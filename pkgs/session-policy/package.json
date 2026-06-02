@@ -1,0 +1,21 @@
+{
+  "name": "@mosoo/session-policy",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "vp lint .",
+    "test": "vp exec bun test tests",
+    "tc": "vp exec tsc --noEmit"
+  },
+  "dependencies": {
+    "@mosoo/contracts": "workspace:*",
+    "@mosoo/runtime-catalog": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite-plus": "^0.1.23"
+  }
+}

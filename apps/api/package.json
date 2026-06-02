@@ -1,0 +1,52 @@
+{
+  "name": "@mosoo/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp exec bun bin/dev-local.ts",
+    "deploy": "vp exec bun bin/deploy-prod.ts",
+    "env:init": "vp exec bun bin/init-dev-vars.ts",
+    "cf:types": "mkdir -p .tmp/.config .tmp/types && XDG_CONFIG_HOME=$PWD/.tmp/.config vp exec wrangler types .tmp/types/worker-configuration.d.ts",
+    "db:migrate:local": "vp exec wrangler d1 migrations apply DB --local",
+    "lint": "vp lint .",
+    "tc": "vp run cf:types && vp exec tsc --noEmit",
+    "test": "vp exec bun test tests"
+  },
+  "dependencies": {
+    "@cloudflare/ai-chat": "^0.7.2",
+    "@cloudflare/codemode": "^0.3.4",
+    "@cloudflare/sandbox": "0.10.3",
+    "@larksuiteoapi/node-sdk": "^1.66.0",
+    "@mosoo/ag-ui-session": "workspace:*",
+    "@mosoo/agent-package": "workspace:*",
+    "@mosoo/contracts": "workspace:*",
+    "@mosoo/db": "workspace:*",
+    "@mosoo/development-auth": "workspace:*",
+    "@mosoo/driver-protocol": "workspace:*",
+    "@mosoo/effects": "workspace:*",
+    "@mosoo/id": "workspace:*",
+    "@mosoo/observability": "workspace:*",
+    "@mosoo/runtime-catalog": "workspace:*",
+    "@mosoo/runtime-events": "workspace:*",
+    "@mosoo/session-policy": "workspace:*",
+    "@mosoo/skill-package": "workspace:*",
+    "@orpc/server": "^1.14.3",
+    "agents": "^0.13.3",
+    "ai": "^6.0.193",
+    "arktype": "^2.2.0",
+    "better-auth": "^1.6.13",
+    "drizzle-orm": "^0.45.2",
+    "fflate": "^0.8.3",
+    "graphql": "^16.13.2",
+    "graphql-yoga": "^5.21.0",
+    "hono": "^4.12.19",
+    "xstate": "^5.32.0",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "typescript": "^6.0.3",
+    "vite-plus": "^0.1.23",
+    "wrangler": "^4.92.0"
+  }
+}

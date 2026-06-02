@@ -1,0 +1,49 @@
+{
+  "name": "@mosoo/contracts",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./account": "./src/account/account.contract.ts",
+    "./agent-builder": "./src/agent-builder/agent-builder-planner.contract.ts",
+    "./agent-config-change-plan": "./src/agent/agent-config-change-plan.contract.ts",
+    "./agent": "./src/agent/agent.contract.ts",
+    "./agent-manifest": "./src/agent/agent-manifest.contract.ts",
+    "./agent-manifest-parser": "./src/agent/agent-manifest-parser.contract.ts",
+    "./agent-manifest-serializer": "./src/agent/agent-manifest-serializer.contract.ts",
+    "./app-info": "./src/metadata/app-info.contract.ts",
+    "./auth": "./src/auth/auth.contract.ts",
+    "./channel": "./src/channel/channel.contract.ts",
+    "./driver-instance": "./src/runtime/driver-instance.contract.ts",
+    "./environment": "./src/environment/environment.contract.ts",
+    "./file": "./src/file/file.contract.ts",
+    "./mcp": "./src/mcp/mcp.contract.ts",
+    "./models": "./models/index.ts",
+    "./operation-result": "./src/transport/operation-result.contract.ts",
+    "./permission": "./src/permission/permission.contract.ts",
+    "./public-api": "./src/http/public-api.contract.ts",
+    "./id": "./src/id/id.contract.ts",
+    "./runtime-command": "./src/runtime/runtime-command.contract.ts",
+    "./sandbox": "./src/runtime/sandbox.contract.ts",
+    "./session": "./src/session/session.contract.ts",
+    "./session-run": "./src/session/session-run.contract.ts",
+    "./skill": "./src/skill/skill.contract.ts",
+    "./space": "./src/space/space.contract.ts",
+    "./validation": "./src/validation/primitives.contract.ts",
+    "./vendor-credential": "./src/vendor-credential/vendor-credential.contract.ts",
+    "./organization": "./src/organization/organization.contract.ts"
+  },
+  "scripts": {
+    "lint": "vp lint .",
+    "test": "vp exec bun test tests",
+    "tc": "vp exec tsc --noEmit"
+  },
+  "dependencies": {
+    "@mosoo/id": "workspace:*",
+    "arktype": "^2.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite-plus": "^0.1.23"
+  }
+}

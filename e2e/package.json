@@ -1,0 +1,14 @@
+{
+  "name": "@mosoo/e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "tc": "vp exec tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/bun": "^1.3.14",
+    "@types/node": "^25.8.0",
+    "typescript": "^6.0.3"
+  }
+}

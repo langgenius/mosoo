@@ -1,0 +1,450 @@
+import {
+  createPublicApiPlatformIdSchema,
+  PUBLIC_API_PREFIX,
+  PUBLISHED_AGENT_API_PREFIX,
+  PUBLISHED_AGENT_THREADS_MAX_LIMIT,
+  PUBLISHED_THREAD_EVENTS_DEFAULT_LIMIT,
+  PUBLISHED_THREAD_EVENTS_MAX_LIMIT,
+  PUBLIC_API_VERSION,
+} from "@mosoo/contracts/public-api";
+
+import { createPublishedAgentOpenApiComponents } from "./published-agent-openapi-components";
+
+type HttpMethod = "delete" | "get" | "post";
+
+interface OpenApiParameter {
+  description?: string;
+  example?: unknown;
+  in: "header" | "path" | "query";
+  name: string;
+  required?: boolean;
+  schema: Record<string, unknown>;
+}
+
+interface OpenApiOperation {
+  description?: string;
+  parameters?: OpenApiParameter[];
+  requestBody?: Record<string, unknown>;
+  responses: Record<string, unknown>;
+  security?: Array<Record<string, []>>;
+  summary: string;
+}
+
+type OpenApiPaths = Record<string, Partial<Record<HttpMethod, OpenApiOperation>>>;
+
+interface PublishedAgentOpenApiDocument {
+  components: ReturnType<typeof createPublishedAgentOpenApiComponents>;
+  info: {
+    description: string;
+    title: string;
+    version: typeof PUBLIC_API_VERSION;
+  };
+  openapi: "3.1.0";
+  paths: OpenApiPaths;
+  security: { publicApiBearer: [] }[];
+  servers: { url: string }[];
+}
+
+const EXAMPLE_AGENT_ID = "01J00000000000000000000001";
+const EXAMPLE_THREAD_ID = "01J00000000000000000000009";
+const EXAMPLE_ACCOUNT_ID = "01J00000000000000000000002";
+const EXAMPLE_FILE_ID = "01J0000000000000000000000J";
+const HUMAN_PAT_SECURITY: Array<Record<string, []>> = [{ personalAccessToken: [] }];
+
+const EXAMPLE_SESSION_FILE = {
+  committed: true,
+  createdAt: "2026-05-19T00:02:00.000Z",
+  id: EXAMPLE_FILE_ID,
+  kind: "attachment",
+  mimeType: "text/plain",
+  name: "brief.txt",
+  size: 19,
+};
+
+function platformIdPathParameter(input: {
+  description: string;
+  example: string;
+  name: string;
+}): OpenApiParameter {
+  return {
+    description: input.description,
+    example: input.example,
+    in: "path",
+    name: input.name,
+    required: true,
+    schema: {
+      ...createPublicApiPlatformIdSchema({ example: input.example }),
+      "x-default": input.example,
+    },
+  };
+}
+
+const exampleAgentIdParameter = platformIdPathParameter({
+  description: "Published Agent ID from the Agent's API Access panel. v1 IDs are bare ULIDs.",
+  example: EXAMPLE_AGENT_ID,
+  name: "agentId",
+});
+
+const threadIdParameter = platformIdPathParameter({
+  description: "Thread ID returned by create thread. v1 IDs are bare ULIDs.",
+  example: EXAMPLE_THREAD_ID,
+  name: "threadId",
+});
+
+const fileIdParameter = platformIdPathParameter({
+  description: "File ID returned by add or list Thread files. v1 IDs are bare ULIDs.",
+  example: EXAMPLE_FILE_ID,
+  name: "fileId",
+});
+
+const idempotencyKeyParameter = {
+  description:
+    "Optional key for retry-safe create-thread and send-events calls. Reusing the same key with the same request returns the original response. Reusing the key while the original request is still processing returns 409.",
+  example: "thread-20260528-linear-eng-123",
+  in: "header",
+  name: "Idempotency-Key",
+  schema: { maxLength: 128, type: "string" },
+} satisfies OpenApiParameter;
+
+const threadEventsLimitParameter = {
+  description: "Maximum number of latest Thread events to return.",
+  example: PUBLISHED_THREAD_EVENTS_DEFAULT_LIMIT,
+  in: "query",
+  name: "limit",
+  schema: {
+    default: PUBLISHED_THREAD_EVENTS_DEFAULT_LIMIT,
+    maximum: PUBLISHED_THREAD_EVENTS_MAX_LIMIT,
+    minimum: 1,
+    type: "integer",
+  },
+} satisfies OpenApiParameter;
+
+const standardResponses = {
+  "400": {
+    $ref: "#/components/responses/InvalidRequest",
+  },
+  "401": {
+    $ref: "#/components/responses/Unauthenticated",
+  },
+  "403": {
+    $ref: "#/components/responses/Forbidden",
+  },
+  "404": {
+    $ref: "#/components/responses/NotFound",
+  },
+  "409": {
+    $ref: "#/components/responses/Conflict",
+  },
+  "429": {
+    $ref: "#/components/responses/RateLimited",
+  },
+  "500": {
+    $ref: "#/components/responses/InternalError",
+  },
+};
+
+function jsonRequestBody(schema: Record<string, unknown>, example?: unknown) {
+  return {
+    content: {
+      "application/json": {
+        schema,
+        ...(example === undefined ? {} : { example }),
+      },
+    },
+    required: true,
+  };
+}
+
+function jsonRequestBodyExamples(
+  schema: Record<string, unknown>,
+  examples: Record<string, { summary: string; value: unknown }>,
+) {
+  return {
+    content: {
+      "application/json": {
+        examples,
+        schema,
+      },
+    },
+    required: true,
+  };
+}
+
+function jsonResponse(description: string, schema: Record<string, unknown>, example?: unknown) {
+  return {
+    content: {
+      "application/json": {
+        ...(example === undefined ? {} : { example }),
+        schema,
+      },
+    },
+    description,
+  };
+}
+
+function idempotentJsonResponse(description: string, schema: Record<string, unknown>) {
+  return {
+    ...jsonResponse(description, schema),
+    headers: {
+      "Idempotency-Replayed": {
+        description:
+          "Present as true when this response is replayed from a previous completed request.",
+        schema: { const: "true", type: "string" },
+      },
+    },
+  };
+}
+
+function okResponse(description: string) {
+  return jsonResponse(description, {
+    properties: {
+      ok: { const: true },
+    },
+    required: ["ok"],
+    type: "object",
+  });
+}
+
+function operation(
+  input: Omit<OpenApiOperation, "responses"> & {
+    success: Record<string, unknown>;
+    responses?: Record<string, unknown>;
+  },
+): OpenApiOperation {
+  const { responses, success, ...operationInput } = input;
+
+  return {
+    ...operationInput,
+    responses: {
+      ...success,
+      ...standardResponses,
+      ...responses,
+    },
+  };
+}
+
+export function createPublishedAgentOpenApiDocument(origin: string): PublishedAgentOpenApiDocument {
+  const paths = {
+    "/agents/{agentId}/threads": {
+      get: operation({
+        description: "Returns Threads created by the authenticated Personal Access Token caller.",
+        parameters: [
+          exampleAgentIdParameter,
+          { in: "query", name: "archived", schema: { type: "boolean" } },
+        ],
+        success: {
+          "200": jsonResponse("Thread list.", {
+            properties: {
+              threads: {
+                items: { $ref: "#/components/schemas/ThreadSummary" },
+                maxItems: PUBLISHED_AGENT_THREADS_MAX_LIMIT,
+                type: "array",
+              },
+            },
+            required: ["threads"],
+            type: "object",
+          }),
+        },
+        security: HUMAN_PAT_SECURITY,
+        summary: "List Threads for a published Agent",
+      }),
+      post: operation({
+        description:
+          "Creates a Thread, the backing AgentSession, and the initial Run. Human PAT callers are implicitly attributed to the PAT owner. Organization Service tokens may omit human attribution or pass attributed_user_id when the token is allowed to do so.",
+        parameters: [exampleAgentIdParameter, idempotencyKeyParameter],
+        requestBody: jsonRequestBodyExamples(
+          { $ref: "#/components/schemas/CreateThreadRequest" },
+          {
+            humanPatWithFile: {
+              summary: "Human PAT with an uploaded file",
+              value: {
+                client_external_ref: "linear-ENG-123",
+                files: [{ file_id: EXAMPLE_FILE_ID }],
+                input: {
+                  content: [
+                    {
+                      text: "Summarize the attached launch plan and list follow-ups.",
+                      type: "text",
+                    },
+                  ],
+                  type: "user.message",
+                },
+              },
+            },
+            serviceTokenNoAttribution: {
+              summary: "Service token without human attribution",
+              value: {
+                client_external_ref: "cron-nightly-check",
+                input: {
+                  content: [{ text: "Run the nightly checklist.", type: "text" }],
+                  type: "user.message",
+                },
+              },
+            },
+            serviceTokenWithAttribution: {
+              summary: "Service token projecting work to a bound user",
+              value: {
+                attributed_user_id: EXAMPLE_ACCOUNT_ID,
+                client_external_ref: "support-ticket-182",
+                input: {
+                  content: [{ text: "Triage this customer escalation.", type: "text" }],
+                  type: "user.message",
+                },
+              },
+            },
+            cattleAgentSameShape: {
+              summary: "Cattle Agent using the same request shape",
+              value: {
+                input: {
+                  content: [{ text: "Run this one-off published Agent Thread.", type: "text" }],
+                  type: "user.message",
+                },
+              },
+            },
+          },
+        ),
+        success: {
+          "201": idempotentJsonResponse("Created Thread.", {
+            $ref: "#/components/schemas/CreateThreadResponse",
+          }),
+        },
+        summary: "Create a Thread for a published Agent",
+      }),
+    },
+    "/threads/{threadId}": {
+      delete: operation({
+        parameters: [threadIdParameter],
+        security: HUMAN_PAT_SECURITY,
+        success: {
+          "200": okResponse("Deleted."),
+        },
+        summary: "Delete a Thread",
+      }),
+      get: operation({
+        parameters: [threadIdParameter],
+        success: {
+          "200": jsonResponse("Thread summary.", {
+            $ref: "#/components/schemas/RetrieveThreadResponse",
+          }),
+        },
+        summary: "Retrieve Thread summary",
+      }),
+    },
+    "/threads/{threadId}/archive": {
+      post: operation({
+        parameters: [threadIdParameter],
+        security: HUMAN_PAT_SECURITY,
+        success: {
+          "200": okResponse("Archived."),
+        },
+        summary: "Archive a Thread",
+      }),
+    },
+    "/threads/{threadId}/events": {
+      get: operation({
+        description:
+          "Returns the latest public event log entries for this Thread in chronological order. This is the stable read surface for CLI and API consumers; it does not expose raw runtime payloads, transcript, diagnostics, or streaming.",
+        parameters: [threadIdParameter, threadEventsLimitParameter],
+        success: {
+          "200": jsonResponse("Thread event list.", {
+            $ref: "#/components/schemas/ThreadEventListResponse",
+          }),
+        },
+        summary: "List Thread events",
+      }),
+      post: operation({
+        parameters: [threadIdParameter, idempotencyKeyParameter],
+        requestBody: jsonRequestBody(
+          {
+            $ref: "#/components/schemas/SendEventsRequest",
+          },
+          {
+            events: [
+              {
+                text: "Say hello from the API.",
+                type: "user_message",
+              },
+            ],
+          },
+        ),
+        success: {
+          "200": idempotentJsonResponse("Accepted event batch.", {
+            $ref: "#/components/schemas/SendEventsResponse",
+          }),
+        },
+        security: HUMAN_PAT_SECURITY,
+        summary: "Send user messages, permission decisions, or interrupts to a Thread",
+      }),
+    },
+    "/threads/{threadId}/files": {
+      get: operation({
+        parameters: [threadIdParameter],
+        security: HUMAN_PAT_SECURITY,
+        success: {
+          "200": jsonResponse(
+            "Thread file list.",
+            { $ref: "#/components/schemas/ThreadFileListResponse" },
+            { files: [EXAMPLE_SESSION_FILE] },
+          ),
+        },
+        summary: "List Thread files",
+      }),
+      post: operation({
+        description:
+          "Claims a ready draft file handle into this Thread. Upload file bytes through the files data plane first, then pass the resulting fileId here.",
+        parameters: [threadIdParameter],
+        security: HUMAN_PAT_SECURITY,
+        requestBody: jsonRequestBody(
+          {
+            $ref: "#/components/schemas/CreateThreadFileRequest",
+          },
+          {
+            fileId: EXAMPLE_SESSION_FILE.id,
+          },
+        ),
+        success: {
+          "201": jsonResponse(
+            "Created Thread file.",
+            { $ref: "#/components/schemas/ThreadFileResponse" },
+            { file: EXAMPLE_SESSION_FILE },
+          ),
+        },
+        summary: "Add a Thread file",
+      }),
+    },
+    "/threads/{threadId}/files/{fileId}": {
+      delete: operation({
+        parameters: [threadIdParameter, fileIdParameter],
+        security: HUMAN_PAT_SECURITY,
+        success: {
+          "200": okResponse("Removed."),
+        },
+        summary: "Remove a Thread file",
+      }),
+    },
+    "/threads/{threadId}/unarchive": {
+      post: operation({
+        parameters: [threadIdParameter],
+        security: HUMAN_PAT_SECURITY,
+        success: {
+          "200": okResponse("Unarchived."),
+        },
+        summary: "Unarchive a Thread",
+      }),
+    },
+  } satisfies OpenApiPaths;
+
+  return {
+    components: createPublishedAgentOpenApiComponents(),
+    info: {
+      description:
+        "Public HTTPS API for creating and retrieving Threads on published Mosoo Agents. v1 resource identifiers are bare ULIDs, not prefixed IDs. Human PATs identify an account caller; Organization Service tokens identify machine callers with selected-Agent allowlists. Runtime execution resolves the published Agent owner's capabilities while attribution controls Thread projection.",
+      title: "Mosoo Published Agent API",
+      version: PUBLIC_API_VERSION,
+    },
+    openapi: "3.1.0",
+    paths,
+    security: [{ publicApiBearer: [] }],
+    servers: [{ url: `${origin}${PUBLIC_API_PREFIX}${PUBLISHED_AGENT_API_PREFIX}` }],
+  };
+}

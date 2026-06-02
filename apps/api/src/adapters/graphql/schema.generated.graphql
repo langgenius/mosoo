@@ -1,0 +1,2450 @@
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+input AcceptOrganizationInvitationInput {
+  invitationId: ULID!
+}
+
+type Account {
+  email: String!
+  id: ULID!
+  imageUrl: String
+  name: String!
+  systemAgentModel: SystemAgentModelSetting
+}
+
+input AddAgentCollaboratorInput {
+  agentId: ULID!
+  principal: String!
+  role: AgentCollaboratorRole!
+}
+
+input AddCollaboratorInput {
+  email: String!
+  role: SpaceRole!
+  spaceId: ULID!
+}
+
+input AddOrganizationCollaboratorInput {
+  spaceId: ULID!
+}
+
+input AddSessionResourceFileInput {
+  contentType: String!
+  name: String!
+  size: Int!
+}
+
+input AddSessionResourceInput {
+  file: AddSessionResourceFileInput!
+  sessionId: ULID!
+}
+
+type Agent {
+  createdAt: String!
+  description: String
+  id: ULID!
+  kind: AgentKind!
+  liveVersion: AgentDeploymentVersion
+  model: String!
+  name: String!
+  organizationId: ULID!
+  packageSharingEnabled: Boolean!
+  prompt: String!
+  provider: String!
+  runtimeId: String!
+  skills: [AgentSkillReference!]!
+  status: AgentStatus!
+  updatedAt: String!
+  visibility: AgentVisibility!
+}
+
+type AgentBuilderMessage {
+  cardsJson: String
+  contentText: String!
+  createdAt: String!
+  createdByAccountId: ULID
+  id: ULID!
+  inputKind: String
+  plannerRunId: ULID
+  role: AgentBuilderMessageRole!
+  seq: Int!
+  threadId: ULID!
+}
+
+enum AgentBuilderMessageRole {
+  assistant
+  system
+  tool
+  user
+}
+
+type AgentBuilderThread {
+  agentId: ULID!
+  createdAt: String!
+  creatorAccountId: ULID!
+  id: ULID!
+  lastTurnAt: String
+  organizationId: ULID!
+  status: AgentBuilderThreadStatus!
+  title: String
+  updatedAt: String!
+}
+
+enum AgentBuilderThreadStatus {
+  active
+  archived
+}
+
+type AgentChannelBinding {
+  activityLastTriggeredAt: String
+  activitySessionCount7d: Int!
+  agentId: ULID!
+  createdAt: String!
+  displayMetadata: PrimitiveRecord!
+  externalBotId: String!
+  externalTenantId: String!
+  id: ULID!
+  lastErrorCode: String
+  provider: ChannelProvider!
+  status: AgentChannelBindingStatus!
+  updatedAt: String!
+}
+
+enum AgentChannelBindingStatus {
+  active
+  error
+}
+
+type AgentCollaborator {
+  email: String
+  imageUrl: String
+  name: String
+  principal: String!
+  role: AgentCollaboratorRole!
+}
+
+enum AgentCollaboratorRole {
+  admin
+  user
+}
+
+type AgentCostCard {
+  agentId: ULID!
+  agentName: String!
+  agents: [CostAgentRow!]!
+  daily: [CostDailyPoint!]!
+  models: [CostModelRow!]!
+  ownerId: ULID!
+  ownerName: String!
+  recentSessions: [CostRecentSession!]!
+  totals: CostTotals!
+  users: [CostUserRow!]!
+}
+
+type AgentDeploymentVersion {
+  agentId: ULID!
+  createdAt: String!
+  createdByAccountId: ULID!
+  environmentId: ULID
+  id: ULID!
+  isLive: Boolean!
+  kind: AgentKind!
+  model: String!
+  provider: String!
+  runtimeId: String!
+  summary: String!
+  versionNumber: Int!
+}
+
+type AgentDetail {
+  createdAt: String!
+  description: String
+  id: ULID!
+  kind: AgentKind!
+  liveVersion: AgentDeploymentVersion
+  model: String!
+  name: String!
+  organizationId: ULID!
+  owner: AgentOwnerSummary!
+  packageSharingEnabled: Boolean!
+  prompt: String!
+  provider: String!
+  runtimeId: String!
+  skills: [AgentSkillReference!]!
+  status: AgentStatus!
+  tools: [AgentToolSummary!]!
+  updatedAt: String!
+  versions: [AgentDeploymentVersion!]!
+  viewerRole: AgentViewerRole!
+  visibility: AgentVisibility!
+}
+
+type AgentEditorState {
+  collaborators: [AgentCollaborator!]!
+  environment: AgentEnvironmentConfig!
+  id: ULID!
+  mcpBindings: [AgentMcpBinding!]!
+  packageResolution: AgentPackageResolutionState
+  readiness: AgentReadiness!
+}
+
+type AgentEnvironmentConfig {
+  agentsFileId: ULID
+  boundSpaceIds: [ULID!]!
+  environmentId: ULID
+}
+
+input AgentEnvironmentConfigInput {
+  agentsFileId: ULID
+  boundSpaceIds: [ULID!]!
+  environmentId: ULID
+}
+
+type AgentFileContent {
+  agentId: ULID!
+  content: String
+  mimeType: String!
+  name: String!
+  path: String!
+  preview: AgentFilePreview!
+  sandboxId: ULID!
+  sizeBytes: Int!
+}
+
+type AgentFileEntry {
+  kind: AgentFileEntryKind!
+  mimeType: String
+  name: String!
+  path: String!
+  persistence: AgentFilePersistence!
+  preview: AgentFilePreview!
+  session: AgentFileSessionNode
+  sizeBytes: Int!
+  space: AgentFileSpaceMountNode
+}
+
+enum AgentFileEntryKind {
+  directory
+  file
+  space_mount
+  symlink
+}
+
+enum AgentFilePersistence {
+  persistent
+  temporary
+}
+
+enum AgentFilePreview {
+  binary
+  empty
+  large_text
+  text
+}
+
+enum AgentFileSandboxStatus {
+  active
+  backing_up
+  cold
+  destroying
+  error
+  missing
+  restoring
+  unsupported
+}
+
+type AgentFileSessionNode {
+  active: Boolean!
+  id: ULID!
+  status: SessionStatus!
+  title: String
+  updatedAt: String!
+}
+
+type AgentFileSpaceMountNode {
+  path: String!
+  spaceId: ULID!
+  spaceName: String!
+  url: String!
+}
+
+type AgentFileTree {
+  agentId: ULID!
+  entries: [AgentFileEntry!]!
+  lastError: String
+  path: String!
+  sandboxId: ULID
+  sandboxStatus: AgentFileSandboxStatus!
+  totalCount: Int!
+  truncated: Boolean!
+}
+
+enum AgentKind {
+  cattle
+  pet
+}
+
+type AgentManifestExport {
+  agentId: ULID!
+  json: String!
+  yaml: String!
+}
+
+type AgentMcpBinding {
+  authType: McpAuthType!
+  authorizationState: McpAuthorizationState!
+  createdAt: String!
+  credentialMode: AgentMcpCredentialMode!
+  credentialScope: McpCredentialScope!
+  credentialStatus: McpCredentialStatus!
+  credentialSubject: String
+  enabled: Boolean!
+  hasSharedCredential: Boolean!
+  iconUrl: String
+  id: ULID!
+  name: String!
+  serverId: ULID!
+  source: McpServerSource!
+  updatedAt: String!
+  url: String!
+}
+
+enum AgentMcpCredentialMode {
+  agent_bound
+  runtime_resolved
+}
+
+type AgentOwnerSummary {
+  id: ULID!
+  imageUrl: String
+  name: String
+}
+
+type AgentPackageExport {
+  agentId: ULID!
+  contentType: String!
+  fileId: ULID!
+  fileName: String!
+  manifestYaml: String!
+  size: Int!
+}
+
+type AgentPackageImportResult {
+  agent: Agent!
+  resolution: AgentPackageResolutionReport!
+}
+
+type AgentPackageResolutionReport {
+  issues: [AgentResolutionIssue!]!
+  summary: AgentPackageResolutionSummary!
+}
+
+enum AgentPackageResolutionSource {
+  fork
+  import
+}
+
+type AgentPackageResolutionState {
+  recordedAt: String!
+  report: AgentPackageResolutionReport!
+  source: AgentPackageResolutionSource!
+}
+
+type AgentPackageResolutionSummary {
+  boundMcpServerCount: Int!
+  boundSkillCount: Int!
+  boundSpaceCount: Int!
+  copiedAssetCount: Int!
+  createdMcpServerCount: Int!
+  reusedMcpServerCount: Int!
+}
+
+type AgentReadiness {
+  checkedAt: String!
+  issues: [AgentReadinessIssue!]!
+  ready: Boolean!
+}
+
+type AgentReadinessIssue {
+  code: String!
+  message: String!
+  severity: AgentReadinessSeverity!
+}
+
+enum AgentReadinessSeverity {
+  error
+  warning
+}
+
+type AgentResolutionIssue {
+  actionLabel: String
+  code: String!
+  message: String!
+  required: Boolean!
+  severity: AgentResolutionSeverity!
+  status: AgentResolutionStatus!
+  targetLabel: String
+  targetType: AgentResolutionTargetType!
+}
+
+enum AgentResolutionSeverity {
+  error
+  info
+  warning
+}
+
+enum AgentResolutionStatus {
+  missing
+  needs_reconnect
+  permission_denied
+  resolved
+  unavailable
+  unsupported
+  warning
+}
+
+enum AgentResolutionTargetType {
+  agent
+  agents_md
+  channel
+  environment
+  mcp_server
+  model
+  provider
+  runtime
+  skill
+  space
+}
+
+type AgentRuntimeEvent {
+  createdAt: String!
+  cursor: String!
+  eventType: String!
+  family: AgentRuntimeEventFamily!
+  id: ULID!
+  occurredAt: String!
+  sessionId: ULID!
+  source: AgentRuntimeEventSource!
+  summary: String!
+  visibility: AgentRuntimeEventVisibility!
+}
+
+type AgentRuntimeEventConnection {
+  nodes: [AgentRuntimeEvent!]!
+  pageInfo: AgentRuntimeEventPageInfo!
+}
+
+enum AgentRuntimeEventFamily {
+  config
+  diagnostics
+  driver
+  file
+  input
+  lifecycle
+  message
+  permission
+  provisioning
+  resource
+  run
+  sandbox
+  state
+  tool
+  transport
+  usage
+}
+
+type AgentRuntimeEventPageInfo {
+  endCursor: String
+  hasMore: Boolean!
+  startCursor: String
+}
+
+enum AgentRuntimeEventSource {
+  api
+  driver
+  file
+  system
+  viewer
+}
+
+enum AgentRuntimeEventVisibility {
+  all_consumers
+  owner_debug
+}
+
+type AgentSessionActionCapability {
+  action: AgentSessionActionCapabilityName!
+  reason: String
+  status: AgentSessionActionCapabilityStatus!
+}
+
+enum AgentSessionActionCapabilityName {
+  add_session_resource
+  archive_session
+  connect_stream
+  create_session
+  delete_session
+  list_session_resources
+  permission_decision
+  remove_session_resource
+  retrieve_session
+  send_user_message
+  unarchive_session
+  user_interrupt
+}
+
+enum AgentSessionActionCapabilityStatus {
+  available
+  degraded
+  unavailable
+}
+
+type AgentSessionDiagnostics {
+  execution: AgentSessionExecutionDiagnostics
+  generatedAt: String!
+  nativeRuntimeRef: AgentSessionNativeRuntimeRefDiagnostics!
+  pendingPermissionCount: Int!
+  session: Session!
+}
+
+type AgentSessionEventBatch {
+  acceptedAt: String!
+  events: [AgentSessionEventResult!]!
+  session: Session!
+  warnings: [UserWarning!]!
+}
+
+input AgentSessionEventInput {
+  attachmentIds: [ULID!]
+  clientRequestId: String
+  decision: AgentSessionPermissionDecision
+  requestId: String
+  runId: ULID
+  text: String
+  type: AgentSessionEventType!
+}
+
+type AgentSessionEventResult {
+  clientRequestId: String
+  run: SessionRun
+  type: AgentSessionEventType!
+}
+
+enum AgentSessionEventType {
+  permission_decision
+  user_interrupt
+  user_message
+}
+
+type AgentSessionExecutionDiagnostics {
+  binding: SessionExecutionBinding!
+  skills: [SessionExecutionSkillReference!]!
+  spaces: [SessionExecutionSpaceReference!]!
+  tools: [SessionExecutionToolReference!]!
+}
+
+type AgentSessionNativeRuntimeRefDiagnostics {
+  kind: String
+  runtimeId: String
+  status: String!
+  valuePreview: String
+}
+
+enum AgentSessionPermissionDecision {
+  allow_once
+  reject_once
+}
+
+type AgentSessionRecoverability {
+  reason: String
+  status: AgentSessionRecoverabilityStatus!
+}
+
+enum AgentSessionRecoverabilityStatus {
+  not_recoverable
+  read_only
+  resumable
+}
+
+type AgentSessionRetrieve {
+  capabilities: [AgentSessionActionCapability!]!
+  recoverability: AgentSessionRecoverability!
+  session: Session!
+}
+
+type AgentSessionRetrieveConnection {
+  nodes: [AgentSessionRetrieve!]!
+  pageInfo: SessionListPageInfo!
+}
+
+type AgentSkillReference {
+  ownerName: String
+  skillId: ULID!
+  skillName: String!
+  state: AgentSkillState!
+}
+
+enum AgentSkillState {
+  active
+  tombstone
+}
+
+enum AgentStatus {
+  draft
+  published
+}
+
+type AgentSummary {
+  createdAt: String!
+  description: String
+  id: ULID!
+  kind: AgentKind!
+  name: String!
+  organizationId: ULID!
+  owner: AgentOwnerSummary!
+  runtimeId: String!
+  status: AgentStatus!
+  tools: [AgentToolSummary!]!
+  updatedAt: String!
+  viewerRole: AgentViewerRole!
+  visibility: AgentVisibility!
+}
+
+type AgentToolSummary {
+  enabled: Boolean!
+  iconUrl: String
+  name: String!
+  serverId: ULID!
+}
+
+enum AgentViewerRole {
+  admin
+  none
+  owner
+  user
+}
+
+enum AgentVisibility {
+  organization
+  private
+}
+
+type AppInfo {
+  api: String!
+  name: String!
+  runtime: String!
+}
+
+type AuditActor {
+  display: String!
+  id: String
+  type: AuditActorType!
+}
+
+enum AuditActorType {
+  agent
+  api_key
+  system
+  user
+}
+
+type AuditEvent {
+  action: String!
+  actor: AuditActor!
+  after: PrimitiveRecord!
+  before: PrimitiveRecord!
+  correlationId: String
+  id: ULID!
+  ipAddress: String
+  metadata: PrimitiveRecord!
+  outcome: AuditOutcome!
+  resourceDisplay: String
+  resourceId: String
+  resourceType: String!
+  sessionId: ULID
+  timestamp: String!
+  userAgent: String
+}
+
+input AuditEventsFilterInput {
+  organizationId: ULID!
+  outcome: AuditOutcome
+  q: String
+  startMs: Float
+}
+
+enum AuditOutcome {
+  denied
+  failure
+  success
+}
+
+enum AuthMethod {
+  email_otp
+  google_oauth
+}
+
+enum AuthSecurityLevel {
+  basic
+  strong
+  verified_email
+}
+
+input BootstrapOnboardingInput {
+  action: String!
+  kind: OrganizationKind
+  name: String
+  organizationId: ULID
+}
+
+input CancelOrganizationInvitationInput {
+  invitationId: ULID!
+}
+
+enum ChannelProvider {
+  discord
+  lark
+  slack
+  telegram
+  wechat
+}
+
+type Collaborator {
+  assignedBy: ULID
+  createdAt: String!
+  email: String
+  imageUrl: String
+  name: String
+  principal: String!
+  role: SpaceRole!
+}
+
+input ConnectMcpBearerInput {
+  serverId: ULID!
+  subjectLabel: String
+  token: String!
+}
+
+input ConvertPersonalOrganizationInput {
+  organizationId: ULID!
+}
+
+type CostAgentRow implements CostAggregate {
+  activeUsers: Int!
+  agentId: ULID!
+  agentName: String!
+  cacheCreationTokens: Int!
+  cacheReadTokens: Int!
+  debugCostUsd: Float!
+  evalCostUsd: Float!
+  inputTokens: Int!
+  outputTokens: Int!
+  ownerEmail: String
+  ownerId: ULID!
+  ownerName: String!
+  previewCostUsd: Float!
+  previousCostUsd: Float
+  productionCostUsd: Float!
+  requestCount: Int!
+  scheduledCostUsd: Float!
+  totalCostUsd: Float!
+  unpricedRequestCount: Int!
+}
+
+interface CostAggregate {
+  activeUsers: Int!
+  cacheCreationTokens: Int!
+  cacheReadTokens: Int!
+  inputTokens: Int!
+  outputTokens: Int!
+  requestCount: Int!
+  totalCostUsd: Float!
+  unpricedRequestCount: Int!
+}
+
+type CostAttributionCard {
+  agents: [CostAgentRow!]!
+  daily: [CostDailyPoint!]!
+  models: [CostModelRow!]!
+  recentSessions: [CostRecentSession!]!
+  totals: CostTotals!
+}
+
+type CostDailyPoint implements CostAggregate {
+  activeUsers: Int!
+  cacheCreationTokens: Int!
+  cacheReadTokens: Int!
+  date: String!
+  inputTokens: Int!
+  outputTokens: Int!
+  requestCount: Int!
+  totalCostUsd: Float!
+  unpricedRequestCount: Int!
+}
+
+type CostModelRow implements CostAggregate {
+  activeUsers: Int!
+  cacheCreationTokens: Int!
+  cacheReadTokens: Int!
+  cacheReadUsdPerMillion: Float
+  cacheWriteUsdPerMillion: Float
+  inputTokens: Int!
+  inputUsdPerMillion: Float
+  model: String!
+  outputTokens: Int!
+  outputUsdPerMillion: Float
+  provider: String!
+  requestCount: Int!
+  totalCostUsd: Float!
+  unpricedRequestCount: Int!
+  vendor: String!
+}
+
+enum CostRange {
+  LAST_7_DAYS
+  LAST_30_DAYS
+  LAST_90_DAYS
+  MONTH_TO_DATE
+}
+
+type CostRecentSession {
+  actorEmail: String
+  actorName: String!
+  actorUserId: ULID!
+  cacheCreationTokens: Int!
+  cacheReadTokens: Int!
+  createdAt: String!
+  inputTokens: Int!
+  model: String!
+  outputTokens: Int!
+  provider: String!
+  runPurpose: String!
+  sessionId: ULID
+  sessionRunId: ULID
+  totalCostUsd: Float!
+}
+
+enum CostRunPurpose {
+  debug
+  eval
+  preview
+  production
+  scheduled
+}
+
+type CostTotals implements CostAggregate {
+  activeUsers: Int!
+  cacheCreationTokens: Int!
+  cacheReadTokens: Int!
+  inputTokens: Int!
+  outputTokens: Int!
+  requestCount: Int!
+  totalCostUsd: Float!
+  unpricedRequestCount: Int!
+}
+
+type CostUserRow implements CostAggregate {
+  activeUsers: Int!
+  agentCount: Int!
+  cacheCreationTokens: Int!
+  cacheReadTokens: Int!
+  inputTokens: Int!
+  outputTokens: Int!
+  previousCostUsd: Float
+  requestCount: Int!
+  topAgentId: ULID
+  topAgentName: String
+  totalCostUsd: Float!
+  unpricedRequestCount: Int!
+  userEmail: String
+  userId: ULID!
+  userName: String!
+}
+
+input CreateAgentForkInput {
+  agentId: ULID!
+  kind: AgentKind
+}
+
+input CreateAgentInput {
+  description: String
+  kind: AgentKind!
+  model: String!
+  name: String!
+  organizationId: ULID!
+  prompt: String!
+  provider: String!
+  runtimeId: String!
+  skillIds: [ULID!]!
+}
+
+input CreateAgentSessionInput {
+  agentId: ULID!
+  type: SessionType
+  waitForRuntimeReady: Boolean
+}
+
+input CreateDiscordAgentChannelBindingInput {
+  agentId: ULID!
+  applicationId: String!
+  botToken: String!
+  relaySecret: String!
+}
+
+input CreateEnvironmentForkInput {
+  environmentId: ULID!
+}
+
+input CreateEnvironmentInput {
+  allowMcpServers: Boolean!
+  allowPackageManagers: Boolean!
+  allowedHosts: [String!]!
+  description: String
+  envVars: [EnvironmentVariableInput!]!
+  name: String!
+  networkPolicy: EnvironmentNetworkPolicy!
+  organizationId: ULID!
+  packages: [EnvironmentPackageSpecInput!]!
+  setupScript: String!
+}
+
+input CreateLarkAgentChannelBindingInput {
+  agentId: ULID!
+  appId: String!
+  appSecret: String!
+  connectionMode: LarkConnectionMode!
+  domain: LarkDomain!
+  encryptKey: String
+  verificationToken: String
+}
+
+input CreateOrganizationInput {
+  kind: OrganizationKind
+  name: String
+}
+
+input CreateOrganizationMcpServerInput {
+  authType: McpAuthType!
+  credentialScope: McpCredentialScope!
+  description: String
+  iconUrl: String
+  name: String!
+  oauthClientId: String
+  oauthClientSecret: String
+  organizationId: ULID!
+  sharedBearerToken: String
+  url: String!
+}
+
+input CreatePersonalMcpServerInput {
+  authType: McpAuthType!
+  description: String
+  iconUrl: String
+  name: String!
+  oauthClientId: String
+  oauthClientSecret: String
+  organizationId: ULID!
+  url: String!
+}
+
+input CreateSkillForkInput {
+  skillId: ULID!
+}
+
+input CreateSlackAgentChannelBindingInput {
+  agentId: ULID!
+  appLevelToken: String
+  botToken: String!
+  signingSecret: String!
+  threadRepliesRequireMention: Boolean
+}
+
+input CreateSpaceDirectoryInput {
+  name: String!
+  path: String
+  spaceId: ULID!
+}
+
+input CreateSpaceInput {
+  name: String!
+  organizationId: ULID!
+  visibility: SpaceVisibility
+}
+
+input CreateTelegramAgentChannelBindingInput {
+  agentId: ULID!
+  botToken: String!
+  webhookSecret: String!
+}
+
+input CreateVendorCredentialInput {
+  apiBase: String
+  apiKey: String!
+  isDefault: Boolean
+  isPreferred: Boolean
+  models: [String!]
+  name: String!
+  organizationId: ULID!
+  scope: VendorCredentialScope
+  vendorId: String!
+}
+
+enum CreatorMembershipStatus {
+  active
+  disabled
+  removed
+}
+
+type CredentialPolicy {
+  allowedProviderIds: [String!]!
+  byokEnabled: Boolean!
+  organizationId: ULID!
+}
+
+input DeleteAgentChannelBindingInput {
+  bindingId: ULID!
+}
+
+input DeleteAgentInput {
+  agentId: ULID!
+}
+
+input DeleteEnvironmentInput {
+  environmentId: ULID!
+}
+
+input DeleteSpaceEntryInput {
+  key: String!
+  spaceId: ULID!
+}
+
+input DeleteVendorCredentialInput {
+  id: ULID!
+}
+
+type DirectoryEntry {
+  key: String!
+}
+
+type EnvironmentDetail {
+  allowMcpServers: Boolean!
+  allowPackageManagers: Boolean!
+  allowedHosts: [String!]!
+  canDelete: Boolean!
+  canEdit: Boolean!
+  createdAt: String!
+  currentRevisionId: ULID!
+  description: String!
+  envVars: [EnvironmentVariablePreview!]!
+  forkOrigin: EnvironmentForkOrigin
+  id: ULID!
+  isBuiltIn: Boolean!
+  isDefault: Boolean!
+  isEditable: Boolean!
+  name: String!
+  networkPolicy: EnvironmentNetworkPolicy!
+  organizationId: ULID!
+  owner: EnvironmentOwnerSummary!
+  packages: [EnvironmentPackageSpec!]!
+  role: EnvironmentRegistryRole!
+  setupScript: String!
+  shareTargets: [EnvironmentShareTarget!]!
+  updatedAt: String!
+  usedByAgentCount: Int!
+}
+
+type EnvironmentForkOrigin {
+  environmentId: ULID!
+  name: String!
+  ownerName: String!
+}
+
+enum EnvironmentNetworkPolicy {
+  full
+  limited
+}
+
+type EnvironmentOwnerSummary {
+  id: ULID
+  imageUrl: String
+  name: String
+}
+
+enum EnvironmentPackageManager {
+  apt
+  cargo
+  gem
+  go
+  npm
+  pip
+}
+
+type EnvironmentPackageSpec {
+  manager: EnvironmentPackageManager!
+  packages: [String!]!
+}
+
+input EnvironmentPackageSpecInput {
+  manager: EnvironmentPackageManager!
+  packages: [String!]!
+}
+
+enum EnvironmentRegistryRole {
+  owner
+  user
+}
+
+type EnvironmentShareTarget {
+  createdAt: String!
+  email: String
+  id: ULID!
+  kind: EnvironmentShareTargetKind!
+  name: String
+}
+
+enum EnvironmentShareTargetKind {
+  organization
+  user
+}
+
+type EnvironmentSummary {
+  allowMcpServers: Boolean!
+  allowPackageManagers: Boolean!
+  allowedHosts: [String!]!
+  canDelete: Boolean!
+  canEdit: Boolean!
+  createdAt: String!
+  currentRevisionId: ULID!
+  description: String!
+  envVars: [EnvironmentVariablePreview!]!
+  forkOrigin: EnvironmentForkOrigin
+  id: ULID!
+  isBuiltIn: Boolean!
+  isDefault: Boolean!
+  isEditable: Boolean!
+  name: String!
+  networkPolicy: EnvironmentNetworkPolicy!
+  organizationId: ULID!
+  owner: EnvironmentOwnerSummary!
+  packages: [EnvironmentPackageSpec!]!
+  role: EnvironmentRegistryRole!
+  setupScript: String!
+  updatedAt: String!
+  usedByAgentCount: Int!
+}
+
+input EnvironmentVariableInput {
+  key: String!
+  value: String
+}
+
+type EnvironmentVariablePreview {
+  key: String!
+  preview: String!
+  status: EnvironmentVariableStatus!
+}
+
+enum EnvironmentVariableStatus {
+  configured
+  pending
+}
+
+type FileEntry {
+  etag: String
+  id: ULID!
+  key: String!
+  lock: SpaceFileLock
+  mimeType: String
+  size: Int!
+  uploadedAt: String!
+  version: Int!
+}
+
+type FileOwner {
+  id: ULID!
+  kind: FileOwnerKind!
+}
+
+enum FileOwnerKind {
+  account
+  organization
+  session
+  space
+}
+
+enum FilePurpose {
+  agent_asset
+  agent_package
+  organization_avatar
+  organization_draft
+  session_attachment
+  space_file
+}
+
+type FileScope {
+  id: ULID!
+  kind: FileScopeKind!
+}
+
+enum FileScopeKind {
+  agent_package
+  organization_avatar
+  organization_draft
+  session
+  space
+}
+
+enum FileUploadStatus {
+  aborted
+  completed
+  completing
+  expired
+  failed
+  pending
+  uploading
+}
+
+enum FileUploadStrategy {
+  multipart
+  single_put
+}
+
+input ImportAgentPackageInput {
+  fileId: ULID!
+  organizationId: ULID!
+}
+
+input InviteOrganizationMemberInput {
+  email: String!
+  organizationId: ULID!
+}
+
+type LarkAgentChannelRegistration {
+  appId: String
+  appSecret: String
+  deviceCode: String
+  domain: LarkDomain!
+  expireIn: Int
+  interval: Int
+  lastErrorCode: String
+  openId: String
+  qrUrl: String
+  status: LarkAppRegistrationStatus!
+  userCode: String
+}
+
+enum LarkAppRegistrationStatus {
+  access_denied
+  confirmed
+  expired
+  failed
+  qr_pending
+  slow_down
+}
+
+enum LarkConnectionMode {
+  webhook
+  websocket
+}
+
+enum LarkDomain {
+  feishu
+  lark
+}
+
+enum McpAuthType {
+  bearer
+  oauth
+}
+
+enum McpAuthorizationState {
+  active
+  authorization_required
+  disabled
+  expired
+  revoked
+}
+
+enum McpCredentialRecordScope {
+  agent
+  organization_shared
+  user
+}
+
+enum McpCredentialScope {
+  organization_shared
+  user
+}
+
+enum McpCredentialStatus {
+  active
+  expired
+  none
+  revoked
+}
+
+type McpCredentialSummary {
+  authType: McpAuthType!
+  createdAt: String!
+  expiresAt: String
+  id: ULID!
+  scope: McpCredentialRecordScope!
+  scopeValues: [String!]!
+  status: McpCredentialStatus!
+  subjectLabel: String
+  updatedAt: String!
+}
+
+type McpOAuthFlowState {
+  authorizationState: McpAuthorizationState
+  errorMessage: String
+  flowId: ULID!
+  serverId: ULID!
+  status: McpOAuthFlowStatus!
+  subjectLabel: String
+}
+
+enum McpOAuthFlowStatus {
+  expired
+  failed
+  pending
+  succeeded
+}
+
+type McpRegistry {
+  currentUserEmail: String!
+  currentUserId: ULID!
+  currentUserName: String!
+  isAdmin: Boolean!
+  organizationId: ULID!
+  organizationShared: [McpServerWithCredential!]!
+  personal: [McpServerWithCredential!]!
+}
+
+type McpServer {
+  authType: McpAuthType!
+  createdAt: String!
+  credentialScope: McpCredentialScope!
+  description: String
+  enabled: Boolean!
+  hasSharedCredential: Boolean!
+  iconUrl: String
+  id: ULID!
+  name: String!
+  organizationId: ULID!
+  ownerId: ULID!
+  ownerName: String!
+  source: McpServerSource!
+  updatedAt: String!
+  url: String!
+}
+
+enum McpServerSource {
+  organization_shared
+  personal
+}
+
+type McpServerWithCredential {
+  authType: McpAuthType!
+  authorizationState: McpAuthorizationState!
+  createdAt: String!
+  credential: McpCredentialSummary
+  credentialScope: McpCredentialScope!
+  credentialStatus: McpCredentialStatus!
+  description: String
+  enabled: Boolean!
+  hasSharedCredential: Boolean!
+  iconUrl: String
+  id: ULID!
+  name: String!
+  organizationId: ULID!
+  ownerId: ULID!
+  ownerName: String!
+  source: McpServerSource!
+  updatedAt: String!
+  url: String!
+}
+
+type MemberCostCard {
+  owned: CostAttributionCard!
+  used: CostAttributionCard!
+}
+
+enum ModelCatalogSource {
+  custom
+  preset
+}
+
+type Mutation {
+  acceptOrganizationInvitation(input: AcceptOrganizationInvitationInput!): Organization!
+  addAgentCollaborator(input: AddAgentCollaboratorInput!): OperationResult!
+  addCollaborator(input: AddCollaboratorInput!): Collaborator!
+  addOrganizationCollaborator(input: AddOrganizationCollaboratorInput!): Collaborator!
+  addSessionResource(input: AddSessionResourceInput!): SessionResourceUpload!
+  archiveAgentSession(sessionId: ULID!): OperationResult!
+  autoTitleSession(input: RenameSessionInput!): Session!
+  cancelOrganizationInvitation(input: CancelOrganizationInvitationInput!): OrganizationInvitation!
+  clearOrganizationSharedCredential(serverId: ULID!): McpServerWithCredential!
+  connectMcpBearer(input: ConnectMcpBearerInput!): McpServerWithCredential!
+  convertPersonalOrganization(input: ConvertPersonalOrganizationInput!): Organization!
+  createAgent(input: CreateAgentInput!): Agent!
+  createAgentFork(input: CreateAgentForkInput!): AgentPackageImportResult!
+  createAgentSession(input: CreateAgentSessionInput!): Session!
+  createDiscordAgentChannelBinding(input: CreateDiscordAgentChannelBindingInput!): AgentChannelBinding!
+  createEnvironment(input: CreateEnvironmentInput!): EnvironmentSummary!
+  createEnvironmentFork(input: CreateEnvironmentForkInput!): EnvironmentSummary!
+  createLarkAgentChannelBinding(input: CreateLarkAgentChannelBindingInput!): AgentChannelBinding!
+  createOrganization(input: CreateOrganizationInput!): Organization!
+  createOrganizationMcpServer(input: CreateOrganizationMcpServerInput!): McpServerWithCredential!
+  createPersonalMcpServer(input: CreatePersonalMcpServerInput!): McpServerWithCredential!
+  createSkillFork(input: CreateSkillForkInput!): SkillSummary!
+  createSlackAgentChannelBinding(input: CreateSlackAgentChannelBindingInput!): AgentChannelBinding!
+  createSpace(input: CreateSpaceInput!): SpaceView!
+  createSpaceDirectory(input: CreateSpaceDirectoryInput!): DirectoryEntry!
+  createTelegramAgentChannelBinding(input: CreateTelegramAgentChannelBindingInput!): AgentChannelBinding!
+  createVendorCredential(input: CreateVendorCredentialInput!): VendorCredential!
+  deleteAgent(input: DeleteAgentInput!): OperationResult!
+  deleteAgentChannelBinding(input: DeleteAgentChannelBindingInput!): OperationResult!
+  deleteAgentSession(sessionId: ULID!): OperationResult!
+  deleteEnvironment(input: DeleteEnvironmentInput!): OperationResult!
+  deleteMcpServer(serverId: ULID!): OperationResult!
+  deleteOwnedSkill(skillId: ULID!): OperationResult!
+  deleteSpace(spaceId: ULID!): OperationResult!
+  deleteSpaceEntry(input: DeleteSpaceEntryInput!): OperationResult!
+  deleteVendorCredential(input: DeleteVendorCredentialInput!): OperationResult!
+  ensureAgentBuilderThread(agentId: ULID!): AgentBuilderThread!
+  importAgentPackage(input: ImportAgentPackageInput!): AgentPackageImportResult!
+  inviteOrganizationMember(input: InviteOrganizationMemberInput!): OrganizationInvitation!
+  onboardingBootstrap(input: BootstrapOnboardingInput!): OnboardingStatus!
+  pollLarkAgentChannelRegistration(input: PollLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!
+  pollWeChatAgentChannelPairing(input: PollWeChatAgentChannelPairingInput!): WeChatAgentChannelPairing!
+  prewarmAgentSession(sessionId: ULID!): SessionRuntimePrewarmAck!
+  publishAgent(input: PublishAgentInput!): Agent!
+  recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
+  removeAgentCollaborator(input: RemoveAgentCollaboratorInput!): OperationResult!
+  removeCollaborator(input: RemoveCollaboratorInput!): OperationResult!
+  removeOrganizationMember(input: RemoveOrganizationMemberInput!): OperationResult!
+  removeSessionResource(input: RemoveSessionResourceInput!): OperationResult!
+  renameSession(input: RenameSessionInput!): Session!
+  requestOrganizationAccess(input: RequestOrganizationAccessInput!): OrganizationAccessRequest!
+  requestOrganizationInvitation(input: RequestOrganizationInvitationInput!): OrganizationAccessRequest!
+  resetAgentState(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
+  restartDriver(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
+  reviewOrganizationAccessRequest(input: ReviewOrganizationAccessRequestInput!): OrganizationAccessRequest!
+  revokeMcpUserCredential(serverId: ULID!): McpServerWithCredential!
+  sendAgentSessionEvents(events: [AgentSessionEventInput!]!, sessionId: ULID!): AgentSessionEventBatch!
+  setActiveOrganization(input: SetActiveOrganizationInput!): Organization!
+  setEnvironmentVariableValue(input: SetEnvironmentVariableValueInput!): EnvironmentDetail!
+  setMcpServerEnabled(enabled: Boolean!, serverId: ULID!): McpServerWithCredential!
+  setOrganizationDefaultEnvironment(input: SetOrganizationDefaultEnvironmentInput!): EnvironmentSummary!
+  setOrganizationMemberStatus(input: SetOrganizationMemberStatusInput!): OrganizationMember!
+  setOrganizationSharedBearer(input: SetOrganizationSharedMcpBearerInput!): McpServerWithCredential!
+  setSkillAutoEnabled(input: SetSkillAutoEnabledInput!): SkillAutoPreference!
+  setSystemAgentModel(input: SetSystemAgentModelInput!): Account!
+  shareEnvironmentWithOrganization(input: ShareEnvironmentWithOrganizationInput!): EnvironmentShareTarget!
+  shareEnvironmentWithUser(input: ShareEnvironmentWithUserInput!): EnvironmentShareTarget!
+  shareSkillWithOrganization(input: ShareSkillWithOrganizationInput!): SkillShareTarget!
+  shareSkillWithUser(input: ShareSkillWithUserInput!): SkillShareTarget!
+  startLarkAgentChannelRegistration(input: StartLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!
+  startMcpOAuth(input: StartMcpOAuthInput!): StartMcpOAuthPayload!
+  startWeChatAgentChannelPairing(input: StartWeChatAgentChannelPairingInput!): WeChatAgentChannelPairing!
+  testVendorCredential(input: TestVendorCredentialInput!): TestVendorCredentialResult!
+  unarchiveAgentSession(sessionId: ULID!): OperationResult!
+  unpublishAgent(agentId: ULID!): Agent!
+  unshareEnvironmentTarget(input: UnshareEnvironmentTargetInput!): OperationResult!
+  unshareSkillTarget(input: UnshareSkillTargetInput!): OperationResult!
+  updateAgentCollaborator(input: UpdateAgentCollaboratorInput!): OperationResult!
+  updateAgentConfig(input: UpdateAgentConfigInput!): Agent!
+  updateAgentPackageSharing(input: UpdateAgentPackageSharingInput!): Agent!
+  updateCollaborator(input: UpdateCollaboratorInput!): Collaborator!
+  updateCredentialPolicy(input: UpdateCredentialPolicyInput!): CredentialPolicy!
+  updateEnvironment(input: UpdateEnvironmentInput!): EnvironmentDetail!
+  updateOrganizationJoinPolicy(input: UpdateOrganizationJoinPolicyInput!): Organization!
+  updateOrganizationMemberRole(input: UpdateOrganizationMemberRoleInput!): OrganizationMember!
+  updateOrganizationPrimaryDomain(input: UpdateOrganizationPrimaryDomainInput!): Organization!
+  updateOrganizationProfile(input: UpdateOrganizationProfileInput!): Organization!
+  updateProfile(input: UpdateAccountProfileInput!): Account!
+  updateSessionThreadUiState(input: UpdateSessionThreadUiStateInput!): SessionThreadUiState!
+  updateSpace(input: UpdateSpaceInput!): Space!
+  updateVendorCredential(input: UpdateVendorCredentialInput!): VendorCredential!
+}
+
+type OnboardingDiscovery {
+  domain: String!
+  isPublicEmail: Boolean!
+  orgs: [OnboardingDiscoveryOrganization!]!
+}
+
+type OnboardingDiscoveryOrganization {
+  creator: String!
+  id: ULID!
+  joinPolicy: OrganizationJoinPolicy!
+  memberCount: Int!
+  name: String!
+}
+
+type OnboardingStatus {
+  completed: Boolean!
+  organization: Organization
+}
+
+type OperationResult {
+  ok: Boolean!
+}
+
+type Organization {
+  avatarUrl: String
+  createdAt: String!
+  id: ULID!
+  joinPolicy: OrganizationJoinPolicy!
+  kind: OrganizationKind!
+  name: String!
+  primaryDomain: String
+  slug: String!
+  viewerRole: OrganizationMemberRole
+}
+
+type OrganizationAccessRequest {
+  createdAt: String!
+  id: ULID!
+  organizationId: ULID!
+  organizationName: String!
+  referrerAccountId: ULID
+  referrerName: String
+  requestedByAccountId: ULID!
+  requesterEmail: String!
+  requesterName: String!
+  reviewedAt: String
+  reviewedBy: ULID
+  reviewedByName: String
+  status: OrganizationAccessRequestStatus!
+  updatedAt: String!
+}
+
+enum OrganizationAccessRequestDecision {
+  approve
+  reject
+}
+
+enum OrganizationAccessRequestStatus {
+  approved
+  cancelled
+  pending
+  rejected
+}
+
+type OrganizationCostCard {
+  agents: [CostAgentRow!]!
+  daily: [CostDailyPoint!]!
+  models: [CostModelRow!]!
+  ownerUsers: [CostUserRow!]!
+  previousTotals: CostTotals!
+  recentSessions: [CostRecentSession!]!
+  totals: CostTotals!
+  users: [CostUserRow!]!
+}
+
+type OrganizationCreationSlotStatus {
+  occupied: Boolean!
+  organizationId: ULID
+}
+
+type OrganizationInvitation {
+  accountId: ULID
+  createdAt: String!
+  email: String!
+  expiresAt: String
+  id: ULID!
+  invitedBy: ULID!
+  invitedByName: String
+  organizationId: ULID!
+  organizationName: String!
+  status: OrganizationInvitationStatus!
+  updatedAt: String!
+}
+
+enum OrganizationInvitationStatus {
+  accepted
+  cancelled
+  expired
+  pending
+  rejected
+}
+
+enum OrganizationJoinPolicy {
+  auto
+  invite_only
+}
+
+type OrganizationJoinTarget {
+  organization: Organization!
+  organizationId: ULID!
+  organizationName: String!
+  pendingInvitation: OrganizationInvitation
+  pendingRequest: OrganizationAccessRequest
+  viewerIsAuthenticated: Boolean!
+  viewerIsMember: Boolean!
+}
+
+enum OrganizationKind {
+  personal
+  team
+}
+
+type OrganizationMember {
+  accountId: ULID!
+  disabledAt: String
+  disabledByAccountId: ULID
+  email: String!
+  imageUrl: String
+  joinedAt: String!
+  name: String!
+  role: OrganizationMemberRole!
+  status: OrganizationMemberStatus!
+}
+
+enum OrganizationMemberRole {
+  admin
+  member
+  owner
+}
+
+enum OrganizationMemberStatus {
+  active
+  disabled
+}
+
+input PollLarkAgentChannelRegistrationInput {
+  agentId: ULID!
+  deviceCode: String!
+  domain: LarkDomain!
+}
+
+input PollWeChatAgentChannelPairingInput {
+  agentId: ULID!
+  qrToken: String!
+}
+
+scalar PrimitiveRecord
+
+input PublishAgentInput {
+  agentId: ULID!
+  """
+  Omit on re-publish to inherit the agent's current visibility. Required only
+  on the very first publish.
+  """
+  visibility: AgentVisibility
+}
+
+type Query {
+  accessibleAgentList(organizationId: ULID!): [AgentSummary!]!
+  agent(agentId: ULID!): AgentDetail!
+  agentBuilderMessages(agentId: ULID!, beforeSeq: Int, limit: Int): [AgentBuilderMessage!]!
+  agentChannelBindingList(agentId: ULID!): [AgentChannelBinding!]!
+  agentCollaboratorList(agentId: ULID!): [AgentCollaborator!]!
+  agentCostCard(agentId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AgentCostCard!
+  agentEditorState(agentId: ULID!): AgentEditorState!
+  agentFileContent(agentId: ULID!, path: String!): AgentFileContent!
+  agentFileTree(agentId: ULID!, path: String!): AgentFileTree!
+  agentManifest(agentId: ULID!): AgentManifestExport!
+  agentRuntimeEvents(agentId: ULID!, beforeCursor: String, families: [AgentRuntimeEventFamily!], limit: Int!): AgentRuntimeEventConnection!
+  agentSessionDiagnostics(sessionId: ULID!): AgentSessionDiagnostics!
+  agentSessionList(agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, type: SessionType): SessionConnection!
+  agentSessionRetrieve(sessionId: ULID!): AgentSessionRetrieve!
+  appInfo: AppInfo!
+  auditEvents(filter: AuditEventsFilterInput!): [AuditEvent!]!
+  availableAgentModels(currentModelId: String, currentVendorId: String, runtimeId: String!): [ResolvedModelEntry!]!
+  credentialPolicy(organizationId: ULID!): CredentialPolicy!
+  environment(environmentId: ULID!): EnvironmentDetail!
+  exportAgentPackage(agentId: ULID!): AgentPackageExport!
+  listSessionResources(sessionId: ULID!): [SessionResource!]!
+  mcpOAuthFlowStatus(flowId: ULID!): McpOAuthFlowState!
+  mcpRegistry(organizationId: ULID!): McpRegistry!
+  memberCostCard(memberId: ULID!, organizationId: ULID!, range: CostRange!): MemberCostCard!
+  onboardingDiscovery: OnboardingDiscovery!
+  organizationAccessRequestList(organizationId: ULID!): [OrganizationAccessRequest!]!
+  organizationCostCard(organizationId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): OrganizationCostCard!
+  organizationEnvironmentList(organizationId: ULID!): [EnvironmentSummary!]!
+  organizationInvitationList(organizationId: ULID!): [OrganizationInvitation!]!
+  organizationJoinTarget(organizationId: ULID!): OrganizationJoinTarget!
+  organizationMemberList(organizationId: ULID!): [OrganizationMember!]!
+  organizationSkillList(organizationId: ULID!): [SkillSummary!]!
+  ownerCostCard(organizationId: ULID!, ownerUserId: ULID!, range: CostRange!): CostAttributionCard!
+  pendingOrganizationInvitationList: [OrganizationInvitation!]!
+  session(sessionId: ULID!): Session!
+  sessionList(archived: Boolean, beforeCursor: String, limit: Int, organizationId: ULID!, type: SessionType): SessionConnection!
+  sessionMessages(sessionId: ULID!): [SessionMessage!]!
+  sessionProcessEvents(limit: Int, sessionId: ULID!): [SessionProcessEvent!]!
+  sessionThreadUiStateList(organizationId: ULID!): [SessionThreadUiState!]!
+  skillDetail(skillId: ULID!): SkillDetail!
+  skillShareTargetList(skillId: ULID!): [SkillShareTarget!]!
+  space(spaceId: ULID!): Space!
+  spaceCollaboratorList(spaceId: ULID!): [Collaborator!]!
+  spaceFiles(path: String, spaceId: ULID!): SpaceFileListing!
+  spaceList(organizationId: ULID!): [SpaceView!]!
+  threadAgentSessionList(archived: Boolean, beforeCursor: String, limit: Int, organizationId: ULID!, type: SessionType): AgentSessionRetrieveConnection!
+  threadAgentSessionRetrieve(sessionId: ULID!): AgentSessionRetrieve!
+  threadSessionMessages(sessionId: ULID!): [SessionMessage!]!
+  threadSessionProcessEvents(limit: Int, sessionId: ULID!): [SessionProcessEvent!]!
+  vendorCredentialCapabilities(organizationId: ULID!): [VendorCredentialCapability!]!
+  vendorCredentialList(organizationId: ULID!): [VendorCredential!]!
+  viewer: Viewer!
+}
+
+input RemoveAgentCollaboratorInput {
+  agentId: ULID!
+  principal: String!
+}
+
+input RemoveCollaboratorInput {
+  principal: String!
+  spaceId: ULID!
+}
+
+input RemoveOrganizationMemberInput {
+  accountId: ULID!
+  organizationId: ULID!
+}
+
+input RemoveSessionResourceInput {
+  resourceId: ULID!
+  sessionId: ULID!
+}
+
+input RenameSessionInput {
+  sessionId: ULID!
+  title: String!
+}
+
+input RequestOrganizationAccessInput {
+  organizationId: ULID!
+}
+
+input RequestOrganizationInvitationInput {
+  email: String!
+  organizationId: ULID!
+}
+
+type ResolvedModelEntry {
+  available: Boolean!
+  displayName: String!
+  modelId: String!
+  reason: String
+  source: ModelCatalogSource!
+  statusDetail: String
+  statusLabel: String!
+  vendorId: String!
+  vendorLabel: String!
+}
+
+input ReviewOrganizationAccessRequestInput {
+  decision: OrganizationAccessRequestDecision!
+  requestId: ULID!
+}
+
+type RunError {
+  code: String!
+  details: PrimitiveRecord!
+  message: String!
+  retryable: Boolean!
+}
+
+enum RunStatus {
+  booting
+  cancelled
+  completed
+  expired
+  failed
+  queued
+  running
+  waiting_input
+}
+
+enum RuntimeStateOperation {
+  recreateSandbox
+  resetAgentState
+  restartDriver
+}
+
+input RuntimeStateOperationInput {
+  affectedFields: [String!]
+  agentId: ULID!
+  applyActionKind: String
+  targetVersion: RuntimeStateTargetVersionInput
+}
+
+type RuntimeStateOperationResult {
+  affectedSessionCount: Int!
+  agentId: ULID!
+  ok: Boolean!
+  operation: RuntimeStateOperation!
+}
+
+input RuntimeStateTargetVersionInput {
+  id: ULID!
+  versionNumber: Int!
+}
+
+type Session {
+  agentId: ULID!
+  archivedAt: String
+  createdAt: String!
+  deploymentVersionId: ULID
+  deploymentVersionNumber: Int
+  id: ULID!
+  kind: AgentKind!
+  lastMessageAt: String
+  lastRun: SessionRun
+  model: String!
+  organizationId: ULID!
+  provider: String!
+  runtimeId: String!
+  status: SessionStatus!
+  title: String
+  type: SessionType!
+  updatedAt: String!
+}
+
+type SessionConnection {
+  nodes: [Session!]!
+  pageInfo: SessionListPageInfo!
+}
+
+type SessionExecutionBinding {
+  agentId: ULID!
+  deploymentVersionId: ULID
+  deploymentVersionNumber: Int
+  kind: AgentKind!
+  model: String!
+  prompt: String!
+  provider: String!
+  runtimeId: String!
+  sessionId: ULID!
+}
+
+type SessionExecutionSkillReference {
+  resolutionMode: String!
+  sessionId: ULID!
+  skillId: ULID!
+  skillName: String!
+  snapshotId: ULID
+  sortOrder: Int!
+}
+
+type SessionExecutionSpaceReference {
+  sessionId: ULID!
+  sortOrder: Int!
+  spaceId: ULID!
+}
+
+type SessionExecutionToolReference {
+  agentCredentialId: ULID
+  credentialMode: String!
+  serverId: ULID!
+  sessionId: ULID!
+  sortOrder: Int!
+}
+
+enum SessionFileKind {
+  artifact
+  attachment
+}
+
+type SessionListPageInfo {
+  endCursor: String
+  hasMore: Boolean!
+  startCursor: String
+}
+
+type SessionMessage {
+  content: String!
+  createdAt: String!
+  createdBy: ULID!
+  id: ULID!
+  plan: [SessionMessagePlanEntry!]!
+  role: SessionMessageRole!
+  segments: [SessionMessageSegment!]!
+}
+
+type SessionMessagePlanEntry {
+  content: String!
+  priority: SessionMessagePlanPriority!
+  status: SessionMessagePlanStatus!
+}
+
+enum SessionMessagePlanPriority {
+  high
+  low
+  medium
+}
+
+enum SessionMessagePlanStatus {
+  completed
+  in_progress
+  pending
+}
+
+enum SessionMessageRole {
+  assistant
+  user
+}
+
+type SessionMessageSegment {
+  argsText: String
+  kind: SessionMessageSegmentKind!
+  output: String
+  path: String
+  text: String
+  tool: String
+  toolCallId: String
+}
+
+enum SessionMessageSegmentKind {
+  text
+  tool_result
+  tool_use
+}
+
+type SessionProcessEvent {
+  content: String!
+  durationMs: Int
+  id: ULID!
+  occurredAt: String!
+  status: SessionProcessEventStatus!
+  tokens: Int
+  type: SessionProcessEventType!
+}
+
+enum SessionProcessEventStatus {
+  available
+  error
+  unsupported
+}
+
+enum SessionProcessEventType {
+  agent_message_delta
+  agent_thinking_delta
+  file_changed
+  run_completed
+  run_failed
+  run_started
+  session_files_updated
+  session_status
+  tool_confirmation_required
+  tool_use_completed
+  tool_use_started
+  usage_updated
+  user_message
+}
+
+type SessionResource {
+  createdAt: String!
+  id: ULID!
+  mimeType: String
+  name: String!
+  path: String!
+  size: Int!
+}
+
+type SessionResourceUpload {
+  contentType: String!
+  expectedSize: Int!
+  expiresAt: String!
+  fileId: ULID!
+  owner: FileOwner!
+  partSize: Int
+  path: String!
+  purpose: FilePurpose!
+  scope: FileScope!
+  status: FileUploadStatus!
+  strategy: FileUploadStrategy!
+}
+
+type SessionRun {
+  completedAt: String
+  createdAt: String!
+  deploymentVersionId: ULID
+  deploymentVersionNumber: Int
+  error: RunError
+  id: ULID!
+  model: String
+  provider: String
+  startedAt: String
+  status: RunStatus!
+  traceId: String!
+  trigger: SessionRunTrigger!
+  updatedAt: String!
+}
+
+enum SessionRunTrigger {
+  resume
+  retry
+  system
+  user_prompt
+}
+
+type SessionRuntimePrewarmAck {
+  scheduledAt: String!
+  sessionId: ULID!
+}
+
+enum SessionStatus {
+  IDLE
+  RESCHEDULING
+  RUNNING
+  TERMINATED
+}
+
+type SessionThreadUiState {
+  pinned: Boolean!
+  readAt: String
+  sessionId: ULID!
+  updatedAt: String!
+}
+
+enum SessionType {
+  api_channel
+  preview
+  ui
+}
+
+input SetActiveOrganizationInput {
+  organizationId: ULID!
+}
+
+input SetEnvironmentVariableValueInput {
+  environmentId: ULID!
+  key: String!
+  value: String!
+}
+
+input SetOrganizationDefaultEnvironmentInput {
+  environmentId: ULID!
+  organizationId: ULID!
+}
+
+input SetOrganizationMemberStatusInput {
+  accountId: ULID!
+  organizationId: ULID!
+  status: OrganizationMemberStatus!
+}
+
+input SetOrganizationSharedMcpBearerInput {
+  serverId: ULID!
+  subjectLabel: String
+  token: String!
+}
+
+input SetSkillAutoEnabledInput {
+  autoEnabled: Boolean!
+  skillId: ULID!
+}
+
+input SetSystemAgentModelInput {
+  modelId: String!
+  vendor: String!
+}
+
+input ShareEnvironmentWithOrganizationInput {
+  environmentId: ULID!
+}
+
+input ShareEnvironmentWithUserInput {
+  email: String!
+  environmentId: ULID!
+}
+
+input ShareSkillWithOrganizationInput {
+  skillId: ULID!
+}
+
+input ShareSkillWithUserInput {
+  email: String!
+  skillId: ULID!
+}
+
+type SkillAutoPreference {
+  autoEnabled: Boolean!
+  skillId: ULID!
+}
+
+type SkillDetail {
+  author: String!
+  autoEnabled: Boolean!
+  createdAt: String!
+  currentSnapshot: SkillSnapshotRecord!
+  description: String!
+  entries: [SkillSnapshotEntry!]!
+  forkOrigin: SkillForkOrigin
+  id: ULID!
+  name: String!
+  organizationId: ULID!
+  ownerId: ULID!
+  ownerName: String!
+  role: SkillRegistryRole!
+  shareTargets: [SkillShareTarget!]!
+  snapshotId: ULID!
+  sourceKind: SkillSourceKind!
+  updatedAt: String!
+}
+
+type SkillForkOrigin {
+  name: String!
+  ownerName: String!
+  skillId: ULID!
+}
+
+enum SkillRegistryRole {
+  owner
+  user
+}
+
+type SkillShareTarget {
+  createdAt: String!
+  email: String
+  id: ULID!
+  kind: SkillShareTargetKind!
+  name: String
+}
+
+enum SkillShareTargetKind {
+  organization
+  user
+}
+
+type SkillSnapshotEntry {
+  entryKind: SkillSnapshotEntryKind!
+  isExecutable: Boolean!
+  mimeType: String
+  path: String!
+  sha256: String
+  size: Int!
+}
+
+enum SkillSnapshotEntryKind {
+  directory
+  file
+}
+
+type SkillSnapshotRecord {
+  archiveFormat: String!
+  author: String!
+  blobKey: String!
+  blobSha256: String!
+  blobSize: Int!
+  compression: String!
+  createdAt: String!
+  description: String!
+  id: ULID!
+  name: String!
+  skillMarkdownPath: String!
+  uncompressedSize: Int!
+  version: String
+}
+
+enum SkillSourceKind {
+  official
+  user
+}
+
+type SkillSummary {
+  author: String!
+  autoEnabled: Boolean!
+  createdAt: String!
+  description: String!
+  forkOrigin: SkillForkOrigin
+  id: ULID!
+  name: String!
+  organizationId: ULID!
+  ownerId: ULID!
+  ownerName: String!
+  role: SkillRegistryRole!
+  snapshotId: ULID!
+  sourceKind: SkillSourceKind!
+  updatedAt: String!
+}
+
+type Space {
+  canDelete: Boolean!
+  canUpdateAcl: Boolean!
+  createdAt: String!
+  creatorMembershipStatus: CreatorMembershipStatus!
+  id: ULID!
+  isSharedWithViewer: Boolean!
+  name: String!
+  organizationId: ULID!
+  ownerId: ULID!
+  viewerAssetRole: SpaceRole!
+  visibility: SpaceVisibility!
+}
+
+type SpaceFileListing {
+  directories: [DirectoryEntry!]!
+  files: [FileEntry!]!
+}
+
+type SpaceFileLock {
+  expiresAt: Float!
+  holder: SpaceFileLockHolder!
+  path: String!
+}
+
+type SpaceFileLockHolder {
+  displayName: String
+  id: ULID!
+  type: SpaceFileLockHolderType!
+}
+
+enum SpaceFileLockHolderType {
+  agent
+  user
+}
+
+enum SpaceRole {
+  admin
+  edit
+  read
+}
+
+type SpaceView {
+  canDelete: Boolean!
+  canUpdateAcl: Boolean!
+  createdAt: String!
+  creatorMembershipStatus: CreatorMembershipStatus!
+  id: ULID!
+  isSharedWithViewer: Boolean!
+  name: String!
+  ownerId: ULID!
+  role: SpaceRole!
+  storagePrefix: String!
+  viewerAssetRole: SpaceRole!
+  visibility: SpaceVisibility!
+}
+
+enum SpaceVisibility {
+  private
+  shared
+}
+
+input StartLarkAgentChannelRegistrationInput {
+  agentId: ULID!
+  domain: LarkDomain!
+}
+
+input StartMcpOAuthInput {
+  returnUrl: String
+  serverId: ULID!
+}
+
+type StartMcpOAuthPayload {
+  authorizationUrl: String!
+  flowId: ULID!
+}
+
+input StartWeChatAgentChannelPairingInput {
+  agentId: ULID!
+}
+
+type SystemAgentModelSetting {
+  modelId: String!
+  vendor: String!
+}
+
+input TestVendorCredentialInput {
+  apiBase: String
+  apiKey: String!
+  modelId: String
+  organizationId: ULID!
+  scope: VendorCredentialScope
+  vendorId: String!
+}
+
+type TestVendorCredentialResult {
+  errorCode: String
+  latencyMs: Int!
+  ok: Boolean!
+}
+
+scalar ULID
+
+input UnshareEnvironmentTargetInput {
+  environmentId: ULID!
+  targetId: ULID!
+  targetKind: EnvironmentShareTargetKind!
+}
+
+input UnshareSkillTargetInput {
+  skillId: ULID!
+  targetId: ULID!
+  targetKind: SkillShareTargetKind!
+}
+
+input UpdateAccountProfileInput {
+  name: String!
+}
+
+input UpdateAgentCollaboratorInput {
+  agentId: ULID!
+  principal: String!
+  role: AgentCollaboratorRole!
+}
+
+input UpdateAgentConfigInput {
+  agentId: ULID!
+  description: String
+  environment: AgentEnvironmentConfigInput!
+  kind: AgentKind!
+  mcpServerIds: [ULID!]!
+  model: String!
+  name: String!
+  prompt: String!
+  provider: String!
+  runtimeId: String!
+  skillIds: [ULID!]!
+}
+
+input UpdateAgentPackageSharingInput {
+  agentId: ULID!
+  packageSharingEnabled: Boolean!
+}
+
+input UpdateCollaboratorInput {
+  role: SpaceRole!
+  spaceId: ULID!
+  userId: ULID!
+}
+
+input UpdateCredentialPolicyInput {
+  allowedProviderIds: [String!]!
+  byokEnabled: Boolean!
+  organizationId: ULID!
+}
+
+input UpdateEnvironmentInput {
+  allowMcpServers: Boolean!
+  allowPackageManagers: Boolean!
+  allowedHosts: [String!]!
+  description: String
+  envVars: [EnvironmentVariableInput!]!
+  environmentId: ULID!
+  name: String!
+  networkPolicy: EnvironmentNetworkPolicy!
+  packages: [EnvironmentPackageSpecInput!]!
+  setupScript: String!
+}
+
+input UpdateOrganizationJoinPolicyInput {
+  joinPolicy: OrganizationJoinPolicy!
+  organizationId: ULID!
+}
+
+input UpdateOrganizationMemberRoleInput {
+  accountId: ULID!
+  organizationId: ULID!
+  role: OrganizationMemberRole!
+}
+
+input UpdateOrganizationPrimaryDomainInput {
+  convertPersonal: Boolean
+  domain: String
+  organizationId: ULID!
+}
+
+input UpdateOrganizationProfileInput {
+  avatarUrl: String
+  name: String
+  organizationId: ULID!
+}
+
+input UpdateSessionThreadUiStateInput {
+  pinned: Boolean
+  readAt: String
+  sessionId: ULID!
+}
+
+input UpdateSpaceInput {
+  name: String
+  spaceId: ULID!
+  visibility: SpaceVisibility
+}
+
+input UpdateVendorCredentialInput {
+  apiBase: String
+  apiKey: String
+  id: ULID!
+  isDefault: Boolean
+  isPreferred: Boolean
+  models: [String!]
+  name: String
+}
+
+type UserWarning {
+  code: String!
+  message: String!
+}
+
+type VendorCredential {
+  apiBase: String
+  disabledByPolicy: Boolean!
+  id: ULID!
+  isDefault: Boolean!
+  isPreferred: Boolean!
+  maskedApiKey: String!
+  models: [String!]
+  name: String!
+  organizationId: ULID!
+  ownerUserId: ULID
+  scope: VendorCredentialScope!
+  vendorId: String!
+}
+
+type VendorCredentialCapability {
+  organizationId: ULID!
+  personalCredentialAllowed: Boolean!
+  providerAllowed: Boolean!
+  vendorId: String!
+}
+
+enum VendorCredentialScope {
+  company
+  personal
+}
+
+type Viewer {
+  account: Account
+  activeOrganization: Organization
+  auth: ViewerAuth!
+  memberships: [ViewerOrganizationMembership!]!
+  organizationCreationSlot: OrganizationCreationSlotStatus!
+}
+
+type ViewerAuth {
+  currentSecurityLevel: AuthSecurityLevel!
+  methods: [AuthMethod!]!
+}
+
+type ViewerOrganizationMembership {
+  joinedAt: String!
+  organization: Organization!
+  role: OrganizationMemberRole!
+}
+
+type WeChatAgentChannelPairing {
+  binding: AgentChannelBinding
+  lastErrorCode: String
+  qrCodeImageSrc: String
+  qrToken: String
+  status: WeChatQrPairingStatus!
+}
+
+enum WeChatQrPairingStatus {
+  confirmed
+  expired
+  failed
+  idle
+  qr_pending
+  scanned
+}

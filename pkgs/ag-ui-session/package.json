@@ -1,0 +1,22 @@
+{
+  "name": "@mosoo/ag-ui-session",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "vp lint .",
+    "tc": "vp exec tsc --noEmit",
+    "test": "vp exec bun test tests"
+  },
+  "dependencies": {
+    "@ag-ui/core": "^0.0.54",
+    "@mosoo/contracts": "workspace:*",
+    "arktype": "^2.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite-plus": "^0.1.23"
+  }
+}

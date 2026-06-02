@@ -1,0 +1,126 @@
+import { ShieldCheck, Undo2 } from "lucide-react";
+import { useState } from "react";
+import type { ReactElement } from "react";
+
+import { Button } from "@/shared/ui/button";
+
+import type { Agent } from "../agent.types";
+import { isAutoSaveEligible } from "../components/editor/use-auto-save";
+import type { AgentEditorModel } from "../components/editor/use-model";
+import { LiveConfigActionDialog } from "./live-config-action-dialog";
+import type { LifecycleActionKind } from "./live-config-action-dialog";
+
+export interface PendingChangesBannerProps {
+  agent: Agent;
+  model: AgentEditorModel;
+  onAfterApply?: (kind: LifecycleActionKind | "direct-update") => void;
+  onDiscard: () => void;
+}
+
+// Sticky banner for unsaved live-config edits.
+// It owns confirmation orchestration around the editor model's save action.
+export function PendingChangesBanner({
+  agent,
+  model,
+  onAfterApply,
+  onDiscard,
+}: PendingChangesBannerProps): ReactElement | null {
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  if (!model.dirty || model.changePlan.fieldLabels.length === 0) {
+    return null;
+  }
+
+  // Auto-save handles these silently in Preview; the banner would just flicker
+  // for the debounce window before the save lands. Restart/recreate/fork still
+  // need explicit confirmation, so the banner stays for those.
+  if (isAutoSaveEligible(model.changePlan)) {
+    return null;
+  }
+
+  const { action } = model.changePlan;
+  const forkBlocked = action === "fork-agent";
+  // Drafts don't run drivers yet — saving propagates to the next test session
+  // Automatically, so we skip the runtime-op dialog and just save. Live agents
+  // (where requiresRuntimeOperation flips on) see the appropriate dialog.
+  const dialogEnabled =
+    forkBlocked || (model.changePlan.requiresRuntimeOperation && action !== "direct-update");
+
+  async function applySaved(reportedKind: LifecycleActionKind | "direct-update") {
+    const ok = await model.save();
+    if (ok) {
+      onAfterApply?.(reportedKind);
+    }
+  }
+
+  async function applyWithDialog() {
+    setDialogOpen(false);
+    if (action === "direct-update") {
+      return;
+    }
+    await applySaved(action);
+  }
+
+  function handleApplyClick() {
+    if (dialogEnabled) {
+      setDialogOpen(true);
+      return;
+    }
+    void applySaved("direct-update");
+  }
+
+  const fieldCount = model.changePlan.fieldLabels.length;
+
+  return (
+    <>
+      <div className="shrink-0 border-b border-amber-300/60 bg-amber-50/95 px-4 py-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2 text-[12.5px] text-amber-900">
+            <ShieldCheck className="size-3.5 shrink-0" />
+            <span className="min-w-0 truncate">
+              {fieldCount} field{fieldCount === 1 ? "" : "s"} edited ·{" "}
+              <span className="font-medium">{model.changePlan.actionLabel}</span>
+              {model.changePlan.agentStatePreserved && action !== "direct-update" ? (
+                <span className="text-amber-900/70"> · agent-state preserved</span>
+              ) : null}
+            </span>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              className="gap-1 text-amber-900"
+              disabled={model.saving}
+              onClick={onDiscard}
+              size="xs"
+              variant="ghost"
+            >
+              <Undo2 className="size-3" />
+              Discard
+            </Button>
+            <Button
+              className="bg-amber-700 hover:bg-amber-800"
+              disabled={model.saving}
+              onClick={handleApplyClick}
+              size="xs"
+            >
+              {model.saving ? "Applying…" : "Apply changes"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {dialogEnabled ? (
+        <LiveConfigActionDialog
+          affectedFields={model.changePlan.fieldLabels}
+          agentName={agent.name}
+          busy={model.saving}
+          kind={action}
+          onCancel={() => {
+            setDialogOpen(false);
+          }}
+          onConfirm={() => void applyWithDialog()}
+          open={dialogOpen}
+        />
+      ) : null}
+    </>
+  );
+}

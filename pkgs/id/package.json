@@ -1,0 +1,21 @@
+{
+  "name": "@mosoo/id",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "lint": "vp lint .",
+    "tc": "vp exec tsc --noEmit",
+    "test": "vp exec bun test tests"
+  },
+  "dependencies": {
+    "ulid": "^3.0.2"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite-plus": "^0.1.23"
+  }
+}

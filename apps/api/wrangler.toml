@@ -1,0 +1,234 @@
+name = "mosoo-api"
+main = "src/index.ts"
+compatibility_date = "2026-06-01"
+compatibility_flags = ["nodejs_compat"]
+keep_vars = true
+
+[observability]
+enabled = true
+
+[observability.logs]
+head_sampling_rate = 1
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+
+[vars]
+APP_NAME = "mosoo"
+WEB_ORIGIN = "http://localhost:5173"
+AUTH_EMAIL_FROM = "Mosoo AUTH <auth@mosoo.ai>"
+FILE_BUCKET_NAME = "mosoo-file"
+SANDBOX_STATE_BUCKET_NAME = "mosoo-sandbox-state"
+SANDBOX_FILE_BUCKET_LOCAL = "true"
+
+[[send_email]]
+name = "AUTH_EMAIL"
+
+[[worker_loaders]]
+binding = "AGENT_BUILDER_CODE_WORKER_LOADER"
+
+[secrets]
+required = [
+  "BETTER_AUTH_SECRET",
+  "RUNTIME_ACTION_TOKEN_SECRET",
+  "VAULT_ROOT_SECRET",
+  "R2_ACCESS_KEY_ID",
+  "R2_SECRET_ACCESS_KEY",
+  "CLOUDFLARE_ACCOUNT_ID",
+]
+
+[triggers]
+crons = ["* * * * *"]
+
+[[durable_objects.bindings]]
+name = "DriverConnection"
+class_name = "DriverConnection"
+
+[[durable_objects.bindings]]
+name = "Session"
+class_name = "Session"
+
+[[durable_objects.bindings]]
+name = "ChannelConnection"
+class_name = "ChannelConnection"
+
+[[durable_objects.bindings]]
+name = "Sandbox"
+class_name = "Sandbox"
+
+[[durable_objects.bindings]]
+name = "AgentBuilderSystemAgent"
+class_name = "AgentBuilderSystemAgent"
+
+[[containers]]
+class_name = "Sandbox"
+image = "../driver/Dockerfile"
+instance_type = "lite"
+max_instances = 1
+
+[[r2_buckets]]
+binding = "FILE_BUCKET"
+bucket_name = "mosoo-file"
+
+[[r2_buckets]]
+binding = "SANDBOX_STATE_BUCKET"
+bucket_name = "mosoo-sandbox-state"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mosoo"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "../../pkgs/db/drizzle"
+
+[[queues.producers]]
+binding = "API_COMMAND_QUEUE"
+queue = "api-command"
+
+[[queues.producers]]
+binding = "CHANNEL_FINAL_DELIVERY_QUEUE"
+queue = "channel-final-delivery"
+
+[[queues.consumers]]
+queue = "api-command"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "api-command-dlq"
+
+[[queues.consumers]]
+queue = "api-command-dlq"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 1
+
+[[queues.consumers]]
+queue = "channel-final-delivery"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "channel-final-delivery-dlq"
+
+[env.prod]
+name = "mosoo-api-prod"
+workers_dev = false
+
+[env.prod.observability.traces]
+enabled = true
+head_sampling_rate = 0.1
+
+[env.prod.vars]
+APP_NAME = "mosoo"
+WEB_ORIGIN = "https://mosoo.ai"
+AUTH_EMAIL_FROM = "Mosoo AUTH <auth@mosoo.ai>"
+FILE_BUCKET_NAME = "mosoo-file"
+SANDBOX_STATE_BUCKET_NAME = "mosoo-sandbox-state"
+SANDBOX_FILE_BUCKET_LOCAL = "false"
+
+[[env.prod.send_email]]
+name = "AUTH_EMAIL"
+
+[[env.prod.worker_loaders]]
+binding = "AGENT_BUILDER_CODE_WORKER_LOADER"
+
+[env.prod.secrets]
+required = [
+  "BETTER_AUTH_SECRET",
+  "RUNTIME_ACTION_TOKEN_SECRET",
+  "VAULT_ROOT_SECRET",
+  "R2_ACCESS_KEY_ID",
+  "R2_SECRET_ACCESS_KEY",
+  "CLOUDFLARE_ACCOUNT_ID",
+]
+
+[[env.prod.routes]]
+zone_name = "mosoo.ai"
+pattern = "mosoo.ai/api/*"
+
+[[env.prod.durable_objects.bindings]]
+name = "DriverConnection"
+class_name = "DriverConnection"
+
+[[env.prod.durable_objects.bindings]]
+name = "Session"
+class_name = "Session"
+
+[[env.prod.durable_objects.bindings]]
+name = "ChannelConnection"
+class_name = "ChannelConnection"
+
+[[env.prod.durable_objects.bindings]]
+name = "Sandbox"
+class_name = "Sandbox"
+
+[[env.prod.durable_objects.bindings]]
+name = "AgentBuilderSystemAgent"
+class_name = "AgentBuilderSystemAgent"
+
+[[env.prod.containers]]
+class_name = "Sandbox"
+image = "../driver/Dockerfile"
+instance_type = "basic"
+max_instances = 1000
+
+[[env.prod.r2_buckets]]
+binding = "FILE_BUCKET"
+bucket_name = "mosoo-file"
+
+[[env.prod.r2_buckets]]
+binding = "SANDBOX_STATE_BUCKET"
+bucket_name = "mosoo-sandbox-state"
+
+[[env.prod.d1_databases]]
+binding = "DB"
+database_name = "mosoo-prod"
+database_id = "36b60a1f-b724-42e1-adb7-1d759ed16d2d"
+migrations_dir = "../../pkgs/db/drizzle"
+
+[[env.prod.queues.producers]]
+binding = "API_COMMAND_QUEUE"
+queue = "api-command"
+
+[[env.prod.queues.producers]]
+binding = "CHANNEL_FINAL_DELIVERY_QUEUE"
+queue = "channel-final-delivery"
+
+[[env.prod.queues.consumers]]
+queue = "api-command"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "api-command-dlq"
+
+[[env.prod.queues.consumers]]
+queue = "api-command-dlq"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 1
+
+[[env.prod.queues.consumers]]
+queue = "channel-final-delivery"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "channel-final-delivery-dlq"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = [
+  "DriverConnection",
+  "Sandbox",
+  "Session",
+  "ChannelConnection",
+  "AgentBuilderSystemAgent",
+]
+
+[[env.prod.migrations]]
+tag = "v1"
+new_sqlite_classes = [
+  "DriverConnection",
+  "Sandbox",
+  "Session",
+  "ChannelConnection",
+  "AgentBuilderSystemAgent",
+]

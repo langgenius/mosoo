@@ -1,0 +1,36 @@
+import type { AgentCollaboratorRole } from "@mosoo/contracts/agent";
+import type { AgentChannelBindingProvider } from "@mosoo/contracts/channel";
+
+export type AgentPublishMode = "private" | "organization";
+export type ChannelId = AgentChannelBindingProvider;
+
+export const ROLE_OPTIONS: { value: AgentCollaboratorRole; label: string }[] = [
+  { label: "Admin", value: "admin" },
+  { label: "Can use", value: "user" },
+];
+
+export const DISTRIBUTION_CHANNELS: {
+  enabled: boolean;
+  id: ChannelId;
+  label: string;
+}[] = [
+  { enabled: true, id: "slack", label: "Slack" },
+  { enabled: true, id: "lark", label: "Lark / 飞书" },
+  { enabled: true, id: "discord", label: "Discord" },
+  { enabled: true, id: "telegram", label: "Telegram" },
+  { enabled: true, id: "wechat", label: "WeChat" },
+];
+
+export function downloadTextFile(fileName: string, contentType: string, content: string) {
+  const blob = new Blob([content], { type: contentType });
+  downloadBlob(fileName, blob);
+}
+
+function downloadBlob(fileName: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@mosoo/agent-package",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "vp lint .",
+    "test": "vp exec bun test tests",
+    "tc": "vp exec tsc --noEmit"
+  },
+  "dependencies": {
+    "@mosoo/contracts": "workspace:*",
+    "@mosoo/skill-package": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite-plus": "^0.1.23"
+  }
+}

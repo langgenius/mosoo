@@ -1,0 +1,446 @@
+import { getAgentKindRuntimePolicy } from "@mosoo/contracts/agent";
+import {
+  ArrowLeft,
+  ChevronDown,
+  FileText,
+  FolderTree,
+  Settings,
+  TerminalSquare,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+
+import { useAppSession } from "@/app/session-provider";
+import { useAgentDetailQuery, useAgentEditorStateQuery } from "@/domains/agent/query/agent-queries";
+import { useAuth } from "@/domains/auth/use-auth";
+import { cn } from "@/shared/lib/class-names";
+import { Button } from "@/shared/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
+
+import { isTruthy } from "../../shared/lib/truthiness";
+import { canShowOwnerDebugTerminalItem } from "./agent-debug-menu-policy";
+import { mapAgentDetailToView } from "./agent-view.mapper";
+import type { Agent, AgentMode } from "./agent.types";
+import { ConsumeMode } from "./components/consume-mode";
+import { AgentCostTab } from "./components/cost-tab";
+import { DevMode } from "./components/dev-mode";
+import { FileBrowserMode } from "./components/file-browser-mode";
+import { LogsTab } from "./components/logs-tab";
+import { PreviewMode } from "./components/preview-mode";
+import { SettingsSheet } from "./components/settings-dialog";
+import { RuntimeIcon } from "./components/shared-components";
+import { SystemLogMode } from "./components/system-log-mode";
+import { TerminalMode } from "./components/terminal-mode";
+import { VersionsTab } from "./components/versions-tab";
+import { LifecycleShell } from "./lifecycle/lifecycle-shell";
+import { getRuntimeInfo } from "./runtime-catalog";
+
+type DetailMode = AgentMode | "cost" | "files" | "logs" | "system-log" | "terminal";
+
+const MODE_TABS: { id: DetailMode; label: string; ownerOnly?: boolean }[] = [
+  { id: "dev", label: "Dev", ownerOnly: true },
+  { id: "preview", label: "Preview" },
+  { id: "logs", label: "Logs", ownerOnly: true },
+  { id: "cost", label: "Cost", ownerOnly: true },
+];
+
+const DEBUG_MODES = new Set<DetailMode>(["files", "system-log", "terminal"]);
+
+function toDetailMode(value: string | null): DetailMode | null {
+  switch (value) {
+    case "consume":
+    case "cost":
+    case "create":
+    case "dev":
+    case "files":
+    case "logs":
+    case "preview":
+    case "system-log":
+    case "terminal":
+      return value;
+    default:
+      return null;
+  }
+}
+
+export function AgentDetailPage() {
+  const { agentId } = useParams<{ agentId: string }>();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { activeOrganization } = useAppSession();
+  const { user } = useAuth();
+  const [selectedMode, setSelectedMode] = useState<DetailMode | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
+  const [headerCta, setHeaderCta] = useState<ReactNode>(null);
+
+  const detailQuery = useAgentDetailQuery(agentId ?? null);
+  const canEdit = detailQuery.data
+    ? detailQuery.data.viewerRole === "owner" || detailQuery.data.viewerRole === "admin"
+    : false;
+  const editorStateQuery = useAgentEditorStateQuery(agentId ?? null, canEdit);
+
+  const agent = useMemo<Agent | null>(() => {
+    if (!detailQuery.data) {
+      return null;
+    }
+
+    return mapAgentDetailToView(detailQuery.data, editorStateQuery.data ?? null, user);
+  }, [detailQuery.data, editorStateQuery.data, user]);
+
+  const basePath = globalThis.location.pathname.startsWith("/demo") ? "/demo/agent" : "/agent";
+  const runtime = useMemo(() => (agent ? getRuntimeInfo(agent.runtime) : null), [agent]);
+  const isOwnerOrAdmin = agent?.role === "owner" || agent?.role === "admin";
+  const viewerOrgRole =
+    activeOrganization && activeOrganization.id === detailQuery.data?.organizationId
+      ? activeOrganization.viewerRole
+      : null;
+  const canManageAgentAccess =
+    detailQuery.data?.viewerRole === "owner" || viewerOrgRole === "owner";
+  const canUseTerminal = canShowOwnerDebugTerminalItem({
+    agentKind: agent?.kind ?? null,
+    viewerRole: detailQuery.data?.viewerRole ?? null,
+  });
+  const runtimeKindPolicy = agent ? getAgentKindRuntimePolicy(agent.kind) : null;
+  const usesStableRuntimeSubject = Boolean(runtimeKindPolicy?.subject.stable);
+  const canUseFileBrowser = Boolean(
+    agent && detailQuery.data?.viewerRole === "owner" && usesStableRuntimeSubject,
+  );
+  const canUseSystemLog = Boolean(agent && isOwnerOrAdmin && usesStableRuntimeSubject);
+  const canShowDebugMenu = Boolean(
+    agent &&
+    isOwnerOrAdmin &&
+    (runtimeKindPolicy?.operations.ownerTerminal || runtimeKindPolicy?.subject.stable),
+  );
+  const urlMode = toDetailMode(searchParams.get("tab") ?? searchParams.get("mode"));
+
+  const handleSelectMode = useCallback(
+    (nextMode: DetailMode) => {
+      setSelectedMode(nextMode);
+      setSearchParams(
+        (current) => {
+          const nextParams = new URLSearchParams(current);
+          nextParams.set("tab", nextMode);
+          return nextParams;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  // Allow other surfaces (e.g. the Agents list dropdown) to deep-link
+  // Straight into the settings sheet via `?settings=1`.
+  const settingsParam = searchParams.get("settings");
+  useEffect(() => {
+    if (settingsParam !== "1") {
+      return;
+    }
+    setShowSettings(true);
+    setSearchParams(
+      (current) => {
+        const nextParams = new URLSearchParams(current);
+        nextParams.delete("settings");
+        return nextParams;
+      },
+      { replace: true },
+    );
+  }, [settingsParam, setSearchParams]);
+
+  // Default mode: Owner/Admin → Dev (config), others → Consume (read-only chat).
+  // Owners can still reach Consume via `?tab=consume` (e.g. the
+  // post-publish success modal's "Open Chat" CTA) or the Preview tab for
+  // an in-context test chat.
+  const defaultMode: DetailMode = isOwnerOrAdmin ? "dev" : "consume";
+  const requestedMode = selectedMode ?? urlMode ?? defaultMode;
+  const mode =
+    !isOwnerOrAdmin && requestedMode !== "consume"
+      ? "consume"
+      : requestedMode === "terminal" && !canUseTerminal
+        ? defaultMode
+        : requestedMode === "files" && !canUseFileBrowser
+          ? defaultMode
+          : requestedMode === "system-log" && !canUseSystemLog
+            ? defaultMode
+            : requestedMode;
+
+  if (!isTruthy(agentId)) {
+    return (
+      <div className="text-destructive flex h-full items-center justify-center text-sm">
+        Agent id is missing.
+      </div>
+    );
+  }
+
+  if (detailQuery.isLoading || (canEdit && editorStateQuery.isLoading && !editorStateQuery.data)) {
+    return (
+      <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+        Loading agent…
+      </div>
+    );
+  }
+
+  const loadError = detailQuery.error ?? editorStateQuery.error;
+
+  if (loadError || !agent) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4">
+        <div className="text-destructive text-sm">
+          {loadError instanceof Error ? loadError.message : "Agent not found."}
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => {
+            void navigate(basePath);
+          }}
+        >
+          Back to agents
+        </Button>
+      </div>
+    );
+  }
+
+  const detail = detailQuery.data;
+
+  if (!detail) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4">
+        <div className="text-destructive text-sm">Agent not found.</div>
+        <Button
+          variant="outline"
+          onClick={() => {
+            void navigate(basePath);
+          }}
+        >
+          Back to agents
+        </Button>
+      </div>
+    );
+  }
+
+  // ── User role on published agent → pure Consume mode ──
+  if (!isOwnerOrAdmin) {
+    return <ConsumeMode agent={agent} organizationId={detail.organizationId} />;
+  }
+
+  // ── Owner/Admin on published agent in consume mode → Chat + Config button ──
+  if (mode === "consume") {
+    return (
+      <ConsumeMode
+        agent={agent}
+        onOpenConfig={() => {
+          handleSelectMode("dev");
+        }}
+        showConfigButton
+        organizationId={detail.organizationId}
+      />
+    );
+  }
+
+  // ── Owner/Admin config modes (Create / Preview / Dev / Logs) ──
+  // Lifecycle shell wraps Draft agents in the Configure / Preview / Publish
+  // surfaces. Live agents fall through to the existing tabbed UI unchanged.
+  const isDraftLifecycle = agent.status === "draft";
+  const lifecycleMode = mode === "dev" || mode === "preview" ? mode : null;
+
+  return (
+    <div className="flex h-full flex-col">
+      {/* Top Bar */}
+      <header className="border-border-subtle relative flex h-13 shrink-0 items-center justify-between border-b bg-white px-5">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => {
+              void navigate(basePath);
+            }}
+            className="text-muted-foreground"
+          >
+            <ArrowLeft className="size-4" />
+          </Button>
+
+          {runtime ? <RuntimeIcon runtime={runtime} size={28} /> : null}
+          <span className="text-foreground text-[14px] font-medium">{agent.name}</span>
+          {isDraftLifecycle ? (
+            <button
+              type="button"
+              onClick={() => {
+                setShowVersions(true);
+              }}
+              className="focus-visible:ring-ring ml-1 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900 transition-colors hover:bg-amber-100 focus:outline-none focus-visible:ring-2"
+              aria-label="Open version history"
+            >
+              Draft
+            </button>
+          ) : agent.liveVersion ? (
+            <button
+              type="button"
+              onClick={() => {
+                setShowVersions(true);
+              }}
+              className="focus-visible:ring-ring ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-800 transition-colors hover:bg-green-200/70 focus:outline-none focus-visible:ring-2"
+              aria-label="Open version history"
+            >
+              v{agent.liveVersion.versionNumber} live
+            </button>
+          ) : null}
+        </div>
+
+        {/* Mode tabs — hidden inside the Draft lifecycle shell since the
+            shell owns its own navigation. Live agents keep the tab strip.
+            Debug dropdown is Pet-only (entry hidden entirely for Cattle);
+            Terminal is owner-only. Absolutely centered so the strip stays
+            put when the right-side headerCta width changes across tabs
+            (dev/preview set a CTA, logs/cost clear it). */}
+        {isDraftLifecycle && lifecycleMode ? (
+          <div />
+        ) : (
+          <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1">
+            {MODE_TABS.flatMap((tab) =>
+              tab.ownerOnly === true && !isOwnerOrAdmin
+                ? []
+                : [
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => {
+                        handleSelectMode(tab.id);
+                      }}
+                      className={cn(
+                        "px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-all",
+                        mode === tab.id
+                          ? "bg-brand-light text-brand"
+                          : "text-muted-foreground hover:bg-accent",
+                      )}
+                    >
+                      {tab.label}
+                    </button>,
+                  ],
+            )}
+            {canShowDebugMenu ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex items-center gap-1 rounded-lg px-3.5 py-1.5 text-[13px] font-medium outline-none transition-all",
+                      DEBUG_MODES.has(mode)
+                        ? "bg-brand-light text-brand"
+                        : "text-muted-foreground hover:bg-accent",
+                    )}
+                  >
+                    Debug
+                    <ChevronDown aria-hidden="true" size={14} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {canUseTerminal ? (
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        handleSelectMode("terminal");
+                      }}
+                    >
+                      <TerminalSquare aria-hidden="true" size={14} /> Terminal
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canUseFileBrowser ? (
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        handleSelectMode("files");
+                      }}
+                    >
+                      <FolderTree aria-hidden="true" size={14} />
+                      <span className="flex-1">File System</span>
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canUseSystemLog ? (
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        handleSelectMode("system-log");
+                      }}
+                    >
+                      <FileText aria-hidden="true" size={14} />
+                      <span className="flex-1">System Log</span>
+                    </DropdownMenuItem>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </div>
+        )}
+
+        <div className="flex items-center gap-2">
+          {headerCta}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => {
+              setShowSettings(true);
+            }}
+            className="text-muted-foreground"
+          >
+            <Settings className="size-4" />
+          </Button>
+        </div>
+      </header>
+
+      {/* Content */}
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {isDraftLifecycle && lifecycleMode ? (
+          <LifecycleShell
+            agent={agent}
+            mode={lifecycleMode}
+            onSwitchMode={handleSelectMode}
+            organizationId={detail.organizationId}
+            onHeaderCtaChange={setHeaderCta}
+          />
+        ) : (
+          <>
+            {mode === "preview" && (
+              <PreviewMode
+                agent={agent}
+                onSwitchMode={handleSelectMode}
+                organizationId={detail.organizationId}
+                onHeaderCtaChange={setHeaderCta}
+              />
+            )}
+            {mode === "dev" && (
+              <DevMode
+                agent={agent}
+                onSwitchMode={handleSelectMode}
+                onHeaderCtaChange={setHeaderCta}
+              />
+            )}
+          </>
+        )}
+        {mode === "logs" && <LogsTab agentId={agent.id} />}
+        {mode === "files" && <FileBrowserMode agent={agent} />}
+        {mode === "system-log" && <SystemLogMode agent={agent} />}
+        {mode === "cost" && <AgentCostTab agentId={agent.id} />}
+        {mode === "terminal" && <TerminalMode key={agent.id} agent={agent} />}
+      </div>
+
+      <SettingsSheet
+        agent={agent}
+        open={showSettings}
+        onOpenChange={setShowSettings}
+        organizationId={detail.organizationId}
+        canManageAccess={canManageAgentAccess}
+      />
+
+      <Sheet open={showVersions} onOpenChange={setShowVersions}>
+        <SheetContent className="w-[560px] max-w-[calc(100vw-2rem)] p-0">
+          <SheetTitle className="sr-only">Versions</SheetTitle>
+          <VersionsTab agent={agent} />
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}

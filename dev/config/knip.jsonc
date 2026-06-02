@@ -1,0 +1,80 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+  // Keep this config focused on non-default runtime, script, and test entrypoints.
+  // Library package src/index.ts files are already discovered from package exports.
+  "includeEntryExports": true,
+  "treatConfigHintsAsErrors": true,
+  "workspaces": {
+    ".": {
+      "includeEntryExports": false,
+      "entry": ["dev/config/**/*.ts", "dev/scripts/**/*.ts", "vite.config.ts"],
+      "project": ["dev/config/**/*.d.ts", "dev/config/**/*.ts", "dev/scripts/**/*.ts"],
+      "ignoreDependencies": [
+        "@graphql-codegen/client-preset",
+        "@graphql-codegen/schema-ast",
+        "tsx",
+      ],
+    },
+    "apps/api": {
+      "includeEntryExports": false,
+      "entry": ["bin/**/*.ts", "src/adapters/graphql/codegen-schema.ts", "tests/**/*.test.ts"],
+      "project": ["bin/**/*.ts", "src/**/*.ts!", "tests/**/*.ts"],
+      "ignoreDependencies": ["cloudflare", "wrangler"],
+    },
+    "apps/driver": {
+      "entry": [
+        "bin/check-openai-app-server-schema.ts",
+        "bin/openai-local-runtime-probe.ts",
+        "src/index.ts",
+        "tests/**/*.test.ts",
+      ],
+      "project": ["bin/**/*.ts", "src/**/*.ts!", "tests/**/*.ts"],
+    },
+    "apps/web": {
+      "includeEntryExports": false,
+      "entry": ["src/main.tsx", "vite.config.ts", "tests/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "src/**/*.tsx!", "tests/**/*.ts"],
+      "ignoreDependencies": ["tailwindcss", "tw-animate-css", "wrangler"],
+    },
+    "e2e": {
+      "includeEntryExports": false,
+      "entry": ["playwright.config.ts", "*.spec.ts", "*.test.ts"],
+      "project": ["*.ts"],
+      "playwright": false,
+    },
+    "pkgs/ag-ui-session": {
+      "includeEntryExports": false,
+      "entry": ["tests/**/*.test.ts", "tests/**/*.typecheck.ts"],
+      "project": ["src/**/*.ts!", "tests/**/*.ts"],
+    },
+    "pkgs/id": {
+      "includeEntryExports": false,
+      "entry": ["tests/**/*.test.ts", "tests/**/*.typecheck.ts"],
+      "project": ["src/**/*.ts!", "tests/**/*.ts"],
+    },
+    "pkgs/db": {
+      "includeEntryExports": false,
+      "entry": ["scripts/**/*.ts", "tests/**/*.test.ts"],
+      "project": ["scripts/**/*.ts", "src/**/*.ts!", "tests/**/*.ts"],
+    },
+    "pkgs/contracts": {
+      "includeEntryExports": false,
+      "entry": ["tests/**/*.test.ts"],
+      "project": ["models/**/*.ts!", "src/**/*.ts!", "tests/**/*.ts"],
+    },
+    "pkgs/{agent-package,driver-protocol,runtime-catalog,runtime-events,session-policy,skill-package}": {
+      "includeEntryExports": false,
+      "entry": ["tests/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "tests/**/*.ts"],
+    },
+    "pkgs/{development-auth,effects,observability}": {
+      "includeEntryExports": false,
+      "project": ["src/**/*.ts!"],
+    },
+  },
+  "ignore": ["apps/driver/src/runtimes/openai/generated/**"],
+  "ignoreExportsUsedInFile": {
+    "interface": true,
+    "type": true,
+  },
+}

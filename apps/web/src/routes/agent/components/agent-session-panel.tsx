@@ -1,0 +1,309 @@
+import type { AgentReadiness } from "@mosoo/contracts/agent";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ShieldAlert, X } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
+
+import {
+  listSessionResources,
+  sessionResourcesQueryKey,
+} from "@/domains/session/api/session-resources";
+import { SessionComposer } from "@/features/session-chat/session-composer";
+import { SessionMessageList } from "@/features/session-chat/session-message-list";
+import { useSessionResourceDraft } from "@/features/session-chat/use-session-resource-draft";
+import { SessionFilesPanel } from "@/features/session-files/session-files-panel";
+import {
+  completeSessionFileUpload,
+  failSessionFileUpload,
+  markSessionFileUploadProgress,
+  startSessionFileUpload,
+  useSessionFilesStore,
+} from "@/features/session-files/session-files-store";
+import { uploadSessionResource } from "@/features/session-files/session-resource-upload";
+import { toSessionId } from "@/routes/typed-id";
+import { Button } from "@/shared/ui/button";
+
+import { isTruthy } from "../../../shared/lib/truthiness";
+import { AgentReadinessBlockersBanner } from "./agent-readiness-blockers-banner";
+import { AgentSessionPanelHeader } from "./agent-session-panel-header";
+import {
+  deriveSessionPill,
+  readinessBlockSummary,
+  sendDisabledReasonForSession,
+} from "./agent-session-panel-status";
+import { useAgentSessionPanelModel } from "./use-agent-session-panel-model";
+
+export function AgentSessionPanel({
+  agentId,
+  agentName,
+  configurationChangedAt,
+  configurationRevisionKey,
+  tone,
+  organizationId,
+  readiness,
+}: {
+  agentId: string;
+  agentName: string;
+  configurationChangedAt?: string | null;
+  configurationRevisionKey?: string | null;
+  readiness: AgentReadiness | null;
+  tone: "preview" | "consume";
+  organizationId: string | null;
+}) {
+  const model = useAgentSessionPanelModel({
+    agentId,
+    configurationChangedAt: configurationChangedAt ?? null,
+    configurationRevisionKey: configurationRevisionKey ?? null,
+    organizationId,
+    readiness,
+    requireFreshConfiguration: tone === "preview",
+    sessionType: tone === "preview" ? "preview" : "ui",
+    waitForRuntimeReadyOnNewSession: tone === "preview",
+  });
+  const activeTitle = model.activeSession?.title ?? null;
+  const pill = deriveSessionPill(model);
+  const stopped = pill === "Stopped";
+  const setupBlocked = pill === "Setup required";
+  const setupSummary = readinessBlockSummary(model.readiness) ?? model.readinessBlockMessage;
+  const reconnectingSubtitle =
+    model.reconnecting || model.lifecycle === "RESCHEDULING" ? "reconnecting" : null;
+  const sendDisabledReason = sendDisabledReasonForSession({
+    configurationRefreshRequired: model.configurationRefreshRequired,
+    lifecycle: model.lifecycle,
+    reconnecting: model.reconnecting,
+    setupBlocked,
+    setupSummary,
+    stopped,
+  });
+
+  const [filesPanelOpen, setFilesPanelOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const { pendingBySession } = useSessionFilesStore();
+  const activeSessionId =
+    model.activeSessionId === null ? null : toSessionId(model.activeSessionId);
+  const resourceDraft = useSessionResourceDraft(activeSessionId);
+  const sessionResourcesQuery = useQuery({
+    enabled: activeSessionId !== null,
+    queryFn: async () => listSessionResources(activeSessionId!),
+    queryKey: sessionResourcesQueryKey(activeSessionId),
+  });
+  const pendingFiles = isTruthy(activeSessionId) ? (pendingBySession[activeSessionId] ?? []) : [];
+  const sessionResourceMentions = resourceDraft.mentions;
+  const pendingSessionFiles = pendingFiles.flatMap((file) => {
+    if (file.status !== "uploading" && file.status !== "failed") {
+      return [];
+    }
+
+    return [
+      {
+        id: file.id,
+        name: file.name,
+        ...(typeof file.progress === "number" ? { progress: file.progress } : {}),
+        status: file.status,
+      },
+    ];
+  });
+  const sessionFilesCount = pendingFiles.length + (sessionResourcesQuery.data?.length ?? 0);
+
+  const handleUploadFiles = async (files: File[]): Promise<void> => {
+    if (files.length === 0) {
+      return;
+    }
+
+    const sessionId = toSessionId(await model.ensureActiveSession());
+
+    await Promise.all(
+      files.map(async (file) => {
+        const pendingId = startSessionFileUpload(sessionId, file);
+
+        try {
+          markSessionFileUploadProgress(sessionId, pendingId, 35);
+          const uploadedResource = await uploadSessionResource(sessionId, file);
+          markSessionFileUploadProgress(sessionId, pendingId, 95);
+          completeSessionFileUpload(sessionId, pendingId);
+          resourceDraft.appendMention(sessionId, uploadedResource);
+          await queryClient.invalidateQueries({ queryKey: sessionResourcesQueryKey(sessionId) });
+        } catch {
+          failSessionFileUpload(sessionId, pendingId);
+        }
+      }),
+    );
+  };
+
+  const handleSend = async (): Promise<void> => {
+    const sent = await model.handleSend({ sessionResourceMentions });
+
+    if (sent) {
+      resourceDraft.clearActiveMentions();
+    }
+  };
+
+  const handleKeyDown = async (event: React.KeyboardEvent): Promise<void> => {
+    const sent = await model.handleKeyDown(event, { sessionResourceMentions });
+
+    if (sent) {
+      resourceDraft.clearActiveMentions();
+    }
+  };
+
+  return (
+    <div className="flex h-full bg-[#fafafa]" data-testid="agent-session-panel">
+      <div className="flex h-full min-w-0 flex-1 flex-col">
+        <AgentSessionPanelHeader
+          activeTitle={activeTitle}
+          agentName={agentName}
+          filesPanelOpen={filesPanelOpen}
+          onFilesPanelToggle={() => {
+            setFilesPanelOpen((prev) => !prev);
+          }}
+          onStartNewSession={model.handleStartNewSession}
+          pill={pill}
+          reconnectingSubtitle={reconnectingSubtitle}
+          sending={model.sending}
+          sessionCount={model.sessionCount}
+          sessionFilesCount={sessionFilesCount}
+          tone={tone}
+        />
+
+        {isTruthy(model.sessionLoadError) ? (
+          <div className="border-b border-amber-500/20 bg-amber-50/70 px-4 py-2 text-[11px] leading-relaxed text-amber-900/90">
+            Failed to load previous sessions. You can still start a new live run.
+          </div>
+        ) : null}
+
+        {setupBlocked && model.readiness ? (
+          <AgentReadinessBlockersBanner
+            onRetryProviderCheck={() => void model.retryProviderCheck()}
+            readiness={model.readiness}
+            retrying={model.sending}
+            summary={setupSummary}
+          />
+        ) : null}
+
+        {model.configurationRefreshRequired ? (
+          <div className="border-b border-amber-500/20 bg-amber-50/70 px-4 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 text-[12px] font-medium text-amber-950">
+                Start new session to test latest config
+              </div>
+              <Button
+                onClick={() => void model.handleStartNewSession()}
+                size="xs"
+                variant="outline"
+              >
+                Start new session
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="relative min-h-0 flex-1 overflow-hidden">
+          {model.isConversationLoading ? (
+            <div className="text-muted-foreground flex h-full items-center justify-center text-[13px]">
+              Loading conversation…
+            </div>
+          ) : (
+            <SessionMessageList
+              messages={model.messages}
+              messagesEndRef={model.messagesEndRef}
+              streaming={model.streaming}
+            />
+          )}
+        </div>
+
+        <div className="relative z-10 mx-auto w-2/3 shrink-0 py-4">
+          {stopped ? (
+            <div className="border-border bg-muted/40 mb-3 rounded-lg border p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-foreground text-[13px] font-semibold">Session stopped</div>
+                  <div className="text-muted-foreground mt-0.5 text-[12px] leading-relaxed">
+                    {model.run.error?.message ??
+                      "Start a new session after fixing runtime diagnostics."}
+                  </div>
+                </div>
+                <Button
+                  onClick={() => void model.handleStartNewSession()}
+                  size="sm"
+                  variant="outline"
+                >
+                  New session
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {model.permissionRequests[0] ? (
+            <div className="relative z-20 mb-3 rounded-lg border border-amber-300/50 bg-amber-50 p-3 text-amber-950">
+              <div className="flex items-start gap-2">
+                <ShieldAlert className="mt-0.5 size-4 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold">{model.permissionRequests[0].title}</div>
+                  {isTruthy(model.permissionRequests[0].rawInput) ? (
+                    <div className="mt-1 truncate font-mono text-[11px] text-amber-900/75">
+                      {model.permissionRequests[0].rawInput}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 gap-1.5">
+                  <Button
+                    aria-label="Dismiss permission request"
+                    onClick={() =>
+                      void model.resolvePermission(model.permissionRequests[0]!, "reject_once")
+                    }
+                    size="icon-sm"
+                    variant="ghost"
+                  >
+                    <X className="size-4" />
+                  </Button>
+                  <Button
+                    onClick={() =>
+                      void model.resolvePermission(model.permissionRequests[0]!, "reject_once")
+                    }
+                    size="sm"
+                    variant="ghost"
+                  >
+                    Reject once
+                  </Button>
+                  <Button
+                    onClick={() =>
+                      void model.resolvePermission(model.permissionRequests[0]!, "allow_once")
+                    }
+                    size="sm"
+                  >
+                    Allow once
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <SessionComposer
+            composerError={model.composerError}
+            fileInputRef={model.fileInputRef}
+            input={model.input}
+            inputRef={model.inputRef}
+            onKeyDown={(event) => void handleKeyDown(event)}
+            onFilesSelected={(files) => void handleUploadFiles(files)}
+            onSend={() => void handleSend()}
+            pendingSessionFiles={pendingSessionFiles}
+            sending={model.sending}
+            sessionResourceMentions={sessionResourceMentions}
+            setInput={model.setInput}
+            streaming={model.streaming}
+            sendDisabledReason={sendDisabledReason}
+          />
+        </div>
+      </div>
+      {filesPanelOpen ? (
+        <SessionFilesPanel
+          onClose={() => {
+            setFilesPanelOpen(false);
+          }}
+          onUploadFiles={(files) => void handleUploadFiles(files)}
+          sessionId={model.activeSessionId}
+        />
+      ) : null}
+    </div>
+  );
+}

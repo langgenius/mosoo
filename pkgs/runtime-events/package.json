@@ -1,0 +1,22 @@
+{
+  "name": "@mosoo/runtime-events",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "vp lint .",
+    "tc": "vp exec tsc --noEmit",
+    "test": "vp exec bun test tests"
+  },
+  "dependencies": {
+    "@mosoo/ag-ui-session": "workspace:*",
+    "@mosoo/contracts": "workspace:*",
+    "@mosoo/id": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite-plus": "^0.1.23"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@mosoo/db",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "db:regen": "rm -rf ./drizzle && vp exec drizzle-kit generate --config drizzle.config.ts --name baseline && vp exec bun ./scripts/normalize-drizzle-baseline.ts && vp fmt --write ./drizzle",
+    "lint": "vp lint .",
+    "tc": "vp exec tsc --noEmit",
+    "test": "vp exec bun test tests"
+  },
+  "dependencies": {
+    "@mosoo/contracts": "workspace:*",
+    "@mosoo/id": "workspace:*",
+    "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^6.0.3",
+    "vite-plus": "^0.1.23"
+  }
+}

@@ -1,0 +1,112 @@
+import type {
+  AgentDeploymentVersion,
+  AgentKind,
+  AgentReadiness,
+  AgentVisibility,
+} from "@mosoo/contracts/agent";
+import type { AgentPackageResolutionState } from "@mosoo/contracts/agent-manifest";
+import type { McpAuthorizationState, McpCredentialStatus } from "@mosoo/contracts/mcp";
+
+export type AgentStatus = "draft" | "published";
+export type AgentRole = "owner" | "admin" | "user";
+export type AgentMode = "create" | "preview" | "dev" | "consume";
+export type { AgentKind };
+
+export type RuntimeId = string;
+
+export interface RuntimeInfo {
+  defaultModel: string;
+  id: RuntimeId;
+  name: string;
+  provider: string;
+  vendor: string;
+  color: string;
+  icon: string; // Fallback text when image unavailable
+}
+
+export interface ToolInfo {
+  id: string;
+  name: string;
+  icon: string;
+}
+
+export interface SkillInfo {
+  id: string;
+  name: string;
+  filename: string;
+  state?: "active" | "tombstone";
+}
+
+export interface McpServer {
+  id: string;
+  bindingId?: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+  authorizationState?: McpAuthorizationState;
+  iconUrl?: string; // Connector icon
+  type?: "web" | "custom";
+  /**
+   * Source pool this server was added from.
+   * personal = the owner's Integration pool.
+   * organization_shared = Admin-managed Organization pool.
+   */
+  source?: "personal" | "organization_shared";
+  /**
+   * Credential resolution mode for this Agent × Server binding.
+   * runtime_resolved = resolve at runtime from the active credential source.
+   * agent_bound = persist the builder's credential on the agent itself.
+   */
+  credentialMode?: "runtime_resolved" | "agent_bound";
+  credentialStatus?: McpCredentialStatus;
+  /**
+   * When credentialMode === "agent_bound", the human-readable subject label of
+   * the bound credential (e.g. "yevan@mosoo.ai" or "Bearer Token configured").
+   */
+  credentialSubject?: string;
+}
+
+export interface SpaceBinding {
+  id: string;
+  name: string;
+}
+
+export interface AgentConfig {
+  agentsFileId: string | null;
+  environmentId: string | null;
+  mcpServers: McpServer[];
+  model: string;
+  prompt: string;
+  skills: SkillInfo[];
+  spaces: SpaceBinding[];
+}
+
+export interface UserInfo {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+}
+
+export interface Agent {
+  id: string;
+  kind: AgentKind;
+  liveVersion: AgentDeploymentVersion | null;
+  name: string;
+  description: string;
+  provider: string;
+  readiness: AgentReadiness | null;
+  runtime: RuntimeId;
+  status: AgentStatus;
+  tools: ToolInfo[];
+  createdAt: string;
+  updatedAt: string;
+  versions: AgentDeploymentVersion[];
+  visibility: AgentVisibility;
+  owner: UserInfo;
+  packageSharingEnabled: boolean;
+  packageResolution: AgentPackageResolutionState | null;
+  role: AgentRole;
+  config: AgentConfig;
+  collaborators: { user: UserInfo; role: "admin" | "user" }[];
+}

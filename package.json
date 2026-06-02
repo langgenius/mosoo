@@ -1,0 +1,48 @@
+{
+  "devDependencies": {
+    "@graphql-codegen/cli": "^7.1.1",
+    "@graphql-codegen/client-preset": "^6.0.1",
+    "@graphql-codegen/schema-ast": "^6.0.1",
+    "@j178/prek": "^0.4.3",
+    "graphql": "^16.14.0",
+    "knip": "^6.15.0",
+    "tsx": "^4.22.4",
+    "vite-plus": "^0.1.23"
+  },
+  "engines": {
+    "bun": ">=1.3.14"
+  },
+  "name": "mosoo",
+  "packageManager": "bun@1.3.14",
+  "private": true,
+  "scripts": {
+    "build": "vp run --filter @mosoo/driver --filter @mosoo/web build",
+    "cf:types": "vp run --filter @mosoo/api cf:types",
+    "check": "vp run -w fmt:check && vp run -w lint && vp run -w tc && vp run -w test",
+    "db:migrate:local": "vp run --filter @mosoo/api db:migrate:local",
+    "db:regen": "vp run --filter @mosoo/db db:regen",
+    "deploy": "vp run -w deploy:api && vp run -w deploy:web",
+    "deploy:api": "vp run --filter @mosoo/api deploy",
+    "deploy:web": "vp run --filter @mosoo/web deploy",
+    "dev": "vp run --filter @mosoo/driver build && vp run --filter @mosoo/api --filter @mosoo/web --parallel dev",
+    "e2e:deterministic": "./e2e/run-deterministic.sh",
+    "e2e:preview-latency": "./e2e/run-preview-latency.sh",
+    "e2e:preview-smoke": "./e2e/run-preview-smoke.sh",
+    "e2e:signal-contract": "vp exec bun test e2e/runtime-signal-collector.test.ts",
+    "env:init": "vp run --filter @mosoo/api env:init",
+    "fmt": "vp fmt --write dev/config/bun-script-types.d.ts dev/config/graphql-codegen.ts dev/config/knip.jsonc dev/config/prek.toml dev/config/tsconfig.base.json dev/config/vite-plus.shared.ts dev/scripts vite.config.ts justfile apps pkgs e2e --ignore-path .gitignore",
+    "fmt:check": "vp fmt --check dev/config/bun-script-types.d.ts dev/config/graphql-codegen.ts dev/config/knip.jsonc dev/config/prek.toml dev/config/tsconfig.base.json dev/config/vite-plus.shared.ts dev/scripts vite.config.ts justfile apps pkgs e2e --ignore-path .gitignore",
+    "graphql:codegen": "vp exec tsx node_modules/.bin/graphql-codegen --config dev/config/graphql-codegen.ts",
+    "graphql:codegen:check": "vp exec tsx dev/scripts/check-graphql-codegen.ts",
+    "knip": "vp exec knip --config dev/config/knip.jsonc",
+    "lint": "vp run -w cf:types && vp lint vite.config.ts dev/config/bun-script-types.d.ts dev/config/vite-plus.shared.ts dev/scripts apps pkgs e2e",
+    "tc": "vp run -r tc",
+    "test": "vp run --filter @mosoo/api --filter @mosoo/driver --filter @mosoo/web --filter @mosoo/ag-ui-session --filter @mosoo/agent-package --filter @mosoo/contracts --filter @mosoo/db --filter @mosoo/driver-protocol --filter @mosoo/id --filter @mosoo/runtime-catalog --filter @mosoo/runtime-events --filter @mosoo/session-policy --filter @mosoo/skill-package test && vp run -w graphql:codegen:check"
+  },
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "pkgs/*",
+    "e2e"
+  ]
+}

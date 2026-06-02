@@ -1,0 +1,12 @@
+export const MANIFEST_PATH = "manifest.json";
+export const ENVIRONMENT_DEFINITION_PATH = "environment/definition.json";
+export const MCP_JSON_PATH = ".mcp.json";
+export const PACKAGE_CONTENT_TEXT_LIMIT_BYTES = 2_000_000;
+const MAX_AGENT_PACKAGE_ENTRY_COUNT = 512;
+const MAX_AGENT_PACKAGE_UNCOMPRESSED_BYTES = 64 * 1024 * 1024;
+export const MAX_AGENT_PACKAGE_ARCHIVE_BYTES = 64 * 1024 * 1024;
+
+export const AGENT_PACKAGE_ARCHIVE_EXTRACT_OPTIONS = {
+  maxEntryCount: MAX_AGENT_PACKAGE_ENTRY_COUNT,
+  maxTotalFileBytes: MAX_AGENT_PACKAGE_UNCOMPRESSED_BYTES,
+};

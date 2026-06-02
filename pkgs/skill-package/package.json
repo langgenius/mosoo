@@ -1,0 +1,21 @@
+{
+  "name": "@mosoo/skill-package",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "vp lint .",
+    "test": "vp exec bun test tests",
+    "tc": "vp exec tsc --noEmit"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite-plus": "^0.1.23"
+  }
+}

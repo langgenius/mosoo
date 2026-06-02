@@ -1,0 +1,9 @@
+node_modules
+.tmp
+.wrangler
+.dev.vars
+.envrc
+dist
+.DS_Store
+playwright-report
+test-results

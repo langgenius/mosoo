@@ -1,0 +1,330 @@
+import { AlertTriangle, ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
+
+import {
+  ADD_PROVIDER_KEY_TEXT,
+  getPrimaryProviderReadinessPresentation,
+} from "@/domains/vendor-credential/model/provider-readiness-copy";
+import { cn } from "@/shared/lib/class-names";
+import { Button } from "@/shared/ui/button";
+import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
+
+import type { Agent } from "../../agent.types";
+import { isRuntimeSelectable, listRuntimeOptions } from "../../runtime-catalog";
+import { AgentChannelsField } from "../channels-field";
+import { PackageResolutionIssueCard } from "../package-resolution-issue-card";
+import { RuntimeIcon } from "../shared-components";
+import { AgentsFileField } from "./agents-file-field";
+import { EnvironmentPicker } from "./environment-picker";
+import { AgentMcpBindingsField } from "./mcp-bindings-field";
+import { ModelPickerField } from "./model-picker-field";
+import { AgentSkillsField } from "./skills-field";
+import { AgentSpacesField } from "./spaces-field";
+import { RequiredMark, SectionHeader } from "./ui";
+import type { AgentEditorModel } from "./use-model";
+
+function ReadinessBanner({ agent }: { agent: Agent }) {
+  if (!agent.readiness || agent.readiness.ready || agent.readiness.issues.length === 0) {
+    return null;
+  }
+
+  const errors = agent.readiness.issues.filter((issue) => issue.severity === "error");
+
+  if (errors.length === 0) {
+    return null;
+  }
+
+  const primary = errors[0];
+  const providerPresentation = getPrimaryProviderReadinessPresentation(errors);
+  const message =
+    providerPresentation?.message ??
+    primary?.message ??
+    "Resolve configuration before preview or publish.";
+
+  return (
+    <div className="rounded-xl border border-amber-500/30 bg-amber-50/60 px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-[13px] font-medium text-amber-900">
+            <AlertTriangle className="size-4" />
+            {providerPresentation?.title ?? "Configuration required"}
+          </div>
+          <div className="mt-1 text-[12px] leading-relaxed text-amber-900/90">{message}</div>
+          {providerPresentation?.originalMessage !== undefined &&
+          providerPresentation.originalMessage !== null &&
+          providerPresentation.originalMessage !== message ? (
+            <div className="mt-1 text-[11px] leading-relaxed text-amber-900/70">
+              {providerPresentation.originalMessage}
+            </div>
+          ) : null}
+        </div>
+        {providerPresentation?.action === "add-provider-key" ? (
+          <Button asChild size="xs" variant="outline">
+            <Link to="/providers">
+              {ADD_PROVIDER_KEY_TEXT}
+              <ExternalLink className="size-3" />
+            </Link>
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function PackageResolutionBanner({ agent }: { agent: Agent }) {
+  const resolution = agent.packageResolution;
+
+  if (!resolution || resolution.report.issues.length === 0) {
+    return null;
+  }
+
+  const blockingIssues = resolution.report.issues.filter(
+    (issue) =>
+      issue.required &&
+      issue.severity === "error" &&
+      issue.status !== "resolved" &&
+      issue.status !== "warning",
+  );
+
+  return (
+    <div className="border-border bg-muted/30 rounded-xl border px-4 py-3">
+      <div className="text-foreground flex items-center gap-2 text-[13px] font-medium">
+        <AlertTriangle className="size-4 text-amber-600" />
+        Package repair {blockingIssues.length > 0 ? "required" : "recommended"}
+      </div>
+      <div className="text-muted-foreground mt-1 text-[12px]">
+        This draft was created by {resolution.source}. Required unresolved items block preview and
+        publish until repaired.
+      </div>
+      <div className="mt-3 space-y-2">
+        {resolution.report.issues.map((issue) => (
+          <PackageResolutionIssueCard
+            issue={issue}
+            key={`${issue.code}:${issue.targetLabel ?? ""}`}
+            requiredTone="amber"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function BasicsSection({
+  agent,
+  model,
+  organizationId,
+  readOnly,
+}: {
+  agent: Agent;
+  model: AgentEditorModel;
+  organizationId: string | null;
+  readOnly: boolean;
+}) {
+  return (
+    <div className="space-y-5">
+      <ReadinessBanner agent={agent} />
+      {agent.packageResolution ? <PackageResolutionBanner agent={agent} /> : null}
+
+      <div>
+        <SectionHeader>Identity</SectionHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-muted-foreground text-[12px]">
+              Name
+              <RequiredMark />
+            </Label>
+            <Input
+              onChange={(event) => {
+                model.setName(event.target.value);
+              }}
+              readOnly={readOnly}
+              value={model.draft.name}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-muted-foreground text-[12px]" htmlFor="agent-description">
+              Description
+            </Label>
+            <textarea
+              aria-label="Description"
+              className="border-border focus:ring-brand-ring w-full rounded-lg border bg-white px-3 py-2 text-[13px] outline-none focus:ring-2"
+              id="agent-description"
+              onChange={(event) => {
+                model.setDescription(event.target.value);
+              }}
+              placeholder="Describe what this agent does."
+              readOnly={readOnly}
+              rows={3}
+              value={model.draft.description}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-muted-foreground text-[12px]">
+                Runtime
+                <RequiredMark />
+              </Label>
+              {agent.status === "published" ? (
+                <span
+                  className="text-muted-foreground text-[11px]"
+                  title="Runtime cannot be changed in-place once an Agent is published. Fork Agent to switch."
+                >
+                  Locked · Fork Agent to switch
+                </span>
+              ) : null}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {listRuntimeOptions(model.draft.runtime).map((runtime) => {
+                const selected = runtime.id === model.draft.runtime;
+                const selectable = isRuntimeSelectable(runtime.id);
+                const publishedRuntimeLocked = agent.status === "published" && !selected;
+                const disabled = readOnly || !selectable || publishedRuntimeLocked;
+
+                return (
+                  <button
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors",
+                      selected && selectable
+                        ? "border-brand bg-brand-light"
+                        : "border-border hover:border-brand/30",
+                      disabled ? "pointer-events-none bg-muted/40 opacity-70" : null,
+                    )}
+                    disabled={disabled}
+                    key={runtime.id}
+                    onClick={() => {
+                      model.setRuntime(runtime.id);
+                    }}
+                    type="button"
+                  >
+                    <RuntimeIcon runtime={runtime} size={24} />
+                    <div className="min-w-0">
+                      <div className="text-foreground text-[13px] font-medium">{runtime.name}</div>
+                      <div className="text-muted-foreground text-[11px]">
+                        {publishedRuntimeLocked
+                          ? "Fork Agent required"
+                          : selectable
+                            ? runtime.vendor
+                            : selected
+                              ? "Runtime disabled"
+                              : "Runtime unavailable"}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {agent.status === "published" ? (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-50/60 px-3 py-2 text-[12px] leading-5 text-amber-900">
+                Runtime is locked for this published Agent. Fork Agent to switch runtime; existing
+                sessions, audit, cost, logs, and agent-state stay attached here.
+              </div>
+            ) : null}
+          </div>
+
+          <ModelPickerField model={model} readOnly={readOnly} />
+        </div>
+      </div>
+
+      <div className="border-border-subtle border-t pt-5">
+        <SectionHeader>System Prompt</SectionHeader>
+        <textarea
+          aria-label="System prompt"
+          className="border-border focus:ring-brand-ring w-full resize-y rounded-lg border bg-white px-4 py-3 text-[13px] leading-relaxed outline-none focus:ring-2"
+          onChange={(event) => {
+            model.setPrompt(event.target.value);
+          }}
+          placeholder={`Describe this agent's role, boundaries, answer style, and when it should ask clarifying questions.
+
+Example:
+You are a concise operations agent. Confirm scope before changing production data. Ask clarifying questions when user intent, source data, or approval boundaries are unclear.`}
+          readOnly={readOnly}
+          rows={8}
+          value={model.draft.prompt}
+        />
+      </div>
+
+      <div className="border-border-subtle border-t pt-5">
+        <SectionHeader>AGENTS.md</SectionHeader>
+        <AgentsFileField
+          agentsFileId={model.draft.agentsFileId}
+          onChange={model.setAgentsFileId}
+          organizationId={organizationId}
+          readOnly={readOnly}
+        />
+      </div>
+    </div>
+  );
+}
+
+export function IntegrationsSection({
+  model,
+  organizationId,
+  readOnly,
+}: {
+  model: AgentEditorModel;
+  organizationId: string | null;
+  readOnly: boolean;
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <SectionHeader>Skills</SectionHeader>
+        <AgentSkillsField
+          organizationId={organizationId}
+          readOnly={readOnly}
+          selectedSkills={model.draft.skills}
+          setSkills={model.setSkills}
+        />
+      </div>
+
+      <div className="border-border-subtle scroll-mt-24 border-t pt-5" id="agent-mcp-bindings">
+        <SectionHeader>MCP Servers</SectionHeader>
+        <AgentMcpBindingsField
+          organizationId={organizationId}
+          readOnly={readOnly}
+          selectedServers={model.draft.mcpServers}
+          setServers={model.setMcpServers}
+        />
+      </div>
+    </div>
+  );
+}
+
+export function EnvironmentSection({
+  agent,
+  model,
+  organizationId,
+  readOnly,
+}: {
+  agent: Agent;
+  model: AgentEditorModel;
+  organizationId: string | null;
+  readOnly: boolean;
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <SectionHeader>Environment</SectionHeader>
+        <EnvironmentPicker model={model} organizationId={organizationId} readOnly={readOnly} />
+      </div>
+
+      <div className="border-border-subtle border-t pt-5">
+        <SectionHeader>Spaces</SectionHeader>
+        <AgentSpacesField
+          organizationId={organizationId}
+          readOnly={readOnly}
+          selectedSpaces={model.draft.spaces}
+          setSpaces={model.setSpaces}
+        />
+      </div>
+
+      <div className="border-border-subtle border-t pt-5">
+        <SectionHeader>Channels</SectionHeader>
+        <AgentChannelsField agent={agent} />
+      </div>
+    </div>
+  );
+}
