@@ -6,7 +6,7 @@
 
 ## One-line positioning
 
-Mosoo Terminal exposes the **root shell experience that ships natively with the Cloudflare Sandbox** directly to **Pet** agent owners. We **don't reimplement a terminal — we just wire up CF's capabilities correctly**: CF provides the PTY, automatic replay, multi-client support, lazy-wake, and exponential backoff; we add ownership checks, audit trails, reconnect keep-alive, and honest copy.
+Mosoo Terminal exposes the **root shell experience that ships natively with the Cloudflare Sandbox** directly to **Pet** agent owners. We **don't reimplement a terminal — we just wire up CF's capabilities correctly**: CF provides the PTY, automatic replay, multi-client support, lazy-wake, and exponential backoff; we add ownership checks, reconnect keep-alive, and honest copy.
 
 **Cattle agents do not surface a Terminal entry point in the frontend** (see "Why Cattle has no Terminal" below).
 
@@ -24,14 +24,12 @@ Your Mosoo **Pet** agent is that VPS. **The Terminal is the shell you use to ope
 - **During the day**: notice the agent is stuck → `tail -f` the logs / `ps aux` to check processes / kill and restart.
 - **Fixing things**: `vim /workspace/config.yaml` to change a line, then restart the service.
 - **Updating**: `apt install` a missing tool, `pip install` a new dependency, `git pull` the agent repo.
-- **Before clocking off in the evening**: the admin uses Audit to look up "who touched agent X's sandbox today?"
 
 **Frequency reference** (the norm when running an AI agent on a VPS):
 
 - Each Pet owner opens the Terminal 3-10 times per day.
 - Hundreds of reconnects accumulate per week (WiFi blips, laptop waking from sleep, switching tabs, switching between desktop and laptop).
 - Multiple tabs in parallel: a split between monitoring and running commands is the default workflow.
-- Audit traffic: the admin checks the "who entered the Terminal" lookup table 1-2 times a week.
 
 **Mosoo Terminal is NOT an emergency debug tool; it IS the shell for your daily ops (Pet only).**
 
@@ -84,9 +82,6 @@ A Cattle owner who wants to inspect task execution → goes to the **Logs tab** 
        opens Mosoo → the same Terminal → sees the live state from the desktop session
        (cross-device continuity, thanks to a sessionId that is stable per owner+agent)
 
-17:30  Admin Alice filters by agent X on the Audit page
-       Sees: "09:15 Bob open terminal (still active)"
-       Pings Bob: "what did you change on agent X today?"
 ```
 
 A Pet owner **runs through this journey 3-10 times a day**, scaled by the number of Pet agents per team × the number of Pet owners.
@@ -97,7 +92,7 @@ A Pet owner **runs through this journey 3-10 times a day**, scaled by the number
 
 ## The 4 things we build
 
-We cut the 11-14 dev-days envisioned in v1.0 down to ~1.75 dev-days, doing only the 4 things — plus 1 frontend gate — that make **frequent, VPS-style use genuinely smooth for Pet owners**:
+We cut the 11-14 dev-days envisioned in v1.0 down to ~1.75 dev-days, doing only the 3 things — plus 1 frontend gate — that make **frequent, VPS-style use genuinely smooth for Pet owners**:
 
 ### (1) No content lost after reconnect
 
@@ -113,13 +108,7 @@ Two tabs viewing the same agent's Terminal stay in **real-time input/output sync
 
 > ⚠️ If your workflow is "tab A runs tail -f / tab B runs commands" — i.e. parallel **independent** shells — v1 does not support per-tab independent PTYs by default. Open `tmux` or `screen` inside the sandbox to split windows yourself.
 
-### (3) Audit trail (admin lookup)
-
-The admin filters agent X's `agent.update` events on the Audit page → sees "2026-05-20 14:32 · Bob · agent X", expands the metadata, and reads the `terminal_open` marker plus the duration.
-
-**How we do it**: we don't add a new audit verb — we **reuse the existing `agent.update` + metadata pattern** (the same mental model as restart / recreate / reset).
-
-### (4) Honest copy for the first few seconds
+### (3) Honest copy for the first few seconds
 
 A sandbox that hasn't been used in a week will hibernate; after you click Terminal, CF takes a few seconds to lazy-wake it. The copy tells you "it takes a few seconds to wake the sandbox the first time," so you don't think the system has crashed.
 
@@ -141,4 +130,3 @@ This product has several ops tools. Don't mix them up:
 | See what messages / tool calls a given session ran (Pet + Cattle)           | **Logs tab** → pick a session                                            |
 | Open a root shell to debug / maintain the sandbox (**Pet only, daily ops**) | **Terminal tab** (this PRD)                                              |
 | See an agent's version history and roll back to an older version            | **Versions tab** ([for-humans](./agent-versions.md), currently deferred) |
-| See who performed which governance actions (publish / share, etc.)          | **Audit Log** (top navigation)                                           |

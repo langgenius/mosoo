@@ -85,7 +85,7 @@ Users should be able to:
 | Logo / brand assets                  |          Yes |        Yes | Copied as a package asset; a new asset id is generated on import                                                            |
 | Provider / MCP / Environment secrets |           No |         No | Re-authorize or re-enter after import                                                                                       |
 | Session runtime state / Agent memory |           No |         No | Belongs to the runtime snapshot, not the Package                                                                            |
-| Sessions / logs / audit / cost       |           No |         No | Run history                                                                                                                 |
+| Sessions / logs / cost               |           No |         No | Run history                                                                                                                 |
 
 > **Security red line**: a `.agent` file **never carries a plaintext secret** — provider key, MCP token, Environment secret, webhook signing secret, and personal OAuth token are all excluded. Secrets are configuration items and must be reconfigured in the new environment.
 
@@ -154,7 +154,7 @@ my-agent.agent
 | MCP declaration                                |            Yes | Carries only the server intent; credential, token, and source connection state do not enter the package      |
 | Environment template                           |            Yes | Carries declarative config; secret values must be reconnected target-side                                    |
 | Space bindings                                 |            Yes | Carries only binding intent such as alias / expected name; does not copy Space content or source permissions |
-| Runtime state / sessions / logs / audit / cost |             No | Belongs to run history, not the package                                                                      |
+| Runtime state / sessions / logs / cost         |             No | Belongs to run history, not the package                                                                      |
 
 ### Key constraints
 
@@ -205,4 +205,4 @@ flowchart TD
 
 ---
 
-> The full engineering contract (covering architecture impact, scope / non-scope, the resolution matrix, MCP / Space invariants, collision policy, Screens, Flows, thinking audit, and implementation boundaries) lives in the shipped PRD.
+> The full engineering contract (covering architecture impact, scope / non-scope, the resolution matrix, MCP / Space invariants, collision policy, Screens, Flows, reasoning review, and implementation boundaries) lives in the shipped PRD.

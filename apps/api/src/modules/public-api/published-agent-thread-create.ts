@@ -91,22 +91,6 @@ export async function createPublishedAgentThread(
       options: {
         accessViewer: admission.accessViewer,
         attributedUserId: admission.attributedUserId,
-        auditActor: {
-          display:
-            admission.createdByKind === "service_token"
-              ? `Service Token: ${admission.tokenLabel}`
-              : `API Key: ${admission.tokenLabel}`,
-          id: admission.tokenId,
-          metadata: {
-            attributedUserId: admission.attributedUserId ?? "",
-            clientExternalRef: metadata.client_external_ref ?? "",
-            executionOwnerId: admission.executionOwnerId,
-            publicApiCredentialId: admission.tokenId,
-            publicApiCredentialLabel: admission.tokenLabel,
-            source: "public_api",
-          },
-          type: "api_key",
-        },
         metadata: { public_api: metadata },
       },
       viewer: admission.creatorViewer,

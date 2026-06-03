@@ -50,7 +50,7 @@ const META: Record<LifecycleActionKind, ActionMeta> = {
     title: "Apply changes · recreate sandbox (state preserved)",
   },
   "fork-agent": {
-    body: "Runtime change is not allowed in-place on a published agent. Fork this agent into a new identity with the new runtime; sessions, cost, audit, and agent-state stay attached to the original.",
+    body: "Runtime change is not allowed in-place on a published agent. Fork this agent into a new identity with the new runtime; sessions, cost, and agent-state stay attached to the original.",
     danger: "medium",
     preservesState: true,
     primary: "Fork with new runtime",

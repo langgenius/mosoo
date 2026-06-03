@@ -40,7 +40,7 @@ Agent owners have real pain in two kinds of scenarios — but **there is current
 
 - Today you only see a one-line summary ("Skills + 2 · MCP server added").
 - You want to know exactly which skill changed, whether the prompt was touched, whether the model was changed → you can't see it.
-- You want to know who published it → you can't see the actor; you have to go search the Audit page yourself.
+- You want to know which version was published → you can inspect the deployment version history directly.
 
 ### Scenario B: v5 broke and you need to roll back immediately
 
@@ -68,7 +68,7 @@ Once done, an owner should be able to:
 | **Live Version**                      | The version currently used for new sessions. There is only ever one at a time.                                                                                                                       |
 | **Snapshot view (frozen view)**       | The read-only page you reach by clicking a version row — it reuses the layout of the Edit page, but all inputs are disabled.                                                                         |
 | **Restore (rollback / time machine)** | Select an old version → the system creates a new live version that copies the configuration from that time + resets the agent's own accumulated memory back to its initial state at that time.       |
-| **The "time machine" principle**      | From the user's point of view, the agent is 100% back to the way it was (configuration + memory); records that belong to the observer's point of view (cost / audit / logs) keep their real history. |
+| **The "time machine" principle**      | From the user's point of view, the agent is 100% back to the way it was (configuration + memory); records that belong to the observer's point of view (cost / logs) keep their real history.         |
 | **Session pinning**                   | A session is bound to the live version that was current when it was created; this binding **never changes**. Restore does not switch sessions that are already running.                              |
 
 ---
@@ -87,7 +87,6 @@ flowchart LR
 
   subgraph Preserved["❌ Untouched (real history preserved)"]
     Cost["Cost records"]
-    Audit["Audit logs"]
     SystemLog["Runtime logs"]
     OldSess["Running existing sessions<br/>continue on their respective versions"]
   end
@@ -104,7 +103,7 @@ flowchart LR
 **Key boundaries:**
 
 - **Everything from the user's point of view is rolled back** (configuration + agent memory).
-- **Everything from the observer's point of view is preserved** (cost / audit / logs = "things that actually happened").
+- **Everything from the observer's point of view is preserved** (cost / logs = "things that actually happened").
 - **External dependencies are untouched** (the Space has its own file versioning system).
 - **Running existing sessions are not switched** (this is a feature, not a bug — a customer's experience must not be interrupted midway).
 
@@ -149,7 +148,7 @@ flowchart LR
 3. The snapshot view has a **Restore button** in the top right (only on non-live rows).
 4. The Restore dialog → the system executes the rollback.
 
-**Everything else (the overall list layout, the Edit page itself, Logs / Cost / Preview / Audit Log) is completely unchanged.**
+**Everything else (the overall list layout, the Edit page itself, Logs / Cost / Preview) is completely unchanged.**
 
 ---
 
@@ -159,7 +158,6 @@ This product has several kinds of "logs / history / versions." Do not mix them u
 
 | What you want to know                                             | Where to look                                                                  |
 | ----------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Who performed what mutation (publish / share / fork / login …)    | **Audit Log** (top navigation)                                                 |
 | What a given session did (messages / tools / permissions / files) | **Logs tab** → select session                                                  |
 | What recently happened on this agent's machine                    | **Debug → System Log** (a separate PRD, [for-humans](./agent-runtime-logs.md)) |
 | An agent's historical versions + rolling back to an old version   | **Versions tab** (**this PRD, currently deferred**)                            |

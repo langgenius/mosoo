@@ -23,7 +23,6 @@ const SKILL_ALLOWED_ROOTS = ["assets/", "references/", "scripts/"] as const;
 const ARCHIVE_PATH_FORBIDDEN_SEGMENTS = new Set([
   ".env",
   ".state",
-  "audit",
   "channel",
   "channels",
   "cost",

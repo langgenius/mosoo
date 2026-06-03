@@ -85,8 +85,8 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                   Unpublish <strong>{agent.name}</strong>?
                 </p>
                 <p className="text-muted-foreground text-xs">
-                  New sessions stop accepting. Existing sessions, audit, cost, and the live version
-                  stay accessible. You can re-publish anytime; visibility is remembered.
+                  New sessions stop accepting. Existing sessions, cost, and the live version stay
+                  accessible. You can re-publish anytime; visibility is remembered.
                 </p>
                 {unpublishMutation.error ? (
                   <div className="text-destructive text-xs">
@@ -248,7 +248,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                     <li>Agent profile, prompts, Skills, and MCP refs</li>
                     <li>Space files</li>
                     <li>Past sessions and transcripts</li>
-                    <li>Audit log and cost history</li>
+                    <li>Cost history</li>
                   </ul>
                 </div>
               </div>

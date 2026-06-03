@@ -16,11 +16,6 @@ import { and, eq, isNull } from "drizzle-orm";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { errorMessageChainIncludes, forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { getPublicEmailDomain } from "../../auth/domain/email-domain";
 import { recordLastActiveOrganization } from "../../users/application/account-organization-context.service";
@@ -316,20 +311,6 @@ export async function updateOrganizationPrimaryDomain(
       throw error;
     }
 
-    await appendAuditEvent(database, {
-      action: AUDIT_ACTION.orgSettingsUpdate,
-      ...resolveViewerAuditActor(viewer),
-      metadata: {
-        kind: "convert_personal_with_primary_domain",
-        primaryDomain: normalizedDomain ?? "",
-      },
-      organizationId: input.organizationId,
-      outcome: "success",
-      resourceDisplay: "Organization settings",
-      resourceId: input.organizationId,
-      resourceType: AUDIT_RESOURCE.orgSettings,
-    });
-
     return toOrganizationSummary({
       ...admitted,
       join_policy: "auto",
@@ -347,20 +328,6 @@ export async function updateOrganizationPrimaryDomain(
   if (updated === null) {
     throw new Error("Organization not found.");
   }
-
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.orgSettingsUpdate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      kind: "primary_domain",
-      primaryDomain: normalizedDomain ?? "",
-    },
-    organizationId: input.organizationId,
-    outcome: "success",
-    resourceDisplay: "Organization settings",
-    resourceId: input.organizationId,
-    resourceType: AUDIT_RESOURCE.orgSettings,
-  });
 
   return toOrganizationSummaryWithViewerRole(updated, admitted.viewer_role);
 }
@@ -408,21 +375,6 @@ export async function updateOrganizationProfile(
     throw new Error("Organization not found.");
   }
 
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.orgSettingsUpdate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      avatarChanged: avatarProvided,
-      kind: "profile",
-      nameChanged: nameProvided,
-    },
-    organizationId: input.organizationId,
-    outcome: "success",
-    resourceDisplay: "Organization settings",
-    resourceId: input.organizationId,
-    resourceType: AUDIT_RESOURCE.orgSettings,
-  });
-
   return toOrganizationSummaryWithViewerRole(updated, membership.role);
 }
 
@@ -448,19 +400,6 @@ export async function convertPersonalOrganization(
     })
     .where(eq(organizationsTable.id, input.organizationId))
     .run();
-
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.orgSettingsUpdate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      kind: "convert_personal",
-    },
-    organizationId: input.organizationId,
-    outcome: "success",
-    resourceDisplay: "Organization settings",
-    resourceId: input.organizationId,
-    resourceType: AUDIT_RESOURCE.orgSettings,
-  });
 
   return toOrganizationSummary({
     ...admitted,

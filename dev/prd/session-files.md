@@ -1,6 +1,6 @@
 # Session Files — for humans
 
-> This is the product-narrative version for non-engineering readers. The full engineering contract (the file-manifest injection mechanism, state machine, corner cases, thinking audit, implementation boundaries, and runtime-adapter constraints) lives in the shipped engineering PRD for this same feature.
+> This is the product-narrative version for non-engineering readers. The full engineering contract (the file-manifest injection mechanism, state machine, corner cases, reasoning review, implementation boundaries, and runtime-adapter constraints) lives in the shipped engineering PRD for this same feature.
 
 ## In one sentence
 

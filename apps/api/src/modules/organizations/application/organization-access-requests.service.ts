@@ -15,11 +15,6 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError, notFoundError, validationError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import { sendOrganizationAccessDecisionEmail } from "../../auth/application/auth-email.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { normalizeEmail } from "../../users/domain/email-address";
@@ -146,7 +141,7 @@ export async function requestOrganizationAccess(
     return toOrganizationAccessRequest(concurrentRequest);
   }
 
-  const created = toPendingOrganizationAccessRequest({
+  return toPendingOrganizationAccessRequest({
     createdAtMs: timestampMs,
     id: requestId,
     organizationId: admission.organization_id,
@@ -157,23 +152,6 @@ export async function requestOrganizationAccess(
     requesterEmail: normalizedViewerEmail,
     requesterName: viewer.name,
   });
-
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.memberShare,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      kind: "access_request_create",
-      requestId: created.id,
-      status: "pending",
-    },
-    organizationId: created.organizationId,
-    outcome: "success",
-    resourceDisplay: created.requesterEmail,
-    resourceId: created.requestedByAccountId,
-    resourceType: AUDIT_RESOURCE.member,
-  });
-
-  return created;
 }
 
 export async function requestOrganizationInvitation(
@@ -287,7 +265,7 @@ export async function requestOrganizationInvitation(
     return toOrganizationAccessRequest(concurrentRequest);
   }
 
-  const created = toPendingOrganizationAccessRequest({
+  return toPendingOrganizationAccessRequest({
     createdAtMs: timestampMs,
     id: requestId,
     organizationId: admission.organization_id,
@@ -298,23 +276,6 @@ export async function requestOrganizationInvitation(
     requesterEmail: normalizedEmail,
     requesterName: inviteeName,
   });
-
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.memberShare,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      kind: "invitation_request_create",
-      requestId,
-      status: "pending",
-    },
-    organizationId: admission.organization_id,
-    outcome: "success",
-    resourceDisplay: inviteeName || normalizedEmail,
-    resourceId: inviteeId,
-    resourceType: AUDIT_RESOURCE.member,
-  });
-
-  return created;
 }
 
 export async function listOrganizationAccessRequests(
@@ -435,38 +396,6 @@ export async function reviewOrganizationAccessRequest(
         ),
       )
       .run();
-
-    await appendAuditEvent(database, {
-      action: AUDIT_ACTION.memberCreate,
-      ...resolveViewerAuditActor(viewer),
-      metadata: {
-        kind: "access_request_approve",
-        requestId: reviewed.id,
-        role: "member",
-        status: "active",
-      },
-      organizationId: reviewed.organizationId,
-      outcome: "success",
-      resourceDisplay: reviewed.requesterEmail,
-      resourceId: reviewed.requestedByAccountId,
-      resourceType: AUDIT_RESOURCE.member,
-    });
-  } else {
-    await appendAuditEvent(database, {
-      action: AUDIT_ACTION.memberUpdate,
-      ...resolveViewerAuditActor(viewer),
-      metadata: {
-        decision: input.decision,
-        kind: "access_request_reject",
-        requestId: reviewed.id,
-        status: "rejected",
-      },
-      organizationId: reviewed.organizationId,
-      outcome: "success",
-      resourceDisplay: reviewed.requesterEmail,
-      resourceId: reviewed.requestedByAccountId,
-      resourceType: AUDIT_RESOURCE.member,
-    });
   }
 
   try {

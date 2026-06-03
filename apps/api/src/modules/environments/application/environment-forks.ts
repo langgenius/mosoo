@@ -17,11 +17,6 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
   ensureEnvironmentAccess,
@@ -69,17 +64,6 @@ export async function createEnvironmentFork(
     timestampMs,
   });
 
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.environmentFork,
-    ...resolveViewerAuditActor(viewer),
-    metadata: { sourceEnvironmentId: access.row.id },
-    organizationId: access.row.organizationId,
-    outcome: "success",
-    resourceDisplay: forkName,
-    resourceId: forkId,
-    resourceType: AUDIT_RESOURCE.environment,
-  });
-
   const fork = await getEnvironmentRecordRow(bindings.DB, forkId);
 
   if (!fork) {
@@ -125,7 +109,6 @@ export async function deleteEnvironment(
 
   const targetUserIds = await collectCascadeForkUsers(bindings.DB, access.row);
   const sourceConfig = toConfig(access.row);
-  const ownerAtTimeId = access.row.ownerId ?? "organization";
   const timestampMs = currentTimestampMs();
   const forkNamesByTargetUserId = await allocateCopyNamesByOwner(
     bindings.DB,
@@ -169,21 +152,6 @@ export async function deleteEnvironment(
         ),
       )
       .run();
-
-    await appendAuditEvent(bindings.DB, {
-      action: AUDIT_ACTION.environmentFork,
-      ...resolveViewerAuditActor(viewer),
-      metadata: {
-        cascade: "true",
-        sourceEnvironmentId: access.row.id,
-        targetUserId,
-      },
-      organizationId: access.row.organizationId,
-      outcome: "success",
-      resourceDisplay: forkName,
-      resourceId: forkId,
-      resourceType: AUDIT_RESOURCE.environment,
-    });
   }
 
   await getAppDatabase(bindings.DB)
@@ -203,18 +171,4 @@ export async function deleteEnvironment(
     .delete(environmentsTable)
     .where(eq(environmentsTable.id, access.row.id))
     .run();
-
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.environmentDelete,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      owner_at_time_id: ownerAtTimeId,
-      ...(access.row.ownerId !== viewerId ? { override: "organization_admin" } : {}),
-    },
-    organizationId: access.row.organizationId,
-    outcome: "success",
-    resourceDisplay: access.row.name,
-    resourceId: access.row.id,
-    resourceType: AUDIT_RESOURCE.environment,
-  });
 }

@@ -219,24 +219,6 @@ export type AgentVisibility =
   | 'organization'
   | 'private';
 
-export type AuditActorType =
-  | 'agent'
-  | 'api_key'
-  | 'system'
-  | 'user';
-
-export type AuditEventsFilterInput = {
-  organizationId: PlatformId;
-  outcome?: AuditOutcome | null | undefined;
-  q?: string | null | undefined;
-  startMs?: number | null | undefined;
-};
-
-export type AuditOutcome =
-  | 'denied'
-  | 'failure'
-  | 'success';
-
 export type AuthMethod =
   | 'email_otp'
   | 'google_oauth';
@@ -1213,15 +1195,6 @@ export type ResetAgentStateMutationVariables = Exact<{
 
 export type ResetAgentStateMutation = { resetAgentState: { affectedSessionCount: number, agentId: PlatformId, ok: boolean, operation: RuntimeStateOperation } };
 
-export type AuditEventFieldsFragment = { action: string, after: PrimitiveRecord, before: PrimitiveRecord, correlationId: string | null, id: PlatformId, ipAddress: string | null, metadata: PrimitiveRecord, outcome: AuditOutcome, resourceDisplay: string | null, resourceId: string | null, resourceType: string, sessionId: PlatformId | null, timestamp: string, userAgent: string | null, actor: { display: string, id: string | null, type: AuditActorType } };
-
-export type AuditEventsQueryVariables = Exact<{
-  filter: AuditEventsFilterInput;
-}>;
-
-
-export type AuditEventsQuery = { auditEvents: Array<{ action: string, after: PrimitiveRecord, before: PrimitiveRecord, correlationId: string | null, id: PlatformId, ipAddress: string | null, metadata: PrimitiveRecord, outcome: AuditOutcome, resourceDisplay: string | null, resourceId: string | null, resourceType: string, sessionId: PlatformId | null, timestamp: string, userAgent: string | null, actor: { display: string, id: string | null, type: AuditActorType } }> };
-
 type CostTotalsFields_CostAgentRow_Fragment = { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number };
 
 type CostTotalsFields_CostDailyPoint_Fragment = { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number };
@@ -2143,29 +2116,6 @@ fragment AgentFileSpaceMountFields on AgentFileSpaceMountNode {
   spaceName
   url
 }`, {"fragmentName":"AgentFileEntryFields"}) as unknown as TypedDocumentString<AgentFileEntryFieldsFragment, unknown>;
-export const AuditEventFieldsFragmentDoc = new TypedDocumentString(`
-    fragment AuditEventFields on AuditEvent {
-  action
-  actor {
-    display
-    id
-    type
-  }
-  after
-  before
-  correlationId
-  id
-  ipAddress
-  metadata
-  outcome
-  resourceDisplay
-  resourceId
-  resourceType
-  sessionId
-  timestamp
-  userAgent
-}
-    `, {"fragmentName":"AuditEventFields"}) as unknown as TypedDocumentString<AuditEventFieldsFragment, unknown>;
 export const CostAgentFieldsFragmentDoc = new TypedDocumentString(`
     fragment CostAgentFields on CostAgentRow {
   activeUsers
@@ -3510,33 +3460,6 @@ export const ResetAgentStateDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ResetAgentStateMutation, ResetAgentStateMutationVariables>;
-export const AuditEventsDocument = new TypedDocumentString(`
-    query AuditEvents($filter: AuditEventsFilterInput!) {
-  auditEvents(filter: $filter) {
-    ...AuditEventFields
-  }
-}
-    fragment AuditEventFields on AuditEvent {
-  action
-  actor {
-    display
-    id
-    type
-  }
-  after
-  before
-  correlationId
-  id
-  ipAddress
-  metadata
-  outcome
-  resourceDisplay
-  resourceId
-  resourceType
-  sessionId
-  timestamp
-  userAgent
-}`) as unknown as TypedDocumentString<AuditEventsQuery, AuditEventsQueryVariables>;
 export const OrganizationCostCardDocument = new TypedDocumentString(`
     query OrganizationCostCard($organizationId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
   organizationCostCard(

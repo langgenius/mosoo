@@ -54,8 +54,6 @@ export async function createCompletedTelegramFinalDeliveryJob(input: {
     clientRequestId: input.externalEventId,
     text: "Review this",
     trigger: {
-      auditActorDisplay: "Telegram 42",
-      auditActorId: "42",
       eventId: input.externalEventId,
       externalActorId: "telegram:user:42",
       externalMessageId: `${input.externalEventId}:message`,
@@ -142,8 +140,6 @@ export async function createCompletedDiscordFinalDeliveryJob(input: {
     clientRequestId: input.externalEventId,
     text: "Review this",
     trigger: {
-      auditActorDisplay: "Discord Ada",
-      auditActorId: "discord-user-1",
       eventId: input.externalEventId,
       externalActorId: "discord:user:discord-user-1",
       externalMessageId: "discord-channel-1:message-1",
@@ -236,8 +232,6 @@ export async function createCompletedLarkFinalDeliveryJob(input: {
     clientRequestId: input.externalEventId,
     text: "Review this",
     trigger: {
-      auditActorDisplay: "Lark Ada",
-      auditActorId: "ou_alice",
       eventId: input.externalEventId,
       externalActorId: "lark:ou_alice",
       externalMessageId: "om_message",

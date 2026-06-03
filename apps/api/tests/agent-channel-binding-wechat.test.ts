@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 
 import {
   agentChannelBindingsTable,
-  auditEventsTable,
   vaultSecretsTable,
   wechatChannelAccountsTable,
   wechatChannelPairingsTable,
@@ -309,15 +308,6 @@ describe("agent channel WeChat bindings", () => {
         await expect(
           readSecretOutcome(database, bindings, newBindingRow.encryptedCredsSecretId),
         ).resolves.toMatchObject({ status: "found" });
-
-        const auditRows = await database.app().select().from(auditEventsTable).all();
-        expect(
-          auditRows.some(
-            (event) =>
-              Boolean(event.metadataJson?.includes('"channel_binding_event":"updated"')) &&
-              Boolean(event.metadataJson?.includes('"credential_secret_cleanup":"completed"')),
-          ),
-        ).toBe(true);
       },
     });
   });

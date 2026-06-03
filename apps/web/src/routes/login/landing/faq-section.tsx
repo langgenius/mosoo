@@ -9,7 +9,7 @@ type Faq = { q: string; a: string };
 const FAQS: readonly Faq[] = [
   {
     q: "What is Mosoo?",
-    a: "Mosoo is an open-source enterprise AMS (an Agent Management System) that's self-hostable and BYOK. It turns agents from personal desktop tools into organizational assets that are visible, controllable, accountable, auditable, deployable, and scalable. It is currently alpha.",
+    a: "Mosoo is an open-source enterprise AMS (an Agent Management System) that's self-hostable and BYOK. It turns agents from personal desktop tools into organizational assets that are visible, controllable, accountable, deployable, and scalable. It is currently alpha.",
   },
   {
     q: "Who is Mosoo built for?",
@@ -29,15 +29,15 @@ const FAQS: readonly Faq[] = [
   },
   {
     q: "Which runtimes does Mosoo support, and am I locked to one vendor?",
-    a: "In the current alpha the Claude Agent SDK and Codex are live, and every harness is normalized to the same interface: streaming, tool calls, native resume, MCP permissions, and session replay. OpenClaw, Hermes, OpenCode, and Gemini are on the roadmap. Because the runtime is a swappable harness, an agent is configured once and resolves a single provider credential at launch, so you can move between vendors without touching the agent definition.",
+    a: "In the current alpha the Claude Agent SDK and OpenAI runtime are live, and every harness is normalized to the same interface: streaming, tool calls, native resume, MCP permissions, and session replay. OpenClaw, Hermes, OpenCode, and Gemini are on the roadmap. Because the runtime is a swappable harness, an agent is configured once and resolves a single provider credential at launch, so you can move between vendors without touching the agent definition.",
   },
   {
     q: "When should I use a deterministic workflow versus a general agent?",
-    a: "Use a deterministic workflow when the steps are known and you want repeatability and auditability; use a general agent when the path is open-ended and you want it to reason its way through. The alpha's framing question is how an enterprise unifies both under one production and governance plane, rather than forcing every scenario into a single engine.",
+    a: "Use a deterministic workflow when the steps are known and you want repeatability; use a general agent when the path is open-ended and you want it to reason its way through. The alpha's framing question is how an enterprise unifies both under one production and governance plane, rather than forcing every scenario into a single engine.",
   },
   {
     q: "What does the governance plane show an admin?",
-    a: "An agent inventory with lifecycle status, organization members under an owner/admin/member role model, an audit log that distinguishes allowed from denied outcomes with actor and reason, and cost rolled up by agent, user, and model with token and cache breakdowns and CSV export. These are shipping views, not mockups; fine-grained per-agent ACLs and deeper per-run failure diagnostics are still being filled in during alpha.",
+    a: "An agent inventory with lifecycle status, organization members under an owner/admin/member role model, and cost rolled up by agent, user, and model with token and cache breakdowns and CSV export. These are shipping views, not mockups; fine-grained per-agent ACLs and deeper per-run failure diagnostics are still being filled in during alpha.",
   },
   {
     q: "How do employees reach an agent once it's published?",
@@ -49,7 +49,7 @@ const FAQS: readonly Faq[] = [
   },
   {
     q: "How is Mosoo different from Dify, n8n, OpenClaw, Claude Code, or building this in-house?",
-    a: "Dify and n8n are strong at deterministic workflows; OpenClaw, Claude Code, and Hermes are strong as general agent runtimes. Mosoo doesn't replace them. It sits above them as a production and governance plane that lets one enterprise run both kinds under unified versioning, permissions, cost, and audit, instead of rebuilding that control plane yourself.",
+    a: "Dify and n8n are strong at deterministic workflows; OpenClaw, Claude Code, and Hermes are strong as general agent runtimes. Mosoo doesn't replace them. It sits above them as a production and governance plane that lets one enterprise run both kinds under unified versioning, permissions, and cost, instead of rebuilding that control plane yourself.",
   },
   {
     q: "What's the license and cost, and is it production-ready?",

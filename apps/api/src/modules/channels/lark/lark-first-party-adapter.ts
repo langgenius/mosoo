@@ -64,8 +64,6 @@ export async function processLarkWorkTrigger(input: {
       clientRequestId: input.trigger.eventId,
       text: toMosooMessage(input.trigger),
       trigger: {
-        auditActorDisplay: `Lark ${input.trigger.senderOpenId}`,
-        auditActorId: input.trigger.senderOpenId,
         eventId: input.trigger.eventId,
         externalActorId: input.trigger.externalActorId,
         externalMessageId: input.trigger.externalMessageId,

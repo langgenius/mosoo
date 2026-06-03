@@ -63,27 +63,6 @@ function createOrganizationJoinPolicyDatabase(): SqliteD1Database {
       PRIMARY KEY (organization_id, account_id)
     );
 
-    CREATE TABLE audit_event (
-      action text NOT NULL,
-      after_json text,
-      actor_display text NOT NULL,
-      actor_id text,
-      actor_type text NOT NULL,
-      before_json text,
-      correlation_id text,
-      id text PRIMARY KEY NOT NULL,
-      ip_address text,
-      metadata_json text,
-      organization_id text NOT NULL,
-      outcome text NOT NULL,
-      resource_display text,
-      resource_id text,
-      resource_type text NOT NULL,
-      session_id text,
-      timestamp integer NOT NULL,
-      user_agent text
-    );
-
     INSERT INTO account (
       id,
       email,
@@ -135,23 +114,6 @@ describe("organization settings updates", () => {
     });
 
     expect(summary.joinPolicy).toBe("auto");
-
-    const auditEvent = await database
-      .prepare(
-        `
-          SELECT after_json, before_json
-          FROM audit_event
-          WHERE organization_id = '${ORGANIZATION_ID}'
-        `,
-      )
-      .first<{ after_json: string; before_json: string }>();
-
-    expect(JSON.parse(auditEvent?.before_json ?? "{}")).toEqual({
-      joinPolicy: "request",
-    });
-    expect(JSON.parse(auditEvent?.after_json ?? "{}")).toEqual({
-      joinPolicy: "auto",
-    });
   });
 
   test("returns profile updates from the updated organization row", async () => {
@@ -168,22 +130,6 @@ describe("organization settings updates", () => {
       id: ORGANIZATION_ID,
       name: "Renamed Org",
       viewerRole: "owner",
-    });
-
-    const auditEvent = await database
-      .prepare(
-        `
-          SELECT metadata_json
-          FROM audit_event
-          WHERE organization_id = '${ORGANIZATION_ID}'
-        `,
-      )
-      .first<{ metadata_json: string }>();
-
-    expect(JSON.parse(auditEvent?.metadata_json ?? "{}")).toMatchObject({
-      avatarChanged: true,
-      kind: "profile",
-      nameChanged: true,
     });
   });
 

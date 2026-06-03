@@ -32,7 +32,6 @@ const ADDED_CATTLE_TO_PET = ["A new stable Pet Sandbox"];
 
 const STAYS_ON_ORIGINAL = [
   "Existing sessions",
-  "Audit log entries",
   "Cost history",
   "Runtime logs",
   "Pet stable Sandbox state",

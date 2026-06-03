@@ -20,7 +20,7 @@ On top of this capability, the Public Thread API can create a Thread-backed Agen
 This draft locks down three things:
 
 1. **The Agent Session API answers only "how the Agent runs"**: Agent + EnvironmentRevision + Credential + Space mount plan -> AgentSession -> Run -> runtime projection.
-2. **Surfaces / Channels answer only "where the Agent is dispatched"**: install, external identity, trigger, session key, write-back, audit, and attribution belong to the Surface Deployment API, not the Agent Session API.
+2. **Surfaces / Channels answer only "where the Agent is dispatched"**: install, external identity, trigger, session key, write-back, and attribution belong to the Surface Deployment API, not the Agent Session API.
 3. **The Web UI must also be an API consumer**: Preview / Sessions / Debug no longer use a separate internal mock or legacy run grammar; they consume the same create / send / retrieve / transcript / diagnostics / archive / unarchive / delete / cancel capabilities.
 
 The API mental model should resemble Claude Managed Agents Sessions, but the object semantics are owned by Mosoo itself:
@@ -67,7 +67,7 @@ After this round, Mosoo should be able to clearly articulate, both internally an
 - Input events are unified as `send events`, rather than the legacy `run.start` or vendor-native commands.
 - Runtime output is first projected uniformly into text, tools, permissions, files, usage, status, and diagnostics; the Web viewer consumes live state, while the public API consumes stable projections such as retrieve / transcript / diagnostics.
 - The native runtime id can serve only as an internal recovery record; it never becomes a URL, public id, Manifest field, or external API id.
-- Execution Actor = Agent Owner; the Caller only feeds into audit, surface trigger, permission context, and attribution.
+- Execution Actor = Agent Owner; the Caller only feeds into surface trigger, permission context, and attribution.
 - Surface Adapters act as consumers of the Agent Session API and must not bypass it to drive the native runtime directly.
 
 ---
@@ -87,7 +87,7 @@ After this round, Mosoo should be able to clearly articulate, both internally an
 | Native resume pointer     | The vendor runtime's own resume pointer, such as an OpenAI runtime thread or a Claude session. It exists only in internal state / diagnostics.                                                                                                                                   |
 | CapabilityRegistry        | The capabilities self-reported by the Runtime / Driver: native resume, permission bridge, usage, file watch, recoverable disconnect, MCP mode, and so on.                                                                                                                        |
 | Execution Actor           | The Agent's runtime identity. Locked to the Agent Owner, used for credential resolution, Agent memory ownership, and runtime identity.                                                                                                                                           |
-| Caller                    | The person, API client, or surface that triggered this session/event. The Caller influences audit, entry-point context, and permission attribution, but does not by default determine the Credential, Agent memory, or runtime identity.                                         |
+| Caller                    | The person, API client, or surface that triggered this session/event. The Caller influences entry-point context and permission attribution, but does not by default determine the Credential, Agent memory, or runtime identity.                                                |
 | Surface Adapter           | A deployment-layer entry point such as Slack / Lark / Linear / GitHub. It converts an external trigger into Agent Session API calls and writes session output back to the host.                                                                                                  |
 | SessionFile               | A copy of user-provided material attached to a given AgentSession. Its lifecycle follows that Session, and the Agent can read it in every turn for the duration of the Session. See [`session-files.md`](./session-files.md).                                                    |
 
@@ -270,7 +270,7 @@ The Surface Adapter is the deployment/binding layer on top of the Agent Session 
 3. Find or create a SurfaceSessionBinding.
 4. Call the Agent Session API create/send/retrieve.
 5. Write session output back to the host via the ActivityBridge.
-6. Retain external identity, session key, write-back records, and audit.
+6. Retain external identity, session key, and write-back records.
 
 The Surface Adapter must not:
 

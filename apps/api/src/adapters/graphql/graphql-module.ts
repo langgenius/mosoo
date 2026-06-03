@@ -1,22 +1,7 @@
 import { GraphQLError } from "graphql";
 
-import {
-  appendDeniedControlOperationAuditEvent,
-  appendFailedControlOperationAuditEvent,
-} from "../../modules/control-operations/application/control-operation-outcome-audit.service";
-import {
-  isKnownControlOperationOutcomePolicy,
-  shouldAuditControlOperationOutcome,
-} from "../../modules/control-operations/application/control-operation-registry";
 import { createErrorLogContext, logError } from "../../platform/cloudflare/logger";
-import {
-  API_ERROR_STATUS,
-  isApiError,
-  toApiErrorResponseDetails,
-  unauthorizedError,
-} from "../../platform/errors";
-import type { ApiErrorResponseDetails } from "../../platform/errors";
-import { isTruthy } from "../../shared/truthiness";
+import { isApiError, toApiErrorResponseDetails, unauthorizedError } from "../../platform/errors";
 import type { AuthenticatedGraphQLContext, GraphQLContext } from "./graphql-context";
 
 type GraphQLResolverFor<Context extends GraphQLContext> = {
@@ -126,20 +111,6 @@ function logUnhandledResolverError(
   });
 }
 
-function getApiErrorDetails(error: unknown): ApiErrorResponseDetails | null {
-  return isApiError(error) ? toApiErrorResponseDetails(error) : null;
-}
-
-function isDeniedControlOperationError(details: ApiErrorResponseDetails | null): boolean {
-  return (
-    details?.status === API_ERROR_STATUS.forbidden || details?.status === API_ERROR_STATUS.notFound
-  );
-}
-
-function getErrorMessage(error: unknown, defaultMessage: string): string {
-  return error instanceof Error ? error.message : defaultMessage;
-}
-
 function withApiErrors(
   resolver: GraphQLResolver,
   fieldName: string,
@@ -149,29 +120,6 @@ function withApiErrors(
     try {
       return await resolver(parent, args, context);
     } catch (error) {
-      const auditedOutcomeField =
-        typeName === "Mutation" ||
-        (typeName === "Query" && shouldAuditControlOperationOutcome(fieldName));
-      if (auditedOutcomeField && context.viewer) {
-        const details = getApiErrorDetails(error);
-        if (isDeniedControlOperationError(details)) {
-          await appendDeniedControlOperationAuditEvent(context.bindings.DB, {
-            args,
-            error,
-            operationName: fieldName,
-            viewer: context.viewer,
-          });
-        } else if (details === null || details.status >= 500) {
-          await appendFailedControlOperationAuditEvent(context.bindings.DB, {
-            args,
-            errorClass: error instanceof Error ? error.name : typeof error,
-            errorMessage: getErrorMessage(error, "Unknown mutation failure."),
-            operationName: fieldName,
-            viewer: context.viewer,
-          });
-        }
-      }
-
       if (!isApiError(error)) {
         logUnhandledResolverError(error, { fieldName, typeName });
       }
@@ -207,23 +155,6 @@ function collectRootFields(
   return modules.flatMap((module) => module[key] ?? []);
 }
 
-function getRootFieldName(field: string): string {
-  const delimiterIndex = field.search(/[(:]/);
-  return delimiterIndex === -1 ? field.trim() : field.slice(0, delimiterIndex).trim();
-}
-
-function enforceMutationOutcomePolicies(mutationFields: string[]): void {
-  const missingOperationNames = mutationFields
-    .map((field) => getRootFieldName(field))
-    .filter((operationName) => !isKnownControlOperationOutcomePolicy(operationName));
-
-  if (missingOperationNames.length > 0) {
-    throw new Error(
-      `GraphQL mutations must declare a control operation outcome policy: ${missingOperationNames.join(", ")}.`,
-    );
-  }
-}
-
 export function composeGraphQLModules(modules: GraphQLModule[]): {
   mutationFields: string[];
   mutationResolvers: Record<string, GraphQLResolver>;
@@ -234,8 +165,6 @@ export function composeGraphQLModules(modules: GraphQLModule[]): {
   const queryResolvers: Record<string, GraphQLResolver> = {};
   const mutationResolvers: Record<string, GraphQLResolver> = {};
   const mutationFields = collectRootFields(modules, "mutationFields");
-
-  enforceMutationOutcomePolicies(mutationFields);
 
   for (const module of modules) {
     mergeFieldResolvers(queryResolvers, module.queryResolvers, "Query");
@@ -253,6 +182,6 @@ export function composeGraphQLModules(modules: GraphQLModule[]): {
     mutationResolvers,
     queryFields: collectRootFields(modules, "queryFields"),
     queryResolvers,
-    typeDefs: modules.flatMap((module) => (isTruthy(module.typeDefs) ? [module.typeDefs] : [])),
+    typeDefs: modules.flatMap((module) => (module.typeDefs ? [module.typeDefs] : [])),
   };
 }

@@ -42,8 +42,6 @@ export async function processWeChatWorkTrigger(input: {
       clientRequestId: input.trigger.eventId,
       text: toMosooMessage(input.trigger),
       trigger: {
-        auditActorDisplay: `WeChat ${input.trigger.peerId}`,
-        auditActorId: input.trigger.peerId,
         eventId: input.trigger.eventId,
         externalActorId: input.trigger.externalActorId,
         externalMessageId: input.trigger.externalMessageId,

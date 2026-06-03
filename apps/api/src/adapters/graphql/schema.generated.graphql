@@ -638,50 +638,6 @@ type AppInfo {
   runtime: String!
 }
 
-type AuditActor {
-  display: String!
-  id: String
-  type: AuditActorType!
-}
-
-enum AuditActorType {
-  agent
-  api_key
-  system
-  user
-}
-
-type AuditEvent {
-  action: String!
-  actor: AuditActor!
-  after: PrimitiveRecord!
-  before: PrimitiveRecord!
-  correlationId: String
-  id: ULID!
-  ipAddress: String
-  metadata: PrimitiveRecord!
-  outcome: AuditOutcome!
-  resourceDisplay: String
-  resourceId: String
-  resourceType: String!
-  sessionId: ULID
-  timestamp: String!
-  userAgent: String
-}
-
-input AuditEventsFilterInput {
-  organizationId: ULID!
-  outcome: AuditOutcome
-  q: String
-  startMs: Float
-}
-
-enum AuditOutcome {
-  denied
-  failure
-  success
-}
-
 enum AuthMethod {
   email_otp
   google_oauth
@@ -1655,7 +1611,6 @@ type Query {
   agentSessionList(agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, type: SessionType): SessionConnection!
   agentSessionRetrieve(sessionId: ULID!): AgentSessionRetrieve!
   appInfo: AppInfo!
-  auditEvents(filter: AuditEventsFilterInput!): [AuditEvent!]!
   availableAgentModels(currentModelId: String, currentVendorId: String, runtimeId: String!): [ResolvedModelEntry!]!
   credentialPolicy(organizationId: ULID!): CredentialPolicy!
   environment(environmentId: ULID!): EnvironmentDetail!

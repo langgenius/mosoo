@@ -66,7 +66,6 @@ export interface RecordAgentChannelBindingErrorInput {
   agentId: AgentId;
   bindingId: ChannelBindingId;
   errorCode: string;
-  provider: AgentChannelBindingProvider;
 }
 
 export interface AgentChannelBinding {

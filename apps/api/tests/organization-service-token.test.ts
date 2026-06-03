@@ -68,27 +68,6 @@ function createOrganizationServiceTokenDatabase(): SqliteD1Database {
       status text NOT NULL
     );
 
-    CREATE TABLE audit_event (
-      action text NOT NULL,
-      after_json text,
-      actor_display text NOT NULL,
-      actor_id text,
-      actor_type text NOT NULL,
-      before_json text,
-      correlation_id text,
-      id text PRIMARY KEY NOT NULL,
-      ip_address text,
-      metadata_json text,
-      organization_id text NOT NULL,
-      outcome text NOT NULL,
-      resource_display text,
-      resource_id text,
-      resource_type text NOT NULL,
-      session_id text,
-      timestamp integer NOT NULL,
-      user_agent text
-    );
-
     INSERT INTO organization (
       id,
       join_policy
@@ -248,13 +227,8 @@ describe("organization service tokens", () => {
       .prepare("SELECT revoked_at FROM organization_service_token WHERE id = ?")
       .bind(TOKEN_1_ID)
       .first<{ revoked_at: number | null }>();
-    const auditEvent = await database
-      .prepare("SELECT resource_id FROM audit_event WHERE resource_id = ?")
-      .bind(TOKEN_1_ID)
-      .first<{ resource_id: string }>();
 
     expect(token?.revoked_at).toBeNumber();
-    expect(auditEvent?.resource_id).toBe(TOKEN_1_ID);
   });
 
   test("rejects unsupported bearer token prefixes", async () => {

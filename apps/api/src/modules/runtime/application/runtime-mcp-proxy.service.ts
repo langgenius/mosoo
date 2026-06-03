@@ -28,8 +28,6 @@ export async function resolveRuntimeMcpProxyTarget(
     throw createRuntimeMcpProxyError({
       code: "mcp_proxy_forbidden",
       message: "MCP proxy grant is not available.",
-      reason: "grant_missing",
-      serverId: input.serverId,
       status: 403,
     });
   }
@@ -38,8 +36,6 @@ export async function resolveRuntimeMcpProxyTarget(
     throw createRuntimeMcpProxyError({
       code: "mcp_proxy_forbidden",
       message: "MCP proxy grant is not active.",
-      reason: "grant_inactive",
-      serverId: input.serverId,
       status: 403,
     });
   }
@@ -48,8 +44,6 @@ export async function resolveRuntimeMcpProxyTarget(
     throw createRuntimeMcpProxyError({
       code: "mcp_credential_unavailable",
       message: "MCP credential is unavailable.",
-      reason: "grant_missing_credential",
-      serverId: input.serverId,
       status: 401,
     });
   }
@@ -63,10 +57,7 @@ export async function resolveRuntimeMcpProxyTarget(
   if (server === null) {
     throw createRuntimeMcpProxyError({
       code: "mcp_proxy_not_found",
-      credentialId,
       message: "MCP server is not available.",
-      reason: "server_not_found",
-      serverId: input.serverId,
       status: 404,
     });
   }
@@ -74,10 +65,7 @@ export async function resolveRuntimeMcpProxyTarget(
   if (credential === null) {
     throw createRuntimeMcpProxyError({
       code: "mcp_credential_unavailable",
-      credentialId,
       message: "MCP credential is unavailable.",
-      reason: "credential_not_found",
-      serverId: server.id,
       status: 401,
     });
   }
@@ -85,10 +73,7 @@ export async function resolveRuntimeMcpProxyTarget(
   if (credential.serverId !== input.serverId) {
     throw createRuntimeMcpProxyError({
       code: "mcp_proxy_forbidden",
-      credentialId: credential.id,
       message: "MCP proxy grant is not allowed.",
-      reason: "credential_server_mismatch",
-      serverId: server.id,
       status: 403,
     });
   }
@@ -96,11 +81,7 @@ export async function resolveRuntimeMcpProxyTarget(
   if (server.enabled !== 1) {
     throw createRuntimeMcpProxyError({
       code: "mcp_policy_disabled",
-      credentialId: credential.id,
       message: "MCP server is disabled.",
-      reason: "server_disabled",
-      serverEnabled: false,
-      serverId: server.id,
       status: 403,
     });
   }
@@ -110,11 +91,7 @@ export async function resolveRuntimeMcpProxyTarget(
   if (credentialStatus !== "active") {
     throw createRuntimeMcpProxyError({
       code: "mcp_credential_unavailable",
-      credentialId: credential.id,
-      credentialStatus,
       message: "MCP credential is unavailable.",
-      reason: "credential_inactive",
-      serverId: server.id,
       status: 401,
     });
   }
@@ -129,13 +106,7 @@ export async function resolveRuntimeMcpProxyTarget(
   if (accessToken.status === "denied") {
     throw createRuntimeMcpProxyError({
       code: "mcp_credential_unavailable",
-      credentialId: credential.id,
-      credentialStatus,
-      mcpSecretReadPurpose: accessToken.purpose,
-      mcpSecretReadReason: accessToken.reason,
       message: "MCP credential is unavailable.",
-      reason: "credential_secret_denied",
-      serverId: server.id,
       status: 401,
     });
   }

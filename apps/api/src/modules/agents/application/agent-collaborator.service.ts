@@ -11,7 +11,6 @@ import { eq, inArray } from "drizzle-orm";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { appendSuccessfulControlOperationAuditEvent } from "../../control-operations/application/control-operation-outcome-audit.service";
 import {
   deleteResourceAcl,
   insertResourceAclIfAbsent,
@@ -25,37 +24,10 @@ import {
 } from "./agent-access.service";
 import { readAccountId } from "./agent-platform-ids";
 import { hasPersonalMcpBindings, listAgentCollaboratorRows } from "./agent-repository";
-import type { AgentRow, CollaboratorRow } from "./agent-types";
+import type { CollaboratorRow } from "./agent-types";
 
 function readAgentCollaboratorPrincipal(principal: string): AccountId | "*" {
   return principal === "*" ? principal : readAccountId(principal, "Agent collaborator principal");
-}
-
-async function appendAgentAclAuditEvent(
-  database: D1Database,
-  input: {
-    agent: AgentRow;
-    operationName: "addAgentCollaborator" | "removeAgentCollaborator" | "updateAgentCollaborator";
-    principal: string;
-    role?: string;
-    viewer: AuthenticatedViewer;
-    viewerRole: string;
-  },
-): Promise<void> {
-  await appendSuccessfulControlOperationAuditEvent(database, {
-    metadata: {
-      kind: "acl",
-      owner_at_time_id: input.agent.ownerId,
-      principal: input.principal,
-      ...(input.role ? { role: input.role } : {}),
-      viewerRole: input.viewerRole,
-    },
-    organizationId: input.agent.organizationId,
-    operationName: input.operationName,
-    resourceDisplay: input.agent.name,
-    resourceId: input.agent.id,
-    viewer: input.viewer,
-  });
 }
 
 async function enrichCollaborators(
@@ -147,15 +119,6 @@ export async function addAgentCollaborator(
     })
     .where(eq(agentsTable.id, input.agentId))
     .run();
-
-  await appendAgentAclAuditEvent(database, {
-    agent: editable.agent,
-    operationName: "addAgentCollaborator",
-    principal: input.principal,
-    role: input.role,
-    viewer,
-    viewerRole: editable.viewerRole,
-  });
 }
 
 export async function removeAgentCollaborator(
@@ -183,14 +146,6 @@ export async function removeAgentCollaborator(
     })
     .where(eq(agentsTable.id, input.agentId))
     .run();
-
-  await appendAgentAclAuditEvent(database, {
-    agent: editable.agent,
-    operationName: "removeAgentCollaborator",
-    principal: input.principal,
-    viewer,
-    viewerRole: editable.viewerRole,
-  });
 }
 
 export async function updateAgentCollaborator(
@@ -229,13 +184,4 @@ export async function updateAgentCollaborator(
     })
     .where(eq(agentsTable.id, input.agentId))
     .run();
-
-  await appendAgentAclAuditEvent(database, {
-    agent: editable.agent,
-    operationName: "updateAgentCollaborator",
-    principal: input.principal,
-    role: input.role,
-    viewer,
-    viewerRole: editable.viewerRole,
-  });
 }

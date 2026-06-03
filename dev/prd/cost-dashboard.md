@@ -6,7 +6,7 @@
 
 ## One-line positioning
 
-Give a Mosoo Organization a dashboard that can answer "**who is spending money**." Three entry points, three audiences: admins audit the whole organization, Agent owners explain their own Agent's spend, and individual members self-serve "how much did I use."
+Give a Mosoo Organization a dashboard that can answer "**who is spending money**." Three entry points, three audiences: admins review the whole organization, Agent owners explain their own Agent's spend, and individual members self-serve "how much did I use."
 
 An analogy: it compresses the product shape of AWS Cost Explorer down onto a single Agent runtime — the same cost facts, viewed through four dimensions: **Organization / Agent / member / model**.
 
@@ -78,7 +78,7 @@ Four tabs with a unified header: **title + period switcher (7d / 30d / MTD / 90d
 | **By User**  | Who is using it / whose developed Agents are burning? How much is external channel-triggered? | Sortable table + toggle between Used by / Owned by modes + External channel-triggered footer       |
 | **By Model** | Where is the money going by model / by provider? Is this model expensive?                     | Donut + By vendor horizontal bars + pricing table (list price per 1M tokens · cache hit % · share) |
 
-Why not merge ① and ②? An admin's audit needs (cross-Agent, cross-member) and an Agent owner's diagnostic needs ("who is using my Agent") are **two different shapes of data** — force them together and the second need gets hidden.
+Why not merge ① and ②? An admin's review needs (cross-Agent, cross-member) and an Agent owner's diagnostic needs ("who is using my Agent") are **two different shapes of data** — force them together and the second need gets hidden.
 
 Why not stuff ① into Settings? A four-tab, data-dense dashboard won't fit into the 220px Settings sidebar. It deserves a dedicated top-level entry point, just like `Providers`.
 
@@ -149,7 +149,7 @@ The dashboard **never drops** usage for an unknown model. It labels that usage s
 
 ## 7. User journey maps
 
-### A · Admin's end-of-month audit
+### A · Admin's end-of-month review
 
 | Stage               | What the admin is doing                                                          | What they see                                                               | Mood      |
 | ------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | --------- |

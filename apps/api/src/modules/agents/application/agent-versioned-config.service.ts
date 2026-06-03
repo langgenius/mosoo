@@ -19,7 +19,7 @@ import type { AgentRow } from "./agent-types";
 class AgentRuntimeForkRequiredError extends Error {
   public constructor() {
     super(
-      "Runtime change is not allowed in place on a published Agent. Fork Agent to change runtime; sessions, logs, cost, audit, and agent-state stay attached to the original Agent.",
+      "Runtime change is not allowed in place on a published Agent. Fork Agent to change runtime; sessions, logs, cost, and agent-state stay attached to the original Agent.",
     );
     this.name = "AgentRuntimeForkRequiredError";
   }

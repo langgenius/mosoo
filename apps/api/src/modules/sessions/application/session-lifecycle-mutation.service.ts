@@ -7,8 +7,6 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
-import { appendAuditEvent } from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { listLiveRuntimeDriverInstanceIdsForSession } from "../../runtime/application/runtime-driver-instance-query.service";
 import {
@@ -20,9 +18,12 @@ import {
   setSystemSessionRunStatus,
 } from "../../runtime/application/session-lifecycle-transition.service";
 import { ACTIVE_SESSION_RUN_STATUSES } from "../../runtime/domain/session-run-lifecycle.machine";
-import type { SessionMutationCapabilityAccessRow } from "../domain/session-access.policy";
+import type {
+  SessionActionAuthorization,
+  SessionParticipantCapabilityAccessRow,
+} from "../domain/session-access.policy";
 import {
-  getSessionMutationCapabilityAccess,
+  getSessionParticipantCapabilityAccess,
   resolveSessionActionCreatorFlag,
 } from "../domain/session-access.policy";
 import {
@@ -37,26 +38,25 @@ import type {
   SessionArchiveCleanupTargets,
 } from "../domain/session-cleanup-plan";
 import { closeSessionViewerSockets } from "../infrastructure/session/client";
-import { resolveSessionMutationAuditActor } from "./session-mutation-audit";
-import type { SessionMutationOptions } from "./session-mutation-audit";
+import { deleteSessionCascade } from "./session-cleanup.service";
 
 export interface ArchiveAgentSessionRequest {
+  authorization?: SessionActionAuthorization | undefined;
   bindings: ApiBindings;
-  options?: SessionMutationOptions;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
 }
 
 export interface UnarchiveAgentSessionRequest {
+  authorization?: SessionActionAuthorization | undefined;
   database: D1Database;
-  options?: SessionMutationOptions;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
 }
 
 export interface DeleteAgentSessionRequest {
+  authorization?: SessionActionAuthorization | undefined;
   bindings: ApiBindings;
-  options?: SessionMutationOptions;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
 }
@@ -70,8 +70,8 @@ const ARCHIVED_RUN_ERROR = {
 
 function ensureLifecycleActionCapability(input: {
   action: AgentSessionActionCapabilityName;
-  authorization: SessionMutationOptions["authorization"];
-  session: SessionMutationCapabilityAccessRow;
+  authorization?: SessionActionAuthorization | undefined;
+  session: SessionParticipantCapabilityAccessRow;
 }): void {
   getAvailableAgentSessionActionCapability({
     action: input.action,
@@ -146,15 +146,15 @@ async function normalizeSessionRuntimeLifecycle(
 }
 
 export async function archiveAgentSession({
+  authorization,
   bindings,
-  options = {},
   sessionId,
   viewer,
 }: ArchiveAgentSessionRequest): Promise<SessionArchiveCleanupStepOutcome[]> {
-  const session = await getSessionMutationCapabilityAccess(bindings.DB, viewer.id, sessionId);
+  const session = await getSessionParticipantCapabilityAccess(bindings.DB, viewer.id, sessionId);
   ensureLifecycleActionCapability({
     action: "archive_session",
-    authorization: options.authorization,
+    authorization,
     session,
   });
   const timestampMs = currentTimestampMs();
@@ -256,26 +256,6 @@ export async function archiveAgentSession({
     outcomes.push(completeSessionArchiveCleanupStep(step));
   }
 
-  const actor = resolveSessionMutationAuditActor(viewer, options.auditActor);
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.sessionUpdate,
-    actorDisplay: actor.actorDisplay,
-    actorId: actor.actorId,
-    actorType: actor.actorType,
-    ipAddress: actor.ipAddress,
-    metadata: {
-      agentId: session.agent_id,
-      kind: "archive",
-      ...actor.actorMetadata,
-    },
-    organizationId: session.organization_id,
-    outcome: "success",
-    resourceDisplay: session.title ?? "Untitled session",
-    resourceId: sessionId,
-    resourceType: AUDIT_RESOURCE.session,
-    userAgent: actor.userAgent,
-  });
-
   return outcomes;
 }
 
@@ -290,15 +270,15 @@ function requireArchiveCleanupTargets(
 }
 
 export async function unarchiveAgentSession({
+  authorization,
   database,
-  options = {},
   sessionId,
   viewer,
 }: UnarchiveAgentSessionRequest): Promise<void> {
-  const session = await getSessionMutationCapabilityAccess(database, viewer.id, sessionId);
+  const session = await getSessionParticipantCapabilityAccess(database, viewer.id, sessionId);
   ensureLifecycleActionCapability({
     action: "unarchive_session",
-    authorization: options.authorization,
+    authorization,
     session,
   });
 
@@ -312,60 +292,20 @@ export async function unarchiveAgentSession({
     })
     .where(eq(sessionsTable.id, sessionId))
     .run();
-
-  const actor = resolveSessionMutationAuditActor(viewer, options.auditActor);
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.sessionUpdate,
-    actorDisplay: actor.actorDisplay,
-    actorId: actor.actorId,
-    actorType: actor.actorType,
-    ipAddress: actor.ipAddress,
-    metadata: {
-      agentId: session.agent_id,
-      kind: "unarchive",
-      ...actor.actorMetadata,
-    },
-    organizationId: session.organization_id,
-    outcome: "success",
-    resourceDisplay: session.title ?? "Untitled session",
-    resourceId: sessionId,
-    resourceType: AUDIT_RESOURCE.session,
-    userAgent: actor.userAgent,
-  });
 }
 
 export async function deleteAgentSession({
+  authorization,
   bindings,
-  options = {},
   sessionId,
   viewer,
 }: DeleteAgentSessionRequest): Promise<void> {
-  const session = await getSessionMutationCapabilityAccess(bindings.DB, viewer.id, sessionId);
+  const session = await getSessionParticipantCapabilityAccess(bindings.DB, viewer.id, sessionId);
   ensureLifecycleActionCapability({
     action: "delete_session",
-    authorization: options.authorization,
+    authorization,
     session,
   });
 
-  const { deleteSessionCascade } = await import("./session-cleanup.service");
   await deleteSessionCascade(bindings, sessionId);
-
-  const actor = resolveSessionMutationAuditActor(viewer, options.auditActor);
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.sessionDelete,
-    actorDisplay: actor.actorDisplay,
-    actorId: actor.actorId,
-    actorType: actor.actorType,
-    ipAddress: actor.ipAddress,
-    metadata: {
-      agentId: session.agent_id,
-      ...actor.actorMetadata,
-    },
-    organizationId: session.organization_id,
-    outcome: "success",
-    resourceDisplay: session.title ?? "Untitled session",
-    resourceId: sessionId,
-    resourceType: AUDIT_RESOURCE.session,
-    userAgent: actor.userAgent,
-  });
 }

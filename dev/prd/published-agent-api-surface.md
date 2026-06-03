@@ -30,7 +30,7 @@ A Builder can already configure an Agent in Mosoo, invite cooperators, and click
 >
 > "I want to decide whether this Agent can be called by everyone in the Organization, or only by the few people I've invited."
 >
-> "When it's called externally, whose permissions are used to access Space, credentials, and MCP? Can the audit log show who made the call?"
+> "When it's called externally, whose permissions are used to access Space, credentials, and MCP? Can the Thread attribution show who made the call?"
 
 ### 1.2 Internal Web UI + API Consumer
 
@@ -40,7 +40,7 @@ Mosoo's own Web UI and internal system integrations need to call Agents, but the
 >
 > "Follow-ups, permission confirmations, interrupts, archive / delete — let me do all of these on the thread as the main axis. Don't make me learn a separate session API."
 >
-> "How I log in, get admitted, and get audited in the Web UI should be the same as when I call in through the API. Don't split it into two systems."
+> "How I log in, get admitted, and get attributed in the Web UI should be the same as when I call in through the API. Don't split it into two systems."
 >
 > "I want to add / remove / list a piece of material for this thread directly. Don't make me first learn where files live, and don't make me learn some vendor's file API."
 
@@ -73,8 +73,8 @@ So this phase must be designed with a public-API mental model. It can't be built
 | **Thread**                      | The "one unit of work" context that an external caller creates and continues. The first screen of the public docs only talks about opening a new conversation / viewing a conversation, and does **not** require the caller to understand session mechanics first.    |
 | **Human PAT**                   | Personal Access Token. Identifies a **person** as the caller. It carries no per-agent scope, does not replace vendor credentials, and is not involved in BYOK.                                                                                                        |
 | **Service token**               | An organization-level **machine** identity token. Customer backends / CLIs / automations use it to call. Managed by Org Owner/Admin; a `selected agents` allowlist must be chosen by default; it is **not** any user's PAT, and **not** a Channel binding credential. |
-| **Caller**                      | The principal that issues a request holding a PAT or a Service token. Used for admission / audit / attribution; it is **not** the same as the executor.                                                                                                               |
-| **Attributed user**             | The human optionally specified for attribution when a Service token creates a Thread. It only affects the Threads / Audit projection; it does not switch the runtime's execution identity.                                                                            |
+| **Caller**                      | The principal that issues a request holding a PAT or a Service token. Used for admission and attribution; it is **not** the same as the executor.                                                                                                                     |
+| **Attributed user**             | The human optionally specified for attribution when a Service token creates a Thread. It only affects the Thread attribution projection; it does not switch the runtime's execution identity.                                                                          |
 | **Agent Owner**                 | The person who creates and owns the Agent's service identity. **The Agent's execution permissions are understood as an RBAC proxy of the Owner.**                                                                                                                     |
 | **Cooperator**                  | A collaborator that the Agent Owner has explicitly authorized to access the Agent.                                                                                                                                                                                    |
 | **Organization-wide access**    | The Owner allows every valid member in the Org to call the Agent.                                                                                                                                                                                                     |

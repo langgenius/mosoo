@@ -4,7 +4,6 @@ export {
   createSlackAgentChannelBinding,
   createTelegramAgentChannelBinding,
 } from "./agent-channel-binding-create.service";
-export { recordAgentChannelBindingError } from "./agent-channel-binding-error";
 export { deleteAgentChannelBinding } from "./agent-channel-binding-maintenance.service";
 export {
   pollLarkAgentChannelRegistration,
@@ -21,7 +20,6 @@ export type {
   LarkAgentChannelRegistration,
   PollLarkAgentChannelRegistrationInput,
   PollWeChatAgentChannelPairingInput,
-  RecordAgentChannelBindingErrorInput,
   StartLarkAgentChannelRegistrationInput,
   StartWeChatAgentChannelPairingInput,
   WeChatAgentChannelPairing,

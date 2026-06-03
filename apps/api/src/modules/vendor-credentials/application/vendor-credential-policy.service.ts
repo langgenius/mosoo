@@ -15,11 +15,6 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { toVendorCredentialWithSecret } from "./vendor-credential.mapper";
 import {
@@ -138,20 +133,6 @@ export async function updateCredentialPolicy(
     })
     .where(eq(organizationsTable.id, input.organizationId))
     .run();
-
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.orgSettingsUpdate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      byokEnabled: input.byokEnabled,
-      kind: "credential_policy",
-    },
-    organizationId: input.organizationId,
-    outcome: "success",
-    resourceDisplay: "Credential policy",
-    resourceId: input.organizationId,
-    resourceType: AUDIT_RESOURCE.orgSettings,
-  });
 
   return toCredentialPolicy(input.organizationId, {
     byokAllowedProviders: serializedProviderIds,

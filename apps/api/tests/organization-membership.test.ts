@@ -56,27 +56,6 @@ function createOrganizationMembershipDatabase(): SqliteD1Database {
       PRIMARY KEY (organization_id, account_id)
     );
 
-    CREATE TABLE audit_event (
-      action text NOT NULL,
-      after_json text,
-      actor_display text NOT NULL,
-      actor_id text,
-      actor_type text NOT NULL,
-      before_json text,
-      correlation_id text,
-      id text PRIMARY KEY NOT NULL,
-      ip_address text,
-      metadata_json text,
-      organization_id text NOT NULL,
-      outcome text NOT NULL,
-      resource_display text,
-      resource_id text,
-      resource_type text NOT NULL,
-      session_id text,
-      timestamp integer NOT NULL,
-      user_agent text
-    );
-
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
@@ -231,7 +210,7 @@ describe("organization member mutations", () => {
     });
   });
 
-  test("returns role updates and records audit metadata", async () => {
+  test("returns role updates", async () => {
     const database = createOrganizationMembershipDatabase();
 
     const member = await updateOrganizationMemberRole(database, VIEWER, {
@@ -246,26 +225,9 @@ describe("organization member mutations", () => {
       role: "admin",
       status: "active",
     });
-
-    const auditEvent = await database
-      .prepare(
-        `
-          SELECT metadata_json
-          FROM audit_event
-          WHERE resource_id = '${MEMBER_TWO_ID}'
-        `,
-      )
-      .first<{ metadata_json: string }>();
-
-    expect(JSON.parse(auditEvent?.metadata_json ?? "{}")).toMatchObject({
-      actorOrganizationRole: "owner",
-      kind: "role",
-      previousRole: "member",
-      role: "admin",
-    });
   });
 
-  test("returns status updates and records audit metadata", async () => {
+  test("returns status updates", async () => {
     const database = createOrganizationMembershipDatabase();
 
     const member = await setOrganizationMemberStatus(database, VIEWER, {
@@ -281,26 +243,9 @@ describe("organization member mutations", () => {
       status: "disabled",
     });
     expect(member.disabledAt).not.toBeNull();
-
-    const auditEvent = await database
-      .prepare(
-        `
-          SELECT metadata_json
-          FROM audit_event
-          WHERE resource_id = '${MEMBER_TWO_ID}'
-        `,
-      )
-      .first<{ metadata_json: string }>();
-
-    expect(JSON.parse(auditEvent?.metadata_json ?? "{}")).toMatchObject({
-      actorOrganizationRole: "owner",
-      kind: "status",
-      previousStatus: "active",
-      status: "disabled",
-    });
   });
 
-  test("removes members and records audit metadata", async () => {
+  test("removes members", async () => {
     const database = createOrganizationMembershipDatabase();
     const bindings = { DB: database } as ApiBindings;
 
@@ -315,23 +260,7 @@ describe("organization member mutations", () => {
         `,
       )
       .first<{ account_id: string }>();
-    const auditEvent = await database
-      .prepare(
-        `
-          SELECT metadata_json, resource_display
-          FROM audit_event
-          WHERE resource_id = '${MEMBER_TWO_ID}'
-        `,
-      )
-      .first<{ metadata_json: string; resource_display: string }>();
 
     expect(member).toBeNull();
-    expect(auditEvent?.resource_display).toBe("Member Two");
-    expect(JSON.parse(auditEvent?.metadata_json ?? "{}")).toMatchObject({
-      actorOrganizationRole: "owner",
-      deletedSessionCount: "0",
-      role: "member",
-      status: "active",
-    });
   });
 });

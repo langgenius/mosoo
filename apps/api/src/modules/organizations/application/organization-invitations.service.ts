@@ -14,11 +14,6 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import { sendOrganizationInvitationEmail } from "../../auth/application/auth-email.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { normalizeEmail } from "../../users/domain/email-address";
@@ -142,7 +137,6 @@ function requireExistingInvitation(
   if (invitation === null) {
     throw new Error("Invitation could not be loaded.");
   }
-
   return invitation;
 }
 
@@ -264,20 +258,6 @@ export async function inviteOrganizationMember(
     organizationName: invitation.organizationName,
   });
 
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.memberShare,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      kind: "invitation",
-      status: invitation.status,
-    },
-    organizationId: admission.organization_id,
-    outcome: "success",
-    resourceDisplay: invitation.email,
-    resourceId: invitation.id,
-    resourceType: AUDIT_RESOURCE.member,
-  });
-
   return invitation;
 }
 
@@ -388,22 +368,6 @@ export async function acceptOrganizationInvitation(
       ),
   ]);
 
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.memberCreate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      invitationId: invitation.id,
-      kind: "invitation_accept",
-      role: "member",
-      status: "active",
-    },
-    organizationId: invitation.organizationId,
-    outcome: "success",
-    resourceDisplay: viewer.name || viewer.email,
-    resourceId: viewer.id,
-    resourceType: AUDIT_RESOURCE.member,
-  });
-
   return toAcceptedInvitationOrganizationSummary(invitationRow);
 }
 
@@ -464,20 +428,6 @@ export async function cancelOrganizationInvitation(
   const cancelledInvitation = toCancelledOrganizationInvitation(invitationRow, {
     accountId: viewer.id,
     timestampMs,
-  });
-
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.memberUnshare,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      kind: "invitation",
-      status: invitation.status,
-    },
-    organizationId: invitation.organizationId,
-    outcome: "success",
-    resourceDisplay: invitation.email,
-    resourceId: invitation.id,
-    resourceType: AUDIT_RESOURCE.member,
   });
 
   return cancelledInvitation;

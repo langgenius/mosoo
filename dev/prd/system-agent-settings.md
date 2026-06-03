@@ -1,6 +1,6 @@
 # System Agent Settings — for humans
 
-> This is the product-story version for non-engineer readers. For the full engineering contract (field contracts / readiness behavior / audit trail / self-check), see the shipped System Agent Settings PRD.
+> This is the product-story version for non-engineer readers. For the full engineering contract (field contracts / readiness behavior / self-check trail), see the shipped System Agent Settings PRD.
 
 ---
 
@@ -70,4 +70,4 @@ flowchart LR
 
 ---
 
-> Full engineering contract + field names + audit verbs + implementation boundaries (what must follow existing product patterns / what must come back for a question / what not to build even if technically more complete): see the shipped System Agent Settings PRD.
+> Full engineering contract + field names + change verbs + implementation boundaries (what must follow existing product patterns / what must come back for a question / what not to build even if technically more complete): see the shipped System Agent Settings PRD.

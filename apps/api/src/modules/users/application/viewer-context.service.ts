@@ -16,11 +16,6 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { getOrganizationCreationSlotStatus } from "../../organizations/domain/organization-kind.policy";
 import { ensureModelAvailableForSelection } from "../../vendor-credentials/application/available-models";
@@ -242,21 +237,6 @@ export async function setSystemAgentModel(
   if (updated === null) {
     throw new Error("Account not found.");
   }
-
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.orgSettingsUpdate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      kind: "system_agent_model",
-      modelId: systemAgentModel.modelId,
-      vendor: systemAgentModel.vendor,
-    },
-    organizationId: activeOrganization.id,
-    outcome: "success",
-    resourceDisplay: "System agent model",
-    resourceId: activeOrganization.id,
-    resourceType: AUDIT_RESOURCE.orgSettings,
-  });
 
   return createAccountProfile(viewer, systemAgentModel);
 }

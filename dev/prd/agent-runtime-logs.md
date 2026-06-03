@@ -88,7 +88,7 @@ When v2 is complete:
 - Open the same panel (owner_debug role) and additionally see internal diagnostic signals: driver pid / CF error code / trace_id.
 - Use the dropdown to single-select the "machine process" family and look specifically at process-related events.
 - See precise reconnection timings ("was the network blip 4 seconds or 40 seconds?").
-- Export JSONL for colleagues to grep / jq for offline analysis (carried over from v1.1).
+- Export JSONL for colleagues to search with `rg` and transform with `jaq` for offline analysis (carried over from v1.1).
 
 ---
 
@@ -107,7 +107,6 @@ flowchart LR
 
 - **No new event sources** — the existing runtime scheduling / driver process / network layers already emit these; v2 simply turns those signals into events and exposes them to owners.
 - **Session layer and machine layer use different surfaces** — there is no "toggle switch"; to see the conversation, go straight to the Logs tab.
-- **Audit Log is a separate matter** (it records what "people" did: publish / share / login).
 
 ---
 
@@ -189,11 +188,10 @@ flowchart LR
 
 ## Boundaries at a glance
 
-There are four kinds of "log / history" in this product. Don't mix them up:
+There are three kinds of "log / history" in this product. Don't mix them up:
 
 | What you want to know                                                                | Where to look                                                         |
 | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| Who did what mutation (publish / share / fork / login …)                             | **Audit Log** (top navigation)                                        |
 | What the agent said / which tool it called in a specific session                     | **Logs tab** → select a session (session-layer view)                  |
 | What recently happened to this agent's machine (sandbox / driver / network / config) | **Debug → System Log** (v2 turns this into a machine-layer exclusive) |
 | Agent Manifest history (v1 → v2 → current live)                                      | **Versions tab** (a separate PRD)                                     |

@@ -47,7 +47,6 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 - [RBAC](./rbac.md)
 - [Credentials](./credentials.md)
 - [Organization Kind & CE Creation Slots](./org-kind-prd.md)
-- [Audit Log](./audit-log-prd.md)
 
 ### Admin & cost
 

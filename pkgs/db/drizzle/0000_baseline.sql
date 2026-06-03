@@ -156,34 +156,6 @@ CREATE TABLE `api_command` (
 CREATE UNIQUE INDEX `api_command_dedupe_idx` ON `api_command` (`dedupe_key`);--> statement-breakpoint
 CREATE INDEX `api_command_status_updated_idx` ON `api_command` (`status`,`updated_at`);--> statement-breakpoint
 CREATE INDEX `api_command_claim_idx` ON `api_command` (`status`,`claim_expires_at`);--> statement-breakpoint
-CREATE TABLE `audit_event` (
-	`action` text NOT NULL,
-	`after_json` text,
-	`actor_display` text NOT NULL,
-	`actor_id` text CHECK ("actor_id" = upper("actor_id") AND length("actor_id") = 26 AND "actor_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
-	`actor_type` text NOT NULL,
-	`before_json` text,
-	`correlation_id` text,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
-	`ip_address` text,
-	`metadata_json` text,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`outcome` text NOT NULL,
-	`resource_display` text,
-	`resource_id` text CHECK ("resource_id" = upper("resource_id") AND length("resource_id") = 26 AND "resource_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
-	`resource_type` text NOT NULL,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND "session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
-	`timestamp` integer NOT NULL,
-	`user_agent` text,
-	CONSTRAINT "audit_event_actor_type_check" CHECK("audit_event"."actor_type" IN ('user', 'agent', 'system', 'api_key')),
-	CONSTRAINT "audit_event_outcome_check" CHECK("audit_event"."outcome" IN ('success', 'failure', 'denied'))
-);
---> statement-breakpoint
-CREATE INDEX `audit_event_organization_time_idx` ON `audit_event` (`organization_id`,`timestamp`);--> statement-breakpoint
-CREATE INDEX `audit_event_actor_idx` ON `audit_event` (`actor_id`,`timestamp`);--> statement-breakpoint
-CREATE INDEX `audit_event_action_idx` ON `audit_event` (`action`,`timestamp`);--> statement-breakpoint
-CREATE INDEX `audit_event_resource_idx` ON `audit_event` (`resource_type`,`resource_id`);--> statement-breakpoint
-CREATE INDEX `audit_event_correlation_idx` ON `audit_event` (`correlation_id`);--> statement-breakpoint
 CREATE TABLE `auth_account` (
 	`access_token` text,
 	`access_token_expires_at` integer,

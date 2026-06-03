@@ -1,6 +1,5 @@
 import { canRemoveOrganizationMember } from "@mosoo/contracts/permission";
 import {
-  accountsTable,
   agentMcpBindingsTable,
   agentsTable,
   environmentsTable,
@@ -23,23 +22,12 @@ import { alias } from "drizzle-orm/sqlite-core";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { memberResourceDisplay, membershipStatus } from "./organization-member-audit";
 
 interface OrganizationMemberRemovalAdmission {
   actorRole: "admin" | "member" | "owner";
-  target: {
-    disabledAt: number | null;
-    email: string | null;
-    hasOwnedSessions: boolean;
-    name: string | null;
-    role: "admin" | "member" | "owner";
-  };
+  targetHasOwnedSessions: boolean;
+  targetRole: "admin" | "member" | "owner";
 }
 
 const targetOrganizationMembersTable = alias(organizationMembersTable, "target_member");
@@ -55,9 +43,6 @@ async function admitOrganizationMemberRemoval(
       .select({
         actorDisabledAt: organizationMembersTable.disabledAt,
         actorRole: organizationMembersTable.role,
-        disabledAt: targetOrganizationMembersTable.disabledAt,
-        email: accountsTable.email,
-        name: accountsTable.name,
         role: targetOrganizationMembersTable.role,
         targetHasOwnedSessions: sql<number>`EXISTS (
           SELECT 1
@@ -81,7 +66,6 @@ async function admitOrganizationMemberRemoval(
           eq(targetOrganizationMembersTable.accountId, accountId),
         ),
       )
-      .leftJoin(accountsTable, eq(accountsTable.id, targetOrganizationMembersTable.accountId))
       .where(
         and(
           eq(organizationMembersTable.organizationId, organizationId),
@@ -105,13 +89,8 @@ async function admitOrganizationMemberRemoval(
 
   return {
     actorRole: row.actorRole,
-    target: {
-      disabledAt: row.disabledAt,
-      email: row.email,
-      hasOwnedSessions: Boolean(row.targetHasOwnedSessions),
-      name: row.name,
-      role: row.role,
-    },
+    targetHasOwnedSessions: Boolean(row.targetHasOwnedSessions),
+    targetRole: row.role,
   };
 }
 
@@ -138,11 +117,11 @@ async function deleteMemberOwnedSessions(
   bindings: ApiBindings,
   organizationId: OrganizationId,
   accountId: AccountId,
-): Promise<number> {
+): Promise<void> {
   const sessionIds = await listMemberOwnedSessionIds(bindings.DB, organizationId, accountId);
 
   if (sessionIds.length === 0) {
-    return 0;
+    return;
   }
 
   const { deleteSessionCascade } =
@@ -151,8 +130,6 @@ async function deleteMemberOwnedSessions(
   for (const sessionId of sessionIds) {
     await deleteSessionCascade(bindings, sessionId);
   }
-
-  return sessionIds.length;
 }
 
 async function cleanupMemberAccess(
@@ -307,31 +284,15 @@ export async function removeOrganizationMember(
   if (
     !canRemoveOrganizationMember({
       actorRole: admission.actorRole,
-      targetRole: admission.target.role,
+      targetRole: admission.targetRole,
     })
   ) {
     throw forbiddenError();
   }
 
-  const deletedSessionCount = admission.target.hasOwnedSessions
-    ? await deleteMemberOwnedSessions(bindings, organizationId, accountId)
-    : 0;
+  if (admission.targetHasOwnedSessions) {
+    await deleteMemberOwnedSessions(bindings, organizationId, accountId);
+  }
   await cleanupMemberAccess(bindings.DB, organizationId, accountId);
   await deleteOrganizationMembership(bindings.DB, organizationId, accountId);
-
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.memberDelete,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      actorOrganizationRole: admission.actorRole,
-      deletedSessionCount: String(deletedSessionCount),
-      role: admission.target.role,
-      status: membershipStatus(admission.target.disabledAt),
-    },
-    organizationId,
-    outcome: "success",
-    resourceDisplay: memberResourceDisplay(admission.target),
-    resourceId: accountId,
-    resourceType: AUDIT_RESOURCE.member,
-  });
 }

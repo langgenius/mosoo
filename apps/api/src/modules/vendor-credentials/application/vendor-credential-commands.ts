@@ -20,7 +20,6 @@ import {
   ensureOrganizationAdmin,
   ensureOrganizationMembership,
 } from "../../organizations/domain/organization-access.policy";
-import { appendCredentialAuditEvent } from "./vendor-credential-audit";
 import {
   enforceApiBaseAllowed,
   enforceCredentialModelShape,
@@ -212,15 +211,6 @@ export async function createVendorCredential(
 
   const policy = await loadPolicy(bindings.DB, input.organizationId);
   const credential = await toVisibleVendorCredential(bindings, viewer, row, policy);
-  await appendCredentialAuditEvent({
-    database: bindings.DB,
-    name,
-    organizationId: input.organizationId,
-    resourceId: id,
-    vendorId: input.vendorId,
-    verb: "create",
-    viewer,
-  });
   return credential;
 }
 
@@ -339,15 +329,6 @@ export async function updateVendorCredential(
   const policy = await loadPolicy(bindings.DB, row.organizationId);
   const credential = await toVisibleVendorCredential(bindings, viewer, updated, policy);
 
-  await appendCredentialAuditEvent({
-    database: bindings.DB,
-    name,
-    organizationId: row.organizationId,
-    resourceId: row.id,
-    vendorId: row.vendorId,
-    verb: "update",
-    viewer,
-  });
   return credential;
 }
 
@@ -383,13 +364,4 @@ export async function deleteVendorCredential(
       secretId: row.apiKeySecretId,
     }),
   );
-  await appendCredentialAuditEvent({
-    database: bindings.DB,
-    name: row.name,
-    organizationId: row.organizationId,
-    resourceId: row.id,
-    vendorId: row.vendorId,
-    verb: "delete",
-    viewer,
-  });
 }

@@ -72,27 +72,6 @@ function createPersonalTokenDatabase(): SqliteD1Database {
       PRIMARY KEY (organization_id, account_id)
     );
 
-    CREATE TABLE audit_event (
-      action text NOT NULL,
-      after_json text,
-      actor_display text NOT NULL,
-      actor_id text,
-      actor_type text NOT NULL,
-      before_json text,
-      correlation_id text,
-      id text PRIMARY KEY NOT NULL,
-      ip_address text,
-      metadata_json text,
-      organization_id text NOT NULL,
-      outcome text NOT NULL,
-      resource_display text,
-      resource_id text,
-      resource_type text NOT NULL,
-      session_id text,
-      timestamp integer NOT NULL,
-      user_agent text
-    );
-
     INSERT INTO account (
       id,
       email,
@@ -158,7 +137,7 @@ describe("personal access tokens", () => {
     expect(tokenCount?.count).toBe(0);
   });
 
-  test("revokes an owned token and records audit metadata", async () => {
+  test("revokes an owned token", async () => {
     const innerDatabase = createPersonalTokenDatabase();
 
     await revokePersonalAccessToken(innerDatabase, VIEWER, TOKEN_ID);
@@ -166,11 +145,7 @@ describe("personal access tokens", () => {
     const token = await innerDatabase
       .prepare(`SELECT revoked_at FROM personal_access_token WHERE id = '${TOKEN_ID}'`)
       .first<{ revoked_at: number | null }>();
-    const auditEvent = await innerDatabase
-      .prepare(`SELECT resource_id FROM audit_event WHERE resource_id = '${TOKEN_ID}'`)
-      .first<{ resource_id: string }>();
 
     expect(token?.revoked_at).toBeNumber();
-    expect(auditEvent?.resource_id).toBe(TOKEN_ID);
   });
 });

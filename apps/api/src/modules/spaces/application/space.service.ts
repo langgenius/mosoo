@@ -14,11 +14,6 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { deleteFilesForScope } from "../../files/application/file-scope-cleanup.service";
 import { ensureOrganizationMembership } from "../../organizations/domain/organization-access.policy";
@@ -36,6 +31,7 @@ import {
   spaceCreatorMembersTable,
 } from "../domain/space-access.policy";
 import { normalizeSpaceName } from "../domain/space-name";
+import { updateSpaceVisibilityAfterCollaboratorChange } from "../domain/space-visibility.policy";
 import { toSpaceDetail, toSpaceView } from "./space-view.mapper";
 
 export async function listVisibleSpaces(
@@ -142,16 +138,6 @@ export async function createSpace(
   }
 
   const createdSpace = await ensureSpaceAccess(database, viewerId, spaceId, "read");
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.spaceCreate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: { visibility },
-    organizationId: input.organizationId,
-    outcome: "success",
-    resourceDisplay: name,
-    resourceId: spaceId,
-    resourceType: AUDIT_RESOURCE.space,
-  });
 
   return toSpaceView(createdSpace, viewerId);
 }
@@ -175,30 +161,25 @@ export async function updateSpace(
   const space = await ensureSpaceAccess(database, viewerId, input.spaceId, "admin");
 
   const updates: Partial<typeof spacesTable.$inferInsert> = {};
-  let resourceDisplay = space.name;
 
   if (isTruthy(input.name)) {
-    const nextName = normalizeSpaceName(input.name);
-    updates.name = nextName;
-    resourceDisplay = nextName;
+    updates.name = normalizeSpaceName(input.name);
   }
 
-  if (input.visibility) {
-    updates.visibility = input.visibility;
-  }
-
-  if (Object.keys(updates).length === 0) {
+  if (Object.keys(updates).length === 0 && !input.visibility) {
     return getSpace(database, viewer, input.spaceId);
   }
 
-  await getAppDatabase(database)
-    .update(spacesTable)
-    .set({
-      ...updates,
-      updatedAt: currentTimestampMs(),
-    })
-    .where(eq(spacesTable.id, input.spaceId))
-    .run();
+  if (Object.keys(updates).length > 0) {
+    await getAppDatabase(database)
+      .update(spacesTable)
+      .set({
+        ...updates,
+        updatedAt: currentTimestampMs(),
+      })
+      .where(eq(spacesTable.id, input.spaceId))
+      .run();
+  }
 
   if (input.visibility === "shared") {
     await insertResourceAclIfAbsent(database, {
@@ -209,34 +190,23 @@ export async function updateSpace(
       role: "read",
       target: toOrganizationAclTarget(space.organization_id),
     });
-  } else if (input.visibility) {
+    await updateSpaceVisibilityAfterCollaboratorChange(database, input.spaceId);
+  } else if (input.visibility === "private") {
     await getAppDatabase(database)
       .delete(resourceAclTable)
       .where(
         and(
           eq(resourceAclTable.resourceType, "space"),
           eq(resourceAclTable.resourceId, input.spaceId),
-          eq(resourceAclTable.targetKind, "organization"),
+          sql`NOT (
+            ${resourceAclTable.targetKind} = 'user'
+            AND ${resourceAclTable.targetId} = ${space.owner_account_id}
+          )`,
         ),
       )
       .run();
+    await updateSpaceVisibilityAfterCollaboratorChange(database, input.spaceId);
   }
-
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.spaceUpdate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      owner_at_time_id: space.owner_account_id,
-      owner_at_time_status: space.creator_membership_status,
-      ...(input.visibility ? { visibility: input.visibility } : {}),
-      viewerOrganizationRole: space.viewer_organization_role,
-    },
-    organizationId: space.organization_id,
-    outcome: "success",
-    resourceDisplay,
-    resourceId: input.spaceId,
-    resourceType: AUDIT_RESOURCE.space,
-  });
 
   return getSpace(database, viewer, input.spaceId);
 }
@@ -247,7 +217,7 @@ export async function deleteSpace(
   spaceId: SpaceId,
 ): Promise<void> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  const space = await ensureSpaceAclManager(bindings.DB, viewerId, spaceId);
+  await ensureSpaceAclManager(bindings.DB, viewerId, spaceId);
 
   await deleteFilesForScope(bindings, {
     actorAccountId: viewerId,
@@ -265,19 +235,4 @@ export async function deleteSpace(
     )
     .run();
   await getAppDatabase(bindings.DB).delete(spacesTable).where(eq(spacesTable.id, spaceId)).run();
-
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.spaceDelete,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      owner_at_time_id: space.owner_account_id,
-      owner_at_time_status: space.creator_membership_status,
-      viewerOrganizationRole: space.viewer_organization_role,
-    },
-    organizationId: space.organization_id,
-    outcome: "success",
-    resourceDisplay: space.name,
-    resourceId: space.id,
-    resourceType: AUDIT_RESOURCE.space,
-  });
 }

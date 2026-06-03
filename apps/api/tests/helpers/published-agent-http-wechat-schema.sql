@@ -79,27 +79,6 @@ CREATE TABLE resource_acl (
   PRIMARY KEY (resource_type, resource_id, target_kind, target_id)
 );
 
-CREATE TABLE audit_event (
-  id text PRIMARY KEY NOT NULL,
-  organization_id text NOT NULL,
-  timestamp integer NOT NULL,
-  actor_type text NOT NULL,
-  actor_id text,
-  actor_display text NOT NULL,
-  action text NOT NULL,
-  resource_type text NOT NULL,
-  resource_id text,
-  resource_display text,
-  outcome text NOT NULL,
-  ip_address text,
-  user_agent text,
-  correlation_id text,
-  metadata_json text,
-  session_id text,
-  before_json text,
-  after_json text
-);
-
 CREATE TABLE public_api_rate_limit_window (
   bucket_key text NOT NULL,
   request_count integer DEFAULT 0 NOT NULL,

@@ -15,8 +15,6 @@ import {
 import { currentTimestampMs, toIsoString } from "../../../time";
 import { ensureAgentReadable } from "../../agents/application/agent-access.service";
 import type { ensureAgentEditor } from "../../agents/application/agent-access.service";
-import { appendAuditEvent } from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import type { AgentChannelBinding } from "./agent-channel-binding.types";
 import {
@@ -40,7 +38,7 @@ const AGENT_CHANNEL_BINDING_PROVIDER_LABELS = {
   wechat: "WeChat",
 } satisfies Record<AgentChannelBindingProvider, string>;
 
-export function getAgentChannelBindingProviderLabel(provider: AgentChannelBindingProvider): string {
+function getAgentChannelBindingProviderLabel(provider: AgentChannelBindingProvider): string {
   return AGENT_CHANNEL_BINDING_PROVIDER_LABELS[provider];
 }
 
@@ -347,25 +345,6 @@ export async function createProviderAgentChannelBinding(input: {
     }
     throw error;
   }
-
-  await appendAuditEvent(input.bindings.DB, {
-    action: AUDIT_ACTION.agentUpdate,
-    actorDisplay: input.viewer.name,
-    actorId: input.viewer.id,
-    actorMetadata: {},
-    actorType: "user",
-    metadata: {
-      agentId,
-      bindingId: id,
-      channel_binding_event: "created",
-      provider: input.provider,
-    },
-    organizationId,
-    outcome: "success",
-    resourceDisplay: input.access.agent.name,
-    resourceId: agentId,
-    resourceType: AUDIT_RESOURCE.agent,
-  });
 
   return readAgentChannelBindingById(input.bindings.DB, id);
 }

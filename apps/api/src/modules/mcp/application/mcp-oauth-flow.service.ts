@@ -14,8 +14,6 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
-import { appendAuditEvent } from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureOrganizationMembership } from "../../organizations/domain/organization-access.policy";
 import {
@@ -357,24 +355,6 @@ export async function completeMcpOAuthCallback(
       subjectLabel: viewerRow.email ?? viewerRow.name ?? flow.initiatorUserId,
       tokenExpiresAt,
       ...(scope === "user" ? { userId: flow.initiatorUserId } : {}),
-    });
-
-    await appendAuditEvent(bindings.DB, {
-      action: existing ? AUDIT_ACTION.credentialUpdate : AUDIT_ACTION.credentialCreate,
-      actorDisplay: viewerRow.name ?? viewerRow.email ?? flow.initiatorUserId,
-      actorId: flow.initiatorUserId,
-      actorType: "user",
-      metadata: {
-        flowId: flow.id,
-        kind: "mcp_oauth",
-        status: credential.status,
-        serverId: server.id,
-      },
-      organizationId: flow.organizationId,
-      outcome: "success",
-      resourceDisplay: server.name,
-      resourceId: credential.id,
-      resourceType: AUDIT_RESOURCE.credential,
     });
 
     await markOAuthFlowTerminal(bindings.DB, {

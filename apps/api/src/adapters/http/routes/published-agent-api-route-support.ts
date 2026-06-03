@@ -13,13 +13,6 @@ import {
 import type { PublicApiCaller } from "../../../modules/auth/application/public-api-caller.service";
 import { FileControlError } from "../../../modules/files/application/file-control-errors";
 import {
-  appendPublishedApiSessionMutationOutcomeAuditEvent,
-  appendPublishedApiThreadReadDeniedAuditEvent,
-  appendPublishedApiThreadMutationOutcomeAuditEvent,
-} from "../../../modules/public-api/published-agent-api-audit";
-import type { PublishedApiThreadMutationAuditContext } from "../../../modules/public-api/published-agent-api-audit";
-import type { PublishedApiAuditOptions } from "../../../modules/public-api/published-agent-api-audit";
-import {
   publicInternalError,
   publicInvalidJson,
   publicInvalidRequest,
@@ -45,7 +38,6 @@ import { mapFileControlErrorToPublicApiError } from "./published-agent-file-erro
 type PublishedApiRouteContext = Context<ApiGatewayEnvironment>;
 
 interface PublishedApiAuthenticatedOperation {
-  auditOptions: PublishedApiAuditOptions;
   caller: PersonalAccessTokenCaller;
 }
 
@@ -64,22 +56,6 @@ interface PublicApiJsonErrorResponse {
   };
   headers: HeadersInit;
   status: number;
-}
-
-type PublishedApiSessionMutationAuditAction = Parameters<
-  typeof appendPublishedApiSessionMutationOutcomeAuditEvent
->[2]["action"];
-
-type PublishedApiThreadMutationAuditAction = Parameters<
-  typeof appendPublishedApiThreadMutationOutcomeAuditEvent
->[2]["action"];
-
-type PublishedApiThreadReadAuditAction = Parameters<
-  typeof appendPublishedApiThreadReadDeniedAuditEvent
->[2]["action"];
-
-function resolveRouteValue<T>(value: RouteValue<T> | undefined): T | undefined {
-  return typeof value === "function" ? (value as () => T)() : value;
 }
 
 function resolveRequiredRouteValue<T>(value: RouteValue<T>): T {
@@ -132,13 +108,6 @@ async function requireRateLimitedPublicApiCaller(
   const caller = await requirePublicApiCaller(c);
   await enforcePublishedApiRateLimit(c.env.DB, caller.tokenId);
   return caller;
-}
-
-function createAuditOptions(caller: PersonalAccessTokenCaller): PublishedApiAuditOptions {
-  return {
-    tokenId: caller.tokenId,
-    tokenLabel: caller.tokenLabel,
-  };
 }
 
 function errorHeaders(error: PublishedAgentApiError): HeadersInit {
@@ -255,9 +224,7 @@ async function runPublicApiIdempotentJson<T>(
   input: {
     bodyHash: string | null;
     idempotencySubjectId: PlatformId;
-    logCredentialId: string;
     beforeOperation?: (() => Promise<void>) | undefined;
-    onOperationError?: ((error: unknown) => Promise<void>) | undefined;
     operation: () => Promise<T>;
     persistOperationErrors?: boolean | undefined;
     status: number;
@@ -294,8 +261,6 @@ async function runPublicApiIdempotentJson<T>(
   try {
     body = await input.operation();
   } catch (error) {
-    await input.onOperationError?.(error);
-
     if (input.persistOperationErrors === true) {
       const errorResponse = toErrorResponseDetails(error);
       await completePublicApiIdempotency(c.env.DB, reservation.reservationId, {
@@ -306,7 +271,7 @@ async function runPublicApiIdempotentJson<T>(
           ...createErrorLogContext(completionError),
           reservationId: reservation.reservationId,
           route: new URL(c.req.url).pathname,
-          tokenId: input.logCredentialId,
+          tokenId: input.idempotencySubjectId,
         });
       });
 
@@ -330,7 +295,7 @@ async function runPublicApiIdempotentJson<T>(
       ...createErrorLogContext(error),
       reservationId: reservation.reservationId,
       route: new URL(c.req.url).pathname,
-      tokenId: input.logCredentialId,
+      tokenId: input.idempotencySubjectId,
     });
   }
 
@@ -353,47 +318,32 @@ export async function runPublishedApiAuthenticatedJson<T>(
 export async function runPublishedApiSessionMutation<T, Prepared = undefined>(
   c: PublishedApiRouteContext,
   input: {
-    action: PublishedApiSessionMutationAuditAction;
-    agentId?: RouteValue<AgentId> | undefined;
     bodyHash?: (prepared: Prepared) => string | null;
     operation: (
       input: PublishedApiAuthenticatedOperation & {
-        agentId: AgentId | undefined;
         prepared: Prepared;
-        threadId: PublicThreadId | undefined;
+        threadId: PublicThreadId;
       },
     ) => Promise<T>;
     prepare?: (input: PublishedApiAuthenticatedOperation) => Promise<Prepared>;
     status?: number | undefined;
-    threadId?: RouteValue<PublicThreadId> | undefined;
+    threadId: RouteValue<PublicThreadId>;
   },
 ): Promise<Response> {
-  let caller: PersonalAccessTokenCaller | null = null;
-  let agentId: AgentId | undefined;
-  let threadId: PublicThreadId | undefined;
-
   try {
-    caller = await requirePatCaller(c);
-    const authenticatedCaller = caller;
-    agentId = resolveRouteValue(input.agentId);
-    threadId = resolveRouteValue(input.threadId);
-    const operationInput: PublishedApiAuthenticatedOperation = {
-      auditOptions: createAuditOptions(authenticatedCaller),
-      caller: authenticatedCaller,
-    };
+    const caller = await requirePatCaller(c);
+    const threadId = resolveRequiredRouteValue(input.threadId);
+    const operationInput: PublishedApiAuthenticatedOperation = { caller };
     const prepared = input.prepare ? await input.prepare(operationInput) : (undefined as Prepared);
     const status = input.status ?? 200;
-    const operation = async () =>
-      input.operation({ ...operationInput, agentId, prepared, threadId });
-    const beforeOperation = () =>
-      enforcePublishedApiRateLimit(c.env.DB, authenticatedCaller.tokenId);
+    const operation = async () => input.operation({ ...operationInput, prepared, threadId });
+    const beforeOperation = () => enforcePublishedApiRateLimit(c.env.DB, caller.tokenId);
 
     if (input.bodyHash) {
       return await runPublicApiIdempotentJson(c, {
         bodyHash: input.bodyHash(prepared),
         beforeOperation,
-        idempotencySubjectId: authenticatedCaller.tokenId,
-        logCredentialId: authenticatedCaller.tokenId,
+        idempotencySubjectId: caller.tokenId,
         operation,
         status,
       });
@@ -402,17 +352,6 @@ export async function runPublishedApiSessionMutation<T, Prepared = undefined>(
     await beforeOperation();
     return Response.json(await operation(), { status });
   } catch (error) {
-    if (caller) {
-      await appendPublishedApiSessionMutationOutcomeAuditEvent(c.env.DB, caller.viewer, {
-        action: input.action,
-        agentId,
-        error,
-        threadId,
-        tokenId: caller.tokenId,
-        tokenLabel: caller.tokenLabel,
-      });
-    }
-
     return toErrorResponse(error);
   }
 }
@@ -420,30 +359,18 @@ export async function runPublishedApiSessionMutation<T, Prepared = undefined>(
 export async function runPublishedApiThreadReadJson<T>(
   c: PublishedApiRouteContext,
   input: {
-    action: PublishedApiThreadReadAuditAction;
     operation: (input: PublishedApiThreadOperation & { threadId: PublicThreadId }) => Promise<T>;
     status?: number | undefined;
     threadId: RouteValue<PublicThreadId>;
   },
 ): Promise<Response> {
-  let caller: PublicApiCaller | null = null;
-  let threadId: PublicThreadId | undefined;
-
   try {
-    caller = await requireRateLimitedPublicApiCaller(c);
-    threadId = resolveRequiredRouteValue(input.threadId);
+    const caller = await requireRateLimitedPublicApiCaller(c);
+    const threadId = resolveRequiredRouteValue(input.threadId);
     const status = input.status ?? 200;
 
     return Response.json(await input.operation({ caller, threadId }), { status });
   } catch (error) {
-    if (caller && threadId !== undefined) {
-      await appendPublishedApiThreadReadDeniedAuditEvent(c.env.DB, caller, {
-        action: input.action,
-        error,
-        threadId,
-      });
-    }
-
     return toErrorResponse(error);
   }
 }
@@ -451,9 +378,7 @@ export async function runPublishedApiThreadReadJson<T>(
 export async function runPublishedApiThreadMutation<T, Prepared = undefined>(
   c: PublishedApiRouteContext,
   input: {
-    action: PublishedApiThreadMutationAuditAction;
     agentId: RouteValue<AgentId>;
-    auditContext?: (prepared: Prepared) => PublishedApiThreadMutationAuditContext;
     bodyHash?: (prepared: Prepared) => string | null;
     operation: (
       input: PublishedApiThreadOperation & { agentId: AgentId; prepared: Prepared },
@@ -462,38 +387,20 @@ export async function runPublishedApiThreadMutation<T, Prepared = undefined>(
     status?: number | undefined;
   },
 ): Promise<Response> {
-  let caller: PublicApiCaller | null = null;
-  let agentId: AgentId | undefined;
-  let auditContext: PublishedApiThreadMutationAuditContext | undefined;
-
   try {
-    caller = await requirePublicApiCaller(c);
-    const authenticatedCaller = caller;
-    agentId = resolveRequiredRouteValue(input.agentId);
-    const resolvedAgentId = agentId;
-    const operationInput: PublishedApiThreadOperation = { caller: authenticatedCaller };
+    const caller = await requirePublicApiCaller(c);
+    const agentId = resolveRequiredRouteValue(input.agentId);
+    const operationInput: PublishedApiThreadOperation = { caller };
     const prepared = input.prepare ? await input.prepare(operationInput) : (undefined as Prepared);
-    auditContext = input.auditContext ? input.auditContext(prepared) : undefined;
     const status = input.status ?? 200;
-    const operation = async () =>
-      input.operation({ ...operationInput, agentId: resolvedAgentId, prepared });
-    const beforeOperation = () =>
-      enforcePublishedApiRateLimit(c.env.DB, authenticatedCaller.tokenId);
+    const operation = async () => input.operation({ ...operationInput, agentId, prepared });
+    const beforeOperation = () => enforcePublishedApiRateLimit(c.env.DB, caller.tokenId);
 
     if (input.bodyHash) {
       return await runPublicApiIdempotentJson(c, {
         bodyHash: input.bodyHash(prepared),
         beforeOperation,
-        idempotencySubjectId: authenticatedCaller.tokenId,
-        logCredentialId: authenticatedCaller.tokenId,
-        onOperationError: async (error) => {
-          await appendPublishedApiThreadMutationOutcomeAuditEvent(c.env.DB, authenticatedCaller, {
-            action: input.action,
-            agentId: resolvedAgentId,
-            auditContext,
-            error,
-          });
-        },
+        idempotencySubjectId: caller.tokenId,
         operation,
         persistOperationErrors: true,
         status,
@@ -503,15 +410,6 @@ export async function runPublishedApiThreadMutation<T, Prepared = undefined>(
     await beforeOperation();
     return Response.json(await operation(), { status });
   } catch (error) {
-    if (caller && agentId !== undefined) {
-      await appendPublishedApiThreadMutationOutcomeAuditEvent(c.env.DB, caller, {
-        action: input.action,
-        agentId,
-        auditContext,
-        error,
-      });
-    }
-
     return toErrorResponse(error);
   }
 }

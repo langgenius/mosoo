@@ -40,10 +40,9 @@ After the pivot, Mosoo is a self-managed Agent platform for a single organizatio
 - "Someone shared a Skill with me — can I fork it as my own?"
 - "Can I see how much I personally spent inside a Public Agent?"
 
-**What Compliance / Audit say:**
+**What Finance / Compliance say:**
 
 - "Who can see the Org's overall cost ledger? Can a Member read it through a side channel?"
-- "For an event a Member triggered themselves, can they see their own audit entry?"
 
 **Current pain points:**
 
@@ -58,7 +57,7 @@ After the pivot, Mosoo is a self-managed Agent platform for a single organizatio
 
 ### What Owners / Admins can do
 
-- See the entire organization's members, assets, cost, and audit logs.
+- See the entire organization's members, assets, and cost.
 - Invite / approve / disable / remove members (the Owner exclusively holds these five: "promote to Admin / demote from Admin / change the Org's primary domain / delete the Org / transfer Owner").
 - **Reach through** any Agent / Space / Skill / MCP / Environment to edit, publish, and run it.
 - After an asset owner leaves, **automatically** gain the right to delete / change the ACL / transfer that asset.
@@ -77,8 +76,7 @@ After the pivot, Mosoo is a self-managed Agent platform for a single organizatio
 ### What nobody can do
 
 - **See someone else's private Threads, or send messages or approve permission requests as another caller** (only the Session creator can do this).
-- **See Org-level cost / audit / export** (only the Owner/Admin).
-- **See the audit events they themselves triggered** (a Member cannot see audit logs, even when an event's `triggered_by` is themselves).
+- **See Org-level cost / export** (only the Owner/Admin).
 - **Open an Agent's Debug Terminal** (allowed only for the Agent owner in person — neither the Agent admin nor the Org admin can do this).
 - **Share a personal MCP** (hard-locked; to share it, ask an Admin to rebuild it as an Organization MCP).
 - **See someone else's personal Provider key value or per-user MCP connection status** (fully personal).
@@ -91,12 +89,12 @@ After the pivot, Mosoo is a self-managed Agent platform for a single organizatio
 
 | Term                           | Plain-language definition                                                                                                                                                                                                     |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Org role**                   | `owner` / `admin` / `member` — three tiers, evaluated only at the Org level. A fourth tier, Auditor, is out of scope for this release.                                                                                        |
+| **Org role**                   | `owner` / `admin` / `member` — three tiers, evaluated only at the Org level. A fourth read-only compliance tier is out of scope for this release.                                                                              |
 | **Asset owner**                | The person who created an asset, automatically granted "the highest asset-level role on that asset." This is a dimension **orthogonal** to the Org role.                                                                      |
 | **Asset**                      | An object a user can directly create, share, delete, or select. Mosoo locks this to 5 kinds: **Agent / Space / Skill / MCP Server / Environment.**                                                                            |
 | **AgentSession (work object)** | A single working context between a caller and a given Agent. **It is not an asset** — it has no ACL, cannot be shared, and cannot be transferred. Its lifecycle belongs to the Session creator alone.                         |
 | **Admin reach-through**        | An Org `admin` can edit / publish / run any asset by default, but the "destroy the asset" tier (delete / change ACL / transfer / reset) is locked while the asset owner is still around.                                      |
-| **Org owner break-glass**      | An Org `owner` can delete / change the ACL / transfer any asset **at any time**, without waiting for the asset owner to leave. Each such action leaves an audit entry.                                                        |
+| **Org owner break-glass**      | An Org `owner` can delete / change the ACL / transfer any asset **at any time**, without waiting for the asset owner to leave.                                                                                                  |
 | **Policy, not state**          | "Owner leaves → Admin auto-unlocks" is a **decision rule**, not a data migration. There is no claim API and no scheduled job that rewrites the owner field. The moment the owner returns, the lock is automatically restored. |
 
 ### Who owns the three key actions (the most frequently asked question)
@@ -105,7 +103,7 @@ After the pivot, Mosoo is a self-managed Agent platform for a single organizatio
 | -------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------ |
 | **Asset owner (active)**                     | ✅                                                            | ✅ (exclusive)                                                  | ✅ Agent owner only      |
 | **Org admin**                                | ✅ reach-through                                              | ❌ (while owner is active); ✅ auto-unlocked after owner leaves | ❌                       |
-| **Org owner**                                | ✅ reach-through                                              | ✅ at any time (break-glass, audited)                           | ❌ (must transfer first) |
+| **Org owner**                                | ✅ reach-through                                              | ✅ at any time (break-glass)                                    | ❌ (must transfer first) |
 | **ACL collaborator (the shared-with party)** | Depends on the specific ACL tier (read / edit / user / admin) | ❌                                                              | ❌                       |
 
 ---
@@ -130,7 +128,7 @@ A Member can go through the entire flow without asking an Admin. Along the way, 
 flowchart TD
   D1["Admin disables / removes<br/>Member B"] --> D2["The ACLs of all assets B holds<br/>auto-unlock to all Admins / Owners"]
   D2 --> D3["Admins can perform destructive actions<br/>(delete / change ACL / transfer)"]
-  D3 --> D4["Each destructive action<br/>writes an audit entry + redundantly records owner_at_time"]
+  D3 --> D4["Each destructive action<br/>checks owner status at operation time<br/>and records owner_at_time"]
   D5["B is re-enabled"] --> D6["owner-only lock<br/>auto-restores"]
 ```
 

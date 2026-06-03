@@ -24,7 +24,7 @@ type LogContext = Record<string, unknown>;
 const INGRESS_METADATA_HEADER_MAX_LENGTH = 128;
 const INGRESS_METADATA_HEADER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
-export interface IngressRequestMetadataProjection {
+interface IngressRequestMetadataProjection {
   correlationId?: string;
   requestId?: string;
 }
@@ -49,7 +49,7 @@ function readIngressMetadataHeader(headers: Headers, name: string): string | nul
   return trimmed;
 }
 
-export function createIngressRequestMetadataProjection(
+function createIngressRequestMetadataProjection(
   request: Request,
 ): IngressRequestMetadataProjection {
   const requestId = readIngressMetadataHeader(request.headers, "x-request-id");

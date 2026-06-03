@@ -3,7 +3,6 @@ import type { ApiCommandId } from "@mosoo/db";
 import { createErrorLogContext, logError, logInfo } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { currentTimestampMs } from "../../../time";
-import { cleanupExpiredAuditEvents } from "../../audit/application/audit-query.service";
 import { cleanupOrphanChannelBindingCredentialSecrets } from "../../channels/application/agent-channel-binding-maintenance.service";
 import { resolveAgentChannelBindingContextById } from "../../channels/application/channel-binding-context";
 import { createChannelFinalDeliveryScheduler } from "../../channels/application/channel-final-delivery.service";
@@ -78,7 +77,6 @@ async function processScheduledMaintenanceCommand(
   const tasks: Promise<unknown>[] = [
     runSandboxMaintenance(bindings),
     cleanupExpiredSpaceFileLocks(bindings),
-    cleanupExpiredAuditEvents(bindings.DB, scheduledAt),
     runDiscordGatewayConnectionMaintenance(bindings, scheduledAt),
     cleanupOrphanChannelBindingCredentialSecrets(bindings, scheduledAt),
     runLarkLongConnectionMaintenance(bindings, scheduledAt),

@@ -42,7 +42,7 @@ Remove or rewrite implementation-spec material:
 - Endpoint / route inventories, OpenAPI / curl examples, JSON schema, request / response contracts.
 - TypeScript interfaces, DB fields, entity attributes, resolver / service / module breakdown.
 - Sequence diagrams, call stacks, deployment topology, infra wiring, file paths, generated-artifact instructions, test commands.
-- Detailed edge-case matrices, thinking audit, and decision-boundary checklists.
+- Detailed edge-case matrices, reasoning review, and decision-boundary checklists.
 
 Ask: "Can a non-engineer make a product decision from this?" If not, it belongs in the full PRD.
 

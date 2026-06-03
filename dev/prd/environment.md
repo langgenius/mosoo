@@ -59,8 +59,8 @@ She uses an Agent a colleague published, and the UI asks her "which Environment?
 
 - Create a named Environment ("compliance-locked") configured with Limited network + Allowed Hosts
 - **Share it with the entire Organization** and mark it as the **Organization Default**—so new Agents adopt it automatically
-- Discover that a member's forked version reset the network back to Full → **edit that copy directly to change it back** (the Org Admin override permission), with every action recorded in the Audit log
-- See in the Audit Log "who, when, added `api.notion.com` to which Environment's Allowed Hosts"
+- Discover that a member's forked version reset the network back to Full → **edit that copy directly to change it back** through the Org Admin override permission
+- See from the Environment detail who last changed `api.notion.com` in Allowed Hosts
 
 ### What a regular Member (Yang Yaxin) can do
 
@@ -68,7 +68,7 @@ She uses an Agent a colleague published, and the UI asks her "which Environment?
 
 ### What InfoSec (Zhang Min) can do
 
-- Quarterly audit: who shared / forked / cascade-forked / was overridden by an Admin—all visible with one search in the Audit Log
+- Quarterly review: which Environments are shared, forked, cascade-forked, or overridden by an Admin
 
 ---
 
@@ -154,7 +154,7 @@ flowchart TD
 
 ### The Org Admin override permission (this differs from Skill)
 
-The Org Admin **has a compliance-governance right over any Environment**—they can directly edit someone else's Environment (e.g. changing the network from Full back to Limited). **Every override action is recorded in the Audit log with actor = Org Admin, and the Owner can look it up there themselves.**
+The Org Admin **has a compliance-governance right over any Environment**—they can directly edit someone else's Environment (e.g. changing the network from Full back to Limited). The UI must make this explicit before saving and show the Owner that the Environment was changed by an Org Admin.
 
 Rationale: the **blast radius of network policy is too large**—a single member resetting the network to Full breaks compliance, so someone must be able to dial it back immediately.
 
@@ -197,4 +197,4 @@ Rationale: the **blast radius of network policy is too large**—a single member
 
 ---
 
-> Full engineering contract + 18 Non-Goals + change-impact matrix + protocol-layer lifecycle decisions + override-governance audit details are covered in the shipped Environment PRD.
+> Full engineering contract + 18 Non-Goals + change-impact matrix + protocol-layer lifecycle decisions + override-governance details are covered in the shipped Environment PRD.

@@ -551,38 +551,6 @@ describe("Published Agent Public Thread API e2e", () => {
       expect(
         expectArray(expectRecord(await readJson(serviceEventsResponse))["events"]).length,
       ).toBe(1);
-      const readThreadAuditRows = async () =>
-        (
-          await database
-            .prepare(
-              `
-                SELECT
-                  action,
-                  actor_display,
-                  actor_id,
-                  metadata_json,
-                  outcome,
-                  resource_id,
-                  session_id
-                FROM audit_event
-                WHERE resource_id = ?
-                  AND outcome = 'denied'
-                ORDER BY rowid
-              `,
-            )
-            .bind(threadId)
-            .all<{
-              action: string;
-              actor_display: string;
-              actor_id: string | null;
-              metadata_json: string | null;
-              outcome: string;
-              resource_id: string | null;
-              session_id: string | null;
-            }>()
-        ).results;
-
-      expect(await readThreadAuditRows()).toEqual([]);
 
       const ownerEventsResponse = await requestPublicApi(
         app,
@@ -592,26 +560,6 @@ describe("Published Agent Public Thread API e2e", () => {
         }),
       );
       expect(ownerEventsResponse.status).toBe(404);
-      const ownerAuditRows = await readThreadAuditRows();
-      expect(ownerAuditRows).toHaveLength(1);
-      const ownerAuditRow = ownerAuditRows[0];
-      if (!ownerAuditRow) {
-        throw new Error("Expected owner read denial audit row.");
-      }
-      expect(ownerAuditRow).toMatchObject({
-        action: "session.update",
-        actor_id: PUBLIC_API_TEST_IDS.patOwner,
-        outcome: "denied",
-        resource_id: threadId,
-        session_id: threadId,
-      });
-      expect(expectRecord(JSON.parse(expectString(ownerAuditRow.metadata_json)))).toMatchObject({
-        errorCode: "not_found",
-        reason: "Thread not found.",
-        source: "public_api",
-        status: 404,
-        threadId,
-      });
 
       await database
         .prepare(
@@ -632,36 +580,12 @@ describe("Published Agent Public Thread API e2e", () => {
       expect(expectRecord(await readJson(disallowedServiceEventsResponse))["error"]).toMatchObject({
         code: "forbidden",
       });
-      const serviceAuditRows = await readThreadAuditRows();
-      expect(serviceAuditRows).toHaveLength(2);
-      const serviceAuditRow = serviceAuditRows[1];
-      if (!serviceAuditRow) {
-        throw new Error("Expected service token read denial audit row.");
-      }
-      expect(serviceAuditRow).toMatchObject({
-        action: "session.update",
-        actor_display: "Service Token: Channel adapter",
-        actor_id: PUBLIC_API_TEST_IDS.serviceToken,
-        outcome: "denied",
-        resource_id: threadId,
-        session_id: threadId,
-      });
-      expect(expectRecord(JSON.parse(expectString(serviceAuditRow.metadata_json)))).toMatchObject({
-        errorCode: "forbidden",
-        reason: "Service token is not allowed to invoke this Agent.",
-        source: "public_api",
-        status: 403,
-        threadId,
-      });
     });
   });
 
   test("denies Service token Thread creation when the execution owner membership is disabled", async () => {
     const database = await createPublicHttpContractDatabase();
     const app = createPublishedApiTestApp();
-    const correlationId = "public-create-denied";
-    const requestId = "request-create-denied";
-    const traceId = "11111111111111111111111111111111";
 
     await database
       .prepare(
@@ -686,9 +610,6 @@ describe("Published Agent Public Thread API e2e", () => {
         headers: {
           Authorization: bearer(TOKENS.service),
           "Content-Type": "application/json",
-          traceparent: `00-${traceId}-2222222222222222-01`,
-          "X-Correlation-Id": correlationId,
-          "X-Request-Id": requestId,
         },
         method: "POST",
       }),
@@ -698,64 +619,6 @@ describe("Published Agent Public Thread API e2e", () => {
     expect(expectRecord(await readJson(response))["error"]).toMatchObject({
       code: "forbidden",
     });
-
-    const auditRows = (
-      await database
-        .prepare(
-          `
-            SELECT
-              action,
-              actor_id,
-              correlation_id,
-              metadata_json,
-              outcome,
-              resource_id,
-              session_id
-            FROM audit_event
-            WHERE action = 'session.create'
-              AND actor_id = ?
-              AND outcome = 'denied'
-            ORDER BY rowid
-          `,
-        )
-        .bind(PUBLIC_API_TEST_IDS.serviceToken)
-        .all<{
-          action: string;
-          actor_id: string | null;
-          correlation_id: string | null;
-          metadata_json: string | null;
-          outcome: string;
-          resource_id: string | null;
-          session_id: string | null;
-        }>()
-    ).results;
-
-    expect(auditRows).toHaveLength(1);
-    const auditRow = auditRows[0];
-    if (!auditRow) {
-      throw new Error("Expected service token create denial audit row.");
-    }
-    expect(auditRow).toMatchObject({
-      action: "session.create",
-      actor_id: PUBLIC_API_TEST_IDS.serviceToken,
-      correlation_id: correlationId,
-      outcome: "denied",
-      resource_id: null,
-      session_id: null,
-    });
-    const metadata = expectRecord(JSON.parse(expectString(auditRow.metadata_json)));
-    expect(metadata).toMatchObject({
-      agentId: PUBLIC_API_TEST_IDS.agent,
-      errorCode: "forbidden",
-      executionOwnerId: PUBLIC_API_TEST_IDS.ownerAccount,
-      reason: "Your organization membership is disabled.",
-      requestId,
-      source: "public_api",
-      status: 403,
-      traceId,
-    });
-    expect(JSON.stringify(metadata)).not.toContain(TOKENS.service);
-    expect(JSON.stringify(metadata)).not.toContain(bearer(TOKENS.service));
   });
 
   test("archives, unarchives, and manages Thread files through the public routes", async () => {

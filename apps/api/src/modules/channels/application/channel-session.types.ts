@@ -19,8 +19,6 @@ export interface AgentChannelBindingContext {
 }
 
 export interface ChannelWorkTrigger {
-  auditActorDisplay: string;
-  auditActorId: string;
   eventId: string;
   externalActorId: string;
   externalMessageId: string;

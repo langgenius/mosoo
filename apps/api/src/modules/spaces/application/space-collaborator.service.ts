@@ -11,14 +11,7 @@ import type { AccountId, SpaceId } from "@mosoo/id";
 import { and, asc, eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs, toIsoString } from "../../../time";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
-import type { AuditAction } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
   deleteResourceAcl,
@@ -28,7 +21,6 @@ import {
 } from "../../resource-access/application/resource-acl.service";
 import { getAccountByEmail } from "../../users/domain/user-account.policy";
 import { ensureSpaceAccess, ensureSpaceAclManager } from "../domain/space-access.policy";
-import type { SpaceAccessRow } from "../domain/space-access.policy";
 import { updateSpaceVisibilityAfterCollaboratorChange } from "../domain/space-visibility.policy";
 interface CollaboratorRow {
   assigned_by: AccountId | null;
@@ -62,35 +54,6 @@ function toCollaborator(row: CollaboratorRow): Collaborator {
     principal: row.principal,
     role: row.role,
   };
-}
-
-async function appendSpaceAclAuditEvent(
-  database: D1Database,
-  input: {
-    action: AuditAction;
-    principal: string;
-    role?: string;
-    space: SpaceAccessRow;
-    viewer: AuthenticatedViewer;
-  },
-): Promise<void> {
-  await appendAuditEvent(database, {
-    action: input.action,
-    ...resolveViewerAuditActor(input.viewer),
-    metadata: {
-      kind: "acl",
-      owner_at_time_id: input.space.owner_account_id,
-      owner_at_time_status: input.space.creator_membership_status,
-      principal: input.principal,
-      ...(isTruthy(input.role) ? { role: input.role } : {}),
-      viewerOrganizationRole: input.space.viewer_organization_role,
-    },
-    organizationId: input.space.organization_id,
-    outcome: "success",
-    resourceDisplay: input.space.name,
-    resourceId: input.space.id,
-    resourceType: AUDIT_RESOURCE.space,
-  });
 }
 
 export async function getCollaborators(
@@ -173,15 +136,6 @@ export async function addCollaborator(
   });
 
   await updateSpaceVisibilityAfterCollaboratorChange(database, input.spaceId);
-
-  await appendSpaceAclAuditEvent(database, {
-    action: AUDIT_ACTION.spaceShare,
-    principal: invitedUserId,
-    role: input.role,
-    space,
-    viewer,
-  });
-
   const collaborators = await getCollaborators(database, viewer, input.spaceId);
   const collaborator = collaborators.find((entry) => entry.principal === invitedUserId);
 
@@ -211,15 +165,6 @@ export async function addOrganizationCollaborator(
   });
 
   await updateSpaceVisibilityAfterCollaboratorChange(database, input.spaceId);
-
-  await appendSpaceAclAuditEvent(database, {
-    action: AUDIT_ACTION.spaceShare,
-    principal: "*",
-    role: "read",
-    space,
-    viewer,
-  });
-
   const collaborators = await getCollaborators(database, viewer, input.spaceId);
   const collaborator = collaborators.find((entry) => entry.principal === "*");
 
@@ -243,6 +188,10 @@ export async function updateCollaborator(
   }
   const userId: AccountId = parsePlatformId(input.userId, "collaborator account ID");
 
+  if (userId === space.owner_account_id) {
+    throw new Error("Cannot change the space owner collaborator role.");
+  }
+
   await updateResourceAclRole(database, {
     assignedByAccountId: viewerId,
     createdAt: currentTimestampMs(),
@@ -250,14 +199,6 @@ export async function updateCollaborator(
     resourceType: "space",
     role: input.role,
     target: principalToAclTarget(space.organization_id, userId),
-  });
-
-  await appendSpaceAclAuditEvent(database, {
-    action: AUDIT_ACTION.spaceUpdate,
-    principal: userId,
-    role: input.role,
-    space,
-    viewer,
   });
 
   const collaborators = await getCollaborators(database, viewer, input.spaceId);
@@ -290,11 +231,4 @@ export async function removeCollaborator(
   });
 
   await updateSpaceVisibilityAfterCollaboratorChange(database, input.spaceId);
-
-  await appendSpaceAclAuditEvent(database, {
-    action: AUDIT_ACTION.spaceUnshare,
-    principal,
-    space,
-    viewer,
-  });
 }

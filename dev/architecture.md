@@ -4,7 +4,7 @@
 
 This project provides a deliberately simple web experience for orchestrating heterogeneous Agents, including CLI tools and SDK-based runtimes.
 
-The current priority is OPCs, personal developers, and small self-hosted deployments. A user should be able to run, configure, debug, and distribute Agents in their own Cloudflare account with low operational overhead. Team collaboration, enterprise governance, long-retention audit, cost management, and stronger compliance controls are extension paths for the same architecture, not default complexity for the current community edition.
+The current priority is OPCs, personal developers, and small self-hosted deployments. A user should be able to run, configure, debug, and distribute Agents in their own Cloudflare account with low operational overhead. Team collaboration, enterprise governance, cost management, and stronger compliance controls are extension paths for the same architecture, not default complexity for the current community edition.
 
 To support lightweight deployment, fast iteration, and future governance expansion, the architecture embraces Serverless and edge computing and follows these baseline principles:
 
@@ -22,7 +22,7 @@ The architecture is built on the Cloudflare platform and uses a Serverless shape
 - **Frontend and ingress: Cloudflare Workers**. The Web Worker serves Vite-built static assets. The API Worker handles stateless GraphQL / Web API requests and WebSocket handshakes, then hands upgraded session connections to the corresponding Session Durable Object. Cloudflare routing sends `mosoo.ai/api/*` to the API Worker and all other paths to the Web Worker.
 - **State and connection management: Cloudflare Durable Objects**. Durable Objects hold upgraded WebSocket connections, high-frequency Session state, and distributed coordination points that need single-instance concurrency.
 - **Primary database: Cloudflare D1**. D1 stores Organization / Account / Membership records, core entity configuration, and metadata.
-- **Message queues: Cloudflare Queues**. Queues decouple the control plane from audit and offline tasks. They provide consumer groups, ACK semantics, dead-letter queues, and at-least-once delivery for asynchronous work and cost log ingestion.
+- **Message queues: Cloudflare Queues**. Queues decouple the control plane from offline tasks. They provide consumer groups, ACK semantics, dead-letter queues, and at-least-once delivery for asynchronous work and cost log ingestion.
 - **Object storage: Cloudflare R2**. R2 stores long-lived Space files, session-level file objects, sandbox state backups, and configuration attachments. User-visible Space files are mounted into the Sandbox from R2 bucket prefixes. Sandbox private state backups use a separate backup bucket and must not be mixed with user-visible file prefixes.
 - **Execution sandbox: Cloudflare Sandbox / Containers**. Heterogeneous Agents run in container-image-backed isolated environments, with Sandbox APIs and Durable Object boundaries controlling runtime lifecycle.
 - **System assistant framework: Cloudflare Agents SDK**. The current implementation is the `AgentBuilderSystemAgent` / agent-builder path. It provides lightweight system assistance for Agent configuration creation, prompt preparation, and control-plane operation planning. It does not enter the full Sandbox / Driver runtime path.
@@ -49,7 +49,6 @@ graph TD
         Vault[Credential / Secret Vault Service]
         File[File Service<br/>Space Control & Snapshots]
         Env[Environment Service<br/>Runtime Templates & Revisions]
-        Audit[Audit Service<br/>Append-only Events]
         Cost[Cost / Billing Service]
 
         subgraph Agent_Plane [Agent Plane]
@@ -58,11 +57,10 @@ graph TD
             Runtime[Runtime Scheduler]
         end
 
-        Ingress --> |GraphQL Resolver / In-Process Calls| Identity & Auth & Vault & File & Env & Agent_Plane & Audit & Cost
+        Ingress --> |GraphQL Resolver / In-Process Calls| Identity & Auth & Vault & File & Env & Agent_Plane & Cost
         Ingress --> |WS Upgrade Handoff| Session
         File & Agent_Plane --> |Push Events / Session RPC| Session
         Env --> |Resolve frozen EnvironmentRevision| Runtime
-        Auth & Identity & Vault & File & Env & Agent_Plane --> |Append Audit Events| Audit
         Agent_Plane --> |Usage / Runtime Metrics| Cost
     end
 
@@ -125,10 +123,10 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
 
 2. **Agent Plane**
    The Agent Plane unifies configuration management, lightweight system assistance, and runtime scheduling. The public data entity is the bare `Agent`. Historical terms such as `AgentService` and `PublishedAgent` have been collapsed into `Agent`, and the module name `Agent Plane` avoids a naming collision with the entity itself.
-   - **Profile management**: Agent definitions are stored in D1 and support CRUD plus import/export flows. The Profile manages Skill availability, MCP bindings, `AGENTS.md`, Runtime references, and Provider references. Runtime plaintext credentials are not stored in the Profile. They are resolved through Credential / Vault by `(execution_actor, organization, provider)`. In the Runtime Session Kernel, the execution actor is the Agent owner; the caller is used only for audit, ingress context, and permission response attribution.
+   - **Profile management**: Agent definitions are stored in D1 and support CRUD plus import/export flows. The Profile manages Skill availability, MCP bindings, `AGENTS.md`, Runtime references, and Provider references. Runtime plaintext credentials are not stored in the Profile. They are resolved through Credential / Vault by `(execution_actor, organization, provider)`. In the Runtime Session Kernel, the execution actor is the Agent owner; the caller is used only for ingress context and permission response attribution.
    - **System Agent**: This path helps users create and edit Agent configuration, generate system prompts, choose models and tools, and validate configuration completeness. It uses lightweight LLM calls, does not start a Sandbox, does not launch an Agent Driver or Agent Process, and does not use Skills for dynamic expansion. It is made from model, system prompt, and controlled tool schemas, with Cloudflare Agents SDK used only as a thin session/state/RPC wrapper.
    - **Runtime**: The Runtime validates execution rights and orchestrates Cloudflare Sandbox instances. It does not wait for an in-sandbox Driver to call back to a public endpoint. Instead, it uses Sandbox SDK `wsConnect()` to reach the Driver's local WebSocket / JSON-RPC interface inside the container. It also applies Agent `kind` to choose Pet Sandbox or Cattle Session Sandbox behavior, restores platform conversation history, mounts authorized Spaces, manages Sandbox Backup/Restore and destruction policy, and consumes `sandbox.watch()` file events on the Worker side.
-     - **Pet Runtime path**: A Pet Agent is bound to a stable Agent Sandbox with subject `agent:{agentId}`. Multiple Sessions for the same Pet happen inside the same Sandbox. The default initial working directory is shared, and Session-to-Session isolation is not guaranteed. Backup/Restore preserves user-visible continuity across Sandbox startup and teardown. Reset agent-state clears only this stable Sandbox state and does not delete Agent config, Space files, Session history, Audit, Cost, or logs.
+     - **Pet Runtime path**: A Pet Agent is bound to a stable Agent Sandbox with subject `agent:{agentId}`. Multiple Sessions for the same Pet happen inside the same Sandbox. The default initial working directory is shared, and Session-to-Session isolation is not guaranteed. Backup/Restore preserves user-visible continuity across Sandbox startup and teardown. Reset agent-state clears only this stable Sandbox state and does not delete Agent config, Space files, Session history, Cost, or logs.
      - **Cattle Runtime path**: Each Cattle Agent Session is bound to an isolated Session Sandbox with subject `session:{sessionId}`. The Sandbox is the Session boundary. It is destroyed when the run ends or the lifecycle policy triggers. Temporary files, caches, login state, and native runtime state that are not written to Space or explicitly captured by a restore policy disappear with the Sandbox.
      - **Cattle continuation**: The product still allows continuing the same Cattle Session. If the old Session Sandbox has been destroyed, the next `send events` call creates a new Session Sandbox and restores only platform-persisted conversation history, metadata, and explicit Space/Backup content. This is not Sandbox reuse and not cross-Session memory.
      - **Scaling extension point**: Runtime, Session Durable Object, and Driver contracts must not hard-code "single sandbox" as a permanent product fact. Pet may later add more stable Sandbox strategies under consistency constraints, and Cattle may later add standby pools or batch scheduling. The external API semantics remain governed by `kind`.
@@ -152,7 +150,7 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
 5. **Identity & Access Service**
    - The product model has collapsed from `Organization -> Workspace -> Account` into `Organization -> Account`. Workspace and Team are not architecture concepts. In the current code, Organization has no physical `kind` column. API and product-level `personal | team` is derived from `primary_domain is null AND join_policy = 'invite_only'`, and is used to express Personal Slot and collaboration boundaries.
    - Core entities are `Account`, `Organization`, `Membership`, `Invitation`, and `AccessRequest`. `Account.email` is globally unique. `Organization.primary_domain` and `slug` are globally unique. `(Organization, Account)` membership is unique. At any time, each Account can own at most one `kind=personal` Organization membership.
-   - Organization roles are `owner`, `admin`, and `member`. Removing a member is a membership-level hard delete; the Audit Log preserves traceability. Generic `deleted_at` soft-delete assumptions must not be applied to the identity domain.
+   - Organization roles are `owner`, `admin`, and `member`. Removing a member is a membership-level hard delete. Generic `deleted_at` soft-delete assumptions must not be applied to the identity domain.
    - Login fallback uses `lastActiveOrgId` plus active membership fallback. The system no longer maintains `account.origin_organization_id` or an "Origin Org for life" concept. New users with public email domains automatically receive a Personal Org. Enterprise email users with no domain match choose a normal Organization or Personal Org during onboarding.
 
 6. **Auth Service**
@@ -165,30 +163,15 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
    - It manages the conversation context between user and Agent and acts as the high-frequency event bus. It receives events from Runtime and File Service, then broadcasts them to connected clients. Session Durable Objects do not perform gateway handshake responsibilities; ingress and handoff stay in the Worker.
 
 8. **Credential / Secret Vault Service**
-   - The platform stores Company Credentials and Personal Credentials. Company Credentials belong to an Organization. Personal Credentials belong to `(Account, Organization)`. Runtime resolves the active key by `(execution_actor, organization, provider)`. In Agent execution, the execution actor is the Agent owner; the caller is used only for audit and ingress context.
+   - The platform stores Company Credentials and Personal Credentials. Company Credentials belong to an Organization. Personal Credentials belong to `(Account, Organization)`. Runtime resolves the active key by `(execution_actor, organization, provider)`. In Agent execution, the execution actor is the Agent owner; the caller is used only for ingress context.
    - API keys, provider keys, and MCP access credentials are encrypted at rest with envelope encryption. Plaintext exists only briefly in runtime memory. Profiles store provider and credential references, never plaintext secrets.
-   - Credential CRUD, active key switching, and Agent / MCP binding changes are control-plane changes and must append Audit Events. High-frequency `resolveCredential()` calls are runtime reads and do not emit Audit Events.
+   - Credential CRUD, active key switching, and Agent / MCP binding changes are control-plane changes. High-frequency `resolveCredential()` calls are runtime reads and remain outside mutation workflows.
 
-9. **Audit Service**
-   - **Positioning**: Audit Service is an Organization-level audit plane. It records who did what to which control-plane resource, when, and with what outcome. It is separate from Runtime Log, OTel traces, structured logs, and Cost / Billing data. Runtime prompts and responses, Agent execution traces, ordinary file reads and writes, UI clickstream, and cost metering do not enter Audit Log.
-   - **Day 1 scope**: It records authentication events, admin actions, and control-plane configuration changes, including `auth.*`, `member.*`, `agent.*`, `skill.*`, `provider.credential_*`, `mcp.binding_*`, `organization.settings_change`, and `audit_log.export`. Historical `workspace.settings_change` terminology is normalized to Organization-level events.
-   - **Event ownership**: Every event must bind to `organization_id`. Asset-level events also use `resource_type`, `resource_id`, and `resource_display` to attribute the action to Agent, Space, Credential, MCP Binding, API Key, or another resource. Audit does not depend on Workspace or Team scope.
-   - **Data model**: `audit_event` uses the platform ULID system. Core fields include `organization_id`, `timestamp`, `actor_type`, `actor_id`, `actor_display`, `action`, `resource_type`, `resource_id`, `resource_display`, `outcome`, `ip_address`, `user_agent`, `session_id`, `correlation_id`, `before`, `after`, and `metadata`. Query indexes should cover at least `(organization_id, timestamp)`, `actor_id`, `action`, `resource_type/resource_id`, and `correlation_id`.
-   - **Actor model**: Supported actor types are `user`, `agent`, `system`, and `api_key`. `actor_display` and `resource_display` are denormalized so audit rows remain readable after users, API keys, or Agents are deleted. API key actors should also retain owner attribution in metadata.
-   - **Outcome model**: `outcome` is `success`, `failure`, or `denied`. `denied` is a high-value compliance event. Permission failures, insufficient scope, and access denial must write Audit Events and explain the reason in `metadata.reason`.
-   - **Event content**: Mutation events write `before` and `after`. Create writes only `after`, delete writes the deleted snapshot, and update writes a diff of changed fields. Sensitive fields must be redacted before storage. Raw API keys, MCP bearer tokens, and password hashes must never be written as plaintext.
-   - **Correlation**: Ingress generates or propagates a `correlation_id` for each HTTP / GraphQL / tool operation and carries it through request-scoped context. Multiple audit events caused by the same operation share the same `correlation_id`.
-   - **Write boundary**: Domain services append Audit Events explicitly in permission and mutation paths through `appendAuditEvent()`. The service layer exposes append, query, and export helpers, but not update or delete helpers. Control-plane changes triggered by Agent or system actors use the corresponding `actor_type`; ordinary runtime activity remains in Runtime Log.
-   - **Performance and failure policy**: Current Day-1 persistence writes directly to D1 as a best-effort request-tail append and logs `audit.append.failed` when storage rejects the row. There is no audit Queue, outbox table, or audit queue producer in the current implementation. Any future Queue / outbox change must update this section and implementation together. Audit write completion must not be a precondition for authorization success. Audit write failure must enter structured logs, OTel error signals, and alerting, but must not change the original authorization result.
-   - **Retention**: The open-source edition defaults to 30-day retention. A scheduled task cleans expired events, and the cleanup itself does not write an Audit Event. Enterprise extensions include 365-day or longer retention, configurable retention, legal hold, tamper-evident hash chains, WORM storage, SIEM sinks, and Data Access Log.
-   - **Query and export**: Owner and Admin can access `/audit` and Audit APIs. Member receives 403. Queries default to a 7-day window and support date range, actor, action, outcome, resource type, limit, and cursor. CSV export uses the same filters, streams output, has a Day-1 limit of 100,000 rows, and writes `audit_log.export`.
-   - **UI alignment**: Audit Log is a standalone Governance / Admin page next to Cost, not a Settings tab. The page includes a header summary, filter bar, event table, persistent detail drawer, and 30-day retention banner.
-
-10. **Cost / Billing Service**
+9. **Cost / Billing Service**
 
 - Cost and billing data are recorded as a usage ledger. The current schema uses `usage_event` and `usage_daily_rollup`, with dimensions such as `organization_id`, `agent_id`, `actor_user_id`, `agent_owner_user_id`, `session_id`, `session_run_id`, provider, model, runtime id, run purpose, token buckets, pricing status, and usage contract.
 - Runtime model-call events are normalized before they enter the cost service. The cost service consumes already-normalized usage and does not infer provider-specific token semantics itself.
-- Cost can share identifiers such as `organization_id`, `agent_id`, `session_id`, and `correlation_id` with Audit, but it does not reuse Audit Log as a billing ledger.
+- Cost records usage in its own ledger and does not reuse Runtime Log, traces, or structured application logs as billing data.
 
 ### 4.3 Driver Layer
 
@@ -261,12 +244,12 @@ An Agent's runtime filesystem must not be treated as a generic workspace. The ar
 | **Cattle Session Sandbox**   | Cattle       | Isolated Session-level Sandbox, subject `session:{sessionId}`. The Sandbox is the Session boundary and is destroyed by lifecycle policy.                                                                              | Temporary files, build artifacts, caches, login state, vendor-native state for one Session               | Runtime temporary resource; not persistent by default                    |
 | **Space / Knowledge**        | Pet / Cattle | Explicit long-lived user-managed file / knowledge asset. It survives across Sessions and Sandboxes according to Space permissions.                                                                                    | User uploads, shared knowledge, explicitly saved Agent outputs                                           | Space / FILE_BUCKET, R2 object + D1 metadata                             |
 | **Session File / Resource**  | Pet / Cattle | Explicit attachment set for a product Session. Upload or Public API file creation keeps it on the Session. Archive makes the Session read-only. Session deletion hard-deletes file objects and control-plane records. | Files uploaded for the current Session, Public API thread attachments                                    | FILE_BUCKET + `file_record(scope_kind=session, session_kind=attachment)` |
-| **Platform Session History** | Pet / Cattle | Product Session data persisted by Session Durable Object / API. Used for continuation, audit context, and UI replay. It is not the Sandbox filesystem.                                                                | Transcript, event metadata, run state, ingress context                                                   | D1 / Session storage / Runtime metadata                                  |
+| **Platform Session History** | Pet / Cattle | Product Session data persisted by Session Durable Object / API. Used for continuation and UI replay. It is not the Sandbox filesystem.                                                                                 | Transcript, event metadata, run state, ingress context                                                   | D1 / Session storage / Runtime metadata                                  |
 | **Sandbox Cache**            | Pet / Cattle | Disposable and rebuildable. Environment changes or Sandbox rebuilds rematerialize it from EnvironmentRevision.                                                                                                        | Package cache, setup script artifacts, rebuildable tool cache                                            | Environment / Runtime provisioning cache                                 |
 
 Invariants:
 
-- **Pet continuity comes from stable Sandbox + Backup/Restore + platform Session history**. Reset agent-state clears only the stable Sandbox state and its Backup/Restore continuity. It does not delete Agent config, Space files, Session history, Audit, Cost, or logs.
+- **Pet continuity comes from stable Sandbox + Backup/Restore + platform Session history**. Reset agent-state clears only the stable Sandbox state and its Backup/Restore continuity. It does not delete Agent config, Space files, Session history, Cost, or logs.
 - **Cattle isolation comes from one Sandbox per Session**. Cattle has no Agent-level stable Sandbox state. When the Sandbox is destroyed, temporary files, caches, login state, and native state disappear unless they were written to Space or explicitly captured by policy.
 - **Cattle continuation is not old-Sandbox reuse**. Continuing a product Session may create a fresh Sandbox and restore only platform-persisted conversation/history/metadata plus explicit Space/Backup content.
 - **Space is the explicit persistence layer**. Pet and Cattle can read and write authorized Spaces. Space writes persist across Sessions and Sandboxes. Non-Space content follows Sandbox semantics.
@@ -365,7 +348,6 @@ sequenceDiagram
 - `Session Lifecycle PRD`: [`session-lifecycle.md`](./prd/session-lifecycle.md)
 - `Runtime Session Kernel PRD`: [`runtime-session-kernel.md`](./prd/runtime-session-kernel.md)
 - `Environment PRD`: [`environment.md`](./prd/environment.md)
-- `Audit Log PRD`: [`audit-log-prd.md`](./prd/audit-log-prd.md)
 
 ### External Protocols And Platforms
 

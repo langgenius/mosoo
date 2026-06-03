@@ -9,7 +9,6 @@ import {
   Inbox,
   KeyRound,
   Puzzle,
-  ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -23,7 +22,6 @@ interface AppNavChild {
 }
 
 interface AppNavItem {
-  adminOnly?: boolean;
   children?: AppNavChild[];
   icon: LucideIcon;
   label: string;
@@ -33,6 +31,7 @@ interface AppNavItem {
 interface AppNavSection {
   items: AppNavItem[];
   label: string;
+  requiresGovernanceAccess?: boolean;
 }
 
 const NAV_SECTIONS: AppNavSection[] = [
@@ -59,11 +58,9 @@ const NAV_SECTIONS: AppNavSection[] = [
     label: "Studio",
   },
   {
-    items: [
-      { adminOnly: true, icon: BarChart3, label: "Cost", path: "/cost" },
-      { adminOnly: true, icon: ShieldCheck, label: "Audit Log", path: "/audit" },
-    ],
+    items: [{ icon: BarChart3, label: "Cost", path: "/cost" }],
     label: "Governance",
+    requiresGovernanceAccess: true,
   },
 ];
 
@@ -217,20 +214,18 @@ function NavGroup({
 }
 
 export function AppNavigation({
+  canReadGovernance,
   collapsed,
-  isOrganizationAdmin,
   pathname,
 }: {
+  canReadGovernance: boolean;
   collapsed: boolean;
-  isOrganizationAdmin: boolean;
   pathname: string;
 }) {
   return (
     <div className={cn("flex flex-col", collapsed ? "gap-2" : "gap-3")}>
       {NAV_SECTIONS.map((section, sectionIndex) => {
-        const visibleItems = section.items.filter((item) => !item.adminOnly || isOrganizationAdmin);
-
-        if (visibleItems.length === 0) {
+        if (section.requiresGovernanceAccess === true && !canReadGovernance) {
           return null;
         }
 
@@ -246,7 +241,7 @@ export function AppNavigation({
               </div>
             )}
             <div className={cn("flex flex-col", collapsed ? "gap-1" : "gap-0.5")}>
-              {visibleItems.map((item) =>
+              {section.items.map((item) =>
                 item.children && item.children.length > 0 ? (
                   <NavGroup key={item.path} collapsed={collapsed} item={item} pathname={pathname} />
                 ) : (

@@ -10,10 +10,6 @@ import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.ser
 import { getRuntimeKindPolicy } from "../domain/runtime-kind-policy";
 import { createSandboxExecutionPlaneAdapter } from "../infrastructure/execution-plane/sandbox-execution-plane-adapter";
 import { enforceSandboxBackupConfigured } from "../infrastructure/sandbox-backup-config";
-import {
-  appendRuntimeStateOperationAuditEvent,
-  resolveRuntimeStateOperationAuditAction,
-} from "./runtime-state-operation-audit";
 import { executeRuntimeStateOperationSubjects } from "./runtime-state-operation-execution";
 import {
   completeRuntimeStateOperationPhase,
@@ -24,7 +20,6 @@ import {
 import {
   resolveRuntimeOperationScope,
   selectAdmittedRuntimeOperationSubjects,
-  summarizeRuntimeOperationSubjects,
 } from "./runtime-state-operation-subjects";
 import type { RuntimeOperationSubject } from "./runtime-state-operation-subjects";
 import { appendRuntimeDriverRestartAttemptedEvents } from "./runtime-state-operation-target-events";
@@ -61,10 +56,6 @@ async function executeRuntimeStateOperation(context: {
   }
 
   const { subjects, targets } = await resolveRuntimeOperationScope(bindings.DB, agent);
-  resolveRuntimeStateOperationAuditAction({
-    applyActionKind: input.applyActionKind,
-    operation,
-  });
 
   const phase = await startRuntimeStateOperationPhase(bindings, {
     agentId: agent.id,
@@ -103,18 +94,6 @@ async function executeRuntimeStateOperation(context: {
       phase,
     });
 
-    await appendRuntimeStateOperationAuditEvent(bindings.DB, {
-      agent,
-      applyActionKind: input.applyActionKind,
-      errorMessage: error instanceof Error ? error.message : "Runtime operation failed.",
-      operation,
-      outcome: "failure",
-      sandboxId: summarizeRuntimeOperationSubjects(admittedSubjects),
-      targetCount: admittedTargets.length,
-      targetVersion,
-      viewer,
-    });
-
     throw error;
   }
 
@@ -122,16 +101,6 @@ async function executeRuntimeStateOperation(context: {
     agentId: agent.id,
     operation,
     phase,
-  });
-  await appendRuntimeStateOperationAuditEvent(bindings.DB, {
-    agent,
-    applyActionKind: input.applyActionKind,
-    operation,
-    outcome: "success",
-    sandboxId: summarizeRuntimeOperationSubjects(admittedSubjects),
-    targetCount: admittedTargets.length,
-    targetVersion,
-    viewer,
   });
 
   return {

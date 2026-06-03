@@ -14,7 +14,6 @@ import type {
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../shared/truthiness";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { appendSuccessfulControlOperationAuditEvent } from "../../control-operations/application/control-operation-outcome-audit.service";
 import { ensureAgentPackageAccess } from "./agent-access.service";
 import { loadAgentEnvironmentConfig } from "./agent-environment.service";
 import { buildAgentManifest } from "./agent-manifest.service";
@@ -130,20 +129,6 @@ export async function createAgentFork(
   });
 
   await bindDraftAgentMcpServers(bindings.DB, agent.id, mcpResolution.serverIds);
-  await appendSuccessfulControlOperationAuditEvent(bindings.DB, {
-    metadata: {
-      issueCount: String(resolution.issues.length),
-      kind: "package_fork",
-      sourceAgentId: sourceAgent.id,
-      sourceKind: sourceAgent.kind,
-      targetKind: forkKind,
-    },
-    organizationId: sourceAgent.organizationId,
-    operationName: "createAgentFork",
-    resourceDisplay: `${sourceAgent.name} Copy`,
-    resourceId: agent.id,
-    viewer,
-  });
 
   return {
     agent: await toAgentModel(bindings.DB, viewer, agent),

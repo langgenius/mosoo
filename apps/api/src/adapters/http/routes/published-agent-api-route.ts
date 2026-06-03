@@ -1,7 +1,6 @@
 import { PUBLISHED_AGENT_API_PREFIX } from "@mosoo/contracts/public-api";
 import { Hono } from "hono";
 
-import { AUDIT_ACTION } from "../../../modules/audit/domain/audit-vocabulary";
 import { hashPublicApiIdempotencyBody } from "../../../modules/public-api/published-agent-idempotency.service";
 import { listPublishedAgentThreads } from "../../../modules/public-api/published-agent-session-query.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
@@ -56,12 +55,7 @@ export function registerPublishedAgentApiRoute(app: Hono<ApiGatewayEnvironment>)
 
   v1.post("/agents/:agentId/threads", async (c) => {
     return runPublishedApiThreadMutation(c, {
-      action: AUDIT_ACTION.sessionCreate,
       agentId: () => parseAgentIdParam(c.req.param("agentId")),
-      auditContext: (prepared) => ({
-        attributedUserId: prepared.body.attributedUserId,
-        clientExternalRef: prepared.body.clientExternalRef,
-      }),
       bodyHash: (prepared) => prepared.bodyHash,
       operation: async ({ agentId, caller, prepared }) => {
         const { createPublishedAgentThread } = await loadPublishedAgentThreadService();
@@ -87,7 +81,6 @@ export function registerPublishedAgentApiRoute(app: Hono<ApiGatewayEnvironment>)
 
   v1.get("/threads/:threadId", async (c) =>
     runPublishedApiThreadReadJson(c, {
-      action: AUDIT_ACTION.sessionUpdate,
       operation: async ({ caller, threadId }) => {
         const { retrievePublishedAgentThread } = await loadPublishedAgentThreadService();
         return retrievePublishedAgentThread({
@@ -102,7 +95,6 @@ export function registerPublishedAgentApiRoute(app: Hono<ApiGatewayEnvironment>)
 
   v1.get("/threads/:threadId/events", async (c) =>
     runPublishedApiThreadReadJson(c, {
-      action: AUDIT_ACTION.sessionUpdate,
       operation: async ({ caller, threadId }) => {
         const { listPublishedAgentThreadEvents } = await loadPublishedAgentThreadService();
         return listPublishedAgentThreadEvents({
@@ -127,19 +119,14 @@ export function registerPublishedAgentApiRoute(app: Hono<ApiGatewayEnvironment>)
 
   v1.post("/threads/:threadId/events", async (c) => {
     return runPublishedApiSessionMutation(c, {
-      action: AUDIT_ACTION.sessionUpdate,
       bodyHash: (prepared) => prepared.bodyHash,
-      operation: async ({ auditOptions, caller, prepared, threadId }) => {
-        if (threadId === undefined) {
-          throw new Error("Thread ID is required.");
-        }
+      operation: async ({ caller, prepared, threadId }) => {
         const { sendPublishedAgentSessionEvents } = await loadPublishedAgentCommandService();
         return sendPublishedAgentSessionEvents({
           bindings: c.env,
           caller: caller.viewer,
           executionContext: c.executionCtx,
           input: prepared.body,
-          options: auditOptions,
           requestUrl: c.req.url,
           threadId,
         });
@@ -157,16 +144,11 @@ export function registerPublishedAgentApiRoute(app: Hono<ApiGatewayEnvironment>)
 
   v1.post("/threads/:threadId/archive", async (c) => {
     return runPublishedApiSessionMutation(c, {
-      action: AUDIT_ACTION.sessionUpdate,
-      operation: async ({ auditOptions, caller, threadId }) => {
-        if (threadId === undefined) {
-          throw new Error("Thread ID is required.");
-        }
+      operation: async ({ caller, threadId }) => {
         const { archivePublishedAgentSession } = await loadPublishedAgentCommandService();
         await archivePublishedAgentSession({
           bindings: c.env,
           caller: caller.viewer,
-          options: auditOptions,
           threadId,
         });
         return { ok: true };
@@ -177,16 +159,11 @@ export function registerPublishedAgentApiRoute(app: Hono<ApiGatewayEnvironment>)
 
   v1.post("/threads/:threadId/unarchive", async (c) => {
     return runPublishedApiSessionMutation(c, {
-      action: AUDIT_ACTION.sessionUpdate,
-      operation: async ({ auditOptions, caller, threadId }) => {
-        if (threadId === undefined) {
-          throw new Error("Thread ID is required.");
-        }
+      operation: async ({ caller, threadId }) => {
         const { unarchivePublishedAgentSession } = await loadPublishedAgentCommandService();
         await unarchivePublishedAgentSession({
           caller: caller.viewer,
           database: c.env.DB,
-          options: auditOptions,
           threadId,
         });
         return { ok: true };
@@ -197,16 +174,11 @@ export function registerPublishedAgentApiRoute(app: Hono<ApiGatewayEnvironment>)
 
   v1.delete("/threads/:threadId", async (c) => {
     return runPublishedApiSessionMutation(c, {
-      action: AUDIT_ACTION.sessionDelete,
-      operation: async ({ auditOptions, caller, threadId }) => {
-        if (threadId === undefined) {
-          throw new Error("Thread ID is required.");
-        }
+      operation: async ({ caller, threadId }) => {
         const { deletePublishedAgentSession } = await loadPublishedAgentCommandService();
         await deletePublishedAgentSession({
           bindings: c.env,
           caller: caller.viewer,
-          options: auditOptions,
           threadId,
         });
         return { ok: true };

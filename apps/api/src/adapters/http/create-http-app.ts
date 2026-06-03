@@ -11,7 +11,6 @@ import type { ApiGatewayEnvironment } from "../../platform/cloudflare/worker-typ
 import { requestLoggingMiddleware } from "./request-logging.middleware";
 import { registerAccessTokenRoute } from "./routes/access-token-route";
 import { registerAgentFileRoute } from "./routes/agent-file-route";
-import { registerAuditRoute } from "./routes/audit-route";
 import { registerAuthRoute } from "./routes/auth-route";
 import { registerDiscordEventsRoute } from "./routes/discord-events-route";
 import { registerDriverRoute } from "./routes/driver-route";
@@ -45,7 +44,6 @@ export function createHttpApp() {
   registerHealthRoute(publicApi);
   registerAccessTokenRoute(publicApi);
   registerAgentFileRoute(publicApi);
-  registerAuditRoute(publicApi);
   registerAuthRoute(publicApi);
   registerFileRoute(publicApi);
   registerMcpRoute(publicApi);

@@ -177,7 +177,7 @@ describe("Agent Builder Assembly turn ledger bridge", () => {
     expect(typeof contextJson.workflowExecution?.durationMs).toBe("number");
   });
 
-  test("persists a failed workflow as an assistant turn for auditability", async () => {
+  test("persists a failed workflow as an assistant turn for traceability", async () => {
     const fixture = await createAgentBuilderApiFixture();
     const viewer = await login(fixture);
     const executor = createDeterministicBuilderWorkflowExecutor(() => {

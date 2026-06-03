@@ -29,12 +29,6 @@ import {
 } from "../../../agents/application/agent-readiness.service";
 import { parseAgentStoredConfig } from "../../../agents/application/agent-stored-config.service";
 import type { AgentRow } from "../../../agents/application/agent-types";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../../audit/application/audit-query.service";
-import type { AuditActorInput } from "../../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { resolveAgentEnvironmentSnapshot } from "../../../environments/application/environment.service";
 import type { SessionExecutionPlan } from "../session-definition/session-execution.types";
@@ -42,7 +36,6 @@ import type { SessionExecutionPlan } from "../session-definition/session-executi
 export interface CreateAgentSessionOptions {
   accessViewer?: AuthenticatedViewer;
   attributedUserId?: string | AccountId | null | undefined;
-  auditActor?: AuditActorInput;
   metadata?: AgentSessionMetadata | null | undefined;
 }
 
@@ -260,41 +253,6 @@ async function insertAgentSessionSnapshot(input: {
   ]);
 }
 
-async function appendSessionCreateAuditEvent(input: {
-  auditActor?: AuditActorInput;
-  bindings: ApiBindings;
-  sessionId: SessionId;
-  source: AgentSessionExecutionSource;
-  type: SessionType;
-  viewer: AuthenticatedViewer;
-}): Promise<void> {
-  await appendAuditEvent(input.bindings.DB, {
-    action: AUDIT_ACTION.sessionCreate,
-    ...(input.auditActor
-      ? {
-          actorDisplay: input.auditActor.display,
-          actorId: input.auditActor.id,
-          actorMetadata: input.auditActor.metadata ?? {},
-          actorType: input.auditActor.type,
-          ipAddress: input.auditActor.ipAddress ?? null,
-          userAgent: input.auditActor.userAgent ?? null,
-        }
-      : resolveViewerAuditActor(input.viewer)),
-    metadata: {
-      agentId: input.source.agent.id,
-      agentName: input.source.agent.name,
-      deploymentVersionId: input.source.liveVersion?.id ?? "",
-      sessionType: input.type,
-      versionNumber: input.source.liveVersion ? String(input.source.liveVersion.versionNumber) : "",
-    },
-    organizationId: input.source.agent.organizationId,
-    outcome: "success",
-    resourceDisplay: input.source.agent.name,
-    resourceId: input.sessionId,
-    resourceType: AUDIT_RESOURCE.session,
-  });
-}
-
 function buildCreatedSessionSummary(input: {
   sessionId: SessionId;
   source: AgentSessionExecutionSource;
@@ -368,15 +326,6 @@ export async function createAgentSession(
     ),
     metadata: options.metadata ?? null,
     viewer: request.viewer,
-  });
-
-  await appendSessionCreateAuditEvent({
-    bindings: request.bindings,
-    sessionId,
-    source,
-    type: sessionType,
-    viewer: request.viewer,
-    ...(options.auditActor ? { auditActor: options.auditActor } : {}),
   });
 
   const session = buildCreatedSessionSummary({

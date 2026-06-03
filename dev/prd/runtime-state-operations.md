@@ -1,6 +1,6 @@
 # Runtime State Operations — for humans
 
-> This is the product-story version for non-engineering readers. For the full engineering contract (the 5-tier Action field mapping, Runtime backend orchestration, Screens specs, Audit touchpoints, states and corner cases, decision boundaries, and Self-check), see the full Runtime State Operations PRD.
+> This is the product-story version for non-engineering readers. For the full engineering contract (the 5-tier Action field mapping, Runtime backend orchestration, Screens specs, states and corner cases, decision boundaries, and Self-check), see the full Runtime State Operations PRD.
 
 ## One-line positioning
 
@@ -43,7 +43,7 @@ After this round, an admin should be able to:
 - See, right after editing a field, the **highest Action tier** of the current edit and "what will happen" in the PendingChangesBanner at the top.
 - See, at a glance at the top of the Apply Changes dialog, a green **"agent-state preserved"** badge (a reset shows a red ✗ "will be cleared").
 - Know that Reset agent-state is only found under the Pet's Settings → Danger Zone, and requires type-to-confirm.
-- See, in the dialog copy before doing a Reset, **what will not be cleared** (Profile / Skills / MCP refs / Space files / historical sessions / audit / cost).
+- See, in the dialog copy before doing a Reset, **what will not be cleared** (Profile / Skills / MCP refs / Space files / historical sessions / cost).
 
 On the platform side, the following must hold:
 
@@ -51,7 +51,6 @@ On the platform side, the following must hold:
 - The Runtime must provide three categories of backend capability — restart / recreate / reset — aligned one-to-one with the frontend's 5-tier semantics; reset-agent-state must be Pet-only.
 - The 4 configuration tiers (restart-process / patch-and-restart / recreate-preserving-state / fork-agent) **preserve agent-state** by default; only the reset-agent-state tier wipes the Pet agent-state.
 - M1B guarantees that the **session execution snapshot is immutable**: Apply Changes creates a new DeploymentVersion and affects new sessions; existing sessions do not silently swap configuration and do not follow the new version.
-- Audit must record actor=user / action / outcome / the list of affected fields.
 - **Caller perspective**: During the driver restart / sandbox recreate triggered by Apply Changes, every in-flight session connection receives an updating signal, and the caller UI shows an "Agent is updating" overlay; once the driver is ready, it continues using the session execution snapshot frozen at creation time (see §5 Flow A step 7).
 
 ---
@@ -85,7 +84,7 @@ Frontend copy principles:
 - The default action must be a Restart or Recreate that preserves agent-state.
 - `Reset` may only be used to wipe agent-state / factory reset; it must not be used for an ordinary restart or container rebuild.
 - `Recreate sandbox` must carry `preserving state` or an equivalent note, to avoid users assuming data will be wiped.
-- `Fork Agent` is not a reset. It creates a new bare-named Agent; the old sessions, logs, cost, audit, and agent-state stay on the old Agent.
+- `Fork Agent` is not a reset. It creates a new bare-named Agent; the old sessions, logs, cost, and agent-state stay on the old Agent.
 - Space files are not part of agent-state and must not appear in the deletion scope of reset agent-state.
 
 ---

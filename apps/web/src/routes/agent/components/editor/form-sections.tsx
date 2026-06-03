@@ -219,7 +219,7 @@ export function BasicsSection({
             {agent.status === "published" ? (
               <div className="rounded-lg border border-amber-500/30 bg-amber-50/60 px-3 py-2 text-[12px] leading-5 text-amber-900">
                 Runtime is locked for this published Agent. Fork Agent to switch runtime; existing
-                sessions, audit, cost, logs, and agent-state stay attached here.
+                sessions, cost, logs, and agent-state stay attached here.
               </div>
             ) : null}
           </div>

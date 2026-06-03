@@ -184,17 +184,3 @@ export function selectAdmittedRuntimeOperationSubjects(input: {
       : [];
   });
 }
-
-export function summarizeRuntimeOperationSubjects(
-  subjects: readonly RuntimeOperationSubject[],
-): string {
-  if (subjects.length === 0) {
-    return "";
-  }
-
-  if (subjects.length === 1) {
-    return subjects[0]?.runtimeSubjectId ?? "";
-  }
-
-  return subjects.map((subject) => subject.runtimeSubjectId).join(", ");
-}

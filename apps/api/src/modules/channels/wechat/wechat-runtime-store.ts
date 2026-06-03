@@ -14,8 +14,6 @@ import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzl
 import { validationError } from "../../../platform/errors";
 import { currentTimestampMs, toIsoString } from "../../../time";
 import { ensureAgentEditor } from "../../agents/application/agent-access.service";
-import { appendAuditEvent } from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { deleteSecretsById } from "../../mcp/application/mcp-secret-store";
 import {
@@ -386,7 +384,7 @@ export async function persistConfirmedWeChatQrPairing(
     throw error;
   }
 
-  const credentialSecretCleanupSucceeded = await cleanupStoredWeChatCredentialSecrets({
+  await cleanupStoredWeChatCredentialSecrets({
     agentId: input.agentId,
     database: bindings.DB,
     organizationId: access.agent.organizationId,
@@ -400,26 +398,6 @@ export async function persistConfirmedWeChatQrPairing(
   if (!row) {
     throw new Error("WeChat channel account could not be loaded.");
   }
-
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.agentUpdate,
-    actorDisplay: viewer.name,
-    actorId: viewerId,
-    actorMetadata: {},
-    actorType: "user",
-    metadata: {
-      agentId: access.agent.id,
-      bindingId: accountId,
-      channel_binding_event: existingBinding ? "updated" : "created",
-      credential_secret_cleanup: credentialSecretCleanupSucceeded ? "completed" : "failed",
-      provider: "wechat",
-    },
-    organizationId: access.agent.organizationId,
-    outcome: "success",
-    resourceDisplay: access.agent.name,
-    resourceId: access.agent.id,
-    resourceType: AUDIT_RESOURCE.agent,
-  });
 
   return toWeChatChannelAccount(row);
 }

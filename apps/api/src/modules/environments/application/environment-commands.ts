@@ -16,11 +16,6 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureOrganizationPermission } from "../../organizations/domain/organization-access.policy";
 import {
@@ -77,16 +72,6 @@ export async function createEnvironment(
     timestampMs,
   });
 
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.environmentCreate,
-    ...resolveViewerAuditActor(viewer),
-    organizationId: input.organizationId,
-    outcome: "success",
-    resourceDisplay: metadata.name,
-    resourceId: environmentId,
-    resourceType: AUDIT_RESOURCE.environment,
-  });
-
   const created = await getEnvironmentRecordRow(bindings.DB, environmentId);
 
   if (!created) {
@@ -134,23 +119,6 @@ export async function updateEnvironment(
     })
     .where(eq(environmentsTable.id, access.row.id))
     .run();
-
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.environmentUpdate,
-    ...resolveViewerAuditActor(viewer),
-    metadata:
-      access.row.ownerId !== viewerId
-        ? {
-            override: "organization_admin",
-            resourceOwnerId: access.row.ownerId ?? "",
-          }
-        : {},
-    organizationId: access.row.organizationId,
-    outcome: "success",
-    resourceDisplay: metadata.name,
-    resourceId: access.row.id,
-    resourceType: AUDIT_RESOURCE.environment,
-  });
 
   return getEnvironmentDetail(bindings, viewer, access.row.id);
 }
@@ -207,20 +175,6 @@ export async function setEnvironmentVariableValue(
     .where(eq(environmentsTable.id, access.row.id))
     .run();
 
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.environmentUpdate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      envVarKey: key,
-      kind: "set_environment_variable_value",
-    },
-    organizationId: access.row.organizationId,
-    outcome: "success",
-    resourceDisplay: access.row.name,
-    resourceId: access.row.id,
-    resourceType: AUDIT_RESOURCE.environment,
-  });
-
   return getEnvironmentDetail(bindings, viewer, access.row.id);
 }
 
@@ -258,19 +212,6 @@ export async function setOrganizationDefaultEnvironment(
     })
     .where(eq(organizationsTable.id, input.organizationId))
     .run();
-
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.environmentUpdate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      kind: "set_org_default",
-    },
-    organizationId: input.organizationId,
-    outcome: "success",
-    resourceDisplay: access.row.name,
-    resourceId: access.row.id,
-    resourceType: AUDIT_RESOURCE.environment,
-  });
 
   const row = await getEnvironmentRecordRow(bindings.DB, access.row.id);
 

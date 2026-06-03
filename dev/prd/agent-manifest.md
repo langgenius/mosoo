@@ -54,7 +54,7 @@ If we built only the lowest common denominator:
 The real problem is not "how do we merge every vendor's fields into one," but rather:
 
 - **Agent authors need a readable, editable, publishable entry point for product configuration.**
-- **The platform needs a stable contract** that can create, start, audit, and recover Agents, and that can also be consumed by Agent Builder and other downstream tools.
+- **The platform needs a stable contract** that can create, start, diagnose, and recover Agents, and that can also be consumed by Agent Builder and other downstream tools.
 - **Each Agent's runtime environment** must still retain the vendor's full capabilities.
 - **When the UI, the Sandbox, and the vendor-native config disagree**, the user must clearly understand who is the source of truth and what to do next.
 
@@ -153,9 +153,9 @@ The Manifest is a minimal common set → it is impossible to move all of the Ope
 | **`AGENTS.md`**                  | The Agent's "long system instruction" file. The user uploads any Markdown, and Mosoo stores it as a file asset without forcing a heading / frontmatter structure.                                                                                           |
 | **Rendered Native Config**       | The vendor config file / startup parameters the Agent Driver renders from the Manifest. **A materialized result, not the truth.**                                                                                                                           |
 | **Drift**                        | The intent expressed by the Manifest vs. the actual state running inside the Sandbox disagree. Possible sources: you changed it in the Terminal / the vendor runtime changed it on its own / the platform failed to sync.                                   |
-| **Advanced Sandbox Mode**        | The Terminal / advanced entry point that operates the Sandbox directly. It can change native state, but **cannot break through** the Space / Credential / Network / Audit boundaries.                                                                       |
+| **Advanced Sandbox Mode**        | The Terminal / advanced entry point that operates the Sandbox directly. It can change native state, but **cannot break through** the Space / Credential / Network boundaries.                                                                               |
 | **Import / Adopt**               | Explicitly absorb certain observed config from the Sandbox back into the Manifest. **By default this never happens automatically.**                                                                                                                         |
-| **Fork Agent**                   | Take a clean copy: the Manifest + asset bindings are copied over, while runtime state / login state / session history / audit / cost are left behind.                                                                                                       |
+| **Fork Agent**                   | Take a clean copy: the Manifest + asset bindings are copied over, while runtime state / login state / session history / cost are left behind.                                                                                                               |
 | **Readiness (grayed-out state)** | When any one of runtime / model / credential / MCP / Environment / Space is unavailable, the Manifest is **kept**, but the frontend shows a clear grayed-out state + a fix-it path; it does **not** auto-swap the runtime and does not auto-swap the model. |
 | **Unavailable Model**            | A model that was selected before but is no longer in the dynamic model list. The Manifest still keeps it, the UI marks it Unavailable, and the user switches it manually.                                                                                   |
 
@@ -228,4 +228,4 @@ flowchart TD
 
 ---
 
-> Complete engineering contract + canonical example + edge-case matrix + thinking audit: see the shipped Agent Manifest PRD.
+> Complete engineering contract + canonical example + edge-case matrix + reasoning review: see the shipped Agent Manifest PRD.

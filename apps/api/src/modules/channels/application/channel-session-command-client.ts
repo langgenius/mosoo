@@ -133,17 +133,6 @@ export function createChannelSessionClient(input: {
               options: {
                 accessViewer: input.binding.owner,
                 attributedUserId: null,
-                auditActor: {
-                  display: command.trigger.auditActorDisplay,
-                  id: input.binding.bindingId,
-                  metadata: {
-                    binding_id: input.binding.bindingId,
-                    event_id: command.trigger.eventId,
-                    external_actor_id: command.trigger.auditActorId,
-                    provider: input.binding.provider,
-                  },
-                  type: "system",
-                },
                 metadata: {
                   triggered_by: toTriggeredByMetadata(input.binding, command.trigger),
                 },
@@ -226,7 +215,6 @@ export function createChannelSessionClient(input: {
         agentId: input.binding.agentId,
         bindingId: input.binding.bindingId,
         errorCode,
-        provider: input.binding.provider,
       });
     },
     retrieveSessionReply(sessionId, runId) {

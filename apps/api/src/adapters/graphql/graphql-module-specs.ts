@@ -1,7 +1,6 @@
 import type { GraphQLModule } from "./graphql-module.ts";
 import { agentBuilderSchema } from "./schema/agent-builder-schema.ts";
 import { agentSchema } from "./schema/agent-schema.ts";
-import { auditSchema } from "./schema/audit-schema.ts";
 import { channelSchema } from "./schema/channel-schema.ts";
 import { commonSchema } from "./schema/common-schema.ts";
 import { costSchema } from "./schema/cost-schema.ts";
@@ -19,11 +18,6 @@ type GraphQLModuleSpec = Pick<GraphQLModule, "mutationFields" | "queryFields" | 
 export const commonGraphQLSpec = {
   queryFields: ["appInfo: AppInfo!"],
   typeDefs: commonSchema,
-} satisfies GraphQLModuleSpec;
-
-export const auditGraphQLSpec = {
-  queryFields: ["auditEvents(filter: AuditEventsFilterInput!): [AuditEvent!]!"],
-  typeDefs: auditSchema,
 } satisfies GraphQLModuleSpec;
 
 export const channelGraphQLSpec = {
@@ -262,7 +256,6 @@ export const graphqlModuleSpecs = [
   commonGraphQLSpec,
   agentGraphQLSpec,
   agentBuilderGraphQLSpec,
-  auditGraphQLSpec,
   channelGraphQLSpec,
   costGraphQLSpec,
   environmentGraphQLSpec,

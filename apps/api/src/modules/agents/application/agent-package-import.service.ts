@@ -14,7 +14,6 @@ import type {
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../shared/truthiness";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { appendSuccessfulControlOperationAuditEvent } from "../../control-operations/application/control-operation-outcome-audit.service";
 import { toAgentModel } from "./agent-models";
 import { createDraftAgentBatch } from "./agent-package-draft.service";
 import {
@@ -160,19 +159,6 @@ export async function importAgentPackage(
     throw error;
   }
 
-  await appendSuccessfulControlOperationAuditEvent(bindings.DB, {
-    metadata: {
-      fileId,
-      issueCount: String(resolution.issues.length),
-      kind: "package_import",
-      packageVersion: parsed.package.packageVersion,
-    },
-    organizationId: input.organizationId,
-    operationName: "importAgentPackage",
-    resourceDisplay: parsed.package.app.name,
-    resourceId: agent.id,
-    viewer,
-  });
   await deleteImportedAgentPackageFile({
     bindings,
     fileId,

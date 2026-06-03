@@ -1,5 +1,5 @@
 import { agentMcpBindingsTable, mcpServersTable, resourceAclTable } from "@mosoo/db";
-import type { AgentId, AgentMcpBindingId, CredentialId, McpServerId } from "@mosoo/id";
+import type { AgentId } from "@mosoo/id";
 import { and, asc, eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -84,20 +84,6 @@ export async function listAgentBindingRows(
     .all();
 
   return results.map(toAgentBindingRow);
-}
-
-export async function listServerBindingArtifacts(
-  database: D1Database,
-  serverId: McpServerId,
-): Promise<{ agentCredentialId: CredentialId | null; id: AgentMcpBindingId }[]> {
-  return getAppDatabase(database)
-    .select({
-      agentCredentialId: agentMcpBindingsTable.agentCredentialId,
-      id: agentMcpBindingsTable.id,
-    })
-    .from(agentMcpBindingsTable)
-    .where(eq(agentMcpBindingsTable.serverId, serverId))
-    .all();
 }
 
 export async function hasNonOwnerCollaborators(

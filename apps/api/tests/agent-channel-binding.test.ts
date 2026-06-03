@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  agentChannelBindingsTable,
-  auditEventsTable,
-  sessionsTable,
-  vaultSecretsTable,
-} from "@mosoo/db";
+import { agentChannelBindingsTable, sessionsTable, vaultSecretsTable } from "@mosoo/db";
 import { count, eq } from "drizzle-orm";
 
 import { cleanupOrphanChannelBindingCredentialSecrets } from "../src/modules/channels/application/agent-channel-binding-maintenance.service";
@@ -284,16 +279,6 @@ describe("agent channel bindings", () => {
           secretId: row.encryptedCredsSecretId,
         }),
       ).rejects.toThrow();
-
-      const audit = await database
-        .app()
-        .select()
-        .from(auditEventsTable)
-        .where(eq(auditEventsTable.resourceId, "01J00000000000000000000009"))
-        .all();
-      expect(audit.some((event) => event.metadataJson?.includes("channel_binding_event"))).toBe(
-        true,
-      );
     });
   });
 

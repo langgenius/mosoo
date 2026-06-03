@@ -1,6 +1,6 @@
 # Session Lifecycle — for humans
 
-> This is the product-story version written for non-engineering readers. For the full engineering contract (state-machine details, sequence diagrams, edge-case matrix, implementation boundaries, and thinking audit), see the shipped engineering PRD.
+> This is the product-story version written for non-engineering readers. For the full engineering contract (state-machine details, sequence diagrams, edge-case matrix, implementation boundaries, and reasoning review), see the shipped engineering PRD.
 
 ## One-line positioning
 
@@ -92,7 +92,7 @@ Long-term memory as a fallback: the agent can proactively write Space files duri
 
 > Agent v3 is running with 5 sessions still alive → Yevan changes the prompt and adds a skill, then publishes v4 → the 5 old sessions keep running on v3, while new incoming sessions default to v4.
 
-Once an old session ends naturally (the user archives it or it times out from idle), v3 is not deleted right away; it's retained for auditing and for reviewing old conversations.
+Once an old session ends naturally (the user archives it or it times out from idle), v3 is not deleted right away; it's retained for reviewing old conversations.
 
 > If what Yevan changes is the **runtime** (for example, switching from the OpenAI runtime to Claude), the platform does not allow an in-place upgrade; he must Fork the Agent, and the original Agent and all its sessions remain unchanged.
 
@@ -146,7 +146,7 @@ The session's product promise is not "always try to recover the Agent's latest c
 | The environment my old session used has already been deleted by the author or can't be recovered — what happens?         | This session goes to TERMINATED, with a "New session" button                                                    |
 | What about Space files that were changed or permissions that were revoked?                                               | Every continuation re-validates against the current permissions; it won't use an old snapshot to bypass the ACL |
 | Can I have the platform upgrade me to the latest version?                                                                | No. To upgrade, create a new session; this is the "no silent config swap" promise                               |
-| I'm the owner of a Pet Agent and want to clear leftover login state in the sandbox — what do I do?                       | Reset agent-state; this clears only sandbox state and doesn't touch the transcript / Space / audit / cost       |
+| I'm the owner of a Pet Agent and want to clear leftover login state in the sandbox — what do I do?                       | Reset agent-state; this clears only sandbox state and doesn't touch the transcript / Space / cost               |
 
 ---
 

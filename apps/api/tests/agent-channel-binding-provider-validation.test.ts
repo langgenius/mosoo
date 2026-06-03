@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { agentChannelBindingsTable, auditEventsTable } from "@mosoo/db";
+import { agentChannelBindingsTable } from "@mosoo/db";
 import { count, eq } from "drizzle-orm";
 
+import { recordAgentChannelBindingError } from "../src/modules/channels/application/agent-channel-binding-error";
 import {
   createDiscordAgentChannelBinding,
   createLarkAgentChannelBinding,
@@ -10,7 +11,6 @@ import {
   createTelegramAgentChannelBinding,
   listAgentChannelBindings,
   pollLarkAgentChannelRegistration,
-  recordAgentChannelBindingError,
   startLarkAgentChannelRegistration,
 } from "../src/modules/channels/application/agent-channel-binding.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
@@ -227,7 +227,7 @@ describe("agent channel provider validation", () => {
     });
   });
 
-  test("moves Slack bindings to error status and writes audit metadata", async () => {
+  test("moves Slack bindings to error status", async () => {
     await withSlackAuthTestMock(async () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
@@ -241,7 +241,6 @@ describe("agent channel provider validation", () => {
         agentId: "01J00000000000000000000009",
         bindingId: binding.id,
         errorCode: "invalid_auth",
-        provider: "slack",
       });
 
       await expect(
@@ -253,22 +252,6 @@ describe("agent channel provider validation", () => {
           status: "error",
         }),
       ]);
-
-      const audit = await database
-        .app()
-        .select()
-        .from(auditEventsTable)
-        .where(eq(auditEventsTable.resourceId, "01J00000000000000000000009"))
-        .all();
-
-      expect(
-        audit.some(
-          (event) =>
-            event.outcome === "failure" &&
-            event.metadataJson?.includes('"channel_binding_event":"error"') === true &&
-            event.metadataJson.includes('"error_code":"invalid_auth"'),
-        ),
-      ).toBe(true);
     });
   });
 

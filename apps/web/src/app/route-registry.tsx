@@ -71,10 +71,6 @@ const CredentialPolicy = lazyNamed(
 );
 const Members = lazyNamed(async () => import("../routes/members/members.route"), "MembersPage");
 const Cost = lazyNamed(async () => import("../routes/cost/cost.route"), "CostPage");
-const AuditLog = lazyNamed(
-  async () => import("../routes/audit-log/audit-log.route"),
-  "AuditLogPage",
-);
 const SettingsLayout = lazyNamed(
   async () => import("../routes/settings/settings.route"),
   "SettingsLayout",
@@ -186,8 +182,6 @@ const appRoutes = [
     ),
     path: "/cost",
   },
-  { element: protectedRoute(<AuditLog />), path: "/audit" },
-  { element: protectedRoute(<Navigate to="/audit" replace />), path: "/audit-log" },
   {
     element: protectedRoute(<Navigate to="/settings/credential-policy" replace />),
     path: "/credential-policy",

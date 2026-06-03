@@ -21,20 +21,7 @@ export function createGraphQLGateway() {
       const tokenCaller = isTruthy(token)
         ? await authenticatePersonalAccessToken(bindings.DB, token)
         : null;
-      const viewer = tokenCaller
-        ? {
-            ...tokenCaller.viewer,
-            auditActor: {
-              display: `API Key: ${tokenCaller.tokenLabel}`,
-              id: tokenCaller.tokenId,
-              metadata: {
-                ownerDisplay: tokenCaller.viewer.name || tokenCaller.viewer.email,
-                ownerId: tokenCaller.viewer.id,
-              },
-              type: "api_key" as const,
-            },
-          }
-        : sessionViewer;
+      const viewer = tokenCaller ? tokenCaller.viewer : sessionViewer;
 
       return {
         ...serverContext,

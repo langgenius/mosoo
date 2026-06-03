@@ -11,17 +11,11 @@ import { eq } from "drizzle-orm";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
   ensureOrganizationMembership,
   ensureOrganizationPermission,
 } from "../../organizations/domain/organization-access.policy";
-import { listServerBindingArtifacts } from "./mcp-agent-binding.repository";
 import {
   deleteCredentialArtifactsBatch,
   getSharedCredentialRow,
@@ -119,20 +113,6 @@ export async function createPersonalMcpServer(
   }
 
   const server = await getServerRow(bindings.DB, serverId);
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.mcpBindingCreate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      authType: server.authType,
-      credentialScope: server.credentialScope,
-      source: server.source,
-    },
-    organizationId: server.organizationId,
-    outcome: "success",
-    resourceDisplay: server.name,
-    resourceId: server.id,
-    resourceType: AUDIT_RESOURCE.mcpBinding,
-  });
   return toServerWithCredential(server, null, false);
 }
 
@@ -241,38 +221,6 @@ export async function createOrganizationMcpServer(
       ? await getSharedCredentialRow(bindings.DB, server.id)
       : null;
 
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.mcpBindingCreate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      authType: server.authType,
-      credentialScope: server.credentialScope,
-      source: server.source,
-    },
-    organizationId: server.organizationId,
-    outcome: "success",
-    resourceDisplay: server.name,
-    resourceId: server.id,
-    resourceType: AUDIT_RESOURCE.mcpBinding,
-  });
-
-  if (credential) {
-    await appendAuditEvent(bindings.DB, {
-      action: AUDIT_ACTION.credentialCreate,
-      ...resolveViewerAuditActor(viewer),
-      metadata: {
-        kind: "mcp_organization_shared_bearer",
-        serverId: server.id,
-        status: credential.status,
-      },
-      organizationId: server.organizationId,
-      outcome: "success",
-      resourceDisplay: server.name,
-      resourceId: credential.id,
-      resourceType: AUDIT_RESOURCE.credential,
-    });
-  }
-
   return toServerWithCredential(
     server,
     credential,
@@ -294,19 +242,6 @@ export async function setMcpServerEnabled(
     .run();
 
   const server = await getServerRow(database, serverId);
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.mcpBindingUpdate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      enabled: Boolean(server.enabled),
-      kind: "mcp_server_enabled",
-    },
-    organizationId: server.organizationId,
-    outcome: "success",
-    resourceDisplay: server.name,
-    resourceId: server.id,
-    resourceType: AUDIT_RESOURCE.mcpBinding,
-  });
   const [credential, shared] = await Promise.all([
     resolveRegistryCredential(database, server, viewer.id),
     hasSharedCredential(database, server.id),
@@ -321,8 +256,7 @@ export async function deleteMcpServer(
   serverId: McpServerId,
 ): Promise<void> {
   const { membership, server } = await ensureServerManageAccess(database, viewer, serverId);
-  const [bindingRows, credentialRows, oauthFlowRows] = await Promise.all([
-    listServerBindingArtifacts(database, serverId),
+  const [credentialRows, oauthFlowRows] = await Promise.all([
     listCredentialRowsByServerId(database, serverId),
     listOAuthFlowRowsByServerId(database, serverId),
   ]);
@@ -358,24 +292,4 @@ export async function deleteMcpServer(
     .delete(mcpServersTable)
     .where(eq(mcpServersTable.id, serverId))
     .run();
-
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.mcpBindingDelete,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      ...(bindingRows.length > 0
-        ? { cascadeDeletedMcpBindingIds: bindingRows.map((row) => row.id).join(", ") }
-        : {}),
-      ...(credentialRows.length > 0
-        ? { cascadeDeletedCredentialIds: credentialRows.map((row) => row.id).join(", ") }
-        : {}),
-      owner_at_time_id: server.ownerId,
-      ...(server.ownerId !== readAccountId(viewer.id) ? { override: "organization_admin" } : {}),
-    },
-    organizationId: server.organizationId,
-    outcome: "success",
-    resourceDisplay: server.name,
-    resourceId: server.id,
-    resourceType: AUDIT_RESOURCE.mcpBinding,
-  });
 }

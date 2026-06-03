@@ -6,7 +6,6 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureAgentDestructiveAccess } from "./agent-access.service";
-import { appendAgentAuditEvent } from "./agent-command-audit.service";
 import { toAgentModel } from "./agent-models";
 import { getAgentRow } from "./agent-repository";
 import { parseAgentStoredConfig, serializeAgentStoredConfig } from "./agent-stored-config.service";
@@ -32,16 +31,6 @@ export async function updateAgentPackageSharing(
     })
     .where(eq(agentsTable.id, editable.agent.id))
     .run();
-
-  await appendAgentAuditEvent(database, {
-    agent: editable.agent,
-    metadata: {
-      kind: "package_sharing",
-    },
-    operationName: "updateAgentPackageSharing",
-    viewer,
-    viewerRole: editable.viewerRole,
-  });
 
   return toAgentModel(database, viewer, await getAgentRow(database, editable.agent.id));
 }

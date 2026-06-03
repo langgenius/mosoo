@@ -50,13 +50,13 @@ And here is what external collaborators (Slack users) say:
 - Trigger the bot inside a Slack / Lark / Telegram thread and **immediately see a working indicator or a native platform reply**
 - See the full reply appear in the same thread within tens of seconds to a few minutes (Slack can rewrite the working message; Lark / Telegram present it as a native reply / new message. Discord / WeChat already have setup and backend paths, but a successful setup, a relay fixture, or a QR fixture must not be treated as live delivery proof)
 - Ask a follow-up like `now give me the risks` in the same thread, and **the bot automatically continues the same Session** and remembers the context
-- Have the trigger recorded in Mosoo Audit / Logs, while **never** being automatically counted as a Mosoo member and **never** entering any user's private Web Threads
+- Have the trigger recorded in Session metadata / Logs, while **never** being automatically counted as a Mosoo member and **never** entering any user's private Web Threads
 
 ### The product promise for future channels
 
 - The current setup providers are Slack / Lark / Telegram / Discord / WeChat; Lark and Feishu are the same provider, and the regional difference is the binding credential
 - Both Discord and personal WeChat have already been proven feasible in the reference. This round, Discord adds the setup UI, the backend relay slice (internal enum / binding mutation / relay-signed callback / REST writeback), a testable Gateway protocol / relay / health scaffold, a `channel_runtime_state` persistent lease/health/resume-state, a deterministic owner harness, a `ChannelConnection` Durable Object runtime, a scheduled reconciler, a heartbeat ACK watchdog, and fatal-close binding error mapping; it still lacks a real bot-token smoke test under the Cloudflare runtime. This round, personal WeChat is built out to QR setup + backend QR pairing registration (the `wechat` provider enum + QR start/poll mutation + a pending pairing token hash table + confirmed QR → `agent_channel_binding`), an internal iLink client + a scheduled poll-once owner lifecycle + encrypted runtime persistence. With fixtures we can already prove that QR-confirmed credentials enter the vault, that the `getupdates` cursor/runtime state can be recovered, that the per-peer `context_token` is encrypted and saved, that a DM trigger enters the shared channel session spine, and that final delivery must read the stored token; but a real QR/account smoke test is still needed. Personal WeChat should first be viewed as a DM-first surface; whether ordinary WeChat group events are delivered reliably needs verification against a real account.
-- Adding a new channel **will not** change already-shipped product behavior such as the existing Slack binding / Web Threads / Audit / Logs
+- Adding a new channel **will not** change already-shipped product behavior such as the existing Slack binding / Web Threads / Logs
 
 ---
 
@@ -69,7 +69,7 @@ And here is what external collaborators (Slack users) say:
 | **Channel**                 | A type of external collaboration platform. The current owner-facing setup providers are Slack / Lark / Telegram / Discord / WeChat; Discord is a setup-enabled backend relay + Gateway scaffold + runtime-state/owner harness + Durable Object runtime; personal WeChat is a setup-enabled backend-registered QR pairing + iLink client + scheduled poll-once owner lifecycle. Discord / WeChat live-verified status still awaits a real-account smoke test. |
 | **AgentChannelBinding**     | One Agent + one channel provider = one binding. It expresses "Agent X accepts messages as a bot on Slack / Lark / Telegram." **Isolated per Agent**: if one external bot wants to serve multiple Agents, create multiple bots/apps on the corresponding platform or configure them separately.                                                                                                                                                               |
 | **Distribution / Channels** | A section within Agent Publish Settings. It contains three sub-zones: Web Threads / API Access / Channels. **A Channel is a configuration item** (a set of fields + status), at the same level as the Web toggle / API token; it is not a standalone setup wizard.                                                                                                                                                                                           |
-| **Triggered_by**            | The "source fingerprint" recorded on the Session triggered by a Channel: which platform, which workspace, which external user, which external message, which event id. Audit / Logs can show "Slack #growth · @alice · 12 seconds ago."                                                                                                                                                                                                                      |
+| **Triggered_by**            | The "source fingerprint" recorded on the Session triggered by a Channel: which platform, which workspace, which external user, which external message, which event id. Session UI / Logs can show "Slack #growth · @alice · 12 seconds ago."                                                                                                                                                                                                                |
 | **Binding status**          | Only `Active` (normal) / `Error` (credentials expired). There is **no** pause / soft-delete / 30-day retention; once deleted, it is gone, and to restore it you re-paste the credentials.                                                                                                                                                                                                                                                                    |
 
 ### What changed and what didn't
@@ -80,7 +80,7 @@ flowchart LR
     A1["Agent configuration (Skill / MCP / Space / Env)"]
     A2["Public Thread API contract"]
     A3["Owner Shadow execution model"]
-    A4["Audit 11-verb subset"]
+    A4["Session trigger metadata"]
     A5["Web Threads (channels do not project into them)"]
   end
 

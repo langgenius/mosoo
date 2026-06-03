@@ -25,7 +25,7 @@ const CAPABILITIES: readonly Capability[] = [
   },
   {
     Icon: History,
-    tag: "Audit",
+    tag: "Replay",
     body: "Replay any run from start to finish. When something breaks, reconstruct what happened and trace it to its owner.",
   },
   {

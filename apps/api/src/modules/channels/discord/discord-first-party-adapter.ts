@@ -86,8 +86,6 @@ export async function processDiscordWorkTrigger(input: {
       clientRequestId: input.trigger.eventId,
       text: toMosooMessage(input.trigger),
       trigger: {
-        auditActorDisplay: `Discord ${input.trigger.authorDisplayName ?? input.trigger.authorId}`,
-        auditActorId: input.trigger.authorId,
         eventId: input.trigger.eventId,
         externalActorId: input.trigger.externalActorId,
         externalMessageId: input.trigger.externalMessageId,

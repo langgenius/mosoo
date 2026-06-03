@@ -80,8 +80,6 @@ describe("WeChat channel final delivery", () => {
         clientRequestId: "wechat:message:final",
         text: "Review this WeChat message",
         trigger: {
-          auditActorDisplay: "WeChat peer-1",
-          auditActorId: "peer-1",
           eventId: "wechat:message:final",
           externalActorId: "wechat:user:peer-1",
           externalMessageId: "peer-1:final",
@@ -196,8 +194,6 @@ describe("WeChat channel final delivery", () => {
         clientRequestId: "wechat:message:missing-context",
         text: "Review this WeChat message",
         trigger: {
-          auditActorDisplay: "WeChat peer-1",
-          auditActorId: "peer-1",
           eventId: "wechat:message:missing-context",
           externalActorId: "wechat:user:peer-1",
           externalMessageId: "peer-1:missing-context",

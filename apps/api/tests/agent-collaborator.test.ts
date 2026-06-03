@@ -65,27 +65,6 @@ function createAgentCollaboratorDatabase(): SqliteD1Database {
       PRIMARY KEY (resource_type, resource_id, target_kind, target_id)
     );
 
-    CREATE TABLE audit_event (
-      action text NOT NULL,
-      after_json text,
-      actor_display text NOT NULL,
-      actor_id text,
-      actor_type text NOT NULL,
-      before_json text,
-      correlation_id text,
-      id text PRIMARY KEY NOT NULL,
-      ip_address text,
-      metadata_json text,
-      organization_id text NOT NULL,
-      outcome text NOT NULL,
-      resource_display text,
-      resource_id text,
-      resource_type text NOT NULL,
-      session_id text,
-      timestamp integer NOT NULL,
-      user_agent text
-    );
-
     CREATE TABLE agent_mcp_binding (
       agent_id text NOT NULL,
       server_id text NOT NULL

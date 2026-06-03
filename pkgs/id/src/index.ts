@@ -15,7 +15,6 @@ export type AgentBuilderThreadId = SemanticPlatformId<"AgentBuilderThreadId">;
 export type AgentDeploymentVersionId = SemanticPlatformId<"AgentDeploymentVersionId">;
 export type AgentId = SemanticPlatformId<"AgentId">;
 export type AgentMcpBindingId = SemanticPlatformId<"AgentMcpBindingId">;
-export type AuditEventId = SemanticPlatformId<"AuditEventId">;
 export type ChannelBindingId = SemanticPlatformId<"ChannelBindingId">;
 export type CredentialId = SemanticPlatformId<"CredentialId">;
 export type DriverCommandId = SemanticPlatformId<"DriverCommandId">;

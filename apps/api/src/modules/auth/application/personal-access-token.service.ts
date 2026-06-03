@@ -12,12 +12,6 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs, toIsoString } from "../../../time";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
-import { resolveActiveOrganization } from "../../users/application/account-organization-context.service";
 import type { AuthenticatedViewer } from "./viewer-auth.service";
 const TOKEN_SECRET_BYTE_LENGTH = 32;
 const TOKEN_VALUE_PREFIX = "grt_pat_";
@@ -145,24 +139,6 @@ export async function createPersonalAccessToken(
     })
     .run();
 
-  const activeOrganization = await resolveActiveOrganization(database, viewer.id);
-  if (activeOrganization) {
-    await appendAuditEvent(database, {
-      action: AUDIT_ACTION.apiKeyCreate,
-      ...resolveViewerAuditActor(viewer),
-      metadata: {
-        ownerDisplay: viewer.name || viewer.email,
-        ownerId: viewer.id,
-        status: "active",
-      },
-      organizationId: activeOrganization.id,
-      outcome: "success",
-      resourceDisplay: label,
-      resourceId: tokenId,
-      resourceType: AUDIT_RESOURCE.apiKey,
-    });
-  }
-
   return {
     token: {
       createdAt: toIsoString(timestampMs),
@@ -184,8 +160,7 @@ export async function revokePersonalAccessToken(
   const token =
     (await getAppDatabase(database)
       .select({
-        label: personalAccessTokensTable.label,
-        revokedAt: sql<number | null>`${personalAccessTokensTable.revokedAt}`,
+        id: personalAccessTokensTable.id,
       })
       .from(personalAccessTokensTable)
       .where(
@@ -214,24 +189,6 @@ export async function revokePersonalAccessToken(
       ),
     )
     .run();
-
-  const activeOrganization = await resolveActiveOrganization(database, viewer.id);
-  if (activeOrganization) {
-    await appendAuditEvent(database, {
-      action: AUDIT_ACTION.apiKeyDelete,
-      ...resolveViewerAuditActor(viewer),
-      metadata: {
-        ownerDisplay: viewer.name || viewer.email,
-        ownerId: viewer.id,
-        previousStatus: token.revokedAt === null ? "active" : "revoked",
-      },
-      organizationId: activeOrganization.id,
-      outcome: "success",
-      resourceDisplay: token.label,
-      resourceId: tokenId,
-      resourceType: AUDIT_RESOURCE.apiKey,
-    });
-  }
 }
 
 export async function authenticatePersonalAccessToken(

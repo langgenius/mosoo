@@ -26,7 +26,7 @@ At this point her "personal slot" is already taken by Acme. She wants to spin up
 
 **Story B: The CE abuse boundary**
 
-The `+ Create Organization` action at the bottom of the Org Switcher is one-click creation: a user can repeatedly click out multiple Organizations with the same name. The Personal Org already enforces "one per person" to prevent arbitrage, but **an ordinary Organization is still a top-level tenant boundary** — each one opened brings the full cost of member invitations, Credentials, Access Requests, auditing, and domain discovery. CE should not accidentally implement "belonging to multiple organizations" as "unlimited self-creation of company organizations."
+The `+ Create Organization` action at the bottom of the Org Switcher is one-click creation: a user can repeatedly click out multiple Organizations with the same name. The Personal Org already enforces "one per person" to prevent arbitrage, but **an ordinary Organization is still a top-level tenant boundary** — each one opened brings the full cost of member invitations, Credentials, Access Requests, and domain discovery. CE should not accidentally implement "belonging to multiple organizations" as "unlimited self-creation of company organizations."
 
 Common complaints owners hear:
 

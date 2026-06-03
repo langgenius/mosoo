@@ -58,8 +58,6 @@ type Documents = {
     "\n  mutation RestartDriver($input: RuntimeStateOperationInput!) {\n    restartDriver(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": typeof types.RestartDriverDocument,
     "\n  mutation RecreateSandbox($input: RuntimeStateOperationInput!) {\n    recreateSandbox(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": typeof types.RecreateSandboxDocument,
     "\n  mutation ResetAgentState($input: RuntimeStateOperationInput!) {\n    resetAgentState(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": typeof types.ResetAgentStateDocument,
-    "\n  fragment AuditEventFields on AuditEvent {\n    action\n    actor {\n      display\n      id\n      type\n    }\n    after\n    before\n    correlationId\n    id\n    ipAddress\n    metadata\n    outcome\n    resourceDisplay\n    resourceId\n    resourceType\n    sessionId\n    timestamp\n    userAgent\n  }\n": typeof types.AuditEventFieldsFragmentDoc,
-    "\n  query AuditEvents($filter: AuditEventsFilterInput!) {\n    auditEvents(filter: $filter) {\n      ...AuditEventFields\n    }\n  }\n": typeof types.AuditEventsDocument,
     "\n  fragment CostTotalsFields on CostAggregate {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostTotalsFieldsFragmentDoc,
     "\n  fragment CostDailyFields on CostDailyPoint {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    date\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostDailyFieldsFragmentDoc,
     "\n  fragment CostAgentFields on CostAgentRow {\n    activeUsers\n    agentId\n    agentName\n    cacheCreationTokens\n    cacheReadTokens\n    debugCostUsd\n    evalCostUsd\n    inputTokens\n    outputTokens\n    ownerEmail\n    ownerId\n    ownerName\n    previousCostUsd\n    previewCostUsd\n    productionCostUsd\n    requestCount\n    scheduledCostUsd\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostAgentFieldsFragmentDoc,
@@ -217,8 +215,6 @@ const documents: Documents = {
     "\n  mutation RestartDriver($input: RuntimeStateOperationInput!) {\n    restartDriver(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": types.RestartDriverDocument,
     "\n  mutation RecreateSandbox($input: RuntimeStateOperationInput!) {\n    recreateSandbox(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": types.RecreateSandboxDocument,
     "\n  mutation ResetAgentState($input: RuntimeStateOperationInput!) {\n    resetAgentState(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": types.ResetAgentStateDocument,
-    "\n  fragment AuditEventFields on AuditEvent {\n    action\n    actor {\n      display\n      id\n      type\n    }\n    after\n    before\n    correlationId\n    id\n    ipAddress\n    metadata\n    outcome\n    resourceDisplay\n    resourceId\n    resourceType\n    sessionId\n    timestamp\n    userAgent\n  }\n": types.AuditEventFieldsFragmentDoc,
-    "\n  query AuditEvents($filter: AuditEventsFilterInput!) {\n    auditEvents(filter: $filter) {\n      ...AuditEventFields\n    }\n  }\n": types.AuditEventsDocument,
     "\n  fragment CostTotalsFields on CostAggregate {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostTotalsFieldsFragmentDoc,
     "\n  fragment CostDailyFields on CostDailyPoint {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    date\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostDailyFieldsFragmentDoc,
     "\n  fragment CostAgentFields on CostAgentRow {\n    activeUsers\n    agentId\n    agentName\n    cacheCreationTokens\n    cacheReadTokens\n    debugCostUsd\n    evalCostUsd\n    inputTokens\n    outputTokens\n    ownerEmail\n    ownerId\n    ownerName\n    previousCostUsd\n    previewCostUsd\n    productionCostUsd\n    requestCount\n    scheduledCostUsd\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostAgentFieldsFragmentDoc,
@@ -505,14 +501,6 @@ export function graphql(source: "\n  mutation RecreateSandbox($input: RuntimeSta
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation ResetAgentState($input: RuntimeStateOperationInput!) {\n    resetAgentState(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n"): typeof import('./graphql').ResetAgentStateDocument;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  fragment AuditEventFields on AuditEvent {\n    action\n    actor {\n      display\n      id\n      type\n    }\n    after\n    before\n    correlationId\n    id\n    ipAddress\n    metadata\n    outcome\n    resourceDisplay\n    resourceId\n    resourceType\n    sessionId\n    timestamp\n    userAgent\n  }\n"): typeof import('./graphql').AuditEventFieldsFragmentDoc;
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  query AuditEvents($filter: AuditEventsFilterInput!) {\n    auditEvents(filter: $filter) {\n      ...AuditEventFields\n    }\n  }\n"): typeof import('./graphql').AuditEventsDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

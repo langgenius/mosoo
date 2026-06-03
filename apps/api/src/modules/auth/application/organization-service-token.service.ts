@@ -20,11 +20,6 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError, validationError } from "../../../platform/errors";
 import { currentTimestampMs, toIsoString } from "../../../time";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import { hashTokenValue } from "./personal-access-token.service";
 import type { AuthenticatedViewer } from "./viewer-auth.service";
 
@@ -62,12 +57,6 @@ interface OrganizationServiceTokenCreateAdmissionRow {
   agent_id: AgentId | null;
   membership_disabled_at: number | null;
   membership_role: OrganizationMemberRole;
-}
-
-interface OrganizationServiceTokenRevocationAdmission {
-  label: string;
-  organizationId: OrganizationId;
-  revokedAt: number | null;
 }
 
 function normalizeTokenLabel(label: string): string {
@@ -237,15 +226,12 @@ async function admitOrganizationServiceTokenRevocation(
   database: D1Database,
   viewerId: AccountId,
   tokenId: OrganizationServiceTokenId,
-): Promise<OrganizationServiceTokenRevocationAdmission> {
+): Promise<void> {
   const row =
     (await getAppDatabase(database)
       .select({
-        label: organizationServiceTokensTable.label,
         membership_disabled_at: organizationMembersTable.disabledAt,
         membership_role: organizationMembersTable.role,
-        organization_id: organizationServiceTokensTable.organizationId,
-        revoked_at: sql<number | null>`${organizationServiceTokensTable.revokedAt}`,
       })
       .from(organizationServiceTokensTable)
       .leftJoin(
@@ -263,11 +249,8 @@ async function admitOrganizationServiceTokenRevocation(
       .get()) ?? null;
 
   const admission = row satisfies {
-    label: string;
     membership_disabled_at: number | null;
     membership_role: OrganizationMemberRole | null;
-    organization_id: OrganizationId;
-    revoked_at: number | null;
   } | null;
 
   if (!admission) {
@@ -285,12 +268,6 @@ async function admitOrganizationServiceTokenRevocation(
   if (!can(admission.membership_role, Permission.OrganizationServiceTokensManage)) {
     throw forbiddenError();
   }
-
-  return {
-    label: admission.label,
-    organizationId: admission.organization_id,
-    revokedAt: admission.revoked_at,
-  };
 }
 
 export async function listOrganizationServiceTokens(
@@ -355,7 +332,6 @@ export async function listOrganizationServiceTokens(
   if (!can(firstRow.membership_role, Permission.OrganizationServiceTokensManage)) {
     throw forbiddenError();
   }
-
   return {
     tokens: toTokenSummaries(rows),
   };
@@ -409,24 +385,6 @@ export async function createOrganizationServiceToken(
     )
     .run();
 
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.apiKeyCreate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      allowedAgentIds,
-      allowAttribution: input.allowAttribution,
-      ownerDisplay: viewer.name || viewer.email,
-      ownerId: viewer.id,
-      status: "active",
-      tokenKind: "service_token",
-    },
-    organizationId: input.organizationId,
-    outcome: "success",
-    resourceDisplay: label,
-    resourceId: tokenId,
-    resourceType: AUDIT_RESOURCE.apiKey,
-  });
-
   return {
     token: {
       allowAttribution: input.allowAttribution,
@@ -449,7 +407,7 @@ export async function revokeOrganizationServiceToken(
   tokenId: OrganizationServiceTokenId,
 ): Promise<void> {
   const db = getAppDatabase(database);
-  const token = await admitOrganizationServiceTokenRevocation(database, viewer.id, tokenId);
+  await admitOrganizationServiceTokenRevocation(database, viewer.id, tokenId);
   const timestampMs = currentTimestampMs();
 
   await db
@@ -460,20 +418,4 @@ export async function revokeOrganizationServiceToken(
     })
     .where(eq(organizationServiceTokensTable.id, tokenId))
     .run();
-
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.apiKeyDelete,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      ownerDisplay: viewer.name || viewer.email,
-      ownerId: viewer.id,
-      previousStatus: token.revokedAt === null ? "active" : "revoked",
-      tokenKind: "service_token",
-    },
-    organizationId: token.organizationId,
-    outcome: "success",
-    resourceDisplay: token.label,
-    resourceId: tokenId,
-    resourceType: AUDIT_RESOURCE.apiKey,
-  });
 }

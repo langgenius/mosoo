@@ -1,17 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  auditEventsTable,
-  channelThreadSessionsTable,
-  sessionRunsTable,
-  sessionsTable,
-} from "@mosoo/db";
+import { channelThreadSessionsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
 import { eq } from "drizzle-orm";
 
 import {
   createLarkAgentChannelBinding,
   createTelegramAgentChannelBinding,
-  recordAgentChannelBindingError,
 } from "../src/modules/channels/application/agent-channel-binding.service";
 import {
   createChannelSessionClient,
@@ -121,8 +115,6 @@ describe("multi-provider channel sessions", () => {
         clientRequestId: "telegram:update:1",
         text: "Review the launch plan.",
         trigger: {
-          auditActorDisplay: "Telegram 42",
-          auditActorId: "42",
           eventId: "telegram:update:1",
           externalActorId: "telegram:user:42",
           externalMessageId: "42:77",
@@ -160,8 +152,6 @@ describe("multi-provider channel sessions", () => {
         clientRequestId: "telegram:update:2",
         text: "Now list the risks.",
         trigger: {
-          auditActorDisplay: "Telegram 42",
-          auditActorId: "42",
           eventId: "telegram:update:2",
           externalActorId: "telegram:user:42",
           externalMessageId: "42:78",
@@ -231,27 +221,6 @@ describe("multi-provider channel sessions", () => {
           sessionId: command.sessionId,
         }),
       ]);
-
-      await recordAgentChannelBindingError(database, {
-        agentId: "01J00000000000000000000009",
-        bindingId: binding.id,
-        errorCode: "telegram_delivery_failed",
-        provider: "telegram",
-      });
-      const auditRows = await database
-        .app()
-        .select({
-          actorDisplay: auditEventsTable.actorDisplay,
-          outcome: auditEventsTable.outcome,
-        })
-        .from(auditEventsTable)
-        .where(eq(auditEventsTable.resourceId, "01J00000000000000000000009"))
-        .all();
-
-      expect(auditRows).toContainEqual({
-        actorDisplay: "Telegram",
-        outcome: "failure",
-      });
     });
   });
 

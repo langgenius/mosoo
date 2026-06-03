@@ -17,7 +17,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const { activeOrganization, user } = useAppSession();
   const location = useLocation();
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
-  const isOrganizationAdmin = can(activeOrganization?.viewerRole, Permission.AuditOrganizationRead);
+  const canReadGovernance = can(activeOrganization?.viewerRole, Permission.CostOrganizationRead);
 
   const ToggleIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
   const toggleLabel = collapsed ? "Expand sidebar" : "Collapse sidebar";
@@ -75,8 +75,8 @@ export function Layout({ children }: { children: ReactNode }) {
         </Tooltip>
 
         <AppNavigation
+          canReadGovernance={canReadGovernance}
           collapsed={collapsed}
-          isOrganizationAdmin={isOrganizationAdmin}
           pathname={location.pathname}
         />
 

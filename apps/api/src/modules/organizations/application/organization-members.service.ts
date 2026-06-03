@@ -1,5 +1,4 @@
 import type {
-  OrganizationJoinPolicy,
   OrganizationMember,
   OrganizationMemberRole,
   OrganizationSummary,
@@ -16,11 +15,6 @@ import { alias } from "drizzle-orm/sqlite-core";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs, toIsoString } from "../../../time";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
   organizationSummaryColumns,
@@ -29,10 +23,8 @@ import {
 } from "../domain/organization-access.policy";
 import type { OrganizationMemberRow } from "../domain/organization-access.policy";
 import { organizationKindValue } from "../domain/organization-kind.policy";
-import { memberResourceDisplay } from "./organization-member-audit";
 
 interface JoinPolicyUpdateContext {
-  previousJoinPolicy: OrganizationJoinPolicy;
   viewerRole: OrganizationMemberRole;
 }
 
@@ -138,7 +130,6 @@ async function admitOrganizationMemberMutation(
   if (!target) {
     throw new Error("Organization member not found.");
   }
-
   return {
     actorRole: row.actor_role,
     target,
@@ -232,22 +223,6 @@ export async function updateOrganizationMemberRole(
     throw new Error("Organization member not found.");
   }
 
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.memberUpdate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      actorOrganizationRole: admission.actorRole,
-      kind: "role",
-      previousRole: admission.target.role,
-      role: input.role,
-    },
-    organizationId: input.organizationId,
-    outcome: "success",
-    resourceDisplay: memberResourceDisplay(admission.target),
-    resourceId: input.accountId,
-    resourceType: AUDIT_RESOURCE.member,
-  });
-
   return {
     ...admission.target,
     role: input.role,
@@ -278,7 +253,6 @@ async function admitJoinPolicyUpdate(
     (await getAppDatabase(database)
       .select({
         disabled_at: organizationMembersTable.disabledAt,
-        join_policy: organizationsTable.joinPolicy,
         kind: organizationKindValue(),
         role: organizationMembersTable.role,
       })
@@ -298,7 +272,6 @@ async function admitJoinPolicyUpdate(
 
   const context = row satisfies {
     disabled_at: number | null;
-    join_policy: OrganizationJoinPolicy;
     kind: OrganizationSummary["kind"];
     role: OrganizationMemberRole;
   } | null;
@@ -320,7 +293,6 @@ async function admitJoinPolicyUpdate(
   }
 
   return {
-    previousJoinPolicy: context.join_policy,
     viewerRole: context.role,
   };
 }
@@ -371,22 +343,6 @@ export async function setOrganizationMemberStatus(
     throw new Error("Organization member not found.");
   }
 
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.memberUpdate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      actorOrganizationRole: admission.actorRole,
-      kind: "status",
-      previousStatus: admission.target.status,
-      status: input.status,
-    },
-    organizationId: input.organizationId,
-    outcome: "success",
-    resourceDisplay: memberResourceDisplay(admission.target),
-    resourceId: input.accountId,
-    resourceType: AUDIT_RESOURCE.member,
-  });
-
   return {
     ...admission.target,
     disabledAt: disabledAtMs === null ? null : toIsoString(disabledAtMs),
@@ -416,21 +372,6 @@ export async function updateJoinPolicy(
   if (updated === null) {
     throw new Error("Organization not found.");
   }
-
-  await appendAuditEvent(database, {
-    action: AUDIT_ACTION.orgSettingsUpdate,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      kind: "join_policy",
-      joinPolicy: input.joinPolicy,
-      previousJoinPolicy: context.previousJoinPolicy,
-    },
-    organizationId: input.organizationId,
-    outcome: "success",
-    resourceDisplay: "Organization settings",
-    resourceId: input.organizationId,
-    resourceType: AUDIT_RESOURCE.orgSettings,
-  });
 
   return toOrganizationSummaryWithViewerRole(updated, context.viewerRole);
 }

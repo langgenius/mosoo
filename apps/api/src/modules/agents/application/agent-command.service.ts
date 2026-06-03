@@ -26,7 +26,6 @@ import {
 } from "../../mcp/application/mcp-agent-binding.service";
 import { ensureOrganizationMembership } from "../../organizations/domain/organization-access.policy";
 import { ensureAgentEditor } from "./agent-access.service";
-import { appendAgentAuditEvent } from "./agent-command-audit.service";
 import { prepareAgentDeploymentVersionCandidate } from "./agent-deployment-version.service";
 import {
   loadAgentEnvironmentConfig,
@@ -110,15 +109,6 @@ export async function createAgent(
   await replaceAgentSkills(database, agentId, skillIds, timestampMs);
 
   const createdAgent = await getAgentRow(database, agentId);
-
-  await appendAgentAuditEvent(database, {
-    agent: createdAgent,
-    metadata: {
-      kind: "create",
-    },
-    operationName: "createAgent",
-    viewer,
-  });
 
   return toAgentModel(database, viewer, createdAgent);
 }
@@ -282,16 +272,6 @@ export async function updateAgentConfig(
   ]);
 
   const updatedAgent = await getAgentRow(database, editable.agent.id);
-
-  await appendAgentAuditEvent(database, {
-    agent: updatedAgent,
-    metadata: {
-      kind: "config",
-      ...(changePlan.requiresDeploymentVersion ? { deploymentSummary } : {}),
-    },
-    operationName: "updateAgentConfig",
-    viewer,
-  });
 
   return toAgentModel(database, viewer, updatedAgent);
 }

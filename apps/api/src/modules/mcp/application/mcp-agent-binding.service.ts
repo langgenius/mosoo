@@ -70,26 +70,6 @@ async function ensureConfigMcpServerAccess(input: {
   return serversById;
 }
 
-export async function resolveAgentMcpServerSelectionForConfig(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  input: {
-    agent: AgentRow;
-    serverIds: readonly string[];
-  },
-): Promise<McpServerId[]> {
-  const serverIds = normalizeMcpServerIds(input.serverIds);
-
-  await ensureConfigMcpServerAccess({
-    agent: input.agent,
-    database,
-    serverIds,
-    viewer,
-  });
-
-  return serverIds;
-}
-
 export async function listAgentMcpBindings(
   database: D1Database,
   viewer: AuthenticatedViewer,
@@ -241,11 +221,10 @@ export async function deletePreparedAgentMcpBindingCredentials(
 export async function removeAllAgentMcpBindings(
   database: D1Database,
   agentId: AgentId,
-): Promise<{ bindingIds: AgentMcpBindingId[]; credentialIds: CredentialId[] }> {
-  const results = await getAppDatabase(database)
+): Promise<void> {
+  const rows = await getAppDatabase(database)
     .select({
       agentCredentialId: agentMcpBindingsTable.agentCredentialId,
-      id: agentMcpBindingsTable.id,
       serverId: agentMcpBindingsTable.serverId,
     })
     .from(agentMcpBindingsTable)
@@ -253,7 +232,7 @@ export async function removeAllAgentMcpBindings(
     .all();
   const credentials = await listCredentialsForAgentBindingDeletion(database, {
     agentId,
-    bindings: results,
+    bindings: rows,
   });
   await deleteCredentialArtifactsBatch(database, credentials);
 
@@ -261,11 +240,4 @@ export async function removeAllAgentMcpBindings(
     .delete(agentMcpBindingsTable)
     .where(eq(agentMcpBindingsTable.agentId, agentId))
     .run();
-
-  return {
-    bindingIds: results.map((row) => row.id),
-    credentialIds: results
-      .map((row) => row.agentCredentialId)
-      .filter((credentialId): credentialId is CredentialId => credentialId !== null),
-  };
 }

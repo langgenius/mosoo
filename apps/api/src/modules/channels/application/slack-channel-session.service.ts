@@ -96,8 +96,6 @@ function toAgentChannelBindingContext(
 
 function toChannelWorkTrigger(trigger: SlackWorkTrigger): ChannelWorkTrigger {
   return {
-    auditActorDisplay: `Slack ${trigger.userId}`,
-    auditActorId: trigger.userId,
     eventId: trigger.eventId,
     externalActorId: `slack:${trigger.userId}`,
     externalMessageId: trigger.messageTs,

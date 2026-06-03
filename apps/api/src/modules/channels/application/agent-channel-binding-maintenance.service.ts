@@ -18,8 +18,6 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { notFoundError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
 import { ensureAgentEditor } from "../../agents/application/agent-access.service";
-import { appendAuditEvent } from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { stopDiscordGatewayConnection } from "../discord/discord-gateway-connection-client";
 import { deleteWeChatChannelAccountRuntime } from "../wechat/wechat-runtime-store";
@@ -187,7 +185,6 @@ export async function deleteAgentChannelBinding(
   const row = await getAppDatabase(bindings.DB)
     .select({
       agentId: agentChannelBindingsTable.agentId,
-      agentName: agentsTable.name,
       encryptedCredsSecretId: agentChannelBindingsTable.encryptedCredsSecretId,
       id: agentChannelBindingsTable.id,
       organizationId: agentsTable.organizationId,
@@ -227,7 +224,7 @@ export async function deleteAgentChannelBinding(
       ),
     )
     .run();
-  const credentialSecretCleanupSucceeded = await cleanupStoredAgentChannelBindingCredentialSecret({
+  await cleanupStoredAgentChannelBindingCredentialSecret({
     command: {
       agentId: row.agentId,
       organizationId: row.organizationId,
@@ -236,25 +233,5 @@ export async function deleteAgentChannelBinding(
       secretId: row.encryptedCredsSecretId,
     },
     database: bindings.DB,
-  });
-
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.agentUpdate,
-    actorDisplay: viewer.name,
-    actorId: viewer.id,
-    actorMetadata: {},
-    actorType: "user",
-    metadata: {
-      agentId: row.agentId,
-      bindingId: row.id,
-      channel_binding_event: "removed",
-      credential_secret_cleanup: credentialSecretCleanupSucceeded ? "completed" : "failed",
-      provider: row.provider,
-    },
-    organizationId: row.organizationId,
-    outcome: "success",
-    resourceDisplay: row.agentName,
-    resourceId: row.agentId,
-    resourceType: AUDIT_RESOURCE.agent,
   });
 }

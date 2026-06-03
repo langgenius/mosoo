@@ -6,7 +6,6 @@ export type {
   AgentDeploymentVersionId,
   AgentId,
   AgentMcpBindingId,
-  AuditEventId,
   ChannelBindingId,
   CredentialId,
   DriverCommandId,

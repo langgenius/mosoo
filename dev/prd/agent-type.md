@@ -56,7 +56,7 @@ When this is done, the Builder should be able to:
 | **Non-Space state**        | Content outside a Space follows sandbox semantics: for Pet it stays in the stable Sandbox; for Cattle it disappears when the session ends, unless explicitly persisted.                                                                                                         |
 | **Cattle continuation**    | A user can resume an old Cattle Session; if the old Sandbox has already been destroyed, the platform creates a new Session Sandbox that inherits only the conversation history and explicitly persisted content — not the old Sandbox's temporary files / caches / login state. |
 | **Kind lock**              | The first Publish makes the kind field immutable; during the Draft phase (including after Test in Chat) the kind can be switched freely; after that, switching the kind requires a Fork.                                                                                        |
-| **Fork (for kind switch)** | Creates a new Agent identity (with the new kind). The original Agent's sessions / audit / cost / logs stay on the original Agent and are not migrated.                                                                                                                          |
+| **Fork (for kind switch)** | Creates a new Agent identity (with the new kind). The original Agent's sessions / cost / logs stay on the original Agent and are not migrated.                                                                                                                                  |
 | **Lock banner**            | A yellow inline banner that mirrors the existing published-Agent configuration lock, telling the user "Agent type is locked, Fork to switch".                                                                                                                                   |
 
 ---
@@ -147,4 +147,4 @@ stateDiagram-v2
 - The kind can be changed at will during the Draft phase (including after Test in Chat).
 - The first Publish is the decision point (the kind gets locked).
 - After Locked, there is only one way to switch the kind: Fork.
-- A Fork produces a **new Agent identity**; the original Agent's sessions / audit / cost / logs are **not migrated** and stay in place.
+- A Fork produces a **new Agent identity**; the original Agent's sessions / cost / logs are **not migrated** and stay in place.

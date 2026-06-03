@@ -167,7 +167,7 @@ flowchart TD
 
 ### Who runs the Agent
 
-Locked by [`runtime-session-kernel.md`](./runtime-session-kernel.md): **Execution Actor = Agent Owner**. Even if someone else triggers the Agent, the "identity" used to pick the key is still the Agent's owner; the trigger merely enters the audit and permission context and never gets hold of someone else's Provider key.
+Locked by [`runtime-session-kernel.md`](./runtime-session-kernel.md): **Execution Actor = Agent Owner**. Even if someone else triggers the Agent, the "identity" used to pick the key is still the Agent's owner; the trigger merely enters the ingress and permission context and never gets hold of someone else's Provider key.
 
 ---
 

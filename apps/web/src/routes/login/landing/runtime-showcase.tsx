@@ -25,7 +25,7 @@ const RUNTIMES: readonly Runtime[] = [
     provider: "Anthropic",
     available: true,
   },
-  { runtimeId: "openai-runtime", label: "Codex", provider: "OpenAI", available: true },
+  { runtimeId: "openai-runtime", label: "OpenAI", provider: "OpenAI", available: true },
   { runtimeId: "opencode", label: "OpenCode", provider: "sst", available: false },
   { runtimeId: "openclaw", label: "OpenClaw", provider: "OpenClaw", available: false },
   { runtimeId: "hermes", label: "Hermes", provider: "Hermes", available: false },
@@ -40,7 +40,7 @@ const CAPABILITIES = [
   "Streaming + tool calls",
   "Native resume",
   "MCP tools & permissions",
-  "Session replay & audit",
+  "Session replay",
 ] as const;
 
 function CheckDot(): ReactElement {
@@ -115,9 +115,9 @@ export function RuntimeShowcase(): ReactElement | null {
             One Agent. Any runtime.
           </h2>
           <p className="text-fg-2 mt-4 max-w-[480px] text-[15px] leading-[1.6]">
-            A Mosoo agent is harness-neutral. Configure it once, then run it on the Claude Agent
-            SDK, Codex, or any driver: the runtime is a swappable harness, not a rewrite. Same
-            interface, same audit trail, every time.
+            A Mosoo agent is harness-neutral. Configure it once, then run it on the Claude Agent SDK
+            or any driver: the runtime is a swappable harness, not a rewrite. Same interface, same
+            session model, every time.
           </p>
 
           <p className="text-fg-3 mt-8 text-[11px] font-semibold tracking-[0.14em] uppercase">

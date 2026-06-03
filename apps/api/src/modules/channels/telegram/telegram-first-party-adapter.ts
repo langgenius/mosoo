@@ -69,8 +69,6 @@ export async function processTelegramWorkTrigger(input: {
       clientRequestId: input.trigger.eventId,
       text: toMosooMessage(input.trigger),
       trigger: {
-        auditActorDisplay: `Telegram ${input.trigger.userId ?? input.trigger.chatId}`,
-        auditActorId: input.trigger.userId ?? input.trigger.chatId,
         eventId: input.trigger.eventId,
         externalActorId: input.trigger.externalActorId,
         externalMessageId: input.trigger.externalMessageId,

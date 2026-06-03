@@ -21,8 +21,6 @@ type ApiCommandPayload =
   | SessionRunDispatchCommandPayload;
 
 type JsonRecord = Record<string, unknown>;
-type ViewerAuditActor = NonNullable<AuthenticatedViewer["auditActor"]>;
-type ViewerAuditContext = NonNullable<AuthenticatedViewer["auditContext"]>;
 
 export type ChannelWorkTriggerProvider = "discord" | "lark" | "slack" | "telegram";
 
@@ -177,25 +175,13 @@ function readStringArray(record: JsonRecord, field: string, label: string): stri
 
 function readViewer(value: unknown, label: string): AuthenticatedViewer {
   const record = requireRecord(value, label);
-  const viewer: AuthenticatedViewer = {
+  return {
     email: readNonEmptyString(record, "email", label),
     emailVerified: readBoolean(record, "emailVerified", label),
     id: parsePlatformId<AccountId>(record["id"], `${label}.id`),
     imageUrl: readOptionalString(record, "imageUrl", label),
     name: readString(record, "name", label),
   };
-
-  const auditActor = record["auditActor"];
-  if (auditActor !== undefined) {
-    viewer.auditActor = auditActor as ViewerAuditActor;
-  }
-
-  const auditContext = record["auditContext"];
-  if (auditContext !== undefined) {
-    viewer.auditContext = auditContext as ViewerAuditContext;
-  }
-
-  return viewer;
 }
 
 function parseSessionRunDispatchPayload(value: unknown): SessionRunDispatchCommandPayload {

@@ -15,7 +15,6 @@ import { validationError } from "../../../platform/errors";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { appendSuccessfulControlOperationAuditEvent } from "../../control-operations/application/control-operation-outcome-audit.service";
 import { removeAllAgentMcpBindings } from "../../mcp/application/mcp-agent-binding.service";
 import { ensureAgentDestructiveAccess, ensureAgentEditor } from "./agent-access.service";
 import { prepareAgentDeploymentVersionCandidate } from "./agent-deployment-version.service";
@@ -30,13 +29,9 @@ export async function deleteAgent(
   viewer: AuthenticatedViewer,
   input: DeleteAgentInput,
 ): Promise<void> {
-  const { agent, viewerRole } = await ensureAgentDestructiveAccess(
-    database,
-    viewer.id,
-    input.agentId,
-  );
+  const { agent } = await ensureAgentDestructiveAccess(database, viewer.id, input.agentId);
 
-  const deletedMcpArtifacts = await removeAllAgentMcpBindings(database, agent.id);
+  await removeAllAgentMcpBindings(database, agent.id);
 
   await runAppDatabaseBatch(database, (db) => [
     db.delete(agentSkillsTable).where(eq(agentSkillsTable.agentId, agent.id)),
@@ -48,28 +43,6 @@ export async function deleteAgent(
       ),
     db.delete(agentsTable).where(eq(agentsTable.id, agent.id)),
   ]);
-
-  await appendSuccessfulControlOperationAuditEvent(database, {
-    metadata: {
-      owner_at_time_id: agent.ownerId,
-      ...(deletedMcpArtifacts.bindingIds.length > 0
-        ? {
-            cascadeDeletedMcpBindingIds: deletedMcpArtifacts.bindingIds.join(", "),
-          }
-        : {}),
-      ...(deletedMcpArtifacts.credentialIds.length > 0
-        ? {
-            cascadeDeletedCredentialIds: deletedMcpArtifacts.credentialIds.join(", "),
-          }
-        : {}),
-      viewerRole,
-    },
-    organizationId: agent.organizationId,
-    operationName: "deleteAgent",
-    resourceDisplay: agent.name,
-    resourceId: agent.id,
-    viewer,
-  });
 }
 
 export async function publishAgent(
@@ -173,20 +146,6 @@ export async function publishAgent(
           ),
   ]);
 
-  await appendSuccessfulControlOperationAuditEvent(database, {
-    metadata: {
-      deploymentVersionId: version.record.id,
-      status: "published",
-      versionNumber: version.record.versionNumber,
-      visibility: targetVisibility,
-    },
-    organizationId: agent.organizationId,
-    operationName: "publishAgent",
-    resourceDisplay: agent.name,
-    resourceId: agent.id,
-    viewer,
-  });
-
   return toAgentModel(database, viewer, await getAgentRow(database, agent.id));
 }
 
@@ -203,18 +162,6 @@ export async function unpublishAgent(
     .set({ status: "draft", updatedAt: timestampMs })
     .where(eq(agentsTable.id, agent.id))
     .run();
-
-  await appendSuccessfulControlOperationAuditEvent(database, {
-    metadata: {
-      previousStatus: agent.status,
-      status: "draft",
-    },
-    organizationId: agent.organizationId,
-    operationName: "unpublishAgent",
-    resourceDisplay: agent.name,
-    resourceId: agent.id,
-    viewer,
-  });
 
   return toAgentModel(database, viewer, await getAgentRow(database, agent.id));
 }

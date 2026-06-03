@@ -45,7 +45,7 @@ import {
   isCustomRuntimeModelProvider,
   parseRuntimeModelIdentity,
 } from "@mosoo/contracts/models";
-import { Permission, can, canRemoveOrganizationMember } from "@mosoo/contracts/permission";
+import { canRemoveOrganizationMember } from "@mosoo/contracts/permission";
 import { parseRuntimeCommand } from "@mosoo/contracts/runtime-command";
 import {
   AGENT_SESSION_ARCHIVED_READ_ONLY_REASON,
@@ -588,11 +588,6 @@ describe("contracts owner boundaries", () => {
   });
 
   test("permission vocabulary keeps member and organization owner powers separated", () => {
-    expect(can("owner", Permission.AuditOrganizationRead)).toBe(true);
-    expect(can("admin", Permission.AuditOrganizationRead)).toBe(true);
-    expect(can("member", Permission.AuditOrganizationRead)).toBe(false);
-    expect(can(undefined, Permission.AuditOrganizationRead)).toBe(false);
-
     expect(canRemoveOrganizationMember({ actorRole: "owner", targetRole: "admin" })).toBe(true);
     expect(canRemoveOrganizationMember({ actorRole: "admin", targetRole: "owner" })).toBe(false);
     expect(canRemoveOrganizationMember({ actorRole: "admin", targetRole: "member" })).toBe(true);

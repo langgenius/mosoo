@@ -17,7 +17,6 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../shared/truthiness";
 import { toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { appendSuccessfulControlOperationAuditEvent } from "../../control-operations/application/control-operation-outcome-audit.service";
 import { getFileRecordById } from "../../files/application/file-record-read.service";
 import { readSkillPackageBytesFromSnapshot } from "../../skills/application/skill-package-snapshot.service";
 import { ensureAgentPackageAccess } from "./agent-access.service";
@@ -156,20 +155,6 @@ export async function exportAgentPackage(
     bindings,
     fileName,
     organizationId: packageAccess.agent.organizationId,
-    viewer,
-  });
-
-  await appendSuccessfulControlOperationAuditEvent(bindings.DB, {
-    metadata: {
-      assetCount: String(assets.length),
-      fileId: packageFile.fileId,
-      kind: "package_export",
-      size: String(packageFile.size),
-    },
-    organizationId: packageAccess.agent.organizationId,
-    operationName: "exportAgentPackage",
-    resourceDisplay: packageAccess.agent.name,
-    resourceId: packageAccess.agent.id,
     viewer,
   });
 

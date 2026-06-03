@@ -430,7 +430,6 @@ export class DiscordGatewayConnectionRuntimeService {
           agentId: active.agentId,
           bindingId: active.bindingId,
           errorCode: getFatalGatewayCloseErrorCode(event.code),
-          provider: "discord",
         });
       } catch (error) {
         logError("discord-gateway-do.fatal_close_persist_failed", {

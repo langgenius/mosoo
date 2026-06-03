@@ -6,7 +6,7 @@
 
 ## 1. In one sentence
 
-The Public Thread API lets external systems invoke a Published Agent and receive a **Thread** they can continue, view, archive, and audit.
+The Public Thread API lets external systems invoke a Published Agent and receive a **Thread** they can continue, view, archive, and review.
 
 The old Public Task API tried to solve "don't make developers understand Session mechanics on day one." That direction was right, but the `Task` wrapper was too thin: it created a Session, surfaced Session / Run status, and then every real interaction fell back to the Session or the Web Thread. In the end users had to understand four nouns at once — Task, Session, Run, and Thread.
 

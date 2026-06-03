@@ -3,7 +3,6 @@ import { createSchema } from "graphql-yoga";
 
 import { agentBuilderGraphQLModule } from "../../modules/agent-builder/graphql/agent-builder-graphql";
 import { agentGraphQLModule } from "../../modules/agents/graphql/agent-graphql";
-import { auditGraphQLModule } from "../../modules/audit/graphql/audit-graphql";
 import { channelGraphQLModule } from "../../modules/channels/graphql/channel-graphql";
 import { costGraphQLModule } from "../../modules/cost/graphql/cost-graphql";
 import { environmentGraphQLModule } from "../../modules/environments/graphql/environment-graphql";
@@ -25,7 +24,6 @@ const composedGraphQLModules = composeGraphQLModules([
   commonGraphQLModule,
   agentGraphQLModule,
   agentBuilderGraphQLModule,
-  auditGraphQLModule,
   channelGraphQLModule,
   costGraphQLModule,
   environmentGraphQLModule,

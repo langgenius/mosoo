@@ -69,7 +69,7 @@ Extensibility, abstraction, future scenarios, operational flourishes — all of 
 | Strategy / project initiation / long-term planning   | PESTLE + SWOT + Competitive Analysis                               |
 | You don't know which category the problem falls into | Use **Cynefin** first to assess the category, then pick a tool     |
 
-> The output of this section does not need to appear in full in the PRD body, but the key pruning conclusions must leave a trace in the PRD. Sections 2.3 and 2.4 below are the two foundational mindsets that every PRD should run by default; their conclusions should ultimately land in the "Reasoning Audit" section rather than staying only in the writer's head.
+> The output of this section does not need to appear in full in the PRD body, but the key pruning conclusions must leave a trace in the PRD. Sections 2.3 and 2.4 below are the two foundational mindsets that every PRD should run by default; their conclusions should ultimately land in the "Reasoning Review" section rather than staying only in the writer's head.
 
 ### 2.3 First Principles (run this first on every PRD)
 
@@ -79,7 +79,7 @@ Whichever method above you use, first-principles thinking is the underlying mind
 - **Does that assumption actually hold?** If it doesn't, does the requirement still need to be built?
 - **Is this a problem that B2B / SaaS has already solved N times?** Is there a ready-made, minimal form?
 
-For mature problems (authentication, invitations, roles, email, billing, audit…) — first look at how Notion / Linear / Vercel / Stripe do it, assess how easy it is to implement, and **don't reinvent the wheel**.
+For mature problems (authentication, invitations, roles, email, billing, event history…) — first look at how Notion / Linear / Vercel / Stripe do it, assess how easy it is to implement, and **don't reinvent the wheel**.
 
 ### 2.4 Musk's Five-Step Algorithm (run this whenever you need to cut redundancy)
 
@@ -99,13 +99,13 @@ After the draft is written, go back through the breakdown / boundary scenarios a
 
 Anything that should not be in this round must be written explicitly into **Non-Goals** — don't quietly handle it on the main path.
 
-### 2.6 Reasoning Audit (must leave an explicit trace)
+### 2.6 Reasoning Review (must leave an explicit trace)
 
 If first principles and Musk's five steps are only run in your head, implementers cannot see the trade-off boundaries, nor can they tell whether a feature is "deliberately not done" or simply "missed." Every PRD must capture this in a short paragraph:
 
 - **Premises that were challenged**: Which requirements depend on a particular assumption? To what extent does that assumption hold?
 - **Scope that was deleted**: Which states, fields, entry points, roles, or automations were removed? Does the user's goal still hold after removing them?
-- **Alignment with mature solutions**: When this is a mature B2B problem such as authentication / invitations / roles / email / billing / audit, which mature product's minimal form is the default reference?
+- **Alignment with mature solutions**: When this is a mature B2B problem such as authentication / invitations / roles / email / billing / event history, which mature product's minimal form is the default reference?
 - **Why automation is deferred**: Should capabilities like automation, batch operations, or smart recommendations really be in this round? If so, why aren't they Phase 2?
 
 This section records **decision outcomes**, not a lengthy reasoning narrative; the goal is to let whoever picks this up later understand "why not the other approach."
@@ -162,7 +162,7 @@ Be explicit about **what you won't do**. Every PRD must have a **Non-Goals** sec
 - The MVP does not do SCIM
 - No dynamic permission configuration
 - No complex department trees
-- No audit-log redaction
+- No event-log redaction
 - No cross-Org resource sharing
 
 The boundary lock is the single most important section for the implementer. Omitting a Non-Goal is effectively granting permission for the implementation scope to expand on its own.
@@ -258,11 +258,11 @@ The coverage matrix should check at least these dimensions:
 
 Edge Cases is not a list of engineering exceptions; write down only product exceptions that change the user's understanding, permissions, next action, or recoverability. Don't pile up text for anything derivable from the state diagram / coverage matrix; for anything that can't be handled, explicitly put it in Non-Goals or "must come back and ask."
 
-### 5.8 Reasoning Audit (First Principles / Musk 5)
+### 5.8 Reasoning Review (First Principles / Musk 5)
 
 Record the product judgments that first principles and Musk's five steps ultimately left behind. Keep it short, but it cannot be empty.
 
-| Audit Item                                                            | This PRD's Conclusion |
+| Review Item                                                           | This PRD's Conclusion |
 | --------------------------------------------------------------------- | --------------------- |
 | Core premises that were challenged                                    | ...                   |
 | Scope explicitly deleted                                              | ...                   |
@@ -280,7 +280,7 @@ This section records only the architectural impact triggered by the product requ
 
 | Question                                         | This PRD's Conclusion                                                                                                                                                                                                                                   |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Which boundary did this add / change?            | For example Web/API, GraphQL, Public API, Runtime/Driver, Space/File, Credential/Vault, Audit, Cost, Organization/Access, etc.                                                                                                                          |
+| Which boundary did this add / change?            | For example Web/API, GraphQL, Public API, Runtime/Driver, Space/File, Credential/Vault, Cost, Organization/Access, etc.                                                                                                                                 |
 | Which contract is the truth source?              | For example `dev/architecture.md`, some `pkgs/contracts/*`, the GraphQL spec, the runtime protocol, the DB schema, an OpenAPI doc, or an existing PRD.                                                                                                  |
 | Which generated artifacts must run?              | For example `vp run graphql:codegen`, `vp run db:regen`, OpenAPI example validation, etc.; write "none" if there are no generated artifacts.                                                                                                            |
 | E2E proof required?                              | For example `none`, `deterministic-e2e`, `live-smoke`, `manual-only`, `deferred-with-trigger`; state clearly why this posture is sufficient.                                                                                                            |
@@ -329,7 +329,7 @@ Reiterate the Non-Goals items an engineer is most likely to do by reflex. For ex
 - Roles / permissions / user disabling
 - Teams / workspaces / resource ownership
 - Billing / quotas / subscriptions
-- Audit logs / notifications
+- Event logs / notifications
 
 When you reach these points, first ask:
 
@@ -352,7 +352,7 @@ When you reach these points, first ask:
 | No screenshots and no placeholders                   | Visual decisions aren't locked; screen state is left entirely to imagination                                                                     |
 | Mermaid drawing an ERD / sequence diagram            | Disguising an engineering diagram as a product diagram                                                                                           |
 | Complex state written only in Edge Cases             | Coverage is inherently low; misses identity / permission / failure-recovery branches                                                             |
-| No reasoning audit                                   | First principles and Musk's five steps left no reviewable pruning result                                                                         |
+| No reasoning review                                  | First principles and Musk's five steps left no reviewable pruning result                                                                         |
 | No Architecture Impact                               | The implementer doesn't know the boundary, truth source, generated artifacts, E2E acceptance posture, or retired assumptions, and can only guess |
 | Writing Architecture Impact as schema / API design   | This pollutes the PRD back into an engineering document; when long-term architectural decisions are needed, add an ADR                           |
 | Multiple spellings for the same noun                 | The concept isn't locked                                                                                                                         |
@@ -480,9 +480,9 @@ stateDiagram-v2
 | ---- | -------- |
 | ...  | ...      |
 
-## Reasoning Audit
+## Reasoning Review
 
-| Audit Item                                                            | This PRD's Conclusion |
+| Review Item                                                           | This PRD's Conclusion |
 | --------------------------------------------------------------------- | --------------------- |
 | Core premises that were challenged                                    | ...                   |
 | Scope explicitly deleted                                              | ...                   |
@@ -539,7 +539,7 @@ After writing a PRD, tick off each item below:
 - [ ] **State coverage**: complex objects have a state diagram; Corner Cases cover roles, states, permissions, entry points, external dependencies, and recovery paths
 - [ ] **Screenshots**: every key screen has an image or a placeholder
 - [ ] **Implementation boundary**: all four sub-sections are filled in
-- [ ] **Reasoning audit**: first principles, Musk's five steps, and the mature SaaS reference all have explicit pruning results
+- [ ] **Reasoning review**: first principles, Musk's five steps, and the mature SaaS reference all have explicit pruning results
 - [ ] **Architecture Impact**: the boundary, truth source, generated artifacts, E2E acceptance posture, and retired architectural assumptions are all declared; if a long-term architecture changes, an ADR has been added / referenced
 - [ ] **Word count** ≈ estimated lines of code × 30%
 - [ ] **No** schema / API path / interface definitions

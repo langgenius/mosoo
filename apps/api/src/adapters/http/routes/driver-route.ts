@@ -12,7 +12,6 @@ import {
   invalidateRuntimeCredential,
   refreshRuntimeCredential,
 } from "../../../modules/runtime/application/runtime-mcp-credential.service";
-import { appendRuntimeMcpProxyErrorAuditEvent } from "../../../modules/runtime/application/runtime-mcp-proxy-audit";
 import {
   createRuntimeMcpProxyError,
   runtimeMcpProxyErrorBody,
@@ -325,16 +324,6 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
         serverId,
       });
     } catch (error) {
-      const driverInstanceId = toPlatformId<DriverInstanceId>(
-        grant.driverInstanceId,
-        "Driver instance ID",
-      );
-      await appendRuntimeMcpProxyErrorAuditEvent(c.env, {
-        driverInstanceId,
-        error,
-        request: c.req.raw,
-        serverId,
-      });
       const details = toRuntimeMcpProxyPublicErrorDetails(error);
       return Response.json(runtimeMcpProxyErrorBody(details), { status: details.status });
     }
@@ -345,19 +334,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
       const proxyError = createRuntimeMcpProxyError({
         code: "mcp_upstream_unavailable",
         message: "MCP proxy upstream request failed.",
-        reason: "upstream_request_failed",
-        serverId: target.serverId,
         status: 502,
-      });
-      const driverInstanceId = toPlatformId<DriverInstanceId>(
-        grant.driverInstanceId,
-        "Driver instance ID",
-      );
-      await appendRuntimeMcpProxyErrorAuditEvent(c.env, {
-        driverInstanceId,
-        error: proxyError,
-        request: c.req.raw,
-        serverId: target.serverId,
       });
       const details = toRuntimeMcpProxyPublicErrorDetails(proxyError);
       return Response.json(runtimeMcpProxyErrorBody(details), { status: details.status });

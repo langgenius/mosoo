@@ -8,11 +8,15 @@ import {
   agentsTable,
   agentSkillsTable,
   agentSpaceBindingsTable,
-  auditEventsTable,
+  apiCommandsTable,
   authAccountsTable,
   authSessionsTable,
   authVerificationsTable,
   agentChannelBindingsTable,
+  channelConnectionStatesTable,
+  channelEventReceiptsTable,
+  channelFinalDeliveryJobsTable,
+  channelThreadSessionsTable,
   driverCommandsTable,
   driverInstanceMcpGrantsTable,
   driverInstancesTable,
@@ -60,6 +64,9 @@ import {
   usageEventsTable,
   vaultSecretsTable,
   vendorCredentialsTable,
+  wechatChannelAccountsTable,
+  wechatChannelPairingsTable,
+  wechatContextTokensTable,
 } from "@mosoo/db";
 import type { SQL } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -75,11 +82,15 @@ const schema = {
   agentsTable,
   agentSkillsTable,
   agentSpaceBindingsTable,
-  auditEventsTable,
+  apiCommandsTable,
   authAccountsTable,
   authSessionsTable,
   authVerificationsTable,
   agentChannelBindingsTable,
+  channelConnectionStatesTable,
+  channelEventReceiptsTable,
+  channelFinalDeliveryJobsTable,
+  channelThreadSessionsTable,
   driverCommandsTable,
   driverInstanceMcpGrantsTable,
   driverInstancesTable,
@@ -127,6 +138,9 @@ const schema = {
   usageEventsTable,
   vaultSecretsTable,
   vendorCredentialsTable,
+  wechatChannelAccountsTable,
+  wechatChannelPairingsTable,
+  wechatContextTokensTable,
 };
 
 type CompatD1RawOptions = { columnNames?: boolean } | undefined;

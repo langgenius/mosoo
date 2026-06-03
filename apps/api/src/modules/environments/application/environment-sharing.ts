@@ -14,11 +14,6 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs, toIsoString } from "../../../time";
-import {
-  appendAuditEvent,
-  resolveViewerAuditActor,
-} from "../../audit/application/audit-query.service";
-import { AUDIT_ACTION, AUDIT_RESOURCE } from "../../audit/domain/audit-vocabulary";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
   deleteResourceAcl,
@@ -28,7 +23,6 @@ import {
 } from "../../resource-access/application/resource-acl.service";
 import type { ResourceAclTarget } from "../../resource-access/application/resource-acl.service";
 import { ensureEnvironmentEditor } from "./environment-access.service";
-import type { EnvironmentAccessResult } from "./environment-access.service";
 
 function toEnvironmentAclTarget(
   targetKind: EnvironmentShareTargetKind,
@@ -41,18 +35,6 @@ function toEnvironmentAclTarget(
   }
 
   return toUserAclTarget(parsePlatformId<AccountId>(targetId, "environment share account ID"));
-}
-
-function environmentOwnerAuditMetadata(
-  access: EnvironmentAccessResult,
-  viewerId: AccountId,
-): Record<string, string> {
-  const ownerAtTimeId = access.row.ownerId ?? "organization";
-
-  return {
-    owner_at_time_id: ownerAtTimeId,
-    ...(access.row.ownerId !== viewerId ? { override: "organization_admin" } : {}),
-  };
 }
 
 export async function shareEnvironmentWithUser(
@@ -100,21 +82,6 @@ export async function shareEnvironmentWithUser(
     target: toUserAclTarget(target.id),
   });
 
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.environmentShare,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      targetId: target.id,
-      targetKind: "user",
-      ...environmentOwnerAuditMetadata(access, viewerId),
-    },
-    organizationId: access.row.organizationId,
-    outcome: "success",
-    resourceDisplay: access.row.name,
-    resourceId: access.row.id,
-    resourceType: AUDIT_RESOURCE.environment,
-  });
-
   return {
     createdAt: toIsoString(aclAssignment.createdAt),
     email: target.email,
@@ -142,21 +109,6 @@ export async function shareEnvironmentWithOrganization(
     target: toOrganizationAclTarget(access.row.organizationId),
   });
 
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.environmentShare,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      targetId: access.row.organizationId,
-      targetKind: "organization",
-      ...environmentOwnerAuditMetadata(access, viewerId),
-    },
-    organizationId: access.row.organizationId,
-    outcome: "success",
-    resourceDisplay: access.row.name,
-    resourceId: access.row.id,
-    resourceType: AUDIT_RESOURCE.environment,
-  });
-
   return {
     createdAt: toIsoString(aclAssignment.createdAt),
     email: null,
@@ -178,20 +130,5 @@ export async function unshareEnvironmentTarget(
     resourceId: access.row.id,
     resourceType: "environment",
     target: toEnvironmentAclTarget(input.targetKind, input.targetId),
-  });
-
-  await appendAuditEvent(bindings.DB, {
-    action: AUDIT_ACTION.environmentUnshare,
-    ...resolveViewerAuditActor(viewer),
-    metadata: {
-      targetId: input.targetId,
-      targetKind: input.targetKind,
-      ...environmentOwnerAuditMetadata(access, viewerId),
-    },
-    organizationId: access.row.organizationId,
-    outcome: "success",
-    resourceDisplay: access.row.name,
-    resourceId: access.row.id,
-    resourceType: AUDIT_RESOURCE.environment,
   });
 }
