@@ -75,7 +75,7 @@ export function ModelPickerItem({
       className={cn(
         "flex flex-col items-start gap-0.5 py-2",
         entry.available ? null : "bg-muted/40 text-muted-foreground opacity-100",
-        selected ? "bg-accent-soft/40" : null,
+        selected ? "bg-ink-100" : null,
       )}
       disabled={!entry.available}
       onSelect={(event) => {

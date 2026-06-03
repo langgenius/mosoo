@@ -132,7 +132,7 @@ function KindChip({
   return (
     <div
       className={`flex min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 ${
-        muted ? "border-border text-fg-2 bg-white/60" : "border-brand/40 bg-brand-light text-brand"
+        muted ? "border-border text-fg-2 bg-white/60" : "border-border-strong bg-ink-100 text-fg-1"
       }`}
     >
       <Icon className="size-3.5 shrink-0" />

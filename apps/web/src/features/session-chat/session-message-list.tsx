@@ -154,7 +154,7 @@ const MessageRow = React.memo(function MessageRow({
         className={cn(
           "min-w-0 text-[14.5px] leading-[1.55]",
           message.role === "user"
-            ? "max-w-[82%] rounded-lg rounded-tl-[4px] bg-accent-soft px-4 py-3 text-ink-900"
+            ? "max-w-[82%] rounded-lg rounded-tl-[4px] bg-ink-100 px-4 py-3 text-ink-900"
             : "w-full text-fg-1",
         )}
       >

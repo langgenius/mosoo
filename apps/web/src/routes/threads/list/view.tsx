@@ -90,9 +90,9 @@ export function NotificationPrompt({
   }
 
   return (
-    <div className="border-border-subtle bg-accent-soft/40 mb-3 flex items-center gap-2 rounded-md border px-3 py-2">
-      <Bell className="text-accent-press size-3.5 shrink-0" />
-      <div className="text-accent-press min-w-0 flex-1 text-[12px] font-medium">
+    <div className="border-border-subtle bg-ink-50 mb-3 flex items-center gap-2 rounded-md border px-3 py-2">
+      <Bell className="text-fg-3 size-3.5 shrink-0" />
+      <div className="text-fg-2 min-w-0 flex-1 text-[12px] font-medium">
         Enable notifications to be pinged when an agent finishes.
       </div>
       <Button

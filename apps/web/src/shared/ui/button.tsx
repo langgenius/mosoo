@@ -24,7 +24,8 @@ const buttonVariants = cva(
         xs: "h-7 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
       },
       variant: {
-        default: "bg-primary text-primary-foreground shadow-xs hover:bg-accent-hover",
+        default: "bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover",
+        accent: "bg-green-500 text-on-accent shadow-xs hover:bg-green-600",
         destructive:
           "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40",
         ghost: "text-fg-2 hover:bg-paper-200/60 hover:text-fg-1 active:scale-100",

@@ -51,46 +51,52 @@
 }
 
 :root {
-  --green-50: #e6f2eb;
-  --green-100: #cce5d6;
-  --green-200: #99c9ad;
-  --green-300: #66ae85;
-  --green-400: #339362;
-  --green-500: #127a46;
-  --green-600: #0c6d3b;
-  --green-700: #086030;
-  --green-800: #065026;
-  --green-900: #043a1b;
-  --green-950: #021f0e;
+  /* Brand green — the bright Moso-bamboo shoot (#6FD305). A disciplined accent
+     only: primary actions stay BLACK; green marks growth/action/life. */
+  --green-50: #f4fce4;
+  --green-100: #e7f8c4;
+  --green-200: #d3f195;
+  --green-300: #b6e85f;
+  --green-400: #95dd2c;
+  --green-500: #6fd305;
+  --green-600: #5cb300;
+  --green-700: #498c07;
+  --green-800: #3a6e0e;
+  --green-900: #2c5113;
+  --green-950: #1a310b;
 
-  --ink-50: #f3f4f1;
-  --ink-100: #e5e7e1;
-  --ink-200: #c6cbc2;
-  --ink-300: #97a095;
-  --ink-400: #667065;
-  --ink-500: #434c46;
-  --ink-600: #2c332e;
-  --ink-700: #1b231f;
-  --ink-800: #101815;
-  --ink-900: #0b1a14;
-  --ink-950: #050a08;
+  /* Neutrals — true cool grays, GitHub-like. No green cast; the grays carry
+     the UI and the green only punctuates it. */
+  --ink-50: #f4f6f8;
+  --ink-100: #e9ecf0;
+  --ink-200: #d2d7dd;
+  --ink-300: #aeb5be;
+  --ink-400: #828a93;
+  --ink-500: #656c75;
+  --ink-600: #515860;
+  --ink-700: #3d434b;
+  --ink-800: #2b3036;
+  --ink-900: #1c2024;
+  --ink-950: #08090a;
 
-  --paper-50: #fafaf7;
-  --paper-100: #f7f6f1;
-  --paper-200: #efede4;
-  --paper-300: #e4e1d4;
-  --paper-400: #d1ccbb;
+  /* Paper — cool near-white surface ramp (was warm cream). */
+  --paper-50: #ffffff;
+  --paper-100: #fbfbfc;
+  --paper-200: #f4f6f8;
+  --paper-300: #e9ecf0;
+  --paper-400: #dfe3e8;
 
+  /* Status accents — kept small, marker-level only. */
   --soil: #7a5230;
-  --sky: #5a8fb8;
-  --amber: #d49a3c;
-  --ember: #c9523b;
+  --sky: #2f6bd4;
+  --amber: #e0a106;
+  --ember: #dc2a2a;
 
   --bg: var(--paper-100);
   --bg-elevated: #ffffff;
   --bg-sunken: var(--paper-200);
   --bg-canvas: #ffffff;
-  --bg-sidebar: #fdfdfb;
+  --bg-sidebar: #fbfbfc;
 
   --fg-1: var(--ink-900);
   --fg-2: var(--ink-500);
@@ -98,16 +104,22 @@
   --fg-muted: var(--ink-300);
   --fg-inverse: var(--paper-100);
 
-  --border-soft: rgba(11, 26, 20, 0.05);
-  --border-default: rgba(11, 26, 20, 0.08);
-  --border-strong: rgba(11, 26, 20, 0.14);
+  /* Cool hairlines — ink-900 based, no green cast. */
+  --border-soft: rgba(28, 32, 36, 0.06);
+  --border-default: rgba(28, 32, 36, 0.1);
+  --border-strong: rgba(28, 32, 36, 0.16);
 
-  --accent: var(--green-700);
+  /* Primary = black (neutral-first, like GitHub). Green is the rare accent. */
+  --primary: var(--ink-900);
+  --primary-hover: var(--ink-800);
+  --fg-on-accent: #0f1a02; /* dark ink on bright green */
+
+  --accent: var(--green-500);
   --accent-hover: var(--green-600);
   --accent-press: var(--green-800);
   --accent-soft: var(--green-50);
   --accent-soft-hover: var(--green-100);
-  --accent-ring: rgba(8, 96, 48, 0.22);
+  --accent-ring: rgba(111, 211, 5, 0.45);
 
   --success: var(--green-700);
   --info: var(--sky);
@@ -157,12 +169,12 @@
   --r-lg: 14px;
   --r-xl: 20px;
 
-  --shadow-xs: 0 1px 0 rgba(11, 26, 20, 0.04), 0 1px 2px rgba(11, 26, 20, 0.04);
-  --shadow-sm: 0 1px 2px rgba(11, 26, 20, 0.04), 0 2px 6px rgba(11, 26, 20, 0.04);
-  --shadow-md: 0 4px 10px rgba(11, 26, 20, 0.05), 0 8px 20px rgba(11, 26, 20, 0.04);
-  --shadow-lg: 0 12px 28px rgba(11, 26, 20, 0.08), 0 4px 12px rgba(11, 26, 20, 0.04);
-  --shadow-xl: 0 30px 60px rgba(11, 26, 20, 0.14), 0 10px 20px rgba(11, 26, 20, 0.06);
-  --shadow-inset: inset 0 0 0 1px rgba(11, 26, 20, 0.06);
+  --shadow-xs: 0 1px 0 rgba(28, 32, 36, 0.04), 0 1px 2px rgba(28, 32, 36, 0.04);
+  --shadow-sm: 0 1px 2px rgba(28, 32, 36, 0.05), 0 2px 6px rgba(28, 32, 36, 0.04);
+  --shadow-md: 0 4px 10px rgba(28, 32, 36, 0.06), 0 8px 20px rgba(28, 32, 36, 0.05);
+  --shadow-lg: 0 12px 28px rgba(28, 32, 36, 0.1), 0 4px 12px rgba(28, 32, 36, 0.05);
+  --shadow-xl: 0 30px 60px rgba(28, 32, 36, 0.16), 0 10px 20px rgba(28, 32, 36, 0.07);
+  --shadow-inset: inset 0 0 0 1px rgba(28, 32, 36, 0.06);
   --shadow-focus: 0 0 0 2px var(--accent-ring);
 
   --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -172,6 +184,73 @@
   --dur-2: 180ms;
   --dur-3: 260ms;
   --dur-4: 420ms;
+}
+
+/* ----------------------------------------------------------------------------
+   Landing scope — the pre-auth experience (marketing landing + auth card) was
+   redesigned on the warm paper/forest palette and is deliberately preserved.
+   Everything OUTSIDE this scope uses the GitHub-style cool-gray system in :root.
+   This block restores the original token values for the /login subtree only.
+   --------------------------------------------------------------------------- */
+[data-theme="landing"] {
+  --green-50: #e6f2eb;
+  --green-100: #cce5d6;
+  --green-200: #99c9ad;
+  --green-300: #66ae85;
+  --green-400: #339362;
+  --green-500: #127a46;
+  --green-600: #0c6d3b;
+  --green-700: #086030;
+  --green-800: #065026;
+  --green-900: #043a1b;
+  --green-950: #021f0e;
+
+  --ink-50: #f3f4f1;
+  --ink-100: #e5e7e1;
+  --ink-200: #c6cbc2;
+  --ink-300: #97a095;
+  --ink-400: #667065;
+  --ink-500: #434c46;
+  --ink-600: #2c332e;
+  --ink-700: #1b231f;
+  --ink-800: #101815;
+  --ink-900: #0b1a14;
+  --ink-950: #050a08;
+
+  --paper-50: #fafaf7;
+  --paper-100: #f7f6f1;
+  --paper-200: #efede4;
+  --paper-300: #e4e1d4;
+  --paper-400: #d1ccbb;
+
+  --soil: #7a5230;
+  --sky: #5a8fb8;
+  --amber: #d49a3c;
+  --ember: #c9523b;
+
+  --bg-sidebar: #fdfdfb;
+
+  --border-soft: rgba(11, 26, 20, 0.05);
+  --border-default: rgba(11, 26, 20, 0.08);
+  --border-strong: rgba(11, 26, 20, 0.14);
+
+  /* primary stays the warm green here, as the landing was originally designed */
+  --primary: var(--accent);
+  --primary-hover: var(--accent-hover);
+
+  --accent: var(--green-700);
+  --accent-hover: var(--green-600);
+  --accent-press: var(--green-800);
+  --accent-soft: var(--green-50);
+  --accent-soft-hover: var(--green-100);
+  --accent-ring: rgba(8, 96, 48, 0.22);
+
+  --shadow-xs: 0 1px 0 rgba(11, 26, 20, 0.04), 0 1px 2px rgba(11, 26, 20, 0.04);
+  --shadow-sm: 0 1px 2px rgba(11, 26, 20, 0.04), 0 2px 6px rgba(11, 26, 20, 0.04);
+  --shadow-md: 0 4px 10px rgba(11, 26, 20, 0.05), 0 8px 20px rgba(11, 26, 20, 0.04);
+  --shadow-lg: 0 12px 28px rgba(11, 26, 20, 0.08), 0 4px 12px rgba(11, 26, 20, 0.04);
+  --shadow-xl: 0 30px 60px rgba(11, 26, 20, 0.14), 0 10px 20px rgba(11, 26, 20, 0.06);
+  --shadow-inset: inset 0 0 0 1px rgba(11, 26, 20, 0.06);
 }
 
 .dark,
@@ -188,15 +267,20 @@
   --fg-muted: var(--ink-400);
   --fg-inverse: var(--ink-900);
 
-  --border-soft: rgba(247, 246, 241, 0.05);
-  --border-default: rgba(247, 246, 241, 0.09);
-  --border-strong: rgba(247, 246, 241, 0.18);
+  --border-soft: rgba(244, 246, 248, 0.05);
+  --border-default: rgba(244, 246, 248, 0.09);
+  --border-strong: rgba(244, 246, 248, 0.18);
+
+  /* On dark surfaces a black primary disappears; lift it to green (white fg
+     reads against it), matching GitHub's dark primary buttons. */
+  --primary: var(--green-600);
+  --primary-hover: var(--green-500);
 
   --accent: var(--green-500);
   --accent-hover: var(--green-400);
   --accent-press: var(--green-300);
-  --accent-soft: rgba(8, 96, 48, 0.16);
-  --accent-soft-hover: rgba(8, 96, 48, 0.24);
+  --accent-soft: rgba(111, 211, 5, 0.16);
+  --accent-soft-hover: rgba(111, 211, 5, 0.24);
 
   --shadow-xs: 0 1px 0 rgba(0, 0, 0, 0.4);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
@@ -216,8 +300,10 @@
   --color-popover: var(--bg-elevated);
   --color-popover-foreground: var(--fg-1);
 
-  --color-primary: var(--accent);
+  --color-primary: var(--primary);
   --color-primary-foreground: #ffffff;
+  --color-primary-hover: var(--primary-hover);
+  --color-on-accent: var(--fg-on-accent);
 
   --color-secondary: var(--paper-200);
   --color-secondary-foreground: var(--fg-1);
@@ -237,10 +323,10 @@
 
   --color-sidebar: var(--bg-sidebar);
   --color-sidebar-foreground: var(--fg-2);
-  --color-sidebar-primary: var(--accent);
+  --color-sidebar-primary: var(--primary);
   --color-sidebar-primary-foreground: #ffffff;
-  --color-sidebar-accent: var(--accent-soft);
-  --color-sidebar-accent-foreground: var(--accent-press);
+  --color-sidebar-accent: var(--paper-200);
+  --color-sidebar-accent-foreground: var(--fg-1);
   --color-sidebar-border: var(--border-soft);
   --color-sidebar-ring: var(--accent-ring);
 
@@ -298,8 +384,13 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 
-  --color-brand: var(--accent);
-  --color-brand-light: var(--accent-soft);
+  /* brand = readable dark green for accent text, borders, and selection
+     markers (icons, radios, dots). The bright --accent (green-500) is reserved
+     for toggles, the one focal action, and the accent dot. */
+  --color-brand: var(--accent-press);
+  /* selection fills are NEUTRAL, not green washes (the key restraint move);
+     --accent-soft stays green for badges, chips, and tonal accents. */
+  --color-brand-light: var(--ink-50);
   --color-brand-ring: var(--accent-ring);
   --color-surface-warm: var(--paper-200);
   --color-text-secondary: var(--fg-2);
@@ -434,7 +525,7 @@
   }
 
   .environment-scroll-area {
-    scrollbar-color: rgba(11, 26, 20, 0.22) transparent;
+    scrollbar-color: rgba(28, 32, 36, 0.22) transparent;
     scrollbar-gutter: stable;
     scrollbar-width: thin;
   }
@@ -448,12 +539,12 @@
   }
 
   .environment-scroll-area::-webkit-scrollbar-thumb {
-    background: rgba(11, 26, 20, 0.18);
+    background: rgba(28, 32, 36, 0.18);
     border-radius: 999px;
   }
 
   .environment-scroll-area::-webkit-scrollbar-thumb:hover {
-    background: rgba(11, 26, 20, 0.28);
+    background: rgba(28, 32, 36, 0.28);
   }
 }
 
@@ -471,9 +562,9 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(11, 26, 20, 0.12);
+  background: rgba(28, 32, 36, 0.12);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(11, 26, 20, 0.2);
+  background: rgba(28, 32, 36, 0.2);
 }

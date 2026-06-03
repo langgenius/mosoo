@@ -50,7 +50,7 @@ export function UsageTab() {
                 }}
                 className={cn(
                   "rounded px-2.5 py-1 text-xs font-semibold uppercase",
-                  range === value ? "bg-accent-soft text-accent-press" : "text-muted-foreground",
+                  range === value ? "bg-ink-100 text-fg-1" : "text-muted-foreground",
                 )}
               >
                 {value}

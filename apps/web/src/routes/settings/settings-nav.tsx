@@ -91,7 +91,7 @@ export function SettingsNav() {
                     cn(
                       "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors",
                       isActive
-                        ? "bg-accent-soft text-accent-press"
+                        ? "bg-ink-100 text-fg-1"
                         : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
                     )
                   }

@@ -129,7 +129,7 @@ function FileTreeRow({
       }}
       className={cn(
         "group flex h-8 w-full items-center gap-1.5 overflow-hidden px-3 text-left text-[12.5px] outline-none transition-colors",
-        selected ? "bg-brand-light text-brand" : "text-fg-2 hover:bg-paper-200/70 hover:text-fg-1",
+        selected ? "bg-ink-100 text-fg-1" : "text-fg-2 hover:bg-paper-200/70 hover:text-fg-1",
       )}
       style={{ paddingLeft: 12 + depth * 16 }}
     >

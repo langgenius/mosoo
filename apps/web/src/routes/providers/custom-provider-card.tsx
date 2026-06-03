@@ -114,7 +114,7 @@ export function CustomProviderCard({
         </Button>
       </div>
 
-      <div className="border-accent/40 bg-accent-soft/20 space-y-3 rounded-lg border p-3">
+      <div className="border-border bg-ink-50 space-y-3 rounded-lg border p-3">
         <div className="grid gap-3 md:grid-cols-2">
           <label className="space-y-1" htmlFor="custom-provider-label">
             <div className="text-muted-foreground text-xs font-medium">Label</div>

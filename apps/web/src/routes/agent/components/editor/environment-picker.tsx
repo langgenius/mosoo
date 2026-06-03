@@ -25,7 +25,7 @@ function EnvironmentOption({
     <button
       className={cn(
         "flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left transition-colors",
-        selected ? "bg-brand-light text-brand" : "hover:bg-accent/50",
+        selected ? "bg-ink-100 text-fg-1" : "hover:bg-accent/50",
       )}
       onClick={onSelect}
       type="button"

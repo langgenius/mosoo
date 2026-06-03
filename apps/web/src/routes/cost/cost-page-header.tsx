@@ -46,7 +46,7 @@ export function CostPageHeader({
             className={cn(
               "rounded px-2.5 py-1.5 text-xs font-semibold",
               runPurpose === item.value
-                ? "bg-accent-soft text-accent-press"
+                ? "bg-ink-100 text-fg-1"
                 : "text-muted-foreground",
             )}
           >
@@ -64,7 +64,7 @@ export function CostPageHeader({
             }}
             className={cn(
               "rounded px-3 py-1.5 text-xs font-semibold uppercase",
-              range === value ? "bg-accent-soft text-accent-press" : "text-muted-foreground",
+              range === value ? "bg-ink-100 text-fg-1" : "text-muted-foreground",
             )}
           >
             {value}

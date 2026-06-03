@@ -316,7 +316,7 @@ export function AgentDetailPage() {
                       className={cn(
                         "px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-all",
                         mode === tab.id
-                          ? "bg-brand-light text-brand"
+                          ? "bg-ink-100 text-fg-1"
                           : "text-muted-foreground hover:bg-accent",
                       )}
                     >
@@ -332,7 +332,7 @@ export function AgentDetailPage() {
                     className={cn(
                       "flex items-center gap-1 rounded-lg px-3.5 py-1.5 text-[13px] font-medium outline-none transition-all",
                       DEBUG_MODES.has(mode)
-                        ? "bg-brand-light text-brand"
+                        ? "bg-ink-100 text-fg-1"
                         : "text-muted-foreground hover:bg-accent",
                     )}
                   >

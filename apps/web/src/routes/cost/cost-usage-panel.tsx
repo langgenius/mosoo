@@ -87,7 +87,7 @@ export function CostUsersPanel({
                 }}
                 className={cn(
                   "rounded px-3 py-1 text-xs font-semibold",
-                  mode === value ? "bg-accent-soft text-accent-press" : "text-muted-foreground",
+                  mode === value ? "bg-ink-100 text-fg-1" : "text-muted-foreground",
                 )}
               >
                 {label}

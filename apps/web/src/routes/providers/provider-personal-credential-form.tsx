@@ -67,7 +67,7 @@ export function ProviderPersonalCredentialForm({
   }
 
   return (
-    <div className="border-accent/40 bg-accent-soft/20 space-y-3 rounded-lg border p-3">
+    <div className="border-border bg-ink-50 space-y-3 rounded-lg border p-3">
       <label className="space-y-1" htmlFor={`personal-credential-${vendor.vendorId}-label`}>
         <div className="text-muted-foreground text-xs font-medium">Label</div>
         <Input

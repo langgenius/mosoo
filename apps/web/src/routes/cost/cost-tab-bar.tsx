@@ -22,7 +22,7 @@ export function CostTabBar({
           className={cn(
             "rounded-md px-3 py-1.5 text-sm font-semibold transition-colors",
             effectiveTab === tab.id
-              ? "bg-accent-soft text-accent-press"
+              ? "bg-ink-100 text-fg-1"
               : "text-muted-foreground hover:bg-muted/60",
           )}
         >

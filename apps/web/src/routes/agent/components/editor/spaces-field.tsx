@@ -92,7 +92,7 @@ export function AgentSpacesField({
           ) : (
             resolvedSelectedSpaces.map((space) => (
               <span
-                className="bg-brand-light text-brand inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-medium"
+                className="bg-ink-100 text-fg-1 inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-medium"
                 key={space.id}
               >
                 {space.name}
@@ -184,7 +184,7 @@ function SpacesMenuContent({
           <button
             className={cn(
               "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors",
-              selected ? "bg-brand-light font-medium text-brand" : "hover:bg-accent/50",
+              selected ? "bg-ink-100 font-medium text-fg-1" : "hover:bg-accent/50",
             )}
             key={space.id}
             onClick={() => {

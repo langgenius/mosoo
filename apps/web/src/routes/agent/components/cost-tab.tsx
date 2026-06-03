@@ -64,7 +64,7 @@ export function AgentCostTab({ agentId }: { agentId: string }): ReactElement {
                   }}
                   className={cn(
                     "rounded px-2.5 py-1 text-xs font-semibold uppercase",
-                    range === value ? "bg-accent-soft text-accent-press" : "text-muted-foreground",
+                    range === value ? "bg-ink-100 text-fg-1" : "text-muted-foreground",
                   )}
                 >
                   {value}
@@ -103,7 +103,7 @@ export function AgentCostTab({ agentId }: { agentId: string }): ReactElement {
               className={cn(
                 "rounded-md border px-3 py-1.5 text-xs font-semibold",
                 purpose === item.value
-                  ? "border-accent-press bg-accent-soft text-accent-press"
+                  ? "border-border-strong bg-ink-100 text-fg-1"
                   : "border-border text-muted-foreground hover:bg-muted",
               )}
             >
@@ -139,7 +139,7 @@ export function AgentCostTab({ agentId }: { agentId: string }): ReactElement {
               key={label}
               className={cn(
                 "rounded-lg border border-border bg-card px-4 py-3",
-                index === 0 ? "bg-accent-soft/40" : "",
+                index === 0 ? "bg-ink-50" : "",
               )}
             >
               <div className="text-muted-foreground text-[11px] font-semibold tracking-[0.12em] uppercase">

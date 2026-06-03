@@ -27,7 +27,7 @@ export function OnboardingChoiceScreen({
       <div className="flex flex-1 items-center justify-center">
         <div className="w-full max-w-[520px] px-6">
           <div className="mb-6 flex justify-center">
-            <div className="border-accent-soft-hover bg-accent-soft flex size-16 items-center justify-center rounded-md border">
+            <div className="border-border bg-ink-100 flex size-16 items-center justify-center rounded-md border">
               <Building2 className="text-accent-press size-7" />
             </div>
           </div>

@@ -320,7 +320,7 @@ export function Onboarding() {
       <div className="flex flex-1 items-center justify-center">
         <div className="w-full max-w-[480px] px-6">
           <div className="mb-6 flex justify-center">
-            <div className="bg-accent-soft border-accent-soft-hover flex size-16 items-center justify-center rounded-md border">
+            <div className="bg-ink-100 border-border flex size-16 items-center justify-center rounded-md border">
               <Building2 className="text-accent-press size-7" />
             </div>
           </div>

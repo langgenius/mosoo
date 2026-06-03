@@ -89,7 +89,7 @@ function NavLink({
         "flex items-center rounded-md text-[13.5px] font-semibold transition-colors",
         collapsed ? "size-9 justify-center self-center" : "gap-2.5 px-2.5 py-2",
         isActive
-          ? "bg-accent-soft text-accent-press"
+          ? "bg-ink-100 text-fg-1"
           : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
       )}
     >
@@ -152,7 +152,7 @@ function NavGroup({
         "flex items-center rounded-md text-[13.5px] font-semibold transition-colors w-full",
         collapsed ? "size-9 justify-center self-center" : "gap-2.5 px-2.5 py-2",
         parentSelfActive
-          ? "bg-accent-soft text-accent-press"
+          ? "bg-ink-100 text-fg-1"
           : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
       )}
     >
@@ -198,7 +198,7 @@ function NavGroup({
                   className={cn(
                     "flex items-center rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
                     childActive
-                      ? "bg-accent-soft text-accent-press"
+                      ? "bg-ink-100 text-fg-1"
                       : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
                   )}
                 >

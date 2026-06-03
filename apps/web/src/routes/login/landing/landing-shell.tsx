@@ -53,7 +53,11 @@ export function LandingShell({ onContinue }: { onContinue: () => void }): ReactE
   const revealProgress = useTransform(scrollY, [revealStart, revealEnd], [0, 1], { clamp: true });
 
   return (
-    <div ref={scrollRef} className="bg-paper-100 fixed inset-0 overflow-x-hidden overflow-y-auto">
+    <div
+      ref={scrollRef}
+      data-theme="landing"
+      className="bg-paper-100 fixed inset-0 overflow-x-hidden overflow-y-auto"
+    >
       <div
         ref={contentRef}
         className="bg-paper-100 relative z-10 shadow-[0_24px_48px_-16px_rgba(11,26,20,0.45)]"

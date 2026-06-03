@@ -124,7 +124,7 @@ function MemberRow({
     <div
       className={cn(
         "flex items-center justify-between gap-4 border-b border-border px-4 py-3 last:border-b-0",
-        focused ? "bg-accent-soft/70" : "",
+        focused ? "bg-ink-100" : "",
       )}
     >
       <div className="flex min-w-0 items-center gap-3">

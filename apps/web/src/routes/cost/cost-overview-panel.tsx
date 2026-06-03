@@ -46,7 +46,7 @@ export function CostOverviewPanel({
             key={label}
             className={cn(
               "rounded-lg border border-border bg-card px-4 py-3",
-              index === 0 ? "bg-accent-soft/40" : "",
+              index === 0 ? "bg-ink-50" : "",
             )}
           >
             <div className="text-muted-foreground text-[11px] font-semibold tracking-[0.12em] uppercase">

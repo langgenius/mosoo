@@ -7,7 +7,7 @@ import { useLoginFlow } from "./use-login";
 
 const authBackgroundStyle = {
   background:
-    "radial-gradient(900px 500px at 85% -10%, rgba(8,96,48,.08), transparent 60%), var(--bg)",
+    "radial-gradient(900px 500px at 85% -10%, rgba(28,32,36,.04), transparent 60%), var(--bg)",
 } as const;
 
 export function LoginPage(): ReactElement {
