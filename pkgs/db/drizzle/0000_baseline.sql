@@ -1,10 +1,10 @@
 CREATE TABLE `agent_deployment_version` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`config_json` text NOT NULL,
 	`created_at` integer NOT NULL,
-	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND "created_by_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`environment_id` text CHECK ("environment_id" = upper("environment_id") AND length("environment_id") = 26 AND "environment_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND substr("created_by_account_id", 1, 1) GLOB '[0-7]' AND "created_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`environment_id` text CHECK ("environment_id" = upper("environment_id") AND length("environment_id") = 26 AND substr("environment_id", 1, 1) GLOB '[0-7]' AND "environment_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`kind` text NOT NULL,
 	`mcp_bindings_json` text NOT NULL,
 	`model` text NOT NULL,
@@ -20,13 +20,13 @@ CREATE TABLE `agent_deployment_version` (
 CREATE UNIQUE INDEX `agent_deployment_version_agent_number_idx` ON `agent_deployment_version` (`agent_id`,`version_number`);--> statement-breakpoint
 CREATE INDEX `agent_deployment_version_agent_created_idx` ON `agent_deployment_version` (`agent_id`,`created_at`);--> statement-breakpoint
 CREATE TABLE `agent_mcp_binding` (
-	`agent_credential_id` text CHECK ("agent_credential_id" = upper("agent_credential_id") AND length("agent_credential_id") = 26 AND "agent_credential_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`agent_credential_id` text CHECK ("agent_credential_id" = upper("agent_credential_id") AND length("agent_credential_id") = 26 AND substr("agent_credential_id", 1, 1) GLOB '[0-7]' AND "agent_credential_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
 	`credential_mode` text DEFAULT 'runtime_resolved' NOT NULL,
 	`enabled` integer DEFAULT true NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
-	`server_id` text CHECK ("server_id" = upper("server_id") AND length("server_id") = 26 AND "server_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
+	`server_id` text CHECK ("server_id" = upper("server_id") AND length("server_id") = 26 AND substr("server_id", 1, 1) GLOB '[0-7]' AND "server_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`sort_order` integer DEFAULT 0 NOT NULL,
 	`updated_at` integer NOT NULL,
 	CONSTRAINT "agent_mcp_binding_agent_credential_shape_check" CHECK(
@@ -39,19 +39,19 @@ CREATE UNIQUE INDEX `agent_mcp_binding_agent_sort_idx` ON `agent_mcp_binding` (`
 CREATE INDEX `agent_mcp_binding_server_idx` ON `agent_mcp_binding` (`server_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `agent_mcp_binding_profile_server_idx` ON `agent_mcp_binding` (`agent_id`,`server_id`);--> statement-breakpoint
 CREATE TABLE `agent_skill` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
-	`skill_id` text CHECK ("skill_id" = upper("skill_id") AND length("skill_id") = 26 AND "skill_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`skill_id` text CHECK ("skill_id" = upper("skill_id") AND length("skill_id") = 26 AND substr("skill_id", 1, 1) GLOB '[0-7]' AND "skill_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`sort_order` integer NOT NULL,
 	PRIMARY KEY(`agent_id`, `skill_id`)
 );
 --> statement-breakpoint
 CREATE INDEX `agent_skill_agent_sort_idx` ON `agent_skill` (`agent_id`,`sort_order`);--> statement-breakpoint
 CREATE TABLE `agent_space_binding` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
 	`sort_order` integer NOT NULL,
-	`space_id` text CHECK ("space_id" = upper("space_id") AND length("space_id") = 26 AND "space_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`space_id` text CHECK ("space_id" = upper("space_id") AND length("space_id") = 26 AND substr("space_id", 1, 1) GLOB '[0-7]' AND "space_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	PRIMARY KEY(`agent_id`, `space_id`)
 );
 --> statement-breakpoint
@@ -60,14 +60,14 @@ CREATE TABLE `agent` (
 	`config_json` text NOT NULL,
 	`created_at` integer NOT NULL,
 	`description` text,
-	`environment_id` text CHECK ("environment_id" = upper("environment_id") AND length("environment_id") = 26 AND "environment_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`environment_id` text CHECK ("environment_id" = upper("environment_id") AND length("environment_id") = 26 AND substr("environment_id", 1, 1) GLOB '[0-7]' AND "environment_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`kind` text DEFAULT 'pet' NOT NULL,
-	`live_deployment_version_id` text CHECK ("live_deployment_version_id" = upper("live_deployment_version_id") AND length("live_deployment_version_id") = 26 AND "live_deployment_version_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`live_deployment_version_id` text CHECK ("live_deployment_version_id" = upper("live_deployment_version_id") AND length("live_deployment_version_id") = 26 AND substr("live_deployment_version_id", 1, 1) GLOB '[0-7]' AND "live_deployment_version_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`model` text NOT NULL,
 	`name` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND "owner_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`prompt` text NOT NULL,
 	`provider` text NOT NULL,
 	`runtime_id` text NOT NULL,
@@ -84,36 +84,36 @@ CREATE TABLE `agent_builder_message` (
 	`cards_json` text,
 	`content_text` text NOT NULL,
 	`created_at` integer NOT NULL,
-	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND "created_by_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND substr("created_by_account_id", 1, 1) GLOB '[0-7]' AND "created_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`input_kind` text,
-	`planner_run_id` text CHECK ("planner_run_id" = upper("planner_run_id") AND length("planner_run_id") = 26 AND "planner_run_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`planner_run_id` text CHECK ("planner_run_id" = upper("planner_run_id") AND length("planner_run_id") = 26 AND substr("planner_run_id", 1, 1) GLOB '[0-7]' AND "planner_run_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`role` text NOT NULL,
 	`seq` integer NOT NULL,
-	`thread_id` text CHECK ("thread_id" = upper("thread_id") AND length("thread_id") = 26 AND "thread_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`thread_id` text CHECK ("thread_id" = upper("thread_id") AND length("thread_id") = 26 AND substr("thread_id", 1, 1) GLOB '[0-7]' AND "thread_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	FOREIGN KEY (`thread_id`) REFERENCES `agent_builder_thread`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `agent_builder_message_thread_seq_idx` ON `agent_builder_message` (`thread_id`,`seq`);--> statement-breakpoint
 CREATE INDEX `agent_builder_message_planner_run_idx` ON `agent_builder_message` (`planner_run_id`);--> statement-breakpoint
 CREATE TABLE `agent_builder_planner_run` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`completed_at` integer,
 	`context_json` text NOT NULL,
 	`created_at` integer NOT NULL,
 	`error_code` text,
 	`error_message` text,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`model` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`output_json` text,
 	`provider` text NOT NULL,
 	`request_digest` text NOT NULL,
 	`status` text NOT NULL,
-	`thread_id` text CHECK ("thread_id" = upper("thread_id") AND length("thread_id") = 26 AND "thread_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`thread_id` text CHECK ("thread_id" = upper("thread_id") AND length("thread_id") = 26 AND substr("thread_id", 1, 1) GLOB '[0-7]' AND "thread_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`trace_id` text NOT NULL,
 	`tool_trace_json` text,
-	`trigger_message_id` text CHECK ("trigger_message_id" = upper("trigger_message_id") AND length("trigger_message_id") = 26 AND "trigger_message_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`trigger_message_id` text CHECK ("trigger_message_id" = upper("trigger_message_id") AND length("trigger_message_id") = 26 AND substr("trigger_message_id", 1, 1) GLOB '[0-7]' AND "trigger_message_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	FOREIGN KEY (`agent_id`) REFERENCES `agent`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`thread_id`) REFERENCES `agent_builder_thread`(`id`) ON UPDATE no action ON DELETE cascade
 );
@@ -122,13 +122,13 @@ CREATE INDEX `agent_builder_planner_run_thread_created_idx` ON `agent_builder_pl
 CREATE INDEX `agent_builder_planner_run_agent_created_idx` ON `agent_builder_planner_run` (`agent_id`,`created_at`);--> statement-breakpoint
 CREATE INDEX `agent_builder_planner_run_trace_idx` ON `agent_builder_planner_run` (`trace_id`);--> statement-breakpoint
 CREATE TABLE `agent_builder_thread` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
-	`creator_account_id` text CHECK ("creator_account_id" = upper("creator_account_id") AND length("creator_account_id") = 26 AND "creator_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`creator_account_id` text CHECK ("creator_account_id" = upper("creator_account_id") AND length("creator_account_id") = 26 AND substr("creator_account_id", 1, 1) GLOB '[0-7]' AND "creator_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`last_turn_at` integer,
 	`message_seq_cursor` integer DEFAULT 0 NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`status` text DEFAULT 'active' NOT NULL,
 	`title` text,
 	`updated_at` integer NOT NULL,
@@ -144,7 +144,7 @@ CREATE TABLE `api_command` (
 	`completed_at` integer,
 	`created_at` integer NOT NULL,
 	`dedupe_key` text NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`kind` text NOT NULL,
 	`last_error_code` text,
 	`last_error_message` text,
@@ -169,7 +169,7 @@ CREATE TABLE `auth_account` (
 	`refresh_token_expires_at` integer,
 	`scope` text,
 	`updated_at` integer NOT NULL,
-	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND "account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL
+	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `auth_account_provider_account_idx` ON `auth_account` (`provider_id`,`provider_account_id`);--> statement-breakpoint
@@ -182,7 +182,7 @@ CREATE TABLE `auth_session` (
 	`token` text NOT NULL,
 	`updated_at` integer NOT NULL,
 	`user_agent` text,
-	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND "account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL
+	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL
 );
 --> statement-breakpoint
 CREATE INDEX `auth_session_expires_at_idx` ON `auth_session` (`expires_at`);--> statement-breakpoint
@@ -200,10 +200,10 @@ CREATE TABLE `auth_verification` (
 CREATE INDEX `auth_verification_expires_at_idx` ON `auth_verification` (`expires_at`);--> statement-breakpoint
 CREATE INDEX `auth_verification_identifier_idx` ON `auth_verification` (`identifier`);--> statement-breakpoint
 CREATE TABLE `organization_service_token_agent` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`token_id` text CHECK ("token_id" = upper("token_id") AND length("token_id") = 26 AND "token_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`token_id` text CHECK ("token_id" = upper("token_id") AND length("token_id") = 26 AND substr("token_id", 1, 1) GLOB '[0-7]' AND "token_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL
 );
 --> statement-breakpoint
 CREATE INDEX `organization_service_token_agent_agent_idx` ON `organization_service_token_agent` (`organization_id`,`agent_id`);--> statement-breakpoint
@@ -211,11 +211,11 @@ CREATE UNIQUE INDEX `organization_service_token_agent_token_agent_idx` ON `organ
 CREATE TABLE `organization_service_token` (
 	`allow_attribution` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL,
-	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND "created_by_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND substr("created_by_account_id", 1, 1) GLOB '[0-7]' AND "created_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`label` text NOT NULL,
 	`last_used_at` integer,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`revoked_at` integer,
 	`token_hash` text NOT NULL,
 	`updated_at` integer NOT NULL
@@ -224,9 +224,9 @@ CREATE TABLE `organization_service_token` (
 CREATE INDEX `organization_service_token_organization_created_idx` ON `organization_service_token` (`organization_id`,`created_at`);--> statement-breakpoint
 CREATE UNIQUE INDEX `organization_service_token_hash_idx` ON `organization_service_token` (`token_hash`);--> statement-breakpoint
 CREATE TABLE `personal_access_token` (
-	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND "account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`label` text NOT NULL,
 	`last_used_at` integer,
 	`revoked_at` integer,
@@ -237,13 +237,13 @@ CREATE TABLE `personal_access_token` (
 CREATE INDEX `personal_access_token_account_created_idx` ON `personal_access_token` (`account_id`,`created_at`);--> statement-breakpoint
 CREATE UNIQUE INDEX `personal_access_token_hash_idx` ON `personal_access_token` (`token_hash`);--> statement-breakpoint
 CREATE TABLE `agent_channel_binding` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
 	`display_metadata_json` text DEFAULT '{}' NOT NULL,
-	`encrypted_creds_secret_id` text CHECK ("encrypted_creds_secret_id" = upper("encrypted_creds_secret_id") AND length("encrypted_creds_secret_id") = 26 AND "encrypted_creds_secret_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`encrypted_creds_secret_id` text CHECK ("encrypted_creds_secret_id" = upper("encrypted_creds_secret_id") AND length("encrypted_creds_secret_id") = 26 AND substr("encrypted_creds_secret_id", 1, 1) GLOB '[0-7]' AND "encrypted_creds_secret_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`external_bot_id` text NOT NULL,
 	`external_tenant_id` text NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`last_error_code` text,
 	`provider` text NOT NULL,
 	`status` text NOT NULL,
@@ -256,9 +256,9 @@ CREATE UNIQUE INDEX `agent_channel_binding_agent_provider_idx` ON `agent_channel
 CREATE UNIQUE INDEX `agent_channel_binding_provider_tenant_bot_idx` ON `agent_channel_binding` (`provider`,`external_tenant_id`,`external_bot_id`);--> statement-breakpoint
 CREATE INDEX `agent_channel_binding_agent_status_idx` ON `agent_channel_binding` (`agent_id`,`status`);--> statement-breakpoint
 CREATE TABLE `channel_runtime_state` (
-	`binding_id` text CHECK ("binding_id" = upper("binding_id") AND length("binding_id") = 26 AND "binding_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`binding_id` text CHECK ("binding_id" = upper("binding_id") AND length("binding_id") = 26 AND substr("binding_id", 1, 1) GLOB '[0-7]' AND "binding_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`last_error_code` text,
 	`last_heartbeat_at` integer,
 	`last_inbound_at` integer,
@@ -278,14 +278,14 @@ CREATE UNIQUE INDEX `channel_runtime_state_provider_binding_account_idx` ON `cha
 CREATE INDEX `channel_runtime_state_status_lease_idx` ON `channel_runtime_state` (`status`,`lease_expires_at`);--> statement-breakpoint
 CREATE INDEX `channel_runtime_state_binding_updated_idx` ON `channel_runtime_state` (`binding_id`,`updated_at`);--> statement-breakpoint
 CREATE TABLE `channel_event_receipt` (
-	`binding_id` text CHECK ("binding_id" = upper("binding_id") AND length("binding_id") = 26 AND "binding_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`binding_id` text CHECK ("binding_id" = upper("binding_id") AND length("binding_id") = 26 AND substr("binding_id", 1, 1) GLOB '[0-7]' AND "binding_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
 	`expires_at` integer NOT NULL,
 	`external_event_id` text NOT NULL,
 	`external_tenant_id` text NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`provider` text NOT NULL,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND "session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`binding_id`) REFERENCES `agent_channel_binding`(`id`) ON UPDATE no action ON DELETE cascade
 );
@@ -295,15 +295,15 @@ CREATE INDEX `channel_event_receipt_binding_updated_idx` ON `channel_event_recei
 CREATE INDEX `channel_event_receipt_expires_idx` ON `channel_event_receipt` (`expires_at`);--> statement-breakpoint
 CREATE TABLE `channel_final_delivery_job` (
 	`attempt_count` integer DEFAULT 0 NOT NULL,
-	`binding_id` text CHECK ("binding_id" = upper("binding_id") AND length("binding_id") = 26 AND "binding_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`binding_id` text CHECK ("binding_id" = upper("binding_id") AND length("binding_id") = 26 AND substr("binding_id", 1, 1) GLOB '[0-7]' AND "binding_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
 	`external_event_id` text NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`last_error_code` text,
 	`payload_json` text NOT NULL,
 	`provider` text NOT NULL,
-	`run_id` text CHECK ("run_id" = upper("run_id") AND length("run_id") = 26 AND "run_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND "session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`run_id` text CHECK ("run_id" = upper("run_id") AND length("run_id") = 26 AND substr("run_id", 1, 1) GLOB '[0-7]' AND "run_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`status` text NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`binding_id`) REFERENCES `agent_channel_binding`(`id`) ON UPDATE no action ON DELETE cascade,
@@ -315,12 +315,12 @@ CREATE UNIQUE INDEX `channel_final_delivery_provider_binding_event_idx` ON `chan
 CREATE INDEX `channel_final_delivery_session_idx` ON `channel_final_delivery_job` (`session_id`);--> statement-breakpoint
 CREATE INDEX `channel_final_delivery_run_idx` ON `channel_final_delivery_job` (`run_id`);--> statement-breakpoint
 CREATE TABLE `channel_thread_session` (
-	`binding_id` text CHECK ("binding_id" = upper("binding_id") AND length("binding_id") = 26 AND "binding_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`binding_id` text CHECK ("binding_id" = upper("binding_id") AND length("binding_id") = 26 AND substr("binding_id", 1, 1) GLOB '[0-7]' AND "binding_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
 	`external_thread_id` text NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`provider` text NOT NULL,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND "session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`binding_id`) REFERENCES `agent_channel_binding`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`session_id`) REFERENCES `session`(`id`) ON UPDATE no action ON DELETE cascade
@@ -329,19 +329,19 @@ CREATE TABLE `channel_thread_session` (
 CREATE UNIQUE INDEX `channel_thread_session_provider_binding_thread_idx` ON `channel_thread_session` (`provider`,`binding_id`,`external_thread_id`);--> statement-breakpoint
 CREATE INDEX `channel_thread_session_session_idx` ON `channel_thread_session` (`session_id`);--> statement-breakpoint
 CREATE TABLE `wechat_channel_account` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`base_url` text NOT NULL,
 	`created_at` integer NOT NULL,
 	`cursor` text,
-	`encrypted_creds_secret_id` text CHECK ("encrypted_creds_secret_id" = upper("encrypted_creds_secret_id") AND length("encrypted_creds_secret_id") = 26 AND "encrypted_creds_secret_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`encrypted_creds_secret_id` text CHECK ("encrypted_creds_secret_id" = upper("encrypted_creds_secret_id") AND length("encrypted_creds_secret_id") = 26 AND substr("encrypted_creds_secret_id", 1, 1) GLOB '[0-7]' AND "encrypted_creds_secret_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`external_account_id` text NOT NULL,
 	`external_bot_id` text NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`last_error_code` text,
 	`last_heartbeat_at` integer,
 	`last_inbound_at` integer,
 	`last_poll_at` integer,
-	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND "owner_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`runtime_state_json` text DEFAULT '{}' NOT NULL,
 	`status` text NOT NULL,
 	`status_changed_at` integer NOT NULL,
@@ -355,12 +355,12 @@ CREATE UNIQUE INDEX `wechat_channel_account_agent_idx` ON `wechat_channel_accoun
 CREATE UNIQUE INDEX `wechat_channel_account_external_idx` ON `wechat_channel_account` (`external_account_id`,`external_bot_id`);--> statement-breakpoint
 CREATE INDEX `wechat_channel_account_status_idx` ON `wechat_channel_account` (`status`,`updated_at`);--> statement-breakpoint
 CREATE TABLE `wechat_channel_pairing` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`consumed_at` integer,
 	`created_at` integer NOT NULL,
-	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND "created_by_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND substr("created_by_account_id", 1, 1) GLOB '[0-7]' AND "created_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`expires_at` integer NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`qr_token_hash` text NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`agent_id`) REFERENCES `agent`(`id`) ON UPDATE no action ON DELETE cascade,
@@ -371,12 +371,12 @@ CREATE UNIQUE INDEX `wechat_channel_pairing_qr_token_hash_idx` ON `wechat_channe
 CREATE INDEX `wechat_channel_pairing_agent_creator_idx` ON `wechat_channel_pairing` (`agent_id`,`created_by_account_id`,`consumed_at`);--> statement-breakpoint
 CREATE INDEX `wechat_channel_pairing_expires_idx` ON `wechat_channel_pairing` (`expires_at`);--> statement-breakpoint
 CREATE TABLE `wechat_context_token` (
-	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND "account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`context_token_key` text NOT NULL,
 	`created_at` integer NOT NULL,
-	`encrypted_context_token_secret_id` text CHECK ("encrypted_context_token_secret_id" = upper("encrypted_context_token_secret_id") AND length("encrypted_context_token_secret_id") = 26 AND "encrypted_context_token_secret_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`encrypted_context_token_secret_id` text CHECK ("encrypted_context_token_secret_id" = upper("encrypted_context_token_secret_id") AND length("encrypted_context_token_secret_id") = 26 AND substr("encrypted_context_token_secret_id", 1, 1) GLOB '[0-7]' AND "encrypted_context_token_secret_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`external_account_id` text NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`peer_id` text NOT NULL,
 	`to_user_id` text NOT NULL,
 	`updated_at` integer NOT NULL,
@@ -406,12 +406,12 @@ CREATE TABLE `environment_revision` (
 	`allow_package_managers` integer NOT NULL,
 	`allowed_hosts_json` text NOT NULL,
 	`created_at` integer NOT NULL,
-	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND "created_by_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND substr("created_by_account_id", 1, 1) GLOB '[0-7]' AND "created_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`env_vars_json` text NOT NULL,
-	`environment_id` text CHECK ("environment_id" = upper("environment_id") AND length("environment_id") = 26 AND "environment_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`environment_id` text CHECK ("environment_id" = upper("environment_id") AND length("environment_id") = 26 AND substr("environment_id", 1, 1) GLOB '[0-7]' AND "environment_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`network_policy` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`packages_json` text NOT NULL,
 	`setup_script` text NOT NULL,
 	CONSTRAINT "environment_revision_network_policy_check" CHECK("environment_revision"."network_policy" IN ('full', 'limited'))
@@ -421,15 +421,15 @@ CREATE INDEX `environment_revision_environment_created_at_idx` ON `environment_r
 CREATE INDEX `environment_revision_organization_created_at_idx` ON `environment_revision` (`organization_id`,`created_at`);--> statement-breakpoint
 CREATE TABLE `environment` (
 	`created_at` integer NOT NULL,
-	`current_revision_id` text CHECK ("current_revision_id" = upper("current_revision_id") AND length("current_revision_id") = 26 AND "current_revision_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`current_revision_id` text CHECK ("current_revision_id" = upper("current_revision_id") AND length("current_revision_id") = 26 AND substr("current_revision_id", 1, 1) GLOB '[0-7]' AND "current_revision_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`description` text NOT NULL,
-	`forked_from_environment_id` text CHECK ("forked_from_environment_id" = upper("forked_from_environment_id") AND length("forked_from_environment_id") = 26 AND "forked_from_environment_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`forked_from_environment_id` text CHECK ("forked_from_environment_id" = upper("forked_from_environment_id") AND length("forked_from_environment_id") = 26 AND substr("forked_from_environment_id", 1, 1) GLOB '[0-7]' AND "forked_from_environment_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`forked_from_environment_name` text,
 	`forked_from_owner_name` text,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND "owner_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
@@ -440,19 +440,19 @@ CREATE UNIQUE INDEX `environment_system_default_idx` ON `environment` (`organiza
 CREATE TABLE `file_record` (
 	`committed` integer NOT NULL,
 	`created_at` integer NOT NULL,
-	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND "created_by_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND substr("created_by_account_id", 1, 1) GLOB '[0-7]' AND "created_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`etag` text,
 	`expires_at` integer,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`mime_type` text,
 	`name` text NOT NULL,
 	`object_key` text NOT NULL,
-	`owner_id` text CHECK ("owner_id" = upper("owner_id") AND length("owner_id") = 26 AND "owner_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`owner_id` text CHECK ("owner_id" = upper("owner_id") AND length("owner_id") = 26 AND substr("owner_id", 1, 1) GLOB '[0-7]' AND "owner_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`owner_kind` text NOT NULL,
 	`parent_path` text NOT NULL,
 	`path` text NOT NULL,
 	`purpose` text NOT NULL,
-	`scope_id` text CHECK ("scope_id" = upper("scope_id") AND length("scope_id") = 26 AND "scope_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`scope_id` text CHECK ("scope_id" = upper("scope_id") AND length("scope_id") = 26 AND substr("scope_id", 1, 1) GLOB '[0-7]' AND "scope_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`scope_kind` text NOT NULL,
 	`session_kind` text,
 	`size` integer NOT NULL,
@@ -470,16 +470,16 @@ CREATE INDEX `file_record_listing_idx` ON `file_record` (`scope_kind`,`scope_id`
 CREATE TABLE `file_upload` (
 	`content_type` text NOT NULL,
 	`created_at` integer NOT NULL,
-	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND "created_by_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND substr("created_by_account_id", 1, 1) GLOB '[0-7]' AND "created_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`expected_size` integer NOT NULL,
 	`expires_at` integer NOT NULL,
-	`file_id` text CHECK ("file_id" = upper("file_id") AND length("file_id") = 26 AND "file_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`file_id` text CHECK ("file_id" = upper("file_id") AND length("file_id") = 26 AND substr("file_id", 1, 1) GLOB '[0-7]' AND "file_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`if_match_etag` text,
 	`multipart_upload_id` text,
 	`overwrite` integer NOT NULL,
 	`part_size` integer,
-	`scope_id` text CHECK ("scope_id" = upper("scope_id") AND length("scope_id") = 26 AND "scope_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`scope_id` text CHECK ("scope_id" = upper("scope_id") AND length("scope_id") = 26 AND substr("scope_id", 1, 1) GLOB '[0-7]' AND "scope_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`scope_kind` text NOT NULL,
 	`status` text NOT NULL,
 	`strategy` text NOT NULL,
@@ -492,9 +492,9 @@ CREATE TABLE `space_file_version` (
 	`committed` integer NOT NULL,
 	`committed_at` integer,
 	`created_at` integer NOT NULL,
-	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND "created_by_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`file_id` text CHECK ("file_id" = upper("file_id") AND length("file_id") = 26 AND "file_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND substr("created_by_account_id", 1, 1) GLOB '[0-7]' AND "created_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`file_id` text CHECK ("file_id" = upper("file_id") AND length("file_id") = 26 AND substr("file_id", 1, 1) GLOB '[0-7]' AND "file_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`mime_type` text,
 	`object_key` text NOT NULL,
 	`path` text NOT NULL,
@@ -502,7 +502,7 @@ CREATE TABLE `space_file_version` (
 	`size` integer NOT NULL,
 	`source_etag` text NOT NULL,
 	`source_object_key` text NOT NULL,
-	`space_id` text CHECK ("space_id" = upper("space_id") AND length("space_id") = 26 AND "space_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`space_id` text CHECK ("space_id" = upper("space_id") AND length("space_id") = 26 AND substr("space_id", 1, 1) GLOB '[0-7]' AND "space_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`version` integer NOT NULL
 );
 --> statement-breakpoint
@@ -511,12 +511,12 @@ CREATE INDEX `space_file_version_space_path_created_idx` ON `space_file_version`
 CREATE INDEX `space_file_version_file_created_idx` ON `space_file_version` (`file_id`,`created_at`);--> statement-breakpoint
 CREATE INDEX `space_file_version_pending_idx` ON `space_file_version` (`committed`,`created_at`) WHERE "space_file_version"."committed" = 0;--> statement-breakpoint
 CREATE TABLE `mcp_credential` (
-	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND "account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`auth_type` text NOT NULL,
 	`created_at` integer NOT NULL,
 	`expires_at` integer,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`last_refreshed_at` integer,
 	`oauth_client_id` text,
 	`oauth_client_secret_secret_id` text,
@@ -524,7 +524,7 @@ CREATE TABLE `mcp_credential` (
 	`scope` text NOT NULL,
 	`scope_values_json` text,
 	`secret_id` text NOT NULL,
-	`server_id` text CHECK ("server_id" = upper("server_id") AND length("server_id") = 26 AND "server_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`server_id` text CHECK ("server_id" = upper("server_id") AND length("server_id") = 26 AND substr("server_id", 1, 1) GLOB '[0-7]' AND "server_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`status` text NOT NULL,
 	`subject_label` text,
 	`updated_at` integer NOT NULL,
@@ -563,15 +563,15 @@ CREATE TABLE `mcp_oauth_flow` (
 	`created_at` integer NOT NULL,
 	`error_message` text,
 	`expires_at` integer NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
-	`initiator_account_id` text CHECK ("initiator_account_id" = upper("initiator_account_id") AND length("initiator_account_id") = 26 AND "initiator_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
+	`initiator_account_id` text CHECK ("initiator_account_id" = upper("initiator_account_id") AND length("initiator_account_id") = 26 AND substr("initiator_account_id", 1, 1) GLOB '[0-7]' AND "initiator_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`oauth_client_id` text NOT NULL,
 	`oauth_client_secret_secret_id` text,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`registration_endpoint` text,
 	`return_url` text,
 	`scope_values_json` text,
-	`server_id` text CHECK ("server_id" = upper("server_id") AND length("server_id") = 26 AND "server_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`server_id` text CHECK ("server_id" = upper("server_id") AND length("server_id") = 26 AND substr("server_id", 1, 1) GLOB '[0-7]' AND "server_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`status` text NOT NULL,
 	`subject_label` text,
 	`token_endpoint` text NOT NULL,
@@ -594,11 +594,11 @@ CREATE TABLE `mcp_server` (
 	`description` text,
 	`enabled` integer DEFAULT true NOT NULL,
 	`icon_url` text,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
 	`oauth_metadata_json` text,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND "owner_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`source` text NOT NULL,
 	`updated_at` integer NOT NULL,
 	`url` text NOT NULL,
@@ -621,7 +621,7 @@ CREATE TABLE `vault_secret` (
 	`ciphertext` text NOT NULL,
 	`ciphertext_iv` text NOT NULL,
 	`created_at` integer NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`kind` text NOT NULL,
 	`updated_at` integer NOT NULL,
 	`wrapped_dek` text NOT NULL,
@@ -631,13 +631,13 @@ CREATE TABLE `vault_secret` (
 CREATE INDEX `vault_secret_kind_created_at_idx` ON `vault_secret` (`kind`,`created_at`);--> statement-breakpoint
 CREATE TABLE `organization_access_request` (
 	`created_at` integer NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`referrer_account_id` text CHECK ("referrer_account_id" = upper("referrer_account_id") AND length("referrer_account_id") = 26 AND "referrer_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
-	`requested_by_account_id` text CHECK ("requested_by_account_id" = upper("requested_by_account_id") AND length("requested_by_account_id") = 26 AND "requested_by_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`referrer_account_id` text CHECK ("referrer_account_id" = upper("referrer_account_id") AND length("referrer_account_id") = 26 AND substr("referrer_account_id", 1, 1) GLOB '[0-7]' AND "referrer_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`requested_by_account_id` text CHECK ("requested_by_account_id" = upper("requested_by_account_id") AND length("requested_by_account_id") = 26 AND substr("requested_by_account_id", 1, 1) GLOB '[0-7]' AND "requested_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`requester_email` text NOT NULL,
 	`reviewed_at` integer,
-	`reviewed_by` text CHECK ("reviewed_by" = upper("reviewed_by") AND length("reviewed_by") = 26 AND "reviewed_by" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`reviewed_by` text CHECK ("reviewed_by" = upper("reviewed_by") AND length("reviewed_by") = 26 AND substr("reviewed_by", 1, 1) GLOB '[0-7]' AND "reviewed_by" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`status` text NOT NULL,
 	`updated_at` integer NOT NULL
 );
@@ -648,8 +648,8 @@ CREATE UNIQUE INDEX `organization_access_request_pending_account_idx` ON `organi
 CREATE TABLE `organization_domain` (
 	`created_at` integer NOT NULL,
 	`domain` text NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`status` text NOT NULL,
 	`updated_at` integer NOT NULL
 );
@@ -657,13 +657,13 @@ CREATE TABLE `organization_domain` (
 CREATE UNIQUE INDEX `organization_domain_domain_idx` ON `organization_domain` (`domain`);--> statement-breakpoint
 CREATE INDEX `organization_domain_organization_id_idx` ON `organization_domain` (`organization_id`);--> statement-breakpoint
 CREATE TABLE `organization_invitation` (
-	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND "account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`created_at` integer NOT NULL,
 	`email` text NOT NULL,
 	`expires_at` integer,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
-	`invited_by` text CHECK ("invited_by" = upper("invited_by") AND length("invited_by") = 26 AND "invited_by" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
+	`invited_by` text CHECK ("invited_by" = upper("invited_by") AND length("invited_by") = 26 AND substr("invited_by", 1, 1) GLOB '[0-7]' AND "invited_by" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`status` text NOT NULL,
 	`updated_at` integer NOT NULL
 );
@@ -672,12 +672,12 @@ CREATE INDEX `organization_invitation_organization_status_idx` ON `organization_
 CREATE INDEX `organization_invitation_email_status_created_idx` ON `organization_invitation` (`email`,`status`,`created_at`);--> statement-breakpoint
 CREATE UNIQUE INDEX `organization_invitation_pending_email_idx` ON `organization_invitation` (`organization_id`,`email`) WHERE "organization_invitation"."status" = 'pending';--> statement-breakpoint
 CREATE TABLE `organization_member` (
-	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND "account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
 	`disabled_at` integer,
-	`disabled_by_account_id` text CHECK ("disabled_by_account_id" = upper("disabled_by_account_id") AND length("disabled_by_account_id") = 26 AND "disabled_by_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`disabled_by_account_id` text CHECK ("disabled_by_account_id" = upper("disabled_by_account_id") AND length("disabled_by_account_id") = 26 AND substr("disabled_by_account_id", 1, 1) GLOB '[0-7]' AND "disabled_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`joined_at` integer NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`role` text NOT NULL,
 	PRIMARY KEY(`organization_id`, `account_id`)
 );
@@ -687,9 +687,9 @@ CREATE TABLE `organization` (
 	`byok_allowed_providers` text,
 	`byok_enabled` integer DEFAULT true NOT NULL,
 	`created_at` integer NOT NULL,
-	`creator_account_id` text CHECK ("creator_account_id" = upper("creator_account_id") AND length("creator_account_id") = 26 AND "creator_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
-	`default_environment_id` text CHECK ("default_environment_id" = upper("default_environment_id") AND length("default_environment_id") = 26 AND "default_environment_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`creator_account_id` text CHECK ("creator_account_id" = upper("creator_account_id") AND length("creator_account_id") = 26 AND substr("creator_account_id", 1, 1) GLOB '[0-7]' AND "creator_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`default_environment_id` text CHECK ("default_environment_id" = upper("default_environment_id") AND length("default_environment_id") = 26 AND substr("default_environment_id", 1, 1) GLOB '[0-7]' AND "default_environment_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`join_policy` text NOT NULL,
 	`name` text NOT NULL,
 	`primary_domain` text,
@@ -702,13 +702,13 @@ CREATE UNIQUE INDEX `organization_slug_idx` ON `organization` (`slug`);--> state
 CREATE TABLE `public_api_idempotency_key` (
 	`body_hash` text,
 	`created_at` integer NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`idempotency_key` text NOT NULL,
 	`method` text NOT NULL,
 	`response_json` text,
 	`response_status` integer,
 	`route` text NOT NULL,
-	`token_id` text CHECK ("token_id" = upper("token_id") AND length("token_id") = 26 AND "token_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`token_id` text CHECK ("token_id" = upper("token_id") AND length("token_id") = 26 AND substr("token_id", 1, 1) GLOB '[0-7]' AND "token_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
@@ -725,12 +725,12 @@ CREATE TABLE `public_api_rate_limit_window` (
 --> statement-breakpoint
 CREATE INDEX `public_api_rate_limit_window_updated_idx` ON `public_api_rate_limit_window` (`updated_at`);--> statement-breakpoint
 CREATE TABLE `resource_acl` (
-	`assigned_by_account_id` text CHECK ("assigned_by_account_id" = upper("assigned_by_account_id") AND length("assigned_by_account_id") = 26 AND "assigned_by_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`assigned_by_account_id` text CHECK ("assigned_by_account_id" = upper("assigned_by_account_id") AND length("assigned_by_account_id") = 26 AND substr("assigned_by_account_id", 1, 1) GLOB '[0-7]' AND "assigned_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`created_at` integer NOT NULL,
-	`resource_id` text CHECK ("resource_id" = upper("resource_id") AND length("resource_id") = 26 AND "resource_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`resource_id` text CHECK ("resource_id" = upper("resource_id") AND length("resource_id") = 26 AND substr("resource_id", 1, 1) GLOB '[0-7]' AND "resource_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`resource_type` text NOT NULL,
 	`role` text NOT NULL,
-	`target_id` text CHECK ("target_id" = upper("target_id") AND length("target_id") = 26 AND "target_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`target_id` text CHECK ("target_id" = upper("target_id") AND length("target_id") = 26 AND substr("target_id", 1, 1) GLOB '[0-7]' AND "target_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`target_kind` text NOT NULL,
 	PRIMARY KEY(`resource_type`, `resource_id`, `target_kind`, `target_id`),
 	CONSTRAINT "resource_acl_resource_type_check" CHECK("resource_acl"."resource_type" IN ('agent', 'environment', 'skill', 'space')),
@@ -743,10 +743,10 @@ CREATE TABLE `driver_command` (
 	`acked_at` integer,
 	`completed_at` integer,
 	`delivery_connection_id` text,
-	`driver_instance_id` text CHECK ("driver_instance_id" = upper("driver_instance_id") AND length("driver_instance_id") = 26 AND "driver_instance_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`driver_instance_id` text CHECK ("driver_instance_id" = upper("driver_instance_id") AND length("driver_instance_id") = 26 AND substr("driver_instance_id", 1, 1) GLOB '[0-7]' AND "driver_instance_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`error_json` text,
 	`expires_at` integer,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`issued_at` integer NOT NULL,
 	`kind` text NOT NULL,
 	`payload_json` text NOT NULL,
@@ -764,9 +764,9 @@ CREATE TABLE `driver_instance_mcp_grant` (
 	`can_invalidate` integer DEFAULT false NOT NULL,
 	`can_refresh` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL,
-	`credential_id` text CHECK ("credential_id" = upper("credential_id") AND length("credential_id") = 26 AND "credential_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
-	`driver_instance_id` text CHECK ("driver_instance_id" = upper("driver_instance_id") AND length("driver_instance_id") = 26 AND "driver_instance_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`server_id` text CHECK ("server_id" = upper("server_id") AND length("server_id") = 26 AND "server_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`credential_id` text CHECK ("credential_id" = upper("credential_id") AND length("credential_id") = 26 AND substr("credential_id", 1, 1) GLOB '[0-7]' AND "credential_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`driver_instance_id` text CHECK ("driver_instance_id" = upper("driver_instance_id") AND length("driver_instance_id") = 26 AND substr("driver_instance_id", 1, 1) GLOB '[0-7]' AND "driver_instance_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`server_id` text CHECK ("server_id" = upper("server_id") AND length("server_id") = 26 AND substr("server_id", 1, 1) GLOB '[0-7]' AND "server_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`driver_instance_id`) REFERENCES `driver_instance`(`id`) ON UPDATE no action ON DELETE cascade
 );
@@ -789,19 +789,19 @@ CREATE TABLE `driver_instance` (
 	`expires_at` integer NOT NULL,
 	`heartbeat_count` integer NOT NULL,
 	`generation` integer DEFAULT 0 NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`last_heartbeat_at` integer,
 	`process_id` text,
 	`protocol` text NOT NULL,
 	`protocol_version` integer NOT NULL,
 	`restart_count` integer DEFAULT 0 NOT NULL,
 	`runtime` text NOT NULL,
-	`sandbox_id` text CHECK ("sandbox_id" = upper("sandbox_id") AND length("sandbox_id") = 26 AND "sandbox_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`sandbox_session_id` text CHECK ("sandbox_session_id" = upper("sandbox_session_id") AND length("sandbox_session_id") = 26 AND "sandbox_session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`sandbox_id` text CHECK ("sandbox_id" = upper("sandbox_id") AND length("sandbox_id") = 26 AND substr("sandbox_id", 1, 1) GLOB '[0-7]' AND "sandbox_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`sandbox_session_id` text CHECK ("sandbox_session_id" = upper("sandbox_session_id") AND length("sandbox_session_id") = 26 AND substr("sandbox_session_id", 1, 1) GLOB '[0-7]' AND "sandbox_session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`status` text NOT NULL,
 	`status_changed_at` integer DEFAULT 0 NOT NULL,
 	`status_event` text DEFAULT 'driver.provision' NOT NULL,
-	`status_operation_id` text CHECK ("status_operation_id" = upper("status_operation_id") AND length("status_operation_id") = 26 AND "status_operation_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`status_operation_id` text CHECK ("status_operation_id" = upper("status_operation_id") AND length("status_operation_id") = 26 AND substr("status_operation_id", 1, 1) GLOB '[0-7]' AND "status_operation_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`status_seq` integer DEFAULT 0 NOT NULL,
 	`status_source` text DEFAULT 'system' NOT NULL,
 	`updated_at` integer NOT NULL,
@@ -818,10 +818,10 @@ CREATE UNIQUE INDEX `driver_instance_live_sandbox_session_idx` ON `driver_instan
 CREATE TABLE `native_resume_ref` (
 	`created_at` integer NOT NULL,
 	`kind` text NOT NULL,
-	`observed_driver_instance_id` text CHECK ("observed_driver_instance_id" = upper("observed_driver_instance_id") AND length("observed_driver_instance_id") = 26 AND "observed_driver_instance_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
-	`observed_session_run_id` text CHECK ("observed_session_run_id" = upper("observed_session_run_id") AND length("observed_session_run_id") = 26 AND "observed_session_run_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`observed_driver_instance_id` text CHECK ("observed_driver_instance_id" = upper("observed_driver_instance_id") AND length("observed_driver_instance_id") = 26 AND substr("observed_driver_instance_id", 1, 1) GLOB '[0-7]' AND "observed_driver_instance_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`observed_session_run_id` text CHECK ("observed_session_run_id" = upper("observed_session_run_id") AND length("observed_session_run_id") = 26 AND substr("observed_session_run_id", 1, 1) GLOB '[0-7]' AND "observed_session_run_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`runtime_id` text NOT NULL,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND "session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`updated_at` integer NOT NULL,
 	`value` text NOT NULL,
 	FOREIGN KEY (`session_id`) REFERENCES `session`(`id`) ON UPDATE no action ON DELETE cascade
@@ -832,9 +832,9 @@ CREATE TABLE `sandbox_backup` (
 	`created_at` integer NOT NULL,
 	`dir` text NOT NULL,
 	`error_message` text,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`keep` integer DEFAULT false NOT NULL,
-	`sandbox_id` text CHECK ("sandbox_id" = upper("sandbox_id") AND length("sandbox_id") = 26 AND "sandbox_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`sandbox_id` text CHECK ("sandbox_id" = upper("sandbox_id") AND length("sandbox_id") = 26 AND substr("sandbox_id", 1, 1) GLOB '[0-7]' AND "sandbox_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`status` text NOT NULL,
 	`ttl_seconds` integer NOT NULL,
 	`updated_at` integer NOT NULL
@@ -842,12 +842,12 @@ CREATE TABLE `sandbox_backup` (
 --> statement-breakpoint
 CREATE INDEX `sandbox_backup_sandbox_status_created_idx` ON `sandbox_backup` (`sandbox_id`,`status`,`created_at`);--> statement-breakpoint
 CREATE TABLE `sandbox_session` (
-	`cloudflare_session_id` text CHECK ("cloudflare_session_id" = upper("cloudflare_session_id") AND length("cloudflare_session_id") = 26 AND "cloudflare_session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`cloudflare_session_id` text CHECK ("cloudflare_session_id" = upper("cloudflare_session_id") AND length("cloudflare_session_id") = 26 AND substr("cloudflare_session_id", 1, 1) GLOB '[0-7]' AND "cloudflare_session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
 	`cwd` text NOT NULL,
 	`origin_json` text NOT NULL,
-	`sandbox_id` text CHECK ("sandbox_id" = upper("sandbox_id") AND length("sandbox_id") = 26 AND "sandbox_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND "session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`sandbox_id` text CHECK ("sandbox_id" = upper("sandbox_id") AND length("sandbox_id") = 26 AND substr("sandbox_id", 1, 1) GLOB '[0-7]' AND "sandbox_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`space_aliases_json` text NOT NULL,
 	`status` text NOT NULL,
 	`updated_at` integer NOT NULL,
@@ -862,20 +862,20 @@ CREATE TABLE `sandbox` (
 	`claim_owner` text,
 	`created_at` integer NOT NULL,
 	`global_mounts_json` text DEFAULT '[]' NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`inactive_deadline_at` integer,
 	`kind` text NOT NULL,
-	`last_backup_id` text CHECK ("last_backup_id" = upper("last_backup_id") AND length("last_backup_id") = 26 AND "last_backup_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`last_backup_id` text CHECK ("last_backup_id" = upper("last_backup_id") AND length("last_backup_id") = 26 AND substr("last_backup_id", 1, 1) GLOB '[0-7]' AND "last_backup_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`last_error` text,
 	`last_error_code` text,
-	`last_restore_backup_id` text CHECK ("last_restore_backup_id" = upper("last_restore_backup_id") AND length("last_restore_backup_id") = 26 AND "last_restore_backup_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`last_restore_backup_id` text CHECK ("last_restore_backup_id" = upper("last_restore_backup_id") AND length("last_restore_backup_id") = 26 AND substr("last_restore_backup_id", 1, 1) GLOB '[0-7]' AND "last_restore_backup_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`status` text NOT NULL,
 	`status_changed_at` integer DEFAULT 0 NOT NULL,
 	`status_event` text DEFAULT 'runtime_subject.cold' NOT NULL,
-	`status_operation_id` text CHECK ("status_operation_id" = upper("status_operation_id") AND length("status_operation_id") = 26 AND "status_operation_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`status_operation_id` text CHECK ("status_operation_id" = upper("status_operation_id") AND length("status_operation_id") = 26 AND substr("status_operation_id", 1, 1) GLOB '[0-7]' AND "status_operation_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`status_seq` integer DEFAULT 0 NOT NULL,
 	`status_source` text DEFAULT 'system' NOT NULL,
-	`subject_id` text CHECK ("subject_id" = upper("subject_id") AND length("subject_id") = 26 AND "subject_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`subject_id` text CHECK ("subject_id" = upper("subject_id") AND length("subject_id") = 26 AND substr("subject_id", 1, 1) GLOB '[0-7]' AND "subject_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`subject_kind` text NOT NULL,
 	`updated_at` integer NOT NULL,
 	CONSTRAINT "sandbox_status_check" CHECK("sandbox"."status" IN ('cold', 'restoring', 'active', 'backing_up', 'destroying', 'error')),
@@ -888,40 +888,40 @@ CREATE INDEX `sandbox_claim_idx` ON `sandbox` (`claim_expires_at`,`claim_owner`)
 CREATE TABLE `session_message` (
 	`content_text` text NOT NULL,
 	`created_at` integer NOT NULL,
-	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND "created_by_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND substr("created_by_account_id", 1, 1) GLOB '[0-7]' AND "created_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`plan_json` text,
 	`role` text NOT NULL,
 	`segments_json` text,
 	`seq` integer NOT NULL,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND "session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`session_run_id` text CHECK ("session_run_id" = upper("session_run_id") AND length("session_run_id") = 26 AND "session_run_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`session_run_id` text CHECK ("session_run_id" = upper("session_run_id") AND length("session_run_id") = 26 AND substr("session_run_id", 1, 1) GLOB '[0-7]' AND "session_run_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	FOREIGN KEY (`session_id`) REFERENCES `session`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `session_message_session_seq_idx` ON `session_message` (`session_id`,`seq`);--> statement-breakpoint
 CREATE INDEX `session_message_run_idx` ON `session_message` (`session_run_id`);--> statement-breakpoint
 CREATE TABLE `session` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`archived_at` integer,
-	`attributed_user_id` text CHECK ("attributed_user_id" = upper("attributed_user_id") AND length("attributed_user_id") = 26 AND "attributed_user_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`attributed_user_id` text CHECK ("attributed_user_id" = upper("attributed_user_id") AND length("attributed_user_id") = 26 AND substr("attributed_user_id", 1, 1) GLOB '[0-7]' AND "attributed_user_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`created_at` integer NOT NULL,
-	`creator_account_id` text CHECK ("creator_account_id" = upper("creator_account_id") AND length("creator_account_id") = 26 AND "creator_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`deployment_version_id` text CHECK ("deployment_version_id" = upper("deployment_version_id") AND length("deployment_version_id") = 26 AND "deployment_version_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`creator_account_id` text CHECK ("creator_account_id" = upper("creator_account_id") AND length("creator_account_id") = 26 AND substr("creator_account_id", 1, 1) GLOB '[0-7]' AND "creator_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`deployment_version_id` text CHECK ("deployment_version_id" = upper("deployment_version_id") AND length("deployment_version_id") = 26 AND substr("deployment_version_id", 1, 1) GLOB '[0-7]' AND "deployment_version_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`deployment_version_number` integer,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`kind` text NOT NULL,
 	`last_message_at` integer,
-	`last_run_id` text CHECK ("last_run_id" = upper("last_run_id") AND length("last_run_id") = 26 AND "last_run_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`last_run_id` text CHECK ("last_run_id" = upper("last_run_id") AND length("last_run_id") = 26 AND substr("last_run_id", 1, 1) GLOB '[0-7]' AND "last_run_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`message_seq_cursor` integer DEFAULT 0 NOT NULL,
 	`metadata_json` text DEFAULT '{}' NOT NULL,
 	`model` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`provider` text NOT NULL,
 	`renamed` integer NOT NULL,
 	`runtime_id` text NOT NULL,
 	`status` text NOT NULL,
-	`status_operation_id` text CHECK ("status_operation_id" = upper("status_operation_id") AND length("status_operation_id") = 26 AND "status_operation_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`status_operation_id` text CHECK ("status_operation_id" = upper("status_operation_id") AND length("status_operation_id") = 26 AND substr("status_operation_id", 1, 1) GLOB '[0-7]' AND "status_operation_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`status_seq` integer DEFAULT 0 NOT NULL,
 	`runtime_event_seq_cursor` integer DEFAULT 0 NOT NULL,
 	`title` text,
@@ -943,7 +943,7 @@ CREATE INDEX `session_organization_attributed_type_archived_updated_idx` ON `ses
 CREATE TABLE `session_execution_snapshot` (
 	`created_at` integer NOT NULL,
 	`plan_json` text NOT NULL,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND "session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	FOREIGN KEY (`session_id`) REFERENCES `session`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
@@ -953,10 +953,10 @@ CREATE TABLE `session_run_skill` (
 	`materialization_status` text NOT NULL,
 	`mount_path` text NOT NULL,
 	`resolution_mode` text NOT NULL,
-	`session_run_id` text CHECK ("session_run_id" = upper("session_run_id") AND length("session_run_id") = 26 AND "session_run_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`skill_id` text CHECK ("skill_id" = upper("skill_id") AND length("skill_id") = 26 AND "skill_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`session_run_id` text CHECK ("session_run_id" = upper("session_run_id") AND length("session_run_id") = 26 AND substr("session_run_id", 1, 1) GLOB '[0-7]' AND "session_run_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`skill_id` text CHECK ("skill_id" = upper("skill_id") AND length("skill_id") = 26 AND substr("skill_id", 1, 1) GLOB '[0-7]' AND "skill_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`skill_name` text NOT NULL,
-	`snapshot_id` text CHECK ("snapshot_id" = upper("snapshot_id") AND length("snapshot_id") = 26 AND "snapshot_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`snapshot_id` text CHECK ("snapshot_id" = upper("snapshot_id") AND length("snapshot_id") = 26 AND substr("snapshot_id", 1, 1) GLOB '[0-7]' AND "snapshot_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`updated_at` integer NOT NULL,
 	`warning_code` text,
 	PRIMARY KEY(`session_run_id`, `skill_id`),
@@ -965,26 +965,26 @@ CREATE TABLE `session_run_skill` (
 --> statement-breakpoint
 CREATE INDEX `session_run_skill_run_resolution_idx` ON `session_run_skill` (`session_run_id`,`resolution_mode`);--> statement-breakpoint
 CREATE TABLE `session_run` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`completed_at` integer,
 	`created_at` integer NOT NULL,
-	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND "created_by_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`deployment_version_id` text CHECK ("deployment_version_id" = upper("deployment_version_id") AND length("deployment_version_id") = 26 AND "deployment_version_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND substr("created_by_account_id", 1, 1) GLOB '[0-7]' AND "created_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`deployment_version_id` text CHECK ("deployment_version_id" = upper("deployment_version_id") AND length("deployment_version_id") = 26 AND substr("deployment_version_id", 1, 1) GLOB '[0-7]' AND "deployment_version_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`deployment_version_number` integer,
-	`driver_instance_id` text CHECK ("driver_instance_id" = upper("driver_instance_id") AND length("driver_instance_id") = 26 AND "driver_instance_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`driver_instance_id` text CHECK ("driver_instance_id" = upper("driver_instance_id") AND length("driver_instance_id") = 26 AND substr("driver_instance_id", 1, 1) GLOB '[0-7]' AND "driver_instance_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`error_code` text,
 	`error_details_json` text,
 	`error_message` text,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`model` text,
 	`provider` text,
 	`runtime_id` text,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND "session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`started_at` integer,
 	`status` text NOT NULL,
 	`status_changed_at` integer DEFAULT 0 NOT NULL,
 	`status_event` text DEFAULT 'run.queue' NOT NULL,
-	`status_operation_id` text CHECK ("status_operation_id" = upper("status_operation_id") AND length("status_operation_id") = 26 AND "status_operation_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`status_operation_id` text CHECK ("status_operation_id" = upper("status_operation_id") AND length("status_operation_id") = 26 AND substr("status_operation_id", 1, 1) GLOB '[0-7]' AND "status_operation_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`status_seq` integer DEFAULT 0 NOT NULL,
 	`status_source` text DEFAULT 'system' NOT NULL,
 	`trace_id` text NOT NULL,
@@ -1000,19 +1000,19 @@ CREATE UNIQUE INDEX `session_run_active_driver_lease_idx` ON `session_run` (`dri
 CREATE INDEX `session_run_session_created_at_idx` ON `session_run` (`session_id`,`created_at`);--> statement-breakpoint
 CREATE INDEX `session_run_session_status_idx` ON `session_run` (`session_id`,`status`);--> statement-breakpoint
 CREATE TABLE `session_event` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`content_text` text NOT NULL,
 	`created_at` integer NOT NULL,
 	`ended_at` integer NOT NULL,
 	`event_type` text NOT NULL,
 	`family` text NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`occurred_at` integer NOT NULL,
 	`process_status` text NOT NULL,
 	`process_type` text NOT NULL,
-	`run_id` text CHECK ("run_id" = upper("run_id") AND length("run_id") = 26 AND "run_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`run_id` text CHECK ("run_id" = upper("run_id") AND length("run_id") = 26 AND substr("run_id", 1, 1) GLOB '[0-7]' AND "run_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`seq` integer NOT NULL,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND "session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`source_event_id` text NOT NULL,
 	`source` text NOT NULL,
 	`tokens` integer,
@@ -1034,18 +1034,18 @@ CREATE TABLE `session_model_call` (
 	`completed_at` integer,
 	`cost_currency` text,
 	`created_at` integer NOT NULL,
-	`driver_instance_id` text CHECK ("driver_instance_id" = upper("driver_instance_id") AND length("driver_instance_id") = 26 AND "driver_instance_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`driver_instance_id` text CHECK ("driver_instance_id" = upper("driver_instance_id") AND length("driver_instance_id") = 26 AND substr("driver_instance_id", 1, 1) GLOB '[0-7]' AND "driver_instance_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`error_code` text,
 	`error_message` text,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`input_tokens` integer,
 	`metadata_json` text,
 	`model` text NOT NULL,
 	`native_call_id` text,
 	`output_tokens` integer,
 	`provider` text NOT NULL,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND "session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`session_run_id` text CHECK ("session_run_id" = upper("session_run_id") AND length("session_run_id") = 26 AND "session_run_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`session_run_id` text CHECK ("session_run_id" = upper("session_run_id") AND length("session_run_id") = 26 AND substr("session_run_id", 1, 1) GLOB '[0-7]' AND "session_run_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`started_at` integer,
 	`status` text NOT NULL,
 	`total_cost_usd_micros` integer,
@@ -1061,11 +1061,11 @@ CREATE UNIQUE INDEX `session_model_call_run_key_idx` ON `session_model_call` (`s
 CREATE UNIQUE INDEX `session_model_call_native_idx` ON `session_model_call` (`driver_instance_id`,`native_call_id`);--> statement-breakpoint
 CREATE TABLE `session_permission_request` (
 	`created_at` integer NOT NULL,
-	`driver_instance_id` text CHECK ("driver_instance_id" = upper("driver_instance_id") AND length("driver_instance_id") = 26 AND "driver_instance_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`driver_instance_id` text CHECK ("driver_instance_id" = upper("driver_instance_id") AND length("driver_instance_id") = 26 AND substr("driver_instance_id", 1, 1) GLOB '[0-7]' AND "driver_instance_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`raw_input` text,
 	`request_id` text NOT NULL,
-	`run_id` text CHECK ("run_id" = upper("run_id") AND length("run_id") = 26 AND "run_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND "session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`run_id` text CHECK ("run_id" = upper("run_id") AND length("run_id") = 26 AND substr("run_id", 1, 1) GLOB '[0-7]' AND "run_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`title` text NOT NULL,
 	`tool_call_id` text,
 	`tool_kind` text,
@@ -1077,16 +1077,16 @@ CREATE TABLE `session_permission_request` (
 CREATE INDEX `session_permission_request_run_idx` ON `session_permission_request` (`session_id`,`run_id`);--> statement-breakpoint
 CREATE TABLE `session_readiness_snapshot` (
 	`readiness_json` text NOT NULL,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND "session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`session_id`) REFERENCES `session`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE TABLE `session_thread_ui_state` (
-	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND "account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`pinned` integer DEFAULT false NOT NULL,
 	`read_at` integer,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND "session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`updated_at` integer NOT NULL,
 	PRIMARY KEY(`account_id`, `session_id`),
 	FOREIGN KEY (`session_id`) REFERENCES `session`(`id`) ON UPDATE no action ON DELETE cascade
@@ -1095,10 +1095,10 @@ CREATE TABLE `session_thread_ui_state` (
 CREATE INDEX `session_thread_ui_state_account_updated_idx` ON `session_thread_ui_state` (`account_id`,`updated_at`,`session_id`);--> statement-breakpoint
 CREATE INDEX `session_thread_ui_state_session_idx` ON `session_thread_ui_state` (`session_id`);--> statement-breakpoint
 CREATE TABLE `skill_preference` (
-	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND "account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`auto_enabled` integer NOT NULL,
 	`created_at` integer NOT NULL,
-	`skill_id` text CHECK ("skill_id" = upper("skill_id") AND length("skill_id") = 26 AND "skill_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`skill_id` text CHECK ("skill_id" = upper("skill_id") AND length("skill_id") = 26 AND substr("skill_id", 1, 1) GLOB '[0-7]' AND "skill_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`updated_at` integer NOT NULL,
 	PRIMARY KEY(`skill_id`, `account_id`)
 );
@@ -1110,7 +1110,7 @@ CREATE TABLE `skill_snapshot_entry` (
 	`path` text NOT NULL,
 	`sha256` text,
 	`size` integer NOT NULL,
-	`snapshot_id` text CHECK ("snapshot_id" = upper("snapshot_id") AND length("snapshot_id") = 26 AND "snapshot_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`snapshot_id` text CHECK ("snapshot_id" = upper("snapshot_id") AND length("snapshot_id") = 26 AND substr("snapshot_id", 1, 1) GLOB '[0-7]' AND "snapshot_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	PRIMARY KEY(`snapshot_id`, `path`)
 );
 --> statement-breakpoint
@@ -1121,9 +1121,9 @@ CREATE TABLE `skill_snapshot` (
 	`blob_size` integer NOT NULL,
 	`created_at` integer NOT NULL,
 	`description` text NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`skill_markdown_path` text NOT NULL,
 	`uncompressed_size` integer NOT NULL,
 	`version` text
@@ -1134,15 +1134,15 @@ CREATE UNIQUE INDEX `skill_snapshot_blob_sha256_idx` ON `skill_snapshot` (`organ
 CREATE TABLE `skill` (
 	`author` text NOT NULL,
 	`created_at` integer NOT NULL,
-	`current_snapshot_id` text CHECK ("current_snapshot_id" = upper("current_snapshot_id") AND length("current_snapshot_id") = 26 AND "current_snapshot_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`current_snapshot_id` text CHECK ("current_snapshot_id" = upper("current_snapshot_id") AND length("current_snapshot_id") = 26 AND substr("current_snapshot_id", 1, 1) GLOB '[0-7]' AND "current_snapshot_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`description` text NOT NULL,
 	`forked_from_owner_name` text,
-	`forked_from_skill_id` text CHECK ("forked_from_skill_id" = upper("forked_from_skill_id") AND length("forked_from_skill_id") = 26 AND "forked_from_skill_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`forked_from_skill_id` text CHECK ("forked_from_skill_id" = upper("forked_from_skill_id") AND length("forked_from_skill_id") = 26 AND substr("forked_from_skill_id", 1, 1) GLOB '[0-7]' AND "forked_from_skill_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`forked_from_skill_name` text,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND "owner_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`source_kind` text NOT NULL,
 	`updated_at` integer NOT NULL,
 	`version` text
@@ -1152,12 +1152,12 @@ CREATE INDEX `skill_organization_updated_at_idx` ON `skill` (`organization_id`,`
 CREATE INDEX `skill_owner_account_updated_at_idx` ON `skill` (`owner_account_id`,`updated_at`);--> statement-breakpoint
 CREATE TABLE `space_directory` (
 	`created_at` integer NOT NULL,
-	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND "created_by_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND substr("created_by_account_id", 1, 1) GLOB '[0-7]' AND "created_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
 	`parent_path` text NOT NULL,
 	`path` text NOT NULL,
-	`space_id` text CHECK ("space_id" = upper("space_id") AND length("space_id") = 26 AND "space_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`space_id` text CHECK ("space_id" = upper("space_id") AND length("space_id") = 26 AND substr("space_id", 1, 1) GLOB '[0-7]' AND "space_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
@@ -1165,10 +1165,10 @@ CREATE UNIQUE INDEX `space_directory_path_idx` ON `space_directory` (`space_id`,
 CREATE INDEX `space_directory_listing_idx` ON `space_directory` (`space_id`,`parent_path`,lower("name"));--> statement-breakpoint
 CREATE TABLE `space` (
 	`created_at` integer NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND "owner_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`updated_at` integer NOT NULL,
 	`visibility` text NOT NULL
 );
@@ -1179,9 +1179,9 @@ CREATE TABLE `account` (
 	`created_at` integer NOT NULL,
 	`email` text NOT NULL,
 	`email_verified` integer NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`image_url` text,
-	`last_active_organization_id` text CHECK ("last_active_organization_id" = upper("last_active_organization_id") AND length("last_active_organization_id") = 26 AND "last_active_organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`last_active_organization_id` text CHECK ("last_active_organization_id" = upper("last_active_organization_id") AND length("last_active_organization_id") = 26 AND substr("last_active_organization_id", 1, 1) GLOB '[0-7]' AND "last_active_organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`name` text NOT NULL,
 	`system_agent_model` text,
 	`updated_at` integer NOT NULL
@@ -1190,16 +1190,16 @@ CREATE TABLE `account` (
 CREATE UNIQUE INDEX `account_email_idx` ON `account` (`email`);--> statement-breakpoint
 CREATE INDEX `account_last_active_organization_idx` ON `account` (`last_active_organization_id`);--> statement-breakpoint
 CREATE TABLE `usage_daily_rollup` (
-	`actor_user_id` text CHECK ("actor_user_id" = upper("actor_user_id") AND length("actor_user_id") = 26 AND "actor_user_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`agent_owner_user_id` text CHECK ("agent_owner_user_id" = upper("agent_owner_user_id") AND length("agent_owner_user_id") = 26 AND "agent_owner_user_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`actor_user_id` text CHECK ("actor_user_id" = upper("actor_user_id") AND length("actor_user_id") = 26 AND substr("actor_user_id", 1, 1) GLOB '[0-7]' AND "actor_user_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`agent_owner_user_id` text CHECK ("agent_owner_user_id" = upper("agent_owner_user_id") AND length("agent_owner_user_id") = 26 AND substr("agent_owner_user_id", 1, 1) GLOB '[0-7]' AND "agent_owner_user_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`agent_publication_state_at_run` text NOT NULL,
 	`cache_creation_tokens` integer NOT NULL,
 	`cache_read_tokens` integer NOT NULL,
 	`date` text NOT NULL,
 	`input_tokens` integer NOT NULL,
 	`model` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`output_tokens` integer NOT NULL,
 	`provider` text NOT NULL,
 	`request_count` integer NOT NULL,
@@ -1214,26 +1214,26 @@ CREATE INDEX `usage_daily_rollup_agent_date_idx` ON `usage_daily_rollup` (`agent
 CREATE INDEX `usage_daily_rollup_actor_date_idx` ON `usage_daily_rollup` (`actor_user_id`,`date`);--> statement-breakpoint
 CREATE INDEX `usage_daily_rollup_owner_date_idx` ON `usage_daily_rollup` (`agent_owner_user_id`,`date`);--> statement-breakpoint
 CREATE TABLE `usage_event` (
-	`actor_user_id` text CHECK ("actor_user_id" = upper("actor_user_id") AND length("actor_user_id") = 26 AND "actor_user_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND "agent_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`agent_owner_user_id` text CHECK ("agent_owner_user_id" = upper("agent_owner_user_id") AND length("agent_owner_user_id") = 26 AND "agent_owner_user_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`actor_user_id` text CHECK ("actor_user_id" = upper("actor_user_id") AND length("actor_user_id") = 26 AND substr("actor_user_id", 1, 1) GLOB '[0-7]' AND "actor_user_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`agent_owner_user_id` text CHECK ("agent_owner_user_id" = upper("agent_owner_user_id") AND length("agent_owner_user_id") = 26 AND substr("agent_owner_user_id", 1, 1) GLOB '[0-7]' AND "agent_owner_user_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`agent_publication_state_at_run` text NOT NULL,
-	`agent_revision_id` text CHECK ("agent_revision_id" = upper("agent_revision_id") AND length("agent_revision_id") = 26 AND "agent_revision_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`agent_revision_id` text CHECK ("agent_revision_id" = upper("agent_revision_id") AND length("agent_revision_id") = 26 AND substr("agent_revision_id", 1, 1) GLOB '[0-7]' AND "agent_revision_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`cache_creation_tokens` integer NOT NULL,
 	`cache_read_tokens` integer NOT NULL,
 	`created_at` integer NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`input_tokens` integer NOT NULL,
 	`model` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`output_tokens` integer NOT NULL,
 	`price_snapshot_json` text,
 	`pricing_status` text NOT NULL,
 	`provider` text NOT NULL,
 	`run_purpose` text NOT NULL,
 	`runtime_id` text,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND "session_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
-	`session_run_id` text CHECK ("session_run_id" = upper("session_run_id") AND length("session_run_id") = 26 AND "session_run_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`session_run_id` text CHECK ("session_run_id" = upper("session_run_id") AND length("session_run_id") = 26 AND substr("session_run_id", 1, 1) GLOB '[0-7]' AND "session_run_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`source` text NOT NULL,
 	`source_event_id` text NOT NULL,
 	`total_cost_usd_micros` integer NOT NULL,
@@ -1248,15 +1248,15 @@ CREATE INDEX `usage_event_session_run_idx` ON `usage_event` (`session_run_id`);-
 CREATE UNIQUE INDEX `usage_event_source_event_idx` ON `usage_event` (`source`,`source_event_id`);--> statement-breakpoint
 CREATE TABLE `vendor_credential` (
 	`api_base` text,
-	`api_key_secret_id` text CHECK ("api_key_secret_id" = upper("api_key_secret_id") AND length("api_key_secret_id") = 26 AND "api_key_secret_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
+	`api_key_secret_id` text CHECK ("api_key_secret_id" = upper("api_key_secret_id") AND length("api_key_secret_id") = 26 AND substr("api_key_secret_id", 1, 1) GLOB '[0-7]' AND "api_key_secret_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND "id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') PRIMARY KEY NOT NULL,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`is_default` integer DEFAULT false NOT NULL,
 	`is_preferred` integer DEFAULT false NOT NULL,
 	`models` text,
 	`name` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND "organization_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]') NOT NULL,
-	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND "owner_account_id" GLOB '[0-7][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z][0-9A-HJKMNP-TV-Z]'),
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`updated_at` integer NOT NULL,
 	`vendor_id` text NOT NULL
 );
