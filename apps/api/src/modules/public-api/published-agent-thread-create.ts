@@ -13,6 +13,7 @@ import { admitPublishedThreadCreator } from "./published-agent-thread-admission"
 import type { ThreadCreationAdmission } from "./published-agent-thread-admission";
 import { createPublicApiThreadMetadata } from "./published-agent-thread-metadata";
 import {
+  toCreateEmptyThreadSessionSummary,
   toCreateThreadResponse,
   toCreateThreadSessionSummary,
 } from "./published-agent-thread-presenter";
@@ -97,6 +98,15 @@ export async function createPublishedAgentThread(
       sessionId,
       viewer: admission.fileViewer,
     });
+
+    if (request.input.inputText === undefined) {
+      return toCreateThreadResponse({
+        attributedUserId: admission.attributedUserId,
+        metadata,
+        run: null,
+        session: toCreateEmptyThreadSessionSummary(session),
+      });
+    }
 
     const queuedRun = await queueSessionRun({
       bindings: request.bindings,

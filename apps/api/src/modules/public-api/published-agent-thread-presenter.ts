@@ -69,10 +69,16 @@ export function toCreateThreadSessionSummary(input: {
   });
 }
 
+export function toCreateEmptyThreadSessionSummary(
+  session: SessionSummary,
+): PublishedSessionProjection {
+  return toPublishedSessionSummary(session);
+}
+
 export function toCreateThreadResponse(input: {
   attributedUserId: AccountId | null;
   metadata: PublicApiThreadMetadata;
-  run: SessionRunSummary;
+  run: SessionRunSummary | null;
   session: PublishedSessionProjection;
 }): PublishedAgentCreateThreadResponse {
   return {

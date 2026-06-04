@@ -15,45 +15,45 @@ export const VARIANT_TONE: Record<
   { bar: string; chip: string; swatch: string }
 > = {
   Agent: {
-    bar: "bg-purple-300",
-    chip: "bg-purple-100 text-purple-800 border-purple-200",
-    swatch: "bg-purple-300",
+    bar: "bg-green-500",
+    chip: "border-green-200 bg-green-50 text-green-800",
+    swatch: "bg-green-500",
   },
   exec_command: {
-    bar: "bg-emerald-300",
-    chip: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    swatch: "bg-emerald-300",
+    bar: "bg-green-600",
+    chip: "border-green-200 bg-green-50 text-green-800",
+    swatch: "bg-green-600",
   },
   Read: {
-    bar: "bg-teal-300",
-    chip: "bg-teal-100 text-teal-800 border-teal-200",
-    swatch: "bg-teal-300",
+    bar: "bg-ink-300",
+    chip: "border-ink-100 bg-ink-50 text-ink-700",
+    swatch: "bg-ink-300",
   },
   Tool: {
-    bar: "bg-slate-300",
-    chip: "bg-slate-100 text-slate-700 border-slate-200",
-    swatch: "bg-slate-300",
+    bar: "bg-amber",
+    chip: "border-amber/30 bg-amber-bg text-amber-fg",
+    swatch: "bg-amber",
   },
   "Web Fetch": {
-    bar: "bg-sky-300",
-    chip: "bg-sky-100 text-sky-800 border-sky-200",
-    swatch: "bg-sky-300",
+    bar: "bg-sky",
+    chip: "border-sky/30 bg-sky-bg text-sky-fg",
+    swatch: "bg-sky",
   },
   "Web Search": {
-    bar: "bg-amber-300",
-    chip: "bg-amber-100 text-amber-800 border-amber-200",
-    swatch: "bg-amber-300",
+    bar: "bg-sky/70",
+    chip: "border-sky/25 bg-sky-bg text-sky-fg",
+    swatch: "bg-sky/70",
   },
   Write: {
-    bar: "bg-orange-300",
-    chip: "bg-orange-100 text-orange-800 border-orange-200",
-    swatch: "bg-orange-300",
+    bar: "bg-soil",
+    chip: "border-soil/25 bg-soil-bg text-soil-fg",
+    swatch: "bg-soil",
   },
 };
 
 export function statusChipClassName(status: ThreadProcessEvent["status"]): string | null {
   if (status === "error") {
-    return "border-destructive/20 bg-destructive/[0.06] text-destructive";
+    return "border-ember/25 bg-ember-bg text-ember-fg";
   }
 
   if (status === "unsupported") {

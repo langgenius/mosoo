@@ -59,7 +59,7 @@ export function DomainFilterBar({
           className={cn(
             "inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11.5px] font-semibold transition-colors",
             errorsOnly
-              ? "border-amber-200 bg-amber-50 text-amber-800"
+              ? "border-amber/30 bg-amber-bg text-amber-fg"
               : "border-border bg-card text-fg-3 hover:bg-muted/50",
           )}
         >

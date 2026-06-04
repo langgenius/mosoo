@@ -375,6 +375,25 @@ export async function runPublishedApiThreadReadJson<T>(
   }
 }
 
+export async function runPublishedApiThreadReadResponse(
+  c: PublishedApiRouteContext,
+  input: {
+    operation: (
+      input: PublishedApiThreadOperation & { threadId: PublicThreadId },
+    ) => Promise<Response>;
+    threadId: RouteValue<PublicThreadId>;
+  },
+): Promise<Response> {
+  try {
+    const caller = await requireRateLimitedPublicApiCaller(c);
+    const threadId = resolveRequiredRouteValue(input.threadId);
+
+    return await input.operation({ caller, threadId });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
 export async function runPublishedApiThreadMutation<T, Prepared = undefined>(
   c: PublishedApiRouteContext,
   input: {

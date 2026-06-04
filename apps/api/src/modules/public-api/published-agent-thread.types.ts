@@ -6,7 +6,7 @@ import type { PublicApiCaller } from "../auth/application/public-api-caller.serv
 export interface CreatePublishedAgentThreadInput {
   clientExternalRef?: string | undefined;
   fileIds: FileId[];
-  inputText: string;
+  inputText?: string | undefined;
 }
 
 export interface CreatePublishedAgentThreadRequest {
@@ -29,4 +29,8 @@ export interface ListPublishedAgentThreadEventsRequest {
   database: D1Database;
   limit: number;
   threadId: PublicThreadId;
+}
+
+export interface StreamPublishedAgentThreadEventsRequest extends ListPublishedAgentThreadEventsRequest {
+  signal?: AbortSignal | null | undefined;
 }

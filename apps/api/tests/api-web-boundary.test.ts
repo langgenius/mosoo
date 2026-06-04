@@ -83,10 +83,28 @@ describe("API to web boundary", () => {
       "/threads/{threadId}",
       "/threads/{threadId}/archive",
       "/threads/{threadId}/events",
+      "/threads/{threadId}/events/stream",
       "/threads/{threadId}/files",
       "/threads/{threadId}/files/{fileId}",
       "/threads/{threadId}/unarchive",
     ]);
+
+    const createThreadSchema = document.components.schemas.CreateThreadRequest;
+    expect(createThreadSchema.required).not.toContain("input");
+    const createThreadResponseProperties = openApiSchemaProperties("CreateThreadResponse");
+    expect(createThreadResponseProperties["run"]).toEqual({
+      oneOf: [{ $ref: "#/components/schemas/RunSummary" }, { type: "null" }],
+    });
+
+    const eventStreamResponse =
+      document.paths["/threads/{threadId}/events/stream"]?.get?.responses["200"];
+    expect(eventStreamResponse).toMatchObject({
+      content: {
+        "text/event-stream": {
+          schema: { type: "string" },
+        },
+      },
+    });
 
     const errorCodeSchema =
       document.components.schemas.ErrorResponse.properties.error.properties.code;
@@ -164,6 +182,26 @@ describe("API to web boundary", () => {
   });
 
   test("parses the Public Thread API create-work body shape", async () => {
+    await expect(
+      readCreateThreadRequest({
+        req: {
+          raw: new Request(
+            `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
+            {
+              body: JSON.stringify({
+                client_external_ref: "empty-thread-draft",
+              }),
+              headers: { "Content-Type": "application/json" },
+              method: "POST",
+            },
+          ),
+        },
+      }),
+    ).resolves.toEqual({
+      clientExternalRef: "empty-thread-draft",
+      fileIds: [],
+    });
+
     await expect(
       readCreateThreadRequest({
         req: {
@@ -288,7 +326,11 @@ describe("API to web boundary", () => {
         },
       });
 
-      expect(parsed.inputText.length).toBeGreaterThan(0);
+      if (name === "emptyThread") {
+        expect(parsed.inputText).toBeUndefined();
+      } else {
+        expect(parsed.inputText?.length).toBeGreaterThan(0);
+      }
       expect(Array.isArray(parsed.fileIds)).toBe(true);
       hasFileExample ||= (parsed.fileIds?.length ?? 0) > 0;
     }

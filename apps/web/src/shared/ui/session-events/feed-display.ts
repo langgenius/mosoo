@@ -30,10 +30,10 @@ export function statusClassName(status: SessionProcessEvent["status"]): string {
       return "border-border bg-muted/40 text-fg-3";
     }
     case "error": {
-      return "border-destructive/20 bg-destructive/[0.06] text-destructive";
+      return "border-ember/25 bg-ember-bg text-ember-fg";
     }
     case "unsupported": {
-      return "border-amber-200 bg-amber/15 text-[#8a6318]";
+      return "border-amber/30 bg-amber-bg text-amber-fg";
     }
   }
 }
@@ -41,22 +41,22 @@ export function statusClassName(status: SessionProcessEvent["status"]): string {
 export function turnStatusClassName(status: SessionTurnStatus): string {
   switch (status) {
     case "completed": {
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+      return "border-green-200 bg-green-50 text-green-800";
     }
     case "failed": {
-      return "border-destructive/20 bg-destructive/[0.06] text-destructive";
+      return "border-ember/25 bg-ember-bg text-ember-fg";
     }
     case "pending": {
       return "border-border bg-muted/50 text-fg-3";
     }
     case "rescheduling": {
-      return "border-amber-200 bg-amber/15 text-[#8a6318]";
+      return "border-amber/30 bg-amber-bg text-amber-fg";
     }
     case "running": {
-      return "border-sky-200 bg-sky-50 text-sky-700";
+      return "border-sky/30 bg-sky-bg text-sky-fg";
     }
     case "terminated": {
-      return "border-destructive/20 bg-destructive/[0.06] text-destructive";
+      return "border-ember/25 bg-ember-bg text-ember-fg";
     }
   }
 }

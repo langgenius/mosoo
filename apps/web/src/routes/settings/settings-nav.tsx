@@ -1,6 +1,15 @@
 import { Permission, can } from "@mosoo/contracts/permission";
 import type { LucideIcon } from "lucide-react";
-import { BarChart3, Bot, Building2, KeyRound, SlidersHorizontal, User, Users } from "lucide-react";
+import {
+  BarChart3,
+  Bot,
+  Box,
+  Building2,
+  KeyRound,
+  SlidersHorizontal,
+  User,
+  Users,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { cn } from "@/shared/lib/class-names";
@@ -39,6 +48,12 @@ const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
         path: "/settings/general",
       },
       { icon: Users, label: "Members", path: "/settings/members" },
+      {
+        adminOnly: true,
+        icon: Box,
+        label: "Environments",
+        path: "/settings/environments",
+      },
       {
         adminOnly: true,
         icon: SlidersHorizontal,

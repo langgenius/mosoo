@@ -142,7 +142,7 @@ export interface PublishedThreadLinks {
 
 export interface PublishedAgentCreateThreadResponse {
   links: PublishedThreadLinks;
-  run: PublishedRunSummary;
+  run: PublishedRunSummary | null;
   thread: PublishedThreadSummary;
 }
 

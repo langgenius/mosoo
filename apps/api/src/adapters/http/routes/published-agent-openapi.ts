@@ -157,6 +157,7 @@ function jsonRequestBody(schema: Record<string, unknown>, example?: unknown) {
 function jsonRequestBodyExamples(
   schema: Record<string, unknown>,
   examples: Record<string, { summary: string; value: unknown }>,
+  options: { required?: boolean } = {},
 ) {
   return {
     content: {
@@ -165,7 +166,7 @@ function jsonRequestBodyExamples(
         schema,
       },
     },
-    required: true,
+    required: options.required ?? true,
   };
 }
 
@@ -191,6 +192,19 @@ function idempotentJsonResponse(description: string, schema: Record<string, unkn
         schema: { const: "true", type: "string" },
       },
     },
+  };
+}
+
+function textEventStreamResponse(description: string) {
+  return {
+    content: {
+      "text/event-stream": {
+        example:
+          ': connected\n\nevent: thread.event\nid: 01J00000000000000000000010\ndata: {"id":"01J00000000000000000000010","type":"run.started","status":"completed","content":"01J0000000000000000000000A","occurredAt":"2026-05-19T00:00:01.000Z","durationMs":null,"tokens":null}\n\n',
+        schema: { type: "string" },
+      },
+    },
+    description,
   };
 }
 
@@ -249,11 +263,17 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
       }),
       post: operation({
         description:
-          "Creates a Thread, the backing AgentSession, and the initial Run. Personal Access Token callers are attributed to the PAT owner.",
+          "Creates a Thread and the backing AgentSession. If input is present, Mosoo also queues the initial Run. If input is omitted, the Thread is immediately visible with IDLE status and no run. Personal Access Token callers are attributed to the PAT owner.",
         parameters: [exampleAgentIdParameter, idempotencyKeyParameter],
         requestBody: jsonRequestBodyExamples(
           { $ref: "#/components/schemas/CreateThreadRequest" },
           {
+            emptyThread: {
+              summary: "Create an empty Thread",
+              value: {
+                client_external_ref: "draft-empty-thread",
+              },
+            },
             humanPatWithFile: {
               summary: "Personal token with an uploaded file",
               value: {
@@ -290,6 +310,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
               },
             },
           },
+          { required: false },
         ),
         success: {
           "201": idempotentJsonResponse("Created Thread.", {
@@ -331,7 +352,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
     "/threads/{threadId}/events": {
       get: operation({
         description:
-          "Returns the latest public event log entries for this Thread in chronological order. This is the stable read surface for CLI and API consumers; it does not expose raw runtime payloads, transcript, diagnostics, or streaming.",
+          "Returns the latest public event log entries for this Thread in chronological order. This is the stable snapshot read surface for CLI and API consumers; it does not expose raw runtime payloads, transcript, or diagnostics.",
         parameters: [threadIdParameter, threadEventsLimitParameter],
         success: {
           "200": jsonResponse("Thread event list.", {
@@ -362,6 +383,17 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
         },
         security: HUMAN_PAT_SECURITY,
         summary: "Send user messages, permission decisions, or interrupts to a Thread",
+      }),
+    },
+    "/threads/{threadId}/events/stream": {
+      get: operation({
+        description:
+          "Streams public Thread event log entries as Server-Sent Events. Each `thread.event` data payload uses the same ThreadEventLogEntry shape as GET /threads/{threadId}/events. The stream is for long-running consumer UX and does not expose raw runtime payloads, internal diagnostics, or private transcripts.",
+        parameters: [threadIdParameter, threadEventsLimitParameter],
+        success: {
+          "200": textEventStreamResponse("Thread event stream."),
+        },
+        summary: "Stream Thread events",
       }),
     },
     "/threads/{threadId}/files": {
