@@ -46,68 +46,73 @@ Mosoo 所在的主线方向仍在快速变化。当前我们选择先聚焦 Clou
 - **Agent 资产管理**：把 Agent、Knowledge、Skill、MCP、Space、Credential、Channel 等能力逐步沉淀成可管理资产。
 - **企业级能力延展**：在个人和 OPC 场景跑通后，继续补齐团队协作、权限、成本、版本控制和运行治理能力。
 
+图例只有两种状态：**开工**（已经有具体产物落地——PR 已合并、main 上有代码、PRD 已冻结）和 **未开工**。原先标记"实施中"的节点，已经被拆成"真正开工的那一块"和"还没开工的那一块"，因为如果用二进制状态没法表达，就说明它拆得不够细。已移到 post-mvp-polish 或挪出本期路线图的部分不再画出。
+
 ```mermaid
 flowchart TD
-  classDef done fill:#d4edda,stroke:#28a745,color:#155724
-  classDef inflight fill:#fff3cd,stroke:#f0ad4e,color:#7a5d00
-  classDef locked fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-  classDef todo fill:#f8f9fa,stroke:#adb5bd,color:#495057,stroke-dasharray:4 3
+  classDef started fill:#d4edda,stroke:#28a745,color:#155724
+  classDef notstarted fill:#f8f9fa,stroke:#adb5bd,color:#495057,stroke-dasharray:4 3
 
-  Base["Completed foundation<br/>M1B session snapshot / lifecycle / runtime state ops<br/>M2 / M2P / M2D minimum slices"]:::done
-  OrgKind["M0I Org Kind / CE Slots<br/>kind + slot now enforced (#93 #105)"]:::done
+  Base["Completed foundation<br/>M1B session snapshot / lifecycle / runtime state ops<br/>M2 / M2P / M2D minimum slices"]:::started
+  OrgKind["M0I Org Kind / CE Slots<br/>kind + slot enforced (#93 #105)"]:::started
 
-  Base --> Diagnostics["M2X Agent Page Operations / Runtime Diagnostics<br/>All three components fully implemented and shipped: Terminal v1.2 (#249) · System Log v1.1 (#235) · File Browser v1.2 (#256)<br/>Session Log v1.5 Email-shape grill, 6 rounds locked (#321) + v1.5 two-dimensional chrome impl shipped (#327) · Runtime Logs v2 infra diagnostics first round shipped (#310)<br/>Versions PRD-D deferred to Phase 3"]:::inflight
-  Base --> Gov["M2G Governance foundation<br/>RBAC trio + errorMessage redaction now shipped<br/>v1 released and ready · remaining items moved into post-mvp-polish"]:::done
-  Base --> Api["M2D-H Published API hardening<br/>gap entry point retired before Public Thread API pivot"]:::done
-  Api --> ThreadApi["M2D-V2 Public Thread API pivot<br/>/tasks wrapper removed before release (61a6e7b4 serves only as removal evidence)<br/>long-term POST /threads + GET /threads/{id}<br/>Channel auth handled separately via Installation / Binding"]:::done
-  Base --> Provider["M2P-H Provider readiness fallback UX<br/>missing-key / wrong-key two states + vendor error pass-through<br/>shipped"]:::done
-  Provider --> SubOAuth["M2P-O Vendor Subscription OAuth Credential<br/>Claude Max / ChatGPT subscriptions directly driving Mosoo Agent<br/>research ready, deferred to V2+, PRD to be split out"]:::todo
+  Base --> DiagShipped["M2X Agent Page Operations / Runtime Diagnostics<br/>Terminal v1.2 (#249) · System Log v1.1 (#235) · File Browser v1.2 (#256)<br/>Session Log v1.5 grill + impl (#321 / #327) · Runtime Logs v2 first round (#310)"]:::started
+  DiagShipped --> DiagVersions["M2X-V Versions<br/>PRD-D frozen, deferred to Phase 3"]:::notstarted
+
+  Base --> Gov["M2G Governance foundation<br/>RBAC trio + errorMessage redaction shipped<br/>v1 released and ready"]:::started
+  Base --> Api["M2D-H Published API hardening<br/>gap entry point retired before Public Thread API pivot"]:::started
+  Api --> ThreadApi["M2D-V2 Public Thread API pivot<br/>/tasks wrapper removed before release (61a6e7b4 serves only as removal evidence)<br/>long-term POST /threads + GET /threads/{id}<br/>Channel auth handled separately via Installation / Binding"]:::started
+  Base --> Provider["M2P-H Provider readiness fallback UX<br/>missing-key / wrong-key two states + vendor error pass-through"]:::started
+
+  Provider --> SubOAuth["M2P-O Vendor Subscription OAuth Credential<br/>Claude Max / ChatGPT subscriptions directly driving Mosoo Agent<br/>research ready, deferred to V2+, PRD to be split out"]:::notstarted
   Gov --> SubOAuth
 
   OrgKind --> Gov
   OrgKind --> Cli
-
   Gov --> ThreadApi
 
-  Api --> Cli["M2C Managed Mosoo CLI<br/>authenticated managed-entity operations<br/>not started yet"]:::todo
+  Api --> Cli["M2C Managed Mosoo CLI<br/>authenticated managed-entity operations"]:::notstarted
   Gov --> Cli
   Provider --> Cli
 
-  Gov --> Diagnostics
-  Diagnostics --> ByoEnv["M2E BYO Runtime Environment<br/>local / self-hosted cloud agent loop hooked into the governance plane<br/>can ship in V2, PRD to be split out"]:::todo
+  Gov --> DiagShipped
+  DiagShipped --> ByoEnv["M2E BYO Runtime Environment<br/>local / self-hosted cloud agent loop hooked into the governance plane<br/>can ship in V2, PRD to be split out"]:::notstarted
   Gov --> ByoEnv
 
-  Gov --> Cost["M3B Cost coverage hardening<br/>cost implementation shipped, correlation and the rest moved into post-mvp-polish"]:::inflight
+  Gov --> Cost["M3B Cost coverage<br/>cost implementation shipped"]:::started
 
-  Gov --> Sys["M3A System Agent<br/>community implementation merged, needs to be refactored into a controlled Draft patch<br/>formal PRD not started yet"]:::todo
-  Provider --> Sys
-  Diagnostics --> Sys
-  Cli --> Sys
-  ThreadApi --> Sys
-  ByoEnv --> Sys
+  Gov --> SysCommunity["M3A System Agent — community implementation<br/>configuration copilot for Agent Builder merged into the repo"]:::started
+  Provider --> SysCommunity
+  DiagShipped --> SysCommunity
+  SysCommunity --> SysFormal["M3A System Agent — formal PRD + controlled Draft patch<br/>refactor community impl into a controlled Draft patch<br/>formal PRD to be written"]:::notstarted
+  Cli --> SysFormal
+  ThreadApi --> SysFormal
+  ByoEnv --> SysFormal
 
-  ThreadApi --> Channel["M4-0 Channels<br/>Slack / Lark / Telegram functional<br/>Discord real smoke remains<br/>personal WeChat QR + polling owner backend"]:::locked
-  Gov --> Channel
-  Channel --> Im["M4A Channel runtime<br/>(Discord real smoke / personal WeChat live smoke / LINE)<br/>independent PRD per provider"]:::todo
-  Im --> Work["M4B Linear / GitHub<br/>different surface family<br/>drafted independently"]:::todo
+  ThreadApi --> ChannelCore["M4-0 Channels<br/>Slack / Lark / Telegram / Discord / WeChat owner setup + backend shipped"]:::started
+  Gov --> ChannelCore
+  ChannelCore --> Im["M4A Channel runtime<br/>Discord real smoke / personal WeChat live smoke / LINE<br/>independent PRD per provider"]:::notstarted
+  Im --> Work["M4B Linear / GitHub<br/>different surface family, drafted independently"]:::notstarted
 
-  Diagnostics --> Vendors["M6 Multi-vendor expansion<br/>baseline in place, horizontal expansion not started"]:::todo
+  DiagShipped --> Vendors["M6 Multi-vendor expansion<br/>baseline in place, horizontal expansion not started"]:::notstarted
   Provider --> Vendors
   Gov --> Vendors
   Cli --> Vendors
   ByoEnv --> Vendors
 
   %% --- Pet/Cattle orthogonal fork (2026-05-09 decision · 2026-05-10 PRD locked, cross-node increment) ---
-  PC["M-PC Pet/Cattle Product Type<br/>core contract shipped, PRD locked (#126)<br/>Manifest kind + Configure selector + Publish visibility + Reset hidden + Lock+Fork<br/>Sandbox subject shipped; Channel default + Billing + SA inference awaiting kind-aware implementation"]:::locked
-  Memory["M2M Cross-session Memory<br/>Pet Agent memory canonicalization<br/>Cattle no-memory boundary preserved<br/>PRD to be split out"]:::todo
-  Base -.Manifest kind + sandbox subject shipped.-> PC
-  PC -.channel default kind split.-> Channel
-  PC -.kind inference backfill.-> Sys
-  PC -.kind-aware billing dimension.-> Cost
-  PC -.memory semantics.-> Memory
-  Diagnostics --> Memory
-  Memory --> Sys
-  Memory --> Vendors
+  Base -.Manifest kind + sandbox subject shipped.-> PCCore["M-PC Pet/Cattle — core contract (#126)<br/>Manifest kind + Configure selector + Publish visibility + Reset hidden + Lock+Fork<br/>Sandbox subject shipped"]:::started
+  PCCore --> PCAdapt["M-PC Pet/Cattle — kind-aware downstream integrations<br/>Channel default + Billing dimension + System Agent inference<br/>awaiting kind-aware implementation"]:::notstarted
+  PCAdapt -.channel default kind split.-> ChannelCore
+  PCAdapt -.kind-aware billing dimension.-> Cost
+  PCAdapt -.kind inference backfill.-> SysFormal
+
+  Base --> MemoryBase["M2M Cross-session Memory — runtime base<br/>Pet sandbox /workspace/home symlink persistence<br/>runtime-native memory (no Groots-defined format)"]:::started
+  MemoryBase --> MemoryPrd["M2M Cross-session Memory — PRD<br/>Pet canonicalization + Cattle no-memory boundary contract<br/>PRD to be split out"]:::notstarted
+  DiagShipped --> MemoryPrd
+  PCAdapt -.memory semantics.-> MemoryPrd
+  MemoryPrd --> SysFormal
+  MemoryPrd --> Vendors
 ```
 
 ## Vision
