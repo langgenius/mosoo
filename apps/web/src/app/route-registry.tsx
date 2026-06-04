@@ -92,6 +92,10 @@ const SettingsOrganizationGeneral = lazyNamed(
   async () => import("../routes/settings/organization-general-tab"),
   "OrganizationGeneralTab",
 );
+const SettingsOrganizationEnvironments = lazyNamed(
+  async () => import("../routes/settings/organization-environments-tab"),
+  "OrganizationEnvironmentsTab",
+);
 const AgentList = lazyNamed(
   async () => import("../routes/agent/agent-list.route"),
   "AgentListPage",
@@ -162,6 +166,7 @@ const appRoutes = [
       { element: <SettingsUsage />, path: "usage" },
       { element: <SettingsOrganizationGeneral />, path: "general" },
       { element: <Members />, path: "members" },
+      { element: <SettingsOrganizationEnvironments />, path: "environments" },
       { element: <CredentialPolicy />, path: "credential-policy" },
     ],
     element: protectedRoute(<SettingsLayout />),
