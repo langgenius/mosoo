@@ -10,12 +10,7 @@ export {
   updateVendorCredential,
 } from "./vendor-credential-commands";
 
-export {
-  getCredentialPolicy,
-  listVendorCredentialCapabilities,
-  listVendorCredentials,
-  updateCredentialPolicy,
-} from "./vendor-credential-policy.service";
+export { listVendorCredentials } from "./vendor-credential-list";
 
 export { resolveProviderFetchProxy } from "./provider-fetch-proxy";
 

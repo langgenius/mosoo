@@ -6,41 +6,10 @@ import { toAccountId, toOrganizationId, toVendorCredentialId } from "@/routes/ty
 
 import { parseAvailableModelReason, parseModelCatalogSource } from "./model-catalog-parsers";
 
-const VENDOR_CREDENTIALS_WITH_POLICY_QUERY = graphql(/* GraphQL */ `
-  query VendorCredentialsWithPolicy($organizationId: ULID!) {
-    credentialPolicy(organizationId: $organizationId) {
-      allowedProviderIds
-      byokEnabled
-      organizationId
-    }
-    vendorCredentialList(organizationId: $organizationId) {
-      apiBase
-      disabledByPolicy
-      id
-      isDefault
-      isPreferred
-      maskedApiKey
-      models
-      name
-      ownerUserId
-      scope
-      vendorId
-      organizationId
-    }
-  }
-`);
-
 const VENDOR_CREDENTIAL_LIST_QUERY = graphql(/* GraphQL */ `
   query VendorCredentialList($organizationId: ULID!) {
-    vendorCredentialCapabilities(organizationId: $organizationId) {
-      organizationId
-      personalCredentialAllowed
-      providerAllowed
-      vendorId
-    }
     vendorCredentialList(organizationId: $organizationId) {
       apiBase
-      disabledByPolicy
       id
       isDefault
       isPreferred
@@ -59,7 +28,6 @@ const CREATE_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
   mutation CreateVendorCredential($input: CreateVendorCredentialInput!) {
     createVendorCredential(input: $input) {
       apiBase
-      disabledByPolicy
       id
       isDefault
       isPreferred
@@ -78,7 +46,6 @@ const UPDATE_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
   mutation UpdateVendorCredential($input: UpdateVendorCredentialInput!) {
     updateVendorCredential(input: $input) {
       apiBase
-      disabledByPolicy
       id
       isDefault
       isPreferred
@@ -88,16 +55,6 @@ const UPDATE_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
       ownerUserId
       scope
       vendorId
-      organizationId
-    }
-  }
-`);
-
-const UPDATE_CREDENTIAL_POLICY_MUTATION = graphql(/* GraphQL */ `
-  mutation UpdateCredentialPolicy($input: UpdateCredentialPolicyInput!) {
-    updateCredentialPolicy(input: $input) {
-      allowedProviderIds
-      byokEnabled
       organizationId
     }
   }
@@ -147,7 +104,6 @@ const TEST_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
 
 export interface VendorCredential {
   apiBase: string | null;
-  disabledByPolicy: boolean;
   id: VendorCredentialId;
   isDefault: boolean;
   isPreferred: boolean;
@@ -160,25 +116,10 @@ export interface VendorCredential {
   organizationId: OrganizationId;
 }
 
-export interface CredentialPolicy {
-  allowedProviderIds: string[];
-  byokEnabled: boolean;
-  organizationId: OrganizationId;
-}
-
-export interface VendorCredentialState {
-  credentials: VendorCredential[];
-  policy: CredentialPolicy | null;
-}
-
 type GraphQLVendorCredential = Omit<VendorCredential, "id" | "organizationId" | "ownerUserId"> & {
   id: string;
   organizationId: string;
   ownerUserId: string | null;
-};
-
-type GraphQLCredentialPolicy = Omit<CredentialPolicy, "organizationId"> & {
-  organizationId: string;
 };
 
 function toVendorCredential(credential: GraphQLVendorCredential): VendorCredential {
@@ -190,40 +131,11 @@ function toVendorCredential(credential: GraphQLVendorCredential): VendorCredenti
   };
 }
 
-function toCredentialPolicy(policy: GraphQLCredentialPolicy): CredentialPolicy {
-  return {
-    ...policy,
-    organizationId: toOrganizationId(policy.organizationId),
-  };
-}
-
 export async function listVendorCredentials(
   organizationId: OrganizationId,
-  includePolicy: boolean,
-): Promise<VendorCredentialState> {
-  if (!includePolicy) {
-    const payload = await requestGraphQL(VENDOR_CREDENTIAL_LIST_QUERY, { organizationId });
-    const allowedProviderIds = payload.vendorCredentialCapabilities.flatMap((capability) =>
-      capability.providerAllowed ? [capability.vendorId] : [],
-    );
-
-    return {
-      credentials: payload.vendorCredentialList.map(toVendorCredential),
-      policy: {
-        allowedProviderIds,
-        byokEnabled: payload.vendorCredentialCapabilities.some(
-          (capability) => capability.personalCredentialAllowed,
-        ),
-        organizationId,
-      },
-    };
-  }
-
-  const payload = await requestGraphQL(VENDOR_CREDENTIALS_WITH_POLICY_QUERY, { organizationId });
-  return {
-    credentials: payload.vendorCredentialList.map(toVendorCredential),
-    policy: toCredentialPolicy(payload.credentialPolicy),
-  };
+): Promise<VendorCredential[]> {
+  const payload = await requestGraphQL(VENDOR_CREDENTIAL_LIST_QUERY, { organizationId });
+  return payload.vendorCredentialList.map(toVendorCredential);
 }
 
 export async function createVendorCredential(input: {
@@ -252,15 +164,6 @@ export async function updateVendorCredential(input: {
 }): Promise<VendorCredential> {
   const payload = await requestGraphQL(UPDATE_VENDOR_CREDENTIAL_MUTATION, { input });
   return toVendorCredential(payload.updateVendorCredential);
-}
-
-export async function updateCredentialPolicy(input: {
-  allowedProviderIds: string[];
-  byokEnabled: boolean;
-  organizationId: OrganizationId;
-}): Promise<CredentialPolicy> {
-  const payload = await requestGraphQL(UPDATE_CREDENTIAL_POLICY_MUTATION, { input });
-  return toCredentialPolicy(payload.updateCredentialPolicy);
 }
 
 export async function deleteVendorCredential(id: VendorCredentialId): Promise<void> {

@@ -8,6 +8,7 @@ import {
   updateVendorCredential,
 } from "../api/vendor-credential-client";
 import type { VendorCredential } from "../api/vendor-credential-client";
+import { canUseCustomEndpoint } from "./provider-credential-endpoint";
 import { getErrorMessage } from "./provider-credential-error";
 import {
   EMPTY_COMPANY_FORM,
@@ -22,7 +23,6 @@ import type {
   PersonalForm,
   TestConnectionState,
 } from "./provider-credential-form-state";
-import { canUseCustomEndpoint } from "./provider-credential-policy";
 
 type Setter<T> = (value: T) => void;
 
@@ -216,10 +216,6 @@ export function createProviderCredentialSaveActions(
   };
 
   const handleUsePersonal = async (credential: VendorCredential): Promise<void> => {
-    if (credential.disabledByPolicy) {
-      return;
-    }
-
     try {
       await updateVendorCredential({ id: credential.id, isPreferred: true });
       await input.refreshCredentials();

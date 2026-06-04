@@ -1,15 +1,6 @@
 import { Permission, can } from "@mosoo/contracts/permission";
 import type { LucideIcon } from "lucide-react";
-import {
-  BarChart3,
-  Bot,
-  Box,
-  Building2,
-  KeyRound,
-  SlidersHorizontal,
-  User,
-  Users,
-} from "lucide-react";
+import { BarChart3, Bot, Box, Building2, KeyRound, User, Users } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { cn } from "@/shared/lib/class-names";
@@ -53,12 +44,6 @@ const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
         icon: Box,
         label: "Environments",
         path: "/settings/environments",
-      },
-      {
-        adminOnly: true,
-        icon: SlidersHorizontal,
-        label: "Provider Access",
-        path: "/settings/credential-policy",
       },
     ],
     label: "Organization",

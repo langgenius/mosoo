@@ -28,9 +28,6 @@ export function SavedCustomProviderCard({
             <Badge variant={credential.scope === "company" ? "outline" : "secondary"}>
               {credential.scope === "company" ? "COMPANY" : "PERSONAL"}
             </Badge>
-            {credential.disabledByPolicy ? (
-              <Badge variant="warning">Disabled by policy</Badge>
-            ) : null}
           </div>
           <p className="text-muted-foreground truncate text-xs">
             {credential.apiBase ?? "—"} · {credential.maskedApiKey}

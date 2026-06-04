@@ -35,8 +35,6 @@ function createOnboardingDatabase(): SqliteD1Database {
       join_policy text NOT NULL,
       primary_domain text,
       avatar_url text,
-      byok_allowed_providers text,
-      byok_enabled integer NOT NULL DEFAULT 1,
       creator_account_id text,
       default_environment_id text,
       created_at integer NOT NULL,

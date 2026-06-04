@@ -289,7 +289,6 @@ export function createEnvironmentBindingDatabase(): SqliteD1Database {
   database
     .prepare(
       `INSERT INTO organization (
-        byok_enabled,
         created_at,
         creator_account_id,
         id,
@@ -297,10 +296,9 @@ export function createEnvironmentBindingDatabase(): SqliteD1Database {
         name,
         slug,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
-      1,
       1,
       "01J00000000000000000000051",
       "01J00000000000000000000006",
@@ -386,8 +384,6 @@ function createEnvironmentBindingSchema(database: SqliteD1Database): void {
 
     CREATE TABLE organization (
       avatar_url text,
-      byok_allowed_providers text,
-      byok_enabled integer DEFAULT true NOT NULL,
       created_at integer NOT NULL,
       creator_account_id text,
       default_environment_id text,

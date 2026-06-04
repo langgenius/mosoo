@@ -1,7 +1,6 @@
 export const vendorCredentialSchema = /* GraphQL */ `
   type VendorCredential {
     apiBase: String
-    disabledByPolicy: Boolean!
     id: ULID!
     isDefault: Boolean!
     isPreferred: Boolean!
@@ -12,19 +11,6 @@ export const vendorCredentialSchema = /* GraphQL */ `
     scope: VendorCredentialScope!
     vendorId: String!
     organizationId: ULID!
-  }
-
-  type CredentialPolicy {
-    allowedProviderIds: [String!]!
-    byokEnabled: Boolean!
-    organizationId: ULID!
-  }
-
-  type VendorCredentialCapability {
-    organizationId: ULID!
-    personalCredentialAllowed: Boolean!
-    providerAllowed: Boolean!
-    vendorId: String!
   }
 
   enum VendorCredentialScope {
@@ -56,12 +42,6 @@ export const vendorCredentialSchema = /* GraphQL */ `
 
   input DeleteVendorCredentialInput {
     id: ULID!
-  }
-
-  input UpdateCredentialPolicyInput {
-    allowedProviderIds: [String!]!
-    byokEnabled: Boolean!
-    organizationId: ULID!
   }
 
   type ResolvedModelEntry {

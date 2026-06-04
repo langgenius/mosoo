@@ -1,21 +1,13 @@
 import { PRESET_MODEL_CATALOG } from "@mosoo/contracts/models";
 import type { PresetModelEntry } from "@mosoo/contracts/models";
-import type { CredentialPolicy } from "@mosoo/contracts/vendor-credential";
 import type { AccountId, OrganizationId } from "@mosoo/id";
 import { VENDOR_OPENAI_COMPATIBLE, getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 
 import { isTruthy } from "../../../shared/truthiness";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { resolveActiveOrganization } from "../../users/application/account-organization-context.service";
-import {
-  customCredentialAllowedByPolicy,
-  listEffectiveCustomCredentialModelRows,
-} from "./vendor-credential-custom-models";
-import { isProviderAllowed, toCredentialPolicy } from "./vendor-credential.policy";
-import {
-  getCredentialPolicyRow,
-  listVisibleVendorCredentialRows,
-} from "./vendor-credential.repository";
+import { listEffectiveCustomCredentialModelRows } from "./vendor-credential-custom-models";
+import { listVisibleVendorCredentialRows } from "./vendor-credential.repository";
 import { collectAvailableVendorIds } from "./vendor-credential.secret-resolution";
 import type { VendorCredentialRow } from "./vendor-credential.types";
 export interface AvailableModelsInput {
@@ -154,18 +146,9 @@ function resolveCustomEntries(
   input: AvailableModelsInput,
   acceptsCustomProvider: boolean,
   runtimeLabel: string | null,
-  policy: CredentialPolicy,
   credentialRows: readonly VendorCredentialRow[],
 ): ResolvedModelEntry[] {
-  if (!isProviderAllowed(policy, VENDOR_OPENAI_COMPATIBLE.vendorId)) {
-    return [];
-  }
-
-  const rows = credentialRows.filter(
-    (row) =>
-      row.vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId &&
-      customCredentialAllowedByPolicy(policy, row),
-  );
+  const rows = credentialRows.filter((row) => row.vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId);
   const entries: ResolvedModelEntry[] = [];
 
   for (const { modelId, row } of listEffectiveCustomCredentialModelRows(rows)) {
@@ -277,17 +260,16 @@ export async function resolveAvailableModels(
   input: AvailableModelsInput,
 ): Promise<ResolvedModelEntry[]> {
   const scope = runtimeModelScope(input.runtimeId);
-  const [policyRow, credentialRows] = await Promise.all([
-    getCredentialPolicyRow(database, input.organizationId),
-    listVisibleVendorCredentialRows(database, input.accountId, input.organizationId),
-  ]);
-  const policy = toCredentialPolicy(input.organizationId, policyRow);
-  const availableVendorIds = collectAvailableVendorIds(policy, input.accountId, credentialRows);
+  const credentialRows = await listVisibleVendorCredentialRows(
+    database,
+    input.accountId,
+    input.organizationId,
+  );
+  const availableVendorIds = collectAvailableVendorIds(input.accountId, credentialRows);
   const customEntries = resolveCustomEntries(
     input,
     scope.acceptsCustomProvider,
     scope.label,
-    policy,
     credentialRows,
   );
   const presetEntries = PRESET_MODEL_CATALOG.map((entry) =>

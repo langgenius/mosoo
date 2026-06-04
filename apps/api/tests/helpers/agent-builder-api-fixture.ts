@@ -258,8 +258,6 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
 
     CREATE TABLE organization (
       avatar_url text,
-      byok_allowed_providers text,
-      byok_enabled integer DEFAULT true NOT NULL,
       created_at integer NOT NULL,
       creator_account_id text,
       default_environment_id text,
@@ -553,7 +551,6 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
   await database
     .prepare(
       `INSERT INTO organization (
-        byok_enabled,
         created_at,
         creator_account_id,
         id,
@@ -561,10 +558,9 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
         name,
         slug,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
-      1,
       1,
       AGENT_BUILDER_TEST_VIEWER.id,
       AGENT_BUILDER_TEST_IDS.organizationId,

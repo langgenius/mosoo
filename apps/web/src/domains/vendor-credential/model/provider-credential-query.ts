@@ -4,32 +4,23 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import { toOrganizationId } from "@/routes/typed-id";
 
 import { listVendorCredentials } from "../api/vendor-credential-client";
-import type {
-  CredentialPolicy,
-  VendorCredential,
-  VendorCredentialState,
-} from "../api/vendor-credential-client";
+import type { VendorCredential } from "../api/vendor-credential-client";
 
 interface VendorCredentialsQueryModel {
   credentials: VendorCredential[];
-  credentialsQuery: UseQueryResult<VendorCredentialState>;
+  credentialsQuery: UseQueryResult<VendorCredential[]>;
   loading: boolean;
-  policy: CredentialPolicy | null;
 }
 
-export function useVendorCredentialsQuery(
-  organizationId: string,
-  includePolicy: boolean,
-): VendorCredentialsQueryModel {
+export function useVendorCredentialsQuery(organizationId: string): VendorCredentialsQueryModel {
   const credentialsQuery = useQuery({
-    queryFn: async () => listVendorCredentials(toOrganizationId(organizationId), includePolicy),
-    queryKey: ["vendor-credentials", organizationId, includePolicy],
+    queryFn: async () => listVendorCredentials(toOrganizationId(organizationId)),
+    queryKey: ["vendor-credentials", organizationId],
   });
 
   return {
-    credentials: credentialsQuery.data?.credentials ?? [],
+    credentials: credentialsQuery.data ?? [],
     credentialsQuery,
     loading: credentialsQuery.isLoading,
-    policy: credentialsQuery.data?.policy ?? null,
   };
 }

@@ -212,13 +212,10 @@ export const vendorCredentialGraphQLSpec = {
     "createVendorCredential(input: CreateVendorCredentialInput!): VendorCredential!",
     "deleteVendorCredential(input: DeleteVendorCredentialInput!): OperationResult!",
     "testVendorCredential(input: TestVendorCredentialInput!): TestVendorCredentialResult!",
-    "updateCredentialPolicy(input: UpdateCredentialPolicyInput!): CredentialPolicy!",
     "updateVendorCredential(input: UpdateVendorCredentialInput!): VendorCredential!",
   ],
   queryFields: [
     "availableAgentModels(runtimeId: String!, currentModelId: String, currentVendorId: String): [ResolvedModelEntry!]!",
-    "credentialPolicy(organizationId: ULID!): CredentialPolicy!",
-    "vendorCredentialCapabilities(organizationId: ULID!): [VendorCredentialCapability!]!",
     "vendorCredentialList(organizationId: ULID!): [VendorCredential!]!",
   ],
   typeDefs: vendorCredentialSchema,

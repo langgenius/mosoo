@@ -31,8 +31,6 @@ CREATE TABLE organization (
   avatar_url text,
   creator_account_id text,
   default_environment_id text,
-  byok_enabled integer DEFAULT 1 NOT NULL,
-  byok_allowed_providers text,
   created_at integer NOT NULL,
   updated_at integer NOT NULL
 );

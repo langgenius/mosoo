@@ -1,6 +1,5 @@
-import { Plus, SlidersHorizontal } from "lucide-react";
+import { Plus } from "lucide-react";
 import type { ReactElement } from "react";
-import { Link } from "react-router-dom";
 
 import { Button } from "@/shared/ui/button";
 import { PageHeader } from "@/shared/ui/page-header";
@@ -79,14 +78,6 @@ export function ProvidersTab({ organization }: { organization: Organization }): 
           <Plus className="size-3.5" />
           Add OpenAI-Compatible Provider
         </Button>
-        {model.isAdmin ? (
-          <Button asChild variant="outline" size="sm">
-            <Link to="/settings/credential-policy">
-              <SlidersHorizontal className="size-3.5" />
-              Provider Access
-            </Link>
-          </Button>
-        ) : null}
       </PageHeader>
 
       <main className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
@@ -108,7 +99,6 @@ export function ProvidersTab({ organization }: { organization: Organization }): 
               activePersonalByVendor={model.activePersonalByVendor}
               credentials={model.credentials}
               defaultCredentialByVendor={model.defaultCredentialByVendor}
-              policy={model.policy}
               visibleRuntimes={model.visibleRuntimes}
             />
           )}
@@ -178,7 +168,6 @@ export function ProvidersTab({ organization }: { organization: Organization }): 
                     personalForm={model.personalForm}
                     personalProviderError={model.actionError}
                     personalProviderTest={model.personalProviderTest}
-                    policy={model.policy}
                     runtimes={runtimes}
                     saving={model.saving}
                     showPersonalKey={model.showPersonalKey}

@@ -1,13 +1,12 @@
+import { PUBLIC_RUNTIME_CATALOG, PUBLIC_VENDORS } from "@mosoo/runtime-catalog";
 import { useMemo } from "react";
 
-import type { CredentialPolicy, VendorCredential } from "../api/vendor-credential-client";
+import type { VendorCredential } from "../api/vendor-credential-client";
 import {
   listActivePersonalCredentialsByVendor,
   listCompanyDefaultCredentialsByVendor,
   listCredentialsByVendor,
   listRuntimesByVendor,
-  listVisibleRuntimes,
-  listVisibleVendors,
 } from "./provider-credential-derived-state";
 
 interface ProviderCredentialDerivedModel {
@@ -15,16 +14,14 @@ interface ProviderCredentialDerivedModel {
   credentialsByVendor: Map<string, VendorCredential[]>;
   defaultCredentialByVendor: Map<string, VendorCredential>;
   runtimesByVendor: Map<string, string[]>;
-  visibleRuntimes: ReturnType<typeof listVisibleRuntimes>;
-  visibleVendors: ReturnType<typeof listVisibleVendors>;
+  visibleRuntimes: typeof PUBLIC_RUNTIME_CATALOG;
+  visibleVendors: typeof PUBLIC_VENDORS;
 }
 
 export function useProviderCredentialDerivedModel(input: {
   credentials: VendorCredential[];
-  isAdmin: boolean;
-  policy: CredentialPolicy | null;
 }): ProviderCredentialDerivedModel {
-  const { credentials, isAdmin, policy } = input;
+  const { credentials } = input;
 
   return {
     activePersonalByVendor: useMemo(
@@ -37,7 +34,7 @@ export function useProviderCredentialDerivedModel(input: {
       [credentials],
     ),
     runtimesByVendor: useMemo(() => listRuntimesByVendor(), []),
-    visibleRuntimes: useMemo(() => listVisibleRuntimes(policy, isAdmin), [isAdmin, policy]),
-    visibleVendors: useMemo(() => listVisibleVendors(policy, isAdmin), [isAdmin, policy]),
+    visibleRuntimes: PUBLIC_RUNTIME_CATALOG,
+    visibleVendors: PUBLIC_VENDORS,
   };
 }

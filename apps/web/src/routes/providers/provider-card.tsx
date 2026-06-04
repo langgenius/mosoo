@@ -2,18 +2,10 @@ import { Plus } from "lucide-react";
 import { useMemo } from "react";
 import type { ReactElement } from "react";
 
-import { Badge } from "@/shared/ui/badge";
 import { VendorIcon, hasVendorIcon } from "@/shared/ui/brand-icons";
 import { Button } from "@/shared/ui/button";
 
-import type {
-  CredentialPolicy,
-  VendorCredential,
-} from "../../domains/vendor-credential/api/vendor-credential-client";
-import {
-  isPersonalCredentialAllowed,
-  isProviderAllowed,
-} from "../../domains/vendor-credential/model/provider-credential-policy";
+import type { VendorCredential } from "../../domains/vendor-credential/api/vendor-credential-client";
 import type {
   CompanyForm,
   PersonalForm,
@@ -51,7 +43,6 @@ export function ProviderCard({
   personalForm,
   personalProviderError,
   personalProviderTest,
-  policy,
   runtimes,
   saving,
   showPersonalKey,
@@ -66,15 +57,12 @@ export function ProviderCard({
     [credentials],
   );
   const companyDefault = defaultCredentialByVendor.get(vendor.vendorId);
-  const providerAllowed = isProviderAllowed(policy, vendor.vendorId);
-  const personalAllowed = isPersonalCredentialAllowed(policy, vendor.vendorId);
 
   return (
     <section className="border-border bg-card space-y-3 rounded-lg border p-4">
       <ProviderCardHeader
         isAdmin={isAdmin}
         onStartAddingCompanyKey={onStartAddingCompanyKey}
-        providerAllowed={providerAllowed}
         runtimes={runtimes}
         vendor={vendor}
       />
@@ -102,9 +90,7 @@ export function ProviderCard({
         onStartAddingPersonalKey={onStartAddingPersonalKey}
         onUseCompanyDefault={onUseCompanyDefault}
         onUsePersonal={onUsePersonal}
-        personalAllowed={personalAllowed}
         personalCredentials={personalCredentials}
-        providerAllowed={providerAllowed}
         vendor={vendor}
       />
 
@@ -149,7 +135,6 @@ interface ProviderCardProperties {
   personalForm: PersonalForm;
   personalProviderError: string | null;
   personalProviderTest: TestConnectionState;
-  policy: CredentialPolicy | null;
   runtimes: string[];
   saving: boolean;
   showPersonalKey: boolean;
@@ -159,13 +144,11 @@ interface ProviderCardProperties {
 function ProviderCardHeader({
   isAdmin,
   onStartAddingCompanyKey,
-  providerAllowed,
   runtimes,
   vendor,
 }: {
   isAdmin: boolean;
   onStartAddingCompanyKey: (vendorId: string) => void;
-  providerAllowed: boolean;
   runtimes: string[];
   vendor: VisibleVendor;
 }): ReactElement {
@@ -181,7 +164,6 @@ function ProviderCardHeader({
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
             <h2 className="text-foreground truncate text-sm font-semibold">{vendor.label}</h2>
-            {providerAllowed ? null : <Badge variant="outline">Provider disabled</Badge>}
           </div>
           <p className="text-muted-foreground truncate text-xs">
             Vendor ID: {vendor.vendorId} · {vendor.apiKeyEnvVar}

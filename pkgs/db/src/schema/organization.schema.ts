@@ -23,8 +23,6 @@ export const organizationsTable = sqliteTable(
   "organization",
   {
     avatarUrl: text("avatar_url"),
-    byokAllowedProviders: text("byok_allowed_providers"),
-    byokEnabled: integer("byok_enabled", { mode: "boolean" }).notNull().default(true),
     createdAt: integer("created_at").notNull(),
     creatorAccountId: platformIdColumn<AccountId>("creator_account_id"),
     defaultEnvironmentId: platformIdColumn<EnvironmentId>("default_environment_id"),

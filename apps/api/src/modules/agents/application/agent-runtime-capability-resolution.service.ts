@@ -3,7 +3,7 @@ import type {
   AgentResolutionIssue,
   AgentResolutionTargetType,
 } from "@mosoo/contracts/agent-manifest";
-import { organizationsTable, vendorCredentialsTable } from "@mosoo/db";
+import { vendorCredentialsTable } from "@mosoo/db";
 import type { AccountId, OrganizationId } from "@mosoo/id";
 import {
   VENDOR_OPENAI,
@@ -17,7 +17,6 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { resolveAvailableModels } from "../../vendor-credentials/application/available-models";
 import type { ResolvedModelEntry } from "../../vendor-credentials/application/available-models";
-import { toCredentialPolicy } from "../../vendor-credentials/application/vendor-credential.policy";
 import {
   probeVendorCredential,
   resolveProviderFetchProxy,
@@ -44,30 +43,6 @@ const OPENAI_SHAPED_PROVIDER_IDS = new Set([
   VENDOR_OPENAI.vendorId,
   VENDOR_OPENAI_COMPATIBLE.vendorId,
 ]);
-
-async function readCredentialPolicy(
-  database: D1Database,
-  organizationId: OrganizationId,
-): Promise<{ allowedProviderIds: string[]; byokEnabled: boolean }> {
-  const row = await getAppDatabase(database)
-    .select({
-      byokAllowedProviders: organizationsTable.byokAllowedProviders,
-      byokEnabled: organizationsTable.byokEnabled,
-    })
-    .from(organizationsTable)
-    .where(eq(organizationsTable.id, organizationId))
-    .limit(1)
-    .get();
-
-  if (!row) {
-    throw new Error("Organization not found.");
-  }
-
-  return toCredentialPolicy(organizationId, {
-    byokAllowedProviders: row.byokAllowedProviders,
-    byokEnabled: row.byokEnabled ? 1 : 0,
-  });
-}
 
 async function hasCompanyCredential(
   database: D1Database,
@@ -140,52 +115,18 @@ async function collectCredentialIssues(
 ): Promise<AgentResolutionIssue[]> {
   const { provider } = input.selection;
   const required = true;
-  const policy = await readCredentialPolicy(input.database, input.organizationId);
-
-  if (!policy.allowedProviderIds.includes(provider)) {
-    return [
-      createCapabilityIssue({
-        actionLabel: "Contact admin",
-        code: `${input.codePrefix}.provider.policy_disabled`,
-        message: `Provider ${provider} is disabled by organization policy.`,
-        required,
-        status: "permission_denied",
-        targetLabel: provider,
-        targetType: "provider",
-      }),
-    ];
-  }
-
-  const companyCredentialAvailable = await hasCompanyCredential(
-    input.database,
-    input.organizationId,
-    provider,
-  );
-  const personalCredentialAvailable = policy.byokEnabled
-    ? await hasPreferredPersonalCredential(
-        input.database,
-        input.actorAccountId,
-        input.organizationId,
-        provider,
-      )
-    : false;
+  const [companyCredentialAvailable, personalCredentialAvailable] = await Promise.all([
+    hasCompanyCredential(input.database, input.organizationId, provider),
+    hasPreferredPersonalCredential(
+      input.database,
+      input.actorAccountId,
+      input.organizationId,
+      provider,
+    ),
+  ]);
 
   if (companyCredentialAvailable || personalCredentialAvailable) {
     return [];
-  }
-
-  if (!policy.byokEnabled) {
-    return [
-      createCapabilityIssue({
-        actionLabel: "Configure company key",
-        code: `${input.codePrefix}.provider_credential.company_key_missing`,
-        message: `Provider ${provider} needs a company key because personal keys are disabled by organization policy.`,
-        required,
-        status: "needs_reconnect",
-        targetLabel: provider,
-        targetType: "provider",
-      }),
-    ];
   }
 
   return [
@@ -246,10 +187,10 @@ async function collectProviderProbeIssues(
   }
 
   // Model availability is already settled upstream by `resolveAvailableModels`
-  // (preset catalog + custom credential allowlist + policy). A strict mismatch
-  // against the provider's `GET /models` payload — provider only lists dated
-  // ids, alias not enumerated, custom OpenAI-compatible base url that requires
-  // a model id we already trust — must not block publish. Only auth /
+  // (preset catalog + custom credential allowlist). A strict mismatch against
+  // the provider's `GET /models` payload — provider only lists dated ids,
+  // alias not enumerated, custom OpenAI-compatible base url that requires a
+  // model id we already trust — must not block publish. Only auth /
   // connectivity failures should.
   if (result.errorCode === "model_not_found" || result.errorCode === "missing_model_id") {
     return [];

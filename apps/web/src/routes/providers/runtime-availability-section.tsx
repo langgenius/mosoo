@@ -4,33 +4,26 @@ import type { ReactElement } from "react";
 import { RuntimeIcon, hasRuntimeIcon } from "@/shared/ui/brand-icons";
 
 import type { VendorCredential } from "../../domains/vendor-credential/api/vendor-credential-client";
-import { isProviderAllowed } from "../../domains/vendor-credential/model/provider-credential-policy";
 import { COMING_SOON_RUNTIMES } from "./coming-soon-runtimes";
 
 type VisibleRuntime = (typeof PUBLIC_RUNTIME_CATALOG)[number];
 
 function runtimeDisabledReason({
   available,
-  providerAllowed,
   runtimeReason,
 }: {
   available: boolean;
-  providerAllowed: boolean;
   runtimeReason: string | undefined;
 }): string | null {
   if (typeof runtimeReason === "string" && runtimeReason.length > 0) {
     return runtimeReason;
   }
 
-  if (providerAllowed) {
-    if (available) {
-      return null;
-    }
-
-    return "No credential available for this provider";
+  if (available) {
+    return null;
   }
 
-  return "Provider disabled by policy";
+  return "No credential available for this provider";
 }
 
 function credentialSuffix({
@@ -55,13 +48,11 @@ export function RuntimeAvailabilitySection({
   activePersonalByVendor,
   credentials,
   defaultCredentialByVendor,
-  policy,
   visibleRuntimes,
 }: {
   activePersonalByVendor: Map<string, VendorCredential>;
   credentials: VendorCredential[];
   defaultCredentialByVendor: Map<string, VendorCredential>;
-  policy: Parameters<typeof isProviderAllowed>[0];
   visibleRuntimes: readonly VisibleRuntime[];
 }): ReactElement {
   return (
@@ -75,21 +66,17 @@ export function RuntimeAvailabilitySection({
       <div className="space-y-2">
         {visibleRuntimes.map((runtime) => {
           const [vendor] = runtime.vendors;
-          const providerAllowed = vendor ? isProviderAllowed(policy, vendor.vendorId) : true;
           const defaultCredential = vendor ? defaultCredentialByVendor.get(vendor.vendorId) : null;
           const activePersonal = vendor ? activePersonalByVendor.get(vendor.vendorId) : null;
           const companyAvailable = vendor
             ? credentials.some(
                 (credential) =>
-                  credential.vendorId === vendor.vendorId &&
-                  credential.scope === "company" &&
-                  !credential.disabledByPolicy,
+                  credential.vendorId === vendor.vendorId && credential.scope === "company",
               )
             : false;
-          const available = Boolean(providerAllowed && (companyAvailable || activePersonal));
+          const available = Boolean(companyAvailable || activePersonal);
           const disabledReason = runtimeDisabledReason({
             available,
-            providerAllowed,
             runtimeReason: runtime.disabledReason,
           });
           const providerCredentialSuffix = credentialSuffix({

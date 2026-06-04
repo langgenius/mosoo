@@ -1,9 +1,5 @@
-import type { CredentialPolicy } from "@mosoo/contracts/vendor-credential";
-import { VENDOR_OPENAI_COMPATIBLE } from "@mosoo/runtime-catalog";
-
 import { isTruthy } from "../../../shared/truthiness";
 import { parseCredentialModels } from "./vendor-credential.mapper";
-import { isByokAllowed, isProviderAllowed } from "./vendor-credential.policy";
 import type { VendorCredentialRow } from "./vendor-credential.types";
 export interface CustomCredentialModelRow {
   modelId: string;
@@ -34,17 +30,6 @@ function compareCredentialRows(left: VendorCredentialRow, right: VendorCredentia
   }
 
   return left.name.localeCompare(right.name) || left.id.localeCompare(right.id);
-}
-
-export function customCredentialAllowedByPolicy(
-  policy: CredentialPolicy,
-  row: VendorCredentialRow,
-): boolean {
-  if (!isProviderAllowed(policy, VENDOR_OPENAI_COMPATIBLE.vendorId)) {
-    return false;
-  }
-
-  return row.ownerUserId === null || isByokAllowed(policy, row.vendorId);
 }
 
 export function listEffectiveCustomCredentialModelRows(

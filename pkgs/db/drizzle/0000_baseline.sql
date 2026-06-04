@@ -660,8 +660,6 @@ CREATE TABLE `organization_member` (
 --> statement-breakpoint
 CREATE TABLE `organization` (
 	`avatar_url` text,
-	`byok_allowed_providers` text,
-	`byok_enabled` integer DEFAULT true NOT NULL,
 	`created_at` integer NOT NULL,
 	`creator_account_id` text CHECK ("creator_account_id" = upper("creator_account_id") AND length("creator_account_id") = 26 AND substr("creator_account_id", 1, 1) GLOB '[0-7]' AND "creator_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`default_environment_id` text CHECK ("default_environment_id" = upper("default_environment_id") AND length("default_environment_id") = 26 AND substr("default_environment_id", 1, 1) GLOB '[0-7]' AND "default_environment_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),

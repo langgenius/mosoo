@@ -6,7 +6,7 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 
 import type { VendorCredential } from "../../domains/vendor-credential/api/vendor-credential-client";
-import { canUseCustomEndpoint } from "../../domains/vendor-credential/model/provider-credential-policy";
+import { canUseCustomEndpoint } from "../../domains/vendor-credential/model/provider-credential-endpoint";
 import { EMPTY_COMPANY_FORM } from "../../domains/vendor-credential/model/provider-credentials-model";
 import type {
   CompanyForm,
@@ -76,9 +76,6 @@ export function ProviderCompanyCredentials({
                     {credential.name}
                   </span>
                   {credential.isDefault ? <Badge variant="primary">Default</Badge> : null}
-                  {credential.disabledByPolicy ? (
-                    <Badge variant="outline">Disabled by policy</Badge>
-                  ) : null}
                 </div>
                 <div className="text-muted-foreground truncate font-mono text-xs">
                   {credential.maskedApiKey}

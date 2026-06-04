@@ -4,7 +4,6 @@ export type VendorCredentialScope = "company" | "personal";
 
 export interface VendorCredential {
   apiBase: string | null;
-  disabledByPolicy: boolean;
   id: VendorCredentialId;
   isDefault: boolean;
   isPreferred: boolean;
@@ -20,19 +19,6 @@ export interface VendorCredential {
 export interface VendorCredentialSummary {
   id: VendorCredentialId;
   name: string;
-  vendorId: string;
-}
-
-export interface CredentialPolicy {
-  allowedProviderIds: string[];
-  byokEnabled: boolean;
-  organizationId: OrganizationId;
-}
-
-export interface VendorCredentialCapability {
-  organizationId: OrganizationId;
-  personalCredentialAllowed: boolean;
-  providerAllowed: boolean;
   vendorId: string;
 }
 
@@ -75,10 +61,4 @@ export interface TestVendorCredentialResult {
 
 export interface DeleteVendorCredentialInput {
   id: VendorCredentialId;
-}
-
-export interface UpdateCredentialPolicyInput {
-  allowedProviderIds: string[];
-  byokEnabled: boolean;
-  organizationId: OrganizationId;
 }

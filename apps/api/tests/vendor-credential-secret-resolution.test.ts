@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 
-import type { CredentialPolicy } from "@mosoo/contracts/vendor-credential";
 import { parsePlatformId } from "@mosoo/id";
 import type { AccountId, OrganizationId, PlatformId, VendorCredentialId } from "@mosoo/id";
 
@@ -30,12 +29,6 @@ const OTHER_CREDENTIAL_ID = parsePlatformId<VendorCredentialId>(
   "01J00000000000000000000008",
   "other credential ID",
 );
-
-const basePolicy: CredentialPolicy = {
-  allowedProviderIds: [],
-  byokEnabled: true,
-  organizationId: ORGANIZATION_ID,
-};
 
 function createSecretDatabase(): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
@@ -320,23 +313,18 @@ describe("vendor credential secret resolution", () => {
     expect(denial).toBe("credential_owner_mismatch");
   });
 
-  test("collects company credential vendors allowed by policy", () => {
+  test("collects available company credential vendors", () => {
     const rows = [
       createCredentialRow({ vendorId: "company-openai" }),
       createCredentialRow({ vendorId: "company-anthropic" }),
-      createCredentialRow({ vendorId: "company-disabled" }),
     ];
-    const policy: CredentialPolicy = {
-      ...basePolicy,
-      allowedProviderIds: ["company-openai", "company-anthropic"],
-    };
 
-    const availableVendorIds = collectAvailableVendorIds(policy, "account-1", rows);
+    const availableVendorIds = collectAvailableVendorIds("account-1", rows);
 
     expect(availableVendorIds).toEqual(new Set(["company-openai", "company-anthropic"]));
   });
 
-  test("collects only the actor's preferred personal credential when BYOK is enabled", () => {
+  test("collects only the actor's preferred personal credential", () => {
     const rows = [
       createCredentialRow({
         isPreferred: 1,
@@ -354,35 +342,10 @@ describe("vendor credential secret resolution", () => {
         vendorId: "other-actor-personal",
       }),
     ];
-    const policy: CredentialPolicy = {
-      ...basePolicy,
-      allowedProviderIds: ["preferred-personal", "non-preferred-personal", "other-actor-personal"],
-      byokEnabled: true,
-    };
 
-    const availableVendorIds = collectAvailableVendorIds(policy, "account-1", rows);
+    const availableVendorIds = collectAvailableVendorIds("account-1", rows);
 
     expect(availableVendorIds).toEqual(new Set(["preferred-personal"]));
-  });
-
-  test("excludes personal credentials when BYOK is disabled", () => {
-    const rows = [
-      createCredentialRow({
-        isPreferred: 1,
-        ownerUserId: "account-1",
-        vendorId: "preferred-personal",
-      }),
-      createCredentialRow({ vendorId: "company-credential" }),
-    ];
-    const policy: CredentialPolicy = {
-      ...basePolicy,
-      allowedProviderIds: ["preferred-personal", "company-credential"],
-      byokEnabled: false,
-    };
-
-    const availableVendorIds = collectAvailableVendorIds(policy, "account-1", rows);
-
-    expect(availableVendorIds).toEqual(new Set(["company-credential"]));
   });
 
   test("collects available vendor IDs from large credential lists", () => {
@@ -402,24 +365,13 @@ describe("vendor credential secret resolution", () => {
         ownerUserId: "account-1",
         vendorId: "non-preferred-personal",
       }),
-      createCredentialRow({
-        vendorId: "disabled-company",
-      }),
     ];
-    const policy: CredentialPolicy = {
-      ...basePolicy,
-      allowedProviderIds: rows
-        .map((row) => row.vendorId)
-        .filter((vendorId) => vendorId !== "disabled-company"),
-      byokEnabled: true,
-    };
 
-    const availableVendorIds = collectAvailableVendorIds(policy, "account-1", rows);
+    const availableVendorIds = collectAvailableVendorIds("account-1", rows);
 
     expect(availableVendorIds.has("company-000")).toBe(true);
     expect(availableVendorIds.has("company-119")).toBe(true);
     expect(availableVendorIds.has("preferred-personal")).toBe(true);
     expect(availableVendorIds.has("non-preferred-personal")).toBe(false);
-    expect(availableVendorIds.has("disabled-company")).toBe(false);
   });
 });

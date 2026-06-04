@@ -1,38 +1,16 @@
-import { organizationsTable, vendorCredentialsTable } from "@mosoo/db";
+import { vendorCredentialsTable } from "@mosoo/db";
 import type { AccountId, OrganizationId, VendorCredentialId } from "@mosoo/id";
 import { and, asc, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
-import type { CredentialPolicyRow, VendorCredentialRow } from "./vendor-credential.types";
+import type { VendorCredentialRow } from "./vendor-credential.types";
 export interface PreferredPersonalCredentialRequest {
   actorAccountId: AccountId;
   database: D1Database;
   organizationId: OrganizationId;
   vendorId: string;
-}
-
-export async function getCredentialPolicyRow(
-  database: D1Database,
-  organizationId: OrganizationId,
-): Promise<CredentialPolicyRow> {
-  const row =
-    (await getAppDatabase(database)
-      .select({
-        byokAllowedProviders: organizationsTable.byokAllowedProviders,
-        byokEnabled: sql<number>`${organizationsTable.byokEnabled}`,
-      })
-      .from(organizationsTable)
-      .where(eq(organizationsTable.id, organizationId))
-      .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    throw new Error("Organization not found.");
-  }
-
-  return row;
 }
 
 function selectVendorCredentialRows(database: D1Database) {

@@ -24,8 +24,6 @@ import {
   vendorProbeModelListIncludes,
 } from "./vendor-credential-probe";
 import { normalizeApiBase } from "./vendor-credential-validation";
-import { getPersonalCredentialPolicyError, toCredentialPolicy } from "./vendor-credential.policy";
-import { getCredentialPolicyRow } from "./vendor-credential.repository";
 
 export interface VendorCredentialProbeInput {
   allowChatCompletionProbe?: boolean;
@@ -119,15 +117,6 @@ async function ensureCredentialTestAccess(
   }
 
   await ensureOrganizationMembership(database, viewer.id, input.organizationId);
-  const policy = toCredentialPolicy(
-    input.organizationId,
-    await getCredentialPolicyRow(database, input.organizationId),
-  );
-  const policyError = getPersonalCredentialPolicyError(policy, input.vendorId);
-
-  if (policyError !== null) {
-    throw new Error(policyError);
-  }
 }
 
 export async function testVendorCredential(

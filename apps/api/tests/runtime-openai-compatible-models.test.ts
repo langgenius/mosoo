@@ -10,9 +10,7 @@ function createAvailableModelsDatabase(): D1Database {
 
   database.execute(`
     CREATE TABLE organization (
-      id TEXT PRIMARY KEY,
-      byok_allowed_providers TEXT,
-      byok_enabled INTEGER NOT NULL
+      id TEXT PRIMARY KEY
     );
 
     CREATE TABLE vendor_credential (
@@ -30,8 +28,7 @@ function createAvailableModelsDatabase(): D1Database {
       vendor_id TEXT NOT NULL
     );
 
-    INSERT INTO organization (id, byok_allowed_providers, byok_enabled)
-    VALUES ('01J00000000000000000000006', NULL, 1);
+    INSERT INTO organization (id) VALUES ('01J00000000000000000000006');
   `);
 
   return database;

@@ -331,8 +331,6 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
     .insert(organizationsTable)
     .values({
       avatarUrl: null,
-      byokAllowedProviders: null,
-      byokEnabled: true,
       createdAt: nowMs,
       creatorAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
       defaultEnvironmentId: PUBLIC_API_TEST_IDS.environment,

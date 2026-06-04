@@ -6,7 +6,7 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Switch } from "@/shared/ui/switch";
 
-import { canUseCustomEndpoint } from "../../domains/vendor-credential/model/provider-credential-policy";
+import { canUseCustomEndpoint } from "../../domains/vendor-credential/model/provider-credential-endpoint";
 import { EMPTY_PERSONAL_FORM } from "../../domains/vendor-credential/model/provider-credentials-model";
 import type {
   PersonalForm,

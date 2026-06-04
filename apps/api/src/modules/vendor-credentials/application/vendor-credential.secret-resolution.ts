@@ -1,4 +1,4 @@
-import type { CredentialPolicy, VendorCredentialScope } from "@mosoo/contracts/vendor-credential";
+import type { VendorCredentialScope } from "@mosoo/contracts/vendor-credential";
 import { vaultSecretsTable } from "@mosoo/db";
 import type { AccountId, OrganizationId, PlatformId, VendorCredentialId } from "@mosoo/id";
 import { VENDOR_OPENAI_COMPATIBLE } from "@mosoo/runtime-catalog";
@@ -11,15 +11,10 @@ import {
   readSecretOutcome,
   storeSecret,
 } from "../../mcp/application/mcp-secret-store";
-import {
-  customCredentialAllowedByPolicy,
-  findCustomCredentialRowForModel,
-} from "./vendor-credential-custom-models";
+import { findCustomCredentialRowForModel } from "./vendor-credential-custom-models";
 import { credentialScope } from "./vendor-credential.mapper";
-import { isByokAllowed, isProviderAllowed, toCredentialPolicy } from "./vendor-credential.policy";
 import {
   getCompanyCredentialRow,
-  getCredentialPolicyRow,
   getPreferredPersonalCredentialRow,
   listReachableCustomCredentialRows,
 } from "./vendor-credential.repository";
@@ -160,11 +155,9 @@ async function readVaultSecretKind(
 }
 
 export function collectAvailableVendorIds(
-  policy: CredentialPolicy,
   actorAccountId: string,
   rows: readonly VendorCredentialRow[],
 ): Set<string> {
-  const allowedProviderIds = new Set(policy.allowedProviderIds);
   const availabilityByVendorId = new Map<
     string,
     { hasCompanyCredential: boolean; hasPreferredPersonalCredential: boolean }
@@ -173,11 +166,6 @@ export function collectAvailableVendorIds(
 
   for (const row of rows) {
     const vendorId = row.vendorId;
-
-    if (!allowedProviderIds.has(vendorId)) {
-      continue;
-    }
-
     let availability = availabilityByVendorId.get(vendorId);
 
     if (availability === undefined) {
@@ -193,7 +181,7 @@ export function collectAvailableVendorIds(
       continue;
     }
 
-    if (policy.byokEnabled && row.ownerUserId === actorAccountId && row.isPreferred === 1) {
+    if (row.ownerUserId === actorAccountId && row.isPreferred === 1) {
       availability.hasPreferredPersonalCredential = true;
     }
   }
@@ -358,21 +346,14 @@ export async function resolveVendorApiKey({
   organizationId,
   vendorId,
 }: ResolveVendorApiKeyRequest): Promise<ResolvedVendorCredential | null> {
-  const policy = toCredentialPolicy(
-    organizationId,
-    await getCredentialPolicyRow(bindings.DB, organizationId),
-  );
-
-  if (!isProviderAllowed(policy, vendorId)) {
-    return null;
-  }
-
   const modelId = options.modelId;
 
   if (vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId && modelId !== undefined) {
-    const rows = (
-      await listReachableCustomCredentialRows(bindings.DB, actorAccountId, organizationId)
-    ).filter((row) => customCredentialAllowedByPolicy(policy, row));
+    const rows = await listReachableCustomCredentialRows(
+      bindings.DB,
+      actorAccountId,
+      organizationId,
+    );
     const row = findCustomCredentialRowForModel(rows, modelId);
 
     if (!row) {
@@ -388,14 +369,12 @@ export async function resolveVendorApiKey({
     });
   }
 
-  const personal = isByokAllowed(policy, vendorId)
-    ? await getPreferredPersonalCredentialRow({
-        actorAccountId,
-        database: bindings.DB,
-        organizationId,
-        vendorId,
-      })
-    : null;
+  const personal = await getPreferredPersonalCredentialRow({
+    actorAccountId,
+    database: bindings.DB,
+    organizationId,
+    vendorId,
+  });
   const row = personal ?? (await getCompanyCredentialRow(bindings.DB, organizationId, vendorId));
 
   if (!row) {

@@ -55,7 +55,6 @@ export interface ProviderCredentialsModel
   loading: boolean;
   personalForm: PersonalForm;
   personalProviderTest: TestConnectionState;
-  policy: ReturnType<typeof useVendorCredentialsQuery>["policy"];
   runtimesByVendor: Map<string, string[]>;
   saving: boolean;
   setCompanyForm: (form: CompanyForm) => void;
@@ -90,10 +89,7 @@ export function useProviderCredentialsModel({
     useState<CustomProviderDeleteDialogState>(EMPTY_DELETE_DIALOG_STATE);
   const isAdmin = can(organization.viewerRole, Permission.ProvidersCompanyManage);
   const queryClient = useQueryClient();
-  const { credentials, credentialsQuery, loading, policy } = useVendorCredentialsQuery(
-    organization.id,
-    isAdmin,
-  );
+  const { credentials, credentialsQuery, loading } = useVendorCredentialsQuery(organization.id);
   const error =
     actionError ??
     (credentialsQuery.error ? getErrorMessage(credentialsQuery.error, "Failed to load.") : null);
@@ -104,7 +100,7 @@ export function useProviderCredentialsModel({
     runtimesByVendor,
     visibleRuntimes,
     visibleVendors,
-  } = useProviderCredentialDerivedModel({ credentials, isAdmin, policy });
+  } = useProviderCredentialDerivedModel({ credentials });
 
   async function refreshCredentials(): Promise<void> {
     await Promise.all([
@@ -172,7 +168,6 @@ export function useProviderCredentialsModel({
     loading,
     personalForm,
     personalProviderTest,
-    policy,
     runtimesByVendor,
     saving,
     ...saveActions,

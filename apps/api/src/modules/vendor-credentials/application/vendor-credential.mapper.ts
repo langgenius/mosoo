@@ -1,11 +1,6 @@
-import type {
-  CredentialPolicy,
-  VendorCredential,
-  VendorCredentialScope,
-} from "@mosoo/contracts/vendor-credential";
+import type { VendorCredential, VendorCredentialScope } from "@mosoo/contracts/vendor-credential";
 
 import { isTruthy } from "../../../shared/truthiness";
-import { credentialDisabledByPolicy } from "./vendor-credential.policy";
 import type { VendorCredentialRow } from "./vendor-credential.types";
 function maskApiKey(apiKey: string): string {
   if (apiKey.length <= 8) {
@@ -41,14 +36,10 @@ export function credentialScope(row: VendorCredentialRow): VendorCredentialScope
 
 export function toVendorCredentialWithSecret(
   row: VendorCredentialRow,
-  policy: CredentialPolicy,
   apiKey: string,
 ): VendorCredential {
-  const scope = credentialScope(row);
-
   return {
     apiBase: row.apiBase,
-    disabledByPolicy: credentialDisabledByPolicy(policy, scope, row.vendorId),
     id: row.id,
     isDefault: row.isDefault === 1,
     isPreferred: row.isPreferred === 1,
@@ -57,7 +48,7 @@ export function toVendorCredentialWithSecret(
     name: row.name,
     organizationId: row.organizationId,
     ownerUserId: row.ownerUserId,
-    scope,
+    scope: credentialScope(row),
     vendorId: row.vendorId,
   };
 }

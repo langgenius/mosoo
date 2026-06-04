@@ -34,9 +34,7 @@ function createCredentialRuntimeDatabase(): SqliteD1Database {
 
   database.execute(`
     CREATE TABLE organization (
-      id text PRIMARY KEY NOT NULL,
-      byok_allowed_providers text,
-      byok_enabled integer NOT NULL
+      id text PRIMARY KEY NOT NULL
     );
 
     CREATE TABLE vendor_credential (
@@ -66,8 +64,7 @@ function createCredentialRuntimeDatabase(): SqliteD1Database {
       wrapped_dek_iv text NOT NULL
     );
 
-    INSERT INTO organization (id, byok_allowed_providers, byok_enabled)
-    VALUES ('${ORGANIZATION_ID}', NULL, 1);
+    INSERT INTO organization (id) VALUES ('${ORGANIZATION_ID}');
   `);
 
   return database;

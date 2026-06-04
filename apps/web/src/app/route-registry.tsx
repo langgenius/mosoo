@@ -65,10 +65,6 @@ const Providers = lazyNamed(
   async () => import("../routes/providers/providers.route"),
   "ProvidersPage",
 );
-const CredentialPolicy = lazyNamed(
-  async () => import("../routes/credential-policy/credential-policy.route"),
-  "CredentialPolicyPage",
-);
 const Members = lazyNamed(async () => import("../routes/members/members.route"), "MembersPage");
 const Cost = lazyNamed(async () => import("../routes/cost/cost.route"), "CostPage");
 const SettingsLayout = lazyNamed(
@@ -167,7 +163,6 @@ const appRoutes = [
       { element: <SettingsOrganizationGeneral />, path: "general" },
       { element: <Members />, path: "members" },
       { element: <SettingsOrganizationEnvironments />, path: "environments" },
-      { element: <CredentialPolicy />, path: "credential-policy" },
     ],
     element: protectedRoute(<SettingsLayout />),
     path: "/settings",
@@ -186,10 +181,6 @@ const appRoutes = [
       </OrganizationPermissionRoute>,
     ),
     path: "/cost",
-  },
-  {
-    element: protectedRoute(<Navigate to="/settings/credential-policy" replace />),
-    path: "/credential-policy",
   },
   { element: protectedRoute(<ProviderDemo />), path: "/demo/provider" },
 ] satisfies RouteObject[];

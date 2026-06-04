@@ -1,6 +1,7 @@
 import { toOrganizationId } from "@/routes/typed-id";
 
 import { testVendorCredential } from "../api/vendor-credential-client";
+import { canUseCustomEndpoint } from "./provider-credential-endpoint";
 import { getErrorMessage } from "./provider-credential-error";
 import type {
   CompanyForm,
@@ -8,7 +9,6 @@ import type {
   PersonalForm,
   TestConnectionState,
 } from "./provider-credential-form-state";
-import { canUseCustomEndpoint } from "./provider-credential-policy";
 import { formatProviderErrorMessage } from "./provider-readiness-copy";
 
 type Setter<T> = (value: T) => void;

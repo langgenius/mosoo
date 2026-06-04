@@ -3,19 +3,12 @@ import { describe, expect, test } from "bun:test";
 import { resolveAvailableModels } from "../src/modules/vendor-credentials/application/available-models";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
-function createAvailableModelsDatabase(
-  input: {
-    allowedProviders?: string | null;
-  } = {},
-): SqliteD1Database {
+function createAvailableModelsDatabase(): SqliteD1Database {
   const database = new SqliteD1Database();
-  const allowedProviders = input.allowedProviders ?? null;
 
   database.execute(`
     CREATE TABLE organization (
-      id text PRIMARY KEY NOT NULL,
-      byok_enabled integer DEFAULT 1 NOT NULL,
-      byok_allowed_providers text
+      id text PRIMARY KEY NOT NULL
     );
 
     CREATE TABLE vendor_credential (
@@ -31,12 +24,7 @@ function createAvailableModelsDatabase(
       is_preferred integer DEFAULT 0 NOT NULL
     );
 
-    INSERT INTO organization (id, byok_enabled, byok_allowed_providers)
-    VALUES (
-      '01J00000000000000000000006',
-      1,
-      ${allowedProviders === null ? "NULL" : `'${allowedProviders}'`}
-    );
+    INSERT INTO organization (id) VALUES ('01J00000000000000000000006');
 
     INSERT INTO vendor_credential (
       id,
@@ -127,30 +115,6 @@ describe("available models", () => {
       reason: "wrong-runtime",
       statusDetail: "Anthropic is not available for System Agent.",
       statusLabel: "Not available",
-    });
-  });
-
-  test("does not expose custom models when organization policy disables the provider", async () => {
-    const entries = await resolveAvailableModels(
-      createAvailableModelsDatabase({ allowedProviders: "openai" }),
-      {
-        accountId: "account-1",
-        organizationId: "01J00000000000000000000006",
-        runtimeId: "openai-runtime",
-      },
-    );
-
-    expect(
-      entries.some(
-        (entry) => entry.vendorId === "openai-compatible" && entry.modelId === "qwen-coder",
-      ),
-    ).toBe(false);
-    expect(
-      entries.find((entry) => entry.vendorId === "openai" && entry.modelId === "gpt-5.4"),
-    ).toMatchObject({
-      available: true,
-      statusDetail: null,
-      statusLabel: "Available",
     });
   });
 

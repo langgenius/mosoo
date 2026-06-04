@@ -14,11 +14,6 @@ export interface VendorCredentialRow {
   organizationId: OrganizationId;
 }
 
-export interface CredentialPolicyRow {
-  byokAllowedProviders: string | null;
-  byokEnabled: number;
-}
-
 export interface ResolvedVendorCredential {
   apiBase: string | null;
   apiKey: string;

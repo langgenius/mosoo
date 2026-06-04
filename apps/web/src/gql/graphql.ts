@@ -870,12 +870,6 @@ export type UpdateCollaboratorInput = {
   userId: PlatformId;
 };
 
-export type UpdateCredentialPolicyInput = {
-  allowedProviderIds: Array<string>;
-  byokEnabled: boolean;
-  organizationId: PlatformId;
-};
-
 export type UpdateEnvironmentInput = {
   allowMcpServers: boolean;
   allowPackageManagers: boolean;
@@ -1868,40 +1862,26 @@ export type SetSystemAgentModelMutationVariables = Exact<{
 
 export type SetSystemAgentModelMutation = { setSystemAgentModel: { id: PlatformId, systemAgentModel: { modelId: string, vendor: string } | null } };
 
-export type VendorCredentialsWithPolicyQueryVariables = Exact<{
-  organizationId: PlatformId;
-}>;
-
-
-export type VendorCredentialsWithPolicyQuery = { credentialPolicy: { allowedProviderIds: Array<string>, byokEnabled: boolean, organizationId: PlatformId }, vendorCredentialList: Array<{ apiBase: string | null, disabledByPolicy: boolean, id: PlatformId, isDefault: boolean, isPreferred: boolean, maskedApiKey: string, models: Array<string> | null, name: string, ownerUserId: PlatformId | null, scope: VendorCredentialScope, vendorId: string, organizationId: PlatformId }> };
-
 export type VendorCredentialListQueryVariables = Exact<{
   organizationId: PlatformId;
 }>;
 
 
-export type VendorCredentialListQuery = { vendorCredentialCapabilities: Array<{ organizationId: PlatformId, personalCredentialAllowed: boolean, providerAllowed: boolean, vendorId: string }>, vendorCredentialList: Array<{ apiBase: string | null, disabledByPolicy: boolean, id: PlatformId, isDefault: boolean, isPreferred: boolean, maskedApiKey: string, models: Array<string> | null, name: string, ownerUserId: PlatformId | null, scope: VendorCredentialScope, vendorId: string, organizationId: PlatformId }> };
+export type VendorCredentialListQuery = { vendorCredentialList: Array<{ apiBase: string | null, id: PlatformId, isDefault: boolean, isPreferred: boolean, maskedApiKey: string, models: Array<string> | null, name: string, ownerUserId: PlatformId | null, scope: VendorCredentialScope, vendorId: string, organizationId: PlatformId }> };
 
 export type CreateVendorCredentialMutationVariables = Exact<{
   input: CreateVendorCredentialInput;
 }>;
 
 
-export type CreateVendorCredentialMutation = { createVendorCredential: { apiBase: string | null, disabledByPolicy: boolean, id: PlatformId, isDefault: boolean, isPreferred: boolean, maskedApiKey: string, models: Array<string> | null, name: string, ownerUserId: PlatformId | null, scope: VendorCredentialScope, vendorId: string, organizationId: PlatformId } };
+export type CreateVendorCredentialMutation = { createVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, isPreferred: boolean, maskedApiKey: string, models: Array<string> | null, name: string, ownerUserId: PlatformId | null, scope: VendorCredentialScope, vendorId: string, organizationId: PlatformId } };
 
 export type UpdateVendorCredentialMutationVariables = Exact<{
   input: UpdateVendorCredentialInput;
 }>;
 
 
-export type UpdateVendorCredentialMutation = { updateVendorCredential: { apiBase: string | null, disabledByPolicy: boolean, id: PlatformId, isDefault: boolean, isPreferred: boolean, maskedApiKey: string, models: Array<string> | null, name: string, ownerUserId: PlatformId | null, scope: VendorCredentialScope, vendorId: string, organizationId: PlatformId } };
-
-export type UpdateCredentialPolicyMutationVariables = Exact<{
-  input: UpdateCredentialPolicyInput;
-}>;
-
-
-export type UpdateCredentialPolicyMutation = { updateCredentialPolicy: { allowedProviderIds: Array<string>, byokEnabled: boolean, organizationId: PlatformId } };
+export type UpdateVendorCredentialMutation = { updateVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, isPreferred: boolean, maskedApiKey: string, models: Array<string> | null, name: string, ownerUserId: PlatformId | null, scope: VendorCredentialScope, vendorId: string, organizationId: PlatformId } };
 
 export type DeleteVendorCredentialMutationVariables = Exact<{
   input: DeleteVendorCredentialInput;
@@ -5740,40 +5720,10 @@ export const SetSystemAgentModelDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SetSystemAgentModelMutation, SetSystemAgentModelMutationVariables>;
-export const VendorCredentialsWithPolicyDocument = new TypedDocumentString(`
-    query VendorCredentialsWithPolicy($organizationId: ULID!) {
-  credentialPolicy(organizationId: $organizationId) {
-    allowedProviderIds
-    byokEnabled
-    organizationId
-  }
-  vendorCredentialList(organizationId: $organizationId) {
-    apiBase
-    disabledByPolicy
-    id
-    isDefault
-    isPreferred
-    maskedApiKey
-    models
-    name
-    ownerUserId
-    scope
-    vendorId
-    organizationId
-  }
-}
-    `) as unknown as TypedDocumentString<VendorCredentialsWithPolicyQuery, VendorCredentialsWithPolicyQueryVariables>;
 export const VendorCredentialListDocument = new TypedDocumentString(`
     query VendorCredentialList($organizationId: ULID!) {
-  vendorCredentialCapabilities(organizationId: $organizationId) {
-    organizationId
-    personalCredentialAllowed
-    providerAllowed
-    vendorId
-  }
   vendorCredentialList(organizationId: $organizationId) {
     apiBase
-    disabledByPolicy
     id
     isDefault
     isPreferred
@@ -5791,7 +5741,6 @@ export const CreateVendorCredentialDocument = new TypedDocumentString(`
     mutation CreateVendorCredential($input: CreateVendorCredentialInput!) {
   createVendorCredential(input: $input) {
     apiBase
-    disabledByPolicy
     id
     isDefault
     isPreferred
@@ -5809,7 +5758,6 @@ export const UpdateVendorCredentialDocument = new TypedDocumentString(`
     mutation UpdateVendorCredential($input: UpdateVendorCredentialInput!) {
   updateVendorCredential(input: $input) {
     apiBase
-    disabledByPolicy
     id
     isDefault
     isPreferred
@@ -5823,15 +5771,6 @@ export const UpdateVendorCredentialDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<UpdateVendorCredentialMutation, UpdateVendorCredentialMutationVariables>;
-export const UpdateCredentialPolicyDocument = new TypedDocumentString(`
-    mutation UpdateCredentialPolicy($input: UpdateCredentialPolicyInput!) {
-  updateCredentialPolicy(input: $input) {
-    allowedProviderIds
-    byokEnabled
-    organizationId
-  }
-}
-    `) as unknown as TypedDocumentString<UpdateCredentialPolicyMutation, UpdateCredentialPolicyMutationVariables>;
 export const DeleteVendorCredentialDocument = new TypedDocumentString(`
     mutation DeleteVendorCredential($input: DeleteVendorCredentialInput!) {
   deleteVendorCredential(input: $input) {

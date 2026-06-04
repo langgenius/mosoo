@@ -7,13 +7,12 @@ import type {
 import { vendorCredentialsTable } from "@mosoo/db";
 import { ignorePromiseRejection } from "@mosoo/effects";
 import { createPlatformId } from "@mosoo/id";
-import type { AccountId, OrganizationId, VendorCredentialId } from "@mosoo/id";
+import type { AccountId, VendorCredentialId } from "@mosoo/id";
 import { getVendor } from "@mosoo/runtime-catalog";
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
@@ -33,9 +32,7 @@ import {
   parseCredentialModels,
   toVendorCredentialWithSecret,
 } from "./vendor-credential.mapper";
-import { getPersonalCredentialPolicyError, toCredentialPolicy } from "./vendor-credential.policy";
 import {
-  getCredentialPolicyRow,
   getCredentialRow,
   hasDefaultCompanyCredential,
   setCompanyCredentialAsDefault,
@@ -47,10 +44,6 @@ import {
   storeVendorCredentialSecret,
 } from "./vendor-credential.secret-resolution";
 import type { VendorCredentialRow } from "./vendor-credential.types";
-async function loadPolicy(database: D1Database, organizationId: OrganizationId) {
-  return toCredentialPolicy(organizationId, await getCredentialPolicyRow(database, organizationId));
-}
-
 function toSecretOwnerCommand(input: { actorAccountId: AccountId; row: VendorCredentialRow }) {
   return {
     actorAccountId: input.actorAccountId,
@@ -74,7 +67,6 @@ async function toVisibleVendorCredential(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   row: VendorCredentialRow,
-  policy: Awaited<ReturnType<typeof loadPolicy>>,
 ): Promise<VendorCredential> {
   const secret = await readVendorCredentialSecret(bindings, {
     actorAccountId: viewer.id,
@@ -88,7 +80,7 @@ async function toVisibleVendorCredential(
     throw new Error("Vendor credential secret is unavailable.");
   }
 
-  return toVendorCredentialWithSecret(row, policy, secret.apiKey);
+  return toVendorCredentialWithSecret(row, secret.apiKey);
 }
 
 export async function createVendorCredential(
@@ -116,12 +108,6 @@ export async function createVendorCredential(
     await ensureOrganizationAdmin(bindings.DB, viewer.id, input.organizationId);
   } else {
     await ensureOrganizationMembership(bindings.DB, viewer.id, input.organizationId);
-    const policy = await loadPolicy(bindings.DB, input.organizationId);
-    const policyError = getPersonalCredentialPolicyError(policy, input.vendorId);
-
-    if (isTruthy(policyError)) {
-      throw new Error(policyError);
-    }
   }
 
   const id = createPlatformId<VendorCredentialId>();
@@ -209,9 +195,7 @@ export async function createVendorCredential(
     throw new Error("Vendor credential could not be loaded.");
   }
 
-  const policy = await loadPolicy(bindings.DB, input.organizationId);
-  const credential = await toVisibleVendorCredential(bindings, viewer, row, policy);
-  return credential;
+  return toVisibleVendorCredential(bindings, viewer, row);
 }
 
 export async function updateVendorCredential(
@@ -233,19 +217,6 @@ export async function updateVendorCredential(
     throw new Error("Vendor credential not found.");
   } else {
     await ensureOrganizationMembership(bindings.DB, viewer.id, row.organizationId);
-
-    const requiresByokPolicy =
-      input.isPreferred === true ||
-      input.name !== undefined ||
-      input.apiKey !== undefined ||
-      input.apiBase !== undefined ||
-      input.models !== undefined;
-    const policy = requiresByokPolicy ? await loadPolicy(bindings.DB, row.organizationId) : null;
-    const policyError = policy ? getPersonalCredentialPolicyError(policy, row.vendorId) : null;
-
-    if (isTruthy(policyError)) {
-      throw new Error(policyError);
-    }
   }
 
   const name = input.name !== undefined ? normalizeCredentialName(input.name) : row.name;
@@ -326,10 +297,7 @@ export async function updateVendorCredential(
     throw new Error("Vendor credential could not be loaded.");
   }
 
-  const policy = await loadPolicy(bindings.DB, row.organizationId);
-  const credential = await toVisibleVendorCredential(bindings, viewer, updated, policy);
-
-  return credential;
+  return toVisibleVendorCredential(bindings, viewer, updated);
 }
 
 export async function deleteVendorCredential(

@@ -7,12 +7,9 @@ import { isTruthy } from "../../../shared/truthiness";
 import {
   createVendorCredential,
   deleteVendorCredential,
-  getCredentialPolicy,
-  listVendorCredentialCapabilities,
   listVendorCredentials,
   resolveAvailableModelsForViewer,
   testVendorCredential,
-  updateCredentialPolicy,
   updateVendorCredential,
 } from "../application/vendor-credential.service";
 
@@ -30,10 +27,6 @@ interface UpdateVendorCredentialArgs {
 
 interface DeleteVendorCredentialArgs {
   input: Parameters<typeof deleteVendorCredential>[2];
-}
-
-interface UpdateCredentialPolicyArgs {
-  input: Parameters<typeof updateCredentialPolicy>[2];
 }
 
 interface AvailableAgentModelsArgs {
@@ -61,8 +54,6 @@ export const vendorCredentialGraphQLModule = {
     },
     testVendorCredential: async (_parent, args: TestVendorCredentialArgs, context) =>
       testVendorCredential(context.bindings, context.viewer, args.input),
-    updateCredentialPolicy: async (_parent, args: UpdateCredentialPolicyArgs, context) =>
-      updateCredentialPolicy(context.bindings.DB, context.viewer, args.input),
     updateVendorCredential: async (_parent, args: UpdateVendorCredentialArgs, context) =>
       updateVendorCredential(context.bindings, context.viewer, args.input),
   },
@@ -73,18 +64,6 @@ export const vendorCredentialGraphQLModule = {
         ...(isTruthy(args.currentVendorId) ? { currentVendorId: args.currentVendorId } : {}),
         runtimeId: args.runtimeId,
       }),
-    credentialPolicy: async (_parent, args: VendorCredentialsArgs, context) =>
-      getCredentialPolicy(
-        context.bindings.DB,
-        context.viewer,
-        parseOrganizationId(args.organizationId),
-      ),
-    vendorCredentialCapabilities: async (_parent, args: VendorCredentialsArgs, context) =>
-      listVendorCredentialCapabilities(
-        context.bindings.DB,
-        context.viewer,
-        parseOrganizationId(args.organizationId),
-      ),
     vendorCredentialList: async (_parent, args: VendorCredentialsArgs, context) =>
       listVendorCredentials(
         context.bindings,

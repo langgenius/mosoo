@@ -954,12 +954,6 @@ enum CreatorMembershipStatus {
   removed
 }
 
-type CredentialPolicy {
-  allowedProviderIds: [String!]!
-  byokEnabled: Boolean!
-  organizationId: ULID!
-}
-
 input DeleteAgentChannelBindingInput {
   bindingId: ULID!
 }
@@ -1416,7 +1410,6 @@ type Mutation {
   updateAgentConfig(input: UpdateAgentConfigInput!): Agent!
   updateAgentPackageSharing(input: UpdateAgentPackageSharingInput!): Agent!
   updateCollaborator(input: UpdateCollaboratorInput!): Collaborator!
-  updateCredentialPolicy(input: UpdateCredentialPolicyInput!): CredentialPolicy!
   updateEnvironment(input: UpdateEnvironmentInput!): EnvironmentDetail!
   updateOrganizationJoinPolicy(input: UpdateOrganizationJoinPolicyInput!): Organization!
   updateOrganizationMemberRole(input: UpdateOrganizationMemberRoleInput!): OrganizationMember!
@@ -1612,7 +1605,6 @@ type Query {
   agentSessionRetrieve(sessionId: ULID!): AgentSessionRetrieve!
   appInfo: AppInfo!
   availableAgentModels(currentModelId: String, currentVendorId: String, runtimeId: String!): [ResolvedModelEntry!]!
-  credentialPolicy(organizationId: ULID!): CredentialPolicy!
   environment(environmentId: ULID!): EnvironmentDetail!
   exportAgentPackage(agentId: ULID!): AgentPackageExport!
   listSessionResources(sessionId: ULID!): [SessionResource!]!
@@ -1644,7 +1636,6 @@ type Query {
   threadAgentSessionRetrieve(sessionId: ULID!): AgentSessionRetrieve!
   threadSessionMessages(sessionId: ULID!): [SessionMessage!]!
   threadSessionProcessEvents(limit: Int, sessionId: ULID!): [SessionProcessEvent!]!
-  vendorCredentialCapabilities(organizationId: ULID!): [VendorCredentialCapability!]!
   vendorCredentialList(organizationId: ULID!): [VendorCredential!]!
   viewer: Viewer!
 }
@@ -2272,12 +2263,6 @@ input UpdateCollaboratorInput {
   userId: ULID!
 }
 
-input UpdateCredentialPolicyInput {
-  allowedProviderIds: [String!]!
-  byokEnabled: Boolean!
-  organizationId: ULID!
-}
-
 input UpdateEnvironmentInput {
   allowMcpServers: Boolean!
   allowPackageManagers: Boolean!
@@ -2343,7 +2328,6 @@ type UserWarning {
 
 type VendorCredential {
   apiBase: String
-  disabledByPolicy: Boolean!
   id: ULID!
   isDefault: Boolean!
   isPreferred: Boolean!
@@ -2353,13 +2337,6 @@ type VendorCredential {
   organizationId: ULID!
   ownerUserId: ULID
   scope: VendorCredentialScope!
-  vendorId: String!
-}
-
-type VendorCredentialCapability {
-  organizationId: ULID!
-  personalCredentialAllowed: Boolean!
-  providerAllowed: Boolean!
   vendorId: String!
 }
 
