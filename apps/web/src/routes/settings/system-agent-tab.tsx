@@ -176,12 +176,12 @@ export function SystemAgentTab() {
             ) : null}
 
             {isEmpty ? (
-              <div className="mt-3 flex items-start justify-between gap-3 rounded-md border border-dashed border-amber-300/60 bg-amber-50/40 px-3 py-2.5">
+              <div className="border-amber/30 bg-amber-bg/60 mt-3 flex items-start justify-between gap-3 rounded-md border border-dashed px-3 py-2.5">
                 <div className="space-y-0.5">
-                  <div className="text-[12px] font-medium text-amber-900">
+                  <div className="text-amber-fg text-[12px] font-medium">
                     No models available for Agent Builder
                   </div>
-                  <div className="text-[11px] text-amber-900/80">
+                  <div className="text-amber-fg/80 text-[11px]">
                     Configure at least one Provider key (or add an OpenAI-Compatible Provider).
                   </div>
                 </div>

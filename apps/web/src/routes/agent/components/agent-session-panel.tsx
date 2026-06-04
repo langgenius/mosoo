@@ -147,7 +147,7 @@ export function AgentSessionPanel({
   };
 
   return (
-    <div className="flex h-full bg-[#fafafa]" data-testid="agent-session-panel">
+    <div className="bg-paper-200 flex h-full" data-testid="agent-session-panel">
       <div className="flex h-full min-w-0 flex-1 flex-col">
         <AgentSessionPanelHeader
           activeTitle={activeTitle}
@@ -166,7 +166,7 @@ export function AgentSessionPanel({
         />
 
         {isTruthy(model.sessionLoadError) ? (
-          <div className="border-b border-amber-500/20 bg-amber-50/70 px-4 py-2 text-[11px] leading-relaxed text-amber-900/90">
+          <div className="border-amber/25 bg-amber-bg/70 text-amber-fg/90 border-b px-4 py-2 text-[11px] leading-relaxed">
             Failed to load previous sessions. You can still start a new live run.
           </div>
         ) : null}
@@ -181,9 +181,9 @@ export function AgentSessionPanel({
         ) : null}
 
         {model.configurationRefreshRequired ? (
-          <div className="border-b border-amber-500/20 bg-amber-50/70 px-4 py-2.5">
+          <div className="border-amber/25 bg-amber-bg/70 border-b px-4 py-2.5">
             <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0 text-[12px] font-medium text-amber-950">
+              <div className="text-amber-fg min-w-0 text-[12px] font-medium">
                 Start new session to test latest config
               </div>
               <Button
@@ -234,13 +234,13 @@ export function AgentSessionPanel({
           ) : null}
 
           {model.permissionRequests[0] ? (
-            <div className="relative z-20 mb-3 rounded-lg border border-amber-300/50 bg-amber-50 p-3 text-amber-950">
+            <div className="border-amber/25 bg-amber-bg text-amber-fg relative z-20 mb-3 rounded-lg border p-3">
               <div className="flex items-start gap-2">
                 <ShieldAlert className="mt-0.5 size-4 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-semibold">{model.permissionRequests[0].title}</div>
                   {isTruthy(model.permissionRequests[0].rawInput) ? (
-                    <div className="mt-1 truncate font-mono text-[11px] text-amber-900/75">
+                    <div className="text-amber-fg/75 mt-1 truncate font-mono text-[11px]">
                       {model.permissionRequests[0].rawInput}
                     </div>
                   ) : null}

@@ -93,7 +93,7 @@ export function sessionIndicatorClassName(pill: SessionPill): string {
       return "bg-accent";
     }
     case "Needs approval": {
-      return "bg-amber-500";
+      return "bg-amber";
     }
     case "Setup required":
     case "Stopped": {

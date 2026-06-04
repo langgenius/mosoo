@@ -160,7 +160,7 @@ function ThreadRow({
         />
 
         {thread.pinned ? (
-          <Pin className="-mr-1 size-3 shrink-0 text-amber-500" aria-label="Pinned" />
+          <Pin className="text-amber -mr-1 size-3 shrink-0" aria-label="Pinned" />
         ) : null}
 
         <span

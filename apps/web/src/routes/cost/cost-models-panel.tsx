@@ -115,7 +115,7 @@ export function CostModelsPanel({ models }: { models: CostModelRow[] }) {
                   {pricing.needsPricingAction ? (
                     <Link
                       to="/providers"
-                      className="rounded-md border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+                      className="border-amber/30 text-amber-fg hover:bg-amber-bg rounded-md border px-2 py-1 text-xs font-semibold"
                     >
                       Set pricing
                     </Link>
@@ -177,7 +177,9 @@ function ModelDonut({ models, totalCost }: { models: CostModelRow[]; totalCost: 
 }
 
 function vendorColor(index: number): string {
-  const colors = ["#15803d", "#0284c7", "#27272a", "#d97706", "#7c3aed", "#be123c"] as const;
+  // mosoo brand palette: green-600, sky, ink-700, amber, soil, ember — keeps
+  // the chart legible while staying inside the design-system tokens.
+  const colors = ["#5cb300", "#2f6bd4", "#3d434b", "#e0a106", "#7a5230", "#dc2a2a"] as const;
 
-  return colors[index % colors.length] ?? "#27272a";
+  return colors[index % colors.length] ?? "#3d434b";
 }

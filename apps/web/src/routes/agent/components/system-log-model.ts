@@ -88,56 +88,36 @@ export function shortSessionId(sessionId: string): string {
 
 export function familyBadgeClass(family: AgentRuntimeEvent["family"]): string {
   switch (family) {
-    case "diagnostics": {
-      return "border-slate-200 bg-slate-50 text-slate-700";
+    case "diagnostics":
+    case "resource":
+    case "state":
+    case "usage": {
+      return "border-ink-200 bg-ink-50 text-ink-700";
     }
     case "config": {
-      return "border-rose-200 bg-rose-50 text-rose-700";
+      return "border-soil/25 bg-soil-bg text-soil-fg";
     }
-    case "driver": {
-      return "border-amber-200 bg-amber-50 text-amber-800";
+    case "driver":
+    case "permission":
+    case "tool": {
+      return "border-amber/30 bg-amber-bg text-amber-fg";
     }
-    case "file": {
-      return "border-sky-200 bg-sky-50 text-sky-700";
+    case "file":
+    case "input":
+    case "provisioning":
+    case "transport": {
+      return "border-sky/30 bg-sky-bg text-sky-fg";
     }
-    case "input": {
-      return "border-indigo-200 bg-indigo-50 text-indigo-700";
-    }
-    case "lifecycle": {
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "lifecycle":
+    case "run":
+    case "sandbox": {
+      return "border-green-200 bg-success-bg text-success-fg";
     }
     case "message": {
-      return "border-violet-200 bg-violet-50 text-violet-700";
-    }
-    case "permission": {
-      return "border-amber-200 bg-amber-50 text-amber-800";
-    }
-    case "provisioning": {
-      return "border-indigo-200 bg-indigo-50 text-indigo-700";
-    }
-    case "resource": {
-      return "border-stone-200 bg-stone-50 text-stone-700";
-    }
-    case "run": {
-      return "border-blue-200 bg-blue-50 text-blue-700";
-    }
-    case "sandbox": {
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    }
-    case "state": {
-      return "border-teal-200 bg-teal-50 text-teal-700";
-    }
-    case "tool": {
-      return "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700";
-    }
-    case "transport": {
-      return "border-cyan-200 bg-cyan-50 text-cyan-700";
-    }
-    case "usage": {
-      return "border-lime-200 bg-lime-50 text-lime-800";
+      return "border-green-200 bg-green-50 text-green-800";
     }
     default: {
-      return "border-slate-200 bg-slate-50 text-slate-700";
+      return "border-ink-200 bg-ink-50 text-ink-700";
     }
   }
 }

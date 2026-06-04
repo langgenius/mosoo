@@ -107,7 +107,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                     Cancel
                   </Button>
                   <Button
-                    className="border-amber-500/60 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                    className="border-amber/45 text-amber-fg hover:bg-amber-bg hover:text-amber-fg"
                     disabled={unpublishMutation.isPending}
                     onClick={() => unpublishMutation.mutate()}
                     size="sm"
@@ -127,7 +127,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                   </p>
                 </div>
                 <Button
-                  className="w-24 shrink-0 border-amber-500/60 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                  className="w-24 shrink-0 border-amber/45 text-amber-fg hover:bg-amber-bg hover:text-amber-fg"
                   onClick={() => {
                     setConfirmUnpublish(true);
                   }}

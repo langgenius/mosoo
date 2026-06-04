@@ -153,7 +153,7 @@ function MemberRow({
             {isOwner ? (
               <Badge
                 variant="outline"
-                className="border-amber-300 bg-amber-50 text-[10px] text-amber-700"
+                className="border-amber/30 bg-amber-bg text-amber-fg text-[10px]"
               >
                 <Crown className="mr-0.5 size-3" />
                 Owner

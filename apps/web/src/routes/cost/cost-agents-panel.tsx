@@ -116,7 +116,7 @@ function AgentDelta({ agent }: { agent: CostAgentRow }) {
   }
 
   return (
-    <div className={cn("font-mono text-xs", delta > 0 ? "text-amber-700" : "text-green-700")}>
+    <div className={cn("font-mono text-xs", delta > 0 ? "text-amber-fg" : "text-success-fg")}>
       {formatPercent(delta)}
     </div>
   );

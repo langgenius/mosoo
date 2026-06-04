@@ -256,7 +256,7 @@ function Card({ children, className }: { children: ReactNode; className?: string
 function Delta({ value }: { value: number }): ReactElement {
   return (
     <span
-      className={cn("font-mono text-[12.5px]", value > 0 ? "text-amber-700" : "text-[#3A6E0E]")}
+      className={cn("font-mono text-[12.5px]", value > 0 ? "text-amber-fg" : "text-[#3A6E0E]")}
     >
       {value > 0 ? "+" : "−"}
       {Math.abs(value).toFixed(1)}%
@@ -439,7 +439,7 @@ export function CostSection(): ReactElement {
                       <span
                         className={cn(
                           "font-mono text-[12px]",
-                          kpi.down ? "text-[#3A6E0E]" : "text-amber-700",
+                          kpi.down ? "text-[#3A6E0E]" : "text-amber-fg",
                         )}
                       >
                         {kpi.delta}

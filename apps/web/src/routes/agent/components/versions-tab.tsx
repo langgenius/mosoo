@@ -21,7 +21,7 @@ export function VersionsTab({ agent }: { agent: Agent }): ReactElement {
   const runtime = getRuntimeInfo(agent.runtime);
 
   return (
-    <div className="flex h-full flex-col bg-[#fafafa]">
+    <div className="bg-paper-200 flex h-full flex-col">
       <header className="border-border-subtle shrink-0 border-b bg-white px-5 py-4 pr-12">
         <div className="flex items-center gap-3">
           <div className="border-border flex size-8 items-center justify-center rounded-lg border bg-white">

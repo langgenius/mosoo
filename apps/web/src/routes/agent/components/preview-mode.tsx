@@ -193,7 +193,7 @@ export function PreviewMode({
         : null}
       <div className="border-border-subtle flex min-h-0 w-[60%] shrink-0 flex-col border-r">
         {model.dirty && !autoSaveEligible ? (
-          <div className="flex shrink-0 items-start gap-2 border-b border-amber-300/60 bg-amber-50/70 px-4 py-2 text-[12px] text-amber-900">
+          <div className="border-amber/30 bg-amber-bg/70 text-amber-fg flex shrink-0 items-start gap-2 border-b px-4 py-2 text-[12px]">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
             <span>
               Pending changes are not yet applied; the chat below is still using the saved config.
@@ -216,7 +216,7 @@ export function PreviewMode({
         </div>
 
         {showAppliedToast && appliedKind ? (
-          <div className="shrink-0 border-t border-emerald-200/60 bg-emerald-50 px-4 py-2 text-[12px] text-emerald-900">
+          <div className="border-green-200/60 bg-success-bg text-success-fg shrink-0 border-t px-4 py-2 text-[12px]">
             Applied · {appliedToastText(appliedKind)}
           </div>
         ) : null}

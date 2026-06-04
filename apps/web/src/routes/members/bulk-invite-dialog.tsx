@@ -170,7 +170,7 @@ export function BulkInviteDialog({
                 "rounded-lg px-3 py-2 text-[12px]",
                 result.failed.length === 0
                   ? "border border-accent-press/30 bg-accent-soft text-accent-press"
-                  : "border border-amber-300 bg-amber-50 text-amber-800",
+                  : "border-amber/30 bg-amber-bg text-amber-fg border",
               )}
             >
               Sent {result.success} invite{result.success === 1 ? "" : "s"}

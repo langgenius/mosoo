@@ -54,7 +54,7 @@ function formatRelativeTime(iso: string): string {
 
 function EmptyState(): ReactElement {
   return (
-    <div className="flex h-full items-center justify-center bg-[#fafafa] px-8">
+    <div className="flex h-full items-center justify-center bg-paper-200 px-8">
       <div className="max-w-md text-center">
         <div className="text-foreground text-[16px] font-medium">No sessions yet.</div>
         <p className="text-muted-foreground mt-2 text-[13px] leading-6">
@@ -241,7 +241,7 @@ function SessionListView({
   onSelect: (sessionId: string) => void;
 }): ReactElement {
   return (
-    <div className="flex h-full flex-col bg-[#fafafa]" data-testid="agent-diagnostics-logs">
+    <div className="flex h-full flex-col bg-paper-200" data-testid="agent-diagnostics-logs">
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto w-full max-w-5xl p-5">
           <div className="mb-3 flex items-baseline justify-between gap-3">
@@ -300,7 +300,7 @@ function SessionDetailView({
   const replay = getReplayTimestamp(selected);
 
   return (
-    <div className="flex h-full flex-col bg-[#fafafa]" data-testid="agent-diagnostics-logs">
+    <div className="flex h-full flex-col bg-paper-200" data-testid="agent-diagnostics-logs">
       <header className="border-border-subtle border-b bg-white px-5 py-3">
         <div className="flex items-start gap-3">
           <Button

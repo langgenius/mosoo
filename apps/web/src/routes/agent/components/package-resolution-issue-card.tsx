@@ -82,7 +82,7 @@ export function PackageResolutionIssueCard({
           className={cn(
             "shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-normal",
             issue.required && requiredTone === "amber"
-              ? "bg-amber-100 text-amber-900"
+              ? "bg-amber-bg text-amber-fg"
               : "bg-muted text-muted-foreground",
           )}
         >

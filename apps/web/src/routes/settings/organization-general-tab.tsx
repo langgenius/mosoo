@@ -274,7 +274,7 @@ function OrganizationGeneralForm({
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <div className="border-border-soft flex size-16 items-center justify-center rounded-xl border bg-emerald-600 text-xl font-semibold text-white">
+                  <div className="border-border-soft bg-green-600 flex size-16 items-center justify-center rounded-xl border text-xl font-semibold text-white">
                     {initial}
                   </div>
                 )}

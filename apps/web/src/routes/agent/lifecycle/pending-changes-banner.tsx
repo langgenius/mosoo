@@ -73,21 +73,21 @@ export function PendingChangesBanner({
 
   return (
     <>
-      <div className="shrink-0 border-b border-amber-300/60 bg-amber-50/95 px-4 py-2.5">
+      <div className="border-amber/30 bg-amber-bg/95 shrink-0 border-b px-4 py-2.5">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2 text-[12.5px] text-amber-900">
+          <div className="text-amber-fg flex min-w-0 items-center gap-2 text-[12.5px]">
             <ShieldCheck className="size-3.5 shrink-0" />
             <span className="min-w-0 truncate">
               {fieldCount} field{fieldCount === 1 ? "" : "s"} edited ·{" "}
               <span className="font-medium">{model.changePlan.actionLabel}</span>
               {model.changePlan.agentStatePreserved && action !== "direct-update" ? (
-                <span className="text-amber-900/70"> · agent-state preserved</span>
+                <span className="text-amber-fg/70"> · agent-state preserved</span>
               ) : null}
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Button
-              className="gap-1 text-amber-900"
+              className="text-amber-fg gap-1"
               disabled={model.saving}
               onClick={onDiscard}
               size="xs"
@@ -97,7 +97,7 @@ export function PendingChangesBanner({
               Discard
             </Button>
             <Button
-              className="bg-amber-700 hover:bg-amber-800"
+              className="bg-amber hover:bg-amber/85"
               disabled={model.saving}
               onClick={handleApplyClick}
               size="xs"

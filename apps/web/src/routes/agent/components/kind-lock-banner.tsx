@@ -10,9 +10,9 @@ export function KindLockBanner({
   canFork: boolean;
 }) {
   return (
-    <div className="flex items-start gap-2.5 rounded-lg border border-amber-300/70 bg-amber-50 px-3.5 py-2.5">
-      <Lock className="mt-0.5 size-3.5 shrink-0 text-amber-700" />
-      <div className="flex-1 text-[12px] leading-relaxed text-amber-950">
+    <div className="border-amber/30 bg-amber-bg flex items-start gap-2.5 rounded-lg border px-3.5 py-2.5">
+      <Lock className="text-amber-fg mt-0.5 size-3.5 shrink-0" />
+      <div className="text-amber-fg flex-1 text-[12px] leading-relaxed">
         Agent type is locked for this published agent. Fork to switch type; sessions, cost, logs,
         and agent-state stay attached here.
       </div>
@@ -21,7 +21,7 @@ export function KindLockBanner({
           Fork agent
         </Button>
       ) : (
-        <span className="shrink-0 text-[11px] text-amber-800">Contact owner to fork</span>
+        <span className="text-amber-fg shrink-0 text-[11px]">Contact owner to fork</span>
       )}
     </div>
   );

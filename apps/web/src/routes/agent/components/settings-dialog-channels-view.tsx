@@ -169,7 +169,7 @@ function ChannelConnectionPanel({
   const statusTone =
     binding.status === "active"
       ? "border-green-200 bg-green-50 text-green-800"
-      : "border-amber-200 bg-amber-50 text-amber-800";
+      : "border-amber/30 bg-amber-bg text-amber-fg";
   const webhookUrl = getOperatorWebhookUrl(channelId, binding.id);
 
   async function handleCopyWebhook() {
@@ -262,7 +262,7 @@ function ChannelConnectionPanel({
         </div>
       ) : null}
       {binding.status === "error" && binding.lastErrorCode ? (
-        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <div className="mt-3 border-amber/30 bg-amber-bg text-amber-fg rounded-md border px-3 py-2 text-xs">
           {channelId === "discord"
             ? (getDiscordBindingErrorCopy(binding.lastErrorCode) ??
               `${channelLabel} delivery failed with ${binding.lastErrorCode}. Remove and reconnect ${channelLabel} to recover.`)
@@ -411,7 +411,7 @@ export function AgentSettingsChannelsView({
               pendingRemove={pendingRemoveBindingId === selectedBinding.id}
             />
           ) : !isPublished ? (
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <div className="border-amber/30 bg-amber-bg text-amber-fg rounded-md border px-3 py-2 text-xs">
               Publish this Agent before connecting {selectedChannel.label}.
             </div>
           ) : !canManageChannels ? (

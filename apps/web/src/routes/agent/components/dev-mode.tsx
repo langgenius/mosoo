@@ -41,7 +41,7 @@ export function DevMode({
             headerActionTarget,
           )
         : null}
-      <div className="flex h-full min-h-0 bg-[#fafafa]">
+      <div className="bg-paper-200 flex h-full min-h-0">
         <div className="border-border-subtle min-h-0 w-[40%] min-w-[360px] shrink-0 border-r">
           <AgentBuilderPanel
             agent={agent}

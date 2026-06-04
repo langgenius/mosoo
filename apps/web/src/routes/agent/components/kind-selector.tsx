@@ -63,7 +63,7 @@ export function KindSelector({
           </p>
         </div>
         {locked ? (
-          <div className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-300/70 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-900">
+          <div className="border-amber/30 bg-amber-bg text-amber-fg inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium">
             <Lock className="size-3" />
             Locked · Fork to switch
           </div>
@@ -120,7 +120,7 @@ export function KindSelector({
                         </span>
                       ) : null}
                       {isLockedAlternative ? (
-                        <span className="inline-flex items-center gap-0.5 rounded-sm bg-amber-100 px-1.5 py-px text-[10px] font-medium text-amber-900">
+                        <span className="bg-amber-bg text-amber-fg inline-flex items-center gap-0.5 rounded-sm px-1.5 py-px text-[10px] font-medium">
                           <X className="size-2.5" /> Fork required
                         </span>
                       ) : null}

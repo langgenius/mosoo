@@ -109,10 +109,10 @@ function ConfigureStage({
           )
         : null}
       {model.dirty ? (
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-5 py-2.5">
-          <div className="min-w-0 text-[12px] leading-relaxed text-amber-950">
+        <div className="border-amber/30 bg-amber-bg flex shrink-0 items-center justify-between gap-3 border-b px-5 py-2.5">
+          <div className="text-amber-fg min-w-0 text-[12px] leading-relaxed">
             {editedText === null ? null : <span className="font-medium">{editedText}</span>}
-            <span className="text-amber-900/80"> · Save changes before testing in chat.</span>
+            <span className="text-amber-fg/80"> · Save changes before testing in chat.</span>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Button

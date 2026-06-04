@@ -11,9 +11,12 @@ const RUNTIME_COLOR_BY_ID: Record<string, string> = {
   "openai-runtime": "#7A9DFF",
 };
 
+const FALLBACK_RUNTIME_COLOR_INK_700 = "#3d434b";
+const FALLBACK_RUNTIME_COLOR_INK_500 = "#656c75";
+
 function toRuntimeInfo(entry: (typeof PUBLIC_RUNTIME_CATALOG)[number]): RuntimeInfo {
   return {
-    color: RUNTIME_COLOR_BY_ID[entry.runtimeId] ?? "#374151",
+    color: RUNTIME_COLOR_BY_ID[entry.runtimeId] ?? FALLBACK_RUNTIME_COLOR_INK_700,
     defaultModel: entry.defaultModel,
     icon: entry.label
       .split(/\s+/)
@@ -32,7 +35,7 @@ export const RUNTIMES: RuntimeInfo[] = PUBLIC_RUNTIME_CATALOG.map((entry) => toR
 function createExternalRuntimeInfo(runtimeId: string): RuntimeInfo {
   if (runtimeId === "__private_runtime__") {
     return {
-      color: "#6B7280",
+      color: FALLBACK_RUNTIME_COLOR_INK_500,
       defaultModel: "",
       icon: "RT",
       id: runtimeId,
@@ -43,7 +46,7 @@ function createExternalRuntimeInfo(runtimeId: string): RuntimeInfo {
   }
 
   return {
-    color: "#6B7280",
+    color: FALLBACK_RUNTIME_COLOR_INK_500,
     defaultModel: "",
     icon:
       runtimeId

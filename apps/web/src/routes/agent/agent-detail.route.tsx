@@ -116,7 +116,7 @@ function AgentDetailHeader({
           <button
             type="button"
             onClick={onOpenVersions}
-            className="focus-visible:ring-ring ml-1 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900 transition-colors hover:bg-amber-100 focus:outline-none focus-visible:ring-2"
+            className="focus-visible:ring-ring bg-amber-bg text-amber-fg hover:bg-amber-bg/70 ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors focus:outline-none focus-visible:ring-2"
             aria-label="Open version history"
           >
             Draft

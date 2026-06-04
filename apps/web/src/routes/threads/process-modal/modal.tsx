@@ -69,8 +69,8 @@ export function ThreadProcessModal({
                     className={cn(
                       "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide",
                       threadFailed
-                        ? "border-destructive/20 bg-destructive/[0.06] text-destructive"
-                        : "border-emerald-200 bg-emerald-50 text-emerald-700",
+                        ? "border-ember/25 bg-ember-bg text-ember-fg"
+                        : "border-green-200 bg-success-bg text-success-fg",
                     )}
                   >
                     {threadWorking && !threadFailed ? (

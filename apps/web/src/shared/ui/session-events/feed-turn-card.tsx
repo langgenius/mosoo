@@ -156,7 +156,7 @@ export function TurnCard({
         </Button>
       </div>
       {!collapsed && visible ? (
-        <div className="border-border-subtle flex flex-col gap-1.5 border-t bg-[#fbfbfb] p-2.5">
+        <div className="border-border-subtle bg-paper-100 flex flex-col gap-1.5 border-t p-2.5">
           {filteredEvents.map((event) => (
             <SessionEventRow
               key={event.id}

@@ -44,7 +44,7 @@ export function AgentCostTab({ agentId }: { agentId: string }): ReactElement {
   const totals = card?.totals;
 
   return (
-    <div className="h-full overflow-y-auto bg-[#fafafa] px-6 py-5">
+    <div className="bg-paper-200 h-full overflow-y-auto px-6 py-5">
       <div className="mx-auto max-w-6xl space-y-5">
         <div className="flex items-center justify-between gap-4">
           <div>

@@ -175,12 +175,12 @@ export function MembersTab({
           ) : null}
 
           {isTruthy(model.inviteNotice) ? (
-            <div className="flex items-start justify-between gap-3 rounded-lg border border-emerald-200/70 bg-emerald-50/50 p-3 text-sm text-emerald-900">
+            <div className="border-green-200/70 bg-success-bg/60 text-success-fg flex items-start justify-between gap-3 rounded-lg border p-3 text-sm">
               <span>{model.inviteNotice}</span>
               <button
                 type="button"
                 aria-label="Dismiss"
-                className="text-emerald-900/70 hover:text-emerald-900"
+                className="text-success-fg/70 hover:text-success-fg"
                 onClick={handleInviteNoticeDismiss}
               >
                 <X className="size-4" />

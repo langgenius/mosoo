@@ -47,7 +47,7 @@ export function AccessRow(props: AccessRowProps): ReactElement {
           <div className="flex items-center gap-1.5">
             <span className="text-foreground truncate text-sm font-medium">{title}</span>
             {badge ? (
-              <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-600">
+              <span className="bg-amber-bg text-amber-fg rounded-md px-1.5 py-0.5 text-[10px] font-medium">
                 {badge}
               </span>
             ) : null}

@@ -140,10 +140,10 @@ export function modelColor(model: string): string {
     return "bg-green-500";
   }
   if (normalized.includes("gemini")) {
-    return "bg-sky-500";
+    return "bg-sky";
   }
   if (normalized.includes("qwen")) {
-    return "bg-amber-500";
+    return "bg-amber";
   }
   return "bg-ink-500";
 }
@@ -221,8 +221,8 @@ export function filterCostUsers(users: CostUserRow[], query: string): CostUserRo
 export function runMixSegments(agent: CostAgentRow): RunMixSegment[] {
   return [
     { className: "bg-green-600", label: "Production", value: agent.productionCostUsd },
-    { className: "bg-amber-500", label: "Debug", value: agent.debugCostUsd },
-    { className: "bg-sky-500", label: "Preview", value: agent.previewCostUsd },
+    { className: "bg-amber", label: "Debug", value: agent.debugCostUsd },
+    { className: "bg-sky", label: "Preview", value: agent.previewCostUsd },
   ].filter((segment) => segment.value > 0);
 }
 

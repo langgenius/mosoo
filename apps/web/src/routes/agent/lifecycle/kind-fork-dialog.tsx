@@ -156,9 +156,9 @@ function Section({
   tone: "positive" | "warning" | "info" | "muted";
 }) {
   const toneClass = {
-    positive: "text-emerald-700",
-    warning: "text-amber-700",
-    info: "text-sky-700",
+    positive: "text-success-fg",
+    warning: "text-amber-fg",
+    info: "text-sky-fg",
     muted: "text-fg-3",
   }[tone];
 

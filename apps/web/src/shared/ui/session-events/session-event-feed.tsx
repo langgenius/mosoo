@@ -103,7 +103,7 @@ export function SessionEventFeed({ events }: SessionEventFeedProps): ReactElemen
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#fafafa]">
+    <div className="bg-paper-200 flex h-full min-h-0 flex-col">
       <DomainFilterBar
         domains={activeDomains}
         errorsOnly={errorsOnly}

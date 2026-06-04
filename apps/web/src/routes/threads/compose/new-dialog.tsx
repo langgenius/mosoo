@@ -256,8 +256,8 @@ function AgentAssignField({
                         className={cn(
                           "shrink-0 rounded-sm border px-1 py-0.5 text-[9.5px] font-bold uppercase tracking-wide",
                           agent.kind === "pet"
-                            ? "border-purple-200 bg-purple-50 text-purple-700"
-                            : "border-sky-200 bg-sky-50 text-sky-700",
+                            ? "border-soil/25 bg-soil-bg text-soil-fg"
+                            : "border-sky/30 bg-sky-bg text-sky-fg",
                         )}
                       >
                         {agent.kind}
@@ -433,7 +433,7 @@ export function NewThreadDialog({
           ) : null}
 
           {draftSelected ? (
-            <div className="rounded-md border border-amber-500/20 bg-amber-50/80 px-3 py-2 text-[12.5px] text-amber-900">
+            <div className="border-amber/30 bg-amber-bg text-amber-fg rounded-md border px-3 py-2 text-[12.5px]">
               Publish this agent before assigning a Thread.
             </div>
           ) : null}
@@ -445,7 +445,7 @@ export function NewThreadDialog({
           ) : null}
 
           {discardWarning ? (
-            <div className="rounded-md border border-amber-500/20 bg-amber-50/80 px-3 py-2 text-[12.5px] text-amber-900">
+            <div className="border-amber/30 bg-amber-bg text-amber-fg rounded-md border px-3 py-2 text-[12.5px]">
               Closing will discard this draft.
             </div>
           ) : null}

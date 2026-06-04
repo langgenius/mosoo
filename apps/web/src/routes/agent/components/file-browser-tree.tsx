@@ -32,7 +32,7 @@ function getEntryIcon(entry: AgentFileEntry): ReactElement {
 }
 
 function getPersistenceClass(entry: AgentFileEntry): string {
-  return entry.persistence === "persistent" ? "bg-violet-500" : "bg-zinc-300";
+  return entry.persistence === "persistent" ? "bg-green-600" : "bg-ink-300";
 }
 
 function getVisibleEntries(
@@ -57,7 +57,7 @@ export function SandboxStatusNotice({ tree }: { tree: AgentFileTree | null }): R
 
   if (tree.sandboxStatus === "cold" || tree.sandboxStatus === "restoring") {
     return (
-      <div className="border-border-subtle border-b bg-amber-50 px-4 py-2 text-[12px] text-amber-900">
+      <div className="border-border-subtle bg-amber-bg text-amber-fg border-b px-4 py-2 text-[12px]">
         Waking sandbox…
       </div>
     );
@@ -65,7 +65,7 @@ export function SandboxStatusNotice({ tree }: { tree: AgentFileTree | null }): R
 
   if (tree.sandboxStatus === "unsupported") {
     return (
-      <div className="border-border-subtle border-b bg-amber-50 px-4 py-2 text-[12px] text-amber-900">
+      <div className="border-border-subtle bg-amber-bg text-amber-fg border-b px-4 py-2 text-[12px]">
         {tree.lastError ?? "File Browser is not supported for this agent."}
       </div>
     );
@@ -73,7 +73,7 @@ export function SandboxStatusNotice({ tree }: { tree: AgentFileTree | null }): R
 
   if (tree.sandboxStatus === "destroying" || tree.sandboxStatus === "error") {
     return (
-      <div className="border-border-subtle border-b bg-red-50 px-4 py-2 text-[12px] text-red-700">
+      <div className="border-border-subtle bg-ember-bg text-ember-fg border-b px-4 py-2 text-[12px]">
         {tree.lastError ?? "Sandbox is not available."}
       </div>
     );
@@ -188,7 +188,7 @@ function TreeErrorRow({
     <button
       type="button"
       onClick={onRetry}
-      className="flex h-8 w-full items-center gap-2 px-3 text-left text-[12px] text-red-700 hover:bg-red-50"
+      className="text-ember-fg hover:bg-ember-bg flex h-8 w-full items-center gap-2 px-3 text-left text-[12px]"
       style={{ paddingLeft: 12 + depth * 16 }}
     >
       <RefreshCw aria-hidden="true" className="size-3.5" />

@@ -248,12 +248,12 @@ export function WeChatChannelInlineSetup({
       </div>
 
       {agent.status !== "published" ? (
-        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <div className="border-amber/30 bg-amber-bg text-amber-fg mt-4 rounded-md border px-3 py-2 text-xs">
           Publish this Agent before connecting WeChat.
         </div>
       ) : null}
       {startMutation.error || pollMutation.error ? (
-        <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+        <div className="border-ember/25 bg-ember-bg text-ember-fg mt-4 rounded-md border px-3 py-2 text-xs">
           {startMutation.error instanceof Error
             ? startMutation.error.message
             : pollMutation.error instanceof Error

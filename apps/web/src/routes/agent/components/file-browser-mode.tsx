@@ -178,11 +178,11 @@ export function FileBrowserMode({ agent }: { agent: Agent }): ReactElement {
         />
         <div className="border-border-subtle text-muted-foreground flex h-9 shrink-0 items-center gap-4 border-t px-4 text-[11px]">
           <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-violet-500" />
+            <span className="bg-green-600 size-2 rounded-full" />
             Persistent
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-zinc-300" />
+            <span className="bg-ink-300 size-2 rounded-full" />
             Temporary
           </span>
         </div>

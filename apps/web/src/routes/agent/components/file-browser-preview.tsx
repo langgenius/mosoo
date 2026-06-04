@@ -160,7 +160,7 @@ export function FilePreview({
     return (
       <div className="flex h-full items-center justify-center px-6">
         <div className="border-border-subtle rounded-md border bg-white p-5 text-center">
-          <div className="text-[13px] font-medium text-red-700">Failed to load file.</div>
+          <div className="text-ember-fg text-[13px] font-medium">Failed to load file.</div>
           <div className="text-muted-foreground mt-1 max-w-sm text-[12px]">
             {contentError.message}
           </div>

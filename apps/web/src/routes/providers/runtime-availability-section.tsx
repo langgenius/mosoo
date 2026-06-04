@@ -109,7 +109,7 @@ export function RuntimeAvailabilitySection({
               <span
                 className={
                   disabledReason === null
-                    ? "shrink-0 text-xs font-medium text-emerald-700"
+                    ? "text-success-fg shrink-0 text-xs font-medium"
                     : "text-muted-foreground shrink-0 text-xs"
                 }
               >

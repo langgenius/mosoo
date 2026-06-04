@@ -214,8 +214,8 @@ export function OAuthConnectDialog({
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center gap-3 py-10">
-            <div className="flex size-9 items-center justify-center rounded-full bg-emerald-500/15">
-              <Check className="size-4 text-emerald-600" />
+            <div className="bg-green-500/15 flex size-9 items-center justify-center rounded-full">
+              <Check className="text-success-fg size-4" />
             </div>
             <div className="text-foreground text-[13px] font-medium">Authorization complete</div>
           </div>

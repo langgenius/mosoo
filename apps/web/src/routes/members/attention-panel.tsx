@@ -28,15 +28,15 @@ export function AttentionPanel({
   reviewingRequestId: string | null;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-amber-200/70 bg-amber-50/40">
+    <section className="border-amber/25 bg-amber-bg/60 overflow-hidden rounded-xl border">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-amber-50/60"
+        className="hover:bg-amber-bg/80 flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors"
       >
         <div className="flex items-center gap-2.5">
-          <Bell className="size-4 text-amber-600" />
-          <span className="text-[13px] font-semibold text-amber-900">
+          <Bell className="text-amber-fg size-4" />
+          <span className="text-amber-fg text-[13px] font-semibold">
             {accessRequests.length > 0
               ? `${accessRequests.length} access ${accessRequests.length === 1 ? "request" : "requests"}`
               : null}
@@ -47,11 +47,11 @@ export function AttentionPanel({
           </span>
         </div>
         <ChevronRight
-          className={cn("size-4 text-amber-700 transition-transform", open ? "rotate-90" : "")}
+          className={cn("text-amber-fg size-4 transition-transform", open ? "rotate-90" : "")}
         />
       </button>
       {open ? (
-        <div className="bg-background/50 border-t border-amber-200/70">
+        <div className="bg-background/50 border-amber/25 border-t">
           {accessRequests.map((request) => (
             <div
               key={request.id}
@@ -67,7 +67,7 @@ export function AttentionPanel({
                     {isTruthy(request.referrerAccountId) ? "invited by member" : "wants to join"}
                   </span>
                   {isTruthy(request.referrerName) ? (
-                    <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10.5px] font-medium text-amber-800">
+                    <span className="bg-amber-bg text-amber-fg rounded-full px-1.5 py-0.5 text-[10.5px] font-medium">
                       Referred by {request.referrerName}
                     </span>
                   ) : null}

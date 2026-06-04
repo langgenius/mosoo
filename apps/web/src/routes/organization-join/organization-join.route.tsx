@@ -329,7 +329,7 @@ function OrganizationJoinStatusPanel({
   if (status === "member") {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-2 text-emerald-600">
+        <div className="text-success-fg flex items-center gap-2">
           <CheckCircle2 className="size-5" />
           <span className="text-sm font-medium">You already have access</span>
         </div>
@@ -371,7 +371,7 @@ function OrganizationJoinStatusPanel({
   if (status === "pending") {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-2 text-amber-600">
+        <div className="text-amber-fg flex items-center gap-2">
           <Clock3 className="size-5" />
           <span className="text-sm font-medium">Access request pending</span>
         </div>

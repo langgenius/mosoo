@@ -44,18 +44,18 @@ function ReadinessBanner({ agent }: { agent: Agent }) {
     "Resolve configuration before preview or publish.";
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-amber-50/60 px-4 py-3">
+    <div className="border-amber/30 bg-amber-bg/70 rounded-xl border px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-[13px] font-medium text-amber-900">
+          <div className="text-amber-fg flex items-center gap-2 text-[13px] font-medium">
             <AlertTriangle className="size-4" />
             {providerPresentation?.title ?? "Configuration required"}
           </div>
-          <div className="mt-1 text-[12px] leading-relaxed text-amber-900/90">{message}</div>
+          <div className="text-amber-fg/90 mt-1 text-[12px] leading-relaxed">{message}</div>
           {providerPresentation?.originalMessage !== undefined &&
           providerPresentation.originalMessage !== null &&
           providerPresentation.originalMessage !== message ? (
-            <div className="mt-1 text-[11px] leading-relaxed text-amber-900/70">
+            <div className="text-amber-fg/70 mt-1 text-[11px] leading-relaxed">
               {providerPresentation.originalMessage}
             </div>
           ) : null}
@@ -91,7 +91,7 @@ function PackageResolutionBanner({ agent }: { agent: Agent }) {
   return (
     <div className="border-border bg-muted/30 rounded-xl border px-4 py-3">
       <div className="text-foreground flex items-center gap-2 text-[13px] font-medium">
-        <AlertTriangle className="size-4 text-amber-600" />
+        <AlertTriangle className="text-amber-fg size-4" />
         Package repair {blockingIssues.length > 0 ? "required" : "recommended"}
       </div>
       <div className="text-muted-foreground mt-1 text-[12px]">
@@ -218,7 +218,7 @@ export function BasicsSection({
               })}
             </div>
             {agent.status === "published" ? (
-              <div className="rounded-lg border border-amber-500/30 bg-amber-50/60 px-3 py-2 text-[12px] leading-5 text-amber-900">
+              <div className="border-amber/30 bg-amber-bg/70 text-amber-fg rounded-lg border px-3 py-2 text-[12px] leading-5">
                 Runtime is locked for this published Agent. Fork Agent to switch runtime; existing
                 sessions, cost, logs, and agent-state stay attached here.
               </div>

@@ -15,7 +15,7 @@ export function SystemLogMode({ agent }: { agent: Agent }): ReactElement {
   const feed = useSystemLogFeed(agent.id);
 
   return (
-    <div className="flex h-full flex-col bg-[#fafafa]" data-testid="agent-system-log">
+    <div className="bg-paper-200 flex h-full flex-col" data-testid="agent-system-log">
       <header className="border-border-subtle sticky top-0 z-10 flex shrink-0 items-center justify-between gap-4 border-b bg-white px-5 py-3">
         <div className="min-w-0">
           <div className="text-foreground text-[14px] font-medium">System Log</div>
@@ -52,7 +52,7 @@ export function SystemLogMode({ agent }: { agent: Agent }): ReactElement {
       </header>
 
       {feed.liveTailPaused ? (
-        <div className="border-border-subtle border-b bg-amber-50 px-5 py-2 text-[12px] font-medium text-amber-900">
+        <div className="border-border-subtle bg-amber-bg text-amber-fg border-b px-5 py-2 text-[12px] font-medium">
           Live tail paused, retrying…
         </div>
       ) : null}
@@ -121,7 +121,7 @@ export function SystemLogMode({ agent }: { agent: Agent }): ReactElement {
               </div>
 
               {feed.loadOlderError ? (
-                <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+                <div className="border-ember/25 bg-ember-bg text-ember-fg mb-3 rounded-md border px-3 py-2 text-[12px]">
                   {feed.loadOlderError}
                 </div>
               ) : null}

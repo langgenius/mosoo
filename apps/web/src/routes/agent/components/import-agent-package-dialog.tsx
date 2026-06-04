@@ -161,7 +161,7 @@ export function ImportAgentPackageDialog({
           {importResult !== null ? (
             <div className="border-border bg-muted/20 rounded-md border p-3">
               <div className="text-foreground flex items-center gap-2 text-sm font-medium">
-                <CheckCircle2 className="size-4 text-emerald-600" />
+                <CheckCircle2 className="text-success-fg size-4" />
                 Draft created
               </div>
               <div className="text-muted-foreground mt-2 grid gap-2 text-xs sm:grid-cols-3">

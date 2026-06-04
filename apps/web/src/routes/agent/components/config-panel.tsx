@@ -99,11 +99,11 @@ function ConfigPanelContent({
   return (
     <div className="flex h-full min-h-0 flex-col bg-white">
       {!readOnly && model.dirty ? (
-        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2.5">
+        <div className="border-amber/30 bg-amber-bg border-b px-4 py-2.5">
           <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0 text-[12px] leading-relaxed text-amber-950">
+            <div className="text-amber-fg min-w-0 text-[12px] leading-relaxed">
               <span className="font-medium">{editedFieldText}</span>
-              <span className="text-amber-900/80"> · {getPendingChangeCopy(model)}</span>
+              <span className="text-amber-fg/80"> · {getPendingChangeCopy(model)}</span>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Button disabled={model.saving} onClick={handleDiscard} size="xs" variant="ghost">

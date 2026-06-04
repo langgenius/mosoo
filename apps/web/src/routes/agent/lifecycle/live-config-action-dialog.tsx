@@ -134,7 +134,7 @@ export function LiveConfigActionDialog({
           ) : null}
 
           {forkBlocked ? (
-            <div className="rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-900">
+            <div className="border-amber/30 bg-amber-bg text-amber-fg rounded-md border px-3 py-2 text-[12px] leading-relaxed">
               Runtime fork is not yet wired to apply these unsaved changes. To switch runtime,
               create a fork manually and choose the new runtime in the copy.
             </div>
@@ -192,7 +192,7 @@ export function LiveConfigActionDialog({
 function StatePreservationBadge({ preserves }: { preserves: boolean }) {
   if (preserves) {
     return (
-      <div className="flex items-start gap-2 rounded-md bg-emerald-50/60 px-3 py-2 text-[12.5px] text-emerald-900">
+      <div className="bg-success-bg/60 text-success-fg flex items-start gap-2 rounded-md px-3 py-2 text-[12.5px]">
         <ShieldCheck className="mt-0.5 size-3.5" />
         <span>
           Your <span className="font-mono">agent-state</span> is preserved: login, cache, memory,
@@ -202,7 +202,7 @@ function StatePreservationBadge({ preserves }: { preserves: boolean }) {
     );
   }
   return (
-    <div className="flex items-start gap-2 rounded-md bg-red-50 px-3 py-2 text-[12.5px] text-red-900">
+    <div className="bg-ember-bg text-ember-fg flex items-start gap-2 rounded-md px-3 py-2 text-[12.5px]">
       <Lock className="mt-0.5 size-3.5" />
       <span>
         This action will clear <span className="font-mono">agent-state</span>: login, cache, memory,

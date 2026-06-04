@@ -88,7 +88,9 @@
 
   /* Status accents — kept small, marker-level only. Each carries a paired
      darker text (_fg) and soft tint (_bg) so chips can render readable copy
-     on a brand-tinted background without falling back to Tailwind defaults. */
+     on a brand-tinted background without falling back to Tailwind defaults.
+     Values mirror the semantic-status quartet (success / warning / danger /
+     info) in the mosoo design system's colors_and_type.css handoff. */
   --soil: #7a5230;
   --soil-fg: #5b3c22;
   --soil-bg: #f4ece2;
@@ -101,6 +103,8 @@
   --ember: #dc2a2a;
   --ember-fg: #b91c1c;
   --ember-bg: #fbeaea;
+  --success-fg: var(--green-800);
+  --success-bg: #edf9d8;
 
   --bg: var(--paper-100);
   --bg-elevated: #ffffff;
@@ -380,6 +384,8 @@
   --color-sky: var(--sky);
   --color-sky-fg: var(--sky-fg);
   --color-sky-bg: var(--sky-bg);
+  --color-success-fg: var(--success-fg);
+  --color-success-bg: var(--success-bg);
 
   --color-fg-1: var(--fg-1);
   --color-fg-2: var(--fg-2);

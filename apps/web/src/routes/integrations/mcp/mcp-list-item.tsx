@@ -83,7 +83,7 @@ export function McpListItem({
           {mode === "shared" && server.source === "organization_shared" && (
             <ScopeBadge scope={server.credentialScope} serviceAccountReady={isServiceAccount} />
           )}
-          {!server.enabled && <span className="shrink-0 text-[10px] text-amber-600">Disabled</span>}
+          {!server.enabled && <span className="text-amber-fg shrink-0 text-[10px]">Disabled</span>}
         </div>
         {server.description && (
           <p className="text-muted-foreground mt-0.5 truncate text-[12px]">{server.description}</p>
@@ -145,7 +145,7 @@ function ScopeBadge({
       <span
         className={cn(
           "inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[10px] font-bold tracking-[0.02em] shrink-0",
-          serviceAccountReady ? "bg-amber/15 text-[#8a6318]" : "bg-paper-200 text-fg-2",
+          serviceAccountReady ? "bg-amber-bg text-amber-fg" : "bg-paper-200 text-fg-2",
         )}
       >
         <Shield className="size-2.5" />
