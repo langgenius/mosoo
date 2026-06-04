@@ -56,7 +56,7 @@ const CREATE_THREAD_REQUEST_FIELDS: ReadonlySet<string> = new Set([
 export interface ParsedCreateThreadRequest {
   clientExternalRef?: string | undefined;
   fileIds: FileId[];
-  inputText: string;
+  inputText?: string | undefined;
 }
 
 function parseContentLength(value: string | null): number | null {
@@ -119,6 +119,19 @@ async function readRequestTextWithLimit(request: Request, maxBytes: number): Pro
 
 async function readJsonBodyWithLimit(c: RawJsonRequestContext, maxBytes: number): Promise<unknown> {
   return JSON.parse(await readRequestTextWithLimit(c.req.raw, maxBytes));
+}
+
+async function readOptionalJsonBodyWithLimit(
+  c: RawJsonRequestContext,
+  maxBytes: number,
+): Promise<unknown> {
+  const body = await readRequestTextWithLimit(c.req.raw, maxBytes);
+
+  if (body.trim().length === 0) {
+    return {};
+  }
+
+  return JSON.parse(body);
 }
 
 export function parseOptionalBoolean(value: string | undefined): boolean | null {
@@ -306,11 +319,15 @@ function readCreateThreadFileIds(input: Record<string, unknown>): FileId[] {
   return fileIds;
 }
 
-function readCreateThreadInputText(input: Record<string, unknown>): string {
+function readCreateThreadInputText(input: Record<string, unknown>): string | undefined {
   const rawInput = input["input"];
 
+  if (rawInput === undefined) {
+    return undefined;
+  }
+
   if (!isRecord(rawInput)) {
-    throw publicInvalidRequest("input is required.");
+    throw publicInvalidRequest("input must be an object.");
   }
 
   assertOnlyFields(rawInput, CREATE_THREAD_INPUT_FIELDS, "create thread input");
@@ -473,7 +490,7 @@ export async function readCreateThreadFileRequest(
 export async function readCreateThreadRequest(
   c: RawJsonRequestContext,
 ): Promise<ParsedCreateThreadRequest> {
-  const body = await readJsonBodyWithLimit(c, PUBLISHED_THREAD_JSON_BODY_MAX_BYTES);
+  const body = await readOptionalJsonBodyWithLimit(c, PUBLISHED_THREAD_JSON_BODY_MAX_BYTES);
 
   if (!isRecord(body)) {
     throw publicInvalidRequest("Request body must be an object.");
@@ -485,10 +502,11 @@ export async function readCreateThreadRequest(
     "client_external_ref",
     PUBLISHED_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
   );
+  const inputText = readCreateThreadInputText(body);
 
   return {
     fileIds: readCreateThreadFileIds(body),
-    inputText: readCreateThreadInputText(body),
+    ...(inputText === undefined ? {} : { inputText }),
     ...(clientExternalRef === undefined ? {} : { clientExternalRef }),
   };
 }

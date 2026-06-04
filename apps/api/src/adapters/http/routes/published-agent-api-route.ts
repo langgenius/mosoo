@@ -20,6 +20,7 @@ import {
   runPublishedApiSessionMutation,
   runPublishedApiThreadMutation,
   runPublishedApiThreadReadJson,
+  runPublishedApiThreadReadResponse,
 } from "./published-agent-api-route-support";
 import { createPublishedAgentOpenApiDocument } from "./published-agent-openapi";
 
@@ -41,7 +42,7 @@ async function hashCreateThreadIdempotencyBody(
   return hashPublicApiIdempotencyBody({
     clientExternalRef: body.clientExternalRef ?? null,
     fileIds: body.fileIds,
-    inputText: body.inputText,
+    inputText: body.inputText ?? null,
   });
 }
 
@@ -101,6 +102,30 @@ export function registerPublishedAgentApiRoute(app: Hono<ApiGatewayEnvironment>)
           database: c.env.DB,
           limit: parseThreadEventsLimit(c.req.query("limit")),
           threadId,
+        });
+      },
+      threadId: () => parseThreadIdParam(c.req.param("threadId")),
+    }),
+  );
+
+  v1.get("/threads/:threadId/events/stream", async (c) =>
+    runPublishedApiThreadReadResponse(c, {
+      operation: async ({ caller, threadId }) => {
+        const { createPublishedAgentThreadEventStream } = await loadPublishedAgentThreadService();
+        const stream = await createPublishedAgentThreadEventStream({
+          caller,
+          database: c.env.DB,
+          limit: parseThreadEventsLimit(c.req.query("limit")),
+          signal: c.req.raw.signal,
+          threadId,
+        });
+
+        return new Response(stream, {
+          headers: {
+            "Cache-Control": "no-store",
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "X-Accel-Buffering": "no",
+          },
         });
       },
       threadId: () => parseThreadIdParam(c.req.param("threadId")),

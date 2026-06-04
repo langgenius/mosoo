@@ -212,14 +212,16 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
         type: "object",
       },
     },
-    required: ["input"],
+    required: [],
     type: "object",
   },
   CreateThreadResponse: {
     additionalProperties: false,
     properties: {
       links: { $ref: "#/components/schemas/ThreadLinks" },
-      run: { $ref: "#/components/schemas/RunSummary" },
+      run: {
+        oneOf: [{ $ref: "#/components/schemas/RunSummary" }, { type: "null" }],
+      },
       thread: { $ref: "#/components/schemas/ThreadSummary" },
     },
     required: ["links", "run", "thread"],
