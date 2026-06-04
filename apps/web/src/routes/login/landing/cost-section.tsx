@@ -7,10 +7,11 @@ import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { cn } from "@/shared/lib/class-names";
 
 import { Reveal } from "./motion";
-import { sectionHeadingStyle } from "./ui";
+import { sectionHeadingStyle } from "./typography";
 
 // Brighter, higher-saturation avatar palette (lime brand scale + accents).
 const AVATAR_COLORS = ["#5CB300", "#3B9AE1", "#E8A22E", "#7A5230", "#95DD2C"];
+const MODEL_DONUT_TRACK_STYLE = { stroke: "var(--ink-100)" } satisfies CSSProperties;
 
 type Kpi = {
   label: string;
@@ -351,7 +352,6 @@ function SpendChart(): ReactElement {
 
 function ModelDonut(): ReactElement {
   let cumulative = 0;
-  const TRACK_STYLE = { stroke: "var(--ink-100)" } satisfies CSSProperties;
 
   return (
     <Card className="flex flex-col p-5">
@@ -360,7 +360,14 @@ function ModelDonut(): ReactElement {
       <div className="mt-4 flex items-center gap-5">
         <div className="relative size-[128px] shrink-0">
           <svg viewBox="0 0 36 36" className="size-full -rotate-90">
-            <circle cx="18" cy="18" r="15.915" fill="none" strokeWidth="3.4" style={TRACK_STYLE} />
+            <circle
+              cx="18"
+              cy="18"
+              r="15.915"
+              fill="none"
+              strokeWidth="3.4"
+              style={MODEL_DONUT_TRACK_STYLE}
+            />
             {MODELS.map((model) => {
               const segment = (
                 <circle

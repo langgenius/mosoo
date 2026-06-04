@@ -1,20 +1,12 @@
 {
-  "devDependencies": {
-    "@graphql-codegen/cli": "^7.1.1",
-    "@graphql-codegen/client-preset": "^6.0.1",
-    "@graphql-codegen/schema-ast": "^6.0.1",
-    "@j178/prek": "^0.4.3",
-    "graphql": "^16.14.0",
-    "knip": "^6.15.0",
-    "tsx": "^4.22.4",
-    "vite-plus": "^0.1.23"
-  },
-  "engines": {
-    "bun": ">=1.3.14"
-  },
   "name": "mosoo",
-  "packageManager": "bun@1.3.14",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "pkgs/*",
+    "e2e"
+  ],
+  "type": "module",
   "scripts": {
     "build": "vp run --filter @mosoo/driver --filter @mosoo/web build",
     "cf:types": "vp run --filter @mosoo/api cf:types",
@@ -36,13 +28,25 @@
     "graphql:codegen:check": "vp exec tsx dev/scripts/check-graphql-codegen.ts",
     "knip": "vp exec knip --config dev/config/knip.jsonc",
     "lint": "vp run -w cf:types && vp lint vite.config.ts dev/config/bun-script-types.d.ts dev/config/vite-plus.shared.ts dev/scripts apps pkgs e2e",
+    "react-doctor": "vp exec react-doctor apps/web --full",
+    "react-doctor:diff": "vp exec react-doctor apps/web --verbose --diff",
+    "react-doctor:report": "vp exec react-doctor apps/web --json --json-compact --full --fail-on none",
     "tc": "vp run -r tc",
     "test": "vp run --filter @mosoo/api --filter @mosoo/driver --filter @mosoo/web --filter @mosoo/ag-ui-session --filter @mosoo/agent-package --filter @mosoo/contracts --filter @mosoo/db --filter @mosoo/driver-protocol --filter @mosoo/id --filter @mosoo/runtime-catalog --filter @mosoo/runtime-events --filter @mosoo/session-policy --filter @mosoo/skill-package test && vp run -w graphql:codegen:check"
   },
-  "type": "module",
-  "workspaces": [
-    "apps/*",
-    "pkgs/*",
-    "e2e"
-  ]
+  "devDependencies": {
+    "@graphql-codegen/cli": "^7.1.1",
+    "@graphql-codegen/client-preset": "^6.0.1",
+    "@graphql-codegen/schema-ast": "^6.0.1",
+    "@j178/prek": "^0.4.3",
+    "graphql": "^16.14.0",
+    "knip": "^6.15.0",
+    "react-doctor": "0.2.16",
+    "tsx": "^4.22.4",
+    "vite-plus": "^0.1.23"
+  },
+  "engines": {
+    "bun": ">=1.3.14"
+  },
+  "packageManager": "bun@1.3.14"
 }

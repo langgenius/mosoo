@@ -1,0 +1,15 @@
+{
+  "$schema": "https://react.doctor/schema/config.json",
+  "lint": true,
+  "verbose": true,
+  "failOn": "warning",
+  "share": false,
+  "respectInlineDisables": true,
+  "adoptExistingLintConfig": true,
+  "ignore": {
+    "files": ["src/gql/**"]
+  },
+  "rules": {
+    "react-doctor/react-in-jsx-scope": "off"
+  }
+}

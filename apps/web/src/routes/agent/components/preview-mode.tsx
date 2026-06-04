@@ -1,8 +1,9 @@
 import type { AgentVisibility } from "@mosoo/contracts/agent";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
-import type { ReactElement, ReactNode } from "react";
-import { useEffect, useState } from "react";
+import type { ReactElement } from "react";
+import { useEffect, useReducer } from "react";
+import { createPortal } from "react-dom";
 
 import { publishAgent } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
@@ -27,12 +28,34 @@ interface PublishStatusMessage {
   readonly text: string;
 }
 
+interface PreviewModeState {
+  appliedKind: AppliedToastKind | null;
+  channelsDialogOpen: boolean;
+  discardCounter: number;
+  showAppliedToast: boolean;
+  showSuccessModal: boolean;
+}
+
+type PreviewModeAction =
+  | { type: "applied"; kind: AppliedToastKind }
+  | { type: "discarded" }
+  | { type: "setAppliedToast"; open: boolean }
+  | { type: "setChannelsDialogOpen"; open: boolean }
+  | { type: "setSuccessModalOpen"; open: boolean };
+
 const DEFAULT_PUBLISH_VISIBILITY: AgentVisibility = "organization";
 const DEFAULT_CHANNEL_ID: ChannelId = "slack";
+const PREVIEW_MODE_INITIAL_STATE: PreviewModeState = {
+  appliedKind: null,
+  channelsDialogOpen: false,
+  discardCounter: 0,
+  showAppliedToast: false,
+  showSuccessModal: false,
+};
 
 export interface PreviewModeProps {
   agent: Agent;
-  onHeaderCtaChange?: (cta: ReactNode) => void;
+  headerActionTarget: HTMLDivElement | null;
   onSwitchMode: (mode: AgentMode | "logs") => void;
   organizationId: string | null;
 }
@@ -63,30 +86,43 @@ function publishStatusMessage({
   return null;
 }
 
+function previewModeReducer(state: PreviewModeState, action: PreviewModeAction): PreviewModeState {
+  switch (action.type) {
+    case "applied":
+      return { ...state, appliedKind: action.kind, showAppliedToast: true };
+    case "discarded":
+      return { ...state, discardCounter: state.discardCounter + 1 };
+    case "setAppliedToast":
+      return { ...state, showAppliedToast: action.open };
+    case "setChannelsDialogOpen":
+      return { ...state, channelsDialogOpen: action.open };
+    case "setSuccessModalOpen":
+      return { ...state, showSuccessModal: action.open };
+  }
+}
+
 // Preview surface for Draft stage 2 and Live debug-and-iterate flows.
 // The writable form classifies dirty fields and routes them to the right apply action.
 export function PreviewMode({
   agent,
+  headerActionTarget,
   onSwitchMode,
   organizationId,
-  onHeaderCtaChange,
 }: PreviewModeProps): ReactElement {
   const queryClient = useQueryClient();
   const model = useAgentEditorModel({ agent });
   useAgentEditorAutoSave(model);
   const autoSaveEligible = isAutoSaveEligible(model.changePlan);
-  const [discardCounter, setDiscardCounter] = useState(0);
-  const [appliedKind, setAppliedKind] = useState<AppliedToastKind | null>(null);
-  const [showAppliedToast, setShowAppliedToast] = useState(false);
-  const [channelsDialogOpen, setChannelsDialogOpen] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [state, dispatch] = useReducer(previewModeReducer, PREVIEW_MODE_INITIAL_STATE);
+  const { appliedKind, channelsDialogOpen, discardCounter, showAppliedToast, showSuccessModal } =
+    state;
 
   useEffect(() => {
     let timer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
     if (showAppliedToast) {
       timer = globalThis.setTimeout(() => {
-        setShowAppliedToast(false);
+        dispatch({ open: false, type: "setAppliedToast" });
       }, 2400);
     }
 
@@ -115,7 +151,7 @@ export function PreviewMode({
         queryClient.invalidateQueries({ queryKey: agentKeys.editorState(agent.id) }),
         queryClient.invalidateQueries({ queryKey: agentKeys.lists() }),
       ]);
-      setShowSuccessModal(true);
+      dispatch({ open: true, type: "setSuccessModalOpen" });
     },
   });
 
@@ -129,46 +165,32 @@ export function PreviewMode({
     publishBlocked,
   });
 
-  useEffect(() => {
-    if (onHeaderCtaChange !== undefined) {
-      onHeaderCtaChange(
-        <PublishMenu
-          agent={agent}
-          busy={publishMutation.isPending}
-          disabled={publishDisabled}
-          errorMessage={publishError?.message ?? null}
-          onChannelClick={() => {
-            setChannelsDialogOpen(true);
-          }}
-          onPublish={() => {
-            // Re-publish inherits the agent's current visibility (omit). First
-            // publish defaults to organization — audience changes live in
-            // Settings → Collaborators afterward.
-            if (isLive) {
-              publishMutation.mutate(undefined);
-            } else {
-              publishMutation.mutate(DEFAULT_PUBLISH_VISIBILITY);
-            }
-          }}
-        />,
-      );
-    }
-
-    return () => {
-      onHeaderCtaChange?.(null);
-    };
-  }, [
-    onHeaderCtaChange,
-    agent,
-    publishDisabled,
-    isLive,
-    publishMutation.isPending,
-    publishMutation.mutate,
-    publishError?.message,
-  ]);
-
   return (
     <div className="flex h-full" data-testid="agent-preview-panel">
+      {headerActionTarget !== null
+        ? createPortal(
+            <PublishMenu
+              agent={agent}
+              busy={publishMutation.isPending}
+              disabled={publishDisabled}
+              errorMessage={publishError?.message ?? null}
+              onChannelClick={() => {
+                dispatch({ open: true, type: "setChannelsDialogOpen" });
+              }}
+              onPublish={() => {
+                // Re-publish inherits the agent's current visibility (omit). First
+                // publish defaults to organization — audience changes live in
+                // Settings → Collaborators afterward.
+                if (isLive) {
+                  publishMutation.mutate(undefined);
+                } else {
+                  publishMutation.mutate(DEFAULT_PUBLISH_VISIBILITY);
+                }
+              }}
+            />,
+            headerActionTarget,
+          )
+        : null}
       <div className="border-border-subtle flex min-h-0 w-[60%] shrink-0 flex-col border-r">
         {model.dirty && !autoSaveEligible ? (
           <div className="flex shrink-0 items-start gap-2 border-b border-amber-300/60 bg-amber-50/70 px-4 py-2 text-[12px] text-amber-900">
@@ -206,12 +228,11 @@ export function PreviewMode({
           key={`${agent.id}:${discardCounter}`}
           model={model}
           onAfterApply={(kind) => {
-            setAppliedKind(kind);
-            setShowAppliedToast(true);
+            dispatch({ kind, type: "applied" });
           }}
           onDiscard={() => {
             model.discard();
-            setDiscardCounter((current) => current + 1);
+            dispatch({ type: "discarded" });
           }}
         />
 
@@ -237,7 +258,9 @@ export function PreviewMode({
         <ChannelsConfigDialog
           agent={agent}
           initialChannelId={DEFAULT_CHANNEL_ID}
-          onOpenChange={setChannelsDialogOpen}
+          onOpenChange={(open) => {
+            dispatch({ open, type: "setChannelsDialogOpen" });
+          }}
           open={channelsDialogOpen}
         />
       ) : null}
@@ -245,7 +268,7 @@ export function PreviewMode({
       <PublishSuccessModal
         agent={agent}
         onOpenChange={(next) => {
-          setShowSuccessModal(next);
+          dispatch({ open: next, type: "setSuccessModalOpen" });
           if (!next) {
             onSwitchMode("consume");
           }

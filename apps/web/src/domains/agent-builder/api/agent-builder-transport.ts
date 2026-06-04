@@ -11,7 +11,7 @@ export interface AgentBuilderSystemAgentAddress {
 const AGENT_BUILDER_SYSTEM_AGENT_NAME = "agent-builder-system-agent";
 const AGENT_BUILDER_SYSTEM_AGENT_BASE_PATH = "api/agents/agent-builder-system-agent";
 
-export function createAgentBuilderSystemAgentInstanceName(input: {
+function createAgentBuilderSystemAgentInstanceName(input: {
   agentId: AgentId;
   threadId: AgentBuilderThreadId;
 }): string {

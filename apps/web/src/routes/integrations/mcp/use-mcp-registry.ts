@@ -27,6 +27,15 @@ import { mcpKeys, useMcpRegistryQuery } from "@/domains/mcp/query/mcp-queries";
 import { toMcpOAuthFlowId, toMcpServerId, toOrganizationId } from "@/routes/typed-id";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
+
+async function startOAuthFlow(serverId: string): Promise<StartMcpOAuthPayload> {
+  return startMcpOAuth({ serverId: toMcpServerId(serverId) });
+}
+
+async function getOAuthFlowState(flowId: string) {
+  return getMcpOAuthFlowState(toMcpOAuthFlowId(flowId));
+}
+
 export function useMcpRegistry() {
   const queryClient = useQueryClient();
   const { activeOrganization, organizationsLoading } = useAppSession();
@@ -85,14 +94,6 @@ export function useMcpRegistry() {
     const nextServer = await connectMcpBearer(input);
     await refresh();
     return nextServer;
-  }
-
-  async function startOAuthFlow(serverId: string): Promise<StartMcpOAuthPayload> {
-    return startMcpOAuth({ serverId: toMcpServerId(serverId) });
-  }
-
-  async function getOAuthFlowState(flowId: string) {
-    return getMcpOAuthFlowState(toMcpOAuthFlowId(flowId));
   }
 
   async function revokeCredential(serverId: string): Promise<McpServerWithCredential> {

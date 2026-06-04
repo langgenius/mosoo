@@ -6,7 +6,8 @@ import type { CSSProperties, ReactElement } from "react";
 import { GithubMark } from "../github-mark";
 import { MOSOO_GITHUB_URL } from "../links";
 import { Reveal } from "./motion";
-import { Eyebrow, sectionHeadingStyle } from "./ui";
+import { sectionHeadingStyle } from "./typography";
+import { Eyebrow } from "./ui";
 import { UnicornBackground } from "./unicorn";
 
 const CTA_SCENE_ID = "dyB6OzmnClK6iCdmrv2H";

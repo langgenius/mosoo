@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RefObject, UIEvent } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import type { UIEvent } from "react";
 
 import { fetchAgentRuntimeEvents } from "@/domains/session/api/agent-runtime-events";
 import type { AgentRuntimeEvent } from "@/domains/session/api/agent-runtime-events";
@@ -31,15 +31,56 @@ export interface SystemLogFeedState {
   readonly loadingOlder: boolean;
   readonly newEventCount: number;
   readonly pagination: SystemLogPagination;
-  readonly scrollContainerRef: RefObject<HTMLDivElement | null>;
   readonly searchingOlder: boolean;
   readonly selectedFamilySet: ReadonlySet<AgentRuntimeEventFamily>;
   loadOlder(): Promise<void>;
   refreshLatest(): void;
   resetFamilyFilter(): void;
   scrollToBottom(): void;
+  setOlderSearchNode(node: HTMLDivElement | null): void;
+  setScrollContainerNode(node: HTMLDivElement | null): void;
+  setScrollContentNode(node: HTMLDivElement | null): void;
   toggleFamily(family: AgentRuntimeEventFamily): void;
   trackScroll(event: UIEvent<HTMLDivElement>): void;
+}
+
+interface SystemLogFeedRuntimeState {
+  readonly isSticky: boolean;
+  readonly loadOlderError: string | null;
+  readonly loadingOlder: boolean;
+  readonly olderEvents: AgentRuntimeEvent[];
+  readonly olderPagination: SystemLogPagination | null;
+  readonly pausedAtEventId: string | null;
+  readonly scope: string;
+}
+
+function createSystemLogFeedRuntimeState(scope: string): SystemLogFeedRuntimeState {
+  return {
+    isSticky: true,
+    loadOlderError: null,
+    loadingOlder: false,
+    olderEvents: [],
+    olderPagination: null,
+    pausedAtEventId: null,
+    scope,
+  };
+}
+
+function countEventsAfter(events: AgentRuntimeEvent[], eventId: string | null): number {
+  if (eventId === null) {
+    return 0;
+  }
+
+  const index = events.findIndex((event) => event.id === eventId);
+
+  return index === -1 ? events.length : index;
+}
+
+function getRuntimeStateForScope(
+  current: SystemLogFeedRuntimeState,
+  scope: string,
+): SystemLogFeedRuntimeState {
+  return current.scope === scope ? current : createSystemLogFeedRuntimeState(scope);
 }
 
 export function useSystemLogFeed(agentId: string): SystemLogFeedState {
@@ -47,15 +88,7 @@ export function useSystemLogFeed(agentId: string): SystemLogFeedState {
   const stickToBottomRef = useRef(true);
   const restoreScrollHeightRef = useRef<number | null>(null);
   const eventsRef = useRef<AgentRuntimeEvent[]>([]);
-  const [events, setEvents] = useState<AgentRuntimeEvent[]>([]);
-  const [pagination, setPagination] = useState<SystemLogPagination>({
-    hasMoreOlder: false,
-    olderCursor: null,
-  });
-  const [isSticky, setIsSticky] = useState(true);
-  const [newEventCount, setNewEventCount] = useState(0);
-  const [loadingOlder, setLoadingOlder] = useState(false);
-  const [loadOlderError, setLoadOlderError] = useState<string | null>(null);
+  const olderSearchRequestRef = useRef<string | null>(null);
   const [selectedFamilySet, setSelectedFamilySet] = useState<Set<AgentRuntimeEventFamily>>(
     () => new Set(SYSTEM_LOG_RUNTIME_EVENT_FAMILIES),
   );
@@ -66,8 +99,19 @@ export function useSystemLogFeed(agentId: string): SystemLogFeedState {
   const selectedFamilyKey = selectedFamilies.join(",");
   const feedScope = `${agentId}:${selectedFamilyKey}`;
   const feedScopeRef = useRef(feedScope);
+  const [runtimeState, setRuntimeState] = useState<SystemLogFeedRuntimeState>(() =>
+    createSystemLogFeedRuntimeState(feedScope),
+  );
 
-  eventsRef.current = events;
+  const scopedRuntimeState = getRuntimeStateForScope(runtimeState, feedScope);
+
+  if (feedScopeRef.current !== feedScope) {
+    feedScopeRef.current = feedScope;
+    restoreScrollHeightRef.current = null;
+    stickToBottomRef.current = true;
+  }
+
+  stickToBottomRef.current = scopedRuntimeState.isSticky;
 
   const liveQuery = useQuery({
     queryFn: async () =>
@@ -80,54 +124,25 @@ export function useSystemLogFeed(agentId: string): SystemLogFeedState {
     refetchInterval: SYSTEM_LOG_POLLING_INTERVAL_MS,
   });
 
-  useEffect(() => {
-    feedScopeRef.current = feedScope;
-    eventsRef.current = [];
-    restoreScrollHeightRef.current = null;
-    stickToBottomRef.current = true;
-    setEvents([]);
-    setPagination({ hasMoreOlder: false, olderCursor: null });
-    setIsSticky(true);
-    setNewEventCount(0);
-    setLoadingOlder(false);
-    setLoadOlderError(null);
-  }, [feedScope]);
+  const events = useMemo(
+    () => mergeRuntimeEvents(scopedRuntimeState.olderEvents, liveQuery.data?.nodes ?? []),
+    [liveQuery.data?.nodes, scopedRuntimeState.olderEvents],
+  );
+  const pagination = scopedRuntimeState.olderPagination ?? {
+    hasMoreOlder: liveQuery.data?.pageInfo.hasMore ?? false,
+    olderCursor: liveQuery.data?.pageInfo.endCursor ?? null,
+  };
+  const isSticky = scopedRuntimeState.isSticky;
+  const loadingOlder = scopedRuntimeState.loadingOlder;
+  const loadOlderError = scopedRuntimeState.loadOlderError;
+  const newEventCount = isSticky ? 0 : countEventsAfter(events, scopedRuntimeState.pausedAtEventId);
+  const eventsVersion = `${events.length}:${events[0]?.id ?? ""}:${events.at(-1)?.id ?? ""}`;
 
-  useEffect(() => {
-    stickToBottomRef.current = isSticky;
-  }, [isSticky]);
+  eventsRef.current = events;
 
-  useEffect(() => {
-    const page = liveQuery.data;
+  const adjustScrollPosition = useCallback(() => {
+    void eventsVersion;
 
-    if (!page) {
-      return;
-    }
-
-    const currentEvents = eventsRef.current;
-    const isInitialPage = currentEvents.length === 0;
-    const currentIds = new Set(currentEvents.map((event) => event.id));
-    const incomingNewEvents = page.nodes.filter((event) => !currentIds.has(event.id));
-
-    if (!isInitialPage && incomingNewEvents.length === 0) {
-      setLoadOlderError(null);
-      return;
-    }
-
-    setEvents(mergeRuntimeEvents(currentEvents, page.nodes));
-    setLoadOlderError(null);
-
-    if (isInitialPage) {
-      setPagination({
-        hasMoreOlder: page.pageInfo.hasMore,
-        olderCursor: page.pageInfo.endCursor,
-      });
-    } else if (!stickToBottomRef.current) {
-      setNewEventCount((count) => count + incomingNewEvents.length);
-    }
-  }, [liveQuery.data, liveQuery.dataUpdatedAt]);
-
-  useEffect(() => {
     const container = scrollContainerRef.current;
 
     if (!container) {
@@ -144,24 +159,56 @@ export function useSystemLogFeed(agentId: string): SystemLogFeedState {
     if (isSticky) {
       container.scrollTop = container.scrollHeight;
     }
-  }, [events, isSticky]);
+  }, [eventsVersion, isSticky]);
+
+  const setScrollContainerNode = useCallback(
+    (node: HTMLDivElement | null): void => {
+      scrollContainerRef.current = node;
+
+      if (node !== null) {
+        adjustScrollPosition();
+      }
+    },
+    [adjustScrollPosition],
+  );
+
+  const setScrollContentNode = useCallback(
+    (node: HTMLDivElement | null): void => {
+      if (node !== null) {
+        adjustScrollPosition();
+      }
+    },
+    [adjustScrollPosition],
+  );
 
   const displayEvents = useMemo(() => events.toReversed(), [events]);
 
-  const trackScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
-    const target = event.currentTarget;
-    const distanceToBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+  const trackScroll = useCallback(
+    (event: UIEvent<HTMLDivElement>) => {
+      const target = event.currentTarget;
+      const distanceToBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
 
-    if (distanceToBottom <= SYSTEM_LOG_BOTTOM_STICKY_THRESHOLD_PX) {
-      setIsSticky(true);
-      setNewEventCount(0);
-      return;
-    }
+      if (distanceToBottom <= SYSTEM_LOG_BOTTOM_STICKY_THRESHOLD_PX) {
+        setRuntimeState((current) => ({
+          ...getRuntimeStateForScope(current, feedScope),
+          isSticky: true,
+          pausedAtEventId: null,
+        }));
+        return;
+      }
 
-    if (distanceToBottom >= target.clientHeight) {
-      setIsSticky(false);
-    }
-  }, []);
+      if (distanceToBottom >= target.clientHeight) {
+        setRuntimeState((current) => {
+          const scoped = getRuntimeStateForScope(current, feedScope);
+
+          return scoped.isSticky
+            ? { ...scoped, isSticky: false, pausedAtEventId: eventsRef.current[0]?.id ?? null }
+            : scoped;
+        });
+      }
+    },
+    [feedScope],
+  );
 
   const scrollToBottom = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -170,52 +217,77 @@ export function useSystemLogFeed(agentId: string): SystemLogFeedState {
       return;
     }
 
-    setIsSticky(true);
-    setNewEventCount(0);
+    setRuntimeState((current) => ({
+      ...getRuntimeStateForScope(current, feedScope),
+      isSticky: true,
+      pausedAtEventId: null,
+    }));
     container.scrollTo({ behavior: "smooth", top: container.scrollHeight });
-  }, []);
+  }, [feedScope]);
 
   const loadOlder = useCallback(async () => {
-    if (!pagination.olderCursor || loadingOlder) {
+    const currentPagination = scopedRuntimeState.olderPagination ?? {
+      hasMoreOlder: liveQuery.data?.pageInfo.hasMore ?? false,
+      olderCursor: liveQuery.data?.pageInfo.endCursor ?? null,
+    };
+
+    if (!currentPagination.olderCursor || scopedRuntimeState.loadingOlder) {
       return;
     }
 
     const requestScope = feedScopeRef.current;
     const container = scrollContainerRef.current;
     restoreScrollHeightRef.current = container?.scrollHeight ?? null;
-    setLoadingOlder(true);
-    setLoadOlderError(null);
+    setRuntimeState((current) => ({
+      ...getRuntimeStateForScope(current, requestScope),
+      loadingOlder: true,
+      loadOlderError: null,
+    }));
 
     try {
       const page = await fetchAgentRuntimeEvents({
         agentId: toAgentId(agentId),
-        beforeCursor: pagination.olderCursor,
+        beforeCursor: currentPagination.olderCursor,
         families: selectedFamilies,
         limit: SYSTEM_LOG_PAGE_SIZE,
       });
 
-      if (feedScopeRef.current !== requestScope) {
-        return;
-      }
-
-      setEvents((currentEvents) => mergeRuntimeEvents(currentEvents, page.nodes));
-      setPagination({
-        hasMoreOlder: page.pageInfo.hasMore,
-        olderCursor: page.pageInfo.endCursor,
-      });
-    } catch (error) {
-      if (feedScopeRef.current !== requestScope) {
-        return;
-      }
-
-      restoreScrollHeightRef.current = null;
-      setLoadOlderError(error instanceof Error ? error.message : "Failed to load older events.");
-    } finally {
       if (feedScopeRef.current === requestScope) {
-        setLoadingOlder(false);
+        setRuntimeState((current) => {
+          const scoped = getRuntimeStateForScope(current, requestScope);
+
+          return {
+            ...scoped,
+            loadOlderError: null,
+            olderEvents: mergeRuntimeEvents(scoped.olderEvents, page.nodes),
+            olderPagination: {
+              hasMoreOlder: page.pageInfo.hasMore,
+              olderCursor: page.pageInfo.endCursor,
+            },
+          };
+        });
       }
+    } catch (error) {
+      if (feedScopeRef.current === requestScope) {
+        restoreScrollHeightRef.current = null;
+        setRuntimeState((current) => ({
+          ...getRuntimeStateForScope(current, requestScope),
+          loadOlderError: error instanceof Error ? error.message : "Failed to load older events.",
+        }));
+      }
+    } finally {
+      setRuntimeState((current) =>
+        current.scope === requestScope ? { ...current, loadingOlder: false } : current,
+      );
     }
-  }, [agentId, loadingOlder, pagination.olderCursor, selectedFamilies]);
+  }, [
+    agentId,
+    liveQuery.data?.pageInfo.endCursor,
+    liveQuery.data?.pageInfo.hasMore,
+    scopedRuntimeState.loadingOlder,
+    scopedRuntimeState.olderPagination,
+    selectedFamilies,
+  ]);
 
   const resetFamilyFilter = useCallback(() => {
     setSelectedFamilySet(new Set(SYSTEM_LOG_RUNTIME_EVENT_FAMILIES));
@@ -249,11 +321,24 @@ export function useSystemLogFeed(agentId: string): SystemLogFeedState {
     !liveQuery.isLoading && !initialLoadFailed && events.length === 0 && !pagination.hasMoreOlder;
   const lastRefreshedAt = liveQuery.dataUpdatedAt > 0 ? liveQuery.dataUpdatedAt : null;
 
-  useEffect(() => {
-    if (searchingOlder && !loadingOlder && !loadOlderError) {
-      void loadOlder();
-    }
-  }, [loadOlder, loadOlderError, loadingOlder, searchingOlder]);
+  const setOlderSearchNode = useCallback(
+    (node: HTMLDivElement | null): void => {
+      const cursor = pagination.olderCursor;
+
+      if (
+        node !== null &&
+        searchingOlder &&
+        !loadingOlder &&
+        !loadOlderError &&
+        cursor !== null &&
+        olderSearchRequestRef.current !== cursor
+      ) {
+        olderSearchRequestRef.current = cursor;
+        void loadOlder();
+      }
+    },
+    [loadOlder, loadOlderError, loadingOlder, pagination.olderCursor, searchingOlder],
+  );
 
   return {
     displayEvents,
@@ -270,7 +355,6 @@ export function useSystemLogFeed(agentId: string): SystemLogFeedState {
     loadingOlder,
     newEventCount,
     pagination,
-    scrollContainerRef,
     searchingOlder,
     selectedFamilySet,
     loadOlder,
@@ -279,6 +363,9 @@ export function useSystemLogFeed(agentId: string): SystemLogFeedState {
     },
     resetFamilyFilter,
     scrollToBottom,
+    setOlderSearchNode,
+    setScrollContainerNode,
+    setScrollContentNode,
     toggleFamily,
     trackScroll,
   };

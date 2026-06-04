@@ -68,6 +68,20 @@ function toToolInfo(binding: AgentSummary["tools"][number], index: number): Tool
   };
 }
 
+function toEnabledToolInfos(tools: AgentSummary["tools"]): ToolInfo[] {
+  const toolInfos: ToolInfo[] = [];
+
+  for (const [index, binding] of tools.entries()) {
+    if (!binding.enabled) {
+      continue;
+    }
+
+    toolInfos.push(toToolInfo(binding, index));
+  }
+
+  return toolInfos;
+}
+
 function toMcpServer(binding: AgentEditorState["mcpBindings"][number]): McpServer {
   const server: McpServer = {
     authorizationState: binding.authorizationState,
@@ -155,9 +169,7 @@ export function mapAgentSummaryToListView(
     role: toAgentRole(profile.viewerRole),
     runtime: parseKnownRuntimeId(profile.runtimeId),
     status: toAgentStatus(profile.status),
-    tools: profile.tools
-      .filter((binding) => binding.enabled)
-      .map((binding, index) => toToolInfo(binding, index)),
+    tools: toEnabledToolInfos(profile.tools),
     updatedAt: profile.updatedAt,
     versions: [],
     visibility: profile.visibility,
@@ -210,9 +222,7 @@ export function mapAgentDetailToView(
     role: toAgentRole(profile.viewerRole),
     runtime: parseKnownRuntimeId(profile.runtimeId),
     status: toAgentStatus(profile.status),
-    tools: profile.tools
-      .filter((binding) => binding.enabled)
-      .map((binding, index) => toToolInfo(binding, index)),
+    tools: toEnabledToolInfos(profile.tools),
     updatedAt: profile.updatedAt,
     versions: profile.versions,
     visibility: profile.visibility,

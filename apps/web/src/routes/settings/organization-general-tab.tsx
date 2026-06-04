@@ -1,5 +1,5 @@
 import { Check, Loader2, Upload } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useReducer, useRef } from "react";
 import type { ChangeEvent } from "react";
 import { Navigate } from "react-router-dom";
 
@@ -15,6 +15,66 @@ const MAX_NAME_LENGTH = 80;
 const MAX_AVATAR_URL_LENGTH = 2048;
 const MAX_AVATAR_UPLOAD_BYTES = 5 * 1024 * 1024;
 const AVATAR_FILE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif,image/svg+xml";
+
+interface OrganizationGeneralFormState {
+  avatarInput: string;
+  error: string | null;
+  name: string;
+  saved: boolean;
+  saving: boolean;
+  uploading: boolean;
+}
+
+type OrganizationGeneralFormAction =
+  | { type: "avatarUploaded"; url: string }
+  | { type: "changeAvatarInput"; value: string }
+  | { type: "changeName"; value: string }
+  | { type: "reset"; avatarInput: string; name: string }
+  | { type: "setError"; error: string | null }
+  | { type: "setSaved"; saved: boolean }
+  | { type: "setSaving"; saving: boolean }
+  | { type: "setUploading"; uploading: boolean };
+
+function createOrganizationGeneralFormState({
+  avatarUrl,
+  organizationName,
+}: {
+  avatarUrl: string | null;
+  organizationName: string;
+}): OrganizationGeneralFormState {
+  return {
+    avatarInput: avatarUrl ?? "",
+    error: null,
+    name: organizationName,
+    saved: false,
+    saving: false,
+    uploading: false,
+  };
+}
+
+function organizationGeneralFormReducer(
+  state: OrganizationGeneralFormState,
+  action: OrganizationGeneralFormAction,
+): OrganizationGeneralFormState {
+  switch (action.type) {
+    case "avatarUploaded":
+      return { ...state, avatarInput: action.url };
+    case "changeAvatarInput":
+      return { ...state, avatarInput: action.value };
+    case "changeName":
+      return { ...state, name: action.value };
+    case "reset":
+      return { ...state, avatarInput: action.avatarInput, error: null, name: action.name };
+    case "setError":
+      return { ...state, error: action.error };
+    case "setSaved":
+      return { ...state, saved: action.saved };
+    case "setSaving":
+      return { ...state, saving: action.saving };
+    case "setUploading":
+      return { ...state, uploading: action.uploading };
+  }
+}
 
 function normalizeForCompare(value: string | null): string {
   return value?.trim() ?? "";
@@ -77,13 +137,13 @@ function OrganizationGeneralForm({
   organizationName: string;
   organizationSlug: string;
 }) {
-  const [name, setName] = useState(organizationName);
-  const [avatarInput, setAvatarInput] = useState(avatarUrl ?? "");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [state, dispatch] = useReducer(
+    organizationGeneralFormReducer,
+    { avatarUrl, organizationName },
+    createOrganizationGeneralFormState,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { avatarInput, error, name, saved, saving, uploading } = state;
 
   const trimmedName = name.trim();
   const trimmedAvatar = avatarInput.trim();
@@ -108,8 +168,8 @@ function OrganizationGeneralForm({
       return;
     }
 
-    setSaving(true);
-    setError(null);
+    dispatch({ saving: true, type: "setSaving" });
+    dispatch({ error: null, type: "setError" });
 
     const input: Parameters<typeof updateOrganizationProfile>[0] = {
       organizationId: toOrganizationId(organizationId),
@@ -127,21 +187,22 @@ function OrganizationGeneralForm({
       await updateOrganizationProfile(input);
 
       await onSaved();
-      setSaved(true);
+      dispatch({ saved: true, type: "setSaved" });
       setTimeout(() => {
-        setSaved(false);
+        dispatch({ saved: false, type: "setSaved" });
       }, 2000);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Failed to save changes.");
+      dispatch({
+        error: nextError instanceof Error ? nextError.message : "Failed to save changes.",
+        type: "setError",
+      });
     } finally {
-      setSaving(false);
+      dispatch({ saving: false, type: "setSaving" });
     }
   }
 
   function handleReset() {
-    setName(organizationName);
-    setAvatarInput(avatarUrl ?? "");
-    setError(null);
+    dispatch({ avatarInput: avatarUrl ?? "", name: organizationName, type: "reset" });
   }
 
   async function handleAvatarFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -156,25 +217,28 @@ function OrganizationGeneralForm({
     }
 
     if (!file.type.startsWith("image/")) {
-      setError("Logo must be an image file.");
+      dispatch({ error: "Logo must be an image file.", type: "setError" });
       return;
     }
 
     if (file.size > MAX_AVATAR_UPLOAD_BYTES) {
-      setError("Logo must be 5 MB or smaller.");
+      dispatch({ error: "Logo must be 5 MB or smaller.", type: "setError" });
       return;
     }
 
-    setUploading(true);
-    setError(null);
+    dispatch({ type: "setUploading", uploading: true });
+    dispatch({ error: null, type: "setError" });
 
     try {
       const { url } = await uploadOrganizationAvatar(toOrganizationId(organizationId), file);
-      setAvatarInput(url);
+      dispatch({ type: "avatarUploaded", url });
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Failed to upload logo.");
+      dispatch({
+        error: nextError instanceof Error ? nextError.message : "Failed to upload logo.",
+        type: "setError",
+      });
     } finally {
-      setUploading(false);
+      dispatch({ type: "setUploading", uploading: false });
     }
   }
 
@@ -224,7 +288,7 @@ function OrganizationGeneralForm({
                       placeholder="https://example.com/logo.png"
                       value={avatarInput}
                       onChange={(event) => {
-                        setAvatarInput(event.target.value);
+                        dispatch({ type: "changeAvatarInput", value: event.target.value });
                       }}
                       className="border-border bg-background text-foreground focus:ring-primary/20 focus:border-primary h-10 min-w-0 flex-1 rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
                     />
@@ -275,7 +339,7 @@ function OrganizationGeneralForm({
                   value={name}
                   maxLength={MAX_NAME_LENGTH}
                   onChange={(event) => {
-                    setName(event.target.value);
+                    dispatch({ type: "changeName", value: event.target.value });
                   }}
                   className="border-border bg-background text-foreground focus:ring-primary/20 focus:border-primary h-10 w-full rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
                 />

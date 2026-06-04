@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 
 import { LoginAuthCard } from "./auth-card";
-import { LandingShell } from "./landing";
+import { LandingShell } from "./landing/landing-shell";
 import { LoginAuthTopbar } from "./topbar";
 import { useLoginFlow } from "./use-login";
 

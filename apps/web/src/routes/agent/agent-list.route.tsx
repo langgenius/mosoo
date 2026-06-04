@@ -1,5 +1,5 @@
 import { Bot, Plus, Upload } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useReducer } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAppSession } from "@/app/session-provider";
@@ -25,15 +25,53 @@ import { AgentTable } from "./components/agent-table";
 import { CreateAgentDialog } from "./components/create-agent-dialog";
 import { ImportAgentPackageDialog } from "./components/import-agent-package-dialog";
 
+interface AgentListPageState {
+  scope: Scope;
+  search: string;
+  showCreate: boolean;
+  showImport: boolean;
+  view: "list" | "grid";
+}
+
+type AgentListPageAction =
+  | { type: "setScope"; scope: Scope }
+  | { type: "setSearch"; search: string }
+  | { type: "setShowCreate"; open: boolean }
+  | { type: "setShowImport"; open: boolean }
+  | { type: "setView"; view: "list" | "grid" };
+
+const AGENT_LIST_PAGE_INITIAL_STATE: AgentListPageState = {
+  scope: "mine",
+  search: "",
+  showCreate: false,
+  showImport: false,
+  view: "list",
+};
+
+function agentListPageReducer(
+  state: AgentListPageState,
+  action: AgentListPageAction,
+): AgentListPageState {
+  switch (action.type) {
+    case "setScope":
+      return { ...state, scope: action.scope };
+    case "setSearch":
+      return { ...state, search: action.search };
+    case "setShowCreate":
+      return { ...state, showCreate: action.open };
+    case "setShowImport":
+      return { ...state, showImport: action.open };
+    case "setView":
+      return { ...state, view: action.view };
+  }
+}
+
 export function AgentListPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { activeOrganization } = useAppSession();
-  const [view, setView] = useState<"list" | "grid">("list");
-  const [scope, setScope] = useState<Scope>("mine");
-  const [search, setSearch] = useState("");
-  const [showCreate, setShowCreate] = useState(false);
-  const [showImport, setShowImport] = useState(false);
+  const [state, dispatch] = useReducer(agentListPageReducer, AGENT_LIST_PAGE_INITIAL_STATE);
+  const { scope, search, showCreate, showImport, view } = state;
   const organizationId = activeOrganization?.id ?? null;
   const agentsQuery = useVisibleAgentsQuery(organizationId);
 
@@ -54,7 +92,7 @@ export function AgentListPage() {
       <PageHeader title="Agents" description="Reusable workers your whole team can run.">
         <Button
           onClick={() => {
-            setShowCreate(true);
+            dispatch({ open: true, type: "setShowCreate" });
           }}
           size="sm"
         >
@@ -66,7 +104,9 @@ export function AgentListPage() {
       <ListPageToolbar>
         <ScopeTabs
           value={scope}
-          onChange={setScope}
+          onChange={(nextScope) => {
+            dispatch({ scope: nextScope, type: "setScope" });
+          }}
           tabs={[
             { count: agentScopes.myAgents.length, label: "Mine", value: "mine" },
             { count: agentScopes.sharedAgents.length, label: "Shared with me", value: "shared" },
@@ -75,12 +115,18 @@ export function AgentListPage() {
 
         <ListPageToolbarSpacer />
 
-        <ListPageSearch value={search} onChange={setSearch} placeholder="Search agents…" />
+        <ListPageSearch
+          value={search}
+          onChange={(nextSearch) => {
+            dispatch({ search: nextSearch, type: "setSearch" });
+          }}
+          placeholder="Search agents…"
+        />
 
         <Button
           variant="outline"
           onClick={() => {
-            setShowImport(true);
+            dispatch({ open: true, type: "setShowImport" });
           }}
           size="sm"
         >
@@ -88,7 +134,12 @@ export function AgentListPage() {
           Import package
         </Button>
 
-        <ViewToggle value={view} onChange={setView} />
+        <ViewToggle
+          value={view}
+          onChange={(nextView) => {
+            dispatch({ type: "setView", view: nextView });
+          }}
+        />
       </ListPageToolbar>
 
       <ListPageContent>
@@ -113,7 +164,7 @@ export function AgentListPage() {
             {scope === "mine" ? (
               <Button
                 onClick={() => {
-                  setShowCreate(true);
+                  dispatch({ open: true, type: "setShowCreate" });
                 }}
                 size="sm"
               >
@@ -142,12 +193,19 @@ export function AgentListPage() {
         )}
       </ListPageContent>
 
-      <CreateAgentDialog open={showCreate} onOpenChange={setShowCreate} />
+      <CreateAgentDialog
+        open={showCreate}
+        onOpenChange={(open) => {
+          dispatch({ open, type: "setShowCreate" });
+        }}
+      />
       <ImportAgentPackageDialog
         onImportedAgentOpen={(agentId) => {
           void navigate(`${basePath}/${agentId}`);
         }}
-        onOpenChange={setShowImport}
+        onOpenChange={(open) => {
+          dispatch({ open, type: "setShowImport" });
+        }}
         open={showImport}
         organizationId={organizationId}
       />

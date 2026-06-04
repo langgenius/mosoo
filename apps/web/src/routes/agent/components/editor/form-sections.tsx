@@ -14,14 +14,15 @@ import type { Agent } from "../../agent.types";
 import { isRuntimeSelectable, listRuntimeOptions } from "../../runtime-catalog";
 import { AgentChannelsField } from "../channels-field";
 import { PackageResolutionIssueCard } from "../package-resolution-issue-card";
-import { RuntimeIcon } from "../shared-components";
+import { RuntimeIcon } from "../runtime-icon";
 import { AgentsFileField } from "./agents-file-field";
 import { EnvironmentPicker } from "./environment-picker";
 import { AgentMcpBindingsField } from "./mcp-bindings-field";
 import { ModelPickerField } from "./model-picker-field";
+import { RequiredMark } from "./required-mark";
+import { SectionHeader } from "./section-header";
 import { AgentSkillsField } from "./skills-field";
 import { AgentSpacesField } from "./spaces-field";
-import { RequiredMark, SectionHeader } from "./ui";
 import type { AgentEditorModel } from "./use-model";
 
 function ReadinessBanner({ agent }: { agent: Agent }) {

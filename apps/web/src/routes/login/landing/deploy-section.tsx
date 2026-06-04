@@ -4,7 +4,7 @@ import type { ReactElement } from "react";
 
 import { MOSOO_DEPLOY_URL } from "../links";
 import { Reveal } from "./motion";
-import { sectionHeadingStyle } from "./ui";
+import { sectionHeadingStyle } from "./typography";
 
 function CliMock(): ReactElement {
   return (

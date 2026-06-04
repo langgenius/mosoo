@@ -2,7 +2,7 @@ import { Accordion } from "@base-ui/react/accordion";
 import { ChevronDown } from "lucide-react";
 import type { ReactElement } from "react";
 
-import { sectionHeadingStyle } from "./ui";
+import { sectionHeadingStyle } from "./typography";
 
 type Faq = { q: string; a: string };
 

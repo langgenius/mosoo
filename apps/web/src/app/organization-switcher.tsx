@@ -27,6 +27,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import { isTruthy } from "../shared/lib/truthiness";
 import { useAppSession } from "./session-provider";
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unexpected error";
+}
+
 function OrganizationBadge({ name }: { name: string }) {
   return (
     <div
@@ -64,10 +69,6 @@ export function OrganizationSwitcher({ collapsed }: { collapsed: boolean }) {
   function resetCreateOrganizationDialog() {
     setNewOrganizationName("");
     setCreateOrganizationError(null);
-  }
-
-  function getErrorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : "Unexpected error";
   }
 
   async function handleCreateOrganization(kind: "personal" | "team") {

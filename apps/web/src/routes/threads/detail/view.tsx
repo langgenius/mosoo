@@ -35,12 +35,14 @@ import { EmptyState } from "@/shared/ui/empty-state";
 import { Markdown } from "@/shared/ui/markdown";
 import { Textarea } from "@/shared/ui/textarea";
 
+import { AgentAvatar } from "../agent-avatar";
 import { formatRelativeTime } from "../model/format";
 import { getThreadActionCapabilities } from "../model/session-capabilities";
 import { getThreadStateGlyph, isThreadWorking } from "../model/thread";
 import type { ThreadListItem } from "../model/thread";
 import { ThreadProcessModal } from "../process-modal/modal";
-import { AgentAvatar, ThreadStateIcon, UserAvatar } from "../shared-ui";
+import { ThreadStateIcon } from "../thread-state-icon";
+import { UserAvatar } from "../user-avatar";
 
 interface ViewerInfo {
   image: string | null;
@@ -136,6 +138,202 @@ function ThreadActivityCard({
   );
 }
 
+function ThreadDetailHeader({
+  onArchive,
+  onBack,
+  onDelete,
+  onOpenProcess,
+  onTogglePinned,
+  stateGlyph,
+  thread,
+  threadActionCapabilities,
+  working,
+}: {
+  onArchive: (threadId: string) => void;
+  onBack: () => void;
+  onDelete: (threadId: string) => void;
+  onOpenProcess: () => void;
+  onTogglePinned: (threadId: string) => void;
+  stateGlyph: ReturnType<typeof getThreadStateGlyph>;
+  thread: ThreadListItem;
+  threadActionCapabilities: ReturnType<typeof getThreadActionCapabilities>;
+  working: boolean;
+}): ReactElement {
+  return (
+    <div className="border-border-subtle flex h-12 shrink-0 items-center gap-2 border-b px-4">
+      <Button size="icon-sm" variant="ghost" onClick={onBack} aria-label="Back to threads">
+        <ArrowLeft className="size-4" />
+      </Button>
+      <div className="text-fg-3 flex min-w-0 items-center gap-1.5 text-[12px]">
+        <button type="button" onClick={onBack} className="hover:text-fg-1 transition-colors">
+          Threads
+        </button>
+        <ChevronRight className="size-3 shrink-0" />
+        <span className="text-fg-1 truncate text-[12.5px] font-medium" title={thread.title}>
+          {thread.title}
+        </span>
+      </div>
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        {working && !thread.failed ? (
+          <Badge
+            asChild
+            variant="primary"
+            className="cursor-pointer hover:bg-green-100 focus-visible:ring-offset-1"
+          >
+            <button
+              type="button"
+              aria-label="Open event flow"
+              title="Open event flow"
+              onClick={onOpenProcess}
+            >
+              <ThreadStateIcon glyph={stateGlyph} />
+              <span>Working</span>
+            </button>
+          </Badge>
+        ) : (
+          <Badge variant={thread.failed ? "danger" : "outline"}>
+            <ThreadStateIcon glyph={stateGlyph} />
+            <span>
+              {thread.failed ? "Failed" : thread.bucket === "archived" ? "Archived" : "Completed"}
+            </span>
+          </Badge>
+        )}
+        {threadActionCapabilities.archive.available ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              onArchive(thread.id);
+            }}
+          >
+            <Archive className="size-3.5" />
+            Archive
+          </Button>
+        ) : null}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="icon-sm" variant="ghost" aria-label="More actions">
+              <MoreHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onSelect={() => {
+                onTogglePinned(thread.id);
+              }}
+            >
+              {thread.pinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
+              {thread.pinned ? "Unpin" : "Pin"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!threadActionCapabilities.delete.available}
+              title={threadActionCapabilities.delete.reason ?? undefined}
+              onSelect={() => {
+                onDelete(thread.id);
+              }}
+            >
+              <Trash2 className="size-3.5" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
+
+function ThreadReplyComposer({
+  actionError,
+  canSend,
+  followUpMode,
+  onChangeReply,
+  onSend,
+  readOnlyReason,
+  reply,
+  thread,
+  threadActionCapabilities,
+}: {
+  actionError: string | null;
+  canSend: boolean;
+  followUpMode: boolean;
+  onChangeReply: (reply: string) => void;
+  onSend: () => Promise<void>;
+  readOnlyReason: string | null;
+  reply: string;
+  thread: ThreadListItem;
+  threadActionCapabilities: ReturnType<typeof getThreadActionCapabilities>;
+}): ReactElement {
+  return (
+    <div className="border-border-subtle bg-background shrink-0 border-t px-6 py-4">
+      <div className="mx-auto max-w-[760px]">
+        {readOnlyReason ? (
+          <div className="border-border bg-muted/40 text-fg-2 mb-2 rounded-md border px-3 py-2 text-[12.5px]">
+            {readOnlyReason}
+          </div>
+        ) : null}
+        {actionError ? (
+          <div className="border-destructive/20 bg-destructive/[0.06] text-destructive mb-2 rounded-md border px-3 py-2 text-[12.5px]">
+            {actionError}
+          </div>
+        ) : null}
+        <div className="border-border-subtle bg-card flex items-end gap-2 rounded-lg border px-3 py-2.5 shadow-[var(--shadow-sm)]">
+          <Textarea
+            value={reply}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              onChangeReply(nextValue);
+              if (
+                followUpMode &&
+                nextValue.length > 0 &&
+                threadActionCapabilities.followUp.available
+              ) {
+                triggerAgentSessionPrewarm(toSessionId(thread.id));
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault();
+                void onSend();
+              }
+            }}
+            className="max-h-[200px] min-h-[36px] flex-1 resize-none border-0 bg-transparent p-0 text-[13px] shadow-none focus-visible:ring-0"
+            placeholder={
+              followUpMode ? `Follow up — re-dispatches to ${thread.agentName}` : "Add a comment..."
+            }
+          />
+          <Button
+            type="button"
+            size="icon-xs"
+            variant="ghost"
+            aria-label="Attach files"
+            className="text-fg-3 shrink-0"
+            disabled
+          >
+            <Paperclip className="size-3.5" />
+          </Button>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            disabled={!canSend}
+            aria-label={followUpMode ? "Follow up" : "Send comment"}
+            className="text-fg-3 hover:text-fg-1 shrink-0"
+            onClick={() => {
+              void onSend();
+            }}
+          >
+            {followUpMode ? (
+              <RotateCcw className="size-3.5" />
+            ) : (
+              <CornerDownLeft className="size-3.5" />
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ThreadDetail({
   actionError,
   agent,
@@ -206,87 +404,19 @@ export function ThreadDetail({
 
   return (
     <div className="bg-background flex h-full min-w-0 flex-1 flex-col">
-      <div className="border-border-subtle flex h-12 shrink-0 items-center gap-2 border-b px-4">
-        <Button size="icon-sm" variant="ghost" onClick={onBack} aria-label="Back to threads">
-          <ArrowLeft className="size-4" />
-        </Button>
-        <div className="text-fg-3 flex min-w-0 items-center gap-1.5 text-[12px]">
-          <button type="button" onClick={onBack} className="hover:text-fg-1 transition-colors">
-            Threads
-          </button>
-          <ChevronRight className="size-3 shrink-0" />
-          <span className="text-fg-1 truncate text-[12.5px] font-medium" title={thread.title}>
-            {thread.title}
-          </span>
-        </div>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          {working && !thread.failed ? (
-            <Badge
-              asChild
-              variant="primary"
-              className="cursor-pointer hover:bg-green-100 focus-visible:ring-offset-1"
-            >
-              <button
-                type="button"
-                aria-label="Open event flow"
-                title="Open event flow"
-                onClick={() => {
-                  setProcessOpen(true);
-                }}
-              >
-                <ThreadStateIcon glyph={stateGlyph} />
-                <span>Working</span>
-              </button>
-            </Badge>
-          ) : (
-            <Badge variant={thread.failed ? "danger" : "outline"}>
-              <ThreadStateIcon glyph={stateGlyph} />
-              <span>
-                {thread.failed ? "Failed" : thread.bucket === "archived" ? "Archived" : "Completed"}
-              </span>
-            </Badge>
-          )}
-          {threadActionCapabilities.archive.available ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                onArchive(thread.id);
-              }}
-            >
-              <Archive className="size-3.5" />
-              Archive
-            </Button>
-          ) : null}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="icon-sm" variant="ghost" aria-label="More actions">
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onSelect={() => {
-                  onTogglePinned(thread.id);
-                }}
-              >
-                {thread.pinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
-                {thread.pinned ? "Unpin" : "Pin"}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!threadActionCapabilities.delete.available}
-                title={threadActionCapabilities.delete.reason ?? undefined}
-                onSelect={() => {
-                  onDelete(thread.id);
-                }}
-              >
-                <Trash2 className="size-3.5" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
+      <ThreadDetailHeader
+        onArchive={onArchive}
+        onBack={onBack}
+        onDelete={onDelete}
+        onOpenProcess={() => {
+          setProcessOpen(true);
+        }}
+        onTogglePinned={onTogglePinned}
+        stateGlyph={stateGlyph}
+        thread={thread}
+        threadActionCapabilities={threadActionCapabilities}
+        working={working}
+      />
 
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
         <div className="mx-auto w-full max-w-[760px]">
@@ -351,79 +481,17 @@ export function ThreadDetail({
         </div>
       </div>
 
-      <div className="border-border-subtle bg-background shrink-0 border-t px-6 py-4">
-        <div className="mx-auto max-w-[760px]">
-          {readOnlyReason ? (
-            <div className="border-border bg-muted/40 text-fg-2 mb-2 rounded-md border px-3 py-2 text-[12.5px]">
-              {readOnlyReason}
-            </div>
-          ) : null}
-          {actionError ? (
-            <div className="border-destructive/20 bg-destructive/[0.06] text-destructive mb-2 rounded-md border px-3 py-2 text-[12.5px]">
-              {actionError}
-            </div>
-          ) : null}
-          <div className="border-border-subtle bg-card flex items-end gap-2 rounded-lg border px-3 py-2.5 shadow-[var(--shadow-sm)]">
-            <Textarea
-              value={reply}
-              onChange={(event) => {
-                const nextValue = event.target.value;
-                setReply(nextValue);
-                // Nudge the runtime prewarm pipeline as soon as the user starts
-                // composing a follow-up. The helper throttles per session so
-                // rapid keystrokes do not amplify into back-to-back mutations,
-                // and the server scheduler is idempotent + fire-and-forget.
-                if (
-                  followUpMode &&
-                  nextValue.length > 0 &&
-                  threadActionCapabilities.followUp.available
-                ) {
-                  triggerAgentSessionPrewarm(toSessionId(thread.id));
-                }
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                  event.preventDefault();
-                  void send();
-                }
-              }}
-              className="max-h-[200px] min-h-[36px] flex-1 resize-none border-0 bg-transparent p-0 text-[13px] shadow-none focus-visible:ring-0"
-              placeholder={
-                followUpMode
-                  ? `Follow up — re-dispatches to ${thread.agentName}`
-                  : "Add a comment..."
-              }
-            />
-            <Button
-              type="button"
-              size="icon-xs"
-              variant="ghost"
-              aria-label="Attach files"
-              className="text-fg-3 shrink-0"
-              disabled
-            >
-              <Paperclip className="size-3.5" />
-            </Button>
-            <Button
-              type="button"
-              size="icon-sm"
-              variant="ghost"
-              disabled={!canSend}
-              aria-label={followUpMode ? "Follow up" : "Send comment"}
-              className="text-fg-3 hover:text-fg-1 shrink-0"
-              onClick={() => {
-                void send();
-              }}
-            >
-              {followUpMode ? (
-                <RotateCcw className="size-3.5" />
-              ) : (
-                <CornerDownLeft className="size-3.5" />
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <ThreadReplyComposer
+        actionError={actionError}
+        canSend={canSend}
+        followUpMode={followUpMode}
+        onChangeReply={setReply}
+        onSend={send}
+        readOnlyReason={readOnlyReason}
+        reply={reply}
+        thread={thread}
+        threadActionCapabilities={threadActionCapabilities}
+      />
 
       <ThreadProcessModal
         agent={agent}

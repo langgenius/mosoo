@@ -1,11 +1,12 @@
 import { ArrowUpRight, Star } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { m, useReducedMotion } from "motion/react";
 import type { CSSProperties, ReactElement } from "react";
 
 import { GithubMark } from "../github-mark";
 import { MOSOO_API_REFERENCE_URL, MOSOO_GITHUB_URL } from "../links";
-import { fadeUp, staggerParent } from "./motion";
-import { DISPLAY_FONT, Eyebrow } from "./ui";
+import { fadeUp, staggerParent } from "./motion-variants";
+import { DISPLAY_FONT } from "./typography";
+import { Eyebrow } from "./ui";
 import { UnicornBackground } from "./unicorn";
 
 const HERO_SCENE_ID = "RasGv747UbFbFukg0cwh";
@@ -38,35 +39,32 @@ export function Hero({ onContinue }: { onContinue: () => void }): ReactElement {
       {/* WebGL aurora — the brand's signature hero motion */}
       <UnicornBackground projectId={HERO_SCENE_ID} />
 
-      <motion.div
+      <m.div
         className="relative z-10 flex w-full max-w-[1080px] flex-col items-center text-center"
         initial={reduceMotion ? false : "hidden"}
         animate="visible"
         variants={staggerParent}
       >
-        <motion.div variants={fadeUp}>
+        <m.div variants={fadeUp}>
           <Eyebrow>Open source · Managed agents</Eyebrow>
-        </motion.div>
-        <motion.h1
+        </m.div>
+        <m.h1
           className="text-ink-900 mt-7 [text-wrap:balance]"
           style={HERO_HEADLINE_STYLE}
           variants={fadeUp}
         >
           <span className="block">Managed agents,</span>
           <span className="block">built open source.</span>
-        </motion.h1>
-        <motion.p
+        </m.h1>
+        <m.p
           className="text-ink-800 mt-6 max-w-[640px]"
           style={HERO_SUBHEAD_STYLE}
           variants={fadeUp}
         >
           One control plane for Codex, Claude Code, OpenClaw, and Hermes Agent. Runtime-agnostic
           agents your enterprise can actually govern.
-        </motion.p>
-        <motion.div
-          className="mt-9 flex flex-wrap items-center justify-center gap-3"
-          variants={fadeUp}
-        >
+        </m.p>
+        <m.div className="mt-9 flex flex-wrap items-center justify-center gap-3" variants={fadeUp}>
           <button
             type="button"
             onClick={onContinue}
@@ -94,14 +92,14 @@ export function Hero({ onContinue }: { onContinue: () => void }): ReactElement {
             <span>API reference</span>
             <ArrowUpRight className="size-4" />
           </a>
-        </motion.div>
-        <motion.p
+        </m.div>
+        <m.p
           className="text-ink-700 mt-6 font-mono text-[11px] tracking-[0.18em] uppercase"
           variants={fadeUp}
         >
           Open source · Self-hostable · BYOK
-        </motion.p>
-      </motion.div>
+        </m.p>
+      </m.div>
     </section>
   );
 }

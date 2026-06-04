@@ -61,6 +61,37 @@ async function uploadSinglePut(session: FileUploadSummary, file: Blob): Promise<
   }
 }
 
+async function uploadMultipartPart(input: {
+  file: Blob;
+  partNumber: number;
+  partSize: number;
+  session: FileUploadSummary;
+  uploadedPartNumbers: Set<number>;
+}): Promise<void> {
+  const start = (input.partNumber - 1) * input.partSize;
+  const end = Math.min(start + input.partSize, input.file.size);
+  const response = await apiFetch(`/files/${input.session.fileId}/parts/${input.partNumber}`, {
+    body: input.file.slice(start, end),
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/octet-stream",
+    },
+    method: "PUT",
+  });
+
+  if (!response.ok) {
+    throw await parseFileApiError(response);
+  }
+
+  const payload = parseUploadFilePartResponse(await response.json(), input.partNumber);
+
+  input.uploadedPartNumbers.add(payload.partNumber);
+  await appendUploadedPart(input.session.fileId, {
+    etag: payload.etag,
+    partNumber: payload.partNumber,
+  });
+}
+
 async function uploadMultipartParts(session: FileUploadSummary, file: Blob): Promise<void> {
   if (!isTruthy(session.partSize)) {
     throw createFileApiError({
@@ -71,47 +102,37 @@ async function uploadMultipartParts(session: FileUploadSummary, file: Blob): Pro
     });
   }
 
+  const partSize = session.partSize;
   const stored = await getFileUploadSession(session.fileId);
   const uploadedPartNumbers = new Set((stored?.parts ?? []).map((part) => part.partNumber));
-  const totalParts = Math.ceil(file.size / session.partSize);
+  const totalParts = Math.ceil(file.size / partSize);
+  const pendingPartNumbers = Array.from(
+    { length: totalParts },
+    (_unused, index) => index + 1,
+  ).filter((partNumber) => !uploadedPartNumbers.has(partNumber));
+  let nextPartIndex = 0;
 
-  for (let batchStart = 1; batchStart <= totalParts; batchStart += 8) {
-    const batchNumbers = Array.from(
-      { length: Math.min(8, totalParts - batchStart + 1) },
-      (_unused, index) => batchStart + index,
-    ).filter((partNumber) => !uploadedPartNumbers.has(partNumber));
+  async function uploadNextPart(): Promise<void> {
+    const partNumber = pendingPartNumbers[nextPartIndex];
+    nextPartIndex += 1;
 
-    if (batchNumbers.length === 0) {
-      continue;
+    if (partNumber === undefined) {
+      return;
     }
 
-    await Promise.all(
-      batchNumbers.map(async (partNumber) => {
-        const start = (partNumber - 1) * session.partSize!;
-        const end = Math.min(start + session.partSize!, file.size);
-        const response = await apiFetch(`/files/${session.fileId}/parts/${partNumber}`, {
-          body: file.slice(start, end),
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/octet-stream",
-          },
-          method: "PUT",
-        });
-
-        if (!response.ok) {
-          throw await parseFileApiError(response);
-        }
-
-        const payload = parseUploadFilePartResponse(await response.json(), partNumber);
-
-        uploadedPartNumbers.add(payload.partNumber);
-        await appendUploadedPart(session.fileId, {
-          etag: payload.etag,
-          partNumber: payload.partNumber,
-        });
-      }),
-    );
+    await uploadMultipartPart({
+      file,
+      partNumber,
+      partSize,
+      session,
+      uploadedPartNumbers,
+    });
+    await uploadNextPart();
   }
+
+  await Promise.all(
+    Array.from({ length: Math.min(8, pendingPartNumbers.length) }, () => uploadNextPart()),
+  );
 }
 
 async function completeUpload(session: FileUploadSummary): Promise<FileRecord> {
@@ -159,6 +180,10 @@ async function persistUploadSession(
   return record;
 }
 
+function persistAndRunUploadSession(session: FileUploadSummary, file: File): Promise<FileRecord> {
+  return persistUploadSession(session, file).then(() => runUploadSession(session, file));
+}
+
 export async function runUploadSession(
   session: FileUploadSummary,
   file: Blob,
@@ -188,8 +213,7 @@ export async function createAndRunFileUpload(
     method: "POST",
   });
 
-  await persistUploadSession(session, file);
-  await runUploadSession(session, file);
+  await persistAndRunUploadSession(session, file);
 
   return {
     fileId: session.fileId,

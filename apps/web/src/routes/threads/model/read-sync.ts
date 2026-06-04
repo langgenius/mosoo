@@ -12,7 +12,9 @@ export function useSelectedThreadReadSync({
   selectedThread: ThreadListItem | null;
 }): void {
   const pendingReadMarkerRef = useRef<string | null>(null);
-  const completedReadMarkersRef = useRef<Set<string>>(new Set());
+  const completedReadMarkersRef = useRef<Set<string> | null>(null);
+  completedReadMarkersRef.current ??= new Set<string>();
+  const completedReadMarkers = completedReadMarkersRef.current;
 
   useEffect(() => {
     if (selectedThread === null || selectedThread.read) {
@@ -21,7 +23,7 @@ export function useSelectedThreadReadSync({
 
     const marker = `${selectedThread.id}:${selectedThread.lastActivityAt}`;
 
-    if (pendingReadMarkerRef.current === marker || completedReadMarkersRef.current.has(marker)) {
+    if (pendingReadMarkerRef.current === marker || completedReadMarkers.has(marker)) {
       return;
     }
 
@@ -34,7 +36,7 @@ export function useSelectedThreadReadSync({
           readAt: threadToMark.lastActivityAt,
           threadId: threadToMark.id,
         });
-        completedReadMarkersRef.current.add(marker);
+        completedReadMarkers.add(marker);
       } catch (error) {
         onError(error);
       } finally {
@@ -45,5 +47,5 @@ export function useSelectedThreadReadSync({
     }
 
     void markSelectedThreadRead();
-  }, [markRead, onError, selectedThread]);
+  }, [completedReadMarkers, markRead, onError, selectedThread]);
 }

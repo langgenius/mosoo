@@ -1,7 +1,7 @@
 import type { Collaborator, SpaceRole } from "@mosoo/contracts/space";
 import { Globe, Loader2, Lock } from "lucide-react";
 
-import { AccessRow } from "@/features/resource-sharing/access-primitives";
+import { AccessRow } from "@/features/resource-sharing/access-row";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { ROLE_LABELS } from "./constants";

@@ -12,7 +12,7 @@ import {
   Send,
   X,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useReducer, useRef } from "react";
 import type { ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -34,7 +34,7 @@ import {
 } from "@/shared/ui/dropdown-menu";
 import { Textarea } from "@/shared/ui/textarea";
 
-import { AgentAvatar } from "../shared-ui";
+import { AgentAvatar } from "../agent-avatar";
 
 export interface NewThreadSubmitInput {
   agentId: string;
@@ -95,6 +95,196 @@ function getDefaultAgentId(input: {
   return null;
 }
 
+interface NewThreadDialogState {
+  body: string;
+  discardWarning: boolean;
+  expanded: boolean;
+  files: File[];
+  selectedAgentId: string | null;
+}
+
+type NewThreadDialogAction =
+  | { type: "addFiles"; files: File[] }
+  | { type: "changeBody"; body: string }
+  | { type: "removeFile"; index: number }
+  | { type: "setDiscardWarning"; warning: boolean }
+  | { type: "setSelectedAgentId"; agentId: string | null }
+  | { type: "toggleExpanded" };
+
+function createNewThreadDialogState(input: {
+  agents: readonly AgentSummary[];
+  lastAgentId: string | null;
+  lockedAgentId: string | null;
+}): NewThreadDialogState {
+  return {
+    body: "",
+    discardWarning: false,
+    expanded: false,
+    files: [],
+    selectedAgentId: getDefaultAgentId(input),
+  };
+}
+
+function newThreadDialogReducer(
+  state: NewThreadDialogState,
+  action: NewThreadDialogAction,
+): NewThreadDialogState {
+  switch (action.type) {
+    case "addFiles":
+      return { ...state, files: [...state.files, ...action.files] };
+    case "changeBody":
+      return { ...state, body: action.body, discardWarning: false };
+    case "removeFile":
+      return {
+        ...state,
+        files: state.files.filter((_file, index) => index !== action.index),
+      };
+    case "setDiscardWarning":
+      return { ...state, discardWarning: action.warning };
+    case "setSelectedAgentId":
+      return { ...state, selectedAgentId: action.agentId };
+    case "toggleExpanded":
+      return { ...state, expanded: !state.expanded };
+  }
+}
+
+function AgentAssignField({
+  agents,
+  locked,
+  noAgentsAvailable,
+  onCreateAgent,
+  onSelectAgent,
+  selectedAgent,
+  selectedAgentId,
+}: {
+  agents: AgentSummary[];
+  locked: boolean;
+  noAgentsAvailable: boolean;
+  onCreateAgent: () => void;
+  onSelectAgent: (agentId: string) => void;
+  selectedAgent: AgentSummary | null;
+  selectedAgentId: string | null;
+}): ReactElement {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-fg-3 shrink-0 text-[10.5px] font-bold tracking-[0.16em] uppercase">
+        Assign to
+      </span>
+      {noAgentsAvailable ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="h-auto min-h-10 min-w-0 flex-1 justify-between gap-2 px-2.5 py-1.5 text-left"
+          onClick={onCreateAgent}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="bg-muted/40 text-fg-3 inline-flex size-6 shrink-0 items-center justify-center rounded-full">
+              <Plus className="size-3.5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="text-fg-1 block truncate text-[13px] leading-snug font-semibold">
+                Create your first agent
+              </span>
+              <span className="text-fg-3 block truncate text-[11.5px] leading-snug">
+                No agents yet; set one up to dispatch this thread.
+              </span>
+            </span>
+          </span>
+          <ArrowUpRight className="text-fg-3 size-4 shrink-0" />
+        </Button>
+      ) : locked ? (
+        <div
+          aria-readonly="true"
+          className="border-border-strong bg-card dark:border-input dark:bg-input/30 flex h-auto min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 text-left"
+        >
+          <AgentBadge agent={selectedAgent} size="sm" />
+          <span className="min-w-0 flex-1">
+            <span className="text-fg-1 block truncate text-[13px] leading-snug font-semibold">
+              {selectedAgent?.name ?? "Select an agent"}
+            </span>
+            {selectedAgent?.description ? (
+              <span className="text-fg-3 block truncate text-[11.5px] leading-snug">
+                {selectedAgent.description}
+              </span>
+            ) : null}
+          </span>
+        </div>
+      ) : (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto min-h-10 min-w-0 flex-1 justify-between gap-2 px-2.5 py-1.5 text-left"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <AgentBadge agent={selectedAgent} size="sm" />
+                <span className="min-w-0 flex-1">
+                  <span className="text-fg-1 block truncate text-[13px] leading-snug font-semibold">
+                    {selectedAgent?.name ?? "Select an agent"}
+                  </span>
+                  {selectedAgent?.description ? (
+                    <span className="text-fg-3 block truncate text-[11.5px] leading-snug">
+                      {selectedAgent.description}
+                    </span>
+                  ) : null}
+                </span>
+              </span>
+              <ChevronDown className="text-fg-3 size-4 shrink-0" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="max-h-[320px] w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto">
+            {agents.map((agent) => {
+              const isSelected = agent.id === selectedAgentId;
+
+              return (
+                <DropdownMenuItem
+                  key={agent.id}
+                  disabled={agent.status !== "published"}
+                  onSelect={() => {
+                    onSelectAgent(agent.id);
+                  }}
+                  className="items-start gap-2.5 py-2"
+                >
+                  <AgentBadge agent={agent} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-fg-1 truncate text-[13px] font-semibold">
+                        {agent.name}
+                      </span>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-sm border px-1 py-0.5 text-[9.5px] font-bold uppercase tracking-wide",
+                          agent.kind === "pet"
+                            ? "border-purple-200 bg-purple-50 text-purple-700"
+                            : "border-sky-200 bg-sky-50 text-sky-700",
+                        )}
+                      >
+                        {agent.kind}
+                      </span>
+                      {agent.status !== "published" ? (
+                        <span className="text-fg-3 shrink-0 text-[10.5px]">draft</span>
+                      ) : null}
+                    </div>
+                    {agent.description ? (
+                      <div className="text-fg-3 mt-0.5 line-clamp-2 text-[11.5px] leading-snug">
+                        {agent.description}
+                      </div>
+                    ) : null}
+                  </div>
+                  {isSelected ? (
+                    <Check className="text-accent-press mt-1 size-3.5 shrink-0" />
+                  ) : null}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
+  );
+}
+
 export function NewThreadDialog({
   agents,
   error,
@@ -107,14 +297,13 @@ export function NewThreadDialog({
   submitting,
 }: NewThreadDialogProps): ReactElement {
   const navigate = useNavigate();
-  const [body, setBody] = useState("");
-  const [expanded, setExpanded] = useState(false);
-  const [files, setFiles] = useState<File[]>([]);
-  const [discardWarning, setDiscardWarning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(() =>
-    getDefaultAgentId({ agents, lastAgentId, lockedAgentId }),
+  const [state, dispatch] = useReducer(
+    newThreadDialogReducer,
+    { agents, lastAgentId, lockedAgentId },
+    createNewThreadDialogState,
   );
+  const { body, discardWarning, expanded, files, selectedAgentId } = state;
   const selectedAgent = useMemo(
     () => agents.find((agent) => agent.id === selectedAgentId) ?? null,
     [agents, selectedAgentId],
@@ -142,7 +331,7 @@ export function NewThreadDialog({
 
   function requestOpenChange(nextOpen: boolean): void {
     if (!nextOpen && body.trim().length > 0 && !discardWarning) {
-      setDiscardWarning(true);
+      dispatch({ type: "setDiscardWarning", warning: true });
       return;
     }
 
@@ -168,7 +357,7 @@ export function NewThreadDialog({
               type="button"
               variant="ghost"
               onClick={() => {
-                setExpanded((current) => !current);
+                dispatch({ type: "toggleExpanded" });
               }}
             >
               {expanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
@@ -177,134 +366,28 @@ export function NewThreadDialog({
         </DialogHeader>
 
         <div className="flex min-h-0 flex-col gap-3 px-5 py-4">
-          <div className="flex items-center gap-3">
-            <span className="text-fg-3 shrink-0 text-[10.5px] font-bold tracking-[0.16em] uppercase">
-              Assign to
-            </span>
-            {noAgentsAvailable ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="h-auto min-h-10 min-w-0 flex-1 justify-between gap-2 px-2.5 py-1.5 text-left"
-                onClick={() => {
-                  const basePath = globalThis.location.pathname.startsWith("/demo")
-                    ? "/demo/agent"
-                    : "/agent";
-                  onOpenChange(false);
-                  void navigate(basePath);
-                }}
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="bg-muted/40 text-fg-3 inline-flex size-6 shrink-0 items-center justify-center rounded-full">
-                    <Plus className="size-3.5" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="text-fg-1 block truncate text-[13px] leading-snug font-semibold">
-                      Create your first agent
-                    </span>
-                    <span className="text-fg-3 block truncate text-[11.5px] leading-snug">
-                      No agents yet; set one up to dispatch this thread.
-                    </span>
-                  </span>
-                </span>
-                <ArrowUpRight className="text-fg-3 size-4 shrink-0" />
-              </Button>
-            ) : locked ? (
-              <div
-                aria-readonly="true"
-                className="border-border-strong bg-card dark:border-input dark:bg-input/30 flex h-auto min-h-10 min-w-0 flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 text-left"
-              >
-                <AgentBadge agent={selectedAgent} size="sm" />
-                <span className="min-w-0 flex-1">
-                  <span className="text-fg-1 block truncate text-[13px] leading-snug font-semibold">
-                    {selectedAgent?.name ?? "Select an agent"}
-                  </span>
-                  {selectedAgent?.description ? (
-                    <span className="text-fg-3 block truncate text-[11.5px] leading-snug">
-                      {selectedAgent.description}
-                    </span>
-                  ) : null}
-                </span>
-              </div>
-            ) : (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-auto min-h-10 min-w-0 flex-1 justify-between gap-2 px-2.5 py-1.5 text-left"
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <AgentBadge agent={selectedAgent} size="sm" />
-                      <span className="min-w-0 flex-1">
-                        <span className="text-fg-1 block truncate text-[13px] leading-snug font-semibold">
-                          {selectedAgent?.name ?? "Select an agent"}
-                        </span>
-                        {selectedAgent?.description ? (
-                          <span className="text-fg-3 block truncate text-[11.5px] leading-snug">
-                            {selectedAgent.description}
-                          </span>
-                        ) : null}
-                      </span>
-                    </span>
-                    <ChevronDown className="text-fg-3 size-4 shrink-0" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="max-h-[320px] w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto">
-                  {agents.map((agent) => {
-                    const isSelected = agent.id === selectedAgentId;
-
-                    return (
-                      <DropdownMenuItem
-                        key={agent.id}
-                        disabled={agent.status !== "published"}
-                        onSelect={() => {
-                          setSelectedAgentId(agent.id);
-                        }}
-                        className="items-start gap-2.5 py-2"
-                      >
-                        <AgentBadge agent={agent} size="sm" />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-fg-1 truncate text-[13px] font-semibold">
-                              {agent.name}
-                            </span>
-                            <span
-                              className={cn(
-                                "shrink-0 rounded-sm border px-1 py-0.5 text-[9.5px] font-bold uppercase tracking-wide",
-                                agent.kind === "pet"
-                                  ? "border-purple-200 bg-purple-50 text-purple-700"
-                                  : "border-sky-200 bg-sky-50 text-sky-700",
-                              )}
-                            >
-                              {agent.kind}
-                            </span>
-                            {agent.status !== "published" ? (
-                              <span className="text-fg-3 shrink-0 text-[10.5px]">draft</span>
-                            ) : null}
-                          </div>
-                          {agent.description ? (
-                            <div className="text-fg-3 mt-0.5 line-clamp-2 text-[11.5px] leading-snug">
-                              {agent.description}
-                            </div>
-                          ) : null}
-                        </div>
-                        {isSelected ? (
-                          <Check className="text-accent-press mt-1 size-3.5 shrink-0" />
-                        ) : null}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
+          <AgentAssignField
+            agents={agents}
+            locked={locked}
+            noAgentsAvailable={noAgentsAvailable}
+            onCreateAgent={() => {
+              const basePath = globalThis.location.pathname.startsWith("/demo")
+                ? "/demo/agent"
+                : "/agent";
+              onOpenChange(false);
+              void navigate(basePath);
+            }}
+            onSelectAgent={(agentId) => {
+              dispatch({ agentId, type: "setSelectedAgentId" });
+            }}
+            selectedAgent={selectedAgent}
+            selectedAgentId={selectedAgentId}
+          />
 
           <Textarea
             value={body}
             onChange={(event) => {
-              setBody(event.target.value);
-              setDiscardWarning(false);
+              dispatch({ body: event.target.value, type: "changeBody" });
             }}
             onKeyDown={(event) => {
               if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
@@ -332,9 +415,7 @@ export function NewThreadDialog({
                     type="button"
                     aria-label={`Remove ${file.name}`}
                     onClick={() => {
-                      setFiles((current) =>
-                        current.filter((_file, fileIndex) => fileIndex !== index),
-                      );
+                      dispatch({ index, type: "removeFile" });
                     }}
                     className="text-fg-3 hover:text-fg-1"
                   >
@@ -380,7 +461,7 @@ export function NewThreadDialog({
             const selectedFiles = event.target.files;
 
             if (selectedFiles) {
-              setFiles((current) => [...current, ...selectedFiles]);
+              dispatch({ files: [...selectedFiles], type: "addFiles" });
             }
 
             event.target.value = "";

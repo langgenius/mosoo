@@ -2,7 +2,6 @@ import { AlertTriangle } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
-import { Button } from "@/shared/ui/button";
 
 import {
   SESSION_EVENT_DOMAIN_LABEL,
@@ -10,33 +9,6 @@ import {
   SESSION_EVENT_FILTER_DOMAINS,
 } from "./domain";
 import type { SessionEventDomain } from "./domain";
-
-export function EmptyFeedState(): ReactElement {
-  return (
-    <div className="flex min-h-full items-center justify-center px-8 py-16">
-      <div className="max-w-sm text-center">
-        <div className="text-fg-1 text-[14px] font-semibold">No events yet.</div>
-        <p className="text-fg-3 mt-1 text-[12.5px] leading-5">
-          The first user.message will appear here when the agent runs.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-export function FilterEmptyState({ onReset }: { onReset: () => void }): ReactElement {
-  return (
-    <div className="flex min-h-[260px] flex-col items-center justify-center gap-3 px-8 text-center">
-      <div>
-        <div className="text-fg-1 text-[14px] font-semibold">No events match these filters.</div>
-        <p className="text-fg-3 mt-1 text-[12.5px]">Reset the feed to inspect the full turn.</p>
-      </div>
-      <Button onClick={onReset} size="sm" variant="outline">
-        Reset filters
-      </Button>
-    </div>
-  );
-}
 
 export function DomainFilterBar({
   domains,

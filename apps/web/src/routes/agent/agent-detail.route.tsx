@@ -7,8 +7,8 @@ import {
   Settings,
   TerminalSquare,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { useAppSession } from "@/app/session-provider";
@@ -34,8 +34,8 @@ import { DevMode } from "./components/dev-mode";
 import { FileBrowserMode } from "./components/file-browser-mode";
 import { LogsTab } from "./components/logs-tab";
 import { PreviewMode } from "./components/preview-mode";
+import { RuntimeIcon } from "./components/runtime-icon";
 import { SettingsSheet } from "./components/settings-dialog";
-import { RuntimeIcon } from "./components/shared-components";
 import { SystemLogMode } from "./components/system-log-mode";
 import { TerminalMode } from "./components/terminal-mode";
 import { VersionsTab } from "./components/versions-tab";
@@ -52,6 +52,12 @@ const MODE_TABS: { id: DetailMode; label: string; ownerOnly?: boolean }[] = [
 ];
 
 const DEBUG_MODES = new Set<DetailMode>(["files", "system-log", "terminal"]);
+
+interface DebugModeItem {
+  icon: LucideIcon;
+  id: Extract<DetailMode, "files" | "system-log" | "terminal">;
+  label: string;
+}
 
 function toDetailMode(value: string | null): DetailMode | null {
   switch (value) {
@@ -70,6 +76,140 @@ function toDetailMode(value: string | null): DetailMode | null {
   }
 }
 
+function AgentDetailHeader({
+  agent,
+  debugItems,
+  headerActionTargetRef,
+  isDraftLifecycle,
+  isOwnerOrAdmin,
+  lifecycleMode,
+  mode,
+  onBack,
+  onOpenSettings,
+  onOpenVersions,
+  onSelectMode,
+  runtime,
+}: {
+  agent: Agent;
+  debugItems: DebugModeItem[];
+  headerActionTargetRef: (node: HTMLDivElement | null) => void;
+  isDraftLifecycle: boolean;
+  isOwnerOrAdmin: boolean;
+  lifecycleMode: Extract<DetailMode, "dev" | "preview"> | null;
+  mode: DetailMode;
+  onBack: () => void;
+  onOpenSettings: () => void;
+  onOpenVersions: () => void;
+  onSelectMode: (mode: DetailMode) => void;
+  runtime: ReturnType<typeof getRuntimeInfo> | null;
+}) {
+  return (
+    <header className="border-border-subtle relative flex h-13 shrink-0 items-center justify-between border-b bg-white px-5">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon-sm" onClick={onBack} className="text-muted-foreground">
+          <ArrowLeft className="size-4" />
+        </Button>
+
+        {runtime ? <RuntimeIcon runtime={runtime} size={28} /> : null}
+        <span className="text-foreground text-[14px] font-medium">{agent.name}</span>
+        {isDraftLifecycle ? (
+          <button
+            type="button"
+            onClick={onOpenVersions}
+            className="focus-visible:ring-ring ml-1 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900 transition-colors hover:bg-amber-100 focus:outline-none focus-visible:ring-2"
+            aria-label="Open version history"
+          >
+            Draft
+          </button>
+        ) : agent.liveVersion ? (
+          <button
+            type="button"
+            onClick={onOpenVersions}
+            className="focus-visible:ring-ring ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-800 transition-colors hover:bg-green-200/70 focus:outline-none focus-visible:ring-2"
+            aria-label="Open version history"
+          >
+            v{agent.liveVersion.versionNumber} live
+          </button>
+        ) : null}
+      </div>
+
+      {isDraftLifecycle && lifecycleMode ? (
+        <div />
+      ) : (
+        <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1">
+          {MODE_TABS.flatMap((tab) =>
+            tab.ownerOnly === true && !isOwnerOrAdmin
+              ? []
+              : [
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      onSelectMode(tab.id);
+                    }}
+                    className={cn(
+                      "px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-all",
+                      mode === tab.id
+                        ? "bg-ink-100 text-fg-1"
+                        : "text-muted-foreground hover:bg-accent",
+                    )}
+                  >
+                    {tab.label}
+                  </button>,
+                ],
+          )}
+          {debugItems.length > 0 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    "flex items-center gap-1 rounded-lg px-3.5 py-1.5 text-[13px] font-medium outline-none transition-all",
+                    DEBUG_MODES.has(mode)
+                      ? "bg-ink-100 text-fg-1"
+                      : "text-muted-foreground hover:bg-accent",
+                  )}
+                >
+                  Debug
+                  <ChevronDown aria-hidden="true" size={14} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {debugItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <DropdownMenuItem
+                      key={item.id}
+                      onSelect={() => {
+                        onSelectMode(item.id);
+                      }}
+                    >
+                      <Icon aria-hidden="true" size={14} />
+                      <span className="flex-1">{item.label}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <div ref={headerActionTargetRef} className="flex items-center gap-2" />
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onOpenSettings}
+          className="text-muted-foreground"
+        >
+          <Settings className="size-4" />
+        </Button>
+      </div>
+    </header>
+  );
+}
+
 export function AgentDetailPage() {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
@@ -79,7 +219,7 @@ export function AgentDetailPage() {
   const [selectedMode, setSelectedMode] = useState<DetailMode | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
-  const [headerCta, setHeaderCta] = useState<ReactNode>(null);
+  const [headerActionTarget, setHeaderActionTarget] = useState<HTMLDivElement | null>(null);
 
   const detailQuery = useAgentDetailQuery(agentId ?? null);
   const canEdit = detailQuery.data
@@ -119,6 +259,16 @@ export function AgentDetailPage() {
     isOwnerOrAdmin &&
     (runtimeKindPolicy?.operations.ownerTerminal || runtimeKindPolicy?.subject.stable),
   );
+  const debugItems: DebugModeItem[] = [];
+  if (canShowDebugMenu && canUseTerminal) {
+    debugItems.push({ icon: TerminalSquare, id: "terminal", label: "Terminal" });
+  }
+  if (canShowDebugMenu && canUseFileBrowser) {
+    debugItems.push({ icon: FolderTree, id: "files", label: "File System" });
+  }
+  if (canShowDebugMenu && canUseSystemLog) {
+    debugItems.push({ icon: FileText, id: "system-log", label: "System Log" });
+  }
   const urlMode = toDetailMode(searchParams.get("tab") ?? searchParams.get("mode"));
 
   const handleSelectMode = useCallback(
@@ -252,144 +402,26 @@ export function AgentDetailPage() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Top Bar */}
-      <header className="border-border-subtle relative flex h-13 shrink-0 items-center justify-between border-b bg-white px-5">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => {
-              void navigate(basePath);
-            }}
-            className="text-muted-foreground"
-          >
-            <ArrowLeft className="size-4" />
-          </Button>
-
-          {runtime ? <RuntimeIcon runtime={runtime} size={28} /> : null}
-          <span className="text-foreground text-[14px] font-medium">{agent.name}</span>
-          {isDraftLifecycle ? (
-            <button
-              type="button"
-              onClick={() => {
-                setShowVersions(true);
-              }}
-              className="focus-visible:ring-ring ml-1 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900 transition-colors hover:bg-amber-100 focus:outline-none focus-visible:ring-2"
-              aria-label="Open version history"
-            >
-              Draft
-            </button>
-          ) : agent.liveVersion ? (
-            <button
-              type="button"
-              onClick={() => {
-                setShowVersions(true);
-              }}
-              className="focus-visible:ring-ring ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-800 transition-colors hover:bg-green-200/70 focus:outline-none focus-visible:ring-2"
-              aria-label="Open version history"
-            >
-              v{agent.liveVersion.versionNumber} live
-            </button>
-          ) : null}
-        </div>
-
-        {/* Mode tabs — hidden inside the Draft lifecycle shell since the
-            shell owns its own navigation. Live agents keep the tab strip.
-            Debug dropdown is Pet-only (entry hidden entirely for Cattle);
-            Terminal is owner-only. Absolutely centered so the strip stays
-            put when the right-side headerCta width changes across tabs
-            (dev/preview set a CTA, logs/cost clear it). */}
-        {isDraftLifecycle && lifecycleMode ? (
-          <div />
-        ) : (
-          <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1">
-            {MODE_TABS.flatMap((tab) =>
-              tab.ownerOnly === true && !isOwnerOrAdmin
-                ? []
-                : [
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => {
-                        handleSelectMode(tab.id);
-                      }}
-                      className={cn(
-                        "px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-all",
-                        mode === tab.id
-                          ? "bg-ink-100 text-fg-1"
-                          : "text-muted-foreground hover:bg-accent",
-                      )}
-                    >
-                      {tab.label}
-                    </button>,
-                  ],
-            )}
-            {canShowDebugMenu ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn(
-                      "flex items-center gap-1 rounded-lg px-3.5 py-1.5 text-[13px] font-medium outline-none transition-all",
-                      DEBUG_MODES.has(mode)
-                        ? "bg-ink-100 text-fg-1"
-                        : "text-muted-foreground hover:bg-accent",
-                    )}
-                  >
-                    Debug
-                    <ChevronDown aria-hidden="true" size={14} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {canUseTerminal ? (
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        handleSelectMode("terminal");
-                      }}
-                    >
-                      <TerminalSquare aria-hidden="true" size={14} /> Terminal
-                    </DropdownMenuItem>
-                  ) : null}
-                  {canUseFileBrowser ? (
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        handleSelectMode("files");
-                      }}
-                    >
-                      <FolderTree aria-hidden="true" size={14} />
-                      <span className="flex-1">File System</span>
-                    </DropdownMenuItem>
-                  ) : null}
-                  {canUseSystemLog ? (
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        handleSelectMode("system-log");
-                      }}
-                    >
-                      <FileText aria-hidden="true" size={14} />
-                      <span className="flex-1">System Log</span>
-                    </DropdownMenuItem>
-                  ) : null}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
-          </div>
-        )}
-
-        <div className="flex items-center gap-2">
-          {headerCta}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => {
-              setShowSettings(true);
-            }}
-            className="text-muted-foreground"
-          >
-            <Settings className="size-4" />
-          </Button>
-        </div>
-      </header>
+      <AgentDetailHeader
+        agent={agent}
+        debugItems={debugItems}
+        headerActionTargetRef={setHeaderActionTarget}
+        isDraftLifecycle={isDraftLifecycle}
+        isOwnerOrAdmin={isOwnerOrAdmin}
+        lifecycleMode={lifecycleMode}
+        mode={mode}
+        onBack={() => {
+          void navigate(basePath);
+        }}
+        onOpenSettings={() => {
+          setShowSettings(true);
+        }}
+        onOpenVersions={() => {
+          setShowVersions(true);
+        }}
+        onSelectMode={handleSelectMode}
+        runtime={runtime}
+      />
 
       {/* Content */}
       <div className="min-h-0 flex-1 overflow-hidden">
@@ -399,7 +431,7 @@ export function AgentDetailPage() {
             mode={lifecycleMode}
             onSwitchMode={handleSelectMode}
             organizationId={detail.organizationId}
-            onHeaderCtaChange={setHeaderCta}
+            headerActionTarget={headerActionTarget}
           />
         ) : (
           <>
@@ -408,14 +440,14 @@ export function AgentDetailPage() {
                 agent={agent}
                 onSwitchMode={handleSelectMode}
                 organizationId={detail.organizationId}
-                onHeaderCtaChange={setHeaderCta}
+                headerActionTarget={headerActionTarget}
               />
             )}
             {mode === "dev" && (
               <DevMode
                 agent={agent}
                 onSwitchMode={handleSelectMode}
-                onHeaderCtaChange={setHeaderCta}
+                headerActionTarget={headerActionTarget}
               />
             )}
           </>

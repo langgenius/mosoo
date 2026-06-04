@@ -58,7 +58,7 @@ export function SystemLogMode({ agent }: { agent: Agent }): ReactElement {
       ) : null}
 
       <div
-        ref={feed.scrollContainerRef}
+        ref={feed.setScrollContainerNode}
         onScroll={feed.trackScroll}
         className="relative min-h-0 flex-1 overflow-auto"
       >
@@ -86,14 +86,17 @@ export function SystemLogMode({ agent }: { agent: Agent }): ReactElement {
             No runtime events yet. The agent has not been provisioned. Trigger a session to start.
           </div>
         ) : feed.searchingOlder ? (
-          <div className="text-muted-foreground flex h-full items-center justify-center gap-2 px-6 text-center text-[13px]">
+          <div
+            ref={feed.setOlderSearchNode}
+            className="text-muted-foreground flex h-full items-center justify-center gap-2 px-6 text-center text-[13px]"
+          >
             <span className="inline-flex animate-spin">
               <Loader2 aria-hidden="true" size={16} />
             </span>
             Searching older runtime events…
           </div>
         ) : (
-          <div className="min-h-full py-3">
+          <div ref={feed.setScrollContentNode} className="min-h-full py-3">
             <div className="mx-auto w-full max-w-[1280px] px-5">
               <div className="mb-3 flex justify-center">
                 {feed.pagination.hasMoreOlder && feed.pagination.olderCursor ? (

@@ -54,11 +54,15 @@ export function useAgentBuilderSystemAgentSession(
   const typedAgentId = toAgentId(agentId);
   const [pendingChatTurn, setPendingChatTurn] = useState<AgentBuilderPendingChatTurn | null>(null);
   const optimisticTurnCounterRef = useRef(0);
-  const processedChatResultKeysRef = useRef<Set<string>>(new Set());
-  const queuedChatResultKeysRef = useRef<Set<string>>(new Set());
+  const processedChatResultKeysRef = useRef<Set<string> | null>(null);
+  const queuedChatResultKeysRef = useRef<Set<string> | null>(null);
   const queryClient = useQueryClient();
   const threadQuery = useEnsuredAgentBuilderThreadQuery(agentId);
   const messagesQuery = useAgentBuilderMessagesQuery(agentId);
+  processedChatResultKeysRef.current ??= new Set<string>();
+  queuedChatResultKeysRef.current ??= new Set<string>();
+  const processedChatResultKeys = processedChatResultKeysRef.current;
+  const queuedChatResultKeys = queuedChatResultKeysRef.current;
   const systemAgent = resolveAgentBuilderSystemAgentAddress({
     agentId: typedAgentId,
     threadId: threadQuery.data?.id ?? null,
@@ -67,13 +71,13 @@ export function useAgentBuilderSystemAgentSession(
     (result: AgentBuilderSystemAgentChatResult) => {
       const resultKey = createAgentBuilderSystemAgentChatResultKey(result);
 
-      queuedChatResultKeysRef.current.delete(resultKey);
+      queuedChatResultKeys.delete(resultKey);
 
-      if (processedChatResultKeysRef.current.has(resultKey)) {
+      if (processedChatResultKeys.has(resultKey)) {
         return;
       }
 
-      processedChatResultKeysRef.current.add(resultKey);
+      processedChatResultKeys.add(resultKey);
       setPendingChatTurn(null);
       queryClient.setQueryData<AgentBuilderMessage[]>(
         agentBuilderKeys.messages(agentId),
@@ -83,7 +87,7 @@ export function useAgentBuilderSystemAgentSession(
       void queryClient.invalidateQueries({ queryKey: agentBuilderKeys.messages(agentId) });
       void onTurnMessages([...result.messages]);
     },
-    [agentId, onTurnMessages, queryClient],
+    [agentId, onTurnMessages, processedChatResultKeys, queryClient, queuedChatResultKeys],
   );
   const handleSystemAgentChatData = useCallback(
     (part: { readonly data?: unknown; readonly type: string }) => {
@@ -93,20 +97,17 @@ export function useAgentBuilderSystemAgentSession(
 
       const resultKey = createAgentBuilderSystemAgentChatResultKey(part.data);
 
-      if (
-        processedChatResultKeysRef.current.has(resultKey) ||
-        queuedChatResultKeysRef.current.has(resultKey)
-      ) {
+      if (processedChatResultKeys.has(resultKey) || queuedChatResultKeys.has(resultKey)) {
         return;
       }
 
-      queuedChatResultKeysRef.current.add(resultKey);
+      queuedChatResultKeys.add(resultKey);
       enqueueAgentBuilderSystemAgentChatResult({
         onResult: applySystemAgentChatResult,
         part,
       });
     },
-    [applySystemAgentChatResult],
+    [applySystemAgentChatResult, processedChatResultKeys, queuedChatResultKeys],
   );
   const systemAgentConnection = useAgent({
     agent: "AgentBuilderSystemAgent",
@@ -179,7 +180,6 @@ export function useAgentBuilderSystemAgentSession(
         });
     },
     [
-      agentId,
       draftRevision,
       draftYaml,
       onError,

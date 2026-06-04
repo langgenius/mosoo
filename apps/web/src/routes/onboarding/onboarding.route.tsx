@@ -1,7 +1,7 @@
 import type { OrganizationInvitation } from "@mosoo/contracts/organization";
 import { sleepPromise } from "@mosoo/effects";
 import { ArrowRight, Building2, Loader2, Lock, MailCheck, Plus, Users } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useReducer } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAppSession } from "../../app/session-provider";
@@ -22,6 +22,35 @@ import { getOnboardingDomainOrganizationName } from "./onboarding-domain";
 type OnboardingStep = "loading" | "invitations" | "choice" | "discovery" | "provisioning";
 type ProvisioningAction = "join" | "create_team" | "create_personal";
 type OnboardingBootstrapInput = NonNullable<Parameters<typeof onboardingBootstrap>[1]>;
+
+interface OnboardingState {
+  bootstrapping: boolean;
+  discovery: DiscoverResult | null;
+  error: string | null;
+  invitations: OrganizationInvitation[];
+  provisioningAction: ProvisioningAction;
+  step: OnboardingStep;
+}
+
+type OnboardingAction =
+  | { type: "bootstrapFailed"; error: string; step: OnboardingStep }
+  | { type: "bootstrapStarted"; provisioningAction: ProvisioningAction }
+  | { type: "loadFailed"; error: string }
+  | {
+      type: "loadSucceeded";
+      discovery: DiscoverResult;
+      invitations: OrganizationInvitation[];
+      step: OnboardingStep;
+    };
+
+const ONBOARDING_INITIAL_STATE: OnboardingState = {
+  bootstrapping: false,
+  discovery: null,
+  error: null,
+  invitations: [],
+  provisioningAction: "create_team",
+  step: "loading",
+};
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unexpected error";
@@ -53,16 +82,47 @@ function toOnboardingBootstrapInput(input?: {
   return nextInput;
 }
 
+function onboardingReducer(state: OnboardingState, action: OnboardingAction): OnboardingState {
+  switch (action.type) {
+    case "bootstrapFailed":
+      return { ...state, bootstrapping: false, error: action.error, step: action.step };
+    case "bootstrapStarted":
+      return {
+        ...state,
+        bootstrapping: true,
+        error: null,
+        provisioningAction: action.provisioningAction,
+        step: "provisioning",
+      };
+    case "loadFailed":
+      return { ...state, error: action.error, step: "discovery" };
+    case "loadSucceeded":
+      return {
+        ...state,
+        discovery: action.discovery,
+        invitations: action.invitations,
+        step: action.step,
+      };
+  }
+}
+
+function getNextOnboardingStep(input: {
+  discovery: DiscoverResult;
+  invitations: OrganizationInvitation[];
+}): OnboardingStep {
+  if (input.invitations.length > 0) {
+    return "invitations";
+  }
+
+  return input.discovery.orgs.length === 0 ? "choice" : "discovery";
+}
+
 export function Onboarding() {
   const { refreshPendingInvitations, refreshOrganizations, setActiveOrganizationId, user } =
     useAppSession();
   const navigate = useNavigate();
-  const [step, setStep] = useState<OnboardingStep>("loading");
-  const [discovery, setDiscovery] = useState<DiscoverResult | null>(null);
-  const [invitations, setInvitations] = useState<OrganizationInvitation[]>([]);
-  const [bootstrapping, setBootstrapping] = useState(false);
-  const [provisioningAction, setProvisioningAction] = useState<ProvisioningAction>("create_team");
-  const [error, setError] = useState<string | null>(null);
+  const [state, dispatch] = useReducer(onboardingReducer, ONBOARDING_INITIAL_STATE);
+  const { bootstrapping, discovery, error, invitations, provisioningAction, step } = state;
 
   const handleBootstrap = useCallback(
     async (
@@ -72,10 +132,7 @@ export function Onboarding() {
       const nextProvisioningAction: ProvisioningAction =
         action === "join" ? "join" : input?.kind === "personal" ? "create_personal" : "create_team";
 
-      setProvisioningAction(nextProvisioningAction);
-      setStep("provisioning");
-      setBootstrapping(true);
-      setError(null);
+      dispatch({ provisioningAction: nextProvisioningAction, type: "bootstrapStarted" });
       try {
         const result = await onboardingBootstrap(action, toOnboardingBootstrapInput(input));
         await Promise.all([
@@ -86,9 +143,11 @@ export function Onboarding() {
         ]);
         void navigate("/", { replace: true });
       } catch (caughtError: unknown) {
-        setError(getErrorMessage(caughtError) || "Something went wrong");
-        setStep(action === "join" ? "discovery" : "choice");
-        setBootstrapping(false);
+        dispatch({
+          error: getErrorMessage(caughtError) || "Something went wrong",
+          step: action === "join" ? "discovery" : "choice",
+          type: "bootstrapFailed",
+        });
       }
     },
     [navigate, refreshOrganizations, refreshPendingInvitations, setActiveOrganizationId],
@@ -108,24 +167,17 @@ export function Onboarding() {
           return;
         }
 
-        setInvitations(pendingInvites);
-        setDiscovery(result);
-
-        if (pendingInvites.length > 0) {
-          setStep("invitations");
-          return;
-        }
-
         if (result.isPublicEmail) {
           await handleBootstrap("create", { kind: "personal" });
           return;
         }
 
-        if (result.orgs.length === 0) {
-          setStep("choice");
-        } else {
-          setStep("discovery");
-        }
+        dispatch({
+          discovery: result,
+          invitations: pendingInvites,
+          step: getNextOnboardingStep({ discovery: result, invitations: pendingInvites }),
+          type: "loadSucceeded",
+        });
       } catch (caughtError: unknown) {
         if (cancelled) {
           return;
@@ -138,8 +190,7 @@ export function Onboarding() {
           return;
         }
 
-        setError(message);
-        setStep("discovery");
+        dispatch({ error: message, type: "loadFailed" });
       }
     }
 
@@ -151,10 +202,7 @@ export function Onboarding() {
   }, [handleBootstrap, navigate]);
 
   const handleAcceptInvitation = async (invitationId: string) => {
-    setProvisioningAction("join");
-    setStep("provisioning");
-    setBootstrapping(true);
-    setError(null);
+    dispatch({ provisioningAction: "join", type: "bootstrapStarted" });
 
     try {
       const organization = await acceptOrganizationInvitation(
@@ -168,54 +216,35 @@ export function Onboarding() {
       ]);
       void navigate("/", { replace: true });
     } catch (nextError: unknown) {
-      setError(getErrorMessage(nextError) || "Something went wrong");
-      setStep("invitations");
-      setBootstrapping(false);
+      dispatch({
+        error: getErrorMessage(nextError) || "Something went wrong",
+        step: "invitations",
+        type: "bootstrapFailed",
+      });
     }
   };
 
   const handleRequestAccess = async (organizationId: string) => {
-    setProvisioningAction("create_team");
-    setStep("provisioning");
-    setBootstrapping(true);
-    setError(null);
+    dispatch({ provisioningAction: "create_team", type: "bootstrapStarted" });
 
     try {
       await requestOrganizationAccess(toOrganizationId(organizationId));
       await handleBootstrap("create", { kind: "team" });
     } catch (nextError: unknown) {
-      setError(getErrorMessage(nextError) || "Something went wrong");
-      setStep("discovery");
-      setBootstrapping(false);
+      dispatch({
+        error: getErrorMessage(nextError) || "Something went wrong",
+        step: "discovery",
+        type: "bootstrapFailed",
+      });
     }
   };
 
-  // ── Loading state ──
   if (step === "loading") {
-    return (
-      <div className="bg-background fixed inset-0 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="text-primary size-8 animate-spin" />
-          <p className="text-muted-foreground text-sm">Setting things up…</p>
-        </div>
-      </div>
-    );
+    return <OnboardingLoadingScreen />;
   }
 
-  // ── Provisioning state ──
   if (step === "provisioning") {
-    return (
-      <div className="bg-background fixed inset-0 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="text-primary size-8 animate-spin" />
-          <p className="text-muted-foreground text-sm">
-            {provisioningAction === "join"
-              ? "Joining an existing organization…"
-              : "Creating your organization…"}
-          </p>
-        </div>
-      </div>
-    );
+    return <OnboardingProvisioningScreen provisioningAction={provisioningAction} />;
   }
 
   // ── Discovery Screen ──
@@ -226,76 +255,16 @@ export function Onboarding() {
 
   if (step === "invitations") {
     return (
-      <div className="bg-background fixed inset-0 flex flex-col">
-        <div className="flex items-center px-8 py-5">
-          <span className="text-xl font-light tracking-tight">Mosoo</span>
-        </div>
-
-        <div className="flex flex-1 items-center justify-center">
-          <div className="w-full max-w-[520px] px-6">
-            <div className="mb-6 flex justify-center">
-              <div className="border-primary/20 from-primary/20 to-primary/5 flex size-16 items-center justify-center rounded-full border-2 bg-gradient-to-br">
-                <MailCheck className="text-primary size-7" />
-              </div>
-            </div>
-
-            <h2 className="text-foreground text-center text-2xl font-semibold">You have invites</h2>
-            <p className="text-muted-foreground mt-2 text-center text-sm">
-              Accept one to enter right away, or create your own organization instead.
-            </p>
-
-            <div className="mt-8 space-y-3">
-              {invitations.map((invitation) => (
-                <button
-                  key={invitation.id}
-                  aria-label={`Accept invitation to ${invitation.organizationName}`}
-                  type="button"
-                  onClick={() => void handleAcceptInvitation(invitation.id)}
-                  disabled={bootstrapping}
-                  className="group border-border hover:border-primary/30 hover:bg-primary/[0.02] w-full rounded-lg border p-4 text-left transition-all"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <div className="text-foreground text-sm font-semibold">
-                        {invitation.organizationName}
-                      </div>
-                      <div className="text-muted-foreground mt-1 text-xs">
-                        {invitation.organizationName}
-                        {isTruthy(invitation.invitedByName)
-                          ? ` · Invited by ${invitation.invitedByName}`
-                          : ""}
-                      </div>
-                    </div>
-                    <div className="text-primary flex items-center gap-1 text-xs font-medium opacity-0 transition-opacity group-hover:opacity-100">
-                      Accept <ArrowRight className="size-3.5" />
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={() =>
-                  void handleBootstrap("create", {
-                    kind: discovery?.isPublicEmail === true ? "personal" : "team",
-                  })
-                }
-                disabled={bootstrapping}
-                className="text-muted-foreground hover:bg-accent/50 hover:text-foreground flex w-full items-center justify-center gap-2 rounded-lg p-3 text-sm font-medium transition-colors"
-              >
-                <Plus className="size-4" />
-                Create my own organization
-              </button>
-            </div>
-
-            {isTruthy(error) ? (
-              <p className="text-destructive mt-4 text-center text-sm">{error}</p>
-            ) : null}
-          </div>
-        </div>
-      </div>
+      <OnboardingInvitationsScreen
+        bootstrapping={bootstrapping}
+        createKind={discovery?.isPublicEmail === true ? "personal" : "team"}
+        error={error}
+        invitations={invitations}
+        onAcceptInvitation={handleAcceptInvitation}
+        onCreate={(kind) => {
+          void handleBootstrap("create", { kind });
+        }}
+      />
     );
   }
 
@@ -312,6 +281,166 @@ export function Onboarding() {
   }
 
   return (
+    <OnboardingDiscoveryScreen
+      bootstrapping={bootstrapping}
+      discovery={discovery}
+      domainOrganizationName={domainOrganizationName}
+      error={error}
+      inviteOnlyOrgs={inviteOnlyOrgs}
+      joinableOrgs={joinableOrgs}
+      onCreateTeam={(name) => {
+        void handleBootstrap("create", { kind: "team", name });
+      }}
+      onJoin={(organizationId) => {
+        void handleBootstrap("join", { organizationId });
+      }}
+      onRequestAccess={handleRequestAccess}
+      userName={user?.name ?? null}
+    />
+  );
+}
+
+function OnboardingLoadingScreen() {
+  return (
+    <div className="bg-background fixed inset-0 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="text-primary size-8 animate-spin" />
+        <p className="text-muted-foreground text-sm">Setting things up…</p>
+      </div>
+    </div>
+  );
+}
+
+function OnboardingProvisioningScreen({
+  provisioningAction,
+}: {
+  provisioningAction: ProvisioningAction;
+}) {
+  return (
+    <div className="bg-background fixed inset-0 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="text-primary size-8 animate-spin" />
+        <p className="text-muted-foreground text-sm">
+          {provisioningAction === "join"
+            ? "Joining an existing organization…"
+            : "Creating your organization…"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function OnboardingInvitationsScreen({
+  bootstrapping,
+  createKind,
+  error,
+  invitations,
+  onAcceptInvitation,
+  onCreate,
+}: {
+  bootstrapping: boolean;
+  createKind: "personal" | "team";
+  error: string | null;
+  invitations: OrganizationInvitation[];
+  onAcceptInvitation: (invitationId: string) => Promise<void>;
+  onCreate: (kind: "personal" | "team") => void;
+}) {
+  return (
+    <div className="bg-background fixed inset-0 flex flex-col">
+      <div className="flex items-center px-8 py-5">
+        <span className="text-xl font-light tracking-tight">Mosoo</span>
+      </div>
+
+      <div className="flex flex-1 items-center justify-center">
+        <div className="w-full max-w-[520px] px-6">
+          <div className="mb-6 flex justify-center">
+            <div className="border-primary/20 from-primary/20 to-primary/5 flex size-16 items-center justify-center rounded-full border-2 bg-gradient-to-br">
+              <MailCheck className="text-primary size-7" />
+            </div>
+          </div>
+
+          <h2 className="text-foreground text-center text-2xl font-semibold">You have invites</h2>
+          <p className="text-muted-foreground mt-2 text-center text-sm">
+            Accept one to enter right away, or create your own organization instead.
+          </p>
+
+          <div className="mt-8 space-y-3">
+            {invitations.map((invitation) => (
+              <button
+                key={invitation.id}
+                aria-label={`Accept invitation to ${invitation.organizationName}`}
+                type="button"
+                onClick={() => void onAcceptInvitation(invitation.id)}
+                disabled={bootstrapping}
+                className="group border-border hover:border-primary/30 hover:bg-primary/[0.02] w-full rounded-lg border p-4 text-left transition-all"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-foreground text-sm font-semibold">
+                      {invitation.organizationName}
+                    </div>
+                    <div className="text-muted-foreground mt-1 text-xs">
+                      {invitation.organizationName}
+                      {isTruthy(invitation.invitedByName)
+                        ? ` · Invited by ${invitation.invitedByName}`
+                        : ""}
+                    </div>
+                  </div>
+                  <div className="text-primary flex items-center gap-1 text-xs font-medium opacity-0 transition-opacity group-hover:opacity-100">
+                    Accept <ArrowRight className="size-3.5" />
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={() => {
+                onCreate(createKind);
+              }}
+              disabled={bootstrapping}
+              className="text-muted-foreground hover:bg-accent/50 hover:text-foreground flex w-full items-center justify-center gap-2 rounded-lg p-3 text-sm font-medium transition-colors"
+            >
+              <Plus className="size-4" />
+              Create my own organization
+            </button>
+          </div>
+
+          {isTruthy(error) ? (
+            <p className="text-destructive mt-4 text-center text-sm">{error}</p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OnboardingDiscoveryScreen({
+  bootstrapping,
+  discovery,
+  domainOrganizationName,
+  error,
+  inviteOnlyOrgs,
+  joinableOrgs,
+  onCreateTeam,
+  onJoin,
+  onRequestAccess,
+  userName,
+}: {
+  bootstrapping: boolean;
+  discovery: DiscoverResult | null;
+  domainOrganizationName: string;
+  error: string | null;
+  inviteOnlyOrgs: DiscoverResult["orgs"];
+  joinableOrgs: DiscoverResult["orgs"];
+  onCreateTeam: (name: string) => void;
+  onJoin: (organizationId: string) => void;
+  onRequestAccess: (organizationId: string) => Promise<void>;
+  userName: string | null;
+}) {
+  return (
     <div className="bg-background fixed inset-0 flex flex-col">
       <div className="flex items-center px-10 py-[22px]">
         <img src="/brand/logo-wordmark-onlight.svg" alt="Mosoo" className="block h-[22px]" />
@@ -326,21 +455,20 @@ export function Onboarding() {
           </div>
 
           <h2 className="text-fg-1 text-center text-[24px] font-semibold tracking-normal">
-            Welcome, {user?.name?.split(" ")[0] ?? "there"}.
+            Welcome, {userName?.split(" ")[0] ?? "there"}.
           </h2>
           <p className="text-muted-foreground mt-2 text-center text-sm">
             We found organizations on{" "}
             <span className="text-foreground font-medium">@{discovery?.domain}</span>
           </p>
 
-          {/* Org list */}
           <div className="mt-8 space-y-3">
             {joinableOrgs.map((org) => (
               <button
                 key={org.id}
                 type="button"
                 onClick={() => {
-                  void handleBootstrap("join", { organizationId: org.id });
+                  onJoin(org.id);
                 }}
                 disabled={bootstrapping}
                 className="group border-border hover:border-primary/30 hover:bg-primary/[0.02] flex w-full items-center justify-between rounded-lg border p-4 text-left transition-all"
@@ -367,7 +495,7 @@ export function Onboarding() {
               <button
                 key={org.id}
                 type="button"
-                onClick={() => void handleRequestAccess(org.id)}
+                onClick={() => void onRequestAccess(org.id)}
                 disabled={bootstrapping}
                 className="border-border flex w-full items-center justify-between rounded-lg border p-4 opacity-60"
               >
@@ -389,15 +517,11 @@ export function Onboarding() {
             ))}
           </div>
 
-          {/* Create own organization */}
           <div className="mt-6">
             <button
               type="button"
               onClick={() => {
-                void handleBootstrap("create", {
-                  kind: "team",
-                  name: domainOrganizationName,
-                });
+                onCreateTeam(domainOrganizationName);
               }}
               disabled={bootstrapping}
               className="text-muted-foreground hover:bg-accent/50 hover:text-foreground flex w-full items-center justify-center gap-2 rounded-lg p-3 text-sm font-medium transition-colors"

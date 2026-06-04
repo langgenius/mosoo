@@ -1,5 +1,4 @@
 import { Check, Plus, Trash2 } from "lucide-react";
-import { useMemo } from "react";
 
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
@@ -17,6 +16,196 @@ import {
 import { createDraftId, createPackageRow, hasPackageManagerError } from "./environment-form-model";
 import type { EditablePackageRow, EnvironmentDraft } from "./environment-form-model";
 
+function EnvironmentPackagesSection({
+  disabled,
+  onAdd,
+  onRemove,
+  onUpdate,
+  packageManagerError,
+  packages,
+}: {
+  disabled: boolean;
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+  onUpdate: (id: string, transform: (row: EditablePackageRow) => EditablePackageRow) => void;
+  packageManagerError: boolean;
+  packages: EditablePackageRow[];
+}) {
+  return (
+    <EnvironmentFormSection
+      action={
+        <Button
+          className="size-8"
+          disabled={disabled}
+          onClick={onAdd}
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+        >
+          <Plus className="size-4" />
+        </Button>
+      }
+      description="Specify packages and their versions available in this environment. Separate multiple values with spaces."
+      title="Packages"
+    >
+      <div className="environment-scroll-area max-h-[220px] space-y-2 overflow-y-auto pr-1">
+        {packages.map((row) => (
+          <div
+            className="environment-row-enter grid gap-2 sm:grid-cols-[160px_minmax(0,1fr)_36px]"
+            key={row.id}
+          >
+            <PackageManagerSelect
+              disabled={disabled}
+              onChange={(manager) => {
+                onUpdate(row.id, (current) => ({
+                  ...current,
+                  manager,
+                }));
+              }}
+              value={row.manager}
+            />
+            <Input
+              className={cn(
+                "font-mono text-[12px]",
+                row.packagesText.trim() && !row.manager ? "border-destructive" : null,
+              )}
+              disabled={disabled}
+              onChange={(event) => {
+                onUpdate(row.id, (current) => ({
+                  ...current,
+                  packagesText: event.target.value,
+                }));
+              }}
+              placeholder="package package==1.0.0"
+              value={row.packagesText}
+            />
+            <Button
+              className="text-fg-3 hover:text-destructive size-9"
+              disabled={disabled}
+              onClick={() => {
+                onRemove(row.id);
+              }}
+              size="icon-sm"
+              type="button"
+              variant="ghost"
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+        ))}
+
+        {packageManagerError ? (
+          <div className="text-destructive text-[11px]">
+            Choose a package manager for every package row.
+          </div>
+        ) : null}
+      </div>
+    </EnvironmentFormSection>
+  );
+}
+
+function EnvironmentVariablesSection({
+  disabled,
+  envVars,
+  onAdd,
+  onChange,
+  onRemove,
+}: {
+  disabled: boolean;
+  envVars: EnvironmentDraft["envVars"];
+  onAdd: () => void;
+  onChange: (transform: (current: EnvironmentDraft) => EnvironmentDraft) => void;
+  onRemove: (id: string) => void;
+}) {
+  const envVarCount = envVars.length;
+
+  return (
+    <EnvironmentFormSection
+      action={
+        <Button
+          className="size-8"
+          disabled={disabled}
+          onClick={onAdd}
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+        >
+          <Plus className="size-4" />
+        </Button>
+      }
+      description="Values are encrypted after save. Existing values can stay blank."
+      title="Environment variables"
+    >
+      <div className="environment-scroll-area max-h-[220px] space-y-2 overflow-y-auto pr-1">
+        {envVarCount === 0 ? (
+          <div className="border-border text-fg-3 rounded-md border border-dashed p-3 text-[12px]">
+            No environment variables.
+          </div>
+        ) : null}
+
+        {envVars.map((envVar) => (
+          <div
+            className="environment-row-enter grid gap-2 sm:grid-cols-[1fr_1fr_36px]"
+            key={envVar.id}
+          >
+            <Input
+              className="font-mono text-[12px]"
+              disabled={disabled}
+              onChange={(event) => {
+                onChange((current) => ({
+                  ...current,
+                  envVars: current.envVars.map((candidate) =>
+                    candidate.id === envVar.id
+                      ? { ...candidate, key: event.target.value }
+                      : candidate,
+                  ),
+                }));
+              }}
+              placeholder="SLACK_TOKEN"
+              value={envVar.key}
+            />
+            <Input
+              className="font-mono text-[12px]"
+              disabled={disabled}
+              onChange={(event) => {
+                onChange((current) => ({
+                  ...current,
+                  envVars: current.envVars.map((candidate) =>
+                    candidate.id === envVar.id
+                      ? { ...candidate, value: event.target.value }
+                      : candidate,
+                  ),
+                }));
+              }}
+              placeholder={
+                envVar.status === "pending"
+                  ? "pending value"
+                  : isTruthy(envVar.preview)
+                    ? `Keep ${envVar.preview}`
+                    : "value"
+              }
+              type="password"
+              value={envVar.value}
+            />
+            <Button
+              className="text-fg-3 hover:text-destructive size-9"
+              disabled={disabled}
+              onClick={() => {
+                onRemove(envVar.id);
+              }}
+              size="icon-sm"
+              type="button"
+              variant="ghost"
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
+    </EnvironmentFormSection>
+  );
+}
+
 export function EnvironmentForm({
   disabled = false,
   draft,
@@ -33,7 +222,6 @@ export function EnvironmentForm({
   submitLabel: string;
 }) {
   const limited = draft.networkPolicy === "limited";
-  const envVarCount = useMemo(() => draft.envVars.length, [draft.envVars.length]);
   const packageManagerError = hasPackageManagerError(draft.packages);
 
   function update(transform: (current: EnvironmentDraft) => EnvironmentDraft) {
@@ -198,75 +386,14 @@ export function EnvironmentForm({
         </div>
       </EnvironmentFormSection>
 
-      <EnvironmentFormSection
-        action={
-          <Button
-            className="size-8"
-            disabled={disabled}
-            onClick={addPackageRow}
-            size="icon-sm"
-            type="button"
-            variant="ghost"
-          >
-            <Plus className="size-4" />
-          </Button>
-        }
-        description="Specify packages and their versions available in this environment. Separate multiple values with spaces."
-        title="Packages"
-      >
-        <div className="environment-scroll-area max-h-[220px] space-y-2 overflow-y-auto pr-1">
-          {draft.packages.map((row) => (
-            <div
-              className="environment-row-enter grid gap-2 sm:grid-cols-[160px_minmax(0,1fr)_36px]"
-              key={row.id}
-            >
-              <PackageManagerSelect
-                disabled={disabled}
-                onChange={(manager) => {
-                  updatePackageRow(row.id, (current) => ({
-                    ...current,
-                    manager,
-                  }));
-                }}
-                value={row.manager}
-              />
-              <Input
-                className={cn(
-                  "font-mono text-[12px]",
-                  row.packagesText.trim() && !row.manager ? "border-destructive" : null,
-                )}
-                disabled={disabled}
-                onChange={(event) => {
-                  updatePackageRow(row.id, (current) => ({
-                    ...current,
-                    packagesText: event.target.value,
-                  }));
-                }}
-                placeholder="package package==1.0.0"
-                value={row.packagesText}
-              />
-              <Button
-                className="text-fg-3 hover:text-destructive size-9"
-                disabled={disabled}
-                onClick={() => {
-                  removePackageRow(row.id);
-                }}
-                size="icon-sm"
-                type="button"
-                variant="ghost"
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </div>
-          ))}
-
-          {packageManagerError ? (
-            <div className="text-destructive text-[11px]">
-              Choose a package manager for every package row.
-            </div>
-          ) : null}
-        </div>
-      </EnvironmentFormSection>
+      <EnvironmentPackagesSection
+        disabled={disabled}
+        onAdd={addPackageRow}
+        onRemove={removePackageRow}
+        onUpdate={updatePackageRow}
+        packageManagerError={packageManagerError}
+        packages={draft.packages}
+      />
 
       <EnvironmentFormSection
         description="Run after package installation before a session starts."
@@ -286,89 +413,13 @@ export function EnvironmentForm({
         />
       </EnvironmentFormSection>
 
-      <EnvironmentFormSection
-        action={
-          <Button
-            className="size-8"
-            disabled={disabled}
-            onClick={addEnvVarRow}
-            size="icon-sm"
-            type="button"
-            variant="ghost"
-          >
-            <Plus className="size-4" />
-          </Button>
-        }
-        description="Values are encrypted after save. Existing values can stay blank."
-        title="Environment variables"
-      >
-        <div className="environment-scroll-area max-h-[220px] space-y-2 overflow-y-auto pr-1">
-          {envVarCount === 0 ? (
-            <div className="border-border text-fg-3 rounded-md border border-dashed p-3 text-[12px]">
-              No environment variables.
-            </div>
-          ) : null}
-
-          {draft.envVars.map((envVar) => (
-            <div
-              className="environment-row-enter grid gap-2 sm:grid-cols-[1fr_1fr_36px]"
-              key={envVar.id}
-            >
-              <Input
-                className="font-mono text-[12px]"
-                disabled={disabled}
-                onChange={(event) => {
-                  update((current) => ({
-                    ...current,
-                    envVars: current.envVars.map((candidate) =>
-                      candidate.id === envVar.id
-                        ? { ...candidate, key: event.target.value }
-                        : candidate,
-                    ),
-                  }));
-                }}
-                placeholder="SLACK_TOKEN"
-                value={envVar.key}
-              />
-              <Input
-                className="font-mono text-[12px]"
-                disabled={disabled}
-                onChange={(event) => {
-                  update((current) => ({
-                    ...current,
-                    envVars: current.envVars.map((candidate) =>
-                      candidate.id === envVar.id
-                        ? { ...candidate, value: event.target.value }
-                        : candidate,
-                    ),
-                  }));
-                }}
-                placeholder={
-                  envVar.status === "pending"
-                    ? "pending value"
-                    : isTruthy(envVar.preview)
-                      ? `Keep ${envVar.preview}`
-                      : "value"
-                }
-                type="password"
-                value={envVar.value}
-              />
-              <Button
-                className="text-fg-3 hover:text-destructive size-9"
-                disabled={disabled}
-                onClick={() => {
-                  removeEnvVarRow(envVar.id);
-                }}
-                size="icon-sm"
-                type="button"
-                variant="ghost"
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </div>
-          ))}
-        </div>
-      </EnvironmentFormSection>
+      <EnvironmentVariablesSection
+        disabled={disabled}
+        envVars={draft.envVars}
+        onAdd={addEnvVarRow}
+        onChange={update}
+        onRemove={removeEnvVarRow}
+      />
 
       <div className="border-border flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-fg-3 flex items-center gap-2 text-[12px]">

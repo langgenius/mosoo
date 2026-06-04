@@ -205,7 +205,7 @@ function SaveIndicator({ state, message }: { state: SavedState; message: string 
     return (
       <span className="text-muted-foreground inline-flex items-center gap-1 text-[11px]">
         <Loader2 className="size-3 animate-spin" />
-        Saving...
+        Saving&hellip;
       </span>
     );
   }

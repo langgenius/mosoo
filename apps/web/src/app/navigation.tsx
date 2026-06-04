@@ -88,9 +88,7 @@ function NavLink({
       className={cn(
         "flex items-center rounded-md text-[13.5px] font-semibold transition-colors",
         collapsed ? "size-9 justify-center self-center" : "gap-2.5 px-2.5 py-2",
-        isActive
-          ? "bg-ink-100 text-fg-1"
-          : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
+        isActive ? "bg-ink-100 text-fg-1" : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
       )}
     >
       <Icon className="size-4" />

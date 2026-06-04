@@ -3,7 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { Reveal } from "./motion";
-import { sectionHeadingStyle } from "./ui";
+import { sectionHeadingStyle } from "./typography";
 
 type Capability = { Icon: LucideIcon; tag: string; body: string };
 

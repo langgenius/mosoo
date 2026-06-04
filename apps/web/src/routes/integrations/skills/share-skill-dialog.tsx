@@ -1,5 +1,5 @@
 import type { SkillShareTarget, SkillSummary } from "@mosoo/contracts/skill";
-import { useEffect, useState } from "react";
+import { useEffect, useReducer } from "react";
 
 import { Button } from "@/shared/ui/button";
 import {
@@ -23,12 +23,50 @@ interface Props {
   skill: SkillSummary;
 }
 
+interface ShareSkillDialogState {
+  email: string;
+  error: string | null;
+  loading: boolean;
+  submitting: boolean;
+  targets: SkillShareTarget[];
+}
+
+type ShareSkillDialogAction =
+  | { type: "changeEmail"; email: string }
+  | { type: "loadFailed"; error: string }
+  | { type: "loadSucceeded"; targets: SkillShareTarget[] }
+  | { type: "setError"; error: string | null }
+  | { type: "setSubmitting"; submitting: boolean };
+
+const SHARE_SKILL_DIALOG_INITIAL_STATE: ShareSkillDialogState = {
+  email: "",
+  error: null,
+  loading: true,
+  submitting: false,
+  targets: [],
+};
+
+function shareSkillDialogReducer(
+  state: ShareSkillDialogState,
+  action: ShareSkillDialogAction,
+): ShareSkillDialogState {
+  switch (action.type) {
+    case "changeEmail":
+      return { ...state, email: action.email };
+    case "loadFailed":
+      return { ...state, error: action.error, loading: false };
+    case "loadSucceeded":
+      return { ...state, loading: false, targets: action.targets };
+    case "setError":
+      return { ...state, error: action.error };
+    case "setSubmitting":
+      return { ...state, submitting: action.submitting };
+  }
+}
+
 export function ShareSkillDialog({ onOpenChange, open, registry, skill }: Props) {
-  const [email, setEmail] = useState("");
-  const [targets, setTargets] = useState<SkillShareTarget[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [state, dispatch] = useReducer(shareSkillDialogReducer, SHARE_SKILL_DIALOG_INITIAL_STATE);
+  const { email, error, loading, submitting, targets } = state;
 
   useEffect(() => {
     if (!open) {
@@ -39,15 +77,14 @@ export function ShareSkillDialog({ onOpenChange, open, registry, skill }: Props)
       try {
         const detail = await registry.getSkillDetail(skill.id);
         if (!abortController.signal.aborted) {
-          setTargets(detail.shareTargets);
+          dispatch({ targets: detail.shareTargets, type: "loadSucceeded" });
         }
       } catch (caughtError) {
         if (!abortController.signal.aborted) {
-          setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
-        }
-      } finally {
-        if (!abortController.signal.aborted) {
-          setLoading(false);
+          dispatch({
+            error: caughtError instanceof Error ? caughtError.message : String(caughtError),
+            type: "loadFailed",
+          });
         }
       }
     })();
@@ -58,9 +95,15 @@ export function ShareSkillDialog({ onOpenChange, open, registry, skill }: Props)
 
   async function refresh() {
     try {
-      setTargets((await registry.getSkillDetail(skill.id)).shareTargets);
+      dispatch({
+        targets: (await registry.getSkillDetail(skill.id)).shareTargets,
+        type: "loadSucceeded",
+      });
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+      dispatch({
+        error: caughtError instanceof Error ? caughtError.message : String(caughtError),
+        type: "setError",
+      });
     }
   }
 
@@ -72,16 +115,19 @@ export function ShareSkillDialog({ onOpenChange, open, registry, skill }: Props)
     if (!clean) {
       return;
     }
-    setError(null);
-    setSubmitting(true);
+    dispatch({ error: null, type: "setError" });
+    dispatch({ submitting: true, type: "setSubmitting" });
     try {
       await registry.shareSkillWithUser(skill.id, clean);
-      setEmail("");
+      dispatch({ email: "", type: "changeEmail" });
       await refresh();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+      dispatch({
+        error: caughtError instanceof Error ? caughtError.message : String(caughtError),
+        type: "setError",
+      });
     } finally {
-      setSubmitting(false);
+      dispatch({ submitting: false, type: "setSubmitting" });
     }
   }
 
@@ -89,15 +135,18 @@ export function ShareSkillDialog({ onOpenChange, open, registry, skill }: Props)
     if (submitting) {
       return;
     }
-    setError(null);
-    setSubmitting(true);
+    dispatch({ error: null, type: "setError" });
+    dispatch({ submitting: true, type: "setSubmitting" });
     try {
       await registry.shareSkillWithOrganization(skill.id);
       await refresh();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+      dispatch({
+        error: caughtError instanceof Error ? caughtError.message : String(caughtError),
+        type: "setError",
+      });
     } finally {
-      setSubmitting(false);
+      dispatch({ submitting: false, type: "setSubmitting" });
     }
   }
 
@@ -105,15 +154,18 @@ export function ShareSkillDialog({ onOpenChange, open, registry, skill }: Props)
     if (submitting) {
       return;
     }
-    setError(null);
-    setSubmitting(true);
+    dispatch({ error: null, type: "setError" });
+    dispatch({ submitting: true, type: "setSubmitting" });
     try {
       await registry.unshareSkillTarget(skill.id, target);
       await refresh();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+      dispatch({
+        error: caughtError instanceof Error ? caughtError.message : String(caughtError),
+        type: "setError",
+      });
     } finally {
-      setSubmitting(false);
+      dispatch({ submitting: false, type: "setSubmitting" });
     }
   }
 
@@ -138,7 +190,7 @@ export function ShareSkillDialog({ onOpenChange, open, registry, skill }: Props)
             placeholder="Teammate email..."
             value={email}
             onChange={(e) => {
-              setEmail(e.target.value);
+              dispatch({ email: e.target.value, type: "changeEmail" });
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {

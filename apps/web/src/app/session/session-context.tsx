@@ -40,6 +40,11 @@ interface AppSessionContextValue {
 }
 
 const AppSessionContext = createContext<AppSessionContextValue | null>(null);
+const DEFAULT_ORGANIZATION_CREATION_SLOT: OrganizationCreationSlotStatus = {
+  occupied: false,
+  organizationId: null,
+};
+const EMPTY_ORGANIZATIONS: OrganizationSummary[] = [];
 
 function toSessionUser(account: AccountProfile | null): SessionUser | null {
   if (!account) {
@@ -75,12 +80,14 @@ export function AppSessionProvider({ children }: { children: ReactNode }) {
   const viewer = viewerQuery.data ?? null;
   const user = toSessionUser(viewer?.account ?? null);
   const pendingInvitationsState = usePendingOrganizationInvitationsState(user?.id ?? null);
-  const organizations = viewer?.memberships.map((membership) => membership.organization) ?? [];
+  const memberships = viewer?.memberships;
+  const organizations = useMemo(
+    () => memberships?.map((membership) => membership.organization) ?? EMPTY_ORGANIZATIONS,
+    [memberships],
+  );
   const activeOrganization = viewer?.activeOrganization ?? null;
-  const organizationCreationSlot = viewer?.organizationCreationSlot ?? {
-    occupied: false,
-    organizationId: null,
-  };
+  const organizationCreationSlot =
+    viewer?.organizationCreationSlot ?? DEFAULT_ORGANIZATION_CREATION_SLOT;
   const onboardingState = resolveOnboardingState({
     hasOrganizations: organizations.length > 0,
     loading: viewerQuery.isLoading,

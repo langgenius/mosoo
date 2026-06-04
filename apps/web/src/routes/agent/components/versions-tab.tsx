@@ -6,7 +6,7 @@ import { ScrollArea } from "@/shared/ui/scroll-area";
 
 import type { Agent } from "../agent.types";
 import { getRuntimeInfo } from "../runtime-catalog";
-import { RuntimeIcon } from "./shared-components";
+import { RuntimeIcon } from "./runtime-icon";
 
 function formatVersionTime(value: string): string {
   return new Date(value).toLocaleString(undefined, {

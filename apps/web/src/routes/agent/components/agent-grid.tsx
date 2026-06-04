@@ -1,10 +1,14 @@
 import type { CSSProperties, ReactElement } from "react";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/avatar";
+import { AvatarFallback } from "@/shared/ui/avatar-fallback";
+import { AvatarImage } from "@/shared/ui/avatar-image";
+import { Avatar } from "@/shared/ui/avatar-root";
 
 import type { Agent } from "../agent.types";
 import { getRuntimeInfo } from "../runtime-catalog";
-import { RuntimeIcon, StatusBadge, ToolIcons } from "./shared-components";
+import { RuntimeIcon } from "./runtime-icon";
+import { StatusBadge } from "./status-badge";
+import { ToolIcons } from "./tool-icons";
 
 const AGENT_GRID_CARD_STYLE: CSSProperties = { boxShadow: "var(--shadow-xs)" };
 

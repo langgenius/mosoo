@@ -19,7 +19,6 @@ import type {
   SkillId,
   SkillSnapshotId,
   SpaceId,
-  UploadId,
   VendorCredentialId,
 } from "@mosoo/contracts/id";
 import { parsePlatformId } from "@mosoo/id";
@@ -110,14 +109,6 @@ export function toSkillSnapshotId(id: string): SkillSnapshotId {
 
 export function toSpaceId(id: string): SpaceId {
   return parsePlatformId(id, "Space ID") as SpaceId;
-}
-
-export function toUploadId(id: string): UploadId {
-  return parsePlatformId(id, "Upload ID") as UploadId;
-}
-
-export function toUploadIds(ids: readonly string[]): UploadId[] {
-  return ids.map((id, index) => parsePlatformId(id, `Upload ID[${index}]`));
 }
 
 export function toVendorCredentialId(id: string): VendorCredentialId {

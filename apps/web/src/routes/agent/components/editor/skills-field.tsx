@@ -15,7 +15,7 @@ import {
 } from "@/shared/ui/dropdown-menu";
 
 import type { SkillInfo } from "../../agent.types";
-import { MarkdownPreviewDialog } from "./ui";
+import { MarkdownPreviewDialog } from "./markdown-preview-dialog";
 import { useAgentSkillsFieldModel } from "./use-skills-field-model";
 
 interface AgentSkillsFieldProps {

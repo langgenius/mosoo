@@ -2,7 +2,7 @@ import { Permission, can } from "@mosoo/contracts/permission";
 import { ignorePromiseRejection } from "@mosoo/effects";
 import { PUBLIC_VENDORS } from "@mosoo/runtime-catalog";
 import { Info } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useReducer } from "react";
 import { Navigate } from "react-router-dom";
 
 import { Badge } from "@/shared/ui/badge";
@@ -17,39 +17,96 @@ import {
 } from "../../domains/vendor-credential/api/vendor-credential-client";
 import type { CredentialPolicy } from "../../domains/vendor-credential/api/vendor-credential-client";
 import { isTruthy } from "../../shared/lib/truthiness";
+
+interface CredentialPolicyState {
+  customProviderAllowed: boolean;
+  error: string | null;
+  loading: boolean;
+  policy: CredentialPolicy | null;
+  saving: boolean;
+}
+
+type CredentialPolicyAction =
+  | { type: "loadBlocked"; loading: boolean }
+  | { type: "loadFailed"; error: string }
+  | { type: "loadStarted" }
+  | { type: "loadSucceeded"; policy: CredentialPolicy }
+  | { type: "saveFailed"; error: string }
+  | { type: "saveFinished" }
+  | { type: "saveStarted"; policy: CredentialPolicy }
+  | { type: "saveSucceeded"; policy: CredentialPolicy }
+  | { type: "setCustomProviderAllowed"; value: boolean };
+
+const CREDENTIAL_POLICY_INITIAL_STATE: CredentialPolicyState = {
+  customProviderAllowed: true,
+  error: null,
+  loading: true,
+  policy: null,
+  saving: false,
+};
+
+function requireCredentialPolicy(policy: CredentialPolicy | null): CredentialPolicy {
+  if (policy === null) {
+    throw new Error("Credential policy is missing.");
+  }
+
+  return policy;
+}
+
+function credentialPolicyReducer(
+  state: CredentialPolicyState,
+  action: CredentialPolicyAction,
+): CredentialPolicyState {
+  switch (action.type) {
+    case "loadBlocked":
+      return { ...state, loading: action.loading };
+    case "loadFailed":
+      return { ...state, error: action.error, loading: false };
+    case "loadStarted":
+      return { ...state, error: null, loading: true };
+    case "loadSucceeded":
+      return { ...state, loading: false, policy: action.policy };
+    case "saveFailed":
+      return { ...state, error: action.error };
+    case "saveFinished":
+      return { ...state, saving: false };
+    case "saveStarted":
+      return { ...state, error: null, policy: action.policy, saving: true };
+    case "saveSucceeded":
+      return { ...state, policy: action.policy };
+    case "setCustomProviderAllowed":
+      return { ...state, customProviderAllowed: action.value };
+  }
+}
+
 export function CredentialPolicyPage() {
   const { activeOrganization: organization, organizationsLoading } = useAppSession();
-  const [policy, setPolicy] = useState<CredentialPolicy | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [customProviderAllowed, setCustomProviderAllowed] = useState(true);
+  const [state, dispatch] = useReducer(credentialPolicyReducer, CREDENTIAL_POLICY_INITIAL_STATE);
+  const { customProviderAllowed, error, loading, policy, saving } = state;
   const isAdmin = can(organization?.viewerRole, Permission.ProvidersCompanyManage);
   const organizationId = organization?.id ?? null;
 
   useEffect(() => {
     if (!isTruthy(organizationId) || !isAdmin) {
-      setLoading(organizationsLoading);
+      dispatch({ loading: organizationsLoading, type: "loadBlocked" });
       return;
     }
 
     const abortController = new AbortController();
-    setLoading(true);
-    setError(null);
+    dispatch({ type: "loadStarted" });
 
     void (async () => {
       try {
         const result = await listVendorCredentials(organizationId, true);
         if (!abortController.signal.aborted) {
-          setPolicy(result.policy);
+          dispatch({ policy: requireCredentialPolicy(result.policy), type: "loadSucceeded" });
         }
       } catch (nextError) {
         if (!abortController.signal.aborted) {
-          setError(nextError instanceof Error ? nextError.message : "Failed to load policy.");
-        }
-      } finally {
-        if (!abortController.signal.aborted) {
-          setLoading(false);
+          dispatch({
+            error: nextError instanceof Error ? nextError.message : "Failed to load policy.",
+            type: "loadFailed",
+          });
         }
       }
     })();
@@ -72,23 +129,24 @@ export function CredentialPolicyPage() {
   }
 
   async function handlePolicyChange(nextPolicy: CredentialPolicy) {
-    setPolicy(nextPolicy);
-    setSaving(true);
-    setError(null);
+    dispatch({ policy: nextPolicy, type: "saveStarted" });
 
     try {
       const updated = await updateCredentialPolicy(nextPolicy);
-      setPolicy(updated);
+      dispatch({ policy: updated, type: "saveSucceeded" });
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Failed to update policy.");
+      dispatch({
+        error: nextError instanceof Error ? nextError.message : "Failed to update policy.",
+        type: "saveFailed",
+      });
       try {
         const result = await listVendorCredentials(nextPolicy.organizationId, true);
-        setPolicy(result.policy);
+        dispatch({ policy: requireCredentialPolicy(result.policy), type: "saveSucceeded" });
       } catch (reloadError) {
         ignorePromiseRejection(reloadError);
       }
     } finally {
-      setSaving(false);
+      dispatch({ type: "saveFinished" });
     }
   }
 
@@ -228,7 +286,9 @@ export function CredentialPolicyPage() {
                       checked={customProviderAllowed}
                       disabled={saving}
                       id="credential-policy-provider-openai-compatible"
-                      onCheckedChange={setCustomProviderAllowed}
+                      onCheckedChange={(value) => {
+                        dispatch({ type: "setCustomProviderAllowed", value });
+                      }}
                     />
                   </label>
                 </div>

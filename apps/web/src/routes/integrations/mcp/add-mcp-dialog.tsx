@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useReducer } from "react";
 
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
@@ -33,29 +33,92 @@ interface Props {
   onSubmit: (input: AddMcpInput) => Promise<void> | void;
 }
 
+interface AddMcpDialogState {
+  advancedOpen: boolean;
+  authType: "oauth" | "bearer";
+  description: string;
+  iconUrl: string;
+  name: string;
+  oauthClientId: string;
+  oauthClientSecret: string;
+  submitError: string | null;
+  submitting: boolean;
+  url: string;
+}
+
+type AddMcpDialogAction =
+  | { type: "changeAuthType"; authType: "oauth" | "bearer" }
+  | { type: "changeDescription"; description: string }
+  | { type: "changeIconUrl"; iconUrl: string }
+  | { type: "changeName"; name: string }
+  | { type: "changeOauthClientId"; oauthClientId: string }
+  | { type: "changeOauthClientSecret"; oauthClientSecret: string }
+  | { type: "changeUrl"; url: string }
+  | { type: "reset" }
+  | { type: "setSubmitError"; error: string | null }
+  | { type: "setSubmitting"; submitting: boolean }
+  | { type: "toggleAdvanced" };
+
+const ADD_MCP_DIALOG_INITIAL_STATE: AddMcpDialogState = {
+  advancedOpen: false,
+  authType: "oauth",
+  description: "",
+  iconUrl: "",
+  name: "",
+  oauthClientId: "",
+  oauthClientSecret: "",
+  submitError: null,
+  submitting: false,
+  url: "",
+};
+
+function addMcpDialogReducer(
+  state: AddMcpDialogState,
+  action: AddMcpDialogAction,
+): AddMcpDialogState {
+  switch (action.type) {
+    case "changeAuthType":
+      return { ...state, authType: action.authType };
+    case "changeDescription":
+      return { ...state, description: action.description };
+    case "changeIconUrl":
+      return { ...state, iconUrl: action.iconUrl };
+    case "changeName":
+      return { ...state, name: action.name };
+    case "changeOauthClientId":
+      return { ...state, oauthClientId: action.oauthClientId };
+    case "changeOauthClientSecret":
+      return { ...state, oauthClientSecret: action.oauthClientSecret };
+    case "changeUrl":
+      return { ...state, url: action.url };
+    case "reset":
+      return ADD_MCP_DIALOG_INITIAL_STATE;
+    case "setSubmitError":
+      return { ...state, submitError: action.error };
+    case "setSubmitting":
+      return { ...state, submitting: action.submitting };
+    case "toggleAdvanced":
+      return { ...state, advancedOpen: !state.advancedOpen };
+  }
+}
+
 export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
-  const [name, setName] = useState("");
-  const [url, setUrl] = useState("");
-  const [description, setDescription] = useState("");
-  const [authType, setAuthType] = useState<"oauth" | "bearer">("oauth");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [iconUrl, setIconUrl] = useState("");
-  const [oauthClientId, setOauthClientId] = useState("");
-  const [oauthClientSecret, setOauthClientSecret] = useState("");
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [state, dispatch] = useReducer(addMcpDialogReducer, ADD_MCP_DIALOG_INITIAL_STATE);
+  const {
+    advancedOpen,
+    authType,
+    description,
+    iconUrl,
+    name,
+    oauthClientId,
+    oauthClientSecret,
+    submitError,
+    submitting,
+    url,
+  } = state;
 
   function reset() {
-    setName("");
-    setUrl("");
-    setDescription("");
-    setAuthType("oauth");
-    setAdvancedOpen(false);
-    setIconUrl("");
-    setOauthClientId("");
-    setOauthClientSecret("");
-    setSubmitError(null);
-    setSubmitting(false);
+    dispatch({ type: "reset" });
   }
 
   function handleOpenChange(next: boolean) {
@@ -76,8 +139,8 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
     const trimmedIcon = iconUrl.trim();
     const trimmedClientId = oauthClientId.trim();
     const trimmedClientSecret = oauthClientSecret.trim();
-    setSubmitError(null);
-    setSubmitting(true);
+    dispatch({ error: null, type: "setSubmitError" });
+    dispatch({ submitting: true, type: "setSubmitting" });
 
     try {
       await onSubmit({
@@ -91,9 +154,12 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
       });
       handleOpenChange(false);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Failed to add MCP connection.");
+      dispatch({
+        error: error instanceof Error ? error.message : "Failed to add MCP connection.",
+        type: "setSubmitError",
+      });
     } finally {
-      setSubmitting(false);
+      dispatch({ submitting: false, type: "setSubmitting" });
     }
   }
 
@@ -122,7 +188,7 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
                 id="mcp-name"
                 value={name}
                 onChange={(e) => {
-                  setName(e.target.value);
+                  dispatch({ name: e.target.value, type: "changeName" });
                 }}
                 placeholder="For example: Figma"
               />
@@ -136,7 +202,7 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
               id="mcp-url"
               value={url}
               onChange={(e) => {
-                setUrl(e.target.value);
+                dispatch({ type: "changeUrl", url: e.target.value });
               }}
               placeholder="https://mcp.figma.com/mcp"
             />
@@ -154,7 +220,7 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
                   key={t}
                   type="button"
                   onClick={() => {
-                    setAuthType(t);
+                    dispatch({ authType: t, type: "changeAuthType" });
                   }}
                   className={cn(
                     "rounded-md border px-3 py-2 text-[13px] text-left transition",
@@ -179,7 +245,7 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
             <button
               type="button"
               onClick={() => {
-                setAdvancedOpen((v) => !v);
+                dispatch({ type: "toggleAdvanced" });
               }}
               className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-[12px] transition"
             >
@@ -197,7 +263,7 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
                     id="mcp-icon"
                     value={iconUrl}
                     onChange={(e) => {
-                      setIconUrl(e.target.value);
+                      dispatch({ iconUrl: e.target.value, type: "changeIconUrl" });
                     }}
                     placeholder="https://logo.clearbit.com/example.com"
                   />
@@ -212,7 +278,7 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
                     id="mcp-desc"
                     value={description}
                     onChange={(e) => {
-                      setDescription(e.target.value);
+                      dispatch({ description: e.target.value, type: "changeDescription" });
                     }}
                     rows={2}
                     placeholder="What capabilities does this MCP server provide?"
@@ -227,7 +293,10 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
                         id="mcp-client-id"
                         value={oauthClientId}
                         onChange={(e) => {
-                          setOauthClientId(e.target.value);
+                          dispatch({
+                            oauthClientId: e.target.value,
+                            type: "changeOauthClientId",
+                          });
                         }}
                         placeholder="Leave empty to use dynamic client registration"
                       />
@@ -239,7 +308,10 @@ export function AddMcpDialog({ open, onOpenChange, onSubmit }: Props) {
                         type="password"
                         value={oauthClientSecret}
                         onChange={(e) => {
-                          setOauthClientSecret(e.target.value);
+                          dispatch({
+                            oauthClientSecret: e.target.value,
+                            type: "changeOauthClientSecret",
+                          });
                         }}
                       />
                     </div>

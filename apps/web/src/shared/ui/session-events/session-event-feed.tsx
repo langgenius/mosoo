@@ -10,9 +10,11 @@ import {
   SESSION_EVENT_FILTER_DOMAINS,
 } from "./domain";
 import type { SessionEventDomain } from "./domain";
-import { DomainFilterBar, EmptyFeedState, FilterEmptyState } from "./feed-filter";
+import { DomainFilterBar } from "./domain-filter-bar";
+import { EmptyFeedState } from "./empty-feed-state";
 import { TurnCard } from "./feed-turn-card";
 import { SessionTurnDrawer } from "./feed-turn-drawer";
+import { FilterEmptyState } from "./filter-empty-state";
 import { filterSessionTurnEvents, useSessionTurns } from "./turns";
 
 interface SessionEventFeedProps {

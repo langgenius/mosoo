@@ -4,7 +4,7 @@ import { Input } from "@/shared/ui/input";
 
 import type { Agent } from "../agent.types";
 import { getRuntimeInfo } from "../runtime-catalog";
-import { RuntimeIcon } from "./shared-components";
+import { RuntimeIcon } from "./runtime-icon";
 
 export function AgentSettingsSummary({ agent }: { agent: Agent }): ReactElement {
   const runtime = getRuntimeInfo(agent.runtime);

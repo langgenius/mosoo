@@ -5,7 +5,7 @@ import { ChannelBrandIcon } from "@/shared/ui/channel-brand-icon";
 import type { BrandIconKey } from "@/shared/ui/channel-brand-icon";
 
 import { Reveal } from "./motion";
-import { DISPLAY_FONT } from "./ui";
+import { DISPLAY_FONT } from "./typography";
 
 const HEADING_STYLE = {
   fontFamily: DISPLAY_FONT,

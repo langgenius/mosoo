@@ -1,18 +1,6 @@
-import type { CSSProperties, ReactElement, ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import { cn } from "@/shared/lib/class-names";
-
-// Warm, rounded display face — used large and light for headlines (marketing
-// only). Body and UI stay on the neutral sans defined in app.css.
-export const DISPLAY_FONT = '"Cabinet Grotesk", "Geist", ui-sans-serif, system-ui, sans-serif';
-
-export const sectionHeadingStyle: CSSProperties = {
-  fontFamily: DISPLAY_FONT,
-  fontSize: "clamp(28px, 3.4vw, 44px)",
-  fontWeight: 500,
-  letterSpacing: "-0.028em",
-  lineHeight: 1.08,
-};
 
 /** Uppercase overline with the single green accent dot. */
 export function Eyebrow({

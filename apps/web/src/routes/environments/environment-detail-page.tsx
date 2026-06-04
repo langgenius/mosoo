@@ -30,6 +30,135 @@ import { Label } from "@/shared/ui/label";
 
 import { isTruthy } from "../../shared/lib/truthiness";
 import { EnvironmentBadges } from "./environment-badges";
+
+type EnvironmentDetail = NonNullable<ReturnType<typeof useEnvironmentDetailQuery>["data"]>;
+
+function EnvironmentDetailHeader({
+  environment,
+  isAdmin,
+  onDelete,
+  onSetDefault,
+}: {
+  environment: EnvironmentDetail;
+  isAdmin: boolean;
+  onDelete: () => void;
+  onSetDefault: () => void;
+}) {
+  return (
+    <div className="border-border flex flex-col gap-3 border-b pb-5 md:flex-row md:items-end md:justify-between">
+      <div>
+        <Link className="text-fg-3 hover:text-fg-1 text-[12px] font-medium" to="/environment">
+          Environments
+        </Link>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <h1 className="text-fg-1 text-2xl font-semibold">{environment.name}</h1>
+          <EnvironmentBadges environment={environment} />
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {isAdmin && !environment.isDefault ? (
+          <Button className="gap-2" onClick={onSetDefault} variant="outline">
+            <Star className="size-4" />
+            Set default
+          </Button>
+        ) : null}
+        {environment.canDelete ? (
+          <Button onClick={onDelete} variant="outline">
+            Delete
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function EnvironmentShareSection({
+  environment,
+  onChangeShareEmail,
+  onShareOrganization,
+  onShareUser,
+  onUnshare,
+  shareEmail,
+  shareOrgPending,
+  shareUserPending,
+}: {
+  environment: EnvironmentDetail;
+  onChangeShareEmail: (value: string) => void;
+  onShareOrganization: () => void;
+  onShareUser: () => void;
+  onUnshare: (targetId: string, targetKind: "organization" | "user") => void;
+  shareEmail: string;
+  shareOrgPending: boolean;
+  shareUserPending: boolean;
+}) {
+  return (
+    <section className="border-border rounded-md border bg-white p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <ShieldCheck className="text-accent-press size-4" />
+        <h2 className="text-fg-1 text-[14px] font-semibold">Share</h2>
+      </div>
+      <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+        <div className="space-y-1.5">
+          <Label>Member email</Label>
+          <Input
+            onChange={(event) => {
+              onChangeShareEmail(event.target.value);
+            }}
+            placeholder="teammate@mosoo.ai"
+            value={shareEmail}
+          />
+        </div>
+        <div className="flex items-end gap-2">
+          <Button
+            disabled={!shareEmail.trim() || shareUserPending}
+            onClick={onShareUser}
+            variant="outline"
+          >
+            Share member
+          </Button>
+          <Button disabled={shareOrgPending} onClick={onShareOrganization} variant="outline">
+            Share organization
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {environment.shareTargets.length === 0 ? (
+          <div className="border-border text-fg-3 rounded-md border border-dashed p-3 text-[12px]">
+            No share targets.
+          </div>
+        ) : (
+          environment.shareTargets.map((target) => (
+            <div
+              className="border-border flex items-center justify-between rounded-md border px-3 py-2"
+              key={`${target.kind}:${target.id}`}
+            >
+              <div>
+                <div className="text-fg-1 text-[13px] font-medium">
+                  {target.kind === "organization"
+                    ? "Everyone in organization"
+                    : (target.name ?? target.email)}
+                </div>
+                <div className="text-fg-3 text-[12px]">{target.email ?? target.kind}</div>
+              </div>
+              <Button
+                className="h-8"
+                onClick={() => {
+                  onUnshare(target.id, target.kind);
+                }}
+                size="sm"
+                variant="ghost"
+              >
+                Remove
+              </Button>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function EnvironmentDetailPage({ environmentId }: { environmentId: string }) {
   const { activeOrganization, activeOrganizationId } = useAppSession();
   const organizationId = activeOrganizationId;
@@ -42,38 +171,71 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
   const environment = environmentQuery.data ?? null;
   const [draftOverride, setDraftOverride] = useState<EnvironmentDraft | null>(null);
 
-  async function invalidateEnvironment() {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: environmentKeys.detail(environmentId) }),
-      typedOrganizationId !== null
-        ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(typedOrganizationId) })
-        : Promise.resolve(),
-    ]);
-  }
-
   const updateMutation = useMutation({
     mutationFn: updateEnvironment,
-    onSuccess: invalidateEnvironment,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: environmentKeys.detail(environmentId) }),
+        typedOrganizationId !== null
+          ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(typedOrganizationId) })
+          : Promise.resolve(),
+      ]);
+    },
   });
   const defaultMutation = useMutation({
     mutationFn: setOrganizationDefaultEnvironment,
-    onSuccess: invalidateEnvironment,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: environmentKeys.detail(environmentId) }),
+        typedOrganizationId !== null
+          ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(typedOrganizationId) })
+          : Promise.resolve(),
+      ]);
+    },
   });
   const shareUserMutation = useMutation({
     mutationFn: shareEnvironmentWithUser,
-    onSuccess: invalidateEnvironment,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: environmentKeys.detail(environmentId) }),
+        typedOrganizationId !== null
+          ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(typedOrganizationId) })
+          : Promise.resolve(),
+      ]);
+    },
   });
   const shareOrgMutation = useMutation({
     mutationFn: shareEnvironmentWithOrganization,
-    onSuccess: invalidateEnvironment,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: environmentKeys.detail(environmentId) }),
+        typedOrganizationId !== null
+          ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(typedOrganizationId) })
+          : Promise.resolve(),
+      ]);
+    },
   });
   const unshareMutation = useMutation({
     mutationFn: unshareEnvironmentTarget,
-    onSuccess: invalidateEnvironment,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: environmentKeys.detail(environmentId) }),
+        typedOrganizationId !== null
+          ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(typedOrganizationId) })
+          : Promise.resolve(),
+      ]);
+    },
   });
   const deleteMutation = useMutation({
     mutationFn: deleteEnvironment,
-    onSuccess: invalidateEnvironment,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: environmentKeys.detail(environmentId) }),
+        typedOrganizationId !== null
+          ? queryClient.invalidateQueries({ queryKey: environmentKeys.list(typedOrganizationId) })
+          : Promise.resolve(),
+      ]);
+    },
   });
   const isAdmin = can(activeOrganization?.viewerRole, Permission.ProvidersCompanyManage);
   const initialDraft = useMemo(() => createEnvironmentDraft(environment), [environment]);
@@ -184,30 +346,16 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 p-6">
-        <div className="border-border flex flex-col gap-3 border-b pb-5 md:flex-row md:items-end md:justify-between">
-          <div>
-            <Link className="text-fg-3 hover:text-fg-1 text-[12px] font-medium" to="/environment">
-              Environments
-            </Link>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <h1 className="text-fg-1 text-2xl font-semibold">{environment.name}</h1>
-              <EnvironmentBadges environment={environment} />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {isAdmin && !environment.isDefault ? (
-              <Button className="gap-2" onClick={() => void handleSetDefault()} variant="outline">
-                <Star className="size-4" />
-                Set default
-              </Button>
-            ) : null}
-            {environment.canDelete ? (
-              <Button onClick={() => void handleDelete()} variant="outline">
-                Delete
-              </Button>
-            ) : null}
-          </div>
-        </div>
+        <EnvironmentDetailHeader
+          environment={environment}
+          isAdmin={isAdmin}
+          onDelete={() => {
+            void handleDelete();
+          }}
+          onSetDefault={() => {
+            void handleSetDefault();
+          }}
+        />
 
         {isTruthy(error) ? (
           <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-[13px]">
@@ -232,72 +380,22 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
         </section>
 
         {environment.canEdit ? (
-          <section className="border-border rounded-md border bg-white p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <ShieldCheck className="text-accent-press size-4" />
-              <h2 className="text-fg-1 text-[14px] font-semibold">Share</h2>
-            </div>
-            <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-              <div className="space-y-1.5">
-                <Label>Member email</Label>
-                <Input
-                  onChange={(event) => {
-                    setShareEmail(event.target.value);
-                  }}
-                  placeholder="teammate@mosoo.ai"
-                  value={shareEmail}
-                />
-              </div>
-              <div className="flex items-end gap-2">
-                <Button
-                  disabled={!shareEmail.trim() || shareUserMutation.isPending}
-                  onClick={() => void handleShareUser()}
-                  variant="outline"
-                >
-                  Share member
-                </Button>
-                <Button
-                  disabled={shareOrgMutation.isPending}
-                  onClick={() => void handleShareOrganization()}
-                  variant="outline"
-                >
-                  Share organization
-                </Button>
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-2">
-              {environment.shareTargets.length === 0 ? (
-                <div className="border-border text-fg-3 rounded-md border border-dashed p-3 text-[12px]">
-                  No share targets.
-                </div>
-              ) : (
-                environment.shareTargets.map((target) => (
-                  <div
-                    className="border-border flex items-center justify-between rounded-md border px-3 py-2"
-                    key={`${target.kind}:${target.id}`}
-                  >
-                    <div>
-                      <div className="text-fg-1 text-[13px] font-medium">
-                        {target.kind === "organization"
-                          ? "Everyone in organization"
-                          : (target.name ?? target.email)}
-                      </div>
-                      <div className="text-fg-3 text-[12px]">{target.email ?? target.kind}</div>
-                    </div>
-                    <Button
-                      className="h-8"
-                      onClick={() => void handleUnshare(target.id, target.kind)}
-                      size="sm"
-                      variant="ghost"
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
+          <EnvironmentShareSection
+            environment={environment}
+            onChangeShareEmail={setShareEmail}
+            onShareOrganization={() => {
+              void handleShareOrganization();
+            }}
+            onShareUser={() => {
+              void handleShareUser();
+            }}
+            onUnshare={(targetId, targetKind) => {
+              void handleUnshare(targetId, targetKind);
+            }}
+            shareEmail={shareEmail}
+            shareOrgPending={shareOrgMutation.isPending}
+            shareUserPending={shareUserMutation.isPending}
+          />
         ) : null}
       </div>
     </div>

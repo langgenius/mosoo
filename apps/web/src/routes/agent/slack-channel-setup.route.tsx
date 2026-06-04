@@ -6,7 +6,7 @@ import { Button } from "@/shared/ui/button";
 
 import { SlackChannelInlineSetup } from "./components/settings-dialog-slack-setup";
 
-export const SLACK_CHANNEL_SETUP_LAYOUT_CLASSES = {
+const SLACK_CHANNEL_SETUP_LAYOUT_CLASSES = {
   content: "mx-auto w-full max-w-3xl px-5 py-6 pb-10",
   page: "bg-background flex h-full min-h-0 flex-col",
   scroll: "min-h-0 flex-1 overflow-y-auto",

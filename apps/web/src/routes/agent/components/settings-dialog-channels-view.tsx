@@ -56,7 +56,7 @@ function formatTimestamp(value: string): string {
   return TIMESTAMP_FORMATTER.format(new Date(value));
 }
 
-export function getOperatorWebhookUrl(channelId: ChannelId, bindingId: string): string | null {
+function getOperatorWebhookUrl(channelId: ChannelId, bindingId: string): string | null {
   const origin = resolveChannelWebhookOrigin();
 
   switch (channelId) {
@@ -79,7 +79,7 @@ export function getOperatorWebhookUrl(channelId: ChannelId, bindingId: string): 
   }
 }
 
-export function getDiscordBindingErrorCopy(errorCode: string): string | null {
+function getDiscordBindingErrorCopy(errorCode: string): string | null {
   if (errorCode === "discord_gateway_disallowed_intents") {
     return "Discord refused the connection because Message Content Intent is disabled. Open the Discord Developer Portal → Bot → Privileged Gateway Intents, enable Message Content Intent, save, then disconnect and reconnect Discord here.";
   }
@@ -91,7 +91,7 @@ export function getDiscordBindingErrorCopy(errorCode: string): string | null {
   return null;
 }
 
-export function getTelegramBotDeepLink(botUsername: string | null): string | null {
+function getTelegramBotDeepLink(botUsername: string | null): string | null {
   const normalized = botUsername?.trim().replace(/^@/u, "") ?? "";
 
   return normalized ? `https://t.me/${encodeURIComponent(normalized)}` : null;

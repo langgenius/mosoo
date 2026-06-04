@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown, Copy, ExternalLink, Loader2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useReducer } from "react";
 import type { FormEvent } from "react";
 
 import { createSlackAgentChannelBinding } from "@/domains/agent/api/agent-client";
@@ -21,7 +21,7 @@ import {
   buildSlackManifest,
 } from "./settings-dialog-slack-manifest";
 
-export function SlackManifestHelpLink() {
+function SlackManifestHelpLink() {
   return (
     <a
       className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs font-medium underline-offset-2 hover:underline"
@@ -35,6 +35,52 @@ export function SlackManifestHelpLink() {
   );
 }
 
+interface SlackChannelInlineSetupState {
+  appLevelToken: string;
+  botToken: string;
+  copied: boolean;
+  manifestOpen: boolean;
+  signingSecret: string;
+  threadRepliesRequireMention: boolean;
+}
+
+type SlackChannelInlineSetupAction =
+  | { type: "changeAppLevelToken"; value: string }
+  | { type: "changeBotToken"; value: string }
+  | { type: "changeSigningSecret"; value: string }
+  | { type: "setCopied"; copied: boolean }
+  | { type: "setThreadRepliesRequireMention"; value: boolean }
+  | { type: "toggleManifest" };
+
+const SLACK_CHANNEL_INLINE_SETUP_INITIAL_STATE: SlackChannelInlineSetupState = {
+  appLevelToken: "",
+  botToken: "",
+  copied: false,
+  manifestOpen: true,
+  signingSecret: "",
+  threadRepliesRequireMention: false,
+};
+
+function slackChannelInlineSetupReducer(
+  state: SlackChannelInlineSetupState,
+  action: SlackChannelInlineSetupAction,
+): SlackChannelInlineSetupState {
+  switch (action.type) {
+    case "changeAppLevelToken":
+      return { ...state, appLevelToken: action.value };
+    case "changeBotToken":
+      return { ...state, botToken: action.value };
+    case "changeSigningSecret":
+      return { ...state, signingSecret: action.value };
+    case "setCopied":
+      return { ...state, copied: action.copied };
+    case "setThreadRepliesRequireMention":
+      return { ...state, threadRepliesRequireMention: action.value };
+    case "toggleManifest":
+      return { ...state, manifestOpen: !state.manifestOpen };
+  }
+}
+
 export function SlackChannelInlineSetup({
   agent,
   onSuccess,
@@ -43,12 +89,18 @@ export function SlackChannelInlineSetup({
   onSuccess?: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [botToken, setBotToken] = useState("");
-  const [signingSecret, setSigningSecret] = useState("");
-  const [appLevelToken, setAppLevelToken] = useState("");
-  const [threadRepliesRequireMention, setThreadRepliesRequireMention] = useState(false);
-  const [manifestOpen, setManifestOpen] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [state, dispatch] = useReducer(
+    slackChannelInlineSetupReducer,
+    SLACK_CHANNEL_INLINE_SETUP_INITIAL_STATE,
+  );
+  const {
+    appLevelToken,
+    botToken,
+    copied,
+    manifestOpen,
+    signingSecret,
+    threadRepliesRequireMention,
+  } = state;
 
   const manifest = useMemo(() => buildSlackManifest(agent.name), [agent.name]);
 
@@ -68,9 +120,9 @@ export function SlackChannelInlineSetup({
 
   async function handleCopyManifest() {
     await navigator.clipboard.writeText(manifest);
-    setCopied(true);
+    dispatch({ copied: true, type: "setCopied" });
     globalThis.setTimeout(() => {
-      setCopied(false);
+      dispatch({ copied: false, type: "setCopied" });
     }, 1500);
   }
 
@@ -96,7 +148,7 @@ export function SlackChannelInlineSetup({
         <button
           className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
           onClick={() => {
-            setManifestOpen((value) => !value);
+            dispatch({ type: "toggleManifest" });
           }}
           type="button"
         >
@@ -142,7 +194,7 @@ export function SlackChannelInlineSetup({
               autoComplete="off"
               id="slack-bot-token"
               onChange={(event) => {
-                setBotToken(event.target.value);
+                dispatch({ type: "changeBotToken", value: event.target.value });
               }}
               type="password"
               value={botToken}
@@ -154,7 +206,7 @@ export function SlackChannelInlineSetup({
               autoComplete="off"
               id="slack-signing-secret"
               onChange={(event) => {
-                setSigningSecret(event.target.value);
+                dispatch({ type: "changeSigningSecret", value: event.target.value });
               }}
               type="password"
               value={signingSecret}
@@ -166,7 +218,7 @@ export function SlackChannelInlineSetup({
               autoComplete="off"
               id="slack-app-level-token"
               onChange={(event) => {
-                setAppLevelToken(event.target.value);
+                dispatch({ type: "changeAppLevelToken", value: event.target.value });
               }}
               type="password"
               value={appLevelToken}
@@ -182,7 +234,9 @@ export function SlackChannelInlineSetup({
             <Switch
               checked={threadRepliesRequireMention}
               id="slack-thread-reply-mention"
-              onCheckedChange={setThreadRepliesRequireMention}
+              onCheckedChange={(value) => {
+                dispatch({ type: "setThreadRepliesRequireMention", value });
+              }}
             />
           </label>
         </div>

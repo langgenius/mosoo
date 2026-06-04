@@ -1,7 +1,7 @@
 import { classifyAgentConfigChanges } from "@mosoo/contracts/agent-config-change-plan";
 import type { AgentConfigChangePlan } from "@mosoo/contracts/agent-config-change-plan";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   recreateSandbox,
@@ -40,6 +40,7 @@ import {
 import type { AgentEditorDraft } from "./draft";
 import { applyAgentEditorBuilderPatch, applyAgentEditorPatch } from "./patch";
 import type { AgentEditorBuilderPatch, AgentEditorBuilderPatchApplyResult } from "./patch";
+import { AGENT_FORM_HIGHLIGHT_DURATION_MS } from "./section-ids";
 import type { AgentFormSectionId } from "./section-ids";
 
 export type { AgentEditorDraft } from "./draft";
@@ -113,6 +114,7 @@ export function useAgentEditorModel({
   const [highlightedSections, setHighlightedSections] = useState<ReadonlySet<AgentFormSectionId>>(
     new Set(),
   );
+  const highlightClearTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const [savedDraft, setSavedDraft] = useState<AgentEditorDraft>(initialDraft);
   const [savedSnapshot, setSavedSnapshot] = useState(() => createSnapshot(initialDraft));
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -139,6 +141,33 @@ export function useAgentEditorModel({
       await queryClient.invalidateQueries({ queryKey: agentKeys.detail(variables.agentId) });
     },
   });
+
+  useEffect(
+    () => () => {
+      if (highlightClearTimerRef.current !== null) {
+        globalThis.clearTimeout(highlightClearTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  function focusAndHighlightSections(sectionIds: readonly AgentFormSectionId[]): void {
+    if (sectionIds.length === 0) {
+      return;
+    }
+
+    setFocusSection(sectionIds[0] ?? null);
+    setHighlightedSections(new Set(sectionIds));
+
+    if (highlightClearTimerRef.current !== null) {
+      globalThis.clearTimeout(highlightClearTimerRef.current);
+    }
+
+    highlightClearTimerRef.current = globalThis.setTimeout(() => {
+      setHighlightedSections(new Set());
+      highlightClearTimerRef.current = null;
+    }, AGENT_FORM_HIGHLIGHT_DURATION_MS);
+  }
 
   const dirty = createSnapshot(draft) !== savedSnapshot;
   const changePlan = classifyAgentConfigChanges({
@@ -270,10 +299,7 @@ export function useAgentEditorModel({
         setRevision((currentRevision) => currentRevision + 1);
       }
 
-      if (result.appliedSections.length > 0) {
-        setFocusSection(result.appliedSections[0] ?? null);
-        setHighlightedSections(new Set(result.appliedSections));
-      }
+      focusAndHighlightSections(result.appliedSections);
 
       return result;
     },
@@ -286,10 +312,7 @@ export function useAgentEditorModel({
         setRevision((currentRevision) => currentRevision + 1);
       }
 
-      if (result.appliedSections.length > 0) {
-        setFocusSection(result.appliedSections[0] ?? null);
-        setHighlightedSections(new Set(result.appliedSections));
-      }
+      focusAndHighlightSections(result.appliedSections);
 
       if (!changed) {
         return {

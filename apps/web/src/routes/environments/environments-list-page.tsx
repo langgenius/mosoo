@@ -44,26 +44,42 @@ export function EnvironmentsListPage() {
   const [error, setError] = useState<string | null>(null);
   const [scope, setScope] = useState<Scope>("mine");
   const [search, setSearch] = useState("");
-  async function invalidateEnvironmentList() {
-    if (!isTruthy(organizationId)) {
-      return;
-    }
-    await queryClient.invalidateQueries({
-      queryKey: environmentKeys.list(toOrganizationId(organizationId)),
-    });
-  }
 
   const defaultMutation = useMutation({
     mutationFn: setOrganizationDefaultEnvironment,
-    onSuccess: invalidateEnvironmentList,
+    onSuccess: async () => {
+      if (!isTruthy(organizationId)) {
+        return;
+      }
+
+      await queryClient.invalidateQueries({
+        queryKey: environmentKeys.list(toOrganizationId(organizationId)),
+      });
+    },
   });
   const forkMutation = useMutation({
     mutationFn: createEnvironmentFork,
-    onSuccess: invalidateEnvironmentList,
+    onSuccess: async () => {
+      if (!isTruthy(organizationId)) {
+        return;
+      }
+
+      await queryClient.invalidateQueries({
+        queryKey: environmentKeys.list(toOrganizationId(organizationId)),
+      });
+    },
   });
   const deleteMutation = useMutation({
     mutationFn: deleteEnvironment,
-    onSuccess: invalidateEnvironmentList,
+    onSuccess: async () => {
+      if (!isTruthy(organizationId)) {
+        return;
+      }
+
+      await queryClient.invalidateQueries({
+        queryKey: environmentKeys.list(toOrganizationId(organizationId)),
+      });
+    },
   });
   const isAdmin = can(activeOrganization?.viewerRole, Permission.ProvidersCompanyManage);
   const environments = useMemo(() => environmentsQuery.data ?? [], [environmentsQuery.data]);
@@ -205,7 +221,15 @@ export function EnvironmentsListPage() {
       </ListPageContent>
 
       <CreateEnvironmentDialog
-        onCreated={() => void invalidateEnvironmentList()}
+        onCreated={() => {
+          if (!isTruthy(organizationId)) {
+            return;
+          }
+
+          void queryClient.invalidateQueries({
+            queryKey: environmentKeys.list(toOrganizationId(organizationId)),
+          });
+        }}
         onOpenChange={setCreateOpen}
         open={createOpen}
         organizationId={organizationId}

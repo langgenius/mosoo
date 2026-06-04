@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import { cn } from "@/shared/lib/class-names";
@@ -14,8 +14,6 @@ import type { AgentEditorModel } from "./use-model";
 //   3. Environment  — environment, spaces
 // "Advanced Settings" was removed; runtime-specific options will return as
 // Section-scoped inputs once any runtime declares them.
-const HIGHLIGHT_DURATION_MS = 1500;
-
 // `highlightedSections` + `readOnly` are load-bearing for the deferred PRD-D
 // Agent Versions "frozen v3 view" feature. Do not remove as dead code without
 // reading dev/prd/agent-versions.md §20.B first.
@@ -90,32 +88,28 @@ function useSectionNavigation(input: {
     environment: null,
     integrations: null,
   });
+  const scrolledFocusRef = useRef<AgentFormSectionId | null>(null);
 
-  useEffect(() => {
-    if (!input.focusSection) {
-      return;
-    }
-    const node = sectionRefs.current[input.focusSection];
-    if (node) {
+  if (input.focusSection === null) {
+    scrolledFocusRef.current = null;
+  }
+
+  function setSectionRef(sectionId: AgentFormSectionId, node: HTMLDivElement | null): void {
+    sectionRefs.current[sectionId] = node;
+
+    if (
+      node !== null &&
+      input.focusSection === sectionId &&
+      scrolledFocusRef.current !== sectionId
+    ) {
+      scrolledFocusRef.current = sectionId;
       node.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [input.focusSection]);
+  }
 
-  const [activeRings, setActiveRings] = useState<ReadonlySet<AgentFormSectionId>>(new Set());
-  useEffect(() => {
-    if (!input.highlightedSections || input.highlightedSections.size === 0) {
-      return;
-    }
-    setActiveRings(input.highlightedSections);
-    const timer = globalThis.setTimeout(() => {
-      setActiveRings(new Set());
-    }, HIGHLIGHT_DURATION_MS);
-    return () => {
-      globalThis.clearTimeout(timer);
-    };
-  }, [input.highlightedSections]);
+  const activeRings = input.highlightedSections ?? new Set<AgentFormSectionId>();
 
-  return { activeRings, sectionRefs };
+  return { activeRings, setSectionRef };
 }
 
 function TabbedAgentFormView({
@@ -126,7 +120,10 @@ function TabbedAgentFormView({
   organizationId,
   readOnly,
 }: StackedAgentFormViewProps): ReactElement {
-  const { activeRings, sectionRefs } = useSectionNavigation({ focusSection, highlightedSections });
+  const { activeRings, setSectionRef } = useSectionNavigation({
+    focusSection,
+    highlightedSections,
+  });
 
   return (
     <div className="space-y-0">
@@ -136,7 +133,7 @@ function TabbedAgentFormView({
           activeRings.has("basics") ? "shadow-[inset_3px_0_0_var(--brand)]" : null,
         )}
         ref={(node) => {
-          sectionRefs.current.basics = node;
+          setSectionRef("basics", node);
         }}
       >
         <BasicsSection
@@ -153,7 +150,7 @@ function TabbedAgentFormView({
           activeRings.has("integrations") ? "shadow-[inset_3px_0_0_var(--brand)]" : null,
         )}
         ref={(node) => {
-          sectionRefs.current.integrations = node;
+          setSectionRef("integrations", node);
         }}
       >
         <IntegrationsSection model={model} organizationId={organizationId} readOnly={readOnly} />
@@ -165,7 +162,7 @@ function TabbedAgentFormView({
           activeRings.has("environment") ? "shadow-[inset_3px_0_0_var(--brand)]" : null,
         )}
         ref={(node) => {
-          sectionRefs.current.environment = node;
+          setSectionRef("environment", node);
         }}
       >
         <EnvironmentSection
@@ -187,7 +184,10 @@ function StackedAgentFormView({
   organizationId,
   readOnly,
 }: StackedAgentFormViewProps): ReactElement {
-  const { activeRings, sectionRefs } = useSectionNavigation({ focusSection, highlightedSections });
+  const { activeRings, setSectionRef } = useSectionNavigation({
+    focusSection,
+    highlightedSections,
+  });
 
   const sections: StackedAgentFormSection[] = [
     {
@@ -235,7 +235,7 @@ function StackedAgentFormView({
           )}
           key={section.id}
           ref={(node) => {
-            sectionRefs.current[section.id] = node;
+            setSectionRef(section.id, node);
           }}
         >
           <div className="border-border-subtle/60 text-fg-3 border-b py-2 text-[11.5px] font-semibold tracking-wide uppercase">

@@ -4,7 +4,7 @@ import type { ReactElement } from "react";
 import { RuntimeIcon } from "@/shared/ui/brand-icons";
 
 import { Reveal } from "./motion";
-import { sectionHeadingStyle } from "./ui";
+import { sectionHeadingStyle } from "./typography";
 
 // A static recreation of the live sandbox shell — styled after the app's
 // Owner Debug Terminal, but it tells the "spin up on demand" story instead of
@@ -30,7 +30,7 @@ function SandboxTerminal(): ReactElement {
         </span>
       </div>
 
-      <div className="min-h-[300px] bg-[#090b0f] px-4 py-4 font-mono text-[12px] leading-[1.85]">
+      <div className="min-h-[300px] bg-[#090b0f] p-4 font-mono text-[12px] leading-[1.85]">
         <p className="text-white/80">
           <span className="text-emerald-300">$</span> mosoo run support-agent --runtime
           claude-agent-sdk

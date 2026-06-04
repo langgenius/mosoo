@@ -16,11 +16,12 @@ import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 
+import { AgentAvatar } from "../agent-avatar";
 import { getNotificationPermission, formatShortRelative } from "../model/format";
 import { getThreadActionCapabilities } from "../model/session-capabilities";
 import { getThreadStateGlyph } from "../model/thread";
 import type { ThreadFilter, ThreadListItem, ThreadSection } from "../model/thread";
-import { AgentAvatar, ThreadStateIcon } from "../shared-ui";
+import { ThreadStateIcon } from "../thread-state-icon";
 
 const THREAD_FILTERS: { label: string; value: ThreadFilter }[] = [
   { label: "All", value: "all" },

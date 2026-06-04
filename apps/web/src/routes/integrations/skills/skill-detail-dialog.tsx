@@ -1,5 +1,5 @@
 import type { SkillDetail, SkillSummary } from "@mosoo/contracts/skill";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useReducer } from "react";
 
 import { skillPackageUrl } from "@/domains/skill/api/skill-client";
 import { Button } from "@/shared/ui/button";
@@ -25,15 +25,73 @@ interface Props {
   skill: SkillSummary;
 }
 
+interface SkillDetailDialogState {
+  actionError: string | null;
+  content: string;
+  contentError: string | null;
+  contentLoading: boolean;
+  detail: SkillDetail | null;
+  forking: boolean;
+  showDelete: boolean;
+  showShare: boolean;
+}
+
+type SkillDetailDialogAction =
+  | { type: "contentFailed"; error: string }
+  | { type: "contentLoaded"; content: string; detail: SkillDetail }
+  | { type: "setActionError"; error: string | null }
+  | { type: "setForking"; forking: boolean }
+  | { type: "setShowDelete"; open: boolean }
+  | { type: "setShowShare"; open: boolean };
+
+const SKILL_DETAIL_DIALOG_INITIAL_STATE: SkillDetailDialogState = {
+  actionError: null,
+  content: "",
+  contentError: null,
+  contentLoading: true,
+  detail: null,
+  forking: false,
+  showDelete: false,
+  showShare: false,
+};
+
+function skillDetailDialogReducer(
+  state: SkillDetailDialogState,
+  action: SkillDetailDialogAction,
+): SkillDetailDialogState {
+  switch (action.type) {
+    case "contentFailed":
+      return { ...state, contentError: action.error, contentLoading: false };
+    case "contentLoaded":
+      return {
+        ...state,
+        content: action.content,
+        contentLoading: false,
+        detail: action.detail,
+      };
+    case "setActionError":
+      return { ...state, actionError: action.error };
+    case "setForking":
+      return { ...state, forking: action.forking };
+    case "setShowDelete":
+      return { ...state, showDelete: action.open };
+    case "setShowShare":
+      return { ...state, showShare: action.open };
+  }
+}
+
 export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
-  const [detail, setDetail] = useState<SkillDetail | null>(null);
-  const [showShare, setShowShare] = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
-  const [content, setContent] = useState("");
-  const [contentLoading, setContentLoading] = useState(true);
-  const [contentError, setContentError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [forking, setForking] = useState(false);
+  const [state, dispatch] = useReducer(skillDetailDialogReducer, SKILL_DETAIL_DIALOG_INITIAL_STATE);
+  const {
+    actionError,
+    content,
+    contentError,
+    contentLoading,
+    detail,
+    forking,
+    showDelete,
+    showShare,
+  } = state;
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -46,15 +104,13 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
         if (abortController.signal.aborted) {
           return;
         }
-        setDetail(nextDetail);
-        setContent(text);
+        dispatch({ content: text, detail: nextDetail, type: "contentLoaded" });
       } catch (error) {
         if (!abortController.signal.aborted) {
-          setContentError(error instanceof Error ? error.message : String(error));
-        }
-      } finally {
-        if (!abortController.signal.aborted) {
-          setContentLoading(false);
+          dispatch({
+            error: error instanceof Error ? error.message : String(error),
+            type: "contentFailed",
+          });
         }
       }
     })();
@@ -69,15 +125,18 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
     if (forking) {
       return;
     }
-    setActionError(null);
-    setForking(true);
+    dispatch({ error: null, type: "setActionError" });
+    dispatch({ forking: true, type: "setForking" });
 
     try {
       await registry.createSkillFork(skill.id);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Failed to fork skill.");
+      dispatch({
+        error: error instanceof Error ? error.message : "Failed to fork skill.",
+        type: "setActionError",
+      });
     } finally {
-      setForking(false);
+      dispatch({ forking: false, type: "setForking" });
     }
   }
 
@@ -142,7 +201,7 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setShowDelete(true);
+                    dispatch({ open: true, type: "setShowDelete" });
                   }}
                   className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
                 >
@@ -156,7 +215,7 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setShowShare(true);
+                    dispatch({ open: true, type: "setShowShare" });
                   }}
                 >
                   Share
@@ -184,7 +243,9 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
             <ShareSkillDialog
               skill={skill}
               open={showShare}
-              onOpenChange={setShowShare}
+              onOpenChange={(open) => {
+                dispatch({ open, type: "setShowShare" });
+              }}
               registry={registry}
             />
           ) : null}
@@ -192,10 +253,12 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
             <DeleteSkillDialog
               skill={skill}
               open={showDelete}
-              onOpenChange={setShowDelete}
+              onOpenChange={(open) => {
+                dispatch({ open, type: "setShowDelete" });
+              }}
               registry={registry}
               onDeleted={() => {
-                setShowDelete(false);
+                dispatch({ open: false, type: "setShowDelete" });
                 onOpenChange(false);
               }}
             />

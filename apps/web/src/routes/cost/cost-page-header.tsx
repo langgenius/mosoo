@@ -45,9 +45,7 @@ export function CostPageHeader({
             }}
             className={cn(
               "rounded px-2.5 py-1.5 text-xs font-semibold",
-              runPurpose === item.value
-                ? "bg-ink-100 text-fg-1"
-                : "text-muted-foreground",
+              runPurpose === item.value ? "bg-ink-100 text-fg-1" : "text-muted-foreground",
             )}
           >
             {item.label}

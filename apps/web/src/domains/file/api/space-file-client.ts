@@ -108,21 +108,36 @@ async function uploadOneSpaceFile(input: {
       throw error;
     }
 
-    for (let copyNumber = 1; copyNumber <= 99; copyNumber += 1) {
-      try {
-        return await uploadOneSpaceFile({
-          ...input,
-          conflictMode: "fail",
-          logicalPath: createCopyPath(input.logicalPath, copyNumber),
-        });
-      } catch (retryError) {
-        if (!(retryError instanceof FileApiError) || retryError.code !== "file_conflict") {
-          throw retryError;
-        }
-      }
+    return uploadSpaceFileCopy(input, 1, error);
+  }
+}
+
+async function uploadSpaceFileCopy(
+  input: {
+    file: File;
+    logicalPath: string;
+    replaceIfMatchEtag?: string | undefined;
+    spaceId: SpaceId;
+  },
+  copyNumber: number,
+  originalError: FileApiError,
+): Promise<{ fileId: FileId }> {
+  if (copyNumber > 99) {
+    throw originalError;
+  }
+
+  try {
+    return await uploadOneSpaceFile({
+      ...input,
+      conflictMode: "fail",
+      logicalPath: createCopyPath(input.logicalPath, copyNumber),
+    });
+  } catch (retryError) {
+    if (!(retryError instanceof FileApiError) || retryError.code !== "file_conflict") {
+      throw retryError;
     }
 
-    throw error;
+    return uploadSpaceFileCopy(input, copyNumber + 1, originalError);
   }
 }
 

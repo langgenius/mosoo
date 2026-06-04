@@ -14,10 +14,10 @@ import {
 } from "@/shared/ui/dialog";
 import { SessionEventDrawerCore } from "@/shared/ui/session-events";
 
+import { AgentAvatar } from "../agent-avatar";
 import { createProcessCopyText } from "../model/process";
 import type { ThreadProcessEvent } from "../model/process";
-import { AgentAvatar } from "../shared-ui";
-import { ProcessEventRow, ProcessLegend, ProcessTimelineBar } from "./events";
+import { ProcessEventRow, ProcessLegend, ProcessTimeline } from "./events";
 import { formatTokens, formatTotalDuration } from "./format";
 
 interface ThreadProcessModalProps {
@@ -106,6 +106,7 @@ export function ThreadProcessModal({
 
         <SessionEventDrawerCore
           key={`${open}:${events[0]?.id ?? "none"}`}
+          EventComponent={ProcessEventRow}
           emptyState={
             <div className="px-7 py-12 text-center">
               <div className="text-fg-1 text-sm font-semibold">No process events recorded</div>
@@ -115,17 +116,8 @@ export function ThreadProcessModal({
             </div>
           }
           events={events}
-          renderEvent={(input) => <ProcessEventRow {...input} />}
-          renderLegend={() => <ProcessLegend />}
-          renderTimeline={({ onSelect, selectedId }) => (
-            <>
-              <div className="text-fg-3 flex items-center justify-between text-[10.5px] tabular-nums">
-                <span>0:00</span>
-                <span>{formatTotalDuration(totalDurationMs)}</span>
-              </div>
-              <ProcessTimelineBar events={events} onSelect={onSelect} selectedId={selectedId} />
-            </>
-          )}
+          LegendComponent={ProcessLegend}
+          TimelineComponent={ProcessTimeline}
         />
       </DialogContent>
     </Dialog>

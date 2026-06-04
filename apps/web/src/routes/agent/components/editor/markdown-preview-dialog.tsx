@@ -1,28 +1,7 @@
 import { FileText } from "lucide-react";
-import type { ReactElement, ReactNode } from "react";
+import type { ReactElement } from "react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
-
-const SECTION_HEADER_STYLE = { color: "#777169" } as const;
-
-export function SectionHeader({ children }: { children: ReactNode }): ReactElement {
-  return (
-    <h4
-      className="mb-3 text-[11px] font-semibold tracking-wider uppercase"
-      style={SECTION_HEADER_STYLE}
-    >
-      {children}
-    </h4>
-  );
-}
-
-export function RequiredMark(): ReactElement {
-  return (
-    <span aria-label="required" className="text-destructive ml-0.5" title="Required">
-      *
-    </span>
-  );
-}
 
 export function MarkdownPreviewDialog({
   content,

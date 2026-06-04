@@ -196,15 +196,23 @@ export function mapAgentBuilderChatMessagesToStreamingMessages(input: {
     input.pendingTurn === null || input.pendingTurn === undefined
       ? input.chatMessages
       : input.chatMessages.slice(input.pendingTurn.chatMessageStartIndex ?? 0);
-  const chatMessages = activeChatMessages.filter(isRenderableChatMessage).map((message, index) =>
-    createStreamingBuilderMessage({
-      contentText: readChatMessageText(message),
-      id: `streaming:${message.id}`,
-      role: message.role,
-      seq: STREAMING_MESSAGE_SEQ_BASE + 100 + index,
-      threadId: input.threadId,
-    }),
-  );
+  const chatMessages: AgentBuilderMessage[] = [];
+
+  for (const message of activeChatMessages) {
+    if (!isRenderableChatMessage(message)) {
+      continue;
+    }
+
+    chatMessages.push(
+      createStreamingBuilderMessage({
+        contentText: readChatMessageText(message),
+        id: `streaming:${message.id}`,
+        role: message.role,
+        seq: STREAMING_MESSAGE_SEQ_BASE + 100 + chatMessages.length,
+        threadId: input.threadId,
+      }),
+    );
+  }
 
   if (input.pendingTurn === null || input.pendingTurn === undefined) {
     return chatMessages;

@@ -7,7 +7,7 @@ import { Button } from "@/shared/ui/button";
 import type { Agent } from "../agent.types";
 import { getRuntimeInfo } from "../runtime-catalog";
 import { AgentSessionPanel } from "./agent-session-panel";
-import { RuntimeIcon } from "./shared-components";
+import { RuntimeIcon } from "./runtime-icon";
 
 export function ConsumeMode({
   agent,

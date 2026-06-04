@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { ReactElement, ReactNode } from "react";
+import { useMemo, useRef, useState } from "react";
+import type { ComponentType, ReactElement, ReactNode } from "react";
 
 const SESSION_EVENT_DRAWER_ROW_HEIGHT = 70;
 const SESSION_EVENT_DRAWER_OVERSCAN = 6;
@@ -13,21 +13,34 @@ export interface SessionEventDrawerCoreEvent {
 interface SessionEventDrawerCoreProps<TEvent extends SessionEventDrawerCoreEvent> {
   emptyState: ReactNode;
   events: readonly TEvent[];
+  EventComponent: ComponentType<SessionEventDrawerEventComponentProps<TEvent>>;
   focusEventId?: string | null;
-  renderEvent: (input: {
-    event: TEvent;
-    expanded: boolean;
-    index: number;
-    offsetMs: number;
-    onSelect: () => void;
-    onToggleExpanded: () => void;
-    selected: boolean;
-  }) => ReactNode;
-  renderLegend: () => ReactNode;
-  renderTimeline: (input: {
-    onSelect: (eventId: string) => void;
-    selectedId: string | null;
-  }) => ReactNode;
+  LegendComponent: ComponentType<SessionEventDrawerLegendComponentProps<TEvent>>;
+  TimelineComponent: ComponentType<SessionEventDrawerTimelineComponentProps<TEvent>>;
+}
+
+export interface SessionEventDrawerEventComponentProps<TEvent extends SessionEventDrawerCoreEvent> {
+  event: TEvent;
+  expanded: boolean;
+  index: number;
+  offsetMs: number;
+  onSelect: () => void;
+  onToggleExpanded: () => void;
+  selected: boolean;
+}
+
+export interface SessionEventDrawerLegendComponentProps<
+  TEvent extends SessionEventDrawerCoreEvent,
+> {
+  events: readonly TEvent[];
+}
+
+export interface SessionEventDrawerTimelineComponentProps<
+  TEvent extends SessionEventDrawerCoreEvent,
+> {
+  events: readonly TEvent[];
+  onSelect: (eventId: string) => void;
+  selectedId: string | null;
 }
 
 interface EventOffsets {
@@ -77,24 +90,31 @@ function calculateCumulativeOffsetsMs(events: readonly SessionEventDrawerCoreEve
 export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEvent>({
   emptyState,
   events,
+  EventComponent,
   focusEventId = null,
-  renderEvent,
-  renderLegend,
-  renderTimeline,
+  LegendComponent,
+  TimelineComponent,
 }: SessionEventDrawerCoreProps<TEvent>): ReactElement {
-  const initialEventsRef = useRef(events);
-  const initialFocusRef = useRef(focusEventId);
-  const initialSelectedId = initialFocusRef.current ?? initialEventsRef.current[0]?.id ?? null;
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(initialSelectedId);
-  const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(() =>
-    initialSelectedId === null ? new Set<string>() : new Set([initialSelectedId]),
-  );
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(() => new Set());
+  const [expansionTouched, setExpansionTouched] = useState(false);
   const [scrollTop, setScrollTop] = useState(0);
-  const eventRefs = useRef(new Map<string, HTMLDivElement>());
+  const eventRefs = useRef<Map<string, HTMLDivElement> | null>(null);
+  eventRefs.current ??= new Map<string, HTMLDivElement>();
+  const eventRefMap = eventRefs.current;
   const listRef = useRef<HTMLDivElement | null>(null);
-  const selectedId = selectedEventId;
+  const initialScrollCompletedRef = useRef(false);
+  const selectedId = selectedEventId ?? focusEventId ?? events[0]?.id ?? null;
   const virtualized = events.length > 200;
-  const expandedReadonly = useMemo(() => new Set(expandedEventIds), [expandedEventIds]);
+  const expandedReadonly = useMemo(() => {
+    const next = new Set(expandedEventIds);
+
+    if (!expansionTouched && selectedId !== null) {
+      next.add(selectedId);
+    }
+
+    return next;
+  }, [expandedEventIds, expansionTouched, selectedId]);
   const { offsets, totalHeight } = useMemo(
     () => createEventOffsets({ events, expandedEventIds: expandedReadonly }),
     [events, expandedReadonly],
@@ -117,26 +137,22 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
     return { end, start };
   }, [events.length, offsets, scrollTop, virtualized]);
 
-  useEffect(() => {
-    if (initialSelectedId === null) {
+  function scrollInitialSelection(): void {
+    if (initialScrollCompletedRef.current || selectedId === null) {
       return;
     }
 
-    const initialEvents = initialEventsRef.current;
-    const index = initialEvents.findIndex((event) => event.id === initialSelectedId);
-    const initialOffsets = createEventOffsets({
-      events: initialEvents,
-      expandedEventIds: new Set([initialSelectedId]),
-    }).offsets;
-    const offset = index === -1 ? null : initialOffsets[index];
+    const index = events.findIndex((event) => event.id === selectedId);
+    const offset = index === -1 ? null : offsets[index];
 
-    if (offset !== null && offset !== undefined) {
-      window.requestAnimationFrame(() => {
+    if (offset !== null && offset !== undefined && listRef.current !== null) {
+      initialScrollCompletedRef.current = true;
+      globalThis.requestAnimationFrame(() => {
         listRef.current?.scrollTo({ top: offset });
-        eventRefs.current.get(initialSelectedId)?.scrollIntoView({ block: "nearest" });
+        eventRefMap.get(selectedId)?.scrollIntoView({ block: "nearest" });
       });
     }
-  }, [initialSelectedId]);
+  }
 
   function selectEvent(eventId: string): void {
     setSelectedEventId(eventId);
@@ -152,14 +168,15 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
       return;
     }
 
-    eventRefs.current.get(eventId)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    eventRefMap.get(eventId)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
   function toggleExpanded(eventId: string): void {
+    setExpansionTouched(true);
     setExpandedEventIds((current) => {
       const next = new Set(current);
 
-      if (next.has(eventId)) {
+      if (expandedReadonly.has(eventId)) {
         next.delete(eventId);
       } else {
         next.add(eventId);
@@ -175,10 +192,15 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
 
   return (
     <div className="flex min-h-0 flex-col gap-3 px-7 py-4">
-      {renderTimeline({ onSelect: selectEvent, selectedId })}
-      {renderLegend()}
+      <TimelineComponent events={events} onSelect={selectEvent} selectedId={selectedId} />
+      <LegendComponent events={events} />
       <div
-        ref={listRef}
+        ref={(node) => {
+          listRef.current = node;
+          if (node !== null) {
+            scrollInitialSelection();
+          }
+        }}
         onScroll={(event) => {
           setScrollTop(event.currentTarget.scrollTop);
         }}
@@ -192,19 +214,19 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
 
               return (
                 <div key={event.id} className="absolute right-0 left-0 px-0.5" style={{ top }}>
-                  {renderEvent({
-                    event,
-                    expanded: expandedEventIds.has(event.id),
-                    index: eventIndex,
-                    offsetMs: cumulativeOffsetsMs[eventIndex] ?? 0,
-                    onSelect: () => {
+                  <EventComponent
+                    event={event}
+                    expanded={expandedReadonly.has(event.id)}
+                    index={eventIndex}
+                    offsetMs={cumulativeOffsetsMs[eventIndex] ?? 0}
+                    onSelect={() => {
                       selectEvent(event.id);
-                    },
-                    onToggleExpanded: () => {
+                    }}
+                    onToggleExpanded={() => {
                       toggleExpanded(event.id);
-                    },
-                    selected: selectedId === event.id,
-                  })}
+                    }}
+                    selected={selectedId === event.id}
+                  />
                 </div>
               );
             })}
@@ -216,25 +238,28 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
                 key={event.id}
                 ref={(node) => {
                   if (node) {
-                    eventRefs.current.set(event.id, node);
+                    eventRefMap.set(event.id, node);
+                    if (event.id === selectedId) {
+                      scrollInitialSelection();
+                    }
                   } else {
-                    eventRefs.current.delete(event.id);
+                    eventRefMap.delete(event.id);
                   }
                 }}
               >
-                {renderEvent({
-                  event,
-                  expanded: expandedEventIds.has(event.id),
-                  index,
-                  offsetMs: cumulativeOffsetsMs[index] ?? 0,
-                  onSelect: () => {
+                <EventComponent
+                  event={event}
+                  expanded={expandedReadonly.has(event.id)}
+                  index={index}
+                  offsetMs={cumulativeOffsetsMs[index] ?? 0}
+                  onSelect={() => {
                     selectEvent(event.id);
-                  },
-                  onToggleExpanded: () => {
+                  }}
+                  onToggleExpanded={() => {
                     toggleExpanded(event.id);
-                  },
-                  selected: selectedId === event.id,
-                })}
+                  }}
+                  selected={selectedId === event.id}
+                />
               </div>
             ))}
           </div>

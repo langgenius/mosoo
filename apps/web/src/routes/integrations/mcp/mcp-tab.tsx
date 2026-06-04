@@ -1,5 +1,5 @@
 import { Plus, Search, Shield, Zap } from "lucide-react";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useReducer } from "react";
 
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
@@ -27,16 +27,53 @@ function scopeToView(scope: Scope): McpViewMode {
   return "managed";
 }
 
+interface McpTabState {
+  addOpen: boolean;
+  hostOpen: boolean;
+  oauthServer: McpServerWithCredential | null;
+  scope: Scope;
+  search: string;
+  serviceAccountServer: McpServerWithCredential | null;
+}
+
+type McpTabAction =
+  | { type: "setAddOpen"; open: boolean }
+  | { type: "setHostOpen"; open: boolean }
+  | { type: "setOauthServer"; server: McpServerWithCredential | null }
+  | { type: "setScope"; scope: Scope }
+  | { type: "setSearch"; search: string }
+  | { type: "setServiceAccountServer"; server: McpServerWithCredential | null };
+
+const MCP_TAB_INITIAL_STATE: McpTabState = {
+  addOpen: false,
+  hostOpen: false,
+  oauthServer: null,
+  scope: "mine",
+  search: "",
+  serviceAccountServer: null,
+};
+
+function mcpTabReducer(state: McpTabState, action: McpTabAction): McpTabState {
+  switch (action.type) {
+    case "setAddOpen":
+      return { ...state, addOpen: action.open };
+    case "setHostOpen":
+      return { ...state, hostOpen: action.open };
+    case "setOauthServer":
+      return { ...state, oauthServer: action.server };
+    case "setScope":
+      return { ...state, scope: action.scope };
+    case "setSearch":
+      return { ...state, search: action.search };
+    case "setServiceAccountServer":
+      return { ...state, serviceAccountServer: action.server };
+  }
+}
+
 export function McpTab() {
   const registry = useMcpRegistry();
-  const [scope, setScope] = useState<Scope>("mine");
-  const [search, setSearch] = useState("");
-  const [addOpen, setAddOpen] = useState(false);
-  const [hostOpen, setHostOpen] = useState(false);
-  const [oauthServer, setOauthServer] = useState<McpServerWithCredential | null>(null);
-  const [serviceAccountServer, setServiceAccountServer] = useState<McpServerWithCredential | null>(
-    null,
-  );
+  const [state, dispatch] = useReducer(mcpTabReducer, MCP_TAB_INITIAL_STATE);
+  const { addOpen, hostOpen, oauthServer, scope, search, serviceAccountServer } = state;
 
   const effectiveScope: Scope = !registry.isAdmin && scope === "organization" ? "mine" : scope;
   const active: McpViewMode = scopeToView(effectiveScope);
@@ -57,7 +94,7 @@ export function McpTab() {
     if (server.credentialScope === "organization_shared" && server.hasSharedCredential) {
       return;
     }
-    setOauthServer(server);
+    dispatch({ server, type: "setOauthServer" });
   }
 
   async function handleAddSubmit(input: {
@@ -78,7 +115,7 @@ export function McpTab() {
       ...(input.oauthClientId && { oauthClientId: input.oauthClientId }),
       ...(input.oauthClientSecret && { oauthClientSecret: input.oauthClientSecret }),
     });
-    setOauthServer(created);
+    dispatch({ server: created, type: "setOauthServer" });
   }
 
   async function handleHostSubmit(input: HostOrganizationMcpInput) {
@@ -109,7 +146,7 @@ export function McpTab() {
         {showAddButton ? (
           <Button
             onClick={() => {
-              setAddOpen(true);
+              dispatch({ open: true, type: "setAddOpen" });
             }}
             size="sm"
           >
@@ -119,7 +156,7 @@ export function McpTab() {
         ) : showHostButton ? (
           <Button
             onClick={() => {
-              setHostOpen(true);
+              dispatch({ open: true, type: "setHostOpen" });
             }}
             size="sm"
           >
@@ -132,7 +169,9 @@ export function McpTab() {
       <div className="flex shrink-0 items-center gap-2.5 px-8 pb-4">
         <ScopeTabs
           value={effectiveScope}
-          onChange={setScope}
+          onChange={(nextScope) => {
+            dispatch({ scope: nextScope, type: "setScope" });
+          }}
           tabs={[
             { count: registry.personal.length, label: "Mine", value: "mine" },
             {
@@ -157,7 +196,7 @@ export function McpTab() {
             placeholder="Search MCP servers…"
             value={search}
             onChange={(e) => {
-              setSearch(e.target.value);
+              dispatch({ search: e.target.value, type: "setSearch" });
             }}
             className="h-8 pl-9"
           />
@@ -177,10 +216,10 @@ export function McpTab() {
             kind={active}
             searching={search.length > 0}
             onAdd={() => {
-              setAddOpen(true);
+              dispatch({ open: true, type: "setAddOpen" });
             }}
             onHost={() => {
-              setHostOpen(true);
+              dispatch({ open: true, type: "setHostOpen" });
             }}
           />
         ) : (
@@ -202,7 +241,7 @@ export function McpTab() {
                         onClearSharedCredential: () =>
                           void registry.clearOrganizationSharedCredential(s.id),
                         onConfigureSharedCredential: () => {
-                          setServiceAccountServer(s);
+                          dispatch({ server: s, type: "setServiceAccountServer" });
                         },
                       })}
                     onRevoke={() => void registry.revokeCredential(s.id)}
@@ -221,10 +260,18 @@ export function McpTab() {
         )}
       </div>
 
-      <AddMcpDialog open={addOpen} onOpenChange={setAddOpen} onSubmit={handleAddSubmit} />
+      <AddMcpDialog
+        open={addOpen}
+        onOpenChange={(open) => {
+          dispatch({ open, type: "setAddOpen" });
+        }}
+        onSubmit={handleAddSubmit}
+      />
       <HostOrganizationMcpDialog
         open={hostOpen}
-        onOpenChange={setHostOpen}
+        onOpenChange={(open) => {
+          dispatch({ open, type: "setHostOpen" });
+        }}
         onSubmit={handleHostSubmit}
       />
       <ServiceAccountCredentialDialog
@@ -232,7 +279,7 @@ export function McpTab() {
         server={serviceAccountServer}
         onOpenChange={(next) => {
           if (!next) {
-            setServiceAccountServer(null);
+            dispatch({ server: null, type: "setServiceAccountServer" });
           }
         }}
         onSubmit={async (input) =>
@@ -271,7 +318,7 @@ export function McpTab() {
         }
         onOpenChange={(next) => {
           if (!next) {
-            setOauthServer(null);
+            dispatch({ server: null, type: "setOauthServer" });
           }
         }}
         onPollOAuthFlow={async (flowId) => registry.getOAuthFlowState(flowId)}

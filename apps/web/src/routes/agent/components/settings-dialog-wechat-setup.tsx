@@ -27,9 +27,7 @@ interface WeChatPairingStatusCopy {
   label: string;
 }
 
-export function getWeChatPairingStatusCopy(
-  status: WeChatPairingStatus | null,
-): WeChatPairingStatusCopy {
+function getWeChatPairingStatusCopy(status: WeChatPairingStatus | null): WeChatPairingStatusCopy {
   switch (status) {
     case "confirmed":
       return {
@@ -69,7 +67,7 @@ export function getWeChatPairingStatusCopy(
   }
 }
 
-export function isWeChatPairingPollingStatus(status: WeChatPairingStatus): boolean {
+function isWeChatPairingPollingStatus(status: WeChatPairingStatus): boolean {
   return status === "qr_pending" || status === "scanned";
 }
 

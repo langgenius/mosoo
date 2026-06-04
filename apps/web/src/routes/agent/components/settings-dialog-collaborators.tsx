@@ -4,11 +4,9 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import { Globe, Loader2, Lock } from "lucide-react";
 import type { ReactElement } from "react";
 
-import {
-  AccessIconButton,
-  AccessRow,
-  ShareMemberSearch,
-} from "@/features/resource-sharing/access-primitives";
+import { AccessIconButton } from "@/features/resource-sharing/access-icon-button";
+import { AccessRow } from "@/features/resource-sharing/access-row";
+import { ShareMemberSearch } from "@/features/resource-sharing/share-member-search";
 import { Button } from "@/shared/ui/button";
 import { Separator } from "@/shared/ui/separator";
 

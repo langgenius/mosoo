@@ -21,7 +21,7 @@ import { Label } from "@/shared/ui/label";
 
 import type { RuntimeId } from "../agent.types";
 import { RUNTIMES, getRuntimeInfo } from "../runtime-catalog";
-import { RuntimeIcon } from "./shared-components";
+import { RuntimeIcon } from "./runtime-icon";
 
 const TITLE_STYLE = { letterSpacing: "0" } satisfies CSSProperties;
 

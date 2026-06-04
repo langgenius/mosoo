@@ -4,7 +4,7 @@ import { getAgentKindRuntimePolicy } from "@mosoo/contracts/agent";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal as XTermTerminal } from "@xterm/xterm";
 import { Circle, RefreshCw, Terminal as TerminalIcon, TriangleAlert } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import type { ReactElement, RefObject } from "react";
 
 import "@xterm/xterm/css/xterm.css";
@@ -21,6 +21,49 @@ interface OwnerDebugTerminalController {
   reconnect: () => void;
 }
 
+interface OwnerDebugTerminalConnectionSnapshot {
+  connectionError: string | null;
+  connectionState: ConnectionState;
+}
+
+interface OwnerDebugTerminalConnectionStore {
+  getSnapshot: () => OwnerDebugTerminalConnectionSnapshot;
+  setSnapshot: (snapshot: OwnerDebugTerminalConnectionSnapshot) => void;
+  subscribe: (listener: () => void) => () => void;
+}
+
+function createOwnerDebugTerminalConnectionStore(): OwnerDebugTerminalConnectionStore {
+  let snapshot: OwnerDebugTerminalConnectionSnapshot = {
+    connectionError: null,
+    connectionState: "connecting",
+  };
+  const listeners = new Set<() => void>();
+
+  return {
+    getSnapshot: () => snapshot,
+    setSnapshot: (nextSnapshot) => {
+      if (
+        nextSnapshot.connectionError === snapshot.connectionError &&
+        nextSnapshot.connectionState === snapshot.connectionState
+      ) {
+        return;
+      }
+
+      snapshot = nextSnapshot;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
+
 function buildOwnerDebugTerminalWebSocketUrl(input: { agentId: string; origin: string }): string {
   return new URL(
     `/api/agent/${encodeURIComponent(input.agentId)}/owner-debug-terminal/ws`,
@@ -29,12 +72,19 @@ function buildOwnerDebugTerminalWebSocketUrl(input: { agentId: string; origin: s
 }
 
 function useOwnerDebugTerminalController(agentId: string): OwnerDebugTerminalController {
+  const agentIdRef = useRef(agentId);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hasConnectedOnceRef = useRef(false);
   const preserveReconnectBufferRef = useRef(false);
   const sandboxAddonRef = useRef<SandboxAddon | null>(null);
-  const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
-  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const connectionStoreRef = useRef<OwnerDebugTerminalConnectionStore | null>(null);
+  connectionStoreRef.current ??= createOwnerDebugTerminalConnectionStore();
+  const connectionStore = connectionStoreRef.current;
+  const { connectionError, connectionState } = useSyncExternalStore(
+    connectionStore.subscribe,
+    connectionStore.getSnapshot,
+    connectionStore.getSnapshot,
+  );
 
   useEffect(() => {
     const container = containerRef.current;
@@ -79,8 +129,10 @@ function useOwnerDebugTerminalController(agentId: string): OwnerDebugTerminalCon
           hasConnectedOnceRef.current = true;
           preserveReconnectBufferRef.current = false;
         }
-        setConnectionState(state === "disconnected" && !error ? "connecting" : state);
-        setConnectionError(error?.message ?? null);
+        connectionStore.setSnapshot({
+          connectionError: error?.message ?? null,
+          connectionState: state === "disconnected" && !error ? "connecting" : state,
+        });
       },
     });
     const removeReconnectClearGuard = installTerminalReconnectClearGuard(terminal, {
@@ -99,7 +151,10 @@ function useOwnerDebugTerminalController(agentId: string): OwnerDebugTerminalCon
       try {
         fitAddon.fit();
       } catch (error) {
-        setConnectionError(error instanceof Error ? error.message : "Terminal resize failed.");
+        connectionStore.setSnapshot({
+          ...connectionStore.getSnapshot(),
+          connectionError: error instanceof Error ? error.message : "Terminal resize failed.",
+        });
       }
     }
 
@@ -119,7 +174,7 @@ function useOwnerDebugTerminalController(agentId: string): OwnerDebugTerminalCon
     sandboxAddonRef.current = sandboxAddon;
     scheduleFit();
     terminal.focus();
-    sandboxAddon.connect({ sandboxId: agentId });
+    sandboxAddon.connect({ sandboxId: agentIdRef.current });
 
     const resizeObserver =
       globalThis.ResizeObserver === undefined
@@ -145,7 +200,7 @@ function useOwnerDebugTerminalController(agentId: string): OwnerDebugTerminalCon
       removeReconnectClearGuard();
       terminal.dispose();
     };
-  }, [agentId]);
+  }, [connectionStore]);
 
   const reconnect = useCallback(() => {
     const sandboxAddon = sandboxAddonRef.current;
@@ -153,12 +208,14 @@ function useOwnerDebugTerminalController(agentId: string): OwnerDebugTerminalCon
       return;
     }
 
-    setConnectionError(null);
+    connectionStore.setSnapshot({
+      connectionError: null,
+      connectionState: "connecting",
+    });
     preserveReconnectBufferRef.current = hasConnectedOnceRef.current;
     sandboxAddon.disconnect();
-    setConnectionState("connecting");
-    sandboxAddon.connect({ sandboxId: agentId });
-  }, [agentId]);
+    sandboxAddon.connect({ sandboxId: agentIdRef.current });
+  }, [connectionStore]);
 
   return {
     connectionError,

@@ -1,6 +1,6 @@
 import { ArrowRight, Rocket } from "lucide-react";
-import type { ReactElement, ReactNode } from "react";
-import { useEffect } from "react";
+import type { ReactElement } from "react";
+import { createPortal } from "react-dom";
 
 import { useAppSession } from "@/app/session-provider";
 import { Button } from "@/shared/ui/button";
@@ -17,15 +17,15 @@ export type LifecycleMode = Extract<AgentMode, "dev" | "preview"> | "publish";
 
 export interface LifecycleShellProps {
   agent: Agent;
+  headerActionTarget: HTMLDivElement | null;
   mode: LifecycleMode;
-  onHeaderCtaChange: (cta: ReactNode) => void;
   onSwitchMode: (mode: AgentMode | "logs") => void;
   organizationId: string | null;
 }
 
 interface ConfigureStageProps {
   agent: Agent;
-  onHeaderCtaChange: (cta: ReactNode) => void;
+  headerActionTarget: HTMLDivElement | null;
   onSwitchMode: (mode: AgentMode | "logs") => void;
 }
 
@@ -45,10 +45,10 @@ function editedFieldsText(fieldsEdited: number): string | null {
 // Live agents bypass this shell until Stage 3 becomes their home surface.
 export function LifecycleShell({
   agent,
+  headerActionTarget,
   mode,
   onSwitchMode,
   organizationId,
-  onHeaderCtaChange,
 }: LifecycleShellProps): ReactElement {
   return (
     <div className="bg-bg-1 flex h-full min-h-0 flex-col">
@@ -57,7 +57,7 @@ export function LifecycleShell({
           <ConfigureStage
             agent={agent}
             onSwitchMode={onSwitchMode}
-            onHeaderCtaChange={onHeaderCtaChange}
+            headerActionTarget={headerActionTarget}
           />
         )}
         {mode === "preview" && (
@@ -65,7 +65,7 @@ export function LifecycleShell({
             agent={agent}
             onSwitchMode={onSwitchMode}
             organizationId={organizationId}
-            onHeaderCtaChange={onHeaderCtaChange}
+            headerActionTarget={headerActionTarget}
           />
         )}
         {mode === "publish" && <DistributionPanel agent={agent} />}
@@ -77,7 +77,7 @@ export function LifecycleShell({
 function ConfigureStage({
   agent,
   onSwitchMode,
-  onHeaderCtaChange,
+  headerActionTarget,
 }: ConfigureStageProps): ReactElement {
   const { activeOrganization } = useAppSession();
   const organizationId = activeOrganization?.id ?? null;
@@ -90,28 +90,24 @@ function ConfigureStage({
   const saveDisabled = !model.dirty || model.saving || model.changePlan.action === "fork-agent";
   const testDisabled = !readinessReady || model.dirty || model.saving;
 
-  useEffect(() => {
-    onHeaderCtaChange(
-      <Button
-        disabled={testDisabled}
-        onClick={() => {
-          onSwitchMode("preview");
-        }}
-        size="sm"
-      >
-        <Rocket />
-        Test in Chat
-        <ArrowRight />
-      </Button>,
-    );
-
-    return () => {
-      onHeaderCtaChange(null);
-    };
-  }, [onHeaderCtaChange, testDisabled, onSwitchMode]);
-
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {headerActionTarget !== null
+        ? createPortal(
+            <Button
+              disabled={testDisabled}
+              onClick={() => {
+                onSwitchMode("preview");
+              }}
+              size="sm"
+            >
+              <Rocket />
+              Test in Chat
+              <ArrowRight />
+            </Button>,
+            headerActionTarget,
+          )
+        : null}
       {model.dirty ? (
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-5 py-2.5">
           <div className="min-w-0 text-[12px] leading-relaxed text-amber-950">

@@ -1,9 +1,9 @@
 import type { OrganizationMember } from "@mosoo/contracts/organization";
 import type { Collaborator, SpaceRole } from "@mosoo/contracts/space";
 import { Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useReducer } from "react";
 
-import { ShareMemberSearch } from "@/features/resource-sharing/access-primitives";
+import { ShareMemberSearch } from "@/features/resource-sharing/share-member-search";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -38,6 +38,90 @@ interface Props {
   organizationId: string;
 }
 
+interface SpaceSettingsDialogState {
+  accessList: Collaborator[];
+  addingEveryone: boolean;
+  error: string | null;
+  loading: boolean;
+  members: OrganizationMember[];
+  pendingPrincipal: string | null;
+  search: string;
+  showDropdown: boolean;
+}
+
+type SpaceSettingsDialogAction =
+  | { type: "addCollaborator"; collaborator: Collaborator }
+  | { type: "loadFailed"; error: string }
+  | { type: "loadStarted" }
+  | { type: "loadSucceeded"; accessList: Collaborator[]; members: OrganizationMember[] }
+  | { type: "removeCollaborator"; principal: string }
+  | { type: "setAddingEveryone"; adding: boolean }
+  | { type: "setError"; error: string | null }
+  | { type: "setPendingPrincipal"; principal: string | null }
+  | { type: "setSearch"; search: string }
+  | { type: "setShowDropdown"; show: boolean }
+  | { type: "updateCollaboratorRole"; principal: string; role: SpaceRole };
+
+const SPACE_SETTINGS_DIALOG_INITIAL_STATE: SpaceSettingsDialogState = {
+  accessList: [],
+  addingEveryone: false,
+  error: null,
+  loading: true,
+  members: [],
+  pendingPrincipal: null,
+  search: "",
+  showDropdown: false,
+};
+
+function spaceSettingsDialogReducer(
+  state: SpaceSettingsDialogState,
+  action: SpaceSettingsDialogAction,
+): SpaceSettingsDialogState {
+  switch (action.type) {
+    case "addCollaborator":
+      return {
+        ...state,
+        accessList: [
+          ...state.accessList.filter((entry) => entry.principal !== action.collaborator.principal),
+          action.collaborator,
+        ],
+      };
+    case "loadFailed":
+      return { ...state, error: action.error, loading: false };
+    case "loadStarted":
+      return { ...state, loading: true };
+    case "loadSucceeded":
+      return {
+        ...state,
+        accessList: action.accessList,
+        loading: false,
+        members: action.members,
+      };
+    case "removeCollaborator":
+      return {
+        ...state,
+        accessList: state.accessList.filter((entry) => entry.principal !== action.principal),
+      };
+    case "setAddingEveryone":
+      return { ...state, addingEveryone: action.adding };
+    case "setError":
+      return { ...state, error: action.error };
+    case "setPendingPrincipal":
+      return { ...state, pendingPrincipal: action.principal };
+    case "setSearch":
+      return { ...state, search: action.search };
+    case "setShowDropdown":
+      return { ...state, showDropdown: action.show };
+    case "updateCollaboratorRole":
+      return {
+        ...state,
+        accessList: state.accessList.map((entry) =>
+          entry.principal === action.principal ? { ...entry, role: action.role } : entry,
+        ),
+      };
+  }
+}
+
 export function SpaceSettingsDialog({
   currentUserId,
   isAdmin,
@@ -49,32 +133,39 @@ export function SpaceSettingsDialog({
   spaceOwnerId,
   organizationId,
 }: Props) {
-  const [accessList, setAccessList] = useState<Collaborator[]>([]);
-  const [members, setMembers] = useState<OrganizationMember[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pendingPrincipal, setPendingPrincipal] = useState<string | null>(null);
-  const [addingEveryone, setAddingEveryone] = useState(false);
+  const [state, dispatch] = useReducer(
+    spaceSettingsDialogReducer,
+    SPACE_SETTINGS_DIALOG_INITIAL_STATE,
+  );
+  const {
+    accessList,
+    addingEveryone,
+    error,
+    loading,
+    members,
+    pendingPrincipal,
+    search,
+    showDropdown,
+  } = state;
   const typedCurrentUserId = toAccountId(currentUserId);
   const typedSpaceId = toSpaceId(spaceId);
   const typedOrganizationId = toOrganizationId(organizationId);
 
   const loadData = useCallback(async () => {
-    setLoading(true);
+    dispatch({ type: "loadStarted" });
 
     try {
       const [collaboratorsData, membersData] = await Promise.all([
         getCollaborators(typedSpaceId),
         organizationMembers(typedOrganizationId),
       ]);
-      setAccessList(collaboratorsData);
-      setMembers(membersData);
+      dispatch({
+        accessList: collaboratorsData,
+        members: membersData,
+        type: "loadSucceeded",
+      });
     } catch {
-      setError("Failed to load data");
-    } finally {
-      setLoading(false);
+      dispatch({ error: "Failed to load data", type: "loadFailed" });
     }
   }, [typedOrganizationId, typedSpaceId]);
 
@@ -94,24 +185,26 @@ export function SpaceSettingsDialog({
       return;
     }
 
-    setError(null);
+    dispatch({ error: null, type: "setError" });
 
     const member = members.find((entry) => entry.accountId === userId);
 
     if (!isTruthy(member?.email)) {
-      setError(getShareDialogErrorMessage(new Error("member email not found")));
+      dispatch({
+        error: getShareDialogErrorMessage(new Error("member email not found")),
+        type: "setError",
+      });
       return;
     }
 
-    setPendingPrincipal(userId);
-    setSearch("");
-    setShowDropdown(false);
+    dispatch({ principal: userId, type: "setPendingPrincipal" });
+    dispatch({ search: "", type: "setSearch" });
+    dispatch({ show: false, type: "setShowDropdown" });
 
     try {
       await addCollaborator(typedSpaceId, { email: member.email, role });
-      setAccessList((prev) => [
-        ...prev.filter((entry) => entry.principal !== userId),
-        {
+      dispatch({
+        collaborator: {
           assignedBy: typedCurrentUserId,
           createdAt: new Date().toISOString(),
           email: member.email,
@@ -120,11 +213,12 @@ export function SpaceSettingsDialog({
           principal: userId,
           role,
         },
-      ]);
+        type: "addCollaborator",
+      });
     } catch (caughtError: unknown) {
-      setError(getShareDialogErrorMessage(caughtError));
+      dispatch({ error: getShareDialogErrorMessage(caughtError), type: "setError" });
     } finally {
-      setPendingPrincipal(null);
+      dispatch({ principal: null, type: "setPendingPrincipal" });
     }
   }
 
@@ -136,14 +230,13 @@ export function SpaceSettingsDialog({
       return;
     }
 
-    setError(null);
-    setAddingEveryone(true);
+    dispatch({ error: null, type: "setError" });
+    dispatch({ adding: true, type: "setAddingEveryone" });
 
     try {
       await addOrganizationCollaborator(typedSpaceId);
-      setAccessList((prev) => [
-        ...prev.filter((entry) => entry.principal !== "*"),
-        {
+      dispatch({
+        collaborator: {
           assignedBy: typedCurrentUserId,
           createdAt: new Date().toISOString(),
           email: null,
@@ -152,16 +245,17 @@ export function SpaceSettingsDialog({
           principal: "*",
           role: "read",
         },
-      ]);
+        type: "addCollaborator",
+      });
     } catch (caughtError: unknown) {
-      setError(getShareDialogErrorMessage(caughtError));
+      dispatch({ error: getShareDialogErrorMessage(caughtError), type: "setError" });
     } finally {
-      setAddingEveryone(false);
+      dispatch({ adding: false, type: "setAddingEveryone" });
     }
   }
 
   async function handleChangeRole(principal: string, role: SpaceRole) {
-    setError(null);
+    dispatch({ error: null, type: "setError" });
 
     try {
       if (principal === "*") {
@@ -169,22 +263,20 @@ export function SpaceSettingsDialog({
       }
 
       await updateCollaborator(typedSpaceId, toAccountId(principal), { role });
-      setAccessList((prev) =>
-        prev.map((entry) => (entry.principal === principal ? { ...entry, role } : entry)),
-      );
+      dispatch({ principal, role, type: "updateCollaboratorRole" });
     } catch (caughtError: unknown) {
-      setError(getShareDialogErrorMessage(caughtError));
+      dispatch({ error: getShareDialogErrorMessage(caughtError), type: "setError" });
     }
   }
 
   async function handleRemove(principal: string) {
-    setError(null);
+    dispatch({ error: null, type: "setError" });
 
     try {
       await removeCollaborator(typedSpaceId, principal);
-      setAccessList((prev) => prev.filter((entry) => entry.principal !== principal));
+      dispatch({ principal, type: "removeCollaborator" });
     } catch (caughtError: unknown) {
-      setError(getShareDialogErrorMessage(caughtError));
+      dispatch({ error: getShareDialogErrorMessage(caughtError), type: "setError" });
     }
   }
 
@@ -210,8 +302,12 @@ export function SpaceSettingsDialog({
               onAddMember={async (member) => {
                 await handleAddMember(member.accountId);
               }}
-              onSearchChange={setSearch}
-              onShowDropdownChange={setShowDropdown}
+              onSearchChange={(nextSearch) => {
+                dispatch({ search: nextSearch, type: "setSearch" });
+              }}
+              onShowDropdownChange={(show) => {
+                dispatch({ show, type: "setShowDropdown" });
+              }}
               pendingPrincipal={pendingPrincipal}
               search={search}
               showDropdown={showDropdown}

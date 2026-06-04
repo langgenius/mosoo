@@ -1,4 +1,4 @@
-import { motion, useReducedMotion, useTransform } from "motion/react";
+import { m, useReducedMotion, useTransform } from "motion/react";
 import type { MotionValue } from "motion/react";
 import type { CSSProperties, ReactElement } from "react";
 
@@ -13,7 +13,7 @@ import {
   MOSOO_X_URL,
 } from "../links";
 import { XMark } from "../x-mark";
-import { DISPLAY_FONT } from "./ui";
+import { DISPLAY_FONT } from "./typography";
 
 type FooterLink = { label: string; href: string };
 
@@ -109,15 +109,15 @@ export function LandingFooter({
   const bodyStyle = reduceMotion ? {} : { opacity: bodyOpacity };
 
   return (
-    <footer className="text-paper-100 bg-black px-4 pt-16 pb-10 md:px-6 md:pt-20">
+    <footer className="text-paper-100 bg-[#050805] px-4 pt-16 pb-10 md:px-6 md:pt-20">
       <div className="mx-auto w-full max-w-[1280px]">
-        <motion.div className="max-w-[760px]" style={taglineStyle}>
+        <m.div className="max-w-[760px]" style={taglineStyle}>
           <p className="[text-wrap:balance]" style={TAGLINE_STYLE}>
             Take root, and grow a bamboo sea.
           </p>
-        </motion.div>
+        </m.div>
 
-        <motion.div className="border-paper-100/10 mt-12 border-t pt-12" style={bodyStyle}>
+        <m.div className="border-paper-100/10 mt-12 border-t pt-12" style={bodyStyle}>
           <div className="grid grid-cols-1 gap-10 sm:grid-cols-3 sm:gap-8">
             <div>
               <img src="/brand/logo-wordmark-ondark.svg" alt="Mosoo" className="block h-[22px]" />
@@ -145,7 +145,7 @@ export function LandingFooter({
               Self-hostable · BYOK
             </p>
           </div>
-        </motion.div>
+        </m.div>
       </div>
     </footer>
   );

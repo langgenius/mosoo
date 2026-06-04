@@ -5,7 +5,7 @@ import { UnicornScene } from "unicornstudio-react";
 // Shared Unicorn Studio WebGL background. A single SDK version is used across the
 // whole landing so the global runtime loads once and every scene renders on the
 // same build (the loader injects the SDK only on first mount).
-export const UNICORN_SDK_URL =
+const UNICORN_SDK_URL =
   "https://cdn.jsdelivr.net/gh/hiunicornstudio/unicornstudio.js@v2.2.0/dist/unicornStudio.umd.js";
 
 /**

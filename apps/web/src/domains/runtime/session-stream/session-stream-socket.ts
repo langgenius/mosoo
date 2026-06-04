@@ -35,6 +35,12 @@ interface SocketController {
   socket: WebSocket;
 }
 
+interface SessionStreamSnapshot {
+  readonly hydrated: boolean;
+  readonly liveState: SessionLiveState | null;
+  readonly sessionId: string | null;
+}
+
 function buildSessionSocketUrl(sessionId: string): string {
   const url = new URL(`/api/ag-ui/session/${sessionId}/ws`, globalThis.location.origin);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
@@ -49,18 +55,37 @@ function createEmptyLiveState(sessionId: string): SessionLiveState {
   });
 }
 
+function createSessionStreamSnapshot(sessionId: string | null): SessionStreamSnapshot {
+  return {
+    hydrated: false,
+    liveState: isTruthy(sessionId) ? createEmptyLiveState(sessionId) : null,
+    sessionId,
+  };
+}
+
 export function useSessionStreamSocket(sessionId: string | null): {
   activeSessionIdRef: MutableRefObject<string | null>;
   hydrated: boolean;
   liveState: SessionLiveState | null;
   sendViewerEvent: SessionStreamEventSender;
 } {
-  const [hydrated, setHydrated] = useState(false);
-  const [liveState, setLiveState] = useState<SessionLiveState | null>(null);
+  const [snapshot, setSnapshot] = useState<SessionStreamSnapshot>(() =>
+    createSessionStreamSnapshot(sessionId),
+  );
   const activeSessionIdRef = useRef<string | null>(sessionId);
-  const liveStateRef = useRef<SessionLiveState | null>(null);
+  const liveStateRef = useRef<SessionLiveState | null>(snapshot.liveState);
   const renderSchedulerRef = useRef<SessionStreamRenderScheduler | null>(null);
   const socketRef = useRef<SocketController | null>(null);
+
+  activeSessionIdRef.current = sessionId;
+
+  let scopedSnapshot = snapshot;
+
+  if (snapshot.sessionId !== sessionId) {
+    scopedSnapshot = createSessionStreamSnapshot(sessionId);
+    liveStateRef.current = scopedSnapshot.liveState;
+    setSnapshot(scopedSnapshot);
+  }
 
   const applyScheduledEvents = useCallback(
     (targetSessionId: string, queuedEvents: AgUiSessionEvent[]): boolean => {
@@ -68,13 +93,18 @@ export function useSessionStreamSocket(sessionId: string | null): {
         return false;
       }
 
-      setHydrated(true);
-      setLiveState((currentState) => {
+      setSnapshot((currentSnapshot) => {
         const baseState =
-          currentState ?? liveStateRef.current ?? createEmptyLiveState(targetSessionId);
+          currentSnapshot.liveState ??
+          liveStateRef.current ??
+          createEmptyLiveState(targetSessionId);
         const nextState = applyAgUiEventsToSessionLiveState(baseState, queuedEvents);
         liveStateRef.current = nextState;
-        return nextState;
+        return {
+          hydrated: true,
+          liveState: nextState,
+          sessionId: targetSessionId,
+        };
       });
       return true;
     },
@@ -92,14 +122,6 @@ export function useSessionStreamSocket(sessionId: string | null): {
     },
     [applyScheduledEvents],
   );
-
-  const resetState = useCallback((nextSessionId: string | null) => {
-    renderSchedulerRef.current?.clear();
-    setHydrated(false);
-    const nextState = isTruthy(nextSessionId) ? createEmptyLiveState(nextSessionId) : null;
-    liveStateRef.current = nextState;
-    setLiveState(nextState);
-  }, []);
 
   const closeSocket = useCallback((reason: string) => {
     const { current } = socketRef;
@@ -236,9 +258,8 @@ export function useSessionStreamSocket(sessionId: string | null): {
   const sendViewerEvent = useCallback<SessionStreamEventSender>(
     async (targetSessionId, event, options) => {
       const maxAttempts = options?.maxAttempts ?? 1;
-      let lastError: Error | null = null;
 
-      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      async function sendAttempt(attempt: number): Promise<void> {
         try {
           const socket = await connectToSession(targetSessionId);
 
@@ -249,7 +270,8 @@ export function useSessionStreamSocket(sessionId: string | null): {
           socket.send(JSON.stringify(event));
           return;
         } catch (error) {
-          lastError = error instanceof Error ? error : new Error("Session websocket send failed.");
+          const lastError =
+            error instanceof Error ? error : new Error("Session websocket send failed.");
 
           const { current } = socketRef;
 
@@ -260,41 +282,41 @@ export function useSessionStreamSocket(sessionId: string | null): {
           if (attempt === maxAttempts - 1 && activeSessionIdRef.current === targetSessionId) {
             void connectToSession(targetSessionId).catch(ignorePromiseRejection);
           }
+
+          if (attempt >= maxAttempts - 1) {
+            throw lastError;
+          }
+
+          await sendAttempt(attempt + 1);
         }
       }
 
-      throw lastError ?? new Error("Session websocket send failed.");
+      await sendAttempt(0);
     },
     [closeSocket, connectToSession],
   );
 
   useEffect(() => {
-    activeSessionIdRef.current = sessionId;
-
     if (!isTruthy(sessionId)) {
       closeSocket("session.cleared");
-      resetState(null);
       return;
     }
 
-    resetState(sessionId);
     void connectToSession(sessionId).catch(ignorePromiseRejection);
 
     return () => {
-      if (activeSessionIdRef.current === sessionId) {
-        closeSocket("session.effect.cleanup");
-      }
+      closeSocket("session.effect.cleanup");
     };
-  }, [closeSocket, connectToSession, resetState, sessionId]);
+  }, [closeSocket, connectToSession, sessionId]);
 
   useEffect(() => {
-    liveStateRef.current = liveState;
-  }, [liveState]);
+    liveStateRef.current = scopedSnapshot.liveState;
+  }, [scopedSnapshot.liveState]);
 
   return {
     activeSessionIdRef,
-    hydrated,
-    liveState,
+    hydrated: scopedSnapshot.hydrated,
+    liveState: scopedSnapshot.liveState,
     sendViewerEvent,
   };
 }

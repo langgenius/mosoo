@@ -41,6 +41,16 @@ import { useRequestAccessLink } from "./use-request-access-link";
 
 export type { BulkInviteResult } from "./use-bulk-invite-model";
 
+interface JoinPolicyOverride {
+  organizationId: string;
+  value: OrganizationJoinPolicy;
+}
+
+interface PrimaryDomainDraft {
+  organizationId: string;
+  value: string;
+}
+
 function memberError(error: unknown): string {
   return error instanceof Error ? error.message : "Unexpected error";
 }
@@ -59,7 +69,7 @@ export function useMembersAccessModel({
   const [invitations, setInvitations] = useState<OrganizationInvitation[]>([]);
   const [accessRequests, setAccessRequests] = useState<OrganizationAccessRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [joinPolicy, setJoinPolicy] = useState<OrganizationJoinPolicy>(organization.joinPolicy);
+  const [joinPolicyOverride, setJoinPolicyOverride] = useState<JoinPolicyOverride | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviting, setInviting] = useState(false);
   const [cancellingInvitationId, setCancellingInvitationId] = useState<string | null>(null);
@@ -68,11 +78,25 @@ export function useMembersAccessModel({
   const [inviteNotice, setInviteNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [accessSettingsOpen, setAccessSettingsOpen] = useState(false);
-  const [primaryDomain, setPrimaryDomain] = useState(organization.primaryDomain ?? "");
+  const [primaryDomainDraft, setPrimaryDomainDraft] = useState<PrimaryDomainDraft | null>(null);
   const [savingPrimaryDomain, setSavingPrimaryDomain] = useState(false);
   const [attentionOpen, setAttentionOpen] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const typedOrganizationId = toOrganizationId(organization.id);
+  const joinPolicy =
+    joinPolicyOverride?.organizationId === organization.id
+      ? joinPolicyOverride.value
+      : organization.joinPolicy;
+  const primaryDomain =
+    primaryDomainDraft?.organizationId === organization.id
+      ? primaryDomainDraft.value
+      : (organization.primaryDomain ?? "");
+  const setPrimaryDomain = useCallback(
+    (value: string) => {
+      setPrimaryDomainDraft({ organizationId: organization.id, value });
+    },
+    [organization.id],
+  );
 
   const currentMember = members.find((member) => member.accountId === currentUserId);
   const viewerRole = currentMember?.role ?? organization.viewerRole;
@@ -142,11 +166,6 @@ export function useMembersAccessModel({
     organizationId: organization.id,
     setError,
   });
-
-  useEffect(() => {
-    setJoinPolicy(organization.joinPolicy);
-    setPrimaryDomain(organization.primaryDomain ?? "");
-  }, [organization.joinPolicy, organization.primaryDomain]);
 
   useEffect(() => {
     void loadAccessSurface();
@@ -275,7 +294,7 @@ export function useMembersAccessModel({
 
     try {
       await updateJoinPolicy(typedOrganizationId, policy);
-      setJoinPolicy(policy);
+      setJoinPolicyOverride({ organizationId: organization.id, value: policy });
     } catch (nextError: unknown) {
       setError(memberError(nextError));
     }

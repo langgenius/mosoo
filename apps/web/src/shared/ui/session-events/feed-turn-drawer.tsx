@@ -75,6 +75,28 @@ function SessionTimelineBar({
   );
 }
 
+function SessionTimeline({
+  events,
+  onSelect,
+  selectedId,
+}: {
+  events: readonly SessionProcessEvent[];
+  onSelect: (eventId: string) => void;
+  selectedId: string | null;
+}): ReactElement {
+  const totalDurationMs = events.reduce((total, event) => total + (event.durationMs ?? 0), 0);
+
+  return (
+    <>
+      <div className="text-fg-3 flex items-center justify-between text-[10.5px] tabular-nums">
+        <span>0:00</span>
+        <span>{formatTotalDuration(totalDurationMs)}</span>
+      </div>
+      <SessionTimelineBar events={events} onSelect={onSelect} selectedId={selectedId} />
+    </>
+  );
+}
+
 function SessionEventLegend({ events }: { events: readonly SessionProcessEvent[] }): ReactElement {
   const counts = countSessionTurnDomains(events);
 
@@ -246,6 +268,7 @@ export function SessionTurnDrawer({
 
         <SessionEventDrawerCore
           key={`${open}:${turn?.id ?? "none"}`}
+          EventComponent={DrawerEventRow}
           emptyState={
             <div className="px-7 py-12 text-center">
               <div className="text-fg-1 text-sm font-semibold">No events recorded</div>
@@ -254,21 +277,8 @@ export function SessionTurnDrawer({
           }
           events={visibleEvents}
           focusEventId={focusEventId}
-          renderEvent={(input) => <DrawerEventRow {...input} />}
-          renderLegend={() => <SessionEventLegend events={visibleEvents} />}
-          renderTimeline={({ onSelect, selectedId }) => (
-            <>
-              <div className="text-fg-3 flex items-center justify-between text-[10.5px] tabular-nums">
-                <span>0:00</span>
-                <span>{formatTotalDuration(totalDurationMs)}</span>
-              </div>
-              <SessionTimelineBar
-                events={visibleEvents}
-                onSelect={onSelect}
-                selectedId={selectedId}
-              />
-            </>
-          )}
+          LegendComponent={SessionEventLegend}
+          TimelineComponent={SessionTimeline}
         />
       </DialogContent>
     </Dialog>

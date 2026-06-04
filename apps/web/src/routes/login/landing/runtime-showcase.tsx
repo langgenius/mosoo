@@ -1,13 +1,14 @@
 import { Check, Clock } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, m, useReducedMotion } from "motion/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
 import { RuntimeIcon } from "@/shared/ui/brand-icons";
 
-import { EASE_OUT, Reveal } from "./motion";
-import { sectionHeadingStyle } from "./ui";
+import { Reveal } from "./motion";
+import { EASE_OUT } from "./motion-variants";
+import { sectionHeadingStyle } from "./typography";
 
 type Runtime = {
   runtimeId: string;
@@ -153,7 +154,7 @@ export function RuntimeShowcase(): ReactElement | null {
         <Reveal delay={0.08} className="md:pl-4">
           <div className="relative min-h-[284px]">
             <AnimatePresence mode="wait" initial={false}>
-              <motion.div
+              <m.div
                 key={current.runtimeId}
                 initial={reduceMotion ? false : { opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -161,7 +162,7 @@ export function RuntimeShowcase(): ReactElement | null {
                 transition={{ duration: 0.24, ease: EASE_OUT }}
               >
                 <RuntimeCard runtime={current} />
-              </motion.div>
+              </m.div>
             </AnimatePresence>
           </div>
         </Reveal>

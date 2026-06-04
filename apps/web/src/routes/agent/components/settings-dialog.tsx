@@ -44,30 +44,32 @@ export function SettingsSheet({
   const [showDropdown, setShowDropdown] = useState(false);
   const typedAgentId = toAgentId(agent.id);
 
-  const invalidateAgentCollaborators = async () =>
-    queryClient.invalidateQueries({ queryKey: agentKeys.editorState(agent.id) });
-  const invalidateAgentDetail = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: agentKeys.detail(agent.id) }),
-      queryClient.invalidateQueries({ queryKey: agentKeys.lists() }),
-    ]);
-  };
-
   const addCollaboratorMutation = useMutation({
     mutationFn: addAgentCollaborator,
-    onSuccess: invalidateAgentCollaborators,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: agentKeys.editorState(agent.id) });
+    },
   });
   const updateCollaboratorMutation = useMutation({
     mutationFn: updateAgentCollaborator,
-    onSuccess: invalidateAgentCollaborators,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: agentKeys.editorState(agent.id) });
+    },
   });
   const removeCollaboratorMutation = useMutation({
     mutationFn: removeAgentCollaborator,
-    onSuccess: invalidateAgentCollaborators,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: agentKeys.editorState(agent.id) });
+    },
   });
   const publishMutation = useMutation({
     mutationFn: publishAgent,
-    onSuccess: invalidateAgentDetail,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: agentKeys.detail(agent.id) }),
+        queryClient.invalidateQueries({ queryKey: agentKeys.lists() }),
+      ]);
+    },
   });
   const organizationMembersQuery = useOrganizationMembersQuery(
     canManageAccess ? organizationId : null,

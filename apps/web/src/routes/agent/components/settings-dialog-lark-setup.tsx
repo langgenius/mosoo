@@ -2,8 +2,8 @@ import type { AgentId } from "@mosoo/contracts/id";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import { useEffect, useReducer } from "react";
+import type { Dispatch, FormEvent } from "react";
 
 import {
   createLarkAgentChannelBinding,
@@ -53,7 +53,7 @@ function getLarkDomainLabel(domain: LarkDomain): string {
   return domain === "feishu" ? "Feishu" : "Lark";
 }
 
-export function getLarkEventConfigUrl(domain: LarkDomain, appId: string): string | null {
+function getLarkEventConfigUrl(domain: LarkDomain, appId: string): string | null {
   const trimmed = appId.trim();
   if (trimmed.length === 0) {
     return null;
@@ -61,7 +61,7 @@ export function getLarkEventConfigUrl(domain: LarkDomain, appId: string): string
   return `${LARK_OPEN_PLATFORM_ORIGIN[domain]}/app/${encodeURIComponent(trimmed)}/event-subscriptions/event-config`;
 }
 
-export function getLarkRegistrationStatusCopy(
+function getLarkRegistrationStatusCopy(
   status: LarkAgentChannelRegistrationFieldsFragment["status"] | null,
   connectionMode: LarkConnectionMode = "webhook",
 ): string {
@@ -146,6 +146,85 @@ function useLarkRegistrationPolling({
   }, [agentId, deviceCode, domain, poll, shouldPoll, status]);
 }
 
+interface LarkChannelInlineSetupState {
+  appId: string;
+  appSecret: string;
+  connectionMode: LarkConnectionMode;
+  domain: LarkDomain;
+  encryptKey: string;
+  registration: LarkAgentChannelRegistrationFieldsFragment | null;
+  verificationToken: string;
+}
+
+type LarkChannelInlineSetupAction =
+  | { type: "changeAppId"; appId: string }
+  | { type: "changeAppSecret"; appSecret: string }
+  | { type: "changeConnectionMode"; connectionMode: LarkConnectionMode }
+  | { type: "changeDomain"; domain: LarkDomain }
+  | { type: "changeEncryptKey"; encryptKey: string }
+  | { type: "changeVerificationToken"; verificationToken: string }
+  | { type: "registrationPolled"; registration: LarkAgentChannelRegistrationFieldsFragment }
+  | { type: "registrationStarted"; registration: LarkAgentChannelRegistrationFieldsFragment };
+
+type LarkChannelInlineSetupDispatch = Dispatch<LarkChannelInlineSetupAction>;
+
+const LARK_CHANNEL_INLINE_SETUP_INITIAL_STATE: LarkChannelInlineSetupState = {
+  appId: "",
+  appSecret: "",
+  connectionMode: "webhook",
+  domain: "feishu",
+  encryptKey: "",
+  registration: null,
+  verificationToken: "",
+};
+
+function larkChannelInlineSetupReducer(
+  state: LarkChannelInlineSetupState,
+  action: LarkChannelInlineSetupAction,
+): LarkChannelInlineSetupState {
+  switch (action.type) {
+    case "changeAppId":
+      return { ...state, appId: action.appId };
+    case "changeAppSecret":
+      return { ...state, appSecret: action.appSecret };
+    case "changeConnectionMode":
+      return { ...state, connectionMode: action.connectionMode };
+    case "changeDomain":
+      return { ...state, domain: action.domain };
+    case "changeEncryptKey":
+      return { ...state, encryptKey: action.encryptKey };
+    case "changeVerificationToken":
+      return { ...state, verificationToken: action.verificationToken };
+    case "registrationPolled": {
+      const nextState = {
+        ...state,
+        domain: action.registration.domain,
+        registration: mergeRegistration(state.registration, action.registration),
+      };
+
+      if (
+        action.registration.status === "confirmed" &&
+        action.registration.appId &&
+        action.registration.appSecret
+      ) {
+        return {
+          ...nextState,
+          appId: action.registration.appId,
+          appSecret: action.registration.appSecret,
+        };
+      }
+
+      return nextState;
+    }
+    case "registrationStarted":
+      return {
+        ...state,
+        domain: action.registration.domain,
+        registration: action.registration,
+      };
+  }
+}
+
 export function LarkChannelInlineSetup({
   agent,
   onSuccess,
@@ -154,34 +233,25 @@ export function LarkChannelInlineSetup({
   onSuccess?: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [appId, setAppId] = useState("");
-  const [appSecret, setAppSecret] = useState("");
-  const [connectionMode, setConnectionMode] = useState<LarkConnectionMode>("webhook");
-  const [domain, setDomain] = useState<LarkDomain>("feishu");
-  const [encryptKey, setEncryptKey] = useState("");
-  const [registration, setRegistration] =
-    useState<LarkAgentChannelRegistrationFieldsFragment | null>(null);
-  const [verificationToken, setVerificationToken] = useState("");
+  const [state, dispatch] = useReducer(
+    larkChannelInlineSetupReducer,
+    LARK_CHANNEL_INLINE_SETUP_INITIAL_STATE,
+  );
+  const { appId, appSecret, connectionMode, domain, encryptKey, registration, verificationToken } =
+    state;
   const typedAgentId = toAgentId(agent.id);
 
   const registrationStartMutation = useMutation({
     mutationFn: startLarkAgentChannelRegistration,
     onSuccess: async (result) => {
-      setRegistration(result);
-      setDomain(result.domain);
+      dispatch({ registration: result, type: "registrationStarted" });
       await queryClient.invalidateQueries({ queryKey: agentKeys.channelBindings(agent.id) });
     },
   });
   const registrationPollMutation = useMutation({
     mutationFn: pollLarkAgentChannelRegistration,
     onSuccess: async (result) => {
-      setRegistration((current) => mergeRegistration(current, result));
-      setDomain(result.domain);
-
-      if (result.status === "confirmed" && result.appId && result.appSecret) {
-        setAppId(result.appId);
-        setAppSecret(result.appSecret);
-      }
+      dispatch({ registration: result, type: "registrationPolled" });
       await queryClient.invalidateQueries({ queryKey: agentKeys.channelBindings(agent.id) });
     },
   });
@@ -268,226 +338,323 @@ export function LarkChannelInlineSetup({
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
-      <section className="border-border bg-card rounded-lg border p-4">
-        <div className="grid gap-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-foreground text-sm font-semibold">Scan-to-create</div>
-              <div className="text-muted-foreground mt-1 text-xs leading-relaxed">
-                Scan creates a Lark / Feishu app and pre-fills App ID and App Secret.{" "}
-                {connectionMode === "websocket"
-                  ? "WebSocket mode is set up the moment Save is clicked."
-                  : "Webhook fields still come from the Lark Open Platform event-subscription page."}
-              </div>
-            </div>
-            <Button
-              disabled={agent.status !== "published" || registrationStartMutation.isPending}
-              onClick={handleStartRegistration}
-              type="button"
-            >
-              {registrationStartMutation.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : null}
-              Start
-            </Button>
-          </div>
+      <LarkRegistrationSection
+        agentStatus={agent.status}
+        connectionMode={connectionMode}
+        onPoll={handlePollRegistration}
+        onStart={handleStartRegistration}
+        pollPending={registrationPollMutation.isPending}
+        registration={registration}
+        registrationDeviceCode={registrationDeviceCode}
+        registrationError={registrationError}
+        registrationStatus={registrationStatus}
+        startPending={registrationStartMutation.isPending}
+      />
 
-          <div className="border-border-subtle bg-muted/20 rounded-md border px-3 py-2 text-xs leading-relaxed">
-            {getLarkRegistrationStatusCopy(registrationStatus, connectionMode)}
-          </div>
+      <LarkConfigurationSection
+        agentStatus={agent.status}
+        canSubmit={canSubmit}
+        dispatch={dispatch}
+        domainLabel={domainLabel}
+        eventConfigUrl={eventConfigUrl}
+        saveError={saveMutation.error}
+        savePending={saveMutation.isPending}
+        state={state}
+      />
+    </form>
+  );
+}
 
-          {registration?.qrUrl ? (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-              <div className="border-border-subtle bg-background flex size-52 shrink-0 items-center justify-center rounded-md border p-3">
-                <QRCodeSVG
-                  className="max-h-full max-w-full"
-                  level="M"
-                  size={176}
-                  value={registration.qrUrl}
-                />
-              </div>
-              <div className="flex flex-1 flex-wrap items-center gap-2">
-                <Button asChild variant="outline">
-                  <a href={registration.qrUrl} rel="noreferrer" target="_blank">
-                    <ExternalLink className="size-4" />
-                    Open authorization
-                  </a>
-                </Button>
-                <Button
-                  disabled={
-                    !registrationDeviceCode ||
-                    registrationPollMutation.isPending ||
-                    registrationStatus === "confirmed"
-                  }
-                  onClick={handlePollRegistration}
-                  type="button"
-                  variant="outline"
-                >
-                  {registrationPollMutation.isPending ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="size-4" />
-                  )}
-                  Check
-                </Button>
-                {registration.userCode ? (
-                  <code className="bg-muted text-muted-foreground rounded-md border px-2 py-1 text-[11px]">
-                    {registration.userCode}
-                  </code>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
-          {registrationError ? (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
-              {registrationError.message}
-            </div>
-          ) : null}
-        </div>
-      </section>
-
-      <section className="border-border bg-card rounded-lg border p-4">
-        <div className="grid gap-4">
-          <div className="text-foreground text-sm font-semibold">Configuration</div>
-
-          <div className="grid gap-1.5">
-            <Label>Connection mode</Label>
-            <div className="bg-muted/30 grid rounded-md border p-1">
-              {LARK_CONNECTION_MODE_OPTIONS.map((option) => (
-                <button
-                  className={cn(
-                    "rounded-sm px-3 py-1.5 text-sm font-medium transition-colors",
-                    connectionMode === option.value
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                  key={option.value}
-                  onClick={() => {
-                    setConnectionMode(option.value);
-                  }}
-                  type="button"
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <div className="text-muted-foreground text-xs leading-relaxed">
-              {LARK_CONNECTION_MODE_OPTIONS.find((option) => option.value === connectionMode)
-                ?.description ?? ""}
-              {" Values entered for one mode aren't applied to the other on save."}
+function LarkRegistrationSection({
+  agentStatus,
+  connectionMode,
+  onPoll,
+  onStart,
+  pollPending,
+  registration,
+  registrationDeviceCode,
+  registrationError,
+  registrationStatus,
+  startPending,
+}: {
+  agentStatus: ChannelInlineSetupAgent["status"];
+  connectionMode: LarkConnectionMode;
+  onPoll: () => void;
+  onStart: () => void;
+  pollPending: boolean;
+  registration: LarkAgentChannelRegistrationFieldsFragment | null;
+  registrationDeviceCode: string | null;
+  registrationError: Error | null;
+  registrationStatus: LarkAgentChannelRegistrationFieldsFragment["status"] | null;
+  startPending: boolean;
+}) {
+  return (
+    <section className="border-border bg-card rounded-lg border p-4">
+      <div className="grid gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-foreground text-sm font-semibold">Scan-to-create</div>
+            <div className="text-muted-foreground mt-1 text-xs leading-relaxed">
+              Scan creates a Lark / Feishu app and pre-fills App ID and App Secret.{" "}
+              {connectionMode === "websocket"
+                ? "WebSocket mode is set up the moment Save is clicked."
+                : "Webhook fields still come from the Lark Open Platform event-subscription page."}
             </div>
           </div>
-
-          <div className="grid gap-1.5">
-            <Label>Open Platform</Label>
-            <div className="bg-muted/30 grid grid-cols-2 rounded-md border p-1">
-              {LARK_DOMAIN_OPTIONS.map((option) => (
-                <button
-                  className={cn(
-                    "rounded-sm px-3 py-1.5 text-sm font-medium transition-colors",
-                    domain === option.value
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                  key={option.value}
-                  onClick={() => {
-                    setDomain(option.value);
-                  }}
-                  type="button"
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="lark-app-id">App ID</Label>
-            <Input
-              autoComplete="off"
-              id="lark-app-id"
-              onChange={(event) => {
-                setAppId(event.target.value);
-              }}
-              value={appId}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="lark-app-secret">App Secret</Label>
-            <Input
-              autoComplete="off"
-              id="lark-app-secret"
-              onChange={(event) => {
-                setAppSecret(event.target.value);
-              }}
-              type="password"
-              value={appSecret}
-            />
-          </div>
-
-          {connectionMode === "webhook" ? (
-            <>
-              {eventConfigUrl ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button asChild variant="outline">
-                    <a href={eventConfigUrl} rel="noreferrer" target="_blank">
-                      <ExternalLink className="size-4" />
-                      Open {domainLabel} event-subscription page
-                    </a>
-                  </Button>
-                  <div className="text-muted-foreground text-xs">
-                    Copy Verification Token + Encrypt Key from there.
-                  </div>
-                </div>
-              ) : null}
-              <div className="grid gap-1.5">
-                <Label htmlFor="lark-verification-token">Verification Token</Label>
-                <Input
-                  autoComplete="off"
-                  id="lark-verification-token"
-                  onChange={(event) => {
-                    setVerificationToken(event.target.value);
-                  }}
-                  type="password"
-                  value={verificationToken}
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="lark-encrypt-key">Encrypt Key</Label>
-                <Input
-                  autoComplete="off"
-                  id="lark-encrypt-key"
-                  onChange={(event) => {
-                    setEncryptKey(event.target.value);
-                  }}
-                  type="password"
-                  value={encryptKey}
-                />
-              </div>
-            </>
-          ) : null}
-        </div>
-
-        {agent.status !== "published" ? (
-          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            Publish this Agent before connecting Lark / 飞书.
-          </div>
-        ) : null}
-        {saveMutation.error ? (
-          <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
-            {saveMutation.error instanceof Error
-              ? saveMutation.error.message
-              : "Lark / 飞书 setup failed."}
-          </div>
-        ) : null}
-
-        <div className="mt-4 flex justify-end">
-          <Button disabled={!canSubmit} type="submit">
-            {saveMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-            Save
+          <Button
+            disabled={agentStatus !== "published" || startPending}
+            onClick={onStart}
+            type="button"
+          >
+            {startPending ? <Loader2 className="size-4 animate-spin" /> : null}
+            Start
           </Button>
         </div>
-      </section>
-    </form>
+
+        <div className="border-border-subtle bg-muted/20 rounded-md border px-3 py-2 text-xs leading-relaxed">
+          {getLarkRegistrationStatusCopy(registrationStatus, connectionMode)}
+        </div>
+
+        {registration?.qrUrl ? (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="border-border-subtle bg-background flex size-52 shrink-0 items-center justify-center rounded-md border p-3">
+              <QRCodeSVG
+                className="max-h-full max-w-full"
+                level="M"
+                size={176}
+                value={registration.qrUrl}
+              />
+            </div>
+            <div className="flex flex-1 flex-wrap items-center gap-2">
+              <Button asChild variant="outline">
+                <a href={registration.qrUrl} rel="noreferrer" target="_blank">
+                  <ExternalLink className="size-4" />
+                  Open authorization
+                </a>
+              </Button>
+              <Button
+                disabled={
+                  !registrationDeviceCode || pollPending || registrationStatus === "confirmed"
+                }
+                onClick={onPoll}
+                type="button"
+                variant="outline"
+              >
+                {pollPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-4" />
+                )}
+                Check
+              </Button>
+              {registration.userCode ? (
+                <code className="bg-muted text-muted-foreground rounded-md border px-2 py-1 text-[11px]">
+                  {registration.userCode}
+                </code>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {registrationError ? (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+            {registrationError.message}
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function LarkConfigurationSection({
+  agentStatus,
+  canSubmit,
+  dispatch,
+  domainLabel,
+  eventConfigUrl,
+  saveError,
+  savePending,
+  state,
+}: {
+  agentStatus: ChannelInlineSetupAgent["status"];
+  canSubmit: boolean;
+  dispatch: LarkChannelInlineSetupDispatch;
+  domainLabel: string;
+  eventConfigUrl: string | null;
+  saveError: Error | null;
+  savePending: boolean;
+  state: LarkChannelInlineSetupState;
+}) {
+  const { appId, appSecret, connectionMode, domain, encryptKey, verificationToken } = state;
+
+  return (
+    <section className="border-border bg-card rounded-lg border p-4">
+      <div className="grid gap-4">
+        <div className="text-foreground text-sm font-semibold">Configuration</div>
+
+        <div className="grid gap-1.5">
+          <Label>Connection mode</Label>
+          <div className="bg-muted/30 grid rounded-md border p-1">
+            {LARK_CONNECTION_MODE_OPTIONS.map((option) => (
+              <button
+                className={cn(
+                  "rounded-sm px-3 py-1.5 text-sm font-medium transition-colors",
+                  connectionMode === option.value
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                key={option.value}
+                onClick={() => {
+                  dispatch({ connectionMode: option.value, type: "changeConnectionMode" });
+                }}
+                type="button"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div className="text-muted-foreground text-xs leading-relaxed">
+            {LARK_CONNECTION_MODE_OPTIONS.find((option) => option.value === connectionMode)
+              ?.description ?? ""}
+            {" Values entered for one mode aren't applied to the other on save."}
+          </div>
+        </div>
+
+        <div className="grid gap-1.5">
+          <Label>Open Platform</Label>
+          <div className="bg-muted/30 grid grid-cols-2 rounded-md border p-1">
+            {LARK_DOMAIN_OPTIONS.map((option) => (
+              <button
+                className={cn(
+                  "rounded-sm px-3 py-1.5 text-sm font-medium transition-colors",
+                  domain === option.value
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                key={option.value}
+                onClick={() => {
+                  dispatch({ domain: option.value, type: "changeDomain" });
+                }}
+                type="button"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-1.5">
+          <Label htmlFor="lark-app-id">App ID</Label>
+          <Input
+            autoComplete="off"
+            id="lark-app-id"
+            onChange={(event) => {
+              dispatch({ appId: event.target.value, type: "changeAppId" });
+            }}
+            value={appId}
+          />
+        </div>
+
+        <div className="grid gap-1.5">
+          <Label htmlFor="lark-app-secret">App Secret</Label>
+          <Input
+            autoComplete="off"
+            id="lark-app-secret"
+            onChange={(event) => {
+              dispatch({ appSecret: event.target.value, type: "changeAppSecret" });
+            }}
+            type="password"
+            value={appSecret}
+          />
+        </div>
+
+        {connectionMode === "webhook" ? (
+          <LarkWebhookFields
+            dispatch={dispatch}
+            domainLabel={domainLabel}
+            encryptKey={encryptKey}
+            eventConfigUrl={eventConfigUrl}
+            verificationToken={verificationToken}
+          />
+        ) : null}
+      </div>
+
+      {agentStatus !== "published" ? (
+        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          Publish this Agent before connecting Lark / 飞书.
+        </div>
+      ) : null}
+      {saveError ? (
+        <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+          {saveError.message}
+        </div>
+      ) : null}
+
+      <div className="mt-4 flex justify-end">
+        <Button disabled={!canSubmit} type="submit">
+          {savePending ? <Loader2 className="size-4 animate-spin" /> : null}
+          Save
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function LarkWebhookFields({
+  dispatch,
+  domainLabel,
+  encryptKey,
+  eventConfigUrl,
+  verificationToken,
+}: {
+  dispatch: LarkChannelInlineSetupDispatch;
+  domainLabel: string;
+  encryptKey: string;
+  eventConfigUrl: string | null;
+  verificationToken: string;
+}) {
+  return (
+    <>
+      {eventConfigUrl ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline">
+            <a href={eventConfigUrl} rel="noreferrer" target="_blank">
+              <ExternalLink className="size-4" />
+              Open {domainLabel} event-subscription page
+            </a>
+          </Button>
+          <div className="text-muted-foreground text-xs">
+            Copy Verification Token + Encrypt Key from there.
+          </div>
+        </div>
+      ) : null}
+      <div className="grid gap-1.5">
+        <Label htmlFor="lark-verification-token">Verification Token</Label>
+        <Input
+          autoComplete="off"
+          id="lark-verification-token"
+          onChange={(event) => {
+            dispatch({
+              type: "changeVerificationToken",
+              verificationToken: event.target.value,
+            });
+          }}
+          type="password"
+          value={verificationToken}
+        />
+      </div>
+      <div className="grid gap-1.5">
+        <Label htmlFor="lark-encrypt-key">Encrypt Key</Label>
+        <Input
+          autoComplete="off"
+          id="lark-encrypt-key"
+          onChange={(event) => {
+            dispatch({ encryptKey: event.target.value, type: "changeEncryptKey" });
+          }}
+          type="password"
+          value={encryptKey}
+        />
+      </div>
+    </>
   );
 }

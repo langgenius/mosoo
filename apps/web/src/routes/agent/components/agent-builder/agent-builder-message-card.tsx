@@ -19,7 +19,8 @@ import type {
   AgentBuilderStarterPackBatchApprovalSubmission,
   AgentBuilderStarterPackSingleApprovalSubmission,
 } from "./starter-pack-approval-submission";
-import { parseAgentBuilderStarterPackCardsJson, StarterPackCard } from "./starter-pack-card";
+import { StarterPackCard } from "./starter-pack-card";
+import { parseAgentBuilderStarterPackCardsJson } from "./starter-pack-card-model";
 
 function isOptimisticAgentBuilderMessage(message: AgentBuilderMessage): boolean {
   return isAgentBuilderStreamingMessage(message);
