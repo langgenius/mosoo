@@ -26,6 +26,7 @@ import { dispatchDriverTurn, ensureDriverSessionReady } from "../driver-session.
 import {
   createRuntimeSubjectLifecycleService,
   getRuntimeSubjectKeepAliveHandle,
+  prepareRuntimeSubjectFilesystem,
 } from "../runtime-subject-lifecycle/runtime-subject-lifecycle.service";
 import {
   recreateRuntimeSubjectPreservingState,
@@ -104,7 +105,11 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
   ): Promise<Response> {
     const subject = await getRuntimeSubjectKeepAliveHandle(bindings, input.runtimeSubjectId);
 
-    await subject.setKeepAlive(true);
+    // Owners can open the terminal before any run has executed prepareRun, so the
+    // sandbox container may be live but /workspace/{cache,memory,se} have never
+    // been provisioned — ls would show an empty workspace and look broken.
+    // Re-assert the platform roots here, matching the file-browser sandbox guard.
+    await prepareRuntimeSubjectFilesystem(subject);
 
     if (input.terminalSessionId) {
       const terminalSession = await ensureTerminalSession(subject, input.terminalSessionId);
