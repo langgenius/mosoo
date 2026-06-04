@@ -72,7 +72,7 @@ export function SystemAgentTab() {
     (entry) => entry.modelId === initialModelId && entry.vendorId === initialVendorId,
   );
   const triggerLabel =
-    currentEntry?.displayName ?? initialModelId ?? "Pick a model for System Agent";
+    currentEntry?.displayName ?? initialModelId ?? "Pick a model for Agent Builder";
   const isEmpty = !loading && entries.length === 0;
   const hasAvailable = entries.some((entry) => entry.available);
   const lockedVendors = listLockedVendorLabels(entries);
@@ -95,15 +95,15 @@ export function SystemAgentTab() {
   return (
     <>
       <header className="border-border-subtle flex h-12 shrink-0 items-center border-b px-5">
-        <span className="text-sm font-medium">System Agent</span>
+        <span className="text-sm font-medium">Agent Builder</span>
       </header>
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[520px] p-6">
           <div className="mb-6">
             <p className="text-muted-foreground text-[13px]">
-              The System Agent is your configuration co-pilot; it understands your intent and drafts
-              agent configuration on your behalf. Pick the model it should use when assisting you.
-              Per-user preference; other members are unaffected.
+              Agent Builder helps turn your ideas into Agent drafts: prompts, model choices, tools,
+              and setup suggestions. Pick the model it should use while helping you build or edit
+              Agents. This is your personal preference; other members are unaffected.
             </p>
           </div>
 
@@ -131,7 +131,7 @@ export function SystemAgentTab() {
                 align="start"
                 className="w-[var(--radix-dropdown-menu-trigger-width)]"
               >
-                <DropdownMenuLabel>Available models for System Agent</DropdownMenuLabel>
+                <DropdownMenuLabel>Available models for Agent Builder</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {isEmpty ? (
                   <div className="text-muted-foreground px-3 py-6 text-center text-[12px]">
@@ -179,7 +179,7 @@ export function SystemAgentTab() {
               <div className="mt-3 flex items-start justify-between gap-3 rounded-md border border-dashed border-amber-300/60 bg-amber-50/40 px-3 py-2.5">
                 <div className="space-y-0.5">
                   <div className="text-[12px] font-medium text-amber-900">
-                    No models available for System Agent
+                    No models available for Agent Builder
                   </div>
                   <div className="text-[11px] text-amber-900/80">
                     Configure at least one Provider key (or add an OpenAI-Compatible Provider).

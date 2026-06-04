@@ -25,7 +25,7 @@ const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
     items: [
       { icon: User, label: "Profile", path: "/settings/profile" },
       { icon: KeyRound, label: "API Tokens", path: "/settings/access-tokens" },
-      { icon: Bot, label: "System Agent", path: "/settings/system-agent" },
+      { icon: Bot, label: "Agent Builder", path: "/settings/system-agent" },
       { icon: BarChart3, label: "My Usage", path: "/settings/usage" },
     ],
     label: "Account",
@@ -42,7 +42,7 @@ const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
       {
         adminOnly: true,
         icon: SlidersHorizontal,
-        label: "Credential Policy",
+        label: "Provider Access",
         path: "/settings/credential-policy",
       },
     ],

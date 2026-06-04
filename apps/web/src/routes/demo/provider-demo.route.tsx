@@ -17,7 +17,7 @@ export function ProviderDemoPage(): ReactElement {
         <div>
           <h1 className="text-foreground text-lg font-semibold">Provider Demo</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Walk through Admin Providers, member credential policy, and session runtime
+            Walk through admin provider setup, member provider access, and session runtime
             availability.
           </p>
         </div>
@@ -36,12 +36,12 @@ export function ProviderDemoPage(): ReactElement {
           </section>
 
           <section className="border-border bg-card rounded-xl border p-4">
-            <h2 className="text-foreground text-sm font-semibold">Credential Policy</h2>
+            <h2 className="text-foreground text-sm font-semibold">Provider Access</h2>
             <p className="text-muted-foreground mt-1 text-xs">
               Organization and personal provider key resolution.
             </p>
             <Button asChild className="mt-4" size="sm" variant="outline">
-              <Link to="/settings/credential-policy">Open Credential Policy</Link>
+              <Link to="/settings/credential-policy">Open Provider Access</Link>
             </Button>
           </section>
 

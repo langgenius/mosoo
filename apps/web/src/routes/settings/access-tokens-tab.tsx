@@ -1,6 +1,6 @@
 import type { PersonalAccessTokenSummary } from "@mosoo/contracts/auth";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, KeyRound, Loader2, Plus, Trash2 } from "lucide-react";
+import { Check, Copy, ExternalLink, KeyRound, Loader2, Plus, Trash2 } from "lucide-react";
 import { useReducer } from "react";
 
 import {
@@ -8,6 +8,7 @@ import {
   listPersonalAccessTokens,
   revokePersonalAccessToken,
 } from "@/domains/auth/api/personal-access-token-client";
+import { MOSOO_API_REFERENCE_URL } from "@/shared/config/external-links";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 
@@ -120,8 +121,14 @@ export function AccessTokensTab() {
 
   return (
     <>
-      <header className="border-border-subtle flex h-12 shrink-0 items-center border-b px-5">
+      <header className="border-border-subtle flex h-12 shrink-0 items-center justify-between gap-3 border-b px-5">
         <span className="text-sm font-medium">API Tokens</span>
+        <Button asChild className="gap-1 text-[11.5px]" size="xs" variant="outline">
+          <a href={MOSOO_API_REFERENCE_URL} rel="noreferrer noopener" target="_blank">
+            <ExternalLink className="size-3" />
+            API reference
+          </a>
+        </Button>
       </header>
       <div className="flex-1 overflow-y-auto p-6">
         <div className="mx-auto max-w-4xl space-y-5">
@@ -177,11 +184,10 @@ function PersonalTokenSection({
         <div className="min-w-0">
           <div className="text-foreground flex items-center gap-2 text-sm font-semibold">
             <KeyRound className="text-fg-3 size-4" />
-            Personal tokens
+            API Tokens
           </div>
           <p className="text-muted-foreground mt-1 max-w-2xl text-[12.5px] leading-relaxed">
-            Use this token to call published Agents as yourself. Access follows your organization
-            membership and Agent access mode, and revoked tokens fail on the next request.
+            Create API tokens to call published Agents. Requests are tied to your account.
           </p>
         </div>
       </div>

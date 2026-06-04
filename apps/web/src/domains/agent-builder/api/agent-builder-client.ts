@@ -105,7 +105,7 @@ function createSystemAgentRpcPath(
   operationPath: "starter-pack/approve",
 ): ApiPath {
   if (!systemAgent.publicPath.startsWith("/api/")) {
-    throw new Error("Agent Builder System Agent path must start with /api/.");
+    throw new Error("Agent Builder is not configured correctly.");
   }
 
   return `${systemAgent.publicPath.slice("/api".length)}/${operationPath}` as ApiPath;
@@ -189,7 +189,7 @@ function readSystemAgentRpcMessages(payload: unknown): AgentBuilderMessage[] {
     !("messages" in payload) ||
     !Array.isArray(payload.messages)
   ) {
-    throw new Error("Agent Builder System Agent response did not include messages.");
+    throw new Error("Agent Builder response did not include messages.");
   }
 
   return payload.messages.map(parseAgentBuilderMessage);

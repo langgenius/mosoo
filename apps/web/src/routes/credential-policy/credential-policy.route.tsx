@@ -154,15 +154,15 @@ export function CredentialPolicyPage() {
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader
         className="border-border-subtle border-b"
-        title="Credential Policy"
-        description="Decide whether members can attach their own LLM keys and which providers they can see and use."
+        title="Provider Access"
+        description="Control whether members can use their own provider keys and which AI providers are available in this organization."
       />
 
       <main className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
         <div className="mx-auto w-full max-w-4xl space-y-6">
           {loading ? (
             <div className="border-border bg-card text-muted-foreground rounded-lg border px-4 py-6 text-sm">
-              Loading credential policy…
+              Loading provider access settings…
             </div>
           ) : null}
 
@@ -174,27 +174,17 @@ export function CredentialPolicyPage() {
 
           {!loading && policy ? (
             <>
-              <section className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Badge variant="success">A</Badge>
-                  <div>
-                    <h2 className="text-foreground text-sm font-semibold">BYOK master switch</h2>
-                    <p className="text-muted-foreground text-xs">
-                      Members can add and manage their own API keys.
-                    </p>
-                  </div>
-                </div>
-
+              <section>
                 <label
                   className="border-border-strong bg-card flex items-center justify-between gap-4 rounded-lg border px-4 py-3"
                   htmlFor="credential-policy-byok-enabled"
                 >
                   <div>
                     <div className="text-foreground text-sm font-semibold">
-                      Allow members to add their own credentials
+                      Allow members to add provider keys
                     </div>
                     <div className="text-muted-foreground mt-0.5 text-xs">
-                      When off, company credentials can still be used for allowed providers.
+                      When off, organization keys can still be used for allowed providers.
                     </div>
                   </div>
                   <Switch
@@ -214,7 +204,7 @@ export function CredentialPolicyPage() {
                   <div>
                     <h2 className="text-foreground text-sm font-semibold">Allowed providers</h2>
                     <p className="text-muted-foreground text-xs">
-                      Providers members can see and use in this organization.
+                      Choose which providers are available to members.
                     </p>
                   </div>
                 </div>
@@ -297,8 +287,8 @@ export function CredentialPolicyPage() {
               <div className="border-border bg-card text-muted-foreground flex gap-3 rounded-lg border px-4 py-3 text-sm">
                 <Info className="mt-0.5 size-4 shrink-0" />
                 <p>
-                  Disabled providers are hidden from members and cannot be used at runtime. Existing
-                  company and personal keys stay stored so admins can re-enable the provider later.
+                  Already published Agents keep their current provider setup. This setting only
+                  controls which providers members can choose going forward.
                 </p>
               </div>
             </>

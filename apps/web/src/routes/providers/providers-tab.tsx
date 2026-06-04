@@ -73,7 +73,7 @@ export function ProvidersTab({ organization }: { organization: Organization }): 
       <PageHeader
         className="border-border-subtle border-b"
         title="Providers"
-        description="Configure Provider credentials and choose the active key used by each Runtime. Vendor IDs remain the internal namespace for stored keys."
+        description="Configure provider keys and choose which key each runtime uses."
       >
         <Button onClick={handleAddCustomProvider} size="sm" variant="outline">
           <Plus className="size-3.5" />
@@ -83,7 +83,7 @@ export function ProvidersTab({ organization }: { organization: Organization }): 
           <Button asChild variant="outline" size="sm">
             <Link to="/settings/credential-policy">
               <SlidersHorizontal className="size-3.5" />
-              Credential Policy
+              Provider Access
             </Link>
           </Button>
         ) : null}

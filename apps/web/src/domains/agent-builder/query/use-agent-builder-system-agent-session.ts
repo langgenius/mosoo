@@ -176,7 +176,7 @@ export function useAgentBuilderSystemAgentSession(
         )
         .catch((error: unknown) => {
           setPendingChatTurn(null);
-          onError(error instanceof Error ? error.message : "System Agent streaming failed.");
+          onError(error instanceof Error ? error.message : "Agent Builder response failed.");
         });
     },
     [

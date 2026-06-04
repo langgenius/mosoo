@@ -43,7 +43,7 @@ export function ProfileTab() {
       </header>
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[520px] p-6">
-          <div className="mb-8 flex items-center gap-4">
+          <div className="mb-8 flex items-center gap-5">
             {isTruthy(user?.image) ? (
               <img
                 src={user.image}
@@ -62,9 +62,9 @@ export function ProfileTab() {
                 {user?.name?.charAt(0)?.toUpperCase() ?? "?"}
               </div>
             )}
-            <div>
-              <div className="text-foreground text-sm font-medium">{user?.name}</div>
-              <div className="text-muted-foreground text-xs">{user?.email}</div>
+            <div className="min-w-0">
+              <div className="text-foreground truncate text-lg font-semibold">{user?.name}</div>
+              <div className="text-muted-foreground truncate text-sm">{user?.email}</div>
             </div>
           </div>
 
