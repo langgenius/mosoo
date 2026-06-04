@@ -6,31 +6,68 @@ import { Button } from "@/shared/ui/button";
 import { useAppSession } from "../../app/session-provider";
 import { updateProfile } from "../../domains/user/api/user-client";
 import { isTruthy } from "../../shared/lib/truthiness";
+
+const MAX_AVATAR_URL_LENGTH = 2048;
+
+function isValidAvatarUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function ProfileTab() {
-  const { user } = useAppSession();
+  const { refreshOrganizations, user } = useAppSession();
   const [name, setName] = useState(user?.name ?? "");
+  const [avatarInput, setAvatarInput] = useState(user?.image ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isTruthy(user?.name)) {
-      setName(user.name);
-    }
+    setName(user?.name ?? "");
   }, [user?.name]);
 
+  useEffect(() => {
+    setAvatarInput(user?.image ?? "");
+  }, [user?.image]);
+
+  const trimmedName = name.trim();
+  const trimmedAvatar = avatarInput.trim();
+  const currentAvatar = user?.image ?? "";
+  const nameChanged = trimmedName !== (user?.name ?? "");
+  const avatarChanged = trimmedAvatar !== currentAvatar;
+  const dirty = nameChanged || avatarChanged;
+  const nameValid = trimmedName.length > 0;
+  const avatarValid =
+    trimmedAvatar === "" ||
+    (trimmedAvatar.length <= MAX_AVATAR_URL_LENGTH && isValidAvatarUrl(trimmedAvatar));
+  const avatarPreview = trimmedAvatar || currentAvatar;
+  const avatarPreviewValid = avatarPreview === "" || isValidAvatarUrl(avatarPreview);
+  const canSave = dirty && nameValid && avatarValid && !saving;
+
   async function handleSave() {
-    if (!name.trim() || name.trim() === user?.name) {
+    if (!canSave) {
       return;
     }
 
     setSaving(true);
+    setError(null);
 
     try {
-      await updateProfile(name.trim());
+      await updateProfile({
+        imageUrl: trimmedAvatar === "" ? null : trimmedAvatar,
+        name: trimmedName,
+      });
+      await refreshOrganizations();
       setSaved(true);
       setTimeout(() => {
         setSaved(false);
       }, 2000);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Failed to save changes.");
     } finally {
       setSaving(false);
     }
@@ -44,10 +81,10 @@ export function ProfileTab() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[520px] p-6">
           <div className="mb-8 flex items-center gap-5">
-            {isTruthy(user?.image) ? (
+            {isTruthy(avatarPreview) && avatarPreviewValid ? (
               <img
-                src={user.image}
-                alt={user.name}
+                src={avatarPreview}
+                alt={user?.name ?? ""}
                 className="size-16 rounded-full object-cover"
                 referrerPolicy="no-referrer"
               />
@@ -69,6 +106,28 @@ export function ProfileTab() {
           </div>
 
           <div className="space-y-2">
+            <label className="text-foreground text-sm font-medium" htmlFor="profile-avatar-url">
+              Profile picture
+            </label>
+            <p className="text-fg-2 text-[12px]">Paste an image URL to use as your avatar.</p>
+            <input
+              aria-label="Profile picture URL"
+              id="profile-avatar-url"
+              type="url"
+              inputMode="url"
+              placeholder="https://example.com/avatar.png"
+              value={avatarInput}
+              onChange={(event) => {
+                setAvatarInput(event.target.value);
+              }}
+              className="border-border bg-background text-foreground focus:ring-primary/20 focus:border-primary h-10 w-full rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
+            />
+            {trimmedAvatar !== "" && !avatarValid ? (
+              <p className="text-destructive text-[12px]">Enter a valid http or https URL.</p>
+            ) : null}
+          </div>
+
+          <div className="mt-4 space-y-2">
             <label className="text-foreground text-sm font-medium" htmlFor="profile-display-name">
               Display name
             </label>
@@ -98,12 +157,14 @@ export function ProfileTab() {
             />
           </div>
 
+          {isTruthy(error) ? (
+            <div className="bg-destructive/10 text-destructive mt-4 rounded-lg p-3 text-sm">
+              {error}
+            </div>
+          ) : null}
+
           <div className="mt-6">
-            <Button
-              onClick={() => void handleSave()}
-              disabled={saving || !name.trim() || name.trim() === user?.name}
-              size="sm"
-            >
+            <Button onClick={() => void handleSave()} disabled={!canSave} size="sm">
               {saving ? (
                 <>
                   <Loader2 className="mr-1 size-4 animate-spin" /> Saving…

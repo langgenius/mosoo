@@ -16,6 +16,7 @@ export interface AccountProfile {
 }
 
 export interface UpdateAccountProfileInput {
+  imageUrl?: string | null;
   name: string;
 }
 

@@ -63,6 +63,7 @@ export const userSchema = /* GraphQL */ `
   }
 
   input UpdateAccountProfileInput {
+    imageUrl: String
     name: String!
   }
 

@@ -2229,6 +2229,7 @@ input UnshareSkillTargetInput {
 }
 
 input UpdateAccountProfileInput {
+  imageUrl: String
   name: String!
 }
 

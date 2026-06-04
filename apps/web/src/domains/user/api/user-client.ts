@@ -61,6 +61,7 @@ const VIEWER_QUERY = graphql(/* GraphQL */ `
 const UPDATE_PROFILE_MUTATION = graphql(/* GraphQL */ `
   mutation UpdateProfile($input: UpdateAccountProfileInput!) {
     updateProfile(input: $input) {
+      imageUrl
       name
     }
   }
@@ -109,14 +110,16 @@ export async function getViewer(): Promise<Viewer> {
   return toViewer(payload.viewer);
 }
 
-export async function updateProfile(name: string): Promise<{ name: string }> {
+export async function updateProfile(input: {
+  imageUrl?: string | null;
+  name: string;
+}): Promise<{ imageUrl: string | null; name: string }> {
   const payload = await requestGraphQL(UPDATE_PROFILE_MUTATION, {
-    input: {
-      name,
-    },
+    input,
   });
 
   return {
+    imageUrl: payload.updateProfile.imageUrl ?? null,
     name: payload.updateProfile.name,
   };
 }

@@ -115,6 +115,72 @@ describe("viewer organization context", () => {
     });
   });
 
+  test("updates the account image url", async () => {
+    const database = createViewerContextDatabase();
+
+    const account = await updateProfile(database, VIEWER, {
+      imageUrl: "https://cdn.example.com/avatar.png",
+      name: "Viewer",
+    });
+
+    expect(account.imageUrl).toBe("https://cdn.example.com/avatar.png");
+
+    const stored = (await database
+      .prepare("SELECT image_url FROM account WHERE id = ?")
+      .bind("account-1")
+      .first()) as { image_url: string | null } | null;
+    expect(stored?.image_url).toBe("https://cdn.example.com/avatar.png");
+  });
+
+  test("clears the account image url when set to empty", async () => {
+    const database = createViewerContextDatabase();
+    database.execute(`
+      UPDATE account SET image_url = 'https://cdn.example.com/old.png' WHERE id = 'account-1';
+    `);
+
+    const account = await updateProfile(
+      database,
+      { ...VIEWER, imageUrl: "https://cdn.example.com/old.png" },
+      { imageUrl: "", name: "Viewer" },
+    );
+
+    expect(account.imageUrl).toBeNull();
+
+    const stored = (await database
+      .prepare("SELECT image_url FROM account WHERE id = ?")
+      .bind("account-1")
+      .first()) as { image_url: string | null } | null;
+    expect(stored?.image_url).toBeNull();
+  });
+
+  test("rejects an invalid image url", async () => {
+    const database = createViewerContextDatabase();
+
+    await expect(
+      updateProfile(database, VIEWER, { imageUrl: "javascript:alert(1)", name: "Viewer" }),
+    ).rejects.toThrow();
+  });
+
+  test("leaves the image url untouched when not provided", async () => {
+    const database = createViewerContextDatabase();
+    database.execute(`
+      UPDATE account SET image_url = 'https://cdn.example.com/keep.png' WHERE id = 'account-1';
+    `);
+
+    await updateProfile(
+      database,
+      { ...VIEWER, imageUrl: "https://cdn.example.com/keep.png" },
+      { name: "Renamed" },
+    );
+
+    const stored = (await database
+      .prepare("SELECT image_url, name FROM account WHERE id = ?")
+      .bind("account-1")
+      .first()) as { image_url: string | null; name: string } | null;
+    expect(stored?.image_url).toBe("https://cdn.example.com/keep.png");
+    expect(stored?.name).toBe("Renamed");
+  });
+
   test("builds the viewer payload with memberships", async () => {
     const database = createViewerContextDatabase();
 
@@ -141,6 +207,22 @@ describe("viewer organization context", () => {
       modelId: "model-1",
       vendor: "openai",
     });
+  });
+
+  test("reads the account name and image from the database, not the session", async () => {
+    const database = createViewerContextDatabase();
+    database.execute(`
+      UPDATE account
+      SET image_url = 'https://cdn.example.com/fresh.png', name = 'Fresh Name'
+      WHERE id = 'account-1';
+    `);
+
+    // Session viewer is intentionally stale (e.g. better-auth cookie cache).
+    const staleViewer = { ...VIEWER, imageUrl: null, name: "Stale Name" };
+    const viewer = await getViewer(database, {} as ApiBindings, staleViewer);
+
+    expect(viewer.account?.imageUrl).toBe("https://cdn.example.com/fresh.png");
+    expect(viewer.account?.name).toBe("Fresh Name");
   });
 
   test("switches active organization", async () => {

@@ -836,6 +836,7 @@ export type UnshareSkillTargetInput = {
 };
 
 export type UpdateAccountProfileInput = {
+  imageUrl?: string | null | undefined;
   name: string;
 };
 
@@ -1853,7 +1854,7 @@ export type UpdateProfileMutationVariables = Exact<{
 }>;
 
 
-export type UpdateProfileMutation = { updateProfile: { name: string } };
+export type UpdateProfileMutation = { updateProfile: { imageUrl: string | null, name: string } };
 
 export type SetSystemAgentModelMutationVariables = Exact<{
   input: SetSystemAgentModelInput;
@@ -5705,6 +5706,7 @@ export const ViewerDocument = new TypedDocumentString(`
 export const UpdateProfileDocument = new TypedDocumentString(`
     mutation UpdateProfile($input: UpdateAccountProfileInput!) {
   updateProfile(input: $input) {
+    imageUrl
     name
   }
 }

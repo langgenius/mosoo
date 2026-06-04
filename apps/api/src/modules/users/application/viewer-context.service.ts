@@ -19,6 +19,7 @@ import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { getOrganizationCreationSlotStatus } from "../../organizations/domain/organization-kind.policy";
 import { ensureModelAvailableForSelection } from "../../vendor-credentials/application/available-models";
+import { normalizeAccountImageUrl } from "../domain/user-avatar";
 import { normalizeAccountName } from "../domain/user-name";
 import {
   listViewerOrganizationMemberships,
@@ -28,7 +29,9 @@ import {
 
 interface ViewerAccountState {
   id: AccountId;
+  imageUrl: string | null;
   lastActiveOrganizationId: OrganizationId | null;
+  name: string;
   systemAgentModel: SystemAgentModelSetting | null;
 }
 
@@ -95,7 +98,9 @@ async function getViewerAccountState(
     (await getAppDatabase(database)
       .select({
         id: accountsTable.id,
+        image: accountsTable.image,
         lastActiveOrganizationId: accountsTable.lastActiveOrganizationId,
+        name: accountsTable.name,
         systemAgentModel: accountsTable.systemAgentModel,
       })
       .from(accountsTable)
@@ -109,7 +114,9 @@ async function getViewerAccountState(
 
   return {
     id: row.id,
+    imageUrl: row.image,
     lastActiveOrganizationId: row.lastActiveOrganizationId,
+    name: row.name,
     systemAgentModel: parseSystemAgentModel(row.systemAgentModel),
   };
 }
@@ -168,7 +175,10 @@ export async function getViewer(
   );
 
   return {
-    account: createAccountProfile(viewer, accountState.systemAgentModel),
+    account: createAccountProfile(
+      { ...viewer, imageUrl: accountState.imageUrl, name: accountState.name },
+      accountState.systemAgentModel,
+    ),
     activeOrganization: organizationContext.activeOrganization,
     auth: getViewerAuth(bindings, viewer),
     memberships: organizationContext.memberships,
@@ -183,11 +193,22 @@ export async function updateProfile(
 ): Promise<AccountProfile> {
   const timestampMs = currentTimestampMs();
   const name = normalizeAccountName(input.name);
+  const imageProvided = Object.prototype.hasOwnProperty.call(input, "imageUrl");
+  const imageUrl = imageProvided ? normalizeAccountImageUrl(input.imageUrl) : viewer.imageUrl;
+
+  const updates: { image?: string | null; name: string; updatedAt: number } = {
+    name,
+    updatedAt: timestampMs,
+  };
+
+  if (imageProvided) {
+    updates.image = imageUrl;
+  }
 
   const updated =
     (await getAppDatabase(database)
       .update(accountsTable)
-      .set({ name, updatedAt: timestampMs })
+      .set(updates)
       .where(eq(accountsTable.id, viewer.id))
       .returning({ systemAgentModel: accountsTable.systemAgentModel })
       .get()) ?? null;
@@ -196,7 +217,10 @@ export async function updateProfile(
     throw new Error("Account not found.");
   }
 
-  return createAccountProfile({ ...viewer, name }, parseSystemAgentModel(updated.systemAgentModel));
+  return createAccountProfile(
+    { ...viewer, imageUrl, name },
+    parseSystemAgentModel(updated.systemAgentModel),
+  );
 }
 
 export async function setSystemAgentModel(
