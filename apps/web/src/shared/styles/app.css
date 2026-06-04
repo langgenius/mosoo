@@ -86,11 +86,21 @@
   --paper-300: #e9ecf0;
   --paper-400: #dfe3e8;
 
-  /* Status accents — kept small, marker-level only. */
+  /* Status accents — kept small, marker-level only. Each carries a paired
+     darker text (_fg) and soft tint (_bg) so chips can render readable copy
+     on a brand-tinted background without falling back to Tailwind defaults. */
   --soil: #7a5230;
+  --soil-fg: #5b3c22;
+  --soil-bg: #f4ece2;
   --sky: #2f6bd4;
+  --sky-fg: #235fbe;
+  --sky-bg: #e8f0fd;
   --amber: #e0a106;
+  --amber-fg: #9a6800;
+  --amber-bg: #fbf1d4;
   --ember: #dc2a2a;
+  --ember-fg: #b91c1c;
+  --ember-bg: #fbeaea;
 
   --bg: var(--paper-100);
   --bg-elevated: #ffffff;
@@ -359,9 +369,17 @@
   --color-green-900: var(--green-900);
 
   --color-soil: var(--soil);
+  --color-soil-fg: var(--soil-fg);
+  --color-soil-bg: var(--soil-bg);
   --color-amber: var(--amber);
+  --color-amber-fg: var(--amber-fg);
+  --color-amber-bg: var(--amber-bg);
   --color-ember: var(--ember);
+  --color-ember-fg: var(--ember-fg);
+  --color-ember-bg: var(--ember-bg);
   --color-sky: var(--sky);
+  --color-sky-fg: var(--sky-fg);
+  --color-sky-bg: var(--sky-bg);
 
   --color-fg-1: var(--fg-1);
   --color-fg-2: var(--fg-2);

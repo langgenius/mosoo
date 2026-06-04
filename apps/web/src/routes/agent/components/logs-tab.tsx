@@ -170,7 +170,7 @@ function SessionCapabilitySummary({ runtimeId }: { runtimeId: string }): ReactEl
             className={cn(
               "inline-flex h-5 items-center gap-1 rounded-sm border px-1.5 text-[10.5px] font-semibold",
               supported
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                ? "border-green-200 bg-green-50 text-green-800"
                 : "border-border bg-muted/50 text-fg-3",
             )}
           >
