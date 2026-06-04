@@ -90,13 +90,13 @@ async function requirePublicApiCaller(c: PublishedApiRouteContext): Promise<Publ
   const token = readPublicApiBearerToken(c.req.raw);
 
   if (!isTruthy(token)) {
-    throw publicUnauthenticated("A valid Human PAT or Service token is required.");
+    throw publicUnauthenticated("A valid Personal Access Token is required.");
   }
 
   const caller = await authenticatePublicApiCaller(c.env.DB, token);
 
   if (!caller) {
-    throw publicUnauthenticated("Human PAT or Service token is invalid or revoked.");
+    throw publicUnauthenticated("Personal Access Token is invalid or revoked.");
   }
 
   return caller;

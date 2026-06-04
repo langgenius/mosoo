@@ -50,7 +50,7 @@ Mosoo's own channel adapters need to turn a Slack mention, a Lark message, or a 
 
 > "I'm responsible for my own host installation, signing, thread binding, and reply write-back — don't mix these into the Agent Session API."
 >
-> "I shouldn't have to pretend to be a Service token caller; I have my own channel binding."
+> "I shouldn't have to pretend to be a Personal token caller; I have my own channel binding."
 >
 > "I don't care whether the backend is the Claude Agent SDK, an OpenAI runtime, or something else — give me a surface-neutral set of conversation semantics and that's enough."
 
@@ -58,7 +58,7 @@ Mosoo's own channel adapters need to turn a Slack mention, a Lark message, or a 
 
 The first wave of M2D consumers is primarily Mosoo internal and first-party adapters, but once a Published Agent commits to public HTTPS, it will naturally be called by customer backends initiating HTTPS calls from their own services.
 
-> "I want to get a Service token, call this Agent from our backend to accomplish some task, and then write the result back into our ticketing system."
+> "I want to get a token, call this Agent from our backend to accomplish some task, and then write the result back into our ticketing system."
 
 So this phase must be designed with a public-API mental model. It can't be built as a temporary, frontend-only internal route.
 
@@ -72,9 +72,7 @@ So this phase must be designed with a public-API mental model. It can't be built
 | **API Consumer**                | A system that calls a Published Agent. Primarily aimed at customer backends, CLIs, and automations; the Mosoo Web UI and first-party adapters reuse the same underlying semantics, but do not necessarily go through the public token gate.                           |
 | **Thread**                      | The "one unit of work" context that an external caller creates and continues. The first screen of the public docs only talks about opening a new conversation / viewing a conversation, and does **not** require the caller to understand session mechanics first.    |
 | **Human PAT**                   | Personal Access Token. Identifies a **person** as the caller. It carries no per-agent scope, does not replace vendor credentials, and is not involved in BYOK.                                                                                                        |
-| **Service token**               | An organization-level **machine** identity token. Customer backends / CLIs / automations use it to call. Managed by Org Owner/Admin; a `selected agents` allowlist must be chosen by default; it is **not** any user's PAT, and **not** a Channel binding credential. |
-| **Caller**                      | The principal that issues a request holding a PAT or a Service token. Used for admission and attribution; it is **not** the same as the executor.                                                                                                                     |
-| **Attributed user**             | The human optionally specified for attribution when a Service token creates a Thread. It only affects the Thread attribution projection; it does not switch the runtime's execution identity.                                                                          |
+| **Caller**                      | The principal that issues a request holding a PAT. Used for admission and attribution; it is **not** the same as the executor.                                                                                                                                        |
 | **Agent Owner**                 | The person who creates and owns the Agent's service identity. **The Agent's execution permissions are understood as an RBAC proxy of the Owner.**                                                                                                                     |
 | **Cooperator**                  | A collaborator that the Agent Owner has explicitly authorized to access the Agent.                                                                                                                                                                                    |
 | **Organization-wide access**    | The Owner allows every valid member in the Org to call the Agent.                                                                                                                                                                                                     |
@@ -113,7 +111,7 @@ flowchart TD
   Owner["Agent Owner"]
   Access["Agent access mode<br/>Org-wide or invited-only"]
   Docs["Published Agent API docs<br/>call examples + machine-readable interface description"]
-  Token["Caller token identity<br/>Human PAT or Service token"]
+  Token["Caller token identity<br/>Human PAT"]
   PublicAPI["Public HTTPS call surface"]
   ThreadAPI["Public Thread API<br/>open a new conversation / view a conversation"]
   AppContract["A single set of conversation semantics<br/>Session / Run"]

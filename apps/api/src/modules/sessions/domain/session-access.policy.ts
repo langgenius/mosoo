@@ -66,7 +66,13 @@ function activeSessionMembershipCondition(viewerId: AccountId): SQL {
 function humanSessionCreatorCondition(viewerId: AccountId): SQL {
   return and(
     eq(sessionsTable.creatorAccountId, viewerId),
-    sql`COALESCE(json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.kind'), 'human_pat') <> 'service_token'`,
+    or(
+      sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') IS NULL`,
+      and(
+        sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') = 'public_api'`,
+        sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.kind') = 'human_pat'`,
+      ),
+    ),
   )!;
 }
 

@@ -73,7 +73,7 @@ export function PublishSuccessModal({
             <div className="min-w-0">
               <DialogTitle className="text-[16px]">Published "{agent.name}"</DialogTitle>
               <DialogDescription className="mt-0.5 text-[12.5px]">
-                Allowed callers can reach this agent now. Human PAT or Service-token authenticated,
+                Allowed callers can reach this agent now. Personal-token authenticated,
                 access-gated.
               </DialogDescription>
             </div>

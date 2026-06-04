@@ -18,7 +18,6 @@ export type {
   OrganizationAccessRequestId,
   OrganizationId,
   OrganizationInvitationId,
-  OrganizationServiceTokenId,
   PersonalAccessTokenId,
   PlatformId,
   PublicThreadId,

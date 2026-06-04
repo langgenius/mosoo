@@ -149,6 +149,7 @@ export async function listPublishedAgentThreads(
   const rows = await getAppDatabase(database)
     .select({
       ...sessionSummaryWithLastRunColumns(),
+      attributed_user_id: sessionsTable.attributedUserId,
       metadata_json: sessionsTable.metadataJson,
     })
     .from(sessionsTable)
@@ -167,6 +168,7 @@ export async function listPublishedAgentThreads(
 
       return [
         toPublishedThreadSummary({
+          attributedUserId: row.attributed_user_id,
           metadata,
           session: toPublishedSessionSummary(buildSessionSummaryFromJoinedRow(row)),
         }),

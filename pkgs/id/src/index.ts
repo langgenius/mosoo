@@ -27,7 +27,6 @@ export type McpServerId = SemanticPlatformId<"McpServerId">;
 export type OrganizationAccessRequestId = SemanticPlatformId<"OrganizationAccessRequestId">;
 export type OrganizationId = SemanticPlatformId<"OrganizationId">;
 export type OrganizationInvitationId = SemanticPlatformId<"OrganizationInvitationId">;
-export type OrganizationServiceTokenId = SemanticPlatformId<"OrganizationServiceTokenId">;
 export type PersonalAccessTokenId = SemanticPlatformId<"PersonalAccessTokenId">;
 export type PublicThreadId = SemanticPlatformId<"PublicThreadId">;
 export type RuntimeEventId = SemanticPlatformId<"RuntimeEventId">;

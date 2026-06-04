@@ -122,7 +122,7 @@ export function PublishMenu({
           <div className="flex min-w-0 flex-col">
             <span className="text-[13px] font-medium">API Access</span>
             <span className="text-muted-foreground text-[11.5px] leading-snug">
-              Open the REST docs · POST /threads with a Human PAT or Service token.
+              Open the REST docs · POST /threads with a Personal token.
             </span>
           </div>
         </DropdownMenuItem>
@@ -185,7 +185,7 @@ function buildAgentSkillMarkdown(agent: Agent, distribution: AgentDistribution):
     "",
     "## How to use",
     "",
-    "Call this agent over HTTP with a bearer token issued from your Mosoo access-token settings.",
+    "Call this agent over HTTP with a bearer token issued from your Mosoo API Tokens settings.",
     "",
     "```bash",
     buildAgentApiCurl(agent),

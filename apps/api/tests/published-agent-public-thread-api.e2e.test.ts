@@ -4,11 +4,6 @@ import { PUBLISHED_AGENT_THREADS_MAX_LIMIT } from "@mosoo/contracts/public-api";
 import { sessionsTable } from "@mosoo/db";
 
 import {
-  createOrganizationServiceToken,
-  listOrganizationServiceTokens,
-  revokeOrganizationServiceToken,
-} from "../src/modules/auth/application/organization-service-token.service";
-import {
   completeFileUpload,
   createFileUpload,
   uploadFileContent,
@@ -26,7 +21,6 @@ import {
   createPublicHttpTestBindings,
 } from "./helpers/published-agent-http-test-fixture";
 import {
-  MEMBER_VIEWER,
   OWNER_VIEWER,
   bearer,
   createPublishedApiTestApp,
@@ -170,7 +164,6 @@ async function insertPublicThread(
       lastRunId: null,
       metadataJson: JSON.stringify({
         public_api: {
-          attributed_user_id: null,
           client_external_ref: null,
           created_by: {
             account_id: PUBLIC_API_TEST_IDS.ownerAccount,
@@ -196,55 +189,6 @@ async function insertPublicThread(
 }
 
 describe("Published Agent Public Thread API e2e", () => {
-  test("manages Organization Service tokens with selected Agent allowlists", async () => {
-    const database = await createPublicHttpContractDatabase();
-
-    await expect(
-      createOrganizationServiceToken(database, MEMBER_VIEWER, {
-        allowAttribution: true,
-        allowedAgentIds: [PUBLIC_API_TEST_IDS.agent],
-        label: "Member attempt",
-        organizationId: PUBLIC_API_TEST_IDS.organization,
-      }),
-    ).rejects.toThrow("You do not have permission to perform this action.");
-
-    const created = await createOrganizationServiceToken(database, OWNER_VIEWER, {
-      allowAttribution: true,
-      allowedAgentIds: [PUBLIC_API_TEST_IDS.agent],
-      label: "Slack adapter",
-      organizationId: PUBLIC_API_TEST_IDS.organization,
-    });
-    expect(created.value.startsWith("grt_svc_")).toBeTrue();
-    expect(created.token).toMatchObject({
-      allowAttribution: true,
-      allowedAgentIds: [PUBLIC_API_TEST_IDS.agent],
-      createdByAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
-      label: "Slack adapter",
-      organizationId: PUBLIC_API_TEST_IDS.organization,
-      revokedAt: null,
-    });
-
-    const listed = await listOrganizationServiceTokens(
-      database,
-      OWNER_VIEWER,
-      PUBLIC_API_TEST_IDS.organization,
-    );
-    expect(listed.tokens.find((token) => token.id === created.token.id)).toMatchObject({
-      allowedAgentIds: [PUBLIC_API_TEST_IDS.agent],
-      label: "Slack adapter",
-    });
-
-    await revokeOrganizationServiceToken(database, OWNER_VIEWER, created.token.id);
-    const afterRevoke = await listOrganizationServiceTokens(
-      database,
-      OWNER_VIEWER,
-      PUBLIC_API_TEST_IDS.organization,
-    );
-    expect(
-      afterRevoke.tokens.find((token) => token.id === created.token.id)?.revokedAt,
-    ).toBeString();
-  });
-
   test("creates, retrieves, and lists a Thread without a Task wrapper", async () => {
     const database = await createPublicHttpContractDatabase();
     const app = createPublishedApiTestApp();
@@ -499,126 +443,6 @@ describe("Published Agent Public Thread API e2e", () => {
       generatedPublicThreadId(PUBLISHED_AGENT_THREADS_MAX_LIMIT + 4),
     );
     expect(expectRecord(threads.at(-1))["id"]).toBe(generatedPublicThreadId(5));
-  });
-
-  test("lists Thread events through the creating Service token only", async () => {
-    const database = await createPublicHttpContractDatabase();
-    const app = createPublishedApiTestApp();
-
-    await withProviderProbeMock(async () => {
-      const response = await requestPublicApi(
-        app,
-        database,
-        new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
-          body: JSON.stringify({
-            input: {
-              content: [{ text: "Run service token work.", type: "text" }],
-              type: "user.message",
-            },
-          }),
-          headers: {
-            Authorization: bearer(TOKENS.service),
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-        }),
-      );
-      expect(response.status).toBe(201);
-      const body = await readJson(response);
-      const threadId = expectString(expectRecord(body["thread"])["id"]);
-      const runId = expectString(expectRecord(body["run"])["id"]);
-      await database.prepare("DELETE FROM session_event WHERE session_id = ?").bind(threadId).run();
-
-      await insertRuntimeEvent(database, {
-        kind: "run.started",
-        occurredAt: 2_000,
-        payload: {
-          startedAt: "1970-01-01T00:00:02.000Z",
-        },
-        runId,
-        seq: 1,
-        sessionId: threadId,
-      });
-
-      const serviceEventsResponse = await requestPublicApi(
-        app,
-        database,
-        new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
-          headers: { Authorization: bearer(TOKENS.service) },
-        }),
-      );
-      expect(serviceEventsResponse.status).toBe(200);
-      expect(
-        expectArray(expectRecord(await readJson(serviceEventsResponse))["events"]).length,
-      ).toBe(1);
-
-      const ownerEventsResponse = await requestPublicApi(
-        app,
-        database,
-        new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
-          headers: { Authorization: bearer(TOKENS.owner) },
-        }),
-      );
-      expect(ownerEventsResponse.status).toBe(404);
-
-      await database
-        .prepare(
-          `DELETE FROM organization_service_token_agent
-            WHERE token_id = ?
-              AND agent_id = ?`,
-        )
-        .bind(PUBLIC_API_TEST_IDS.serviceToken, PUBLIC_API_TEST_IDS.agent)
-        .run();
-      const disallowedServiceEventsResponse = await requestPublicApi(
-        app,
-        database,
-        new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
-          headers: { Authorization: bearer(TOKENS.service) },
-        }),
-      );
-      expect(disallowedServiceEventsResponse.status).toBe(403);
-      expect(expectRecord(await readJson(disallowedServiceEventsResponse))["error"]).toMatchObject({
-        code: "forbidden",
-      });
-    });
-  });
-
-  test("denies Service token Thread creation when the execution owner membership is disabled", async () => {
-    const database = await createPublicHttpContractDatabase();
-    const app = createPublishedApiTestApp();
-
-    await database
-      .prepare(
-        `UPDATE organization_member
-            SET disabled_at = ?
-          WHERE organization_id = ?
-            AND account_id = ?`,
-      )
-      .bind(9_999, PUBLIC_API_TEST_IDS.organization, PUBLIC_API_TEST_IDS.ownerAccount)
-      .run();
-
-    const response = await requestPublicApi(
-      app,
-      database,
-      new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
-        body: JSON.stringify({
-          input: {
-            content: [{ text: "Run service token work.", type: "text" }],
-            type: "user.message",
-          },
-        }),
-        headers: {
-          Authorization: bearer(TOKENS.service),
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-      }),
-    );
-
-    expect(response.status).toBe(403);
-    expect(expectRecord(await readJson(response))["error"]).toMatchObject({
-      code: "forbidden",
-    });
   });
 
   test("archives, unarchives, and manages Thread files through the public routes", async () => {
@@ -878,97 +702,6 @@ describe("Published Agent Public Thread API e2e", () => {
         },
       });
     }
-  });
-
-  test("creates an attributed Thread through an allowed Service token", async () => {
-    const database = await createPublicHttpContractDatabase();
-    const app = createPublishedApiTestApp();
-
-    await withProviderProbeMock(async () => {
-      const response = await requestPublicApi(
-        app,
-        database,
-        new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
-          body: JSON.stringify({
-            attributed_user_id: PUBLIC_API_TEST_IDS.memberAccount,
-            input: {
-              content: [{ text: "Open a Linear follow-up.", type: "text" }],
-              type: "user.message",
-            },
-          }),
-          headers: {
-            Authorization: bearer(TOKENS.service),
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-        }),
-      );
-      expect(response.status).toBe(201);
-
-      const body = await readJson(response);
-      const thread = expectRecord(body["thread"]);
-      const threadId = expectString(thread["id"]);
-      expect(thread).toMatchObject({
-        agent_id: PUBLIC_API_TEST_IDS.agent,
-        attributed_user: { id: PUBLIC_API_TEST_IDS.memberAccount },
-        created_by: { id: PUBLIC_API_TEST_IDS.serviceToken, kind: "service_token" },
-        source: "api",
-      });
-      const initialRunId = expectString(expectRecord(body["run"])["id"]);
-
-      const retrieveResponse = await requestPublicApi(
-        app,
-        database,
-        new Request(`https://api.example.com/api/v1/threads/${threadId}`, {
-          headers: { Authorization: bearer(TOKENS.service) },
-        }),
-      );
-      expect(retrieveResponse.status).toBe(200);
-
-      await database
-        .prepare("UPDATE session_run SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?")
-        .bind("completed", 1, 1, initialRunId)
-        .run();
-      await database
-        .prepare("UPDATE session SET status = ? WHERE id = ?")
-        .bind("IDLE", threadId)
-        .run();
-
-      const followUpResponse = await requestPublicApi(
-        app,
-        database,
-        new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
-          body: JSON.stringify({
-            events: [
-              {
-                text: "Continue the follow-up.",
-                type: "user_message",
-              },
-            ],
-          }),
-          headers: {
-            Authorization: bearer(TOKENS.member),
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-        }),
-      );
-      expect(followUpResponse.status).toBe(200);
-      expect(expectRecord(await readJson(followUpResponse))["thread"]).toMatchObject({
-        id: threadId,
-      });
-
-      const archiveResponse = await requestPublicApi(
-        app,
-        database,
-        new Request(`https://api.example.com/api/v1/threads/${threadId}/archive`, {
-          headers: { Authorization: bearer(TOKENS.member) },
-          method: "POST",
-        }),
-      );
-      expect(archiveResponse.status).toBe(200);
-      expect(await readJson(archiveResponse)).toEqual({ ok: true });
-    });
   });
 
   test("replays create Thread responses by Idempotency-Key", async () => {

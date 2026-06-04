@@ -9,7 +9,6 @@ import {
   ensureOrganizationDraftFilesClaimable,
 } from "../files/application/draft-file-claim.service";
 import { createAgentSession, queueSessionRun } from "../runtime/application/session-run.service";
-import { publicInvalidRequest } from "./published-agent-api-errors";
 import { admitPublishedThreadCreator } from "./published-agent-thread-admission";
 import type { ThreadCreationAdmission } from "./published-agent-thread-admission";
 import { createPublicApiThreadMetadata } from "./published-agent-thread-metadata";
@@ -50,12 +49,6 @@ async function ensureThreadFilesClaimable(input: {
     return;
   }
 
-  if (input.admission.createdByKind === "service_token") {
-    throw publicInvalidRequest(
-      "Organization Service token callers cannot attach files in the MVP Thread API.",
-    );
-  }
-
   await ensureOrganizationDraftFilesClaimable(input.bindings, input.admission.fileViewer, {
     attachmentIds: input.fileIds,
     organizationId: input.admission.organizationId,
@@ -67,7 +60,6 @@ export async function createPublishedAgentThread(
 ): Promise<PublishedAgentCreateThreadResponse> {
   const admission = await admitPublishedThreadCreator(request.bindings.DB, request.caller, {
     agentId: request.agentId,
-    attributedUserId: request.input.attributedUserId,
   });
   await ensureThreadFilesClaimable({
     admission,
@@ -86,7 +78,7 @@ export async function createPublishedAgentThread(
       executionContext: request.executionContext,
       input: {
         agentId: request.agentId,
-        type: admission.attributedUserId === null ? "api_channel" : "ui",
+        type: "ui",
       },
       options: {
         accessViewer: admission.accessViewer,
@@ -145,6 +137,7 @@ export async function createPublishedAgentThread(
     });
 
     return toCreateThreadResponse({
+      attributedUserId: admission.attributedUserId,
       metadata,
       run,
       session: updatedSession,

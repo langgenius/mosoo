@@ -1,10 +1,4 @@
-import type {
-  AccountId,
-  AgentId,
-  OrganizationId,
-  OrganizationServiceTokenId,
-  PersonalAccessTokenId,
-} from "@mosoo/id";
+import type { AccountId, PersonalAccessTokenId } from "@mosoo/id";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 import { platformIdColumn } from "./id-column";
@@ -94,47 +88,3 @@ export const personalAccessTokensTable = sqliteTable(
 );
 
 export type PersonalAccessTokenRow = typeof personalAccessTokensTable.$inferSelect;
-
-export const organizationServiceTokensTable = sqliteTable(
-  "organization_service_token",
-  {
-    allowAttribution: integer("allow_attribution", { mode: "boolean" }).notNull().default(false),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-    createdByAccountId: platformIdColumn<AccountId>("created_by_account_id").notNull(),
-    id: platformIdColumn<OrganizationServiceTokenId>("id").primaryKey(),
-    label: text("label").notNull(),
-    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
-    organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
-    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
-    tokenHash: text("token_hash").notNull(),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
-  },
-  (table) => [
-    index("organization_service_token_organization_created_idx").on(
-      table.organizationId,
-      table.createdAt,
-    ),
-    uniqueIndex("organization_service_token_hash_idx").on(table.tokenHash),
-  ],
-);
-
-export const organizationServiceTokenAgentsTable = sqliteTable(
-  "organization_service_token_agent",
-  {
-    agentId: platformIdColumn<AgentId>("agent_id").notNull(),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-    organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
-    tokenId: platformIdColumn<OrganizationServiceTokenId>("token_id").notNull(),
-  },
-  (table) => [
-    index("organization_service_token_agent_agent_idx").on(table.organizationId, table.agentId),
-    uniqueIndex("organization_service_token_agent_token_agent_idx").on(
-      table.tokenId,
-      table.agentId,
-    ),
-  ],
-);
-
-export type OrganizationServiceTokenAgentRow =
-  typeof organizationServiceTokenAgentsTable.$inferSelect;
-export type OrganizationServiceTokenRow = typeof organizationServiceTokensTable.$inferSelect;

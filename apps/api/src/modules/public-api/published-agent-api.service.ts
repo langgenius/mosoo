@@ -98,6 +98,7 @@ export async function sendPublishedAgentSessionEvents(
   return toPublishedEventBatch({
     batch,
     thread: toPublishedThreadSummary({
+      attributedUserId: admission.session.attributed_user_id,
       metadata: admission.metadata,
       session: toPublishedSessionSummary(batch.session),
     }),

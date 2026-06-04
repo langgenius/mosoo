@@ -61,7 +61,7 @@ After the pivot, Mosoo is a self-managed Agent platform for a single organizatio
 - Invite / approve / disable / remove members (the Owner exclusively holds these five: "promote to Admin / demote from Admin / change the Org's primary domain / delete the Org / transfer Owner").
 - **Reach through** any Agent / Space / Skill / MCP / Environment to edit, publish, and run it.
 - After an asset owner leaves, **automatically** gain the right to delete / change the ACL / transfer that asset.
-- Manage Org-level credentials (Company Provider keys, Organization MCP), Org service tokens, and Credential Policy (the BYOK toggle).
+- Manage Org-level credentials (Company Provider keys, Organization MCP) and Credential Policy (the BYOK toggle).
 
 ### What Members can do
 

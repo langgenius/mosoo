@@ -58,8 +58,7 @@ export function DistributionPanel({
             <span className="text-foreground font-medium">
               {isLive ? "live" : "draft (publish to enable)"}
             </span>
-            . Human PAT or Service-token authenticated, access-gated, executes under owner's shadow
-            RBAC.
+            . Personal-token authenticated, access-gated, executes under owner's shadow RBAC.
           </p>
         </div>
         {onOpenSettings ? (
@@ -92,12 +91,12 @@ export function DistributionPanel({
             <>
               <div className="text-fg-2 font-mono text-[12px]">{distribution.apiPath}</div>
               <div className="text-fg-3 mt-0.5 text-[11px]">
-                Use a Human PAT or Service token from{" "}
+                Use a Personal token from{" "}
                 <a
                   className="decoration-fg-3/50 hover:text-foreground underline underline-offset-2"
                   href={distribution.tokenSettingsPath}
                 >
-                  settings → access tokens
+                  settings / API Tokens
                 </a>{" "}
                 · 403 outside Agent access · 429 includes Retry-After
               </div>
@@ -176,8 +175,7 @@ export function DistributionPanel({
         <div className="border-border-subtle bg-card rounded-lg border px-3.5 py-3">
           <div className="text-foreground text-[13px] font-medium">Cooperators</div>
           <p className="text-fg-3 mt-0.5 text-[12px] leading-relaxed">
-            Cooperators are the explicit allow-list for Human callers. Service tokens use their own
-            selected-Agent allowlist and do not unlock every published Agent by default.
+            Cooperators are the explicit allow-list for Personal token callers.
           </p>
           <div className="mt-2.5">
             <Button

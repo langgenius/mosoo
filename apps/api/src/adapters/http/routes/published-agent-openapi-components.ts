@@ -47,16 +47,16 @@ export function createPublishedAgentOpenApiComponents() {
           },
         },
       },
-      Unauthenticated: jsonResponse("A valid Human PAT or Service token is required.", {
+      Unauthenticated: jsonResponse("A valid Personal Access Token is required.", {
         $ref: "#/components/schemas/ErrorResponse",
       }),
     },
     schemas: PUBLISHED_AGENT_OPENAPI_SCHEMAS,
     securitySchemes: {
       publicApiBearer: {
-        bearerFormat: "Mosoo Human PAT or Organization Service token",
+        bearerFormat: "Mosoo Personal Access Token",
         description:
-          "Use Authorization: Bearer grt_pat_... for Human PAT calls or an Organization Service token for machine calls.",
+          "Use Authorization: Bearer grt_pat_... . PATs identify an account and do not carry scopes.",
         scheme: "bearer",
         type: "http",
       },

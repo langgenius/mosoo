@@ -1,21 +1,8 @@
-import type {
-  CreateOrganizationServiceTokenRequest,
-  CreatePersonalAccessTokenRequest,
-} from "@mosoo/contracts/auth";
-import { parsePlatformId, parsePlatformIdList } from "@mosoo/id";
-import type {
-  AgentId,
-  OrganizationId,
-  OrganizationServiceTokenId,
-  PersonalAccessTokenId,
-} from "@mosoo/id";
+import type { CreatePersonalAccessTokenRequest } from "@mosoo/contracts/auth";
+import { parsePlatformId } from "@mosoo/id";
+import type { PersonalAccessTokenId } from "@mosoo/id";
 import type { Hono } from "hono";
 
-import {
-  createOrganizationServiceToken,
-  listOrganizationServiceTokens,
-  revokeOrganizationServiceToken,
-} from "../../../modules/auth/application/organization-service-token.service";
 import {
   createPersonalAccessToken,
   listPersonalAccessTokens,
@@ -58,14 +45,6 @@ function parseRequestPlatformId(value: unknown, label: string) {
   }
 }
 
-function parseRequestPlatformIdList(values: readonly unknown[], label: string) {
-  try {
-    return parsePlatformIdList(values, label);
-  } catch {
-    throw validationError(`${label} must contain valid ULIDs.`);
-  }
-}
-
 async function readCreatePersonalAccessTokenRequest(
   request: Request,
 ): Promise<CreatePersonalAccessTokenRequest | null> {
@@ -84,45 +63,6 @@ async function readCreatePersonalAccessTokenRequest(
 
   return {
     label: body.label,
-  };
-}
-
-async function readCreateOrganizationServiceTokenRequest(
-  request: Request,
-): Promise<CreateOrganizationServiceTokenRequest | null> {
-  const body = await request.json().catch(() => {
-    throw validationError("Request body must be valid JSON.");
-  });
-
-  if (
-    typeof body !== "object" ||
-    body === null ||
-    !("label" in body) ||
-    typeof body.label !== "string" ||
-    !("organizationId" in body) ||
-    typeof body.organizationId !== "string" ||
-    !("allowedAgentIds" in body) ||
-    !Array.isArray(body.allowedAgentIds) ||
-    body.allowedAgentIds.some((agentId) => typeof agentId !== "string")
-  ) {
-    return null;
-  }
-
-  const input = body as Record<string, unknown>;
-  const allowedAgentIds = parseRequestPlatformIdList(
-    input["allowedAgentIds"] as readonly unknown[],
-    "Allowed Agent IDs",
-  ) as AgentId[];
-  const organizationId = parseRequestPlatformId(
-    input["organizationId"],
-    "Organization ID",
-  ) as OrganizationId;
-
-  return {
-    allowAttribution: input["allowAttribution"] === true,
-    allowedAgentIds,
-    label: input["label"] as string,
-    organizationId,
   };
 }
 
@@ -171,68 +111,6 @@ export function registerAccessTokenRoute(app: Hono<ApiGatewayEnvironment>) {
       ) as PersonalAccessTokenId;
 
       await revokePersonalAccessToken(c.env.DB, viewer, tokenId);
-      return c.json({ ok: true });
-    } catch (error) {
-      return tokenError(error);
-    }
-  });
-
-  app.get("/organization-service-tokens", async (c) => {
-    try {
-      const viewer = await getViewerFromRequest(c.env, c.req.raw);
-      if (!viewer) {
-        return unauthorized();
-      }
-
-      const organizationId = c.req.query("organizationId");
-      if (!organizationId) {
-        return invalidRequest("Organization id is required.");
-      }
-
-      const parsedOrganizationId = parseRequestPlatformId(
-        organizationId,
-        "Organization ID",
-      ) as OrganizationId;
-
-      return c.json(await listOrganizationServiceTokens(c.env.DB, viewer, parsedOrganizationId));
-    } catch (error) {
-      return tokenError(error);
-    }
-  });
-
-  app.post("/organization-service-tokens", async (c) => {
-    try {
-      const viewer = await getViewerFromRequest(c.env, c.req.raw);
-      if (!viewer) {
-        return unauthorized();
-      }
-
-      const body = await readCreateOrganizationServiceTokenRequest(c.req.raw);
-      if (!body) {
-        return invalidRequest(
-          "Service token label, organization, and selected Agents are required.",
-        );
-      }
-
-      return c.json(await createOrganizationServiceToken(c.env.DB, viewer, body), 201);
-    } catch (error) {
-      return tokenError(error);
-    }
-  });
-
-  app.delete("/organization-service-tokens/:tokenId", async (c) => {
-    try {
-      const viewer = await getViewerFromRequest(c.env, c.req.raw);
-      if (!viewer) {
-        return unauthorized();
-      }
-
-      const tokenId = parseRequestPlatformId(
-        c.req.param("tokenId"),
-        "Organization service token ID",
-      ) as OrganizationServiceTokenId;
-
-      await revokeOrganizationServiceToken(c.env.DB, viewer, tokenId);
       return c.json({ ok: true });
     } catch (error) {
       return tokenError(error);

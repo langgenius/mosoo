@@ -171,7 +171,6 @@ describe("API to web boundary", () => {
             `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
             {
               body: JSON.stringify({
-                attributed_user_id: PUBLIC_API_TEST_IDS.memberAccount,
                 client_external_ref: "linear-ENG-123",
                 files: [{ file_id: PUBLIC_API_TEST_IDS.file }],
                 input: {
@@ -186,10 +185,33 @@ describe("API to web boundary", () => {
         },
       }),
     ).resolves.toEqual({
-      attributedUserId: PUBLIC_API_TEST_IDS.memberAccount,
       clientExternalRef: "linear-ENG-123",
       fileIds: [PUBLIC_API_TEST_IDS.file],
       inputText: "Summarize the launch plan.",
+    });
+
+    await expect(
+      readCreateThreadRequest({
+        req: {
+          raw: new Request(
+            `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
+            {
+              body: JSON.stringify({
+                attributed_user_id: PUBLIC_API_TEST_IDS.memberAccount,
+                input: {
+                  content: [{ text: "Do the work.", type: "text" }],
+                  type: "user.message",
+                },
+              }),
+              headers: { "Content-Type": "application/json" },
+              method: "POST",
+            },
+          ),
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      status: 400,
     });
 
     await expect(
@@ -248,7 +270,6 @@ describe("API to web boundary", () => {
 
   test("keeps published thread OpenAPI request examples parseable by the public reader", async () => {
     const examples = publishedThreadRequestExamples();
-    let hasAttributedExample = false;
     let hasFileExample = false;
 
     expect(examples.length).toBeGreaterThanOrEqual(3);
@@ -269,11 +290,9 @@ describe("API to web boundary", () => {
 
       expect(parsed.inputText.length).toBeGreaterThan(0);
       expect(Array.isArray(parsed.fileIds)).toBe(true);
-      hasAttributedExample ||= parsed.attributedUserId !== undefined;
       hasFileExample ||= (parsed.fileIds?.length ?? 0) > 0;
     }
 
-    expect(hasAttributedExample).toBe(true);
     expect(hasFileExample).toBe(true);
   });
 

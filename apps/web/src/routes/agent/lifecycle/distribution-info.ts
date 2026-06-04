@@ -85,9 +85,8 @@ export function buildAgentDistribution(agent: Agent): AgentDistribution {
 }
 
 /**
- * Curl example using a Human PAT or Organization Service token bearer. The
- * placeholder `$MOSOO_API_TOKEN` is meant to be replaced by a token from the
- * access-token settings surface.
+ * Curl example using a Personal Access Token bearer. The placeholder
+ * `$MOSOO_API_TOKEN` is meant to be replaced by a token from API Tokens settings.
  *
  * @param {Agent} agent Agent whose public API endpoints should be shown.
  * @returns {string} Copy-ready curl command for creating a thread.

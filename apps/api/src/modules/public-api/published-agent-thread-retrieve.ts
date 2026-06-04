@@ -13,6 +13,7 @@ export async function retrievePublishedAgentThread(
   await admitPublishedThreadReader(request.database, request.caller, snapshot);
 
   return toRetrieveThreadResponse({
+    attributedUserId: snapshot.row.attributed_user_id,
     metadata: snapshot.metadata,
     session: snapshot.session,
   });

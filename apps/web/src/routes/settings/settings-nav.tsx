@@ -24,7 +24,7 @@ const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
   {
     items: [
       { icon: User, label: "Profile", path: "/settings/profile" },
-      { icon: KeyRound, label: "Access Tokens", path: "/settings/access-tokens" },
+      { icon: KeyRound, label: "API Tokens", path: "/settings/access-tokens" },
       { icon: Bot, label: "System Agent", path: "/settings/system-agent" },
       { icon: BarChart3, label: "My Usage", path: "/settings/usage" },
     ],

@@ -199,30 +199,6 @@ CREATE TABLE `auth_verification` (
 --> statement-breakpoint
 CREATE INDEX `auth_verification_expires_at_idx` ON `auth_verification` (`expires_at`);--> statement-breakpoint
 CREATE INDEX `auth_verification_identifier_idx` ON `auth_verification` (`identifier`);--> statement-breakpoint
-CREATE TABLE `organization_service_token_agent` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`created_at` integer NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`token_id` text CHECK ("token_id" = upper("token_id") AND length("token_id") = 26 AND substr("token_id", 1, 1) GLOB '[0-7]' AND "token_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `organization_service_token_agent_agent_idx` ON `organization_service_token_agent` (`organization_id`,`agent_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `organization_service_token_agent_token_agent_idx` ON `organization_service_token_agent` (`token_id`,`agent_id`);--> statement-breakpoint
-CREATE TABLE `organization_service_token` (
-	`allow_attribution` integer DEFAULT false NOT NULL,
-	`created_at` integer NOT NULL,
-	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND substr("created_by_account_id", 1, 1) GLOB '[0-7]' AND "created_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
-	`label` text NOT NULL,
-	`last_used_at` integer,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`revoked_at` integer,
-	`token_hash` text NOT NULL,
-	`updated_at` integer NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `organization_service_token_organization_created_idx` ON `organization_service_token` (`organization_id`,`created_at`);--> statement-breakpoint
-CREATE UNIQUE INDEX `organization_service_token_hash_idx` ON `organization_service_token` (`token_hash`);--> statement-breakpoint
 CREATE TABLE `personal_access_token` (
 	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,

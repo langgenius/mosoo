@@ -7,8 +7,6 @@ import {
   agentsTable,
   environmentRevisionsTable,
   environmentsTable,
-  organizationServiceTokenAgentsTable,
-  organizationServiceTokensTable,
   organizationMembersTable,
   organizationsTable,
   personalAccessTokensTable,
@@ -81,7 +79,6 @@ export const PUBLIC_API_TEST_IDS = {
   run: "01J0000000000000000000000N",
   runAlt: "01J0000000000000000000000P",
   sandbox: "01J0000000000000000000000D",
-  serviceToken: "01J00000000000000000000067",
   driverMember: "01J0000000000000000000000E",
   driverOwner: "01J0000000000000000000000F",
 } as const;
@@ -104,7 +101,6 @@ export const TOKENS = {
   outsider: "grt_pat_outsider_public_http_token_01",
   owner: "grt_pat_owner_public_http_token_01",
   revoked: "grt_pat_revoked_public_http_token_01",
-  service: "grt_svc_public_thread_token_01",
 } as const;
 
 export function nowMsForTest(): number {
@@ -543,13 +539,6 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
     revokedAt: nowMs,
     tokenValue: TOKENS.revoked,
   });
-  await insertServiceToken({
-    allowAttribution: true,
-    database,
-    id: PUBLIC_API_TEST_IDS.serviceToken,
-    label: "Channel adapter",
-    tokenValue: TOKENS.service,
-  });
 
   return database;
 }
@@ -593,42 +582,6 @@ async function insertPat(input: {
           : new Date(input.revokedAt),
       tokenHash: await hashTokenValue(input.tokenValue),
       updatedAt: new Date(nowMs),
-    })
-    .run();
-}
-
-async function insertServiceToken(input: {
-  allowAttribution: boolean;
-  database: SqliteD1Database;
-  id: string;
-  label: string;
-  tokenValue: string;
-}): Promise<void> {
-  const nowMs = nowMsForTest();
-  await input.database
-    .app()
-    .insert(organizationServiceTokensTable)
-    .values({
-      allowAttribution: input.allowAttribution,
-      createdAt: new Date(nowMs),
-      createdByAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
-      id: input.id,
-      label: input.label,
-      lastUsedAt: null,
-      organizationId: PUBLIC_API_TEST_IDS.organization,
-      revokedAt: null,
-      tokenHash: await hashTokenValue(input.tokenValue),
-      updatedAt: new Date(nowMs),
-    })
-    .run();
-  await input.database
-    .app()
-    .insert(organizationServiceTokenAgentsTable)
-    .values({
-      agentId: PUBLIC_API_TEST_IDS.agent,
-      createdAt: new Date(nowMs),
-      organizationId: PUBLIC_API_TEST_IDS.organization,
-      tokenId: input.id,
     })
     .run();
 }

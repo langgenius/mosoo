@@ -6,7 +6,7 @@ import type {
 } from "@mosoo/contracts/public-api";
 import type { SessionSummary } from "@mosoo/contracts/session";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
-import type { PublicThreadId } from "@mosoo/id";
+import type { AccountId, PublicThreadId } from "@mosoo/id";
 
 import { toPublishedRunSummary, toPublishedSessionSummary } from "./published-agent-api-presenter";
 import type { PublishedSessionProjection } from "./published-agent-api-presenter";
@@ -19,16 +19,17 @@ function createThreadLinks(threadId: PublicThreadId): PublishedThreadLinks {
 }
 
 export function toPublishedThreadSummary(input: {
+  attributedUserId: AccountId | null;
   metadata: PublicApiThreadMetadata;
   session: PublishedSessionProjection;
 }): PublishedThreadSummary {
   return {
     agent_id: input.session.agentId,
     attributed_user:
-      input.metadata.attributed_user_id === null
+      input.attributedUserId === null
         ? null
         : {
-            id: input.metadata.attributed_user_id,
+            id: input.attributedUserId,
           },
     client_external_ref: input.metadata.client_external_ref,
     created_at: input.session.createdAt,
@@ -69,6 +70,7 @@ export function toCreateThreadSessionSummary(input: {
 }
 
 export function toCreateThreadResponse(input: {
+  attributedUserId: AccountId | null;
   metadata: PublicApiThreadMetadata;
   run: SessionRunSummary;
   session: PublishedSessionProjection;
@@ -77,6 +79,7 @@ export function toCreateThreadResponse(input: {
     links: createThreadLinks(input.session.id),
     run: toPublishedRunSummary(input.run),
     thread: toPublishedThreadSummary({
+      attributedUserId: input.attributedUserId,
       metadata: input.metadata,
       session: input.session,
     }),
@@ -84,6 +87,7 @@ export function toCreateThreadResponse(input: {
 }
 
 export function toRetrieveThreadResponse(input: {
+  attributedUserId: AccountId | null;
   metadata: PublicApiThreadMetadata;
   session: SessionSummary;
 }): PublishedAgentRetrieveThreadResponse {
@@ -93,6 +97,7 @@ export function toRetrieveThreadResponse(input: {
     links: createThreadLinks(session.id),
     run: session.lastRun,
     thread: toPublishedThreadSummary({
+      attributedUserId: input.attributedUserId,
       metadata: input.metadata,
       session,
     }),

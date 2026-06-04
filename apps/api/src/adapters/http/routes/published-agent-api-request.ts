@@ -11,7 +11,7 @@ import {
   PUBLISHED_THREAD_JSON_BODY_MAX_BYTES,
 } from "@mosoo/contracts/public-api";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AgentId, FileId, PublicThreadId, SessionRunId } from "@mosoo/id";
+import type { AgentId, FileId, PublicThreadId, SessionRunId } from "@mosoo/id";
 
 import {
   PublishedAgentApiError,
@@ -50,12 +50,10 @@ const THREAD_FILE_REQUEST_FIELDS: ReadonlySet<string> = new Set(["fileId"]);
 const CREATE_THREAD_REQUEST_FIELDS: ReadonlySet<string> = new Set([
   "input",
   "files",
-  "attributed_user_id",
   "client_external_ref",
 ]);
 
 export interface ParsedCreateThreadRequest {
-  attributedUserId?: AccountId | undefined;
   clientExternalRef?: string | undefined;
   fileIds: FileId[];
   inputText: string;
@@ -482,7 +480,6 @@ export async function readCreateThreadRequest(
   }
 
   assertOnlyFields(body, CREATE_THREAD_REQUEST_FIELDS, "create thread");
-  const attributedUserIdInput = readOptionalLimitedStringField(body, "attributed_user_id", 26);
   const clientExternalRef = readOptionalLimitedStringField(
     body,
     "client_external_ref",
@@ -492,14 +489,6 @@ export async function readCreateThreadRequest(
   return {
     fileIds: readCreateThreadFileIds(body),
     inputText: readCreateThreadInputText(body),
-    ...(attributedUserIdInput === undefined
-      ? {}
-      : {
-          attributedUserId: parsePublicPlatformId(
-            attributedUserIdInput,
-            "attributed_user_id",
-          ) as AccountId,
-        }),
     ...(clientExternalRef === undefined ? {} : { clientExternalRef }),
   };
 }

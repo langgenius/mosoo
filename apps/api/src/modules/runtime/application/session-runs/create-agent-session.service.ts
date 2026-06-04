@@ -52,11 +52,10 @@ export interface ChannelSessionTriggeredByMetadata {
 
 export interface AgentSessionMetadata {
   public_api?: {
-    attributed_user_id: AccountId | null;
     client_external_ref: string | null;
     created_by: {
       id: string;
-      kind: "human_pat" | "service_token";
+      kind: "human_pat";
       token_id: string;
       token_label: string;
     };

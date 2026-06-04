@@ -1,10 +1,9 @@
-import type { AccountId, AgentId, FileId, PublicThreadId } from "@mosoo/id";
+import type { AgentId, FileId, PublicThreadId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import type { PublicApiCaller } from "../auth/application/public-api-caller.service";
 
 export interface CreatePublishedAgentThreadInput {
-  attributedUserId?: AccountId | undefined;
   clientExternalRef?: string | undefined;
   fileIds: FileId[];
   inputText: string;

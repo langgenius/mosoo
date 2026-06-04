@@ -48,26 +48,6 @@ CREATE TABLE organization_member (
   PRIMARY KEY (organization_id, account_id)
 );
 
-CREATE TABLE organization_service_token (
-  id text PRIMARY KEY NOT NULL,
-  organization_id text NOT NULL,
-  label text NOT NULL,
-  token_hash text NOT NULL,
-  created_by_account_id text NOT NULL,
-  allow_attribution integer DEFAULT 0 NOT NULL,
-  created_at integer NOT NULL,
-  updated_at integer NOT NULL,
-  last_used_at integer,
-  revoked_at integer
-);
-
-CREATE TABLE organization_service_token_agent (
-  token_id text NOT NULL,
-  organization_id text NOT NULL,
-  agent_id text NOT NULL,
-  created_at integer NOT NULL
-);
-
 CREATE TABLE agent (
   id text PRIMARY KEY NOT NULL,
   organization_id text NOT NULL,

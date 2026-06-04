@@ -47,7 +47,6 @@ interface PublishedAgentOpenApiDocument {
 
 const EXAMPLE_AGENT_ID = "01J00000000000000000000001";
 const EXAMPLE_THREAD_ID = "01J00000000000000000000009";
-const EXAMPLE_ACCOUNT_ID = "01J00000000000000000000002";
 const EXAMPLE_FILE_ID = "01J0000000000000000000000J";
 const HUMAN_PAT_SECURITY: Array<Record<string, []>> = [{ personalAccessToken: [] }];
 
@@ -250,13 +249,13 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
       }),
       post: operation({
         description:
-          "Creates a Thread, the backing AgentSession, and the initial Run. Human PAT callers are implicitly attributed to the PAT owner. Organization Service tokens may omit human attribution or pass attributed_user_id when the token is allowed to do so.",
+          "Creates a Thread, the backing AgentSession, and the initial Run. Personal Access Token callers are attributed to the PAT owner.",
         parameters: [exampleAgentIdParameter, idempotencyKeyParameter],
         requestBody: jsonRequestBodyExamples(
           { $ref: "#/components/schemas/CreateThreadRequest" },
           {
             humanPatWithFile: {
-              summary: "Human PAT with an uploaded file",
+              summary: "Personal token with an uploaded file",
               value: {
                 client_external_ref: "linear-ENG-123",
                 files: [{ file_id: EXAMPLE_FILE_ID }],
@@ -271,23 +270,12 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
                 },
               },
             },
-            serviceTokenNoAttribution: {
-              summary: "Service token without human attribution",
+            personalTokenBasic: {
+              summary: "Personal token",
               value: {
-                client_external_ref: "cron-nightly-check",
+                client_external_ref: "demo-thread-001",
                 input: {
-                  content: [{ text: "Run the nightly checklist.", type: "text" }],
-                  type: "user.message",
-                },
-              },
-            },
-            serviceTokenWithAttribution: {
-              summary: "Service token projecting work to a bound user",
-              value: {
-                attributed_user_id: EXAMPLE_ACCOUNT_ID,
-                client_external_ref: "support-ticket-182",
-                input: {
-                  content: [{ text: "Triage this customer escalation.", type: "text" }],
+                  content: [{ text: "Say hello from the API.", type: "text" }],
                   type: "user.message",
                 },
               },
@@ -438,7 +426,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
     components: createPublishedAgentOpenApiComponents(),
     info: {
       description:
-        "Public HTTPS API for creating and retrieving Threads on published Mosoo Agents. v1 resource identifiers are bare ULIDs, not prefixed IDs. Human PATs identify an account caller; Organization Service tokens identify machine callers with selected-Agent allowlists. Runtime execution resolves the published Agent owner's capabilities while attribution controls Thread projection.",
+        "Public HTTPS API for creating and retrieving Threads on published Mosoo Agents. v1 resource identifiers are bare ULIDs, not prefixed IDs. Personal Access Tokens identify the account caller. Runtime execution resolves the published Agent owner's capabilities while the Thread is attributed to the PAT owner.",
       title: "Mosoo Published Agent API",
       version: PUBLIC_API_VERSION,
     },

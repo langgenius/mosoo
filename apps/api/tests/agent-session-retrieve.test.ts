@@ -165,7 +165,7 @@ describe("agent session retrieve", () => {
     });
   });
 
-  test("does not treat service-token attribution metadata as a human thread creator", async () => {
+  test("does not treat unsupported public API creator metadata as a human thread creator", async () => {
     const database = createAgentSessionRetrieveDatabase();
 
     await database
@@ -173,12 +173,10 @@ describe("agent session retrieve", () => {
       .bind(
         JSON.stringify({
           public_api: {
-            attributed_user_id: null,
             client_external_ref: null,
             created_by: {
               id: "01J00000000000000000000067",
-              kind: "service_token",
-              service_token_id: "01J00000000000000000000067",
+              kind: "machine",
               token_id: "01J00000000000000000000067",
               token_label: "Automation",
             },

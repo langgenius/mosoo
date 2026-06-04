@@ -165,14 +165,12 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
   CreateThreadRequest: {
     additionalProperties: false,
     properties: {
-      attributed_user_id: PLATFORM_ID_SCHEMA,
       client_external_ref: {
         maxLength: PUBLISHED_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
         type: "string",
       },
       files: {
-        description:
-          "Draft file handles uploaded by the same Human PAT caller. Organization Service tokens cannot attach files until machine-owned upload handles are available.",
+        description: "Draft file handles uploaded by the same Personal Access Token caller.",
         items: {
           additionalProperties: false,
           properties: {
@@ -288,7 +286,7 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
     additionalProperties: false,
     properties: {
       id: PLATFORM_ID_SCHEMA,
-      kind: { enum: ["human_pat", "service_token"] },
+      kind: { enum: ["human_pat"] },
     },
     required: ["id", "kind"],
     type: "object",

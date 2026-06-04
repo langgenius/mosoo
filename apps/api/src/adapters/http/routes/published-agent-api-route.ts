@@ -39,7 +39,6 @@ async function hashCreateThreadIdempotencyBody(
   body: ParsedCreateThreadRequest,
 ): Promise<string | null> {
   return hashPublicApiIdempotencyBody({
-    attributedUserId: body.attributedUserId ?? null,
     clientExternalRef: body.clientExternalRef ?? null,
     fileIds: body.fileIds,
     inputText: body.inputText,
