@@ -1,55 +1,107 @@
 ---
-title: "Why mosoo — take root, grow agents"
-description: "From local one-off agent work to a cloud agent session lifecycle API — why we're building mosoo."
+title: "The journey begins with an Imagine If."
+titleAccent: "If"
+description: "一封写给 agent builder 的信：我们为什么从本地实验走向 cloud agent session lifecycle API。"
 date: 2026-05-28
 category: "Product"
 author: "mosoo team"
+locale: "zh"
+permalink: "the-journey-begins-with-an-imagine-if"
+translationKey: "why-mosoo"
 featured: true
 heroImage: "/blog/blog/why-mosoo/hero.jpg"
 heroAlt: "A textured green spray-paint field with the mosoo asterisk emerging at the lower right — the bamboo shoot rising through paper."
 ---
 
-<p class="text-[20px] leading-[1.6] text-[color:var(--fg)]">
-  The journey begins with an Imagine <span class="text-[color:var(--accent-text)]">If</span>.
-</p>
-
 > Follow the notes upon the journey. At first sight marks one's destiny. Return lies within the hasty keys.
 
-几个月前，我穿梭在若干家客户现场，推广我们的 new agent design in workflow。客户现场频频发问：为什么不试试 OpenClaw 呢？这和 Hermes agent 有什么区别？
+亲爱的 builder，
 
-这并不是我第一次感觉到 get lost。对于消费级场景来说，提前构建“组件库”的门槛太高了。很多时候，我们可以直接使用 Claude Code 或 Codex 解决问题：这是一次性需求，我也不确定三个月内是否还会遇到同类型的问题。没有必要提前抽象，也没有必要先构建一个应用再解决问题，直接面向结果交付就好了。
+几个月前，我穿梭在若干家客户现场，讲我们新的 agent design in workflow。
 
-甚至很多时候，我会向客户推荐：这个问题你搞错了，不需要弄这么复杂，Claude Code 可以解决你的问题。如果还会遇到的话，额外写一个 skill，或许就是关于这个问题的最小投入。
+每到现场，总有人问：为什么不试试 OpenClaw？这和 Hermes agent 有什么区别？
 
-直至无数 personal PC 上开始出现碎片化解决方案时，我才感到奇怪：软件，或者说 agent 的交付物，是某种快消品吗？
+这并不是我第一次感觉到 get lost。
 
-我可以在我的 computer 上完成这个 task。只要你的本地环境和我一致，我们有对应的 session history、对应的 context、本地相同的文件副本、相同的 MCP 工具以及 skill，你就可以在遇到相同问题的时候复现我的“实验”。
+后来我意识到，困惑并不来自某一个工具本身，而是来自我们还没有说清楚一条边界：什么时候 agent 只是一次交付，什么时候它应该成为生产系统的一部分。
 
-目前为止，我依然认为我们处在一片充满动静却又缺乏实际进展的蛮荒之地。
+对于许多消费级场景，提前构建“组件库”的门槛太高了。
 
-图像里，灰度值就是一个像素的明暗程度，通常 0 代表纯黑，255 代表纯白。而在某一阈值以下的应用，我们可以称之为一次性应用，或者用 skill 进行替代即可。
+一个一次性需求，一个三个月后未必会再次出现的问题，直接用 Claude Code 或 Codex 做掉就好。没有必要先抽象，也没有必要先搭一个应用，再去解决本来可以直接交付的结果。
 
-但是，对于构建、评估、部署、A/B 测试、从生产环境生成评估结果这些更加复杂的应用，工具是分散的。你必须将多个点解决方案拼凑在一起，才能覆盖整个生命周期。开发者依然需要粘合一系列组件，才能为用户提供一个良好的用户体验。
+有时我甚至会劝客户把问题放轻一点。
 
-此时，你并不是在用 Codex 或 Claude Code 解决你自己的问题，而是在用它们为你的客户构建一个生产方案。你浸泡在各种 harness 以及依赖当中不断循环，用着多个终端、worktree，或者新时代 ADE，尝试更有效地推进自己的工作。
+“这个问题不需要弄这么复杂。Claude Code 可以解决。如果它反复出现，再写一个 skill，可能就是最小投入。”
 
-在未来的代码仓库当中，有一半的代码可以被视为高级编程语言，包含前后端逻辑；而另外一部分关于 agent 运行时托管和部署的代码，混杂着一些甚至 90% 由字符串 prompt 构成的函数，却要被一遍又一遍地重复实现。
+这仍然是我相信的判断。
 
-为什么这里不可以有一个框架无关的 “Supabase”，将我从这里解放？
+但另一件事也慢慢变得明显：无数 personal PC 上，开始长出很多碎片化的 agent 解决方案。
 
-云计算时代之前，做软件更像“自己买地、盖房、养物业”：先买物理服务器、交换机、存储，放进机房或 IDC。Agent app 开发也会经历一样的旅程。
+它们像实验，也像作品。它们依赖本地环境、session history、上下文、文件副本、MCP 工具和 skill。
 
-过去，我们将 token 封装成 LLM API call，作为最小单元的计算资源。现在，我们将 token 封装为对一个 cloud agent 的一次请求。从长期来看，现在 Hermes 和 OpenClaw 在本地的消费级需求，会转向 cloud agent in a sandbox，走向更高并发、更长时间、更强隔离性的后台任务。
+我可以在我的 computer 上完成这个 task。只要你拥有相同环境，你就可以复现我的“实验”。
 
-我们正在将云里的“机器资源”重新抽象成开发者可以直接调用的 cloud agent session lifecycle API。
+可是，如果软件或者 agent 的交付物只能这样被转移，那它到底是什么？是快消品吗？是一段偶然成立的现场表演吗？
 
-这就是我们现在在做的事情。
+这就是 mosoo 心路里真正重要的拐点。
+
+我们并不是想把所有 agent work 都平台化。恰恰相反，我们想承认那条阈值线。
+
+在图像里，灰度值描述一个像素的明暗程度。通常 0 是纯黑，255 是纯白。
+
+在 agent app 里，也存在类似的阈值。
+
+阈值以下，是一次性应用，是 skill，是一次本地交付，是“别把它弄复杂”的地方。
+
+阈值以上，是构建、评估、部署、A/B 测试，是从生产环境生成评估结果，是需要覆盖完整生命周期的地方。
+
+走到这里以后，工具突然变得分散。
+
+开发者必须把多个点解决方案拼在一起：sandbox、eval harness、部署脚本、日志、权限、上下文、UI，以及一堆由 prompt 字符串组成的函数。
+
+此时，你并不是在用 Codex 或 Claude Code 解决自己的问题。
+
+你是在用它们为客户构建一个生产方案。
+
+你会浸泡在各种 harness 和依赖里，不断循环。你会打开多个终端、多个 worktree，或者一个新的 ADE，试着让工作往前走。
+
+这时我开始反复问自己：为什么这里不能有一个框架无关的 “Supabase”？
+
+不是为了替代开发者，而是为了把重复的 agent runtime 托管、部署、隔离和评估从每一个项目里释放出来。
+
+云计算时代之前，做软件像“自己买地、盖房、养物业”。
+
+你要买物理服务器、交换机、存储，把它们放进机房或 IDC，然后才能谈应用。
+
+Agent app 开发也会经历类似的旅程。
+
+过去，我们把 token 封装成 LLM API call，把它当成最小的计算资源。
+
+现在，我们正在把 token 重新封装成对一个 cloud agent 的一次请求。
+
+长期来看，本地 Hermes 或 OpenClaw 代表的消费级需求，会继续存在；但更复杂的生产需求，会走向 cloud agent in a sandbox。
+
+它需要更高并发，更长运行时间，更强隔离性，也需要后台任务能够被创建、暂停、恢复、评估和部署。
+
+我们正在把云里的“机器资源”，重新抽象成开发者可以直接调用的 cloud agent session lifecycle API。
+
+这就是 mosoo 在做的事情。
+
+不是又一个 agent demo。
+
+不是又一个 prompt wrapper。
+
+而是一种判断：当 agent work 真的跨过那条阈值，它应该像云资源一样被托管，被隔离，被观测，被复用。
 
 We call it **mosoo**.
 
 ## What's next
 
-We will keep writing from the boundary between local experiments and production agent systems: runtime internals, sandbox lifecycle, deployment stories, and the evaluation loop that turns agent work into product work.
+接下来，我们会继续写这些笔记。
+
+有些会关于 runtime internals，有些会关于 sandbox lifecycle，有些会关于部署、评估和从真实生产环境回收信号。
+
+如果你也正在把 agent 从本地实验带进生产系统，希望这些 notes 能让旅程少一点迷雾。
 
 <a
   href="https://mosoo.ai/login"

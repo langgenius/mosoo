@@ -1,15 +1,20 @@
 import type { APIRoute } from "astro";
 import { getCollection } from "astro:content";
+import { DEFAULT_LOCALE, getPostHref } from "../lib/i18n";
 
 export const GET: APIRoute = async ({ site }) => {
-  const posts = (await getCollection("blog", ({ data }) => !data.draft)).sort(
-    (a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
-  );
+  const posts = (
+    await getCollection(
+      "blog",
+      ({ data }) => !data.draft && data.locale === DEFAULT_LOCALE,
+    )
+  ).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
 
-  const base = (site?.href ?? "https://mosoo.ai/").replace(/\/$/, "") + "/blog";
+  const siteRoot = (site?.href ?? "https://mosoo.ai/").replace(/\/$/, "");
+  const base = `${siteRoot}/blog`;
   const items = posts
     .map((post) => {
-      const url = `${base}/${post.id}`;
+      const url = `${siteRoot}${getPostHref(post, "/blog")}`;
       const pubDate = post.data.date.toUTCString();
       const escape = (s: string): string =>
         s

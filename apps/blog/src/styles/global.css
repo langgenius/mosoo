@@ -18,13 +18,15 @@
 .prose-mosoo {
   font-family: var(--font-sans);
   font-size: var(--text-body-lg);
-  line-height: var(--lh-body);
+  line-height: 1.72;
   color: var(--ink-900);
   font-weight: var(--fw-regular);
 }
 .prose-mosoo > * + * {
-  margin-top: var(--space-5);
+  margin-top: var(--space-7);
 }
+.prose-mosoo > p + p { margin-top: 1.45em; }
+.prose-mosoo > blockquote + p { margin-top: var(--space-9); }
 .prose-mosoo h2 {
   font-family: var(--font-display);
   font-size: var(--text-h2);
@@ -101,7 +103,7 @@
 .prose-mosoo blockquote {
   border-left: 2px solid var(--green-500);
   padding: 0 0 0 var(--space-5);
-  margin: 0;
+  margin: var(--space-8) 0;
   color: var(--fg-secondary);
   font-family: var(--font-display);
   font-size: var(--text-h4);

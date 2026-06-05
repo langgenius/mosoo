@@ -1,0 +1,91 @@
+---
+import type { CollectionEntry } from "astro:content";
+import Hero from "./Hero.astro";
+import Card from "./Card.astro";
+import CategoryTabs from "./CategoryTabs.astro";
+import { CATEGORIES } from "../content.config";
+import { getPostHref } from "../lib/i18n";
+
+interface Props {
+  posts: CollectionEntry<"blog">[];
+  base: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+}
+
+const { posts, base, eyebrow, title, description } = Astro.props;
+const featured = posts.find((p) => p.data.featured) ?? posts[0];
+const categories = CATEGORIES.filter((category) =>
+  posts.some((post) => post.data.category === category),
+);
+---
+
+<main>
+  <section class="culm-band border-b border-[color:var(--border)]">
+    <div class="mx-auto w-full max-w-[1180px] px-7 py-20 md:py-28">
+      <div class="inline-flex items-center gap-2 font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-[color:var(--fg-muted)]">
+        <span class="inline-block h-[7px] w-[7px] rounded-full bg-[color:var(--green-500)]"></span>
+        {eyebrow}
+      </div>
+      <h1 class="mt-5 max-w-3xl font-display text-[52px] font-medium leading-[1.04] tracking-[-0.025em] text-[color:var(--ink-950)] md:text-[72px]">
+        {title}
+      </h1>
+      <p class="mt-7 max-w-xl text-[18px] leading-[1.55] text-[color:var(--fg-secondary)]">
+        {description}
+      </p>
+    </div>
+  </section>
+
+  {
+    featured && (
+      <section class="border-b border-[color:var(--border)]">
+        <div class="mx-auto w-full max-w-[1180px] px-7 py-12 md:py-16">
+          <Hero featured={featured} base={base} />
+        </div>
+      </section>
+    )
+  }
+
+  <section>
+    <div class="mx-auto w-full max-w-[1180px] px-7 py-12 md:py-16">
+      <div class="mb-8 flex items-end justify-between gap-4">
+        <h2 class="font-display text-[28px] font-medium tracking-[-0.02em] text-[color:var(--ink-950)] md:text-[32px]">
+          All posts
+        </h2>
+        <span class="font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-[color:var(--fg-muted)]">
+          {posts.length} {posts.length === 1 ? "entry" : "entries"}
+        </span>
+      </div>
+
+      <CategoryTabs categories={categories} />
+
+      <div class="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {
+          posts.map((post) => (
+            <div data-card data-category={post.data.category}>
+              <Card
+                href={getPostHref(post, base)}
+                title={post.data.title}
+                category={post.data.category}
+                date={post.data.date}
+                description={post.data.description}
+                slug={post.id}
+                heroImage={post.data.heroImage}
+                heroAlt={post.data.heroAlt}
+              />
+            </div>
+          ))
+        }
+      </div>
+
+      {
+        posts.length === 0 && (
+          <div class="rounded-[var(--r-lg)] border border-dashed border-[color:var(--border)] p-12 text-center text-[14px] text-[color:var(--fg-muted)]">
+            No posts yet — check back soon.
+          </div>
+        )
+      }
+    </div>
+  </section>
+</main>

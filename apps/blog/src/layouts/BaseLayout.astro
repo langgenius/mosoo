@@ -11,6 +11,7 @@ interface Props {
   type?: "website" | "article";
   publishedTime?: Date;
   author?: string;
+  lang?: "en" | "zh-CN";
 }
 const {
   title,
@@ -20,6 +21,7 @@ const {
   type = "website",
   publishedTime,
   author,
+  lang = "en",
 } = Astro.props;
 const cleanPath = Astro.url.pathname.replace(/\/$/, "") || "/";
 const canonicalUrl = canonical ?? new URL(cleanPath, Astro.site).href;
@@ -27,7 +29,7 @@ const ogImageUrl = ogImage ?? new URL("/og-default.png", Astro.site).href;
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={lang}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

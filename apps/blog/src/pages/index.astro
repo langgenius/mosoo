@@ -1,99 +1,25 @@
 ---
 import { getCollection } from "astro:content";
 import BaseLayout from "../layouts/BaseLayout.astro";
-import Hero from "../components/Hero.astro";
-import Card from "../components/Card.astro";
-import CategoryTabs from "../components/CategoryTabs.astro";
-import { CATEGORIES } from "../content.config";
+import BlogIndex from "../components/BlogIndex.astro";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-const all = (await getCollection("blog", ({ data }) => !data.draft)).sort(
+const posts = (await getCollection("blog", ({ data }) => !data.draft && data.locale === "en")).sort(
   (a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
-);
-
-const featured = all.find((p) => p.data.featured) ?? all[0];
-const categories = CATEGORIES.filter((category) =>
-  all.some((post) => post.data.category === category),
 );
 ---
 
 <BaseLayout
   title="mosoo blog · Notes from the bamboo grove"
-  description="Engineering, product, and research notes from the team building mosoo — the enterprise agent + knowledge platform."
+  description="Notes from the mosoo team on agent products, runtime design, and the road to production."
+  lang="en"
 >
-  <main>
-    <!-- Title band with the signature culm hairlines as a subtle paper grain -->
-    <section class="culm-band border-b border-[color:var(--border)]">
-      <div class="mx-auto w-full max-w-[1180px] px-7 py-20 md:py-28">
-        <div class="inline-flex items-center gap-2 font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-[color:var(--fg-muted)]">
-          <span class="inline-block h-[7px] w-[7px] rounded-full bg-[color:var(--green-500)]"></span>
-          mosoo.ai / blog
-        </div>
-        <h1 class="mt-5 max-w-3xl font-display text-[52px] font-medium leading-[1.04] tracking-[-0.025em] text-[color:var(--ink-950)] md:text-[72px]">
-          Notes from the bamboo grove.
-        </h1>
-        <p class="mt-7 max-w-xl text-[18px] leading-[1.55] text-[color:var(--fg-secondary)]">
-          Field notes from the team building mosoo — what we ship, what we
-          measure, and the calm-runtime ideas behind it.
-        </p>
-      </div>
-    </section>
-
-    <!-- Featured -->
-    {
-      featured && (
-        <section class="border-b border-[color:var(--border)]">
-          <div class="mx-auto w-full max-w-[1180px] px-7 py-12 md:py-16">
-            <Hero featured={featured} base={base} />
-          </div>
-        </section>
-      )
-    }
-
-    <!-- Tabs + Grid -->
-    <section>
-      <div class="mx-auto w-full max-w-[1180px] px-7 py-12 md:py-16">
-        <div class="mb-8 flex items-end justify-between gap-4">
-          <div>
-            <h2 class="font-display text-[28px] font-medium tracking-[-0.02em] text-[color:var(--ink-950)] md:text-[32px]">
-              All posts
-            </h2>
-          </div>
-          <span class="font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-[color:var(--fg-muted)]">
-            {all.length} {all.length === 1 ? "entry" : "entries"}
-          </span>
-        </div>
-
-        <CategoryTabs categories={categories} />
-
-        <div class="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {
-            all.map((post) => (
-              <div data-card data-category={post.data.category}>
-                <Card
-                  href={`${base}/${post.id}`}
-                  title={post.data.title}
-                  category={post.data.category}
-                  date={post.data.date}
-                  description={post.data.description}
-                  slug={post.id}
-                  heroImage={post.data.heroImage}
-                  heroAlt={post.data.heroAlt}
-                />
-              </div>
-            ))
-          }
-        </div>
-
-        {
-          all.length === 0 && (
-            <div class="rounded-[var(--r-lg)] border border-dashed border-[color:var(--border)] p-12 text-center text-[14px] text-[color:var(--fg-muted)]">
-              No posts yet — check back soon.
-            </div>
-          )
-        }
-      </div>
-    </section>
-  </main>
+  <BlogIndex
+    posts={posts}
+    base={base}
+    eyebrow="mosoo.ai / blog"
+    title="Notes from the bamboo grove."
+    description="Letters for builders moving agents from local experiments into production systems."
+  />
 </BaseLayout>

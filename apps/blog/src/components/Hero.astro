@@ -1,5 +1,6 @@
 ---
 import CardVisual from "./CardVisual.astro";
+import { getPostHref } from "../lib/i18n";
 import type { CollectionEntry } from "astro:content";
 
 interface Props {
@@ -7,6 +8,7 @@ interface Props {
   base: string;
 }
 const { featured, base } = Astro.props;
+const href = getPostHref(featured, base);
 const dateLabel = featured.data.date.toLocaleDateString("en-US", {
   year: "numeric",
   month: "long",
@@ -15,7 +17,7 @@ const dateLabel = featured.data.date.toLocaleDateString("en-US", {
 ---
 
 <a
-  href={`${base}/${featured.id}`}
+  href={href}
   class="group block overflow-hidden rounded-[var(--r-2xl)] border border-[color:var(--border)] bg-[color:var(--surface)] shadow-[var(--shadow-sm)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-lg)]"
 >
   <div class="grid grid-cols-1 md:grid-cols-[0.95fr_1.05fr]">

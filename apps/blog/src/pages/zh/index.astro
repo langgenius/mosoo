@@ -1,0 +1,25 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import BlogIndex from "../../components/BlogIndex.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const posts = (await getCollection("blog", ({ data }) => !data.draft && data.locale === "zh")).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
+);
+---
+
+<BaseLayout
+  title="mosoo blog · Notes from the bamboo grove"
+  description="mosoo 团队关于 agent 产品、运行时和生产化路径的手记。"
+  lang="zh-CN"
+>
+  <BlogIndex
+    posts={posts}
+    base={base}
+    eyebrow="mosoo.ai / blog"
+    title="Notes from the bamboo grove."
+    description="写给正在把 agent 从本地实验带进生产系统的人。"
+  />
+</BaseLayout>

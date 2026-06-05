@@ -9,6 +9,7 @@ export const CATEGORIES = [
   "Research",
   "Customer Stories",
 ] as const;
+export const LOCALES = ["zh", "en"] as const;
 
 const blog = defineCollection({
   loader: glob({
@@ -17,10 +18,14 @@ const blog = defineCollection({
   }),
   schema: z.object({
     title: z.string(),
+    titleAccent: z.string().optional(),
     description: z.string(),
     date: z.coerce.date(),
     category: z.enum(CATEGORIES),
     author: z.string().default("mosoo team"),
+    locale: z.enum(LOCALES).default("en"),
+    permalink: z.string().optional(),
+    translationKey: z.string().optional(),
     featured: z.boolean().default(false),
     draft: z.boolean().default(false),
     // Custom hero image, optional. When set, the card and the article hero

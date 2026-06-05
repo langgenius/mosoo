@@ -1,15 +1,41 @@
 ---
 import BaseLayout from "./BaseLayout.astro";
 import CardVisual from "../components/CardVisual.astro";
+import { getIndexHref, getPostLocale } from "../lib/i18n";
 import type { CollectionEntry } from "astro:content";
 
 interface Props {
   post: CollectionEntry<"blog">;
 }
 const { post } = Astro.props;
-const { title, description, date, category, author, heroImage, heroAlt } =
-  post.data;
-const dateLabel = date.toLocaleDateString("en-US", {
+const {
+  title,
+  titleAccent,
+  description,
+  date,
+  category,
+  author,
+  heroImage,
+  heroAlt,
+} = post.data;
+const accentIndex = titleAccent ? title.indexOf(titleAccent) : -1;
+const hasTitleAccent = Boolean(titleAccent && accentIndex >= 0);
+const titleBefore = hasTitleAccent ? title.slice(0, accentIndex) : title;
+const titleAfter =
+  hasTitleAccent && titleAccent
+    ? title.slice(accentIndex + titleAccent.length)
+    : "";
+const locale = getPostLocale(post);
+const lang = locale === "zh" ? "zh-CN" : "en";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const indexHref = getIndexHref(locale, base);
+const copy = {
+  back: locale === "zh" ? "← 返回全部文章" : "← Back to all posts",
+  by: locale === "zh" ? "By" : "By",
+  more: locale === "zh" ? "← More posts" : "← More posts",
+  try: "Try mosoo →",
+};
+const dateLabel = date.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", {
   year: "numeric",
   month: "long",
   day: "numeric",
@@ -41,6 +67,7 @@ const jsonLd = {
   publishedTime={date}
   author={author}
   ogImage={heroImage ? new URL(heroImage, Astro.site).href : undefined}
+  lang={lang}
 >
   <script
     is:inline
@@ -51,10 +78,10 @@ const jsonLd = {
 
   <article class="mx-auto w-full max-w-[760px] px-6 py-14 md:py-20">
     <a
-      href="/blog"
+      href={indexHref}
       class="mb-10 inline-flex items-center gap-2 font-mono text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[color:var(--fg-muted)] transition-colors hover:text-[color:var(--fg)]"
     >
-      ← Back to all posts
+      {copy.back}
     </a>
 
     <div class="mb-4 flex items-center gap-3 font-mono text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[color:var(--fg-muted)]">
@@ -67,7 +94,15 @@ const jsonLd = {
     </div>
 
     <h1 class="mb-5 font-display text-[42px] font-medium leading-[1.05] tracking-[-0.025em] text-[color:var(--ink-950)] md:text-[56px]">
-      {title}
+      {
+        hasTitleAccent && titleAccent ? (
+          <>
+            {titleBefore}<span class="text-[#0033ff]">{titleAccent}</span>{titleAfter}
+          </>
+        ) : (
+          title
+        )
+      }
     </h1>
 
     <p class="mb-8 text-[19px] leading-[1.55] text-[color:var(--fg-secondary)]">
@@ -84,7 +119,7 @@ const jsonLd = {
           class="h-7 w-7"
         />
       </span>
-      <span>By {author}</span>
+      <span>{copy.by} {author}</span>
     </div>
 
     <div class="mb-14 overflow-hidden rounded-[var(--r-xl)] border border-[color:var(--border)] shadow-[var(--shadow-sm)]">
@@ -104,14 +139,14 @@ const jsonLd = {
 
     <div class="flex items-center justify-between text-[13px] text-[color:var(--fg-secondary)]">
       <a
-        href="/blog"
+        href={indexHref}
         class="font-mono font-semibold uppercase tracking-[0.08em] hover:text-[color:var(--fg)]"
-        >← More posts</a
+        >{copy.more}</a
       >
       <a
         href="https://mosoo.ai/login"
         class="inline-flex items-center gap-2 rounded-[var(--r-md)] bg-[color:var(--green-500)] px-3.5 py-2 font-semibold text-[color:var(--fg-on-accent)] transition-colors hover:bg-[color:var(--green-600)]"
-        >Try mosoo →</a
+        >{copy.try}</a
       >
     </div>
   </article>
