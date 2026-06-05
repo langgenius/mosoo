@@ -33,7 +33,7 @@ const copy = {
   back: locale === "zh" ? "← 返回全部文章" : "← Back to all posts",
   by: locale === "zh" ? "By" : "By",
   more: locale === "zh" ? "← More posts" : "← More posts",
-  try: "Try Mosoo →",
+  learnMore: "Learn More →",
 };
 const dateLabel = date.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", {
   year: "numeric",
@@ -140,9 +140,9 @@ const jsonLd = {
         >{copy.more}</a
       >
       <a
-        href="https://mosoo.ai/login"
+        href="https://github.com/langgenius/mosoo-agent-driver"
         class="inline-flex items-center gap-2 rounded-[var(--r-md)] bg-[color:var(--green-500)] px-3.5 py-2 font-semibold text-[color:var(--fg-on-accent)] transition-colors hover:bg-[color:var(--green-600)]"
-        >{copy.try}</a
+        >{copy.learnMore}</a
       >
     </div>
   </article>
