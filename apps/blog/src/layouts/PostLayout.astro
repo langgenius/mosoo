@@ -43,6 +43,7 @@ const jsonLd = {
   ogImage={heroImage ? new URL(heroImage, Astro.site).href : undefined}
 >
   <script
+    is:inline
     type="application/ld+json"
     set:html={JSON.stringify(jsonLd)}
     slot="head"
@@ -74,8 +75,14 @@ const jsonLd = {
     </p>
 
     <div class="mb-12 flex items-center gap-3 text-[14px] text-[color:var(--fg-secondary)]">
-      <span class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--green-100)] font-semibold text-[color:var(--accent-text)]">
-        {author.slice(0, 1).toUpperCase()}
+      <span class="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[color:var(--border)] bg-white shadow-[var(--shadow-xs)]">
+        <img
+          src="/blog/favicon.svg"
+          alt=""
+          width="28"
+          height="28"
+          class="h-7 w-7"
+        />
       </span>
       <span>By {author}</span>
     </div>
@@ -85,7 +92,7 @@ const jsonLd = {
         slug={post.id}
         heroImage={heroImage}
         heroAlt={heroAlt ?? title}
-        ratio="3/2"
+        ratio="16/9"
       />
     </div>
 

@@ -18,24 +18,24 @@ const dateLabel = featured.data.date.toLocaleDateString("en-US", {
   href={`${base}/${featured.id}`}
   class="group block overflow-hidden rounded-[var(--r-2xl)] border border-[color:var(--border)] bg-[color:var(--surface)] shadow-[var(--shadow-sm)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-lg)]"
 >
-  <div class="grid grid-cols-1 md:grid-cols-2">
+  <div class="grid grid-cols-1 md:grid-cols-[0.95fr_1.05fr]">
     <div class="md:order-2">
       <CardVisual
         slug={featured.id}
         heroImage={featured.data.heroImage}
         heroAlt={featured.data.heroAlt ?? featured.data.title}
-        ratio="3/2"
+        ratio="16/9"
         label={featured.data.category}
       />
     </div>
-    <div class="flex flex-col gap-6 p-8 md:order-1 md:p-12">
+    <div class="flex flex-col gap-4 p-6 md:order-1 md:p-8 lg:p-9">
       <div class="font-mono text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[color:var(--fg-muted)]">
         Featured · {dateLabel}
       </div>
-      <h2 class="font-display text-[34px] font-medium leading-[1.05] tracking-[-0.02em] text-[color:var(--ink-950)] transition-colors group-hover:text-[color:var(--accent-press)] md:text-[44px]">
+      <h2 class="font-display text-[30px] font-medium leading-[1.05] tracking-[-0.02em] text-[color:var(--ink-950)] transition-colors group-hover:text-[color:var(--accent-press)] md:text-[38px]">
         {featured.data.title}
       </h2>
-      <p class="text-[16px] leading-[1.6] text-[color:var(--fg-secondary)]">
+      <p class="text-[15px] leading-[1.5] text-[color:var(--fg-secondary)]">
         {featured.data.description}
       </p>
       <div class="mt-auto flex items-center gap-3 text-[13px] text-[color:var(--fg-secondary)]">

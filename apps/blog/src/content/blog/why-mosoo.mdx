@@ -1,6 +1,6 @@
 ---
 title: "Why mosoo — take root, grow agents"
-description: "How we got tired of half-finished agent platforms and started building one we'd want to use ourselves."
+description: "From local one-off agent work to a cloud agent session lifecycle API — why we're building mosoo."
 date: 2026-05-28
 category: "Product"
 author: "mosoo team"
@@ -9,18 +9,51 @@ heroImage: "/blog/blog/why-mosoo/hero.jpg"
 heroAlt: "A textured green spray-paint field with the mosoo asterisk emerging at the lower right — the bamboo shoot rising through paper."
 ---
 
-When we started, the agent space looked like a frontier with a lot of motion and not a lot of mileage. Every demo was impressive for 90 seconds and brittle for the rest of the week. We kept asking the same question to anyone who would listen: _what does this look like in six months, with real users, real money on the line, real ops on call?_
+<p class="text-[20px] leading-[1.6] text-[color:var(--fg)]">
+  The journey begins with an Imagine <span class="text-[color:var(--accent-text)]">If</span>.
+</p>
 
-The honest answer was that nobody knew. So we built **mosoo** — a runtime designed for that six-month version of the world, not the demo.
+> Follow the notes upon the journey. At first sight marks one's destiny. Return lies within the hasty keys.
 
-## Three things we kept coming back to
+几个月前，我穿梭在若干家客户现场，推广我们的 new agent design in workflow。客户现场频频发问：为什么不试试 OpenClaw 呢？这和 Hermes agent 有什么区别？
 
-1. **Calm is a feature.** A platform that wakes up at 3am because a tool call timed out is a platform that won't ship serious workloads. Mosoo is built around a small, boring control plane and a transparent execution model.
-2. **Boundaries are sacred.** Credentials, permissions, environments — these aren't UX flourishes. They are how you get to "yes" from security and legal in real organizations.
-3. **The agent is not the product.** The product is the outcome the agent enables. We measure success by minutes saved, not tokens spent.
+这并不是我第一次感觉到 get lost。对于消费级场景来说，提前构建“组件库”的门槛太高了。很多时候，我们可以直接使用 Claude Code 或 Codex 解决问题：这是一次性需求，我也不确定三个月内是否还会遇到同类型的问题。没有必要提前抽象，也没有必要先构建一个应用再解决问题，直接面向结果交付就好了。
+
+甚至很多时候，我会向客户推荐：这个问题你搞错了，不需要弄这么复杂，Claude Code 可以解决你的问题。如果还会遇到的话，额外写一个 skill，或许就是关于这个问题的最小投入。
+
+直至无数 personal PC 上开始出现碎片化解决方案时，我才感到奇怪：软件，或者说 agent 的交付物，是某种快消品吗？
+
+我可以在我的 computer 上完成这个 task。只要你的本地环境和我一致，我们有对应的 session history、对应的 context、本地相同的文件副本、相同的 MCP 工具以及 skill，你就可以在遇到相同问题的时候复现我的“实验”。
+
+目前为止，我依然认为我们处在一片充满动静却又缺乏实际进展的蛮荒之地。
+
+图像里，灰度值就是一个像素的明暗程度，通常 0 代表纯黑，255 代表纯白。而在某一阈值以下的应用，我们可以称之为一次性应用，或者用 skill 进行替代即可。
+
+但是，对于构建、评估、部署、A/B 测试、从生产环境生成评估结果这些更加复杂的应用，工具是分散的。你必须将多个点解决方案拼凑在一起，才能覆盖整个生命周期。开发者依然需要粘合一系列组件，才能为用户提供一个良好的用户体验。
+
+此时，你并不是在用 Codex 或 Claude Code 解决你自己的问题，而是在用它们为你的客户构建一个生产方案。你浸泡在各种 harness 以及依赖当中不断循环，用着多个终端、worktree，或者新时代 ADE，尝试更有效地推进自己的工作。
+
+在未来的代码仓库当中，有一半的代码可以被视为高级编程语言，包含前后端逻辑；而另外一部分关于 agent 运行时托管和部署的代码，混杂着一些甚至 90% 由字符串 prompt 构成的函数，却要被一遍又一遍地重复实现。
+
+为什么这里不可以有一个框架无关的 “Supabase”，将我从这里解放？
+
+云计算时代之前，做软件更像“自己买地、盖房、养物业”：先买物理服务器、交换机、存储，放进机房或 IDC。Agent app 开发也会经历一样的旅程。
+
+过去，我们将 token 封装成 LLM API call，作为最小单元的计算资源。现在，我们将 token 封装为对一个 cloud agent 的一次请求。从长期来看，现在 Hermes 和 OpenClaw 在本地的消费级需求，会转向 cloud agent in a sandbox，走向更高并发、更长时间、更强隔离性的后台任务。
+
+我们正在将云里的“机器资源”重新抽象成开发者可以直接调用的 cloud agent session lifecycle API。
+
+这就是我们现在在做的事情。
+
+We call it **mosoo**.
 
 ## What's next
 
-We'll be writing more here as we go — runtime internals, deploy stories, the occasional postmortem. If you want to follow along, the [RSS feed](/blog/rss.xml) is the cheapest way.
+We will keep writing from the boundary between local experiments and production agent systems: runtime internals, sandbox lifecycle, deployment stories, and the evaluation loop that turns agent work into product work.
 
-If you'd rather try it: [come say hello at mosoo.ai](https://mosoo.ai/login).
+<a
+  href="https://mosoo.ai/login"
+  class="not-prose mt-2 inline-flex items-center rounded-[var(--r-md)] bg-[color:var(--green-500)] px-4 py-2.5 text-[14px] font-semibold text-[color:var(--fg-on-accent)] no-underline transition-colors hover:bg-[color:var(--green-600)]"
+>
+  Try mosoo →
+</a>
