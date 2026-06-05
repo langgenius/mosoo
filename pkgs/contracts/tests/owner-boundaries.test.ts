@@ -36,6 +36,7 @@ import {
   ensureSpaceFilePathHasExtension,
   joinPath,
   normalizeFileName,
+  normalizeSpaceDirectoryPath,
   normalizeSpaceFilePath,
   toSessionResourceMaterializedPath,
 } from "@mosoo/contracts/file";
@@ -434,6 +435,17 @@ describe("contracts owner boundaries", () => {
         runtimeId: "openai-runtime",
       }),
     ).toThrow();
+  });
+
+  test("space directory path normalization tolerates absent roots", () => {
+    // A root-level listing arrives as an explicit `null` from the GraphQL
+    // nullable `path` argument; it must normalize to the empty root, not throw
+    // `Cannot read properties of null (reading 'trim')`.
+    expect(normalizeSpaceDirectoryPath(null)).toBe("");
+    expect(normalizeSpaceDirectoryPath(undefined)).toBe("");
+    expect(normalizeSpaceDirectoryPath("")).toBe("");
+    expect(normalizeSpaceDirectoryPath("docs/notes ")).toBe("docs/notes");
+    expect(() => normalizeSpaceDirectoryPath("/docs")).toThrow();
   });
 
   test("file contract owns user path admission before object key projection", () => {

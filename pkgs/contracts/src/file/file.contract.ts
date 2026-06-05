@@ -123,7 +123,7 @@ export function normalizeFileName(name: string): string {
   return normalized;
 }
 
-export function normalizeOptionalPath(path?: string): string {
+export function normalizeOptionalPath(path?: string | null): string {
   if (!path) {
     return "";
   }
@@ -166,8 +166,11 @@ export function getSpaceFileNameExtensionError(name: string): string | null {
   return null;
 }
 
-function normalizeSpacePath(path: string | undefined, input: { allowEmpty: boolean }): string {
-  if (path !== undefined) {
+function normalizeSpacePath(
+  path: string | null | undefined,
+  input: { allowEmpty: boolean },
+): string {
+  if (path != null) {
     assertRelativePathOriginal(path);
   }
 
@@ -187,7 +190,7 @@ function normalizeSpacePath(path: string | undefined, input: { allowEmpty: boole
     .join("/");
 }
 
-export function normalizeSpaceDirectoryPath(path?: string): string {
+export function normalizeSpaceDirectoryPath(path?: string | null): string {
   return normalizeSpacePath(path, { allowEmpty: true });
 }
 
