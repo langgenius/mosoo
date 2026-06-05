@@ -1,0 +1,348 @@
+/* ============================================================================
+   mosoo · Design Tokens — colors_and_type.css
+   Brand: enterprise AI agent + knowledge platform, inspired by Moso bamboo (毛竹).
+   System: neutral-forward, premium & minimal, lime-green as a disciplined accent.
+   ----------------------------------------------------------------------------
+   Fonts are loaded from Google Fonts (see note in README → Typography).
+   Primary: Hanken Grotesk (neo-grotesque). Mono: JetBrains Mono.
+   ========================================================================== */
+
+/* Consumer apps load the Google Fonts stylesheet via a <link rel="stylesheet">
+   in their <head> so the @import-must-be-first rule never bites when this
+   file is composed with @import "tailwindcss". See apps/blog/BaseLayout. */
+
+:root {
+  /* ---------------------------------------------------------------------------
+     1 · BRAND GREEN  (bamboo shoot / new growth) — the signature accent
+     500 is the official brand green (#6FD305). Use 600–800 for text/contrast.
+     --------------------------------------------------------------------------- */
+  --green-50:  #F4FCE4;
+  --green-100: #E7F8C4;
+  --green-200: #D3F195;
+  --green-300: #B6E85F;
+  --green-400: #95DD2C;
+  --green-500: #6FD305;  /* ← BRAND */
+  --green-600: #5CB300;
+  --green-700: #498C07;
+  --green-800: #3A6E0E;
+  --green-900: #2C5113;
+  --green-950: #1A310B;
+
+  /* ---------------------------------------------------------------------------
+     2 · NEUTRALS  (true cool grays — calm, GitHub-like; green is NOT in here)
+     --------------------------------------------------------------------------- */
+  --ink-950: #08090A;  /* strongest ink */
+  --ink-900: #1C2024;  /* primary text */
+  --ink-800: #2B3036;
+  --ink-700: #3D434B;  /* secondary text */
+  --ink-600: #515860;
+  --ink-500: #656C75;  /* tertiary / muted text */
+  --ink-400: #828A93;  /* placeholder */
+  --ink-300: #AEB5BE;  /* disabled text */
+  --ink-200: #D2D7DD;  /* strong border */
+  --ink-150: #DFE3E8;  /* divider */
+  --ink-100: #E9ECF0;  /* hairline border */
+  --ink-50:  #F4F6F8;  /* subtle fill / row hover */
+  --paper:   #FBFBFC;  /* app / page background */
+  --surface: #FFFFFF;  /* cards, panels, sheets */
+
+  /* ---------------------------------------------------------------------------
+     3 · CARBON  (near-black with a whisper of green — dark sections, footers)
+     kept under the --forest-* names for compatibility; now calm near-neutral
+     --------------------------------------------------------------------------- */
+  --forest-950: #090B0A;
+  --forest-900: #10130F;
+  --forest-800: #181C18;
+  --forest-700: #262B26;
+  --forest-600: #39413A;
+
+  /* ---------------------------------------------------------------------------
+     4 · SEMANTIC STATUS
+     --------------------------------------------------------------------------- */
+  --success-fg: #3A6E0E;  --success: #5CB300;  --success-bg: #EDF9D8;
+  --warning-fg: #9A6800;  --warning: #E0A106;  --warning-bg: #FBF1D4;
+  --danger-fg:  #B91C1C;  --danger:  #DC2A2A;  --danger-bg:  #FBEAEA;
+  --info-fg:    #235FBE;  --info:    #2F6BD4;  --info-bg:    #E8F0FD;
+
+  /* ---------------------------------------------------------------------------
+     5 · SEMANTIC ALIASES  (use these in product UI)
+     --------------------------------------------------------------------------- */
+  --bg:            var(--paper);
+  --bg-elevated:   var(--surface);
+  --bg-sunken:     var(--ink-50);
+  --fg:            var(--ink-900);   /* primary text */
+  --fg-secondary:  var(--ink-700);
+  --fg-muted:      var(--ink-500);
+  --fg-subtle:     var(--ink-400);
+  --fg-on-accent:  #0F1A02;          /* ink on bright green */
+  --fg-on-dark:    #E6E9ED;          /* text on carbon */
+
+  --accent:        var(--green-500);
+  --accent-hover:  var(--green-600);
+  --accent-press:  var(--green-700);
+  --accent-text:   var(--green-800); /* green text on light, AA */
+  --accent-quiet:  var(--green-50);  /* tinted fill */
+
+  --border:        var(--ink-100);
+  --border-strong: var(--ink-200);
+  --divider:       var(--ink-150);
+  --ring:          var(--green-600);
+  /* one layer is enough: a single solid green ring for borderless elements;
+     bordered elements (inputs) simply turn their own border green on focus */
+  --focus-ring:    0 0 0 2px var(--green-600);
+  --focus-ring-on-light: 0 0 0 2px var(--green-600);
+
+  /* ---------------------------------------------------------------------------
+     6 · TYPOGRAPHY
+     --------------------------------------------------------------------------- */
+  --font-display: 'DM Sans', 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; /* warm, soft, rounded — headlines */
+  --font-sans: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;       /* clean neo-grotesque — body & UI */
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* weights */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-extrabold: 800;
+
+  /* type scale (rem @ 16px root) */
+  --text-display: 4rem;     /* 64 */
+  --text-h1:      2.75rem;   /* 44 */
+  --text-h2:      1.875rem;  /* 30 */
+  --text-h3:      1.375rem;  /* 22 */
+  --text-h4:      1.125rem;  /* 18 */
+  --text-body-lg: 1.125rem;  /* 18 */
+  --text-body:    0.9375rem; /* 15 */
+  --text-sm:      0.8125rem; /* 13 */
+  --text-xs:      0.75rem;   /* 12 */
+  --text-mono:    0.8125rem; /* 13 */
+
+  /* line-heights */
+  --lh-tight: 1.08;
+  --lh-snug: 1.2;
+  --lh-heading: 1.25;
+  --lh-body: 1.6;
+
+  /* letter-spacing (large + light display reads best with tighter tracking) */
+  --ls-display: -0.02em;
+  --ls-heading: -0.01em;
+  --ls-body: 0em;
+  --ls-overline: 0.08em;
+
+  /* ---------------------------------------------------------------------------
+     7 · RADII
+     --------------------------------------------------------------------------- */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-2xl: 24px;
+  --r-full: 999px;
+
+  /* ---------------------------------------------------------------------------
+     8 · SPACING  (4px base)
+     --------------------------------------------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* ---------------------------------------------------------------------------
+     9 · ELEVATION  (restrained, premium)
+     --------------------------------------------------------------------------- */
+  --shadow-xs: 0 1px 2px rgba(15,20,12,0.05);
+  --shadow-sm: 0 1px 3px rgba(15,20,12,0.06), 0 1px 2px rgba(15,20,12,0.04);
+  --shadow-md: 0 4px 12px rgba(15,20,12,0.08), 0 2px 4px rgba(15,20,12,0.04);
+  --shadow-lg: 0 12px 32px rgba(15,20,12,0.10), 0 4px 8px rgba(15,20,12,0.05);
+  --shadow-xl: 0 24px 56px rgba(15,20,12,0.14), 0 8px 16px rgba(15,20,12,0.06);
+
+  /* transitions */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 360ms;
+}
+
+/* ============================================================================
+   SEMANTIC TEXT ROLES — apply directly to elements
+   ========================================================================== */
+.t-display {
+  font-family: var(--font-display);
+  font-size: var(--text-display);
+  font-weight: var(--fw-regular);
+  line-height: 1.04;
+  letter-spacing: var(--ls-display);
+  color: var(--fg);
+}
+.t-h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-h1);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--ls-heading);
+  color: var(--fg);
+}
+.t-h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-h2);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-heading);
+  letter-spacing: var(--ls-heading);
+  color: var(--fg);
+}
+.t-h3 {
+  font-family: var(--font-display);
+  font-size: var(--text-h3);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-heading);
+  letter-spacing: var(--ls-heading);
+  color: var(--fg);
+}
+.t-h4 {
+  font-family: var(--font-display);
+  font-size: var(--text-h4);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-snug);
+  color: var(--fg);
+}
+.t-body-lg {
+  font-family: var(--font-sans);
+  font-size: var(--text-body-lg);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-body);
+  color: var(--fg-secondary);
+}
+.t-body {
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-body);
+  color: var(--fg-secondary);
+}
+.t-sm {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  color: var(--fg-muted);
+}
+.t-overline {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  line-height: 1.4;
+  letter-spacing: var(--ls-overline);
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.t-mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  font-weight: var(--fw-regular);
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: var(--fg-secondary);
+}
+
+/* ============================================================================
+   TAILWIND v4 TOKEN BRIDGE
+   Expose the design-system variables as Tailwind v4 theme tokens so consumers
+   can use them as color-/font-/radius-/spacing utilities.
+   ========================================================================== */
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+
+  --color-ink-50: var(--ink-50);
+  --color-ink-100: var(--ink-100);
+  --color-ink-150: var(--ink-150);
+  --color-ink-200: var(--ink-200);
+  --color-ink-300: var(--ink-300);
+  --color-ink-400: var(--ink-400);
+  --color-ink-500: var(--ink-500);
+  --color-ink-600: var(--ink-600);
+  --color-ink-700: var(--ink-700);
+  --color-ink-800: var(--ink-800);
+  --color-ink-900: var(--ink-900);
+  --color-ink-950: var(--ink-950);
+
+  --color-green-50: var(--green-50);
+  --color-green-100: var(--green-100);
+  --color-green-200: var(--green-200);
+  --color-green-300: var(--green-300);
+  --color-green-400: var(--green-400);
+  --color-green-500: var(--green-500);
+  --color-green-600: var(--green-600);
+  --color-green-700: var(--green-700);
+  --color-green-800: var(--green-800);
+  --color-green-900: var(--green-900);
+
+  --color-forest-700: var(--forest-700);
+  --color-forest-800: var(--forest-800);
+  --color-forest-900: var(--forest-900);
+  --color-forest-950: var(--forest-950);
+
+  --color-fg: var(--fg);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-fg-on-accent: var(--fg-on-accent);
+  --color-fg-on-dark: var(--fg-on-dark);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-divider: var(--divider);
+
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-accent-quiet: var(--accent-quiet);
+
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-success-fg: var(--success-fg);
+
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+  --radius-2xl: var(--r-2xl);
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  html, body {
+    font-family: var(--font-sans);
+    color: var(--fg);
+    background: var(--paper);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    margin: 0;
+    font-size: var(--text-body);
+    line-height: var(--lh-body);
+  }
+  ::selection {
+    background: var(--green-100);
+    color: var(--ink-900);
+  }
+}

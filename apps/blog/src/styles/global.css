@@ -1,105 +1,174 @@
 @import "tailwindcss";
-@import "@mosoo/design-tokens/landing.css";
+@import "@mosoo/design-tokens/mosoo.css";
 
-/* Fonts are served by the blog worker at /blog/fonts/*. apps/blog/public/fonts
-   holds the woff2 files; Cloudflare Workers Assets serves them under base. */
-@font-face {
-  font-family: "Geist";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url("/blog/fonts/Geist-Variable.woff2") format("woff2-variations"),
-    url("/blog/fonts/Geist-Variable.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Cabinet Grotesk";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url("/blog/fonts/CabinetGrotesk-Variable.woff2") format("woff2-variations"),
-    url("/blog/fonts/CabinetGrotesk-Variable.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Geist Mono";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url("/blog/fonts/GeistMono-Variable.woff2") format("woff2-variations"),
-    url("/blog/fonts/GeistMono-Variable.woff2") format("woff2");
+/* The signature "culm" texture — a barely-there vertical hairline every 64px,
+   the bamboo-segment rhythm called out in the design system. Used on the hero
+   band; pull it back to ~2.5% opacity so it reads as paper grain, not stripes. */
+.culm-band {
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0 64px,
+    rgba(15, 20, 12, 0.025) 64px 65px
+  );
 }
 
-/* Reading-view tweaks for MDX article body. */
+/* Reading view — calm paper, Hanken Grotesk body, generous line-height. The
+   article body sets its own type scale so prose stays consistent regardless of
+   the parent layout. */
 .prose-mosoo {
-  font-size: var(--fs-18);
-  line-height: var(--lh-loose);
-  color: var(--fg-1);
+  font-family: var(--font-sans);
+  font-size: var(--text-body-lg);
+  line-height: var(--lh-body);
+  color: var(--ink-900);
+  font-weight: var(--fw-regular);
+}
+.prose-mosoo > * + * {
+  margin-top: var(--space-5);
 }
 .prose-mosoo h2 {
   font-family: var(--font-display);
-  font-size: var(--fs-30);
-  line-height: var(--lh-snug);
-  margin-top: var(--s-12);
-  margin-bottom: var(--s-4);
-  font-weight: 700;
+  font-size: var(--text-h2);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-heading);
+  letter-spacing: var(--ls-heading);
+  color: var(--ink-950);
+  margin-top: var(--space-12);
+  margin-bottom: var(--space-3);
 }
 .prose-mosoo h3 {
   font-family: var(--font-display);
-  font-size: var(--fs-20);
-  margin-top: var(--s-8);
-  margin-bottom: var(--s-3);
-  font-weight: 700;
+  font-size: var(--text-h3);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-heading);
+  letter-spacing: var(--ls-heading);
+  color: var(--ink-950);
+  margin-top: var(--space-8);
+  margin-bottom: var(--space-2);
 }
-.prose-mosoo p {
-  margin: var(--s-4) 0;
+.prose-mosoo h4 {
+  font-family: var(--font-display);
+  font-size: var(--text-h4);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-950);
+  margin-top: var(--space-6);
+  margin-bottom: var(--space-2);
 }
+.prose-mosoo p { margin: 0; }
 .prose-mosoo a {
-  color: var(--accent-press);
+  color: var(--accent-text);
   text-decoration: underline;
-  text-decoration-color: var(--accent-ring);
+  text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
+  text-decoration-color: rgba(58, 110, 14, 0.35);
+  transition: color var(--dur) var(--ease-out);
 }
 .prose-mosoo a:hover {
-  color: var(--accent-hover);
+  color: var(--accent-press);
+  text-decoration-color: var(--accent-press);
 }
+.prose-mosoo strong {
+  font-weight: var(--fw-semibold);
+  color: var(--ink-950);
+}
+.prose-mosoo em { font-style: italic; }
 .prose-mosoo code {
   font-family: var(--font-mono);
-  font-size: 0.92em;
-  background: var(--paper-200);
-  padding: 0.1em 0.3em;
+  font-size: 0.88em;
+  background: var(--ink-50);
+  color: var(--ink-900);
+  padding: 0.12em 0.36em;
   border-radius: var(--r-xs);
+  border: 1px solid var(--border);
 }
 .prose-mosoo pre {
   font-family: var(--font-mono);
-  background: var(--ink-900);
-  color: var(--paper-100);
-  padding: var(--s-5);
-  border-radius: var(--r-md);
+  background: var(--forest-900);
+  color: var(--fg-on-dark);
+  padding: var(--space-5) var(--space-6);
+  border-radius: var(--r-lg);
   overflow-x: auto;
-  font-size: var(--fs-14);
-  line-height: var(--lh-normal);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  margin-top: var(--space-6);
 }
 .prose-mosoo pre code {
   background: transparent;
+  border: none;
   padding: 0;
   color: inherit;
+  font-size: inherit;
 }
 .prose-mosoo blockquote {
-  border-left: 3px solid var(--accent);
-  padding-left: var(--s-4);
-  margin-left: 0;
-  color: var(--fg-2);
-  font-style: italic;
+  border-left: 2px solid var(--green-500);
+  padding: 0 0 0 var(--space-5);
+  margin: 0;
+  color: var(--fg-secondary);
+  font-family: var(--font-display);
+  font-size: var(--text-h4);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--ls-heading);
 }
 .prose-mosoo ul,
 .prose-mosoo ol {
-  padding-left: var(--s-6);
-  margin: var(--s-4) 0;
+  padding-left: var(--space-6);
+  margin: 0;
 }
-.prose-mosoo li {
-  margin: var(--s-2) 0;
+.prose-mosoo ul { list-style: none; }
+.prose-mosoo ul > li {
+  position: relative;
+  padding-left: var(--space-4);
 }
+.prose-mosoo ul > li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.7em;
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: var(--green-500);
+}
+.prose-mosoo ol { list-style: decimal; }
+.prose-mosoo li + li { margin-top: var(--space-2); }
 .prose-mosoo hr {
   border: none;
-  border-top: 1px solid var(--border-default);
-  margin: var(--s-10) 0;
+  border-top: 1px solid var(--border);
+  margin: var(--space-12) 0;
+}
+.prose-mosoo img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border);
+  margin-top: var(--space-6);
+}
+.prose-mosoo figure { margin: 0; }
+.prose-mosoo figcaption {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  margin-top: var(--space-2);
+  text-align: center;
+}
+.prose-mosoo table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-body);
+  margin-top: var(--space-6);
+}
+.prose-mosoo th,
+.prose-mosoo td {
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-3) var(--space-3);
+  text-align: left;
+  vertical-align: top;
+}
+.prose-mosoo th {
+  font-weight: var(--fw-semibold);
+  color: var(--ink-900);
+  font-size: var(--text-sm);
+  letter-spacing: var(--ls-overline);
+  text-transform: uppercase;
 }

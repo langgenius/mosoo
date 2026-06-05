@@ -7,17 +7,20 @@ const { categories, active = "All" } = Astro.props;
 const all = ["All", ...categories];
 ---
 
-<div class="flex flex-wrap items-center gap-2 overflow-x-auto py-3" data-category-tabs>
+<div
+  class="flex flex-wrap items-center gap-2 overflow-x-auto"
+  data-category-tabs
+>
   {
     all.map((c) => (
       <button
         type="button"
         data-category={c}
         class:list={[
-          "rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors",
+          "rounded-[var(--r-md)] border px-3.5 py-1.5 text-[13px] font-medium tracking-[-0.01em] transition-colors",
           c === active
-            ? "border-[color:var(--ink-900)] bg-[color:var(--ink-900)] text-[color:var(--paper-100)]"
-            : "border-[color:var(--border-strong)] bg-[color:var(--bg-elevated)] text-[color:var(--fg-2)] hover:border-[color:var(--ink-700)] hover:text-[color:var(--fg-1)]",
+            ? "border-[color:var(--ink-900)] bg-[color:var(--ink-900)] text-white"
+            : "border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--fg-secondary)] hover:border-[color:var(--border-strong)] hover:text-[color:var(--fg)]",
         ]}
       >
         {c}
@@ -28,18 +31,18 @@ const all = ["All", ...categories];
 
 <script>
   const buttons = document.querySelectorAll<HTMLButtonElement>(
-    "[data-category-tabs] [data-category]"
+    "[data-category-tabs] [data-category]",
   );
   const cards = document.querySelectorAll<HTMLElement>("[data-card]");
   const select = (category: string): void => {
     buttons.forEach((b) => {
-      const active = b.dataset.category === category;
-      b.classList.toggle("border-[color:var(--ink-900)]", active);
-      b.classList.toggle("bg-[color:var(--ink-900)]", active);
-      b.classList.toggle("text-[color:var(--paper-100)]", active);
-      b.classList.toggle("border-[color:var(--border-strong)]", !active);
-      b.classList.toggle("bg-[color:var(--bg-elevated)]", !active);
-      b.classList.toggle("text-[color:var(--fg-2)]", !active);
+      const isActive = b.dataset.category === category;
+      b.classList.toggle("border-[color:var(--ink-900)]", isActive);
+      b.classList.toggle("bg-[color:var(--ink-900)]", isActive);
+      b.classList.toggle("text-white", isActive);
+      b.classList.toggle("border-[color:var(--border)]", !isActive);
+      b.classList.toggle("bg-[color:var(--surface)]", !isActive);
+      b.classList.toggle("text-[color:var(--fg-secondary)]", !isActive);
     });
     cards.forEach((c) => {
       c.style.display =
@@ -47,6 +50,6 @@ const all = ["All", ...categories];
     });
   };
   buttons.forEach((b) =>
-    b.addEventListener("click", () => select(b.dataset.category ?? "All"))
+    b.addEventListener("click", () => select(b.dataset.category ?? "All")),
   );
 </script>

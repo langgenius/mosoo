@@ -4,9 +4,17 @@ import { gradientFromSlug } from "../lib/gradient-from-slug";
 interface Props {
   slug: string;
   ratio?: "16/9" | "4/3" | "3/2" | "21/9";
+  heroImage?: string | undefined;
+  heroAlt?: string | undefined;
   label?: string;
 }
-const { slug, ratio = "16/9", label } = Astro.props;
+const {
+  slug,
+  ratio = "16/9",
+  heroImage,
+  heroAlt,
+  label,
+} = Astro.props;
 const visual = gradientFromSlug(slug);
 const aspect =
   ratio === "16/9"
@@ -18,22 +26,33 @@ const aspect =
         : "aspect-[3/2]";
 ---
 
-<div
-  class:list={[
-    "relative w-full overflow-hidden",
-    aspect,
-  ]}
-  style={`background: ${visual.background}`}
->
-  <!-- Soft horizon band — adds the painterly "edge between sky and land". -->
-  <div
-    class="absolute inset-x-0 top-[58%] h-px"
-    style={`background: ${visual.palette[2]}; box-shadow: 0 0 var(--horizon-blur) ${visual.palette[2]};`}
-  >
-  </div>
+<div class:list={["relative w-full overflow-hidden bg-[color:var(--ink-50)]", aspect]}>
+  {
+    heroImage ? (
+      <img
+        src={heroImage}
+        alt={heroAlt ?? ""}
+        loading="lazy"
+        decoding="async"
+        class="absolute inset-0 h-full w-full object-cover"
+      />
+    ) : (
+      <>
+        <div
+          class="absolute inset-0"
+          style={`background: ${visual.background}`}
+        />
+        <div
+          class="absolute inset-x-0 top-[58%] h-px"
+          style={`background: ${visual.palette[2]}; box-shadow: 0 0 var(--horizon-blur) ${visual.palette[2]};`}
+        />
+      </>
+    )
+  }
   {
     label && (
-      <span class="absolute left-4 top-4 rounded-full bg-[color:var(--paper-100)]/85 px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.06em] text-[color:var(--fg-1)] backdrop-blur-sm">
+      <span class="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-[var(--r-sm)] bg-white/90 px-2 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[color:var(--ink-900)] backdrop-blur-sm">
+        <span class="block h-1.5 w-1.5 rounded-full bg-[color:var(--green-500)]" />
         {label}
       </span>
     )

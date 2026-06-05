@@ -1,33 +1,33 @@
 ---
 import MosooMark from "./MosooMark.astro";
-const base = import.meta.env.BASE_URL;
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 ---
 
-<header class="border-border-default sticky top-0 z-20 border-b backdrop-blur-md bg-[color:var(--paper-100)]/85">
-  <div class="mx-auto flex w-full max-w-[1280px] items-center justify-between px-4 py-4 md:px-6">
-    <a href="/" class="flex items-center gap-2.5 text-[color:var(--fg-1)]">
-      <MosooMark size={22} />
-      <span class="font-mono text-[13px] uppercase tracking-[0.06em] text-[color:var(--fg-2)]">
-        Mosoo
+<header class="sticky top-0 z-20 border-b border-[color:var(--border)] bg-[color:var(--paper)]/85 backdrop-blur-md">
+  <div class="mx-auto flex w-full max-w-[1180px] items-center justify-between gap-6 px-7 py-3.5">
+    <a href="/" class="flex items-center gap-3 text-[color:var(--fg)]">
+      <MosooMark size={20} />
+      <span class="text-[14.5px] font-medium tracking-[-0.01em] text-[color:var(--ink-900)]">
+        mosoo
       </span>
-      <span class="text-[color:var(--fg-3)]">/</span>
-      <span class="font-display text-[15px] font-semibold tracking-[-0.01em] text-[color:var(--fg-1)]">
+      <span class="text-[color:var(--ink-300)]">/</span>
+      <span class="text-[14.5px] font-medium tracking-[-0.01em] text-[color:var(--ink-900)]">
         Blog
       </span>
     </a>
-    <nav class="flex items-center gap-6 text-[13px] text-[color:var(--fg-2)]">
-      <a href="/" class="hover:text-[color:var(--fg-1)]">Back to mosoo</a>
+    <nav class="flex items-center gap-6 text-[14px] text-[color:var(--fg-secondary)]">
+      <a href="/" class="font-medium hover:text-[color:var(--fg)] transition-colors">Back to mosoo</a>
       <a
         href={`${base}/rss.xml`}
-        class="hover:text-[color:var(--fg-1)]"
+        class="font-medium hover:text-[color:var(--fg)] transition-colors"
         title="Subscribe via RSS"
         >RSS</a
       >
       <a
         href="https://mosoo.ai/login"
-        class="rounded-full bg-[color:var(--ink-900)] px-3.5 py-1.5 text-[color:var(--paper-100)] hover:bg-[color:var(--ink-800)]"
+        class="inline-flex items-center gap-2 rounded-[var(--r-md)] bg-[color:var(--ink-900)] px-3.5 py-2 text-[14px] font-semibold tracking-[-0.01em] text-white transition-colors hover:bg-[color:var(--ink-800)]"
       >
-        Try Mosoo
+        Try mosoo
       </a>
     </nav>
   </div>

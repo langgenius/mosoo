@@ -7,7 +7,8 @@ interface Props {
   post: CollectionEntry<"blog">;
 }
 const { post } = Astro.props;
-const { title, description, date, category, author } = post.data;
+const { title, description, date, category, author, heroImage, heroAlt } =
+  post.data;
 const dateLabel = date.toLocaleDateString("en-US", {
   year: "numeric",
   month: "long",
@@ -20,10 +21,13 @@ const jsonLd = {
   headline: title,
   description,
   datePublished: date.toISOString(),
+  ...(heroImage
+    ? { image: new URL(heroImage, Astro.site).href }
+    : {}),
   author: { "@type": "Person", name: author },
   publisher: {
     "@type": "Organization",
-    name: "Mosoo",
+    name: "mosoo",
     url: "https://mosoo.ai",
   },
   url: new URL(Astro.url.pathname, Astro.site).href,
@@ -31,11 +35,12 @@ const jsonLd = {
 ---
 
 <BaseLayout
-  title={`${title} · Mosoo Blog`}
+  title={`${title} · mosoo blog`}
   description={description}
   type="article"
   publishedTime={date}
   author={author}
+  ogImage={heroImage ? new URL(heroImage, Astro.site).href : undefined}
 >
   <script
     type="application/ld+json"
@@ -43,48 +48,64 @@ const jsonLd = {
     slot="head"
   />
 
-  <article class="mx-auto w-full max-w-[760px] px-4 py-12 md:px-6 md:py-16">
+  <article class="mx-auto w-full max-w-[760px] px-6 py-14 md:py-20">
     <a
       href="/blog"
-      class="font-mono mb-8 inline-flex items-center gap-2 text-[12px] uppercase tracking-[0.06em] text-[color:var(--fg-3)] hover:text-[color:var(--fg-1)]"
-      >← Back to all posts</a
+      class="mb-10 inline-flex items-center gap-2 font-mono text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[color:var(--fg-muted)] transition-colors hover:text-[color:var(--fg)]"
     >
+      ← Back to all posts
+    </a>
 
-    <div class="font-mono mb-3 flex items-center gap-3 text-[12px] uppercase tracking-[0.06em] text-[color:var(--fg-3)]">
+    <div class="mb-4 flex items-center gap-3 font-mono text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[color:var(--fg-muted)]">
       <span>{dateLabel}</span>
-      <span>·</span>
-      <span class="text-[color:var(--accent-press)]">{category}</span>
+      <span class="text-[color:var(--ink-300)]">·</span>
+      <span class="inline-flex items-center gap-1.5 text-[color:var(--accent-text)]">
+        <span class="block h-1.5 w-1.5 rounded-full bg-[color:var(--green-500)]" />
+        {category}
+      </span>
     </div>
 
-    <h1
-      class="font-display mb-4 text-[40px] font-bold leading-[1.05] tracking-[-0.01em] text-[color:var(--fg-1)] md:text-[52px]"
-    >
+    <h1 class="mb-5 font-display text-[42px] font-medium leading-[1.05] tracking-[-0.025em] text-[color:var(--ink-950)] md:text-[56px]">
       {title}
     </h1>
 
-    <p class="mb-8 text-[18px] leading-[1.5] text-[color:var(--fg-2)]">
+    <p class="mb-8 text-[19px] leading-[1.55] text-[color:var(--fg-secondary)]">
       {description}
     </p>
 
-    <div class="mb-10 text-[13px] text-[color:var(--fg-3)]">By {author}</div>
+    <div class="mb-12 flex items-center gap-3 text-[14px] text-[color:var(--fg-secondary)]">
+      <span class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--green-100)] font-semibold text-[color:var(--accent-text)]">
+        {author.slice(0, 1).toUpperCase()}
+      </span>
+      <span>By {author}</span>
+    </div>
 
-    <div class="border-border-default mb-12 overflow-hidden border">
-      <CardVisual slug={post.id} ratio="21/9" />
+    <div class="mb-14 overflow-hidden rounded-[var(--r-xl)] border border-[color:var(--border)] shadow-[var(--shadow-sm)]">
+      <CardVisual
+        slug={post.id}
+        heroImage={heroImage}
+        heroAlt={heroAlt ?? title}
+        ratio="21/9"
+      />
     </div>
 
     <div class="prose-mosoo">
       <slot />
     </div>
 
-    <hr class="my-16 border-[color:var(--border-default)]" />
+    <hr class="my-16 border-[color:var(--border)]" />
 
-    <div class="flex items-center justify-between text-[13px] text-[color:var(--fg-2)]">
+    <div class="flex items-center justify-between text-[13px] text-[color:var(--fg-secondary)]">
       <a
         href="/blog"
-        class="font-mono uppercase tracking-[0.06em] hover:text-[color:var(--fg-1)]"
+        class="font-mono font-semibold uppercase tracking-[0.08em] hover:text-[color:var(--fg)]"
         >← More posts</a
       >
-      <a href="https://mosoo.ai/login" class="t-link">Try Mosoo →</a>
+      <a
+        href="https://mosoo.ai/login"
+        class="inline-flex items-center gap-2 rounded-[var(--r-md)] bg-[color:var(--green-500)] px-3.5 py-2 font-semibold text-[color:var(--fg-on-accent)] transition-colors hover:bg-[color:var(--green-600)]"
+        >Try mosoo →</a
+      >
     </div>
   </article>
 </BaseLayout>

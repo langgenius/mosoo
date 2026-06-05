@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./landing.css": "./landing.css"
+    "./mosoo.css": "./mosoo.css"
   },
   "files": [
-    "landing.css"
+    "mosoo.css"
   ]
 }

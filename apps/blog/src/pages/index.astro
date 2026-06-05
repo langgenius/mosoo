@@ -17,43 +17,51 @@ const rest = featured ? all.filter((p) => p.id !== featured.id) : all;
 ---
 
 <BaseLayout
-  title="Mosoo Blog · Notes from the bamboo grove"
-  description="Engineering, product, and research notes from the team building Mosoo — the calm runtime for agents."
+  title="mosoo blog · Notes from the bamboo grove"
+  description="Engineering, product, and research notes from the team building mosoo — the enterprise agent + knowledge platform."
 >
-  <main class="mx-auto w-full max-w-[1280px] px-4 md:px-6">
-    <section class="border-border-strong divide-border-default divide-y border-x">
-      <!-- Title band -->
-      <div class="px-6 py-16 md:px-10 md:py-24">
-        <div class="font-mono mb-4 text-[12px] uppercase tracking-[0.08em] text-[color:var(--accent-press)]">
+  <main>
+    <!-- Title band with the signature culm hairlines as a subtle paper grain -->
+    <section class="culm-band border-b border-[color:var(--border)]">
+      <div class="mx-auto w-full max-w-[1180px] px-7 py-20 md:py-28">
+        <div class="inline-flex items-center gap-2 font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-[color:var(--fg-muted)]">
+          <span class="inline-block h-[7px] w-[7px] rounded-full bg-[color:var(--green-500)]"></span>
           mosoo.ai / blog
         </div>
-        <h1
-          class="font-display max-w-3xl text-[52px] font-bold leading-[1.02] tracking-[-0.015em] text-[color:var(--fg-1)] md:text-[72px]"
-        >
+        <h1 class="mt-5 max-w-3xl font-display text-[52px] font-medium leading-[1.04] tracking-[-0.025em] text-[color:var(--ink-950)] md:text-[72px]">
           Notes from the bamboo grove.
         </h1>
-        <p class="mt-6 max-w-xl text-[17px] leading-[1.5] text-[color:var(--fg-2)]">
-          Field notes from the team building Mosoo — what we ship, what we measure,
-          and the calm-runtime ideas behind it.
+        <p class="mt-7 max-w-xl text-[18px] leading-[1.55] text-[color:var(--fg-secondary)]">
+          Field notes from the team building mosoo — what we ship, what we
+          measure, and the calm-runtime ideas behind it.
         </p>
       </div>
+    </section>
 
-      <!-- Featured -->
-      {
-        featured && (
-          <div class="px-6 py-10 md:px-10 md:py-14">
+    <!-- Featured -->
+    {
+      featured && (
+        <section class="border-b border-[color:var(--border)]">
+          <div class="mx-auto w-full max-w-[1180px] px-7 py-12 md:py-16">
             <Hero featured={featured} base={base} />
           </div>
-        )
-      }
+        </section>
+      )
+    }
 
-      <!-- Tabs + Grid -->
-      <div class="px-6 py-10 md:px-10 md:py-14">
+    <!-- Tabs + Grid -->
+    <section>
+      <div class="mx-auto w-full max-w-[1180px] px-7 py-12 md:py-16">
         <div class="mb-8 flex items-end justify-between gap-4">
-          <h2 class="font-display text-[24px] font-bold tracking-[-0.01em] text-[color:var(--fg-1)] md:text-[28px]">
-            All posts
-          </h2>
-          <span class="font-mono text-[12px] uppercase tracking-[0.06em] text-[color:var(--fg-3)]">
+          <div>
+            <div class="font-mono text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[color:var(--fg-muted)]">
+              Archive
+            </div>
+            <h2 class="mt-2 font-display text-[28px] font-medium tracking-[-0.02em] text-[color:var(--ink-950)] md:text-[32px]">
+              All posts
+            </h2>
+          </div>
+          <span class="font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-[color:var(--fg-muted)]">
             {all.length} {all.length === 1 ? "entry" : "entries"}
           </span>
         </div>
@@ -71,6 +79,8 @@ const rest = featured ? all.filter((p) => p.id !== featured.id) : all;
                   date={post.data.date}
                   description={post.data.description}
                   slug={post.id}
+                  heroImage={post.data.heroImage}
+                  heroAlt={post.data.heroAlt}
                 />
               </div>
             ))
@@ -79,7 +89,7 @@ const rest = featured ? all.filter((p) => p.id !== featured.id) : all;
 
         {
           rest.length === 0 && (
-            <div class="rounded-md border border-dashed border-[color:var(--border-default)] p-12 text-center text-[14px] text-[color:var(--fg-3)]">
+            <div class="rounded-[var(--r-lg)] border border-dashed border-[color:var(--border)] p-12 text-center text-[14px] text-[color:var(--fg-muted)]">
               No posts yet — check back soon.
             </div>
           )

@@ -6,19 +6,12 @@ interface Props {
   title: string;
   category: string;
   date: Date;
-  description?: string;
+  description?: string | undefined;
   slug: string;
-  size?: "default" | "small";
+  heroImage?: string | undefined;
+  heroAlt?: string | undefined;
 }
-const {
-  href,
-  title,
-  category,
-  date,
-  description,
-  slug,
-  size = "default",
-} = Astro.props;
+const { href, title, category, date, description, slug, heroImage, heroAlt } = Astro.props;
 const dateLabel = date.toLocaleDateString("en-US", {
   year: "numeric",
   month: "short",
@@ -28,33 +21,30 @@ const dateLabel = date.toLocaleDateString("en-US", {
 
 <a
   href={href}
-  class="group border-border-default flex flex-col overflow-hidden border bg-[color:var(--bg-elevated)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)]"
+  class="group flex flex-col overflow-hidden rounded-[var(--r-lg)] border border-[color:var(--border)] bg-[color:var(--surface)] shadow-[var(--shadow-xs)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]"
 >
-  <CardVisual slug={slug} ratio={size === "small" ? "16/9" : "16/9"} />
-  <div class:list={["flex flex-1 flex-col gap-3", size === "small" ? "p-4" : "p-5"]}>
-    <div class="font-mono text-[12px] uppercase tracking-[0.06em] text-[color:var(--fg-3)]">
-      {dateLabel}
+  <CardVisual slug={slug} heroImage={heroImage} heroAlt={heroAlt} ratio="16/9" />
+  <div class="flex flex-1 flex-col gap-3 p-5">
+    <div class="flex items-center gap-2.5 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--fg-muted)]">
+      <span>{dateLabel}</span>
+      <span class="text-[color:var(--ink-200)]">·</span>
+      <span class="inline-flex items-center gap-1.5 text-[color:var(--accent-text)]">
+        <span class="block h-1.5 w-1.5 rounded-full bg-[color:var(--green-500)]" />
+        {category}
+      </span>
     </div>
-    <h3
-      class:list={[
-        "font-display tracking-[-0.01em] text-[color:var(--fg-1)] transition-colors group-hover:text-[color:var(--accent-press)]",
-        size === "small" ? "text-[18px] leading-[1.25]" : "text-[22px] leading-[1.2]",
-      ]}
-    >
+    <h3 class="font-display text-[20px] font-medium leading-[1.2] tracking-[-0.015em] text-[color:var(--ink-950)] transition-colors group-hover:text-[color:var(--accent-press)]">
       {title}
     </h3>
     {
-      description && size !== "small" && (
-        <p class="text-[14px] leading-[1.45] text-[color:var(--fg-2)] line-clamp-2">
+      description && (
+        <p class="text-[14px] leading-[1.55] text-[color:var(--fg-secondary)] line-clamp-2">
           {description}
         </p>
       )
     }
-    <div class="mt-auto pt-3">
-      <span class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--accent-soft)] px-2.5 py-1 text-[12px] font-medium text-[color:var(--accent-press)]">
-        <span class="block h-1.5 w-1.5 rounded-full bg-[color:var(--accent-press)]"></span>
-        {category}
-      </span>
+    <div class="mt-auto pt-2 font-mono text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[color:var(--fg-muted)]">
+      Read post →
     </div>
   </div>
 </a>

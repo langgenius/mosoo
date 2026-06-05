@@ -21,15 +21,13 @@ const {
   publishedTime,
   author,
 } = Astro.props;
-// Drop any trailing slash so the canonical matches the extensionless URL the
-// user types and the host actually serves.
 const cleanPath = Astro.url.pathname.replace(/\/$/, "") || "/";
 const canonicalUrl = canonical ?? new URL(cleanPath, Astro.site).href;
 const ogImageUrl = ogImage ?? new URL("/og-default.png", Astro.site).href;
 ---
 
 <!doctype html>
-<html lang="en" data-theme="landing">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -39,8 +37,14 @@ const ogImageUrl = ogImage ?? new URL("/og-default.png", Astro.site).href;
     <link
       rel="alternate"
       type="application/rss+xml"
-      title="Mosoo Blog"
+      title="mosoo blog"
       href="/blog/rss.xml"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
     />
     <title>{title}</title>
     <meta name="description" content={description} />
@@ -49,7 +53,7 @@ const ogImageUrl = ogImage ?? new URL("/og-default.png", Astro.site).href;
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:image" content={ogImageUrl} />
-    <meta property="og:site_name" content="Mosoo" />
+    <meta property="og:site_name" content="mosoo" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
@@ -62,7 +66,7 @@ const ogImageUrl = ogImage ?? new URL("/og-default.png", Astro.site).href;
     {type === "article" && author && <meta property="article:author" content={author} />}
     <slot name="head" />
   </head>
-  <body class="min-h-screen bg-[color:var(--bg)] text-[color:var(--fg-1)]">
+  <body class="min-h-screen bg-[color:var(--paper)] text-[color:var(--ink-900)]">
     <Header />
     <slot />
     <Footer />

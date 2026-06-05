@@ -1,19 +1,21 @@
 ---
-const year = 2026;
-const base = import.meta.env.BASE_URL;
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 ---
 
-<footer class="border-border-default mt-20 border-t">
-  <div class="mx-auto flex w-full max-w-[1280px] flex-col gap-4 px-4 py-10 md:flex-row md:items-center md:justify-between md:px-6">
-    <div class="font-mono text-[12px] uppercase tracking-[0.06em] text-[color:var(--fg-3)]">
-      © {year} Mosoo · Notes from the bamboo grove
+<footer class="mt-24 border-t border-[color:var(--border)] bg-[color:var(--paper)]">
+  <div class="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-7 py-10 md:flex-row md:items-center md:justify-between">
+    <div class="flex items-center gap-2 text-[12.5px] text-[color:var(--fg-muted)]">
+      <span class="inline-block h-[7px] w-[7px] rounded-full bg-[color:var(--green-500)]"></span>
+      <span class="font-mono uppercase tracking-[0.08em]">
+        © 2026 mosoo · take root, and grow a bamboo sea
+      </span>
     </div>
-    <div class="flex items-center gap-5 text-[13px] text-[color:var(--fg-2)]">
-      <a href="/" class="hover:text-[color:var(--fg-1)]">mosoo.ai</a>
-      <a href={`${base}/rss.xml`} class="hover:text-[color:var(--fg-1)]">RSS</a>
+    <div class="flex items-center gap-6 text-[14px] text-[color:var(--fg-secondary)]">
+      <a href="/" class="hover:text-[color:var(--fg)] transition-colors">mosoo.ai</a>
+      <a href={`${base}/rss.xml`} class="hover:text-[color:var(--fg)] transition-colors">RSS</a>
       <a
         href="https://github.com/langgenius/mosoo"
-        class="hover:text-[color:var(--fg-1)]">GitHub</a
+        class="hover:text-[color:var(--fg)] transition-colors">GitHub</a
       >
     </div>
   </div>

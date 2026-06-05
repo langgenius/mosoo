@@ -11,15 +11,25 @@ export const CATEGORIES = [
 ] as const;
 
 const blog = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/blog" }),
+  loader: glob({
+    pattern: ["**/*.{md,mdx}", "!README.md"],
+    base: "./src/content/blog",
+  }),
   schema: z.object({
     title: z.string(),
     description: z.string(),
     date: z.coerce.date(),
     category: z.enum(CATEGORIES),
-    author: z.string().default("Mosoo Team"),
+    author: z.string().default("mosoo team"),
     featured: z.boolean().default(false),
     draft: z.boolean().default(false),
+    // Custom hero image, optional. When set, the card and the article hero
+    // render this image instead of the deterministic gradient. Convention:
+    // store assets under `public/blog/<slug>/hero.<ext>` so they ship from
+    // the blog worker at `/blog/blog/<slug>/hero.<ext>`. The path goes here
+    // as a root-absolute URL — e.g. "/blog/blog/why-mosoo/hero.jpg".
+    heroImage: z.string().optional(),
+    heroAlt: z.string().optional(),
   }),
 });
 
