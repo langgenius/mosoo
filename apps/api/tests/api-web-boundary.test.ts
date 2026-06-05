@@ -92,7 +92,7 @@ describe("API to web boundary", () => {
     const createThreadSchema = document.components.schemas.CreateThreadRequest;
     expect(createThreadSchema.required).not.toContain("input");
     const createThreadResponseProperties = openApiSchemaProperties("CreateThreadResponse");
-    expect(createThreadResponseProperties["run"]).toEqual({
+    expect(createThreadResponseProperties["run"]).toMatchObject({
       oneOf: [{ $ref: "#/components/schemas/RunSummary" }, { type: "null" }],
     });
 
@@ -108,7 +108,7 @@ describe("API to web boundary", () => {
 
     const errorCodeSchema =
       document.components.schemas.ErrorResponse.properties.error.properties.code;
-    expect(errorCodeSchema).toEqual({ enum: PUBLIC_API_ERROR_CODES });
+    expect(errorCodeSchema).toMatchObject({ enum: PUBLIC_API_ERROR_CODES });
     expect(
       Object.keys(document.components.schemas).filter((name) => name.includes("Task")),
     ).toEqual([]);

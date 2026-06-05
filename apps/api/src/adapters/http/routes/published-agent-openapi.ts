@@ -243,7 +243,13 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
         description: "Returns Threads created by the authenticated Personal Access Token caller.",
         parameters: [
           exampleAgentIdParameter,
-          { in: "query", name: "archived", schema: { type: "boolean" } },
+          {
+            description:
+              "Filter by archived state: true returns only archived Threads, false only active ones. Omit to return all Threads.",
+            in: "query",
+            name: "archived",
+            schema: { type: "boolean" },
+          },
         ],
         success: {
           "200": jsonResponse("Thread list.", {
@@ -322,6 +328,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
     },
     "/threads/{threadId}": {
       delete: operation({
+        description: "Permanently deletes the Thread and its backing AgentSession.",
         parameters: [threadIdParameter],
         security: HUMAN_PAT_SECURITY,
         success: {
@@ -330,6 +337,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
         summary: "Delete a Thread",
       }),
       get: operation({
+        description: "Returns the current Thread summary, its most recent Run, and links.",
         parameters: [threadIdParameter],
         success: {
           "200": jsonResponse("Thread summary.", {
@@ -341,6 +349,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
     },
     "/threads/{threadId}/archive": {
       post: operation({
+        description: "Archives the Thread so it is hidden from default Thread lists.",
         parameters: [threadIdParameter],
         security: HUMAN_PAT_SECURITY,
         success: {
@@ -362,6 +371,8 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
         summary: "List Thread events",
       }),
       post: operation({
+        description:
+          "Applies a batch of events to the Thread: send user messages, answer pending permission requests, or interrupt the current Run. A user message queues a new Run when the Thread is idle.",
         parameters: [threadIdParameter, idempotencyKeyParameter],
         requestBody: jsonRequestBody(
           {
@@ -398,6 +409,8 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
     },
     "/threads/{threadId}/files": {
       get: operation({
+        description:
+          "Lists files attached to the Thread, including caller attachments and Agent artifacts.",
         parameters: [threadIdParameter],
         security: HUMAN_PAT_SECURITY,
         success: {
@@ -434,6 +447,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
     },
     "/threads/{threadId}/files/{fileId}": {
       delete: operation({
+        description: "Detaches a file from the Thread.",
         parameters: [threadIdParameter, fileIdParameter],
         security: HUMAN_PAT_SECURITY,
         success: {
@@ -444,6 +458,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
     },
     "/threads/{threadId}/unarchive": {
       post: operation({
+        description: "Restores a previously archived Thread to active Thread lists.",
         parameters: [threadIdParameter],
         security: HUMAN_PAT_SECURITY,
         success: {
