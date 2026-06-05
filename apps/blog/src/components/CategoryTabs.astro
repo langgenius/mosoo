@@ -1,0 +1,52 @@
+---
+interface Props {
+  categories: readonly string[];
+  active?: string;
+}
+const { categories, active = "All" } = Astro.props;
+const all = ["All", ...categories];
+---
+
+<div class="flex flex-wrap items-center gap-2 overflow-x-auto py-3" data-category-tabs>
+  {
+    all.map((c) => (
+      <button
+        type="button"
+        data-category={c}
+        class:list={[
+          "rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors",
+          c === active
+            ? "border-[color:var(--ink-900)] bg-[color:var(--ink-900)] text-[color:var(--paper-100)]"
+            : "border-[color:var(--border-strong)] bg-[color:var(--bg-elevated)] text-[color:var(--fg-2)] hover:border-[color:var(--ink-700)] hover:text-[color:var(--fg-1)]",
+        ]}
+      >
+        {c}
+      </button>
+    ))
+  }
+</div>
+
+<script>
+  const buttons = document.querySelectorAll<HTMLButtonElement>(
+    "[data-category-tabs] [data-category]"
+  );
+  const cards = document.querySelectorAll<HTMLElement>("[data-card]");
+  const select = (category: string): void => {
+    buttons.forEach((b) => {
+      const active = b.dataset.category === category;
+      b.classList.toggle("border-[color:var(--ink-900)]", active);
+      b.classList.toggle("bg-[color:var(--ink-900)]", active);
+      b.classList.toggle("text-[color:var(--paper-100)]", active);
+      b.classList.toggle("border-[color:var(--border-strong)]", !active);
+      b.classList.toggle("bg-[color:var(--bg-elevated)]", !active);
+      b.classList.toggle("text-[color:var(--fg-2)]", !active);
+    });
+    cards.forEach((c) => {
+      c.style.display =
+        category === "All" || c.dataset["category"] === category ? "" : "none";
+    });
+  };
+  buttons.forEach((b) =>
+    b.addEventListener("click", () => select(b.dataset.category ?? "All"))
+  );
+</script>

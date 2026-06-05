@@ -1,0 +1,9 @@
+# Astro
+dist/
+.astro/
+
+# Wrangler
+.wrangler/
+
+# Dependencies
+node_modules/

@@ -1,0 +1,34 @@
+---
+import MosooMark from "./MosooMark.astro";
+const base = import.meta.env.BASE_URL;
+---
+
+<header class="border-border-default sticky top-0 z-20 border-b backdrop-blur-md bg-[color:var(--paper-100)]/85">
+  <div class="mx-auto flex w-full max-w-[1280px] items-center justify-between px-4 py-4 md:px-6">
+    <a href="/" class="flex items-center gap-2.5 text-[color:var(--fg-1)]">
+      <MosooMark size={22} />
+      <span class="font-mono text-[13px] uppercase tracking-[0.06em] text-[color:var(--fg-2)]">
+        Mosoo
+      </span>
+      <span class="text-[color:var(--fg-3)]">/</span>
+      <span class="font-display text-[15px] font-semibold tracking-[-0.01em] text-[color:var(--fg-1)]">
+        Blog
+      </span>
+    </a>
+    <nav class="flex items-center gap-6 text-[13px] text-[color:var(--fg-2)]">
+      <a href="/" class="hover:text-[color:var(--fg-1)]">Back to mosoo</a>
+      <a
+        href={`${base}/rss.xml`}
+        class="hover:text-[color:var(--fg-1)]"
+        title="Subscribe via RSS"
+        >RSS</a
+      >
+      <a
+        href="https://mosoo.ai/login"
+        class="rounded-full bg-[color:var(--ink-900)] px-3.5 py-1.5 text-[color:var(--paper-100)] hover:bg-[color:var(--ink-800)]"
+      >
+        Try Mosoo
+      </a>
+    </nav>
+  </div>
+</header>

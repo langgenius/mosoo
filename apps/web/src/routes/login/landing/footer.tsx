@@ -5,6 +5,7 @@ import type { CSSProperties, ReactElement } from "react";
 import { GithubMark } from "../github-mark";
 import {
   MOSOO_API_REFERENCE_URL,
+  MOSOO_BLOG_URL,
   MOSOO_DOCS_URL,
   MOSOO_GITHUB_URL,
   MOSOO_LICENSE_URL,
@@ -15,9 +16,10 @@ import {
 import { XMark } from "../x-mark";
 import { DISPLAY_FONT } from "./typography";
 
-type FooterLink = { label: string; href: string };
+type FooterLink = { label: string; href: string; internal?: boolean };
 
 const RESOURCE_LINKS: readonly FooterLink[] = [
+  { label: "Blog", href: MOSOO_BLOG_URL, internal: true },
   { label: "Docs", href: MOSOO_DOCS_URL },
   { label: "API reference", href: MOSOO_API_REFERENCE_URL },
   { label: "Releases", href: MOSOO_RELEASES_URL },
@@ -54,8 +56,9 @@ function FooterColumn({
           <li key={link.label}>
             <a
               href={link.href}
-              target="_blank"
-              rel="noreferrer noopener"
+              {...(link.internal
+                ? {}
+                : { target: "_blank", rel: "noreferrer noopener" })}
               className="text-paper-100/85 hover:text-paper-100 focus-visible:ring-paper-100/40 rounded-sm text-[13.5px] transition-colors outline-none focus-visible:ring-2"
             >
               {link.label}

@@ -1,0 +1,60 @@
+---
+import CardVisual from "./CardVisual.astro";
+
+interface Props {
+  href: string;
+  title: string;
+  category: string;
+  date: Date;
+  description?: string;
+  slug: string;
+  size?: "default" | "small";
+}
+const {
+  href,
+  title,
+  category,
+  date,
+  description,
+  slug,
+  size = "default",
+} = Astro.props;
+const dateLabel = date.toLocaleDateString("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+});
+---
+
+<a
+  href={href}
+  class="group border-border-default flex flex-col overflow-hidden border bg-[color:var(--bg-elevated)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)]"
+>
+  <CardVisual slug={slug} ratio={size === "small" ? "16/9" : "16/9"} />
+  <div class:list={["flex flex-1 flex-col gap-3", size === "small" ? "p-4" : "p-5"]}>
+    <div class="font-mono text-[12px] uppercase tracking-[0.06em] text-[color:var(--fg-3)]">
+      {dateLabel}
+    </div>
+    <h3
+      class:list={[
+        "font-display tracking-[-0.01em] text-[color:var(--fg-1)] transition-colors group-hover:text-[color:var(--accent-press)]",
+        size === "small" ? "text-[18px] leading-[1.25]" : "text-[22px] leading-[1.2]",
+      ]}
+    >
+      {title}
+    </h3>
+    {
+      description && size !== "small" && (
+        <p class="text-[14px] leading-[1.45] text-[color:var(--fg-2)] line-clamp-2">
+          {description}
+        </p>
+      )
+    }
+    <div class="mt-auto pt-3">
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--accent-soft)] px-2.5 py-1 text-[12px] font-medium text-[color:var(--accent-press)]">
+        <span class="block h-1.5 w-1.5 rounded-full bg-[color:var(--accent-press)]"></span>
+        {category}
+      </span>
+    </div>
+  </div>
+</a>

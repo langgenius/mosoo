@@ -1,0 +1,38 @@
+---
+title: "Designing the runtime signal contract"
+description: "How we use a typed signal bus to keep agents, drivers, and the UI in sync without a global queue."
+date: 2026-05-15
+category: "Engineering"
+author: "Mosoo Team"
+---
+
+A long time ago, "agent platform" usually meant one of two architectures:
+
+- A **global queue** that everything reads from, with state lookups in a separate database;
+- Or a **bespoke RPC tree** between bespoke services that needed to know each other's shape.
+
+Both are fine. Neither is fun to debug.
+
+## The signal bus
+
+We landed on something else: a typed signal bus where every runtime event has a contract and every consumer subscribes by predicate. Drivers emit. Agents observe. The UI replays. Nobody owns the queue.
+
+```ts
+const observed = subscribe({
+  kind: "ToolCall",
+  tool: "shell.exec",
+  predicate: (e) => e.session === sessionId,
+});
+```
+
+A few things fall out for free:
+
+- **Replay**: the same signal stream that powers the live UI also recreates a finished session for an audit.
+- **Local-first dev**: drivers can be swapped for in-memory ones during tests without changing agent code.
+- **Backpressure** lives at the consumer, not the producer. If you can't keep up, you drop signals; you don't slow the whole runtime down.
+
+## What we'd do differently
+
+Two things. First, we'd ship typed schemas (Arktype, in our case) earlier — we paid for two months of "is this field a string or number" debates. Second, we'd accept that some signals deserve durability and some don't, and stop pretending one bus fits both.
+
+There's more in the [contracts package](https://github.com/langgenius/mosoo/tree/main/pkgs/contracts) if you want to poke at the actual shape.

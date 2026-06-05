@@ -1,0 +1,27 @@
+{
+  "name": "@mosoo/blog",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "deploy": "astro build && wrangler deploy --env prod",
+    "tc": "astro check",
+    "lint": "vp lint ."
+  },
+  "dependencies": {
+    "@astrojs/mdx": "^4.3.14",
+    "@astrojs/sitemap": "^3.7.3",
+    "@mosoo/design-tokens": "workspace:*",
+    "@tailwindcss/vite": "^4.3.0",
+    "astro": "^5.18.2",
+    "tailwindcss": "^4.3.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.9",
+    "typescript": "^6.0.3",
+    "vite-plus": "^0.1.23",
+    "wrangler": "^4.92.0"
+  }
+}

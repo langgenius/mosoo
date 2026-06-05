@@ -1,0 +1,90 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Hero from "../components/Hero.astro";
+import Card from "../components/Card.astro";
+import CategoryTabs from "../components/CategoryTabs.astro";
+import { CATEGORIES } from "../content.config";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const all = (await getCollection("blog", ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
+);
+
+const featured = all.find((p) => p.data.featured) ?? all[0];
+const rest = featured ? all.filter((p) => p.id !== featured.id) : all;
+---
+
+<BaseLayout
+  title="Mosoo Blog · Notes from the bamboo grove"
+  description="Engineering, product, and research notes from the team building Mosoo — the calm runtime for agents."
+>
+  <main class="mx-auto w-full max-w-[1280px] px-4 md:px-6">
+    <section class="border-border-strong divide-border-default divide-y border-x">
+      <!-- Title band -->
+      <div class="px-6 py-16 md:px-10 md:py-24">
+        <div class="font-mono mb-4 text-[12px] uppercase tracking-[0.08em] text-[color:var(--accent-press)]">
+          mosoo.ai / blog
+        </div>
+        <h1
+          class="font-display max-w-3xl text-[52px] font-bold leading-[1.02] tracking-[-0.015em] text-[color:var(--fg-1)] md:text-[72px]"
+        >
+          Notes from the bamboo grove.
+        </h1>
+        <p class="mt-6 max-w-xl text-[17px] leading-[1.5] text-[color:var(--fg-2)]">
+          Field notes from the team building Mosoo — what we ship, what we measure,
+          and the calm-runtime ideas behind it.
+        </p>
+      </div>
+
+      <!-- Featured -->
+      {
+        featured && (
+          <div class="px-6 py-10 md:px-10 md:py-14">
+            <Hero featured={featured} base={base} />
+          </div>
+        )
+      }
+
+      <!-- Tabs + Grid -->
+      <div class="px-6 py-10 md:px-10 md:py-14">
+        <div class="mb-8 flex items-end justify-between gap-4">
+          <h2 class="font-display text-[24px] font-bold tracking-[-0.01em] text-[color:var(--fg-1)] md:text-[28px]">
+            All posts
+          </h2>
+          <span class="font-mono text-[12px] uppercase tracking-[0.06em] text-[color:var(--fg-3)]">
+            {all.length} {all.length === 1 ? "entry" : "entries"}
+          </span>
+        </div>
+
+        <CategoryTabs categories={CATEGORIES} />
+
+        <div class="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {
+            rest.map((post) => (
+              <div data-card data-category={post.data.category}>
+                <Card
+                  href={`${base}/${post.id}`}
+                  title={post.data.title}
+                  category={post.data.category}
+                  date={post.data.date}
+                  description={post.data.description}
+                  slug={post.id}
+                />
+              </div>
+            ))
+          }
+        </div>
+
+        {
+          rest.length === 0 && (
+            <div class="rounded-md border border-dashed border-[color:var(--border-default)] p-12 text-center text-[14px] text-[color:var(--fg-3)]">
+              No posts yet — check back soon.
+            </div>
+          )
+        }
+      </div>
+    </section>
+  </main>
+</BaseLayout>

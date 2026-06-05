@@ -11,3 +11,8 @@ export const MOSOO_DOCS_URL = `${MOSOO_GITHUB_URL}blob/main/README.md`;
 export const MOSOO_RELEASES_URL = `${MOSOO_GITHUB_URL}releases`;
 export const MOSOO_LICENSE_URL = `${MOSOO_GITHUB_URL}blob/main/LICENSE`;
 export const MOSOO_SECURITY_URL = `${MOSOO_GITHUB_URL}security`;
+
+// Blog lives at /blog on the same custom domain but is served by a separate
+// Cloudflare Worker (apps/blog). Use a plain <a href> so the browser leaves
+// the SPA and lets the blog worker take over.
+export const MOSOO_BLOG_URL = "/blog";

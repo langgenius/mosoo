@@ -1,0 +1,58 @@
+---
+import CardVisual from "./CardVisual.astro";
+import type { CollectionEntry } from "astro:content";
+
+interface Props {
+  featured: CollectionEntry<"blog">;
+  base: string;
+}
+const { featured, base } = Astro.props;
+const dateLabel = featured.data.date.toLocaleDateString("en-US", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+---
+
+<a
+  href={`${base}/${featured.id}`}
+  class="group border-border-default block overflow-hidden border bg-[color:var(--bg-elevated)] transition-shadow duration-200 hover:shadow-[var(--shadow-lg)]"
+>
+  <div class="grid grid-cols-1 md:grid-cols-2">
+    <div class="md:order-2">
+      <CardVisual
+        slug={featured.id}
+        ratio="3/2"
+        label={featured.data.category}
+      />
+    </div>
+    <div class="flex flex-col gap-5 p-8 md:order-1 md:p-12">
+      <div class="font-mono text-[12px] uppercase tracking-[0.06em] text-[color:var(--fg-3)]">
+        Featured · {dateLabel}
+      </div>
+      <h2
+        class="font-display text-[34px] leading-[1.05] tracking-[-0.01em] text-[color:var(--fg-1)] transition-colors group-hover:text-[color:var(--accent-press)] md:text-[44px]"
+      >
+        {featured.data.title}
+      </h2>
+      <p class="text-[16px] leading-[1.5] text-[color:var(--fg-2)]">
+        {featured.data.description}
+      </p>
+      <div class="mt-2 flex items-center gap-3 text-[13px] text-[color:var(--fg-2)]">
+        <span>{featured.data.author}</span>
+        <span class="text-[color:var(--fg-muted)]">·</span>
+        <span class="inline-flex items-center gap-1.5">
+          <span class="block h-1.5 w-1.5 rounded-full bg-[color:var(--accent-press)]"></span>
+          {featured.data.category}
+        </span>
+      </div>
+      <div class="mt-3">
+        <span
+          class="font-mono inline-flex items-center gap-2 text-[13px] uppercase tracking-[0.06em] text-[color:var(--accent-press)]"
+        >
+          Read post →
+        </span>
+      </div>
+    </div>
+  </div>
+</a>

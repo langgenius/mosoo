@@ -1,0 +1,11 @@
+{
+  "name": "@mosoo/design-tokens",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./landing.css": "./landing.css"
+  },
+  "files": [
+    "landing.css"
+  ]
+}
