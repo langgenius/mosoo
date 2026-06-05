@@ -7,6 +7,7 @@ import { Avatar } from "@/shared/ui/avatar-root";
 
 import type { Agent } from "../agent.types";
 import { getRuntimeInfo } from "../runtime-catalog";
+import { AgentIdBadge } from "./agent-id-badge";
 import { AgentRowActions } from "./agent-row-actions";
 import { RuntimeIcon } from "./runtime-icon";
 import { StatusBadge } from "./status-badge";
@@ -85,7 +86,12 @@ export function AgentTable({
                 <div className="flex min-w-0 items-center gap-3">
                   <RuntimeIcon runtime={runtime} size={32} />
                   <div className="min-w-0">
-                    <div className="text-fg-1 truncate text-[14px] font-bold">{agent.name}</div>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="text-fg-1 truncate text-[14px] font-bold">{agent.name}</span>
+                      {agent.status === "published" ? (
+                        <AgentIdBadge agentId={agent.id} className="shrink-0" />
+                      ) : null}
+                    </div>
                     <div className="text-fg-2 max-w-[320px] truncate text-[12.5px]">
                       {agent.description}
                     </div>

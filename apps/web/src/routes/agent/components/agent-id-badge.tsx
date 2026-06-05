@@ -27,7 +27,8 @@ export function AgentIdBadge({
 }): ReactElement {
   const [copied, setCopied] = useState(false);
 
-  async function handleCopy(): Promise<void> {
+  async function handleCopy(event: React.MouseEvent): Promise<void> {
+    event.stopPropagation();
     const didCopy = await writeClipboardText(agentId);
     if (!didCopy) {
       return;
@@ -52,8 +53,8 @@ export function AgentIdBadge({
       <Button
         aria-label={copied ? "Agent ID copied" : "Copy agent ID"}
         className="text-muted-foreground hover:text-foreground size-4"
-        onClick={() => {
-          void handleCopy();
+        onClick={(event) => {
+          void handleCopy(event);
         }}
         size="icon-xs"
         title={copied ? "Copied" : "Copy agent ID"}
