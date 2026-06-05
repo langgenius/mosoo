@@ -146,6 +146,7 @@ export async function exportAgentPackage(
     license: null,
     manifest,
     packageVersion: AGENT_PACKAGE_VERSION,
+    sourceAgentId: packageAccess.agent.id,
     version: null,
   };
   const fileName = createAgentPackageFileName(packageAccess.agent.name);
@@ -163,7 +164,7 @@ export async function exportAgentPackage(
     contentType: packageFile.contentType,
     fileId: packageFile.fileId,
     fileName: packageFile.fileName,
-    manifestYaml: serializeAgentManifestToYaml(manifest),
+    manifestYaml: serializeAgentManifestToYaml(manifest, packageAccess.agent.id),
     size: packageFile.size,
   };
 }

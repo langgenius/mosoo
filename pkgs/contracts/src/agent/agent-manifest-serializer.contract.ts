@@ -21,9 +21,13 @@ function appendStringRecordYaml(lines: string[], record: Record<string, string>,
   }
 }
 
-export function serializeAgentManifestToYaml(manifest: AgentManifest): string {
+export function serializeAgentManifestToYaml(
+  manifest: AgentManifest,
+  sourceAgentId: string | null = null,
+): string {
   const lines: string[] = [
     `manifestVersion: ${yamlString(manifest.manifestVersion)}`,
+    ...(sourceAgentId === null ? [] : [`sourceAgentId: ${yamlString(sourceAgentId)}`]),
     `kind: ${yamlString(manifest.kind)}`,
     "metadata:",
     `  name: ${yamlString(manifest.metadata.name)}`,
@@ -108,8 +112,15 @@ export function serializeAgentManifestToYaml(manifest: AgentManifest): string {
   return `${lines.join("\n")}\n`;
 }
 
-export function serializeAgentManifestToJson(manifest: AgentManifest): string {
-  return JSON.stringify(manifest, null, 2);
+export function serializeAgentManifestToJson(
+  manifest: AgentManifest,
+  sourceAgentId: string | null = null,
+): string {
+  if (sourceAgentId === null) {
+    return JSON.stringify(manifest, null, 2);
+  }
+
+  return JSON.stringify({ sourceAgentId, ...manifest }, null, 2);
 }
 
 export function serializeAgentPackageToJson(agentPackage: AgentPackage): string {
@@ -153,6 +164,7 @@ export function toAgentPackageManifestJson(agentPackage: AgentPackage): Record<s
     description: agentPackage.app.description,
     author: agentPackage.author,
     license: agentPackage.license,
+    sourceAgentId: agentPackage.sourceAgentId,
     exportedAt: agentPackage.exportedAt,
     packageVersion: agentPackage.packageVersion,
     manifestVersion: manifest.manifestVersion,

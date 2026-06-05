@@ -138,6 +138,7 @@ export interface AgentPackage {
   license: string | null;
   manifest: AgentManifest;
   packageVersion: typeof AGENT_PACKAGE_VERSION;
+  sourceAgentId: string | null;
   version: string | null;
 }
 

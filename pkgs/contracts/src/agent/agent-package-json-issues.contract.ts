@@ -28,6 +28,7 @@ const PACKAGE_MANIFEST_TOP_LEVEL_FIELDS = new Set([
   "provider",
   "runtime",
   "skills",
+  "sourceAgentId",
   "spaceBindings",
   "version",
 ]);
@@ -41,7 +42,6 @@ const PACKAGE_MANIFEST_FORBIDDEN_FIELDS = new Set([
   "runtimeState",
   "secrets",
   "sessions",
-  "sourceAgentId",
   "sourceOrgId",
   "sourceOrganizationId",
   "sourceProvenance",

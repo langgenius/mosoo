@@ -27,7 +27,7 @@ export async function exportAgentManifest(
 
   return {
     agentId: editable.agent.id,
-    json: serializeAgentManifestToJson(manifest),
-    yaml: serializeAgentManifestToYaml(manifest),
+    json: serializeAgentManifestToJson(manifest, editable.agent.id),
+    yaml: serializeAgentManifestToYaml(manifest, editable.agent.id),
   };
 }

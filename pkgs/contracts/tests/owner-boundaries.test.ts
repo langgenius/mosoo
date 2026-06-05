@@ -160,7 +160,7 @@ describe("contracts owner boundaries", () => {
         prompts: { system: "Help with operations." },
         provider: "openai",
         runtime: "openai-runtime",
-        sourceAgentId: "01J00000000000000000000001",
+        sourceOrganizationId: "01J00000000000000000000001",
       }),
     );
 

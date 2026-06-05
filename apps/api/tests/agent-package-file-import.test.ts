@@ -240,6 +240,7 @@ function createPackageFixture(input: { agentsMd?: boolean } = {}): AgentPackage 
       spaces: [],
     },
     packageVersion: AGENT_PACKAGE_VERSION,
+    sourceAgentId: null,
     version: "1.0.0",
   };
 }

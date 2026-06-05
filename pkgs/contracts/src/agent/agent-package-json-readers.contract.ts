@@ -34,6 +34,7 @@ export function readAgentPackageFromRecord(
     license: readNullableString(input, "license"),
     manifest,
     packageVersion: AGENT_PACKAGE_VERSION,
+    sourceAgentId: readNullableString(input, "sourceAgentId"),
     version: readNullableString(input, "version"),
   };
 }

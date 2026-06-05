@@ -1,7 +1,9 @@
 import { getAgentKindRuntimePolicy } from "@mosoo/contracts/agent";
 import {
   ArrowLeft,
+  Check,
   ChevronDown,
+  Copy,
   FileText,
   FolderTree,
   Settings,
@@ -52,6 +54,48 @@ const MODE_TABS: { id: DetailMode; label: string; ownerOnly?: boolean }[] = [
 ];
 
 const DEBUG_MODES = new Set<DetailMode>(["files", "system-log", "terminal"]);
+
+function AgentIdBadge({ agentId }: { agentId: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    if (!navigator.clipboard) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(agentId);
+    } catch {
+      return;
+    }
+
+    setCopied(true);
+    globalThis.setTimeout(() => {
+      setCopied(false);
+    }, 1500);
+  }
+
+  return (
+    <div className="border-border-subtle text-muted-foreground ml-1 inline-flex items-center gap-1 rounded-md border bg-white py-0.5 pr-0.5 pl-1.5 text-[11px]">
+      <span title={agentId} className="font-mono">
+        ID: {agentId}
+      </span>
+      <Button
+        aria-label={copied ? "Agent ID copied" : "Copy agent ID"}
+        className="text-muted-foreground hover:text-foreground size-4"
+        onClick={() => {
+          void handleCopy();
+        }}
+        size="icon-xs"
+        title={copied ? "Copied" : "Copy agent ID"}
+        type="button"
+        variant="ghost"
+      >
+        {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+      </Button>
+    </div>
+  );
+}
 
 interface DebugModeItem {
   icon: LucideIcon;
@@ -131,6 +175,7 @@ function AgentDetailHeader({
             v{agent.liveVersion.versionNumber} live
           </button>
         ) : null}
+        {isDraftLifecycle ? null : <AgentIdBadge agentId={agent.id} />}
       </div>
 
       {isDraftLifecycle && lifecycleMode ? (
