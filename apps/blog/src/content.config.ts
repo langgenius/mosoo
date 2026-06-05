@@ -22,7 +22,7 @@ const blog = defineCollection({
     description: z.string(),
     date: z.coerce.date(),
     category: z.enum(CATEGORIES),
-    author: z.string().default("mosoo team"),
+    author: z.string().default("Mosoo team"),
     locale: z.enum(LOCALES).default("en"),
     permalink: z.string().optional(),
     translationKey: z.string().optional(),
@@ -32,7 +32,8 @@ const blog = defineCollection({
     // render this image instead of the deterministic gradient. Convention:
     // store assets under `public/blog/<slug>/hero.<ext>` so they ship from
     // the blog worker at `/blog/blog/<slug>/hero.<ext>`. The path goes here
-    // as a root-absolute URL — e.g. "/blog/blog/why-mosoo/hero.jpg".
+    // as a root-absolute URL — e.g.
+    // "/blog/blog/the-journey-begins-with-an-imagine-if/hero.jpg".
     heroImage: z.string().optional(),
     heroAlt: z.string().optional(),
   }),

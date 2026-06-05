@@ -33,7 +33,7 @@ const copy = {
   back: locale === "zh" ? "← 返回全部文章" : "← Back to all posts",
   by: locale === "zh" ? "By" : "By",
   more: locale === "zh" ? "← More posts" : "← More posts",
-  try: "Try mosoo →",
+  try: "Try Mosoo →",
 };
 const dateLabel = date.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", {
   year: "numeric",
@@ -53,7 +53,7 @@ const jsonLd = {
   author: { "@type": "Person", name: author },
   publisher: {
     "@type": "Organization",
-    name: "mosoo",
+    name: "Mosoo",
     url: "https://mosoo.ai",
   },
   url: new URL(Astro.url.pathname, Astro.site).href,
@@ -61,7 +61,7 @@ const jsonLd = {
 ---
 
 <BaseLayout
-  title={`${title} · mosoo blog`}
+  title={`${title} · Mosoo blog`}
   description={description}
   type="article"
   publishedTime={date}
@@ -93,7 +93,7 @@ const jsonLd = {
       </span>
     </div>
 
-    <h1 class="mb-5 font-display text-[42px] font-medium leading-[1.05] tracking-[-0.025em] text-[color:var(--ink-950)] md:text-[56px]">
+    <h1 class="mb-8 font-display text-[42px] font-medium leading-[1.05] tracking-[-0.025em] text-[color:var(--ink-950)] md:text-[56px]">
       {
         hasTitleAccent && titleAccent ? (
           <>
@@ -104,10 +104,6 @@ const jsonLd = {
         )
       }
     </h1>
-
-    <p class="mb-8 text-[19px] leading-[1.55] text-[color:var(--fg-secondary)]">
-      {description}
-    </p>
 
     <div class="mb-12 flex items-center gap-3 text-[14px] text-[color:var(--fg-secondary)]">
       <span class="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[color:var(--border)] bg-white shadow-[var(--shadow-xs)]">

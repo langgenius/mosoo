@@ -11,8 +11,8 @@ const posts = (await getCollection("blog", ({ data }) => !data.draft && data.loc
 ---
 
 <BaseLayout
-  title="mosoo blog · Notes from the bamboo grove"
-  description="Notes from the mosoo team on agent products, runtime design, and the road to production."
+  title="Mosoo blog · Notes from the bamboo grove"
+  description="Notes from the Mosoo team on Agent products, runtime design, and the road to production."
   lang="en"
 >
   <BlogIndex
@@ -20,6 +20,6 @@ const posts = (await getCollection("blog", ({ data }) => !data.draft && data.loc
     base={base}
     eyebrow="mosoo.ai / blog"
     title="Notes from the bamboo grove."
-    description="Letters for builders moving agents from local experiments into production systems."
+    description="Letters for builders moving Agents from local experiments into production systems."
   />
 </BaseLayout>

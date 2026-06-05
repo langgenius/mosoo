@@ -10,10 +10,14 @@ Validated by `src/content.config.ts`.
 ```yaml
 ---
 title: "Post title"
-description: "One- or two-sentence dek shown on the index card and below the title."
+description: "One- or two-sentence dek shown on the index card and metadata."
 date: 2026-05-28
 category: "Engineering" # Engineering | Product | Research | Customer Stories
-author: "mosoo team"    # optional, defaults to "mosoo team"
+author: "Mosoo team"    # optional, defaults to "Mosoo team"
+locale: "en"            # en | zh, defaults to en
+permalink: "post-title" # optional shared slug for localized posts
+translationKey: "post-title" # optional key linking localized versions
+titleAccent: "If"       # optional colored substring in the title
 featured: false         # at most one true — wins the hero slot on the index
 draft: false            # true keeps the post out of the build
 heroImage: "/blog/blog/<slug>/hero.jpg"   # optional, see Images below
@@ -26,28 +30,28 @@ heroAlt: "..."          # optional alt for heroImage
 **Where to put them.** Drop assets under `apps/blog/public/blog/<slug>/`.
 Cloudflare Workers Assets serves `public/` at the worker root and the worker
 itself is mounted at `mosoo.ai/blog`, so a file at
-`apps/blog/public/blog/why-mosoo/hero.jpg` is served from
-`https://mosoo.ai/blog/blog/why-mosoo/hero.jpg`.
+`apps/blog/public/blog/the-journey-begins-with-an-imagine-if/hero.jpg` is served from
+`https://mosoo.ai/blog/blog/the-journey-begins-with-an-imagine-if/hero.jpg`.
 
 **How to reference them.** Use root-absolute URLs in frontmatter and MDX —
 they survive base-path changes. Example:
 
 ```yaml
-heroImage: "/blog/blog/why-mosoo/hero.jpg"
+heroImage: "/blog/blog/the-journey-begins-with-an-imagine-if/hero.jpg"
 heroAlt:   "A young moso bamboo culm pushing through paper"
 ```
 
 In the post body, use standard markdown:
 
 ```md
-![A young moso bamboo culm pushing through paper](/blog/blog/why-mosoo/culm.jpg)
+![A young moso bamboo culm pushing through paper](/blog/blog/the-journey-begins-with-an-imagine-if/culm.jpg)
 ```
 
 Add a caption by wrapping in a `<figure>`:
 
 ```mdx
 <figure>
-  ![Alt text](/blog/blog/why-mosoo/culm.jpg)
+  ![Alt text](/blog/blog/the-journey-begins-with-an-imagine-if/culm.jpg)
   <figcaption>A young moso bamboo culm pushing through paper.</figcaption>
 </figure>
 ```
@@ -61,8 +65,8 @@ over ~500 KB should be downsized.
 
 ## Writing tips
 
-- Sentence case in titles and headings. Lowercase "mosoo" everywhere,
-  including the first word of a sentence (reword if it would lead).
+- Sentence case in titles and headings. Use the brand casing the post needs,
+  including `Mosoo` when it is a product name in prose.
 - `description` shows up in the OG card, the index dek, and the search
   snippet. Make it stand alone.
 - The first paragraph is the lede — write it like a magazine opener.
