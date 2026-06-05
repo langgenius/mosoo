@@ -4,6 +4,7 @@ import { Input } from "@/shared/ui/input";
 
 import type { Agent } from "../agent.types";
 import { getRuntimeInfo } from "../runtime-catalog";
+import { AgentIdBadge } from "./agent-id-badge";
 import { RuntimeIcon } from "./runtime-icon";
 
 export function AgentSettingsSummary({ agent }: { agent: Agent }): ReactElement {
@@ -21,6 +22,9 @@ export function AgentSettingsSummary({ agent }: { agent: Agent }): ReactElement 
           defaultValue={agent.description}
           placeholder="Description..."
         />
+        {agent.status === "published" ? (
+          <AgentIdBadge agentId={agent.id} className="w-fit" />
+        ) : null}
       </div>
     </div>
   );
