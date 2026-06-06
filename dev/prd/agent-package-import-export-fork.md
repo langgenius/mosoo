@@ -126,6 +126,7 @@ my-agent.agent
   "description": "...",
   "author": { "name": "...", "email": "..." },
   "license": "MIT",
+  "sourceAgentId": "01J...",
   "exportedAt": "...",
   "packageVersion": "mosoo.agent.package.v1",
   "manifestVersion": "mosoo.agent.manifest.v1",
@@ -166,7 +167,7 @@ my-agent.agent
 | **The Environment template lives in `environment/definition.json`** as a full definition, without secret values | Secrets go through needs_reconnect                                                                                                          |
 | **Space binding intent goes into `manifest.json`**                                                              | Carries only alias / expectedName, not Space files, source Space id, blocking policy, or permission state                                   |
 | **Space permissions are computed by target-side RBAC**                                                          | Determined in real time at import repair / preview / publish / session start, based on the target user, Agent owner, and the selected Space |
-| **ULIDs never appear in any file in the zip**                                                                   | Resolution is by name; source ids do not participate in target resolution                                                                   |
+| **The only source ULID that may appear is `manifest.json#sourceAgentId`** (provenance pointer to the exporting Agent); no other source ULIDs (Organization id, user id, asset ids, Space ids, MCP server ids) appear in any file in the zip | Resolution is still by name; `sourceAgentId` is provenance only — the importer does not look it up against the target Organization, and a mismatch never blocks an import                                                                   |
 
 ---
 
