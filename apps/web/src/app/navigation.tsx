@@ -1,15 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import {
-  BarChart3,
-  Bot,
-  Box,
-  ChevronDown,
-  ChevronRight,
-  Folder,
-  Inbox,
-  KeyRound,
-  Puzzle,
-} from "lucide-react";
+import { Bot, Box, ChevronDown, ChevronRight, Folder, Inbox, KeyRound, Puzzle } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -31,7 +21,6 @@ interface AppNavItem {
 interface AppNavSection {
   items: AppNavItem[];
   label: string;
-  requiresGovernanceAccess?: boolean;
 }
 
 const NAV_SECTIONS: AppNavSection[] = [
@@ -56,11 +45,6 @@ const NAV_SECTIONS: AppNavSection[] = [
       { icon: KeyRound, label: "Providers", path: "/providers" },
     ],
     label: "Studio",
-  },
-  {
-    items: [{ icon: BarChart3, label: "Cost", path: "/cost" }],
-    label: "Governance",
-    requiresGovernanceAccess: true,
   },
 ];
 
@@ -211,22 +195,10 @@ function NavGroup({
   );
 }
 
-export function AppNavigation({
-  canReadGovernance,
-  collapsed,
-  pathname,
-}: {
-  canReadGovernance: boolean;
-  collapsed: boolean;
-  pathname: string;
-}) {
+export function AppNavigation({ collapsed, pathname }: { collapsed: boolean; pathname: string }) {
   return (
     <div className={cn("flex flex-col", collapsed ? "gap-2" : "gap-3")}>
       {NAV_SECTIONS.map((section, sectionIndex) => {
-        if (section.requiresGovernanceAccess === true && !canReadGovernance) {
-          return null;
-        }
-
         return (
           <div key={section.label}>
             {collapsed ? (

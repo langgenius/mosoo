@@ -163,6 +163,17 @@ const appRoutes = [
       { element: <SettingsOrganizationGeneral />, path: "general" },
       { element: <Members />, path: "members" },
       { element: <SettingsOrganizationEnvironments />, path: "environments" },
+      {
+        element: (
+          <OrganizationPermissionRoute
+            description="Workspace Cost is available to organization admins. You can still review your own usage in Settings."
+            permission={Permission.CostOrganizationRead}
+          >
+            <Cost />
+          </OrganizationPermissionRoute>
+        ),
+        path: "cost",
+      },
     ],
     element: protectedRoute(<SettingsLayout />),
     path: "/settings",
@@ -171,17 +182,7 @@ const appRoutes = [
   { element: protectedRoute(<Navigate to="/settings/usage" replace />), path: "/usage" },
   { element: protectedRoute(<Navigate to="/settings/members" replace />), path: "/members" },
   { element: protectedRoute(<Providers />), path: "/providers" },
-  {
-    element: protectedRoute(
-      <OrganizationPermissionRoute
-        description="Workspace Cost is available to organization admins. You can still review your own usage in Settings."
-        permission={Permission.CostOrganizationRead}
-      >
-        <Cost />
-      </OrganizationPermissionRoute>,
-    ),
-    path: "/cost",
-  },
+  { element: protectedRoute(<Navigate to="/settings/cost" replace />), path: "/cost" },
   { element: protectedRoute(<ProviderDemo />), path: "/demo/provider" },
 ] satisfies RouteObject[];
 

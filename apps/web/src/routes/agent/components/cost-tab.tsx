@@ -72,7 +72,7 @@ export function AgentCostTab({ agentId }: { agentId: string }): ReactElement {
               ))}
             </div>
             <Link
-              to="/cost"
+              to="/settings/cost"
               className="border-border hover:bg-muted inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-semibold"
             >
               <ExternalLink className="size-3.5" />

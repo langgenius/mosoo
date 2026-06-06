@@ -1,4 +1,3 @@
-import { Permission, can } from "@mosoo/contracts/permission";
 import { PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -14,10 +13,9 @@ import { useAppSession } from "./session-provider";
 import { useSidebarCollapsed } from "./use-sidebar-collapsed";
 
 export function Layout({ children }: { children: ReactNode }) {
-  const { activeOrganization, user } = useAppSession();
+  const { user } = useAppSession();
   const location = useLocation();
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
-  const canReadGovernance = can(activeOrganization?.viewerRole, Permission.CostOrganizationRead);
 
   const ToggleIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
   const toggleLabel = collapsed ? "Expand sidebar" : "Collapse sidebar";
@@ -74,11 +72,7 @@ export function Layout({ children }: { children: ReactNode }) {
           {collapsed ? <TooltipContent side="right">New thread</TooltipContent> : null}
         </Tooltip>
 
-        <AppNavigation
-          canReadGovernance={canReadGovernance}
-          collapsed={collapsed}
-          pathname={location.pathname}
-        />
+        <AppNavigation collapsed={collapsed} pathname={location.pathname} />
 
         <div className="flex-1" />
         <Separator className="bg-border-soft" />
