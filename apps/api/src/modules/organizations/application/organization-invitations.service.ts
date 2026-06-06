@@ -60,7 +60,6 @@ function toAcceptedInvitationOrganizationSummary(
     created_at: row.organization_created_at,
     id: row.organization_id,
     join_policy: row.organization_join_policy,
-    kind: row.organization_kind,
     name: row.organization_name,
     primary_domain: row.organization_primary_domain,
     slug: row.organization_slug,
@@ -180,10 +179,6 @@ export async function inviteOrganizationMember(
 
   if (!can(admission.viewer_role, Permission.InvitationsCreate)) {
     throw forbiddenError();
-  }
-
-  if (admission.kind === "personal") {
-    throw forbiddenError("Convert this Personal Org to collaborate with others.");
   }
 
   if (admission.existing_member_account_id !== null) {
@@ -335,7 +330,6 @@ export async function acceptOrganizationInvitation(
   await grantOrganizationMembership(database, {
     accountId: viewer.id,
     makeActive: true,
-    organizationKind: invitationRow.organization_kind,
     organizationId: invitation.organizationId,
     role: "member",
   });

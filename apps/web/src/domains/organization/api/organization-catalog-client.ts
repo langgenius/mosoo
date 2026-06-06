@@ -13,7 +13,6 @@ const CREATE_ORGANIZATION_MUTATION = graphql(/* GraphQL */ `
       createdAt
       id
       joinPolicy
-      kind
       name
       primaryDomain
       slug
@@ -29,7 +28,6 @@ const SET_ACTIVE_ORGANIZATION_MUTATION = graphql(/* GraphQL */ `
       createdAt
       id
       joinPolicy
-      kind
       name
       primaryDomain
       slug
@@ -45,7 +43,6 @@ const UPDATE_ORGANIZATION_PRIMARY_DOMAIN_MUTATION = graphql(/* GraphQL */ `
       createdAt
       id
       joinPolicy
-      kind
       name
       primaryDomain
       slug
@@ -61,7 +58,6 @@ const UPDATE_ORGANIZATION_PROFILE_MUTATION = graphql(/* GraphQL */ `
       createdAt
       id
       joinPolicy
-      kind
       name
       primaryDomain
       slug
@@ -70,26 +66,7 @@ const UPDATE_ORGANIZATION_PROFILE_MUTATION = graphql(/* GraphQL */ `
   }
 `);
 
-const CONVERT_PERSONAL_ORGANIZATION_MUTATION = graphql(/* GraphQL */ `
-  mutation ConvertPersonalOrganization($input: ConvertPersonalOrganizationInput!) {
-    convertPersonalOrganization(input: $input) {
-      avatarUrl
-      createdAt
-      id
-      joinPolicy
-      kind
-      name
-      primaryDomain
-      slug
-      viewerRole
-    }
-  }
-`);
-
-export async function createOrganization(input: {
-  kind?: Organization["kind"];
-  name?: string;
-}): Promise<Organization> {
+export async function createOrganization(input: { name?: string }): Promise<Organization> {
   const payload = await requestGraphQL(CREATE_ORGANIZATION_MUTATION, {
     input,
   });
@@ -110,11 +87,9 @@ export async function setActiveOrganization(organizationId: OrganizationId): Pro
 export async function updateOrganizationPrimaryDomain(
   organizationId: OrganizationId,
   domain: string | null,
-  convertPersonal?: boolean,
 ): Promise<Organization> {
   const payload = await requestGraphQL(UPDATE_ORGANIZATION_PRIMARY_DOMAIN_MUTATION, {
     input: {
-      convertPersonal,
       domain,
       organizationId,
     },
@@ -133,16 +108,4 @@ export async function updateOrganizationProfile(input: {
   });
 
   return toOrganizationSummary(payload.updateOrganizationProfile);
-}
-
-export async function convertPersonalOrganization(
-  organizationId: OrganizationId,
-): Promise<Organization> {
-  const payload = await requestGraphQL(CONVERT_PERSONAL_ORGANIZATION_MUTATION, {
-    input: {
-      organizationId,
-    },
-  });
-
-  return toOrganizationSummary(payload.convertPersonalOrganization);
 }

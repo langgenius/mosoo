@@ -230,7 +230,6 @@ export type AuthSecurityLevel =
 
 export type BootstrapOnboardingInput = {
   action: string;
-  kind?: OrganizationKind | null | undefined;
   name?: string | null | undefined;
   organizationId?: PlatformId | null | undefined;
 };
@@ -250,10 +249,6 @@ export type ConnectMcpBearerInput = {
   serverId: PlatformId;
   subjectLabel?: string | null | undefined;
   token: string;
-};
-
-export type ConvertPersonalOrganizationInput = {
-  organizationId: PlatformId;
 };
 
 export type CostRange =
@@ -327,7 +322,6 @@ export type CreateLarkAgentChannelBindingInput = {
 };
 
 export type CreateOrganizationInput = {
-  kind?: OrganizationKind | null | undefined;
   name?: string | null | undefined;
 };
 
@@ -577,10 +571,6 @@ export type OrganizationInvitationStatus =
 export type OrganizationJoinPolicy =
   | 'auto'
   | 'invite_only';
-
-export type OrganizationKind =
-  | 'personal'
-  | 'team';
 
 export type OrganizationMemberRole =
   | 'admin'
@@ -896,7 +886,6 @@ export type UpdateOrganizationMemberRoleInput = {
 };
 
 export type UpdateOrganizationPrimaryDomainInput = {
-  convertPersonal?: boolean | null | undefined;
   domain?: string | null | undefined;
   organizationId: PlatformId;
 };
@@ -1419,7 +1408,7 @@ export type OnboardingBootstrapMutationVariables = Exact<{
 }>;
 
 
-export type OnboardingBootstrapMutation = { onboardingBootstrap: { completed: boolean, organization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, kind: OrganizationKind, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } | null } };
+export type OnboardingBootstrapMutation = { onboardingBootstrap: { completed: boolean, organization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } | null } };
 
 export type OrganizationAccessRequestsQueryVariables = Exact<{
   organizationId: PlatformId;
@@ -1433,7 +1422,7 @@ export type OrganizationJoinTargetQueryVariables = Exact<{
 }>;
 
 
-export type OrganizationJoinTargetQuery = { organizationJoinTarget: { organizationId: PlatformId, organizationName: string, viewerIsAuthenticated: boolean, viewerIsMember: boolean, pendingInvitation: { createdAt: string, email: string, expiresAt: string | null, id: PlatformId, invitedBy: PlatformId, invitedByName: string | null, organizationId: PlatformId, organizationName: string, status: OrganizationInvitationStatus, updatedAt: string, accountId: PlatformId | null } | null, pendingRequest: { createdAt: string, id: PlatformId, organizationId: PlatformId, organizationName: string, referrerAccountId: PlatformId | null, referrerName: string | null, requestedByAccountId: PlatformId, requesterEmail: string, requesterName: string, reviewedAt: string | null, reviewedBy: PlatformId | null, reviewedByName: string | null, status: OrganizationAccessRequestStatus, updatedAt: string } | null, organization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, kind: OrganizationKind, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } } };
+export type OrganizationJoinTargetQuery = { organizationJoinTarget: { organizationId: PlatformId, organizationName: string, viewerIsAuthenticated: boolean, viewerIsMember: boolean, pendingInvitation: { createdAt: string, email: string, expiresAt: string | null, id: PlatformId, invitedBy: PlatformId, invitedByName: string | null, organizationId: PlatformId, organizationName: string, status: OrganizationInvitationStatus, updatedAt: string, accountId: PlatformId | null } | null, pendingRequest: { createdAt: string, id: PlatformId, organizationId: PlatformId, organizationName: string, referrerAccountId: PlatformId | null, referrerName: string | null, requestedByAccountId: PlatformId, requesterEmail: string, requesterName: string, reviewedAt: string | null, reviewedBy: PlatformId | null, reviewedByName: string | null, status: OrganizationAccessRequestStatus, updatedAt: string } | null, organization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } } };
 
 export type RequestOrganizationAccessMutationVariables = Exact<{
   input: RequestOrganizationAccessInput;
@@ -1468,35 +1457,28 @@ export type CreateOrganizationMutationVariables = Exact<{
 }>;
 
 
-export type CreateOrganizationMutation = { createOrganization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, kind: OrganizationKind, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } };
+export type CreateOrganizationMutation = { createOrganization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } };
 
 export type SetActiveOrganizationMutationVariables = Exact<{
   input: SetActiveOrganizationInput;
 }>;
 
 
-export type SetActiveOrganizationMutation = { setActiveOrganization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, kind: OrganizationKind, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } };
+export type SetActiveOrganizationMutation = { setActiveOrganization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } };
 
 export type UpdateOrganizationPrimaryDomainMutationVariables = Exact<{
   input: UpdateOrganizationPrimaryDomainInput;
 }>;
 
 
-export type UpdateOrganizationPrimaryDomainMutation = { updateOrganizationPrimaryDomain: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, kind: OrganizationKind, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } };
+export type UpdateOrganizationPrimaryDomainMutation = { updateOrganizationPrimaryDomain: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } };
 
 export type UpdateOrganizationProfileMutationVariables = Exact<{
   input: UpdateOrganizationProfileInput;
 }>;
 
 
-export type UpdateOrganizationProfileMutation = { updateOrganizationProfile: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, kind: OrganizationKind, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } };
-
-export type ConvertPersonalOrganizationMutationVariables = Exact<{
-  input: ConvertPersonalOrganizationInput;
-}>;
-
-
-export type ConvertPersonalOrganizationMutation = { convertPersonalOrganization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, kind: OrganizationKind, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } };
+export type UpdateOrganizationProfileMutation = { updateOrganizationProfile: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } };
 
 export type OrganizationInvitationsQueryVariables = Exact<{
   organizationId: PlatformId;
@@ -1522,7 +1504,7 @@ export type AcceptOrganizationInvitationMutationVariables = Exact<{
 }>;
 
 
-export type AcceptOrganizationInvitationMutation = { acceptOrganizationInvitation: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, kind: OrganizationKind, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } };
+export type AcceptOrganizationInvitationMutation = { acceptOrganizationInvitation: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } };
 
 export type CancelOrganizationInvitationMutationVariables = Exact<{
   input: CancelOrganizationInvitationInput;
@@ -1847,7 +1829,7 @@ export type SpacesQuery = { spaceList: Array<{ createdAt: string, id: PlatformId
 export type ViewerQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ViewerQuery = { viewer: { account: { email: string, id: PlatformId, imageUrl: string | null, name: string, systemAgentModel: { modelId: string, vendor: string } | null } | null, activeOrganization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, kind: OrganizationKind, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } | null, auth: { currentSecurityLevel: AuthSecurityLevel, methods: Array<AuthMethod> }, memberships: Array<{ joinedAt: string, role: OrganizationMemberRole, organization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, kind: OrganizationKind, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } }>, organizationCreationSlot: { occupied: boolean, organizationId: PlatformId | null } } };
+export type ViewerQuery = { viewer: { account: { email: string, id: PlatformId, imageUrl: string | null, name: string, systemAgentModel: { modelId: string, vendor: string } | null } | null, activeOrganization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } | null, auth: { currentSecurityLevel: AuthSecurityLevel, methods: Array<AuthMethod> }, memberships: Array<{ joinedAt: string, role: OrganizationMemberRole, organization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } }>, organizationCreationSlot: { occupied: boolean, organizationId: PlatformId | null } } };
 
 export type UpdateProfileMutationVariables = Exact<{
   input: UpdateAccountProfileInput;
@@ -4563,7 +4545,6 @@ export const OnboardingBootstrapDocument = new TypedDocumentString(`
       createdAt
       id
       joinPolicy
-      kind
       name
       primaryDomain
       slug
@@ -4633,7 +4614,6 @@ export const OrganizationJoinTargetDocument = new TypedDocumentString(`
       createdAt
       id
       joinPolicy
-      kind
       name
       primaryDomain
       slug
@@ -4716,7 +4696,6 @@ export const CreateOrganizationDocument = new TypedDocumentString(`
     createdAt
     id
     joinPolicy
-    kind
     name
     primaryDomain
     slug
@@ -4731,7 +4710,6 @@ export const SetActiveOrganizationDocument = new TypedDocumentString(`
     createdAt
     id
     joinPolicy
-    kind
     name
     primaryDomain
     slug
@@ -4746,7 +4724,6 @@ export const UpdateOrganizationPrimaryDomainDocument = new TypedDocumentString(`
     createdAt
     id
     joinPolicy
-    kind
     name
     primaryDomain
     slug
@@ -4761,7 +4738,6 @@ export const UpdateOrganizationProfileDocument = new TypedDocumentString(`
     createdAt
     id
     joinPolicy
-    kind
     name
     primaryDomain
     slug
@@ -4769,21 +4745,6 @@ export const UpdateOrganizationProfileDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<UpdateOrganizationProfileMutation, UpdateOrganizationProfileMutationVariables>;
-export const ConvertPersonalOrganizationDocument = new TypedDocumentString(`
-    mutation ConvertPersonalOrganization($input: ConvertPersonalOrganizationInput!) {
-  convertPersonalOrganization(input: $input) {
-    avatarUrl
-    createdAt
-    id
-    joinPolicy
-    kind
-    name
-    primaryDomain
-    slug
-    viewerRole
-  }
-}
-    `) as unknown as TypedDocumentString<ConvertPersonalOrganizationMutation, ConvertPersonalOrganizationMutationVariables>;
 export const OrganizationInvitationsDocument = new TypedDocumentString(`
     query OrganizationInvitations($organizationId: ULID!) {
   organizationInvitationList(organizationId: $organizationId) {
@@ -4842,7 +4803,6 @@ export const AcceptOrganizationInvitationDocument = new TypedDocumentString(`
     createdAt
     id
     joinPolicy
-    kind
     name
     primaryDomain
     slug
@@ -5671,7 +5631,6 @@ export const ViewerDocument = new TypedDocumentString(`
       createdAt
       id
       joinPolicy
-      kind
       name
       primaryDomain
       slug
@@ -5689,7 +5648,6 @@ export const ViewerDocument = new TypedDocumentString(`
         createdAt
         id
         joinPolicy
-        kind
         name
         primaryDomain
         slug

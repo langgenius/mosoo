@@ -11,7 +11,6 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { normalizeEmail } from "../../users/domain/email-address";
 import { organizationSummaryColumns } from "../domain/organization-access.policy";
-import { organizationKindValue } from "../domain/organization-kind.policy";
 import {
   inviterAccountsTable,
   referrerAccountsTable,
@@ -39,7 +38,6 @@ export async function getOrganizationAccessSubmissionAdmission(
         active_domain_id: organizationDomainsTable.id,
         active_membership_account_id: organizationMembersTable.accountId,
         join_policy: organizationsTable.joinPolicy,
-        kind: organizationKindValue(),
         organization_id: organizationsTable.id,
         organization_name: organizationsTable.name,
         pending_invitation_id: organizationInvitationsTable.id,

@@ -8,7 +8,6 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs, toIsoString } from "../../../time";
 import { toOrganizationSummary } from "../../organizations/domain/organization-access.policy";
-import { organizationKindValue } from "../../organizations/domain/organization-kind.policy";
 
 export interface AccountOrganizationState {
   id: AccountId;
@@ -76,7 +75,6 @@ export async function listViewerOrganizationMemberships(
       id: organizationsTable.id,
       joined_at: organizationMembersTable.joinedAt,
       join_policy: organizationsTable.joinPolicy,
-      kind: organizationKindValue(),
       name: organizationsTable.name,
       primary_domain: organizationsTable.primaryDomain,
       role: organizationMembersTable.role,

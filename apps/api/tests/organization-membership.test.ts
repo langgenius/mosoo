@@ -41,7 +41,6 @@ function createOrganizationMembershipDatabase(): SqliteD1Database {
 
     CREATE TABLE organization (
       id text PRIMARY KEY NOT NULL,
-      kind text NOT NULL,
       join_policy text NOT NULL
     );
 
@@ -137,8 +136,8 @@ function createOrganizationMembershipDatabase(): SqliteD1Database {
       ('01J00000000000000000000002', 'member@example.com', 1, NULL, '01J00000000000000000000006', 'Member One', NULL, 1, 1),
       ('${MEMBER_TWO_ID}', 'member2@example.com', 1, NULL, '${ORGANIZATION_ID}', 'Member Two', NULL, 1, 1);
 
-    INSERT INTO organization (id, kind, join_policy)
-    VALUES ('01J00000000000000000000006', 'team', 'request');
+    INSERT INTO organization (id, join_policy)
+    VALUES ('01J00000000000000000000006', 'request');
 
     INSERT INTO organization_member (
       organization_id,

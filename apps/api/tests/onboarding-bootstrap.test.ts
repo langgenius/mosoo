@@ -129,14 +129,12 @@ describe("onboarding bootstrap", () => {
 
     const status = await bootstrapOnboarding(database, VIEWER, {
       action: "create",
-      kind: "team",
       name: "Created Org",
     });
 
     expect(status.completed).toBe(true);
     expect(status.organization).toMatchObject({
       joinPolicy: "auto",
-      kind: "team",
       name: "Created Org",
       primaryDomain: null,
       slug: "created-org",
@@ -180,7 +178,6 @@ describe("onboarding bootstrap", () => {
     `);
     const status = await bootstrapOnboarding(database, VIEWER, {
       action: "create",
-      kind: "team",
       name: "Created Org",
     });
 

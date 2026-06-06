@@ -651,7 +651,6 @@ enum AuthSecurityLevel {
 
 input BootstrapOnboardingInput {
   action: String!
-  kind: OrganizationKind
   name: String
   organizationId: ULID
 }
@@ -682,10 +681,6 @@ input ConnectMcpBearerInput {
   serverId: ULID!
   subjectLabel: String
   token: String!
-}
-
-input ConvertPersonalOrganizationInput {
-  organizationId: ULID!
 }
 
 type CostAgentRow implements CostAggregate {
@@ -878,7 +873,6 @@ input CreateLarkAgentChannelBindingInput {
 }
 
 input CreateOrganizationInput {
-  kind: OrganizationKind
   name: String
 }
 
@@ -1339,7 +1333,6 @@ type Mutation {
   cancelOrganizationInvitation(input: CancelOrganizationInvitationInput!): OrganizationInvitation!
   clearOrganizationSharedCredential(serverId: ULID!): McpServerWithCredential!
   connectMcpBearer(input: ConnectMcpBearerInput!): McpServerWithCredential!
-  convertPersonalOrganization(input: ConvertPersonalOrganizationInput!): Organization!
   createAgent(input: CreateAgentInput!): Agent!
   createAgentFork(input: CreateAgentForkInput!): AgentPackageImportResult!
   createAgentSession(input: CreateAgentSessionInput!): Session!
@@ -1449,7 +1442,6 @@ type Organization {
   createdAt: String!
   id: ULID!
   joinPolicy: OrganizationJoinPolicy!
-  kind: OrganizationKind!
   name: String!
   primaryDomain: String
   slug: String!
@@ -1536,11 +1528,6 @@ type OrganizationJoinTarget {
   pendingRequest: OrganizationAccessRequest
   viewerIsAuthenticated: Boolean!
   viewerIsMember: Boolean!
-}
-
-enum OrganizationKind {
-  personal
-  team
 }
 
 type OrganizationMember {
@@ -2289,7 +2276,6 @@ input UpdateOrganizationMemberRoleInput {
 }
 
 input UpdateOrganizationPrimaryDomainInput {
-  convertPersonal: Boolean
   domain: String
   organizationId: ULID!
 }

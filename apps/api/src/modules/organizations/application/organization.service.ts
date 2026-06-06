@@ -1,7 +1,5 @@
 import type {
-  ConvertPersonalOrganizationInput,
   CreateOrganizationInput,
-  OrganizationKind,
   OrganizationMemberRole,
   OrganizationSummary,
   SetActiveOrganizationInput,
@@ -11,7 +9,7 @@ import type {
 import { Permission, can } from "@mosoo/contracts/permission";
 import { organizationMembersTable, organizationsTable } from "@mosoo/db";
 import type { AccountId, OrganizationId } from "@mosoo/id";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { errorMessageChainIncludes, forbiddenError } from "../../../platform/errors";
@@ -24,15 +22,10 @@ import {
   ensureOrganizationPermission,
   getOrganizationSummaryForActiveMember,
   organizationSummaryColumns,
-  toOrganizationSummary,
   toOrganizationSummaryWithViewerRole,
 } from "../domain/organization-access.policy";
 import type { OrganizationSummaryDataRow } from "../domain/organization-access.policy";
 import { normalizeOrganizationAvatarUrl } from "../domain/organization-avatar";
-import {
-  enforceValidOrganizationKind,
-  normalizeOrganizationKind,
-} from "../domain/organization-kind.policy";
 import { normalizeOrganizationName } from "../domain/organization-name";
 import { provisionOrganizationWithOwner } from "./organization-provisioning.service";
 function normalizePrimaryDomain(domain: string | null): string | null {
@@ -51,10 +44,6 @@ function normalizePrimaryDomain(domain: string | null): string | null {
   }
 
   return normalized;
-}
-
-function derivePersonalOrganizationName(viewer: AuthenticatedViewer): string {
-  return `${viewer.name}'s Sandbox`;
 }
 
 function isOrganizationPrimaryDomainConflict(error: unknown): boolean {
@@ -121,79 +110,6 @@ async function admitOrganizationSummaryPermission(
   return row;
 }
 
-async function hasActiveOrganizationMembership(
-  database: D1Database,
-  accountId: AccountId,
-): Promise<boolean> {
-  const membership =
-    (await getAppDatabase(database)
-      .select({ accountId: organizationMembersTable.accountId })
-      .from(organizationMembersTable)
-      .where(
-        and(
-          eq(organizationMembersTable.accountId, accountId),
-          isNull(organizationMembersTable.disabledAt),
-        ),
-      )
-      .limit(1)
-      .get()) ?? null;
-
-  return Boolean(membership);
-}
-
-async function admitPersonalOrganizationConversion(
-  database: D1Database,
-  viewerId: AccountId,
-  organizationId: OrganizationId,
-): Promise<OrganizationSummaryAdmissionRow> {
-  const row = await loadOrganizationSummaryAdmission(database, viewerId, organizationId);
-
-  if (row.viewer_role !== "owner") {
-    throw forbiddenError("Only the Personal Org owner can convert it.");
-  }
-
-  if (row.kind !== "personal") {
-    throw new Error("Only Personal Orgs can be converted.");
-  }
-
-  return row;
-}
-
-async function resolveCreateOrganizationKind(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  input: CreateOrganizationInput,
-): Promise<OrganizationKind> {
-  const requestedKind = input.kind === undefined ? null : normalizeOrganizationKind(input.kind);
-  if (requestedKind !== null) {
-    enforceValidOrganizationKind(requestedKind);
-  }
-
-  const domain = viewer.email.split("@")[1]?.toLowerCase() ?? "";
-  const isPublicEmail = getPublicEmailDomain(domain);
-
-  if (requestedKind === "personal") {
-    return "personal";
-  }
-
-  if (requestedKind === "team" && !isPublicEmail) {
-    return "team";
-  }
-
-  const hasMembership = await hasActiveOrganizationMembership(database, viewer.id);
-  if (!hasMembership) {
-    if (isPublicEmail) {
-      return "personal";
-    }
-
-    if (requestedKind === null) {
-      throw new Error("Choose whether to create an organization or a Personal Org.");
-    }
-  }
-
-  return requestedKind ?? "team";
-}
-
 async function updateOrganizationPrimaryDomainRow(
   database: D1Database,
   input: {
@@ -228,15 +144,12 @@ async function updateOrganizationPrimaryDomainRow(
 function deriveNewOrganizationName(
   viewer: AuthenticatedViewer,
   input: CreateOrganizationInput,
-  kind: OrganizationKind,
 ): string {
   if (input.name !== undefined) {
     return normalizeOrganizationName(input.name);
   }
 
-  return kind === "personal"
-    ? derivePersonalOrganizationName(viewer)
-    : deriveOrgName(viewer.email, viewer.name);
+  return deriveOrgName(viewer.email, viewer.name);
 }
 
 export async function createOrganization(
@@ -244,12 +157,9 @@ export async function createOrganization(
   viewer: AuthenticatedViewer,
   input: CreateOrganizationInput,
 ): Promise<OrganizationSummary> {
-  const kind = await resolveCreateOrganizationKind(database, viewer, input);
-
   return provisionOrganizationWithOwner(database, viewer, {
-    kind,
     makeActive: true,
-    name: deriveNewOrganizationName(viewer, input, kind),
+    name: deriveNewOrganizationName(viewer, input),
   });
 }
 
@@ -280,44 +190,6 @@ export async function updateOrganizationPrimaryDomain(
   );
   const normalizedDomain = normalizePrimaryDomain(input.domain);
   const timestampMs = currentTimestampMs();
-
-  if (admitted.kind === "personal" && Boolean(normalizedDomain)) {
-    if (!(input.convertPersonal === true)) {
-      throw new Error("Claiming a domain requires converting this Personal Org first.");
-    }
-
-    if (admitted.viewer_role !== "owner") {
-      throw forbiddenError("Only the Personal Org owner can convert it.");
-    }
-
-    try {
-      await getAppDatabase(database)
-        .update(organizationsTable)
-        .set({
-          creatorAccountId: viewer.id,
-          joinPolicy: "auto",
-          primaryDomain: normalizedDomain,
-          updatedAt: timestampMs,
-        })
-        .where(eq(organizationsTable.id, input.organizationId))
-        .run();
-    } catch (error) {
-      if (isOrganizationPrimaryDomainConflict(error)) {
-        throw new Error("This domain is already claimed by another organization.", {
-          cause: error,
-        });
-      }
-
-      throw error;
-    }
-
-    return toOrganizationSummary({
-      ...admitted,
-      join_policy: "auto",
-      kind: "team",
-      primary_domain: normalizedDomain,
-    });
-  }
 
   const updated = await updateOrganizationPrimaryDomainRow(database, {
     normalizedDomain,
@@ -376,34 +248,4 @@ export async function updateOrganizationProfile(
   }
 
   return toOrganizationSummaryWithViewerRole(updated, membership.role);
-}
-
-export async function convertPersonalOrganization(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  input: ConvertPersonalOrganizationInput,
-): Promise<OrganizationSummary> {
-  const admitted = await admitPersonalOrganizationConversion(
-    database,
-    viewer.id,
-    input.organizationId,
-  );
-
-  const timestampMs = currentTimestampMs();
-
-  await getAppDatabase(database)
-    .update(organizationsTable)
-    .set({
-      creatorAccountId: viewer.id,
-      joinPolicy: "auto",
-      updatedAt: timestampMs,
-    })
-    .where(eq(organizationsTable.id, input.organizationId))
-    .run();
-
-  return toOrganizationSummary({
-    ...admitted,
-    join_policy: "auto",
-    kind: "team",
-  });
 }

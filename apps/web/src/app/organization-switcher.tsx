@@ -1,4 +1,4 @@
-import { Check, ChevronsUpDown, Loader2, Plus, User } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, Plus } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
 
@@ -55,15 +55,12 @@ export function OrganizationSwitcher({ collapsed }: { collapsed: boolean }) {
     refreshOrganizations,
     setActiveOrganizationId,
   } = useAppSession();
-  const [creatingKind, setCreatingKind] = useState<"personal" | "team" | null>(null);
+  const [creating, setCreating] = useState(false);
   const [createOrganizationDialogOpen, setCreateOrganizationDialogOpen] = useState(false);
   const [newOrganizationName, setNewOrganizationName] = useState("");
   const [createOrganizationError, setCreateOrganizationError] = useState<string | null>(null);
   const activeOrganizationName =
     activeOrganization?.name ?? (organizationsLoading ? "Loading..." : "No organization");
-  const personalSlotOccupied = organizations.some(
-    (organization) => organization.kind === "personal",
-  );
   const organizationCreationSlotOccupied = organizationCreationSlot.occupied;
 
   function resetCreateOrganizationDialog() {
@@ -71,18 +68,7 @@ export function OrganizationSwitcher({ collapsed }: { collapsed: boolean }) {
     setCreateOrganizationError(null);
   }
 
-  async function handleCreateOrganization(kind: "personal" | "team") {
-    setCreatingKind(kind);
-
-    try {
-      const organization = await createOrganization({ kind });
-      await Promise.all([refreshOrganizations(), setActiveOrganizationId(organization.id)]);
-    } finally {
-      setCreatingKind(null);
-    }
-  }
-
-  async function handleCreateTeamOrganization(event: FormEvent<HTMLFormElement>) {
+  async function handleCreateOrganization(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const name = newOrganizationName.trim();
@@ -92,18 +78,18 @@ export function OrganizationSwitcher({ collapsed }: { collapsed: boolean }) {
       return;
     }
 
-    setCreatingKind("team");
+    setCreating(true);
     setCreateOrganizationError(null);
 
     try {
-      const organization = await createOrganization({ kind: "team", name });
+      const organization = await createOrganization({ name });
       await Promise.all([refreshOrganizations(), setActiveOrganizationId(organization.id)]);
       setCreateOrganizationDialogOpen(false);
       resetCreateOrganizationDialog();
     } catch (error: unknown) {
       setCreateOrganizationError(getErrorMessage(error));
     } finally {
-      setCreatingKind(null);
+      setCreating(false);
     }
   }
 
@@ -162,11 +148,6 @@ export function OrganizationSwitcher({ collapsed }: { collapsed: boolean }) {
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <div className="truncate text-[12.5px] font-semibold">{organization.name}</div>
-                  {organization.kind === "personal" ? (
-                    <span className="bg-muted text-muted-foreground shrink-0 rounded-sm px-1.5 py-0.5 text-[9.5px] font-semibold">
-                      Personal
-                    </span>
-                  ) : null}
                 </div>
                 <div className="text-muted-foreground truncate text-[10.5px] capitalize">
                   {organization.viewerRole}
@@ -178,28 +159,13 @@ export function OrganizationSwitcher({ collapsed }: { collapsed: boolean }) {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          {!personalSlotOccupied ? (
-            <DropdownMenuItem
-              onSelect={() => void handleCreateOrganization("personal")}
-              disabled={creatingKind !== null}
-              className="cursor-pointer rounded-md"
-            >
-              <User className="size-3.5" />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[12.5px] font-semibold">Create Personal Org</div>
-              </div>
-              {creatingKind === "personal" ? (
-                <span className="text-muted-foreground text-[10.5px]">Creating</span>
-              ) : null}
-            </DropdownMenuItem>
-          ) : null}
           <DropdownMenuItem
             onSelect={() => {
               if (!organizationCreationSlotOccupied) {
                 setCreateOrganizationDialogOpen(true);
               }
             }}
-            disabled={creatingKind !== null || organizationCreationSlotOccupied}
+            disabled={creating || organizationCreationSlotOccupied}
             className="cursor-pointer rounded-md"
           >
             <Plus className="size-3.5" />
@@ -219,12 +185,12 @@ export function OrganizationSwitcher({ collapsed }: { collapsed: boolean }) {
         onOpenChange={handleCreateOrganizationDialogOpenChange}
       >
         <DialogContent className="rounded-lg sm:max-w-[440px]">
-          <form onSubmit={(event) => void handleCreateTeamOrganization(event)} className="contents">
+          <form onSubmit={(event) => void handleCreateOrganization(event)} className="contents">
             <DialogHeader>
               <DialogTitle>Create organization</DialogTitle>
               <DialogDescription>
-                Use this for collaboration with teammates. CE allows one organization you create;
-                you can still join other organizations by invite or request access.
+                CE allows one organization you create; you can still join other organizations by
+                invite or request access.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2">
@@ -237,7 +203,7 @@ export function OrganizationSwitcher({ collapsed }: { collapsed: boolean }) {
                 }}
                 placeholder="Acme"
                 autoComplete="organization"
-                disabled={creatingKind === "team"}
+                disabled={creating}
               />
               {isTruthy(createOrganizationError) ? (
                 <p className="text-destructive text-[12px]">{createOrganizationError}</p>
@@ -250,15 +216,12 @@ export function OrganizationSwitcher({ collapsed }: { collapsed: boolean }) {
                 onClick={() => {
                   handleCreateOrganizationDialogOpenChange(false);
                 }}
-                disabled={creatingKind === "team"}
+                disabled={creating}
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={creatingKind === "team" || !newOrganizationName.trim()}
-              >
-                {creatingKind === "team" ? <Loader2 className="size-4 animate-spin" /> : "Create"}
+              <Button type="submit" disabled={creating || !newOrganizationName.trim()}>
+                {creating ? <Loader2 className="size-4 animate-spin" /> : "Create"}
               </Button>
             </DialogFooter>
           </form>

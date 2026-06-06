@@ -61,7 +61,6 @@ function createPersonalTokenDatabase(): SqliteD1Database {
       avatar_url text,
       created_at integer NOT NULL,
       join_policy text NOT NULL,
-      kind text NOT NULL,
       name text NOT NULL,
       primary_domain text,
       slug text NOT NULL
@@ -96,12 +95,11 @@ function createPersonalTokenDatabase(): SqliteD1Database {
       avatar_url,
       created_at,
       join_policy,
-      kind,
       name,
       primary_domain,
       slug
     )
-    VALUES ('01J00000000000000000000006', NULL, 1, 'request', 'team', 'Acme', NULL, 'acme');
+    VALUES ('01J00000000000000000000006', NULL, 1, 'request', 'Acme', NULL, 'acme');
 
     INSERT INTO organization_member (
       organization_id,

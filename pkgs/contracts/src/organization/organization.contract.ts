@@ -7,7 +7,6 @@ import type {
 
 export type OrganizationMemberRole = "owner" | "admin" | "member";
 export type OrganizationMemberStatus = "active" | "disabled";
-export type OrganizationKind = "personal" | "team";
 export type OrganizationJoinPolicy = "auto" | "invite_only";
 export type OrganizationInvitationStatus =
   | "pending"
@@ -22,7 +21,6 @@ export interface OrganizationSummary {
   createdAt: string;
   id: OrganizationId;
   joinPolicy: OrganizationJoinPolicy;
-  kind: OrganizationKind;
   name: string;
   primaryDomain: string | null;
   slug: string;
@@ -123,7 +121,6 @@ export interface CancelOrganizationInvitationInput {
 }
 
 export interface CreateOrganizationInput {
-  kind?: OrganizationKind;
   name?: string;
 }
 
@@ -146,7 +143,6 @@ export interface UpdateOrganizationJoinPolicyInput {
 }
 
 export interface UpdateOrganizationPrimaryDomainInput {
-  convertPersonal?: boolean;
   domain: string | null;
   organizationId: OrganizationId;
 }
@@ -154,9 +150,5 @@ export interface UpdateOrganizationPrimaryDomainInput {
 export interface UpdateOrganizationProfileInput {
   avatarUrl?: string | null;
   name?: string;
-  organizationId: OrganizationId;
-}
-
-export interface ConvertPersonalOrganizationInput {
   organizationId: OrganizationId;
 }

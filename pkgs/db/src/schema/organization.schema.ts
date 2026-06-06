@@ -34,6 +34,9 @@ export const organizationsTable = sqliteTable(
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
+    uniqueIndex("organization_creator_account_idx")
+      .on(table.creatorAccountId)
+      .where(sql`${table.creatorAccountId} IS NOT NULL`),
     uniqueIndex("organization_primary_domain_idx").on(table.primaryDomain),
     uniqueIndex("organization_slug_idx").on(table.slug),
   ],

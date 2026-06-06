@@ -671,6 +671,7 @@ CREATE TABLE `organization` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX `organization_creator_account_idx` ON `organization` (`creator_account_id`) WHERE "organization"."creator_account_id" IS NOT NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX `organization_primary_domain_idx` ON `organization` (`primary_domain`);--> statement-breakpoint
 CREATE UNIQUE INDEX `organization_slug_idx` ON `organization` (`slug`);--> statement-breakpoint
 CREATE TABLE `public_api_idempotency_key` (

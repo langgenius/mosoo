@@ -46,7 +46,6 @@ function createInvitationDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       slug text NOT NULL,
-      kind text DEFAULT 'team' NOT NULL,
       join_policy text NOT NULL,
       primary_domain text,
       avatar_url text,
@@ -119,7 +118,6 @@ function createInvitationDatabase(): SqliteD1Database {
       id,
       name,
       slug,
-      kind,
       join_policy,
       primary_domain,
       avatar_url,
@@ -127,7 +125,7 @@ function createInvitationDatabase(): SqliteD1Database {
       created_at,
       updated_at
     )
-    VALUES ('01J00000000000000000000006', 'Team Org', 'team-org', 'team', 'auto', NULL, NULL, 'account-1', 1, 1);
+    VALUES ('01J00000000000000000000006', 'Team Org', 'team-org', 'auto', NULL, NULL, 'account-1', 1, 1);
 
     INSERT INTO organization_member (
       organization_id,
@@ -211,6 +209,29 @@ describe("organization invitations", () => {
     expect(storedInvitation).toEqual({
       email: "new@example.com",
       invited_by: "account-1",
+      status: "pending",
+    });
+  });
+
+  test("creates invitations for invite-only organizations without a primary domain", async () => {
+    const database = createInvitationDatabase();
+    database.execute(`
+      DELETE FROM organization_invitation;
+      UPDATE organization
+      SET join_policy = 'invite_only', primary_domain = NULL
+      WHERE id = '01J00000000000000000000006';
+    `);
+
+    const invitation = await inviteOrganizationMember(
+      createBindings(database),
+      OWNER,
+      "new@example.com",
+      "01J00000000000000000000006",
+    );
+
+    expect(invitation).toMatchObject({
+      email: "new@example.com",
+      organizationId: "01J00000000000000000000006",
       status: "pending",
     });
   });

@@ -7,7 +7,6 @@ import type { AccountId, OrganizationAccessRequestId, OrganizationId } from "@mo
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { organizationKindValue } from "../domain/organization-kind.policy";
 import {
   organizationAccessRequestRecordColumns,
   referrerAccountsTable,
@@ -32,7 +31,6 @@ export async function getOrganizationAccessRequestReviewAdmission(
     (await getAppDatabase(database)
       .select({
         ...organizationAccessRequestRecordColumns(),
-        organization_kind: organizationKindValue(),
         viewer_disabled_at: organizationMembersTable.disabledAt,
         viewer_role: organizationMembersTable.role,
       })

@@ -25,7 +25,6 @@ CREATE TABLE organization (
   id text PRIMARY KEY NOT NULL,
   name text NOT NULL,
   slug text NOT NULL,
-  kind text DEFAULT 'team' NOT NULL,
   join_policy text NOT NULL,
   primary_domain text,
   avatar_url text,

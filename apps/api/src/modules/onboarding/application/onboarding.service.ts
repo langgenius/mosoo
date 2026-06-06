@@ -3,7 +3,7 @@ import type {
   OnboardingDiscovery,
   OnboardingStatus,
 } from "@mosoo/contracts/account";
-import type { OrganizationKind, OrganizationMemberRole } from "@mosoo/contracts/organization";
+import type { OrganizationMemberRole } from "@mosoo/contracts/organization";
 import {
   accountsTable,
   organizationDomainsTable,
@@ -25,11 +25,6 @@ import { provisionOrganizationWithOwner } from "../../organizations/application/
 import type { OrganizationSummaryRow } from "../../organizations/domain/organization-access.policy";
 import { toOrganizationSummary } from "../../organizations/domain/organization-access.policy";
 import { getOrganizationEmailDomain } from "../../organizations/domain/organization-domain-match";
-import {
-  enforceValidOrganizationKind,
-  normalizeOrganizationKind,
-  organizationKindValue,
-} from "../../organizations/domain/organization-kind.policy";
 import { normalizeOrganizationName } from "../../organizations/domain/organization-name";
 import { deriveOrgName } from "../../users/domain/user-account.policy";
 const NEW_ACCOUNT_WINDOW_MS = 30 * 1000;
@@ -58,7 +53,6 @@ interface OnboardingJoinBootstrapRow {
   current_created_at: number | null;
   current_id: OrganizationId | null;
   current_join_policy: OrganizationSummaryRow["join_policy"] | null;
-  current_kind: OrganizationSummaryRow["kind"] | null;
   current_name: string | null;
   current_primary_domain: string | null;
   current_slug: string | null;
@@ -68,7 +62,6 @@ interface OnboardingJoinBootstrapRow {
   target_created_at: number | null;
   target_id: OrganizationId | null;
   target_join_policy: OrganizationSummaryRow["join_policy"] | null;
-  target_kind: OrganizationSummaryRow["kind"] | null;
   target_name: string | null;
   target_primary_domain: string | null;
   target_slug: string | null;
@@ -79,31 +72,9 @@ interface OnboardingJoinBootstrapSnapshot {
   target: (OrganizationSummaryRow & { active_domain_id: string | null }) | null;
 }
 
-function derivePersonalOrganizationName(viewer: AuthenticatedViewer): string {
-  return `${viewer.name}'s Sandbox`;
-}
-
-function resolveOnboardingOrganizationKind(
-  viewer: AuthenticatedViewer,
-  input: BootstrapOnboardingInput,
-): OrganizationKind {
-  const domain = viewer.email.split("@")[1]?.toLowerCase() ?? "";
-  if (getPublicEmailDomain(domain)) {
-    return "personal";
-  }
-
-  if (input.kind) {
-    enforceValidOrganizationKind(input.kind);
-    return input.kind;
-  }
-
-  throw new Error("Choose whether to create an organization or a Personal Org.");
-}
-
 function resolveOnboardingOrganizationName(
   viewer: AuthenticatedViewer,
   input: BootstrapOnboardingInput,
-  kind: OrganizationKind,
 ): string {
   const requestedName = input.name?.trim();
 
@@ -111,9 +82,7 @@ function resolveOnboardingOrganizationName(
     return normalizeOrganizationName(requestedName);
   }
 
-  return kind === "personal"
-    ? derivePersonalOrganizationName(viewer)
-    : deriveOrgName(viewer.email, viewer.name);
+  return deriveOrgName(viewer.email, viewer.name);
 }
 
 function requireOnboardingJoinValue<T>(value: T | null, fieldName: string): T {
@@ -139,7 +108,6 @@ function toCurrentOnboardingStatus(row: OnboardingJoinBootstrapRow): OnboardingS
       created_at: requireOnboardingJoinValue(row.current_created_at, "current_created_at"),
       id: row.current_id,
       join_policy: requireOnboardingJoinValue(row.current_join_policy, "current_join_policy"),
-      kind: requireOnboardingJoinValue(row.current_kind, "current_kind"),
       name: requireOnboardingJoinValue(row.current_name, "current_name"),
       primary_domain: row.current_primary_domain,
       slug: requireOnboardingJoinValue(row.current_slug, "current_slug"),
@@ -161,7 +129,6 @@ function toOnboardingJoinTarget(
     created_at: requireOnboardingJoinValue(row.target_created_at, "target_created_at"),
     id: row.target_id,
     join_policy: requireOnboardingJoinValue(row.target_join_policy, "target_join_policy"),
-    kind: requireOnboardingJoinValue(row.target_kind, "target_kind"),
     name: requireOnboardingJoinValue(row.target_name, "target_name"),
     primary_domain: row.target_primary_domain,
     slug: requireOnboardingJoinValue(row.target_slug, "target_slug"),
@@ -184,7 +151,6 @@ async function getOnboardingJoinBootstrapSnapshot(
         current_created_at: currentOnboardingOrganizationsTable.createdAt,
         current_id: currentOnboardingOrganizationsTable.id,
         current_join_policy: currentOnboardingOrganizationsTable.joinPolicy,
-        current_kind: organizationKindValue(currentOnboardingOrganizationsTable),
         current_name: currentOnboardingOrganizationsTable.name,
         current_primary_domain: currentOnboardingOrganizationsTable.primaryDomain,
         current_slug: currentOnboardingOrganizationsTable.slug,
@@ -194,7 +160,6 @@ async function getOnboardingJoinBootstrapSnapshot(
         target_created_at: targetOnboardingOrganizationsTable.createdAt,
         target_id: targetOnboardingOrganizationsTable.id,
         target_join_policy: targetOnboardingOrganizationsTable.joinPolicy,
-        target_kind: organizationKindValue(targetOnboardingOrganizationsTable),
         target_name: targetOnboardingOrganizationsTable.name,
         target_primary_domain: targetOnboardingOrganizationsTable.primaryDomain,
         target_slug: targetOnboardingOrganizationsTable.slug,
@@ -262,7 +227,6 @@ export async function getOnboardingStatus(
         created_at: organizationsTable.createdAt,
         id: organizationsTable.id,
         join_policy: organizationsTable.joinPolicy,
-        kind: organizationKindValue(),
         name: organizationsTable.name,
         primary_domain: organizationsTable.primaryDomain,
         slug: organizationsTable.slug,
@@ -405,10 +369,6 @@ export async function bootstrapOnboarding(
       throw new Error("This organization requires an invite.");
     }
 
-    if (organization.kind === "personal") {
-      throw new Error("Personal Orgs do not accept new members.");
-    }
-
     if (organization.primary_domain !== emailDomain && organization.active_domain_id === null) {
       throw forbiddenError("Your email domain does not match this organization.");
     }
@@ -416,7 +376,6 @@ export async function bootstrapOnboarding(
     await grantOrganizationMembership(database, {
       accountId: viewer.id,
       makeActive: true,
-      organizationKind: organization.kind,
       organizationId: input.organizationId,
       role: "member",
     });
@@ -433,11 +392,9 @@ export async function bootstrapOnboarding(
     return currentStatus;
   }
 
-  const kind = normalizeOrganizationKind(resolveOnboardingOrganizationKind(viewer, input));
-  const organizationName = resolveOnboardingOrganizationName(viewer, input, kind);
+  const organizationName = resolveOnboardingOrganizationName(viewer, input);
 
   const organization = await provisionOrganizationWithOwner(database, viewer, {
-    kind,
     makeActive: true,
     name: organizationName,
   });

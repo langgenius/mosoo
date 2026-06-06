@@ -1,7 +1,6 @@
 import type {
   OrganizationAccessRequest,
   OrganizationJoinPolicy,
-  OrganizationKind,
   OrganizationInvitation,
   OrganizationMemberRole,
 } from "@mosoo/contracts/organization";
@@ -32,7 +31,6 @@ export interface OrganizationInvitationAcceptanceRow extends OrganizationInvitat
   organization_avatar_url: string | null;
   organization_created_at: number;
   organization_join_policy: OrganizationJoinPolicy;
-  organization_kind: OrganizationKind;
   organization_primary_domain: string | null;
   organization_slug: string;
 }
@@ -60,7 +58,6 @@ export interface OrganizationInvitationListAdmissionRow {
 
 export interface OrganizationInviteMemberAdmissionRow extends OrganizationInvitationListAdmissionRow {
   existing_member_account_id: AccountId | null;
-  kind: OrganizationKind;
 }
 
 export interface OrganizationAccessRequestRow {
@@ -81,7 +78,6 @@ export interface OrganizationAccessRequestRow {
 }
 
 export interface OrganizationAccessRequestReviewAdmissionRow extends OrganizationAccessRequestRow {
-  organization_kind: OrganizationKind;
   viewer_disabled_at: number | null;
   viewer_role: OrganizationMemberRole | null;
 }
@@ -115,7 +111,6 @@ export interface OrganizationAccessSubmissionAdmissionRow {
   active_domain_id: string | null;
   active_membership_account_id: AccountId | null;
   join_policy: OrganizationJoinPolicy;
-  kind: OrganizationKind;
   organization_id: OrganizationId;
   organization_name: string;
   primary_domain: string | null;
@@ -132,7 +127,6 @@ export interface OrganizationInvitationRequestAdmissionRow {
   invitee_active_membership_account_id: AccountId | null;
   invitee_id: AccountId | null;
   invitee_name: string | null;
-  kind: OrganizationKind;
   organization_id: OrganizationId;
   organization_name: string;
   pending_invitation_id: OrganizationInvitationId | null;

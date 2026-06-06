@@ -92,10 +92,6 @@ export async function requestOrganizationAccess(
     });
   }
 
-  if (admission.kind === "personal") {
-    throw forbiddenError("Personal Orgs do not accept access requests.");
-  }
-
   if (admission.join_policy !== "invite_only") {
     throw forbiddenError("This organization does not accept access requests.");
   }
@@ -181,10 +177,6 @@ export async function requestOrganizationInvitation(
 
   if (!can(admission.viewer_role, Permission.InvitationsRequest)) {
     throw forbiddenError();
-  }
-
-  if (admission.kind === "personal") {
-    throw forbiddenError("Convert this Personal Org to collaborate with others.");
   }
 
   if (admission.invitee_id === null || admission.invitee_name === null) {
@@ -377,7 +369,6 @@ export async function reviewOrganizationAccessRequest(
   if (input.decision === "approve") {
     await grantOrganizationMembership(database, {
       accountId: reviewed.requestedByAccountId,
-      organizationKind: requestRow.organization_kind,
       organizationId: reviewed.organizationId,
       role: "member",
     });

@@ -6,7 +6,7 @@ import { PageHeader } from "@/shared/ui/page-header";
 
 import type { Organization } from "../../domains/organization/api/organization-client";
 import { isTruthy } from "../../shared/lib/truthiness";
-import { AccessSettingsDialog, PersonalOrgConversionDialog } from "./access-settings-dialog";
+import { AccessSettingsDialog } from "./access-settings-dialog";
 import { AttentionPanel } from "./attention-panel";
 import { BulkInviteDialog } from "./bulk-invite-dialog";
 import { MembersList } from "./members-list";
@@ -34,14 +34,6 @@ export function MembersTab({
   const handleCancelInvitation = (invitationId: string) => {
     void model.handleCancelInvitation(invitationId);
   };
-  const handleConvertAndClaimDomain = () => {
-    void model.handleConvertAndClaimDomain();
-  };
-  const handleConvertAndClaimOpenChange = model.setConvertAndClaimOpen;
-  const handleConvertPersonal = () => {
-    void model.handleConvertPersonal();
-  };
-  const handleConvertPersonalOpenChange = model.setConvertPersonalOpen;
   const handleCopyLink = () => {
     void model.handleCopyLink();
   };
@@ -83,9 +75,6 @@ export function MembersTab({
   const handlePrimaryDomainChange = model.setPrimaryDomain;
   const handlePrimaryDomainSave = () => {
     void model.handlePrimaryDomainSave();
-  };
-  const handleRequestConvertPersonal = () => {
-    model.setConvertPersonalOpen(true);
   };
   const handleReviewRequest = (requestId: string, decision: "approve" | "reject") => {
     void model.handleReviewRequest(requestId, decision);
@@ -175,7 +164,7 @@ export function MembersTab({
           ) : null}
 
           {isTruthy(model.inviteNotice) ? (
-            <div className="border-green-200/70 bg-success-bg/60 text-success-fg flex items-start justify-between gap-3 rounded-lg border p-3 text-sm">
+            <div className="bg-success-bg/60 text-success-fg flex items-start justify-between gap-3 rounded-lg border border-green-200/70 p-3 text-sm">
               <span>{model.inviteNotice}</span>
               <button
                 type="button"
@@ -232,42 +221,17 @@ export function MembersTab({
       />
 
       <AccessSettingsDialog
-        canConvertPersonal={model.canConvertPersonalOrganization}
         copied={model.copied}
-        convertingPersonal={model.convertingPersonal}
-        conversionBlockedReason={model.personalConversionBlockedReason}
-        isPersonalOrganization={model.isPersonalOrganization}
         joinPolicy={model.joinPolicy}
         onCopyLink={handleCopyLink}
         onOpenChange={handleAccessSettingsOpenChange}
         onPolicyChange={(policy) => void model.handlePolicyChange(policy)}
         onPrimaryDomainChange={handlePrimaryDomainChange}
         onPrimaryDomainSave={handlePrimaryDomainSave}
-        onRequestConvertPersonal={handleRequestConvertPersonal}
         open={model.accessSettingsOpen}
         primaryDomain={model.primaryDomain}
         requestAccessLink={model.requestAccessLink}
         savingPrimaryDomain={model.savingPrimaryDomain}
-      />
-
-      <PersonalOrgConversionDialog
-        busy={model.convertingPersonal}
-        confirmLabel="Convert"
-        description="This turns your Personal Org into a collaborative organization, uses your CE organization creation slot, and frees your Personal Org slot. You'll be able to create a new Personal Org afterwards. This cannot be undone."
-        onConfirm={handleConvertPersonal}
-        onOpenChange={handleConvertPersonalOpenChange}
-        open={model.convertPersonalOpen}
-        title="Convert to Organization?"
-      />
-
-      <PersonalOrgConversionDialog
-        busy={model.savingConvertAndClaim}
-        confirmLabel="Convert and claim"
-        description="Claiming a company domain turns this Personal Org into an organization for collaboration. This uses your CE organization creation slot, frees your Personal Org slot, and cannot be undone."
-        onConfirm={handleConvertAndClaimDomain}
-        onOpenChange={handleConvertAndClaimOpenChange}
-        open={model.convertAndClaimOpen}
-        title="Convert and claim domain?"
       />
     </>
   );

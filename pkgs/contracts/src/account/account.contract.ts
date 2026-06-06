@@ -2,7 +2,6 @@ import type { AuthMethod, AuthSecurityLevel } from "../auth/auth.contract";
 import type { AccountId, OrganizationId } from "../id/id.contract";
 import type {
   OrganizationCreationSlotStatus,
-  OrganizationKind,
   OrganizationMemberRole,
   OrganizationSummary,
 } from "../organization/organization.contract";
@@ -51,7 +50,6 @@ export interface OnboardingStatus {
 
 export interface BootstrapOnboardingInput {
   action: "create" | "join";
-  kind?: OrganizationKind;
   name?: string;
   organizationId?: OrganizationId;
 }

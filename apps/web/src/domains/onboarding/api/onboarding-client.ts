@@ -44,7 +44,6 @@ const ONBOARDING_BOOTSTRAP_MUTATION = graphql(/* GraphQL */ `
         createdAt
         id
         joinPolicy
-        kind
         name
         primaryDomain
         slug
@@ -72,7 +71,7 @@ export async function onboardingDiscover(): Promise<DiscoverResult> {
 
 export async function onboardingBootstrap(
   action: "join" | "create",
-  input?: { kind?: OrganizationSummary["kind"]; name?: string; organizationId?: OrganizationId },
+  input?: { name?: string; organizationId?: OrganizationId },
 ): Promise<{ organization: OrganizationSummary }> {
   const payload = await requestGraphQL(ONBOARDING_BOOTSTRAP_MUTATION, {
     input: {

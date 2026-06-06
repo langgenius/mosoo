@@ -9,7 +9,6 @@ import { eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { organizationKindValue } from "../domain/organization-kind.policy";
 
 export const inviterAccountsTable = alias(accountsTable, "inviter");
 export const inviteeAccountsTable = alias(accountsTable, "invitee");
@@ -74,7 +73,6 @@ export function selectOrganizationInvitationAcceptanceRecords(database: D1Databa
       organization_created_at: organizationsTable.createdAt,
       organization_id: organizationInvitationsTable.organizationId,
       organization_join_policy: organizationsTable.joinPolicy,
-      organization_kind: organizationKindValue(),
       organization_name: sql`${organizationsTable.name}`
         .mapWith(organizationsTable.name)
         .as("organization_name"),

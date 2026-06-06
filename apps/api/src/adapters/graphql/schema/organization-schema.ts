@@ -4,7 +4,6 @@ export const organizationSchema = /* GraphQL */ `
     createdAt: String!
     id: ULID!
     joinPolicy: OrganizationJoinPolicy!
-    kind: OrganizationKind!
     name: String!
     primaryDomain: String
     slug: String!
@@ -69,11 +68,6 @@ export const organizationSchema = /* GraphQL */ `
     invite_only
   }
 
-  enum OrganizationKind {
-    personal
-    team
-  }
-
   enum OrganizationMemberRole {
     owner
     admin
@@ -131,7 +125,6 @@ export const organizationSchema = /* GraphQL */ `
   }
 
   input CreateOrganizationInput {
-    kind: OrganizationKind
     name: String
   }
 
@@ -159,7 +152,6 @@ export const organizationSchema = /* GraphQL */ `
   }
 
   input UpdateOrganizationPrimaryDomainInput {
-    convertPersonal: Boolean
     domain: String
     organizationId: ULID!
   }
@@ -167,10 +159,6 @@ export const organizationSchema = /* GraphQL */ `
   input UpdateOrganizationProfileInput {
     avatarUrl: String
     name: String
-    organizationId: ULID!
-  }
-
-  input ConvertPersonalOrganizationInput {
     organizationId: ULID!
   }
 

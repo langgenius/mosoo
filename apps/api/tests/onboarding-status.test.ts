@@ -21,7 +21,6 @@ function createOnboardingStatusDatabase(): SqliteD1Database {
       created_at integer NOT NULL,
       id text PRIMARY KEY NOT NULL,
       join_policy text NOT NULL,
-      kind text NOT NULL,
       name text NOT NULL,
       primary_domain text,
       slug text NOT NULL
@@ -41,15 +40,14 @@ function createOnboardingStatusDatabase(): SqliteD1Database {
       created_at,
       id,
       join_policy,
-      kind,
       name,
       primary_domain,
       slug
     )
     VALUES
-      (NULL, 1, 'org-old', 'invite_only', 'team', 'Old Org', NULL, 'old-org'),
-      (NULL, 2, 'org-current', 'auto', 'team', 'Current Org', NULL, 'current-org'),
-      (NULL, 3, 'org-disabled', 'auto', 'team', 'Disabled Org', NULL, 'disabled-org');
+      (NULL, 1, 'org-old', 'invite_only', 'Old Org', NULL, 'old-org'),
+      (NULL, 2, 'org-current', 'auto', 'Current Org', NULL, 'current-org'),
+      (NULL, 3, 'org-disabled', 'auto', 'Disabled Org', NULL, 'disabled-org');
 
     INSERT INTO organization_member (
       account_id,

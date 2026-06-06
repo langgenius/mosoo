@@ -22,7 +22,6 @@ import {
   toOrganizationSummaryWithViewerRole,
 } from "../domain/organization-access.policy";
 import type { OrganizationMemberRow } from "../domain/organization-access.policy";
-import { organizationKindValue } from "../domain/organization-kind.policy";
 
 interface JoinPolicyUpdateContext {
   viewerRole: OrganizationMemberRole;
@@ -253,7 +252,6 @@ async function admitJoinPolicyUpdate(
     (await getAppDatabase(database)
       .select({
         disabled_at: organizationMembersTable.disabledAt,
-        kind: organizationKindValue(),
         role: organizationMembersTable.role,
       })
       .from(organizationMembersTable)
@@ -272,7 +270,6 @@ async function admitJoinPolicyUpdate(
 
   const context = row satisfies {
     disabled_at: number | null;
-    kind: OrganizationSummary["kind"];
     role: OrganizationMemberRole;
   } | null;
 
@@ -286,10 +283,6 @@ async function admitJoinPolicyUpdate(
 
   if (!can(context.role, Permission.OrgSetJoinPolicy)) {
     throw forbiddenError();
-  }
-
-  if (context.kind === "personal") {
-    throw new Error("Convert this Personal Org to collaborate with others.");
   }
 
   return {

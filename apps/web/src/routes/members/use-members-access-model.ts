@@ -13,7 +13,6 @@ import {
 } from "@mosoo/contracts/permission";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useAppSession } from "../../app/session-provider";
 import {
   cancelOrganizationInvitation,
   inviteMember,
@@ -36,7 +35,6 @@ import {
 } from "../typed-id";
 import { filterOrganizationMembers } from "./member-filter";
 import { useBulkInviteModel } from "./use-bulk-invite-model";
-import { usePersonalOrganizationConversion } from "./use-personal-organization-conversion";
 import { useRequestAccessLink } from "./use-request-access-link";
 
 export type { BulkInviteResult } from "./use-bulk-invite-model";
@@ -64,7 +62,6 @@ export function useMembersAccessModel({
   focusedMemberId: string | null;
   organization: Organization;
 }) {
-  const { organizationCreationSlot, refreshOrganizations } = useAppSession();
   const [members, setMembers] = useState<OrganizationMember[]>([]);
   const [invitations, setInvitations] = useState<OrganizationInvitation[]>([]);
   const [accessRequests, setAccessRequests] = useState<OrganizationAccessRequest[]>([]);
@@ -100,21 +97,12 @@ export function useMembersAccessModel({
 
   const currentMember = members.find((member) => member.accountId === currentUserId);
   const viewerRole = currentMember?.role ?? organization.viewerRole;
-  const isPersonalOrganization = organization.kind === "personal";
-  const canDirectInvite = !isPersonalOrganization && can(viewerRole, Permission.InvitationsCreate);
-  const canRequestInvite =
-    !isPersonalOrganization && !canDirectInvite && can(viewerRole, Permission.InvitationsRequest);
+  const canDirectInvite = can(viewerRole, Permission.InvitationsCreate);
+  const canRequestInvite = !canDirectInvite && can(viewerRole, Permission.InvitationsRequest);
   const canInviteMembers = canDirectInvite || canRequestInvite;
   const canReviewAccess = can(viewerRole, Permission.AccessRequestsReview);
   const canOpenAccessSettings =
     can(viewerRole, Permission.OrgSetJoinPolicy) || can(viewerRole, Permission.OrgSetPrimaryDomain);
-  const personalConversionSlotBlocked = organizationCreationSlot.occupied;
-  const personalConversionBlockedReason =
-    isPersonalOrganization && viewerRole === "owner" && personalConversionSlotBlocked
-      ? "CE allows one organization you create. Delete your self-created organization or join another by invite instead."
-      : null;
-  const canConvertPersonalOrganization =
-    isPersonalOrganization && viewerRole === "owner" && !personalConversionSlotBlocked;
   const attentionCount = invitations.length + accessRequests.length;
   const filteredMembers = useMemo(
     () => filterOrganizationMembers({ focusedMemberId, members, query: memberSearch }),
@@ -134,13 +122,12 @@ export function useMembersAccessModel({
       const nextViewerRole =
         nextMembers.find((member) => member.accountId === currentUserId)?.role ??
         organization.viewerRole;
-      const [nextInvitations, nextRequests] =
-        !isPersonalOrganization && can(nextViewerRole, Permission.InvitationsList)
-          ? await Promise.all([
-              organizationInvitations(typedOrganizationId),
-              organizationAccessRequests(typedOrganizationId),
-            ])
-          : [[], []];
+      const [nextInvitations, nextRequests] = can(nextViewerRole, Permission.InvitationsList)
+        ? await Promise.all([
+            organizationInvitations(typedOrganizationId),
+            organizationAccessRequests(typedOrganizationId),
+          ])
+        : [[], []];
 
       setMembers(nextMembers);
       setInvitations(nextInvitations);
@@ -150,18 +137,7 @@ export function useMembersAccessModel({
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, isPersonalOrganization, organization.viewerRole, typedOrganizationId]);
-
-  const personalConversion = usePersonalOrganizationConversion({
-    canConvertPersonalOrganization,
-    conversionUnavailableMessage: personalConversionBlockedReason,
-    loadAccessSurface,
-    organizationId: organization.id,
-    primaryDomain,
-    refreshOrganizations,
-    setError,
-    setPrimaryDomain,
-  });
+  }, [currentUserId, organization.viewerRole, typedOrganizationId]);
   const requestAccessLinkState = useRequestAccessLink({
     organizationId: organization.id,
     setError,
@@ -241,11 +217,6 @@ export function useMembersAccessModel({
   }
 
   async function handleInvite() {
-    if (isPersonalOrganization) {
-      setError("Convert this Personal Org to collaborate with others.");
-      return;
-    }
-
     if (!canInviteMembers) {
       setError("You do not have permission to perform this action.");
       return;
@@ -282,11 +253,6 @@ export function useMembersAccessModel({
   }
 
   async function handlePolicyChange(policy: OrganizationJoinPolicy) {
-    if (isPersonalOrganization) {
-      setError("Convert this Personal Org to collaborate with others.");
-      return;
-    }
-
     if (!can(viewerRole, Permission.OrgSetJoinPolicy)) {
       setError("You do not have permission to perform this action.");
       return;
@@ -303,16 +269,6 @@ export function useMembersAccessModel({
   async function handlePrimaryDomainSave() {
     if (!can(viewerRole, Permission.OrgSetPrimaryDomain)) {
       setError("You do not have permission to perform this action.");
-      return;
-    }
-
-    if (isPersonalOrganization && primaryDomain.trim()) {
-      if (personalConversionBlockedReason) {
-        setError(personalConversionBlockedReason);
-        return;
-      }
-
-      personalConversion.setConvertAndClaimOpen(true);
       return;
     }
 
@@ -390,23 +346,17 @@ export function useMembersAccessModel({
     bulkOpen: bulkInvite.bulkOpen,
     bulkParsing: bulkInvite.bulkParsing,
     bulkResult: bulkInvite.bulkResult,
-    canConvertPersonalOrganization,
     canDirectInvite,
     canInviteMembers,
     canOpenAccessSettings,
     canRequestInvite,
     canReviewAccess,
     cancellingInvitationId,
-    convertAndClaimOpen: personalConversion.convertAndClaimOpen,
-    convertPersonalOpen: personalConversion.convertPersonalOpen,
-    convertingPersonal: personalConversion.convertingPersonal,
     copied: requestAccessLinkState.copied,
     error,
     filteredMembers,
     handleBulkInvite: bulkInvite.handleBulkInvite,
     handleCancelInvitation,
-    handleConvertAndClaimDomain: personalConversion.handleConvertAndClaimDomain,
-    handleConvertPersonal: personalConversion.handleConvertPersonal,
     handleCopyLink: requestAccessLinkState.handleCopyLink,
     handleCsvFile: bulkInvite.handleCsvFile,
     handleInvite,
@@ -419,25 +369,20 @@ export function useMembersAccessModel({
     inviteEmail,
     inviteNotice,
     inviting,
-    isPersonalOrganization,
     joinPolicy,
     loading,
     memberSearch,
     members,
-    personalConversionBlockedReason,
     primaryDomain,
     requestAccessLink: requestAccessLinkState.requestAccessLink,
     resetBulk: bulkInvite.resetBulk,
     reviewingRequestId,
-    savingConvertAndClaim: personalConversion.savingConvertAndClaim,
     savingPrimaryDomain,
     setAccessSettingsOpen,
     setAttentionOpen,
     setBulkDragOver: bulkInvite.setBulkDragOver,
     setBulkEmails: bulkInvite.setBulkEmails,
     setBulkOpen: bulkInvite.setBulkOpen,
-    setConvertAndClaimOpen: personalConversion.setConvertAndClaimOpen,
-    setConvertPersonalOpen: personalConversion.setConvertPersonalOpen,
     setInviteEmail,
     setInviteNotice,
     setMemberSearch,

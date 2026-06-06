@@ -68,7 +68,6 @@ const ACCEPT_INVITATION_MUTATION = graphql(/* GraphQL */ `
       createdAt
       id
       joinPolicy
-      kind
       name
       primaryDomain
       slug

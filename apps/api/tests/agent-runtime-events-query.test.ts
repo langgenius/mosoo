@@ -72,7 +72,6 @@ function createAgentRuntimeEventsDatabase(): SqliteD1Database {
     CREATE TABLE organization (
       id text PRIMARY KEY NOT NULL,
       join_policy text NOT NULL,
-      kind text DEFAULT 'team' NOT NULL,
       name text NOT NULL,
       slug text NOT NULL,
       created_at integer NOT NULL,

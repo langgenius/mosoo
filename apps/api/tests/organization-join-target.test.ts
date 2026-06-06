@@ -32,7 +32,6 @@ function createOrganizationJoinTargetDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       slug text NOT NULL,
-      kind text DEFAULT 'team' NOT NULL,
       join_policy text NOT NULL,
       primary_domain text,
       avatar_url text,
@@ -94,7 +93,6 @@ function createOrganizationJoinTargetDatabase(): SqliteD1Database {
       id,
       name,
       slug,
-      kind,
       join_policy,
       primary_domain,
       avatar_url,
@@ -102,7 +100,7 @@ function createOrganizationJoinTargetDatabase(): SqliteD1Database {
       created_at,
       updated_at
     )
-    VALUES ('01J00000000000000000000006', 'Team Org', 'team-org', 'team', 'invite_only', NULL, NULL, '01J00000000000000000000001', 1, 1);
+    VALUES ('01J00000000000000000000006', 'Team Org', 'team-org', 'invite_only', NULL, NULL, '01J00000000000000000000001', 1, 1);
 
     INSERT INTO organization_member (
       organization_id,

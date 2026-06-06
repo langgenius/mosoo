@@ -79,7 +79,7 @@ function createViewerContextDatabase(): SqliteD1Database {
     )
     VALUES
       ('01J00000000000000000000006', 'First Org', 'first-org', 'auto', NULL, NULL, 'account-1', 1, 1),
-      ('org-2', 'Second Org', 'second-org', 'auto', NULL, NULL, 'account-1', 2, 2);
+      ('org-2', 'Second Org', 'second-org', 'auto', NULL, NULL, 'other-owner', 2, 2);
 
     INSERT INTO organization_member (
       organization_id,

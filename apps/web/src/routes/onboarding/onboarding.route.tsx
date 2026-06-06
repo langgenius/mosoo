@@ -20,7 +20,7 @@ import { toOrganizationId, toOrganizationInvitationId } from "../typed-id";
 import { OnboardingChoiceScreen } from "./onboarding-choice";
 import { getOnboardingDomainOrganizationName } from "./onboarding-domain";
 type OnboardingStep = "loading" | "invitations" | "choice" | "discovery" | "provisioning";
-type ProvisioningAction = "join" | "create_team" | "create_personal";
+type ProvisioningAction = "join" | "create";
 type OnboardingBootstrapInput = NonNullable<Parameters<typeof onboardingBootstrap>[1]>;
 
 interface OnboardingState {
@@ -48,7 +48,7 @@ const ONBOARDING_INITIAL_STATE: OnboardingState = {
   discovery: null,
   error: null,
   invitations: [],
-  provisioningAction: "create_team",
+  provisioningAction: "create",
   step: "loading",
 };
 
@@ -57,7 +57,6 @@ function getErrorMessage(error: unknown): string {
 }
 
 function toOnboardingBootstrapInput(input?: {
-  kind?: "personal" | "team";
   name?: string;
   organizationId?: string;
 }): OnboardingBootstrapInput | undefined {
@@ -66,10 +65,6 @@ function toOnboardingBootstrapInput(input?: {
   }
 
   const nextInput: OnboardingBootstrapInput = {};
-
-  if (input.kind !== undefined) {
-    nextInput.kind = input.kind;
-  }
 
   if (input.name !== undefined) {
     nextInput.name = input.name;
@@ -125,12 +120,8 @@ export function Onboarding() {
   const { bootstrapping, discovery, error, invitations, provisioningAction, step } = state;
 
   const handleBootstrap = useCallback(
-    async (
-      action: "join" | "create",
-      input?: { kind?: "personal" | "team"; name?: string; organizationId?: string },
-    ) => {
-      const nextProvisioningAction: ProvisioningAction =
-        action === "join" ? "join" : input?.kind === "personal" ? "create_personal" : "create_team";
+    async (action: "join" | "create", input?: { name?: string; organizationId?: string }) => {
+      const nextProvisioningAction: ProvisioningAction = action === "join" ? "join" : "create";
 
       dispatch({ provisioningAction: nextProvisioningAction, type: "bootstrapStarted" });
       try {
@@ -168,7 +159,7 @@ export function Onboarding() {
         }
 
         if (result.isPublicEmail) {
-          await handleBootstrap("create", { kind: "personal" });
+          await handleBootstrap("create");
           return;
         }
 
@@ -225,11 +216,11 @@ export function Onboarding() {
   };
 
   const handleRequestAccess = async (organizationId: string) => {
-    dispatch({ provisioningAction: "create_team", type: "bootstrapStarted" });
+    dispatch({ provisioningAction: "create", type: "bootstrapStarted" });
 
     try {
       await requestOrganizationAccess(toOrganizationId(organizationId));
-      await handleBootstrap("create", { kind: "team" });
+      await handleBootstrap("create");
     } catch (nextError: unknown) {
       dispatch({
         error: getErrorMessage(nextError) || "Something went wrong",
@@ -257,12 +248,11 @@ export function Onboarding() {
     return (
       <OnboardingInvitationsScreen
         bootstrapping={bootstrapping}
-        createKind={discovery?.isPublicEmail === true ? "personal" : "team"}
         error={error}
         invitations={invitations}
         onAcceptInvitation={handleAcceptInvitation}
-        onCreate={(kind) => {
-          void handleBootstrap("create", { kind });
+        onCreate={() => {
+          void handleBootstrap("create");
         }}
       />
     );
@@ -274,8 +264,7 @@ export function Onboarding() {
         bootstrapping={bootstrapping}
         domain={discovery?.domain}
         error={error}
-        onCreatePersonal={() => void handleBootstrap("create", { kind: "personal" })}
-        onCreateTeam={(name) => void handleBootstrap("create", { kind: "team", name })}
+        onCreate={(name) => void handleBootstrap("create", { name })}
       />
     );
   }
@@ -289,7 +278,7 @@ export function Onboarding() {
       inviteOnlyOrgs={inviteOnlyOrgs}
       joinableOrgs={joinableOrgs}
       onCreateTeam={(name) => {
-        void handleBootstrap("create", { kind: "team", name });
+        void handleBootstrap("create", { name });
       }}
       onJoin={(organizationId) => {
         void handleBootstrap("join", { organizationId });
@@ -332,18 +321,16 @@ function OnboardingProvisioningScreen({
 
 function OnboardingInvitationsScreen({
   bootstrapping,
-  createKind,
   error,
   invitations,
   onAcceptInvitation,
   onCreate,
 }: {
   bootstrapping: boolean;
-  createKind: "personal" | "team";
   error: string | null;
   invitations: OrganizationInvitation[];
   onAcceptInvitation: (invitationId: string) => Promise<void>;
-  onCreate: (kind: "personal" | "team") => void;
+  onCreate: () => void;
 }) {
   return (
     <div className="bg-background fixed inset-0 flex flex-col">
@@ -398,7 +385,7 @@ function OnboardingInvitationsScreen({
             <button
               type="button"
               onClick={() => {
-                onCreate(createKind);
+                onCreate();
               }}
               disabled={bootstrapping}
               className="text-muted-foreground hover:bg-accent/50 hover:text-foreground flex w-full items-center justify-center gap-2 rounded-lg p-3 text-sm font-medium transition-colors"

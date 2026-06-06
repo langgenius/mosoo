@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { createOrganization } from "../src/modules/organizations/application/organization.service";
-import { ApiError } from "../src/platform/errors";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 function createOrganizationCreateDatabase(currentViewer: AuthenticatedViewer): SqliteD1Database {
@@ -114,36 +113,32 @@ function makeViewer(email: string): AuthenticatedViewer {
 }
 
 describe("organization creation", () => {
-  test("creates an explicit corporate team", async () => {
+  test("creates an organization", async () => {
     const currentViewer = makeViewer("new@example.com");
     const database = createOrganizationCreateDatabase(currentViewer);
 
     const organization = await createOrganization(database, currentViewer, {
-      kind: "team",
       name: "Explicit Team",
     });
 
     expect(organization).toMatchObject({
       joinPolicy: "auto",
-      kind: "team",
       name: "Explicit Team",
       slug: "explicit-team",
       viewerRole: "owner",
     });
   });
 
-  test("keeps first public-email organization creation on the personal path", async () => {
+  test("creates first public-email organization through the same path", async () => {
     const currentViewer = makeViewer("new@gmail.com");
     const database = createOrganizationCreateDatabase(currentViewer);
 
     const organization = await createOrganization(database, currentViewer, {
-      kind: "team",
       name: "Requested Team",
     });
 
     expect(organization).toMatchObject({
-      joinPolicy: "invite_only",
-      kind: "personal",
+      joinPolicy: "auto",
       name: "Requested Team",
       slug: "requested-team",
       viewerRole: "owner",
@@ -175,7 +170,6 @@ describe("organization creation", () => {
     `);
 
     const organization = await createOrganization(database, currentViewer, {
-      kind: "team",
       name: "dify",
     });
 
@@ -186,7 +180,6 @@ describe("organization creation", () => {
 
     expect(organization).toMatchObject({
       id: organization.id,
-      kind: "team",
       name: "dify",
       slug: "dify-2",
     });
@@ -198,18 +191,16 @@ describe("organization creation", () => {
     ]);
   });
 
-  test("raises a typed domain error when the CE organization creation slot is occupied", async () => {
+  test("raises a typed domain error when the CE self-created organization slot is occupied", async () => {
     const currentViewer = makeViewer("new@example.com");
     const database = createOrganizationCreateDatabase(currentViewer);
 
     await createOrganization(database, currentViewer, {
-      kind: "team",
       name: "First Team",
     });
 
     await expect(
       createOrganization(database, currentViewer, {
-        kind: "team",
         name: "Second Team",
       }),
     ).rejects.toMatchObject({
@@ -219,9 +210,11 @@ describe("organization creation", () => {
 
     await expect(
       createOrganization(database, currentViewer, {
-        kind: "team",
         name: "Third Team",
       }),
-    ).rejects.toBeInstanceOf(ApiError);
+    ).rejects.toMatchObject({
+      code: "ORGANIZATION_CREATION_SLOT_OCCUPIED",
+      status: 400,
+    });
   });
 });

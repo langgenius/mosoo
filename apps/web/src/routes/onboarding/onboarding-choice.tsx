@@ -1,4 +1,4 @@
-import { ArrowRight, Building2, User } from "lucide-react";
+import { ArrowRight, Building2 } from "lucide-react";
 
 import { isTruthy } from "../../shared/lib/truthiness";
 import { getOnboardingDomainOrganizationName } from "./onboarding-domain";
@@ -7,14 +7,12 @@ export function OnboardingChoiceScreen({
   bootstrapping,
   domain,
   error,
-  onCreatePersonal,
-  onCreateTeam,
+  onCreate,
 }: {
   bootstrapping: boolean;
   domain: string | undefined;
   error: string | null;
-  onCreatePersonal: () => void;
-  onCreateTeam: (name: string) => void;
+  onCreate: (name: string) => void;
 }) {
   const domainOrganizationName = getOnboardingDomainOrganizationName(domain);
 
@@ -36,14 +34,14 @@ export function OnboardingChoiceScreen({
             Set up your space
           </h2>
           <p className="text-muted-foreground mt-2 text-center text-sm">
-            You can always create the other later from the org switcher.
+            Create your organization to start using Mosoo.
           </p>
 
           <div className="mt-8 space-y-3">
             <button
               type="button"
               onClick={() => {
-                onCreateTeam(domainOrganizationName);
+                onCreate(domainOrganizationName);
               }}
               disabled={bootstrapping}
               className="group border-primary/30 bg-primary/[0.04] hover:border-primary/50 hover:bg-primary/[0.07] flex w-full items-center justify-between rounded-lg border p-4 text-left transition-all"
@@ -57,33 +55,13 @@ export function OnboardingChoiceScreen({
                     Create {domainOrganizationName} organization
                   </div>
                   <div className="text-muted-foreground mt-0.5 text-xs">
-                    For collaboration with people on @{domain}
+                    {isTruthy(domain)
+                      ? `For collaboration with people on @${domain}`
+                      : "For collaboration with your team"}
                   </div>
                 </div>
               </div>
               <ArrowRight className="text-primary size-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
-            </button>
-
-            <button
-              type="button"
-              onClick={onCreatePersonal}
-              disabled={bootstrapping}
-              className="group border-border bg-muted/30 hover:border-border-strong hover:bg-muted/50 flex w-full items-center justify-between rounded-lg border p-4 text-left transition-all"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="bg-background flex size-10 shrink-0 items-center justify-center rounded-lg">
-                  <User className="text-muted-foreground size-5" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-foreground truncate text-sm font-semibold">
-                    Just trying it personally
-                  </div>
-                  <div className="text-muted-foreground mt-0.5 text-xs">
-                    Create a private sandbox for demos and experiments
-                  </div>
-                </div>
-              </div>
-              <ArrowRight className="text-muted-foreground size-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
             </button>
           </div>
 

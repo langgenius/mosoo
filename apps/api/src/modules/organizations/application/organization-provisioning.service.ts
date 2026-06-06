@@ -1,4 +1,4 @@
-import type { OrganizationKind, OrganizationSummary } from "@mosoo/contracts/organization";
+import type { OrganizationSummary } from "@mosoo/contracts/organization";
 import { organizationMembersTable, organizationsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type { AccountId, OrganizationId } from "@mosoo/id";
@@ -11,16 +11,12 @@ import { createOrganizationEnvironmentDefaults } from "../../environments/applic
 import { recordLastActiveOrganization } from "../../users/application/account-organization-context.service";
 import { toOrganizationSummaryWithViewerRole } from "../domain/organization-access.policy";
 import {
-  enforceValidOrganizationKind,
   getOrganizationCreationSlotStatus,
-  getPersonalOrganizationSlotStatus,
   organizationCreationSlotError,
-  personalOrganizationSlotError,
-} from "../domain/organization-kind.policy";
+} from "../domain/organization-creation-slot.policy";
 import { deriveOrganizationSlugBase } from "../domain/organization-name";
 
 interface ProvisionOrganizationWithOwnerInput {
-  kind: OrganizationKind;
   makeActive: boolean;
   name: string;
 }
@@ -77,23 +73,12 @@ export async function provisionOrganizationWithOwner(
   const timestampMs = currentTimestampMs();
   const organizationId: OrganizationId = createPlatformId();
   const slugBase = deriveOrganizationSlugBase(input.name);
-  const joinPolicy = input.kind === "personal" ? "invite_only" : "auto";
+  const joinPolicy = "auto";
   let slug: string | null = null;
 
-  enforceValidOrganizationKind(input.kind);
-
-  if (input.kind === "personal") {
-    const personalSlot = await getPersonalOrganizationSlotStatus(database, owner.id);
-    if (personalSlot.occupied) {
-      throw personalOrganizationSlotError();
-    }
-  }
-
-  if (input.kind === "team") {
-    const creationSlot = await getOrganizationCreationSlotStatus(database, owner.id);
-    if (creationSlot.occupied) {
-      throw organizationCreationSlotError();
-    }
+  const creationSlot = await getOrganizationCreationSlotStatus(database, owner.id);
+  if (creationSlot.occupied) {
+    throw organizationCreationSlotError();
   }
 
   for (let attempt = 1; attempt <= MAX_ORGANIZATION_SLUG_ATTEMPTS; attempt += 1) {
@@ -142,7 +127,6 @@ export async function provisionOrganizationWithOwner(
       created_at: timestampMs,
       id: organizationId,
       join_policy: joinPolicy,
-      kind: input.kind,
       name: input.name,
       primary_domain: null,
       slug,

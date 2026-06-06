@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "bb73a9e5-da11-5f1d-8416-042a407d2512",
+  "id": "7f9729c4-89ec-5c94-800c-6b606f5de385",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_deployment_version": {
@@ -4006,6 +4006,12 @@
         }
       },
       "indexes": {
+        "organization_creator_account_idx": {
+          "name": "organization_creator_account_idx",
+          "columns": ["creator_account_id"],
+          "isUnique": true,
+          "where": "\"organization\".\"creator_account_id\" IS NOT NULL"
+        },
         "organization_primary_domain_idx": {
           "name": "organization_primary_domain_idx",
           "columns": ["primary_domain"],

@@ -14,14 +14,12 @@ import { and, eq, sql } from "drizzle-orm";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
 import { toIsoString } from "../../../time";
-import { organizationKindValue } from "./organization-kind.policy";
 
 export interface OrganizationSummaryRow {
   avatar_url: string | null;
   created_at: number;
   id: OrganizationId;
   join_policy: OrganizationJoinPolicy;
-  kind: OrganizationSummary["kind"];
   name: string;
   primary_domain: string | null;
   slug: string;
@@ -59,7 +57,6 @@ export function toOrganizationSummary(row: OrganizationSummaryRow): Organization
     createdAt: toIsoString(row.created_at),
     id: row.id,
     joinPolicy: row.join_policy,
-    kind: row.kind,
     name: row.name,
     primaryDomain: row.primary_domain,
     slug: row.slug,
@@ -73,7 +70,6 @@ export function organizationSummaryColumns() {
     created_at: organizationsTable.createdAt,
     id: organizationsTable.id,
     join_policy: organizationsTable.joinPolicy,
-    kind: organizationKindValue(),
     name: organizationsTable.name,
     primary_domain: organizationsTable.primaryDomain,
     slug: organizationsTable.slug,

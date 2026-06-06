@@ -3,7 +3,6 @@ import { describe, expect, test } from "bun:test";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { updateJoinPolicy } from "../src/modules/organizations/application/organization-members.service";
 import {
-  convertPersonalOrganization,
   updateOrganizationPrimaryDomain,
   updateOrganizationProfile,
 } from "../src/modules/organizations/application/organization.service";
@@ -11,7 +10,6 @@ import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const CLAIMED_ORGANIZATION_ID = "01J000000000000000000000K1";
 const ORGANIZATION_ID = "01J00000000000000000000006";
-const PERSONAL_ORGANIZATION_ID = "01J000000000000000000000K2";
 const VIEWER_ID = "01J000000000000000000000K3";
 
 const VIEWER: AuthenticatedViewer = {
@@ -87,7 +85,7 @@ function createOrganizationJoinPolicyDatabase(): SqliteD1Database {
       created_at,
       updated_at
     )
-    VALUES ('${ORGANIZATION_ID}', 'Team Org', 'team-org', 'request', NULL, NULL, '${VIEWER_ID}', 1, 1);
+    VALUES ('${ORGANIZATION_ID}', 'Team Org', 'team-org', 'auto', NULL, NULL, '${VIEWER_ID}', 1, 1);
 
     INSERT INTO organization_member (
       organization_id,
@@ -105,15 +103,16 @@ function createOrganizationJoinPolicyDatabase(): SqliteD1Database {
 }
 
 describe("organization settings updates", () => {
-  test("returns join policy updates", async () => {
+  test("returns join policy updates for any owned organization", async () => {
     const database = createOrganizationJoinPolicyDatabase();
-
     const summary = await updateJoinPolicy(database, VIEWER, {
-      joinPolicy: "auto",
+      joinPolicy: "invite_only",
       organizationId: ORGANIZATION_ID,
     });
 
-    expect(summary.joinPolicy).toBe("auto");
+    expect(summary).toMatchObject({
+      joinPolicy: "invite_only",
+    });
   });
 
   test("returns profile updates from the updated organization row", async () => {
@@ -173,66 +172,23 @@ describe("organization settings updates", () => {
   });
 });
 
-describe("organization conversion", () => {
-  function insertPersonalOrganization(innerDatabase: SqliteD1Database): void {
-    innerDatabase.execute(`
-      INSERT INTO organization (
-        id,
-        name,
-        slug,
-        join_policy,
-        primary_domain,
-        avatar_url,
-        creator_account_id,
-        created_at,
-        updated_at
-      )
-      VALUES ('${PERSONAL_ORGANIZATION_ID}', 'Personal Org', 'personal-org', 'invite_only', NULL, NULL, '${VIEWER_ID}', 2, 2);
-
-      INSERT INTO organization_member (
-        organization_id,
-        account_id,
-        role,
-        disabled_at,
-        disabled_by_account_id,
-        created_at,
-        joined_at
-      )
-      VALUES ('${PERSONAL_ORGANIZATION_ID}', '${VIEWER_ID}', 'owner', NULL, NULL, 2, 2);
-
+describe("former personal organization behavior", () => {
+  test("claims a primary domain without conversion", async () => {
+    const database = createOrganizationJoinPolicyDatabase();
+    database.execute(`
+      UPDATE organization
+      SET join_policy = 'invite_only'
+      WHERE id = '${ORGANIZATION_ID}';
     `);
-  }
-
-  test("converts a Personal Org", async () => {
-    const database = createOrganizationJoinPolicyDatabase();
-    insertPersonalOrganization(database);
-
-    const summary = await convertPersonalOrganization(database, VIEWER, {
-      organizationId: PERSONAL_ORGANIZATION_ID,
-    });
-
-    expect(summary).toMatchObject({
-      id: PERSONAL_ORGANIZATION_ID,
-      joinPolicy: "auto",
-      kind: "team",
-      viewerRole: "owner",
-    });
-  });
-
-  test("claims a primary domain while converting", async () => {
-    const database = createOrganizationJoinPolicyDatabase();
-    insertPersonalOrganization(database);
 
     const summary = await updateOrganizationPrimaryDomain(database, VIEWER, {
-      convertPersonal: true,
       domain: "Acme.test",
-      organizationId: PERSONAL_ORGANIZATION_ID,
+      organizationId: ORGANIZATION_ID,
     });
 
     expect(summary).toMatchObject({
-      id: PERSONAL_ORGANIZATION_ID,
-      joinPolicy: "auto",
-      kind: "team",
+      id: ORGANIZATION_ID,
+      joinPolicy: "invite_only",
       primaryDomain: "acme.test",
       viewerRole: "owner",
     });

@@ -25,7 +25,6 @@ const VIEWER_QUERY = graphql(/* GraphQL */ `
         createdAt
         id
         joinPolicy
-        kind
         name
         primaryDomain
         slug
@@ -43,7 +42,6 @@ const VIEWER_QUERY = graphql(/* GraphQL */ `
           createdAt
           id
           joinPolicy
-          kind
           name
           primaryDomain
           slug

@@ -225,7 +225,6 @@ export const organizationGraphQLSpec = {
   mutationFields: [
     "acceptOrganizationInvitation(input: AcceptOrganizationInvitationInput!): Organization!",
     "cancelOrganizationInvitation(input: CancelOrganizationInvitationInput!): OrganizationInvitation!",
-    "convertPersonalOrganization(input: ConvertPersonalOrganizationInput!): Organization!",
     "createOrganization(input: CreateOrganizationInput!): Organization!",
     "inviteOrganizationMember(input: InviteOrganizationMemberInput!): OrganizationInvitation!",
     "removeOrganizationMember(input: RemoveOrganizationMemberInput!): OperationResult!",

@@ -336,7 +336,6 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
       defaultEnvironmentId: PUBLIC_API_TEST_IDS.environment,
       id: PUBLIC_API_TEST_IDS.organization,
       joinPolicy: "invite_only",
-      kind: "team",
       name: "Mosoo Test Org",
       primaryDomain: null,
       slug: "mosoo-test-org",

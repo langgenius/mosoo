@@ -9,7 +9,6 @@ import { and, desc, eq, isNull, notExists, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { normalizeEmail } from "../../users/domain/email-address";
-import { organizationKindValue } from "../domain/organization-kind.policy";
 import {
   inviteeAccountsTable,
   inviteeMembersTable,
@@ -105,7 +104,6 @@ export async function getOrganizationInvitationRequestAdmission(
         invitee_active_membership_account_id: inviteeMembersTable.accountId,
         invitee_id: inviteeAccountsTable.id,
         invitee_name: inviteeAccountsTable.name,
-        kind: organizationKindValue(),
         organization_id: organizationsTable.id,
         organization_name: organizationsTable.name,
         pending_invitation_id: organizationInvitationsTable.id,
@@ -258,7 +256,6 @@ export async function getOrganizationInviteMemberAdmission(
         invited_by_name: sql`${inviterAccountsTable.name}`
           .mapWith(inviterAccountsTable.name)
           .as("invited_by_name"),
-        kind: organizationKindValue(),
         organization_id: organizationsTable.id,
         organization_name: organizationsTable.name,
         status: organizationInvitationsTable.status,

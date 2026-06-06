@@ -34,7 +34,6 @@ function createInvitationRequestDatabase(
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       slug text NOT NULL,
-      kind text DEFAULT 'team' NOT NULL,
       join_policy text NOT NULL,
       primary_domain text,
       avatar_url text,
@@ -98,7 +97,6 @@ function createInvitationRequestDatabase(
       id,
       name,
       slug,
-      kind,
       join_policy,
       primary_domain,
       avatar_url,
@@ -106,7 +104,7 @@ function createInvitationRequestDatabase(
       created_at,
       updated_at
     )
-    VALUES ('01J00000000000000000000006', 'Example Org', 'example-org', 'team', 'auto', NULL, NULL, '01J00000000000000000000001', 1, 1);
+    VALUES ('01J00000000000000000000006', 'Example Org', 'example-org', 'auto', NULL, NULL, '01J00000000000000000000001', 1, 1);
 
     INSERT INTO organization_member (
       organization_id,

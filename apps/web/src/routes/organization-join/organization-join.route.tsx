@@ -18,14 +18,7 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unexpected error.";
 }
 
-type OrganizationJoinStatus =
-  | "guest"
-  | "invite"
-  | "member"
-  | "missing"
-  | "pending"
-  | "personal"
-  | "request";
+type OrganizationJoinStatus = "guest" | "invite" | "member" | "missing" | "pending" | "request";
 
 export function OrganizationJoinPage() {
   const { organizationId } = useParams<{ organizationId: string }>();
@@ -90,10 +83,6 @@ export function OrganizationJoinPage() {
 
     if (target.viewerIsMember) {
       return "member";
-    }
-
-    if (target.organization.kind === "personal") {
-      return "personal";
     }
 
     if (target.pendingInvitation) {
@@ -378,20 +367,6 @@ function OrganizationJoinStatusPanel({
         <p className="text-muted-foreground text-sm">
           An admin will review your request before granting access to this organization.
         </p>
-      </div>
-    );
-  }
-
-  if (status === "personal") {
-    return (
-      <div className="space-y-4">
-        <div>
-          <p className="text-foreground text-sm font-medium">This Personal Org is private</p>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Personal Orgs do not accept access requests or invitations. Ask the owner to convert it
-            to an organization before collaborating.
-          </p>
-        </div>
       </div>
     );
   }

@@ -24,7 +24,6 @@ import {
   updateOrganizationMemberRole,
 } from "../application/organization-members.service";
 import {
-  convertPersonalOrganization,
   createOrganization,
   setActiveOrganization,
   updateOrganizationPrimaryDomain,
@@ -69,10 +68,6 @@ interface CreateOrganizationArgs {
   input: Parameters<typeof createOrganization>[2];
 }
 
-interface ConvertPersonalOrganizationArgs {
-  input: Parameters<typeof convertPersonalOrganization>[2];
-}
-
 interface SetActiveOrganizationArgs {
   input: Parameters<typeof setActiveOrganization>[2];
 }
@@ -114,8 +109,6 @@ export const organizationGraphQLModule = {
       args: CancelOrganizationInvitationArgs,
       context,
     ) => cancelOrganizationInvitation(context.bindings.DB, context.viewer, args.input),
-    convertPersonalOrganization: async (_parent, args: ConvertPersonalOrganizationArgs, context) =>
-      convertPersonalOrganization(context.bindings.DB, context.viewer, args.input),
     createOrganization: async (_parent, args: CreateOrganizationArgs, context) =>
       createOrganization(context.bindings.DB, context.viewer, args.input),
     inviteOrganizationMember: async (_parent, args: InviteOrganizationMemberArgs, context) =>

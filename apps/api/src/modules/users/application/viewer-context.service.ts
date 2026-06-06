@@ -17,7 +17,7 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { getOrganizationCreationSlotStatus } from "../../organizations/domain/organization-kind.policy";
+import { getOrganizationCreationSlotStatus } from "../../organizations/domain/organization-creation-slot.policy";
 import { ensureModelAvailableForSelection } from "../../vendor-credentials/application/available-models";
 import { normalizeAccountImageUrl } from "../domain/user-avatar";
 import { normalizeAccountName } from "../domain/user-name";

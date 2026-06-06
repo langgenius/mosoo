@@ -47,7 +47,6 @@ function createAccessRequestDatabase(
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       slug text NOT NULL,
-      kind text DEFAULT 'team' NOT NULL,
       join_policy text NOT NULL,
       primary_domain text,
       avatar_url text,
@@ -132,7 +131,6 @@ function createAccessRequestDatabase(
       id,
       name,
       slug,
-      kind,
       join_policy,
       primary_domain,
       avatar_url,
@@ -140,7 +138,7 @@ function createAccessRequestDatabase(
       created_at,
       updated_at
     )
-    VALUES ('01J00000000000000000000006', 'Example Org', 'example-org', 'team', 'invite_only', 'example.com', NULL, '01J00000000000000000000001', 1, 1);
+    VALUES ('01J00000000000000000000006', 'Example Org', 'example-org', 'invite_only', 'example.com', NULL, '01J00000000000000000000001', 1, 1);
 
     INSERT INTO organization_member (
       organization_id,
@@ -185,7 +183,6 @@ function createBindings(database: D1Database): ApiBindings {
 describe("organization access request review", () => {
   test("returns submitted requests", async () => {
     const database = createAccessRequestDatabase({ includePendingRequest: false });
-
     const request = await requestOrganizationAccess(database, REQUESTER, {
       organizationId: "01J00000000000000000000006",
     });

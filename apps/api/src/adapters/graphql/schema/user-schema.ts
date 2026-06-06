@@ -57,7 +57,6 @@ export const userSchema = /* GraphQL */ `
 
   input BootstrapOnboardingInput {
     action: String!
-    kind: OrganizationKind
     name: String
     organizationId: ULID
   }
