@@ -185,20 +185,25 @@ export function mapAgentDetailToView(
 
   return {
     collaborators:
-      editorDetail?.collaborators.map((collaborator) => {
-        const collaboratorUser: UserInfo = {
-          email: collaborator.email ?? "",
-          id: collaborator.principal,
-          name: collaborator.name ?? collaborator.principal,
-        };
-        if (isTruthy(collaborator.imageUrl)) {
-          collaboratorUser.avatar = collaborator.imageUrl;
-        }
-        return {
-          role: collaborator.role,
-          user: collaboratorUser,
-        };
-      }) ?? [],
+      editorDetail?.collaborators
+        // The org-wide "*" principal is surfaced by the dedicated "Everyone in
+        // organization" row (driven by visibility). Excluding it here avoids a
+        // duplicate entry with inconsistent controls in the collaborators list.
+        .filter((collaborator) => collaborator.principal !== "*")
+        .map((collaborator) => {
+          const collaboratorUser: UserInfo = {
+            email: collaborator.email ?? "",
+            id: collaborator.principal,
+            name: collaborator.name ?? collaborator.principal,
+          };
+          if (isTruthy(collaborator.imageUrl)) {
+            collaboratorUser.avatar = collaborator.imageUrl;
+          }
+          return {
+            role: collaborator.role,
+            user: collaboratorUser,
+          };
+        }) ?? [],
     config: {
       agentsFileId: environmentConfig.agentsFileId,
       environmentId: environmentConfig.environmentId,
