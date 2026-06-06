@@ -28,7 +28,6 @@ import { isTruthy } from "../../shared/lib/truthiness";
 import { canShowOwnerDebugTerminalItem } from "./agent-debug-menu-policy";
 import { mapAgentDetailToView } from "./agent-view.mapper";
 import type { Agent, AgentMode } from "./agent.types";
-import { AgentIdBadge } from "./components/agent-id-badge";
 import { ConsumeMode } from "./components/consume-mode";
 import { AgentCostTab } from "./components/cost-tab";
 import { DevMode } from "./components/dev-mode";
@@ -132,7 +131,6 @@ function AgentDetailHeader({
             v{agent.liveVersion.versionNumber} live
           </button>
         ) : null}
-        {isDraftLifecycle ? null : <AgentIdBadge agentId={agent.id} className="ml-1" />}
       </div>
 
       {isDraftLifecycle && lifecycleMode ? (
