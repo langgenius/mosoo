@@ -1,5 +1,7 @@
 import { PUBLIC_API_PREFIX, PUBLISHED_AGENT_API_PREFIX } from "@mosoo/contracts/public-api";
 
+import { MOSOO_API_REFERENCE_URL } from "@/shared/config/external-links";
+
 import type { Agent } from "../agent.types";
 
 export interface AgentDistribution {
@@ -18,8 +20,6 @@ export interface AgentDistribution {
 
 const ACCESS_TOKEN_SETTINGS_PATH = "/settings/access-tokens";
 const MOSOO_PUBLIC_WEB_ORIGIN = "https://mosoo.ai";
-const PUBLISHED_AGENT_DOCS_BASE_URL = "https://dify-da2aabea.mintlify.app";
-const PUBLISHED_AGENT_DOCS_QUICKSTART_PATH = "/quickstart";
 const PUBLISHED_AGENT_API_BASE_PATH = `${PUBLIC_API_PREFIX}${PUBLISHED_AGENT_API_PREFIX}`;
 const PUBLISHED_AGENT_OPENAPI_PATH = `${PUBLISHED_AGENT_API_BASE_PATH}/openapi.json`;
 
@@ -45,12 +45,6 @@ function currentOrigin(): string {
   return globalThis.window !== undefined ? globalThis.location.origin : MOSOO_PUBLIC_WEB_ORIGIN;
 }
 
-function buildAgentApiDocsUrl(agent: Agent): string {
-  const url = new URL(PUBLISHED_AGENT_DOCS_QUICKSTART_PATH, PUBLISHED_AGENT_DOCS_BASE_URL);
-  url.searchParams.set("agentId", agent.id);
-  return url.toString();
-}
-
 /**
  * Distribution coordinates surfaced to the publisher. The web URL points at
  * the public chat shell; the API path is the access-gated Thread entry point.
@@ -72,7 +66,7 @@ export function buildAgentDistribution(agent: Agent): AgentDistribution {
   return {
     apiBasePath: PUBLISHED_AGENT_API_BASE_PATH,
     apiBaseUrl: `${origin}${PUBLISHED_AGENT_API_BASE_PATH}`,
-    apiDocsUrl: buildAgentApiDocsUrl(agent),
+    apiDocsUrl: MOSOO_API_REFERENCE_URL,
     apiPath,
     apiUrl,
     openApiPath: PUBLISHED_AGENT_OPENAPI_PATH,

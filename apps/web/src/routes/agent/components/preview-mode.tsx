@@ -10,6 +10,7 @@ import { agentKeys } from "@/domains/agent/query/agent-queries";
 import { toAgentId } from "@/routes/typed-id";
 
 import type { Agent, AgentMode } from "../agent.types";
+import { AgentApiAccessDialog } from "../lifecycle/api-access-panel";
 import type { LifecycleActionKind } from "../lifecycle/live-config-action-dialog";
 import { PendingChangesBanner } from "../lifecycle/pending-changes-banner";
 import { PublishMenu } from "../lifecycle/publish-menu";
@@ -29,6 +30,7 @@ interface PublishStatusMessage {
 }
 
 interface PreviewModeState {
+  apiAccessDialogOpen: boolean;
   appliedKind: AppliedToastKind | null;
   channelsDialogOpen: boolean;
   discardCounter: number;
@@ -39,6 +41,7 @@ interface PreviewModeState {
 type PreviewModeAction =
   | { type: "applied"; kind: AppliedToastKind }
   | { type: "discarded" }
+  | { type: "setApiAccessDialogOpen"; open: boolean }
   | { type: "setAppliedToast"; open: boolean }
   | { type: "setChannelsDialogOpen"; open: boolean }
   | { type: "setSuccessModalOpen"; open: boolean };
@@ -46,6 +49,7 @@ type PreviewModeAction =
 const DEFAULT_PUBLISH_VISIBILITY: AgentVisibility = "organization";
 const DEFAULT_CHANNEL_ID: ChannelId = "slack";
 const PREVIEW_MODE_INITIAL_STATE: PreviewModeState = {
+  apiAccessDialogOpen: false,
   appliedKind: null,
   channelsDialogOpen: false,
   discardCounter: 0,
@@ -92,6 +96,8 @@ function previewModeReducer(state: PreviewModeState, action: PreviewModeAction):
       return { ...state, appliedKind: action.kind, showAppliedToast: true };
     case "discarded":
       return { ...state, discardCounter: state.discardCounter + 1 };
+    case "setApiAccessDialogOpen":
+      return { ...state, apiAccessDialogOpen: action.open };
     case "setAppliedToast":
       return { ...state, showAppliedToast: action.open };
     case "setChannelsDialogOpen":
@@ -114,8 +120,14 @@ export function PreviewMode({
   useAgentEditorAutoSave(model);
   const autoSaveEligible = isAutoSaveEligible(model.changePlan);
   const [state, dispatch] = useReducer(previewModeReducer, PREVIEW_MODE_INITIAL_STATE);
-  const { appliedKind, channelsDialogOpen, discardCounter, showAppliedToast, showSuccessModal } =
-    state;
+  const {
+    apiAccessDialogOpen,
+    appliedKind,
+    channelsDialogOpen,
+    discardCounter,
+    showAppliedToast,
+    showSuccessModal,
+  } = state;
 
   useEffect(() => {
     let timer: ReturnType<typeof globalThis.setTimeout> | null = null;
@@ -174,6 +186,9 @@ export function PreviewMode({
               busy={publishMutation.isPending}
               disabled={publishDisabled}
               errorMessage={publishError?.message ?? null}
+              onApiAccessClick={() => {
+                dispatch({ open: true, type: "setApiAccessDialogOpen" });
+              }}
               onChannelClick={() => {
                 dispatch({ open: true, type: "setChannelsDialogOpen" });
               }}
@@ -216,7 +231,7 @@ export function PreviewMode({
         </div>
 
         {showAppliedToast && appliedKind ? (
-          <div className="border-green-200/60 bg-success-bg text-success-fg shrink-0 border-t px-4 py-2 text-[12px]">
+          <div className="bg-success-bg text-success-fg shrink-0 border-t border-green-200/60 px-4 py-2 text-[12px]">
             Applied · {appliedToastText(appliedKind)}
           </div>
         ) : null}
@@ -262,6 +277,16 @@ export function PreviewMode({
             dispatch({ open, type: "setChannelsDialogOpen" });
           }}
           open={channelsDialogOpen}
+        />
+      ) : null}
+
+      {apiAccessDialogOpen ? (
+        <AgentApiAccessDialog
+          agent={agent}
+          onOpenChange={(open) => {
+            dispatch({ open, type: "setApiAccessDialogOpen" });
+          }}
+          open={apiAccessDialogOpen}
         />
       ) : null}
 

@@ -3,7 +3,7 @@ export const MOSOO_GITHUB_URL = "https://github.com/langgenius/mosoo/";
 // TODO: replace with the verified product X (Twitter) handle once confirmed.
 export const MOSOO_X_URL = "https://x.com/mosoo";
 
-export const MOSOO_API_REFERENCE_URL = "https://app.mintlify.com/dify-da2aabea/dify-da2aabea";
+export const MOSOO_API_REFERENCE_URL = "https://docs.mosoo.ai/zh-Hans/auth-and-access";
 
 export const MOSOO_DEPLOY_URL = `https://deploy.workers.cloudflare.com/?url=${MOSOO_GITHUB_URL}`;
 

@@ -22,6 +22,7 @@ export interface PublishMenuProps {
   busy: boolean;
   disabled: boolean;
   errorMessage: string | null;
+  onApiAccessClick: () => void;
   onChannelClick: () => void;
   onPublish: () => void;
 }
@@ -31,6 +32,7 @@ export function PublishMenu({
   busy,
   disabled,
   errorMessage,
+  onApiAccessClick,
   onChannelClick,
   onPublish,
 }: PublishMenuProps): ReactElement {
@@ -52,10 +54,6 @@ export function PublishMenu({
       "text/markdown;charset=utf-8",
       markdown,
     );
-  }
-
-  function handleOpenApi(): void {
-    globalThis.open(distribution.apiDocsUrl, "_blank", "noreferrer");
   }
 
   function handleOpenThread(): void {
@@ -116,13 +114,16 @@ export function PublishMenu({
         <DropdownMenuItem
           className="items-start gap-2.5 py-2"
           disabled={!isLive}
-          onSelect={handleOpenApi}
+          onSelect={(event) => {
+            event.preventDefault();
+            onApiAccessClick();
+          }}
         >
           <Code className="mt-0.5 size-4" />
           <div className="flex min-w-0 flex-col">
             <span className="text-[13px] font-medium">API Access</span>
             <span className="text-muted-foreground text-[11.5px] leading-snug">
-              Open the REST docs · POST /threads with a Personal token.
+              Agent ID · API token · API reference.
             </span>
           </div>
         </DropdownMenuItem>
