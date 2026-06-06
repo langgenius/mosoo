@@ -1,6 +1,6 @@
 # Agent Service Identity & Deployment Version — for humans
 
-> This is the product-story version for non-engineer readers. The full engineering contract lives in the shipped `agent-service-identity-prd`.
+> This is the product-story version for non-engineer readers. The companion engineering PRD (state machines, scope matrix, reasoning review) has not yet been written; treat this document as the current source of truth until it lands.
 >
 > This document covers only two things: **service identity** and **versioning**. How the Apply Changes button works, how the driver restarts, how agent-state resets — all of that lives in [`./runtime-state-operations.md`](./runtime-state-operations.md).
 
@@ -131,4 +131,4 @@ flowchart TD
 
 ---
 
-> Full engineering contract, state machines, scope matrix, and reasoning review: see the shipped `agent-service-identity-prd`.
+> The companion engineering PRD with the full state machines, scope matrix, and reasoning review is still pending — until it ships, this document is the single source of truth.

@@ -34,14 +34,19 @@ None of these require a separate Task object. They require a trackable, continua
 
 ## 4. API shape
 
-The first screen should be:
+The first screen of the public docs covers five endpoints:
 
 ```text
 POST /api/v1/agents/{agentId}/threads
 GET  /api/v1/threads/{threadId}
+GET  /api/v1/threads/{threadId}/events
+GET  /api/v1/threads/{threadId}/events/stream
+POST /api/v1/threads/{threadId}/events
 ```
 
-The body for creating a Thread stays simple:
+`input` is **optional** on create. When the caller passes input, the system starts the first Run immediately; when it is omitted, the Thread is created in `idle` with no Run yet, ready to be continued later.
+
+Create with an initial prompt:
 
 ```json
 {
@@ -54,7 +59,15 @@ The body for creating a Thread stays simple:
 }
 ```
 
-The response should center on the Thread and the Run:
+Create an empty Thread to populate later (e.g. a draft scoped to a Linear issue):
+
+```json
+{
+  "client_external_ref": "linear-ENG-123"
+}
+```
+
+Either way, the response centers on the Thread; `run` is present when the create started a Run, and `null` for an empty Thread:
 
 ```json
 {
@@ -74,6 +87,14 @@ The response should center on the Thread and the Run:
   }
 }
 ```
+
+### Reading events back
+
+For each Thread the public API exposes two read paths and a write path:
+
+- `GET /api/v1/threads/{threadId}/events` returns the latest event log entries as JSON. A `limit` query parameter (default 100, max 1000) caps the number of entries.
+- `GET /api/v1/threads/{threadId}/events/stream` streams the same events as Server-Sent Events for long-running consumers.
+- `POST /api/v1/threads/{threadId}/events` posts a follow-up input event into the Thread, triggering the next Run (this is how a Thread created empty gets its first Run).
 
 ## 5. Attribution rules
 

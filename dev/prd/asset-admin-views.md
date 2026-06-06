@@ -1,6 +1,8 @@
 # Asset Admin Views — for humans
 
 > This is the product-story version written for non-engineer readers. The full engineering contract lives in the shipped PRD.
+>
+> **Implementation status (2026-06-05)**: the unified Scope filter has shipped on the **MCP Servers** tab (admin-only visibility) and **Spaces** (admin-only by virtue of org-scope rows only being returned to admins by the API). The **Agent**, **Skill**, and **Environment** list pages still ship with `Mine` / `Shared with me` tabs only — the `All organization` tab on those pages is a target state, not current behavior. Treat that gap as outstanding work, not as drift in the contract.
 
 ---
 

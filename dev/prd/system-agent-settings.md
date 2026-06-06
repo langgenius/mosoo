@@ -34,7 +34,7 @@ When this is done, every user should be able to:
 
 - **Pick a copilot model from a dropdown** at `/settings/system-agent`, where the available range = "the full set of models the copilot can run" ∩ "the credentials I personally have access to (company pool + my personal key)".
 - See "Not Available · needs key" immediately when picking a **model with no key**, and jump to `/providers` with one click to configure the key — with **absolutely no silent fallback** to a different model.
-- **Reach this page in one click** from the account menu in the top-right corner.
+- **Reach this page from the account menu**: open `Settings` from the account menu in the top-right corner, then click `Agent Builder` in the sidebar.
 
 ---
 

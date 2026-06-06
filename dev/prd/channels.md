@@ -1,6 +1,8 @@
 # Channels — for human
 
 > The Channels product story for non-engineers. For the full engineering contract, see the complete Channels PRD.
+>
+> **UI status (2026-06-05)**: the "Distribution → Channels" sub-zone inside the Agent Publish Settings dialog described below is the target information architecture. Today, the Distribution panel exposes Threads and API Access cards plus a `Coming soon` Channels card, and the actual Channel setup forms live in the **Agent Editor → Environment → Channels** section. Phrases below such as "Distribution row" or "row inline expansion" describe the target interaction; the current shipping UI uses a sidebar list + detail view in the editor.
 
 ---
 

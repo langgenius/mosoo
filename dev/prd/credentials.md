@@ -24,8 +24,7 @@ Analogy:
 **Admins** often say:
 
 - "I want to configure the company's OpenAI / Anthropic keys so the whole team can run Agents without everyone having to bring their own key."
-- "Some people will want to run Agents on their own Claude Pro quota, so they can just add their own key — but I need to be able to turn that on and off."
-- "For some Providers, our company doesn't want employees bringing their own keys (e.g., for compliance reasons), so I need to be able to disable BYOK per Provider."
+- "Some people will want to run Agents on their own Claude Pro quota, so they can just add their own key."
 
 **Members** often say:
 
@@ -46,7 +45,6 @@ Analogy:
 - Configure company keys in `/providers` (Provider, name, API Key, optional custom endpoint)
 - Mark a company key as the **default**, making it the default choice for that Provider
 - Edit and delete company keys (deletion is a hard delete — the secret is destroyed immediately)
-- Open the **Credential Policy** page to turn off the master BYOK switch, or disable BYOK for a single Provider
 
 ### What members can do
 
@@ -64,13 +62,12 @@ Analogy:
 
 ## 3. Concept lock
 
-### Three resource types
+### Two resource types
 
-| Resource                | Owned by                                      | Visible to                                  | Editable by   |
-| ----------------------- | --------------------------------------------- | ------------------------------------------- | ------------- |
-| **Company Credential**  | Organization                                  | All members of the same Org (masked)        | Owner / Admin |
-| **Personal Credential** | (member, organization) tuple                  | Owner only                                  | Owner only    |
-| **Credential Policy**   | Organization (two fields attached to the Org) | All members of the same Org (for UI gating) | Owner / Admin |
+| Resource                | Owned by                     | Visible to                           | Editable by   |
+| ----------------------- | ---------------------------- | ------------------------------------ | ------------- |
+| **Company Credential**  | Organization                 | All members of the same Org (masked) | Owner / Admin |
+| **Personal Credential** | (member, organization) tuple | Owner only                           | Owner only    |
 
 > The uniqueness boundary for a personal key is `(member, organization, Provider)`. The same person adding a key for the same Provider in different organizations doesn't affect either one; when a person leaves an organization, all of their personal keys under that organization are deleted outright — no soft delete, no recovery on re-invitation.
 
@@ -101,8 +98,6 @@ Analogy:
 flowchart LR
   Org["Organization"] --> Company["Company credential pool"]
   Account["Account"] --> Personal["Personal credentials"]
-  Policy["Credential policy"] --> Company
-  Policy --> Personal
   Company --> Choose["Runtime picks Company default or Personal"]
   Personal --> Choose
   Choose --> Agent["Agent run"]
@@ -114,23 +109,9 @@ flowchart LR
 stateDiagram-v2
   [*] --> CompanyDefault: Default (no personal key preferred)
   CompanyDefault --> Personal: Select a personal key
-  Personal --> CompanyDefault: Switch back / personal key deleted / disabled by Policy
+  Personal --> CompanyDefault: Switch back / personal key deleted
   Personal --> Personal: Switch to another personal key
 ```
-
-### 4.3 State machine for the Policy
-
-```mermaid
-stateDiagram-v2
-  [*] --> Default: Open by default when the Org is created
-  Default --> Restricted: Admin disables a Provider
-  Default --> Closed: Admin turns off the master switch
-  Restricted --> Default: Admin re-enables the Provider
-  Restricted --> Closed: Admin turns off the master switch
-  Closed --> Default: Admin re-enables
-```
-
-> The Policy never "soft-deletes" existing personal keys. Data for a disabled personal key is retained; it is simply greyed out in the UI as `Disabled by policy`, and the runtime skips it and uses the Company default. When the Admin re-enables it, it is restored immediately.
 
 ---
 
@@ -145,10 +126,7 @@ flowchart TD
   Start["Start: actor / org / provider"] --> Pref["Does this actor have a preferred<br/>personal key for this org/provider?"]
   Pref --> HasPref{"Yes?"}
 
-  HasPref -->|Yes| Policy["Check the Org's BYOK Policy"]
-  Policy --> Allowed{"Master switch on AND this Provider allows BYOK"}
-  Allowed -->|Yes| UsePersonal["Use personal · scope=personal"]
-  Allowed -->|No, silent fallback| FindDefault
+  HasPref -->|Yes| UsePersonal["Use personal · scope=personal"]
 
   HasPref -->|No| FindDefault["Find the default company key for this Provider"]
   FindDefault --> FoundDef{"default found"}
@@ -161,7 +139,6 @@ flowchart TD
 
 ### Key behaviors (which users can feel)
 
-- **Policy later disables personal keys**: the user notices **nothing** — the runtime automatically falls back to the Company default, the personal row shows `Disabled by policy` in the UI, and the Agent still runs.
 - **No usable key at all**: the Agent fails to start, and a UI banner shows `No credential available for {Provider}. Configure in Providers.`
 - **Decryption failure** (an extreme case): the Agent is interrupted, and the UI shows `Credential could not be unlocked. Re-add in Providers.`
 
@@ -212,11 +189,3 @@ After saving:
 - It is **automatically** set as preferred — the Select immediately switches to `PERSONAL · {label}`
 - The user can immediately run Agents with their own key, without having to go tick a box on some switch
 
-### 6.5 Credential Policy page (Admin only)
-
-Entered from the top-right corner of `/providers` or the Settings sidebar. Two switches:
-
-- **A. BYOK master switch**: when turned off, the `+ Add my key…` entry point disappears for all members; the runtime no longer selects personal keys (data is retained and greyed out).
-- **B. Allowed Providers**: granular down to the Provider level.
-
-At the bottom of the page, a one-line note "Defaults handled automatically: user-first + round-robin" lays out the hard-coded decision for the Admin to see.
