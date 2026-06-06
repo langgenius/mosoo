@@ -48,7 +48,7 @@ interface PublishedAgentOpenApiDocument {
 const EXAMPLE_AGENT_ID = "01J00000000000000000000001";
 const EXAMPLE_THREAD_ID = "01J00000000000000000000009";
 const EXAMPLE_FILE_ID = "01J0000000000000000000000J";
-const HUMAN_PAT_SECURITY: Array<Record<string, []>> = [{ personalAccessToken: [] }];
+const ACCESS_TOKEN_SECURITY: Array<Record<string, []>> = [{ accessToken: [] }];
 
 const EXAMPLE_SESSION_FILE = {
   committed: true,
@@ -240,7 +240,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
   const paths = {
     "/agents/{agentId}/threads": {
       get: operation({
-        description: "Returns Threads created by the authenticated Personal Access Token caller.",
+        description: "Returns Threads created by the authenticated Access Token caller.",
         parameters: [
           exampleAgentIdParameter,
           {
@@ -264,12 +264,12 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
             type: "object",
           }),
         },
-        security: HUMAN_PAT_SECURITY,
+        security: ACCESS_TOKEN_SECURITY,
         summary: "List Threads for a published Agent",
       }),
       post: operation({
         description:
-          "Creates a Thread and the backing AgentSession. If input is present, Mosoo also queues the initial Run. If input is omitted, the Thread is immediately visible with IDLE status and no run. Personal Access Token callers are attributed to the PAT owner.",
+          "Creates a Thread and the backing AgentSession. If input is present, Mosoo also queues the initial Run. If input is omitted, the Thread is immediately visible with IDLE status and no run. Access Token callers are attributed to the token owner.",
         parameters: [exampleAgentIdParameter, idempotencyKeyParameter],
         requestBody: jsonRequestBodyExamples(
           { $ref: "#/components/schemas/CreateThreadRequest" },
@@ -280,8 +280,8 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
                 client_external_ref: "draft-empty-thread",
               },
             },
-            humanPatWithFile: {
-              summary: "Personal token with an uploaded file",
+            accessTokenWithFile: {
+              summary: "Access Token with an uploaded file",
               value: {
                 client_external_ref: "linear-ENG-123",
                 files: [{ file_id: EXAMPLE_FILE_ID }],
@@ -296,8 +296,8 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
                 },
               },
             },
-            personalTokenBasic: {
-              summary: "Personal token",
+            accessTokenBasic: {
+              summary: "Access Token",
               value: {
                 client_external_ref: "demo-thread-001",
                 input: {
@@ -330,7 +330,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
       delete: operation({
         description: "Permanently deletes the Thread and its backing AgentSession.",
         parameters: [threadIdParameter],
-        security: HUMAN_PAT_SECURITY,
+        security: ACCESS_TOKEN_SECURITY,
         success: {
           "200": okResponse("Deleted."),
         },
@@ -351,7 +351,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
       post: operation({
         description: "Archives the Thread so it is hidden from default Thread lists.",
         parameters: [threadIdParameter],
-        security: HUMAN_PAT_SECURITY,
+        security: ACCESS_TOKEN_SECURITY,
         success: {
           "200": okResponse("Archived."),
         },
@@ -392,7 +392,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
             $ref: "#/components/schemas/SendEventsResponse",
           }),
         },
-        security: HUMAN_PAT_SECURITY,
+        security: ACCESS_TOKEN_SECURITY,
         summary: "Send user messages, permission decisions, or interrupts to a Thread",
       }),
     },
@@ -412,7 +412,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
         description:
           "Lists files attached to the Thread, including caller attachments and Agent artifacts.",
         parameters: [threadIdParameter],
-        security: HUMAN_PAT_SECURITY,
+        security: ACCESS_TOKEN_SECURITY,
         success: {
           "200": jsonResponse(
             "Thread file list.",
@@ -426,7 +426,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
         description:
           "Claims a ready draft file handle into this Thread. Upload file bytes through the files data plane first, then pass the resulting fileId here.",
         parameters: [threadIdParameter],
-        security: HUMAN_PAT_SECURITY,
+        security: ACCESS_TOKEN_SECURITY,
         requestBody: jsonRequestBody(
           {
             $ref: "#/components/schemas/CreateThreadFileRequest",
@@ -449,7 +449,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
       delete: operation({
         description: "Detaches a file from the Thread.",
         parameters: [threadIdParameter, fileIdParameter],
-        security: HUMAN_PAT_SECURITY,
+        security: ACCESS_TOKEN_SECURITY,
         success: {
           "200": okResponse("Removed."),
         },
@@ -460,7 +460,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
       post: operation({
         description: "Restores a previously archived Thread to active Thread lists.",
         parameters: [threadIdParameter],
-        security: HUMAN_PAT_SECURITY,
+        security: ACCESS_TOKEN_SECURITY,
         success: {
           "200": okResponse("Unarchived."),
         },
@@ -473,7 +473,7 @@ export function createPublishedAgentOpenApiDocument(origin: string): PublishedAg
     components: createPublishedAgentOpenApiComponents(),
     info: {
       description:
-        "Public HTTPS API for creating and retrieving Threads on published Mosoo Agents. v1 resource identifiers are bare ULIDs, not prefixed IDs. Personal Access Tokens identify the account caller. Runtime execution resolves the published Agent owner's capabilities while the Thread is attributed to the PAT owner.",
+        "Public HTTPS API for creating and retrieving Threads on published Mosoo Agents. v1 resource identifiers are bare ULIDs, not prefixed IDs. Access Tokens identify the account caller. Runtime execution resolves the published Agent owner's capabilities while the Thread is attributed to the token owner.",
       title: "Mosoo Published Agent API",
       version: PUBLIC_API_VERSION,
     },

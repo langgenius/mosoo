@@ -33,7 +33,7 @@ async function readJson(response: Response): Promise<unknown> {
 
 function parsePersonalAccessTokenSummary(value: unknown): PersonalAccessTokenSummary {
   if (!isJsonObject(value)) {
-    throw new Error("Invalid personal access token response.");
+    throw new Error("Invalid access token response.");
   }
 
   const { createdAt, id, label, lastUsedAt, revokedAt } = value;
@@ -45,7 +45,7 @@ function parsePersonalAccessTokenSummary(value: unknown): PersonalAccessTokenSum
     (lastUsedAt !== null && typeof lastUsedAt !== "string") ||
     (revokedAt !== null && typeof revokedAt !== "string")
   ) {
-    throw new Error("Invalid personal access token response.");
+    throw new Error("Invalid access token response.");
   }
 
   return {
@@ -68,7 +68,7 @@ async function readJsonResponse<T>(response: Response, parse: (value: unknown) =
 
 function parsePersonalAccessTokenListResponse(value: unknown): PersonalAccessTokenListResponse {
   if (!isJsonObject(value) || !Array.isArray(value["tokens"])) {
-    throw new Error("Invalid personal access token list response.");
+    throw new Error("Invalid access token list response.");
   }
 
   return {
@@ -78,7 +78,7 @@ function parsePersonalAccessTokenListResponse(value: unknown): PersonalAccessTok
 
 function parseCreatePersonalAccessTokenResponse(value: unknown): CreatePersonalAccessTokenResponse {
   if (!isJsonObject(value) || typeof value["value"] !== "string") {
-    throw new Error("Invalid personal access token create response.");
+    throw new Error("Invalid access token create response.");
   }
 
   return {
@@ -89,7 +89,7 @@ function parseCreatePersonalAccessTokenResponse(value: unknown): CreatePersonalA
 
 function parsePersonalAccessTokenDeleteResponse(value: unknown): PersonalAccessTokenDeleteResponse {
   if (!isJsonObject(value) || value["ok"] !== true) {
-    throw new Error("Invalid personal access token delete response.");
+    throw new Error("Invalid access token delete response.");
   }
 
   return { ok: true };

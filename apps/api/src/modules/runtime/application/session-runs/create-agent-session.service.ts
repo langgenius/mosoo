@@ -55,7 +55,7 @@ export interface AgentSessionMetadata {
     client_external_ref: string | null;
     created_by: {
       id: string;
-      kind: "human_pat";
+      kind: "access_token";
       token_id: string;
       token_label: string;
     };

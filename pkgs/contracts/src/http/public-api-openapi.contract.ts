@@ -133,7 +133,7 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
           minLength: 1,
         }),
         description:
-          "ID of a ready draft file (bare ULID) previously uploaded through the files data plane by the same Personal Access Token caller.",
+          "ID of a ready draft file (bare ULID) previously uploaded through the files data plane by the same Access Token caller.",
       },
     },
     required: ["fileId"],
@@ -285,7 +285,7 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
         type: "string",
       },
       files: {
-        description: "Draft file handles uploaded by the same Personal Access Token caller.",
+        description: "Draft file handles uploaded by the same Access Token caller.",
         items: {
           additionalProperties: false,
           description: "Reference to a single uploaded draft file to attach to the Thread.",
@@ -451,7 +451,7 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
   },
   ThreadAttributedUser: {
     additionalProperties: false,
-    description: "The account a Thread is attributed to (the Personal Access Token owner).",
+    description: "The account a Thread is attributed to (the Access Token owner).",
     properties: {
       id: {
         ...PLATFORM_ID_SCHEMA,
@@ -470,8 +470,8 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
         description: "ID (bare ULID) of the caller that created the Thread.",
       },
       kind: {
-        description: "Caller credential type. `human_pat` is a Personal Access Token.",
-        enum: ["human_pat"],
+        description: "Caller credential type. `access_token` identifies an Access Token caller.",
+        enum: ["access_token"],
       },
     },
     required: ["id", "kind"],

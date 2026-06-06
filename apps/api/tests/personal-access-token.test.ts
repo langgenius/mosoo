@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { revokePersonalAccessToken } from "../src/modules/auth/application/personal-access-token.service";
+import {
+  authenticatePersonalAccessToken,
+  createPersonalAccessToken,
+  hashTokenValue,
+  listPersonalAccessTokens,
+  revokePersonalAccessToken,
+} from "../src/modules/auth/application/personal-access-token.service";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -125,6 +131,32 @@ function createPersonalTokenDatabase(): SqliteD1Database {
 }
 
 describe("personal access tokens", () => {
+  test("generates Mosoo access tokens with the MST prefix", async () => {
+    const database = createPersonalTokenDatabase();
+
+    const response = await createPersonalAccessToken(database, VIEWER, {
+      label: "Deploy key",
+    });
+
+    expect(response.value).toStartWith("mst_");
+  });
+
+  test("accepts legacy Growth PAT tokens for existing hashes", async () => {
+    const database = createPersonalTokenDatabase();
+    const legacyTokenValue = "grt_pat_legacy_token_value";
+    const legacyTokenHash = await hashTokenValue(legacyTokenValue);
+
+    database.execute(`
+      UPDATE personal_access_token
+      SET token_hash = '${legacyTokenHash}'
+      WHERE id = '${TOKEN_ID}';
+    `);
+
+    const caller = await authenticatePersonalAccessToken(database, legacyTokenValue);
+
+    expect(caller?.tokenId).toBe(TOKEN_ID);
+  });
+
   test("keeps missing token revocation a no-op", async () => {
     const database = createPersonalTokenTable();
 
@@ -147,5 +179,15 @@ describe("personal access tokens", () => {
       .first<{ revoked_at: number | null }>();
 
     expect(token?.revoked_at).toBeNumber();
+  });
+
+  test("omits revoked tokens from the token list", async () => {
+    const database = createPersonalTokenDatabase();
+
+    await revokePersonalAccessToken(database, VIEWER, TOKEN_ID);
+
+    const response = await listPersonalAccessTokens(database, VIEWER);
+
+    expect(response.tokens).toEqual([]);
   });
 });

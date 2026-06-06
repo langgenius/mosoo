@@ -62,7 +62,9 @@ function resolveRequiredRouteValue<T>(value: RouteValue<T>): T {
   return typeof value === "function" ? (value as () => T)() : value;
 }
 
-async function requirePatCaller(c: PublishedApiRouteContext): Promise<PersonalAccessTokenCaller> {
+async function requireAccessTokenCaller(
+  c: PublishedApiRouteContext,
+): Promise<PersonalAccessTokenCaller> {
   const token = readBearerToken(c.req.raw);
 
   if (!isTruthy(token)) {
@@ -72,16 +74,16 @@ async function requirePatCaller(c: PublishedApiRouteContext): Promise<PersonalAc
   const caller = await authenticatePersonalAccessToken(c.env.DB, token);
 
   if (!caller) {
-    throw publicUnauthenticated("Personal Access Token is invalid or revoked.");
+    throw publicUnauthenticated("Access Token is invalid or revoked.");
   }
 
   return caller;
 }
 
-async function requireRateLimitedPatCaller(
+async function requireRateLimitedAccessTokenCaller(
   c: PublishedApiRouteContext,
 ): Promise<PersonalAccessTokenCaller> {
-  const caller = await requirePatCaller(c);
+  const caller = await requireAccessTokenCaller(c);
   await enforcePublishedApiRateLimit(c.env.DB, caller.tokenId);
   return caller;
 }
@@ -90,13 +92,13 @@ async function requirePublicApiCaller(c: PublishedApiRouteContext): Promise<Publ
   const token = readPublicApiBearerToken(c.req.raw);
 
   if (!isTruthy(token)) {
-    throw publicUnauthenticated("A valid Personal Access Token is required.");
+    throw publicUnauthenticated("A valid Access Token is required.");
   }
 
   const caller = await authenticatePublicApiCaller(c.env.DB, token);
 
   if (!caller) {
-    throw publicUnauthenticated("Personal Access Token is invalid or revoked.");
+    throw publicUnauthenticated("Access Token is invalid or revoked.");
   }
 
   return caller;
@@ -308,7 +310,7 @@ export async function runPublishedApiAuthenticatedJson<T>(
   status = 200,
 ): Promise<Response> {
   try {
-    const caller = await requireRateLimitedPatCaller(c);
+    const caller = await requireRateLimitedAccessTokenCaller(c);
     return Response.json(await operation(caller), { status });
   } catch (error) {
     return toErrorResponse(error);
@@ -331,7 +333,7 @@ export async function runPublishedApiSessionMutation<T, Prepared = undefined>(
   },
 ): Promise<Response> {
   try {
-    const caller = await requirePatCaller(c);
+    const caller = await requireAccessTokenCaller(c);
     const threadId = resolveRequiredRouteValue(input.threadId);
     const operationInput: PublishedApiAuthenticatedOperation = { caller };
     const prepared = input.prepare ? await input.prepare(operationInput) : (undefined as Prepared);

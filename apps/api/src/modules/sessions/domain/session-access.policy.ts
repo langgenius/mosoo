@@ -70,7 +70,7 @@ function humanSessionCreatorCondition(viewerId: AccountId): SQL {
       sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') IS NULL`,
       and(
         sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') = 'public_api'`,
-        sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.kind') = 'human_pat'`,
+        sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.kind') IN ('access_token', 'human_pat')`,
       ),
     ),
   )!;

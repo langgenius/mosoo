@@ -230,7 +230,7 @@ function PersonalTokenSection({
       <CreatedTokenPanel
         copied={copied}
         onCopy={onCopy}
-        title="New personal token"
+        title="New access token"
         token={createdToken}
         tooltip="Copy token"
       />

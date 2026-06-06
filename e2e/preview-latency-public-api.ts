@@ -30,12 +30,12 @@ export async function createPersonalAccessTokenForPublicApi(
 
   if (!response.ok()) {
     throw new Error(
-      `Could not create public API PAT: ${response.status()} ${JSON.stringify(payload)}`,
+      `Could not create public API token: ${response.status()} ${JSON.stringify(payload)}`,
     );
   }
 
   if (!isRecord(payload) || typeof payload["value"] !== "string") {
-    throw new Error("Public API PAT response did not include a token value.");
+    throw new Error("Public API token response did not include a token value.");
   }
 
   return payload["value"];

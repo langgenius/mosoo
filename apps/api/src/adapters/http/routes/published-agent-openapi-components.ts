@@ -47,23 +47,23 @@ export function createPublishedAgentOpenApiComponents() {
           },
         },
       },
-      Unauthenticated: jsonResponse("A valid Personal Access Token is required.", {
+      Unauthenticated: jsonResponse("A valid Access Token is required.", {
         $ref: "#/components/schemas/ErrorResponse",
       }),
     },
     schemas: PUBLISHED_AGENT_OPENAPI_SCHEMAS,
     securitySchemes: {
       publicApiBearer: {
-        bearerFormat: "Mosoo Personal Access Token",
+        bearerFormat: "Mosoo Access Token",
         description:
-          "Use Authorization: Bearer grt_pat_... . PATs identify an account and do not carry scopes.",
+          "Use Authorization: Bearer mst_... . Access Tokens identify an account and do not carry scopes.",
         scheme: "bearer",
         type: "http",
       },
-      personalAccessToken: {
-        bearerFormat: "Mosoo PAT",
+      accessToken: {
+        bearerFormat: "Mosoo Access Token",
         description:
-          "Use Authorization: Bearer grt_pat_... . PATs identify an account and do not carry scopes.",
+          "Use Authorization: Bearer mst_... . Access Tokens identify an account and do not carry scopes.",
         scheme: "bearer",
         type: "http",
       },

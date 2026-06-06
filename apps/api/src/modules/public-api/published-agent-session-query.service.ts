@@ -82,7 +82,7 @@ async function getPublicThreadSessionAccess(
 
   const canRead =
     row.attributed_user_id === callerId ||
-    (metadata.created_by.kind === "human_pat" && row.creator_account_id === callerId);
+    (metadata.created_by.kind === "access_token" && row.creator_account_id === callerId);
 
   if (!canRead) {
     throw publicNotFound("Thread not found.");
@@ -128,7 +128,7 @@ export async function listPublishedAgentThreads(
   const participantFilter = or(
     and(
       eq(sessionsTable.creatorAccountId, caller.id),
-      sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.kind') = 'human_pat'`,
+      sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.kind') IN ('access_token', 'human_pat')`,
     ),
     eq(sessionsTable.attributedUserId, caller.id),
   );

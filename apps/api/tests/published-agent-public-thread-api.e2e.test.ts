@@ -224,7 +224,7 @@ describe("Published Agent Public Thread API e2e", () => {
         agent_id: PUBLIC_API_TEST_IDS.agent,
         attributed_user: { id: PUBLIC_API_TEST_IDS.ownerAccount },
         client_external_ref: "linear-ENG-123",
-        created_by: { id: PUBLIC_API_TEST_IDS.ownerAccount, kind: "human_pat" },
+        created_by: { id: PUBLIC_API_TEST_IDS.ownerAccount, kind: "access_token" },
         id: threadId,
         source: "api",
       });
@@ -261,6 +261,7 @@ describe("Published Agent Public Thread API e2e", () => {
       const metadata = expectRecord(JSON.parse(expectString(sessionRow?.metadata_json)));
       expect(metadata["public_api"]).toMatchObject({
         client_external_ref: "linear-ENG-123",
+        created_by: { id: PUBLIC_API_TEST_IDS.ownerAccount, kind: "access_token" },
         source: "public_api",
       });
 

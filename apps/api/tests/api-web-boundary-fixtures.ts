@@ -75,7 +75,7 @@ export function createThreadSummary(): PublishedThreadSummary {
     created_at: "2026-05-19T00:00:00.000Z",
     created_by: {
       id: "pat-1",
-      kind: "human_pat",
+      kind: "access_token",
     },
     id: PUBLIC_API_TEST_IDS.memberSession,
     kind: "cattle",

@@ -57,7 +57,7 @@ function canReadThreadFromOwnership(
 ): boolean {
   return (
     snapshot.row.attributed_user_id === caller.viewer.id ||
-    (snapshot.metadata.created_by.kind === "human_pat" &&
+    (snapshot.metadata.created_by.kind === "access_token" &&
       snapshot.row.creator_account_id === caller.viewer.id)
   );
 }
@@ -86,7 +86,7 @@ export async function admitPublishedThreadCreator(
     accessViewer: await getOwnerViewer(database, agent.ownerId),
     attributedUserId: caller.viewer.id,
     createdById: caller.viewer.id,
-    createdByKind: "human_pat",
+    createdByKind: "access_token",
     creatorViewer: caller.viewer,
     executionOwnerId: agent.ownerId,
     fileViewer: caller.viewer,

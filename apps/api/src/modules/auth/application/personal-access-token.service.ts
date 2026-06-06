@@ -14,7 +14,8 @@ import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs, toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "./viewer-auth.service";
 const TOKEN_SECRET_BYTE_LENGTH = 32;
-const TOKEN_VALUE_PREFIX = "grt_pat_";
+const TOKEN_VALUE_PREFIX = "mst_";
+const LEGACY_TOKEN_VALUE_PREFIX = "grt_pat_";
 const MAX_LABEL_LENGTH = 80;
 
 interface PersonalAccessTokenListRow {
@@ -62,7 +63,9 @@ function createTokenValue(): string {
 }
 
 export function isPersonalAccessTokenValue(tokenValue: string): boolean {
-  return tokenValue.startsWith(TOKEN_VALUE_PREFIX);
+  return (
+    tokenValue.startsWith(TOKEN_VALUE_PREFIX) || tokenValue.startsWith(LEGACY_TOKEN_VALUE_PREFIX)
+  );
 }
 
 export async function hashTokenValue(tokenValue: string): Promise<string> {
@@ -105,7 +108,12 @@ export async function listPersonalAccessTokens(
       revoked_at: sql<number | null>`${personalAccessTokensTable.revokedAt}`,
     })
     .from(personalAccessTokensTable)
-    .where(eq(personalAccessTokensTable.accountId, viewer.id))
+    .where(
+      and(
+        eq(personalAccessTokensTable.accountId, viewer.id),
+        isNull(personalAccessTokensTable.revokedAt),
+      ),
+    )
     .orderBy(desc(personalAccessTokensTable.createdAt))
     .all();
 

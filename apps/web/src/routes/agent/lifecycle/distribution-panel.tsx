@@ -91,7 +91,7 @@ export function DistributionPanel({
             <>
               <div className="text-fg-2 font-mono text-[12px]">{distribution.apiPath}</div>
               <div className="text-fg-3 mt-0.5 text-[11px]">
-                Use a Personal token from{" "}
+                Use an API token from{" "}
                 <a
                   className="decoration-fg-3/50 hover:text-foreground underline underline-offset-2"
                   href={distribution.tokenSettingsPath}
@@ -175,7 +175,7 @@ export function DistributionPanel({
         <div className="border-border-subtle bg-card rounded-lg border px-3.5 py-3">
           <div className="text-foreground text-[13px] font-medium">Cooperators</div>
           <p className="text-fg-3 mt-0.5 text-[12px] leading-relaxed">
-            Cooperators are the explicit allow-list for Personal token callers.
+            Cooperators are the explicit allow-list for API token callers.
           </p>
           <div className="mt-2.5">
             <Button

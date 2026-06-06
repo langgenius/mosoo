@@ -95,12 +95,12 @@ export function createTestExecutionContext(): ExecutionContext {
 }
 
 export const TOKENS = {
-  collaborator: "grt_pat_collaborator_public_http_token_01",
-  disabled: "grt_pat_disabled_public_http_token_01",
-  member: "grt_pat_member_public_http_token_01",
-  outsider: "grt_pat_outsider_public_http_token_01",
-  owner: "grt_pat_owner_public_http_token_01",
-  revoked: "grt_pat_revoked_public_http_token_01",
+  collaborator: "mst_collaborator_public_http_token_01",
+  disabled: "mst_disabled_public_http_token_01",
+  member: "mst_member_public_http_token_01",
+  outsider: "mst_outsider_public_http_token_01",
+  owner: "mst_owner_public_http_token_01",
+  revoked: "mst_revoked_public_http_token_01",
 } as const;
 
 export function nowMsForTest(): number {

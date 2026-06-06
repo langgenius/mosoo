@@ -112,7 +112,7 @@ export interface PublishedThreadEventResult {
 
 export interface PublishedThreadCallerSummary {
   id: PlatformId;
-  kind: "human_pat";
+  kind: "access_token";
 }
 
 export interface PublishedThreadAttributedUserSummary {

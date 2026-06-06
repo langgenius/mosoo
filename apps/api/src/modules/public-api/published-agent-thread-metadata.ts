@@ -1,10 +1,13 @@
 import { parsePlatformId } from "@mosoo/id";
 import type { AccountId, PersonalAccessTokenId, PlatformId } from "@mosoo/id";
 
+const PUBLIC_API_THREAD_CREATED_BY_KIND = "access_token";
+const LEGACY_PUBLIC_API_THREAD_CREATED_BY_KIND = "human_pat";
+
 export interface PublicApiThreadCreatedByMetadata {
   account_id: AccountId;
   id: AccountId;
-  kind: "human_pat";
+  kind: typeof PUBLIC_API_THREAD_CREATED_BY_KIND;
   token_id: PersonalAccessTokenId;
   token_label: string;
 }
@@ -41,7 +44,8 @@ function readCreatedByMetadata(value: unknown): PublicApiThreadCreatedByMetadata
 
   if (
     typeof id !== "string" ||
-    kind !== "human_pat" ||
+    (kind !== PUBLIC_API_THREAD_CREATED_BY_KIND &&
+      kind !== LEGACY_PUBLIC_API_THREAD_CREATED_BY_KIND) ||
     typeof tokenId !== "string" ||
     typeof tokenLabel !== "string"
   ) {
@@ -57,8 +61,8 @@ function readCreatedByMetadata(value: unknown): PublicApiThreadCreatedByMetadata
     return {
       account_id: parsedAccountId,
       id: parsedAccountId,
-      kind,
-      token_id: parsePlatformId<PersonalAccessTokenId>(tokenId, "Public API PAT ID"),
+      kind: PUBLIC_API_THREAD_CREATED_BY_KIND,
+      token_id: parsePlatformId<PersonalAccessTokenId>(tokenId, "Public API token ID"),
       token_label: tokenLabel,
     };
   } catch {
@@ -79,10 +83,10 @@ export function createPublicApiThreadMetadata(
     created_by: {
       account_id: createdById,
       id: createdById,
-      kind: "human_pat",
+      kind: PUBLIC_API_THREAD_CREATED_BY_KIND,
       token_id: parsePlatformId<PersonalAccessTokenId>(
         input.admission.tokenId,
-        "Public API PAT ID",
+        "Public API token ID",
       ),
       token_label: input.admission.tokenLabel,
     },

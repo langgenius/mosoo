@@ -11,26 +11,26 @@ import {
 import type { PersonalAccessTokenCaller } from "./personal-access-token.service";
 import type { AuthenticatedViewer } from "./viewer-auth.service";
 
-type HumanPatCredentialSubjectId = `human:${AccountId}`;
+type AccessTokenCredentialSubjectId = `human:${AccountId}`;
 
-export interface HumanPatPublicApiCaller {
-  credentialSubjectId: HumanPatCredentialSubjectId;
-  kind: "human_pat";
+export interface AccessTokenPublicApiCaller {
+  credentialSubjectId: AccessTokenCredentialSubjectId;
+  kind: "access_token";
   tokenId: PersonalAccessTokenId;
   tokenLabel: string;
   viewer: AuthenticatedViewer;
 }
 
-export type PublicApiCaller = HumanPatPublicApiCaller;
+export type PublicApiCaller = AccessTokenPublicApiCaller;
 
-function toHumanPatCredentialSubjectId(accountId: AccountId): HumanPatCredentialSubjectId {
+function toAccessTokenCredentialSubjectId(accountId: AccountId): AccessTokenCredentialSubjectId {
   return `human:${accountId}`;
 }
 
-function toHumanPatCaller(caller: PersonalAccessTokenCaller): HumanPatPublicApiCaller {
+function toAccessTokenCaller(caller: PersonalAccessTokenCaller): AccessTokenPublicApiCaller {
   return {
-    credentialSubjectId: toHumanPatCredentialSubjectId(caller.viewer.id),
-    kind: "human_pat",
+    credentialSubjectId: toAccessTokenCredentialSubjectId(caller.viewer.id),
+    kind: "access_token",
     tokenId: caller.tokenId,
     tokenLabel: caller.tokenLabel,
     viewer: caller.viewer,
@@ -73,8 +73,8 @@ export async function authenticatePublicApiCaller(
   tokenValue: string,
 ): Promise<PublicApiCaller | null> {
   if (isPersonalAccessTokenValue(tokenValue)) {
-    const patCaller = await authenticatePersonalAccessToken(database, tokenValue);
-    return patCaller === null ? null : toHumanPatCaller(patCaller);
+    const accessTokenCaller = await authenticatePersonalAccessToken(database, tokenValue);
+    return accessTokenCaller === null ? null : toAccessTokenCaller(accessTokenCaller);
   }
 
   return null;

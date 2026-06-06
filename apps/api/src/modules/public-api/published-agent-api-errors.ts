@@ -47,7 +47,7 @@ export function toPublishedAgentApiError(error: unknown): PublishedAgentApiError
 }
 
 export function publicUnauthenticated(
-  message = "A valid Personal Access Token is required.",
+  message = "A valid Access Token is required.",
 ): PublishedAgentApiError {
   return new PublishedAgentApiError({ code: "unauthenticated", message, status: 401 });
 }
