@@ -59,6 +59,7 @@ Command conventions:
 Run this from the repository root:
 
 ```bash
+git submodule update --init   # populate .skills/mosoo-skills (clone with --recurse-submodules to skip this)
 bun install
 vp run env:init
 vp exec prek -c dev/config/prek.toml install
@@ -73,6 +74,14 @@ vp run db:migrate:local
 - R2 / Cloudflare account variables are only needed for remote storage paths or Cloudflare resources close to production, and can be filled manually as needed.
 
 Local OTP email is emitted as local `.eml` files through Cloudflare Email Workers behavior in Wrangler dev. Production email requires Cloudflare Email Routing and `AUTH_EMAIL_FROM`.
+
+## Agent Skills
+
+Reusable coding-agent skills live in the [`langgenius/mosoo-skills`](https://github.com/langgenius/mosoo-skills) repository, vendored here as a Git submodule at `.skills/mosoo-skills` and exposed through the `.claude/skills` symlink so any agent working in this repo discovers them automatically.
+
+- The skills become available after `git submodule update --init` (or cloning with `--recurse-submodules`). Without it, `.claude/skills` points at an empty submodule directory.
+- To bump to the latest skills: `git submodule update --remote .skills/mosoo-skills`, then commit the updated submodule pointer.
+- Do not edit skills under `.skills/mosoo-skills` here — they are owned upstream in `mosoo-skills`.
 
 ## Local Development
 

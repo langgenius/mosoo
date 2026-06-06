@@ -5,6 +5,7 @@
 - Development, verification, commit, and PR rules live in `docs/CONTRIBUTING.md`.
 - Before coding, read the relevant documents under `dev/` to understand system boundaries, module relationships, and design intent.
 - When boundaries are clear and maintenance cost stays reasonable, split subpackages to avoid large modules without clear ownership.
+- Reusable coding-agent skills live under `.claude/skills` (a symlink into the `.skills/mosoo-skills` submodule, sourced from `langgenius/mosoo-skills`). Run `git submodule update --init` once so they resolve. Prefer an existing skill over re-deriving the same guidance; see `docs/CONTRIBUTING.md` → "Agent Skills".
 
 ## Engineering Guidance
 

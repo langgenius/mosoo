@@ -1,0 +1,3 @@
+[submodule ".skills/mosoo-skills"]
+	path = .skills/mosoo-skills
+	url = https://github.com/langgenius/mosoo-skills.git
