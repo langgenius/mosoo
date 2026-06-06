@@ -10,7 +10,6 @@ import {
 
 function draft(): AgentEditorDraft {
   return {
-    agentsFileId: "01J000000000000000000000E1",
     description: "Reviews releases before publish.",
     environmentId: "01J000000000000000000000E2",
     kind: "pet",

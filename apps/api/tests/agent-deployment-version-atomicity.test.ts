@@ -25,7 +25,6 @@ const OWNER_VIEWER: AuthenticatedViewer = {
 
 const DRAFT_AGENT_ID = "01J0000000000000000000000G";
 const INITIAL_CONFIG_JSON = JSON.stringify({
-  agentsFileId: null,
   packageMcpServers: [],
   packageResolution: null,
   packageSharingEnabled: false,
@@ -138,7 +137,6 @@ describe("agent deployment version atomicity", () => {
       agentId: PUBLIC_API_TEST_IDS.agent,
       description: null,
       environment: {
-        agentsFileId: null,
         boundSpaceIds: [],
         environmentId: PUBLIC_API_TEST_IDS.environment,
       },

@@ -6,7 +6,6 @@ import type {
   AgentId,
   ChannelBindingId,
   EnvironmentId,
-  FileId,
   McpServerId,
   OrganizationId,
   SkillId,
@@ -496,7 +495,6 @@ export interface AgentBuilderVisibleChannelSummary {
 }
 
 export interface AgentBuilderPlannerDraftBindingsContext {
-  agentsFileId: FileId | null;
   channelIds: ChannelBindingId[];
   environmentId: EnvironmentId | null;
   mcpServerIds: McpServerId[];

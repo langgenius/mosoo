@@ -17,7 +17,7 @@ Think of it as the "frictionless distribution" experience of a Claude Code Plugi
 When a user actually wants to "copy / back up / migrate an Agent," they are not moving a Manifest config file — they are moving a **re-deployable Agent**. A `.agent` file carries both control-plane descriptions such as runtime / model / prompt and application-layer material:
 
 - App name, description, avatar / logo / brand asset.
-- User-uploaded `AGENTS.md` and prompt assets.
+- Controlled package assets such as avatar, custom Skill, custom MCP, or Environment definitions.
 - Skills, MCP, Environment, Space bindings.
 - Already-stabilized, declarative configuration from Web / API distribution.
 
@@ -51,7 +51,7 @@ Users should be able to:
 | **Agent Manifest**            | The product desired state of an Agent. Defines how the Agent behaves.                                                                                                                                                                                           |
 | **Portable Agent (`.agent`)** | The complete, importable/exportable Agent file. Contains App metadata, the Agent Manifest, asset files, and a resource catalog. On the user surface it is simply called an Agent; the internal implementation may handle it as a ZIP bundle / package contract. |
 | **App Metadata**              | The application information shown to users: name, description, avatar / icon.                                                                                                                                                                                   |
-| **Package Asset**             | A controlled file asset carried inside the Package, such as the avatar or an uploaded `AGENTS.md`. On import, a new asset id must be generated under the target Organization / new Agent.                                                                       |
+| **Package Asset**             | A controlled file asset carried inside the Package, such as the avatar, custom Skill, custom MCP, or Environment definition. On import, a new asset id must be generated under the target Organization / new Agent.                                             |
 | **Fork Agent**                | Creating a new Agent draft based on an existing Agent within the Mosoo control plane. By default it copies the Agent definition, not the session runtime state or Agent memory.                                                                                 |
 | **Export Agent**              | Packaging an Agent's definition, controlled assets, and dependency manifest into a portable `.agent` file.                                                                                                                                                      |
 | **Import Agent**              | Creating a new Agent from a `.agent` file and entering the dependency repair flow.                                                                                                                                                                              |
@@ -76,7 +76,6 @@ Users should be able to:
 | Avatar / icon                        |          Yes |        Yes | Copied as an asset                                                                                                          |
 | Agent Manifest                       |          Yes |        Yes | Core desired state                                                                                                          |
 | System prompt                        |          Yes |        Yes | Manifest field                                                                                                              |
-| `AGENTS.md`                          |          Yes |        Yes | Carried as a package asset / Markdown asset; a new asset id is generated on import                                          |
 | Runtime intent                       |          Yes |        Yes | Carried losslessly; enters a runtime-disabled grayed-out state when the target Organization has not enabled it              |
 | Skills binding                       |          Yes |        Yes | Carried losslessly as a non-mandatory capability; shows a missing optional skill if the package was manually stripped of it |
 | MCP binding                          |          Yes |        Yes | Does not carry credential plaintext                                                                                         |
@@ -103,7 +102,6 @@ This section is a product-level example of the package contract: it locks down t
 my-agent.agent
 ├── manifest.json                        # Primary contract (JSON; aligned with Claude Code plugin.json)
 ├── attachments/                          # User-uploaded file assets
-│   ├── AGENTS.md                        # Native Markdown (no longer inlined into manifest)
 │   └── avatar.png                       # Native PNG/SVG
 ├── skills/                               # Embedded skill directory tree (agentskills.io standard)
 │   └── <skill-name>/
@@ -137,7 +135,6 @@ my-agent.agent
   "provider": "anthropic",
   "prompts": { "system": "..." },
 
-  "agentsMd": "attachments/AGENTS.md",
   "avatar": "attachments/avatar.png",
 
   "skills": [{ "name": "web-search", "path": "skills/web-search/" }],
@@ -147,21 +144,20 @@ my-agent.agent
 }
 ```
 
-| Content group                                  | Enters package | Product constraint                                                                                           |
-| ---------------------------------------------- | -------------: | ------------------------------------------------------------------------------------------------------------ |
-| Agent Manifest                                 |            Yes | Expresses desired state, not vendor-native full config                                                       |
-| `AGENTS.md` / avatar / other attachments       |            Yes | Carried as file assets inside the package; a new target-side asset is generated on import                    |
-| Skills                                         |            Yes | Carried as a portable capability directory; shows a repairable state when missing or corrupted               |
-| MCP declaration                                |            Yes | Carries only the server intent; credential, token, and source connection state do not enter the package      |
-| Environment template                           |            Yes | Carries declarative config; secret values must be reconnected target-side                                    |
-| Space bindings                                 |            Yes | Carries only binding intent such as alias / expected name; does not copy Space content or source permissions |
-| Runtime state / sessions / logs / cost         |             No | Belongs to run history, not the package                                                                      |
+| Content group                          | Enters package | Product constraint                                                                                           |
+| -------------------------------------- | -------------: | ------------------------------------------------------------------------------------------------------------ |
+| Agent Manifest                         |            Yes | Expresses desired state, not vendor-native full config                                                       |
+| Avatar / other attachments             |            Yes | Carried as file assets inside the package; a new target-side asset is generated on import                    |
+| Skills                                 |            Yes | Carried as a portable capability directory; shows a repairable state when missing or corrupted               |
+| MCP declaration                        |            Yes | Carries only the server intent; credential, token, and source connection state do not enter the package      |
+| Environment template                   |            Yes | Carries declarative config; secret values must be reconnected target-side                                    |
+| Space bindings                         |            Yes | Carries only binding intent such as alias / expected name; does not copy Space content or source permissions |
+| Runtime state / sessions / logs / cost |             No | Belongs to run history, not the package                                                                      |
 
 ### Key constraints
 
 | Constraint                                                                                                      | Rationale                                                                                                                                   |
 | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| **AGENTS.md must be a file inside the zip**, it cannot be inlined as a `manifest.agentsMd` string               | It is a user-uploaded file asset; inlining loses file editability + cross-tool reuse                                                        |
 | **A Skill must be a `skills/<name>/SKILL.md` directory** (frontmatter `name` = parent dir name)                 | A multi-file unit (SKILL.md + scripts/ + references/)                                                                                       |
 | **MCP server config lives in `.mcp.json`** using the remote HTTP/SSE subset                                     | First guarantee no secrets, no arbitrary command execution, and target reconnect-ability                                                    |
 | **The Environment template lives in `environment/definition.json`** as a full definition, without secret values | Secrets go through needs_reconnect                                                                                                          |

@@ -606,7 +606,6 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
     )
     .bind(
       JSON.stringify({
-        agentsFileId: null,
         packageMcpServers: [],
         packageResolution: null,
         packageSharingEnabled: false,

@@ -5,7 +5,6 @@ import type {
   AgentDeploymentVersionId,
   AgentId,
   EnvironmentId,
-  FileId,
   McpServerId,
   OrganizationId,
   SkillId,
@@ -223,7 +222,6 @@ export interface AgentSkillReference {
 }
 
 export interface AgentEnvironmentConfig {
-  agentsFileId: FileId | null;
   boundSpaceIds: SpaceId[];
   environmentId: EnvironmentId | null;
 }

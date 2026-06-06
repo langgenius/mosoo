@@ -43,7 +43,6 @@ export async function getAgentEditorState(
     database,
     editable.agent.id,
     editable.agent.environmentId,
-    editable.agent.configJson,
   );
   const { packageResolution } = parseAgentStoredConfig(editable.agent.configJson);
 

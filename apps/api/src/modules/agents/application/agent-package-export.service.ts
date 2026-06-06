@@ -17,12 +17,9 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../shared/truthiness";
 import { toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { getFileRecordById } from "../../files/application/file-record-read.service";
 import { readSkillPackageBytesFromSnapshot } from "../../skills/application/skill-package-snapshot.service";
 import { ensureAgentPackageAccess } from "./agent-access.service";
-import { readFileAssetContentText } from "./agent-package-assets.service";
 import { createAgentPackageFile } from "./agent-package-file.service";
-import { readFileId } from "./agent-platform-ids";
 import { buildAgentSpec, toAgentManifest } from "./agent-spec.service";
 import type { AgentSpecSkill } from "./agent-spec.service";
 
@@ -31,14 +28,6 @@ export function createPortableAgentPackageManifest(
 ): AgentPackage["manifest"] {
   return {
     ...sourceManifest,
-    agentsMd: sourceManifest.agentsMd
-      ? {
-          ...sourceManifest.agentsMd,
-          assetId: null,
-          assetKey: "attachments/AGENTS.md",
-          filename: "AGENTS.md",
-        }
-      : null,
     environment: {
       ...sourceManifest.environment,
       environmentId: null,
@@ -109,24 +98,6 @@ export async function exportAgentPackage(
   const sourceManifest = toAgentManifest(sourceSpec);
   const manifest = createPortableAgentPackageManifest(sourceManifest);
   const assets: AgentPackageAsset[] = [];
-
-  const agentsMdAsset = sourceManifest.agentsMd;
-
-  if (agentsMdAsset?.assetId && manifest.agentsMd?.assetKey) {
-    const file = await getFileRecordById(bindings.DB, readFileId(agentsMdAsset.assetId));
-    const contentText = file ? await readFileAssetContentText(bindings, file) : null;
-
-    if (file && contentText !== null) {
-      assets.push({
-        contentText,
-        filename: "AGENTS.md",
-        key: manifest.agentsMd.assetKey,
-        mimeType: file.mime_type,
-        role: "agents_md",
-        size: file.size,
-      });
-    }
-  }
 
   await appendSkillPackageAssets({
     assets,

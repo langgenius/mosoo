@@ -4,7 +4,6 @@ import {
   parseChannelBindingIdList,
   parseMcpServerIdList,
   parseNullableEnvironmentId,
-  parseNullableFileId,
   parseSkillIdList,
   parseSpaceId,
 } from "./agent-builder-ids";
@@ -86,7 +85,6 @@ function readSpaceBindings(value: unknown): DraftSpaceBinding[] {
 
 function emptyDraftBindings(parseError: string | null): AgentBuilderParsedDraftContext {
   return {
-    agentsFileId: null,
     channelIds: [],
     description: null,
     environmentId: null,
@@ -128,10 +126,6 @@ export function parseAgentBuilderPlannerDraft(draftYaml: string): AgentBuilderPa
     const spaces = readSpaceBindings(assets["spaces"]);
 
     return {
-      agentsFileId: parseNullableFileId(
-        readNullableString(assets["agentsFileId"]),
-        "assets.agentsFileId",
-      ),
       channelIds: parseChannelBindingIdList(
         readRawIdList(channels["providers"] ?? channels["setups"]),
         "channels.providers",

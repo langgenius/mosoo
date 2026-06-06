@@ -27,7 +27,6 @@ const draftYaml = [
   "environment:",
   "  environmentId: null",
   "assets:",
-  "  agentsFileId: null",
   "  skills: []",
   "  mcpServers: []",
   "  spaces: []",
@@ -95,7 +94,7 @@ describe("Agent Builder draft patch guardrail", () => {
     expect(
       findRepairableDraftReadinessErrors({
         checkedAt: "2026-05-19T00:00:00.000Z",
-        errorCount: 3,
+        errorCount: 2,
         issues: [
           {
             code: "agent_builder.model.missing",
@@ -107,14 +106,9 @@ describe("Agent Builder draft patch guardrail", () => {
             message: "Provider key is required.",
             severity: "error",
           },
-          {
-            code: "agent.instructions.missing",
-            message: "AGENTS.md is missing.",
-            severity: "warning",
-          },
         ],
         ready: false,
-        warningCount: 1,
+        warningCount: 0,
       }),
     ).toEqual([
       {

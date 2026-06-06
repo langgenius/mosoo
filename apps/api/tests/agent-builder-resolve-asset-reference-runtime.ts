@@ -35,7 +35,6 @@ export function plannerContextWithSpaceQuestion(): AgentBuilderPlannerContext {
         spaces: [],
       },
       draftBindings: {
-        agentsFileId: null,
         channelIds: [],
         environmentId: null,
         mcpServerIds: [],

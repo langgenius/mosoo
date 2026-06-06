@@ -8,7 +8,7 @@
 
 The Agent Manifest is the **declarative product configuration** of a Mosoo Agent:
 
-- It uses **a small set of stable fields** to spell out who an Agent is, which runtime it runs on, which model it uses, which Skills / MCP / Spaces / Environment it has installed, and which `AGENTS.md` it must follow.
+- It uses **a small set of stable fields** to spell out who an Agent is, which runtime it runs on, which model it uses, which system prompt it follows, and which Skills / MCP / Spaces / Environment it has installed.
 - Upstream: the Agent owner edits it through a UI form, or lets **Agent Builder** generate it.
 - Downstream: any tool — Agent Builder, the CLI, CI, a future IDE plugin — can read the same Manifest and package it into a **`.agent` file** to distribute, fork, and import across teams, organizations, and the community.
 
@@ -26,7 +26,7 @@ It is **not** a "super `agent.yaml`" that unifies the vendor configuration files
 The core points it solves are:
 
 1. **Consumable by downstream tools** — whether it is our own Agent Builder, other automation tools, or future third-party platforms, all of them can read the same Manifest to understand "who this Agent is and what it needs."
-2. **Making `.agent` files easy to distribute** — a `.zip` that contains `manifest.json` plus asset files (AGENTS.md / skills / environment definition / etc.) can be attached to a GitHub, Notion, or Slack file and handed to a colleague, and can also be imported into any Mosoo workspace or organization.
+2. **Making `.agent` files easy to distribute** — a `.zip` that contains `manifest.json` plus asset files (skills / environment definition / etc.) can be attached to a GitHub, Notion, or Slack file and handed to a colleague, and can also be imported into any Mosoo workspace or organization.
 3. **Declarative** — the user expresses "what I want," and the platform renders it into something a concrete runtime can run. The user does **not** write startup commands, does not maintain a vendor `.toml`, and does not toggle dozens of advanced switches in a UI form.
 
 ---
@@ -64,8 +64,7 @@ The real problem is not "how do we merge every vendor's fields into one," but ra
 
 ### What Agent authors can do
 
-- Define a long-lived Agent with a small set of stable fields: `kind`, runtime, model, system prompt, `AGENTS.md`, Skills, MCP, Environment, Spaces.
-- **Upload any Markdown** as the `AGENTS.md` — no forced fixed structure, no platform rewriting.
+- Define a long-lived Agent with a small set of stable fields: `kind`, runtime, model, system prompt, Skills, MCP, Environment, Spaces.
 - Let Agent Builder take over the complex editing work: say in natural language "give me an agent that can read Linear tickets," and Builder translates it into a Manifest patch.
 - Export the Agent as a **`.agent` package** to send to colleagues, upload to the community, or fork across organizations.
 - Import someone else's `.agent` package: the Manifest lands, assets are reused, and **credentials / tokens are not carried along with it**.
@@ -113,7 +112,7 @@ flowchart LR
 
 ## 4. The minimal common set + the "full-power VPS" mental model
 
-What we are building is the **overall unification of heterogeneous vendors** — so at the product layer the Manifest only ever appears as a **"minimal common set"**: runtime / model / system prompt / `AGENTS.md` / Skills / MCP / Environment / Spaces.
+What we are building is the **overall unification of heterogeneous vendors** — so at the product layer the Manifest only ever appears as a **"minimal common set"**: runtime / model / system prompt / Skills / MCP / Environment / Spaces.
 
 For configuration that is **not on the user's side** (vendor-private parameters, native CLI settings, login caches, reasoning_effort, performance tuning, and so on), our principles are:
 
@@ -147,10 +146,9 @@ The Manifest is a minimal common set → it is impossible to move all of the Ope
 | Term                             | Plain-language definition                                                                                                                                                                                                                                   |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Agent Manifest**               | An Agent's declarative product configuration. The **minimal common set** + user intent + platform governance fields. Downstream tools only need to read this.                                                                                               |
-| **`.agent` package**             | A distributable zip: `manifest.json` + assets (AGENTS.md / skills / environment / avatar / …). Can be exported / imported / forked. **Does not carry credentials.**                                                                                         |
+| **`.agent` package**             | A distributable zip: `manifest.json` + assets (skills / environment / avatar / …). Can be exported / imported / forked. **Does not carry credentials.**                                                                                                     |
 | **`kind: pet \| cattle`**        | Pet = a Sandbox that follows the Agent long-term (your VPS / colleague). Cattle = an independent Sandbox per session (one instance per task). Locked after the first Publish; switching requires a Fork.                                                    |
 | **Sandbox**                      | The execution environment in which the Agent actually runs. Pet uses an "Agent Sandbox"; Cattle uses a "Session Sandbox." All of the vendor's full capabilities are preserved here.                                                                         |
-| **`AGENTS.md`**                  | The Agent's "long system instruction" file. The user uploads any Markdown, and Mosoo stores it as a file asset without forcing a heading / frontmatter structure.                                                                                           |
 | **Rendered Native Config**       | The vendor config file / startup parameters the Agent Driver renders from the Manifest. **A materialized result, not the truth.**                                                                                                                           |
 | **Drift**                        | The intent expressed by the Manifest vs. the actual state running inside the Sandbox disagree. Possible sources: you changed it in the Terminal / the vendor runtime changed it on its own / the platform failed to sync.                                   |
 | **Advanced Sandbox Mode**        | The Terminal / advanced entry point that operates the Sandbox directly. It can change native state, but **cannot break through** the Space / Credential / Network boundaries.                                                                               |
@@ -163,20 +161,19 @@ The Manifest is a minimal common set → it is impossible to move all of the Ope
 
 ## 6. What is and isn't in the Manifest
 
-| Section                                                    | User mental model                                  |                                      In the Manifest? |
-| ---------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------: |
-| Name / Description                                         | Who this Agent is                                  |                                                    ✅ |
-| Runtime                                                    | Which Agent runtime it runs on                     |                   ✅ (switching after publish = Fork) |
-| Model                                                      | Which provider / model is the default              |                                ✅ (can be grayed out) |
-| System Prompt                                              | The Agent's role, boundaries, and answering style  |                                                    ✅ |
-| `AGENTS.md`                                                | The Markdown instruction file uploaded by the user |                        ✅ (as a file asset reference) |
-| Skills                                                     | Built-in capability bindings                       |                                                    ✅ |
-| MCP Servers                                                | External tool / connector bindings                 |                                                    ✅ |
-| Environment                                                | Reference to a runtime container template          |                                                    ✅ |
-| Space Bindings                                             | The data spaces visible to the Agent               |                                                    ✅ |
-| Vendor native config (`config.toml` / `settings.json` / …) | Vendor-private                                     |                               ❌ → Sandbox / Terminal |
-| Login state / CLI cache / vendor session state             | Runtime-internal state                             | ❌ → Pet Sandbox state / Cattle Session Sandbox state |
-| Performance / auto-switching / reasoning effort            | Vendor-private preferences                         |                               ❌ → Runtime / Advanced |
+| Section                                                    | User mental model                                 |                                      In the Manifest? |
+| ---------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------: |
+| Name / Description                                         | Who this Agent is                                 |                                                    ✅ |
+| Runtime                                                    | Which Agent runtime it runs on                    |                   ✅ (switching after publish = Fork) |
+| Model                                                      | Which provider / model is the default             |                                ✅ (can be grayed out) |
+| System Prompt                                              | The Agent's role, boundaries, and answering style |                                                    ✅ |
+| Skills                                                     | Built-in capability bindings                      |                                                    ✅ |
+| MCP Servers                                                | External tool / connector bindings                |                                                    ✅ |
+| Environment                                                | Reference to a runtime container template         |                                                    ✅ |
+| Space Bindings                                             | The data spaces visible to the Agent              |                                                    ✅ |
+| Vendor native config (`config.toml` / `settings.json` / …) | Vendor-private                                    |                               ❌ → Sandbox / Terminal |
+| Login state / CLI cache / vendor session state             | Runtime-internal state                            | ❌ → Pet Sandbox state / Cattle Session Sandbox state |
+| Performance / auto-switching / reasoning effort            | Vendor-private preferences                        |                               ❌ → Runtime / Advanced |
 
 ---
 
@@ -184,20 +181,20 @@ The Manifest is a minimal common set → it is impossible to move all of the Ope
 
 ### Owner creates an Agent (through the UI or Agent Builder)
 
-| Stage                                  | Action                                                     | Experience                                                                           |
-| -------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| 1. Getting started                     | Fill in name, description                                  | The form shows only stable product semantics                                         |
-| 2. Choose runtime / model              | Pick from dropdowns                                        | See the list of runtimes + models available to the current organization / individual |
-| 3. Write the prompt + upload AGENTS.md | Drag the Markdown file in                                  | The platform does not rewrite the file content                                       |
-| 4. Attach capabilities                 | Skills / MCP / Environment / Spaces, each in its own group | Clear section boundaries, no nesting into each other                                 |
-| 5. Check readiness                     | The UI validates automatically                             | Any unavailable item is grayed out with its reason + a fix-it path                   |
-| 6. Save / Publish                      | One click                                                  | Enters the Manifest state machine: draft / preview / live                            |
+| Stage                     | Action                                                     | Experience                                                                           |
+| ------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 1. Getting started        | Fill in name, description                                  | The form shows only stable product semantics                                         |
+| 2. Choose runtime / model | Pick from dropdowns                                        | See the list of runtimes + models available to the current organization / individual |
+| 3. Write the prompt       | Fill in the system prompt                                  | The platform stores the prompt as part of the Manifest                               |
+| 4. Attach capabilities    | Skills / MCP / Environment / Spaces, each in its own group | Clear section boundaries, no nesting into each other                                 |
+| 5. Check readiness        | The UI validates automatically                             | Any unavailable item is grayed out with its reason + a fix-it path                   |
+| 6. Save / Publish         | One click                                                  | Enters the Manifest state machine: draft / preview / live                            |
 
 ### Owner distributes the Agent
 
 ```mermaid
 flowchart LR
-  A["UI: Export Agent"] --> B["Generate the .agent zip<br/>(manifest.json + AGENTS.md + skills + ...)"]
+  A["UI: Export Agent"] --> B["Generate the .agent zip<br/>(manifest.json + skills + ...)"]
   B --> C["Send to a colleague / upload to the community / submit a PR"]
   C --> D["The recipient Imports it"]
   D --> E["Manifest lands<br/>Assets are reused<br/>The recipient supplies credentials in their own environment"]

@@ -42,10 +42,7 @@ import type {
   AgentSpecMcpBindingSnapshot,
   AgentSpecSpaceBindingSnapshot,
 } from "./agent-spec.service";
-import {
-  normalizeAgentStoredConfigJson,
-  parseAgentStoredConfig,
-} from "./agent-stored-config.service";
+import { normalizeAgentStoredConfigJson } from "./agent-stored-config.service";
 import type { AgentRow } from "./agent-types";
 
 interface AgentDeploymentVersionRow {
@@ -438,10 +435,7 @@ export function toAgentDeploymentVersionModel(
 export function toVersionAgentEnvironmentConfig(
   version: AgentDeploymentVersionRecord,
 ): AgentEnvironmentConfig {
-  const stored = parseAgentStoredConfig(version.configJson);
-
   return {
-    agentsFileId: stored.agentsFileId,
     boundSpaceIds: [...version.spaceBindings]
       .toSorted((left, right) => left.sortOrder - right.sortOrder)
       .map((binding) => binding.spaceId),

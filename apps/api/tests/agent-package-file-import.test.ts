@@ -179,42 +179,19 @@ class MemoryByteBucket {
   }
 }
 
-function createPackageFixture(input: { agentsMd?: boolean } = {}): AgentPackage {
-  const includeAgentsMd = input.agentsMd ?? false;
-
+function createPackageFixture(): AgentPackage {
   return {
     app: {
       avatarAssetKey: null,
       description: "Imported from a file",
       name: "Imported Package Agent",
     },
-    assets: includeAgentsMd
-      ? [
-          {
-            contentText: "# Imported guide",
-            filename: "AGENTS.md",
-            key: "attachments/AGENTS.md",
-            mimeType: "text/markdown",
-            role: "agents_md",
-            size: textEncoder.encode("# Imported guide").byteLength,
-          },
-        ]
-      : [],
+    assets: [],
     author: null,
     exportedAt: "2026-01-01T00:00:00.000Z",
     license: null,
     manifest: {
       advanced: null,
-      agentsMd: includeAgentsMd
-        ? {
-            assetId: null,
-            assetKey: "attachments/AGENTS.md",
-            filename: "AGENTS.md",
-            mimeType: "text/markdown",
-            mountPath: "/organization/AGENTS.md",
-            role: "agents_md",
-          }
-        : null,
       environment: {
         environmentId: null,
         envVars: {},
@@ -245,7 +222,7 @@ function createPackageFixture(input: { agentsMd?: boolean } = {}): AgentPackage 
   };
 }
 
-async function createFixture(input: { archiveBytes?: Uint8Array; agentsMd?: boolean } = {}) {
+async function createFixture(input: { archiveBytes?: Uint8Array } = {}) {
   const database = await createPublicHttpContractDatabase();
   database.execute(`
     CREATE TABLE IF NOT EXISTS skill (
@@ -414,32 +391,16 @@ describe("agent package file import", () => {
     });
   });
 
-  test("imports from a ready package file, stores package assets, and deletes the temp file", async () => {
-    const { bindings, bucket, database, fileId, objectKey } = await createFixture({
-      agentsMd: true,
-    });
+  test("imports from a ready package file and deletes the temp file", async () => {
+    const { bindings, bucket, database, fileId, objectKey } = await createFixture();
 
     const imported = await importAgentPackage(bindings, OWNER_VIEWER, {
       fileId,
       organizationId: ORGANIZATION_ID,
     });
-    const agentRow = await database
-      .prepare("SELECT config_json FROM agent WHERE id = ?")
-      .bind(imported.agent.id)
-      .first<{ config_json: string }>();
-    const agentsFileId = JSON.parse(agentRow?.config_json ?? "{}")["agentsFileId"] as FileId | null;
 
     expect(imported.agent.name).toBe("Imported Package Agent");
     expect(await readFileRow(database, fileId)).toBeNull();
     expect(bucket.objects.has(objectKey)).toBe(false);
-    expect(agentsFileId).not.toBeNull();
-
-    const assetFile = agentsFileId === null ? null : await readFileRow(database, agentsFileId);
-
-    expect(assetFile).toMatchObject({
-      purpose: "agent_asset",
-      scope_kind: "agent_package",
-      status: "ready",
-    });
   });
 });

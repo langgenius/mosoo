@@ -52,12 +52,7 @@ export async function publishAgent(
 ): Promise<Agent> {
   const database = bindings.DB;
   const { agent } = await ensureAgentEditor(database, viewer.id, input.agentId);
-  const environment = await loadAgentEnvironmentConfig(
-    database,
-    agent.id,
-    agent.environmentId,
-    agent.configJson,
-  );
+  const environment = await loadAgentEnvironmentConfig(database, agent.id, agent.environmentId);
   const { packageResolution } = parseAgentStoredConfig(agent.configJson);
   const readiness = await computeAgentReadiness(database, agent.ownerId, {
     agentId: agent.id,

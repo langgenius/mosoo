@@ -4,7 +4,6 @@ import type {
   AgentResolutionIssue,
 } from "@mosoo/contracts/agent-manifest";
 
-import { readArchiveText, textToArchiveBytes } from "./archive-bytes";
 import { PACKAGE_CONTENT_TEXT_LIMIT_BYTES } from "./archive-constants";
 import { createArchiveIssue } from "./archive-issue";
 
@@ -19,67 +18,10 @@ export function readPackageAssets(
 ): PackageAssetReadResult {
   const assets: AgentPackageAsset[] = [];
   const issues: AgentResolutionIssue[] = [];
-  const agentsMdPath = agentPackage.manifest.agentsMd?.assetKey ?? null;
-
-  if (agentsMdPath !== null) {
-    readAgentsMdAsset(agentPackage, entries, assets, issues, agentsMdPath);
-  }
 
   readSkillAssets(agentPackage, entries, assets, issues);
 
   return { assets, issues };
-}
-
-function readAgentsMdAsset(
-  agentPackage: AgentPackage,
-  entries: Record<string, Uint8Array>,
-  assets: AgentPackageAsset[],
-  issues: AgentResolutionIssue[],
-  agentsMdPath: string,
-): void {
-  let contentText: string | null = null;
-  let failedToRead = false;
-
-  try {
-    contentText = readArchiveText(entries, agentsMdPath);
-  } catch {
-    failedToRead = true;
-    issues.push(
-      createArchiveIssue({
-        code: "package.asset.invalid",
-        message: `Package asset ${agentsMdPath} must be valid UTF-8 text under 2 MB.`,
-        status: "unsupported",
-        targetLabel: agentsMdPath,
-        targetType: "agent",
-      }),
-    );
-  }
-
-  if (!failedToRead && contentText === null) {
-    issues.push(
-      createArchiveIssue({
-        code: "package.asset.missing",
-        message: `Package manifest references missing asset ${agentsMdPath}.`,
-        status: "missing",
-        targetLabel: agentsMdPath,
-        targetType: "agent",
-      }),
-    );
-    return;
-  }
-
-  if (contentText === null) {
-    return;
-  }
-
-  assets.push({
-    contentText,
-    filename: agentPackage.manifest.agentsMd?.filename ?? "AGENTS.md",
-    key: agentsMdPath,
-    mimeType: agentPackage.manifest.agentsMd?.mimeType ?? "text/markdown",
-    role: "agents_md",
-    size: textToArchiveBytes(contentText).byteLength,
-  });
 }
 
 function readSkillAssets(

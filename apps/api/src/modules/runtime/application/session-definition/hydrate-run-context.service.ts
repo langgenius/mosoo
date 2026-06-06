@@ -198,7 +198,6 @@ async function hydrateRunContextFromSession(
     (left, right) => left.sortOrder - right.sortOrder,
   );
   const snapshotEnvironment = buildSnapshotAgentEnvironment({
-    agentsFileId: environmentSnapshot.agentsFileId,
     boundSpaceIds: spaceReferences.map((reference) => reference.spaceId),
     environmentId: environmentSnapshot.environmentId,
   });
@@ -302,7 +301,6 @@ async function hydrateRunContextFromSession(
   try {
     runtimeProfileResult = createAgentRuntimeProfile({
       agentId: agent.id,
-      agentsFileId: snapshotEnvironment.agentsFileId,
       cloudflareSessionId: runtimeProfileIds.cloudflareSessionId,
       callerUserId: viewer.id,
       configRevision: {
@@ -463,7 +461,6 @@ async function refreshCachedRunContextVolatileFields(
   });
   const runtimeProfileResult = createAgentRuntimeProfile({
     agentId: agent.id,
-    agentsFileId: environmentSnapshot.agentsFileId,
     cloudflareSessionId: runtimeProfileIds.cloudflareSessionId,
     callerUserId: viewer.id,
     configRevision: {

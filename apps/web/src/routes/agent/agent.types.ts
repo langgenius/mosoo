@@ -72,7 +72,6 @@ export interface SpaceBinding {
 }
 
 export interface AgentConfig {
-  agentsFileId: string | null;
   environmentId: string | null;
   mcpServers: McpServer[];
   model: string;

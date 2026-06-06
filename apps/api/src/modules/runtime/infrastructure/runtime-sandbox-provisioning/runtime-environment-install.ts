@@ -15,7 +15,6 @@ import type { ExecutionSessionHandle } from "../sandbox-handles";
 import {
   ensureProvisioningDirectories,
   ensureRuntimeMemoryMounts,
-  materializeAgentsFile,
   runSetupScript,
 } from "./runtime-driver-files.service";
 
@@ -77,7 +76,6 @@ export async function installRuntimeEnvironment(
     Promise.all([
       ensureProvisioningDirectories(input.cloudflareSession, input.profile),
       ensureRuntimeMemoryMounts(input.cloudflareSession, input.profile),
-      materializeAgentsFile(env, input.cloudflareSession, input.profile),
     ]).then(() => undefined),
   );
   await input.timing.measure("runSetupScript", () =>

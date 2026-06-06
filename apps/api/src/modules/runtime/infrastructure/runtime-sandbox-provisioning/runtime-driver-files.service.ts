@@ -2,9 +2,6 @@ import { SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH } from "@mosoo/driver-protocol"
 import type { DriverProfileConfig } from "@mosoo/driver-protocol";
 
 import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
-import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
-import { getObjectBody } from "../../../files/application/file-object-storage.service";
-import { getFileRecordById } from "../../../files/application/file-record-read.service";
 import type { ExecutionSessionHandle } from "../sandbox-handles";
 import {
   getOrganizationPath,
@@ -15,11 +12,6 @@ import {
 interface RuntimeMemoryMount {
   sourcePath: string;
   targetRelativePath: string;
-}
-
-interface AgentsFileMarker {
-  fileId: string;
-  objectKey: string;
 }
 
 interface SetupScriptMarker {
@@ -77,21 +69,6 @@ async function readJsonFile<T>(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseAgentsFileMarker(value: unknown): AgentsFileMarker | null {
-  if (!isRecord(value) || typeof value["fileId"] !== "string") {
-    return null;
-  }
-
-  if (typeof value["objectKey"] !== "string") {
-    return null;
-  }
-
-  return {
-    fileId: value["fileId"],
-    objectKey: value["objectKey"],
-  };
 }
 
 function parseSetupScriptMarker(value: unknown): SetupScriptMarker | null {
@@ -156,49 +133,6 @@ export async function ensureProvisioningDirectories(
       result.stderr.trim() || result.stdout.trim() || "Runtime directory provisioning failed.",
     );
   }
-}
-
-export async function materializeAgentsFile(
-  bindings: ApiBindings,
-  session: ExecutionSessionHandle,
-  profile: DriverProfileConfig,
-): Promise<void> {
-  if (!profile.agentsFile) {
-    return;
-  }
-
-  const file = await getFileRecordById(bindings.DB, profile.agentsFile.fileId);
-
-  if (file?.status !== "ready") {
-    throw new Error("AGENTS.md asset could not be materialized from File Service.");
-  }
-
-  const markerPath = `${profile.agentsFile.mountPath}.mosoo-cache.json`;
-  const marker = await readJsonFile(session, markerPath, parseAgentsFileMarker);
-
-  if (
-    marker?.fileId === profile.agentsFile.fileId &&
-    marker.objectKey === file.object_key &&
-    (await fileExists(session, profile.agentsFile.mountPath))
-  ) {
-    return;
-  }
-
-  const object = await getObjectBody(bindings, file.object_key);
-
-  if (!object?.body) {
-    throw new Error("AGENTS.md asset content is missing from R2.");
-  }
-
-  await session.mkdir(getParentDirectory(profile.agentsFile.mountPath), { recursive: true });
-  await session.writeFile(profile.agentsFile.mountPath, await object.text());
-  await session.writeFile(
-    markerPath,
-    JSON.stringify({
-      fileId: profile.agentsFile.fileId,
-      objectKey: file.object_key,
-    }),
-  );
 }
 
 export async function ensureRuntimeMemoryMounts(

@@ -33,12 +33,8 @@ export async function loadAgentEnvironmentConfig(
   database: D1Database,
   agentId: AgentId,
   environmentId: EnvironmentId | null,
-  configJson: string,
 ): Promise<AgentEnvironmentConfig> {
-  const stored = parseAgentStoredConfig(configJson);
-
   return {
-    agentsFileId: stored.agentsFileId,
     boundSpaceIds: await getAgentBoundSpaceIds(database, agentId),
     environmentId,
   };
@@ -53,7 +49,6 @@ export function prepareAgentEnvironmentConfigWrite(input: {
   const normalizedSpaceIds = [...new Set(input.environment.boundSpaceIds)];
   const stored = parseAgentStoredConfig(input.currentConfigJson);
   const configJson = serializeAgentStoredConfig({
-    agentsFileId: input.environment.agentsFileId,
     packageMcpServers: stored.packageMcpServers,
     packageSkills: stored.packageSkills,
     packageResolution: stored.packageResolution,
@@ -63,7 +58,6 @@ export function prepareAgentEnvironmentConfigWrite(input: {
   return {
     configJson,
     environment: {
-      agentsFileId: input.environment.agentsFileId,
       boundSpaceIds: normalizedSpaceIds,
       environmentId: input.environment.environmentId,
     },

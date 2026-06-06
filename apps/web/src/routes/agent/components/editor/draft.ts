@@ -1,7 +1,7 @@
 import type { AgentConfigChangeSnapshot } from "@mosoo/contracts/agent-config-change-plan";
 import { parseDocument, stringify } from "yaml";
 
-import { toEnvironmentId, toFileId, toMcpServerId, toSkillId, toSpaceId } from "@/routes/typed-id";
+import { toEnvironmentId, toMcpServerId, toSkillId, toSpaceId } from "@/routes/typed-id";
 
 import type {
   Agent,
@@ -14,7 +14,6 @@ import type {
 import { getRuntimeInfo } from "../../runtime-catalog";
 
 export interface AgentEditorDraft {
-  agentsFileId: string | null;
   description: string;
   environmentId: string | null;
   kind: AgentKind;
@@ -30,7 +29,6 @@ export interface AgentEditorDraft {
 
 export function createInitialDraft(agent: Agent): AgentEditorDraft {
   return {
-    agentsFileId: agent.config.agentsFileId,
     description: agent.description,
     environmentId: agent.config.environmentId,
     kind: agent.kind,
@@ -55,7 +53,6 @@ export function createSnapshotHash(draft: AgentEditorDraft): string {
 
 export function toAgentConfigChangeSnapshot(draft: AgentEditorDraft): AgentConfigChangeSnapshot {
   return {
-    agentsFileId: draft.agentsFileId === null ? null : toFileId(draft.agentsFileId),
     description: draft.description,
     environmentId: draft.environmentId === null ? null : toEnvironmentId(draft.environmentId),
     kind: draft.kind,
@@ -95,7 +92,6 @@ export function normalizeMcpServers(servers: McpServer[]): McpServer[] {
 
 interface AgentDraftYamlShape {
   assets: {
-    agentsFileId: string | null;
     skills: {
       filename: string;
       id: string;
@@ -135,7 +131,6 @@ interface AgentDraftYamlShape {
 function toDraftYamlShape(draft: AgentEditorDraft): AgentDraftYamlShape {
   return {
     assets: {
-      agentsFileId: draft.agentsFileId,
       skills: draft.skills.map((skill) => ({
         filename: skill.filename,
         id: skill.id,
@@ -208,7 +203,6 @@ export function parseDraftYaml(yaml: string, fallback: AgentEditorDraft): AgentE
   const assets = asRecord(root["assets"]);
 
   return {
-    agentsFileId: readNullableString(assets["agentsFileId"], fallback.agentsFileId),
     description: readString(identity["description"], fallback.description),
     environmentId: readNullableString(environment["environmentId"], fallback.environmentId),
     kind: readAgentKind(root["kind"], fallback.kind),

@@ -102,7 +102,6 @@ const agentDetail = {
 const editorState = {
   collaborators: [],
   environment: {
-    agentsFileId: null,
     boundSpaceIds: ["space-e2e-docs"],
     environmentId: "env-e2e",
   },

@@ -15,7 +15,6 @@ const viewer: AuthenticatedViewer = {
 };
 
 const VISIBLE_ASSET_IDS = {
-  agentsFile: "01J00000000000000000000301",
   channelSlack: "01J00000000000000000000302",
   environmentBound: "01J00000000000000000000303",
   environmentOld: "01J00000000000000000000304",
@@ -41,7 +40,6 @@ const draftYaml = [
   "environment:",
   `  environmentId: ${VISIBLE_ASSET_IDS.environmentBound}`,
   "assets:",
-  "  agentsFileId: null",
   "  skills:",
   `    - ${VISIBLE_ASSET_IDS.skillBound}`,
   "  mcpServers:",
@@ -147,7 +145,6 @@ describe("Agent Builder visible asset providers", () => {
 
   test("diffs current summaries against the previous Planner Context asset index", async () => {
     const previousDraftBindings = {
-      agentsFileId: VISIBLE_ASSET_IDS.agentsFile,
       channelIds: [VISIBLE_ASSET_IDS.channelSlack],
       environmentId: VISIBLE_ASSET_IDS.environmentOld,
       mcpServerIds: [VISIBLE_ASSET_IDS.mcpOld],

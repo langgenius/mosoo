@@ -39,7 +39,6 @@ const ORGANIZATION_ACCESS_SNAPSHOT: DriverOrganizationAccessSnapshotOutput = {
 
 const PROFILE: DriverProfileConfig = {
   agentId: AGENT_ID,
-  agentsFile: null,
   configRevision: {
     agentId: AGENT_ID,
     deploymentVersionId: null,

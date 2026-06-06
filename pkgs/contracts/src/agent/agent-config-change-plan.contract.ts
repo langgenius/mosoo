@@ -1,4 +1,4 @@
-import type { EnvironmentId, FileId, McpServerId, SkillId, SpaceId } from "../id/id.contract";
+import type { EnvironmentId, McpServerId, SkillId, SpaceId } from "../id/id.contract";
 import type { AgentKind, AgentStatus, RuntimeStateApplyActionKind } from "./agent.contract";
 import { agentKindPreservesRuntimeState } from "./agent.contract";
 
@@ -10,7 +10,6 @@ export interface AgentConfigChangeSkill {
 }
 
 export interface AgentConfigChangeSnapshot {
-  agentsFileId: FileId | null;
   description: string;
   environmentId: EnvironmentId | null;
   kind: AgentKind;
@@ -116,12 +115,6 @@ export function classifyAgentConfigChanges(input: {
     action: "restart-process",
     changed: input.current.prompt !== input.saved.prompt,
     label: "System prompt",
-    rank: 1,
-  });
-  pushIfChanged(fieldPlans, {
-    action: "restart-process",
-    changed: input.current.agentsFileId !== input.saved.agentsFileId,
-    label: "AGENTS.md",
     rank: 1,
   });
   pushIfChanged(fieldPlans, {

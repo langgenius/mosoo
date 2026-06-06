@@ -101,7 +101,6 @@ function plannerContext(inputText = "帮我做一个客服工单 Agent"): AgentB
         ],
       },
       draftBindings: {
-        agentsFileId: null,
         channelIds: [],
         environmentId: null,
         mcpServerIds: [],

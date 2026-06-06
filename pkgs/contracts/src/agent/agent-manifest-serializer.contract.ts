@@ -45,17 +45,6 @@ export function serializeAgentManifestToYaml(
     lines.push(`    ${promptLine}`);
   }
 
-  lines.push("agentsMd:");
-  if (manifest.agentsMd) {
-    lines.push(`  assetId: ${yamlString(manifest.agentsMd.assetId)}`);
-    lines.push(`  assetKey: ${yamlString(manifest.agentsMd.assetKey)}`);
-    lines.push(`  filename: ${yamlString(manifest.agentsMd.filename)}`);
-    lines.push(`  mountPath: ${yamlString(manifest.agentsMd.mountPath)}`);
-    lines.push(`  role: ${yamlString(manifest.agentsMd.role)}`);
-  } else {
-    lines.push("  null");
-  }
-
   lines.push("skills:");
   if (manifest.skills.length === 0) {
     lines.push("  []");
@@ -173,7 +162,6 @@ export function toAgentPackageManifestJson(agentPackage: AgentPackage): Record<s
     model: manifest.runtime.model,
     provider: manifest.runtime.provider,
     prompts: manifest.prompts,
-    agentsMd: manifest.agentsMd?.assetKey ?? null,
     avatar: agentPackage.app.avatarAssetKey,
     skills: manifest.skills.map((skill) => ({
       name: skill.skillName,

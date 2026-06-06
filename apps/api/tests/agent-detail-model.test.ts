@@ -14,7 +14,6 @@ const VIEWER: AuthenticatedViewer = {
 };
 
 const AGENT_CONFIG_JSON = JSON.stringify({
-  agentsFileId: null,
   packageMcpServers: [],
   packageResolution: null,
   packageSharingEnabled: true,

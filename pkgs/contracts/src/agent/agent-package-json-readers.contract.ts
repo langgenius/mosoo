@@ -2,7 +2,6 @@ import {
   hasRequiredText,
   isRecord,
   readAgentKind,
-  readAssetRole,
   readBooleanOrDefault,
   readNullableString,
   readParsedArray,
@@ -61,7 +60,6 @@ export function buildPackageManifest(input: Record<string, unknown>): AgentManif
 
   return {
     advanced: null,
-    agentsMd: readPackageAssetReference(input["agentsMd"], "AGENTS.md", "agents_md"),
     environment: readPackageEnvironment(input["environment"]),
     kind,
     manifestVersion: AGENT_MANIFEST_VERSION,
@@ -100,27 +98,6 @@ function readAuthor(value: unknown): AgentPackage["author"] {
   return {
     email: readNullableString(value, "email"),
     name,
-  };
-}
-
-function readPackageAssetReference(
-  value: unknown,
-  filenameFallback: string,
-  roleFallback: "agents_md" | "avatar" | "logo",
-): AgentManifest["agentsMd"] {
-  if (typeof value !== "string" || value.length === 0) {
-    return null;
-  }
-
-  const filename = value.split("/").at(-1) ?? filenameFallback;
-
-  return {
-    assetId: null,
-    assetKey: value,
-    filename,
-    mimeType: roleFallback === "agents_md" ? "text/markdown" : null,
-    mountPath: roleFallback === "agents_md" ? "/organization/AGENTS.md" : "/organization/assets",
-    role: readAssetRole(roleFallback),
   };
 }
 

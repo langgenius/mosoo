@@ -1,7 +1,6 @@
 import {
   createEmptyResolutionSummary,
   createPackageResolutionState,
-  createResolutionIssue,
   createResolutionReport,
 } from "@mosoo/agent-package";
 import type { Agent } from "@mosoo/contracts/agent";
@@ -12,13 +11,10 @@ import type {
 } from "@mosoo/contracts/agent-manifest";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { isTruthy } from "../../../shared/truthiness";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureAgentPackageAccess } from "./agent-access.service";
-import { loadAgentEnvironmentConfig } from "./agent-environment.service";
 import { buildAgentManifest } from "./agent-manifest.service";
 import { toAgentModel } from "./agent-models";
-import { copyOrganizationDraftAsset } from "./agent-package-assets.service";
 import { bindDraftAgentMcpServers, createDraftAgent } from "./agent-package-draft.service";
 import { resolveForkMcpServers } from "./agent-package-mcp-resolution.service";
 import { resolvePackageSkills, resolvePackageSpaces } from "./agent-package-resolution.service";
@@ -39,31 +35,6 @@ export async function createAgentFork(
   const summary = createEmptyResolutionSummary();
   const issues: AgentResolutionIssue[] = [];
   const sourceStoredConfig = parseAgentStoredConfig(sourceAgent.configJson);
-  const sourceEnvironment = await loadAgentEnvironmentConfig(
-    bindings.DB,
-    sourceAgent.id,
-    sourceAgent.environmentId,
-    sourceAgent.configJson,
-  );
-  const agentsFileId = await copyOrganizationDraftAsset(
-    bindings,
-    viewer,
-    sourceAgent.organizationId,
-    sourceEnvironment.agentsFileId,
-  );
-
-  if (Boolean(sourceEnvironment.agentsFileId) && !isTruthy(agentsFileId)) {
-    issues.push(
-      createResolutionIssue({
-        actionLabel: "Rebind AGENTS.md",
-        code: "agent.fork.agents_md.missing",
-        message: "AGENTS.md asset could not be copied into the fork.",
-        targetType: "agents_md",
-      }),
-    );
-  } else if (isTruthy(agentsFileId)) {
-    summary.copiedAssetCount += 1;
-  }
 
   issues.push(
     ...(await collectRuntimeCapabilityIssues({
@@ -111,7 +82,6 @@ export async function createAgentFork(
 
   const agent = await createDraftAgent(bindings.DB, {
     agentName: `${sourceAgent.name} Copy`,
-    agentsFileId,
     description: sourceAgent.description,
     environmentId: sourceAgent.environmentId,
     kind: forkKind,

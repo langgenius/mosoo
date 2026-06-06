@@ -1,9 +1,5 @@
 import type { AgentEnvironmentConfig, AgentKind } from "@mosoo/contracts/agent";
-import type {
-  AgentManifest,
-  AgentManifestAssetReference,
-  AgentManifestMcpServerBinding,
-} from "@mosoo/contracts/agent-manifest";
+import type { AgentManifest, AgentManifestMcpServerBinding } from "@mosoo/contracts/agent-manifest";
 import { AGENT_MANIFEST_VERSION } from "@mosoo/contracts/agent-manifest";
 import type {
   SessionExecutionSkillReference,
@@ -37,7 +33,6 @@ import {
   parsePackagesJson,
   parseStoredEnvVarsJson,
 } from "../../environments/application/environment-config";
-import { getFileRecordById } from "../../files/application/file-record-read.service";
 import { listAgentBindingRows } from "../../mcp/application/mcp-agent-binding.repository";
 import { loadAgentEnvironmentConfig } from "./agent-environment.service";
 import {
@@ -89,7 +84,6 @@ export interface AgentSpecSpaceBinding {
 
 export interface AgentSpec {
   agentId: AgentId;
-  agentsMd: AgentManifestAssetReference | null;
   configJson: string;
   description: string | null;
   environment: AgentEnvironmentConfig;
@@ -350,14 +344,10 @@ export async function listAgentSpecSpacesByIds(
   });
 }
 
-function normalizeStoredConfigJson(input: {
-  configJson: string;
-  environment: AgentEnvironmentConfig;
-}): string {
+function normalizeStoredConfigJson(input: { configJson: string }): string {
   const stored = parseAgentStoredConfig(input.configJson);
 
   return serializeAgentStoredConfig({
-    agentsFileId: input.environment.agentsFileId,
     packageMcpServers: stored.packageMcpServers,
     packageSkills: stored.packageSkills,
     packageResolution: stored.packageResolution,
@@ -365,45 +355,18 @@ function normalizeStoredConfigJson(input: {
   });
 }
 
-async function resolveAgentsMdReference(
-  database: D1Database,
-  environment: AgentEnvironmentConfig,
-): Promise<AgentManifestAssetReference | null> {
-  if (!isTruthy(environment.agentsFileId)) {
-    return null;
-  }
-
-  const agentsFile = await getFileRecordById(database, environment.agentsFileId);
-
-  return {
-    assetId: environment.agentsFileId,
-    assetKey: "agents-md",
-    filename: agentsFile?.name ?? "AGENTS.md",
-    mimeType: agentsFile?.mime_type ?? "text/markdown",
-    mountPath: "/organization/AGENTS.md",
-    role: "agents_md",
-  };
-}
-
 export async function buildAgentSpec(database: D1Database, agent: AgentRow): Promise<AgentSpec> {
   const storedConfig = parseAgentStoredConfig(agent.configJson);
-  const environment = await loadAgentEnvironmentConfig(
-    database,
-    agent.id,
-    agent.environmentId,
-    agent.configJson,
-  );
-  const [skills, registryMcpBindings, spaces, environmentManifest, agentsMd] = await Promise.all([
+  const environment = await loadAgentEnvironmentConfig(database, agent.id, agent.environmentId);
+  const [skills, registryMcpBindings, spaces, environmentManifest] = await Promise.all([
     listAgentSpecSkills(database, agent.id),
     listAgentSpecMcpBindings(database, agent.id),
     listAgentSpecSpaces(database, agent.id),
     getAgentEnvironmentManifest(database, environment.environmentId),
-    resolveAgentsMdReference(database, environment),
   ]);
 
   return buildAgentSpecFromProfile({
     agent,
-    agentsMd,
     environment,
     environmentManifest,
     mcpBindings: registryMcpBindings,
@@ -415,7 +378,6 @@ export async function buildAgentSpec(database: D1Database, agent: AgentRow): Pro
 
 function buildAgentSpecFromProfile(input: {
   agent: AgentRow;
-  agentsMd: AgentManifestAssetReference | null;
   environment: AgentEnvironmentConfig;
   environmentManifest: AgentSpec["environmentManifest"];
   mcpBindings: AgentSpecMcpBinding[];
@@ -455,10 +417,8 @@ function buildAgentSpecFromProfile(input: {
 
   return {
     agentId: input.agent.id,
-    agentsMd: input.agentsMd,
     configJson: normalizeStoredConfigJson({
       configJson: input.agent.configJson,
-      environment: input.environment,
     }),
     description: input.agent.description,
     environment: input.environment,
@@ -485,14 +445,13 @@ export async function buildAgentSpecForPreparedProfile(
     spaces: AgentSpecSpaceBinding[];
   },
 ): Promise<AgentSpec> {
-  const [environmentManifest, agentsMd] = await Promise.all([
-    getAgentEnvironmentManifest(database, input.environment.environmentId),
-    resolveAgentsMdReference(database, input.environment),
-  ]);
+  const environmentManifest = await getAgentEnvironmentManifest(
+    database,
+    input.environment.environmentId,
+  );
 
   return buildAgentSpecFromProfile({
     ...input,
-    agentsMd,
     environmentManifest,
     storedConfig: parseAgentStoredConfig(input.agent.configJson),
   });
@@ -501,7 +460,6 @@ export async function buildAgentSpecForPreparedProfile(
 export function toAgentManifest(spec: AgentSpec): AgentManifest {
   return {
     advanced: null,
-    agentsMd: spec.agentsMd,
     environment: {
       envVars: Object.fromEntries(spec.environmentManifest.secretNames.map((key) => [key, ""])),
       environmentId: spec.environment.environmentId,

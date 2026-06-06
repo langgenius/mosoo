@@ -20,10 +20,10 @@ describe("agent package archive entry admission", () => {
     const cases = [
       { code: "package.archive.entry_absolute", path: "/manifest.json" },
       { code: "package.archive.entry_absolute", path: "C:/manifest.json" },
-      { code: "package.archive.entry_empty_segment", path: "attachments//AGENTS.md" },
-      { code: "package.archive.entry_current_segment", path: "attachments/./AGENTS.md" },
-      { code: "package.archive.entry_parent_segment", path: "attachments/../manifest.json" },
-      { code: "package.archive.entry_control_character", path: "attachments/\u0001.md" },
+      { code: "package.archive.entry_empty_segment", path: "skills//demo/SKILL.md" },
+      { code: "package.archive.entry_current_segment", path: "skills/./demo/SKILL.md" },
+      { code: "package.archive.entry_parent_segment", path: "skills/../manifest.json" },
+      { code: "package.archive.entry_control_character", path: "skills/\u0001.md" },
       { code: "package.archive.entry_reserved", path: "manifest.json/child" },
     ];
 
@@ -31,7 +31,7 @@ describe("agent package archive entry admission", () => {
       const parsed = parseAgentPackageArchiveBytes(
         createStoredZipArchive([
           {
-            body: textToArchiveBytes(createPackageManifestJson("attachments/AGENTS.md")),
+            body: textToArchiveBytes(createPackageManifestJson()),
             path: "manifest.json",
           },
           { body: textToArchiveBytes("{}"), path: testCase.path },
@@ -56,18 +56,11 @@ describe("agent package archive entry admission", () => {
         code: "package.archive.entry_collision",
         entries: [
           {
-            body: textToArchiveBytes(createPackageManifestJson("attachments/AGENTS.md")),
-            path: "manifest.json",
-          },
-          { body: textToArchiveBytes("{}"), path: "attachments" },
-          { body: textToArchiveBytes("# Guide"), path: "attachments/AGENTS.md" },
-        ],
-      },
-      {
-        code: "package.archive.entry_collision",
-        entries: [
-          {
-            body: textToArchiveBytes(createPackageManifestJson("skills/demo/SKILL.md")),
+            body: textToArchiveBytes(
+              createPackageManifestJson({
+                skills: [{ name: "Demo", path: "skills/demo/" }],
+              }),
+            ),
             path: "manifest.json",
           },
           {
@@ -112,7 +105,7 @@ describe("agent package archive entry admission", () => {
   test("rejects manifest declarations that target reserved package files", () => {
     const archive = createStoredZipArchive([
       {
-        body: textToArchiveBytes(createPackageManifestJson("manifest.json")),
+        body: textToArchiveBytes(createPackageManifestJson({ avatar: "manifest.json" })),
         path: "manifest.json",
       },
       {
@@ -128,15 +121,14 @@ describe("agent package archive entry admission", () => {
 
   test("rejects package assets that target reserved package files", () => {
     const agentPackage = createAgentPackageFixture({
-      agentsMdPath: "manifest.json",
       assets: [
         {
-          contentText: "# Guide",
-          filename: "AGENTS.md",
+          contentText: "<svg></svg>",
+          filename: "icon.svg",
           key: "manifest.json",
-          mimeType: "text/markdown",
-          role: "agents_md",
-          size: textToArchiveBytes("# Guide").byteLength,
+          mimeType: "image/svg+xml",
+          role: "avatar",
+          size: textToArchiveBytes("<svg></svg>").byteLength,
         },
       ],
     });
@@ -147,16 +139,7 @@ describe("agent package archive entry admission", () => {
   test("round-trips an admitted package archive", () => {
     const skillBytes = textToArchiveBytes("---\nname: Demo\n---\nUse this skill.");
     const agentPackage = createAgentPackageFixture({
-      agentsMdPath: "attachments/AGENTS.md",
       assets: [
-        {
-          contentText: "# Guide",
-          filename: "AGENTS.md",
-          key: "attachments/AGENTS.md",
-          mimeType: "text/markdown",
-          role: "agents_md",
-          size: textToArchiveBytes("# Guide").byteLength,
-        },
         {
           contentBytes: skillBytes,
           contentText: null,
@@ -182,7 +165,6 @@ describe("agent package archive entry admission", () => {
 
     expect(parsed.package).not.toBeNull();
     expect(parsed.package?.assets.map((asset) => asset.key).toSorted()).toEqual([
-      "attachments/AGENTS.md",
       "skills/demo/SKILL.md",
     ]);
   });
@@ -190,16 +172,14 @@ describe("agent package archive entry admission", () => {
 
 function createAgentPackageFixture(
   input: {
-    agentsMdPath?: string | null;
     assets?: AgentPackage["assets"];
+    avatarAssetKey?: string | null;
     skills?: AgentPackage["manifest"]["skills"];
   } = {},
 ): AgentPackage {
-  const agentsMdPath = input.agentsMdPath ?? null;
-
   return {
     app: {
-      avatarAssetKey: null,
+      avatarAssetKey: input.avatarAssetKey ?? null,
       description: "Test package",
       name: "Test Agent",
     },
@@ -209,17 +189,6 @@ function createAgentPackageFixture(
     license: null,
     manifest: {
       advanced: null,
-      agentsMd:
-        agentsMdPath === null
-          ? null
-          : {
-              assetId: null,
-              assetKey: agentsMdPath,
-              filename: "AGENTS.md",
-              mimeType: "text/markdown",
-              mountPath: "/AGENTS.md",
-              role: "agents_md",
-            },
       environment: {
         environmentId: null,
         envVars: {},
@@ -250,11 +219,12 @@ function createAgentPackageFixture(
   };
 }
 
-function createPackageManifestJson(agentsMdPath: string): string {
+function createPackageManifestJson(
+  input: { avatar?: string | null; skills?: { name: string; path: string }[] } = {},
+): string {
   return JSON.stringify({
-    agentsMd: agentsMdPath,
     author: null,
-    avatar: null,
+    avatar: input.avatar ?? null,
     description: "Test package",
     environment: { ref: "environment/definition.json" },
     exportedAt: "2026-01-01T00:00:00.000Z",
@@ -268,7 +238,7 @@ function createPackageManifestJson(agentsMdPath: string): string {
     prompts: { system: "Be useful." },
     provider: "anthropic",
     runtime: "claude-agent-sdk",
-    skills: [],
+    skills: input.skills ?? [],
     spaceBindings: [],
     version: "1.0.0",
   });

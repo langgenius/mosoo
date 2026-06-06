@@ -8,7 +8,6 @@ import {
   agentSkillsTable,
   agentSpaceBindingsTable,
   agentsTable,
-  fileRecordsTable,
 } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type {
@@ -16,7 +15,6 @@ import type {
   AgentMcpBindingId,
   AgentId,
   EnvironmentId,
-  FileId,
   McpServerId,
   OrganizationId,
   SkillId,
@@ -33,7 +31,6 @@ import type { AgentStoredPackageSkill } from "./agent-stored-config.service";
 import type { AgentRow } from "./agent-types";
 
 export interface CreateDraftAgentInput {
-  agentsFileId: FileId | null;
   agentName: string;
   description: string | null;
   environmentId: EnvironmentId | null;
@@ -51,10 +48,7 @@ export interface CreateDraftAgentInput {
   spaceIds: SpaceId[];
 }
 
-export type DraftAgentFileRecordInsert = typeof fileRecordsTable.$inferInsert;
-
 export interface CreateDraftAgentBatchInput extends CreateDraftAgentInput {
-  fileRecords?: readonly DraftAgentFileRecordInsert[];
   mcpServerIds?: readonly McpServerId[];
 }
 
@@ -80,7 +74,6 @@ export async function createDraftAgentBatch(
   await runAppDatabaseBatch(database, (db) => {
     const agentInsert = db.insert(agentsTable).values({
       configJson: serializeAgentStoredConfig({
-        agentsFileId: input.agentsFileId,
         packageMcpServers: input.packageMcpServers,
         packageSkills: input.packageSkills,
         packageResolution: input.packageResolution,
@@ -103,10 +96,6 @@ export async function createDraftAgentBatch(
       visibility: "private",
     });
     const queries: [AppDatabaseBatchItem, ...AppDatabaseBatchItem[]] = [agentInsert];
-
-    if (input.fileRecords && input.fileRecords.length > 0) {
-      queries.unshift(db.insert(fileRecordsTable).values([...input.fileRecords]));
-    }
 
     if (uniqueSkillIds.length > 0) {
       queries.push(

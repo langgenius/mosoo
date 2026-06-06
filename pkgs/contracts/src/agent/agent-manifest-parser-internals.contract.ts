@@ -1,6 +1,4 @@
 import type {
-  AgentManifestAssetReference,
-  AgentManifestAssetRole,
   AgentManifestMcpServerBinding,
   AgentManifestSkillReference,
   AgentManifestSpaceBinding,
@@ -13,7 +11,6 @@ import { AgentKind } from "./agent.contract";
 
 const MANIFEST_TOP_LEVEL_KEYS = new Set<string>([
   "advanced",
-  "agentsMd",
   "environment",
   "kind",
   "manifestVersion",
@@ -165,33 +162,6 @@ export function collectUnknownTopLevelFields(
 
 export function hasRecordEntries(record: Record<string, unknown>): boolean {
   return Object.keys(record).length > 0;
-}
-
-export function readAssetRole(value: string | null): AgentManifestAssetRole {
-  if (value === "avatar" || value === "logo") {
-    return value;
-  }
-
-  if (value === "agents_md") {
-    return value;
-  }
-
-  throw new Error("Agent Manifest asset role is invalid.");
-}
-
-export function readAssetReference(value: unknown): AgentManifestAssetReference | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-
-  return {
-    assetId: readNullableString(value, "assetId"),
-    assetKey: readNullableString(value, "assetKey"),
-    filename: readString(value, "filename") ?? "AGENTS.md",
-    mimeType: readNullableString(value, "mimeType"),
-    mountPath: readString(value, "mountPath") ?? "/organization/AGENTS.md",
-    role: readAssetRole(readString(value, "role")),
-  };
 }
 
 export function readSkillReference(value: unknown): AgentManifestSkillReference | null {

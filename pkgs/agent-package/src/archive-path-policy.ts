@@ -214,16 +214,6 @@ function collectArchiveDeclarationIssues(agentPackage: AgentPackage): AgentResol
 
 function collectArchivePathDeclarations(agentPackage: AgentPackage): ArchivePathDeclaration[] {
   const declarations: ArchivePathDeclaration[] = [];
-  const agentsMdPath = agentPackage.manifest.agentsMd?.assetKey ?? null;
-
-  if (agentsMdPath !== null) {
-    declarations.push({
-      entryKind: "file",
-      path: agentsMdPath,
-      targetLabel: agentsMdPath,
-      targetType: "agents_md",
-    });
-  }
 
   if (agentPackage.app.avatarAssetKey !== null) {
     declarations.push({
@@ -253,14 +243,9 @@ export function createAllowedArchivePaths(
   catalog: ArchiveManifestCatalog,
 ): Set<string> {
   const allowedPaths = new Set<string>([MANIFEST_PATH]);
-  const agentsMdPath = agentPackage.manifest.agentsMd?.assetKey ?? null;
 
   if (catalog.environmentDefinitionReferenced) {
     allowedPaths.add(ENVIRONMENT_DEFINITION_PATH);
-  }
-
-  if (agentsMdPath !== null) {
-    allowedPaths.add(agentsMdPath);
   }
 
   if (agentPackage.app.avatarAssetKey !== null) {

@@ -26,7 +26,6 @@ function toDraftBindings(
   draft: AgentBuilderParsedDraftContext,
 ): AgentBuilderPlannerDraftBindingsContext {
   return {
-    agentsFileId: draft.agentsFileId,
     channelIds: draft.channelIds,
     environmentId: draft.environmentId,
     mcpServerIds: draft.mcpServerIds,

@@ -13,7 +13,6 @@ import {
   toAgentId,
   toAgentDeploymentVersionId,
   toEnvironmentId,
-  toFileId,
   toMcpServerId,
   toSkillId,
   toSpaceId,
@@ -72,7 +71,6 @@ export interface AgentEditorModel {
   saving: boolean;
   revision: number;
   snapshotHash: string;
-  setAgentsFileId(nextFileId: string | null): void;
   setDescription(description: string): void;
   setEnvironmentId(environmentId: string | null): void;
   setKind(kind: AgentKind): void;
@@ -234,8 +232,6 @@ export function useAgentEditorModel({
         agentId: typedAgentId,
         description: draftToSave.description.trim() || null,
         environment: {
-          agentsFileId:
-            draftToSave.agentsFileId === null ? null : toFileId(draftToSave.agentsFileId),
           boundSpaceIds: normalizeSpaces(draftToSave.spaces).map((space) => toSpaceId(space.id)),
           environmentId:
             draftToSave.environmentId === null ? null : toEnvironmentId(draftToSave.environmentId),
@@ -357,12 +353,6 @@ export function useAgentEditorModel({
     saveError,
     saving,
     snapshotHash: createSnapshotHash(draft),
-    setAgentsFileId(nextFileId) {
-      updateDraft((current) => ({
-        ...current,
-        agentsFileId: nextFileId,
-      }));
-    },
     setDescription(description) {
       updateDraft((current) => ({
         ...current,

@@ -179,7 +179,6 @@ function toAgentEnvironmentConfig(
   environment: GraphQLAgentEditorState["environment"],
 ): AgentEnvironmentConfig {
   return {
-    agentsFileId: environment.agentsFileId === null ? null : toFileId(environment.agentsFileId),
     boundSpaceIds: environment.boundSpaceIds.map(toSpaceId),
     environmentId:
       environment.environmentId === null ? null : toEnvironmentId(environment.environmentId),

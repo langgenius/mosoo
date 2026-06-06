@@ -7,13 +7,12 @@ import type {
   AgentResolutionStatus,
   AgentResolutionTargetType,
 } from "@mosoo/contracts/agent-manifest";
-import type { FileId, SkillId, SkillSnapshotId } from "@mosoo/id";
+import type { SkillId, SkillSnapshotId } from "@mosoo/id";
 
 import { isTruthy } from "../../../shared/truthiness";
-import { readFileId, readSkillId, readSkillSnapshotId } from "./agent-platform-ids";
+import { readSkillId, readSkillSnapshotId } from "./agent-platform-ids";
 
 interface StoredAgentConfig {
-  agentsFileId: FileId | null;
   packageMcpServers: AgentManifestMcpServerBinding[];
   packageSkills: AgentStoredPackageSkill[];
   packageSharingEnabled: boolean;
@@ -41,7 +40,6 @@ const AGENT_RESOLUTION_STATUSES: AgentResolutionStatus[] = [
 ];
 const AGENT_RESOLUTION_TARGET_TYPES: AgentResolutionTargetType[] = [
   "agent",
-  "agents_md",
   "channel",
   "environment",
   "model",
@@ -183,7 +181,6 @@ export function isPackageSkillRuntimeId(skillId: string): boolean {
 
 function createEmptyStoredAgentConfig(): StoredAgentConfig {
   return {
-    agentsFileId: null,
     packageMcpServers: [],
     packageSkills: [],
     packageResolution: null,
@@ -324,10 +321,6 @@ export function parseAgentStoredConfig(configJson: string): StoredAgentConfig {
   }
 
   return {
-    agentsFileId:
-      parsed["agentsFileId"] === null
-        ? null
-        : readFileId(readNullableString(parsed["agentsFileId"], "agentsFileId"), "agentsFileId"),
     packageMcpServers: readPackageMcpServers(parsed["packageMcpServers"]),
     packageSkills: readPackageSkills(parsed["packageSkills"]),
     packageResolution: readPackageResolutionState(parsed["packageResolution"]),
@@ -337,7 +330,6 @@ export function parseAgentStoredConfig(configJson: string): StoredAgentConfig {
 
 export function serializeAgentStoredConfig(input: StoredAgentConfig): string {
   return JSON.stringify({
-    agentsFileId: input.agentsFileId,
     packageMcpServers: input.packageMcpServers.map((server) => ({
       authType: server.authType,
       credentialScope: server.credentialScope,

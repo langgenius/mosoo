@@ -4,7 +4,7 @@ import type { AgentKind } from "./agent.contract";
 
 export { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION };
 
-export type AgentManifestAssetRole = "agents_md" | "avatar" | "logo";
+export type AgentManifestAssetRole = "avatar" | "logo";
 export type AgentPackageAssetRole = AgentManifestAssetRole | "skill_file";
 export type AgentResolutionSeverity = "error" | "info" | "warning";
 export type AgentResolutionStatus =
@@ -17,7 +17,6 @@ export type AgentResolutionStatus =
   | "warning";
 export type AgentResolutionTargetType =
   | "agent"
-  | "agents_md"
   | "channel"
   | "environment"
   | "model"
@@ -92,7 +91,6 @@ export interface AgentManifestAdvanced {
 
 export interface AgentManifest {
   advanced: AgentManifestAdvanced | null;
-  agentsMd: AgentManifestAssetReference | null;
   environment: AgentManifestEnvironmentReference;
   kind: AgentKind;
   manifestVersion: typeof AGENT_MANIFEST_VERSION;

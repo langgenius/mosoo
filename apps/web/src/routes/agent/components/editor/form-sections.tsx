@@ -15,7 +15,6 @@ import { isRuntimeSelectable, listRuntimeOptions } from "../../runtime-catalog";
 import { AgentChannelsField } from "../channels-field";
 import { PackageResolutionIssueCard } from "../package-resolution-issue-card";
 import { RuntimeIcon } from "../runtime-icon";
-import { AgentsFileField } from "./agents-file-field";
 import { EnvironmentPicker } from "./environment-picker";
 import { AgentMcpBindingsField } from "./mcp-bindings-field";
 import { ModelPickerField } from "./model-picker-field";
@@ -114,12 +113,10 @@ function PackageResolutionBanner({ agent }: { agent: Agent }) {
 export function BasicsSection({
   agent,
   model,
-  organizationId,
   readOnly,
 }: {
   agent: Agent;
   model: AgentEditorModel;
-  organizationId: string | null;
   readOnly: boolean;
 }) {
   return (
@@ -244,16 +241,6 @@ You are a concise operations agent. Confirm scope before changing production dat
           readOnly={readOnly}
           rows={8}
           value={model.draft.prompt}
-        />
-      </div>
-
-      <div className="border-border-subtle border-t pt-5">
-        <SectionHeader>AGENTS.md</SectionHeader>
-        <AgentsFileField
-          agentsFileId={model.draft.agentsFileId}
-          onChange={model.setAgentsFileId}
-          organizationId={organizationId}
-          readOnly={readOnly}
         />
       </div>
     </div>

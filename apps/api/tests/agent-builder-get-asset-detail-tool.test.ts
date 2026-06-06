@@ -42,7 +42,6 @@ const draftYaml = [
   "environment:",
   `  environmentId: ${DETAIL_IDS.environment}`,
   "assets:",
-  "  agentsFileId: null",
   "  skills:",
   `    - ${DETAIL_IDS.skillSupport}`,
   "  mcpServers:",

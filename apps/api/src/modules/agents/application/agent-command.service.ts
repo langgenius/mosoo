@@ -84,7 +84,6 @@ export async function createAgent(
     .insert(agentsTable)
     .values({
       configJson: serializeAgentStoredConfig({
-        agentsFileId: null,
         packageMcpServers: [],
         packageSkills: [],
         packageResolution: null,
@@ -134,7 +133,6 @@ export async function updateAgentConfig(
     database,
     editable.agent.id,
     editable.agent.environmentId,
-    editable.agent.configJson,
   );
   const currentSkillIds = await listAgentSkillIds(database, editable.agent.id);
   const currentMcpServerIds = (await listAgentMcpServerIds(database, editable.agent.id)).map(

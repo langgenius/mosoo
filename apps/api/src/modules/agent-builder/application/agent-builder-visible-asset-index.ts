@@ -10,7 +10,6 @@ import {
   parseChannelBindingIdList,
   parseMcpServerIdList,
   parseNullableEnvironmentId,
-  parseNullableFileId,
   parseSkillIdList,
   parseSpaceIdList,
 } from "./agent-builder-ids";
@@ -35,7 +34,6 @@ const VISIBLE_ASSET_KIND_BY_COLLECTION = {
 
 function emptyDraftBindings(): AgentBuilderPlannerDraftBindingsContext {
   return {
-    agentsFileId: null,
     channelIds: [],
     environmentId: null,
     mcpServerIds: [],
@@ -66,7 +64,6 @@ function readDraftBindings(value: unknown): AgentBuilderPlannerDraftBindingsCont
   const parseStatus = value["parseStatus"] === "failed" ? "failed" : "parsed";
 
   return {
-    agentsFileId: parseNullableFileId(readNullableString(value["agentsFileId"]), "agentsFileId"),
     channelIds: parseChannelBindingIdList(readStringList(value["channelIds"]), "channelIds"),
     environmentId: parseNullableEnvironmentId(
       readNullableString(value["environmentId"]),

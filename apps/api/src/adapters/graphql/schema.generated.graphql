@@ -192,13 +192,11 @@ type AgentEditorState {
 }
 
 type AgentEnvironmentConfig {
-  agentsFileId: ULID
   boundSpaceIds: [ULID!]!
   environmentId: ULID
 }
 
 input AgentEnvironmentConfigInput {
-  agentsFileId: ULID
   boundSpaceIds: [ULID!]!
   environmentId: ULID
 }
@@ -408,7 +406,6 @@ enum AgentResolutionStatus {
 
 enum AgentResolutionTargetType {
   agent
-  agents_md
   channel
   environment
   mcp_server

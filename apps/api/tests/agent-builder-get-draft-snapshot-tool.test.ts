@@ -25,7 +25,6 @@ const draftYaml = [
   "environment:",
   `  environmentId: ${SNAPSHOT_IDS.environment}`,
   "assets:",
-  "  agentsFileId: null",
   "  skills:",
   `    - ${SNAPSHOT_IDS.skill}`,
   "  mcpServers:",

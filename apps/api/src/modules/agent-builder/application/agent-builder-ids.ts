@@ -8,7 +8,6 @@ import type {
   AgentId,
   ChannelBindingId,
   EnvironmentId,
-  FileId,
   McpServerId,
   OrganizationId,
   PlatformId,
@@ -81,10 +80,6 @@ export function parseEnvironmentId(value: unknown, label = "environmentId"): Env
   return parsePlatformId<EnvironmentId>(value, label);
 }
 
-function parseFileId(value: unknown, label = "fileId"): FileId {
-  return parsePlatformId<FileId>(value, label);
-}
-
 export function parseMcpServerId(value: unknown, label = "mcpServerId"): McpServerId {
   return parsePlatformId<McpServerId>(value, label);
 }
@@ -99,10 +94,6 @@ export function parseSkillId(value: unknown, label = "skillId"): SkillId {
 
 export function parseSpaceId(value: unknown, label = "spaceId"): SpaceId {
   return parsePlatformId<SpaceId>(value, label);
-}
-
-export function parseNullableFileId(value: unknown, label = "fileId"): FileId | null {
-  return value === null || value === undefined ? null : parseFileId(value, label);
 }
 
 export function parseNullableEnvironmentId(

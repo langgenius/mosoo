@@ -19,7 +19,6 @@ import type {
   DriverInstanceId,
   EnvironmentId,
   EnvironmentRevisionId,
-  FileId,
   McpServerId,
   PlatformId,
   SandboxId,
@@ -80,15 +79,6 @@ export const DriverReadinessSnapshot = type({
   ready: "boolean",
 });
 export type DriverReadinessSnapshot = typeof DriverReadinessSnapshot.infer;
-
-export const DriverAgentsFileMount = type({
-  fileId: NonEmptyString,
-  mountPath: NonEmptyString,
-});
-type DriverAgentsFileMountInput = typeof DriverAgentsFileMount.infer;
-export interface DriverAgentsFileMount extends Omit<DriverAgentsFileMountInput, "fileId"> {
-  fileId: FileId;
-}
 
 export const DriverOrigin = type({
   callerUserId: NonEmptyString,
@@ -165,7 +155,6 @@ export interface DriverConfigRevision extends Omit<
 
 export const DriverProfileConfig = type({
   agentId: NonEmptyString,
-  "agentsFile?": DriverAgentsFileMount.or("null"),
   configRevision: DriverConfigRevision,
   envVarNames: NonEmptyString.array(),
   envVars: {
@@ -185,9 +174,8 @@ export const DriverProfileConfig = type({
 type DriverProfileConfigInput = typeof DriverProfileConfig.infer;
 export interface DriverProfileConfig extends Omit<
   DriverProfileConfigInput,
-  "agentId" | "agentsFile" | "configRevision" | "sandbox" | "session"
+  "agentId" | "configRevision" | "sandbox" | "session"
 > {
-  agentsFile?: DriverAgentsFileMount | null;
   agentId: AgentId;
   configRevision: DriverConfigRevision;
   sandbox: DriverSandboxContext;

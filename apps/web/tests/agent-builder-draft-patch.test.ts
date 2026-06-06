@@ -6,7 +6,6 @@ import { applyAgentEditorBuilderPatch } from "../src/routes/agent/components/edi
 
 function draft(): AgentEditorDraft {
   return {
-    agentsFileId: null,
     description: "Old description.",
     environmentId: null,
     kind: "pet",

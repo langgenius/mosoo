@@ -10,7 +10,6 @@ import type {
   CredentialId,
   EnvironmentId,
   EnvironmentRevisionId,
-  FileId,
   McpServerId,
   PlatformId,
   SessionId,
@@ -144,10 +143,6 @@ function parseEnvironment(value: unknown): SessionExecutionPlan["environment"] {
   const record = readRecord(value, "sessionExecutionPlan.environment");
 
   return {
-    agentsFileId: readNullablePlatformId(
-      record["agentsFileId"],
-      "sessionExecutionPlan.environment.agentsFileId",
-    ) as FileId | null,
     allowMcpServers: readBoolean(
       record["allowMcpServers"],
       "sessionExecutionPlan.environment.allowMcpServers",

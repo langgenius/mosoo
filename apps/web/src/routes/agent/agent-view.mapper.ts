@@ -23,7 +23,6 @@ import type {
   UserInfo,
 } from "./agent.types";
 const DEFAULT_ENVIRONMENT_CONFIG: AgentEnvironmentConfig = {
-  agentsFileId: null,
   boundSpaceIds: [],
   environmentId: null,
 };
@@ -138,7 +137,6 @@ function toOwner(
 
 function createEmptyAgentConfig(): Agent["config"] {
   return {
-    agentsFileId: null,
     environmentId: null,
     mcpServers: [],
     model: "",
@@ -205,7 +203,6 @@ export function mapAgentDetailToView(
           };
         }) ?? [],
     config: {
-      agentsFileId: environmentConfig.agentsFileId,
       environmentId: environmentConfig.environmentId,
       mcpServers: editorDetail?.mcpBindings.map((binding) => toMcpServer(binding)) ?? [],
       model: profile.model,

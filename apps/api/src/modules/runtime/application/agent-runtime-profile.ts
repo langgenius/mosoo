@@ -8,14 +8,12 @@ import type {
 import type {
   AccountId,
   AgentId,
-  FileId,
   SandboxId,
   SandboxSessionId,
   SessionId,
   SpaceId,
 } from "@mosoo/id";
 
-import { isTruthy } from "../../../shared/truthiness";
 import {
   isSpaceRoleRankSufficient,
   listSpaceAccessRows,
@@ -54,7 +52,6 @@ export async function resolveAgentSpaceBindings(
 
 export function createAgentRuntimeProfile(input: {
   agentId: AgentId;
-  agentsFileId: FileId | null;
   callerUserId: AccountId;
   configRevision: DriverConfigRevision;
   entrypoint?: "api" | "chat";
@@ -91,12 +88,6 @@ export function createAgentRuntimeProfile(input: {
     organizationAccessSnapshot: frozenBindings.organizationAccessSnapshot,
     profile: {
       agentId: input.agentId,
-      agentsFile: isTruthy(input.agentsFileId)
-        ? {
-            fileId: input.agentsFileId,
-            mountPath: "/organization/AGENTS.md",
-          }
-        : null,
       configRevision: input.configRevision,
       envVarNames: Object.keys(input.envVars),
       envVars: input.envVars,

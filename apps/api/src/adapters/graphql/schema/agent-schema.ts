@@ -54,7 +54,6 @@ export const agentSchema = /* GraphQL */ `
 
   enum AgentResolutionTargetType {
     agent
-    agents_md
     channel
     environment
     model
@@ -148,7 +147,6 @@ export const agentSchema = /* GraphQL */ `
   }
 
   type AgentEnvironmentConfig {
-    agentsFileId: ULID
     boundSpaceIds: [ULID!]!
     environmentId: ULID
   }
@@ -398,7 +396,6 @@ export const agentSchema = /* GraphQL */ `
   }
 
   input AgentEnvironmentConfigInput {
-    agentsFileId: ULID
     boundSpaceIds: [ULID!]!
     environmentId: ULID
   }

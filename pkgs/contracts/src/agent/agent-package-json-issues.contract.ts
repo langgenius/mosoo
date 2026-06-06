@@ -11,7 +11,6 @@ import type { AgentResolutionIssue } from "./agent-manifest.contract";
 import { AGENT_KIND_LIST_LABEL } from "./agent.contract";
 
 const PACKAGE_MANIFEST_TOP_LEVEL_FIELDS = new Set([
-  "agentsMd",
   "author",
   "avatar",
   "description",

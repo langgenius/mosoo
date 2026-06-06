@@ -101,7 +101,6 @@ export function createAgentConfigChangeSnapshot(input: {
   skillIds: readonly SkillId[];
 }): AgentConfigChangeSnapshot {
   return {
-    agentsFileId: input.environment.agentsFileId,
     description: input.agent.description ?? "",
     environmentId: input.environment.environmentId,
     kind: input.agent.kind,

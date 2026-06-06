@@ -9,7 +9,6 @@ import {
 } from "../src/modules/agents/application/agent-versioned-config.service";
 
 const environment: AgentEnvironmentConfig = {
-  agentsFileId: null,
   boundSpaceIds: [],
   environmentId: null,
 };

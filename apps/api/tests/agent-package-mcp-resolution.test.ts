@@ -50,7 +50,6 @@ function createMcpResolutionDatabase(): SqliteD1Database {
 function createManifest(serverId: McpServerId): AgentManifest {
   return {
     advanced: null,
-    agentsMd: null,
     environment: {
       environmentId: null,
       envVars: {},

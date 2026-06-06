@@ -42,9 +42,6 @@ function getIssueActionLabel(issue: AgentResolutionIssue): string {
   if (issue.targetType === "skill") {
     return "Replace or remove skill";
   }
-  if (issue.targetType === "agents_md") {
-    return "Rebind AGENTS.md";
-  }
   return "Review item";
 }
 

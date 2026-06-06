@@ -4,14 +4,13 @@ import { createEmptyResolutionSummary } from "@mosoo/agent-package";
 import type { AgentManifest } from "@mosoo/contracts/agent-manifest";
 import { AGENT_MANIFEST_VERSION } from "@mosoo/contracts/agent-manifest";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, OrganizationId, SkillId, SpaceId } from "@mosoo/id";
+import type { AccountId, OrganizationId, SkillId, SpaceId } from "@mosoo/id";
 
 import { createDraftAgent } from "../src/modules/agents/application/agent-package-draft.service";
 import { resolvePackageSkills } from "../src/modules/agents/application/agent-package-resolution.service";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const DRAFT_IDS = {
-  agentsFile: parsePlatformId<FileId>("01J00000000000000000000002"),
   organization: parsePlatformId<OrganizationId>("01J00000000000000000000006"),
   owner: parsePlatformId<AccountId>("01J00000000000000000000001"),
   skill: parsePlatformId<SkillId>("01J00000000000000000000003"),
@@ -137,7 +136,6 @@ describe("agent package draft", () => {
 
     const agent = await createDraftAgent(database, {
       agentName: "Imported Agent",
-      agentsFileId: DRAFT_IDS.agentsFile,
       description: "Imported from package",
       environmentId: null,
       kind: "pet",
@@ -177,7 +175,6 @@ describe("agent package draft", () => {
       .first<{ config_json: string }>();
 
     expect(JSON.parse(row?.config_json ?? "{}")).toEqual({
-      agentsFileId: DRAFT_IDS.agentsFile,
       packageMcpServers: [],
       packageResolution: null,
       packageSharingEnabled: false,
@@ -191,7 +188,6 @@ describe("agent package draft", () => {
     await expect(
       createDraftAgent(database, {
         agentName: "Imported Agent",
-        agentsFileId: null,
         description: "Imported from package",
         environmentId: null,
         kind: "pet",
@@ -221,7 +217,6 @@ describe("agent package draft", () => {
     const issues: Parameters<typeof resolvePackageSkills>[0]["issues"] = [];
     const manifest: AgentManifest = {
       advanced: null,
-      agentsMd: null,
       environment: {
         environmentId: null,
         envVars: {},

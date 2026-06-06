@@ -61,7 +61,6 @@ function plannerContext(): AgentBuilderPlannerContext {
         spaces: [],
       },
       draftBindings: {
-        agentsFileId: null,
         channelIds: [],
         environmentId: null,
         mcpServerIds: [],
@@ -95,7 +94,6 @@ function plannerContext(): AgentBuilderPlannerContext {
         "environment:",
         "  environmentId: null",
         "assets:",
-        "  agentsFileId: null",
         "  skills: []",
         "  mcpServers: []",
         "  spaces: []",

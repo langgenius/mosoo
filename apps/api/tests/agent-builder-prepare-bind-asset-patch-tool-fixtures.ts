@@ -62,7 +62,6 @@ export function draftYaml(
     "environment:",
     `  environmentId: ${environmentId ?? "null"}`,
     "assets:",
-    "  agentsFileId: null",
     ...skillLines,
     "  mcpServers: []",
     "  spaces: []",
@@ -149,7 +148,6 @@ export function plannerContext(
         ],
       },
       draftBindings: {
-        agentsFileId: null,
         channelIds: [],
         environmentId: null,
         mcpServerIds: [],

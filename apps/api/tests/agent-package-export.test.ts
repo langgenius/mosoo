@@ -7,7 +7,6 @@ import { serializeAgentManifestToYaml } from "@mosoo/contracts/agent-manifest-se
 import { createPortableAgentPackageManifest } from "../src/modules/agents/application/agent-package-export.service";
 
 const SOURCE_IDS = {
-  agentsFile: "01J00000000000000000000001",
   environment: "01J00000000000000000000002",
   mcpServer: "01J00000000000000000000003",
   skill: "01J00000000000000000000004",
@@ -17,14 +16,6 @@ const SOURCE_IDS = {
 function createSourceManifest(): AgentManifest {
   return {
     advanced: null,
-    agentsMd: {
-      assetId: SOURCE_IDS.agentsFile,
-      assetKey: "attachment/source/AGENTS.md",
-      filename: "source.md",
-      mimeType: "text/markdown",
-      mountPath: "/organization/AGENTS.md",
-      role: "agents_md",
-    },
     environment: {
       environmentId: SOURCE_IDS.environment,
       envVars: {
@@ -84,11 +75,6 @@ describe("agent package export", () => {
   test("creates a portable manifest without source resource ids", () => {
     const manifest = createPortableAgentPackageManifest(createSourceManifest());
 
-    expect(manifest.agentsMd).toMatchObject({
-      assetId: null,
-      assetKey: "attachments/AGENTS.md",
-      filename: "AGENTS.md",
-    });
     expect(manifest.environment).toMatchObject({
       environmentId: null,
       envVars: { API_TOKEN: "" },

@@ -47,7 +47,6 @@ const CONTRACT_SCHEMA_SQL = readFileSync(
   );
 
 const INITIAL_AGENT_CONFIG_JSON = JSON.stringify({
-  agentsFileId: null,
   packageMcpServers: [],
   packageResolution: null,
   packageSharingEnabled: false,

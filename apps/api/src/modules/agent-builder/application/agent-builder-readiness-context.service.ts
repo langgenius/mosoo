@@ -120,7 +120,6 @@ export async function collectAgentBuilderReadinessContext(
   }
 
   const environment: AgentEnvironmentConfig = {
-    agentsFileId: draft.agentsFileId,
     boundSpaceIds: draft.spaceIds,
     environmentId: draft.environmentId,
   };

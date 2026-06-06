@@ -42,10 +42,6 @@ export const API_DRIVER_BOUNDARY_IDS = {
 
 export function createDriverProfile(): DriverProfileConfig {
   return {
-    agentsFile: {
-      fileId: "agents-file-1",
-      mountPath: "/organization/agents/AGENTS.md",
-    },
     agentId: API_DRIVER_BOUNDARY_IDS.agent,
     configRevision: {
       agentId: API_DRIVER_BOUNDARY_IDS.agent,

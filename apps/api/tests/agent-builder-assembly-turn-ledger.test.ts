@@ -22,7 +22,6 @@ const DRAFT_YAML = [
   "environment:",
   "  environmentId: null",
   "assets:",
-  "  agentsFileId: null",
   "  skills: []",
   "  mcpServers: []",
   "  spaces: []",

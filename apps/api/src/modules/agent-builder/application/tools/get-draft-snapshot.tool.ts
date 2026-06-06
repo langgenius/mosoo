@@ -19,7 +19,6 @@ export function createGetDraftSnapshotTool(): AgentBuilderToolDefinition {
       const draft = parseAgentBuilderPlannerDraft(draftYaml);
 
       return {
-        agentsFileId: draft.agentsFileId,
         channelIds: draft.channelIds,
         description: draft.description,
         draftRevision,

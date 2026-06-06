@@ -29,7 +29,7 @@ DifyLite v1 has no concept of an Environment. As a result, all three of the peop
 
 ### Scenario A · Agent author, Wang Qiming
 
-He publishes a data-analysis Agent that needs pandas / numpy / scikit-learn. Today he writes in AGENTS.md:
+He publishes a data-analysis Agent that needs pandas / numpy / scikit-learn. Today he puts this in the system prompt:
 
 > "Please run `pip install pandas` first"
 
@@ -76,7 +76,7 @@ She uses an Agent a colleague published, and the UI asks her "which Environment?
 
 | Term                     | Plain-language definition                                                                                                                                                                                                                                                                                           |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Environment**          | A reusable runtime container template. **Contains only**: network policy + pre-installed packages + setup script + env vars + metadata (name / description). **Does not contain** Spaces / AGENTS.md / Skills / MCP server—those all belong to the Agent itself.                                                    |
+| **Environment**          | A reusable runtime container template. **Contains only**: network policy + pre-installed packages + setup script + env vars + metadata (name / description). **Does not contain** Spaces / Skills / MCP server—those all belong to the Agent itself.                                                                |
 | **System Default**       | The platform's built-in, read-only Environment: Full network, no pre-installed packages, empty setup, no env vars. **Every Org has one**—a fallback so that any Agent can at least run.                                                                                                                             |
 | **Organization Default** | What the Admin designates in Org settings as "what a new Agent is pre-filled with." It can be the System Default, or one of the Org's own custom Environments. At most 1 per Org.                                                                                                                                   |
 | **Network · Full**       | The sandbox can reach any external domain (the development default)                                                                                                                                                                                                                                                 |
@@ -96,7 +96,7 @@ She uses an Agent a colleague published, and the UI asks her "which Environment?
 
 ## 4. The relationship rule: Environment **does not nest** other assets
 
-Environment is **orthogonal** to the other first-class assets—an Agent references Environment and Space and Skill simultaneously, and **the Environment itself does not nest Spaces / AGENTS.md / Skills / MCP**.
+Environment is **orthogonal** to the other first-class assets—an Agent references Environment and Space and Skill simultaneously, and **the Environment itself does not nest Spaces / Skills / MCP**.
 
 ```mermaid
 flowchart LR
@@ -112,7 +112,7 @@ flowchart LR
   OrgDefault -.points to.-> Environment
 ```
 
-> **Why no nesting**: a Space is an organization-level data asset with its own ACL; AGENTS.md is the Agent's own persona; MCP / Skill are the Agent's capability pool. Each has its own lifecycle, and cramming them all into the Environment would turn it into a "manages everything" grab-bag—change one thing and everything breaks.
+> **Why no nesting**: a Space is an organization-level data asset with its own ACL; MCP / Skill are the Agent's capability pool. Each has its own lifecycle, and cramming them all into the Environment would turn it into a "manages everything" grab-bag—change one thing and everything breaks.
 
 ---
 

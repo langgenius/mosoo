@@ -13,12 +13,11 @@ import type {
   DriverResolvedMcpServer,
   DriverSkillCatalogEntry,
 } from "@mosoo/driver-protocol";
-import type { EnvironmentId, EnvironmentRevisionId, FileId } from "@mosoo/id";
+import type { EnvironmentId, EnvironmentRevisionId } from "@mosoo/id";
 
 export interface SessionExecutionPlan {
   binding: Omit<SessionExecutionBinding, "sessionId">;
   environment: {
-    agentsFileId: FileId | null;
     allowMcpServers: boolean;
     allowPackageManagers: boolean;
     allowedHostsJson: string;

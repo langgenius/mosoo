@@ -296,7 +296,6 @@ export async function insertSecondPublishedAgent(
 ): Promise<void> {
   const nowMs = nowMsForTest();
   const configJson = JSON.stringify({
-    agentsFileId: null,
     packageMcpServers: [],
     packageResolution: null,
     packageSharingEnabled: false,

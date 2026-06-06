@@ -36,12 +36,6 @@ export interface CreatedAgentPackageFile {
   size: number;
 }
 
-export interface PreparedAgentAssetFile {
-  fileId: FileId;
-  objectKey: string;
-  values: FileRecordInsert;
-}
-
 function isSupportedAgentPackageFileName(fileName: string): boolean {
   return fileName.toLowerCase().endsWith(".agent");
 }
@@ -273,101 +267,6 @@ export async function readAgentPackageArchiveFile(input: {
     archiveBytes: new Uint8Array(await object.arrayBuffer()),
     file,
   };
-}
-
-function readAssetBytes(asset: {
-  contentBytes?: Uint8Array;
-  contentText: string | null;
-}): Uint8Array | null {
-  if (asset.contentBytes !== undefined) {
-    return asset.contentBytes;
-  }
-
-  if (asset.contentText === null) {
-    return null;
-  }
-
-  return new TextEncoder().encode(asset.contentText);
-}
-
-export async function prepareAgentAssetFileFromPackage(input: {
-  asset: {
-    contentBytes?: Uint8Array;
-    contentText: string | null;
-    filename: string;
-    mimeType: string | null;
-    role: string;
-  };
-  bindings: ApiBindings;
-  organizationId: OrganizationId;
-  viewer: AuthenticatedViewer;
-}): Promise<PreparedAgentAssetFile | null> {
-  const body = readAssetBytes(input.asset);
-
-  if (body === null) {
-    return null;
-  }
-
-  const fileId = createPlatformId<FileId>();
-  const fileName = normalizeFileName(input.asset.filename);
-  const timestampMs = currentTimestampMs();
-  const contentType =
-    input.asset.mimeType && input.asset.mimeType.length > 0
-      ? input.asset.mimeType
-      : input.asset.role === "agents_md"
-        ? "text/markdown"
-        : "application/octet-stream";
-  const recordShape = createPackageRecordShape({
-    createdBy: input.viewer.id,
-    fileId,
-    fileName,
-    organizationId: input.organizationId,
-  });
-  const objectKey = createFinalObjectKey(recordShape);
-  const head = await putObject({
-    bindings: input.bindings,
-    body,
-    contentType,
-    objectKey,
-    options: {
-      ifNoneMatch: "*",
-    },
-  });
-
-  return {
-    fileId,
-    objectKey,
-    values: toRecordValues({
-      contentType,
-      createdBy: input.viewer.id,
-      etag: head.etag,
-      expiresAt: null,
-      fileId,
-      fileName,
-      objectKey,
-      organizationId: input.organizationId,
-      purpose: "agent_asset",
-      size: head.contentLength,
-      timestampMs,
-    }),
-  };
-}
-
-export async function cleanupPreparedAgentAssetFiles(
-  bindings: ApiBindings,
-  files: readonly PreparedAgentAssetFile[],
-): Promise<void> {
-  await Promise.all(
-    files.map((file) =>
-      deleteObjectForCompensation({
-        bindings,
-        context: {
-          fileId: file.fileId,
-        },
-        objectKey: file.objectKey,
-      }),
-    ),
-  );
 }
 
 export async function deleteImportedAgentPackageFile(input: {

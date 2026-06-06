@@ -49,9 +49,5 @@ export function listAdditionalDirectories(
     directories.add(getParentDirectory(alias.globalMountPath));
   }
 
-  if (profile.agentsFile) {
-    directories.add(getParentDirectory(profile.agentsFile.mountPath));
-  }
-
   return [...directories];
 }

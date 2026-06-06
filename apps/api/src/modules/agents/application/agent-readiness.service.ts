@@ -20,7 +20,6 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { toIsoString } from "../../../time";
 import { parseStoredEnvVarsJson } from "../../environments/application/environment-config";
-import { getFileRecordById } from "../../files/application/file-record-read.service";
 import { getSupportedRuntimeId } from "../../runtime/domain/runtime-config";
 import {
   isSpaceRoleRankSufficient,
@@ -42,35 +41,6 @@ function createIssue(
 
 function isSqliteEnabled(value: boolean | number | string): boolean {
   return value === true || value === 1 || value === "1";
-}
-
-async function collectAgentsFileIssues(
-  database: D1Database,
-  environment: AgentEnvironmentConfig,
-): Promise<AgentReadinessIssue[]> {
-  if (environment.agentsFileId === null || environment.agentsFileId === "") {
-    return [
-      createIssue(
-        "agent.instructions.missing",
-        "Consider binding an AGENTS.md file in Environment for better results.",
-        "warning",
-      ),
-    ];
-  }
-
-  const file = await getFileRecordById(database, environment.agentsFileId);
-
-  if (file?.status !== "ready") {
-    return [
-      createIssue(
-        "agent.instructions.missing",
-        "Rebind AGENTS.md in Environment — the current file is unavailable.",
-        "warning",
-      ),
-    ];
-  }
-
-  return [];
 }
 
 async function collectBoundSpaceIssues(
@@ -335,14 +305,6 @@ async function collectPackageResolutionIssues(
       continue;
     }
 
-    if (
-      issue.targetType === "agents_md" &&
-      input.environment.agentsFileId !== null &&
-      input.environment.agentsFileId !== ""
-    ) {
-      continue;
-    }
-
     if (issue.targetType === "space" && availableSpaceRepairCount > 0) {
       availableSpaceRepairCount -= 1;
       continue;
@@ -453,7 +415,6 @@ export async function computeAgentReadiness(
     },
   });
   issues.push(...capabilityIssues.map((issue) => toReadinessIssue(issue)));
-  issues.push(...(await collectAgentsFileIssues(database, input.environment)));
   issues.push(
     ...(await collectPackageResolutionIssues(database, {
       agentId: input.agentId,

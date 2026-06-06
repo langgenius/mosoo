@@ -5,7 +5,6 @@ import {
   hasRequiredText,
   isRecord,
   readAgentKind,
-  readAssetReference,
   readMcpServerBinding,
   readNullableString,
   readParsedArray,
@@ -219,7 +218,6 @@ function buildAgentManifest(
 ): AgentManifest {
   return {
     advanced: null,
-    agentsMd: readAssetReference(input["agentsMd"]),
     environment: {
       envVars: readStringRecord(sections.environment["envVars"]),
       environmentId: readNullableString(sections.environment, "environmentId"),

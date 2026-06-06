@@ -98,12 +98,7 @@ async function resolveAgentSessionExecutionSource(input: {
       : null;
   const environment = liveVersion
     ? toVersionAgentEnvironmentConfig(liveVersion)
-    : await loadAgentEnvironmentConfig(
-        input.bindings.DB,
-        agent.id,
-        agent.environmentId,
-        agent.configJson,
-      );
+    : await loadAgentEnvironmentConfig(input.bindings.DB, agent.id, agent.environmentId);
 
   return {
     agent,
@@ -189,7 +184,6 @@ async function buildSessionExecutionPlan(input: {
       runtimeId: input.source.runtimeId,
     },
     environment: {
-      agentsFileId: input.source.environment.agentsFileId,
       allowMcpServers: environmentSnapshot.record.allowMcpServers === 1,
       allowPackageManagers: environmentSnapshot.record.allowPackageManagers === 1,
       allowedHostsJson: environmentSnapshot.record.allowedHostsJson,

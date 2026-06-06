@@ -20,7 +20,7 @@ Mosoo File Browser exposes the **file system view that ships with the Cloudflare
 
 Your Mosoo **Pet** agent is that VPS. **The File Browser is the equivalent of "running `ls` in the browser"** — it is not an upload / edit / management tool, it is a **viewing** tool. Pet owners typically open it at these moments:
 
-- **Right after publishing**: confirm that the `AGENTS.md` / Skill files were actually materialized into `memory/`
+- **Right after publishing**: confirm that Skill files and runtime materialization outputs landed where expected
 - **Seeing what the agent left behind**: after running for a few days, inspect logs / intermediate files / temporary configs in the session working directory
 - **Confirming where a Space is mounted**: you mounted a Space but are unsure which path it landed on → open it and take a look
 - **Helping with debugging**: the Logs tab shows "wrote to /workspace/memory/foo.md", so you go to the File Browser to confirm the file exists
@@ -62,7 +62,7 @@ journey
     section Mon 14:02 · confirmation after publish
       Publish completes, jump back to agent detail page: 4: Alice
       Debug → File System shows the tree (colors + ↗): 5: Alice
-      Expand memory/, click AGENTS.md, view in Monaco: 5: Alice
+      Expand memory/, click a generated Skill file, view it in Monaco: 5: Alice
       Cmd-F search "tone", jump to the paragraph: 5: Alice
       Expand the active session, view agent.log: 4: Alice
       Wants to delete a stale file, no toolbar button → understands: 3: Alice

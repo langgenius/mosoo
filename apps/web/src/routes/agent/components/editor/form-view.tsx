@@ -9,7 +9,7 @@ import type { AgentFormSectionId } from "./section-ids";
 import type { AgentEditorModel } from "./use-model";
 
 // Three-section form layout (locked with Evan 2026-05-05):
-//   1. Basics       — name, description, runtime, model, system prompt, AGENTS.md
+//   1. Basics       — name, description, runtime, model, system prompt
 //   2. Integrations — skills, MCP servers
 //   3. Environment  — environment, spaces
 // "Advanced Settings" was removed; runtime-specific options will return as
@@ -136,12 +136,7 @@ function TabbedAgentFormView({
           setSectionRef("basics", node);
         }}
       >
-        <BasicsSection
-          agent={agent}
-          model={model}
-          organizationId={organizationId}
-          readOnly={readOnly}
-        />
+        <BasicsSection agent={agent} model={model} readOnly={readOnly} />
       </div>
 
       <div
@@ -193,14 +188,7 @@ function StackedAgentFormView({
     {
       id: "basics",
       label: "Basics",
-      render: () => (
-        <BasicsSection
-          agent={agent}
-          model={model}
-          organizationId={organizationId}
-          readOnly={readOnly}
-        />
-      ),
+      render: () => <BasicsSection agent={agent} model={model} readOnly={readOnly} />,
     },
     {
       id: "integrations",
