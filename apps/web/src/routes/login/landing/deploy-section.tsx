@@ -106,8 +106,8 @@ export function DeploySection(): ReactElement {
             Manage everything from the CLI or the console.
           </h2>
           <p className="text-fg-2 mt-4 text-[15px] leading-[1.6]">
-            Spin up, deploy, and govern agents from the terminal or the web UI, and self-host the
-            whole platform on your own Cloudflare in a single click.
+            Spin up, deploy, and run agents from the terminal or the web UI, and self-host the whole
+            platform on your own Cloudflare in a single click.
           </p>
         </Reveal>
 

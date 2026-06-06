@@ -39,10 +39,10 @@ export function CtaBand({ onContinue }: { onContinue: () => void }): ReactElemen
       <Reveal className="relative z-10 mx-auto flex max-w-[680px] flex-col items-center text-center">
         <Eyebrow tone="dark">Get started</Eyebrow>
         <h2 className="mt-4 text-white drop-shadow-sm" style={sectionHeadingStyle}>
-          Take root in your enterprise.
+          Take root in your stack.
         </h2>
         <p className="mt-4 max-w-[460px] text-[15px] leading-[1.6] text-white/80">
-          Log in to manage your agents, or star the repo and self-host in minutes.
+          Log in to build on your agents, or star the repo and self-host in minutes.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <button

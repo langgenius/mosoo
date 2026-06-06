@@ -77,8 +77,8 @@ export function SandboxSection(): ReactElement {
           </h2>
           <p className="text-fg-2 mt-4 max-w-[480px] text-[15px] leading-[1.6]">
             Mosoo mounts a fresh sandbox the instant an agent runs, then tears it down when the turn
-            ends. No standing fleet humming inside your enterprise: compute appears on demand,
-            scoped to the session, and disappears.
+            ends. No standing fleet to pay for or babysit: compute appears on demand, scoped to the
+            session, and disappears.
           </p>
           <span className="border-border-soft bg-bg-elevated mt-6 inline-flex w-fit items-center gap-2 rounded-[8px] border px-3 py-1.5">
             <RuntimeIcon runtimeId="claude-agent-sdk" className="size-4" />

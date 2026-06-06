@@ -10,33 +10,33 @@ type Capability = { Icon: LucideIcon; tag: string; body: string };
 const CAPABILITIES: readonly Capability[] = [
   {
     Icon: Eye,
-    tag: "Visibility",
-    body: "A live view of every agent, the people invoking it, and the data it touches, updated as runs happen.",
+    tag: "Observability",
+    body: "A live view of every agent, the sessions invoking it, and the data it touches, updated as runs happen.",
   },
   {
     Icon: ShieldCheck,
     tag: "Control",
-    body: "Set who can run which agent against which data, then revoke access or kill a run the moment you need to.",
+    body: "Set who can run which agent against which data, then revoke a key or kill a run the moment you need to.",
   },
   {
     Icon: Coins,
-    tag: "Attribution",
-    body: "Spend rolls up to a department, a person, or a single task, so the ROI conversation comes with receipts.",
+    tag: "Metering",
+    body: "Spend rolls up to a project, a user, or a single run, so you can price and bill what you build with receipts.",
   },
   {
     Icon: History,
     tag: "Replay",
-    body: "Replay any run from start to finish. When something breaks, reconstruct what happened and trace it to its owner.",
+    body: "Replay any session from start to finish. When something breaks, reconstruct what happened and trace it to its owner.",
   },
   {
     Icon: Zap,
-    tag: "Enablement",
-    body: "An employee with no platform skills describes the job and gets a working, governed agent by tomorrow.",
+    tag: "Velocity",
+    body: "Wire an agent into your product with one API call, instead of rebuilding the runtime, sandbox, and lifecycle yourself.",
   },
   {
     Icon: TrendingUp,
-    tag: "Growth",
-    body: "The same control plane runs 100 agents today and keeps its guarantees at 10,000 next year.",
+    tag: "Scale",
+    body: "The same API runs 100 sessions today and keeps its guarantees at 100,000 concurrent next year.",
   },
 ];
 
@@ -47,12 +47,12 @@ export function GovernanceSection(): ReactElement {
         <Reveal className="flex flex-col items-start gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <h2 className="text-fg-1 max-w-[640px]" style={sectionHeadingStyle}>
-              Six things every platform team needs.
+              Everything you need to run agents in production.
             </h2>
           </div>
           <p className="text-fg-2 max-w-[340px] text-[14px] leading-[1.55]">
-            An enterprise agent platform isn&apos;t a chatbot. It&apos;s visibility, control, and
-            accounting you can defend in a review.
+            An agent backend isn&apos;t a chatbot. It&apos;s the observability, control, and
+            accounting you need to run agents your users depend on.
           </p>
         </Reveal>
 

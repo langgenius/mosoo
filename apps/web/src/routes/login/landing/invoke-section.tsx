@@ -120,7 +120,7 @@ const CARDS = [
   {
     visual: <ChannelsMock />,
     title: "Live in your channels",
-    desc: "Connect Slack, Lark, Discord, Telegram, or WeChat. Your team talks to the agent without leaving chat.",
+    desc: "Connect Slack, Lark, Discord, Telegram, or WeChat. Your users talk to the agent without leaving chat.",
   },
 ] as const;
 
@@ -147,7 +147,7 @@ export function InvokeSection(): ReactElement {
           </h2>
           <p className="text-fg-2 mt-5 text-[15px] leading-[1.6]">
             A published agent isn&apos;t trapped in a dashboard. Run it as a skill in Claude Code,
-            call it over a typed API, or drop it into the chat tools your team already lives in:
+            call it over a typed API, or drop it into the chat tools your users already live in:
             same agent, every surface.
           </p>
         </Reveal>

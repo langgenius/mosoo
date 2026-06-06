@@ -230,7 +230,7 @@ const MEMBERS: readonly MemberRow[] = [
 
 const TABS = [
   { value: "agent", label: "By Agent" },
-  { value: "member", label: "By Member" },
+  { value: "member", label: "By User" },
   { value: "model", label: "By Model" },
 ] as const;
 
@@ -255,9 +255,7 @@ function Card({ children, className }: { children: ReactNode; className?: string
 
 function Delta({ value }: { value: number }): ReactElement {
   return (
-    <span
-      className={cn("font-mono text-[12.5px]", value > 0 ? "text-amber-fg" : "text-[#3A6E0E]")}
-    >
+    <span className={cn("font-mono text-[12.5px]", value > 0 ? "text-amber-fg" : "text-[#3A6E0E]")}>
       {value > 0 ? "+" : "−"}
       {Math.abs(value).toFixed(1)}%
     </span>
@@ -415,11 +413,11 @@ export function CostSection(): ReactElement {
     <section className="flex flex-col px-4 py-20 md:px-6 md:py-24">
       <Reveal className="max-w-[620px]">
         <h2 className="text-fg-1" style={sectionHeadingStyle}>
-          Account every dollar to a name.
+          Know the unit cost of every run.
         </h2>
         <p className="text-fg-2 mt-4 text-[15px] leading-[1.6]">
-          See exactly where spend goes: by agent, by member, by model. Roll cost up to a team or a
-          person, compare against last period, and prove the ROI of every agent you ship.
+          See exactly where spend goes: by agent, by user, by model. Roll cost up to a project or a
+          run, compare against last period, and know the unit economics of every agent you ship.
         </p>
       </Reveal>
 
@@ -539,8 +537,8 @@ export function CostSection(): ReactElement {
             <Tabs.Panel value="member" className="overflow-x-auto">
               <div className={TABLE_SHELL}>
                 <div className="border-border-soft grid grid-cols-[1.6fr_1fr_1.2fr_80px_110px] items-center gap-3 border-b px-5 py-2.5">
-                  <HeadCell>Member</HeadCell>
-                  <HeadCell>Department</HeadCell>
+                  <HeadCell>User</HeadCell>
+                  <HeadCell>Team</HeadCell>
                   <HeadCell>Top agent</HeadCell>
                   <HeadCell>Agents</HeadCell>
                   <HeadCell className="text-right">Cost</HeadCell>

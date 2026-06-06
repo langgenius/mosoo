@@ -9,23 +9,23 @@ type Faq = { q: string; a: string };
 const FAQS: readonly Faq[] = [
   {
     q: "What is Mosoo?",
-    a: "Mosoo is an open-source enterprise AMS (an Agent Management System) that's self-hostable and BYOK. It turns agents from personal desktop tools into organizational assets that are visible, controllable, accountable, deployable, and scalable. It is currently alpha.",
+    a: "Mosoo is an open-source backend for managed agents — think Supabase, but for cloud agents. It's self-hostable and BYOK, and it turns agents from one-off desktop scripts into deployable, metered, API-callable services you can build products on. It is currently alpha.",
   },
   {
     q: "Who is Mosoo built for?",
-    a: "Enterprise developers and platform teams who want a self-hosted, governable agent management plane, not consumers looking for another chat shell. If your job is to make agents an accountable organizational asset instead of tools scattered across personal accounts and keys, this is aimed at you.",
+    a: "Developers building agent-powered products who don't want to rebuild runtime hosting, sandboxing, and session lifecycle for every project. If you're gluing Claude Code, Codex, or OpenClaw into something your own users depend on, Mosoo is the framework-agnostic backend that handles the plumbing so you ship the product.",
   },
   {
-    q: "Why does an organization need an AMS instead of another chat shell?",
-    a: "Mosoo is a management plane, not a chat UI: chat is one of several consumption surfaces alongside Slack, Lark, GitHub, the API, and internal apps. Once agents enter an enterprise the questions flip from “how do I use this well” to where the data goes, who manages the keys, how billing is aggregated, and who's accountable when an agent acts, and an AMS answers those by managing agents as internal infrastructure in a private Agent Cloud.",
+    q: "Why a backend instead of just running Claude Code or Codex locally?",
+    a: "For a one-off problem, a local agent or a single Skill is the right, minimal tool — no need to abstract anything. The moment you have to build, evaluate, deploy, and run agents for other people, concurrently and for longer, the tooling fragments and you end up gluing point solutions across the whole lifecycle. Mosoo is the backend that covers that lifecycle, so you build the product instead of the plumbing.",
   },
   {
     q: "Where does my data live, and does Mosoo support BYOK?",
-    a: "Mosoo is open source and self-hostable, so data, knowledge, and run history live in infrastructure you control. There's no Mosoo-operated data plane you're forced to route through. It's BYOK: you bring your own model and provider keys, held and managed by the enterprise at the production plane rather than scattered across individual employee accounts.",
+    a: "Mosoo is open source and self-hostable, so data, knowledge, and run history live in infrastructure you control. There's no Mosoo-operated data plane you're forced to route through. It's BYOK: you bring your own model and provider keys, held at the production plane rather than scattered across individual machines and accounts.",
   },
   {
-    q: "What happens to org knowledge when an employee leaves?",
-    a: "Because agents, Skills, and Knowledge are organizational assets in the private Agent Cloud rather than personal desktop tools, they stay with the org when someone departs. Mosoo is alpha, so treat fine-grained access revocation and key-rotation flows as still maturing.",
+    q: "What happens to an agent once it moves off my laptop?",
+    a: "A local agent only reproduces if someone else has your exact files, session history, context, MCP tools, and Skills. Mosoo makes the agent, its Skills, and its Knowledge first-class cloud resources instead of fragments on a personal machine, so a run reproduces from the API rather than a copy of your disk. Mosoo is alpha, so treat fine-grained access and key-rotation flows as still maturing.",
   },
   {
     q: "Which runtimes does Mosoo support, and am I locked to one vendor?",
@@ -33,27 +33,27 @@ const FAQS: readonly Faq[] = [
   },
   {
     q: "When should I use a deterministic workflow versus a general agent?",
-    a: "Use a deterministic workflow when the steps are known and you want repeatability; use a general agent when the path is open-ended and you want it to reason its way through. The alpha's framing question is how an enterprise unifies both under one production and governance plane, rather than forcing every scenario into a single engine.",
+    a: "Use a deterministic workflow when the steps are known and you want repeatability; use a general agent when the path is open-ended and you want it to reason its way through. Mosoo's job is to run both behind one production and lifecycle API, rather than forcing every scenario into a single engine.",
   },
   {
-    q: "What does the governance plane show an admin?",
-    a: "An agent inventory with lifecycle status, organization members under an owner/admin/member role model, and cost rolled up by agent, user, and model with token and cache breakdowns and CSV export. These are shipping views, not mockups; fine-grained per-agent ACLs and deeper per-run failure diagnostics are still being filled in during alpha.",
+    q: "What does the dashboard show me?",
+    a: "An agent inventory with lifecycle status, the users and sessions invoking each agent, and cost rolled up by agent, user, and model with token and cache breakdowns and CSV export. These are shipping views, not mockups; fine-grained per-agent ACLs and deeper per-run failure diagnostics are still being filled in during alpha.",
   },
   {
-    q: "How do employees reach an agent once it's published?",
-    a: "Through whichever channels you bind to it: Web Threads, Slack, Lark, GitHub, the API, or your own internal apps. An agent is a managed entry surface, not a single shared link, so people use it where they already work.",
+    q: "How do my users reach an agent once it's published?",
+    a: "Through whichever surface you bind to it: a typed HTTP API, a /skill in Claude Code, Web Threads, Slack, Lark, GitHub, or your own app. An agent is a managed endpoint, not a single shared link, so you call it where your product already lives.",
   },
   {
     q: "What does a developer configure when building an agent, and how do changes go live?",
-    a: "You set the agent's runtime, attach Skills, connect Knowledge, bind Channels, and wire in API integrations, and changes accumulate in a Draft that only takes effect when you publish, so channels always reach a published version rather than in-progress edits. In the current alpha the builder binds existing Skills, MCP servers, and environments; first-class creation of those assets from inside the builder is still being filled in.",
+    a: "You set the agent's runtime, attach Skills, connect Knowledge, bind Channels, and wire in API integrations, and changes accumulate in a Draft that only takes effect when you publish, so callers always reach a published version rather than in-progress edits. In the current alpha the builder binds existing Skills, MCP servers, and environments; first-class creation of those assets from inside the builder is still being filled in.",
   },
   {
     q: "How is Mosoo different from Dify, n8n, OpenClaw, Claude Code, or building this in-house?",
-    a: "Dify and n8n are strong at deterministic workflows; OpenClaw, Claude Code, and Hermes are strong as general agent runtimes. Mosoo doesn't replace them. It sits above them as a production and governance plane that lets one enterprise run both kinds under unified versioning, permissions, and cost, instead of rebuilding that control plane yourself.",
+    a: "Dify and n8n are strong at deterministic workflows; OpenClaw, Claude Code, and Hermes are strong as general agent runtimes. Mosoo doesn't replace them. It sits above them as the backend that runs both kinds as deployable services — with versioning, permissions, sandboxing, and cost handled for you — instead of you rebuilding that plane yourself.",
   },
   {
     q: "What's the license and cost, and is it production-ready?",
-    a: "Mosoo is open source, self-hostable, and BYOK, so there's no per-seat fee for running it yourself. It's alpha: the four-plane model and open runtime work today, but expect rough edges and breaking changes, with the inventory, governance, and channel surfaces designed to scale from a handful of agents to thousands.",
+    a: "Mosoo is open source, self-hostable, and BYOK, so there's no per-seat fee for running it yourself. It's alpha: the open runtime and lifecycle API work today, but expect rough edges and breaking changes, with the inventory, deploy, and channel surfaces designed to scale from a handful of agents to thousands.",
   },
 ];
 
@@ -66,7 +66,7 @@ export function FaqSection(): ReactElement {
             Frequently asked questions
           </h2>
           <p className="text-fg-2 mt-4 max-w-[280px] text-[14px] leading-[1.6]">
-            What platform teams ask before they put agents into production.
+            What developers ask before they build on Mosoo.
           </p>
         </div>
 

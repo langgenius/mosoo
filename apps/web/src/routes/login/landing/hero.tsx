@@ -46,7 +46,7 @@ export function Hero({ onContinue }: { onContinue: () => void }): ReactElement {
         variants={staggerParent}
       >
         <m.div variants={fadeUp}>
-          <Eyebrow>Open source · Managed agents</Eyebrow>
+          <Eyebrow>Open source · The backend for agents</Eyebrow>
         </m.div>
         <m.h1
           className="text-ink-900 mt-7 [text-wrap:balance]"
@@ -61,8 +61,8 @@ export function Hero({ onContinue }: { onContinue: () => void }): ReactElement {
           style={HERO_SUBHEAD_STYLE}
           variants={fadeUp}
         >
-          One control plane for Codex, Claude Code, OpenClaw, and Hermes Agent. Runtime-agnostic
-          agents your enterprise can actually govern.
+          One API for Codex, Claude Code, OpenClaw, and Hermes Agent. Run them as cloud agents in
+          isolated sandboxes, and ship to your users without rebuilding the runtime.
         </m.p>
         <m.div className="mt-9 flex flex-wrap items-center justify-center gap-3" variants={fadeUp}>
           <button
