@@ -316,17 +316,15 @@ export function ThreadSectionGroup({
 
 export function ThreadsEmptyState({ onNewThread }: { onNewThread: () => void }): ReactElement {
   return (
-    <div className="py-16">
-      <EmptyState
-        icon={Inbox}
-        title="No threads yet"
-        description="Dispatch your first task to an agent."
-      >
-        <Button onClick={onNewThread} size="sm">
-          <Plus className="size-3.5" />
-          New thread
-        </Button>
-      </EmptyState>
-    </div>
+    <EmptyState
+      icon={Inbox}
+      title="No threads yet"
+      description="Dispatch your first task to an agent."
+    >
+      <Button onClick={onNewThread} size="sm">
+        <Plus className="size-3.5" />
+        New thread
+      </Button>
+    </EmptyState>
   );
 }
