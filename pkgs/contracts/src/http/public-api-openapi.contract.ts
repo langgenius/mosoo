@@ -443,7 +443,7 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
     properties: {
       file: {
         $ref: "#/components/schemas/ThreadFile",
-        description: "The Thread file.",
+        description: "The Thread file metadata, including its identifier, name, MIME type, and origin.",
       },
     },
     required: ["file"],

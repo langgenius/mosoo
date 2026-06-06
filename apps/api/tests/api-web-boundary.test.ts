@@ -44,6 +44,51 @@ function expectNoProperties(value: Record<string, unknown>, keys: readonly strin
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasReadableDescription(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const description = value["description"];
+
+  return typeof description === "string" && /[A-Za-z]/.test(description) && description.length > 16;
+}
+
+function collectOpenApiSchemaDescriptionGaps(value: unknown, path: string, gaps: string[]): void {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) =>
+      collectOpenApiSchemaDescriptionGaps(item, `${path}[${index}]`, gaps),
+    );
+    return;
+  }
+
+  if (!isRecord(value)) {
+    return;
+  }
+
+  const properties = value["properties"];
+
+  if (isRecord(properties)) {
+    for (const [propertyName, propertySchema] of Object.entries(properties)) {
+      const propertyPath = `${path}.properties.${propertyName}`;
+
+      if (!hasReadableDescription(propertySchema)) {
+        gaps.push(propertyPath);
+      }
+
+      collectOpenApiSchemaDescriptionGaps(propertySchema, propertyPath, gaps);
+    }
+  }
+
+  for (const key of ["items", "oneOf", "anyOf", "allOf", "additionalProperties"] as const) {
+    collectOpenApiSchemaDescriptionGaps(value[key], `${path}.${key}`, gaps);
+  }
+}
+
 describe("API to web boundary", () => {
   test("keeps preview runtime readiness wait scoped to GraphQL create-session input", () => {
     const schema = createGraphQLSchema();
@@ -138,6 +183,47 @@ describe("API to web boundary", () => {
       });
       expect(parameter?.example).toMatch(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
     }
+  });
+
+  test("documents every visible Published Agent OpenAPI field", () => {
+    const document = createPublishedAgentOpenApiDocument("https://api.example.com");
+    const gaps: string[] = [];
+
+    for (const [path, pathItem] of Object.entries(document.paths)) {
+      for (const [method, routeOperation] of Object.entries(pathItem)) {
+        if (!isRecord(routeOperation)) {
+          continue;
+        }
+
+        const operationPath = `${method.toUpperCase()} ${path}`;
+
+        if (!hasReadableDescription(routeOperation)) {
+          gaps.push(`${operationPath}.description`);
+        }
+
+        const parameters = routeOperation["parameters"];
+
+        if (Array.isArray(parameters)) {
+          parameters.forEach((parameter, index) => {
+            if (!hasReadableDescription(parameter)) {
+              gaps.push(`${operationPath}.parameters[${index}]`);
+            }
+          });
+        }
+      }
+    }
+
+    for (const [schemaName, schema] of Object.entries(document.components.schemas)) {
+      const schemaPath = `components.schemas.${schemaName}`;
+
+      if (!hasReadableDescription(schema)) {
+        gaps.push(schemaPath);
+      }
+
+      collectOpenApiSchemaDescriptionGaps(schema, schemaPath, gaps);
+    }
+
+    expect(gaps).toEqual([]);
   });
 
   test("documents public response essentials without internal runtime fields", () => {
