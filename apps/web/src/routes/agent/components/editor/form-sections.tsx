@@ -235,7 +235,7 @@ export function BasicsSection({
         </div>
       </div>
 
-      <div className="border-border-subtle border-t pt-4">
+      <div>
         <SectionHeader>System prompt</SectionHeader>
         <textarea
           aria-label="System prompt"
@@ -277,7 +277,7 @@ export function IntegrationsSection({
         />
       </div>
 
-      <div className="border-border-subtle scroll-mt-24 border-t pt-4" id="agent-mcp-bindings">
+      <div className="scroll-mt-24" id="agent-mcp-bindings">
         <SectionHeader>MCP servers</SectionHeader>
         <AgentMcpBindingsField
           organizationId={organizationId}
@@ -308,7 +308,7 @@ export function EnvironmentSection({
         <EnvironmentPicker model={model} organizationId={organizationId} readOnly={readOnly} />
       </div>
 
-      <div className="border-border-subtle border-t pt-4">
+      <div>
         <SectionHeader>Spaces</SectionHeader>
         <AgentSpacesField
           organizationId={organizationId}
@@ -318,7 +318,7 @@ export function EnvironmentSection({
         />
       </div>
 
-      <div className="border-border-subtle border-t pt-4">
+      <div>
         <SectionHeader>Channels</SectionHeader>
         <AgentChannelsField agent={agent} />
       </div>
