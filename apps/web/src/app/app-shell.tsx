@@ -2,6 +2,7 @@ import { PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 
+import { HelpMenu } from "@/features/help/help-menu";
 import { cn } from "@/shared/lib/class-names";
 import { Separator } from "@/shared/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
@@ -75,6 +76,9 @@ export function Layout({ children }: { children: ReactNode }) {
         <AppNavigation collapsed={collapsed} pathname={location.pathname} />
 
         <div className="flex-1" />
+        <div className={cn("pb-2", collapsed ? "flex justify-center" : "px-0.5")}>
+          <HelpMenu collapsed={collapsed} />
+        </div>
         <Separator className="bg-border-soft" />
         <AccountMenu collapsed={collapsed} user={user} />
       </nav>
