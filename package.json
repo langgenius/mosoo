@@ -8,7 +8,7 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "vp run --filter @mosoo/driver --filter @mosoo/web --filter @mosoo/blog build",
+    "build": "vp run --filter agent-driver --filter @mosoo/web --filter @mosoo/blog build",
     "cf:types": "vp run --filter @mosoo/api cf:types",
     "check": "vp run -w fmt:check && vp run -w lint && vp run -w tc && vp run -w test",
     "db:migrate:local": "vp run --filter @mosoo/api db:migrate:local",
@@ -17,8 +17,11 @@
     "deploy:api": "vp run --filter @mosoo/api deploy",
     "deploy:web": "vp run --filter @mosoo/web deploy",
     "deploy:blog": "vp run --filter @mosoo/blog deploy",
-    "dev": "vp run --filter @mosoo/driver build && vp run --filter @mosoo/api --filter @mosoo/web --parallel dev",
+    "dev": "vp run --filter agent-driver build && vp run --filter @mosoo/api --filter @mosoo/web --parallel dev",
+    "driver:repo:export": "vp exec bun dev/scripts/export-driver-standalone-repo.ts",
+    "driver:submodule:smoke": "vp exec bun dev/scripts/check-driver-submodule-cutover.ts",
     "e2e:deterministic": "./e2e/run-deterministic.sh",
+    "e2e:harness-contract": "vp exec bun test e2e/runtime-signal-collector.test.ts e2e/preview-env.test.ts e2e/preview-live-harness.test.ts",
     "e2e:preview-latency": "./e2e/run-preview-latency.sh",
     "e2e:preview-smoke": "./e2e/run-preview-smoke.sh",
     "e2e:signal-contract": "vp exec bun test e2e/runtime-signal-collector.test.ts",
@@ -33,7 +36,7 @@
     "react-doctor:diff": "vp exec react-doctor apps/web --verbose --diff",
     "react-doctor:report": "vp exec react-doctor apps/web --json --json-compact --full --fail-on none",
     "tc": "vp run -r tc",
-    "test": "vp run --filter @mosoo/api --filter @mosoo/driver --filter @mosoo/web --filter @mosoo/ag-ui-session --filter @mosoo/agent-package --filter @mosoo/contracts --filter @mosoo/db --filter @mosoo/driver-protocol --filter @mosoo/id --filter @mosoo/runtime-catalog --filter @mosoo/runtime-events --filter @mosoo/session-policy --filter @mosoo/skill-package test && vp run -w graphql:codegen:check"
+    "test": "vp run --filter @mosoo/api --filter agent-driver --filter @mosoo/web --filter @mosoo/ag-ui-session --filter @mosoo/agent-package --filter @mosoo/contracts --filter @mosoo/db --filter @mosoo/id --filter @mosoo/runtime-catalog --filter @mosoo/runtime-events --filter @mosoo/session-policy --filter @mosoo/skill-package test && vp run -w graphql:codegen:check"
   },
   "devDependencies": {
     "@graphql-codegen/cli": "^7.1.1",

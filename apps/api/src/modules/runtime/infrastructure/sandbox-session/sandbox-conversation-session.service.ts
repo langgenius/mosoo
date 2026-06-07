@@ -1,7 +1,7 @@
-import { getSessionOrganizationPath } from "@mosoo/driver-protocol";
 import { createPlatformId } from "@mosoo/id";
 import type { SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
+import { getSessionOrganizationPath } from "agent-driver/paths";
 
 import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";

@@ -1,18 +1,13 @@
 import { parseRuntimeCommand } from "@mosoo/contracts/runtime-command";
 import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
-import { parseSchemaValue } from "@mosoo/contracts/validation";
-import {
-  DriverHeartbeatInput as DriverHeartbeatInputSchema,
-  DriverHelloInput as DriverHelloInputSchema,
-  DriverReadyInput as DriverReadyInputSchema,
-} from "@mosoo/driver-protocol";
-import type {
-  DriverHeartbeatInput,
-  DriverHelloInput,
-  DriverReadyInput,
-} from "@mosoo/driver-protocol";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverInstanceId } from "@mosoo/id";
+import {
+  parseDriverHeartbeatInput,
+  parseDriverHelloInput,
+  parseDriverReadyInput,
+} from "agent-driver/orpc";
+import type { DriverHeartbeatInput, DriverHelloInput, DriverReadyInput } from "agent-driver/orpc";
 
 import type { DriverInstanceCloseSnapshot } from "./state";
 
@@ -182,11 +177,11 @@ function parseCommandQueue(value: unknown): RuntimeCommand[] {
 }
 
 function parseNullableHeartbeat(value: unknown): DriverHeartbeatInput | null {
-  return value === null ? null : parseSchemaValue(DriverHeartbeatInputSchema, value);
+  return value === null ? null : parseDriverHeartbeatInput(value);
 }
 
 function parseNullableHello(value: unknown): DriverHelloInput | null {
-  return value === null ? null : parseSchemaValue(DriverHelloInputSchema, value);
+  return value === null ? null : parseDriverHelloInput(value);
 }
 
 function parseNullableReady(value: unknown): DriverReadyInput | null {
@@ -194,7 +189,7 @@ function parseNullableReady(value: unknown): DriverReadyInput | null {
     return null;
   }
 
-  const ready = parseSchemaValue(DriverReadyInputSchema, value);
+  const ready = parseDriverReadyInput(value);
 
   return {
     ...ready,

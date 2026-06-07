@@ -4,9 +4,9 @@ import {
   sessionRunsTable,
   sessionsTable,
 } from "@mosoo/db";
-import { getSessionOrganizationPath } from "@mosoo/driver-protocol";
 import { createPlatformId } from "@mosoo/id";
 import type { RuntimeOperationId, SessionId, SessionRunId } from "@mosoo/id";
+import { getSessionOrganizationPath } from "agent-driver/paths";
 import type { SQL } from "drizzle-orm";
 import { and, asc, eq, exists, inArray, isNotNull, lte, or, sql } from "drizzle-orm";
 

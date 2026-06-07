@@ -1,4 +1,4 @@
-import { getSessionResourceRootPath } from "@mosoo/driver-protocol";
+import { getSessionResourceRootPath } from "agent-driver/paths";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import {

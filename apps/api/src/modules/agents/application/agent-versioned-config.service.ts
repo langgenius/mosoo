@@ -4,10 +4,10 @@ import type {
   AgentConfigChangePlan,
   AgentConfigChangeSnapshot,
 } from "@mosoo/contracts/agent-config-change-plan";
-import { isSupportedDriverRuntime } from "@mosoo/driver-protocol";
-import type { DriverRuntime } from "@mosoo/driver-protocol";
 import type { AccountId, AgentId, McpServerId, SkillId, SpaceId } from "@mosoo/id";
 import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
+import { isSupportedDriverRuntime } from "agent-driver/runtime";
+import type { DriverRuntime } from "agent-driver/runtime";
 
 import {
   isSpaceRoleRankSufficient,

@@ -1,7 +1,7 @@
 import { driverCommandsTable, driverInstanceMcpGrantsTable, driverInstancesTable } from "@mosoo/db";
-import { DRIVER_PROTOCOL_VERSION } from "@mosoo/driver-protocol";
-import type { DriverRuntime } from "@mosoo/driver-protocol";
 import type { DriverInstanceId, SandboxId, SessionId } from "@mosoo/id";
+import { DRIVER_PROTOCOL_VERSION } from "agent-driver/boot";
+import type { DriverRuntime } from "agent-driver/runtime";
 import { and, desc, eq, inArray, notInArray, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 

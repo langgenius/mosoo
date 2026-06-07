@@ -186,14 +186,14 @@ vp run graphql:codegen
 E2E 入口：
 
 ```bash
-vp run e2e:signal-contract
+vp run e2e:harness-contract
 ./e2e/run-deterministic.sh
 ./e2e/run-preview-smoke.sh
 ./e2e/run-preview-smoke.sh --headed
 ./e2e/run-preview-latency.sh
 ```
 
-`run-deterministic.sh` 是无外部凭据的本地验收路径。Preview live harness 需要 provider key，例如 `MOSOO_E2E_OPENAI_API_KEY` 或 `MOSOO_E2E_PROVIDER_API_KEY`。
+`run-deterministic.sh` 是无外部凭据的本地验收路径。`e2e:harness-contract` 覆盖不需要 live credential 的本地 harness contract。Preview live harness 需要 provider key，例如 `MOSOO_E2E_OPENAI_API_KEY`、`MOSOO_E2E_ANTHROPIC_API_KEY` 或 `MOSOO_E2E_PROVIDER_API_KEY`；设置 `MOSOO_E2E_PROVIDER=openai|anthropic` 选择 public runtime provider。ACP fallback 是 internal transport，由 driver fixture 和 API integration gate 覆盖。
 
 ## 工程原则
 

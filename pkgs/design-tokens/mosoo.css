@@ -16,88 +16,98 @@
      1 · BRAND GREEN  (bamboo shoot / new growth) — the signature accent
      500 is the official brand green (#6FD305). Use 600–800 for text/contrast.
      --------------------------------------------------------------------------- */
-  --green-50:  #F4FCE4;
-  --green-100: #E7F8C4;
-  --green-200: #D3F195;
-  --green-300: #B6E85F;
-  --green-400: #95DD2C;
-  --green-500: #6FD305;  /* ← BRAND */
-  --green-600: #5CB300;
-  --green-700: #498C07;
-  --green-800: #3A6E0E;
-  --green-900: #2C5113;
-  --green-950: #1A310B;
+  --green-50: #f4fce4;
+  --green-100: #e7f8c4;
+  --green-200: #d3f195;
+  --green-300: #b6e85f;
+  --green-400: #95dd2c;
+  --green-500: #6fd305; /* ← BRAND */
+  --green-600: #5cb300;
+  --green-700: #498c07;
+  --green-800: #3a6e0e;
+  --green-900: #2c5113;
+  --green-950: #1a310b;
 
   /* ---------------------------------------------------------------------------
      2 · NEUTRALS  (true cool grays — calm, GitHub-like; green is NOT in here)
      --------------------------------------------------------------------------- */
-  --ink-950: #08090A;  /* strongest ink */
-  --ink-900: #1C2024;  /* primary text */
-  --ink-800: #2B3036;
-  --ink-700: #3D434B;  /* secondary text */
+  --ink-950: #08090a; /* strongest ink */
+  --ink-900: #1c2024; /* primary text */
+  --ink-800: #2b3036;
+  --ink-700: #3d434b; /* secondary text */
   --ink-600: #515860;
-  --ink-500: #656C75;  /* tertiary / muted text */
-  --ink-400: #828A93;  /* placeholder */
-  --ink-300: #AEB5BE;  /* disabled text */
-  --ink-200: #D2D7DD;  /* strong border */
-  --ink-150: #DFE3E8;  /* divider */
-  --ink-100: #E9ECF0;  /* hairline border */
-  --ink-50:  #F4F6F8;  /* subtle fill / row hover */
-  --paper:   #FBFBFC;  /* app / page background */
-  --surface: #FFFFFF;  /* cards, panels, sheets */
+  --ink-500: #656c75; /* tertiary / muted text */
+  --ink-400: #828a93; /* placeholder */
+  --ink-300: #aeb5be; /* disabled text */
+  --ink-200: #d2d7dd; /* strong border */
+  --ink-150: #dfe3e8; /* divider */
+  --ink-100: #e9ecf0; /* hairline border */
+  --ink-50: #f4f6f8; /* subtle fill / row hover */
+  --paper: #fbfbfc; /* app / page background */
+  --surface: #ffffff; /* cards, panels, sheets */
 
   /* ---------------------------------------------------------------------------
      3 · CARBON  (near-black with a whisper of green — dark sections, footers)
      kept under the --forest-* names for compatibility; now calm near-neutral
      --------------------------------------------------------------------------- */
-  --forest-950: #090B0A;
-  --forest-900: #10130F;
-  --forest-800: #181C18;
-  --forest-700: #262B26;
-  --forest-600: #39413A;
+  --forest-950: #090b0a;
+  --forest-900: #10130f;
+  --forest-800: #181c18;
+  --forest-700: #262b26;
+  --forest-600: #39413a;
 
   /* ---------------------------------------------------------------------------
      4 · SEMANTIC STATUS
      --------------------------------------------------------------------------- */
-  --success-fg: #3A6E0E;  --success: #5CB300;  --success-bg: #EDF9D8;
-  --warning-fg: #9A6800;  --warning: #E0A106;  --warning-bg: #FBF1D4;
-  --danger-fg:  #B91C1C;  --danger:  #DC2A2A;  --danger-bg:  #FBEAEA;
-  --info-fg:    #235FBE;  --info:    #2F6BD4;  --info-bg:    #E8F0FD;
+  --success-fg: #3a6e0e;
+  --success: #5cb300;
+  --success-bg: #edf9d8;
+  --warning-fg: #9a6800;
+  --warning: #e0a106;
+  --warning-bg: #fbf1d4;
+  --danger-fg: #b91c1c;
+  --danger: #dc2a2a;
+  --danger-bg: #fbeaea;
+  --info-fg: #235fbe;
+  --info: #2f6bd4;
+  --info-bg: #e8f0fd;
 
   /* ---------------------------------------------------------------------------
      5 · SEMANTIC ALIASES  (use these in product UI)
      --------------------------------------------------------------------------- */
-  --bg:            var(--paper);
-  --bg-elevated:   var(--surface);
-  --bg-sunken:     var(--ink-50);
-  --fg:            var(--ink-900);   /* primary text */
-  --fg-secondary:  var(--ink-700);
-  --fg-muted:      var(--ink-500);
-  --fg-subtle:     var(--ink-400);
-  --fg-on-accent:  #0F1A02;          /* ink on bright green */
-  --fg-on-dark:    #E6E9ED;          /* text on carbon */
+  --bg: var(--paper);
+  --bg-elevated: var(--surface);
+  --bg-sunken: var(--ink-50);
+  --fg: var(--ink-900); /* primary text */
+  --fg-secondary: var(--ink-700);
+  --fg-muted: var(--ink-500);
+  --fg-subtle: var(--ink-400);
+  --fg-on-accent: #0f1a02; /* ink on bright green */
+  --fg-on-dark: #e6e9ed; /* text on carbon */
 
-  --accent:        var(--green-500);
-  --accent-hover:  var(--green-600);
-  --accent-press:  var(--green-700);
-  --accent-text:   var(--green-800); /* green text on light, AA */
-  --accent-quiet:  var(--green-50);  /* tinted fill */
+  --accent: var(--green-500);
+  --accent-hover: var(--green-600);
+  --accent-press: var(--green-700);
+  --accent-text: var(--green-800); /* green text on light, AA */
+  --accent-quiet: var(--green-50); /* tinted fill */
 
-  --border:        var(--ink-100);
+  --border: var(--ink-100);
   --border-strong: var(--ink-200);
-  --divider:       var(--ink-150);
-  --ring:          var(--green-600);
+  --divider: var(--ink-150);
+  --ring: var(--green-600);
   /* one layer is enough: a single solid green ring for borderless elements;
      bordered elements (inputs) simply turn their own border green on focus */
-  --focus-ring:    0 0 0 2px var(--green-600);
+  --focus-ring: 0 0 0 2px var(--green-600);
   --focus-ring-on-light: 0 0 0 2px var(--green-600);
 
   /* ---------------------------------------------------------------------------
      6 · TYPOGRAPHY
      --------------------------------------------------------------------------- */
-  --font-display: 'DM Sans', 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; /* warm, soft, rounded — headlines */
-  --font-sans: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;       /* clean neo-grotesque — body & UI */
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-display:
+    "DM Sans", "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; /* warm, soft, rounded — headlines */
+  --font-sans:
+    "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; /* clean neo-grotesque — body & UI */
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   /* weights */
   --fw-regular: 400;
@@ -107,16 +117,16 @@
   --fw-extrabold: 800;
 
   /* type scale (rem @ 16px root) */
-  --text-display: 4rem;     /* 64 */
-  --text-h1:      2.75rem;   /* 44 */
-  --text-h2:      1.875rem;  /* 30 */
-  --text-h3:      1.375rem;  /* 22 */
-  --text-h4:      1.125rem;  /* 18 */
-  --text-body-lg: 1.125rem;  /* 18 */
-  --text-body:    0.9375rem; /* 15 */
-  --text-sm:      0.8125rem; /* 13 */
-  --text-xs:      0.75rem;   /* 12 */
-  --text-mono:    0.8125rem; /* 13 */
+  --text-display: 4rem; /* 64 */
+  --text-h1: 2.75rem; /* 44 */
+  --text-h2: 1.875rem; /* 30 */
+  --text-h3: 1.375rem; /* 22 */
+  --text-h4: 1.125rem; /* 18 */
+  --text-body-lg: 1.125rem; /* 18 */
+  --text-body: 0.9375rem; /* 15 */
+  --text-sm: 0.8125rem; /* 13 */
+  --text-xs: 0.75rem; /* 12 */
+  --text-mono: 0.8125rem; /* 13 */
 
   /* line-heights */
   --lh-tight: 1.08;
@@ -160,11 +170,11 @@
   /* ---------------------------------------------------------------------------
      9 · ELEVATION  (restrained, premium)
      --------------------------------------------------------------------------- */
-  --shadow-xs: 0 1px 2px rgba(15,20,12,0.05);
-  --shadow-sm: 0 1px 3px rgba(15,20,12,0.06), 0 1px 2px rgba(15,20,12,0.04);
-  --shadow-md: 0 4px 12px rgba(15,20,12,0.08), 0 2px 4px rgba(15,20,12,0.04);
-  --shadow-lg: 0 12px 32px rgba(15,20,12,0.10), 0 4px 8px rgba(15,20,12,0.05);
-  --shadow-xl: 0 24px 56px rgba(15,20,12,0.14), 0 8px 16px rgba(15,20,12,0.06);
+  --shadow-xs: 0 1px 2px rgba(15, 20, 12, 0.05);
+  --shadow-sm: 0 1px 3px rgba(15, 20, 12, 0.06), 0 1px 2px rgba(15, 20, 12, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 20, 12, 0.08), 0 2px 4px rgba(15, 20, 12, 0.04);
+  --shadow-lg: 0 12px 32px rgba(15, 20, 12, 0.1), 0 4px 8px rgba(15, 20, 12, 0.05);
+  --shadow-xl: 0 24px 56px rgba(15, 20, 12, 0.14), 0 8px 16px rgba(15, 20, 12, 0.06);
 
   /* transitions */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -327,8 +337,11 @@
 }
 
 @layer base {
-  * { box-sizing: border-box; }
-  html, body {
+  * {
+    box-sizing: border-box;
+  }
+  html,
+  body {
     font-family: var(--font-sans);
     color: var(--fg);
     background: var(--paper);

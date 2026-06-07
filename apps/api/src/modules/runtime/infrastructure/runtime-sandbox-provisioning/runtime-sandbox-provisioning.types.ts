@@ -1,15 +1,16 @@
+import type { DriverInstanceId, SandboxId, SessionId, SessionRunId } from "@mosoo/id";
+import type { DriverBootPayload } from "agent-driver/boot";
+
+import type { DriverBootPayloadPreparedHandler } from "../../application/execution-plane/driver-boot-payload-prepared";
+import type { RuntimeTimingSnapshot } from "../../application/session-runs/session-runtime-timing";
 import type {
-  DriverBootPayload,
   DriverOrganizationAccessSnapshotOutput,
   DriverProfileConfig,
   DriverResolvedMcpServer,
   DriverResolvedSkill,
   DriverRuntime,
   DriverSkillCatalogEntry,
-} from "@mosoo/driver-protocol";
-import type { DriverInstanceId, SandboxId, SessionId, SessionRunId } from "@mosoo/id";
-
-import type { RuntimeTimingSnapshot } from "../../application/session-runs/session-runtime-timing";
+} from "../../domain/driver-snapshot";
 import type {
   ExecutionSessionHandle,
   RuntimeProcessHandle,
@@ -31,7 +32,7 @@ export interface ProvisionDriverInput {
   cloudflareSession: ExecutionSessionHandle;
   driverRecordConflictStrategy?: "insert-only" | "replace";
   driverInstanceId: DriverInstanceId;
-  onBootPayloadPrepared?: (payload: DriverBootPayload) => Promise<void>;
+  onBootPayloadPrepared?: DriverBootPayloadPreparedHandler;
   profile: DriverProfileConfig;
   requestUrl: string;
   resolvedMcpServers: DriverResolvedMcpServer[];

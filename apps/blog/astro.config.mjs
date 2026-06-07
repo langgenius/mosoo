@@ -1,7 +1,7 @@
-import { defineConfig } from "astro/config";
 import mdx from "@astrojs/mdx";
 import sitemap from "@astrojs/sitemap";
 import tailwind from "@tailwindcss/vite";
+import { defineConfig } from "astro/config";
 
 // Blog is mounted at https://mosoo.ai/blog/* by a separate Cloudflare Worker
 // (apps/blog/wrangler.toml binds the route pattern `mosoo.ai/blog*`). Astro's

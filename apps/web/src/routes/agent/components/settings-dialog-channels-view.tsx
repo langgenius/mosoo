@@ -262,7 +262,7 @@ function ChannelConnectionPanel({
         </div>
       ) : null}
       {binding.status === "error" && binding.lastErrorCode ? (
-        <div className="mt-3 border-amber/30 bg-amber-bg text-amber-fg rounded-md border px-3 py-2 text-xs">
+        <div className="border-amber/30 bg-amber-bg text-amber-fg mt-3 rounded-md border px-3 py-2 text-xs">
           {channelId === "discord"
             ? (getDiscordBindingErrorCopy(binding.lastErrorCode) ??
               `${channelLabel} delivery failed with ${binding.lastErrorCode}. Remove and reconnect ${channelLabel} to recover.`)

@@ -1,12 +1,14 @@
-import { parseSchemaValue } from "@mosoo/contracts/validation";
 import { nativeResumeRefsTable } from "@mosoo/db";
-import { DriverNativeRuntimeRef } from "@mosoo/driver-protocol";
+import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 import type {
-  DriverNativeRuntimeRef as DriverNativeRuntimeRefValue,
+  DriverNativeRuntimeRef,
   DriverNativeRuntimeRefKind,
   DriverRuntime,
-} from "@mosoo/driver-protocol";
-import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
+} from "agent-driver/runtime";
+import {
+  getExpectedDriverNativeRuntimeRefKind,
+  parseDriverNativeRuntimeRef,
+} from "agent-driver/runtime";
 import { eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -20,31 +22,18 @@ interface NativeResumeRefRow {
 
 export interface NativeResumeRefObservation {
   driverInstanceId: DriverInstanceId;
-  nativeResumeRef: DriverNativeRuntimeRefValue;
+  nativeResumeRef: DriverNativeRuntimeRef;
   sessionId: SessionId;
   sessionRunId: SessionRunId;
 }
 
 function expectedNativeRuntimeRefKind(
-  runtimeId: DriverNativeRuntimeRefValue["runtimeId"],
+  runtimeId: DriverNativeRuntimeRef["runtimeId"],
 ): DriverNativeRuntimeRefKind {
-  switch (runtimeId) {
-    case "openai-runtime": {
-      return "openai_thread_id";
-    }
-    case "claude-agent-sdk": {
-      return "claude_session_id";
-    }
-    case "acp-fallback": {
-      return "acp_session_id";
-    }
-    default: {
-      throw new Error("Unsupported native runtime ref runtime.");
-    }
-  }
+  return getExpectedDriverNativeRuntimeRefKind(runtimeId);
 }
 
-function enforceNativeRuntimeRefShape(ref: DriverNativeRuntimeRefValue): void {
+function enforceNativeRuntimeRefShape(ref: DriverNativeRuntimeRef): void {
   const expectedKind = expectedNativeRuntimeRefKind(ref.runtimeId);
 
   if (ref.kind !== expectedKind) {
@@ -52,8 +41,8 @@ function enforceNativeRuntimeRefShape(ref: DriverNativeRuntimeRefValue): void {
   }
 }
 
-function toNativeRuntimeRef(row: NativeResumeRefRow): DriverNativeRuntimeRefValue {
-  const ref = parseSchemaValue(DriverNativeRuntimeRef, {
+function toNativeRuntimeRef(row: NativeResumeRefRow): DriverNativeRuntimeRef {
+  const ref = parseDriverNativeRuntimeRef({
     kind: row.kind,
     runtimeId: row.runtime_id,
     value: row.value,
@@ -69,7 +58,7 @@ export async function getNativeResumeRefForRuntime(
     runtimeId: DriverRuntime;
     sessionId: SessionId;
   },
-): Promise<DriverNativeRuntimeRefValue | null> {
+): Promise<DriverNativeRuntimeRef | null> {
   const row =
     (await getAppDatabase(database)
       .select({

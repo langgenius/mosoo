@@ -5,7 +5,7 @@ import BlogIndex from "../../components/BlogIndex.astro";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-const posts = (await getCollection("blog", ({ data }) => !data.draft && data.locale === "zh")).sort(
+const posts = (await getCollection("blog", ({ data }) => !data.draft && data.locale === "zh")).toSorted(
   (a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
 );
 ---

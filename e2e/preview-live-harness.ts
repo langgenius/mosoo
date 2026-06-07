@@ -3,8 +3,6 @@ import type { Locator, Page } from "@playwright/test";
 
 import { formatHarnessError } from "./harness-error";
 
-const openAiApiKey = process.env["MOSOO_E2E_OPENAI_API_KEY"]?.trim() ?? "";
-
 export type PreviewProviderId = "anthropic" | "openai";
 
 export interface PreviewRuntimeCredential {
@@ -21,23 +19,28 @@ export function getPreviewSmokeEmail(runId: string): string {
   return process.env["MOSOO_E2E_EMAIL"]?.trim() || `preview-smoke-${runId}@mosoo.ai`;
 }
 
-export function requireOpenAiApiKey(): string {
-  if (!openAiApiKey) {
-    throw new Error(
-      formatHarnessError({
-        fix: "Run `MOSOO_E2E_OPENAI_API_KEY=... vp run e2e:preview-smoke`, or record the missing credential in the PR / handoff evidence.",
-        what: "Preview live runtime smoke cannot start because `MOSOO_E2E_OPENAI_API_KEY` is missing.",
-        why: "L2 live runtime smoke proves provider readiness, Preview streaming, tool-call rendering, and sandbox output with real credentials.",
-      }),
-    );
+function readPreviewProviderId(): PreviewProviderId {
+  const provider = process.env["MOSOO_E2E_PROVIDER"]?.trim() ?? "";
+
+  if (provider === "" || provider === "openai") {
+    return "openai";
   }
 
-  return openAiApiKey;
+  if (provider === "anthropic") {
+    return "anthropic";
+  }
+
+  throw new Error(
+    formatHarnessError({
+      fix: "Set `MOSOO_E2E_PROVIDER=openai` or `MOSOO_E2E_PROVIDER=anthropic`.",
+      what: `Preview live runtime smoke cannot start because MOSOO_E2E_PROVIDER=${provider} is unsupported.`,
+      why: "The live harness must select a concrete public runtime provider before creating an agent.",
+    }),
+  );
 }
 
 export function requirePreviewRuntimeCredential(): PreviewRuntimeCredential {
-  const providerId: PreviewProviderId =
-    process.env["MOSOO_E2E_PROVIDER"]?.trim() === "anthropic" ? "anthropic" : "openai";
+  const providerId = readPreviewProviderId();
   const providerKey =
     process.env["MOSOO_E2E_PROVIDER_API_KEY"]?.trim() ||
     (providerId === "anthropic"
@@ -49,8 +52,8 @@ export function requirePreviewRuntimeCredential(): PreviewRuntimeCredential {
     throw new Error(
       formatHarnessError({
         fix: "Set `MOSOO_E2E_PROVIDER=anthropic MOSOO_E2E_PROVIDER_API_KEY=...`, or `MOSOO_E2E_PROVIDER=openai MOSOO_E2E_PROVIDER_API_KEY=...`.",
-        what: "Preview latency smoke cannot start because the provider credential is missing.",
-        why: "Live dispatch latency must be measured against the runtime provider that owns the selected agent.",
+        what: "Preview live runtime smoke cannot start because the provider credential is missing.",
+        why: "Live runtime smoke must run against the provider that owns the selected agent.",
       }),
     );
   }
@@ -141,10 +144,16 @@ export async function loginWithMosooAiBackdoor(page: Page, smokeEmail: string): 
   await page.getByPlaceholder("you@company.com").fill(smokeEmail);
   await page.getByRole("button", { name: "Send code" }).click();
 
-  const personalSetup = page.getByRole("button", {
-    name: /Just trying it personally/i,
-  });
-  await maybeClick(personalSetup, 15_000);
+  const setupChoice = page
+    .getByRole("button", {
+      name: /Just trying it personally/i,
+    })
+    .or(
+      page.getByRole("button", {
+        name: /^Create .+ organization/i,
+      }),
+    );
+  await maybeClick(setupChoice.first(), 15_000);
 
   await expect(page.getByRole("link", { name: "Agents" })).toBeVisible({
     timeout: 60_000,
@@ -184,19 +193,6 @@ export async function verifyPreviewReadinessBlocker(page: Page, agentId: string)
   await expect(page.getByTestId("agent-readiness-blockers")).toBeVisible();
   await page.getByTestId("agent-session-composer-input").fill("Readiness blocker check");
   await expect(page.getByTestId("agent-session-send")).toBeDisabled();
-}
-
-export async function configureOpenAiCompanyKey(
-  page: Page,
-  input: {
-    runId: string;
-  },
-): Promise<void> {
-  await configureProviderCompanyKey(page, {
-    apiKey: requireOpenAiApiKey(),
-    providerId: "openai",
-    runId: input.runId,
-  });
 }
 
 export async function configureProviderCompanyKey(

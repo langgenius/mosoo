@@ -1,5 +1,4 @@
 import type { McpAuthorizationState } from "@mosoo/contracts/mcp";
-import type { DriverResolvedMcpServer } from "@mosoo/driver-protocol";
 import type { AccountId, AgentId, CredentialId, McpServerId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -7,6 +6,7 @@ import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs, toIsoString } from "../../../time";
 import { getAgentRow } from "../../agents/application/agent-repository";
 import { ensureOrganizationMembership } from "../../organizations/domain/organization-access.policy";
+import type { DriverResolvedMcpServer } from "../../runtime/domain/driver-snapshot";
 import { readMcpCredentialSecret } from "./mcp-credential-secret-resolution";
 import {
   expireCredential,

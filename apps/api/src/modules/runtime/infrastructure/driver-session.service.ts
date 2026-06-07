@@ -1,19 +1,19 @@
-import type {
-  DriverBootPayload,
-  DriverOrganizationAccessSnapshotOutput,
-  DriverProfileConfig,
-  DriverResolvedMcpServer,
-  DriverResolvedSkill,
-  DriverSkillCatalogEntry,
-} from "@mosoo/driver-protocol";
 import { sleepPromise } from "@mosoo/effects";
 import { createPlatformId } from "@mosoo/id";
 import type { DriverInstanceId, FileId, SandboxId, SessionId, SessionRunId } from "@mosoo/id";
 
 import { logWarn } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import type { DriverBootPayloadPreparedHandler } from "../application/execution-plane/driver-boot-payload-prepared";
 import { createRuntimeTimingRecorder } from "../application/session-runs/session-runtime-timing";
 import type { RuntimeTimingSnapshot } from "../application/session-runs/session-runtime-timing";
+import type {
+  DriverOrganizationAccessSnapshotOutput,
+  DriverProfileConfig,
+  DriverResolvedMcpServer,
+  DriverResolvedSkill,
+  DriverSkillCatalogEntry,
+} from "../domain/driver-snapshot";
 import { getDriverControlPort } from "../domain/sandbox-layout";
 import { failDriverInstance, sendDriverInstanceCommand } from "./driver-instance/client";
 import {
@@ -139,7 +139,7 @@ export async function ensureDriverSessionReady(
     sessionId: SessionId;
     sessionRunId: SessionRunId;
     traceId: string;
-    onBootPayloadPrepared?: (payload: DriverBootPayload) => Promise<void>;
+    onBootPayloadPrepared?: DriverBootPayloadPreparedHandler;
     organizationAccessSnapshot: DriverOrganizationAccessSnapshotOutput;
   },
 ): Promise<{

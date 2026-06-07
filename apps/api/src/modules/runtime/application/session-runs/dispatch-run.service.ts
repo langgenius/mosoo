@@ -1,6 +1,7 @@
-import type { DriverBootPayload, DriverRuntime } from "@mosoo/driver-protocol";
-import type { DriverInstanceId, FileId, SessionId, SessionRunId } from "@mosoo/id";
+import { parsePlatformId } from "@mosoo/id";
+import type { AgentId, DriverInstanceId, FileId, SessionId, SessionRunId } from "@mosoo/id";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
+import type { DriverBootPayload, DriverRuntime } from "agent-driver/boot";
 
 import { logError, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -46,8 +47,12 @@ async function appendBootPayloadRuntimeEvents(
   },
 ): Promise<void> {
   const configRevision = input.bootPayload.execution.configRevision;
+  const agentId = parsePlatformId<AgentId>(
+    configRevision.agentId,
+    "Driver boot payload config agent ID",
+  );
   const runtimeBase = toRuntimeDiagnosticBaseValue({
-    agentId: configRevision.agentId,
+    agentId,
     sessionId: input.sessionId,
     traceId: input.traceId,
   });
@@ -148,7 +153,7 @@ export async function dispatchSessionRun(
 
     runLease = await executionPlane.prepareRun(bindings, requestUrl, {
       attachmentIds: input.attachmentIds,
-      onBootPayloadPrepared: async (bootPayload) => {
+      onBootPayloadPrepared: async ({ bootPayload }) => {
         const configTraceValue = buildSessionConfigTraceValue(bootPayload);
 
         await appendSessionRuntimeEvents({

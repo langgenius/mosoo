@@ -4,16 +4,23 @@ import type { Page, Route } from "@playwright/test";
 import { formatHarnessError } from "./harness-error";
 import { createRuntimeSignalCollector } from "./runtime-signal-collector";
 
-const agentId = "agent-e2e-harness-contract";
-const organizationId = "org-e2e-harness";
-const sessionId = "session-e2e-harness-replay";
+const agentId = "01J00000000000000000000001";
+const organizationId = "01J00000000000000000000002";
+const sessionId = "01J00000000000000000000003";
+const ownerAccountId = "01J00000000000000000000004";
+const environmentId = "01J00000000000000000000005";
+const deploymentVersionId = "01J00000000000000000000006";
+const sessionRunId = "01J00000000000000000000007";
+const shellServerId = "01J00000000000000000000008";
+const docsSpaceId = "01J00000000000000000000009";
+const viewerEmail = "harness-e2e@mosoo.ai";
 const now = "2026-05-18T08:00:00.000Z";
 const liveVersion = {
   agentId,
   createdAt: now,
-  createdByAccountId: "acct-e2e-owner",
-  environmentId: "env-e2e",
-  id: "agent-version-e2e-3",
+  createdByAccountId: ownerAccountId,
+  environmentId,
+  id: deploymentVersionId,
   isLive: true,
   kind: "pet",
   model: "gpt-4.1-mini",
@@ -28,7 +35,7 @@ const sessionLastRun = {
   deploymentVersionId: liveVersion.id,
   deploymentVersionNumber: liveVersion.versionNumber,
   error: null,
-  id: "run-e2e-harness-1",
+  id: sessionRunId,
   model: liveVersion.model,
   provider: liveVersion.provider,
   startedAt: "2026-05-18T08:00:02.000Z",
@@ -53,10 +60,11 @@ const sessionSummary = {
   runtimeId: liveVersion.runtimeId,
   status: "IDLE",
   title: "Harness contract acceptance replay",
+  type: "preview",
   updatedAt: "2026-05-18T08:00:19.000Z",
 };
 const owner = {
-  id: "acct-e2e-owner",
+  id: ownerAccountId,
   imageUrl: null,
   name: "E2E Owner",
 };
@@ -91,7 +99,7 @@ const agentDetail = {
       enabled: true,
       iconUrl: null,
       name: "Shell",
-      serverId: "shell",
+      serverId: shellServerId,
     },
   ],
   updatedAt: now,
@@ -102,8 +110,8 @@ const agentDetail = {
 const editorState = {
   collaborators: [],
   environment: {
-    boundSpaceIds: ["space-e2e-docs"],
-    environmentId: "env-e2e",
+    boundSpaceIds: [docsSpaceId],
+    environmentId,
   },
   id: agentId,
   mcpBindings: [],
@@ -304,6 +312,34 @@ async function fulfillJson(route: Route, data: unknown): Promise<void> {
   });
 }
 
+async function fulfillAuthSessionFixture(route: Route): Promise<void> {
+  await route.fulfill({
+    body: JSON.stringify({
+      session: {
+        createdAt: now,
+        expiresAt: "2027-05-18T08:00:00.000Z",
+        id: "session-e2e-auth",
+        ipAddress: null,
+        token: "session-token-e2e",
+        updatedAt: now,
+        userAgent: null,
+        userId: ownerAccountId,
+      },
+      user: {
+        createdAt: now,
+        email: viewerEmail,
+        emailVerified: true,
+        id: ownerAccountId,
+        image: null,
+        name: owner.name,
+        updatedAt: now,
+      },
+    }),
+    contentType: "application/json",
+    status: 200,
+  });
+}
+
 async function fulfillGraphQLFixture(route: Route): Promise<void> {
   const body = parseGraphQLRequestBody(route.request().postData());
   const operationName = getOperationName(body);
@@ -313,7 +349,7 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
       await fulfillJson(route, {
         viewer: {
           account: {
-            email: "harness-e2e@mosoo.ai",
+            email: viewerEmail,
             id: owner.id,
             imageUrl: null,
             name: owner.name,
@@ -352,7 +388,7 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
             accountId: owner.id,
             disabledAt: null,
             disabledByAccountId: null,
-            email: "harness-e2e@mosoo.ai",
+            email: viewerEmail,
             imageUrl: null,
             joinedAt: now,
             name: owner.name,
@@ -371,7 +407,9 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
     }
     case "AgentSessionList": {
       await fulfillJson(route, {
-        agentSessionList: [sessionSummary],
+        agentSessionList: {
+          nodes: [sessionSummary],
+        },
       });
       return;
     }
@@ -395,8 +433,8 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
               sessionId,
             },
             skills: [],
-            spaces: [{ spaceId: "space-e2e-docs" }],
-            tools: [{ credentialMode: "runtime_resolved", serverId: "shell" }],
+            spaces: [{ spaceId: docsSpaceId }],
+            tools: [{ credentialMode: "runtime_resolved", serverId: shellServerId }],
           },
           generatedAt: now,
           nativeRuntimeRef: {
@@ -450,6 +488,7 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
 }
 
 async function installDeterministicFixtures(page: Page): Promise<void> {
+  await page.route(/\/api\/auth\/get-session(?:\?|$)/u, fulfillAuthSessionFixture);
   await page.route("**/api/graphql", fulfillGraphQLFixture);
 }
 
@@ -490,6 +529,7 @@ test("Session log acceptance replay renders durable transcript and diagnostics w
   await expect(logs).toContainText("Reading the session log acceptance checklist.");
   await expect(logs).toContainText("durable transcript projection");
   await expect(logs).toContainText("Diagnostics");
+  await logs.getByRole("button", { name: "Expand diagnostics" }).click();
   await expect(logs).toContainText("Session snapshot");
   await runtimeSignals.sampleResources(page, "after-session-log-assertions");
   runtimeSignals.checkpoint("session-log.exit", {

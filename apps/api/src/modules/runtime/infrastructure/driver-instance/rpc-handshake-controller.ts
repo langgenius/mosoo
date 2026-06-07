@@ -1,11 +1,11 @@
-import { SANDBOX_ORGANIZATION_ROOT } from "@mosoo/driver-protocol";
+import { createPlatformId } from "@mosoo/id";
 import type {
   DriverHeartbeatInput,
   DriverHelloInput,
   DriverHelloOutput,
   DriverReadyInput,
-} from "@mosoo/driver-protocol";
-import { createPlatformId } from "@mosoo/id";
+} from "agent-driver/orpc";
+import { SANDBOX_ORGANIZATION_ROOT } from "agent-driver/paths";
 
 import { logInfo } from "../../../../platform/cloudflare/logger";
 import { DRIVER_HEARTBEAT_INTERVAL_MS } from "../../domain/runtime-config";
@@ -103,7 +103,7 @@ export class DriverInstanceRpcHandshakeController {
         driverInstanceId: state.requireDriverInstanceId(),
         driverVersion: input.driverVersion,
         pid: input.pid,
-        sessionRunId: link.sessionRunId,
+        runId: link.sessionRunId,
       });
     });
 
@@ -118,7 +118,7 @@ export class DriverInstanceRpcHandshakeController {
         eventBatchMaxSize: EVENT_BATCH_MAX_SIZE,
         organizationPath: SANDBOX_ORGANIZATION_ROOT,
       },
-      sessionRunId: link.sessionRunId,
+      runId: link.sessionRunId,
     };
   }
 
@@ -144,6 +144,7 @@ export class DriverInstanceRpcHandshakeController {
     const markedReady = await markDriverInstanceReady(env, {
       ...input,
       connectionId: context.connectionId,
+      driverInstanceId: state.requireDriverInstanceId(),
       generation: state.requireDriverGeneration(),
     });
 

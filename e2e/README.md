@@ -6,7 +6,7 @@ Run from the repo root:
 
 ```bash
 ./e2e/run-deterministic.sh
-vp run e2e:signal-contract
+vp run e2e:harness-contract
 ./e2e/run-preview-smoke.sh
 ./e2e/run-preview-smoke.sh --headed
 ./e2e/run-preview-latency.sh
@@ -22,13 +22,24 @@ Both deterministic and Preview smoke specs attach a `runtime-signal-coverage`
 artifact. The artifact is collected by `runtime-signal-collector.ts` and covers
 application lifecycle, feature path execution, GraphQL/API data flow, browser
 resource samples, and browser error / exception context. `run-deterministic.sh`
-also runs the focused collector contract test before the Playwright spec.
+also runs the focused collector, Preview live env preflight, and credential
+resolver contract tests before the Playwright spec.
 
 Required environment for Preview live harnesses:
 
 ```bash
+# OpenAI Runtime by default
 export MOSOO_E2E_OPENAI_API_KEY=...
+
+# or Claude Agent SDK
+export MOSOO_E2E_PROVIDER=anthropic
+export MOSOO_E2E_ANTHROPIC_API_KEY=...
 ```
+
+The Preview live runners check these credentials before launching Playwright, so
+missing-key failures return immediately without starting the local web server.
+`run-preview-smoke.sh` covers the selected public runtime provider; ACP fallback
+is an internal transport covered by driver fixture and API integration gates.
 
 `run-preview-latency.sh` can target either supported live provider:
 

@@ -13,20 +13,11 @@ import type {
   DriverNextCommandInput,
   DriverNextCommandOutput,
   DriverReadyInput,
-} from "@mosoo/driver-protocol";
+} from "agent-driver/orpc";
 
-export interface DriverInstanceRpcContext {
-  onCommandUpdate: (input: DriverCommandUpdateInput) => Promise<{ ok: true }>;
-  onCompleteRun: (input: DriverCompletionInput) => Promise<{ ok: true }>;
-  onFailRun: (input: DriverFailureInput) => Promise<{ ok: true }>;
-  onHeartbeat: (input: DriverHeartbeatInput) => Promise<{ heartbeatCount: number; ok: true }>;
-  onHello: (input: DriverHelloInput) => Promise<DriverHelloOutput>;
-  onNextCommand: (input: DriverNextCommandInput) => Promise<DriverNextCommandOutput>;
-  onPushEvents: (input: DriverEventBatchInput) => Promise<DriverEventBatchOutput>;
-  onPushLogs: (input: DriverLogBatchInput) => Promise<DriverLogBatchOutput>;
-  onReady: (input: DriverReadyInput) => Promise<{ ok: true }>;
-  onWatchCommands: () => AsyncIterable<RuntimeCommand>;
-}
+import type { RuntimeOrpcContext } from "./rpc-wire";
+
+export type DriverInstanceRpcContext = RuntimeOrpcContext;
 
 export interface DriverInstanceRpcOperationContext {
   readonly connectionId: string;
@@ -87,6 +78,9 @@ export function createDriverInstanceRpcContext(
     onPushEvents: async (input) => handler.handlePushEvents(input, context),
     onPushLogs: async (input) => handler.handlePushLogs(input, context),
     onReady: async (input) => handler.handleReady(input, context),
-    onWatchCommands: () => handler.watchCommands(context),
+    onWatchCommands: () =>
+      handler.watchCommands(context)[Symbol.asyncIterator]() as ReturnType<
+        RuntimeOrpcContext["onWatchCommands"]
+      >,
   };
 }

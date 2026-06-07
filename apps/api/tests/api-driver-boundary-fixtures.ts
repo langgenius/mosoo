@@ -1,10 +1,3 @@
-import type {
-  DriverEvent,
-  DriverProfileConfig,
-  DriverResolvedMcpServer,
-  DriverResolvedSkill,
-  DriverSkillCatalogEntry,
-} from "@mosoo/driver-protocol";
 import { parsePlatformId } from "@mosoo/id";
 import type {
   CredentialId,
@@ -15,7 +8,14 @@ import type {
 } from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 import { toRuntimeEventInput } from "@mosoo/runtime-events";
+import type { DriverEvent } from "agent-driver/events";
 
+import type {
+  DriverProfileConfig,
+  DriverResolvedMcpServer,
+  DriverResolvedSkill,
+  DriverSkillCatalogEntry,
+} from "../src/modules/runtime/domain/driver-snapshot";
 import type { RuntimeSessionLink } from "../src/modules/runtime/infrastructure/driver-instance/event-types";
 
 export const API_DRIVER_BOUNDARY_IDS = {

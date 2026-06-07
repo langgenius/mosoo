@@ -14,6 +14,7 @@ const vpBin = `${repoRoot}/node_modules/.bin/vp`;
 const wranglerBin = `${apiDir}/node_modules/.bin/wrangler`;
 const DOCKER_HOST_ENV_KEY = "DOCKER_HOST";
 const DEV_DOCKER_HOST_ENV_KEY = "MOSOO_API_DEV_DOCKER_HOST";
+const DEV_RUNTIME_PROXY_HOST_ENV_KEY = "MOSOO_API_DEV_RUNTIME_PROXY_HOST";
 const LARK_SIDECAR_DISABLED_ENV_KEY = "MOSOO_LARK_SIDECAR_DISABLED";
 const LARK_SIDECAR_SECRET_ENV_KEY = "MOSOO_LARK_SIDECAR_SECRET";
 const SCRUB_HOST_PROXY_ENV_KEY = "MOSOO_API_DEV_SCRUB_HOST_PROXY";
@@ -23,6 +24,22 @@ const SCHEDULED_HANDLER_PUMP_DEFAULT_INTERVAL_MS = 60_000;
 const SCHEDULED_HANDLER_PUMP_BOOT_DELAY_MS = 5_000;
 const SCHEDULED_HANDLER_PUMP_MIN_INTERVAL_MS = 1_000;
 const HOST_PROXY_ENV_KEYS = ["http_proxy", "https_proxy", "all_proxy", "no_proxy"] as const;
+const RUNTIME_NO_PROXY_DEFAULTS = ["localhost", "127.0.0.1", "::1", "host.docker.internal"];
+
+const RUNTIME_PROXY_VAR_MAPPINGS = [
+  {
+    hostKeys: ["http_proxy", "HTTP_PROXY"],
+    runtimeBinding: "MOSOO_RUNTIME_HTTP_PROXY",
+  },
+  {
+    hostKeys: ["https_proxy", "HTTPS_PROXY"],
+    runtimeBinding: "MOSOO_RUNTIME_HTTPS_PROXY",
+  },
+  {
+    hostKeys: ["all_proxy", "ALL_PROXY"],
+    runtimeBinding: "MOSOO_RUNTIME_ALL_PROXY",
+  },
+] as const;
 
 interface RunResult {
   code: number;
@@ -146,6 +163,83 @@ function omitHostProxyEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   }
 
   return next;
+}
+
+function getRuntimeProxyHost(env: NodeJS.ProcessEnv): string {
+  const explicit = env[DEV_RUNTIME_PROXY_HOST_ENV_KEY]?.trim();
+
+  if (explicit !== undefined && explicit.length > 0) {
+    return explicit;
+  }
+
+  return process.platform === "linux" ? "172.17.0.1" : "host.docker.internal";
+}
+
+function toContainerReachableProxyUrl(rawValue: string, runtimeProxyHost: string): string {
+  const value = rawValue.trim();
+
+  if (value.length === 0) {
+    return value;
+  }
+
+  try {
+    const url = new URL(value);
+    if (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "::1") {
+      url.hostname = runtimeProxyHost;
+    }
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
+function toRuntimeNoProxy(value: string | undefined): string {
+  const entries = new Set(
+    (value ?? "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0),
+  );
+
+  for (const entry of RUNTIME_NO_PROXY_DEFAULTS) {
+    entries.add(entry);
+  }
+
+  return [...entries].join(",");
+}
+
+function createRuntimeProxyVarArgs(env: NodeJS.ProcessEnv): string[] {
+  const args: string[] = [];
+  const forwardedKeys: string[] = [];
+  const runtimeProxyHost = getRuntimeProxyHost(env);
+
+  for (const mapping of RUNTIME_PROXY_VAR_MAPPINGS) {
+    const value = readNonEmptyEnvValue(env, mapping.hostKeys);
+
+    if (value === undefined) {
+      continue;
+    }
+
+    args.push(
+      "--var",
+      `${mapping.runtimeBinding}:${toContainerReachableProxyUrl(value, runtimeProxyHost)}`,
+    );
+    forwardedKeys.push(mapping.hostKeys[0]);
+  }
+
+  if (forwardedKeys.length === 0) {
+    return args;
+  }
+
+  args.push(
+    "--var",
+    `MOSOO_RUNTIME_NO_PROXY:${toRuntimeNoProxy(readNonEmptyEnvValue(env, ["no_proxy", "NO_PROXY"]))}`,
+  );
+  writeStderr(
+    `[mosoo/api] Forwarding host proxy env to runtime sandbox via ${runtimeProxyHost}: ${forwardedKeys.join(", ")}`,
+  );
+
+  return args;
 }
 
 function unquoteDevVarValue(value: string): string {
@@ -338,7 +432,7 @@ async function run(
   return { code: await child.exited };
 }
 
-const buildResult = await run(vpBin, ["run", "--filter", "@mosoo/driver", "build"], {
+const buildResult = await run(vpBin, ["run", "--filter", "agent-driver", "build"], {
   cwd: repoRoot,
 });
 if (buildResult.code !== 0) {
@@ -392,6 +486,7 @@ const wranglerResult = await run(
     "--var",
     `WEB_ORIGIN:${webOrigin}`,
     ...createProviderFetchProxyVarArgs(providerFetchProxy),
+    ...createRuntimeProxyVarArgs(wranglerEnv),
     ...(await createWeChatIlinkBaseUrlVarArgs(wranglerEnv)),
     ...(larkSidecarSecret ? createLarkSidecarVarArgs(larkSidecarSecret) : []),
   ],

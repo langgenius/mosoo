@@ -1,8 +1,4 @@
-import type {
-  DriverHeartbeatInput,
-  DriverHelloInput,
-  DriverReadyInput,
-} from "@mosoo/driver-protocol";
+import type { DriverHeartbeatInput, DriverHelloInput, DriverReadyInput } from "agent-driver/orpc";
 
 import type { Deferred } from "./driver-instance-support";
 

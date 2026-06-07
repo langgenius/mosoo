@@ -4,7 +4,7 @@ import {
   SANDBOX_MEMORY_PATH,
   SANDBOX_SESSION_STATE_DIR,
   SANDBOX_SESSION_ROOT,
-} from "@mosoo/driver-protocol";
+} from "agent-driver/paths";
 
 import { parseAgentFileListingOutput } from "../src/modules/runtime/application/agent-file-browser-listing";
 

@@ -178,7 +178,7 @@ export function FileBrowserMode({ agent }: { agent: Agent }): ReactElement {
         />
         <div className="border-border-subtle text-muted-foreground flex h-9 shrink-0 items-center gap-4 border-t px-4 text-[11px]">
           <span className="inline-flex items-center gap-1.5">
-            <span className="bg-green-600 size-2 rounded-full" />
+            <span className="size-2 rounded-full bg-green-600" />
             Persistent
           </span>
           <span className="inline-flex items-center gap-1.5">

@@ -2,13 +2,13 @@ import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
 import {
-  configureOpenAiCompanyKey,
+  configureProviderCompanyKey,
   createPreviewRuntimeAgent,
   createPreviewRunId,
   getPreviewSmokeEmail,
   loginWithMosooAiBackdoor,
   maybeClick,
-  requireOpenAiApiKey,
+  requirePreviewRuntimeCredential,
   verifyPreviewReadinessBlocker,
 } from "./preview-live-harness";
 import { createRuntimeSignalCollector } from "./runtime-signal-collector";
@@ -59,7 +59,7 @@ async function verifyDiagnostics(page: Page, agentId: string): Promise<void> {
 test("Preview E2E smoke covers mosoo.ai login, blockers, stream, tool, pill, and diagnostics", async ({
   page,
 }, testInfo) => {
-  requireOpenAiApiKey();
+  const runtimeCredential = requirePreviewRuntimeCredential();
 
   const runtimeSignals = createRuntimeSignalCollector({
     source: "preview-smoke",
@@ -76,6 +76,7 @@ test("Preview E2E smoke covers mosoo.ai login, blockers, stream, tool, pill, and
   });
   const agentId = await createPreviewRuntimeAgent(page, {
     name: smokeAgentName,
+    runtimeButtonName: runtimeCredential.runtimeButtonName,
   });
   runtimeSignals.checkpoint("preview.readiness.blocker.start", {
     agentId,
@@ -83,9 +84,13 @@ test("Preview E2E smoke covers mosoo.ai login, blockers, stream, tool, pill, and
   await verifyPreviewReadinessBlocker(page, agentId);
   runtimeSignals.checkpoint("preview.provider.configure.start", {
     agentId,
-    provider: "openai",
+    provider: runtimeCredential.providerId,
   });
-  await configureOpenAiCompanyKey(page, { runId });
+  await configureProviderCompanyKey(page, {
+    apiKey: runtimeCredential.apiKey,
+    providerId: runtimeCredential.providerId,
+    runId,
+  });
   runtimeSignals.checkpoint("preview.real-stream.start", {
     agentId,
   });

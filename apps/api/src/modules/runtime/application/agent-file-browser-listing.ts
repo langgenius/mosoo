@@ -4,7 +4,7 @@ import {
   SANDBOX_ORGANIZATION_ROOT,
   isSandboxCachePath,
   isSandboxSessionStatePath,
-} from "@mosoo/driver-protocol";
+} from "agent-driver/paths";
 
 import type {
   AgentFileEntryKind,

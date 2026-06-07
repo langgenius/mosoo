@@ -127,7 +127,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                   </p>
                 </div>
                 <Button
-                  className="w-24 shrink-0 border-amber/45 text-amber-fg hover:bg-amber-bg hover:text-amber-fg"
+                  className="border-amber/45 text-amber-fg hover:bg-amber-bg hover:text-amber-fg w-24 shrink-0"
                   onClick={() => {
                     setConfirmUnpublish(true);
                   }}

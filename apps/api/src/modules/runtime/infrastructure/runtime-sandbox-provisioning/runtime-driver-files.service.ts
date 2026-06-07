@@ -1,7 +1,7 @@
-import { SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH } from "@mosoo/driver-protocol";
-import type { DriverProfileConfig } from "@mosoo/driver-protocol";
+import { SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH } from "agent-driver/paths";
 
 import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
+import type { DriverProfileConfig } from "../../domain/driver-snapshot";
 import type { ExecutionSessionHandle } from "../sandbox-handles";
 import {
   getOrganizationPath,

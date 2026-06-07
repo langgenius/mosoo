@@ -6,7 +6,7 @@ import {
   SANDBOX_MEMORY_PATH,
   SANDBOX_SESSION_ROOT,
   getSessionStateRootPath,
-} from "@mosoo/driver-protocol";
+} from "agent-driver/paths";
 
 import { normalizeAgentFileBrowserPath } from "../src/modules/runtime/application/agent-file-browser-path";
 

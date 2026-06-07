@@ -1,10 +1,3 @@
-import { DRIVER_PROTOCOL_VERSION, parseDriverBootPayload } from "@mosoo/driver-protocol";
-import type {
-  DriverBootPayload,
-  DriverExecutionSpec,
-  DriverRuntime,
-  DriverRuntimeTransport,
-} from "@mosoo/driver-protocol";
 import { parsePlatformId } from "@mosoo/id";
 import type {
   CredentialId,
@@ -13,13 +6,15 @@ import type {
   SandboxId,
   SkillSnapshotId,
 } from "@mosoo/id";
+import type { DriverBootPayload, DriverRuntime, DriverRuntimeTransport } from "agent-driver/boot";
+import { DRIVER_PROTOCOL_VERSION, parseDriverBootPayload } from "agent-driver/boot";
 
 export interface CreateBootPayloadInput {
   bootToken: string;
   driverControlPort: number;
   driverGeneration: number;
   driverInstanceId: DriverInstanceId;
-  execution: DriverExecutionSpec;
+  execution: unknown;
   heartbeatIntervalMs: number;
   runtime: DriverRuntime;
   runtimeTransport: DriverRuntimeTransport;

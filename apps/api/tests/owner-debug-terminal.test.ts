@@ -1,15 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  SANDBOX_CACHE_PATH,
-  SANDBOX_MEMORY_PATH,
-  SANDBOX_SESSION_ROOT,
-} from "@mosoo/driver-protocol";
 import type { AccountId } from "@mosoo/id";
+import { SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH, SANDBOX_SESSION_ROOT } from "agent-driver/paths";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
 import { connectOwnerDebugTerminalWebSocket } from "../src/modules/runtime/application/owner-debug-terminal.service";
+import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { API_ERROR_CODE } from "../src/platform/errors";
 import {

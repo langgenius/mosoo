@@ -1,14 +1,11 @@
 import type { SpaceAliasBinding } from "@mosoo/contracts/sandbox";
 import { SPACE_NAME_PATTERN, SPACE_NAME_RULE_DESCRIPTION } from "@mosoo/contracts/space";
-import {
-  DRIVER_CONTROL_PORT_COUNT,
-  DRIVER_CONTROL_PORT_MIN,
-  getGlobalSpaceMountPath,
-  getSessionAliasPath,
-} from "@mosoo/driver-protocol";
-import type { DriverOrganizationAccessSnapshotOutput } from "@mosoo/driver-protocol";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverInstanceId, SessionId, SpaceId } from "@mosoo/id";
+import { DRIVER_CONTROL_PORT_COUNT, DRIVER_CONTROL_PORT_MIN } from "agent-driver/boot";
+import { getGlobalSpaceMountPath, getSessionAliasPath } from "agent-driver/paths";
+
+import type { DriverOrganizationAccessSnapshotOutput } from "./driver-snapshot";
 
 export interface FrozenSandboxSpaceBinding {
   role: "admin" | "edit" | "read";

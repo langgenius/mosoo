@@ -43,6 +43,13 @@ interface OptionalLocalProviderFetchProxyBindings {
   MOSOO_PROVIDER_FETCH_PROXY_URL?: string;
 }
 
+interface OptionalRuntimeProxyBindings {
+  MOSOO_RUNTIME_ALL_PROXY?: string;
+  MOSOO_RUNTIME_HTTP_PROXY?: string;
+  MOSOO_RUNTIME_HTTPS_PROXY?: string;
+  MOSOO_RUNTIME_NO_PROXY?: string;
+}
+
 export interface OptionalSlackAdapterBindings {
   MOSOO_AGENT_ID?: string;
   MOSOO_API_BASE_URL?: string;
@@ -81,6 +88,7 @@ export type ApiBindings = Env &
   OptionalAgentBuilderSystemAgentBinding &
   OptionalAgentBuilderCodeModeBindings &
   OptionalLocalProviderFetchProxyBindings &
+  OptionalRuntimeProxyBindings &
   OptionalSlackAdapterBindings &
   OptionalWeChatIlinkBindings &
   OptionalLarkSidecarBindings &

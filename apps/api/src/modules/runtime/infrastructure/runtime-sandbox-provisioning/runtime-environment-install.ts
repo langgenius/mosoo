@@ -1,4 +1,3 @@
-import type { DriverProfileConfig } from "@mosoo/driver-protocol";
 import type { EnvironmentRevisionId, SessionId } from "@mosoo/id";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
@@ -11,6 +10,7 @@ import {
   toRuntimeDiagnosticReason,
 } from "../../application/runtime-diagnostic-events";
 import type { RuntimeTimingRecorder } from "../../application/session-runs/session-runtime-timing";
+import type { DriverProfileConfig } from "../../domain/driver-snapshot";
 import type { ExecutionSessionHandle } from "../sandbox-handles";
 import {
   ensureProvisioningDirectories,

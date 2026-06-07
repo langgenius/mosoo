@@ -62,7 +62,7 @@
       "entry": ["tests/**/*.test.ts"],
       "project": ["models/**/*.ts!", "src/**/*.ts!", "tests/**/*.ts"],
     },
-    "pkgs/{agent-package,driver-protocol,runtime-catalog,runtime-events,session-policy,skill-package}": {
+    "pkgs/{agent-package,runtime-catalog,runtime-events,session-policy,skill-package}": {
       "includeEntryExports": false,
       "entry": ["tests/**/*.test.ts"],
       "project": ["src/**/*.ts!", "tests/**/*.ts"],

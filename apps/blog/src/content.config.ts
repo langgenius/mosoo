@@ -1,14 +1,9 @@
-import { defineCollection, z } from "astro:content";
 import { glob } from "astro/loaders";
+import { defineCollection, z } from "astro:content";
 
 // Categories shown as tab pills on the index. Add new ones here and they show
 // up automatically — frontmatter is validated against this list.
-export const CATEGORIES = [
-  "Engineering",
-  "Product",
-  "Research",
-  "Customer Stories",
-] as const;
+export const CATEGORIES = ["Engineering", "Product", "Research", "Customer Stories"] as const;
 export const LOCALES = ["zh", "en"] as const;
 
 const blog = defineCollection({

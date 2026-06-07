@@ -28,7 +28,6 @@
         "@mosoo/contracts": "workspace:*",
         "@mosoo/db": "workspace:*",
         "@mosoo/development-auth": "workspace:*",
-        "@mosoo/driver-protocol": "workspace:*",
         "@mosoo/effects": "workspace:*",
         "@mosoo/id": "workspace:*",
         "@mosoo/observability": "workspace:*",
@@ -37,10 +36,11 @@
         "@mosoo/session-policy": "workspace:*",
         "@mosoo/skill-package": "workspace:*",
         "@orpc/server": "^1.14.3",
+        "agent-driver": "workspace:*",
         "agents": "^0.13.3",
         "ai": "^6.0.193",
         "arktype": "^2.2.0",
-        "better-auth": "^1.6.13",
+        "better-auth": "1.6.13",
         "drizzle-orm": "^0.45.2",
         "fflate": "^0.8.3",
         "graphql": "^16.13.2",
@@ -74,21 +74,19 @@
       },
     },
     "apps/driver": {
-      "name": "@mosoo/driver",
+      "name": "agent-driver",
+      "version": "0.1.0",
+      "bin": {
+        "agent-driver": "./dist/driver.mjs",
+      },
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.158",
         "@anthropic-ai/sdk": "^0.100.1",
         "@cfworker/json-schema": "^4.1.1",
         "@modelcontextprotocol/client": "^2.0.0-alpha.2",
-        "@mosoo/contracts": "workspace:*",
-        "@mosoo/driver-protocol": "workspace:*",
-        "@mosoo/effects": "workspace:*",
-        "@mosoo/id": "workspace:*",
-        "@mosoo/observability": "workspace:*",
-        "@mosoo/runtime-events": "workspace:*",
-        "@mosoo/skill-package": "workspace:*",
         "@orpc/client": "^1.14.3",
-        "@orpc/server": "^1.14.3",
+        "fflate": "^0.8.3",
+        "vestig": "^0.23.0",
         "zod": "^4.4.3",
       },
       "devDependencies": {
@@ -145,6 +143,7 @@
         "@vitejs/plugin-react": "^6.0.2",
         "jsdom": "^29.1.1",
         "typescript": "^6.0.3",
+        "vite": "^8.0.14",
         "vite-plus": "^0.1.23",
         "wrangler": "^4.92.0",
       },
@@ -211,20 +210,6 @@
     },
     "pkgs/development-auth": {
       "name": "@mosoo/development-auth",
-      "devDependencies": {
-        "typescript": "^6.0.3",
-        "vite-plus": "^0.1.23",
-      },
-    },
-    "pkgs/driver-protocol": {
-      "name": "@mosoo/driver-protocol",
-      "dependencies": {
-        "@mosoo/contracts": "workspace:*",
-        "@mosoo/id": "workspace:*",
-        "@mosoo/runtime-events": "workspace:*",
-        "@orpc/server": "^1.14.3",
-        "arktype": "^2.2.0",
-      },
       "devDependencies": {
         "typescript": "^6.0.3",
         "vite-plus": "^0.1.23",
@@ -864,10 +849,6 @@
     "@mosoo/design-tokens": ["@mosoo/design-tokens@workspace:pkgs/design-tokens"],
 
     "@mosoo/development-auth": ["@mosoo/development-auth@workspace:pkgs/development-auth"],
-
-    "@mosoo/driver": ["@mosoo/driver@workspace:apps/driver"],
-
-    "@mosoo/driver-protocol": ["@mosoo/driver-protocol@workspace:pkgs/driver-protocol"],
 
     "@mosoo/e2e": ["@mosoo/e2e@workspace:e2e"],
 
@@ -1602,6 +1583,8 @@
     "acorn-jsx": ["acorn-jsx@5.3.2", "", { "peerDependencies": { "acorn": "^6.0.0 || ^7.0.0 || ^8.0.0" } }, "sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ=="],
 
     "agent-install": ["agent-install@0.0.5", "", { "dependencies": { "@iarna/toml": "^2.2.5", "commander": "^14.0.0", "jsonc-parser": "^3.3.1", "picocolors": "^1.1.1", "prompts": "^2.4.2", "yaml": "^2.8.3" }, "bin": { "agent-install": "bin/agent-install.mjs" } }, "sha512-nHlms9BkP8ZiY79HrwCGiA2DcNaXrAaJrCM/BEqQ7MEsSKyCk+2A76xPGylIfASZSZE0SaU3T0bNSg4rBPIJAQ=="],
+
+    "agent-driver": ["agent-driver@workspace:apps/driver"],
 
     "agents": ["agents@0.13.3", "", { "dependencies": { "@babel/plugin-proposal-decorators": "^7.29.0", "@cfworker/json-schema": "^4.1.1", "@modelcontextprotocol/sdk": "1.29.0", "@rolldown/plugin-babel": "^0.2.3", "cron-schedule": "^6.0.0", "mimetext": "^3.0.28", "nanoid": "^5.1.11", "partyserver": "^0.5.6", "partysocket": "1.1.19", "yargs": "^18.0.0" }, "peerDependencies": { "@cloudflare/ai-chat": ">=0.6.1 <1.0.0", "@cloudflare/codemode": ">=0.3.4 <1.0.0", "@tanstack/ai": ">=0.10.2 <1.0.0", "@x402/core": "^2.0.0", "@x402/evm": "^2.0.0", "ai": "^6.0.0", "chat": "^4.29.0", "react": "^19.0.0", "vite": ">=6.0.0 <9.0.0", "zod": "^4.0.0" }, "optionalPeers": ["@cloudflare/ai-chat", "@cloudflare/codemode", "@tanstack/ai", "@x402/core", "@x402/evm", "chat", "vite"], "bin": { "agents": "dist/cli/index.js" } }, "sha512-sanbvHT9rdMuxq9rsBukqqVr88W7s0t6WXFuRdA0uxqikTMCb7Oki9aGWcgjoUN0qvaV/qlJ9RLTQAVSw/eLNg=="],
 

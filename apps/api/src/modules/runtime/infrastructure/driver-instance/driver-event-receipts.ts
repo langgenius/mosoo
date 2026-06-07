@@ -1,11 +1,12 @@
-import type { DriverEventBatchInput, DriverEventReceipt } from "@mosoo/driver-protocol";
+import type { DriverEventEnvelope } from "agent-driver/events";
+import type { DriverEventReceipt } from "agent-driver/orpc";
 
 const MAX_PROCESSED_DRIVER_EVENT_RECEIPTS = 8192;
 
 export function filterNewDriverEvents(input: {
-  events: DriverEventBatchInput["events"];
+  events: readonly DriverEventEnvelope[];
   processedReceipts: Map<string, DriverEventReceipt>;
-}): DriverEventBatchInput["events"] {
+}): DriverEventEnvelope[] {
   const seenEventIds = new Set<string>();
 
   return input.events.filter((envelope) => {
@@ -24,7 +25,7 @@ export function filterNewDriverEvents(input: {
 }
 
 export function createReceiptsForDriverEvents(input: {
-  events: DriverEventBatchInput["events"];
+  events: readonly DriverEventEnvelope[];
   nextSeq: number;
 }): {
   nextSeq: number;
@@ -45,7 +46,7 @@ export function createReceiptsForDriverEvents(input: {
 }
 
 export function readReceiptsForProcessedDriverEvents(input: {
-  events: DriverEventBatchInput["events"];
+  events: readonly DriverEventEnvelope[];
   processedReceipts: Map<string, DriverEventReceipt>;
 }): DriverEventReceipt[] {
   const receipts: DriverEventReceipt[] = [];

@@ -1,17 +1,12 @@
 import type { SessionSummary } from "@mosoo/contracts/session";
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import type { ResolvedRunSkill } from "@mosoo/contracts/skill";
-import { getSessionOrganizationPath } from "@mosoo/driver-protocol";
-import type {
-  DriverProfileConfig,
-  DriverRuntime,
-  DriverSkillCatalogEntry,
-} from "@mosoo/driver-protocol";
 import { createPlatformId } from "@mosoo/id";
 import type { AgentId, PlatformId, SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
 import { getRuntimeCatalogEntry, getRuntimeCatalogVendorForProvider } from "@mosoo/runtime-catalog";
 import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
+import { getSessionOrganizationPath } from "agent-driver/paths";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { validationError } from "../../../../platform/errors";
@@ -31,6 +26,11 @@ import {
 import { resolveRuntimeMcpServersForSnapshot } from "../../../mcp/application/mcp-runtime.service";
 import { resolveVendorApiKey } from "../../../vendor-credentials/application/vendor-credential.service";
 import type { ResolvedVendorCredential } from "../../../vendor-credentials/application/vendor-credential.types";
+import type {
+  DriverProfileConfig,
+  DriverRuntime,
+  DriverSkillCatalogEntry,
+} from "../../domain/driver-snapshot";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import { resolveAgentRuntimeSandboxSubject } from "../../domain/runtime-sandbox-subject";
 import {

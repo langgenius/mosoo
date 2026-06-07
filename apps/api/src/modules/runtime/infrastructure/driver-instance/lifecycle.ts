@@ -1,10 +1,6 @@
 import { driverInstancesTable } from "@mosoo/db";
-import type {
-  DriverHeartbeatInput,
-  DriverHelloInput,
-  DriverReadyInput,
-} from "@mosoo/driver-protocol";
 import type { DriverInstanceId } from "@mosoo/id";
+import type { DriverHeartbeatInput, DriverHelloInput, DriverReadyInput } from "agent-driver/orpc";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -91,8 +87,9 @@ export async function recordDriverInstanceHello(
 
 export async function markDriverInstanceReady(
   bindings: ApiBindings,
-  input: DriverReadyInput & {
+  input: Omit<DriverReadyInput, "driverInstanceId"> & {
     connectionId: string;
+    driverInstanceId: DriverInstanceId;
     generation: number;
   },
 ): Promise<boolean> {

@@ -1,6 +1,6 @@
-import { DRIVER_BOOT_PAYLOAD_FILE_ENV_NAME } from "@mosoo/driver-protocol";
 import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
+import { DRIVER_BOOT_PAYLOAD_FILE_ENV_NAME } from "agent-driver/boot";
 
 import {
   createApiWideEvent,
@@ -31,6 +31,7 @@ import { getNativeResumeRefForRuntime } from "../native-resume-ref.repository";
 import { createDriverBootPayload, createOpaqueBootToken } from "../runtime-boot-token";
 import { runBestEffortRuntimeCleanup } from "../runtime-cleanup";
 import type { RuntimeProcessHandle } from "../sandbox-handles";
+import { AGENT_DRIVER_PROCESS_COMMAND } from "./runtime-driver-artifact";
 import {
   buildExecutionSpec,
   toDriverInstanceMcpGrantRecord,
@@ -62,6 +63,67 @@ import type {
 } from "./runtime-sandbox-provisioning.types";
 
 export { DriverPrewarmProvisionSkippedError } from "./runtime-driver-prewarm-ownership";
+
+const RUNTIME_NO_PROXY_DEFAULTS = ["localhost", "127.0.0.1", "::1", "host.docker.internal"];
+
+type RuntimeProxyBindings = Pick<
+  ApiBindings,
+  | "MOSOO_RUNTIME_ALL_PROXY"
+  | "MOSOO_RUNTIME_HTTP_PROXY"
+  | "MOSOO_RUNTIME_HTTPS_PROXY"
+  | "MOSOO_RUNTIME_NO_PROXY"
+>;
+
+function readRuntimeProxyBinding(bindings: RuntimeProxyBindings, key: keyof RuntimeProxyBindings) {
+  const value = bindings[key]?.trim();
+  return value === undefined || value.length === 0 ? null : value;
+}
+
+function mergeRuntimeNoProxy(value: string | null): string {
+  const entries = new Set(
+    (value ?? "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0),
+  );
+
+  for (const entry of RUNTIME_NO_PROXY_DEFAULTS) {
+    entries.add(entry);
+  }
+
+  return [...entries].join(",");
+}
+
+export function toRuntimeProcessProxyEnv(bindings: RuntimeProxyBindings): Record<string, string> {
+  const httpProxy = readRuntimeProxyBinding(bindings, "MOSOO_RUNTIME_HTTP_PROXY");
+  const httpsProxy = readRuntimeProxyBinding(bindings, "MOSOO_RUNTIME_HTTPS_PROXY");
+  const allProxy = readRuntimeProxyBinding(bindings, "MOSOO_RUNTIME_ALL_PROXY");
+
+  if (httpProxy === null && httpsProxy === null && allProxy === null) {
+    return {};
+  }
+
+  const env: Record<string, string> = {};
+
+  if (httpProxy !== null) {
+    env["HTTP_PROXY"] = httpProxy;
+    env["http_proxy"] = httpProxy;
+  }
+  if (httpsProxy !== null) {
+    env["HTTPS_PROXY"] = httpsProxy;
+    env["https_proxy"] = httpsProxy;
+  }
+  if (allProxy !== null) {
+    env["ALL_PROXY"] = allProxy;
+    env["all_proxy"] = allProxy;
+  }
+
+  const noProxy = mergeRuntimeNoProxy(readRuntimeProxyBinding(bindings, "MOSOO_RUNTIME_NO_PROXY"));
+  env["NO_PROXY"] = noProxy;
+  env["no_proxy"] = noProxy;
+
+  return env;
+}
 
 export async function provisionSessionDriver(
   env: ApiBindings,
@@ -194,7 +256,7 @@ async function provisionDriver(
       }),
     );
 
-    const builtBootPayload = createDriverBootPayload({
+    const bootPayload = createDriverBootPayload({
       bootToken: bootToken.encoded,
       driverControlPort,
       driverGeneration: activeDriverGeneration,
@@ -207,10 +269,12 @@ async function provisionDriver(
       traceparent,
     });
     const bootPayloadPath = `${input.profile.session.homePath}/driver-boot-payload-${processId}.json`;
-    const bootPayloadJson = JSON.stringify(builtBootPayload);
+    const bootPayloadJson = JSON.stringify(bootPayload);
 
     const bootPayloadPreparedPromise = timing.measure("onBootPayloadPrepared", async () => {
-      await input.onBootPayloadPrepared?.(builtBootPayload);
+      await input.onBootPayloadPrepared?.({
+        bootPayload,
+      });
     });
     void bootPayloadPreparedPromise.catch(() => undefined);
 
@@ -228,11 +292,12 @@ async function provisionDriver(
       input.cloudflareSession.writeFile(bootPayloadPath, bootPayloadJson),
     );
     const startedProcess = await timing.measure("startProcess", () =>
-      input.cloudflareSession.startProcess(`bun /driver.mjs`, {
+      input.cloudflareSession.startProcess(AGENT_DRIVER_PROCESS_COMMAND, {
         autoCleanup: true,
         cwd: organizationPath,
         env: {
           [DRIVER_BOOT_PAYLOAD_FILE_ENV_NAME]: bootPayloadPath,
+          ...toRuntimeProcessProxyEnv(env),
         },
         processId,
       }),
@@ -327,7 +392,7 @@ async function provisionDriver(
     });
 
     return {
-      bootPayload: builtBootPayload,
+      bootPayload,
       bootTokenHash: bootToken.hash,
       driverGeneration: activeDriverGeneration,
       driverInstanceId,

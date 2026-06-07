@@ -1,13 +1,3 @@
-import type {
-  DriverBootMcpServer,
-  DriverExecutionSpec,
-  DriverNativeRuntimeRef,
-  DriverOrganizationAccessSnapshotOutput,
-  DriverProfileConfig,
-  DriverResolvedMcpServer,
-  DriverResolvedSkill,
-  DriverSkillCatalogEntry,
-} from "@mosoo/driver-protocol";
 import { parsePlatformId } from "@mosoo/id";
 import type {
   CredentialId,
@@ -16,7 +6,17 @@ import type {
   SessionRunId,
   SkillSnapshotId,
 } from "@mosoo/id";
+import type { DriverNativeRuntimeRef } from "agent-driver/runtime";
 
+import type {
+  DriverBootMcpServer,
+  DriverExecutionSpec,
+  DriverOrganizationAccessSnapshotOutput,
+  DriverProfileConfig,
+  DriverResolvedMcpServer,
+  DriverResolvedSkill,
+  DriverSkillCatalogEntry,
+} from "../../domain/driver-snapshot";
 import { RUNTIME_ACTION_TOKEN_TTL_MS, RUNTIME_RUN_RETENTION_MS } from "../../domain/runtime-config";
 import {
   getRuntimeDriverMcpProxyPath,

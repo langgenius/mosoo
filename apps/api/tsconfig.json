@@ -2,6 +2,10 @@
   "extends": "../../dev/config/tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ESNext", "WebWorker"],
+    "paths": {
+      "agent-driver": ["../driver/src/index.ts"],
+      "agent-driver/*": ["../driver/src/*"]
+    },
     "types": ["./.tmp/types/worker-configuration.d.ts"]
   },
   "include": ["src/**/*.ts"]

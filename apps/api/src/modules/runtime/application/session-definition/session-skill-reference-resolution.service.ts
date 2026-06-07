@@ -1,11 +1,11 @@
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import type { ResolvedRunSkill } from "@mosoo/contracts/skill";
-import type { DriverSkillCatalogEntry } from "@mosoo/driver-protocol";
 import type { OrganizationId, SkillSnapshotId } from "@mosoo/id";
 
 import { isPackageSkillRuntimeId } from "../../../agents/application/agent-stored-config.service";
 import { listSkillSnapshotsByIds } from "../../../skills/application/skill-package-snapshot.service";
 import type { LoadedSkillSnapshotRow } from "../../../skills/application/skill-package-snapshot.service";
+import type { DriverSkillCatalogEntry } from "../../domain/driver-snapshot";
 import type { SessionExecutionPlan } from "./session-execution.types";
 
 export interface ResolvedSessionSkillReference {

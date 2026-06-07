@@ -1,11 +1,11 @@
 import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
+import { parsePlatformId } from "@mosoo/id";
+import type { DriverCommandId } from "@mosoo/id";
 import type {
   DriverCommandUpdateInput,
   DriverNextCommandInput,
   DriverNextCommandOutput,
-} from "@mosoo/driver-protocol";
-import { parsePlatformId } from "@mosoo/id";
-import type { DriverCommandId } from "@mosoo/id";
+} from "agent-driver/orpc";
 
 import {
   claimNextQueuedRuntimeCommandRecord,
@@ -57,16 +57,17 @@ export class DriverInstanceRpcCommandController {
     if (input.driverInstanceId !== state.requireDriverInstanceId()) {
       throw new Error("Driver instance id mismatch.");
     }
+    const driverInstanceId = state.requireDriverInstanceId();
     context.assertActiveConnection();
 
     const commandId = parsePlatformId<DriverCommandId>(input.commandId, "driver command id");
-    const command = await getRuntimeCommandRecord(env.DB, input.driverInstanceId, commandId);
+    const command = await getRuntimeCommandRecord(env.DB, driverInstanceId, commandId);
     context.assertActiveConnection();
 
     const updateOutcome = await updateRuntimeCommandRecord(env.DB, {
       commandId,
       deliveryConnectionId: context.connectionId,
-      driverInstanceId: input.driverInstanceId,
+      driverInstanceId,
       ...(input.error === undefined ? {} : { error: input.error }),
       status: input.status,
       ...(input.result === undefined ? {} : { result: input.result }),
@@ -84,7 +85,7 @@ export class DriverInstanceRpcCommandController {
         input.status === "cancelled" ||
         input.status === "expired")
     ) {
-      await releaseLinkedTerminalDriverInstanceSessionRun(env, input.driverInstanceId);
+      await releaseLinkedTerminalDriverInstanceSessionRun(env, driverInstanceId);
     }
 
     return { ok: true };
@@ -99,6 +100,7 @@ export class DriverInstanceRpcCommandController {
     if (input.driverInstanceId !== state.requireDriverInstanceId()) {
       throw new Error("Driver instance id mismatch.");
     }
+    const driverInstanceId = state.requireDriverInstanceId();
 
     if (state.commandState().terminalized) {
       return { command: null };
@@ -107,7 +109,7 @@ export class DriverInstanceRpcCommandController {
 
     const record = await claimNextQueuedRuntimeCommandRecord(
       env.DB,
-      input.driverInstanceId,
+      driverInstanceId,
       context.connectionId,
     );
 

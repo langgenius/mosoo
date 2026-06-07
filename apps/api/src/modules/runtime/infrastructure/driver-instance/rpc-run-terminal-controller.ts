@@ -1,4 +1,4 @@
-import type { DriverCompletionInput, DriverFailureInput } from "@mosoo/driver-protocol";
+import type { DriverCompletionInput, DriverFailureInput } from "agent-driver/orpc";
 
 import { logError, logInfo } from "../../../../platform/cloudflare/logger";
 import { syncSessionViewerState } from "../../../sessions/application/session-viewer-events.service";
@@ -35,12 +35,13 @@ export class DriverInstanceRpcRunTerminalController {
     if (input.driverInstanceId !== state.requireDriverInstanceId()) {
       throw new Error("Driver instance id mismatch.");
     }
+    const driverInstanceId = state.requireDriverInstanceId();
     context.assertActiveConnection();
 
     await viewerEventDelivery.flushSafely();
     context.assertActiveConnection();
     await recordDriverInstanceCompletion(env, {
-      driverInstanceId: input.driverInstanceId,
+      driverInstanceId,
       driverReady: state.hello !== null,
     });
     context.assertActiveConnection();
@@ -90,12 +91,13 @@ export class DriverInstanceRpcRunTerminalController {
     if (input.driverInstanceId !== state.requireDriverInstanceId()) {
       throw new Error("Driver instance id mismatch.");
     }
+    const driverInstanceId = state.requireDriverInstanceId();
     context.assertActiveConnection();
 
     await viewerEventDelivery.flushSafely();
     context.assertActiveConnection();
     await recordDriverInstanceFailure(env, {
-      driverInstanceId: input.driverInstanceId,
+      driverInstanceId,
       error: input.error,
     });
     context.assertActiveConnection();

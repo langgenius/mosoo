@@ -186,14 +186,14 @@ Recommended baseline:
 E2E entry points:
 
 ```bash
-vp run e2e:signal-contract
+vp run e2e:harness-contract
 ./e2e/run-deterministic.sh
 ./e2e/run-preview-smoke.sh
 ./e2e/run-preview-smoke.sh --headed
 ./e2e/run-preview-latency.sh
 ```
 
-`run-deterministic.sh` is the local acceptance path without external credentials. The preview live harness requires a provider key such as `MOSOO_E2E_OPENAI_API_KEY` or `MOSOO_E2E_PROVIDER_API_KEY`.
+`run-deterministic.sh` is the local acceptance path without external credentials. `e2e:harness-contract` covers local harness contracts that do not need live credentials. The preview live harness requires a provider key such as `MOSOO_E2E_OPENAI_API_KEY`, `MOSOO_E2E_ANTHROPIC_API_KEY`, or `MOSOO_E2E_PROVIDER_API_KEY`; set `MOSOO_E2E_PROVIDER=openai|anthropic` to choose the public runtime provider. ACP fallback is an internal transport covered by driver fixture and API integration gates.
 
 ## Engineering Principles
 

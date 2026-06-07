@@ -1,10 +1,4 @@
 import type { AgentKind, AgentReadiness } from "@mosoo/contracts/agent";
-import { getSessionOrganizationPath, getSessionRuntimeStatePath } from "@mosoo/driver-protocol";
-import type {
-  DriverConfigRevision,
-  DriverProfileConfig,
-  DriverOrganizationAccessSnapshotOutput,
-} from "@mosoo/driver-protocol";
 import type {
   AccountId,
   AgentId,
@@ -13,12 +7,18 @@ import type {
   SessionId,
   SpaceId,
 } from "@mosoo/id";
+import { getSessionOrganizationPath, getSessionRuntimeStatePath } from "agent-driver/paths";
 
 import {
   isSpaceRoleRankSufficient,
   listSpaceAccessRows,
   rankToSpaceRole,
 } from "../../spaces/domain/space-access.policy";
+import type {
+  DriverConfigRevision,
+  DriverOrganizationAccessSnapshotOutput,
+  DriverProfileConfig,
+} from "../domain/driver-snapshot";
 import { getSupportedRuntimeId } from "../domain/runtime-config";
 import { resolveAgentRuntimeSandboxSubject } from "../domain/runtime-sandbox-subject";
 import { freezeSandboxSpaceBindings } from "../domain/sandbox-layout";

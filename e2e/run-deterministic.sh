@@ -14,6 +14,6 @@ export MOSOO_E2E_WEB_SERVER_COMMAND="${MOSOO_E2E_WEB_SERVER_COMMAND:-$VP_BIN run
 
 cd "$ROOT_DIR"
 if [[ " $* " != *" --list "* ]]; then
-  "$VP_BIN" run e2e:signal-contract
+  "$VP_BIN" run e2e:harness-contract
 fi
 exec "$PLAYWRIGHT_BIN" test "$@" --config e2e/playwright.config.ts e2e/session-log-deterministic.spec.ts

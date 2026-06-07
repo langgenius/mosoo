@@ -30,7 +30,7 @@ export interface GradientVisual {
 
 export function gradientFromSlug(slug: string): GradientVisual {
   const h = hash(slug);
-  const palette = PALETTES[h % PALETTES.length] as readonly [string, string, string, string];
+  const palette = PALETTES[h % PALETTES.length];
   const angle = (h >> 4) % 60; // 0–59° tilt for organic horizon line
   const horizon = 52 + ((h >> 8) % 16); // 52–67% from top
   const blur = 28 + ((h >> 12) % 24); // soften the horizon

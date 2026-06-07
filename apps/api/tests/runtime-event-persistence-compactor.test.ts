@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
-import type { DriverEventEnvelope } from "@mosoo/driver-protocol";
 import { createRuntimeEvent } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope, RuntimeEventKind } from "@mosoo/runtime-events";
+import type { DriverEventEnvelope } from "agent-driver/events";
 
 import type { ProjectedRuntimeEventRecord } from "../src/modules/runtime/infrastructure/driver-instance/event-types";
 import { RuntimeEventPersistenceCompactor } from "../src/modules/runtime/infrastructure/driver-instance/runtime-event-persistence-compactor";

@@ -1,5 +1,5 @@
-import { normalizeSandboxFileBrowserPath } from "@mosoo/driver-protocol";
-import type { SandboxFileBrowserPathPurpose } from "@mosoo/driver-protocol";
+import { normalizeSandboxFileBrowserPath } from "agent-driver/paths";
+import type { SandboxFileBrowserPathPurpose } from "agent-driver/paths";
 
 import { validationError } from "../../../platform/errors";
 

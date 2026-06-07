@@ -3,7 +3,6 @@ import {
   createServerCustomEvent,
   parseNullableSessionUsageSummary,
 } from "@mosoo/ag-ui-session";
-import type { DriverEventEnvelope } from "@mosoo/driver-protocol";
 import type { DriverInstanceId } from "@mosoo/id";
 import {
   parseRuntimeEventEnvelope,
@@ -13,6 +12,7 @@ import {
   readRuntimeEventString,
 } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
+import type { DriverEventEnvelope } from "agent-driver/events";
 
 import { logInfo } from "../../../../platform/cloudflare/logger";
 import { isTruthy } from "../../../../shared/truthiness";
@@ -65,7 +65,7 @@ export async function projectRuntimeDriverEvents(
   input: {
     assertCurrentConnection?: () => void;
     currentLiveState?: SessionLiveState | null;
-    events: DriverEventEnvelope[];
+    events: readonly DriverEventEnvelope[];
     driverInstanceId: DriverInstanceId;
     link?: RuntimeSessionLink | null;
   },

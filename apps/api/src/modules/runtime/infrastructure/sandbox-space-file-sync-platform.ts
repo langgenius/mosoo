@@ -1,4 +1,4 @@
-import type { RuntimeSpaceMountPath } from "@mosoo/driver-protocol";
+import type { RuntimeSpaceMountPath } from "agent-driver/paths";
 
 import { SANDBOX_SPACE_ANCHOR_FILE_NAME } from "../domain/sandbox-layout";
 import type { ExecutionSessionHandle } from "./sandbox-handles";

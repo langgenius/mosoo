@@ -1,12 +1,12 @@
 import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
+import type { DriverInstanceId } from "@mosoo/id";
+import type { DriverEventEnvelope } from "agent-driver/events";
 import type {
-  DriverEventBatchInput,
   DriverEventReceipt,
   DriverHeartbeatInput,
   DriverHelloInput,
   DriverReadyInput,
-} from "@mosoo/driver-protocol";
-import type { DriverInstanceId } from "@mosoo/id";
+} from "agent-driver/orpc";
 
 import { isTruthy } from "../../../../shared/truthiness";
 import type { DriverInstanceCommandState, RuntimeCommandWaiter } from "./commands";
@@ -353,16 +353,14 @@ export class DriverInstanceRuntimeState {
     );
   }
 
-  filterUnprocessedDriverEvents(
-    events: DriverEventBatchInput["events"],
-  ): DriverEventBatchInput["events"] {
+  filterUnprocessedDriverEvents(events: readonly DriverEventEnvelope[]): DriverEventEnvelope[] {
     return filterNewDriverEvents({
       events,
       processedReceipts: this.processedDriverEventReceipts,
     });
   }
 
-  createDriverEventReceipts(events: DriverEventBatchInput["events"]): DriverEventReceipt[] {
+  createDriverEventReceipts(events: readonly DriverEventEnvelope[]): DriverEventReceipt[] {
     const result = createReceiptsForDriverEvents({
       events,
       nextSeq: this.driverEventReceiptSeq,
@@ -371,7 +369,7 @@ export class DriverInstanceRuntimeState {
     return result.receipts;
   }
 
-  readProcessedDriverEventReceipts(events: DriverEventBatchInput["events"]): DriverEventReceipt[] {
+  readProcessedDriverEventReceipts(events: readonly DriverEventEnvelope[]): DriverEventReceipt[] {
     return readReceiptsForProcessedDriverEvents({
       events,
       processedReceipts: this.processedDriverEventReceipts,

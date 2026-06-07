@@ -1,5 +1,6 @@
 import type { CollectionEntry } from "astro:content";
-import { LOCALES } from "../content.config";
+
+import type { LOCALES } from "../content.config";
 
 export type Locale = (typeof LOCALES)[number];
 
@@ -10,8 +11,7 @@ export const localeLabels: Record<Locale, string> = {
   en: "EN",
 };
 
-export const getPostLocale = (post: CollectionEntry<"blog">): Locale =>
-  post.data.locale;
+export const getPostLocale = (post: CollectionEntry<"blog">): Locale => post.data.locale;
 
 export const getPostSlug = (post: CollectionEntry<"blog">): string =>
   post.data.permalink ?? post.id.replace(/-(en|zh)$/, "");
@@ -21,10 +21,8 @@ export const getPostPath = (post: CollectionEntry<"blog">): string => {
   return getPostLocale(post) === DEFAULT_LOCALE ? slug : `${getPostLocale(post)}/${slug}`;
 };
 
-export const getPostHref = (
-  post: CollectionEntry<"blog">,
-  base: string,
-): string => `${base}/${getPostPath(post)}`;
+export const getPostHref = (post: CollectionEntry<"blog">, base: string): string =>
+  `${base}/${getPostPath(post)}`;
 
 export const getIndexHref = (locale: Locale, base: string): string =>
   locale === DEFAULT_LOCALE ? `${base || "/"}` : `${base}/${locale}`;
@@ -35,9 +33,7 @@ export const getLocaleFromPath = (pathname: string, base: string): Locale => {
     normalizedBase && pathname.startsWith(normalizedBase)
       ? pathname.slice(normalizedBase.length)
       : pathname;
-  return withoutBase === "/zh" || withoutBase.startsWith("/zh/")
-    ? "zh"
-    : DEFAULT_LOCALE;
+  return withoutBase === "/zh" || withoutBase.startsWith("/zh/") ? "zh" : DEFAULT_LOCALE;
 };
 
 export const getAlternateLocaleHref = (
@@ -54,10 +50,7 @@ export const getAlternateLocaleHref = (
   const targetWithoutBase = isChinese
     ? withoutBase.replace(/^\/zh(?=\/|$)/, "") || "/"
     : `/zh${withoutBase === "/" ? "" : withoutBase}`;
-  const href =
-    `${normalizedBase}${targetWithoutBase}`.replace(/\/$/, "") ||
-    normalizedBase ||
-    "/";
+  const href = `${normalizedBase}${targetWithoutBase}`.replace(/\/$/, "") || normalizedBase || "/";
 
   return {
     href,

@@ -56,9 +56,7 @@ function FooterColumn({
           <li key={link.label}>
             <a
               href={link.href}
-              {...(link.internal
-                ? {}
-                : { target: "_blank", rel: "noreferrer noopener" })}
+              {...(link.internal ? {} : { target: "_blank", rel: "noreferrer noopener" })}
               className="text-paper-100/85 hover:text-paper-100 focus-visible:ring-paper-100/40 rounded-sm text-[13.5px] transition-colors outline-none focus-visible:ring-2"
             >
               {link.label}

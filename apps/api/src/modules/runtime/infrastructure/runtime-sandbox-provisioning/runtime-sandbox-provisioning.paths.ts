@@ -1,5 +1,6 @@
-import { SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH } from "@mosoo/driver-protocol";
-import type { DriverProfileConfig } from "@mosoo/driver-protocol";
+import { SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH } from "agent-driver/paths";
+
+import type { DriverProfileConfig } from "../../domain/driver-snapshot";
 
 const WRANGLER_DEV_PORT = "8787";
 

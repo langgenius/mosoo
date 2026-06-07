@@ -1,11 +1,12 @@
+import { createPromiseDeferred } from "@mosoo/effects";
+import type { DriverEventEnvelope } from "agent-driver/events";
 import type {
   DriverEventBatchInput,
   DriverEventBatchOutput,
   DriverEventReceipt,
   DriverLogBatchInput,
   DriverLogBatchOutput,
-} from "@mosoo/driver-protocol";
-import { createPromiseDeferred } from "@mosoo/effects";
+} from "agent-driver/orpc";
 
 import type { SessionDeliveryEvent } from "../../../sessions/application/session-live-state.service";
 import { getSessionRuntimeEventSourceReceipts } from "../../../sessions/infrastructure/session-runtime-event-store.repository";
@@ -45,6 +46,7 @@ export class DriverInstanceRpcEventIngestionController {
     if (input.driverInstanceId !== state.requireDriverInstanceId()) {
       throw new Error("Driver instance id mismatch.");
     }
+    const driverInstanceId = state.requireDriverInstanceId();
 
     if (input.events.length > EVENT_BATCH_MAX_SIZE) {
       throw new Error(`Event batch exceeds max size ${EVENT_BATCH_MAX_SIZE}.`);
@@ -81,7 +83,7 @@ export class DriverInstanceRpcEventIngestionController {
       const projection = await projectRuntimeDriverEvents(env.DB, {
         assertCurrentConnection: () => context.assertActiveConnection(),
         currentLiveState: viewCache.currentState,
-        driverInstanceId: input.driverInstanceId,
+        driverInstanceId,
         events,
         link,
       });
@@ -90,7 +92,7 @@ export class DriverInstanceRpcEventIngestionController {
       );
 
       const commit = await persistProjectedRuntimeDriverEvents(env, {
-        driverInstanceId: input.driverInstanceId,
+        driverInstanceId,
         projection: {
           ...projection,
           runtimeEvents: persistenceRuntimeEvents,
@@ -157,7 +159,7 @@ export class DriverInstanceRpcEventIngestionController {
 
   async #readPersistedEventReceipts(
     link: RuntimeSessionLink,
-    events: DriverEventBatchInput["events"],
+    events: readonly DriverEventEnvelope[],
   ): Promise<DriverEventReceipt[]> {
     if (link.sessionId === null) {
       return [];

@@ -7,13 +7,14 @@ import type {
 } from "@mosoo/contracts/session";
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import type { ResolvedRunSkill } from "@mosoo/contracts/skill";
+import type { EnvironmentId, EnvironmentRevisionId } from "@mosoo/id";
+
 import type {
   DriverOrganizationAccessSnapshotOutput,
   DriverProfileConfig,
   DriverResolvedMcpServer,
   DriverSkillCatalogEntry,
-} from "@mosoo/driver-protocol";
-import type { EnvironmentId, EnvironmentRevisionId } from "@mosoo/id";
+} from "../../domain/driver-snapshot";
 
 export interface SessionExecutionPlan {
   binding: Omit<SessionExecutionBinding, "sessionId">;

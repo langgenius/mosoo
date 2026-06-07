@@ -13,15 +13,15 @@ title: "Post title"
 description: "One- or two-sentence dek shown on the index card and metadata."
 date: 2026-05-28
 category: "Engineering" # Engineering | Product | Research | Customer Stories
-author: "Mosoo team"    # optional, defaults to "Mosoo team"
-locale: "en"            # en | zh, defaults to en
+author: "Mosoo team" # optional, defaults to "Mosoo team"
+locale: "en" # en | zh, defaults to en
 permalink: "post-title" # optional shared slug for localized posts
 translationKey: "post-title" # optional key linking localized versions
-titleAccent: "If"       # optional colored substring in the title
-featured: false         # at most one true — wins the hero slot on the index
-draft: false            # true keeps the post out of the build
-heroImage: "/blog/blog/<slug>/hero.jpg"   # optional, see Images below
-heroAlt: "..."          # optional alt for heroImage
+titleAccent: "If" # optional colored substring in the title
+featured: false # at most one true — wins the hero slot on the index
+draft: false # true keeps the post out of the build
+heroImage: "/blog/blog/<slug>/hero.jpg" # optional, see Images below
+heroAlt: "..." # optional alt for heroImage
 ---
 ```
 
@@ -38,7 +38,7 @@ they survive base-path changes. Example:
 
 ```yaml
 heroImage: "/blog/blog/the-journey-begins-with-an-imagine-if/hero.jpg"
-heroAlt:   "A young moso bamboo culm pushing through paper"
+heroAlt: "A young moso bamboo culm pushing through paper"
 ```
 
 In the post body, use standard markdown:

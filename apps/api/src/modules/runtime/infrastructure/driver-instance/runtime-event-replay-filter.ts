@@ -1,16 +1,12 @@
-import type { DriverEventBatchInput } from "@mosoo/driver-protocol";
-import {
-  readRuntimeEventMessageKey,
-  readRuntimeEventPayload,
-  readRuntimeEventString,
-  readRuntimeEventToolCallId,
-} from "@mosoo/runtime-events";
-import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
+import type { DriverEventEnvelope } from "agent-driver/events";
+
+type ReplayRuntimeEvent = DriverEventEnvelope["event"];
+type ReplayRuntimeEventPayload = Record<string, unknown>;
 
 export function filterDurablyAcceptedRuntimeStreamReplays(
-  events: DriverEventBatchInput["events"],
+  events: readonly DriverEventEnvelope[],
   durableEventIds: ReadonlySet<string>,
-): DriverEventBatchInput["events"] {
+): DriverEventEnvelope[] {
   const durableStreams = createDurableRuntimeStreamReplayIndex(events, durableEventIds);
 
   return events.filter((envelope) => {
@@ -30,7 +26,7 @@ interface DurableRuntimeStreamReplayIndex {
 }
 
 function createDurableRuntimeStreamReplayIndex(
-  events: DriverEventBatchInput["events"],
+  events: readonly DriverEventEnvelope[],
   durableEventIds: ReadonlySet<string>,
 ): DurableRuntimeStreamReplayIndex {
   const index: DurableRuntimeStreamReplayIndex = {
@@ -91,7 +87,7 @@ function createDurableRuntimeStreamReplayIndex(
 }
 
 function isDurablyAcceptedRuntimeStreamReplay(
-  event: RuntimeEventEnvelope,
+  event: ReplayRuntimeEvent,
   index: DurableRuntimeStreamReplayIndex,
 ): boolean {
   if (isRunBoundRuntimeStreamEvent(event)) {
@@ -119,7 +115,7 @@ function isDurablyAcceptedRuntimeStreamReplay(
   return toolKey !== null && index.toolKeys.has(toolKey);
 }
 
-function isRunBoundRuntimeStreamEvent(event: RuntimeEventEnvelope): boolean {
+function isRunBoundRuntimeStreamEvent(event: ReplayRuntimeEvent): boolean {
   return (
     event.kind === "item.completed" ||
     event.kind === "item.started" ||
@@ -134,11 +130,11 @@ function isRunBoundRuntimeStreamEvent(event: RuntimeEventEnvelope): boolean {
   );
 }
 
-function readRuntimeRunReplayKey(event: RuntimeEventEnvelope): string | null {
+function readRuntimeRunReplayKey(event: ReplayRuntimeEvent): string | null {
   return event.runId === undefined ? null : `${event.sessionId}:${event.runId}`;
 }
 
-function readRuntimeMessageReplayKey(event: RuntimeEventEnvelope): string | null {
+function readRuntimeMessageReplayKey(event: ReplayRuntimeEvent): string | null {
   if (
     event.kind !== "message.added" &&
     event.kind !== "message.completed" &&
@@ -148,11 +144,12 @@ function readRuntimeMessageReplayKey(event: RuntimeEventEnvelope): string | null
     return null;
   }
 
-  const messageKey = readRuntimeEventMessageKey(event);
+  const payload = readRuntimeEventPayload(event);
+  const messageKey = readRuntimeEventString(payload, "messageId") ?? event.id;
   return messageKey === null ? null : `${event.sessionId}:${event.runId ?? ""}:${messageKey}`;
 }
 
-function readRuntimeThoughtReplayKey(event: RuntimeEventEnvelope): string | null {
+function readRuntimeThoughtReplayKey(event: ReplayRuntimeEvent): string | null {
   if (
     event.kind !== "thought.completed" &&
     event.kind !== "thought.delta" &&
@@ -161,16 +158,17 @@ function readRuntimeThoughtReplayKey(event: RuntimeEventEnvelope): string | null
     return null;
   }
 
-  const thoughtKey = readRuntimeEventMessageKey(event);
+  const payload = readRuntimeEventPayload(event);
+  const thoughtKey = readRuntimeEventString(payload, "thoughtId") ?? event.id;
   return thoughtKey === null ? null : `${event.sessionId}:${event.runId ?? ""}:${thoughtKey}`;
 }
 
-function readRuntimeToolReplayKey(event: RuntimeEventEnvelope): string | null {
+function readRuntimeToolReplayKey(event: ReplayRuntimeEvent): string | null {
   const toolCallId = readRuntimeEventToolCallId(event) ?? readRuntimeToolItemReplayId(event);
   return toolCallId === null ? null : `${event.sessionId}:${event.runId ?? ""}:${toolCallId}`;
 }
 
-function readRuntimeToolItemReplayId(event: RuntimeEventEnvelope): string | null {
+function readRuntimeToolItemReplayId(event: ReplayRuntimeEvent): string | null {
   if (event.kind !== "item.completed" && event.kind !== "item.started") {
     return null;
   }
@@ -182,4 +180,29 @@ function readRuntimeToolItemReplayId(event: RuntimeEventEnvelope): string | null
   }
 
   return readRuntimeEventString(payload, "itemId") ?? event.id;
+}
+
+function readRuntimeEventToolCallId(event: ReplayRuntimeEvent): string | null {
+  if (event.kind !== "tool.call.updated") {
+    return null;
+  }
+
+  return readRuntimeEventString(readRuntimeEventPayload(event), "toolCallId") ?? event.id;
+}
+
+function readRuntimeEventPayload(event: ReplayRuntimeEvent): ReplayRuntimeEventPayload {
+  return isRuntimeEventPayload(event.payload) ? event.payload : {};
+}
+
+function isRuntimeEventPayload(value: unknown): value is ReplayRuntimeEventPayload {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readRuntimeEventString(value: unknown, field: string): string | null {
+  if (!isRuntimeEventPayload(value)) {
+    return null;
+  }
+
+  const entry = value[field];
+  return typeof entry === "string" && entry.length > 0 ? entry : null;
 }

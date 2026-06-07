@@ -1,12 +1,12 @@
 import { describe, expect, mock, test } from "bun:test";
 
-import type {
-  DriverOrganizationAccessSnapshotOutput,
-  DriverProfileConfig,
-} from "@mosoo/driver-protocol";
 import type { SandboxSessionId } from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 
+import type {
+  DriverOrganizationAccessSnapshotOutput,
+  DriverProfileConfig,
+} from "../src/modules/runtime/domain/driver-snapshot";
 import type {
   ExecutionSessionHandle,
   SandboxHandle,

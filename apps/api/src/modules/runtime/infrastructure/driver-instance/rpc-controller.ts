@@ -13,7 +13,7 @@ import type {
   DriverNextCommandInput,
   DriverNextCommandOutput,
   DriverReadyInput,
-} from "@mosoo/driver-protocol";
+} from "agent-driver/orpc";
 
 import type { DriverInstanceRpcHandler, DriverInstanceRpcOperationContext } from "./rpc";
 import { DriverInstanceRpcCommandController } from "./rpc-command-controller";

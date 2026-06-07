@@ -1,6 +1,6 @@
-import { getSessionSpaceRootPath } from "@mosoo/driver-protocol";
 import { discardPromiseResult } from "@mosoo/effects";
 import type { SandboxBackupId, SandboxSessionId, SessionId } from "@mosoo/id";
+import { getSessionSpaceRootPath } from "agent-driver/paths";
 
 import { withDisposedRpcResult } from "../../../../platform/cloudflare/rpc-disposal";
 import { withRuntimeProvisionTimeout } from "../runtime-provision-timeout";

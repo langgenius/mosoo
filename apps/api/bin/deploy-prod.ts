@@ -246,7 +246,7 @@ writeStdout("▶ Ensuring channel-final-delivery queues exist");
 ensureChannelFinalDeliveryQueues();
 
 writeStdout("▶ Building driver");
-runVp(["run", "--filter", "@mosoo/driver", "build"]);
+runVp(["run", "--filter", "agent-driver", "build"]);
 
 writeStdout("▶ Deploying worker");
 run(["deploy", "--env", ENV]);

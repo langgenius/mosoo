@@ -1,4 +1,4 @@
-import type { DriverLogBatchInput } from "@mosoo/driver-protocol";
+import type { DriverLogBatchInput } from "agent-driver/orpc";
 
 import { createApiChildLogger, runWithApiLogContext } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -12,11 +12,12 @@ export async function publishDriverLogBatch(
   state: DriverInstanceRuntimeState,
   input: DriverLogBatchInput,
 ): Promise<void> {
+  const driverInstanceId = state.requireDriverInstanceId();
   const cachedLink = state.runtimeSessionLink;
   const link =
     cachedLink !== null && !runtimeSessionLinkNeedsRefresh(cachedLink)
       ? cachedLink
-      : await getRuntimeSessionLink(env.DB, input.driverInstanceId);
+      : await getRuntimeSessionLink(env.DB, driverInstanceId);
   state.setRuntimeSessionLink(link);
 
   for (const entry of input.logs) {
@@ -29,7 +30,7 @@ export async function publishDriverLogBatch(
         ...(isTruthy(link.traceId) ? { traceId: link.traceId } : {}),
         ...(isTruthy(state.traceId) ? { traceId: state.traceId } : {}),
         ...entry.context,
-        driverInstanceId: input.driverInstanceId,
+        driverInstanceId,
         ...(isTruthy(link.sessionRunId) ? { sessionRunId: link.sessionRunId } : {}),
       },
       () => {

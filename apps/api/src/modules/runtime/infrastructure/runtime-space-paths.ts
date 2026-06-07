@@ -1,7 +1,7 @@
 import { normalizeSpaceFilePath } from "@mosoo/contracts/file";
 import type { SpaceAliasBinding } from "@mosoo/contracts/sandbox";
-import { readRuntimeSpaceMountPathOriginal } from "@mosoo/driver-protocol";
-import type { RuntimeSpaceMountPath } from "@mosoo/driver-protocol";
+import { readRuntimeSpaceMountPathOriginal } from "agent-driver/paths";
+import type { RuntimeSpaceMountPath } from "agent-driver/paths";
 
 export interface RuntimeSpacePathResolution {
   readonly relativePath: string;

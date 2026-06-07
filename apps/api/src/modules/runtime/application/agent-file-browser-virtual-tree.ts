@@ -1,14 +1,14 @@
 import type { SpaceAliasBinding } from "@mosoo/contracts/sandbox";
 import { sandboxSessionsTable, sessionsTable } from "@mosoo/db";
+import { parsePlatformId } from "@mosoo/id";
+import type { AccountId, AgentId, SandboxId, SessionId, SpaceId } from "@mosoo/id";
 import {
   SANDBOX_GLOBAL_SPACE_ROOT,
   SANDBOX_MEMORY_PATH,
   SANDBOX_ORGANIZATION_ROOT,
   SANDBOX_SESSION_ROOT,
   SANDBOX_WORKSPACE_ROOT,
-} from "@mosoo/driver-protocol";
-import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AgentId, SandboxId, SessionId, SpaceId } from "@mosoo/id";
+} from "agent-driver/paths";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";

@@ -2,7 +2,7 @@ import {
   SANDBOX_SESSION_ROOT,
   SANDBOX_SESSION_STATE_DIR,
   SANDBOX_WORKSPACE_ROOT,
-} from "@mosoo/driver-protocol";
+} from "agent-driver/paths";
 
 import { withDisposedRpcResource } from "../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";

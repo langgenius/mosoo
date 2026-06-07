@@ -1,12 +1,12 @@
 import type { AgentKind } from "@mosoo/contracts/agent";
 import type { SpaceAliasBinding } from "@mosoo/contracts/sandbox";
-import type {
-  DriverOrganizationAccessSnapshotOutput,
-  DriverOrigin as DriverOriginValue,
-} from "@mosoo/driver-protocol";
 import type { SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
 
 import type { RuntimeTimingRecorder } from "../../application/session-runs/session-runtime-timing";
+import type {
+  DriverOrganizationAccessSnapshotOutput,
+  DriverOrigin as DriverOriginValue,
+} from "../../domain/driver-snapshot";
 import type { ExecutionSessionHandle, SandboxHandle } from "../sandbox-handles";
 
 export interface EnsureSandboxConversationSessionInput {

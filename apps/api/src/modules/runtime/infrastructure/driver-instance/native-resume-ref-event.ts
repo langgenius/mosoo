@@ -1,12 +1,9 @@
-import { parseSchemaValue } from "@mosoo/contracts/validation";
-import { DriverNativeRuntimeRef } from "@mosoo/driver-protocol";
-import type { DriverNativeRuntimeRef as DriverNativeRuntimeRefValue } from "@mosoo/driver-protocol";
 import { readRuntimeEventPayload, readRuntimeEventString } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
+import type { DriverNativeRuntimeRef } from "agent-driver/runtime";
+import { parseDriverNativeRuntimeRef } from "agent-driver/runtime";
 
-export function readNativeResumeRef(
-  event: RuntimeEventEnvelope,
-): DriverNativeRuntimeRefValue | null {
+export function readNativeResumeRef(event: RuntimeEventEnvelope): DriverNativeRuntimeRef | null {
   const payload = readRuntimeEventPayload(event);
 
   const value = readRuntimeEventString(payload, "resumePointer");
@@ -17,7 +14,7 @@ export function readNativeResumeRef(
 
   const refShape = readNativeResumeRefShape(event.runtimeId);
 
-  return parseSchemaValue(DriverNativeRuntimeRef, {
+  return parseDriverNativeRuntimeRef({
     kind: refShape.kind,
     runtimeId: refShape.runtimeId,
     value,
@@ -26,7 +23,7 @@ export function readNativeResumeRef(
 
 function readNativeResumeRefShape(
   runtimeId: string | undefined,
-): Pick<DriverNativeRuntimeRefValue, "kind" | "runtimeId"> {
+): Pick<DriverNativeRuntimeRef, "kind" | "runtimeId"> {
   switch (runtimeId) {
     case "openai-runtime": {
       return {
