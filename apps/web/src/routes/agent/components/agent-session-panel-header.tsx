@@ -45,7 +45,7 @@ export function AgentSessionPanelHeader({
     <div className="border-border-subtle flex h-10 shrink-0 items-center gap-2 border-b bg-white px-4">
       <div className={cn("size-2 rounded-full", sessionIndicatorClassName(pill))} />
       <span className="text-foreground min-w-0 truncate text-[12px] font-medium">
-        {tone === "preview" ? `Testing — ${agentName}` : agentName}
+        {tone === "preview" ? `Testing ${agentName}` : agentName}
       </span>
       <Badge
         variant={PILL_VARIANTS[pill]}

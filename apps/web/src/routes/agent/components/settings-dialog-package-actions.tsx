@@ -95,7 +95,7 @@ export function AgentSettingsPackageActions({
           variant="outline"
         >
           <Download className="size-3.5" />
-          {exportPackageMutation.isPending ? "Exporting..." : "Export Agent"}
+          {exportPackageMutation.isPending ? "Exporting..." : "Export agent"}
         </Button>
         <Button
           className="gap-1.5 rounded-lg text-[12px]"
@@ -106,7 +106,7 @@ export function AgentSettingsPackageActions({
           variant="outline"
         >
           <Upload className="size-3.5" />
-          Import Agent
+          Import agent
         </Button>
         <Button
           className="gap-1.5 rounded-lg text-[12px]"
@@ -116,7 +116,7 @@ export function AgentSettingsPackageActions({
           variant="outline"
         >
           <Copy className="size-3.5" />
-          {forkMutation.isPending ? "Forking..." : "Fork Agent"}
+          {forkMutation.isPending ? "Forking..." : "Fork agent"}
         </Button>
       </div>
       {packageActionError !== null ? (

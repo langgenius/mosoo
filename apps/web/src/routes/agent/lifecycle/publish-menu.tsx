@@ -174,8 +174,8 @@ function buildAgentSkillMarkdown(agent: Agent, distribution: AgentDistribution):
   const description = agent.description.trim() || "No description provided.";
   const kindHint =
     agent.kind === "pet"
-      ? "Conversational chat agent — designed for back-and-forth dialogue."
-      : "Job-style agent — designed for one-shot calls that return a structured result.";
+      ? "Conversational chat agent designed for back-and-forth dialogue."
+      : "Job-style agent designed for one-shot calls that return a structured result.";
 
   return [
     `# ${agent.name}`,

@@ -227,7 +227,7 @@ export function BasicsSection({
       </div>
 
       <div className="border-border-subtle border-t pt-5">
-        <SectionHeader>System Prompt</SectionHeader>
+        <SectionHeader>System prompt</SectionHeader>
         <textarea
           aria-label="System prompt"
           className="border-border focus:ring-brand-ring w-full resize-y rounded-lg border bg-white px-4 py-3 text-[13px] leading-relaxed outline-none focus:ring-2"
@@ -269,7 +269,7 @@ export function IntegrationsSection({
       </div>
 
       <div className="border-border-subtle scroll-mt-24 border-t pt-5" id="agent-mcp-bindings">
-        <SectionHeader>MCP Servers</SectionHeader>
+        <SectionHeader>MCP servers</SectionHeader>
         <AgentMcpBindingsField
           organizationId={organizationId}
           readOnly={readOnly}

@@ -98,7 +98,7 @@ function McpAddDropdown({
         {nothingLeft ? (
           <div className="text-muted-foreground p-3 text-[12px]">
             {noServersAtAll
-              ? "No MCP servers available — head to Manage MCP servers to add one."
+              ? "No MCP servers available. Head to Manage MCP servers to add one."
               : "All available MCP servers are already added."}
           </div>
         ) : (

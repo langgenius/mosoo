@@ -177,9 +177,16 @@ function ModelDonut({ models, totalCost }: { models: CostModelRow[]; totalCost: 
 }
 
 function vendorColor(index: number): string {
-  // mosoo brand palette: green-600, sky, ink-700, amber, soil, ember — keeps
-  // the chart legible while staying inside the design-system tokens.
-  const colors = ["#5cb300", "#2f6bd4", "#3d434b", "#e0a106", "#7a5230", "#dc2a2a"] as const;
+  // mosoo brand palette: green-600, sky, ink-700, amber, soil, ember. Reference
+  // the design-system tokens so the chart tracks theme changes (incl. dark mode).
+  const colors = [
+    "var(--color-green-600)",
+    "var(--color-sky)",
+    "var(--color-ink-700)",
+    "var(--color-amber)",
+    "var(--color-soil)",
+    "var(--color-ember)",
+  ] as const;
 
-  return colors[index % colors.length] ?? "#3d434b";
+  return colors[index % colors.length] ?? "var(--color-ink-700)";
 }

@@ -90,7 +90,7 @@ export function MembersTab({
     <>
       <PageHeader
         className="border-border-subtle border-b"
-        title="Members & Access"
+        title="Members & access"
         description={`${model.members.length} ${
           model.members.length === 1 ? "member" : "members"
         } in this organization`}
@@ -98,7 +98,7 @@ export function MembersTab({
         {model.canOpenAccessSettings ? (
           <Button variant="outline" size="sm" onClick={handleOpenAccessSettings}>
             <Settings2 className="mr-1.5 size-3.5" />
-            Access Settings
+            Access settings
           </Button>
         ) : null}
         {model.canDirectInvite ? (

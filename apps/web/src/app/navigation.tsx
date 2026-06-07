@@ -36,7 +36,7 @@ const NAV_SECTIONS: AppNavSection[] = [
       {
         children: [
           { label: "Skills", path: "/integrations/skills" },
-          { label: "MCP Servers", path: "/integrations/mcp" },
+          { label: "MCP servers", path: "/integrations/mcp" },
         ],
         icon: Puzzle,
         label: "Integrations",

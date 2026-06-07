@@ -336,7 +336,7 @@ export function SpaceSettingsDialog({
           <>
             <Separator />
             <div className="shrink-0 space-y-2 px-5 py-4">
-              <h4 className="text-destructive text-xs font-semibold">Danger Zone</h4>
+              <h4 className="text-destructive text-xs font-semibold">Danger zone</h4>
               <p className="text-muted-foreground text-xs leading-relaxed">
                 Deleting a space is permanent. All files will be removed and active sessions will be
                 unlinked.

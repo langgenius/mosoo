@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 
@@ -69,6 +71,9 @@ export function CostOverviewPanel({
 
         <div className="border-border bg-card rounded-lg border p-4">
           <h2 className="text-foreground mb-3 text-sm font-semibold">Top agents</h2>
+          {(card?.agents ?? []).length === 0 ? (
+            <PanelEmpty>No agent spend in this range.</PanelEmpty>
+          ) : null}
           <div className="space-y-2">
             {(card?.agents ?? []).slice(0, 5).map((agent) => (
               <button
@@ -95,6 +100,9 @@ export function CostOverviewPanel({
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="border-border bg-card rounded-lg border p-4">
           <h2 className="text-foreground mb-3 text-sm font-semibold">Top users</h2>
+          {(card?.users ?? []).length === 0 ? (
+            <PanelEmpty>No user spend in this range.</PanelEmpty>
+          ) : null}
           <div className="space-y-2">
             {(card?.users ?? []).slice(0, 5).map((user) => (
               <button
@@ -121,6 +129,9 @@ export function CostOverviewPanel({
 
         <div className="border-border bg-card rounded-lg border p-4">
           <h2 className="text-foreground mb-3 text-sm font-semibold">Spend by model</h2>
+          {(card?.models ?? []).length === 0 ? (
+            <PanelEmpty>No model spend in this range.</PanelEmpty>
+          ) : null}
           <div className="space-y-3">
             {(card?.models ?? []).slice(0, 5).map((model) => {
               const total = card?.totals.totalCostUsd ?? 0;
@@ -148,6 +159,14 @@ export function CostOverviewPanel({
         </div>
       </section>
     </>
+  );
+}
+
+function PanelEmpty({ children }: { children: ReactNode }) {
+  return (
+    <div className="text-muted-foreground flex h-[120px] items-center justify-center text-center text-[13px]">
+      {children}
+    </div>
   );
 }
 

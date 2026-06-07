@@ -151,6 +151,11 @@ function UsageSection({
           <div className="border-border border-b px-4 py-3 text-sm font-semibold">
             {agentListTitle}
           </div>
+          {(card?.agents ?? []).length === 0 ? (
+            <div className="text-muted-foreground px-4 py-8 text-center text-[13px]">
+              No agent usage in this range.
+            </div>
+          ) : null}
           {(card?.agents ?? []).slice(0, 6).map((agent) => (
             <div
               key={agent.agentId}
@@ -183,6 +188,11 @@ function UsageSection({
           <div className="border-border border-b px-4 py-3 text-sm font-semibold">
             Recent sessions
           </div>
+          {(card?.recentSessions ?? []).length === 0 ? (
+            <div className="text-muted-foreground px-4 py-8 text-center text-[13px]">
+              No sessions in this range.
+            </div>
+          ) : null}
           {(card?.recentSessions ?? []).slice(0, 7).map((session) => (
             <div
               key={`${session.createdAt}-${session.sessionRunId ?? session.model}`}

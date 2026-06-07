@@ -28,7 +28,7 @@ export function DeleteSpaceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="rounded-lg sm:max-w-[380px]" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle className="text-lg">Delete Space</DialogTitle>
+          <DialogTitle className="text-lg">Delete space</DialogTitle>
         </DialogHeader>
         <p className="text-muted-foreground text-sm">
           Are you sure you want to delete <strong className="break-all">{name}</strong>? This will

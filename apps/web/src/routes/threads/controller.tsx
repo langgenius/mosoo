@@ -153,7 +153,7 @@ function ThreadsWorkspace({
     <div className="bg-background flex h-full flex-1 flex-col overflow-hidden">
       <PageHeader
         title="Threads"
-        description="Dispatch agents. Track progress. Reopen by replying. Async-by-default."
+        description="Dispatch agents and track progress. Reopen threads by replying asynchronously."
       >
         <Button onClick={route.openComposeDialog} size="sm">
           <Plus className="size-3.5" />

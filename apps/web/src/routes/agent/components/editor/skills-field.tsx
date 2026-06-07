@@ -172,7 +172,7 @@ function renderSkillsDropdownContent({
   if (noOptions) {
     const message =
       selectedSkills.length === 0
-        ? "No skills available — head to Manage skills to upload one."
+        ? "No skills available. Head to Manage skills to upload one."
         : "All available skills are already added.";
 
     return <div className="text-muted-foreground p-3 text-[12px]">{message}</div>;

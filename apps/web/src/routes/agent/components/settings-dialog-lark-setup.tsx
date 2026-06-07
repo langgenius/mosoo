@@ -70,7 +70,7 @@ function getLarkRegistrationStatusCopy(
       return "Authorization was denied. Use manual setup or start again.";
     case "confirmed":
       return connectionMode === "websocket"
-        ? "App created. App ID and App Secret were copied — you're ready to save."
+        ? "App created. App ID and App Secret were copied. You're ready to save."
         : "App created. App ID and App Secret were copied into the manual fields.";
     case "expired":
       return "The authorization session expired. Start again or use manual setup.";
@@ -521,7 +521,7 @@ function LarkConfigurationSection({
         </div>
 
         <div className="grid gap-1.5">
-          <Label>Open Platform</Label>
+          <Label>Open platform</Label>
           <div className="bg-muted/30 grid grid-cols-2 rounded-md border p-1">
             {LARK_DOMAIN_OPTIONS.map((option) => (
               <button

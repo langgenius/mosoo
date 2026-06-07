@@ -190,7 +190,7 @@ function OrganizationJoinLayout({ children }: { children: ReactNode }) {
         <span className="text-xl font-light tracking-tight">Mosoo</span>
       </div>
       <div className="flex min-h-[calc(100vh-72px)] items-center justify-center px-6 py-10">
-        <div className="border-border bg-card/80 w-full max-w-[540px] rounded-3xl border p-8 shadow-sm">
+        <div className="border-border bg-card/80 w-full max-w-[540px] rounded-lg border p-8 shadow-sm">
           {children}
         </div>
       </div>
@@ -251,7 +251,7 @@ function OrganizationJoinTargetCard({
         </div>
       </div>
 
-      <div className="border-border bg-background/70 rounded-2xl border p-4">
+      <div className="border-border bg-background/70 rounded-lg border p-4">
         <OrganizationJoinStatusPanel
           onAcceptInvite={onAcceptInvite}
           onContinueToSignIn={onContinueToSignIn}

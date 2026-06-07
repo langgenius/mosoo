@@ -180,7 +180,7 @@ function ProviderCardHeader({
           }}
         >
           <Plus className="size-3.5" />
-          Add Key
+          Add key
         </Button>
       ) : null}
     </div>

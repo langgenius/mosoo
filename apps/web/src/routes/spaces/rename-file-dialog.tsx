@@ -42,7 +42,7 @@ export function RenameFileDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="rounded-lg sm:max-w-[420px]" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>Rename or Move File</DialogTitle>
+          <DialogTitle>Rename or move file</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           {targetSpaces.length > 1 ? (

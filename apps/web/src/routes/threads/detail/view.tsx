@@ -298,7 +298,7 @@ function ThreadReplyComposer({
             }}
             className="max-h-[200px] min-h-[36px] flex-1 resize-none border-0 bg-transparent p-0 text-[13px] shadow-none focus-visible:ring-0"
             placeholder={
-              followUpMode ? `Follow up — re-dispatches to ${thread.agentName}` : "Add a comment..."
+              followUpMode ? `Follow up and re-dispatch to ${thread.agentName}` : "Add a comment..."
             }
           />
           <Button

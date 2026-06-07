@@ -75,7 +75,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
   return (
     <>
       <div className="space-y-3 px-6 py-5">
-        <h3 className="text-destructive text-sm font-semibold">Danger Zone</h3>
+        <h3 className="text-destructive text-sm font-semibold">Danger zone</h3>
 
         <div className="divide-border border-border divide-y rounded-lg border">
           {showUnpublish ? (

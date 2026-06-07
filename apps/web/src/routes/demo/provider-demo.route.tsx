@@ -30,7 +30,7 @@ export function ProviderDemoPage(): ReactElement {
                 : "Hidden for this viewer."}
             </p>
             <Button asChild className="mt-4" size="sm" variant="outline">
-              <Link to="/providers">Open Providers</Link>
+              <Link to="/providers">Open providers</Link>
             </Button>
           </section>
 
@@ -40,7 +40,7 @@ export function ProviderDemoPage(): ReactElement {
               Agent sessions resolve runtime availability before execution.
             </p>
             <Button asChild className="mt-4" size="sm" variant="outline">
-              <Link to="/agent">Open Agents</Link>
+              <Link to="/agent">Open agents</Link>
             </Button>
           </section>
         </div>

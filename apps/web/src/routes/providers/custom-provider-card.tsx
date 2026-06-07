@@ -101,7 +101,7 @@ export function CustomProviderCard({
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
             <h2 className="text-foreground truncate text-sm font-semibold">
-              OpenAI-Compatible Provider · Custom
+              OpenAI-compatible provider · Custom
             </h2>
             <Badge variant="primary">New</Badge>
           </div>

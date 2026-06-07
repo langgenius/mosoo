@@ -170,7 +170,7 @@ export function OrganizationSwitcher({ collapsed }: { collapsed: boolean }) {
           >
             <Plus className="size-3.5" />
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[12.5px] font-semibold">Create Organization</div>
+              <div className="truncate text-[12.5px] font-semibold">Create organization</div>
               {organizationCreationSlotOccupied ? (
                 <div className="text-muted-foreground mt-0.5 text-[10.5px] leading-snug whitespace-normal">
                   CE allows one organization you create.

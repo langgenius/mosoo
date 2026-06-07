@@ -36,7 +36,7 @@ interface ActionMeta {
 
 const META: Record<LifecycleActionKind, ActionMeta> = {
   "patch-and-restart": {
-    body: "These edits update the native runtime config (model, skills, env vars). The Agent will restart and reload login state from the same machine — nothing is wiped.",
+    body: "These edits update the native runtime config (model, skills, env vars). The Agent will restart and reload login state from the same machine. Nothing is wiped.",
     danger: "low",
     preservesState: true,
     primary: "Apply now",

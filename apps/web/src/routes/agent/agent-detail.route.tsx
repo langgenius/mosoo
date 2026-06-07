@@ -264,10 +264,10 @@ export function AgentDetailPage() {
     debugItems.push({ icon: TerminalSquare, id: "terminal", label: "Terminal" });
   }
   if (canShowDebugMenu && canUseFileBrowser) {
-    debugItems.push({ icon: FolderTree, id: "files", label: "File System" });
+    debugItems.push({ icon: FolderTree, id: "files", label: "File system" });
   }
   if (canShowDebugMenu && canUseSystemLog) {
-    debugItems.push({ icon: FileText, id: "system-log", label: "System Log" });
+    debugItems.push({ icon: FileText, id: "system-log", label: "System log" });
   }
   const urlMode = toDetailMode(searchParams.get("tab") ?? searchParams.get("mode"));
 

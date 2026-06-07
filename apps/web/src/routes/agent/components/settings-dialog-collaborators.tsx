@@ -175,7 +175,7 @@ export function AgentSettingsCollaborators({
                   onPublishModeChange("organization");
                 }}
               >
-                Add Everyone in organization
+                Add everyone in organization
               </Button>
               {publishModeChangePending ? (
                 <Loader2 className="text-muted-foreground size-4 animate-spin" />

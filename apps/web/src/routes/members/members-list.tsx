@@ -63,7 +63,7 @@ export function MembersList({
         ) : null}
       </div>
 
-      <div className="border-border bg-card/60 rounded-2xl border">
+      <div className="border-border bg-card/60 rounded-lg border">
         {filteredMembers.length === 0 ? (
           <div className="text-muted-foreground px-4 py-6 text-center text-sm">
             {isTruthy(focusedMemberId)

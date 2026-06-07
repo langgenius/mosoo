@@ -86,7 +86,7 @@ export function DistributionPanel({
 
         <DistributionCard
           icon={<Code className="text-fg-3 size-4" />}
-          title="API Access"
+          title="API access"
           subtitle={
             <>
               <div className="text-fg-2 font-mono text-[12px]">{distribution.apiPath}</div>

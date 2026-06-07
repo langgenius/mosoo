@@ -178,6 +178,11 @@ export function AgentCostTab({ agentId }: { agentId: string }): ReactElement {
           </Panel>
 
           <Panel title="Model usage">
+            {(card?.models ?? []).length === 0 ? (
+              <div className="text-muted-foreground px-4 py-8 text-sm">
+                No model usage in this range.
+              </div>
+            ) : null}
             {(card?.models ?? []).map((model) => (
               <div
                 key={`${model.provider}-${model.model}`}
@@ -201,6 +206,11 @@ export function AgentCostTab({ agentId }: { agentId: string }): ReactElement {
         </section>
 
         <Panel title="Recent sessions">
+          {(card?.recentSessions ?? []).length === 0 ? (
+            <div className="text-muted-foreground px-4 py-8 text-sm">
+              No sessions in this range.
+            </div>
+          ) : null}
           {(card?.recentSessions ?? []).map((session) => (
             <div
               key={`${session.createdAt}-${session.sessionRunId ?? session.model}`}

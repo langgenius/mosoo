@@ -31,10 +31,10 @@ function getIssueActionLabel(issue: AgentResolutionIssue): string {
     return "Connect MCP";
   }
   if (issue.targetType === "environment") {
-    return "Choose Environment";
+    return "Choose environment";
   }
   if (issue.targetType === "space") {
-    return "Rebind Space";
+    return "Rebind space";
   }
   if (issue.targetType === "channel") {
     return "Reconnect channel";

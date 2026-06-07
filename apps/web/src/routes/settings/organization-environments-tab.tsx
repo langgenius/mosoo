@@ -90,7 +90,7 @@ export function OrganizationEnvironmentsTab() {
           </h1>
           <p className="text-fg-2 mt-1 text-[13px] leading-5">
             Choose the runtime template that new agents in this organization start with. Only
-            organization-shared environments can be set as default — use{" "}
+            organization-shared environments can be set as default. Use{" "}
             <Link className="text-accent-press hover:underline" to="/environment">
               Environments
             </Link>{" "}

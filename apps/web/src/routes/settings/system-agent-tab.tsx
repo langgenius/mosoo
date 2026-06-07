@@ -182,7 +182,7 @@ export function SystemAgentTab() {
                     No models available for Agent Builder
                   </div>
                   <div className="text-amber-fg/80 text-[11px]">
-                    Configure at least one Provider key (or add an OpenAI-Compatible Provider).
+                    Configure at least one Provider key (or add an OpenAI-compatible Provider).
                   </div>
                 </div>
                 <Button asChild size="xs" variant="outline">

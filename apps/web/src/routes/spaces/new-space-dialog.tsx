@@ -117,7 +117,7 @@ export function NewSpaceDialog({
               Cancel
             </Button>
             <Button onClick={onCreate} disabled={nameIsEmpty || creating || error !== null}>
-              {creating ? "Creating..." : "Create Space"}
+              {creating ? "Creating..." : "Create space"}
             </Button>
           </div>
         </div>

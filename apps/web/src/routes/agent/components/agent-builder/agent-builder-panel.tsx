@@ -173,7 +173,7 @@ export function AgentBuilderPanel({
           </div>
         ) : null}
         <form
-          className="border-border flex items-center gap-2 rounded-2xl border bg-white px-3 py-2"
+          className="border-border flex items-center gap-2 rounded-lg border bg-white px-3 py-2"
           onSubmit={handleSubmit}
         >
           <input

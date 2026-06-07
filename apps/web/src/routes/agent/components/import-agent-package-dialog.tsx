@@ -112,7 +112,7 @@ export function ImportAgentPackageDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-hidden p-0 sm:max-w-[720px]">
         <DialogHeader className="px-6 pt-6">
-          <DialogTitle>Import Agent</DialogTitle>
+          <DialogTitle>Import agent</DialogTitle>
           <DialogDescription>
             Upload a portable .agent file to create a new draft in this organization.
           </DialogDescription>
@@ -197,7 +197,7 @@ export function ImportAgentPackageDialog({
               onClick={() => void handleImport()}
             >
               <Upload className="size-3.5" />
-              {importMutation.isPending ? "Importing..." : "Import Agent"}
+              {importMutation.isPending ? "Importing..." : "Import agent"}
             </Button>
           )}
           <Button

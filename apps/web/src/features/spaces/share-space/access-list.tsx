@@ -136,7 +136,7 @@ export function ShareAccessList({
             <Globe className="text-muted-foreground size-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-foreground text-sm font-medium">Add Everyone in organization</div>
+            <div className="text-foreground text-sm font-medium">Add everyone in organization</div>
             <div className="text-muted-foreground text-xs">
               Gives all organization members view access
             </div>

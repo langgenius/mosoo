@@ -76,7 +76,7 @@ export function ProvidersTab({ organization }: { organization: Organization }): 
       >
         <Button onClick={handleAddCustomProvider} size="sm" variant="outline">
           <Plus className="size-3.5" />
-          Add OpenAI-Compatible Provider
+          Add OpenAI-compatible provider
         </Button>
       </PageHeader>
 

@@ -95,7 +95,7 @@ export function CreateAgentDialog({
       >
         <DialogHeader className="px-7 pt-7 pb-0">
           <DialogTitle className="text-[20px] font-light" style={TITLE_STYLE}>
-            Create Agent
+            Create agent
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             Name your agent and choose a runtime.

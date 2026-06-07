@@ -39,7 +39,7 @@ export function AccessSettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="rounded-lg sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Access Settings</DialogTitle>
+          <DialogTitle>Access settings</DialogTitle>
           <DialogDescription>
             Control how people discover and join this organization.
           </DialogDescription>

@@ -46,7 +46,7 @@ export function ModelPickerEmptyState(): ReactElement {
       <div className="space-y-0.5">
         <div className="text-amber-fg text-[12px] font-medium">No models available</div>
         <div className="text-amber-fg/80 text-[11px]">
-          Configure a Provider key (or add an OpenAI-Compatible Provider) to unlock models.
+          Configure a Provider key (or add an OpenAI-compatible Provider) to unlock models.
         </div>
       </div>
       <Button asChild size="xs" variant="outline">
