@@ -49,13 +49,10 @@ export function KindSelector({
   const [compareOpen, setCompareOpen] = useState(false);
 
   return (
-    <section
-      aria-label="Agent type"
-      className="border-border-subtle rounded-xl border bg-white px-5 py-4"
-    >
+    <section aria-label="Agent type" className="border-border-subtle border-b pb-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h2 className="text-foreground text-[13.5px] font-semibold">Agent type</h2>
+          <h2 className="text-foreground text-[13px] font-semibold">Agent type</h2>
           <p className="text-fg-3 mt-0.5 text-[12px] leading-relaxed">
             {locked
               ? "Locked on this published agent. Fork to switch type."
@@ -70,7 +67,7 @@ export function KindSelector({
         ) : null}
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {CARDS.map((card) => {
           const Icon = CARD_ICONS[card.kind];
           const selected = value === card.kind;
@@ -92,7 +89,7 @@ export function KindSelector({
                 onChange(card.kind);
               }}
               className={cn(
-                "group relative flex flex-col items-start gap-2 rounded-lg border px-3.5 py-3 text-left transition-all",
+                "group focus-visible:ring-brand-ring relative flex flex-col items-start gap-2 rounded-lg border px-3.5 py-3 text-left transition-all focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none",
                 selected
                   ? "border-brand bg-brand-light/60 shadow-[0_0_0_1px_var(--brand)]"
                   : "border-border-subtle hover:border-brand/40 hover:bg-bg-1",
@@ -115,17 +112,17 @@ export function KindSelector({
                         {card.copy.label}
                       </span>
                       {isCurrent ? (
-                        <span className="bg-brand/10 text-brand inline-flex items-center gap-0.5 rounded-sm px-1.5 py-px text-[10px] font-medium">
+                        <span className="bg-brand/10 text-brand inline-flex items-center gap-0.5 rounded-sm px-1.5 py-px text-[11px] font-medium">
                           <Check className="size-2.5" /> current
                         </span>
                       ) : null}
                       {isLockedAlternative ? (
-                        <span className="bg-amber-bg text-amber-fg inline-flex items-center gap-0.5 rounded-sm px-1.5 py-px text-[10px] font-medium">
+                        <span className="bg-amber-bg text-amber-fg inline-flex items-center gap-0.5 rounded-sm px-1.5 py-px text-[11px] font-medium">
                           <X className="size-2.5" /> Fork required
                         </span>
                       ) : null}
                     </div>
-                    <div className="text-fg-3 text-[11px] tracking-wide uppercase">
+                    <div className="text-fg-3 text-[11px] font-semibold tracking-wide uppercase">
                       {card.copy.tagline}
                     </div>
                   </div>
@@ -154,7 +151,7 @@ export function KindSelector({
         type="button"
         aria-expanded={compareOpen}
         onClick={() => setCompareOpen((open) => !open)}
-        className="text-fg-2 hover:text-brand mt-3 inline-flex items-center gap-1 text-[12px] font-medium"
+        className="text-fg-2 hover:text-brand focus-visible:ring-brand-ring -my-1 mt-3 inline-flex min-h-6 items-center gap-1 rounded-sm py-1 text-[12px] font-medium focus-visible:ring-2 focus-visible:outline-none"
       >
         <ChevronDown className={cn("size-3.5 transition-transform", compareOpen && "rotate-180")} />
         {compareOpen ? "Hide comparison" : "Compare types"}

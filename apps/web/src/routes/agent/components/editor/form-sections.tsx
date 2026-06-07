@@ -43,18 +43,21 @@ function ReadinessBanner({ agent }: { agent: Agent }) {
     "Resolve configuration before preview or publish.";
 
   return (
-    <div className="border-amber/30 bg-amber-bg/70 rounded-xl border px-4 py-3">
+    <div
+      className="border-amber/30 bg-amber-bg text-amber-fg rounded-lg border px-3 py-2.5"
+      role="alert"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-amber-fg flex items-center gap-2 text-[13px] font-medium">
-            <AlertTriangle className="size-4" />
+          <div className="flex items-center gap-2 text-[13px] font-semibold">
+            <AlertTriangle className="size-4 shrink-0" />
             {providerPresentation?.title ?? "Configuration required"}
           </div>
-          <div className="text-amber-fg/90 mt-1 text-[12px] leading-relaxed">{message}</div>
+          <div className="mt-1 text-[12px] leading-relaxed">{message}</div>
           {providerPresentation?.originalMessage !== undefined &&
           providerPresentation.originalMessage !== null &&
           providerPresentation.originalMessage !== message ? (
-            <div className="text-amber-fg/70 mt-1 text-[11px] leading-relaxed">
+            <div className="text-amber-fg/80 mt-1 text-[11px] leading-relaxed">
               {providerPresentation.originalMessage}
             </div>
           ) : null}
@@ -88,12 +91,15 @@ function PackageResolutionBanner({ agent }: { agent: Agent }) {
   );
 
   return (
-    <div className="border-border bg-muted/30 rounded-xl border px-4 py-3">
-      <div className="text-foreground flex items-center gap-2 text-[13px] font-medium">
-        <AlertTriangle className="text-amber-fg size-4" />
+    <div
+      className="border-amber/30 bg-amber-bg text-amber-fg rounded-lg border px-3 py-2.5"
+      role="alert"
+    >
+      <div className="flex items-center gap-2 text-[13px] font-semibold">
+        <AlertTriangle className="size-4 shrink-0" />
         Package repair {blockingIssues.length > 0 ? "required" : "recommended"}
       </div>
-      <div className="text-muted-foreground mt-1 text-[12px]">
+      <div className="mt-1 text-[12px] leading-relaxed">
         This draft was created by {resolution.source}. Required unresolved items block preview and
         publish until repaired.
       </div>
@@ -128,11 +134,13 @@ export function BasicsSection({
         <SectionHeader>Identity</SectionHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label className="text-muted-foreground text-[12px]">
+            <Label className="text-muted-foreground text-[12px]" htmlFor="agent-name">
               Name
               <RequiredMark />
             </Label>
             <Input
+              aria-required
+              id="agent-name"
               onChange={(event) => {
                 model.setName(event.target.value);
               }}
@@ -183,8 +191,9 @@ export function BasicsSection({
 
                 return (
                   <button
+                    aria-pressed={selected}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors",
+                      "focus-visible:ring-brand-ring flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none",
                       selected && selectable
                         ? "border-brand bg-brand-light"
                         : "border-border hover:border-brand/30",
@@ -215,7 +224,7 @@ export function BasicsSection({
               })}
             </div>
             {agent.status === "published" ? (
-              <div className="border-amber/30 bg-amber-bg/70 text-amber-fg rounded-lg border px-3 py-2 text-[12px] leading-5">
+              <div className="border-amber/30 bg-amber-bg text-amber-fg rounded-lg border px-3 py-2.5 text-[12px] leading-relaxed">
                 Runtime is locked for this published Agent. Fork Agent to switch runtime; existing
                 sessions, cost, logs, and agent-state stay attached here.
               </div>
@@ -226,7 +235,7 @@ export function BasicsSection({
         </div>
       </div>
 
-      <div className="border-border-subtle border-t pt-5">
+      <div className="border-border-subtle border-t pt-4">
         <SectionHeader>System prompt</SectionHeader>
         <textarea
           aria-label="System prompt"
@@ -268,7 +277,7 @@ export function IntegrationsSection({
         />
       </div>
 
-      <div className="border-border-subtle scroll-mt-24 border-t pt-5" id="agent-mcp-bindings">
+      <div className="border-border-subtle scroll-mt-24 border-t pt-4" id="agent-mcp-bindings">
         <SectionHeader>MCP servers</SectionHeader>
         <AgentMcpBindingsField
           organizationId={organizationId}
@@ -299,7 +308,7 @@ export function EnvironmentSection({
         <EnvironmentPicker model={model} organizationId={organizationId} readOnly={readOnly} />
       </div>
 
-      <div className="border-border-subtle border-t pt-5">
+      <div className="border-border-subtle border-t pt-4">
         <SectionHeader>Spaces</SectionHeader>
         <AgentSpacesField
           organizationId={organizationId}
@@ -309,7 +318,7 @@ export function EnvironmentSection({
         />
       </div>
 
-      <div className="border-border-subtle border-t pt-5">
+      <div className="border-border-subtle border-t pt-4">
         <SectionHeader>Channels</SectionHeader>
         <AgentChannelsField agent={agent} />
       </div>

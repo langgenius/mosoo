@@ -206,7 +206,7 @@ export function PreviewMode({
             headerActionTarget,
           )
         : null}
-      <div className="border-border-subtle flex min-h-0 w-[60%] shrink-0 flex-col border-r">
+      <div className="border-border-subtle flex min-h-0 w-1/2 shrink-0 flex-col border-r">
         {model.dirty && !autoSaveEligible ? (
           <div className="border-amber/30 bg-amber-bg/70 text-amber-fg flex shrink-0 items-start gap-2 border-b px-4 py-2 text-[12px]">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
@@ -237,7 +237,7 @@ export function PreviewMode({
         ) : null}
       </div>
 
-      <div className="flex min-h-0 w-[40%] min-w-0 flex-col">
+      <div className="flex min-h-0 w-1/2 min-w-0 flex-col">
         <PendingChangesBanner
           agent={agent}
           key={`${agent.id}:${discardCounter}`}
@@ -251,13 +251,8 @@ export function PreviewMode({
           }}
         />
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-white p-4" data-agent-editor-scroll>
-          <AgentFormView
-            agent={agent}
-            mode="tabbed"
-            model={model}
-            organizationId={organizationId}
-          />
+        <div className="min-h-0 flex-1 overflow-y-auto bg-white p-5" data-agent-editor-scroll>
+          <AgentFormView agent={agent} model={model} organizationId={organizationId} />
         </div>
 
         {publishStatus ? (

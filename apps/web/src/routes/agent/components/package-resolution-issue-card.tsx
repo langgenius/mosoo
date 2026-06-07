@@ -67,7 +67,7 @@ export function PackageResolutionIssueCard({
   const actionLink = getIssueActionLink(issue);
 
   return (
-    <div className="border-border bg-background rounded-md border px-3 py-2">
+    <div className="rounded-md bg-white/70 px-3 py-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-muted-foreground text-[11px] font-medium tracking-normal uppercase">
@@ -77,7 +77,7 @@ export function PackageResolutionIssueCard({
         </div>
         <span
           className={cn(
-            "shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-normal",
+            "shrink-0 rounded-sm px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-normal",
             issue.required && requiredTone === "amber"
               ? "bg-amber-bg text-amber-fg"
               : "bg-muted text-muted-foreground",

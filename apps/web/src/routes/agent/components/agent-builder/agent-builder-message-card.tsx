@@ -178,7 +178,7 @@ function DraftPatchValuePreview({
   const content =
     draftPatch.fieldPath === "prompt" && typeof draftPatch.value === "string" ? (
       <div className="space-y-1">
-        <div className="text-muted-foreground text-[10px] leading-none font-semibold tracking-wide uppercase">
+        <div className="text-muted-foreground text-[11px] leading-none font-semibold tracking-wide uppercase">
           {fieldLabel}
         </div>
         <div className="text-muted-foreground line-clamp-2 text-[12px] leading-relaxed break-words">
@@ -191,7 +191,7 @@ function DraftPatchValuePreview({
       </div>
     ) : (
       <div className="space-y-1">
-        <div className="text-muted-foreground text-[10px] leading-none font-semibold tracking-wide uppercase">
+        <div className="text-muted-foreground text-[11px] leading-none font-semibold tracking-wide uppercase">
           {fieldLabel}
         </div>
         <div className="text-muted-foreground line-clamp-2 text-[12px] leading-relaxed break-words">

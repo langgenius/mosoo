@@ -166,7 +166,7 @@ export function AgentSessionPanel({
         />
 
         {isTruthy(model.sessionLoadError) ? (
-          <div className="border-amber/25 bg-amber-bg/70 text-amber-fg/90 border-b px-4 py-2 text-[11px] leading-relaxed">
+          <div className="border-amber/30 bg-amber-bg text-amber-fg border-b px-4 py-2.5 text-[12px] leading-relaxed">
             Failed to load previous sessions. You can still start a new live run.
           </div>
         ) : null}
@@ -181,7 +181,7 @@ export function AgentSessionPanel({
         ) : null}
 
         {model.configurationRefreshRequired ? (
-          <div className="border-amber/25 bg-amber-bg/70 border-b px-4 py-2.5">
+          <div className="border-amber/30 bg-amber-bg border-b px-4 py-2.5">
             <div className="flex items-center justify-between gap-3">
               <div className="text-amber-fg min-w-0 text-[12px] font-medium">
                 Start new session to test latest config
@@ -213,11 +213,14 @@ export function AgentSessionPanel({
 
         <div className="relative z-10 mx-auto w-2/3 shrink-0 py-4">
           {stopped ? (
-            <div className="border-border bg-muted/40 mb-3 rounded-lg border p-3">
+            <div
+              className="border-destructive/25 bg-destructive/[0.05] mb-3 rounded-lg border px-3 py-2.5"
+              role="alert"
+            >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-foreground text-[13px] font-semibold">Session stopped</div>
-                  <div className="text-muted-foreground mt-0.5 text-[12px] leading-relaxed">
+                  <div className="text-destructive text-[13px] font-semibold">Session stopped</div>
+                  <div className="text-fg-2 mt-0.5 text-[12px] leading-relaxed">
                     {model.run.error?.message ??
                       "Start a new session after fixing runtime diagnostics."}
                   </div>
@@ -234,13 +237,18 @@ export function AgentSessionPanel({
           ) : null}
 
           {model.permissionRequests[0] ? (
-            <div className="border-amber/25 bg-amber-bg text-amber-fg relative z-20 mb-3 rounded-lg border p-3">
+            <div
+              className="border-amber/30 bg-amber-bg text-amber-fg relative z-20 mb-3 rounded-lg border px-3 py-2.5"
+              role="alert"
+            >
               <div className="flex items-start gap-2">
                 <ShieldAlert className="mt-0.5 size-4 shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold">{model.permissionRequests[0].title}</div>
+                  <div className="text-[12px] font-semibold">
+                    {model.permissionRequests[0].title}
+                  </div>
                   {isTruthy(model.permissionRequests[0].rawInput) ? (
-                    <div className="text-amber-fg/75 mt-1 truncate font-mono text-[11px]">
+                    <div className="text-amber-fg/80 mt-1 truncate font-mono text-[11px]">
                       {model.permissionRequests[0].rawInput}
                     </div>
                   ) : null}

@@ -156,19 +156,19 @@ export function AgentBuilderPanel({
 
       <div className="border-border-subtle shrink-0 border-t p-3">
         {systemAgentSession.visibleChatError !== undefined ? (
-          <div className="border-destructive/30 bg-destructive/5 text-destructive mb-2 rounded-md border px-3 py-2 text-[11px]">
+          <div className="border-destructive/30 bg-destructive/5 text-destructive mb-2 rounded-lg border px-3 py-2 text-[12px]">
             {systemAgentSession.visibleChatError.message}
           </div>
         ) : null}
         {approveStarterPackMutation.isError ? (
-          <div className="border-destructive/30 bg-destructive/5 text-destructive mb-2 rounded-md border px-3 py-2 text-[11px]">
+          <div className="border-destructive/30 bg-destructive/5 text-destructive mb-2 rounded-lg border px-3 py-2 text-[12px]">
             {approveStarterPackMutation.error instanceof Error
               ? approveStarterPackMutation.error.message
               : "Failed to approve Starter Pack action."}
           </div>
         ) : null}
         {clientPatchError ? (
-          <div className="border-destructive/30 bg-destructive/5 text-destructive mb-2 rounded-md border px-3 py-2 text-[11px]">
+          <div className="border-destructive/30 bg-destructive/5 text-destructive mb-2 rounded-lg border px-3 py-2 text-[12px]">
             {clientPatchError}
           </div>
         ) : null}

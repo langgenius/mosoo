@@ -138,7 +138,7 @@ function ConfigureStage({
       ) : null}
 
       <div className="flex min-h-0 flex-1">
-        <div className="border-border-subtle min-h-0 w-[40%] min-w-[360px] shrink-0 border-r">
+        <div className="border-border-subtle min-h-0 w-1/2 min-w-[360px] shrink-0 border-r">
           <AgentBuilderPanel
             agent={agent}
             draftRevision={model.draftYamlHash}
@@ -147,21 +147,21 @@ function ConfigureStage({
             onDraftPatchFocus={model.focusBuilderPatchSection}
           />
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto" data-agent-editor-scroll>
-          <div className="mx-auto w-full max-w-[760px] space-y-4 p-5">
-            <AgentKindSection
-              agent={{ ...agent, kind: model.draft.kind }}
-              onKindChange={model.setKind}
-            />
-            <AgentFormView
-              agent={agent}
-              focusSection={model.focusSection}
-              highlightedSections={model.highlightedSections}
-              mode="stacked"
-              model={model}
-              organizationId={organizationId}
-            />
-          </div>
+        <div
+          className="min-h-0 w-1/2 shrink-0 overflow-y-auto bg-white p-5"
+          data-agent-editor-scroll
+        >
+          <AgentKindSection
+            agent={{ ...agent, kind: model.draft.kind }}
+            onKindChange={model.setKind}
+          />
+          <AgentFormView
+            agent={agent}
+            focusSection={model.focusSection}
+            highlightedSections={model.highlightedSections}
+            model={model}
+            organizationId={organizationId}
+          />
         </div>
       </div>
     </div>

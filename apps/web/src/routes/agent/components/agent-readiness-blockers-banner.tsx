@@ -33,8 +33,9 @@ export function AgentReadinessBlockersBanner({
 
   return (
     <div
-      className="border-destructive/20 bg-destructive/[0.04] border-b px-4 py-3"
+      className="border-destructive/25 bg-destructive/[0.05] border-b px-4 py-3"
       data-testid="agent-readiness-blockers"
+      role="alert"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
