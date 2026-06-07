@@ -62,7 +62,7 @@ export function Layout({ children }: { children: ReactNode }) {
               aria-label="New thread"
               className={cn(
                 "bg-primary text-primary-foreground hover:bg-primary-hover mt-1 inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold shadow-xs transition-colors",
-                collapsed ? "mx-auto size-9 rounded-md" : "mx-0.5 mb-4 h-9 rounded-lg px-3",
+                collapsed ? "mx-auto size-9 rounded-md" : "mx-0.5 mb-4 h-9 rounded-md px-3",
               )}
             >
               <Plus className="size-3.5" />
