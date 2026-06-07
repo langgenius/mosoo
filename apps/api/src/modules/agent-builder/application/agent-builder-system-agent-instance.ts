@@ -10,7 +10,8 @@ export interface AgentBuilderSystemAgentInstanceIdentity {
 export function parseAgentBuilderSystemAgentInstanceName(
   instanceName: string,
 ): AgentBuilderSystemAgentInstanceIdentity {
-  const parts = instanceName.split(":");
+  const decodedInstanceName = decodeURIComponent(instanceName);
+  const parts = decodedInstanceName.split(":");
 
   if (parts.length !== 4 || parts[0] !== "agent" || parts[2] !== "thread") {
     throw new Error(

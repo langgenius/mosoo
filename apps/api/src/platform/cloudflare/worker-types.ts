@@ -26,10 +26,6 @@ interface OptionalAgentBuilderSystemAgentBinding {
   AgentBuilderSystemAgent?: DurableObjectNamespace<AgentBuilderSystemAgent>;
 }
 
-interface OptionalAgentBuilderCodeModeBindings {
-  AGENT_BUILDER_CODE_WORKER_LOADER?: WorkerLoader;
-}
-
 interface ChannelFinalDeliveryQueueBinding {
   CHANNEL_FINAL_DELIVERY_QUEUE: Queue<ChannelFinalDeliveryMessage>;
 }
@@ -86,7 +82,6 @@ export type ApiBindings = Env &
   OptionalDriverConnectionBinding &
   OptionalSessionBinding &
   OptionalAgentBuilderSystemAgentBinding &
-  OptionalAgentBuilderCodeModeBindings &
   OptionalLocalProviderFetchProxyBindings &
   OptionalRuntimeProxyBindings &
   OptionalSlackAdapterBindings &

@@ -1,3 +1,4 @@
+import { AGENT_BUILDER_EXECUTABLE_ACTION_TOOL_ID_VALUES } from "@mosoo/contracts/agent-builder";
 import { AGENT_BUILDER_MESSAGE_ROLES, AGENT_BUILDER_THREAD_STATUSES } from "@mosoo/db";
 
 function formatEnumValues(values: readonly string[]): string {
@@ -5,6 +6,25 @@ function formatEnumValues(values: readonly string[]): string {
 }
 
 export const agentBuilderSchema = /* GraphQL */ `
+  enum AgentBuilderControlPlaneActionStatus {
+    applied
+    needs_secure_ui
+    noop
+  }
+
+  enum AgentBuilderExecutableActionToolId {
+${formatEnumValues(AGENT_BUILDER_EXECUTABLE_ACTION_TOOL_ID_VALUES)}
+  }
+
+  enum AgentBuilderSecureUiActionKind {
+    create_environment
+    create_remote_mcp_server
+  }
+
+  type AgentBuilderSecureUiAction {
+    kind: AgentBuilderSecureUiActionKind!
+  }
+
   enum AgentBuilderThreadStatus {
 ${formatEnumValues(AGENT_BUILDER_THREAD_STATUSES)}
   }
@@ -36,5 +56,19 @@ ${formatEnumValues(AGENT_BUILDER_MESSAGE_ROLES)}
     role: AgentBuilderMessageRole!
     seq: Int!
     threadId: ULID!
+  }
+
+  type AgentBuilderControlPlaneActionResult {
+    message: String!
+    secureUi: AgentBuilderSecureUiAction
+    sessionId: ULID
+    status: AgentBuilderControlPlaneActionStatus!
+    toolId: AgentBuilderExecutableActionToolId!
+  }
+
+  input ExecuteAgentBuilderControlPlaneActionInput {
+    agentId: ULID!
+    draftYaml: String
+    toolId: AgentBuilderExecutableActionToolId!
   }
 `;

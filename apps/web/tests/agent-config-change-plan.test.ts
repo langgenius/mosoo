@@ -11,6 +11,7 @@ const SPACE_ID = "01J000000000000000000000B3";
 
 function draft(overrides: Partial<AgentEditorDraft> = {}): AgentEditorDraft {
   return {
+    componentDecisions: {},
     description: "Description",
     environmentId: null,
     mcpServers: [],

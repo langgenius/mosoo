@@ -1,12 +1,22 @@
+import type { EnvironmentSummary } from "@mosoo/contracts/environment";
+import type { McpServerWithCredential } from "@mosoo/contracts/mcp";
 import { ArrowRight, Rocket } from "lucide-react";
+import { useState } from "react";
 import type { ReactElement } from "react";
 import { createPortal } from "react-dom";
 
 import { useAppSession } from "@/app/session-provider";
+import { CreateEnvironmentDialog } from "@/domains/environment/components/create-environment-dialog";
 import { Button } from "@/shared/ui/button";
 
 import type { Agent, AgentMode } from "../agent.types";
+import {
+  createCreatedEnvironmentBuilderPatch,
+  createCreatedMcpServerBuilderPatch,
+} from "../components/agent-builder/agent-builder-auto-apply";
 import { AgentBuilderPanel } from "../components/agent-builder/agent-builder-panel";
+import { AgentBuilderRemoteMcpSecureDialog } from "../components/agent-builder/agent-builder-remote-mcp-secure-dialog";
+import { useAgentBuilderControlPlaneActions } from "../components/agent-builder/use-agent-builder-control-plane-actions";
 import { AgentKindSection } from "../components/agent-kind-section";
 import { AgentFormView } from "../components/editor/form-view";
 import { useAgentEditorModel } from "../components/editor/use-model";
@@ -82,6 +92,8 @@ function ConfigureStage({
   const { activeOrganization } = useAppSession();
   const organizationId = activeOrganization?.id ?? null;
   const model = useAgentEditorModel({ agent });
+  const [createEnvironmentOpen, setCreateEnvironmentOpen] = useState(false);
+  const [createRemoteMcpOpen, setCreateRemoteMcpOpen] = useState(false);
 
   const readinessReady = agent.readiness?.ready ?? false;
 
@@ -89,15 +101,76 @@ function ConfigureStage({
   const editedText = editedFieldsText(fieldsEdited);
   const saveDisabled = !model.dirty || model.saving || model.changePlan.action === "fork-agent";
   const testDisabled = !readinessReady || model.dirty || model.saving;
+  const builderActions = useAgentBuilderControlPlaneActions({
+    agentId: agent.id,
+    agentStatus: agent.status,
+    draftYaml: model.draftYaml,
+    draftYamlHash: model.draftYamlHash,
+    markCurrentDraftSaved: model.markCurrentDraftSaved,
+    onCreateEnvironment:
+      organizationId === null
+        ? undefined
+        : () => {
+            setCreateEnvironmentOpen(true);
+          },
+    onCreateRemoteMcpServer:
+      organizationId === null
+        ? undefined
+        : () => {
+            setCreateRemoteMcpOpen(true);
+          },
+    onOpenPreview: () => {
+      onSwitchMode("preview");
+    },
+    previewDisabled: testDisabled,
+    saving: model.saving,
+  });
+
+  function bindCreatedEnvironment(environment: EnvironmentSummary): void {
+    void model.applyAndSaveBuilderPatch(
+      createCreatedEnvironmentBuilderPatch({
+        baseDraftRevision: model.draftYamlHash,
+        baseEnvironmentDecision: model.draft.componentDecisions.environment ?? null,
+        baseEnvironmentId: model.draft.environmentId,
+        environment,
+      }),
+    );
+  }
+
+  function bindCreatedMcpServer(mcpServer: McpServerWithCredential): void {
+    void model.applyAndSaveBuilderPatch(
+      createCreatedMcpServerBuilderPatch({
+        baseDraftRevision: model.draftYamlHash,
+        baseMcpServerIds: model.draft.mcpServers.map((server) => server.id),
+        mcpServer,
+      }),
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {organizationId !== null ? (
+        <>
+          <CreateEnvironmentDialog
+            onCreated={bindCreatedEnvironment}
+            onOpenChange={setCreateEnvironmentOpen}
+            open={createEnvironmentOpen}
+            organizationId={organizationId}
+          />
+          <AgentBuilderRemoteMcpSecureDialog
+            onCreated={bindCreatedMcpServer}
+            onOpenChange={setCreateRemoteMcpOpen}
+            open={createRemoteMcpOpen}
+            organizationId={organizationId}
+          />
+        </>
+      ) : null}
       {headerActionTarget !== null
         ? createPortal(
             <Button
-              disabled={testDisabled}
+              disabled={builderActions.isActionDisabled("open_preview")}
               onClick={() => {
-                onSwitchMode("preview");
+                builderActions.onAction("open_preview");
               }}
               size="sm"
             >
@@ -141,8 +214,12 @@ function ConfigureStage({
         <div className="border-border-subtle min-h-0 w-1/2 min-w-[360px] shrink-0 border-r">
           <AgentBuilderPanel
             agent={agent}
+            actionDisabled={builderActions.isActionDisabled}
+            actionError={builderActions.actionError}
+            actionPending={builderActions.actionPending}
             draftRevision={model.draftYamlHash}
             draftYaml={model.draftYaml}
+            onAction={builderActions.onAction}
             onDraftPatchAutoApply={model.applyAndSaveBuilderPatch}
             onDraftPatchFocus={model.focusBuilderPatchSection}
           />

@@ -3,7 +3,7 @@ import type {
   AgentBuilderPlanNode,
   AgentBuilderPlannerContext,
 } from "@mosoo/contracts/agent-builder";
-import type { SkillId } from "@mosoo/id";
+import type { McpServerId, SkillId } from "@mosoo/id";
 
 import {
   parseAccountId,
@@ -28,6 +28,8 @@ export const NORMALIZER_IDS = {
   environmentLinear: parseEnvironmentId(platformId(103)),
   environmentSystemDefault: parseEnvironmentId(platformId(104)),
   mcpNeedsAuth: parseMcpServerId(platformId(105)),
+  mcpKeep: parseMcpServerId(platformId(113)),
+  mcpRemove: parseMcpServerId(platformId(114)),
   message: parseAgentBuilderMessageId(platformId(106)),
   organization: parseOrganizationId(platformId(107)),
   plannerRun: parseAgentBuilderPlannerRunId(platformId(108)),
@@ -37,6 +39,25 @@ export const NORMALIZER_IDS = {
   thread: parseAgentBuilderThreadId(platformId(112)),
 } as const;
 
+function defaultDraftYaml(assetLines: readonly string[]): string {
+  return [
+    "version: 1",
+    "kind: pet",
+    "identity:",
+    "  name: Old Agent",
+    "  description: Old description.",
+    "runtime:",
+    "  id: claude-agent-sdk",
+    "  provider: anthropic",
+    "  model: claude-sonnet-4-5",
+    "prompt: Old prompt.",
+    "environment:",
+    "  environmentId: null",
+    "assets:",
+    ...assetLines,
+  ].join("\n");
+}
+
 export function normalizerSkillId(index: number): SkillId {
   return parseSkillId(platformId(1_000 + index));
 }
@@ -45,13 +66,13 @@ export function plannerContext(): AgentBuilderPlannerContext {
   return {
     agent: {
       agentId: NORMALIZER_IDS.agent,
+      baseConfigApplied: true,
       kind: "pet",
       organizationId: NORMALIZER_IDS.organization,
       status: "draft",
     },
     assets: {
       changesSinceLastTurn: {
-        channels: { added: [], removed: [], updated: [] },
         environments: { added: [], removed: [], updated: [] },
         mcpServers: { added: [], removed: [], updated: [] },
         selectedSpaceFiles: { added: [], removed: [], updated: [] },
@@ -59,7 +80,6 @@ export function plannerContext(): AgentBuilderPlannerContext {
         spaces: { added: [], removed: [], updated: [] },
       },
       currentIndex: {
-        channels: [],
         environments: [],
         mcpServers: [
           {
@@ -75,7 +95,6 @@ export function plannerContext(): AgentBuilderPlannerContext {
         spaces: [],
       },
       draftBindings: {
-        channelIds: [],
         environmentId: null,
         mcpServerIds: [],
         parseError: null,
@@ -87,7 +106,7 @@ export function plannerContext(): AgentBuilderPlannerContext {
       snapshotHash: "asset_hash",
     },
     boundaryPolicy: {
-      allowedModes: ["plain_text", "draft_patch", "question", "blocked"],
+      allowedModes: ["plain_text", "draft_patch", "question", "action", "blocked"],
       forbiddenWrites: [],
       requiresLlmPlanner: true,
     },
@@ -114,7 +133,15 @@ export function plannerContext(): AgentBuilderPlannerContext {
       ].join("\n"),
     },
     historicalOpenNodes: [],
+    memory: {
+      diagnostics: [],
+    },
     plannerRunId: NORMALIZER_IDS.plannerRun,
+    preview: {
+      messageCount: 0,
+      opened: false,
+      sessionExists: false,
+    },
     readiness: {
       checkedAt: "2026-05-18T00:00:00.000Z",
       errorCount: 0,
@@ -386,6 +413,96 @@ export function plannerContextWithVisibleSkills(
         "  mcpServers: []",
         "  spaces: []",
       ].join("\n"),
+    },
+  };
+}
+
+export function plannerContextWithVisibleMcpServers(
+  existingMcpServerIds: McpServerId[],
+): AgentBuilderPlannerContext {
+  const context = plannerContext();
+  const visibleMcpServerIds = [NORMALIZER_IDS.mcpNeedsAuth, ...existingMcpServerIds];
+  const existingMcpServerIdSet = new Set(existingMcpServerIds);
+
+  return {
+    ...context,
+    assets: {
+      ...context.assets,
+      currentIndex: {
+        ...context.assets.currentIndex,
+        mcpServers: visibleMcpServerIds.map((id) => ({
+          bindingState: existingMcpServerIdSet.has(id)
+            ? ("bound" as const)
+            : ("not_bound" as const),
+          hash: `${id}_hash`,
+          id,
+          kind: "mcp_server" as const,
+          name: `MCP ${id}`,
+        })),
+      },
+      draftBindings: {
+        ...context.assets.draftBindings,
+        mcpServerIds: existingMcpServerIds,
+      },
+    },
+    draft: {
+      ...context.draft,
+      yaml: [
+        "version: 1",
+        "kind: pet",
+        "identity:",
+        "  name: Old Agent",
+        "  description: Old description.",
+        "runtime:",
+        "  id: claude-agent-sdk",
+        "  provider: anthropic",
+        "  model: claude-sonnet-4-5",
+        "prompt: Old prompt.",
+        "environment:",
+        "  environmentId: null",
+        "assets:",
+        "  skills: []",
+        "  mcpServers:",
+        ...existingMcpServerIds.flatMap((id) => [`    - id: ${id}`, `      name: MCP ${id}`]),
+        "  spaces: []",
+      ].join("\n"),
+    },
+  };
+}
+
+export function plannerContextWithVisibleSkillIndex(input: {
+  readonly draftSkillLines: readonly string[];
+  readonly visibleBoundSkillIds: readonly SkillId[];
+}): AgentBuilderPlannerContext {
+  const context = plannerContext();
+
+  return {
+    ...context,
+    assets: {
+      ...context.assets,
+      currentIndex: {
+        ...context.assets.currentIndex,
+        skills: input.visibleBoundSkillIds.map((id) => ({
+          bindingState: "bound" as const,
+          hash: `${id}_hash`,
+          id,
+          kind: "skill" as const,
+          name: `Skill ${id}`,
+        })),
+      },
+      draftBindings: {
+        ...context.assets.draftBindings,
+        skillIds: [...input.visibleBoundSkillIds],
+      },
+    },
+    draft: {
+      ...context.draft,
+      yaml: defaultDraftYaml([
+        "  skills:",
+        ...input.draftSkillLines,
+        "  mcpServers: []",
+        "  spaces: []",
+      ]),
     },
   };
 }

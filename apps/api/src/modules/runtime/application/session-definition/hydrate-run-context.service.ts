@@ -24,6 +24,7 @@ import {
   parseStoredEnvVarsJson,
 } from "../../../environments/application/environment-config";
 import { resolveRuntimeMcpServersForSnapshot } from "../../../mcp/application/mcp-runtime.service";
+import { enforceSafeApiBase } from "../../../vendor-credentials/application/vendor-credential-validation";
 import { resolveVendorApiKey } from "../../../vendor-credentials/application/vendor-credential.service";
 import type { ResolvedVendorCredential } from "../../../vendor-credentials/application/vendor-credential.types";
 import type {
@@ -141,7 +142,9 @@ function sanitizeHydratedRunContextForCache(
   };
 }
 
-function buildRuntimeVendorEnvVars(input: RuntimeVendorEnvironmentInput): Record<string, string> {
+export function buildRuntimeVendorEnvVars(
+  input: RuntimeVendorEnvironmentInput,
+): Record<string, string> {
   const envVars: Record<string, string> = {
     [input.vendor.apiKeyEnvVar]: input.credential.apiKey,
   };
@@ -153,6 +156,7 @@ function buildRuntimeVendorEnvVars(input: RuntimeVendorEnvironmentInput): Record
       );
     }
 
+    enforceSafeApiBase(input.credential.apiBase);
     envVars[input.vendor.apiBaseEnvVar] = input.credential.apiBase;
   }
 

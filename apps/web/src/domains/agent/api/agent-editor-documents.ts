@@ -4,6 +4,11 @@ export const GET_AGENT_EDITOR_STATE_QUERY = graphql(/* GraphQL */ `
   query AgentEditorState($agentId: ULID!) {
     agentEditorState(agentId: $agentId) {
       id
+      builder {
+        componentDecisions {
+          environment
+        }
+      }
       environment {
         boundSpaceIds
         environmentId

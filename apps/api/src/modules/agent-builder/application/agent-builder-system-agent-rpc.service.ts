@@ -1,20 +1,15 @@
-import type { AgentBuilderPlannerRunId, AgentBuilderThreadId, AgentId } from "@mosoo/id";
+import type { AgentBuilderThreadId, AgentId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { appendAgentBuilderPlannerTurnResult } from "./agent-builder-planner-turn.service";
 import type { AgentBuilderProgressReporter } from "./agent-builder-progress.service";
 import type { AgentBuilderSystemAgentSubmitMessageRuntime } from "./agent-builder-system-agent-runtime.service";
 import type { AgentBuilderSystemAgentState } from "./agent-builder-system-agent-state.service";
-import {
-  createAgentBuilderSystemAgentStateFromMessages,
-  readOpenAgentBuilderApprovalCountForPlannerRun,
-} from "./agent-builder-system-agent-state.service";
-import { createCompletedAgentBuilderSystemAgentTerminalResult } from "./agent-builder-system-agent-terminal.service";
+import { createAgentBuilderSystemAgentStateFromMessages } from "./agent-builder-system-agent-state.service";
 import type { AgentBuilderSystemAgentTerminalResult } from "./agent-builder-system-agent-terminal.service";
 import type { AgentBuilderMessageModel } from "./agent-builder-thread.service";
 import { ensureAgentBuilderThreadAddress } from "./agent-builder-thread.service";
-import { appendAgentBuilderAssemblyTurnResult } from "./builder-conversation-turn.service";
-import { approveAgentBuilderStarterPack } from "./builder-starter-pack-approval-ledger.service";
 
 export type { AgentBuilderSystemAgentState } from "./agent-builder-system-agent-state.service";
 
@@ -42,16 +37,13 @@ export async function submitAgentBuilderSystemAgentMessage(
     threadId: input.threadId,
   });
 
-  const turn = await appendAgentBuilderAssemblyTurnResult(bindings, viewer, {
+  const turn = await appendAgentBuilderPlannerTurnResult(bindings, viewer, {
     agentId: input.agentId,
-    code: input.runtime.code,
     draftRevision: input.draftRevision,
     draftYaml: input.draftYaml,
-    executor: input.runtime.executor,
     inputText: input.inputText,
+    planner: input.runtime.planner,
     ...(input.progress === undefined ? {} : { progress: input.progress }),
-    timeoutMs: input.runtime.timeoutMs,
-    tools: input.runtime.tools,
   });
 
   return {
@@ -61,31 +53,5 @@ export async function submitAgentBuilderSystemAgentMessage(
       messages: turn.messages,
     }),
     terminal: turn.terminal,
-  };
-}
-
-export async function approveAgentBuilderSystemAgentStarterPack(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  input: {
-    readonly agentId: AgentId;
-    readonly mode: "batch" | "single";
-    readonly nodeKey?: string | null;
-    readonly plannerRunId: AgentBuilderPlannerRunId;
-  },
-): Promise<AgentBuilderSystemAgentRpcResult> {
-  const messages = await approveAgentBuilderStarterPack(bindings, viewer, input);
-
-  return {
-    messages,
-    state: {
-      draftId: input.agentId,
-      lastPlannerRunId: input.plannerRunId,
-      openApprovalCount: await readOpenAgentBuilderApprovalCountForPlannerRun(
-        bindings.DB,
-        input.plannerRunId,
-      ),
-    },
-    terminal: createCompletedAgentBuilderSystemAgentTerminalResult(),
   };
 }

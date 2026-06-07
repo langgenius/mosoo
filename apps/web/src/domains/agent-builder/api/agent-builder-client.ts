@@ -1,3 +1,4 @@
+import type { AgentBuilderSecureUiAction } from "@mosoo/contracts/agent-builder";
 import type {
   AccountId,
   AgentBuilderMessageId,
@@ -5,18 +6,22 @@ import type {
   AgentBuilderThreadId,
   AgentId,
   OrganizationId,
+  SessionId,
 } from "@mosoo/contracts/id";
 import { parseNullablePlatformId, parsePlatformId } from "@mosoo/id";
 
+import type {
+  AgentBuilderControlPlaneActionStatus,
+  AgentBuilderExecutableActionToolId,
+  ExecuteAgentBuilderControlPlaneActionInput,
+} from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import { apiFetch } from "@/platform/http/public-api";
-import type { ApiPath } from "@/platform/http/public-api";
 
 import {
   AGENT_BUILDER_MESSAGES_QUERY,
   ENSURE_AGENT_BUILDER_THREAD_MUTATION,
+  EXECUTE_AGENT_BUILDER_CONTROL_PLANE_ACTION_MUTATION,
 } from "./agent-builder-documents";
-import type { AgentBuilderSystemAgentAddress } from "./agent-builder-transport";
 
 export interface AgentBuilderThread {
   agentId: AgentId;
@@ -45,50 +50,26 @@ export interface AgentBuilderMessage {
   threadId: AgentBuilderThreadId;
 }
 
-export interface AgentBuilderStarterPackApprovalInput {
-  mode: "BATCH" | "SINGLE";
-  nodeKey?: string | null;
-  plannerRunId: AgentBuilderPlannerRunId;
-}
-
-export async function approveAgentBuilderStarterPack(input: {
-  agentId: AgentId;
-  approval: AgentBuilderStarterPackApprovalInput;
-  systemAgent: AgentBuilderSystemAgentAddress | null;
-}): Promise<AgentBuilderMessage[]> {
-  if (input.systemAgent === null) {
-    throw new Error("Agent Builder session is not ready.");
-  }
-
-  return approveAgentBuilderSystemAgentStarterPack({
-    agentId: input.agentId,
-    approval: input.approval,
-    systemAgent: input.systemAgent,
-  });
-}
-
-async function approveAgentBuilderSystemAgentStarterPack(input: {
-  agentId: AgentId;
-  approval: AgentBuilderStarterPackApprovalInput;
-  systemAgent: AgentBuilderSystemAgentAddress;
-}): Promise<AgentBuilderMessage[]> {
-  const payload = await requestSystemAgentRpc({
-    body: {
-      agentId: input.agentId,
-      mode: input.approval.mode === "BATCH" ? "batch" : "single",
-      nodeKey: input.approval.nodeKey ?? null,
-      plannerRunId: input.approval.plannerRunId,
-      threadId: input.systemAgent.threadId,
-    },
-    path: createSystemAgentRpcPath(input.systemAgent, "starter-pack/approve"),
-  });
-
-  return payload.messages;
+export interface AgentBuilderControlPlaneActionResult {
+  message: string;
+  secureUi: AgentBuilderSecureUiAction | null;
+  sessionId: SessionId | null;
+  status: AgentBuilderControlPlaneActionStatus;
+  toolId: AgentBuilderExecutableActionToolId;
 }
 
 export async function ensureAgentBuilderThread(agentId: AgentId): Promise<AgentBuilderThread> {
   const payload = await requestGraphQL(ENSURE_AGENT_BUILDER_THREAD_MUTATION, { agentId });
   return parseAgentBuilderThread(payload.ensureAgentBuilderThread);
+}
+
+export async function executeAgentBuilderControlPlaneAction(
+  input: ExecuteAgentBuilderControlPlaneActionInput,
+): Promise<AgentBuilderControlPlaneActionResult> {
+  const payload = await requestGraphQL(EXECUTE_AGENT_BUILDER_CONTROL_PLANE_ACTION_MUTATION, {
+    input,
+  });
+  return parseAgentBuilderControlPlaneActionResult(payload.executeAgentBuilderControlPlaneAction);
 }
 
 export async function listAgentBuilderMessages(input: {
@@ -98,32 +79,6 @@ export async function listAgentBuilderMessages(input: {
 }): Promise<AgentBuilderMessage[]> {
   const payload = await requestGraphQL(AGENT_BUILDER_MESSAGES_QUERY, input);
   return payload.agentBuilderMessages.map(parseAgentBuilderMessage);
-}
-
-function createSystemAgentRpcPath(
-  systemAgent: AgentBuilderSystemAgentAddress,
-  operationPath: "starter-pack/approve",
-): ApiPath {
-  if (!systemAgent.publicPath.startsWith("/api/")) {
-    throw new Error("Agent Builder is not configured correctly.");
-  }
-
-  return `${systemAgent.publicPath.slice("/api".length)}/${operationPath}` as ApiPath;
-}
-
-async function readSystemAgentHttpError(response: Response): Promise<string> {
-  const payload = await response.json().catch(() => null);
-
-  if (
-    payload !== null &&
-    typeof payload === "object" &&
-    "error" in payload &&
-    typeof payload.error === "string"
-  ) {
-    return payload.error;
-  }
-
-  return `${response.status} ${response.statusText}`;
 }
 
 function parseAgentBuilderThread(thread: {
@@ -147,6 +102,22 @@ function parseAgentBuilderThread(thread: {
     status: thread.status,
     title: thread.title,
     updatedAt: thread.updatedAt,
+  };
+}
+
+function parseAgentBuilderControlPlaneActionResult(result: {
+  message: string;
+  secureUi: { kind: AgentBuilderSecureUiAction["kind"] } | null;
+  sessionId: string | null;
+  status: AgentBuilderControlPlaneActionStatus;
+  toolId: AgentBuilderExecutableActionToolId;
+}): AgentBuilderControlPlaneActionResult {
+  return {
+    message: result.message,
+    secureUi: result.secureUi,
+    sessionId: parseNullablePlatformId<SessionId>(result.sessionId, "Session ID"),
+    status: result.status,
+    toolId: result.toolId,
   };
 }
 
@@ -179,42 +150,5 @@ function parseAgentBuilderMessage(message: {
     role: message.role,
     seq: message.seq,
     threadId: parsePlatformId<AgentBuilderThreadId>(message.threadId, "Agent Builder thread ID"),
-  };
-}
-
-function readSystemAgentRpcMessages(payload: unknown): AgentBuilderMessage[] {
-  if (
-    payload === null ||
-    typeof payload !== "object" ||
-    !("messages" in payload) ||
-    !Array.isArray(payload.messages)
-  ) {
-    throw new Error("Agent Builder response did not include messages.");
-  }
-
-  return payload.messages.map(parseAgentBuilderMessage);
-}
-
-async function requestSystemAgentRpc(input: {
-  body: Record<string, unknown>;
-  path: ApiPath;
-}): Promise<{ messages: AgentBuilderMessage[] }> {
-  const response = await apiFetch(input.path, {
-    body: JSON.stringify(input.body),
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    method: "POST",
-  });
-
-  if (!response.ok) {
-    const message = await readSystemAgentHttpError(response);
-
-    throw new Error(message);
-  }
-
-  return {
-    messages: readSystemAgentRpcMessages(await response.json()),
   };
 }

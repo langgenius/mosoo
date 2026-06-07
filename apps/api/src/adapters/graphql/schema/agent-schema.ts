@@ -69,6 +69,12 @@ export const agentSchema = /* GraphQL */ `
     import
   }
 
+  enum AgentBuilderComponentDecision {
+    bound
+    created
+    skipped
+  }
+
   enum RuntimeStateOperation {
     recreateSandbox
     resetAgentState
@@ -149,6 +155,14 @@ export const agentSchema = /* GraphQL */ `
   type AgentEnvironmentConfig {
     boundSpaceIds: [ULID!]!
     environmentId: ULID
+  }
+
+  type AgentBuilderComponentDecisions {
+    environment: AgentBuilderComponentDecision
+  }
+
+  type AgentBuilderMetadata {
+    componentDecisions: AgentBuilderComponentDecisions!
   }
 
   type AgentReadinessIssue {
@@ -343,6 +357,7 @@ export const agentSchema = /* GraphQL */ `
   }
 
   type AgentEditorState {
+    builder: AgentBuilderMetadata!
     collaborators: [AgentCollaborator!]!
     environment: AgentEnvironmentConfig!
     id: ULID!
@@ -365,6 +380,7 @@ export const agentSchema = /* GraphQL */ `
 
   input UpdateAgentConfigInput {
     agentId: ULID!
+    builder: AgentBuilderMetadataInput!
     description: String
     environment: AgentEnvironmentConfigInput!
     kind: AgentKind!
@@ -375,6 +391,14 @@ export const agentSchema = /* GraphQL */ `
     provider: String!
     runtimeId: String!
     skillIds: [ULID!]!
+  }
+
+  input AgentBuilderComponentDecisionsInput {
+    environment: AgentBuilderComponentDecision
+  }
+
+  input AgentBuilderMetadataInput {
+    componentDecisions: AgentBuilderComponentDecisionsInput!
   }
 
   input DeleteAgentInput {

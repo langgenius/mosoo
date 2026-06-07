@@ -1,6 +1,13 @@
 import type { AgentBuilderPlannerRunId } from "../id/id.contract";
-import { normalizeAgentBuilderApprovalNodeKey } from "./agent-builder-approval.contract";
+import type { AgentBuilderAskUserMode } from "./agent-builder-control-plane.contract";
+import {
+  AGENT_BUILDER_ASK_USER_MODE_VALUES,
+  isAgentBuilderPlanNodeActionKey,
+} from "./agent-builder-control-plane.contract";
+import { normalizeAgentBuilderNodeKey } from "./agent-builder-node-key.contract";
 import type {
+  AgentBuilderAskUserOption,
+  AgentBuilderAskUserQuestion,
   AgentBuilderDraftPatchChange,
   AgentBuilderDraftPatchReference,
   AgentBuilderDraftPatchReferenceId,
@@ -28,6 +35,7 @@ const AGENT_BUILDER_PLANNER_RESPONSE_MODES = new Set<AgentBuilderPlannerResponse
 );
 
 const AGENT_BUILDER_PLAN_NODE_KINDS = new Set<AgentBuilderPlanNodeKind>([
+  "action",
   "blocked",
   "draft_patch",
   "question",
@@ -41,12 +49,12 @@ const AGENT_BUILDER_PLAN_NODE_STATUSES = new Set<AgentBuilderPlanNodeStatus>([
 ]);
 
 const AGENT_BUILDER_PLAN_NODE_TARGET_TYPES = new Set<AgentBuilderPlanNodeTargetType>([
-  "channel",
   "draft",
   "environment",
   "mcp",
   "skill",
   "space",
+  "workflow",
 ]);
 
 const AGENT_BUILDER_PLAN_NODE_ACTION_STYLES = new Set<AgentBuilderPlanNodeActionStyle>([
@@ -54,6 +62,10 @@ const AGENT_BUILDER_PLAN_NODE_ACTION_STYLES = new Set<AgentBuilderPlanNodeAction
   "primary",
   "secondary",
 ]);
+
+const AGENT_BUILDER_ASK_USER_MODES = new Set<AgentBuilderAskUserMode>(
+  AGENT_BUILDER_ASK_USER_MODE_VALUES,
+);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -65,6 +77,10 @@ function isString(value: unknown): value is string {
 
 function isBoolean(value: unknown): value is boolean {
   return typeof value === "boolean";
+}
+
+function isAbsent(value: unknown): value is null | undefined {
+  return value === undefined || value === null;
 }
 
 function toDraftPatchReferenceId(id: string): AgentBuilderDraftPatchReferenceId {
@@ -106,6 +122,10 @@ function isPlanNodeActionStyle(value: unknown): value is AgentBuilderPlanNodeAct
   );
 }
 
+function isAskUserMode(value: unknown): value is AgentBuilderAskUserMode {
+  return isString(value) && AGENT_BUILDER_ASK_USER_MODES.has(value as AgentBuilderAskUserMode);
+}
+
 function parsePlanNodeAction(value: unknown): AgentBuilderPlanNodeAction | null {
   if (!isRecord(value)) {
     return null;
@@ -118,7 +138,7 @@ function parsePlanNodeAction(value: unknown): AgentBuilderPlanNodeAction | null 
   };
 
   if (
-    !isString(action.actionKey) ||
+    !isAgentBuilderPlanNodeActionKey(action.actionKey) ||
     !isString(action.label) ||
     !isPlanNodeActionStyle(action.style)
   ) {
@@ -132,6 +152,78 @@ function parsePlanNodeAction(value: unknown): AgentBuilderPlanNodeAction | null 
   };
 }
 
+function parseAskUserOption(value: unknown): AgentBuilderAskUserOption | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const description = value["description"];
+  const label = value["label"];
+  const optionKey = normalizeAgentBuilderNodeKey(value["optionKey"]);
+  const optionValue = value["value"];
+
+  if (
+    optionKey === null ||
+    !isString(label) ||
+    (!isAbsent(description) && !isString(description)) ||
+    (!isAbsent(optionValue) && !isString(optionValue))
+  ) {
+    return null;
+  }
+
+  return {
+    ...(isAbsent(description) ? {} : { description }),
+    label,
+    optionKey,
+    ...(isAbsent(optionValue) ? {} : { value: optionValue }),
+  };
+}
+
+function parseAskUserQuestion(value: unknown): AgentBuilderAskUserQuestion | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const allowCustomText = value["allowCustomText"];
+  const allowSkip = value["allowSkip"];
+  const mode = value["mode"];
+  const options = value["options"];
+  const prompt = value["prompt"];
+  const submitLabel = value["submitLabel"];
+  const parsedOptions = Array.isArray(options)
+    ? options.map((entry) => parseAskUserOption(entry))
+    : null;
+
+  if (
+    !isBoolean(allowCustomText) ||
+    !isBoolean(allowSkip) ||
+    !isAskUserMode(mode) ||
+    parsedOptions === null ||
+    parsedOptions.some((option) => option === null) ||
+    !isString(prompt) ||
+    (!isAbsent(submitLabel) && !isString(submitLabel))
+  ) {
+    return null;
+  }
+
+  if ((mode === "single_select" || mode === "multi_select") && parsedOptions.length === 0) {
+    return null;
+  }
+
+  return {
+    allowCustomText,
+    allowSkip,
+    mode,
+    options: parsedOptions.filter((option): option is AgentBuilderAskUserOption => option !== null),
+    prompt,
+    ...(isAbsent(submitLabel) ? {} : { submitLabel }),
+  };
+}
+
 function parseDraftPatchReference(value: unknown): AgentBuilderDraftPatchReference | null {
   if (!isRecord(value)) {
     return null;
@@ -142,23 +234,26 @@ function parseDraftPatchReference(value: unknown): AgentBuilderDraftPatchReferen
   const id = value["id"];
   const name = value["name"];
   const targetType = value["targetType"];
+  const url = value["url"];
 
   if (
     !isAgentBuilderVisibleAssetBindingState(bindingState) ||
     !isString(id) ||
     !isString(name) ||
     !isAgentBuilderDraftPatchReferenceTargetType(targetType) ||
-    (filename !== undefined && !isString(filename))
+    (!isAbsent(filename) && !isString(filename)) ||
+    (!isAbsent(url) && !isString(url))
   ) {
     return null;
   }
 
   return {
     bindingState,
-    ...(filename === undefined ? {} : { filename }),
+    ...(isAbsent(filename) ? {} : { filename }),
     id: toDraftPatchReferenceId(id),
     name,
     targetType,
+    ...(isAbsent(url) ? {} : { url }),
   };
 }
 
@@ -188,10 +283,10 @@ function parseDraftPatchChange(value: unknown): AgentBuilderDraftPatchChange | n
   if (
     !isAgentBuilderDraftPatchFieldPath(fieldPath) ||
     !isAgentBuilderDraftPatchValue(patchValue) ||
-    (autoApply !== undefined && !isBoolean(autoApply)) ||
-    (baseDraftRevision !== undefined && !isString(baseDraftRevision)) ||
+    (!isAbsent(autoApply) && !isBoolean(autoApply)) ||
+    (!isAbsent(baseDraftRevision) && !isString(baseDraftRevision)) ||
     (baseValue !== undefined && !isAgentBuilderDraftPatchValue(baseValue)) ||
-    (sectionId !== undefined && !isAgentBuilderDraftPatchSectionId(sectionId)) ||
+    (!isAbsent(sectionId) && !isAgentBuilderDraftPatchSectionId(sectionId)) ||
     parsedReferences === null ||
     parsedReferences.some((reference) => reference === null)
   ) {
@@ -199,8 +294,8 @@ function parseDraftPatchChange(value: unknown): AgentBuilderDraftPatchChange | n
   }
 
   return {
-    ...(autoApply === undefined ? {} : { autoApply }),
-    ...(baseDraftRevision === undefined ? {} : { baseDraftRevision }),
+    ...(isAbsent(autoApply) ? {} : { autoApply }),
+    ...(isAbsent(baseDraftRevision) ? {} : { baseDraftRevision }),
     ...(baseValue === undefined ? {} : { baseValue }),
     fieldPath,
     ...(resolvedReferences === undefined
@@ -210,7 +305,7 @@ function parseDraftPatchChange(value: unknown): AgentBuilderDraftPatchChange | n
             (reference): reference is AgentBuilderDraftPatchReference => reference !== null,
           ),
         }),
-    ...(sectionId === undefined ? {} : { sectionId }),
+    ...(isAbsent(sectionId) ? {} : { sectionId }),
     value: patchValue,
   };
 }
@@ -221,9 +316,10 @@ function parsePlanNode(value: unknown): AgentBuilderPlanNode | null {
   }
 
   const fieldPath = value["fieldPath"];
+  const askUser = parseAskUserQuestion(value["askUser"]);
   const rawDraftPatch = value["draftPatch"];
   const draftPatch = parseDraftPatchChange(rawDraftPatch);
-  const nodeKey = normalizeAgentBuilderApprovalNodeKey(value["nodeKey"]);
+  const nodeKey = normalizeAgentBuilderNodeKey(value["nodeKey"]);
   const node = {
     actions: value["actions"],
     fieldPath,
@@ -248,6 +344,8 @@ function parsePlanNode(value: unknown): AgentBuilderPlanNode | null {
     !isPlanNodeStatus(node.status) ||
     !isString(node.summary) ||
     !isPlanNodeTargetType(node.targetType) ||
+    (node.kind === "question" && askUser === null) ||
+    (value["askUser"] !== undefined && value["askUser"] !== null && askUser === null) ||
     (fieldPath !== undefined && fieldPath !== null && !isString(fieldPath)) ||
     (rawDraftPatch !== undefined && rawDraftPatch !== null && draftPatch === null)
   ) {
@@ -256,6 +354,7 @@ function parsePlanNode(value: unknown): AgentBuilderPlanNode | null {
 
   return {
     actions: actions.filter((action): action is AgentBuilderPlanNodeAction => action !== null),
+    ...(askUser === null ? {} : { askUser }),
     ...(draftPatch === null ? {} : { draftPatch }),
     ...(fieldPath === undefined || fieldPath === null ? {} : { fieldPath }),
     kind: node.kind,

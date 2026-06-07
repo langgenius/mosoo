@@ -37,6 +37,7 @@ export interface AgentSessionPanelModel {
   ensureActiveSession: () => Promise<string>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   handleKeyDown: (event: KeyboardEvent, options?: SendOptions) => Promise<boolean>;
+  handleResetSession: () => Promise<void>;
   handleSend: (options?: SendOptions) => Promise<boolean>;
   handleStartNewSession: () => Promise<void>;
   input: string;

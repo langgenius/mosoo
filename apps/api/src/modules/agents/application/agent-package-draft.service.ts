@@ -74,6 +74,7 @@ export async function createDraftAgentBatch(
   await runAppDatabaseBatch(database, (db) => {
     const agentInsert = db.insert(agentsTable).values({
       configJson: serializeAgentStoredConfig({
+        builder: { componentDecisions: {} },
         packageMcpServers: input.packageMcpServers,
         packageSkills: input.packageSkills,
         packageResolution: input.packageResolution,

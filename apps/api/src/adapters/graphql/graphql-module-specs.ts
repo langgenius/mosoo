@@ -77,7 +77,10 @@ export const agentGraphQLSpec = {
 } satisfies GraphQLModuleSpec;
 
 export const agentBuilderGraphQLSpec = {
-  mutationFields: ["ensureAgentBuilderThread(agentId: ULID!): AgentBuilderThread!"],
+  mutationFields: [
+    "ensureAgentBuilderThread(agentId: ULID!): AgentBuilderThread!",
+    "executeAgentBuilderControlPlaneAction(input: ExecuteAgentBuilderControlPlaneActionInput!): AgentBuilderControlPlaneActionResult!",
+  ],
   queryFields: [
     "agentBuilderMessages(agentId: ULID!, beforeSeq: Int, limit: Int): [AgentBuilderMessage!]!",
   ],
@@ -155,7 +158,7 @@ export const sessionGraphQLSpec = {
     "threadSessionProcessEvents(limit: Int, sessionId: ULID!): [SessionProcessEvent!]!",
     "listSessionResources(sessionId: ULID!): [SessionResource!]!",
     "sessionList(archived: Boolean, beforeCursor: String, limit: Int, organizationId: ULID!, type: SessionType): SessionConnection!",
-    "agentSessionList(agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, type: SessionType): SessionConnection!",
+    "agentSessionList(agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!",
   ],
   typeDefs: sessionSchema,
 } satisfies GraphQLModuleSpec;

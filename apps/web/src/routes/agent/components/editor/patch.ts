@@ -2,7 +2,6 @@ import type {
   AgentBuilderDraftPatchChange,
   AgentBuilderDraftPatchFieldPath,
   AgentBuilderDraftPatchReference,
-  AgentBuilderDraftPatchValue,
 } from "@mosoo/contracts/agent-builder";
 import { getAgentBuilderDraftPatchAssetFieldSpec } from "@mosoo/contracts/agent-builder";
 
@@ -21,6 +20,16 @@ export interface AgentEditorBuilderPatchApplyResult {
     reason: string;
   }[];
   draft: AgentEditorDraft;
+}
+
+interface BuilderPatchItemApplyResult {
+  blockedReason: string | null;
+  draft: AgentEditorDraft;
+}
+
+interface AssetSelectionResult<T> {
+  items: T[];
+  missingIds: string[];
 }
 
 export function applyAgentEditorPatch(
@@ -51,7 +60,7 @@ export function applyAgentEditorPatch(
     next.prompt = prompt;
   }
   if (typeof environmentId === "string" || environmentId === null) {
-    next.environmentId = environmentId;
+    return withEnvironmentId(next, environmentId);
   }
 
   return next;
@@ -60,30 +69,27 @@ export function applyAgentEditorPatch(
 export function applyAgentEditorBuilderPatch(
   current: AgentEditorDraft,
   patch: AgentEditorBuilderPatch,
-  currentDraftRevision: string,
 ): AgentEditorBuilderPatchApplyResult {
   let next = current;
   const appliedSections = new Set<AgentFormSectionId>();
   const blockedItems: AgentEditorBuilderPatchApplyResult["blockedItems"] = [];
 
   for (const item of patch.items) {
-    const conflictReason = getPatchConflictReason(current, item, currentDraftRevision);
+    const result = applyBuilderPatchItem(next, item);
 
-    if (conflictReason !== null) {
+    if (result.blockedReason !== null) {
       blockedItems.push({
         fieldPath: item.fieldPath,
-        reason: conflictReason,
+        reason: result.blockedReason,
       });
       continue;
     }
 
-    const updated = applyBuilderPatchItem(next, item);
-
-    if (updated === next) {
+    if (result.draft === next) {
       continue;
     }
 
-    next = updated;
+    next = result.draft;
 
     if (item.sectionId !== undefined) {
       appliedSections.add(item.sectionId);
@@ -97,112 +103,129 @@ export function applyAgentEditorBuilderPatch(
   };
 }
 
-function getPatchConflictReason(
-  current: AgentEditorDraft,
-  item: AgentBuilderDraftPatchChange,
-  currentDraftRevision: string,
-): string | null {
-  if (
-    item.baseValue === undefined &&
-    item.baseDraftRevision !== undefined &&
-    item.baseDraftRevision !== currentDraftRevision
-  ) {
-    return "Draft revision changed since this Builder patch was generated.";
-  }
-
-  if (item.baseValue === undefined) {
-    return null;
-  }
-
-  const currentValue = readDraftFieldValue(current, item.fieldPath);
-
-  if (!draftPatchValuesEqual(currentValue, item.baseValue)) {
-    return "Draft changed since this Builder patch was generated.";
-  }
-
-  return null;
-}
-
 function applyBuilderPatchItem(
   current: AgentEditorDraft,
   item: AgentBuilderDraftPatchChange,
-): AgentEditorDraft {
+): BuilderPatchItemApplyResult {
   switch (item.fieldPath) {
+    case "componentDecisions.environment":
+      return item.value === "bound" || item.value === "created" || item.value === "skipped"
+        ? applied({
+            ...current,
+            componentDecisions: {
+              ...current.componentDecisions,
+              environment: item.value,
+            },
+            ...(item.value === "skipped" ? { environmentId: null } : {}),
+          })
+        : blocked(
+            current,
+            "Expected Environment component decision to be bound, created, or skipped.",
+          );
     case "description":
-      return typeof item.value === "string" ? { ...current, description: item.value } : current;
+      return typeof item.value === "string"
+        ? applied({ ...current, description: item.value })
+        : blocked(current, "Expected a string description.");
     case "environmentId":
       return typeof item.value === "string" || item.value === null
-        ? { ...current, environmentId: item.value }
-        : current;
+        ? applied(withEnvironmentId(current, item.value))
+        : blocked(current, "Expected an environment id or null.");
+    case "kind":
+      return item.value === "pet" || item.value === "cattle"
+        ? applied({ ...current, kind: item.value })
+        : blocked(current, "Expected agent kind to be pet or cattle.");
     case "model":
-      return typeof item.value === "string" ? { ...current, model: item.value } : current;
-    case "mcpServerIds":
-      return Array.isArray(item.value)
-        ? { ...current, mcpServers: createMcpServerSelection(current.mcpServers, item.value, item) }
-        : current;
+      return typeof item.value === "string"
+        ? applied({ ...current, model: item.value })
+        : blocked(current, "Expected a string model id.");
+    case "mcpServerIds": {
+      if (!Array.isArray(item.value)) {
+        return blocked(current, "Expected an array of MCP server ids.");
+      }
+
+      const selection = createMcpServerSelection(current.mcpServers, item.value, item);
+
+      return selection.missingIds.length === 0
+        ? applied({ ...current, mcpServers: selection.items })
+        : blocked(current, formatMissingReferences("MCP server", selection.missingIds));
+    }
     case "name":
-      return typeof item.value === "string" ? { ...current, name: item.value } : current;
+      return typeof item.value === "string"
+        ? applied({ ...current, name: item.value })
+        : blocked(current, "Expected a string name.");
     case "prompt":
-      return typeof item.value === "string" ? { ...current, prompt: item.value } : current;
+      return typeof item.value === "string"
+        ? applied({ ...current, prompt: item.value })
+        : blocked(current, "Expected a string system prompt.");
     case "provider":
-      return typeof item.value === "string" ? { ...current, provider: item.value } : current;
+      return typeof item.value === "string"
+        ? applied({ ...current, provider: item.value })
+        : blocked(current, "Expected a string provider id.");
     case "runtimeId":
-      return typeof item.value === "string" ? { ...current, runtime: item.value } : current;
-    case "skillIds":
-      return Array.isArray(item.value)
-        ? { ...current, skills: createSkillSelection(current.skills, item.value, item) }
-        : current;
-    case "spaceIds":
-      return Array.isArray(item.value)
-        ? { ...current, spaces: createSpaceSelection(current.spaces, item.value, item) }
-        : current;
+      return typeof item.value === "string"
+        ? applied({ ...current, runtime: item.value })
+        : blocked(current, "Expected a string runtime id.");
+    case "skillIds": {
+      if (!Array.isArray(item.value)) {
+        return blocked(current, "Expected an array of skill ids.");
+      }
+
+      const selection = createSkillSelection(current.skills, item.value, item);
+
+      return selection.missingIds.length === 0
+        ? applied({ ...current, skills: selection.items })
+        : blocked(current, formatMissingReferences("Skill", selection.missingIds));
+    }
+    case "spaceIds": {
+      if (!Array.isArray(item.value)) {
+        return blocked(current, "Expected an array of space ids.");
+      }
+
+      const selection = createSpaceSelection(current.spaces, item.value, item);
+
+      return selection.missingIds.length === 0
+        ? applied({ ...current, spaces: selection.items })
+        : blocked(current, formatMissingReferences("Space", selection.missingIds));
+    }
   }
 }
 
-function readDraftFieldValue(
-  draft: AgentEditorDraft,
-  fieldPath: AgentBuilderDraftPatchFieldPath,
-): AgentBuilderDraftPatchValue {
-  switch (fieldPath) {
-    case "description":
-      return draft.description;
-    case "environmentId":
-      return draft.environmentId;
-    case "model":
-      return draft.model;
-    case "mcpServerIds":
-      return draft.mcpServers.map((server) => server.id);
-    case "name":
-      return draft.name;
-    case "prompt":
-      return draft.prompt;
-    case "provider":
-      return draft.provider;
-    case "runtimeId":
-      return draft.runtime;
-    case "skillIds":
-      return draft.skills.flatMap((skill) => (skill.state === "tombstone" ? [] : [skill.id]));
-    case "spaceIds":
-      return draft.spaces.map((space) => space.id);
-  }
+function applied(draft: AgentEditorDraft): BuilderPatchItemApplyResult {
+  return {
+    blockedReason: null,
+    draft,
+  };
 }
 
-function draftPatchValuesEqual(
-  left: AgentBuilderDraftPatchValue,
-  right: AgentBuilderDraftPatchValue,
-): boolean {
-  return (
-    JSON.stringify(normalizeDraftPatchValue(left)) ===
-    JSON.stringify(normalizeDraftPatchValue(right))
-  );
+export function withEnvironmentId(
+  current: AgentEditorDraft,
+  environmentId: string | null,
+): AgentEditorDraft {
+  const { environment: _previousEnvironmentDecision, ...nextComponentDecisions } =
+    current.componentDecisions;
+
+  return {
+    ...current,
+    componentDecisions:
+      environmentId === null
+        ? nextComponentDecisions
+        : {
+            ...nextComponentDecisions,
+            environment: "bound",
+          },
+    environmentId,
+  };
 }
 
-function normalizeDraftPatchValue(value: AgentBuilderDraftPatchValue): AgentBuilderDraftPatchValue {
-  if (!Array.isArray(value)) {
-    return value;
-  }
+function blocked(draft: AgentEditorDraft, reason: string): BuilderPatchItemApplyResult {
+  return {
+    blockedReason: reason,
+    draft,
+  };
+}
 
-  return [...value];
+function formatMissingReferences(label: string, missingIds: string[]): string {
+  return `Missing visible ${label} references: ${missingIds.join(", ")}.`;
 }
 
 function createReferenceMap(
@@ -226,25 +249,22 @@ function createSkillSelection(
   currentSkills: SkillInfo[],
   targetIds: string[],
   item: AgentBuilderDraftPatchChange,
-): SkillInfo[] {
+): AssetSelectionResult<SkillInfo> {
   const currentById = new Map(currentSkills.map((skill) => [skill.id, skill]));
   const references = createReferenceMap(item, "skillIds");
+  const missingIds: string[] = [];
 
-  return targetIds.flatMap((id): SkillInfo[] => {
+  const items = targetIds.flatMap((id): SkillInfo[] => {
     const current = currentById.get(id);
 
     if (current !== undefined) {
-      return [
-        {
-          ...current,
-          ...(current.state === "tombstone" ? { state: "active" as const } : {}),
-        },
-      ];
+      return [current];
     }
 
     const reference = references.get(id);
 
     if (reference === undefined) {
+      missingIds.push(id);
       return [];
     }
 
@@ -256,17 +276,23 @@ function createSkillSelection(
       },
     ];
   });
+
+  return {
+    items,
+    missingIds,
+  };
 }
 
 function createSpaceSelection(
   currentSpaces: SpaceBinding[],
   targetIds: string[],
   item: AgentBuilderDraftPatchChange,
-): SpaceBinding[] {
+): AssetSelectionResult<SpaceBinding> {
   const currentById = new Map(currentSpaces.map((space) => [space.id, space]));
   const references = createReferenceMap(item, "spaceIds");
+  const missingIds: string[] = [];
 
-  return targetIds.flatMap((id): SpaceBinding[] => {
+  const items = targetIds.flatMap((id): SpaceBinding[] => {
     const current = currentById.get(id);
 
     if (current !== undefined) {
@@ -275,19 +301,30 @@ function createSpaceSelection(
 
     const reference = references.get(id);
 
-    return reference === undefined ? [] : [{ id: reference.id, name: reference.name }];
+    if (reference === undefined) {
+      missingIds.push(id);
+      return [];
+    }
+
+    return [{ id: reference.id, name: reference.name }];
   });
+
+  return {
+    items,
+    missingIds,
+  };
 }
 
 function createMcpServerSelection(
   currentServers: McpServer[],
   targetIds: string[],
   item: AgentBuilderDraftPatchChange,
-): McpServer[] {
+): AssetSelectionResult<McpServer> {
   const currentById = new Map(currentServers.map((server) => [server.id, server]));
   const references = createReferenceMap(item, "mcpServerIds");
+  const missingIds: string[] = [];
 
-  return targetIds.flatMap((id): McpServer[] => {
+  const items = targetIds.flatMap((id): McpServer[] => {
     const current = currentById.get(id);
 
     if (current !== undefined) {
@@ -296,17 +333,25 @@ function createMcpServerSelection(
 
     const reference = references.get(id);
 
-    return reference === undefined
-      ? []
-      : [
-          {
-            credentialMode: "runtime_resolved",
-            enabled: true,
-            id: reference.id,
-            name: reference.name,
-            type: "web",
-            url: "",
-          },
-        ];
+    if (reference === undefined) {
+      missingIds.push(id);
+      return [];
+    }
+
+    return [
+      {
+        credentialMode: "runtime_resolved",
+        enabled: true,
+        id: reference.id,
+        name: reference.name,
+        type: "web",
+        url: reference.url ?? "",
+      },
+    ];
   });
+
+  return {
+    items,
+    missingIds,
+  };
 }

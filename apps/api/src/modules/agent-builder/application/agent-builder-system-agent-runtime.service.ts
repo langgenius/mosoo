@@ -1,71 +1,93 @@
+import type { AgentBuilderPlannerContext } from "@mosoo/contracts/agent-builder";
+
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { createAgentBuilderPlannerToolRuntime } from "./agent-builder-planner-tool-registry.service";
-import type { AgentBuilderToolRuntime } from "./agent-builder-tool-runtime.service";
-import { createCodeModeBuilderWorkflowExecutor } from "./builder-code-mode-workflow-executor.service";
-import type {
-  AgentBuilderAssemblyToolRuntimeFactory,
-  AgentBuilderAssemblyWorkflowCodeFactory,
-} from "./builder-conversation-turn.service";
-import { generateAgentBuilderAssemblyWorkflowCode } from "./builder-workflow-code-generator.service";
-import type { BuilderWorkflowExecutor } from "./builder-workflow-executor.service";
-
-const DEFAULT_AGENT_BUILDER_SYSTEM_AGENT_WORKFLOW_CODE = [
-  "// Code Mode executor is not configured yet.",
-  "throw new Error('Agent Builder Code Mode executor is not configured.');",
-].join("\n");
-
-const AGENT_BUILDER_SYSTEM_AGENT_WORKFLOW_TIMEOUT_MS = 120_000;
+import { isAgentBuilderOptionalComponentStructuredReplyNodeKey } from "./agent-builder-component-planner-policy.service";
+import { isAgentBuilderEnvironmentStructuredReplyNodeKey } from "./agent-builder-environment-planner-policy.service";
+import { createDefaultAgentBuilderLightweightPlanner } from "./agent-builder-lightweight-planner-policy.service";
+import { createAgentBuilderLlmPlanner } from "./agent-builder-llm-planner.service";
+import type { AgentBuilderLightweightPlanner } from "./agent-builder-planner-turn.service";
+import { parseAgentBuilderStructuredReply } from "./agent-builder-structured-input";
 
 export interface AgentBuilderSystemAgentSubmitMessageRuntime {
-  readonly code: AgentBuilderAssemblyWorkflowCodeFactory | string;
-  readonly executor: BuilderWorkflowExecutor;
-  readonly timeoutMs: number;
-  readonly tools: AgentBuilderAssemblyToolRuntimeFactory | AgentBuilderToolRuntime;
+  readonly planner: AgentBuilderLightweightPlanner;
 }
 
-function createUnavailableWorkflowExecutor(): BuilderWorkflowExecutor {
+export type AgentBuilderSystemAgentPlannerRoute = "deterministic" | "llm";
+
+function isLatestPendingQuestionReply(
+  context: AgentBuilderPlannerContext,
+  nodeKey: string,
+): boolean {
+  const latestNode = context.historicalOpenNodes[0] ?? null;
+
+  return (
+    latestNode !== null &&
+    latestNode.kind === "question" &&
+    latestNode.nodeKey === nodeKey &&
+    latestNode.status === "pending"
+  );
+}
+
+export function selectAgentBuilderSystemAgentPlannerRoute(
+  context: AgentBuilderPlannerContext,
+): AgentBuilderSystemAgentPlannerRoute {
+  if (context.turn.inputKind !== "question_answer") {
+    return "llm";
+  }
+
+  const reply = parseAgentBuilderStructuredReply(context.turn.inputText);
+
+  if (reply === null) {
+    return "llm";
+  }
+
+  if (
+    isAgentBuilderEnvironmentStructuredReplyNodeKey(reply.nodeKey) ||
+    isAgentBuilderOptionalComponentStructuredReplyNodeKey(reply.nodeKey)
+  ) {
+    return "deterministic";
+  }
+
+  return isLatestPendingQuestionReply(context, reply.nodeKey) ? "llm" : "deterministic";
+}
+
+function createAgentBuilderSystemAgentPlanner(input: {
+  readonly bindings: ApiBindings;
+  readonly viewer: AuthenticatedViewer;
+}): AgentBuilderLightweightPlanner {
+  const llmPlanner = createAgentBuilderLlmPlanner(input);
+  const structuredReplyPlanner = createDefaultAgentBuilderLightweightPlanner();
+  let activePlanner: AgentBuilderLightweightPlanner = llmPlanner;
+
   return {
-    async execute() {
-      return {
-        errorMessage: "Agent Builder Code Mode executor is not configured.",
-        logs: [],
-        result: null,
-        trace: [],
-      };
+    get modelId() {
+      return activePlanner.modelId ?? "agent-builder-system-agent";
+    },
+    plan(plannerInput) {
+      activePlanner =
+        selectAgentBuilderSystemAgentPlannerRoute(plannerInput.context) === "deterministic"
+          ? structuredReplyPlanner
+          : llmPlanner;
+
+      return activePlanner.plan(plannerInput);
+    },
+    get provider() {
+      return activePlanner.provider ?? "agent-builder-system-agent";
     },
   };
 }
 
 export function createAgentBuilderSystemAgentSubmitRuntime(input: {
   readonly bindings: ApiBindings;
+  readonly planner?: AgentBuilderLightweightPlanner;
   readonly viewer: AuthenticatedViewer;
 }): AgentBuilderSystemAgentSubmitMessageRuntime {
-  const code =
-    input.bindings.AGENT_BUILDER_CODE_WORKER_LOADER === undefined
-      ? DEFAULT_AGENT_BUILDER_SYSTEM_AGENT_WORKFLOW_CODE
-      : (context: Parameters<AgentBuilderAssemblyWorkflowCodeFactory>[0]) =>
-          generateAgentBuilderAssemblyWorkflowCode({
-            bindings: input.bindings,
-            context,
-            viewer: input.viewer,
-          });
-  const executor =
-    input.bindings.AGENT_BUILDER_CODE_WORKER_LOADER === undefined
-      ? createUnavailableWorkflowExecutor()
-      : createCodeModeBuilderWorkflowExecutor({
-          loader: input.bindings.AGENT_BUILDER_CODE_WORKER_LOADER,
-        });
-
   return {
-    code,
-    executor,
-    timeoutMs: AGENT_BUILDER_SYSTEM_AGENT_WORKFLOW_TIMEOUT_MS,
-    tools: (context) =>
-      createAgentBuilderPlannerToolRuntime({
-        actorAccountId: input.viewer.id,
+    planner:
+      input.planner ??
+      createAgentBuilderSystemAgentPlanner({
         bindings: input.bindings,
-        context,
         viewer: input.viewer,
       }),
   };

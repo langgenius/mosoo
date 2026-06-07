@@ -5,34 +5,32 @@ import type {
   AgentBuilderPlannerContext,
   AgentBuilderPlannerResponseMode,
 } from "@mosoo/contracts/agent-builder";
-import { getAgentBuilderDraftPatchSectionId } from "@mosoo/contracts/agent-builder";
+import {
+  getAgentBuilderDraftPatchAssetFieldSpec,
+  getAgentBuilderDraftPatchSectionId,
+} from "@mosoo/contracts/agent-builder";
 import type { AccountId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { parseAgentBuilderPlannerDraft } from "./agent-builder-draft-parser";
 import {
   createVisibleAssetReferenceMapResolver,
   resolveDraftPatchReferences,
 } from "./agent-builder-draft-patch-assets";
 import type { VisibleAssetReferenceMapResolver } from "./agent-builder-draft-patch-assets";
-import {
-  appendUniqueDraftPatchIds,
-  normalizeDraftPatchIdList,
-} from "./agent-builder-draft-patch-id-list";
-import {
-  ensureRuntimeAndModelPatchAvailable,
-  resolveAgentBuilderModelId,
-  resolveKnownProviderId,
-  resolvePublicRuntimeId,
-} from "./agent-builder-draft-patch-model-selection";
+import { normalizeDraftPatchIdList } from "./agent-builder-draft-patch-id-list";
+import { ensureRuntimeAndModelPatchAvailable } from "./agent-builder-draft-patch-model-selection";
 import { createBlockedDraftPatchNode } from "./agent-builder-draft-patch-node";
+import type { AgentBuilderLightweightPlannerDraftContext } from "./agent-builder-lightweight-draft-types";
+import { toAgentBuilderPlannerDraftContext } from "./agent-builder-lightweight-manifest-projections";
+import {
+  normalizeAgentBuilderManifestPatchValue,
+  readAgentBuilderManifestPatchBaseValue,
+} from "./agent-builder-manifest-patch-policy.service";
 
 export {
   createComparableLookupIndex,
   resolveAgentBuilderModelId,
 } from "./agent-builder-draft-patch-model-selection";
-
-type ParsedPlannerDraft = ReturnType<typeof parseAgentBuilderPlannerDraft>;
 
 type DraftPatchWorkingValues = Map<AgentBuilderDraftPatchFieldPath, AgentBuilderDraftPatchValue>;
 
@@ -47,7 +45,7 @@ export async function normalizeAgentBuilderDraftPatchNodes(input: {
     return input.nodes;
   }
 
-  const draft = parseAgentBuilderPlannerDraft(input.context.draft.yaml);
+  const draft = toAgentBuilderPlannerDraftContext(input.context.draft.yaml);
 
   if (draft.parseStatus === "failed") {
     throw new Error(draft.parseError ?? "Agent Builder draft YAML could not be parsed.");
@@ -56,6 +54,10 @@ export async function normalizeAgentBuilderDraftPatchNodes(input: {
   const resolveVisibleAssetReferenceMap = createVisibleAssetReferenceMapResolver(input.context);
   const workingValues: DraftPatchWorkingValues = new Map();
   const nodes = input.nodes.map((node) => {
+    if (node.kind !== "draft_patch") {
+      return node;
+    }
+
     const normalized = normalizeDraftPatchNodeOrBlock(
       input.context,
       draft,
@@ -80,127 +82,15 @@ export async function normalizeAgentBuilderDraftPatchNodes(input: {
   );
 }
 
-function normalizeDraftPatchValue(
-  currentValue: AgentBuilderDraftPatchValue,
-  fieldPath: AgentBuilderDraftPatchFieldPath,
-  operation: AgentBuilderPlanNode["operation"],
-  value: AgentBuilderDraftPatchValue,
-): AgentBuilderDraftPatchValue {
-  if (operation === "remove" && fieldPath !== "spaceIds") {
-    throw new Error("Agent Builder can only auto-remove Space bindings in this slice.");
-  }
-
-  if (
-    fieldPath === "name" ||
-    fieldPath === "description" ||
-    fieldPath === "prompt" ||
-    fieldPath === "runtimeId" ||
-    fieldPath === "provider" ||
-    fieldPath === "model"
-  ) {
-    if (typeof value !== "string") {
-      throw new Error(`Agent Builder draft_patch ${fieldPath} value must be a string.`);
-    }
-
-    const trimmed = value.trim();
-
-    if (fieldPath === "name" && trimmed.length === 0) {
-      throw new Error("Agent Builder draft_patch name must not be empty.");
-    }
-
-    if (fieldPath === "runtimeId") {
-      return resolvePublicRuntimeId(trimmed);
-    }
-
-    if (fieldPath === "provider") {
-      return resolveKnownProviderId(trimmed);
-    }
-
-    if (fieldPath === "model") {
-      return resolveAgentBuilderModelId(trimmed);
-    }
-
-    return fieldPath === "prompt" ? value.trim() : trimmed;
-  }
-
-  if (fieldPath === "environmentId") {
-    if (value !== null && typeof value !== "string") {
-      throw new Error("Agent Builder draft_patch environmentId value must be a string or null.");
-    }
-
-    const nextEnvironmentId = typeof value === "string" ? value.trim() : null;
-
-    return nextEnvironmentId === "" ? null : nextEnvironmentId;
-  }
-
-  if (fieldPath === "skillIds") {
-    const currentIds = normalizeDraftPatchIdList(currentValue);
-    const ids = normalizeDraftPatchIdList(value);
-
-    return appendUniqueDraftPatchIds(currentIds, ids);
-  }
-
-  if (fieldPath === "mcpServerIds") {
-    const currentIds = normalizeDraftPatchIdList(currentValue);
-    const ids = normalizeDraftPatchIdList(value);
-
-    return appendUniqueDraftPatchIds(currentIds, ids);
-  }
-
-  const ids = normalizeDraftPatchIdList(value);
-  const currentSpaceIds = normalizeDraftPatchIdList(currentValue);
-
-  if (operation === "remove") {
-    const idsToRemove = new Set(ids);
-    const currentSpaceIdSet = new Set(currentSpaceIds);
-    const unboundIds = ids.filter((id) => !currentSpaceIdSet.has(id));
-
-    if (idsToRemove.size === 0) {
-      throw new Error("Agent Builder Space removal must include at least one bound Space ID.");
-    }
-
-    if (unboundIds.length > 0) {
-      throw new Error(
-        `Agent Builder can only unmount currently bound Spaces: ${unboundIds.join(", ")}.`,
-      );
-    }
-
-    return currentSpaceIds.filter((id) => !idsToRemove.has(id));
-  }
-
-  return appendUniqueDraftPatchIds(currentSpaceIds, ids);
-}
-
 function readDraftPatchBaseValue(
-  draft: ParsedPlannerDraft,
+  draft: AgentBuilderLightweightPlannerDraftContext,
   fieldPath: AgentBuilderDraftPatchFieldPath,
 ): AgentBuilderDraftPatchValue {
-  switch (fieldPath) {
-    case "description":
-      return draft.description ?? "";
-    case "environmentId":
-      return draft.environmentId;
-    case "model":
-      return draft.model ?? "";
-    case "mcpServerIds":
-      return draft.mcpServerIds;
-    case "name":
-      return draft.name ?? "";
-    case "prompt":
-      return draft.prompt ?? "";
-    case "provider":
-      return draft.provider ?? "";
-    case "runtimeId":
-      return draft.runtimeId ?? "";
-    case "skillIds":
-      return draft.skillIds;
-    case "spaceIds":
-      return draft.spaceIds;
-  }
+  return readAgentBuilderManifestPatchBaseValue(draft, fieldPath);
 }
 
 function readDraftPatchWorkingValue(
-  draft: ParsedPlannerDraft,
+  draft: AgentBuilderLightweightPlannerDraftContext,
   workingValues: DraftPatchWorkingValues,
   fieldPath: AgentBuilderDraftPatchFieldPath,
 ): AgentBuilderDraftPatchValue {
@@ -219,7 +109,7 @@ function readDraftPatchWorkingValue(
 
 function normalizeDraftPatchNodeOrBlock(
   context: AgentBuilderPlannerContext,
-  draft: ParsedPlannerDraft,
+  draft: AgentBuilderLightweightPlannerDraftContext,
   workingValues: DraftPatchWorkingValues,
   resolveVisibleAssetReferenceMap: VisibleAssetReferenceMapResolver,
   node: AgentBuilderPlanNode,
@@ -242,7 +132,7 @@ function normalizeDraftPatchNodeOrBlock(
 
 function normalizeDraftPatchNode(
   context: AgentBuilderPlannerContext,
-  draft: ParsedPlannerDraft,
+  draft: AgentBuilderLightweightPlannerDraftContext,
   workingValues: DraftPatchWorkingValues,
   resolveVisibleAssetReferenceMap: VisibleAssetReferenceMapResolver,
   node: AgentBuilderPlanNode,
@@ -253,8 +143,9 @@ function normalizeDraftPatchNode(
     throw new Error("Agent Builder draft_patch node is missing draftPatch payload.");
   }
 
-  const value = normalizeDraftPatchValue(
-    readDraftPatchWorkingValue(draft, workingValues, draftPatch.fieldPath),
+  const currentValue = readDraftPatchWorkingValue(draft, workingValues, draftPatch.fieldPath);
+  const value = normalizeAgentBuilderManifestPatchValue(
+    currentValue,
     draftPatch.fieldPath,
     node.operation,
     draftPatch.value,
@@ -262,14 +153,9 @@ function normalizeDraftPatchNode(
   const resolvedReferences = resolveDraftPatchReferences(
     resolveVisibleAssetReferenceMap,
     draftPatch.fieldPath,
-    value,
+    readDraftPatchReferenceValue(currentValue, draftPatch.fieldPath, node.operation, value),
   );
-  const operation =
-    node.operation === "remove" && draftPatch.fieldPath === "spaceIds"
-      ? "remove"
-      : node.operation === "bind"
-        ? "bind"
-        : "update";
+  const operation = node.operation === "bind" ? "bind" : "update";
 
   return {
     ...node,
@@ -290,4 +176,33 @@ function normalizeDraftPatchNode(
     status: "applied",
     targetType: "draft",
   };
+}
+
+function readDraftPatchReferenceValue(
+  currentValue: AgentBuilderDraftPatchValue,
+  fieldPath: AgentBuilderDraftPatchFieldPath,
+  operation: AgentBuilderPlanNode["operation"],
+  value: AgentBuilderDraftPatchValue,
+): AgentBuilderDraftPatchValue {
+  const spec = getAgentBuilderDraftPatchAssetFieldSpec(fieldPath);
+
+  if (spec === null) {
+    return value;
+  }
+
+  if (fieldPath === "environmentId") {
+    const currentEnvironmentId = typeof currentValue === "string" ? currentValue : null;
+
+    return typeof value === "string" && value.length > 0 && value !== currentEnvironmentId
+      ? value
+      : null;
+  }
+
+  if (operation === "remove") {
+    return [];
+  }
+
+  const currentIds = new Set(normalizeDraftPatchIdList(currentValue));
+
+  return normalizeDraftPatchIdList(value).filter((id) => !currentIds.has(id));
 }

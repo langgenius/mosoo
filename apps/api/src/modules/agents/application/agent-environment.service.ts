@@ -1,4 +1,4 @@
-import type { AgentEnvironmentConfig } from "@mosoo/contracts/agent";
+import type { AgentConfigBuilderMetadata, AgentEnvironmentConfig } from "@mosoo/contracts/agent";
 import { agentSpaceBindingsTable, agentsTable } from "@mosoo/db";
 import type { AgentId, EnvironmentId, SpaceId } from "@mosoo/id";
 import { asc, eq } from "drizzle-orm";
@@ -42,6 +42,7 @@ export async function loadAgentEnvironmentConfig(
 
 export function prepareAgentEnvironmentConfigWrite(input: {
   agentId: AgentId;
+  builder?: AgentConfigBuilderMetadata;
   currentConfigJson: string;
   environment: AgentEnvironmentConfig;
   updatedAt: number;
@@ -49,6 +50,7 @@ export function prepareAgentEnvironmentConfigWrite(input: {
   const normalizedSpaceIds = [...new Set(input.environment.boundSpaceIds)];
   const stored = parseAgentStoredConfig(input.currentConfigJson);
   const configJson = serializeAgentStoredConfig({
+    builder: input.builder ?? stored.builder,
     packageMcpServers: stored.packageMcpServers,
     packageSkills: stored.packageSkills,
     packageResolution: stored.packageResolution,

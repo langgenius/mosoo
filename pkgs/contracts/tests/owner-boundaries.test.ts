@@ -9,16 +9,15 @@ import {
   listAgentKindRuntimeComparisonRows,
 } from "@mosoo/contracts/agent";
 import {
-  createAgentBuilderWorkflowToolApprovalPolicy,
+  AGENT_BUILDER_ASK_USER_MODE_VALUES,
+  AGENT_BUILDER_CONTROL_PLANE_TOOL_ID_VALUES,
+  AGENT_BUILDER_NEXT_ACTION_KIND_VALUES,
   getAgentBuilderDraftPatchSectionId,
-  getAgentBuilderStarterPackItemApprovalPolicy,
-  getAgentBuilderWorkflowToolApprovalMode,
-  isAgentBuilderApprovalNodeKey,
   isAgentBuilderDraftPatchOperation,
   isAgentBuilderDraftPatchValue,
-  normalizeAgentBuilderApprovalNodeKey,
+  isAgentBuilderNodeKey,
+  normalizeAgentBuilderNodeKey,
   parseAgentBuilderPlannerOutput,
-  parseAgentBuilderStarterPackResult,
   resolveAgentBuilderDraftPatchFieldPath,
 } from "@mosoo/contracts/agent-builder";
 import { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION } from "@mosoo/contracts/agent-manifest";
@@ -258,93 +257,37 @@ describe("contracts owner boundaries", () => {
     ).toBeNull();
   });
 
-  test("agent builder contract owns approval grammar", () => {
-    expect(getAgentBuilderWorkflowToolApprovalMode("approval_required")).toBe("single_only");
-    expect(getAgentBuilderWorkflowToolApprovalMode("safe_automatic")).toBe("automatic");
-    expect(normalizeAgentBuilderApprovalNodeKey(" tool:commit_create_space ")).toBe(
-      "tool:commit_create_space",
+  test("agent builder contract owns lightweight control-plane grammar", () => {
+    expect(AGENT_BUILDER_CONTROL_PLANE_TOOL_ID_VALUES).toEqual([
+      "inspect_builder_context",
+      "search_builder_assets",
+      "patch_manifest_draft",
+      "ask_user",
+      "show_next_action",
+      "create_agent",
+      "apply_agent_config",
+      "create_environment",
+      "create_remote_mcp_server",
+      "reset_preview_session",
+    ]);
+    expect(AGENT_BUILDER_ASK_USER_MODE_VALUES).toEqual([
+      "single_select",
+      "multi_select",
+      "free_text",
+    ]);
+    expect(AGENT_BUILDER_NEXT_ACTION_KIND_VALUES).toEqual([
+      "create_agent",
+      "configure_environment",
+      "open_preview",
+      "keep_refining",
+    ]);
+    expect(normalizeAgentBuilderNodeKey(" tool:patch_manifest_draft ")).toBe(
+      "tool:patch_manifest_draft",
     );
-    expect(isAgentBuilderApprovalNodeKey("starter_agent_name")).toBe(true);
-    expect(isAgentBuilderApprovalNodeKey("Set Agent name")).toBe(false);
-    expect(isAgentBuilderApprovalNodeKey("设置 Agent 名称")).toBe(false);
-    expect(isAgentBuilderApprovalNodeKey("/repair/item/1")).toBe(false);
-    expect(
-      createAgentBuilderWorkflowToolApprovalPolicy({
-        destructive: true,
-        executionPolicy: "approval_required",
-        toolId: "commit_create_space",
-      }),
-    ).toEqual({
-      actionSemantics: "tool_call",
-      approvalMode: "single_only",
-      destructive: true,
-      nodeKey: "tool:commit_create_space",
-    });
-    expect(
-      getAgentBuilderStarterPackItemApprovalPolicy({
-        action: {
-          patchNodeKey: "patch_agent_name",
-          type: "draft_patch",
-        },
-        approvalMode: "single_or_batch",
-        assetType: "agent_field",
-        evidenceRefs: ["prepare_draft_patch:patch_agent_name"],
-        nodeKey: "starter_agent_name",
-        reason: "Name the draft.",
-        status: "pending",
-        title: "Set name",
-      }),
-    ).toEqual({
-      actionSemantics: "draft_patch",
-      approvalMode: "single_or_batch",
-      destructive: false,
-      nodeKey: "starter_agent_name",
-    });
-    const starterPackItem = {
-      action: {
-        patchNodeKey: "patch_agent_name",
-        type: "draft_patch",
-      },
-      approvalMode: "single_or_batch",
-      assetType: "agent_field",
-      evidenceRefs: ["prepare_draft_patch:patch_agent_name"],
-      nodeKey: "starter_agent_name",
-      reason: "Name the draft.",
-      status: "pending",
-      title: "Set name",
-    } as const;
-
-    expect(
-      parseAgentBuilderStarterPackResult({
-        assistantText: "Starter Pack ready.",
-        intentSummary: "Name the draft.",
-        items: [
-          {
-            ...starterPackItem,
-            nodeKey: "Set Agent name",
-          },
-        ],
-        mode: "starter_pack",
-        plannerRunId: "planner_run_1",
-        version: 1,
-      }),
-    ).toBeNull();
-    expect(
-      parseAgentBuilderStarterPackResult({
-        assistantText: "Starter Pack ready.",
-        intentSummary: "Name the draft.",
-        items: [
-          starterPackItem,
-          {
-            ...starterPackItem,
-            title: "Set description",
-          },
-        ],
-        mode: "starter_pack",
-        plannerRunId: "planner_run_1",
-        version: 1,
-      }),
-    ).toBeNull();
+    expect(isAgentBuilderNodeKey("builder_agent_name")).toBe(true);
+    expect(isAgentBuilderNodeKey("Set Agent name")).toBe(false);
+    expect(isAgentBuilderNodeKey("设置 Agent 名称")).toBe(false);
+    expect(isAgentBuilderNodeKey("/repair/item/1")).toBe(false);
     const planNode = {
       actions: [],
       kind: "draft_patch",

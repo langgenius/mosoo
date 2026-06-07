@@ -1,12 +1,10 @@
 import type {
-  AgentBuilderPlannerDraftBindingsContext,
   AgentBuilderSelectedSpaceFilesSummary,
   AgentBuilderVisibleAssetBindingState,
   AgentBuilderVisibleAssetChangeSet,
   AgentBuilderVisibleAssetIndexEntry,
   AgentBuilderVisibleAssetKind,
   AgentBuilderVisibleAssetsContext,
-  AgentBuilderVisibleChannelSummary,
   AgentBuilderVisibleEnvironmentSummary,
   AgentBuilderVisibleMcpServerSummary,
   AgentBuilderVisibleSkillSummary,
@@ -16,22 +14,10 @@ import type { McpServerId, OrganizationId, SkillId, SpaceId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import type { AgentBuilderLightweightPlannerDraftContext } from "./agent-builder-lightweight-draft-types";
+import type { AgentBuilderLightweightSpaceBinding } from "./agent-builder-lightweight-manifest";
 
-export interface DraftSpaceBinding {
-  id: SpaceId;
-  name: string;
-}
-
-export interface AgentBuilderParsedDraftContext extends AgentBuilderPlannerDraftBindingsContext {
-  description: string | null;
-  mcpServersRepresented: boolean;
-  model: string | null;
-  name: string | null;
-  prompt: string | null;
-  provider: string | null;
-  runtimeId: string | null;
-  spaces: DraftSpaceBinding[];
-}
+export type DraftSpaceBinding = AgentBuilderLightweightSpaceBinding;
 
 export interface HashableAssetSummary {
   bindingState: AgentBuilderVisibleAssetBindingState;
@@ -49,13 +35,12 @@ export interface AgentBuilderVisibleAssetProviderInput {
   boundMcpServerIds: ReadonlySet<McpServerId>;
   boundSkillIds: ReadonlySet<SkillId>;
   boundSpaceIds: ReadonlySet<SpaceId>;
-  draft: AgentBuilderParsedDraftContext;
+  draft: AgentBuilderLightweightPlannerDraftContext;
   organizationId: OrganizationId;
   viewer: AuthenticatedViewer;
 }
 
 export interface AgentBuilderVisibleAssetSummaryCollections {
-  channels: AgentBuilderVisibleChannelSummary[];
   environments: AgentBuilderVisibleEnvironmentSummary[];
   mcpServers: AgentBuilderVisibleMcpServerSummary[];
   selectedSpaceFiles: AgentBuilderSelectedSpaceFilesSummary[];

@@ -137,6 +137,7 @@ function toOwner(
 
 function createEmptyAgentConfig(): Agent["config"] {
   return {
+    builder: { componentDecisions: {} },
     environmentId: null,
     mcpServers: [],
     model: "",
@@ -203,6 +204,7 @@ export function mapAgentDetailToView(
           };
         }) ?? [],
     config: {
+      builder: editorDetail?.builder ?? { componentDecisions: {} },
       environmentId: environmentConfig.environmentId,
       mcpServers: editorDetail?.mcpBindings.map((binding) => toMcpServer(binding)) ?? [],
       model: profile.model,

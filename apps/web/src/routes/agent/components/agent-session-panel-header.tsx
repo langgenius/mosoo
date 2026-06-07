@@ -1,10 +1,11 @@
-import { FolderOpen, Plus } from "lucide-react";
+import { FolderOpen, Plus, RotateCcw } from "lucide-react";
 import type React from "react";
 
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 
+import type { SessionControlMode } from "./agent-session-panel-rules";
 import { sessionIndicatorClassName } from "./agent-session-panel-status";
 import type { SessionPill } from "./agent-session-panel-status";
 
@@ -21,9 +22,10 @@ export function AgentSessionPanelHeader({
   agentName,
   filesPanelOpen,
   onFilesPanelToggle,
-  onStartNewSession,
+  onSessionControlClick,
   pill,
   reconnectingSubtitle,
+  sessionControlMode,
   sending,
   sessionCount,
   sessionFilesCount,
@@ -33,14 +35,18 @@ export function AgentSessionPanelHeader({
   agentName: string;
   filesPanelOpen: boolean;
   onFilesPanelToggle: () => void;
-  onStartNewSession: () => Promise<void>;
+  onSessionControlClick: () => Promise<void>;
   pill: SessionPill;
   reconnectingSubtitle: string | null;
+  sessionControlMode: SessionControlMode;
   sending: boolean;
   sessionCount: number;
   sessionFilesCount: number;
   tone: "preview" | "consume";
 }) {
+  const SessionControlIcon = sessionControlMode === "reset" ? RotateCcw : Plus;
+  const sessionControlLabel = sessionControlMode === "reset" ? "Reset chat" : "New session";
+
   return (
     <div className="border-border-subtle flex h-10 shrink-0 items-center gap-2 border-b bg-white px-4">
       <div className={cn("size-2 rounded-full", sessionIndicatorClassName(pill))} />
@@ -61,18 +67,18 @@ export function AgentSessionPanelHeader({
         <span className="text-muted-foreground min-w-0 truncate text-[11px]">{activeTitle}</span>
       ) : null}
       <div className="flex-1" />
-      {sessionCount > 0 ? (
+      {sessionControlMode === "new_session" && sessionCount > 0 ? (
         <span className="text-muted-foreground text-[10.5px]">{sessionCount} sessions</span>
       ) : null}
       <Button
         className="gap-1.5"
         disabled={sending}
-        onClick={() => void onStartNewSession()}
+        onClick={() => void onSessionControlClick()}
         size="xs"
         variant="ghost"
       >
-        <Plus className="size-3" />
-        New session
+        <SessionControlIcon className="size-3" />
+        {sessionControlLabel}
       </Button>
       <Button
         aria-label="Toggle files panel"

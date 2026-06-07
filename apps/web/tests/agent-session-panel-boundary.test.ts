@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
-import { shouldWaitForRuntimeReadyOnNewSession } from "../src/routes/agent/components/agent-session-panel-rules";
+import {
+  getSessionControlMode,
+  shouldBlockSessionFileUpload,
+  shouldWaitForRuntimeReadyOnNewSession,
+} from "../src/routes/agent/components/agent-session-panel-rules";
+import {
+  getResetSessionIds,
+  removeSessionConfigurationRevisionKeys,
+} from "../src/routes/agent/components/use-agent-session-panel-model";
 
 describe("agent session panel boundary", () => {
   test("only Preview New Session opts into runtime readiness wait", () => {
@@ -22,5 +30,48 @@ describe("agent session panel boundary", () => {
         waitForRuntimeReadyOnNewSession: false,
       }),
     ).toBe(false);
+  });
+
+  test("uses Reset chat instead of New session in Preview mode", () => {
+    expect(getSessionControlMode("preview")).toBe("reset");
+    expect(getSessionControlMode("consume")).toBe("new_session");
+  });
+
+  test("blocks Preview file upload until a preview chat session exists", () => {
+    expect(shouldBlockSessionFileUpload({ activeSessionId: null, tone: "preview" })).toBe(true);
+    expect(shouldBlockSessionFileUpload({ activeSessionId: "session_1", tone: "preview" })).toBe(
+      false,
+    );
+    expect(shouldBlockSessionFileUpload({ activeSessionId: null, tone: "consume" })).toBe(false);
+  });
+
+  test("resets all known Preview chat sessions instead of falling back to older history", () => {
+    expect(
+      getResetSessionIds({
+        activeSessionId: "session_active",
+        sessionType: "preview",
+        sessions: [{ id: "session_old" }, { id: "session_active" }],
+      }),
+    ).toEqual(["session_old", "session_active"]);
+    expect(
+      removeSessionConfigurationRevisionKeys(
+        {
+          session_active: "rev-active",
+          session_keep: "rev-keep",
+          session_old: "rev-old",
+        },
+        ["session_old", "session_active"],
+      ),
+    ).toEqual({ session_keep: "rev-keep" });
+  });
+
+  test("resets only the active session outside Preview mode", () => {
+    expect(
+      getResetSessionIds({
+        activeSessionId: "session_active",
+        sessionType: "ui",
+        sessions: [{ id: "session_old" }, { id: "session_active" }],
+      }),
+    ).toEqual(["session_active"]);
   });
 });

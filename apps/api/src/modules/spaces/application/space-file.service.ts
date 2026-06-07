@@ -20,7 +20,9 @@ import {
 import {
   deleteSpaceEntry as deleteStoredSpaceEntry,
   listSpaceFiles,
+  listSpaceRootFileSummaries,
 } from "../../files/application/space-file-store.service";
+import type { SpaceRootFileSummaryListing } from "../../files/application/space-file-store.service";
 import { ensureParentDirectories, ensureSpaceAccess } from "../domain/space-access.policy";
 
 export async function getSpaceFiles(
@@ -30,6 +32,14 @@ export async function getSpaceFiles(
   path?: string,
 ): Promise<SpaceFileListing> {
   return listSpaceFiles(bindings, viewer, spaceId, path);
+}
+
+export async function getSpaceRootFileSummaries(
+  bindings: ApiBindings,
+  viewer: AuthenticatedViewer,
+  spaceIds: readonly SpaceId[],
+): Promise<Map<SpaceId, SpaceRootFileSummaryListing>> {
+  return listSpaceRootFileSummaries(bindings, viewer, spaceIds);
 }
 
 export async function createSpaceDirectory(

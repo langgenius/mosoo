@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 
 import type { AgentBuilderPlannerOutput } from "@mosoo/contracts/agent-builder";
 
-import { parseAgentBuilderPlannerDraft } from "../src/modules/agent-builder/application/agent-builder-draft-parser";
 import {
   applyAgentBuilderDraftPatchOutputToYaml,
   findNewRepairableDraftReadinessErrors,
@@ -12,6 +11,7 @@ import {
   parseAgentBuilderPlannerRunId,
   parseMcpServerId,
 } from "../src/modules/agent-builder/application/agent-builder-ids";
+import { toAgentBuilderPlannerDraftContext } from "../src/modules/agent-builder/application/agent-builder-lightweight-manifest-projections";
 
 const draftYaml = [
   "version: 1",
@@ -84,7 +84,7 @@ function plannerOutput(): AgentBuilderPlannerOutput {
 describe("Agent Builder draft patch guardrail", () => {
   test("simulates applied draft_patch nodes against Draft YAML", () => {
     const proposedYaml = applyAgentBuilderDraftPatchOutputToYaml(draftYaml, plannerOutput());
-    const proposedDraft = parseAgentBuilderPlannerDraft(proposedYaml);
+    const proposedDraft = toAgentBuilderPlannerDraftContext(proposedYaml);
 
     expect(proposedDraft.prompt).toBe("New prompt.");
     expect(proposedDraft.mcpServerIds).toEqual([GUARDRAIL_IDS.mcpLinear]);

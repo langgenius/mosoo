@@ -1,17 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import { toAgentId } from "@/routes/typed-id";
 
-import {
-  approveAgentBuilderStarterPack,
-  ensureAgentBuilderThread,
-  listAgentBuilderMessages,
-} from "../api/agent-builder-client";
-import type {
-  AgentBuilderMessage,
-  AgentBuilderStarterPackApprovalInput,
-} from "../api/agent-builder-client";
-import type { AgentBuilderSystemAgentAddress } from "../api/agent-builder-transport";
+import { ensureAgentBuilderThread, listAgentBuilderMessages } from "../api/agent-builder-client";
+import type { AgentBuilderMessage } from "../api/agent-builder-client";
 
 export const agentBuilderKeys = {
   all: ["agent-builder"] as const,
@@ -50,34 +42,6 @@ export function useAgentBuilderMessagesQuery(agentId: string | null) {
       agentId === null
         ? [...agentBuilderKeys.all, "messages", "none"]
         : agentBuilderKeys.messages(agentId),
-  });
-}
-
-export function useApproveAgentBuilderStarterPackMutation(
-  agentId: string,
-  systemAgent: AgentBuilderSystemAgentAddress | null,
-) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (approval: AgentBuilderStarterPackApprovalInput) =>
-      approveAgentBuilderStarterPack({
-        agentId: toAgentId(agentId),
-        approval,
-        systemAgent,
-      }),
-    onSettled: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: agentBuilderKeys.thread(agentId) }),
-        queryClient.invalidateQueries({ queryKey: agentBuilderKeys.messages(agentId) }),
-      ]);
-    },
-    onSuccess: (turnMessages) => {
-      queryClient.setQueryData<AgentBuilderMessage[]>(
-        agentBuilderKeys.messages(agentId),
-        (current) => mergeAgentBuilderMessages(current ?? [], turnMessages, []),
-      );
-    },
   });
 }
 

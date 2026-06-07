@@ -11,14 +11,14 @@ export function resolveProviderFetchProxy(
     "MOSOO_PROVIDER_FETCH_PROXY_TOKEN" | "MOSOO_PROVIDER_FETCH_PROXY_URL" | "WEB_ORIGIN"
   >,
 ): ProviderFetchProxyConfig | null {
-  if (!isLocalWebOrigin(bindings.WEB_ORIGIN)) {
+  if (!isLocalOrigin(bindings.WEB_ORIGIN)) {
     return null;
   }
 
   const url = bindings.MOSOO_PROVIDER_FETCH_PROXY_URL?.trim() ?? "";
   const token = bindings.MOSOO_PROVIDER_FETCH_PROXY_TOKEN?.trim() ?? "";
 
-  if (url.length === 0 || token.length === 0) {
+  if (url.length === 0 || token.length === 0 || !isLocalProviderFetchProxyUrl(url)) {
     return null;
   }
 
@@ -81,10 +81,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function isLocalWebOrigin(origin: string): boolean {
+function isLoopbackHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase().replace(/^\[/u, "").replace(/\]$/u, "");
+  return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
+}
+
+function isLocalOrigin(origin: string): boolean {
   try {
     const { hostname } = new URL(origin);
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+    return isLoopbackHostname(hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isLocalProviderFetchProxyUrl(rawUrl: string): boolean {
+  try {
+    const url = new URL(rawUrl);
+    return ["http:", "https:"].includes(url.protocol) && isLoopbackHostname(url.hostname);
   } catch {
     return false;
   }

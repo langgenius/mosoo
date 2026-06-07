@@ -88,6 +88,7 @@ interface AgentSessionListArgs {
   archived?: Parameters<typeof listAgentSessions>[2]["archived"];
   beforeCursor?: string | null;
   limit?: number | null;
+  participantOnly?: Parameters<typeof listAgentSessions>[2]["participantOnly"];
   type?: Parameters<typeof listAgentSessions>[2]["type"];
 }
 
@@ -205,6 +206,7 @@ export const sessionGraphQLModule = {
         archived: args.archived ?? null,
         beforeCursor: args.beforeCursor ?? null,
         limit: args.limit ?? null,
+        participantOnly: args.participantOnly ?? null,
         type: args.type ?? null,
       }),
     agentSessionRetrieve: async (_parent, args: AgentSessionRetrieveArgs, context) =>

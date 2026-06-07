@@ -44,20 +44,21 @@ export async function getAgentEditorState(
     editable.agent.id,
     editable.agent.environmentId,
   );
-  const { packageResolution } = parseAgentStoredConfig(editable.agent.configJson);
+  const storedConfig = parseAgentStoredConfig(editable.agent.configJson);
 
   return {
+    builder: storedConfig.builder,
     collaborators: await listAgentCollaborators(database, viewer, agentId),
     environment,
     id: editable.agent.id,
     mcpBindings: await listAgentMcpBindings(database, viewer, editable.agent.id),
-    packageResolution,
+    packageResolution: storedConfig.packageResolution,
     readiness: await computeAgentReadiness(database, editable.agent.ownerId, {
       agentId: editable.agent.id,
       environment,
       model: editable.agent.model,
       organizationId: editable.agent.organizationId,
-      packageResolution,
+      packageResolution: storedConfig.packageResolution,
       provider: editable.agent.provider,
       runtimeId: editable.agent.runtimeId,
     }),

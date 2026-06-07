@@ -29,7 +29,7 @@ describe("Agent Builder useAgentChat transport helpers", () => {
       data: {
         messages: [],
         state: {
-          openApprovalCount: 1,
+          lastPlannerRunId: "planner_1",
         },
       },
       type: "data-builder-result",
@@ -47,7 +47,7 @@ describe("Agent Builder useAgentChat transport helpers", () => {
     const result = {
       messages: [],
       state: {
-        openApprovalCount: 0,
+        lastPlannerRunId: "planner_1",
       },
     };
     const handled = enqueueAgentBuilderSystemAgentChatResult({

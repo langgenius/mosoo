@@ -8,7 +8,8 @@ import type { AccountId, AgentId, OrganizationId } from "@mosoo/id";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { currentTimestampMs, toIsoString } from "../../../time";
 import { computeAgentReadiness } from "../../agents/application/agent-readiness.service";
-import { parseAgentBuilderPlannerDraft } from "./agent-builder-draft-parser";
+import type { AgentBuilderPlannerDraftInput } from "./agent-builder-planner-draft-input";
+import { resolveAgentBuilderPlannerDraftInput } from "./agent-builder-planner-draft-input";
 
 function createReadinessIssue(
   code: string,
@@ -92,10 +93,9 @@ export async function collectAgentBuilderReadinessContext(
       ownerId: AccountId;
       organizationId: OrganizationId;
     };
-    draftYaml: string;
-  },
+  } & AgentBuilderPlannerDraftInput,
 ): Promise<AgentBuilderReadinessContext> {
-  const draft = parseAgentBuilderPlannerDraft(input.draftYaml);
+  const draft = resolveAgentBuilderPlannerDraftInput(input);
 
   if (draft.parseStatus === "failed") {
     return createLocalReadinessContext([

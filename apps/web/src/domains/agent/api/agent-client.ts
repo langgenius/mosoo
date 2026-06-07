@@ -54,6 +54,7 @@ import type {
   WeChatAgentChannelPairingFieldsFragment,
 } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
+import type { AgentConfig as AgentViewConfig } from "@/routes/agent/agent.types";
 import {
   toAccountId,
   toAgentDeploymentVersionId,
@@ -185,9 +186,21 @@ function toAgentEnvironmentConfig(
   };
 }
 
+function toAgentConfigBuilderMetadata(
+  builder: GraphQLAgentEditorState["builder"],
+): AgentViewConfig["builder"] {
+  return {
+    componentDecisions:
+      builder.componentDecisions.environment === null
+        ? {}
+        : { environment: builder.componentDecisions.environment },
+  };
+}
+
 function toAgentEditorState(state: GraphQLAgentEditorState): AgentEditorState {
   return {
     ...state,
+    builder: toAgentConfigBuilderMetadata(state.builder),
     environment: toAgentEnvironmentConfig(state.environment),
     id: toAgentId(state.id),
     mcpBindings: state.mcpBindings.map((binding) => ({

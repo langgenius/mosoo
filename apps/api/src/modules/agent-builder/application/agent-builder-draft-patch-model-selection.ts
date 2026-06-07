@@ -9,10 +9,8 @@ import { ALL_VENDORS, PUBLIC_RUNTIME_CATALOG } from "@mosoo/runtime-catalog";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { ensureModelAvailableForSelection } from "../../vendor-credentials/application/vendor-credential.service";
-import type { parseAgentBuilderPlannerDraft } from "./agent-builder-draft-parser";
 import { createBlockedDraftPatchNode } from "./agent-builder-draft-patch-node";
-
-type ParsedPlannerDraft = ReturnType<typeof parseAgentBuilderPlannerDraft>;
+import type { AgentBuilderLightweightPlannerDraftContext } from "./agent-builder-lightweight-draft-types";
 
 interface ModelSelection {
   model: string;
@@ -105,7 +103,9 @@ export function resolveAgentBuilderModelId(value: string): string {
   return MODEL_ID_BY_COMPARABLE.get(normalizeComparable(trimmed)) ?? trimmed;
 }
 
-function readDraftModelSelection(draft: ParsedPlannerDraft): ModelSelection {
+function readDraftModelSelection(
+  draft: AgentBuilderLightweightPlannerDraftContext,
+): ModelSelection {
   return {
     model: resolveAgentBuilderModelId(draft.model?.trim() ?? ""),
     provider: resolveKnownProviderId(draft.provider?.trim() ?? ""),
@@ -148,7 +148,7 @@ export async function ensureRuntimeAndModelPatchAvailable(
   bindings: ApiBindings,
   actorAccountId: AccountId,
   context: AgentBuilderPlannerContext,
-  draft: ParsedPlannerDraft,
+  draft: AgentBuilderLightweightPlannerDraftContext,
   nodes: AgentBuilderPlanNode[],
 ): Promise<AgentBuilderPlanNode[]> {
   const nextNodes = [...nodes];
@@ -170,28 +170,42 @@ export async function ensureRuntimeAndModelPatchAvailable(
     }
   }
 
-  const modelNodes = nextNodes.filter(
+  const selectionNodes = nextNodes.filter(
     (node) =>
       node.status === "applied" &&
-      (node.draftPatch?.fieldPath === "model" || node.draftPatch?.fieldPath === "provider"),
+      (node.draftPatch?.fieldPath === "model" ||
+        node.draftPatch?.fieldPath === "provider" ||
+        node.draftPatch?.fieldPath === "runtimeId"),
   );
 
-  if (modelNodes.length === 0) {
+  if (selectionNodes.length === 0) {
     return nextNodes;
   }
 
-  const modelNodeSet = new Set(modelNodes);
+  const selectionNodeSet = new Set(selectionNodes);
+  const currentSelection = readDraftModelSelection(draft);
   const selection = nextNodes
     .filter(isAppliedRuntimeOrModelPatch)
     .reduce(
       (current, node) =>
         node.draftPatch === undefined ? current : applyModelPatchValue(current, node.draftPatch),
-      readDraftModelSelection(draft),
+      currentSelection,
     );
+
+  if (
+    currentSelection.provider.length > 0 &&
+    currentSelection.model.length > 0 &&
+    currentSelection.runtimeId.length > 0 &&
+    selection.model === currentSelection.model &&
+    selection.provider === currentSelection.provider &&
+    selection.runtimeId === currentSelection.runtimeId
+  ) {
+    return nextNodes;
+  }
 
   if (selection.provider.length === 0 || selection.model.length === 0) {
     return nextNodes.map((node) =>
-      modelNodeSet.has(node)
+      selectionNodeSet.has(node)
         ? createBlockedDraftPatchNode(
             node,
             "Provider and model are required before auto-applying model changes.",
@@ -207,7 +221,7 @@ export async function ensureRuntimeAndModelPatchAvailable(
         : `Runtime ${selection.runtimeId} is not available for Agent Builder.`;
 
     return nextNodes.map((node) =>
-      modelNodeSet.has(node) ? createBlockedDraftPatchNode(node, summary) : node,
+      selectionNodeSet.has(node) ? createBlockedDraftPatchNode(node, summary) : node,
     );
   }
 
@@ -226,7 +240,7 @@ export async function ensureRuntimeAndModelPatchAvailable(
         : "Model selection is not available for Agent Builder.";
 
     return nextNodes.map((node) =>
-      modelNodeSet.has(node) ? createBlockedDraftPatchNode(node, summary) : node,
+      selectionNodeSet.has(node) ? createBlockedDraftPatchNode(node, summary) : node,
     );
   }
 

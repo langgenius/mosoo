@@ -4,6 +4,7 @@ import type {
   AgentReadiness,
   AgentVisibility,
 } from "@mosoo/contracts/agent";
+import type { AgentConfigBuilderMetadata } from "@mosoo/contracts/agent";
 import type { AgentPackageResolutionState } from "@mosoo/contracts/agent-manifest";
 import type { McpAuthorizationState, McpCredentialStatus } from "@mosoo/contracts/mcp";
 
@@ -72,6 +73,7 @@ export interface SpaceBinding {
 }
 
 export interface AgentConfig {
+  builder: AgentConfigBuilderMetadata;
   environmentId: string | null;
   mcpServers: McpServer[];
   model: string;

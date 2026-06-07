@@ -15,7 +15,7 @@ import { currentTimestampMs, toIsoString } from "../../../time";
 import { ensureAgentEditor } from "../../agents/application/agent-access.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { createAgentBuilderThreadId } from "./agent-builder-ids";
-import type { AgentBuilderPlannerContextAgent } from "./agent-builder-planner-context.service";
+import type { AgentBuilderPlannerContextSourceAgent } from "./agent-builder-planner-context.service";
 
 export interface AgentBuilderThreadModel {
   agentId: AgentId;
@@ -24,6 +24,7 @@ export interface AgentBuilderThreadModel {
   id: AgentBuilderThreadId;
   lastTurnAt: string | null;
   organizationId: OrganizationId;
+  previewOpenedAt: string | null;
   status: string;
   title: string | null;
   updatedAt: string;
@@ -43,7 +44,7 @@ export interface AgentBuilderMessageModel {
 }
 
 export interface AgentBuilderThreadContext {
-  agent: AgentBuilderPlannerContextAgent;
+  agent: AgentBuilderPlannerContextSourceAgent;
   thread: AgentBuilderThreadRow;
 }
 
@@ -66,6 +67,7 @@ function toAgentBuilderThreadModel(row: AgentBuilderThreadRow): AgentBuilderThre
     id: row.id,
     lastTurnAt: row.lastTurnAt === null ? null : toIsoString(row.lastTurnAt),
     organizationId: row.organizationId,
+    previewOpenedAt: row.previewOpenedAt === null ? null : toIsoString(row.previewOpenedAt),
     status: row.status,
     title: row.title,
     updatedAt: toIsoString(row.updatedAt),
@@ -154,6 +156,7 @@ export async function ensureAgentBuilderThreadContext(
       lastTurnAt: null,
       messageSeqCursor: 0,
       organizationId: agent.organizationId,
+      previewOpenedAt: null,
       status: "active",
       title: null,
       updatedAt: now,
@@ -168,6 +171,32 @@ export async function ensureAgentBuilderThreadContext(
   }
 
   return { agent, thread: row };
+}
+
+export async function markAgentBuilderPreviewOpened(
+  database: D1Database,
+  viewer: AuthenticatedViewer,
+  agentId: AgentId,
+): Promise<AgentBuilderThreadRow> {
+  const { thread } = await ensureAgentBuilderThreadContext(database, viewer, agentId);
+  const now = currentTimestampMs();
+
+  await getAppDatabase(database)
+    .update(agentBuilderThreadsTable)
+    .set({
+      previewOpenedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(agentBuilderThreadsTable.id, thread.id))
+    .run();
+
+  const row = await getAgentBuilderThreadRowByAgentId(database, agentId);
+
+  if (row === null) {
+    throw new Error("Agent Builder thread was not persisted after opening Preview.");
+  }
+
+  return row;
 }
 
 export async function ensureAgentBuilderThreadAddress(

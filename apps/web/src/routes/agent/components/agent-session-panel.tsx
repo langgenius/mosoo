@@ -26,6 +26,7 @@ import { Button } from "@/shared/ui/button";
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { AgentReadinessBlockersBanner } from "./agent-readiness-blockers-banner";
 import { AgentSessionPanelHeader } from "./agent-session-panel-header";
+import { getSessionControlMode, shouldBlockSessionFileUpload } from "./agent-session-panel-rules";
 import {
   deriveSessionPill,
   readinessBlockSummary,
@@ -62,6 +63,8 @@ export function AgentSessionPanel({
   });
   const activeTitle = model.activeSession?.title ?? null;
   const pill = deriveSessionPill(model);
+  const sessionControlMode = getSessionControlMode(tone);
+  const previewResetMode = sessionControlMode === "reset";
   const stopped = pill === "Stopped";
   const setupBlocked = pill === "Setup required";
   const setupSummary = readinessBlockSummary(model.readiness) ?? model.readinessBlockMessage;
@@ -104,9 +107,32 @@ export function AgentSessionPanel({
     ];
   });
   const sessionFilesCount = pendingFiles.length + (sessionResourcesQuery.data?.length ?? 0);
+  const fileUploadDisabled = shouldBlockSessionFileUpload({
+    activeSessionId: model.activeSessionId,
+    tone,
+  });
+  const fileUploadDisabledReason = fileUploadDisabled
+    ? "Send a test message before attaching files to this preview chat."
+    : null;
+  const sessionLoadErrorMessage = previewResetMode
+    ? "Failed to load the previous preview chat. You can still send a new test message."
+    : "Failed to load previous sessions. You can still start a new live run.";
+  const configurationRefreshMessage = previewResetMode
+    ? "Reset chat to test latest config"
+    : "Start new session to test latest config";
+  const configurationRefreshActionLabel = previewResetMode ? "Reset chat" : "Start new session";
+  const stoppedActionLabel = previewResetMode ? "Reset chat" : "New session";
+  const handleResetPreviewSession = async (): Promise<void> => {
+    setFilesPanelOpen(false);
+    resourceDraft.clearActiveMentions();
+    await model.handleResetSession();
+  };
+  const handleSessionControlClick = previewResetMode
+    ? handleResetPreviewSession
+    : model.handleStartNewSession;
 
   const handleUploadFiles = async (files: File[]): Promise<void> => {
-    if (files.length === 0) {
+    if (files.length === 0 || fileUploadDisabled) {
       return;
     }
 
@@ -156,9 +182,10 @@ export function AgentSessionPanel({
           onFilesPanelToggle={() => {
             setFilesPanelOpen((prev) => !prev);
           }}
-          onStartNewSession={model.handleStartNewSession}
+          onSessionControlClick={handleSessionControlClick}
           pill={pill}
           reconnectingSubtitle={reconnectingSubtitle}
+          sessionControlMode={sessionControlMode}
           sending={model.sending}
           sessionCount={model.sessionCount}
           sessionFilesCount={sessionFilesCount}
@@ -167,7 +194,7 @@ export function AgentSessionPanel({
 
         {isTruthy(model.sessionLoadError) ? (
           <div className="border-amber/30 bg-amber-bg text-amber-fg border-b px-4 py-2.5 text-[12px] leading-relaxed">
-            Failed to load previous sessions. You can still start a new live run.
+            {sessionLoadErrorMessage}
           </div>
         ) : null}
 
@@ -184,14 +211,10 @@ export function AgentSessionPanel({
           <div className="border-amber/30 bg-amber-bg border-b px-4 py-2.5">
             <div className="flex items-center justify-between gap-3">
               <div className="text-amber-fg min-w-0 text-[12px] font-medium">
-                Start new session to test latest config
+                {configurationRefreshMessage}
               </div>
-              <Button
-                onClick={() => void model.handleStartNewSession()}
-                size="xs"
-                variant="outline"
-              >
-                Start new session
+              <Button onClick={() => void handleSessionControlClick()} size="xs" variant="outline">
+                {configurationRefreshActionLabel}
               </Button>
             </div>
           </div>
@@ -226,11 +249,11 @@ export function AgentSessionPanel({
                   </div>
                 </div>
                 <Button
-                  onClick={() => void model.handleStartNewSession()}
+                  onClick={() => void handleSessionControlClick()}
                   size="sm"
                   variant="outline"
                 >
-                  New session
+                  {stoppedActionLabel}
                 </Button>
               </div>
             </div>
@@ -288,6 +311,8 @@ export function AgentSessionPanel({
 
           <SessionComposer
             composerError={model.composerError}
+            fileUploadDisabled={fileUploadDisabled}
+            fileUploadDisabledReason={fileUploadDisabledReason}
             fileInputRef={model.fileInputRef}
             input={model.input}
             inputRef={model.inputRef}
@@ -310,6 +335,8 @@ export function AgentSessionPanel({
           }}
           onUploadFiles={(files) => void handleUploadFiles(files)}
           sessionId={model.activeSessionId}
+          uploadDisabled={fileUploadDisabled}
+          uploadDisabledReason={fileUploadDisabledReason}
         />
       ) : null}
     </div>

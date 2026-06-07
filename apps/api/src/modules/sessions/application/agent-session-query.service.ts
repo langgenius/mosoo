@@ -6,6 +6,7 @@ import { eq, isNotNull, isNull } from "drizzle-orm";
 
 import { ensureAgentEditor } from "../../agents/application/agent-access.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { sessionParticipantCondition } from "../domain/session-access.policy";
 import type { SessionSummaryListOptions } from "./session-summary-query.service";
 import { listSessionSummaryConnection } from "./session-summary-query.service";
 
@@ -15,6 +16,7 @@ export async function listAgentSessions(
   input: SessionSummaryListOptions & {
     agentId: AgentId;
     archived?: boolean | null;
+    participantOnly?: boolean | null;
     type?: SessionType | null;
   },
 ): Promise<SessionSummaryConnection> {
@@ -30,6 +32,10 @@ export async function listAgentSessions(
 
   if (input.type !== undefined && input.type !== null) {
     filters.push(eq(sessionsTable.type, input.type));
+  }
+
+  if (input.participantOnly === true) {
+    filters.push(sessionParticipantCondition(viewer.id));
   }
 
   return listSessionSummaryConnection({

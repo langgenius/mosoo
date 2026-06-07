@@ -1,4 +1,3 @@
-import type { AgentBuilderStarterPackItemAssetType } from "@mosoo/contracts/agent-builder";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
 import type {
   AccountId,
@@ -6,7 +5,6 @@ import type {
   AgentBuilderPlannerRunId,
   AgentBuilderThreadId,
   AgentId,
-  ChannelBindingId,
   EnvironmentId,
   McpServerId,
   OrganizationId,
@@ -16,10 +14,7 @@ import type {
 } from "@mosoo/id";
 
 export type AgentBuilderBindableAssetId = EnvironmentId | McpServerId | SkillId | SpaceId;
-export type AgentBuilderBindableAssetType = Exclude<
-  AgentBuilderStarterPackItemAssetType,
-  "agent_field"
->;
+export type AgentBuilderBindableAssetType = "environment" | "mcp" | "skill" | "space";
 
 type ParsePlatformIdValue<TId extends PlatformId> = (value: unknown, label: string) => TId;
 
@@ -72,10 +67,6 @@ export function parseAgentBuilderThreadId(
   return parsePlatformId<AgentBuilderThreadId>(value, label);
 }
 
-function parseChannelBindingId(value: unknown, label = "channelBindingId"): ChannelBindingId {
-  return parsePlatformId<ChannelBindingId>(value, label);
-}
-
 export function parseEnvironmentId(value: unknown, label = "environmentId"): EnvironmentId {
   return parsePlatformId<EnvironmentId>(value, label);
 }
@@ -101,13 +92,6 @@ export function parseNullableEnvironmentId(
   label = "environmentId",
 ): EnvironmentId | null {
   return value === null || value === undefined ? null : parseEnvironmentId(value, label);
-}
-
-export function parseChannelBindingIdList(
-  values: readonly unknown[],
-  label = "channelIds",
-): ChannelBindingId[] {
-  return parseIdList(values, label, parseChannelBindingId);
 }
 
 export function parseMcpServerIdList(

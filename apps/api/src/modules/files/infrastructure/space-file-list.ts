@@ -2,12 +2,13 @@ import type { SpaceFileListing } from "@mosoo/contracts/space";
 import { fileRecordsTable, spaceDirectoriesTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type { AccountId, SpaceId } from "@mosoo/id";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { listSpaceAccessRows } from "../../spaces/domain/space-access.policy";
 import { normalizeSpaceDirectoryPath } from "./file-paths";
 import { ensureSpaceAccess } from "./space-access";
 import { listActiveSpaceFileLocks } from "./space-file-lock";
@@ -78,4 +79,92 @@ export async function listSpaceFiles(
       version: row.version,
     })),
   };
+}
+
+export interface SpaceRootFileSummaryListing {
+  directories: {
+    key: string;
+  }[];
+  files: {
+    key: string;
+    mimeType: string | null;
+    size: number;
+  }[];
+}
+
+export async function listSpaceRootFileSummaries(
+  bindings: ApiBindings,
+  viewer: AuthenticatedViewer,
+  spaceIds: readonly SpaceId[],
+): Promise<Map<SpaceId, SpaceRootFileSummaryListing>> {
+  const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
+  const access = await listSpaceAccessRows(bindings.DB, viewerId, spaceIds);
+  const accessibleSpaceIds = [...access.accessibleRowsById.keys()];
+
+  if (accessibleSpaceIds.length === 0) {
+    return new Map();
+  }
+
+  const database = getAppDatabase(bindings.DB);
+  const [directoryRows, fileRows] = await Promise.all([
+    database
+      .select({
+        path: spaceDirectoriesTable.path,
+        spaceId: spaceDirectoriesTable.spaceId,
+      })
+      .from(spaceDirectoriesTable)
+      .where(
+        and(
+          inArray(spaceDirectoriesTable.spaceId, accessibleSpaceIds),
+          eq(spaceDirectoriesTable.parentPath, ""),
+          sql`${spaceDirectoriesTable.name} NOT LIKE '.%'`,
+        ),
+      )
+      .orderBy(asc(sql<string>`lower(${spaceDirectoriesTable.name})`))
+      .all(),
+    database
+      .select({
+        mimeType: fileRecordsTable.mimeType,
+        path: fileRecordsTable.path,
+        scopeId: fileRecordsTable.scopeId,
+        size: fileRecordsTable.size,
+      })
+      .from(fileRecordsTable)
+      .where(
+        and(
+          eq(fileRecordsTable.scopeKind, "space"),
+          inArray(fileRecordsTable.scopeId, accessibleSpaceIds),
+          eq(fileRecordsTable.parentPath, ""),
+          eq(fileRecordsTable.status, "ready"),
+          sql`${fileRecordsTable.name} NOT LIKE '.%'`,
+        ),
+      )
+      .orderBy(asc(sql<string>`lower(${fileRecordsTable.name})`))
+      .all(),
+  ]);
+  const listingsBySpaceId = new Map<SpaceId, SpaceRootFileSummaryListing>();
+
+  for (const spaceId of accessibleSpaceIds) {
+    listingsBySpaceId.set(spaceId, {
+      directories: [],
+      files: [],
+    });
+  }
+
+  for (const row of directoryRows) {
+    listingsBySpaceId.get(row.spaceId)?.directories.push({
+      key: `${row.path}/`,
+    });
+  }
+
+  for (const row of fileRows) {
+    const spaceId = parsePlatformId<SpaceId>(row.scopeId, "space file summary scope ID");
+    listingsBySpaceId.get(spaceId)?.files.push({
+      key: row.path,
+      mimeType: row.mimeType,
+      size: row.size,
+    });
+  }
+
+  return listingsBySpaceId;
 }

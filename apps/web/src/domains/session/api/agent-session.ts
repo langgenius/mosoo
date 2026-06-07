@@ -58,8 +58,18 @@ const CREATE_AGENT_SESSION_MUTATION = graphql(/* GraphQL */ `
 `);
 
 const AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
-  query AgentSessionList($agentId: ULID!, $archived: Boolean, $type: SessionType) {
-    agentSessionList(agentId: $agentId, archived: $archived, type: $type) {
+  query AgentSessionList(
+    $agentId: ULID!
+    $archived: Boolean
+    $participantOnly: Boolean
+    $type: SessionType
+  ) {
+    agentSessionList(
+      agentId: $agentId
+      archived: $archived
+      participantOnly: $participantOnly
+      type: $type
+    ) {
       nodes {
         agentId
         archivedAt
@@ -270,13 +280,17 @@ export async function createAgentSession(
 
 export async function listAgentSessions(
   agentId: AgentId,
-  archived?: boolean | null,
-  type?: SessionType | null,
+  options: {
+    archived?: boolean | null;
+    participantOnly?: boolean | null;
+    type?: SessionType | null;
+  } = {},
 ): Promise<SessionSummary[]> {
   const payload = await requestGraphQL(AGENT_SESSION_LIST_QUERY, {
     agentId,
-    archived: archived ?? null,
-    type: type ?? null,
+    archived: options.archived ?? null,
+    participantOnly: options.participantOnly ?? null,
+    type: options.type ?? null,
   });
 
   return payload.agentSessionList.nodes.map(toSessionSummary);

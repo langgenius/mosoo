@@ -172,7 +172,15 @@ function FileRow({ file, onRemove }: { file: SessionFile; onRemove: (file: Sessi
   );
 }
 
-function EmptyState({ onPick }: { onPick: () => void }) {
+function EmptyState({
+  onPick,
+  uploadDisabled,
+  uploadDisabledReason,
+}: {
+  onPick: () => void;
+  uploadDisabled: boolean;
+  uploadDisabledReason: string | null;
+}) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
       <div className="bg-paper-200 text-fg-3 flex size-12 items-center justify-center rounded-full">
@@ -184,7 +192,18 @@ function EmptyState({ onPick }: { onPick: () => void }) {
         <br />
         Anything you add stays available to the agent across this session.
       </div>
-      <Button className="mt-4 gap-1.5" onClick={onPick} size="sm" variant="outline">
+      {uploadDisabledReason !== null ? (
+        <div className="text-fg-3 mt-3 max-w-[240px] text-[12px] leading-relaxed">
+          {uploadDisabledReason}
+        </div>
+      ) : null}
+      <Button
+        className="mt-4 gap-1.5"
+        disabled={uploadDisabled}
+        onClick={onPick}
+        size="sm"
+        variant="outline"
+      >
         <Upload className="size-3.5" />
         Add files
       </Button>
@@ -196,10 +215,14 @@ export function SessionFilesPanel({
   onClose,
   onUploadFiles,
   sessionId,
+  uploadDisabled = false,
+  uploadDisabledReason = null,
 }: {
   onClose: () => void;
   onUploadFiles: (files: File[]) => void;
   sessionId: string | null;
+  uploadDisabled?: boolean;
+  uploadDisabledReason?: string | null;
 }) {
   const { pendingBySession } = useSessionFilesStore();
   const queryClient = useQueryClient();
@@ -221,13 +244,20 @@ export function SessionFilesPanel({
       return;
     }
 
+    if (uploadDisabled) {
+      event.target.value = "";
+      return;
+    }
+
     onUploadFiles([...list]);
 
     event.target.value = "";
   };
 
   const triggerPicker = (): void => {
-    inputRef.current?.click();
+    if (!uploadDisabled) {
+      inputRef.current?.click();
+    }
   };
 
   const removeFile = async (file: SessionFile): Promise<void> => {
@@ -261,9 +291,10 @@ export function SessionFilesPanel({
         <button
           type="button"
           aria-label="Add files"
-          disabled={atLimit}
+          disabled={atLimit || uploadDisabled}
           onClick={triggerPicker}
           className="text-fg-3 hover:bg-ink-900/[0.06] hover:text-fg-1 inline-flex size-6 items-center justify-center rounded-md disabled:cursor-not-allowed disabled:opacity-40"
+          title={uploadDisabledReason ?? undefined}
         >
           <Plus className="size-3.5" />
         </button>
@@ -283,11 +314,16 @@ export function SessionFilesPanel({
         multiple
         className="hidden"
         aria-label="Upload session files"
+        disabled={uploadDisabled}
         onChange={handleFiles}
       />
 
       {files.length === 0 ? (
-        <EmptyState onPick={triggerPicker} />
+        <EmptyState
+          onPick={triggerPicker}
+          uploadDisabled={uploadDisabled}
+          uploadDisabledReason={uploadDisabledReason}
+        />
       ) : (
         <div className="flex-1 space-y-1.5 overflow-y-auto p-3">
           {files.map((file) => (

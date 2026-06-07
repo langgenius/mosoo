@@ -1,5 +1,6 @@
 import type {
   AgentBuilderPlannerDraftBindingsContext,
+  AgentBuilderPreviousVisibleAssetsContext,
   AgentBuilderVisibleAssetsContext,
 } from "@mosoo/contracts/agent-builder";
 import type { OrganizationId } from "@mosoo/id";
@@ -7,7 +8,13 @@ import type { OrganizationId } from "@mosoo/id";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { currentTimestampMs, toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { parseAgentBuilderPlannerDraft } from "./agent-builder-draft-parser";
+import type { AgentBuilderLightweightPlannerDraftContext } from "./agent-builder-lightweight-draft-types";
+import type { AgentBuilderPlannerDraftInput } from "./agent-builder-planner-draft-input";
+import { resolveAgentBuilderPlannerDraftInput } from "./agent-builder-planner-draft-input";
+import {
+  availablePreviousVisibleAssetsContext,
+  missingPreviousVisibleAssetsContext,
+} from "./agent-builder-previous-visible-assets";
 import {
   createVisibleAssetChanges,
   createVisibleAssetCurrentIndex,
@@ -19,14 +26,13 @@ import { collectAgentBuilderVisibleAssetSummaries } from "./agent-builder-visibl
 import type {
   AgentBuilderVisibleAssetProviderInput,
   AgentBuilderVisibleAssetSummariesCollector,
-  AgentBuilderParsedDraftContext,
 } from "./agent-builder-visible-assets.types";
 
 function toDraftBindings(
-  draft: AgentBuilderParsedDraftContext,
+  draft: AgentBuilderLightweightPlannerDraftContext,
 ): AgentBuilderPlannerDraftBindingsContext {
   return {
-    channelIds: draft.channelIds,
+    componentDecisions: draft.componentDecisions,
     environmentId: draft.environmentId,
     mcpServerIds: draft.mcpServerIds,
     parseError: draft.parseError,
@@ -36,13 +42,27 @@ function toDraftBindings(
   };
 }
 
-export function createAgentBuilderVisibleAssetProviderInput(input: {
-  bindings: ApiBindings;
-  draftYaml: string;
-  organizationId: OrganizationId;
-  viewer: AuthenticatedViewer;
-}): AgentBuilderVisibleAssetProviderInput {
-  const draftBindings = parseAgentBuilderPlannerDraft(input.draftYaml);
+function resolvePreviousContext(input: {
+  previousAssets: AgentBuilderVisibleAssetsContext | null;
+  previousContext?: AgentBuilderPreviousVisibleAssetsContext | undefined;
+}): AgentBuilderPreviousVisibleAssetsContext {
+  if (input.previousContext !== undefined) {
+    return input.previousContext;
+  }
+
+  return input.previousAssets === null
+    ? missingPreviousVisibleAssetsContext()
+    : availablePreviousVisibleAssetsContext();
+}
+
+export function createAgentBuilderVisibleAssetProviderInput(
+  input: {
+    bindings: ApiBindings;
+    organizationId: OrganizationId;
+    viewer: AuthenticatedViewer;
+  } & AgentBuilderPlannerDraftInput,
+): AgentBuilderVisibleAssetProviderInput {
+  const draftBindings = resolveAgentBuilderPlannerDraftInput(input);
 
   return {
     bindings: input.bindings,
@@ -55,34 +75,55 @@ export function createAgentBuilderVisibleAssetProviderInput(input: {
   };
 }
 
-export async function collectAgentBuilderVisibleAssets(input: {
-  bindings: ApiBindings;
-  collectSummaries?: AgentBuilderVisibleAssetSummariesCollector;
-  draftYaml: string;
-  organizationId: OrganizationId;
-  previousAssets: AgentBuilderVisibleAssetsContext | null;
-  viewer: AuthenticatedViewer;
-}): Promise<AgentBuilderVisibleAssetsContext> {
+export async function collectAgentBuilderVisibleAssets(
+  input: {
+    bindings: ApiBindings;
+    collectSummaries?: AgentBuilderVisibleAssetSummariesCollector;
+    organizationId: OrganizationId;
+    previousAssets: AgentBuilderVisibleAssetsContext | null;
+    previousContext?: AgentBuilderPreviousVisibleAssetsContext | undefined;
+    viewer: AuthenticatedViewer;
+  } & AgentBuilderPlannerDraftInput,
+): Promise<AgentBuilderVisibleAssetsContext> {
+  const draftBindings = resolveAgentBuilderPlannerDraftInput(input);
+  const previousContext = resolvePreviousContext(input);
+
+  if (draftBindings.parseStatus === "failed") {
+    const currentIndex = emptyVisibleAssetIndex();
+
+    return {
+      changesSinceLastTurn: emptyVisibleAssetChanges(),
+      currentIndex,
+      draftBindings: toDraftBindings(draftBindings),
+      observedAt: toIsoString(currentTimestampMs()),
+      previousContext,
+      snapshotHash: hashRecord(currentIndex),
+    };
+  }
+
   const providerInput = createAgentBuilderVisibleAssetProviderInput({
     bindings: input.bindings,
-    draftYaml: input.draftYaml,
+    draft: draftBindings,
     organizationId: input.organizationId,
     viewer: input.viewer,
   });
   const collectSummaries = input.collectSummaries ?? collectAgentBuilderVisibleAssetSummaries;
   const summaries = await collectSummaries(providerInput);
   const currentIndex = createVisibleAssetCurrentIndex(summaries);
-  const previousIndex = input.previousAssets?.currentIndex ?? emptyVisibleAssetIndex();
-  const draftBindings = providerInput.draft;
+  const previousIndex =
+    previousContext.status === "available"
+      ? (input.previousAssets?.currentIndex ?? emptyVisibleAssetIndex())
+      : emptyVisibleAssetIndex();
 
   return {
     changesSinceLastTurn:
-      input.previousAssets === null
+      previousContext.status !== "available" || input.previousAssets === null
         ? emptyVisibleAssetChanges()
         : createVisibleAssetChanges(summaries, previousIndex),
     currentIndex,
     draftBindings: toDraftBindings(draftBindings),
     observedAt: toIsoString(currentTimestampMs()),
+    previousContext,
     snapshotHash: hashRecord(currentIndex),
   };
 }

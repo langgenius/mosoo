@@ -170,10 +170,15 @@ function isBlockedIpv4([first, second]: readonly [number, number, number, number
 }
 
 function isBlockedProbeHostname(hostname: string): boolean {
-  const normalized = hostname.toLowerCase().replace(/^\[/u, "").replace(/\]$/u, "");
+  const normalized = hostname
+    .toLowerCase()
+    .replace(/^\[/u, "")
+    .replace(/\]$/u, "")
+    .replace(/\.+$/u, "");
   const isIpv6 = normalized.includes(":");
 
   if (
+    normalized.length === 0 ||
     normalized === "localhost" ||
     normalized.endsWith(".localhost") ||
     (isIpv6 &&
@@ -215,6 +220,10 @@ export function validateVendorProbeBaseUrl(baseUrl: string): string | null {
     isBlockedProbeHostname(parsed.hostname)
   ) {
     return "blocked_api_base";
+  }
+
+  if (parsed.protocol !== "https:") {
+    return "insecure_api_base";
   }
 
   return null;

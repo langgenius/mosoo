@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7f9729c4-89ec-5c94-800c-6b606f5de385",
+  "id": "412f7261-f3ef-50c0-830f-feb0634914c0",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_deployment_version": {
@@ -801,6 +801,13 @@
           "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "preview_opened_at": {
+          "name": "preview_opened_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "status": {

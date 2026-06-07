@@ -1,5 +1,6 @@
 import { describe, expect, spyOn, test } from "bun:test";
 
+import type { AgentBuilderPlanNode } from "@mosoo/contracts/agent-builder";
 import { PRESET_MODEL_CATALOG } from "@mosoo/contracts/models";
 import { PUBLIC_RUNTIME_CATALOG } from "@mosoo/runtime-catalog";
 
@@ -18,8 +19,11 @@ import {
   plannerContextWithBoundSpaces,
   plannerContextWithMissingModelSelection,
   plannerContextWithUnsupportedRuntime,
+  plannerContextWithVisibleMcpServers,
+  plannerContextWithVisibleSkillIndex,
   plannerContextWithVisibleSkills,
 } from "./agent-builder-draft-patch-normalizer-fixtures";
+import { createAgentBuilderApiFixture } from "./helpers/agent-builder-api-fixture";
 
 describe("Agent Builder draft patch normalizer", () => {
   test("resolves user-facing model labels to canonical preset model IDs", () => {
@@ -35,11 +39,40 @@ describe("Agent Builder draft patch normalizer", () => {
       bindings: { DB: {} as D1Database } as ApiBindings,
       context: plannerContext(),
       mode: "draft_patch",
-      nodes: [draftPatchNode("runtime", "runtimeId", "openai runtime")],
+      nodes: [draftPatchNode("runtime", "runtimeId", "Claude Agent SDK")],
     });
 
     expect(nodes[0]?.status).toBe("applied");
-    expect(nodes[0]?.draftPatch?.value).toBe("openai-runtime");
+    expect(nodes[0]?.draftPatch?.value).toBe("claude-agent-sdk");
+  });
+
+  test("preserves non-patch action nodes in a mixed draft patch output", async () => {
+    const actionNode = {
+      actions: [
+        {
+          actionKey: "create_remote_mcp_server",
+          label: "Create remote MCP server",
+          style: "primary",
+        },
+      ],
+      kind: "action",
+      nodeKey: "show_next_action:create_remote_mcp_server",
+      operation: "show",
+      requiresConfirmation: false,
+      status: "pending",
+      summary: "Open the secure remote MCP server creation UI.",
+      targetType: "workflow",
+    } as const satisfies AgentBuilderPlanNode;
+    const nodes = await normalizeAgentBuilderDraftPatchNodes({
+      actorAccountId: NORMALIZER_IDS.account,
+      bindings: { DB: {} as D1Database } as ApiBindings,
+      context: plannerContext(),
+      mode: "draft_patch",
+      nodes: [draftPatchNode("runtime", "runtimeId", "openai runtime"), actionNode],
+    });
+
+    expect(nodes[0]?.status).toBe("blocked");
+    expect(nodes[1]).toEqual(actionNode);
   });
 
   test("uses catalog lookup indexes for repeated model and Runtime aliases", async () => {
@@ -154,6 +187,26 @@ describe("Agent Builder draft patch normalizer", () => {
     ]);
     expect(nodes[0]?.summary).toContain("legacy-runtime");
     expect(nodes[1]?.draftPatch?.value).toBe("Updated description.");
+  });
+
+  test("blocks Runtime-only changes when the resulting model selection is unavailable", async () => {
+    const fixture = await createAgentBuilderApiFixture();
+    const nodes = await normalizeAgentBuilderDraftPatchNodes({
+      actorAccountId: fixture.viewer.id,
+      bindings: fixture.bindings,
+      context: plannerContext(),
+      mode: "draft_patch",
+      nodes: [
+        draftPatchNode("runtime", "runtimeId", "openai-runtime"),
+        draftPatchNode("description", "description", "Updated description."),
+      ],
+    });
+
+    expect(nodes.map((node) => [node.nodeKey, node.status])).toEqual([
+      ["runtime", "blocked"],
+      ["description", "applied"],
+    ]);
+    expect(nodes[0]?.summary).toContain("not available");
   });
 
   test("allows visible MCP binding patch even when authorization is not ready", async () => {
@@ -276,7 +329,7 @@ describe("Agent Builder draft patch normalizer", () => {
     });
   });
 
-  test("unmounts a bound Space without deleting the Space asset", async () => {
+  test("normalizes Space unmount into remaining Manifest bindings", async () => {
     const nodes = await normalizeAgentBuilderDraftPatchNodes({
       actorAccountId: NORMALIZER_IDS.account,
       bindings: { DB: {} as D1Database } as ApiBindings,
@@ -286,18 +339,10 @@ describe("Agent Builder draft patch normalizer", () => {
     });
 
     expect(nodes[0]?.status).toBe("applied");
-    expect(nodes[0]?.operation).toBe("remove");
+    expect(nodes[0]?.operation).toBe("update");
     expect(nodes[0]?.draftPatch).toMatchObject({
       baseValue: [NORMALIZER_IDS.spaceKeep, NORMALIZER_IDS.spaceRemove],
       fieldPath: "spaceIds",
-      resolvedReferences: [
-        {
-          bindingState: "bound",
-          id: NORMALIZER_IDS.spaceKeep,
-          name: "Keep Space",
-          targetType: "space",
-        },
-      ],
       sectionId: "environment",
       value: [NORMALIZER_IDS.spaceKeep],
     });
@@ -321,5 +366,112 @@ describe("Agent Builder draft patch normalizer", () => {
 
     expect(nodes[0]?.status).toBe("blocked");
     expect(nodes[0]?.summary).toContain("currently bound Spaces");
+  });
+
+  test("normalizes Skill unmount into remaining Manifest bindings", async () => {
+    const keepSkillId = normalizerSkillId(800);
+    const removeSkillId = normalizerSkillId(801);
+    const nodes = await normalizeAgentBuilderDraftPatchNodes({
+      actorAccountId: NORMALIZER_IDS.account,
+      bindings: { DB: {} as D1Database } as ApiBindings,
+      context: plannerContextWithVisibleSkills([keepSkillId, removeSkillId]),
+      mode: "draft_patch",
+      nodes: [draftPatchNode("remove_skill", "skillIds", [removeSkillId], "remove")],
+    });
+
+    expect(nodes[0]?.status).toBe("applied");
+    expect(nodes[0]?.operation).toBe("update");
+    expect(nodes[0]?.draftPatch).toMatchObject({
+      baseValue: [keepSkillId, removeSkillId],
+      fieldPath: "skillIds",
+      sectionId: "integrations",
+      value: [keepSkillId],
+    });
+  });
+
+  test("normalizes MCP server unmount into remaining Manifest bindings", async () => {
+    const keepMcpServerId = NORMALIZER_IDS.mcpKeep;
+    const removeMcpServerId = NORMALIZER_IDS.mcpRemove;
+    const nodes = await normalizeAgentBuilderDraftPatchNodes({
+      actorAccountId: NORMALIZER_IDS.account,
+      bindings: { DB: {} as D1Database } as ApiBindings,
+      context: plannerContextWithVisibleMcpServers([keepMcpServerId, removeMcpServerId]),
+      mode: "draft_patch",
+      nodes: [draftPatchNode("remove_mcp", "mcpServerIds", [removeMcpServerId], "remove")],
+    });
+
+    expect(nodes[0]?.status).toBe("applied");
+    expect(nodes[0]?.operation).toBe("update");
+    expect(nodes[0]?.draftPatch).toMatchObject({
+      baseValue: [keepMcpServerId, removeMcpServerId],
+      fieldPath: "mcpServerIds",
+      sectionId: "integrations",
+      value: [keepMcpServerId],
+    });
+  });
+
+  test("preserves tombstone Skill bindings while unmounting an active Skill", async () => {
+    const removeSkillId = normalizerSkillId(810);
+    const tombstoneSkillId = normalizerSkillId(811);
+    const nodes = await normalizeAgentBuilderDraftPatchNodes({
+      actorAccountId: NORMALIZER_IDS.account,
+      bindings: { DB: {} as D1Database } as ApiBindings,
+      context: plannerContextWithVisibleSkillIndex({
+        draftSkillLines: [
+          `    - id: ${removeSkillId}`,
+          `      name: Skill ${removeSkillId}`,
+          `      filename: ${removeSkillId}.md`,
+          "      state: active",
+          `    - id: ${tombstoneSkillId}`,
+          `      name: Skill ${tombstoneSkillId}`,
+          `      filename: ${tombstoneSkillId}.md`,
+          "      state: tombstone",
+        ],
+        visibleBoundSkillIds: [removeSkillId],
+      }),
+      mode: "draft_patch",
+      nodes: [draftPatchNode("remove_active_skill", "skillIds", [removeSkillId], "remove")],
+    });
+
+    expect(nodes[0]?.status).toBe("applied");
+    expect(nodes[0]?.operation).toBe("update");
+    expect(nodes[0]?.draftPatch).toMatchObject({
+      baseValue: [removeSkillId, tombstoneSkillId],
+      fieldPath: "skillIds",
+      sectionId: "integrations",
+      value: [tombstoneSkillId],
+    });
+    expect(nodes[0]?.draftPatch?.resolvedReferences).toBeUndefined();
+  });
+
+  test("does not block unmount when an unrelated surviving Skill is not visible", async () => {
+    const invisibleKeepSkillId = normalizerSkillId(812);
+    const removeSkillId = normalizerSkillId(813);
+    const nodes = await normalizeAgentBuilderDraftPatchNodes({
+      actorAccountId: NORMALIZER_IDS.account,
+      bindings: { DB: {} as D1Database } as ApiBindings,
+      context: plannerContextWithVisibleSkillIndex({
+        draftSkillLines: [
+          `    - id: ${invisibleKeepSkillId}`,
+          `      name: Skill ${invisibleKeepSkillId}`,
+          `      filename: ${invisibleKeepSkillId}.md`,
+          `    - id: ${removeSkillId}`,
+          `      name: Skill ${removeSkillId}`,
+          `      filename: ${removeSkillId}.md`,
+        ],
+        visibleBoundSkillIds: [removeSkillId],
+      }),
+      mode: "draft_patch",
+      nodes: [draftPatchNode("remove_visible_skill", "skillIds", [removeSkillId], "remove")],
+    });
+
+    expect(nodes[0]?.status).toBe("applied");
+    expect(nodes[0]?.draftPatch).toMatchObject({
+      baseValue: [invisibleKeepSkillId, removeSkillId],
+      fieldPath: "skillIds",
+      sectionId: "integrations",
+      value: [invisibleKeepSkillId],
+    });
+    expect(nodes[0]?.draftPatch?.resolvedReferences).toBeUndefined();
   });
 });

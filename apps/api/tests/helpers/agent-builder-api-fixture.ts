@@ -5,6 +5,7 @@ import { getBetterAuth } from "../../src/modules/auth/application/auth-session.s
 import { getViewerFromRequest } from "../../src/modules/auth/application/viewer-auth.service";
 import type { AuthenticatedViewer } from "../../src/modules/auth/application/viewer-auth.service";
 import { getViewer } from "../../src/modules/users/application/viewer-context.service";
+import { storeVendorCredentialSecret } from "../../src/modules/vendor-credentials/application/vendor-credential.secret-resolution";
 import type { ApiBindings } from "../../src/platform/cloudflare/worker-types";
 import { createPublicHttpTestBindings } from "./published-agent-http-test-fixture";
 import { SqliteD1Database } from "./sqlite-d1";
@@ -202,6 +203,66 @@ export async function createAgentBuilderApiFixture(): Promise<AgentBuilderApiFix
     ids: AGENT_BUILDER_TEST_IDS,
     viewer: AGENT_BUILDER_TEST_VIEWER,
   };
+}
+
+export async function insertAgentBuilderVendorCredential(
+  fixture: AgentBuilderApiFixture,
+  input: {
+    readonly apiBase?: string | null;
+    readonly apiKey?: string;
+    readonly credentialId?: string;
+    readonly isDefault?: boolean;
+    readonly isPreferred?: boolean;
+    readonly models?: readonly string[] | null;
+    readonly name?: string;
+    readonly ownerAccountId?: string | null;
+    readonly vendorId: string;
+  },
+): Promise<void> {
+  const credentialId = input.credentialId ?? "01J000000000000000000000C1";
+  const ownerAccountId = input.ownerAccountId ?? null;
+  const apiKeySecretId = await storeVendorCredentialSecret(fixture.bindings, {
+    actorAccountId: fixture.viewer.id,
+    apiKey: input.apiKey ?? "sk-test",
+    credentialId,
+    organizationId: fixture.ids.organizationId,
+    ownerAccountId,
+    providerId: input.vendorId,
+    purpose: "credential_create_api_key",
+    scope: ownerAccountId === null ? "company" : "personal",
+  });
+
+  await fixture.bindings.DB.prepare(
+    `INSERT INTO vendor_credential (
+      api_base,
+      api_key_secret_id,
+      created_at,
+      id,
+      is_default,
+      is_preferred,
+      models,
+      name,
+      organization_id,
+      owner_account_id,
+      updated_at,
+      vendor_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      input.apiBase ?? null,
+      apiKeySecretId,
+      1,
+      credentialId,
+      input.isDefault === false ? 0 : 1,
+      input.isPreferred === true ? 1 : 0,
+      input.models === undefined || input.models === null ? null : JSON.stringify(input.models),
+      input.name ?? `${input.vendorId} test`,
+      fixture.ids.organizationId,
+      ownerAccountId,
+      1,
+      input.vendorId,
+    )
+    .run();
 }
 
 function createAgentBuilderApiSchema(database: SqliteD1Database): void {
@@ -419,9 +480,184 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       version integer NOT NULL
     );
 
-    CREATE TABLE agent_mcp_binding (
+    CREATE TABLE file_upload (
+      content_type text NOT NULL,
+      created_at integer NOT NULL,
+      created_by_account_id text NOT NULL,
+      expected_size integer NOT NULL,
+      expires_at integer NOT NULL,
+      file_id text NOT NULL,
+      id text PRIMARY KEY NOT NULL,
+      if_match_etag text,
+      multipart_upload_id text,
+      overwrite integer NOT NULL,
+      part_size integer,
+      scope_id text NOT NULL,
+      scope_kind text NOT NULL,
+      status text NOT NULL,
+      strategy text NOT NULL,
+      updated_at integer NOT NULL
+    );
+
+    CREATE TABLE agent_deployment_version (
       agent_id text NOT NULL,
-      server_id text NOT NULL
+      config_json text NOT NULL,
+      created_at integer NOT NULL,
+      created_by_account_id text NOT NULL,
+      environment_id text,
+      id text PRIMARY KEY NOT NULL,
+      kind text NOT NULL,
+      mcp_bindings_json text NOT NULL,
+      model text NOT NULL,
+      prompt text NOT NULL,
+      provider text NOT NULL,
+      runtime_id text NOT NULL,
+      skills_json text NOT NULL,
+      space_bindings_json text NOT NULL,
+      summary text NOT NULL,
+      version_number integer NOT NULL
+    );
+
+    CREATE TABLE agent_skill (
+      agent_id text NOT NULL,
+      created_at integer NOT NULL,
+      skill_id text NOT NULL,
+      sort_order integer NOT NULL,
+      PRIMARY KEY (agent_id, skill_id)
+    );
+
+    CREATE TABLE agent_space_binding (
+      agent_id text NOT NULL,
+      created_at integer NOT NULL,
+      sort_order integer NOT NULL,
+      space_id text NOT NULL,
+      PRIMARY KEY (agent_id, space_id)
+    );
+
+    CREATE TABLE session (
+      agent_id text NOT NULL,
+      archived_at integer,
+      attributed_user_id text,
+      created_at integer NOT NULL,
+      creator_account_id text NOT NULL,
+      deployment_version_id text,
+      deployment_version_number integer,
+      id text PRIMARY KEY NOT NULL,
+      kind text NOT NULL,
+      last_message_at integer,
+      last_run_id text,
+      message_seq_cursor integer DEFAULT 0 NOT NULL,
+      metadata_json text DEFAULT '{}' NOT NULL,
+      model text NOT NULL,
+      organization_id text NOT NULL,
+      provider text NOT NULL,
+      renamed integer NOT NULL,
+      runtime_id text NOT NULL,
+      status text NOT NULL,
+      status_operation_id text,
+      status_seq integer DEFAULT 0 NOT NULL,
+      runtime_event_seq_cursor integer DEFAULT 0 NOT NULL,
+      title text,
+      type text DEFAULT 'preview' NOT NULL,
+      updated_at integer NOT NULL
+    );
+
+    CREATE TABLE session_run (
+      agent_id text NOT NULL,
+      completed_at integer,
+      created_at integer NOT NULL,
+      created_by_account_id text NOT NULL,
+      deployment_version_id text,
+      deployment_version_number integer,
+      driver_instance_id text,
+      error_code text,
+      error_details_json text,
+      error_message text,
+      id text PRIMARY KEY NOT NULL,
+      model text,
+      provider text,
+      runtime_id text,
+      session_id text NOT NULL,
+      started_at integer,
+      status text NOT NULL,
+      status_changed_at integer DEFAULT 0 NOT NULL,
+      status_event text DEFAULT 'run.queue' NOT NULL,
+      status_operation_id text,
+      status_seq integer DEFAULT 0 NOT NULL,
+      status_source text DEFAULT 'system' NOT NULL,
+      trace_id text NOT NULL,
+      trigger text NOT NULL,
+      updated_at integer NOT NULL
+    );
+
+    CREATE TABLE sandbox_session (
+      cloudflare_session_id text NOT NULL,
+      created_at integer NOT NULL,
+      cwd text NOT NULL,
+      origin_json text NOT NULL,
+      sandbox_id text NOT NULL,
+      session_id text PRIMARY KEY NOT NULL,
+      space_aliases_json text NOT NULL,
+      status text NOT NULL,
+      updated_at integer NOT NULL
+    );
+
+    CREATE TABLE sandbox_backup (
+      created_at integer NOT NULL,
+      dir text NOT NULL,
+      error_message text,
+      id text PRIMARY KEY NOT NULL,
+      keep integer DEFAULT 0 NOT NULL,
+      sandbox_id text NOT NULL,
+      status text NOT NULL,
+      ttl_seconds integer NOT NULL,
+      updated_at integer NOT NULL
+    );
+
+    CREATE TABLE driver_instance (
+      boot_token_expires_at integer NOT NULL,
+      boot_token_hash blob NOT NULL,
+      boot_token_used_at integer,
+      close_code integer,
+      close_reason text,
+      connection_id text,
+      created_at integer NOT NULL,
+      command_seq_cursor integer DEFAULT 0 NOT NULL,
+      driver_pid integer,
+      driver_started_at integer,
+      driver_version text,
+      error_message text,
+      expires_at integer NOT NULL,
+      heartbeat_count integer NOT NULL,
+      generation integer DEFAULT 0 NOT NULL,
+      id text PRIMARY KEY NOT NULL,
+      last_heartbeat_at integer,
+      process_id text,
+      protocol text NOT NULL,
+      protocol_version integer NOT NULL,
+      restart_count integer DEFAULT 0 NOT NULL,
+      runtime text NOT NULL,
+      sandbox_id text NOT NULL,
+      sandbox_session_id text NOT NULL,
+      status text NOT NULL,
+      status_changed_at integer DEFAULT 0 NOT NULL,
+      status_event text DEFAULT 'driver.provision' NOT NULL,
+      status_operation_id text,
+      status_seq integer DEFAULT 0 NOT NULL,
+      status_source text DEFAULT 'system' NOT NULL,
+      updated_at integer NOT NULL
+    );
+
+    CREATE TABLE agent_mcp_binding (
+      agent_credential_id text,
+      agent_id text NOT NULL,
+      created_at integer DEFAULT 1 NOT NULL,
+      credential_mode text DEFAULT 'runtime_resolved' NOT NULL,
+      enabled integer DEFAULT 1 NOT NULL,
+      id text PRIMARY KEY DEFAULT '01J00000000000000000000999' NOT NULL,
+      server_id text NOT NULL,
+      sort_order integer DEFAULT 0 NOT NULL,
+      updated_at integer DEFAULT 1 NOT NULL
     );
 
     CREATE TABLE mcp_credential (
@@ -469,6 +705,18 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       vendor_id text NOT NULL
     );
 
+    CREATE TABLE vault_secret (
+      algorithm text NOT NULL DEFAULT 'AES-GCM',
+      ciphertext text NOT NULL,
+      ciphertext_iv text NOT NULL,
+      created_at integer NOT NULL,
+      id text PRIMARY KEY NOT NULL,
+      kind text NOT NULL,
+      updated_at integer NOT NULL,
+      wrapped_dek text NOT NULL,
+      wrapped_dek_iv text NOT NULL
+    );
+
     CREATE TABLE agent_builder_thread (
       agent_id text NOT NULL,
       created_at integer NOT NULL,
@@ -477,6 +725,7 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       last_turn_at integer,
       message_seq_cursor integer DEFAULT 0 NOT NULL,
       organization_id text NOT NULL,
+      preview_opened_at integer,
       status text DEFAULT 'active' NOT NULL,
       title text,
       updated_at integer NOT NULL

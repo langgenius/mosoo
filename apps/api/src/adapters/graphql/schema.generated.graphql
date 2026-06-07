@@ -61,6 +61,43 @@ type Agent {
   visibility: AgentVisibility!
 }
 
+enum AgentBuilderComponentDecision {
+  bound
+  created
+  skipped
+}
+
+type AgentBuilderComponentDecisions {
+  environment: AgentBuilderComponentDecision
+}
+
+input AgentBuilderComponentDecisionsInput {
+  environment: AgentBuilderComponentDecision
+}
+
+type AgentBuilderControlPlaneActionResult {
+  message: String!
+  secureUi: AgentBuilderSecureUiAction
+  sessionId: ULID
+  status: AgentBuilderControlPlaneActionStatus!
+  toolId: AgentBuilderExecutableActionToolId!
+}
+
+enum AgentBuilderControlPlaneActionStatus {
+  applied
+  needs_secure_ui
+  noop
+}
+
+enum AgentBuilderExecutableActionToolId {
+  apply_agent_config
+  create_agent
+  create_environment
+  create_remote_mcp_server
+  open_preview
+  reset_preview_session
+}
+
 type AgentBuilderMessage {
   cardsJson: String
   contentText: String!
@@ -79,6 +116,23 @@ enum AgentBuilderMessageRole {
   system
   tool
   user
+}
+
+type AgentBuilderMetadata {
+  componentDecisions: AgentBuilderComponentDecisions!
+}
+
+input AgentBuilderMetadataInput {
+  componentDecisions: AgentBuilderComponentDecisionsInput!
+}
+
+type AgentBuilderSecureUiAction {
+  kind: AgentBuilderSecureUiActionKind!
+}
+
+enum AgentBuilderSecureUiActionKind {
+  create_environment
+  create_remote_mcp_server
 }
 
 type AgentBuilderThread {
@@ -183,6 +237,7 @@ type AgentDetail {
 }
 
 type AgentEditorState {
+  builder: AgentBuilderMetadata!
   collaborators: [AgentCollaborator!]!
   environment: AgentEnvironmentConfig!
   id: ULID!
@@ -1093,6 +1148,12 @@ enum EnvironmentVariableStatus {
   pending
 }
 
+input ExecuteAgentBuilderControlPlaneActionInput {
+  agentId: ULID!
+  draftYaml: String
+  toolId: AgentBuilderExecutableActionToolId!
+}
+
 type FileEntry {
   etag: String
   id: ULID!
@@ -1356,6 +1417,7 @@ type Mutation {
   deleteSpaceEntry(input: DeleteSpaceEntryInput!): OperationResult!
   deleteVendorCredential(input: DeleteVendorCredentialInput!): OperationResult!
   ensureAgentBuilderThread(agentId: ULID!): AgentBuilderThread!
+  executeAgentBuilderControlPlaneAction(input: ExecuteAgentBuilderControlPlaneActionInput!): AgentBuilderControlPlaneActionResult!
   importAgentPackage(input: ImportAgentPackageInput!): AgentPackageImportResult!
   inviteOrganizationMember(input: InviteOrganizationMemberInput!): OrganizationInvitation!
   onboardingBootstrap(input: BootstrapOnboardingInput!): OnboardingStatus!
@@ -1585,7 +1647,7 @@ type Query {
   agentManifest(agentId: ULID!): AgentManifestExport!
   agentRuntimeEvents(agentId: ULID!, beforeCursor: String, families: [AgentRuntimeEventFamily!], limit: Int!): AgentRuntimeEventConnection!
   agentSessionDiagnostics(sessionId: ULID!): AgentSessionDiagnostics!
-  agentSessionList(agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, type: SessionType): SessionConnection!
+  agentSessionList(agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!
   agentSessionRetrieve(sessionId: ULID!): AgentSessionRetrieve!
   appInfo: AppInfo!
   availableAgentModels(currentModelId: String, currentVendorId: String, runtimeId: String!): [ResolvedModelEntry!]!
@@ -2225,6 +2287,7 @@ input UpdateAgentCollaboratorInput {
 
 input UpdateAgentConfigInput {
   agentId: ULID!
+  builder: AgentBuilderMetadataInput!
   description: String
   environment: AgentEnvironmentConfigInput!
   kind: AgentKind!

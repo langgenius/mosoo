@@ -13,7 +13,7 @@ import { platformIdColumn } from "./id-column";
 
 export const AGENT_BUILDER_THREAD_STATUSES = ["active", "archived"] as const;
 export type AgentBuilderThreadStatus = (typeof AGENT_BUILDER_THREAD_STATUSES)[number];
-export type AgentBuilderPlannerRunStatus = "completed" | "failed" | "pending";
+export type AgentBuilderPlannerRunStatus = "blocked" | "completed";
 export type AgentBuilderMessageInputKind =
   | "confirmation"
   | "guidance_event"
@@ -35,6 +35,7 @@ export const agentBuilderThreadsTable = sqliteTable(
     lastTurnAt: integer("last_turn_at"),
     messageSeqCursor: integer("message_seq_cursor").notNull().default(0),
     organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
+    previewOpenedAt: integer("preview_opened_at"),
     status: text("status").$type<AgentBuilderThreadStatus>().notNull().default("active"),
     title: text("title"),
     updatedAt: integer("updated_at").notNull(),

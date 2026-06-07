@@ -2,6 +2,9 @@ import type { SessionLiveState } from "@mosoo/ag-ui-session";
 import type { AgentReadiness } from "@mosoo/contracts/agent";
 import type { SessionSummary, SessionType } from "@mosoo/contracts/session";
 
+export type AgentSessionPanelTone = "consume" | "preview";
+export type SessionControlMode = "new_session" | "reset";
+
 export interface SessionConfigurationFreshnessInput {
   activeSession: SessionSummary | null;
   activeSessionRevision: string | null;
@@ -25,12 +28,9 @@ export interface RuntimeReadyWaitInput {
   waitForRuntimeReadyOnNewSession: boolean;
 }
 
-export function toAgentSessions(sessions: SessionSummary[], agentId: string): SessionSummary[] {
-  return sessions
-    .filter((session) => session.agentId === agentId)
-    .toSorted(
-      (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
-    );
+export interface SessionFileUploadBlockInput {
+  activeSessionId: string | null;
+  tone: AgentSessionPanelTone;
 }
 
 export function getReadinessBlockMessage(readiness: AgentReadiness | null): string | null {
@@ -81,6 +81,14 @@ export function isComposerSendBlocked(input: ComposerSendBlockInput): boolean {
 
 export function shouldWaitForRuntimeReadyOnNewSession(input: RuntimeReadyWaitInput): boolean {
   return input.waitForRuntimeReadyOnNewSession && input.sessionType === "preview";
+}
+
+export function getSessionControlMode(tone: AgentSessionPanelTone): SessionControlMode {
+  return tone === "preview" ? "reset" : "new_session";
+}
+
+export function shouldBlockSessionFileUpload(input: SessionFileUploadBlockInput): boolean {
+  return input.tone === "preview" && input.activeSessionId === null;
 }
 
 export function createSessionAutoTitle(typedText: string): string {

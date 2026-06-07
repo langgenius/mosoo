@@ -3,24 +3,32 @@ import type {
   AgentBuilderDraftPatchChange,
   AgentBuilderDraftPatchSectionId,
   AgentBuilderDraftPatchValue,
+  AgentBuilderPlanNodeAction,
   AgentBuilderPlanNode,
 } from "@mosoo/contracts/agent-builder";
+import { ArrowRight } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { isAgentBuilderStreamingMessage } from "@/domains/agent-builder/api/agent-builder-chat-transport";
 import type { AgentBuilderMessage } from "@/domains/agent-builder/api/agent-builder-client";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
+import { Button } from "@/shared/ui/button";
 import { Markdown } from "@/shared/ui/markdown";
 
+import { AgentBuilderAskUserCard } from "./agent-builder-ask-user-card";
+import type { AgentBuilderStructuredReply } from "./agent-builder-ask-user-card";
 import { AgentBuilderStreamingText, BuilderStreamCaret } from "./agent-builder-streaming-text";
 import { getEnvironmentConfigLink } from "./environment-config-link";
-import type {
-  AgentBuilderStarterPackBatchApprovalSubmission,
-  AgentBuilderStarterPackSingleApprovalSubmission,
-} from "./starter-pack-approval-submission";
-import { StarterPackCard } from "./starter-pack-card";
-import { parseAgentBuilderStarterPackCardsJson } from "./starter-pack-card-model";
+
+export type AgentBuilderActionDisabled = boolean | ((actionKey: string) => boolean);
+
+function isAgentBuilderActionDisabled(
+  actionDisabled: AgentBuilderActionDisabled,
+  actionKey: string,
+): boolean {
+  return typeof actionDisabled === "function" ? actionDisabled(actionKey) : actionDisabled;
+}
 
 function isOptimisticAgentBuilderMessage(message: AgentBuilderMessage): boolean {
   return isAgentBuilderStreamingMessage(message);
@@ -28,16 +36,18 @@ function isOptimisticAgentBuilderMessage(message: AgentBuilderMessage): boolean 
 
 export function AgentBuilderMessageCard({
   message,
+  onAction,
   onDraftPatchFocus,
-  onStarterPackApproveAll,
-  onStarterPackApproveItem,
-  starterPackApprovalsDisabled,
+  onStructuredReply,
+  actionDisabled,
+  structuredReplyDisabled,
 }: {
   message: AgentBuilderMessage;
+  onAction?: ((actionKey: string) => void) | undefined;
   onDraftPatchFocus?: ((sectionId: AgentBuilderDraftPatchSectionId) => void) | undefined;
-  onStarterPackApproveAll: (input: AgentBuilderStarterPackBatchApprovalSubmission) => void;
-  onStarterPackApproveItem: (input: AgentBuilderStarterPackSingleApprovalSubmission) => void;
-  starterPackApprovalsDisabled: boolean;
+  onStructuredReply?: ((reply: AgentBuilderStructuredReply) => void) | undefined;
+  actionDisabled: AgentBuilderActionDisabled;
+  structuredReplyDisabled: boolean;
 }): ReactElement {
   const isUser = message.role === "user";
   const isStreaming = message.role === "assistant" && isOptimisticAgentBuilderMessage(message);
@@ -56,10 +66,11 @@ export function AgentBuilderMessageCard({
         {isStreaming ? null : (
           <PlannerOutputSurface
             cardsJson={message.cardsJson}
+            onAction={onAction}
             onDraftPatchFocus={onDraftPatchFocus}
-            onStarterPackApproveAll={onStarterPackApproveAll}
-            onStarterPackApproveItem={onStarterPackApproveItem}
-            starterPackApprovalsDisabled={starterPackApprovalsDisabled}
+            onStructuredReply={onStructuredReply}
+            actionDisabled={actionDisabled}
+            structuredReplyDisabled={structuredReplyDisabled}
           />
         )}
       </div>
@@ -104,8 +115,10 @@ function formatDraftPatchValue(value: AgentBuilderDraftPatchValue): string {
 }
 
 const DRAFT_PATCH_FIELD_LABELS: Record<AgentBuilderDraftPatchChange["fieldPath"], string> = {
+  "componentDecisions.environment": "Environment decision",
   description: "Description",
   environmentId: "Environment",
+  kind: "Agent type",
   mcpServerIds: "MCP Servers",
   model: "Model",
   name: "Name",
@@ -156,6 +169,19 @@ function planNodeStatusBadgeVariant(
       return "danger";
     case "pending":
       return "warning";
+  }
+}
+
+function planNodeActionButtonVariant(
+  style: AgentBuilderPlanNodeAction["style"],
+): "default" | "destructive" | "outline" {
+  switch (style) {
+    case "danger":
+      return "destructive";
+    case "secondary":
+      return "outline";
+    case "primary":
+      return "default";
   }
 }
 
@@ -232,10 +258,18 @@ function DraftPatchValuePreview({
 
 function PlannerNodeCard({
   node,
+  onAction,
   onDraftPatchFocus,
+  onStructuredReply,
+  actionDisabled,
+  structuredReplyDisabled,
 }: {
   node: AgentBuilderPlanNode;
+  onAction?: ((actionKey: string) => void) | undefined;
   onDraftPatchFocus?: ((sectionId: AgentBuilderDraftPatchSectionId) => void) | undefined;
+  onStructuredReply?: ((reply: AgentBuilderStructuredReply) => void) | undefined;
+  actionDisabled: AgentBuilderActionDisabled;
+  structuredReplyDisabled: boolean;
 }): ReactElement {
   const fieldLabel = getNodeFieldLabel(node);
 
@@ -259,6 +293,36 @@ function PlannerNodeCard({
             onDraftPatchFocus={onDraftPatchFocus}
           />
         ) : null}
+        {node.askUser === undefined || onStructuredReply === undefined ? null : (
+          <AgentBuilderAskUserCard
+            disabled={structuredReplyDisabled}
+            nodeKey={node.nodeKey}
+            onSubmit={onStructuredReply}
+            question={node.askUser}
+          />
+        )}
+        {node.actions.length === 0 ? null : (
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            {node.actions.map((action) => (
+              <Button
+                disabled={
+                  isAgentBuilderActionDisabled(actionDisabled, action.actionKey) ||
+                  onAction === undefined
+                }
+                key={action.actionKey}
+                onClick={() => {
+                  onAction?.(action.actionKey);
+                }}
+                size="sm"
+                type="button"
+                variant={planNodeActionButtonVariant(action.style)}
+              >
+                {action.label}
+                <ArrowRight />
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -266,46 +330,21 @@ function PlannerNodeCard({
 
 function PlannerOutputSurface({
   cardsJson,
+  onAction,
   onDraftPatchFocus,
-  onStarterPackApproveAll,
-  onStarterPackApproveItem,
-  starterPackApprovalsDisabled,
+  onStructuredReply,
+  actionDisabled,
+  structuredReplyDisabled,
 }: {
   cardsJson: string | null;
+  onAction?: ((actionKey: string) => void) | undefined;
   onDraftPatchFocus?: ((sectionId: AgentBuilderDraftPatchSectionId) => void) | undefined;
-  onStarterPackApproveAll?:
-    | ((input: AgentBuilderStarterPackBatchApprovalSubmission) => void)
-    | undefined;
-  onStarterPackApproveItem?:
-    | ((input: AgentBuilderStarterPackSingleApprovalSubmission) => void)
-    | undefined;
-  starterPackApprovalsDisabled: boolean;
+  onStructuredReply?: ((reply: AgentBuilderStructuredReply) => void) | undefined;
+  actionDisabled: AgentBuilderActionDisabled;
+  structuredReplyDisabled: boolean;
 }): ReactElement | null {
   if (cardsJson === null) {
     return null;
-  }
-
-  const starterPack = parseAgentBuilderStarterPackCardsJson(cardsJson);
-
-  if (starterPack !== null) {
-    return (
-      <StarterPackCard
-        approvalsDisabled={starterPackApprovalsDisabled}
-        onApproveAll={(nodeKeys) =>
-          onStarterPackApproveAll?.({
-            nodeKeys,
-            plannerRunId: starterPack.plannerRunId,
-          })
-        }
-        onApproveItem={(nodeKey) =>
-          onStarterPackApproveItem?.({
-            nodeKey,
-            plannerRunId: starterPack.plannerRunId,
-          })
-        }
-        result={starterPack}
-      />
-    );
   }
 
   const output = parseAgentBuilderPlannerOutputJson(cardsJson);
@@ -317,7 +356,15 @@ function PlannerOutputSurface({
   return (
     <div className="border-border-subtle mt-2.5 space-y-2 border-t pt-2.5">
       {output.nodes.map((node) => (
-        <PlannerNodeCard key={node.nodeKey} node={node} onDraftPatchFocus={onDraftPatchFocus} />
+        <PlannerNodeCard
+          key={node.nodeKey}
+          node={node}
+          onAction={onAction}
+          onDraftPatchFocus={onDraftPatchFocus}
+          onStructuredReply={onStructuredReply}
+          actionDisabled={actionDisabled}
+          structuredReplyDisabled={structuredReplyDisabled}
+        />
       ))}
     </div>
   );

@@ -29,15 +29,15 @@ import type {
 import {
   createDraftYaml,
   createDraftYamlHash,
+  createEditorSaveSnapshot,
   createInitialDraft,
-  createSnapshot,
   createSnapshotHash,
   normalizeMcpServers,
   normalizeSpaces,
   toAgentConfigChangeSnapshot,
 } from "./draft";
 import type { AgentEditorDraft } from "./draft";
-import { applyAgentEditorBuilderPatch, applyAgentEditorPatch } from "./patch";
+import { applyAgentEditorBuilderPatch, applyAgentEditorPatch, withEnvironmentId } from "./patch";
 import type { AgentEditorBuilderPatch, AgentEditorBuilderPatchApplyResult } from "./patch";
 import { AGENT_FORM_HIGHLIGHT_DURATION_MS } from "./section-ids";
 import type { AgentFormSectionId } from "./section-ids";
@@ -90,6 +90,7 @@ export interface AgentEditorModel {
   focusSection: AgentFormSectionId | null;
   highlightedSections: ReadonlySet<AgentFormSectionId>;
   focusBuilderPatchSection(sectionId: AgentFormSectionId): void;
+  markCurrentDraftSaved(draftYamlHash: string): void;
 }
 
 export interface AgentEditorBuilderPatchAutoApplyResult extends AgentEditorBuilderPatchApplyResult {
@@ -107,6 +108,7 @@ export function useAgentEditorModel({
   const queryClient = useQueryClient();
   const initialDraft = createInitialDraft(agent);
   const [draft, setDraft] = useState<AgentEditorDraft>(initialDraft);
+  const draftRef = useRef<AgentEditorDraft>(initialDraft);
   const [revision, setRevision] = useState(0);
   const [focusSection, setFocusSection] = useState<AgentFormSectionId | null>(null);
   const [highlightedSections, setHighlightedSections] = useState<ReadonlySet<AgentFormSectionId>>(
@@ -114,7 +116,7 @@ export function useAgentEditorModel({
   );
   const highlightClearTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const [savedDraft, setSavedDraft] = useState<AgentEditorDraft>(initialDraft);
-  const [savedSnapshot, setSavedSnapshot] = useState(() => createSnapshot(initialDraft));
+  const [savedSnapshot, setSavedSnapshot] = useState(() => createEditorSaveSnapshot(initialDraft));
   const [saveError, setSaveError] = useState<string | null>(null);
   const typedAgentId = toAgentId(agent.id);
   const configMutation = useMutation({
@@ -139,6 +141,10 @@ export function useAgentEditorModel({
       await queryClient.invalidateQueries({ queryKey: agentKeys.detail(variables.agentId) });
     },
   });
+
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
 
   useEffect(
     () => () => {
@@ -167,7 +173,7 @@ export function useAgentEditorModel({
     }, AGENT_FORM_HIGHLIGHT_DURATION_MS);
   }
 
-  const dirty = createSnapshot(draft) !== savedSnapshot;
+  const dirty = createEditorSaveSnapshot(draft) !== savedSnapshot;
   const changePlan = classifyAgentConfigChanges({
     agentStatus: agent.status,
     current: toAgentConfigChangeSnapshot(draft),
@@ -230,6 +236,9 @@ export function useAgentEditorModel({
     try {
       const savedAgent = await configMutation.mutateAsync({
         agentId: typedAgentId,
+        builder: {
+          componentDecisions: draftToSave.componentDecisions,
+        },
         description: draftToSave.description.trim() || null,
         environment: {
           boundSpaceIds: normalizeSpaces(draftToSave.spaces).map((space) => toSpaceId(space.id)),
@@ -273,7 +282,7 @@ export function useAgentEditorModel({
       }
 
       setSavedDraft(draftToSave);
-      setSavedSnapshot(createSnapshot(draftToSave));
+      setSavedSnapshot(createEditorSaveSnapshot(draftToSave));
       return { error: null, ok: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to save agent changes.";
@@ -288,9 +297,9 @@ export function useAgentEditorModel({
 
   return {
     applyBuilderPatch(patch) {
-      const result = applyAgentEditorBuilderPatch(draft, patch, createDraftYamlHash(draft));
+      const result = applyAgentEditorBuilderPatch(draft, patch);
 
-      if (createSnapshot(result.draft) !== createSnapshot(draft)) {
+      if (createEditorSaveSnapshot(result.draft) !== createEditorSaveSnapshot(draft)) {
         setDraft(result.draft);
         setRevision((currentRevision) => currentRevision + 1);
       }
@@ -300,8 +309,8 @@ export function useAgentEditorModel({
       return result;
     },
     async applyAndSaveBuilderPatch(patch) {
-      const result = applyAgentEditorBuilderPatch(draft, patch, createDraftYamlHash(draft));
-      const changed = createSnapshot(result.draft) !== createSnapshot(draft);
+      const result = applyAgentEditorBuilderPatch(draft, patch);
+      const changed = createEditorSaveSnapshot(result.draft) !== createEditorSaveSnapshot(draft);
 
       if (changed) {
         setDraft(result.draft);
@@ -318,7 +327,7 @@ export function useAgentEditorModel({
         };
       }
 
-      const saveResult = await persistDraft(result.draft, { runRuntimeOperations: false });
+      const saveResult = await persistDraft(result.draft, { runRuntimeOperations: true });
 
       return {
         ...result,
@@ -347,6 +356,17 @@ export function useAgentEditorModel({
     },
     focusSection,
     highlightedSections,
+    markCurrentDraftSaved(draftYamlHash) {
+      const currentDraft = draftRef.current;
+
+      if (createDraftYamlHash(currentDraft) !== draftYamlHash) {
+        return;
+      }
+
+      setSavedDraft(currentDraft);
+      setSavedSnapshot(createEditorSaveSnapshot(currentDraft));
+      setSaveError(null);
+    },
     readOnly,
     revision,
     save,
@@ -360,10 +380,7 @@ export function useAgentEditorModel({
       }));
     },
     setEnvironmentId(environmentId) {
-      updateDraft((current) => ({
-        ...current,
-        environmentId,
-      }));
+      updateDraft((current) => withEnvironmentId(current, environmentId));
     },
     setKind(kind) {
       updateDraft((current) => ({

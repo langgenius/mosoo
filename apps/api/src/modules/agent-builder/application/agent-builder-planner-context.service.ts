@@ -1,16 +1,11 @@
 import type { AgentKind, AgentStatus } from "@mosoo/contracts/agent";
-import {
-  AGENT_BUILDER_PLANNER_RESPONSE_MODE_VALUES,
-  parseAgentBuilderPlannerOutputJson,
-} from "@mosoo/contracts/agent-builder";
+import { AGENT_BUILDER_PLANNER_RESPONSE_MODE_VALUES } from "@mosoo/contracts/agent-builder";
 import type {
-  AgentBuilderPlanNode,
   AgentBuilderPlannerBoundaryPolicy,
   AgentBuilderPlannerContext,
-  AgentBuilderPlannerConversationMessage,
+  AgentBuilderPreviewStageSnapshot,
   AgentBuilderPlannerTurnInputKind,
 } from "@mosoo/contracts/agent-builder";
-import { agentBuilderMessagesTable, agentBuilderPlannerRunsTable } from "@mosoo/db";
 import type {
   AccountId,
   AgentBuilderMessageId,
@@ -19,25 +14,32 @@ import type {
   AgentId,
   OrganizationId,
 } from "@mosoo/id";
-import { desc, eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { getAppDatabase } from "../../../platform/db/drizzle";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { getSystemAgentModel } from "../../users/application/viewer-context.service";
+import type { AgentBuilderLightweightPlannerDraftContext } from "./agent-builder-lightweight-draft-types";
+import { toAgentBuilderPlannerDraftContext } from "./agent-builder-lightweight-manifest-projections";
+import { readAgentBuilderPlannerLedgerSnapshot } from "./agent-builder-planner-ledger-snapshot.service";
+import {
+  readAgentBuilderPreviewOpenedAt,
+  readLatestAgentBuilderPreviewSession,
+  toAgentBuilderPreviewStageSnapshot,
+} from "./agent-builder-preview-session.service";
 import { collectAgentBuilderReadinessContext } from "./agent-builder-readiness-context.service";
-import { readVisibleAssetsFromPlannerContextJson } from "./agent-builder-visible-asset-index";
 import { collectAgentBuilderVisibleAssets } from "./agent-builder-visible-assets.service";
 
-const RECENT_MESSAGE_LIMIT = 12;
-const HISTORICAL_RUN_LIMIT = 8;
-const HISTORICAL_NODE_LIMIT = 20;
-
-export interface AgentBuilderPlannerContextAgent {
+export interface AgentBuilderPlannerContextSourceAgent {
+  description: string | null;
   id: AgentId;
   kind: AgentKind;
+  model: string;
+  name: string;
   organizationId: OrganizationId;
   ownerId: AccountId;
+  prompt: string;
+  provider: string;
+  runtimeId: string;
   status: AgentStatus;
 }
 
@@ -55,89 +57,50 @@ const AGENT_BUILDER_BOUNDARY_POLICY = {
   requiresLlmPlanner: true,
 } satisfies AgentBuilderPlannerBoundaryPolicy;
 
-async function listRecentConversationMessages(
+async function readPreviewStageSnapshot(
   database: D1Database,
-  threadId: AgentBuilderThreadId,
-): Promise<AgentBuilderPlannerConversationMessage[]> {
-  const rows = await getAppDatabase(database)
-    .select({
-      contentText: agentBuilderMessagesTable.contentText,
-      role: agentBuilderMessagesTable.role,
-      seq: agentBuilderMessagesTable.seq,
-    })
-    .from(agentBuilderMessagesTable)
-    .where(eq(agentBuilderMessagesTable.threadId, threadId))
-    .orderBy(desc(agentBuilderMessagesTable.seq))
-    .limit(RECENT_MESSAGE_LIMIT)
-    .all();
+  input: {
+    readonly agent: AgentBuilderPlannerContextSourceAgent;
+    readonly threadId: AgentBuilderThreadId;
+    readonly viewerId: AccountId;
+  },
+): Promise<AgentBuilderPreviewStageSnapshot> {
+  const [previewOpenedAt, session] = await Promise.all([
+    readAgentBuilderPreviewOpenedAt(database, input.threadId),
+    readLatestAgentBuilderPreviewSession(database, input),
+  ]);
 
-  return rows.toReversed().map((row) => ({
-    contentText: row.contentText,
-    role: row.role,
-    seq: row.seq,
-  }));
+  return toAgentBuilderPreviewStageSnapshot({ previewOpenedAt, session });
 }
 
-async function listHistoricalOpenNodes(
-  database: D1Database,
-  threadId: AgentBuilderThreadId,
-): Promise<AgentBuilderPlanNode[]> {
-  const rows = await getAppDatabase(database)
-    .select({
-      outputJson: agentBuilderPlannerRunsTable.outputJson,
-    })
-    .from(agentBuilderPlannerRunsTable)
-    .where(eq(agentBuilderPlannerRunsTable.threadId, threadId))
-    .orderBy(desc(agentBuilderPlannerRunsTable.createdAt), desc(agentBuilderPlannerRunsTable.id))
-    .limit(HISTORICAL_RUN_LIMIT)
-    .all();
-
-  const nodes: AgentBuilderPlanNode[] = [];
-
-  for (const row of rows) {
-    if (row.outputJson === null) {
-      continue;
-    }
-
-    const output = parseAgentBuilderPlannerOutputJson(row.outputJson);
-
-    if (output === null) {
-      continue;
-    }
-
-    nodes.push(...output.nodes.filter((node) => node.status !== "applied"));
-
-    if (nodes.length >= HISTORICAL_NODE_LIMIT) {
-      return nodes.slice(0, HISTORICAL_NODE_LIMIT);
-    }
-  }
-
-  return nodes;
-}
-
-async function getPreviousPlannerRunContextJson(
-  database: D1Database,
-  threadId: AgentBuilderThreadId,
-): Promise<string | null> {
-  const row =
-    (await getAppDatabase(database)
-      .select({
-        contextJson: agentBuilderPlannerRunsTable.contextJson,
-      })
-      .from(agentBuilderPlannerRunsTable)
-      .where(eq(agentBuilderPlannerRunsTable.threadId, threadId))
-      .orderBy(desc(agentBuilderPlannerRunsTable.createdAt), desc(agentBuilderPlannerRunsTable.id))
-      .limit(1)
-      .get()) ?? null;
-
-  return row?.contextJson ?? null;
+function isAgentBuilderBaseConfigApplied(input: {
+  readonly agent: AgentBuilderPlannerContextSourceAgent;
+  readonly draft: AgentBuilderLightweightPlannerDraftContext;
+}): boolean {
+  return (
+    input.draft.parseStatus === "parsed" &&
+    input.draft.kind !== null &&
+    input.draft.name !== null &&
+    input.draft.description !== null &&
+    input.draft.runtimeId !== null &&
+    input.draft.provider !== null &&
+    input.draft.model !== null &&
+    input.draft.prompt !== null &&
+    input.agent.kind === input.draft.kind &&
+    input.agent.name === input.draft.name &&
+    input.agent.description === input.draft.description &&
+    input.agent.runtimeId === input.draft.runtimeId &&
+    input.agent.provider === input.draft.provider &&
+    input.agent.model === input.draft.model &&
+    input.agent.prompt === input.draft.prompt
+  );
 }
 
 export async function createAgentBuilderPlannerContext(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   input: {
-    agent: AgentBuilderPlannerContextAgent;
+    agent: AgentBuilderPlannerContextSourceAgent;
     draftRevision: string;
     draftYaml: string;
     inputKind: AgentBuilderPlannerTurnInputKind;
@@ -148,19 +111,23 @@ export async function createAgentBuilderPlannerContext(
   },
 ): Promise<AgentBuilderPlannerContext> {
   const agent = input.agent;
-  const [recentMessages, historicalOpenNodes, previousContextJson, systemAgentModel] =
-    await Promise.all([
-      listRecentConversationMessages(bindings.DB, input.threadId),
-      listHistoricalOpenNodes(bindings.DB, input.threadId),
-      getPreviousPlannerRunContextJson(bindings.DB, input.threadId),
-      getSystemAgentModel(bindings.DB, viewer.id),
-    ]);
+  const draftContext = toAgentBuilderPlannerDraftContext(input.draftYaml);
+  const [ledger, preview, systemAgentModel] = await Promise.all([
+    readAgentBuilderPlannerLedgerSnapshot(bindings.DB, input.threadId),
+    readPreviewStageSnapshot(bindings.DB, {
+      agent,
+      threadId: input.threadId,
+      viewerId: viewer.id,
+    }),
+    getSystemAgentModel(bindings.DB, viewer.id),
+  ]);
   const [assets, readiness] = await Promise.all([
     collectAgentBuilderVisibleAssets({
       bindings,
-      draftYaml: input.draftYaml,
+      draft: draftContext,
       organizationId: agent.organizationId,
-      previousAssets: readVisibleAssetsFromPlannerContextJson(previousContextJson),
+      previousAssets: ledger.previousVisibleAssets.assets,
+      previousContext: ledger.previousVisibleAssets.context,
       viewer,
     }),
     collectAgentBuilderReadinessContext(bindings, {
@@ -169,13 +136,17 @@ export async function createAgentBuilderPlannerContext(
         organizationId: agent.organizationId,
         ownerId: agent.ownerId,
       },
-      draftYaml: input.draftYaml,
+      draft: draftContext,
     }),
   ]);
 
   return {
     agent: {
       agentId: agent.id,
+      baseConfigApplied: isAgentBuilderBaseConfigApplied({
+        agent,
+        draft: draftContext,
+      }),
       kind: agent.kind,
       organizationId: agent.organizationId,
       status: agent.status,
@@ -183,14 +154,18 @@ export async function createAgentBuilderPlannerContext(
     assets,
     boundaryPolicy: AGENT_BUILDER_BOUNDARY_POLICY,
     conversation: {
-      recentMessages,
+      recentMessages: ledger.recentMessages,
     },
     draft: {
       revision: input.draftRevision,
       yaml: input.draftYaml,
     },
-    historicalOpenNodes,
+    historicalOpenNodes: ledger.historicalOpenNodes,
+    memory: {
+      diagnostics: ledger.diagnostics,
+    },
     plannerRunId: input.plannerRunId,
+    preview,
     readiness,
     systemAgent: {
       credentialSource: "provider_database",

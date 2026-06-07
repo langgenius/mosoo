@@ -1,8 +1,17 @@
 import { describe, expect, test } from "bun:test";
 
-import { readVisibleAssetsFromPlannerContextJson } from "../src/modules/agent-builder/application/agent-builder-visible-asset-index";
+import { toAgentBuilderPlannerDraftContext } from "../src/modules/agent-builder/application/agent-builder-lightweight-manifest-projections";
+import {
+  readPreviousVisibleAssetsFromPlannerContextJson,
+  readVisibleAssetsFromPlannerContextJson,
+} from "../src/modules/agent-builder/application/agent-builder-previous-visible-assets";
+import { createAgentBuilderSelectedSpaceFileSummaries } from "../src/modules/agent-builder/application/agent-builder-selected-space-file-summaries";
 import { collectAgentBuilderVisibleAssets } from "../src/modules/agent-builder/application/agent-builder-visible-assets.service";
 import type { AgentBuilderVisibleAssetSummaryCollections } from "../src/modules/agent-builder/application/agent-builder-visible-assets.types";
+import { createAgentBuilderVisibleEnvironmentSummaries } from "../src/modules/agent-builder/application/agent-builder-visible-environment-summaries";
+import { createAgentBuilderVisibleMcpServerSummaries } from "../src/modules/agent-builder/application/agent-builder-visible-mcp-server-summaries";
+import { createAgentBuilderVisibleSkillSummaries } from "../src/modules/agent-builder/application/agent-builder-visible-skill-summaries";
+import { createAgentBuilderVisibleSpaceSummaries } from "../src/modules/agent-builder/application/agent-builder-visible-space-summaries";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 
@@ -15,7 +24,6 @@ const viewer: AuthenticatedViewer = {
 };
 
 const VISIBLE_ASSET_IDS = {
-  channelSlack: "01J00000000000000000000302",
   environmentBound: "01J00000000000000000000303",
   environmentOld: "01J00000000000000000000304",
   mcpBound: "01J00000000000000000000305",
@@ -25,6 +33,7 @@ const VISIBLE_ASSET_IDS = {
   skillSnapshot: "01J00000000000000000000309",
   spaceBound: "01J00000000000000000000310",
   spaceOld: "01J00000000000000000000311",
+  spaceUnavailable: "01J00000000000000000000312",
 } as const;
 
 const draftYaml = [
@@ -51,7 +60,6 @@ const draftYaml = [
 
 function emptySummaries(): AgentBuilderVisibleAssetSummaryCollections {
   return {
-    channels: [],
     environments: [],
     mcpServers: [],
     selectedSpaceFiles: [],
@@ -61,6 +69,273 @@ function emptySummaries(): AgentBuilderVisibleAssetSummaryCollections {
 }
 
 describe("Agent Builder visible asset providers", () => {
+  test("summarizes visible asset records through explicit domain adapters", () => {
+    const environments = createAgentBuilderVisibleEnvironmentSummaries(
+      { environmentId: VISIBLE_ASSET_IDS.environmentBound },
+      [
+        {
+          allowMcpServers: true,
+          allowPackageManagers: true,
+          description: "Support runtime",
+          envVars: [{ key: "SLACK_BOT_TOKEN" }],
+          id: VISIBLE_ASSET_IDS.environmentBound,
+          isBuiltIn: false,
+          isDefault: true,
+          name: "support-env",
+          networkPolicy: "limited",
+          packages: [{ manager: "npm" }, { manager: "pip" }, { manager: "npm" }],
+          setupScript: "echo ready",
+          updatedAt: "2026-05-20T00:00:00.000Z",
+        },
+      ],
+    );
+    const mcpServers = createAgentBuilderVisibleMcpServerSummaries(
+      {
+        bindingRepresented: true,
+        boundMcpServerIds: new Set([VISIBLE_ASSET_IDS.mcpBound]),
+      },
+      {
+        organizationShared: [],
+        personal: [
+          {
+            authType: "oauth",
+            authorizationState: "active",
+            credentialScope: "user",
+            credentialStatus: "active",
+            description: "Slack tools",
+            enabled: true,
+            id: VISIBLE_ASSET_IDS.mcpBound,
+            name: "slack",
+            source: "personal",
+            updatedAt: "2026-05-20T00:00:00.000Z",
+            url: "https://mcp.example.com/slack",
+          },
+        ],
+      },
+    );
+    const skills = createAgentBuilderVisibleSkillSummaries(
+      { boundSkillIds: new Set([VISIBLE_ASSET_IDS.skillBound]) },
+      [
+        {
+          description: "Review docs",
+          id: VISIBLE_ASSET_IDS.skillBound,
+          name: "docs-review",
+          ownerName: "Xiaoke",
+          snapshotId: VISIBLE_ASSET_IDS.skillSnapshot,
+          sourceKind: "user",
+          updatedAt: "2026-05-20T00:00:00.000Z",
+        },
+      ],
+    );
+    const spaces = createAgentBuilderVisibleSpaceSummaries(
+      { boundSpaceIds: new Set([VISIBLE_ASSET_IDS.spaceBound]) },
+      [
+        {
+          id: VISIBLE_ASSET_IDS.spaceBound,
+          name: "support-kb",
+          role: "read",
+          visibility: "shared",
+        },
+      ],
+    );
+
+    expect(environments[0]).toEqual(
+      expect.objectContaining({
+        bindingState: "bound",
+        envVarKeys: ["SLACK_BOT_TOKEN"],
+        packageManagers: ["npm", "pip"],
+      }),
+    );
+    expect(mcpServers[0]).toEqual(
+      expect.objectContaining({
+        bindingState: "bound",
+        name: "slack",
+        urlHost: "mcp.example.com",
+      }),
+    );
+    expect(skills[0]).toEqual(
+      expect.objectContaining({
+        bindingState: "bound",
+        name: "docs-review",
+      }),
+    );
+    expect(spaces[0]).toEqual(
+      expect.objectContaining({
+        bindingState: "bound",
+        name: "support-kb",
+      }),
+    );
+  });
+
+  test("summarizes selected Space files through one batched Space file summary boundary", async () => {
+    const listedBatches: string[][] = [];
+    const summaries = await createAgentBuilderSelectedSpaceFileSummaries({
+      draftSpaces: [
+        { id: VISIBLE_ASSET_IDS.spaceBound, name: "Support KB" },
+        { id: VISIBLE_ASSET_IDS.spaceOld, name: "Legacy KB" },
+        { id: VISIBLE_ASSET_IDS.spaceUnavailable, name: "Private Notes" },
+      ],
+      listSpaceFiles: async (spaceIds) => {
+        listedBatches.push([...spaceIds]);
+
+        return new Map([
+          [
+            VISIBLE_ASSET_IDS.spaceBound,
+            {
+              directories: [{ key: "docs/" }],
+              files: [
+                {
+                  key: "readme.md",
+                  mimeType: "text/markdown",
+                  size: 42,
+                },
+              ],
+            },
+          ],
+          [
+            VISIBLE_ASSET_IDS.spaceOld,
+            {
+              directories: [{ key: "archive/" }],
+              files: [],
+            },
+          ],
+        ]);
+      },
+      visibleSpaces: [{ id: VISIBLE_ASSET_IDS.spaceBound }, { id: VISIBLE_ASSET_IDS.spaceOld }],
+    });
+
+    expect(listedBatches).toEqual([[VISIBLE_ASSET_IDS.spaceBound, VISIBLE_ASSET_IDS.spaceOld]]);
+    expect(summaries.find((summary) => summary.id === VISIBLE_ASSET_IDS.spaceBound)).toEqual(
+      expect.objectContaining({
+        directories: ["docs/"],
+        directoryCount: 1,
+        fileCount: 1,
+        files: [
+          {
+            key: "readme.md",
+            mimeType: "text/markdown",
+            size: 42,
+          },
+        ],
+        id: VISIBLE_ASSET_IDS.spaceBound,
+        listingState: "available",
+        name: "Support KB",
+        unavailableReason: null,
+      }),
+    );
+    expect(summaries.find((summary) => summary.id === VISIBLE_ASSET_IDS.spaceOld)).toEqual(
+      expect.objectContaining({
+        directories: ["archive/"],
+        directoryCount: 1,
+        fileCount: 0,
+        files: [],
+        listingState: "available",
+        name: "Legacy KB",
+        unavailableReason: null,
+      }),
+    );
+    expect(summaries.find((summary) => summary.id === VISIBLE_ASSET_IDS.spaceUnavailable)).toEqual(
+      expect.objectContaining({
+        directories: [],
+        directoryCount: 0,
+        fileCount: 0,
+        files: [],
+        id: VISIBLE_ASSET_IDS.spaceUnavailable,
+        listingState: "unavailable",
+        name: "Private Notes",
+        unavailableReason: "Selected Space is not visible to the current viewer.",
+      }),
+    );
+  });
+
+  test("degrades a missing selected Space file listing entry to an unavailable summary", async () => {
+    const summaries = await createAgentBuilderSelectedSpaceFileSummaries({
+      draftSpaces: [
+        { id: VISIBLE_ASSET_IDS.spaceBound, name: "Support KB" },
+        { id: VISIBLE_ASSET_IDS.spaceOld, name: "Legacy KB" },
+      ],
+      listSpaceFiles: async () => {
+        return new Map([
+          [
+            VISIBLE_ASSET_IDS.spaceBound,
+            {
+              directories: [],
+              files: [
+                {
+                  key: "readme.md",
+                  mimeType: "text/markdown",
+                  size: 42,
+                },
+              ],
+            },
+          ],
+        ]);
+      },
+      visibleSpaces: [{ id: VISIBLE_ASSET_IDS.spaceBound }, { id: VISIBLE_ASSET_IDS.spaceOld }],
+    });
+
+    expect(summaries.find((summary) => summary.id === VISIBLE_ASSET_IDS.spaceBound)).toEqual(
+      expect.objectContaining({
+        fileCount: 1,
+        listingState: "available",
+      }),
+    );
+    expect(summaries.find((summary) => summary.id === VISIBLE_ASSET_IDS.spaceOld)).toEqual(
+      expect.objectContaining({
+        directories: [],
+        directoryCount: 0,
+        fileCount: 0,
+        files: [],
+        id: VISIBLE_ASSET_IDS.spaceOld,
+        listingState: "unavailable",
+        name: "Legacy KB",
+        unavailableReason: "Selected Space files could not be listed.",
+      }),
+    );
+  });
+
+  test("rejects conflicting parsed and raw Draft inputs at runtime", async () => {
+    const conflictingInput = {
+      bindings: {} as ApiBindings,
+      collectSummaries: async () => emptySummaries(),
+      draft: toAgentBuilderPlannerDraftContext(draftYaml),
+      draftYaml: "draft",
+      organizationId: "01J00000000000000000000006",
+      previousAssets: null,
+      viewer,
+    };
+
+    await expect(
+      Reflect.apply(collectAgentBuilderVisibleAssets, null, [conflictingInput]),
+    ).rejects.toThrow(
+      "Agent Builder draft context input must not provide both draft and draftYaml.",
+    );
+  });
+
+  test("does not collect visible assets when Draft YAML cannot be parsed", async () => {
+    const assets = await collectAgentBuilderVisibleAssets({
+      bindings: {} as ApiBindings,
+      collectSummaries: async () => {
+        throw new Error("visible asset providers should not run for invalid Draft YAML");
+      },
+      draftYaml: "draft",
+      organizationId: "01J00000000000000000000006",
+      previousAssets: null,
+      viewer,
+    });
+
+    expect(assets.draftBindings.parseStatus).toBe("failed");
+    expect(assets.draftBindings.parseError).toContain("Manifest YAML must be an object");
+    expect(assets.currentIndex).toEqual(emptySummaries());
+    expect(assets.changesSinceLastTurn).toEqual({
+      environments: { added: [], removed: [], updated: [] },
+      mcpServers: { added: [], removed: [], updated: [] },
+      selectedSpaceFiles: { added: [], removed: [], updated: [] },
+      skills: { added: [], removed: [], updated: [] },
+      spaces: { added: [], removed: [], updated: [] },
+    });
+  });
+
   test("keeps Planner Context visible asset injection behavior after provider extraction", async () => {
     const assets = await collectAgentBuilderVisibleAssets({
       bindings: {} as ApiBindings,
@@ -145,13 +420,24 @@ describe("Agent Builder visible asset providers", () => {
 
   test("diffs current summaries against the previous Planner Context asset index", async () => {
     const previousDraftBindings = {
-      channelIds: [VISIBLE_ASSET_IDS.channelSlack],
+      componentDecisions: {
+        environment: "skipped",
+        mcpServers: "skipped",
+        skills: "skipped",
+        spaces: "skipped",
+      },
       environmentId: VISIBLE_ASSET_IDS.environmentOld,
       mcpServerIds: [VISIBLE_ASSET_IDS.mcpOld],
       parseError: null,
       parseStatus: "parsed" as const,
       skillIds: [VISIBLE_ASSET_IDS.skillOld],
       spaceIds: [VISIBLE_ASSET_IDS.spaceOld],
+    };
+    const expectedPreviousDraftBindings = {
+      ...previousDraftBindings,
+      componentDecisions: {
+        environment: "skipped",
+      },
     };
     const previousAssets = readVisibleAssetsFromPlannerContextJson(
       JSON.stringify({
@@ -183,7 +469,7 @@ describe("Agent Builder visible asset providers", () => {
       }),
     );
 
-    expect(previousAssets?.draftBindings).toEqual(previousDraftBindings);
+    expect(previousAssets?.draftBindings).toEqual(expectedPreviousDraftBindings);
 
     const assets = await collectAgentBuilderVisibleAssets({
       bindings: {} as ApiBindings,
@@ -251,5 +537,147 @@ describe("Agent Builder visible asset providers", () => {
         visibility: "private",
       },
     ]);
+  });
+
+  test("preserves invalid previous Planner Context JSON as explicit metadata", () => {
+    const previous = readPreviousVisibleAssetsFromPlannerContextJson("{");
+
+    expect(previous.assets).toBeNull();
+    expect(previous.context).toEqual({
+      errorMessage: "Agent Builder previous planner context JSON could not be parsed.",
+      status: "invalid",
+    });
+  });
+
+  test("treats parseable previous Planner Context without a visible asset cache as missing", () => {
+    const missingRoot = readPreviousVisibleAssetsFromPlannerContextJson(JSON.stringify({}));
+    const missingIndex = readPreviousVisibleAssetsFromPlannerContextJson(
+      JSON.stringify({ assets: {} }),
+    );
+    const emptyIndex = readPreviousVisibleAssetsFromPlannerContextJson(
+      JSON.stringify({ assets: { currentIndex: {} } }),
+    );
+
+    expect(missingRoot).toEqual({
+      assets: null,
+      context: {
+        errorMessage: null,
+        status: "missing",
+      },
+    });
+    expect(missingIndex).toEqual({
+      assets: null,
+      context: {
+        errorMessage: null,
+        status: "missing",
+      },
+    });
+    expect(emptyIndex).toEqual({
+      assets: null,
+      context: {
+        errorMessage: null,
+        status: "missing",
+      },
+    });
+  });
+
+  test("treats malformed previous visible asset cache entries as invalid", () => {
+    const previous = readPreviousVisibleAssetsFromPlannerContextJson(
+      JSON.stringify({
+        assets: {
+          currentIndex: {
+            skills: [
+              {
+                bindingState: "not_bound",
+                hash: "skill-old-hash",
+                id: VISIBLE_ASSET_IDS.skillBound,
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    expect(previous).toEqual({
+      assets: null,
+      context: {
+        errorMessage: "Agent Builder previous planner context JSON could not be parsed.",
+        status: "invalid",
+      },
+    });
+  });
+
+  test("does not report all current assets as added when previous Planner Context is missing visible asset cache", async () => {
+    const previous = readPreviousVisibleAssetsFromPlannerContextJson(JSON.stringify({}));
+    const assets = await collectAgentBuilderVisibleAssets({
+      bindings: {} as ApiBindings,
+      collectSummaries: async () => ({
+        ...emptySummaries(),
+        skills: [
+          {
+            bindingState: "not_bound",
+            description: "Support macros",
+            hash: "skill-new-hash",
+            id: VISIBLE_ASSET_IDS.skillBound,
+            name: "Support Skill",
+            ownerName: "Xiaoke",
+            snapshotId: VISIBLE_ASSET_IDS.skillSnapshot,
+            sourceKind: "manual",
+            updatedAt: "2026-05-20T00:00:00.000Z",
+          },
+        ],
+      }),
+      draftYaml,
+      organizationId: "01J00000000000000000000006",
+      previousAssets: previous.assets,
+      previousContext: previous.context,
+      viewer,
+    });
+
+    expect(assets.previousContext).toEqual(previous.context);
+    expect(assets.changesSinceLastTurn).toEqual({
+      environments: { added: [], removed: [], updated: [] },
+      mcpServers: { added: [], removed: [], updated: [] },
+      selectedSpaceFiles: { added: [], removed: [], updated: [] },
+      skills: { added: [], removed: [], updated: [] },
+      spaces: { added: [], removed: [], updated: [] },
+    });
+  });
+
+  test("does not report all current assets as added when previous Planner Context is invalid", async () => {
+    const previous = readPreviousVisibleAssetsFromPlannerContextJson("{");
+    const assets = await collectAgentBuilderVisibleAssets({
+      bindings: {} as ApiBindings,
+      collectSummaries: async () => ({
+        ...emptySummaries(),
+        skills: [
+          {
+            bindingState: "not_bound",
+            description: "Support macros",
+            hash: "skill-new-hash",
+            id: VISIBLE_ASSET_IDS.skillBound,
+            name: "Support Skill",
+            ownerName: "Xiaoke",
+            snapshotId: VISIBLE_ASSET_IDS.skillSnapshot,
+            sourceKind: "manual",
+            updatedAt: "2026-05-20T00:00:00.000Z",
+          },
+        ],
+      }),
+      draftYaml,
+      organizationId: "01J00000000000000000000006",
+      previousAssets: previous.assets,
+      previousContext: previous.context,
+      viewer,
+    });
+
+    expect(assets.previousContext).toEqual(previous.context);
+    expect(assets.changesSinceLastTurn).toEqual({
+      environments: { added: [], removed: [], updated: [] },
+      mcpServers: { added: [], removed: [], updated: [] },
+      selectedSpaceFiles: { added: [], removed: [], updated: [] },
+      skills: { added: [], removed: [], updated: [] },
+      spaces: { added: [], removed: [], updated: [] },
+    });
   });
 });

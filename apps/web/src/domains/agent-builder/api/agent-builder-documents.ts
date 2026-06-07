@@ -16,6 +16,22 @@ export const ENSURE_AGENT_BUILDER_THREAD_MUTATION = graphql(/* GraphQL */ `
   }
 `);
 
+export const EXECUTE_AGENT_BUILDER_CONTROL_PLANE_ACTION_MUTATION = graphql(/* GraphQL */ `
+  mutation ExecuteAgentBuilderControlPlaneAction(
+    $input: ExecuteAgentBuilderControlPlaneActionInput!
+  ) {
+    executeAgentBuilderControlPlaneAction(input: $input) {
+      message
+      secureUi {
+        kind
+      }
+      sessionId
+      status
+      toolId
+    }
+  }
+`);
+
 export const AGENT_BUILDER_MESSAGES_QUERY = graphql(/* GraphQL */ `
   query AgentBuilderMessages($agentId: ULID!, $beforeSeq: Int, $limit: Int) {
     agentBuilderMessages(agentId: $agentId, beforeSeq: $beforeSeq, limit: $limit) {

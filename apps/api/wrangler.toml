@@ -25,9 +25,6 @@ SANDBOX_FILE_BUCKET_LOCAL = "true"
 [[send_email]]
 name = "AUTH_EMAIL"
 
-[[worker_loaders]]
-binding = "AGENT_BUILDER_CODE_WORKER_LOADER"
-
 [secrets]
 required = [
   "BETTER_AUTH_SECRET",
@@ -127,9 +124,6 @@ SANDBOX_FILE_BUCKET_LOCAL = "false"
 
 [[env.prod.send_email]]
 name = "AUTH_EMAIL"
-
-[[env.prod.worker_loaders]]
-binding = "AGENT_BUILDER_CODE_WORKER_LOADER"
 
 [env.prod.secrets]
 required = [

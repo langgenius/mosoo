@@ -4,7 +4,6 @@ import type {
   AgentBuilderPlannerRunId,
   AgentBuilderThreadId,
   AgentId,
-  ChannelBindingId,
   EnvironmentId,
   McpServerId,
   OrganizationId,
@@ -12,34 +11,69 @@ import type {
   SkillSnapshotId,
   SpaceId,
 } from "../id/id.contract";
+import type {
+  AgentBuilderAskUserMode,
+  AgentBuilderComponentDecisions,
+  AgentBuilderPlanNodeActionKey,
+  AgentBuilderPreviewStageSnapshot,
+} from "./agent-builder-control-plane.contract";
 
-export type AgentBuilderPlannerResponseMode = "blocked" | "draft_patch" | "plain_text" | "question";
+export type AgentBuilderPlannerResponseMode =
+  | "action"
+  | "blocked"
+  | "draft_patch"
+  | "plain_text"
+  | "question";
 
 export type AgentBuilderPlanNodeKind = Exclude<AgentBuilderPlannerResponseMode, "plain_text">;
 
 export type AgentBuilderPlanNodeStatus = "applied" | "blocked" | "failed" | "pending";
 
 export type AgentBuilderPlanNodeTargetType =
-  | "channel"
   | "draft"
   | "environment"
   | "mcp"
   | "skill"
-  | "space";
+  | "space"
+  | "workflow";
 
-export type AgentBuilderPlanNodeOperation = "ask" | "bind" | "blocked" | "remove" | "update";
+export type AgentBuilderPlanNodeOperation =
+  | "ask"
+  | "bind"
+  | "blocked"
+  | "remove"
+  | "show"
+  | "update";
 
 export type AgentBuilderPlanNodeActionStyle = "danger" | "primary" | "secondary";
 
 export interface AgentBuilderPlanNodeAction {
-  actionKey: string;
+  actionKey: AgentBuilderPlanNodeActionKey;
   label: string;
   style: AgentBuilderPlanNodeActionStyle;
 }
 
+export interface AgentBuilderAskUserOption {
+  description?: string;
+  label: string;
+  optionKey: string;
+  value?: string;
+}
+
+export interface AgentBuilderAskUserQuestion {
+  allowCustomText: boolean;
+  allowSkip: boolean;
+  mode: AgentBuilderAskUserMode;
+  options: AgentBuilderAskUserOption[];
+  prompt: string;
+  submitLabel?: string;
+}
+
 export type AgentBuilderDraftPatchFieldPath =
+  | "componentDecisions.environment"
   | "description"
   | "environmentId"
+  | "kind"
   | "model"
   | "mcpServerIds"
   | "name"
@@ -79,6 +113,7 @@ export interface AgentBuilderDraftPatchReference {
   id: AgentBuilderDraftPatchReferenceId;
   name: string;
   targetType: AgentBuilderDraftPatchReferenceTargetType;
+  url?: string;
 }
 
 export interface AgentBuilderDraftPatchChange {
@@ -93,6 +128,7 @@ export interface AgentBuilderDraftPatchChange {
 
 export interface AgentBuilderPlanNode {
   actions: AgentBuilderPlanNodeAction[];
+  askUser?: AgentBuilderAskUserQuestion;
   draftPatch?: AgentBuilderDraftPatchChange;
   fieldPath?: string;
   kind: AgentBuilderPlanNodeKind;
@@ -114,6 +150,7 @@ export interface AgentBuilderPlannerOutput {
 }
 
 export const AGENT_BUILDER_PLANNER_RESPONSE_MODE_VALUES = [
+  "action",
   "blocked",
   "draft_patch",
   "plain_text",
@@ -125,6 +162,7 @@ export const AGENT_BUILDER_PLAN_NODE_OPERATION_VALUES = [
   "bind",
   "blocked",
   "remove",
+  "show",
   "update",
 ] as const satisfies readonly AgentBuilderPlanNodeOperation[];
 
@@ -135,8 +173,10 @@ export const AGENT_BUILDER_DRAFT_PATCH_OPERATION_VALUES = [
 ] as const satisfies readonly AgentBuilderDraftPatchOperation[];
 
 export const AGENT_BUILDER_DRAFT_PATCH_FIELD_PATH_VALUES = [
+  "componentDecisions.environment",
   "name",
   "description",
+  "kind",
   "prompt",
   "runtimeId",
   "provider",
@@ -246,9 +286,12 @@ export const AGENT_BUILDER_DRAFT_PATCH_FIELD_PATH_ALIASES: Readonly<
   "assets.skills": "skillIds",
   "assets.spaceIds": "spaceIds",
   "assets.spaces": "spaceIds",
+  "builder.componentDecisions.environment": "componentDecisions.environment",
   "environment.environmentId": "environmentId",
   "identity.description": "description",
   "identity.name": "name",
+  agentType: "kind",
+  type: "kind",
   "runtime.id": "runtimeId",
   "runtime.model": "model",
   "runtime.provider": "provider",
@@ -361,7 +404,11 @@ export function getAgentBuilderDraftPatchSectionId(
     return "integrations";
   }
 
-  if (fieldPath === "environmentId" || fieldPath === "spaceIds") {
+  if (
+    fieldPath === "componentDecisions.environment" ||
+    fieldPath === "environmentId" ||
+    fieldPath === "spaceIds"
+  ) {
     return "environment";
   }
 
@@ -386,7 +433,6 @@ export interface AgentBuilderPlannerDraftContext {
 }
 
 export type AgentBuilderVisibleAssetKind =
-  | "channel"
   | "environment"
   | "mcp_server"
   | "selected_space_files"
@@ -486,16 +532,8 @@ export interface AgentBuilderSelectedSpaceFilesSummary {
   unavailableReason: string | null;
 }
 
-export interface AgentBuilderVisibleChannelSummary {
-  bindingState: "not_represented";
-  hash: string;
-  id: string;
-  name: string;
-  sourceState: "not_available";
-}
-
 export interface AgentBuilderPlannerDraftBindingsContext {
-  channelIds: ChannelBindingId[];
+  componentDecisions: AgentBuilderComponentDecisions;
   environmentId: EnvironmentId | null;
   mcpServerIds: McpServerId[];
   parseError: string | null;
@@ -504,9 +542,15 @@ export interface AgentBuilderPlannerDraftBindingsContext {
   spaceIds: SpaceId[];
 }
 
+export type AgentBuilderPreviousVisibleAssetsContextStatus = "available" | "invalid" | "missing";
+
+export interface AgentBuilderPreviousVisibleAssetsContext {
+  errorMessage: string | null;
+  status: AgentBuilderPreviousVisibleAssetsContextStatus;
+}
+
 export interface AgentBuilderVisibleAssetsContext {
   changesSinceLastTurn: {
-    channels: AgentBuilderVisibleAssetChangeSet<AgentBuilderVisibleChannelSummary>;
     environments: AgentBuilderVisibleAssetChangeSet<AgentBuilderVisibleEnvironmentSummary>;
     mcpServers: AgentBuilderVisibleAssetChangeSet<AgentBuilderVisibleMcpServerSummary>;
     selectedSpaceFiles: AgentBuilderVisibleAssetChangeSet<AgentBuilderSelectedSpaceFilesSummary>;
@@ -514,7 +558,6 @@ export interface AgentBuilderVisibleAssetsContext {
     spaces: AgentBuilderVisibleAssetChangeSet<AgentBuilderVisibleSpaceSummary>;
   };
   currentIndex: {
-    channels: AgentBuilderVisibleAssetIndexEntry[];
     environments: AgentBuilderVisibleAssetIndexEntry[];
     mcpServers: AgentBuilderVisibleAssetIndexEntry[];
     selectedSpaceFiles: AgentBuilderVisibleAssetIndexEntry[];
@@ -523,6 +566,7 @@ export interface AgentBuilderVisibleAssetsContext {
   };
   draftBindings: AgentBuilderPlannerDraftBindingsContext;
   observedAt: string;
+  previousContext: AgentBuilderPreviousVisibleAssetsContext;
   snapshotHash: string;
 }
 
@@ -556,6 +600,7 @@ export interface AgentBuilderPlannerSystemAgentContext {
 
 export interface AgentBuilderPlannerAgentContext {
   agentId: AgentId;
+  baseConfigApplied: boolean;
   kind: AgentKind;
   organizationId: OrganizationId;
   status: AgentStatus;
@@ -563,6 +608,17 @@ export interface AgentBuilderPlannerAgentContext {
 
 export interface AgentBuilderPlannerConversationContext {
   recentMessages: AgentBuilderPlannerConversationMessage[];
+}
+
+export interface AgentBuilderPlannerMemoryDiagnostic {
+  code: "invalid_planner_output";
+  message: string;
+  plannerRunId: AgentBuilderPlannerRunId;
+  severity: "warning";
+}
+
+export interface AgentBuilderPlannerMemoryContext {
+  diagnostics: AgentBuilderPlannerMemoryDiagnostic[];
 }
 
 export interface AgentBuilderPlannerTurnContext {
@@ -578,7 +634,9 @@ export interface AgentBuilderPlannerContext {
   conversation: AgentBuilderPlannerConversationContext;
   draft: AgentBuilderPlannerDraftContext;
   historicalOpenNodes: AgentBuilderPlanNode[];
+  memory: AgentBuilderPlannerMemoryContext;
   plannerRunId: AgentBuilderPlannerRunId;
+  preview: AgentBuilderPreviewStageSnapshot;
   readiness: AgentBuilderReadinessContext;
   systemAgent: AgentBuilderPlannerSystemAgentContext;
   threadId: AgentBuilderThreadId;

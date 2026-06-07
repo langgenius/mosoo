@@ -269,6 +269,9 @@ describe("agent access", () => {
     const agent = await getAgentRow(createAgentAccessDatabase(), AGENT_ACCESS_IDS.ownerAgent);
 
     expect(JSON.parse(agent.configJson)).toEqual({
+      builder: {
+        componentDecisions: {},
+      },
       packageMcpServers: [],
       packageResolution: null,
       packageSharingEnabled: false,

@@ -1,5 +1,5 @@
 import { createAgentSession } from "@/domains/session/api/agent-session";
 import { sessions as listSessions } from "@/domains/session/api/list";
-import { autoTitleSession } from "@/domains/session/api/mutations";
+import { autoTitleSession, deleteAgentSession } from "@/domains/session/api/mutations";
 
-export { autoTitleSession, createAgentSession, listSessions };
+export { autoTitleSession, createAgentSession, deleteAgentSession, listSessions };

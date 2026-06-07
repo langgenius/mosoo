@@ -1,5 +1,10 @@
+import type {
+  AgentBuilderComponentDecision,
+  AgentBuilderDraftPatchChange,
+} from "@mosoo/contracts/agent-builder";
 import { parseAgentBuilderPlannerOutputJson } from "@mosoo/contracts/agent-builder";
-import type { AgentBuilderDraftPatchChange } from "@mosoo/contracts/agent-builder";
+import type { EnvironmentSummary } from "@mosoo/contracts/environment";
+import type { McpServerWithCredential } from "@mosoo/contracts/mcp";
 
 import type { AgentBuilderMessage } from "@/domains/agent-builder/api/agent-builder-client";
 
@@ -12,6 +17,74 @@ export interface AgentBuilderPatchApplyResult {
 
 export interface AgentBuilderClientPatch {
   items: AgentBuilderDraftPatchChange[];
+}
+
+export function createCreatedEnvironmentBuilderPatch(input: {
+  readonly baseDraftRevision: string;
+  readonly baseEnvironmentDecision: AgentBuilderComponentDecision | null;
+  readonly baseEnvironmentId: string | null;
+  readonly environment: EnvironmentSummary;
+}): AgentBuilderClientPatch {
+  return {
+    items: [
+      {
+        autoApply: true,
+        baseDraftRevision: input.baseDraftRevision,
+        baseValue: input.baseEnvironmentId,
+        fieldPath: "environmentId",
+        resolvedReferences: [
+          {
+            bindingState: "not_bound",
+            id: input.environment.id,
+            name: input.environment.name,
+            targetType: "environment",
+          },
+        ],
+        sectionId: "environment",
+        value: input.environment.id,
+      },
+      {
+        autoApply: true,
+        baseDraftRevision: input.baseDraftRevision,
+        baseValue: input.baseEnvironmentDecision,
+        fieldPath: "componentDecisions.environment",
+        sectionId: "environment",
+        value: "created",
+      },
+    ],
+  };
+}
+
+export function createCreatedMcpServerBuilderPatch(input: {
+  readonly baseDraftRevision: string;
+  readonly baseMcpServerIds: readonly string[];
+  readonly mcpServer: McpServerWithCredential;
+}): AgentBuilderClientPatch {
+  const nextMcpServerIds = input.baseMcpServerIds.includes(input.mcpServer.id)
+    ? [...input.baseMcpServerIds]
+    : [...input.baseMcpServerIds, input.mcpServer.id];
+
+  return {
+    items: [
+      {
+        autoApply: true,
+        baseDraftRevision: input.baseDraftRevision,
+        baseValue: [...input.baseMcpServerIds],
+        fieldPath: "mcpServerIds",
+        resolvedReferences: [
+          {
+            bindingState: "not_bound",
+            id: input.mcpServer.id,
+            name: input.mcpServer.name,
+            targetType: "mcp_server",
+            url: input.mcpServer.url,
+          },
+        ],
+        sectionId: "integrations",
+        value: nextMcpServerIds,
+      },
+    ],
+  };
 }
 
 export function createAutoApplyDraftPatch(

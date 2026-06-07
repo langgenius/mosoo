@@ -633,6 +633,7 @@ function createOkDurableObjectNamespace() {
   return {
     get: () => ({
       closeViewers: async () => {},
+      destroy: async () => {},
       fetch: async () => new Response(null, { status: 204 }),
       publishEvents: async () => {},
     }),

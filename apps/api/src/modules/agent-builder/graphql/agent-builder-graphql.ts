@@ -1,5 +1,7 @@
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { agentBuilderGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
+import type { ExecuteAgentBuilderControlPlaneActionInput } from "../application/agent-builder-control-plane-action.service";
+import { executeAgentBuilderControlPlaneAction } from "../application/agent-builder-control-plane-action.service";
 import { parseAgentId } from "../application/agent-builder-ids";
 import {
   ensureAgentBuilderThread,
@@ -15,6 +17,12 @@ interface AgentBuilderMessagesArgs extends AgentIdArgs {
   limit?: number | null;
 }
 
+interface ExecuteAgentBuilderControlPlaneActionArgs {
+  input: Omit<ExecuteAgentBuilderControlPlaneActionInput, "agentId"> & {
+    readonly agentId: string;
+  };
+}
+
 export const agentBuilderGraphQLModule = {
   ...agentBuilderGraphQLSpec,
   authenticatedMutationResolvers: {
@@ -24,6 +32,15 @@ export const agentBuilderGraphQLModule = {
         context.viewer,
         parseAgentId(args.agentId, "agentId"),
       ),
+    executeAgentBuilderControlPlaneAction: async (
+      _parent,
+      args: ExecuteAgentBuilderControlPlaneActionArgs,
+      context,
+    ) =>
+      executeAgentBuilderControlPlaneAction(context.bindings, context.viewer, {
+        ...args.input,
+        agentId: parseAgentId(args.input.agentId, "input.agentId"),
+      }),
   },
   authenticatedQueryResolvers: {
     agentBuilderMessages: async (_parent, args: AgentBuilderMessagesArgs, context) =>

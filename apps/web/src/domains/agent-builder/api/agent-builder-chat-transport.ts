@@ -8,7 +8,6 @@ export interface AgentBuilderSystemAgentChatResult {
   readonly state?: {
     readonly draftId?: string | null;
     readonly lastPlannerRunId?: AgentBuilderPlannerRunId | null;
-    readonly openApprovalCount?: number | null;
   };
   readonly terminal?: {
     readonly failureKind?: "model_failure" | "tool_failure" | "transport_close" | null;

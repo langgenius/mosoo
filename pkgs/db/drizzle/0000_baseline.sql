@@ -129,6 +129,7 @@ CREATE TABLE `agent_builder_thread` (
 	`last_turn_at` integer,
 	`message_seq_cursor` integer DEFAULT 0 NOT NULL,
 	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`preview_opened_at` integer,
 	`status` text DEFAULT 'active' NOT NULL,
 	`title` text,
 	`updated_at` integer NOT NULL,

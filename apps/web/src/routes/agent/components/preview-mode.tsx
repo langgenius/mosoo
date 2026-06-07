@@ -46,8 +46,8 @@ type PreviewModeAction =
   | { type: "setChannelsDialogOpen"; open: boolean }
   | { type: "setSuccessModalOpen"; open: boolean };
 
-const DEFAULT_PUBLISH_VISIBILITY: AgentVisibility = "organization";
 const DEFAULT_CHANNEL_ID: ChannelId = "slack";
+const DEFAULT_PUBLISH_VISIBILITY: AgentVisibility = "organization";
 const PREVIEW_MODE_INITIAL_STATE: PreviewModeState = {
   apiAccessDialogOpen: false,
   appliedKind: null,
@@ -264,6 +264,15 @@ export function PreviewMode({
         ) : null}
       </div>
 
+      {apiAccessDialogOpen ? (
+        <AgentApiAccessDialog
+          agent={agent}
+          onOpenChange={(open) => {
+            dispatch({ open, type: "setApiAccessDialogOpen" });
+          }}
+          open={apiAccessDialogOpen}
+        />
+      ) : null}
       {channelsDialogOpen ? (
         <ChannelsConfigDialog
           agent={agent}
@@ -272,16 +281,6 @@ export function PreviewMode({
             dispatch({ open, type: "setChannelsDialogOpen" });
           }}
           open={channelsDialogOpen}
-        />
-      ) : null}
-
-      {apiAccessDialogOpen ? (
-        <AgentApiAccessDialog
-          agent={agent}
-          onOpenChange={(open) => {
-            dispatch({ open, type: "setApiAccessDialogOpen" });
-          }}
-          open={apiAccessDialogOpen}
         />
       ) : null}
 

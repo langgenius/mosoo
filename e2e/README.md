@@ -1,6 +1,8 @@
 # Local E2E Harness
 
-This directory contains an isolated local smoke harness. It is intentionally kept outside the root workspace package list so it does not run during normal lint/typecheck/test loops.
+This directory contains isolated local smoke harnesses. Most commands are invoked
+explicitly so live-provider checks do not run during normal test loops unless
+their required environment is present.
 
 Run from the repo root:
 
@@ -10,6 +12,7 @@ vp run e2e:harness-contract
 ./e2e/run-preview-smoke.sh
 ./e2e/run-preview-smoke.sh --headed
 ./e2e/run-preview-latency.sh
+bun run e2e:agent-builder-live-planner
 ```
 
 `run-deterministic.sh` is the L1 no-credential acceptance harness. It runs the
@@ -40,6 +43,18 @@ The Preview live runners check these credentials before launching Playwright, so
 missing-key failures return immediately without starting the local web server.
 `run-preview-smoke.sh` covers the selected public runtime provider; ACP fallback
 is an internal transport covered by driver fixture and API integration gates.
+
+Agent Builder live planner smoke is an API-level provider check for the
+lightweight System Agent planner. It is skipped unless both variables are set:
+
+```bash
+export MOSOO_E2E_OPENAI_API_KEY=...
+export MOSOO_E2E_OPENAI_MODEL=...
+bun run e2e:agent-builder-live-planner
+```
+
+Set `MOSOO_E2E_REQUIRE_LIVE_PLANNER=1` when the run must fail instead of skip if
+the required variables are missing.
 
 `run-preview-latency.sh` can target either supported live provider:
 

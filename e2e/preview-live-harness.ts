@@ -144,18 +144,36 @@ export async function loginWithMosooAiBackdoor(page: Page, smokeEmail: string): 
   await page.getByPlaceholder("you@company.com").fill(smokeEmail);
   await page.getByRole("button", { name: "Send code" }).click();
 
-  const setupChoice = page
-    .getByRole("button", {
-      name: /Just trying it personally/i,
-    })
-    .or(
-      page.getByRole("button", {
-        name: /^Create .+ organization/i,
-      }),
-    );
-  await maybeClick(setupChoice.first(), 15_000);
+  await completePostLoginOnboarding(page);
+}
 
-  await expect(page.getByRole("link", { name: "Agents" })).toBeVisible({
+async function completePostLoginOnboarding(page: Page): Promise<void> {
+  const agentsLink = page.getByRole("link", { name: "Agents" });
+  const agentsLinkAlreadyVisible = await agentsLink
+    .isVisible({
+      timeout: 3_000,
+    })
+    .catch(() => false);
+
+  if (agentsLinkAlreadyVisible) {
+    return;
+  }
+
+  const domainOrganizationSetup = page.getByRole("button", {
+    name: /Create .+ organization/i,
+  });
+  const createOwnOrganization = page.getByRole("button", {
+    name: /Create my own organization/i,
+  });
+  const personalSetup = page.getByRole("button", {
+    name: /Just trying it personally/i,
+  });
+
+  (await maybeClick(domainOrganizationSetup, 15_000)) ||
+    (await maybeClick(createOwnOrganization, 2_000)) ||
+    (await maybeClick(personalSetup, 2_000));
+
+  await expect(agentsLink).toBeVisible({
     timeout: 60_000,
   });
 }

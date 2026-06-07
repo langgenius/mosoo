@@ -37,11 +37,41 @@ export type AddSessionResourceInput = {
   sessionId: PlatformId;
 };
 
+export type AgentBuilderComponentDecision =
+  | 'bound'
+  | 'created'
+  | 'skipped';
+
+export type AgentBuilderComponentDecisionsInput = {
+  environment?: AgentBuilderComponentDecision | null | undefined;
+};
+
+export type AgentBuilderControlPlaneActionStatus =
+  | 'applied'
+  | 'needs_secure_ui'
+  | 'noop';
+
+export type AgentBuilderExecutableActionToolId =
+  | 'apply_agent_config'
+  | 'create_agent'
+  | 'create_environment'
+  | 'create_remote_mcp_server'
+  | 'open_preview'
+  | 'reset_preview_session';
+
 export type AgentBuilderMessageRole =
   | 'assistant'
   | 'system'
   | 'tool'
   | 'user';
+
+export type AgentBuilderMetadataInput = {
+  componentDecisions: AgentBuilderComponentDecisionsInput;
+};
+
+export type AgentBuilderSecureUiActionKind =
+  | 'create_environment'
+  | 'create_remote_mcp_server';
 
 export type AgentBuilderThreadStatus =
   | 'active'
@@ -449,6 +479,12 @@ export type EnvironmentVariableStatus =
   | 'configured'
   | 'pending';
 
+export type ExecuteAgentBuilderControlPlaneActionInput = {
+  agentId: PlatformId;
+  draftYaml?: string | null | undefined;
+  toolId: AgentBuilderExecutableActionToolId;
+};
+
 export type FileOwnerKind =
   | 'account'
   | 'organization'
@@ -836,6 +872,7 @@ export type UpdateAgentCollaboratorInput = {
 
 export type UpdateAgentConfigInput = {
   agentId: PlatformId;
+  builder: AgentBuilderMetadataInput;
   description?: string | null | undefined;
   environment: AgentEnvironmentConfigInput;
   kind: AgentKind;
@@ -928,6 +965,13 @@ export type EnsureAgentBuilderThreadMutationVariables = Exact<{
 
 
 export type EnsureAgentBuilderThreadMutation = { ensureAgentBuilderThread: { agentId: PlatformId, createdAt: string, creatorAccountId: PlatformId, id: PlatformId, lastTurnAt: string | null, organizationId: PlatformId, status: AgentBuilderThreadStatus, title: string | null, updatedAt: string } };
+
+export type ExecuteAgentBuilderControlPlaneActionMutationVariables = Exact<{
+  input: ExecuteAgentBuilderControlPlaneActionInput;
+}>;
+
+
+export type ExecuteAgentBuilderControlPlaneActionMutation = { executeAgentBuilderControlPlaneAction: { message: string, sessionId: PlatformId | null, status: AgentBuilderControlPlaneActionStatus, toolId: AgentBuilderExecutableActionToolId, secureUi: { kind: AgentBuilderSecureUiActionKind } | null } };
 
 export type AgentBuilderMessagesQueryVariables = Exact<{
   agentId: PlatformId;
@@ -1076,7 +1120,7 @@ export type AgentEditorStateQueryVariables = Exact<{
 }>;
 
 
-export type AgentEditorStateQuery = { agentEditorState: { id: PlatformId, environment: { boundSpaceIds: Array<PlatformId>, environmentId: PlatformId | null }, packageResolution: { recordedAt: string, source: AgentPackageResolutionSource, report: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, boundSpaceCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } | null, collaborators: Array<{ principal: string, role: AgentCollaboratorRole, name: string | null, email: string | null, imageUrl: string | null }>, mcpBindings: Array<{ authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialMode: AgentMcpCredentialMode, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, credentialSubject: string | null, enabled: boolean, hasSharedCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, serverId: PlatformId, source: McpServerSource, updatedAt: string, url: string }>, readiness: { checkedAt: string, ready: boolean, issues: Array<{ code: string, message: string, severity: AgentReadinessSeverity }> } } };
+export type AgentEditorStateQuery = { agentEditorState: { id: PlatformId, builder: { componentDecisions: { environment: AgentBuilderComponentDecision | null } }, environment: { boundSpaceIds: Array<PlatformId>, environmentId: PlatformId | null }, packageResolution: { recordedAt: string, source: AgentPackageResolutionSource, report: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, boundSpaceCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } | null, collaborators: Array<{ principal: string, role: AgentCollaboratorRole, name: string | null, email: string | null, imageUrl: string | null }>, mcpBindings: Array<{ authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialMode: AgentMcpCredentialMode, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, credentialSubject: string | null, enabled: boolean, hasSharedCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, serverId: PlatformId, source: McpServerSource, updatedAt: string, url: string }>, readiness: { checkedAt: string, ready: boolean, issues: Array<{ code: string, message: string, severity: AgentReadinessSeverity }> } } };
 
 export type UpdateAgentConfigMutationVariables = Exact<{
   input: UpdateAgentConfigInput;
@@ -1566,6 +1610,7 @@ export type CreateAgentSessionMutation = { createAgentSession: { agentId: Platfo
 export type AgentSessionListQueryVariables = Exact<{
   agentId: PlatformId;
   archived?: boolean | null | undefined;
+  participantOnly?: boolean | null | undefined;
   type?: SessionType | null | undefined;
 }>;
 
@@ -2541,6 +2586,19 @@ export const EnsureAgentBuilderThreadDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<EnsureAgentBuilderThreadMutation, EnsureAgentBuilderThreadMutationVariables>;
+export const ExecuteAgentBuilderControlPlaneActionDocument = new TypedDocumentString(`
+    mutation ExecuteAgentBuilderControlPlaneAction($input: ExecuteAgentBuilderControlPlaneActionInput!) {
+  executeAgentBuilderControlPlaneAction(input: $input) {
+    message
+    secureUi {
+      kind
+    }
+    sessionId
+    status
+    toolId
+  }
+}
+    `) as unknown as TypedDocumentString<ExecuteAgentBuilderControlPlaneActionMutation, ExecuteAgentBuilderControlPlaneActionMutationVariables>;
 export const AgentBuilderMessagesDocument = new TypedDocumentString(`
     query AgentBuilderMessages($agentId: ULID!, $beforeSeq: Int, $limit: Int) {
   agentBuilderMessages(agentId: $agentId, beforeSeq: $beforeSeq, limit: $limit) {
@@ -2933,6 +2991,11 @@ export const AgentEditorStateDocument = new TypedDocumentString(`
     query AgentEditorState($agentId: ULID!) {
   agentEditorState(agentId: $agentId) {
     id
+    builder {
+      componentDecisions {
+        environment
+      }
+    }
     environment {
       boundSpaceIds
       environmentId
@@ -5032,8 +5095,13 @@ export const CreateAgentSessionDocument = new TypedDocumentString(`
 }
     `) as unknown as TypedDocumentString<CreateAgentSessionMutation, CreateAgentSessionMutationVariables>;
 export const AgentSessionListDocument = new TypedDocumentString(`
-    query AgentSessionList($agentId: ULID!, $archived: Boolean, $type: SessionType) {
-  agentSessionList(agentId: $agentId, archived: $archived, type: $type) {
+    query AgentSessionList($agentId: ULID!, $archived: Boolean, $participantOnly: Boolean, $type: SessionType) {
+  agentSessionList(
+    agentId: $agentId
+    archived: $archived
+    participantOnly: $participantOnly
+    type: $type
+  ) {
     nodes {
       agentId
       archivedAt

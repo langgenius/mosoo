@@ -1,3 +1,4 @@
+import type { SessionType } from "@mosoo/contracts/session";
 import { ignorePromiseRejection } from "@mosoo/effects";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -5,9 +6,10 @@ import type { KeyboardEvent } from "react";
 
 import { useSessionStream } from "@/domains/runtime/use-session-stream";
 import type { PermissionRequest } from "@/domains/runtime/use-session-stream";
+import { listAgentSessions } from "@/domains/session/api/agent-session";
 import { appendSessionResourceMentionsToMessage } from "@/features/session-chat/session-resource-mentions";
 import { useSessionChatLayoutState } from "@/features/session-chat/use-session-chat-layout-state";
-import { toAgentId, toOrganizationId, toSessionId } from "@/routes/typed-id";
+import { toAgentId, toSessionId } from "@/routes/typed-id";
 
 import type {
   AgentSessionPanelModel,
@@ -22,12 +24,11 @@ import {
   hasStaleSessionConfiguration,
   isComposerSendBlocked,
   shouldWaitForRuntimeReadyOnNewSession,
-  toAgentSessions,
 } from "./agent-session-panel-rules";
 import {
   autoTitleSession,
   createAgentSession,
-  listSessions,
+  deleteAgentSession,
 } from "./agent-session-panel-session-actions";
 
 async function autoTitleSessionAndRefresh(input: {
@@ -37,6 +38,37 @@ async function autoTitleSessionAndRefresh(input: {
 }): Promise<void> {
   await autoTitleSession(toSessionId(input.sessionId), input.title).catch(ignorePromiseRejection);
   void input.refreshSessions();
+}
+
+export function getResetSessionIds(input: {
+  readonly activeSessionId: string | null;
+  readonly sessions: readonly { readonly id: string }[];
+  readonly sessionType: SessionType;
+}): string[] {
+  if (input.sessionType !== "preview") {
+    return input.activeSessionId === null ? [] : [input.activeSessionId];
+  }
+
+  const sessionIds = new Set(input.sessions.map((session) => session.id));
+
+  if (input.activeSessionId !== null) {
+    sessionIds.add(input.activeSessionId);
+  }
+
+  return [...sessionIds];
+}
+
+export function removeSessionConfigurationRevisionKeys(
+  current: Readonly<Record<string, string>>,
+  sessionIds: readonly string[],
+): Record<string, string> {
+  const next = { ...current };
+
+  for (const sessionId of sessionIds) {
+    delete next[sessionId];
+  }
+
+  return next;
 }
 
 export function useAgentSessionPanelModel(
@@ -55,14 +87,15 @@ export function useAgentSessionPanelModel(
     queryFn: async () =>
       input.organizationId === null
         ? []
-        : listSessions(toOrganizationId(input.organizationId), input.sessionType),
-    queryKey: ["session-list", input.organizationId, input.sessionType, "active"],
+        : listAgentSessions(toAgentId(input.agentId), {
+            archived: false,
+            participantOnly: true,
+            type: input.sessionType,
+          }),
+    queryKey: ["agent-session-list", input.agentId, input.sessionType, "active"],
   });
 
-  const agentSessions = useMemo(
-    () => toAgentSessions(sessionsQuery.data ?? [], input.agentId),
-    [input.agentId, sessionsQuery.data],
-  );
+  const agentSessions = sessionsQuery.data ?? [];
   const defaultSessionId = agentSessions[0]?.id ?? null;
   const activeSessionId = selectedSessionId === undefined ? defaultSessionId : selectedSessionId;
   const activeSession =
@@ -138,6 +171,44 @@ export function useAgentSessionPanelModel(
         actionLabel: "Retry",
         message: error instanceof Error ? error.message : "Session setup failed.",
         retryable: true,
+      });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleResetSession(): Promise<void> {
+    if (sending) {
+      return;
+    }
+
+    setSending(true);
+    setInputValue("");
+    clearComposerError();
+
+    try {
+      const resetSessionIds = getResetSessionIds({
+        activeSessionId,
+        sessionType: input.sessionType,
+        sessions: agentSessions,
+      });
+
+      for (const sessionId of resetSessionIds) {
+        await deleteAgentSession(toSessionId(sessionId));
+      }
+
+      if (resetSessionIds.length > 0) {
+        setSessionConfigurationRevisions((current) =>
+          removeSessionConfigurationRevisionKeys(current, resetSessionIds),
+        );
+      }
+
+      setSelectedSessionId(null);
+      await refreshSessions();
+    } catch (error) {
+      setComposerError({
+        message: error instanceof Error ? error.message : "Session reset failed.",
+        retryable: false,
       });
     } finally {
       setSending(false);
@@ -280,6 +351,7 @@ export function useAgentSessionPanelModel(
     ensureActiveSession,
     fileInputRef: layout.fileInputRef,
     handleKeyDown,
+    handleResetSession,
     handleSend,
     handleStartNewSession,
     input: inputValue,
