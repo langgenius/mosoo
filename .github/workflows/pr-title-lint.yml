@@ -1,0 +1,47 @@
+name: PR Title Lint
+
+# Because main only allows squash merges, a PR's title becomes the squashed
+# commit message on main. Linting the title here keeps the main history aligned
+# with Conventional Commits (see CLAUDE.md).
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+permissions:
+  pull-requests: read
+
+jobs:
+  lint-pr-title:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Allowed Conventional Commit types (matches CLAUDE.md).
+          types: |
+            feat
+            fix
+            docs
+            test
+            refactor
+            chore
+            perf
+            build
+            ci
+            style
+            revert
+          # Subject must not start with an upper-case letter; keeps titles like
+          # "feat(web): add ..." and rejects "feat(web): Add ...".
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject "{subject}" must start with a lower-case letter
+            (Conventional Commits style), e.g. "feat(web): add help search".
+          # Scope is optional and free-form; require the "type(scope): subject" shape.
+          requireScope: false
