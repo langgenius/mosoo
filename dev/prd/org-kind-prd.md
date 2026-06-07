@@ -1,5 +1,7 @@
 # Organization Kind & CE Creation Slots — for humans
 
+> ⚠️ **DEPRECATED — DO NOT IMPLEMENT.** The `organization.kind` axis and the CE Creation Slot model described below were removed from the product. `apps/api/src/modules/organizations/domain/organization-kind.policy.ts` was deleted along with the `kind` field on the GraphQL schema, services, and tests. The current contract is in [Identity & Access](./identity-access.md), which states: "A `personal / team` kind field **does not exist**." Whether an Org is a "company" is now determined entirely by whether it has claimed a primary domain. This document is retained only for history; any inbound link that lands here should be updated to point at [Identity & Access](./identity-access.md) and (for the self-creation limit) [`organization-creation-slot.policy.ts`](../../apps/api/src/modules/organizations/domain/organization-creation-slot.policy.ts).
+
 > This is the product-story version for non-engineering readers. The full engineering contract lives in the shipped PRD of the same name.
 >
 > This PRD is a **targeted revision** of [Identity & Access](./identity-access.md). It changes only three things: the Personal Org is no longer "once in a lifetime," the `kind` field is reintroduced, and CE limits each person to self-creating at most one ordinary Organization. Everything else — SSO login, Members & Access, email templates, RBAC — stays the same.

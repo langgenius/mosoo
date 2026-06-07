@@ -88,4 +88,4 @@ For Public Task API, keep phrases like:
 
 - "Help me get this Agent to do one thing."
 - "Linear ENG-123 should map to a specific Task in Mosoo."
-- "A background API call should show up only in the PAT owner's private Threads."
+- "A background API call should show up only in the Access Token owner's private Threads."

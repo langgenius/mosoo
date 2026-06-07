@@ -32,7 +32,7 @@ After ship, each of the three user types can do the following:
 
 ### Admin
 
-- A dedicated top-level entry point `/cost` with four tabs (Overview / By Agent / By User / By Model) that answer cross-Agent, cross-member, and cross-model budget questions
+- An admin-only Settings surface at `/settings/cost` (Settings → Cost) with four tabs (Overview / By Agent / By User / By Model) that answer cross-Agent, cross-member, and cross-model budget questions
 - See, at a glance, four KPIs — Total Spend / Requests / Tokens / Active Users — compared against the previous period
 - In the By Agent / By User tables, **sort by column and scan for runaway cost by color** (ember for increases, green-700 for decreases)
 - Export CSV from all three views, so there is hard data to bring to a conversation with finance
@@ -67,7 +67,7 @@ After ship, each of the three user types can do the following:
 
 ## 4. The three entry points (product story)
 
-### ① `/cost` (top-level navigation) · for admins
+### ① `/settings/cost` (Settings → Cost) · for admins
 
 Four tabs with a unified header: **title + period switcher (7d / 30d / MTD / 90d) + Export CSV**.
 
@@ -80,9 +80,9 @@ Four tabs with a unified header: **title + period switcher (7d / 30d / MTD / 90d
 
 Why not merge ① and ②? An admin's review needs (cross-Agent, cross-member) and an Agent owner's diagnostic needs ("who is using my Agent") are **two different shapes of data** — force them together and the second need gets hidden.
 
-Why not stuff ① into Settings? A four-tab, data-dense dashboard won't fit into the 220px Settings sidebar. It deserves a dedicated top-level entry point, just like `Providers`.
+Why is ① in Settings rather than a top-level nav entry? Cost Governance is an admin-only surface and was consolidated under Settings alongside the other organization controls (Members, Environments, General). The four-tab layout still gets a full-width content area inside the Settings layout — the Settings sidebar only carries the section switcher, not the dashboard chrome.
 
-**Role gating**: `/cost` is visible only to organization admins; a non-admin who hits the URL directly sees an "Admins only" empty state that points them to _Settings → Usage_.
+**Role gating**: `/settings/cost` is visible (in the Settings sidebar) only to organization admins, who are the holders of the `cost.organization.read` permission. The legacy `/cost` URL permanent-redirects to `/settings/cost`; a non-admin who lands there is blocked by the organization permission guard and shown an "Admins only" empty state that points them to _Settings → Usage_.
 
 ### ② Agent detail page → Cost tab · for Agent owners
 
@@ -153,7 +153,7 @@ The dashboard **never drops** usage for an unknown model. It labels that usage s
 
 | Stage               | What the admin is doing                                                          | What they see                                                               | Mood      |
 | ------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | --------- |
-| 1 Trigger           | At month's end, wants to see how much was spent                                  | Clicks `Cost` in the sidebar                                                | Neutral   |
+| 1 Trigger           | At month's end, wants to see how much was spent                                  | Opens Settings → Cost                                                       | Neutral   |
 | 2 Overview          | On the Overview tab, looks at the 4 KPIs + 30-day bar chart                      | "$4.82K · -12.3% vs. prior 30 days" — answers the main question at a glance | Reassured |
 | 3 Drill in          | Clicks the Top Agents ranking → jumps to the By Agent tab                        | Sees the customer-support agent at 28%                                      | Alert     |
 | 4 Locate the person | Switches to the By Agent tab, sorts by vs. Prev to find the spiking row          | Sarah's research-bot is +180% week over week                                | Zeroed in |

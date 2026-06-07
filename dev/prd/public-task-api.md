@@ -29,7 +29,7 @@ None of these require a separate Task object. They require a trackable, continua
 | Thread                | Where this work continues, gets viewed, and gets resumed. This is what API users create.                                            |
 | Run                   | A single execution of the Agent. A new Thread starts the first Run; later follow-up input triggers a new Run.                       |
 | AgentSession          | The internal implementation name. It still exists in engineering, but it should not be the first-screen language of the public API. |
-| Human PAT             | A Personal Access Token. It identifies the human caller and attributes the Thread to that caller.                                   |
+| Human Access Token    | An Access Token. It identifies the human caller and attributes the Thread to that caller.                                   |
 | `client_external_ref` | A correlation ID from the customer's system, e.g. a Linear issue or a support ticket.                                               |
 
 ## 4. API shape
@@ -100,13 +100,13 @@ For each Thread the public API exposes two read paths and a write path:
 
 | Caller    | Thread ownership | Enters private Threads?           |
 | --------- | ---------------- | --------------------------------- |
-| Human PAT | PAT owner        | Yes — enters this user's Threads. |
+| Human Access Token | Access Token owner        | Yes — enters this user's Threads. |
 
 ## 6. Relationship to Channels
 
 Channels such as Slack / Lark / Discord / Telegram / WeChat do not go through the Public Thread API.
 
-A Channel is an entry point into an external collaboration platform. It uses its own binding, signature verification, and external thread id to create or reuse an AgentSession inside Mosoo, and then writes the result back to the originating platform. It does not consume a PAT, and it does not automatically project an external user into a Mosoo user's private Thread.
+A Channel is an entry point into an external collaboration platform. It uses its own binding, signature verification, and external thread id to create or reuse an AgentSession inside Mosoo, and then writes the result back to the originating platform. It does not consume an Access Token, and it does not automatically project an external user into a Mosoo user's private Thread.
 
 So this boundary still holds:
 

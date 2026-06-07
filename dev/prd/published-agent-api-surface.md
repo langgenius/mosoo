@@ -71,8 +71,8 @@ So this phase must be designed with a public-API mental model. It can't be built
 | **Published Agent API Surface** | The public HTTPS call surface that an Agent exposes to API consumers after publishing. Includes docs, call examples, and authentication and admission semantics.                                                                                                      |
 | **API Consumer**                | A system that calls a Published Agent. Primarily aimed at customer backends, CLIs, and automations; the Mosoo Web UI and first-party adapters reuse the same underlying semantics, but do not necessarily go through the public token gate.                           |
 | **Thread**                      | The "one unit of work" context that an external caller creates and continues. A Thread can be created with an initial prompt (which starts the first Run immediately) or empty (which parks it in `idle` for the caller to populate later via `POST /threads/{threadId}/events`). The first screen of the public docs only talks about opening a new conversation / viewing a conversation, and does **not** require the caller to understand session mechanics first. |
-| **Human PAT**                   | Personal Access Token. Identifies a **person** as the caller. It carries no per-agent scope, does not replace vendor credentials, and is not involved in BYOK.                                                                                                        |
-| **Caller**                      | The principal that issues a request holding a PAT. Used for admission and attribution; it is **not** the same as the executor.                                                                                                                                        |
+| **Human Access Token**          | Access Token. Identifies a **person** as the caller. It carries no per-agent scope, does not replace vendor credentials, and is not involved in BYOK.                                                                                                                 |
+| **Caller**                      | The principal that issues a request holding an Access Token. Used for admission and attribution; it is **not** the same as the executor.                                                                                                                              |
 | **Agent Owner**                 | The person who creates and owns the Agent's service identity. **The Agent's execution permissions are understood as an RBAC proxy of the Owner.**                                                                                                                     |
 | **Cooperator**                  | A collaborator that the Agent Owner has explicitly authorized to access the Agent.                                                                                                                                                                                    |
 | **Organization-wide access**    | The Owner allows every valid member in the Org to call the Agent.                                                                                                                                                                                                     |
@@ -111,7 +111,7 @@ flowchart TD
   Owner["Agent Owner"]
   Access["Agent access mode<br/>Org-wide or invited-only"]
   Docs["Published Agent API docs<br/>call examples + machine-readable interface description"]
-  Token["Caller token identity<br/>Human PAT"]
+  Token["Caller token identity<br/>Human Access Token"]
   PublicAPI["Public HTTPS call surface"]
   ThreadAPI["Public Thread API<br/>open a new conversation / view a conversation"]
   AppContract["A single set of conversation semantics<br/>Session / Run"]
@@ -147,7 +147,7 @@ Key changes:
 - The way you call them is identical — the system will tell you whether this Agent is a Pet or a Cattle, but there's no difference in how you call it.
 - **Pet**: Multiple sessions share one stable Agent Sandbox; continuity comes from Pet Sandbox Backup/Restore plus the platform's session history.
 - **Cattle**: Each session uses an independent Session Sandbox. When you continue the same session and the old Sandbox has already been destroyed, the runtime simply builds a new one, inheriting only the platform-persisted conversation history, metadata, and explicit Space / Backup content — it does **not** return a "cannot continue" error, and it does not try to restore the old Sandbox's transient state.
-- The main semantics — PAT, access mode, cooperator, SessionFile, archive / delete — are **exactly the same** for Pet and Cattle.
+- The main semantics — Access Token, access mode, cooperator, SessionFile, archive / delete — are **exactly the same** for Pet and Cattle.
 
 ---
 
