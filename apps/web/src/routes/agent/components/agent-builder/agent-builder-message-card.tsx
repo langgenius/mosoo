@@ -12,7 +12,6 @@ import type { ReactElement } from "react";
 import { isAgentBuilderStreamingMessage } from "@/domains/agent-builder/api/agent-builder-chat-transport";
 import type { AgentBuilderMessage } from "@/domains/agent-builder/api/agent-builder-client";
 import { cn } from "@/shared/lib/class-names";
-import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Markdown } from "@/shared/ui/markdown";
 
@@ -158,18 +157,12 @@ function getNodeFieldLabel(node: AgentBuilderPlanNode): string | null {
   return null;
 }
 
-function planNodeStatusBadgeVariant(
-  status: AgentBuilderPlanNode["status"],
-): "danger" | "success" | "warning" {
-  switch (status) {
-    case "applied":
-      return "success";
-    case "blocked":
-    case "failed":
-      return "danger";
-    case "pending":
-      return "warning";
-  }
+export function shouldRenderAgentBuilderPlanNode(node: AgentBuilderPlanNode): boolean {
+  return node.status !== "applied";
+}
+
+export function shouldRenderAgentBuilderPlanNodeControls(node: AgentBuilderPlanNode): boolean {
+  return node.status === "pending";
 }
 
 function planNodeActionButtonVariant(
@@ -199,7 +192,7 @@ function DraftPatchValuePreview({
     onDraftPatchFocus !== undefined &&
     environmentConfigLink === null;
   const containerClassName =
-    "border-border-subtle text-muted-foreground mt-2 w-full border-t pt-2 text-left";
+    "text-muted-foreground mt-1.5 w-full text-left";
 
   const content =
     draftPatch.fieldPath === "prompt" && typeof draftPatch.value === "string" ? (
@@ -272,28 +265,39 @@ function PlannerNodeCard({
   structuredReplyDisabled: boolean;
 }): ReactElement {
   const fieldLabel = getNodeFieldLabel(node);
+  const draftPatch = node.draftPatch;
+  const showControls = shouldRenderAgentBuilderPlanNodeControls(node);
+  const showDraftPatchPreview = draftPatch !== undefined && node.status !== "applied";
+  const isIssueNode = node.status === "blocked" || node.status === "failed";
 
   return (
-    <div className="bg-bg-1 rounded-md p-2.5 text-left">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <Badge variant={planNodeStatusBadgeVariant(node.status)}>{node.status}</Badge>
-          {fieldLabel === null ? null : (
-            <span className="text-foreground text-[12px] leading-none font-semibold">
-              {fieldLabel}
-            </span>
+    <div
+      className={cn(
+        "rounded-md px-3 py-2.5 text-left",
+        isIssueNode ? "bg-danger/5" : "bg-bg-1",
+      )}
+    >
+      <div className="min-w-0 space-y-1.5">
+        {fieldLabel === null ? null : (
+          <div className="text-foreground text-[12px] leading-none font-semibold">
+            {fieldLabel}
+          </div>
+        )}
+        <div
+          className={cn(
+            "text-[13px] leading-relaxed font-medium break-words",
+            isIssueNode ? "text-danger" : "text-foreground",
           )}
-        </div>
-        <div className="text-foreground mt-2 text-[13px] leading-relaxed font-medium break-words">
+        >
           {node.summary}
         </div>
-        {node.draftPatch ? (
+        {showDraftPatchPreview && draftPatch !== undefined ? (
           <DraftPatchValuePreview
-            draftPatch={node.draftPatch}
+            draftPatch={draftPatch}
             onDraftPatchFocus={onDraftPatchFocus}
           />
         ) : null}
-        {node.askUser === undefined || onStructuredReply === undefined ? null : (
+        {!showControls || node.askUser === undefined || onStructuredReply === undefined ? null : (
           <AgentBuilderAskUserCard
             disabled={structuredReplyDisabled}
             nodeKey={node.nodeKey}
@@ -301,7 +305,7 @@ function PlannerNodeCard({
             question={node.askUser}
           />
         )}
-        {node.actions.length === 0 ? null : (
+        {!showControls || node.actions.length === 0 ? null : (
           <div className="mt-2.5 flex flex-wrap gap-2">
             {node.actions.map((action) => (
               <Button
@@ -353,9 +357,15 @@ function PlannerOutputSurface({
     return null;
   }
 
+  const visibleNodes = output.nodes.filter(shouldRenderAgentBuilderPlanNode);
+
+  if (visibleNodes.length === 0) {
+    return null;
+  }
+
   return (
-    <div className="border-border-subtle mt-2.5 space-y-2 border-t pt-2.5">
-      {output.nodes.map((node) => (
+    <div className="mt-2.5 space-y-2">
+      {visibleNodes.map((node) => (
         <PlannerNodeCard
           key={node.nodeKey}
           node={node}

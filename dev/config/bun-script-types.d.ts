@@ -11,6 +11,7 @@ export interface BunHasher {
 
 export interface BunServer {
   readonly port: number;
+  stop(closeActiveConnections?: boolean): void;
 }
 
 export interface BunShellOutput {

@@ -4,7 +4,6 @@ declare const Bun: BunRuntime;
 
 const PROVIDER_FETCH_PROXY_TOKEN_ENV_KEY = "MOSOO_PROVIDER_FETCH_PROXY_TOKEN";
 const PROVIDER_FETCH_PROXY_URL_ENV_KEY = "MOSOO_PROVIDER_FETCH_PROXY_URL";
-const HOST_PROXY_ENV_KEYS = ["http_proxy", "https_proxy", "all_proxy", "no_proxy"] as const;
 
 interface LocalProviderFetchProxy {
   server?: BunServer;
@@ -22,13 +21,6 @@ interface ProviderProxyPayload {
 
 function writeStderr(message: string): void {
   process.stderr.write(`${message}\n`);
-}
-
-function hasHostProxyEnv(env: NodeJS.ProcessEnv): boolean {
-  return HOST_PROXY_ENV_KEYS.some((key) => {
-    const value = env[key];
-    return typeof value === "string" && value.trim().length > 0;
-  });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -148,10 +140,6 @@ export async function startLocalProviderFetchProxy(
     configuredToken.length > 0
   ) {
     return { token: configuredToken, url: configuredUrl };
-  }
-
-  if (!hasHostProxyEnv(env)) {
-    return null;
   }
 
   const token = crypto.randomUUID();

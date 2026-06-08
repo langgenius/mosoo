@@ -145,6 +145,45 @@ describe("Agent Builder System Agent RPC bridge", () => {
     expect(streamedResult.terminal.status).toBe("completed");
   });
 
+  test("keeps internal progress events out of the visible chat text", async () => {
+    const result: AgentBuilderSystemAgentRpcResult = {
+      messages: [
+        {
+          cardsJson: null,
+          contentText: "Ready for preview.",
+          createdAt: "2026-05-25T00:00:01.000Z",
+          createdByAccountId: null,
+          id: CHAT_ASSISTANT_MESSAGE_ID,
+          inputKind: null,
+          plannerRunId: CHAT_PLANNER_RUN_ID,
+          role: "assistant",
+          seq: 1,
+          threadId: CHAT_THREAD_ID,
+        },
+      ],
+      state: {
+        draftId: CHAT_AGENT_ID,
+        lastPlannerRunId: CHAT_PLANNER_RUN_ID,
+      },
+      terminal: {
+        failureKind: null,
+        message: null,
+        status: "completed",
+      },
+    };
+    const responseText = await createAgentBuilderSystemAgentChatResponse({
+      run: (progress) => {
+        progress({
+          message: "正在调用 System Agent 模型规划 Builder 输出",
+          stage: "planner:llm",
+        });
+        return result;
+      },
+    }).text();
+
+    expect(readTextFromStream(responseText)).toBe("Ready for preview.");
+  });
+
   test("streams model failures as a canonical terminal Builder result", async () => {
     const responseText = await createAgentBuilderSystemAgentChatResponse({
       run: async () => {

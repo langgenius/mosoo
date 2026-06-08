@@ -253,7 +253,7 @@ function createSystemAgentModelMissingOutput(
 ): AgentBuilderPlannerOutput {
   return createBlockedOutput({
     assistantText:
-      "Agent Builder 需要先配置 System Agent 模型后才能规划配置。请先在 Settings 的 Agent Builder 模型设置里选择一个可用模型。",
+      "Agent Builder needs a System Agent model before it can plan config changes. Choose an available model in Settings, then send the Builder message again.",
     intentSummary: "Block Agent Builder planning because no System Agent model is configured.",
     nodeKey: "blocked_system_agent_model_missing",
     plannerRunId: input.context.plannerRunId,
@@ -266,7 +266,7 @@ function createSystemAgentCredentialMissingOutput(
   provider: string,
 ): AgentBuilderPlannerOutput {
   return createBlockedOutput({
-    assistantText: `Agent Builder 需要 ${provider} 的 Provider key 才能规划配置。请先在 Providers 中添加可用的 key，然后再发送 Builder 消息。`,
+    assistantText: `Agent Builder needs a ${provider} Provider key before it can plan config changes. Add an available key in Providers, then send the Builder message again.`,
     intentSummary:
       "Block Agent Builder planning because the System Agent provider key is unavailable.",
     nodeKey: "blocked_system_agent_credential_missing",
@@ -280,7 +280,7 @@ function createSystemAgentProviderBlockedOutput(
   reason: string,
 ): AgentBuilderPlannerOutput {
   return createBlockedOutput({
-    assistantText: `Agent Builder 当前不能调用已选择的 System Agent 模型：${reason}`,
+    assistantText: `Agent Builder cannot use the selected System Agent model: ${reason}`,
     intentSummary:
       "Block Agent Builder planning because the selected System Agent provider is invalid.",
     nodeKey: "blocked_system_agent_provider_invalid",
@@ -294,7 +294,7 @@ function createSystemAgentPlannerInvalidOutput(
 ): AgentBuilderPlannerOutput {
   return createBlockedOutput({
     assistantText:
-      "Agent Builder 模型返回的规划结果没有通过结构化校验。我没有应用任何配置变更，请再试一次或改用更明确的指令。",
+      "Agent Builder received an invalid structured plan from the model. I did not apply any config changes. Try again with a clearer instruction.",
     intentSummary:
       "Block Agent Builder planning because the model returned invalid planner output.",
     nodeKey: "blocked_system_agent_invalid_planner_output",
@@ -308,7 +308,7 @@ function createSystemAgentProviderFailureOutput(
   message: string,
 ): AgentBuilderPlannerOutput {
   return createBlockedOutput({
-    assistantText: `Agent Builder 调用模型失败：${message}`,
+    assistantText: `Agent Builder could not call the model provider: ${message}`,
     intentSummary: "Block Agent Builder planning because the model provider request failed.",
     nodeKey: "blocked_system_agent_provider_failure",
     plannerRunId: input.context.plannerRunId,

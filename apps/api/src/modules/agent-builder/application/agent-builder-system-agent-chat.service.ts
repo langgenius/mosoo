@@ -105,7 +105,6 @@ export function createAgentBuilderSystemAgentChatResponse(
   const stream = createUIMessageStream<AgentBuilderSystemAgentChatMessage>({
     execute: async ({ writer }) => {
       const textId = "agent-builder-assistant-text";
-      let hasProgressText = false;
       const writeTextDelta = (delta: string) => {
         writer.write({
           delta,
@@ -113,10 +112,7 @@ export function createAgentBuilderSystemAgentChatResponse(
           type: "text-delta",
         });
       };
-      const progress: AgentBuilderProgressReporter = (event) => {
-        hasProgressText = true;
-        writeTextDelta(`${event.message}\n`);
-      };
+      const progress: AgentBuilderProgressReporter = () => {};
 
       writer.write({
         id: textId,
@@ -138,10 +134,6 @@ export function createAgentBuilderSystemAgentChatResponse(
       }
 
       const assistantText = readAssistantText(result);
-
-      if (hasProgressText && assistantText.length > 0) {
-        writeTextDelta("\n");
-      }
 
       for (const delta of splitTextForStreaming(assistantText)) {
         writeTextDelta(delta);
