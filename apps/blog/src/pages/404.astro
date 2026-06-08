@@ -1,0 +1,44 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+// Astro generates `dist/404.html` for this special filename. After the merged
+// build the file lives at `apps/web/dist/blog/404.html`, and the apps/web
+// worker serves it (with a 404 status) whenever a `/blog/*` path has no
+// matching asset. The body and meta noindex make that explicit for crawlers,
+// so a missing blog URL doesn't get treated as a soft 404 pointing at the SPA.
+---
+
+<BaseLayout
+  title="Page not found · Mosoo blog"
+  description="The page you're looking for doesn't exist on the Mosoo blog."
+>
+  <meta slot="head" name="robots" content="noindex" />
+
+  <main class="mx-auto flex min-h-[60vh] w-full max-w-[760px] flex-col items-start justify-center px-6 py-20">
+    <div class="font-mono mb-4 text-[12px] font-semibold uppercase tracking-[0.08em] text-[color:var(--accent-text)]">
+      404 · Page not found
+    </div>
+    <h1 class="font-display mb-5 text-[44px] font-medium leading-[1.05] tracking-[-0.02em] text-[color:var(--ink-950)] md:text-[56px]">
+      This page doesn&apos;t exist (yet).
+    </h1>
+    <p class="mb-8 max-w-md text-[17px] leading-[1.55] text-[color:var(--fg-secondary)]">
+      The URL you followed isn&apos;t something we publish — the post may have
+      been renamed, or the link may be slightly off. Try the index, or jump
+      back to mosoo.
+    </p>
+    <div class="flex flex-wrap items-center gap-3">
+      <a
+        href="/blog"
+        class="inline-flex items-center gap-2 rounded-[var(--r-md)] bg-[color:var(--ink-900)] px-4 py-2 text-[14px] font-semibold text-white transition-colors hover:bg-[color:var(--ink-800)]"
+      >
+        Read the blog →
+      </a>
+      <a
+        href="/"
+        class="inline-flex items-center gap-2 rounded-[var(--r-md)] border border-[color:var(--border-strong)] bg-[color:var(--surface)] px-4 py-2 text-[14px] font-semibold text-[color:var(--fg)] transition-colors hover:bg-[color:var(--ink-50)]"
+      >
+        Back to mosoo
+      </a>
+    </div>
+  </main>
+</BaseLayout>

@@ -2,10 +2,16 @@
 
 name = "mosoo-web"
 compatibility_date = "2026-06-01"
+main = "src/worker.ts"
 
 [assets]
 directory = "./dist"
-not_found_handling = "single-page-application"
+binding = "ASSETS"
+# The Worker (src/worker.ts) decides SPA-fallback vs blog-404 per-path. Keep
+# this set to "none" so the assets binding never fabricates a 200 — otherwise
+# the binding would short-circuit blog misses with the SPA shell and reintroduce
+# soft 404s on every deleted blog URL.
+not_found_handling = "none"
 
 [env.prod]
 name = "mosoo-web-prod"

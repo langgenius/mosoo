@@ -6,7 +6,6 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "deploy": "astro build && wrangler deploy --env prod",
     "tc": "astro check",
     "lint": "vp lint ."
   },
@@ -21,7 +20,6 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
     "typescript": "^6.0.3",
-    "vite-plus": "^0.1.23",
-    "wrangler": "^4.92.0"
+    "vite-plus": "^0.1.23"
   }
 }

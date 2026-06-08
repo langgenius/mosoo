@@ -3,9 +3,14 @@ import sitemap from "@astrojs/sitemap";
 import tailwind from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
 
-// Blog is mounted at https://mosoo.ai/blog/* by a separate Cloudflare Worker
-// (apps/blog/wrangler.toml binds the route pattern `mosoo.ai/blog*`). Astro's
-// `base` ensures all generated URLs include the /blog prefix.
+// Blog is mounted at https://mosoo.ai/blog/*. apps/blog builds a static
+// site that gets embedded into apps/web's deploy: `apps/web` build runs
+// `apps/blog` build first, then copies `apps/blog/dist` into
+// `apps/web/dist/blog/`. The same Cloudflare Worker (`mosoo-web`) serves
+// both the SPA and the static blog content; `apps/web/src/worker.ts` forks
+// the not-found path so `/blog/*` misses return a real 404 instead of the
+// SPA shell. Astro's `base` ensures all generated URLs include the `/blog`
+// prefix.
 export default defineConfig({
   site: "https://mosoo.ai",
   base: "/blog",
