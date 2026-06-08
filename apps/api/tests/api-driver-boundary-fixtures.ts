@@ -21,7 +21,7 @@ import type { RuntimeSessionLink } from "../src/modules/runtime/infrastructure/d
 export const API_DRIVER_BOUNDARY_IDS = {
   account: PLATFORM_ID_FIXTURES.account,
   agent: PLATFORM_ID_FIXTURES.agent,
-  cloudflareSession: "01J0000000000000000000000S" as SandboxSessionId,
+  sandboxSession: "01J0000000000000000000000S" as SandboxSessionId,
   deploymentVersion: PLATFORM_ID_FIXTURES.agentDeploymentVersion,
   driverInstance: PLATFORM_ID_FIXTURES.driverInstance,
   environment: PLATFORM_ID_FIXTURES.environment,
@@ -73,7 +73,7 @@ export function createDriverProfile(): DriverProfileConfig {
       subjectKind: "session",
     },
     session: {
-      cloudflareSessionId: API_DRIVER_BOUNDARY_IDS.cloudflareSession,
+      sandboxSessionId: API_DRIVER_BOUNDARY_IDS.sandboxSession,
       homePath: "/home/agent",
       origin: {
         callerUserId: API_DRIVER_BOUNDARY_IDS.account,

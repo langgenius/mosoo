@@ -24,7 +24,7 @@ export async function getRuntimeConversationSession(
   const row =
     (await getAppDatabase(database)
       .select({
-        cloudflareSessionId: sandboxSessionsTable.cloudflareSessionId,
+        sandboxSessionId: sandboxSessionsTable.sandboxSessionId,
         cwd: sandboxSessionsTable.cwd,
         latestReadyBackupDir: readyConversationBackupTable.dir,
         latestReadyBackupId: readyConversationBackupTable.id,
@@ -52,7 +52,7 @@ export async function getRuntimeConversationSession(
   }
 
   return {
-    cloudflareSessionId: row.cloudflareSessionId,
+    sandboxSessionId: row.sandboxSessionId,
     cwd: row.cwd,
     latestReadyBackup: mapReadyRuntimeSubjectBackup({
       dir: row.latestReadyBackupDir,
@@ -76,7 +76,7 @@ export async function getRuntimeConversationSessionState(
     (await getAppDatabase(database)
       .select({
         agentId: sessionsTable.agentId,
-        cloudflareSessionId: sandboxSessionsTable.cloudflareSessionId,
+        sandboxSessionId: sandboxSessionsTable.sandboxSessionId,
         kind: sandboxesTable.kind,
         status: sandboxSessionsTable.status,
       })
@@ -118,7 +118,7 @@ export async function ensureRuntimeConversationSessionRecord(
   await getAppDatabase(database)
     .insert(sandboxSessionsTable)
     .values({
-      cloudflareSessionId: createPlatformId<SandboxSessionId>(input.now),
+      sandboxSessionId: createPlatformId<SandboxSessionId>(input.now),
       createdAt: input.now,
       cwd: input.cwd,
       originJson: input.originJson,
@@ -147,7 +147,7 @@ export async function ensureRuntimeConversationSessionRecord(
 export async function recordRuntimeConversationSessionError(
   database: D1Database,
   input: {
-    readonly cloudflareSessionId: SandboxSessionId;
+    readonly sandboxSessionId: SandboxSessionId;
     readonly cwd: string;
     readonly message: string;
     readonly errorCode: RuntimeSubjectErrorCode;
@@ -162,7 +162,7 @@ export async function recordRuntimeConversationSessionError(
     appDb
       .insert(sandboxSessionsTable)
       .values({
-        cloudflareSessionId: input.cloudflareSessionId,
+        sandboxSessionId: input.sandboxSessionId,
         createdAt: input.now,
         cwd: input.cwd,
         originJson: input.originJson,
@@ -204,7 +204,7 @@ export async function recordRuntimeConversationSessionError(
 export async function recordRuntimeConversationSessionActive(
   database: D1Database,
   input: {
-    readonly cloudflareSessionId: SandboxSessionId;
+    readonly sandboxSessionId: SandboxSessionId;
     readonly cwd: string;
     readonly now: number;
     readonly originJson: string;
@@ -217,7 +217,7 @@ export async function recordRuntimeConversationSessionActive(
     appDb
       .insert(sandboxSessionsTable)
       .values({
-        cloudflareSessionId: input.cloudflareSessionId,
+        sandboxSessionId: input.sandboxSessionId,
         createdAt: input.now,
         cwd: input.cwd,
         originJson: input.originJson,
@@ -229,7 +229,7 @@ export async function recordRuntimeConversationSessionActive(
       })
       .onConflictDoUpdate({
         set: {
-          cloudflareSessionId: sql`excluded.cloudflare_session_id`,
+          sandboxSessionId: sql`excluded.cloudflare_session_id`,
           cwd: sql`excluded.cwd`,
           status: "active",
           updatedAt: sql`excluded.updated_at`,

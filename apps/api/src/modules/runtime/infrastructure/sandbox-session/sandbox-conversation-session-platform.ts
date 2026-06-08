@@ -76,18 +76,18 @@ export async function prepareSandboxConversationDirectories(input: {
 }
 
 export async function deleteSandboxConversationSessionBestEffort(input: {
-  readonly cloudflareSessionId: SandboxSessionId;
+  readonly sandboxSessionId: SandboxSessionId;
   readonly sandbox: SandboxHandle;
 }): Promise<void> {
   try {
-    await input.sandbox.deleteSession(input.cloudflareSessionId);
+    await input.sandbox.deleteSession(input.sandboxSessionId);
   } catch {
     // Best-effort cleanup for a partially configured session.
   }
 }
 
 export async function openSandboxConversationSession(input: {
-  readonly cloudflareSessionId: SandboxSessionId;
+  readonly sandboxSessionId: SandboxSessionId;
   readonly cwd: string;
   readonly sandbox: SandboxHandle;
   readonly shouldCreate: boolean;
@@ -98,7 +98,7 @@ export async function openSandboxConversationSession(input: {
         created: true,
         session: await input.sandbox.createSession({
           cwd: input.cwd,
-          id: input.cloudflareSessionId,
+          id: input.sandboxSessionId,
         }),
       };
     } catch (error) {
@@ -108,13 +108,13 @@ export async function openSandboxConversationSession(input: {
 
       return {
         created: false,
-        session: await input.sandbox.getSession(input.cloudflareSessionId),
+        session: await input.sandbox.getSession(input.sandboxSessionId),
       };
     }
   }
 
   return {
     created: false,
-    session: await input.sandbox.getSession(input.cloudflareSessionId),
+    session: await input.sandbox.getSession(input.sandboxSessionId),
   };
 }

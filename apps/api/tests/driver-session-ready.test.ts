@@ -67,7 +67,7 @@ const PROFILE: DriverProfileConfig = {
     subjectKind: "agent",
   },
   session: {
-    cloudflareSessionId: SANDBOX_SESSION_ID,
+    sandboxSessionId: SANDBOX_SESSION_ID,
     homePath: "/workspace",
     origin: {
       callerUserId: ACCOUNT_ID,

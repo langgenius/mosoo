@@ -56,7 +56,7 @@ export interface DriverSandboxContext {
 }
 
 export interface DriverSessionContext {
-  readonly cloudflareSessionId: SandboxSessionId;
+  readonly sandboxSessionId: SandboxSessionId;
   readonly homePath: string;
   readonly origin: DriverOrigin;
   readonly sessionOrganizationPath: string;
@@ -157,7 +157,7 @@ export interface DriverExecutionEnvironment {
 }
 
 export interface DriverExecutionSessionContext {
-  readonly cloudflareSessionId: SandboxSessionId;
+  readonly sandboxSessionId: SandboxSessionId;
   readonly homePath: string;
   readonly organizationAccessSnapshot: DriverOrganizationAccessSnapshotOutput;
   readonly origin: DriverOrigin;

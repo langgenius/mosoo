@@ -227,7 +227,7 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
         ...input.profile,
         session: {
           ...input.profile.session,
-          cloudflareSessionId: executionSession.cloudflareSessionId,
+          sandboxSessionId: executionSession.sandboxSessionId,
           homePath: input.profile.session.homePath,
           origin: executionSession.origin,
           sessionOrganizationPath: executionSession.cwd,

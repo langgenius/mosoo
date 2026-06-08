@@ -260,7 +260,7 @@ describe("ensureSandboxConversationSession", () => {
       createInput(sandbox),
     );
 
-    expect(result.cloudflareSessionId).toBe("01J00000000000000000000001");
+    expect(result.sandboxSessionId).toBe("01J00000000000000000000001");
     await expect(readConversationSession(database)).resolves.toEqual({
       cloudflare_session_id: "01J00000000000000000000001",
       cwd: "/workspace/se/session-1",
@@ -277,9 +277,9 @@ describe("ensureSandboxConversationSession", () => {
       createInput(sandbox),
     );
 
-    expect(isPlatformId(result.cloudflareSessionId)).toBe(true);
+    expect(isPlatformId(result.sandboxSessionId)).toBe(true);
     await expect(readConversationSession(database)).resolves.toEqual({
-      cloudflare_session_id: result.cloudflareSessionId,
+      cloudflare_session_id: result.sandboxSessionId,
       cwd: result.cwd,
       status: "active",
     });
@@ -295,11 +295,11 @@ describe("ensureSandboxConversationSession", () => {
       createInput(sandbox, "cattle"),
     );
 
-    expect(result.cloudflareSessionId).not.toBe("01J00000000000000000000001");
-    expect(isPlatformId(result.cloudflareSessionId)).toBe(true);
+    expect(result.sandboxSessionId).not.toBe("01J00000000000000000000001");
+    expect(isPlatformId(result.sandboxSessionId)).toBe(true);
 
     await expect(readConversationSession(database)).resolves.toMatchObject({
-      cloudflare_session_id: result.cloudflareSessionId,
+      cloudflare_session_id: result.sandboxSessionId,
       status: "active",
     });
   });
@@ -315,7 +315,7 @@ describe("ensureSandboxConversationSession", () => {
       createInput(sandbox, "pet"),
     );
 
-    expect(result.cloudflareSessionId).toBe("01J00000000000000000000001");
+    expect(result.sandboxSessionId).toBe("01J00000000000000000000001");
     await expect(readConversationSession(database)).resolves.toMatchObject({
       cloudflare_session_id: "01J00000000000000000000001",
       status: "active",

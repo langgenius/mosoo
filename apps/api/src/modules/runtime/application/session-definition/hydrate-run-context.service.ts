@@ -75,7 +75,7 @@ async function resolveRuntimeProfileIds(
     sessionId: SessionId;
   },
 ): Promise<{
-  cloudflareSessionId: SandboxSessionId;
+  sandboxSessionId: SandboxSessionId;
   sandboxId: SandboxId;
 }> {
   const sandboxSubject = resolveAgentRuntimeSandboxSubject(input);
@@ -85,8 +85,8 @@ async function resolveRuntimeProfileIds(
   ]);
 
   return {
-    cloudflareSessionId:
-      existingConversationSession?.cloudflareSessionId ?? createPlatformId<SandboxSessionId>(),
+    sandboxSessionId:
+      existingConversationSession?.sandboxSessionId ?? createPlatformId<SandboxSessionId>(),
     sandboxId,
   };
 }
@@ -305,7 +305,7 @@ async function hydrateRunContextFromSession(
   try {
     runtimeProfileResult = createAgentRuntimeProfile({
       agentId: agent.id,
-      cloudflareSessionId: runtimeProfileIds.cloudflareSessionId,
+      sandboxSessionId: runtimeProfileIds.sandboxSessionId,
       callerUserId: viewer.id,
       configRevision: {
         agentId: binding.agentId,
@@ -465,7 +465,7 @@ async function refreshCachedRunContextVolatileFields(
   });
   const runtimeProfileResult = createAgentRuntimeProfile({
     agentId: agent.id,
-    cloudflareSessionId: runtimeProfileIds.cloudflareSessionId,
+    sandboxSessionId: runtimeProfileIds.sandboxSessionId,
     callerUserId: viewer.id,
     configRevision: {
       agentId: binding.agentId,

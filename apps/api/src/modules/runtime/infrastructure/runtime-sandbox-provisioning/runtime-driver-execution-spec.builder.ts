@@ -186,7 +186,7 @@ export async function buildExecutionSpec(
     session: {
       additionalDirectories: listAdditionalDirectories(input.profile, organizationPath),
       context: {
-        cloudflareSessionId: input.profile.session.cloudflareSessionId,
+        sandboxSessionId: input.profile.session.sandboxSessionId,
         homePath: input.profile.session.homePath,
         organizationAccessSnapshot: input.organizationAccessSnapshot,
         origin: input.profile.session.origin,

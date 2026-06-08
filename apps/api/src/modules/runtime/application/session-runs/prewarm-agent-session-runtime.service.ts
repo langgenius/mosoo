@@ -112,7 +112,7 @@ export async function prewarmAgentSessionRuntime(
       ...hydrated.value.profile,
       session: {
         ...hydrated.value.profile.session,
-        cloudflareSessionId: executionSession.cloudflareSessionId,
+        sandboxSessionId: executionSession.sandboxSessionId,
         homePath: hydrated.value.profile.session.homePath,
         origin: executionSession.origin,
         sessionOrganizationPath: executionSession.cwd,

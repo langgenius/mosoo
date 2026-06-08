@@ -23,7 +23,7 @@ export interface EnsureSandboxConversationSessionInput {
 
 export interface SandboxConversationSessionResult {
   cloudflareSession: ExecutionSessionHandle;
-  cloudflareSessionId: SandboxSessionId;
+  sandboxSessionId: SandboxSessionId;
   cwd: string;
   origin: DriverOriginValue;
   spaceAliases: SpaceAliasBinding[];

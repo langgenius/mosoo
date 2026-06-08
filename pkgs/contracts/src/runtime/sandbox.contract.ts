@@ -63,7 +63,7 @@ export interface SandboxSummary {
 }
 
 export interface SandboxSessionSummary {
-  cloudflareSessionId: SandboxSessionId;
+  sandboxSessionId: SandboxSessionId;
   cwd: string;
   id: SessionId;
   originJson: string;

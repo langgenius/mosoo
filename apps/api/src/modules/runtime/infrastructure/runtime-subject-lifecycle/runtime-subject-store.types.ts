@@ -53,7 +53,7 @@ export interface ReadyRuntimeSubjectBackupRecord {
 }
 
 export interface RuntimeConversationSessionRecord {
-  readonly cloudflareSessionId: SandboxSessionId;
+  readonly sandboxSessionId: SandboxSessionId;
   readonly cwd: string;
   readonly latestReadyBackup: ReadyRuntimeSubjectBackupRecord | null;
   readonly originJson: string;
@@ -64,7 +64,7 @@ export interface RuntimeConversationSessionRecord {
 
 export interface RuntimeConversationSessionState {
   readonly agentId: AgentId | null;
-  readonly cloudflareSessionId: SandboxSessionId;
+  readonly sandboxSessionId: SandboxSessionId;
   readonly kind: AgentKind;
   readonly status: RuntimeConversationSessionRecord["status"];
 }

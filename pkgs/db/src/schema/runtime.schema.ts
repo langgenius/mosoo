@@ -81,7 +81,7 @@ export const sandboxesTable = sqliteTable(
 export const sandboxSessionsTable = sqliteTable(
   "sandbox_session",
   {
-    cloudflareSessionId: platformIdColumn<SandboxSessionId>("cloudflare_session_id").notNull(),
+    sandboxSessionId: platformIdColumn<SandboxSessionId>("cloudflare_session_id").notNull(),
     createdAt: integer("created_at").notNull(),
     cwd: text("cwd").notNull(),
     originJson: text("origin_json").notNull(),
@@ -95,7 +95,7 @@ export const sandboxSessionsTable = sqliteTable(
   },
   (table) => [
     index("sandbox_session_sandbox_status_idx").on(table.sandboxId, table.status, table.updatedAt),
-    uniqueIndex("sandbox_session_cloudflare_session_idx").on(table.cloudflareSessionId),
+    uniqueIndex("sandbox_session_cloudflare_session_idx").on(table.sandboxSessionId),
   ],
 );
 

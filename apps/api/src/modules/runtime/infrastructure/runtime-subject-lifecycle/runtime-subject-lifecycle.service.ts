@@ -227,7 +227,7 @@ export class RuntimeSubjectLifecycleService {
   }
 
   async activateConversationSession(input: {
-    readonly cloudflareSessionId: SandboxSessionId;
+    readonly sandboxSessionId: SandboxSessionId;
     readonly cwd: string;
     readonly now: number;
     readonly originJson: string;
@@ -239,7 +239,7 @@ export class RuntimeSubjectLifecycleService {
   }
 
   async failConversationSession(input: {
-    readonly cloudflareSessionId: SandboxSessionId;
+    readonly sandboxSessionId: SandboxSessionId;
     readonly cwd: string;
     readonly errorCode: RuntimeSubjectErrorCode;
     readonly message: string;
@@ -265,7 +265,7 @@ export class RuntimeSubjectLifecycleService {
     const now = currentTimestampMs();
 
     await deleteActiveSandboxConversationSession(this.#bindings, {
-      cloudflareSessionId: state.cloudflareSessionId,
+      sandboxSessionId: state.sandboxSessionId,
       sandboxId: input.runtimeSubjectId,
     });
 

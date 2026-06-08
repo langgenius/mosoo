@@ -178,8 +178,8 @@ export async function runSetupScript(
   }
 
   const organizationPath = getOrganizationPath(profile);
-  const setupScriptPath = `${SANDBOX_CACHE_PATH}/setup/runtime-setup-${profile.session.cloudflareSessionId}.sh`;
-  const setupMarkerPath = `${SANDBOX_CACHE_PATH}/setup/runtime-setup-${profile.session.cloudflareSessionId}.json`;
+  const setupScriptPath = `${SANDBOX_CACHE_PATH}/setup/runtime-setup-${profile.session.sandboxSessionId}.sh`;
+  const setupMarkerPath = `${SANDBOX_CACHE_PATH}/setup/runtime-setup-${profile.session.sandboxSessionId}.json`;
   const setupDigest = await sha256(profile.setupScript);
   const marker = await readJsonFile(session, setupMarkerPath, parseSetupScriptMarker);
 

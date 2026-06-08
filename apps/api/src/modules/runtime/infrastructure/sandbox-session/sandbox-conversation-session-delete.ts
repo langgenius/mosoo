@@ -10,7 +10,7 @@ import { getRuntimeSubjectKeepAliveHandle } from "../runtime-subject-lifecycle/r
 export async function deleteActiveSandboxConversationSession(
   bindings: ApiBindings,
   input: {
-    readonly cloudflareSessionId: SandboxSessionId;
+    readonly sandboxSessionId: SandboxSessionId;
     readonly sandboxId: SandboxId;
   },
 ): Promise<void> {
@@ -18,14 +18,14 @@ export async function deleteActiveSandboxConversationSession(
     await getRuntimeSubjectKeepAliveHandle(bindings, input.sandboxId),
     async (sandbox) => {
       const deleted = await withDisposedRpcResult(
-        sandbox.deleteSession(input.cloudflareSessionId),
+        sandbox.deleteSession(input.sandboxSessionId),
         (deletedSession) => ({
           success: deletedSession.success,
         }),
       );
 
       if (!deleted.success) {
-        throw new Error(`Sandbox session ${input.cloudflareSessionId} could not be deleted.`);
+        throw new Error(`Sandbox session ${input.sandboxSessionId} could not be deleted.`);
       }
     },
   );

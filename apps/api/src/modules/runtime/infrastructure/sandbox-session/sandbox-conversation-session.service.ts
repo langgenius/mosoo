@@ -55,7 +55,7 @@ function resolveConversationContinuationPlan(input: {
   existingSession: RuntimeConversationSessionRecord | null;
   kind: EnsureSandboxConversationSessionInput["kind"];
 }): {
-  cloudflareSessionId?: SandboxSessionId;
+  sandboxSessionId?: SandboxSessionId;
   shouldCreateCloudflareSession: boolean;
   shouldDeleteErrorSession: boolean;
   shouldRestoreCwd: boolean;
@@ -86,7 +86,7 @@ function resolveConversationContinuationPlan(input: {
 
   return {
     ...(shouldUseNewCloudflareSession
-      ? { cloudflareSessionId: createPlatformId<SandboxSessionId>() }
+      ? { sandboxSessionId: createPlatformId<SandboxSessionId>() }
       : {}),
     shouldCreateCloudflareSession: true,
     shouldDeleteErrorSession: input.existingSession.status === "error",
@@ -147,7 +147,7 @@ export async function ensureSandboxConversationSession(
       spaceAliasesJson: JSON.stringify(frozenAliases),
     }),
   );
-  const cloudflareSessionId = continuation.cloudflareSessionId ?? sessionRecord.cloudflareSessionId;
+  const sandboxSessionId = continuation.sandboxSessionId ?? sessionRecord.sandboxSessionId;
   const organizationAccessSnapshot = buildOrganizationAccessSnapshotFromAliases({
     currentSnapshot: input.currentOrganizationAccessSnapshot,
     spaceAliases: frozenAliases,
@@ -187,7 +187,7 @@ export async function ensureSandboxConversationSession(
   if (continuation.shouldDeleteErrorSession) {
     await measureOptional(input.timing, "conversation.deleteErrorSession", () =>
       deleteSandboxConversationSessionBestEffort({
-        cloudflareSessionId: sessionRecord.cloudflareSessionId,
+        sandboxSessionId: sessionRecord.sandboxSessionId,
         sandbox: input.sandbox,
       }),
     );
@@ -198,7 +198,7 @@ export async function ensureSandboxConversationSession(
     "conversation.openSession",
     () =>
       openSandboxConversationSession({
-        cloudflareSessionId,
+        sandboxSessionId,
         cwd,
         sandbox: input.sandbox,
         shouldCreate: continuation.shouldCreateCloudflareSession,
@@ -217,7 +217,7 @@ export async function ensureSandboxConversationSession(
 
     await measureOptional(input.timing, "conversation.activateRecord", () =>
       recordRuntimeConversationSessionActive(bindings.DB, {
-        cloudflareSessionId,
+        sandboxSessionId,
         cwd,
         now,
         originJson: JSON.stringify(frozenOrigin),
@@ -233,7 +233,7 @@ export async function ensureSandboxConversationSession(
         : "Sandbox alias mount failed during session creation.";
 
     await recordRuntimeConversationSessionError(bindings.DB, {
-      cloudflareSessionId,
+      sandboxSessionId,
       cwd,
       errorCode: "runtime.conversation_mount_failed",
       message,
@@ -250,7 +250,7 @@ export async function ensureSandboxConversationSession(
 
   return {
     cloudflareSession,
-    cloudflareSessionId,
+    sandboxSessionId,
     cwd,
     organizationAccessSnapshot,
     origin: frozenOrigin,
@@ -279,7 +279,7 @@ export async function closeSandboxConversationSession(
     await import("./sandbox-conversation-session-delete");
 
   await deleteActiveSandboxConversationSession(bindings, {
-    cloudflareSessionId: state.cloudflareSessionId,
+    sandboxSessionId: state.sandboxSessionId,
     sandboxId: input.sandboxId,
   });
 

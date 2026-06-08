@@ -64,7 +64,7 @@ export function createAgentRuntimeProfile(input: {
   readiness: AgentReadiness;
   runtimeId: string;
   sandboxId: SandboxId;
-  cloudflareSessionId: SandboxSessionId;
+  sandboxSessionId: SandboxSessionId;
   sessionId: SessionId;
   setupScript: string;
   spaceBindings: FrozenSandboxSpaceBinding[];
@@ -104,7 +104,7 @@ export function createAgentRuntimeProfile(input: {
         subjectKind: sandboxSubject.subjectKind,
       },
       session: {
-        cloudflareSessionId: input.cloudflareSessionId,
+        sandboxSessionId: input.sandboxSessionId,
         homePath: getSessionRuntimeStatePath(input.sessionId, runtimeId),
         origin: {
           callerUserId: input.callerUserId,
