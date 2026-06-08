@@ -163,6 +163,16 @@ export function Onboarding() {
           return;
         }
 
+        // First-time creation has no real choice: no pending invitations and
+        // no organizations to join. Skip the confirmation screen and create
+        // the domain-named organization directly.
+        if (pendingInvites.length === 0 && result.orgs.length === 0) {
+          await handleBootstrap("create", {
+            name: getOnboardingDomainOrganizationName(result.domain),
+          });
+          return;
+        }
+
         dispatch({
           discovery: result,
           invitations: pendingInvites,
