@@ -191,8 +191,7 @@ function DraftPatchValuePreview({
     draftPatch.sectionId !== undefined &&
     onDraftPatchFocus !== undefined &&
     environmentConfigLink === null;
-  const containerClassName =
-    "text-muted-foreground mt-1.5 w-full text-left";
+  const containerClassName = "text-muted-foreground mt-1.5 w-full text-left";
 
   const content =
     draftPatch.fieldPath === "prompt" && typeof draftPatch.value === "string" ? (
@@ -272,16 +271,11 @@ function PlannerNodeCard({
 
   return (
     <div
-      className={cn(
-        "rounded-md px-3 py-2.5 text-left",
-        isIssueNode ? "bg-danger/5" : "bg-bg-1",
-      )}
+      className={cn("rounded-md px-3 py-2.5 text-left", isIssueNode ? "bg-danger/5" : "bg-bg-1")}
     >
       <div className="min-w-0 space-y-1.5">
         {fieldLabel === null ? null : (
-          <div className="text-foreground text-[12px] leading-none font-semibold">
-            {fieldLabel}
-          </div>
+          <div className="text-foreground text-[12px] leading-none font-semibold">{fieldLabel}</div>
         )}
         <div
           className={cn(
@@ -292,10 +286,7 @@ function PlannerNodeCard({
           {node.summary}
         </div>
         {showDraftPatchPreview && draftPatch !== undefined ? (
-          <DraftPatchValuePreview
-            draftPatch={draftPatch}
-            onDraftPatchFocus={onDraftPatchFocus}
-          />
+          <DraftPatchValuePreview draftPatch={draftPatch} onDraftPatchFocus={onDraftPatchFocus} />
         ) : null}
         {!showControls || node.askUser === undefined || onStructuredReply === undefined ? null : (
           <AgentBuilderAskUserCard

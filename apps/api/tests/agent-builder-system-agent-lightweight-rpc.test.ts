@@ -744,11 +744,7 @@ describe("Agent Builder System Agent lightweight RPC", () => {
     const fixture = await createAgentBuilderApiFixture();
     const viewer = await login(fixture);
     const thread = await ensureAgentBuilderThread(fixture.bindings.DB, viewer, fixture.ids.agentId);
-    const rawDraftYaml = [
-      DRAFT_YAML,
-      "notes:",
-      "  user_goal: docs-helper",
-    ].join("\n");
+    const rawDraftYaml = [DRAFT_YAML, "notes:", "  user_goal: docs-helper"].join("\n");
     let plannerDraftYaml: string | null = null;
     const result = await submitAgentBuilderSystemAgentMessage(fixture.bindings, viewer, {
       agentId: fixture.ids.agentId,

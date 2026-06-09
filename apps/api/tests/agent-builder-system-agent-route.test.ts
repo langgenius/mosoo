@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
+import { parseAgentBuilderSystemAgentInstanceName } from "../src/modules/agent-builder/application/agent-builder-system-agent-instance";
 import {
   AGENT_BUILDER_SYSTEM_AGENT_ROUTE_PREFIX,
   AGENT_BUILDER_SYSTEM_AGENT_SDK_ROUTE_PREFIX,
   parseAgentBuilderSystemAgentRpcRoute,
   shouldRouteAgentBuilderSystemAgentRequest,
 } from "../src/modules/agent-builder/infrastructure/agent-builder-system-agent-route";
-import { parseAgentBuilderSystemAgentInstanceName } from "../src/modules/agent-builder/application/agent-builder-system-agent-instance";
 
 const ROUTE_AGENT_ID = "01J000000000000000000000G1";
 const ROUTE_THREAD_ID = "01J000000000000000000000G2";

@@ -183,6 +183,7 @@ export async function executeAgentBuilderControlPlaneAction(
     case "reset_preview_session":
       return resetPreviewSession(bindings, viewer, input);
     default:
-      throw new Error(`Unsupported Agent Builder executable action: ${input.toolId}`);
+      const exhaustiveToolId: never = input.toolId;
+      throw new Error(`Unsupported Agent Builder executable action: ${String(exhaustiveToolId)}`);
   }
 }
