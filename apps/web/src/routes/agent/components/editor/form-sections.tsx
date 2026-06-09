@@ -1,12 +1,7 @@
-import { AlertTriangle, ExternalLink } from "lucide-react";
-import { Link } from "react-router-dom";
+import { AlertTriangle } from "lucide-react";
 
-import {
-  ADD_PROVIDER_KEY_TEXT,
-  getPrimaryProviderReadinessPresentation,
-} from "@/domains/vendor-credential/model/provider-readiness-copy";
+import { getPrimaryProviderReadinessPresentation } from "@/domains/vendor-credential/model/provider-readiness-copy";
 import { cn } from "@/shared/lib/class-names";
-import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
@@ -37,6 +32,11 @@ function ReadinessBanner({ agent }: { agent: Agent }) {
 
   const primary = errors[0];
   const providerPresentation = getPrimaryProviderReadinessPresentation(errors);
+
+  if (providerPresentation?.action === "add-provider-key") {
+    return null;
+  }
+
   const message =
     providerPresentation?.message ??
     primary?.message ??
@@ -62,14 +62,6 @@ function ReadinessBanner({ agent }: { agent: Agent }) {
             </div>
           ) : null}
         </div>
-        {providerPresentation?.action === "add-provider-key" ? (
-          <Button asChild size="xs" variant="outline">
-            <Link to="/providers">
-              {ADD_PROVIDER_KEY_TEXT}
-              <ExternalLink className="size-3" />
-            </Link>
-          </Button>
-        ) : null}
       </div>
     </div>
   );
