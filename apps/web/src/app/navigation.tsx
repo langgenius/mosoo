@@ -18,34 +18,21 @@ interface AppNavItem {
   path: string;
 }
 
-interface AppNavSection {
-  items: AppNavItem[];
-  label: string;
-}
-
-const NAV_SECTIONS: AppNavSection[] = [
+const NAV_ITEMS: AppNavItem[] = [
+  { icon: Inbox, label: "Threads", path: "/threads" },
+  { icon: Bot, label: "Agents", path: "/agent" },
+  { icon: Folder, label: "Spaces", path: "/space" },
+  { icon: Box, label: "Environments", path: "/environment" },
   {
-    items: [{ icon: Inbox, label: "Threads", path: "/threads" }],
-    label: "Work",
-  },
-  {
-    items: [
-      { icon: Bot, label: "Agents", path: "/agent" },
-      { icon: Folder, label: "Spaces", path: "/space" },
-      { icon: Box, label: "Environments", path: "/environment" },
-      {
-        children: [
-          { label: "Skills", path: "/integrations/skills" },
-          { label: "MCP servers", path: "/integrations/mcp" },
-        ],
-        icon: Puzzle,
-        label: "Integrations",
-        path: "/integrations",
-      },
-      { icon: KeyRound, label: "Providers", path: "/providers" },
+    children: [
+      { label: "Skills", path: "/integrations/skills" },
+      { label: "MCP servers", path: "/integrations/mcp" },
     ],
-    label: "Studio",
+    icon: Puzzle,
+    label: "Integrations",
+    path: "/integrations",
   },
+  { icon: KeyRound, label: "Providers", path: "/providers" },
 ];
 
 function isNavItemActive(pathname: string, path: string): boolean {
@@ -197,38 +184,21 @@ function NavGroup({
 
 export function AppNavigation({ collapsed, pathname }: { collapsed: boolean; pathname: string }) {
   return (
-    <div className={cn("flex flex-col", collapsed ? "gap-2" : "gap-3")}>
-      {NAV_SECTIONS.map((section, sectionIndex) => {
-        return (
-          <div key={section.label}>
-            {collapsed ? (
-              sectionIndex > 0 ? (
-                <div className="bg-border-soft mx-auto mb-2 h-px w-6" />
-              ) : null
-            ) : (
-              <div className="text-fg-3 px-2.5 pb-1.5 text-[10px] font-semibold tracking-[0.14em] uppercase">
-                {section.label}
-              </div>
-            )}
-            <div className={cn("flex flex-col", collapsed ? "gap-1" : "gap-0.5")}>
-              {section.items.map((item) =>
-                item.children && item.children.length > 0 ? (
-                  <NavGroup key={item.path} collapsed={collapsed} item={item} pathname={pathname} />
-                ) : (
-                  <NavLink
-                    key={item.path}
-                    collapsed={collapsed}
-                    icon={item.icon}
-                    isActive={isNavItemActive(pathname, item.path)}
-                    label={item.label}
-                    path={item.path}
-                  />
-                ),
-              )}
-            </div>
-          </div>
-        );
-      })}
+    <div className={cn("flex flex-col", collapsed ? "gap-1" : "gap-0.5")}>
+      {NAV_ITEMS.map((item) =>
+        item.children && item.children.length > 0 ? (
+          <NavGroup key={item.path} collapsed={collapsed} item={item} pathname={pathname} />
+        ) : (
+          <NavLink
+            key={item.path}
+            collapsed={collapsed}
+            icon={item.icon}
+            isActive={isNavItemActive(pathname, item.path)}
+            label={item.label}
+            path={item.path}
+          />
+        ),
+      )}
     </div>
   );
 }

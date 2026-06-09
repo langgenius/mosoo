@@ -1,6 +1,6 @@
 import { Bot, Plus, Upload } from "lucide-react";
-import { useMemo, useReducer } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useReducer } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAppSession } from "@/app/session-provider";
 import { useVisibleAgentsQuery } from "@/domains/agent/query/agent-queries";
@@ -70,10 +70,19 @@ export function AgentListPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { activeOrganization } = useAppSession();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [state, dispatch] = useReducer(agentListPageReducer, AGENT_LIST_PAGE_INITIAL_STATE);
   const { scope, search, showCreate, showImport, view } = state;
   const organizationId = activeOrganization?.id ?? null;
   const agentsQuery = useVisibleAgentsQuery(organizationId);
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1") return;
+    dispatch({ open: true, type: "setShowCreate" });
+    const next = new URLSearchParams(searchParams);
+    next.delete("create");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const agents = useMemo(
     () => (agentsQuery.data ?? []).map((profile) => mapAgentSummaryToListView(profile, user)),

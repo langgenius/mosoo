@@ -59,18 +59,18 @@ export function Layout({ children }: { children: ReactNode }) {
         <Tooltip>
           <TooltipTrigger asChild>
             <Link
-              to="/threads?compose=1"
-              aria-label="New thread"
+              to="/agent?create=1"
+              aria-label="New agent"
               className={cn(
                 "bg-primary text-primary-foreground hover:bg-primary-hover mt-1 inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold shadow-xs transition-colors",
                 collapsed ? "mx-auto size-9 rounded-md" : "mx-0.5 mb-4 h-9 rounded-md px-3",
               )}
             >
               <Plus className="size-3.5" />
-              {collapsed ? null : <span>New thread</span>}
+              {collapsed ? null : <span>New agent</span>}
             </Link>
           </TooltipTrigger>
-          {collapsed ? <TooltipContent side="right">New thread</TooltipContent> : null}
+          {collapsed ? <TooltipContent side="right">New agent</TooltipContent> : null}
         </Tooltip>
 
         <AppNavigation collapsed={collapsed} pathname={location.pathname} />
