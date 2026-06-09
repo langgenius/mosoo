@@ -40,7 +40,7 @@ If generated output is wrong, fix the schema, contract, resolver, or PRD source 
 
 Required tools:
 
-- `bun >= 1.3.14`
+- `bun >= 1.4.0-canary.1` with text `bun.lock` `lockfileVersion: 2` support.
 - `just >= 1.51`
 - Vite Plus `vp`: `curl -fsSL https://vite.plus | bash`
 
@@ -51,7 +51,7 @@ Command conventions:
 - Use `vp run ...` for task orchestration.
 - Use `vp exec ...` for local tooling.
 - Use `vp exec bun ...` when Bun runtime is required.
-- Use direct `bun install` only for dependency bootstrap before dependencies are installed.
+- Bootstrap dependencies with `bun install --frozen-lockfile` before repository dependencies are installed.
 - Install Git hooks with `vp exec prek -c dev/config/prek.toml install` after `bun install`, so the hook installer comes from the repository dependency graph instead of a one-off `dlx` execution.
 
 ## Initialization
@@ -60,7 +60,7 @@ Run this from the repository root:
 
 ```bash
 git submodule update --init   # populate .skills/mosoo-skills (clone with --recurse-submodules to skip this)
-bun install
+bun install --frozen-lockfile
 vp run env:init
 vp exec prek -c dev/config/prek.toml install
 vp run db:migrate:local
