@@ -72,7 +72,7 @@ export const AGENT_KIND_RUNTIME_POLICIES = {
       description:
         "Independent sandbox per session. Best for high-concurrency tasks, PR reviews, and webhook triggers.",
       examples: "e.g. PR auto-review | Linear ticket triage | Batch jobs",
-      label: "Cattle",
+      label: "Task Agent",
       tagline: "On-demand worker",
     },
     kind: "cattle",
@@ -104,7 +104,7 @@ export const AGENT_KIND_RUNTIME_POLICIES = {
       description:
         "Stable sandbox per agent with Backup/Restore continuity. Best for daily helpers, knowledge agents, and personal copilots.",
       examples: "e.g. Slack helper | Knowledge butler | Personal copilot",
-      label: "Pet",
+      label: "Assistant Agent",
       tagline: "Always-on teammate",
     },
     kind: "pet",

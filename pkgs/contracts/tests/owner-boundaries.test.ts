@@ -81,7 +81,7 @@ describe("contracts owner boundaries", () => {
 
     expect(getAgentKindRuntimePolicy("pet")).toMatchObject({
       copy: {
-        label: "Pet",
+        label: "Assistant Agent",
         tagline: "Always-on teammate",
       },
       nativeResume: {
@@ -93,7 +93,7 @@ describe("contracts owner boundaries", () => {
     });
     expect(getAgentKindRuntimePolicy("cattle")).toMatchObject({
       copy: {
-        label: "Cattle",
+        label: "Task Agent",
         tagline: "On-demand worker",
       },
       nativeResume: {

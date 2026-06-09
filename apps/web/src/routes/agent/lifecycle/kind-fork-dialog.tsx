@@ -13,8 +13,8 @@ import {
 import type { AgentKind } from "../agent.types";
 
 const KIND_LABELS: Record<AgentKind, { title: string; tagline: string; icon: typeof Bot }> = {
-  pet: { title: "Pet", tagline: "Always-on teammate", icon: Bot },
-  cattle: { title: "Cattle", tagline: "On-demand worker", icon: Zap },
+  pet: { title: "Assistant Agent", tagline: "Always-on teammate", icon: Bot },
+  cattle: { title: "Task Agent", tagline: "On-demand worker", icon: Zap },
 };
 
 const CARRIED_OVER = [
@@ -26,15 +26,15 @@ const CARRIED_OVER = [
   "Space bindings",
 ];
 
-const DROPPED_PET_TO_CATTLE = ["Pet stable Sandbox state"];
+const DROPPED_PET_TO_CATTLE = ["Assistant Agent stable Sandbox state"];
 
-const ADDED_CATTLE_TO_PET = ["A new stable Pet Sandbox"];
+const ADDED_CATTLE_TO_PET = ["A new stable Assistant Agent Sandbox"];
 
 const STAYS_ON_ORIGINAL = [
   "Existing sessions",
   "Cost history",
   "Runtime logs",
-  "Pet stable Sandbox state",
+  "Assistant Agent stable Sandbox state",
 ];
 
 export function KindForkDialog({
