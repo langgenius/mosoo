@@ -1,4 +1,4 @@
-import { FolderOpen, Plus, RotateCcw } from "lucide-react";
+import { Plus, RotateCcw } from "lucide-react";
 import type React from "react";
 
 import { cn } from "@/shared/lib/class-names";
@@ -20,28 +20,22 @@ const PILL_VARIANTS: Record<SessionPill, React.ComponentProps<typeof Badge>["var
 export function AgentSessionPanelHeader({
   activeTitle,
   agentName,
-  filesPanelOpen,
-  onFilesPanelToggle,
   onSessionControlClick,
   pill,
   reconnectingSubtitle,
   sessionControlMode,
   sending,
   sessionCount,
-  sessionFilesCount,
   tone,
 }: {
   activeTitle: string | null;
   agentName: string;
-  filesPanelOpen: boolean;
-  onFilesPanelToggle: () => void;
   onSessionControlClick: () => Promise<void>;
   pill: SessionPill;
   reconnectingSubtitle: string | null;
   sessionControlMode: SessionControlMode;
   sending: boolean;
   sessionCount: number;
-  sessionFilesCount: number;
   tone: "preview" | "consume";
 }) {
   const SessionControlIcon = sessionControlMode === "reset" ? RotateCcw : Plus;
@@ -79,20 +73,6 @@ export function AgentSessionPanelHeader({
       >
         <SessionControlIcon className="size-3" />
         {sessionControlLabel}
-      </Button>
-      <Button
-        aria-label="Toggle files panel"
-        aria-pressed={filesPanelOpen}
-        className="gap-1.5"
-        onClick={onFilesPanelToggle}
-        size="xs"
-        variant={filesPanelOpen ? "outline" : "ghost"}
-      >
-        <FolderOpen className="size-3" />
-        Files
-        {sessionFilesCount > 0 ? (
-          <span className="text-muted-foreground text-[10px]">{sessionFilesCount}</span>
-        ) : null}
       </Button>
     </div>
   );

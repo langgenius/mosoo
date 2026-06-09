@@ -1,17 +1,12 @@
 import type { AgentReadiness } from "@mosoo/contracts/agent";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { ShieldAlert, X } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
 
-import {
-  listSessionResources,
-  sessionResourcesQueryKey,
-} from "@/domains/session/api/session-resources";
+import { sessionResourcesQueryKey } from "@/domains/session/api/session-resources";
 import { SessionComposer } from "@/features/session-chat/session-composer";
 import { SessionMessageList } from "@/features/session-chat/session-message-list";
 import { useSessionResourceDraft } from "@/features/session-chat/use-session-resource-draft";
-import { SessionFilesPanel } from "@/features/session-files/session-files-panel";
 import {
   completeSessionFileUpload,
   failSessionFileUpload,
@@ -79,17 +74,11 @@ export function AgentSessionPanel({
     stopped,
   });
 
-  const [filesPanelOpen, setFilesPanelOpen] = useState(false);
   const queryClient = useQueryClient();
   const { pendingBySession } = useSessionFilesStore();
   const activeSessionId =
     model.activeSessionId === null ? null : toSessionId(model.activeSessionId);
   const resourceDraft = useSessionResourceDraft(activeSessionId);
-  const sessionResourcesQuery = useQuery({
-    enabled: activeSessionId !== null,
-    queryFn: async () => listSessionResources(activeSessionId!),
-    queryKey: sessionResourcesQueryKey(activeSessionId),
-  });
   const pendingFiles = isTruthy(activeSessionId) ? (pendingBySession[activeSessionId] ?? []) : [];
   const sessionResourceMentions = resourceDraft.mentions;
   const pendingSessionFiles = pendingFiles.flatMap((file) => {
@@ -106,7 +95,6 @@ export function AgentSessionPanel({
       },
     ];
   });
-  const sessionFilesCount = pendingFiles.length + (sessionResourcesQuery.data?.length ?? 0);
   const fileUploadDisabled = shouldBlockSessionFileUpload({
     activeSessionId: model.activeSessionId,
     tone,
@@ -123,7 +111,6 @@ export function AgentSessionPanel({
   const configurationRefreshActionLabel = previewResetMode ? "Reset chat" : "Start new session";
   const stoppedActionLabel = previewResetMode ? "Reset chat" : "New session";
   const handleResetPreviewSession = async (): Promise<void> => {
-    setFilesPanelOpen(false);
     resourceDraft.clearActiveMentions();
     await model.handleResetSession();
   };
@@ -178,17 +165,12 @@ export function AgentSessionPanel({
         <AgentSessionPanelHeader
           activeTitle={activeTitle}
           agentName={agentName}
-          filesPanelOpen={filesPanelOpen}
-          onFilesPanelToggle={() => {
-            setFilesPanelOpen((prev) => !prev);
-          }}
           onSessionControlClick={handleSessionControlClick}
           pill={pill}
           reconnectingSubtitle={reconnectingSubtitle}
           sessionControlMode={sessionControlMode}
           sending={model.sending}
           sessionCount={model.sessionCount}
-          sessionFilesCount={sessionFilesCount}
           tone={tone}
         />
 
@@ -328,17 +310,6 @@ export function AgentSessionPanel({
           />
         </div>
       </div>
-      {filesPanelOpen ? (
-        <SessionFilesPanel
-          onClose={() => {
-            setFilesPanelOpen(false);
-          }}
-          onUploadFiles={(files) => void handleUploadFiles(files)}
-          sessionId={model.activeSessionId}
-          uploadDisabled={fileUploadDisabled}
-          uploadDisabledReason={fileUploadDisabledReason}
-        />
-      ) : null}
     </div>
   );
 }
