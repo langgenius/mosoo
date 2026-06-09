@@ -8,7 +8,7 @@ import { BasicsSection, EnvironmentSection, IntegrationsSection } from "./form-s
 import type { AgentFormSectionId } from "./section-ids";
 import type { AgentEditorModel } from "./use-model";
 
-// Three-section form layout (locked with Evan 2026-05-05):
+// Three-section form layout (locked on 2026-05-05):
 //   1. Basics       — name, description, runtime, model, system prompt
 //   2. Integrations — skills, MCP servers
 //   3. Environment  — environment, spaces

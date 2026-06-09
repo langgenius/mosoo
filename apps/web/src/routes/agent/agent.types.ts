@@ -62,7 +62,7 @@ export interface McpServer {
   credentialStatus?: McpCredentialStatus;
   /**
    * When credentialMode === "agent_bound", the human-readable subject label of
-   * the bound credential (e.g. "yevan@mosoo.ai" or "Bearer Token configured").
+   * the bound credential (e.g. "alex@example.com" or "Bearer Token configured").
    */
   credentialSubject?: string;
 }

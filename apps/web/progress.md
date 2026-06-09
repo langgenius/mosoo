@@ -1,10 +1,10 @@
 # react-doctor cleanup progress
 
-Tracking remediation for `npx react-doctor` findings on `@groots/web`.
+Tracking remediation for `npx react-doctor` findings on `@mosoo/web`.
 
 **Baseline (2026-05-29):** 27 errors + 357 warnings = **384** issues — score **73/100** (Needs work).
 
-Source: https://www.react.doctor/share?p=%40groots%2Fweb&s=73&e=27&w=357&f=153
+Source: https://www.react.doctor/share?p=%40mosoo%2Fweb&s=73&e=27&w=357&f=153
 
 ## Strategy
 

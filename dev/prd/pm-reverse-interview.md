@@ -1,6 +1,6 @@
 # Reverse Interview: When You (the Engineer) Drill Too Deep, Come Back Up to the Product Layer and Align with the PM
 
-> **Status**: Living document · **Maintainer**: Evanchen · **Last updated**: 2026-04-29
+> **Status**: Living document · **Maintainer**: Product Team · **Last updated**: 2026-04-29
 >
 > **Audience**: Engineers implementing a PRD.
 > **When to use it**: When you are about to go back to the PM to align, but realize your phrasing has already dropped down into implementation detail, leaving the PM unable to make a product-level judgment from it.

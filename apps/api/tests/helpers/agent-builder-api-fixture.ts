@@ -11,11 +11,11 @@ import { createPublicHttpTestBindings } from "./published-agent-http-test-fixtur
 import { SqliteD1Database } from "./sqlite-d1";
 
 const AGENT_BUILDER_TEST_VIEWER = {
-  email: "xiaoke@mosoo.ai",
+  email: "agent.builder.fixture@mosoo.ai",
   emailVerified: true,
   id: "01J00000000000000000000051",
   imageUrl: null,
-  name: "Xiaoke",
+  name: "Agent Builder User",
 } satisfies AuthenticatedViewer;
 
 export const AGENT_BUILDER_TEST_IDS = {

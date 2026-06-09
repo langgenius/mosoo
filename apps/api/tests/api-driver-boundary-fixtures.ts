@@ -106,7 +106,7 @@ export function createResolvedMcpServers(): DriverResolvedMcpServer[] {
       credentialStatus: "active",
       name: "Linear",
       serverId: API_DRIVER_BOUNDARY_IDS.mcpServerLinear,
-      subjectLabel: "Evan",
+      subjectLabel: "Alex Example",
     },
     {
       authType: "bearer",

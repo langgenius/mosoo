@@ -28,7 +28,7 @@ It sits alongside the other first-class assets—**Agent / Space / Skill / MCP S
 
 DifyLite v1 has no concept of an Environment. As a result, all three of the people below end up wrestling with the "runtime container":
 
-### Scenario A · Agent author, Wang Qiming
+### Scenario A · Agent author, Alex
 
 He publishes a data-analysis Agent that needs pandas / numpy / scikit-learn. Today he puts this in the system prompt:
 
@@ -36,34 +36,34 @@ He publishes a data-analysis Agent that needs pandas / numpy / scikit-learn. Tod
 
 Every session cold-start costs an extra 12 seconds, tokens are wasted in tool-call logs, package versions aren't pinned—and when a downstream Agent breaks, he spends ages debugging.
 
-### Scenario B · Org Admin, Li Xue
+### Scenario B · Org Admin, Morgan
 
 Compliance requires that all outbound traffic be limited to `mcp.linear.app` and `api.githubcopilot.com`. She wants to "**flip one switch in one place and have it apply org-wide**"—rather than digging through settings Agent by Agent.
 
-### Scenario C · Design intern, Yang Yaxin
+### Scenario C · Design intern, Riley
 
 She uses an Agent a colleague published, and the UI asks her "which Environment?". She doesn't understand network policy or package managers—**what she wants is a sensible default that just works, with no thinking required**.
 
-> Without Environment: Wang Qiming can only hack it in the prompt; Li Xue can only edit each Agent one at a time; and Yang Yaxin should never have been asked this question at all.
+> Without Environment: Alex can only hack it in the prompt; Morgan can only edit each Agent one at a time; and Riley should never have been asked this question at all.
 
 ---
 
 ## 2. Goals
 
-### What the Agent author (Wang Qiming) can do
+### What the Agent author (Alex) can do
 
 - Define a named "runtime template"—network policy + pre-installed packages + setup script + env vars, written once and shared by reference across multiple Agents
 - Pick an Environment from a dropdown on the Agent config page; or create one on the spot with **"+ Create new environment…"** without leaving the Agent form
 - See the compliance template the Org Admin configured (Limited network + allowlist), and—when needed—**Fork it directly** and add his own pandas, without bothering the Admin
 
-### What the Org Admin (Li Xue) can do
+### What the Org Admin (Morgan) can do
 
 - Create a named Environment ("compliance-locked") configured with Limited network + Allowed Hosts
 - **Share it with the entire Organization** and mark it as the **Organization Default**—so new Agents adopt it automatically
 - Discover that a member's forked version reset the network back to Full → **edit that copy directly to change it back** through the Org Admin override permission
 - See from the Environment detail who last changed `api.notion.com` in Allowed Hosts
 
-### What a regular Member (Yang Yaxin) can do
+### What a regular Member (Riley) can do
 
 - Use any Agent a colleague published **without needing to understand what an Environment is**—the platform already provides a System Default (Full network, no pre-installed packages) as a fallback, and the picker auto-fills the Org Default
 
@@ -169,32 +169,32 @@ Rationale: the **blast radius of network policy is too large**—a single member
 
 | Stage          | Actor  | Experience                                                                              | Pain point → experience                                                                                            |
 | -------------- | ------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Discover       | Li Xue | Hears the compliance requirement, opens the sidebar `Studio → Environments`             | The first item in the list is the System Default with a BUILT-IN badge—clear at a glance                           |
-| Create         | Li Xue | A dialog lets her fill in Name + Limited + Allowed Hosts + one env var in one go → Save | No need to first create an empty shell and then jump to a detail page to configure it—fully configured in one step |
-| Share          | Li Xue | On the detail page, top-right Share → "Add everyone in organization"                    | Once added, it instantly appears under "Shared with me" in every member's list                                     |
-| Set as default | Li Xue | Settings → Organization → select this one as the Default                                | The description is explicit: "Affects new Agents only; existing ones are left untouched"                           |
+| Discover       | Morgan | Hears the compliance requirement, opens the sidebar `Studio → Environments`             | The first item in the list is the System Default with a BUILT-IN badge—clear at a glance                           |
+| Create         | Morgan | A dialog lets her fill in Name + Limited + Allowed Hosts + one env var in one go → Save | No need to first create an empty shell and then jump to a detail page to configure it—fully configured in one step |
+| Share          | Morgan | On the detail page, top-right Share → "Add everyone in organization"                    | Once added, it instantly appears under "Shared with me" in every member's list                                     |
+| Set as default | Morgan | Settings → Organization → select this one as the Default                                | The description is explicit: "Affects new Agents only; existing ones are left untouched"                           |
 
 ### Agent author forks and adds packages → without bothering the Admin
 
-| Stage                          | Actor       | Experience                                                                                                                                                                                                    |
-| ------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Open config page               | Wang Qiming | The picker is already pre-filled with the Org Default "compliance-locked"                                                                                                                                     |
-| Needs pandas                   | Wang Qiming | For him, this env is "Shared with me"—he can't Edit it                                                                                                                                                        |
-| Fork & customize               | Wang Qiming | In the picker dropdown he clicks "+ Create new environment…" or "Fork & customize" on the tile → copies the source, renames it "data-sci-locked", and adds pip packages; he becomes the Owner of the new copy |
-| Continue configuring the Agent | Wang Qiming | **He never left the Agent form**                                                                                                                                                                              |
+| Stage                          | Actor | Experience                                                                                                                                                                                                    |
+| ------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Open config page               | Alex  | The picker is already pre-filled with the Org Default "compliance-locked"                                                                                                                                     |
+| Needs pandas                   | Alex  | For him, this env is "Shared with me"—he can't Edit it                                                                                                                                                        |
+| Fork & customize               | Alex  | In the picker dropdown he clicks "+ Create new environment…" or "Fork & customize" on the tile → copies the source, renames it "data-sci-locked", and adds pip packages; he becomes the Owner of the new copy |
+| Continue configuring the Agent | Alex  | **He never left the Agent form**                                                                                                                                                                              |
 
 ### The person using the Agent notices nothing
 
-| Stage | Actor      | Experience                                                            |
-| ----- | ---------- | --------------------------------------------------------------------- |
-| Run   | Yang Yaxin | Chats with the Agent in Chat—with no idea what an Environment even is |
+| Stage | Actor | Experience                                                            |
+| ----- | ----- | --------------------------------------------------------------------- |
+| Run   | Riley | Chats with the Agent in Chat—with no idea what an Environment even is |
 
 ### Owner deletes a shared env → User discovers an extra copy two weeks later
 
-| Stage                 | Actor       | Experience                                                                                                                                           |
-| --------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cascade Fork fallback | Wang Qiming | One day, his List's Personal group has an extra entry, "compliance-locked-cascade", with an inline banner _Forked from Li Xue's deleted Environment_ |
-| Reaction              | Wang Qiming | "Ah, so Li Xue deleted the original—good thing the system took over automatically, the session can still run." Whether to clean it up is his call    |
+| Stage                 | Actor | Experience                                                                                                                                           |
+| --------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cascade Fork fallback | Alex  | One day, his List's Personal group has an extra entry, "compliance-locked-cascade", with an inline banner _Forked from Morgan's deleted Environment_ |
+| Reaction              | Alex  | "Ah, so Morgan deleted the original—good thing the system took over automatically, the session can still run." Whether to clean it up is his call    |
 
 ---
 

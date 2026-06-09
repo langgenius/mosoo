@@ -16,11 +16,11 @@ import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 
 const viewer: AuthenticatedViewer = {
-  email: "xiaoke@mosoo.ai",
+  email: "agent.builder.fixture@mosoo.ai",
   emailVerified: true,
   id: "01J00000000000000000000051",
   imageUrl: null,
-  name: "Xiaoke",
+  name: "Agent Builder User",
 };
 
 const VISIBLE_ASSET_IDS = {
@@ -120,7 +120,7 @@ describe("Agent Builder visible asset providers", () => {
           description: "Review docs",
           id: VISIBLE_ASSET_IDS.skillBound,
           name: "docs-review",
-          ownerName: "Xiaoke",
+          ownerName: "Agent Builder User",
           snapshotId: VISIBLE_ASSET_IDS.skillSnapshot,
           sourceKind: "user",
           updatedAt: "2026-05-20T00:00:00.000Z",
@@ -372,7 +372,7 @@ describe("Agent Builder visible asset providers", () => {
               hash: "skill-hash",
               id: VISIBLE_ASSET_IDS.skillBound,
               name: "Support Skill",
-              ownerName: "Xiaoke",
+              ownerName: "Agent Builder User",
               snapshotId: VISIBLE_ASSET_IDS.skillSnapshot,
               sourceKind: "manual",
               updatedAt: "2026-05-20T00:00:00.000Z",
@@ -482,7 +482,7 @@ describe("Agent Builder visible asset providers", () => {
             hash: "skill-new-hash",
             id: VISIBLE_ASSET_IDS.skillBound,
             name: "Support Skill",
-            ownerName: "Xiaoke",
+            ownerName: "Agent Builder User",
             snapshotId: VISIBLE_ASSET_IDS.skillSnapshot,
             sourceKind: "manual",
             updatedAt: "2026-05-20T00:00:00.000Z",
@@ -521,7 +521,7 @@ describe("Agent Builder visible asset providers", () => {
         hash: "skill-new-hash",
         id: VISIBLE_ASSET_IDS.skillBound,
         name: "Support Skill",
-        ownerName: "Xiaoke",
+        ownerName: "Agent Builder User",
         snapshotId: VISIBLE_ASSET_IDS.skillSnapshot,
         sourceKind: "manual",
         updatedAt: "2026-05-20T00:00:00.000Z",
@@ -620,7 +620,7 @@ describe("Agent Builder visible asset providers", () => {
             hash: "skill-new-hash",
             id: VISIBLE_ASSET_IDS.skillBound,
             name: "Support Skill",
-            ownerName: "Xiaoke",
+            ownerName: "Agent Builder User",
             snapshotId: VISIBLE_ASSET_IDS.skillSnapshot,
             sourceKind: "manual",
             updatedAt: "2026-05-20T00:00:00.000Z",
@@ -657,7 +657,7 @@ describe("Agent Builder visible asset providers", () => {
             hash: "skill-new-hash",
             id: VISIBLE_ASSET_IDS.skillBound,
             name: "Support Skill",
-            ownerName: "Xiaoke",
+            ownerName: "Agent Builder User",
             snapshotId: VISIBLE_ASSET_IDS.skillSnapshot,
             sourceKind: "manual",
             updatedAt: "2026-05-20T00:00:00.000Z",

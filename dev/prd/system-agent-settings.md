@@ -22,9 +22,9 @@ The copilot's model is currently hard-coded. **When a new organization hasn't ye
 
 What three real personas commonly say:
 
-- **Member Wang Qiming (the 401 victim)**: "Our company pool only has an Anthropic key, but the copilot always uses OpenAI and 401s every time. I want to switch to Sonnet 4.6, but there's no entry point."
-- **Member Yang Yaxin (cost-sensitive)**: "The copilot defaults to Sonnet, which I find too expensive. Personally I'd like to switch to Haiku 4.5 to save money — but I don't want it to affect my colleagues."
-- **Org Admin Li Xue**: "Choosing the copilot's model is a personal preference (everyone has different sensitivities to cost / speed / privacy). As an admin, I **shouldn't** have to make that call on behalf of the whole org."
+- **Member Alex (the 401 victim)**: "Our company pool only has an Anthropic key, but the copilot always uses OpenAI and 401s every time. I want to switch to Sonnet 4.6, but there's no entry point."
+- **Member Riley (cost-sensitive)**: "The copilot defaults to Sonnet, which I find too expensive. Personally I'd like to switch to Haiku 4.5 to save money — but I don't want it to affect my colleagues."
+- **Org Admin Morgan**: "Choosing the copilot's model is a personal preference (everyone has different sensitivities to cost / speed / privacy). As an admin, I **shouldn't** have to make that call on behalf of the whole org."
 
 ---
 
@@ -40,23 +40,23 @@ When this is done, every user should be able to:
 
 ## 3. Concepts
 
-| Term                                  | Plain-language definition                                                                                                                                                                                                                                                                       |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **System Agent** (the copilot)        | The assistant agent in Mosoo that helps you **draft Agent prompts / validate config / recommend models**. It is not the Agent you are configuring — it's the "configuration assistant" standing beside you, helping you.                                                                        |
-| **System Agent Model · per-user**     | "Which model I want the copilot to use when answering me." **One per user, with no cross-impact** — within the same org it's allowed and expected for Wang Qiming to use Sonnet while Yang Yaxin uses Haiku.                                                                                    |
+| Term                                  | Plain-language definition                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **System Agent** (the copilot)        | The assistant agent in Mosoo that helps you **draft Agent prompts / validate config / recommend models**. It is not the Agent you are configuring — it's the "configuration assistant" standing beside you, helping you.                                                                                                                                                                   |
+| **System Agent Model · per-user**     | "Which model I want the copilot to use when answering me." **One per user, with no cross-impact** — within the same org it's allowed and expected for Alex to use Sonnet while Riley uses Haiku.                                                                                                                                                                                           |
 | **Available Models for System Agent** | The full set of models the copilot can run ∩ the credentials you can access. The former is a platform-technical decision (today, the preset models exposed via the Vercel AI SDK path inside the Cloudflare Agents runtime — see `SYSTEM_AGENT_RUNTIME_ID` in `pkgs/runtime-catalog/src/runtime-catalog.ts`); the latter is the company pool key + any personal key you've added yourself. |
-| **Not Available · needs key**         | A model the copilot can run, but for which you **don't have** the corresponding provider's key on hand. The UI renders it grayed out, with a one-line hint and a deep link that jumps to `/providers`.                                                                                          |
+| **Not Available · needs key**         | A model the copilot can run, but for which you **don't have** the corresponding provider's key on hand. The UI renders it grayed out, with a one-line hint and a deep link that jumps to `/providers`.                                                                                                                                                                                     |
 
 ---
 
 ## 4. User journey
 
-| Stage                  | Who         | What they're doing                                                           | What they see                                                          | Mood                                      |
-| ---------------------- | ----------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------- |
-| Hitting the wall       | Wang Qiming | The copilot suddenly 401s                                                    | Discovers a new "System Agent" link in the top account menu            | Confused → found the entry point          |
-| Picking a model        | Wang Qiming | Selects `Claude Sonnet 4.6` from the dropdown → Save                         | The dropdown item is clearly marked "Available"                        | Free                                      |
-| Missing-key safety net | Yang Yaxin  | Wants to pick `gemini-2.0-flash`, but the org hasn't configured a Google key | Grayed-out chip "Not Available · Configure Google key in /providers →" | Blocked → jumps over to configure the key |
-| Switching back         | Wang Qiming | A week later, finds Sonnet too expensive and switches back to `Haiku 4.5`    | Same dropdown → Save                                                   | Smooth                                    |
+| Stage                  | Who   | What they're doing                                                           | What they see                                                          | Mood                                      |
+| ---------------------- | ----- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------- |
+| Hitting the wall       | Alex  | The copilot suddenly 401s                                                    | Discovers a new "System Agent" link in the top account menu            | Confused → found the entry point          |
+| Picking a model        | Alex  | Selects `Claude Sonnet 4.6` from the dropdown → Save                         | The dropdown item is clearly marked "Available"                        | Free                                      |
+| Missing-key safety net | Riley | Wants to pick `gemini-2.0-flash`, but the org hasn't configured a Google key | Grayed-out chip "Not Available · Configure Google key in /providers →" | Blocked → jumps over to configure the key |
+| Switching back         | Alex  | A week later, finds Sonnet too expensive and switches back to `Haiku 4.5`    | Same dropdown → Save                                                   | Smooth                                    |
 
 ```mermaid
 flowchart LR

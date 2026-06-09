@@ -12,12 +12,12 @@ This was called out at the 4-26 architecture review: a session has no defined in
 
 ## 1. The user problem
 
-| Persona                                     | Real-world scenario                                                                                                                                                      | What happens when it's undefined                                                                     |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| Yang Yaxin (Web UI design intern)           | She's halfway through a conversation with the "Weekly Report Assistant" when she's pulled into a meeting; she comes back 45 minutes later wanting to continue            | The system doesn't know how long to keep the session; she may return to find the conversation gone   |
-| Zhang Luyu (API caller / heavy Linear user) | Linear assigns an issue to an agent, which finishes and writes a PR in 8 minutes; the next day there's a follow-up in the comments, and he expects the agent to remember | There's no agreed-upon point at which the caller should archive, and the default behavior is unclear |
-| Lark group member (Channel user)            | Six days ago they @-mentioned the agent in a group chat; today they @ it again and want the agent to know the plan from last time                                        | It's unclear how long a channel session can be kept, or what cross-week memory should rely on        |
-| Yevan (Agent author)                        | He published an agent, 5 sessions are running, and he changes the system prompt and re-publishes                                                                         | Are the old sessions killed, or do they keep running the old prompt? The user experience differs     |
+| Persona                                 | Real-world scenario                                                                                                                                                      | What happens when it's undefined                                                                     |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Riley (Web UI design intern)            | She's halfway through a conversation with the "Weekly Report Assistant" when she's pulled into a meeting; she comes back 45 minutes later wanting to continue            | The system doesn't know how long to keep the session; she may return to find the conversation gone   |
+| Jordan (API caller / heavy Linear user) | Linear assigns an issue to an agent, which finishes and writes a PR in 8 minutes; the next day there's a follow-up in the comments, and he expects the agent to remember | There's no agreed-upon point at which the caller should archive, and the default behavior is unclear |
+| Lark group member (Channel user)        | Six days ago they @-mentioned the agent in a group chat; today they @ it again and want the agent to know the plan from last time                                        | It's unclear how long a channel session can be kept, or what cross-week memory should rely on        |
+| Alex (Agent author)                     | He published an agent, 5 sessions are running, and he changes the system prompt and re-publishes                                                                         | Are the old sessions killed, or do they keep running the old prompt? The user experience differs     |
 
 All four scenarios share the same root cause: **a session has no intermediate state between "alive" and "dead."**
 
@@ -68,13 +68,13 @@ Success criterion ≈ at every point in time, the user can say "which state I'm 
 
 ## 5. User journeys
 
-### Journey 1: Yang Yaxin — away from the Web UI for 30 minutes
+### Journey 1: Riley — away from the Web UI for 30 minutes
 
 > Create a session → send a message → get pulled into a meeting → refresh the page 45 minutes later → the UI shows "Restored, last active 45 minutes ago" → after a 5-second cold start, continue chatting.
 
 She never sees terms like "dozing" or "released"; she only sees a brief loading state and a single lightweight notice.
 
-### Journey 2: Zhang Luyu — Linear follow-up the next day
+### Journey 2: Jordan — Linear follow-up the next day
 
 > Linear assigns the agent for the first time and it finishes the PR in 8 minutes → the next day the conversation continues in the comments → the platform matches the same session and continues automatically.
 
@@ -88,13 +88,13 @@ If the agent is a Cattle agent, the old environment has already been destroyed; 
 
 Long-term memory as a fallback: the agent can proactively write Space files during the conversation; even if the transcript is compacted, the agent can read its own Space files to pick up the thread.
 
-### Journey 4: Yevan — re-publish
+### Journey 4: Alex — re-publish
 
-> Agent v3 is running with 5 sessions still alive → Yevan changes the prompt and adds a skill, then publishes v4 → the 5 old sessions keep running on v3, while new incoming sessions default to v4.
+> Agent v3 is running with 5 sessions still alive → Alex changes the prompt and adds a skill, then publishes v4 → the 5 old sessions keep running on v3, while new incoming sessions default to v4.
 
 Once an old session ends naturally (the user archives it or it times out from idle), v3 is not deleted right away; it's retained for reviewing old conversations.
 
-> If what Yevan changes is the **runtime** (for example, switching from the OpenAI runtime to Claude), the platform does not allow an in-place upgrade; he must Fork the Agent, and the original Agent and all its sessions remain unchanged.
+> If what Alex changes is the **runtime** (for example, switching from the OpenAI runtime to Claude), the platform does not allow an in-place upgrade; he must Fork the Agent, and the original Agent and all its sessions remain unchanged.
 
 ---
 

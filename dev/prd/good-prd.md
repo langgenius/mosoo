@@ -1,6 +1,6 @@
 # What Makes a Good PRD (v2 Writing Charter)
 
-> **Status**: Living document · **Maintainer**: Evanchen · **Last updated**: 2026-05-09
+> **Status**: Living document · **Maintainer**: Product Team · **Last updated**: 2026-05-09
 
 > This document is not a PRD for any single feature. It defines the writing constraints and acceptance criteria for every PRD under `dev/prd/`.
 > Audience: product and design people who write PRDs, plus the engineers who pick up and implement them.

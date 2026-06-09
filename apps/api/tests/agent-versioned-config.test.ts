@@ -31,7 +31,7 @@ function createAgentVersionedConfigDatabase(): D1Database {
     );
 
     INSERT INTO account (id, name)
-    VALUES ('01J00000000000000000000001', 'Evan');
+    VALUES ('01J00000000000000000000001', 'Alex Example');
 
     INSERT INTO skill (id, name, current_snapshot_id, owner_account_id)
     VALUES ('01J0000000000000000000006B', 'registry skill', '01J0000000000000000000006C', '01J00000000000000000000001');

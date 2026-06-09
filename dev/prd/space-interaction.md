@@ -16,7 +16,7 @@ The Space page itself **no longer hosts chat, no longer starts tasks, and no lon
 
 ## User problem
 
-Yang Yaxin is a non-technical Member who wants a particular published Agent on her team to be able to read a batch of materials: contract templates, SOPs, and design files.
+Riley is a non-technical Member who wants a particular published Agent on her team to be able to read a batch of materials: contract templates, SOPs, and design files.
 
 After the pivot, there is **no "open a Space and chat directly" entry point** in the product for her. The only path she can take:
 
@@ -30,18 +30,18 @@ The old PRD treated Space as a "standalone workbench" — offering Open in Work,
 
 ## Concept definitions
 
-| Term                          | Definition                                                                                                                                                                                                             |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Space**                     | A file container plus a sharing boundary. **Its only consumption path is being mounted via the `spaces[]` array in an Agent manifest.**                                                                                |
-| **Space admin**               | The highest permission within a Space. Can read/write files, change collaborators, change settings, and delete the Space. This is the Space-level `admin` role (matching `SpaceRole = "admin" | "edit" | "read"` in `pkgs/contracts/src/space/space.contract.ts`) — **not** an Org-level admin.                                                          |
-| **edit**                      | The mid-tier permission for a Space collaborator: can read/write files but cannot change collaborators.                                                                                                                |
-| **read**                      | The low-tier permission for a Space collaborator: can only list / download files.                                                                                                                                      |
-| **Creator**                   | The user who created the Space. While they remain on the team, they are the sole owner of that Space's ACL (even an Org admin cannot perform destructive actions).                                                     |
-| **Visibility**                | The Space's current sharing state. Derived from the collaborator list: creator only → `private`; any other user or the everyone-wildcard → `shared`.                                                                   |
-| **Everyone-wildcard (`'*'`)** | A single ACL row that shares the Space with "everyone in the organization." Its role is forced to `read` and it covers every member of the Org. The copy must strictly read `Add Everyone in organization`.            |
-| **Shared with me**            | A Space where the current user is not the creator but has gained access through the ACL (an exact entry or the everyone-wildcard). Does not include private Spaces visible only through Admin governance pass-through. |
-| **All organization spaces**   | Appears only in the Owner / Admin pass-through view. Spaces where the user is neither the creator nor an ACL-matched collaborator, but which are visible because of Governance Access.                                 |
-| **Mount**                     | Writing a Space id into the `spaces[]` array in an Agent manifest. This step **does not happen on the Space page.**                                                                                                    |
+| Term                          | Definition                                                                                                                                                                                                                       |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Space**                     | A file container plus a sharing boundary. **Its only consumption path is being mounted via the `spaces[]` array in an Agent manifest.**                                                                                          |
+| **Space admin**               | The highest permission within a Space. Can read/write files, change collaborators, change settings, and delete the Space. This is the Space-level `admin` role (one of `admin`, `edit`, or `read`) — **not** an Org-level admin. |
+| **edit**                      | The mid-tier permission for a Space collaborator: can read/write files but cannot change collaborators.                                                                                                                          |
+| **read**                      | The low-tier permission for a Space collaborator: can only list / download files.                                                                                                                                                |
+| **Creator**                   | The user who created the Space. While they remain on the team, they are the sole owner of that Space's ACL (even an Org admin cannot perform destructive actions).                                                               |
+| **Visibility**                | The Space's current sharing state. Derived from the collaborator list: creator only → `private`; any other user or the everyone-wildcard → `shared`.                                                                             |
+| **Everyone-wildcard (`'*'`)** | A single ACL row that shares the Space with "everyone in the organization." Its role is forced to `read` and it covers every member of the Org. The copy must strictly read `Add Everyone in organization`.                      |
+| **Shared with me**            | A Space where the current user is not the creator but has gained access through the ACL (an exact entry or the everyone-wildcard). Does not include private Spaces visible only through Admin governance pass-through.           |
+| **All organization spaces**   | Appears only in the Owner / Admin pass-through view. Spaces where the user is neither the creator nor an ACL-matched collaborator, but which are visible because of Governance Access.                                           |
+| **Mount**                     | Writing a Space id into the `spaces[]` array in an Agent manifest. This step **does not happen on the Space page.**                                                                                                              |
 
 ---
 
@@ -97,15 +97,15 @@ flowchart LR
 
 > For the complete RBAC table, see [`./rbac.md`](./rbac.md) §3.3; this section only aligns product behavior.
 
-| Capability                                | admin       | edit | read               | Org owner / admin pass-through                   |
-| ----------------------------------------- | ----------- | ---- | ------------------ | ------------------------------------------------ |
-| Browse files                              | ✅          | ✅   | ✅                 | ✅ all Spaces                                    |
-| Upload / create / delete files            | ✅          | ✅   | ❌                 | ✅                                               |
-| Rename / download files                   | ✅          | ✅   | ✅ (download only) | ✅                                               |
-| Change Space settings (name / visibility) | ✅          | ❌   | ❌                 | ✅                                               |
-| View the Settings sheet                   | ✅          | ❌   | ❌                 | ✅                                               |
-| Change collaborator ACL                   | ✅ Creator  | ❌   | ❌                 | ✅ Creator has left<br/>❌ Creator still on team |
-| Delete the Space                          | ✅ Creator  | ❌   | ❌                 | ✅ Creator has left<br/>❌ Creator still on team |
+| Capability                                | admin      | edit | read               | Org owner / admin pass-through                   |
+| ----------------------------------------- | ---------- | ---- | ------------------ | ------------------------------------------------ |
+| Browse files                              | ✅         | ✅   | ✅                 | ✅ all Spaces                                    |
+| Upload / create / delete files            | ✅         | ✅   | ❌                 | ✅                                               |
+| Rename / download files                   | ✅         | ✅   | ✅ (download only) | ✅                                               |
+| Change Space settings (name / visibility) | ✅         | ❌   | ❌                 | ✅                                               |
+| View the Settings sheet                   | ✅         | ❌   | ❌                 | ✅                                               |
+| Change collaborator ACL                   | ✅ Creator | ❌   | ❌                 | ✅ Creator has left<br/>❌ Creator still on team |
+| Delete the Space                          | ✅ Creator | ❌   | ❌                 | ✅ Creator has left<br/>❌ Creator still on team |
 
 **Two hard rules:**
 

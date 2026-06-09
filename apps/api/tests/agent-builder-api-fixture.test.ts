@@ -9,26 +9,26 @@ describe("Agent Builder API fixture", () => {
     const login = await fixture.client.loginAsMosooAiTestAccount();
 
     expect(login.user).toMatchObject({
-      email: "xiaoke@mosoo.ai",
+      email: "agent.builder.fixture@mosoo.ai",
       id: "01J00000000000000000000051",
-      name: "Xiaoke",
+      name: "Agent Builder User",
     });
 
     const firstSessionViewer = await fixture.client.readAuthenticatedViewerFromSession();
     const secondViewerContext = await fixture.client.readViewerContext();
 
     expect(firstSessionViewer).toEqual({
-      email: "xiaoke@mosoo.ai",
+      email: "agent.builder.fixture@mosoo.ai",
       emailVerified: true,
       id: "01J00000000000000000000051",
       imageUrl: null,
-      name: "Xiaoke",
+      name: "Agent Builder User",
     });
     expect(secondViewerContext).toMatchObject({
       account: {
-        email: "xiaoke@mosoo.ai",
+        email: "agent.builder.fixture@mosoo.ai",
         id: "01J00000000000000000000051",
-        name: "Xiaoke",
+        name: "Agent Builder User",
       },
       activeOrganization: {
         id: "01J00000000000000000000052",
