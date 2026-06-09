@@ -1,6 +1,6 @@
 ### Agent Manifest — for humans
 
-> This is the product-narrative version written for non-engineer readers. For the **complete engineering contract** (field naming, the `kind` lock, the package `manifest.json` example, the drift state machine, and the edge-case matrix), see the shipped Agent Manifest PRD.
+> This is the product-narrative version written for non-engineer readers. For the field-level types, see `pkgs/contracts/src/agent/agent-manifest.contract.ts` — the manifest contract source is the de-facto engineering reference.
 
 ---
 
@@ -225,4 +225,4 @@ flowchart TD
 
 ---
 
-> Complete engineering contract + canonical example + edge-case matrix + reasoning review: see the shipped Agent Manifest PRD.
+> Field-level types and the manifest schema live in `pkgs/contracts/src/agent/agent-manifest.contract.ts` — the contract source is the de-facto engineering reference.

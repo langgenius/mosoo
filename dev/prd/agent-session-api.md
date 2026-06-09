@@ -156,7 +156,7 @@ Non-status expressions:
 
 | Concept                                           | How it is expressed                                                                |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| archived                                          | A Boolean flag; an archived session is read-only and does not restore the sandbox. |
+| archived                                          | A nullable `archivedAt` timestamp (presence = archived); an archived session is read-only and does not restore the sandbox. |
 | deleted                                           | A delete operation / tombstone, not an interactive status.                         |
 | creating / resuming / checkpointing / hibernating | An internal phase or UI subtitle; not a public status.                             |
 | needs approval                                    | A permission event + a UI pill; the Session remains `RUNNING`.                     |

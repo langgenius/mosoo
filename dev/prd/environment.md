@@ -12,13 +12,14 @@ Analogy:
 
 > Think of Vercel's Project Settings → Environment Variables + Build Settings + Runtime, but **extracted into a standalone asset** that can be attached to many Agents at once—and it doubles as the switch an Org Admin flips to lock down compliance network policy.
 
-It sits alongside the other first-class assets—**Agent / Space / Skill / Environment**:
+It sits alongside the other first-class assets—**Agent / Space / Skill / MCP Server / Environment**:
 
 | Asset           | In one line                                                                |
 | --------------- | -------------------------------------------------------------------------- |
 | **Agent**       | A "unit of work" with a persona, capabilities, and configuration           |
 | **Space**       | A **file container** an Agent can mount (an organization-level data asset) |
 | **Skill**       | A stateless capability unit (a callable tool)                              |
+| **MCP Server**  | An external capability server (tool endpoint) an Agent can call            |
 | **Environment** | The **runtime container template** an Agent runs inside                    |
 
 ---

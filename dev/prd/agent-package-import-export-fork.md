@@ -1,6 +1,6 @@
 # Agent Import / Export & Fork — for humans
 
-> This is the product-story version for non-engineer readers. The full engineering contract lives in the shipped PRD.
+> This is the product-story version for non-engineer readers. The field-level package contract lives in `pkgs/agent-package/src/archive-path-policy.ts` and `pkgs/contracts/src/agent/agent-manifest-serializer.contract.ts`; the export/import services are under `apps/api/src/modules/agents/application/agent-package-*.service.ts`.
 
 ---
 
@@ -202,4 +202,4 @@ flowchart TD
 
 ---
 
-> The full engineering contract (covering architecture impact, scope / non-scope, the resolution matrix, MCP / Space invariants, collision policy, Screens, Flows, reasoning review, and implementation boundaries) lives in the shipped PRD.
+> The field-level package contract, manifest schema, and resolve / repair flow are implemented in `pkgs/agent-package/src/`, `pkgs/contracts/src/agent/agent-manifest-serializer.contract.ts`, and the export / import services under `apps/api/src/modules/agents/application/`. Note: avatar packaging is described in the bundle layout above but is not yet wired up — `agent-package-export.service.ts` currently writes `avatar: null` and emits no `attachments/` directory.

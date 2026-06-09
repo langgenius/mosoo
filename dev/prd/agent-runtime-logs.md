@@ -138,7 +138,7 @@ flowchart LR
   Before ==> After
 ```
 
-**There's only one change**: the contents of System Log are **completely rebuilt** — the 6 session-layer event classes (message / tool / permission / usage / file / input) are taken out, and the 9 machine-layer classes go in exclusively.
+**There's only one change**: the contents of System Log are **completely rebuilt** — the 6 session-layer event classes (message / tool / permission / usage / file / input) are taken out, and the 10 machine-layer classes (provisioning / sandbox / driver / transport / config / resource / lifecycle / diagnostics / state / run) go in exclusively.
 
 **The outer menu / Logs tab / Terminal / File System / Cost / Preview are all untouched.**
 

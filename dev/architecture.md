@@ -154,8 +154,8 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
    - Login fallback uses `lastActiveOrgId` plus active membership fallback. The system no longer maintains `account.origin_organization_id` or an "Origin Org for life" concept. New users with public email domains automatically receive a Personal Org. Enterprise email users with no domain match choose a normal Organization or Personal Org during onboarding.
 
 6. **Auth Service**
-   - Authentication is built on Better Auth. Supported authentication methods are **Google OAuth**, **Email OTP**, and **Passkey (WebAuthn)**. Google OAuth and Email OTP support registration, recovery, and cross-device fallback. Passkey is the preferred passwordless path for returning users.
-   - The same verified email across providers maps to the same Account. Passkeys are credentials bound to that Account and do not create new Account identities.
+   - Authentication is built on Better Auth. Supported authentication methods are **Google OAuth** and **Email OTP**. Both support registration, recovery, and cross-device fallback. Passkey (WebAuthn) is a planned future option but is not enabled in the current build.
+   - The same verified email across providers maps to the same Account.
    - The current version does not support passwords, magic links, enterprise SAML / OIDC, or SCIM. Enterprise domain discovery, invitation acceptance, and access requests are handled by a post-auth resolver after login.
 
 7. **Session Service**
@@ -202,7 +202,7 @@ Design constraints:
 - **No full Agent Runtime**: It does not create Runtime `AgentSession` or Sandbox execution resources, does not start Agent Driver, does not consume Pet/Cattle Sandbox paths or caches, and does not participate in Space file execution.
 - **No Skill usage**: The goal is deterministic, fast, controlled assistance. Loading Skills would expand context, increase dynamic behavior, and raise cold-start cost.
 - **Direct LLM API call**: Inputs include system prompt, current user context, target config draft, and controlled tool schemas. Outputs must pass structured validation before persistence.
-- **Control-plane tools only**: Tools should be small and stable service functions such as `validateAgentProfile`, `previewAgentConfigDiff`, `createAgentProfile`, `updateAgentProfile`, and `listAvailableModels`. Tools call existing Profile / Vault / File / Permission services for writes and must not bypass domain services to operate directly on D1 or R2.
+- **Control-plane tools only**: Tools should be small and stable control-plane service functions such as `create_agent`, `patch_manifest_draft`, `apply_agent_config`, `inspect_builder_context`, and `search_builder_assets` (defined in `agent-builder-control-plane-tool-descriptor.service.ts`). Tools call existing Manifest / Vault / File / Permission services for writes and must not bypass domain services to operate directly on D1 or R2.
 - **Cloudflare Agents SDK as a thin wrapper**: The SDK may provide `Agent` class state, WebSocket, and callable RPC support for short sessions and frontend interaction state. Canonical configuration remains in D1, R2, and domain services.
 - **Explainable and rollback-safe failure**: LLM output creates a draft or a tool-call request. Real configuration mutation must show a diff, run permission checks, and run schema validation first. Write failures must not silently fall back.
 
@@ -277,7 +277,7 @@ sequenceDiagram
     Client->>Web: Request app shell / assets
     Web-->>Client: HTML / assets
 
-    Client->>Ingress: GraphQL: createAgentSession(agentId, environmentId, surfaceBinding)
+    Client->>Ingress: GraphQL: createAgentSession(agentId, type?, waitForRuntimeReady?)
     Ingress->>AS: Validate Agent / Environment / Credential / Space readiness
     AS->>AS: Freeze SessionExecutionSnapshot<br/>(Agent binding + EnvironmentRevision + Skills/MCP/Spaces)
     AS->>Session: Create AgentSession(status=IDLE)

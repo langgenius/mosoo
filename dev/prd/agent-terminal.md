@@ -50,7 +50,7 @@ A Cattle owner who wants to inspect task execution → goes to the **Logs tab** 
 
 **Keeping a Terminal entry point (even with a tooltip) would give Cattle owners the false expectation that "I can go into the sandbox and tinker."** Opening it would hit a generic error — a worse experience than "never seeing the entry point at all."
 
-> ⚠️ This conflicts with the old [`./agent-type.md`](./agent-type.md) §N7  decision that "the Debug nav is identical across Pet and Cattle."  prioritized nav consistency at the time to avoid drift; the Terminal is now specialized as a "honest UX fit > nav consistency" exception. The agent-type PRD needs a drift note that references this PRD.
+> ⚠️ This conflicts with the [`./agent-type.md`](./agent-type.md) decision that the Debug nav is identical across Pet and Cattle (see the user-journey Run row "Both have consistent nav (Dev / Preview / Logs / Cost / Debug ▾)" and the After diagram node "Cattle: Reset agent-state ✗ / Debug ✓ same as Pet"). That decision prioritized nav consistency to avoid drift; the Terminal is now specialized as a "honest UX fit > nav consistency" exception. The agent-type PRD needs a drift note that references this PRD.
 
 ---
 

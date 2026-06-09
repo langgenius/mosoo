@@ -14,7 +14,7 @@ An analogy:
 
 > It's the same thing OpenAI and Anthropic have both done — turning a model or an agent into a callable API. Mosoo's promise is: once published, you're no longer limited to "clicking on this Agent inside the Web UI." You can also invoke it directly from the CLI, a customer backend, or an automation to get work done.
 
-But this public call surface **only exists on a Published Agent**. Channels (Slack / Lark / Linear / Discord / WeChat) take their own path and do not call it. The Mosoo Web UI can reuse the same underlying semantics, but it does not necessarily go through the public token gate.
+But this public call surface **only exists on a Published Agent**. Channels (Slack / Lark / Telegram / Discord / WeChat) take their own path and do not call it. The Mosoo Web UI can reuse the same underlying semantics, but it does not necessarily go through the public token gate.
 
 ---
 
@@ -44,9 +44,9 @@ Mosoo's own Web UI and internal system integrations need to call Agents, but the
 >
 > "I want to add / remove / list a piece of material for this thread directly. Don't make me first learn where files live, and don't make me learn some vendor's file API."
 
-### 1.3 First-party Slack / Lark / Linear Adapter
+### 1.3 First-party Slack / Lark / Telegram Adapter
 
-Mosoo's own channel adapters need to turn a Slack mention, a Lark message, or a Linear issue trigger into Agent work, but an adapter is a **consumer** — it is not the primary content-model host of this public API. What they want to say is:
+Mosoo's own channel adapters need to turn a Slack mention, a Lark message, or a Telegram message into Agent work, but an adapter is a **consumer** — it is not the primary content-model host of this public API. What they want to say is:
 
 > "I'm responsible for my own host installation, signing, thread binding, and reply write-back — don't mix these into the Agent Session API."
 >
@@ -117,7 +117,7 @@ flowchart TD
   AppContract["A single set of conversation semantics<br/>Session / Run"]
   SessionAPI["Thread advanced actions<br/>follow-up · permission · interrupt · archive"]
   WebUI["Mosoo Web UI / internal API consumer"]
-  Adapters["First-party Slack / Lark / Linear adapters"]
+  Adapters["First-party Slack / Lark / Telegram adapters"]
 
   Owner --> Access
   Owner --> Docs

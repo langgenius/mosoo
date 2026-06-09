@@ -33,7 +33,7 @@ The old PRD treated Space as a "standalone workbench" — offering Open in Work,
 | Term                          | Definition                                                                                                                                                                                                             |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Space**                     | A file container plus a sharing boundary. **Its only consumption path is being mounted via the `spaces[]` array in an Agent manifest.**                                                                                |
-| **Space asset-admin**         | The highest permission within a Space. Can read/write files, change collaborators, change settings, and delete the Space. This is **not** an Org-level admin.                                                          |
+| **Space admin**               | The highest permission within a Space. Can read/write files, change collaborators, change settings, and delete the Space. This is the Space-level `admin` role (matching `SpaceRole = "admin" | "edit" | "read"` in `pkgs/contracts/src/space/space.contract.ts`) — **not** an Org-level admin.                                                          |
 | **edit**                      | The mid-tier permission for a Space collaborator: can read/write files but cannot change collaborators.                                                                                                                |
 | **read**                      | The low-tier permission for a Space collaborator: can only list / download files.                                                                                                                                      |
 | **Creator**                   | The user who created the Space. While they remain on the team, they are the sole owner of that Space's ACL (even an Org admin cannot perform destructive actions).                                                     |
@@ -97,7 +97,7 @@ flowchart LR
 
 > For the complete RBAC table, see [`./rbac.md`](./rbac.md) §3.3; this section only aligns product behavior.
 
-| Capability                                | asset-admin | edit | read               | Org owner / admin pass-through                   |
+| Capability                                | admin       | edit | read               | Org owner / admin pass-through                   |
 | ----------------------------------------- | ----------- | ---- | ------------------ | ------------------------------------------------ |
 | Browse files                              | ✅          | ✅   | ✅                 | ✅ all Spaces                                    |
 | Upload / create / delete files            | ✅          | ✅   | ❌                 | ✅                                               |

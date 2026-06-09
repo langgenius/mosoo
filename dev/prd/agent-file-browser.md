@@ -50,7 +50,7 @@ A Cattle owner who wants to see how a task executed → uses the **Logs tab** an
 
 **Keeping a File Browser entry point would make Cattle owners expect that "I can `ls` my home too"**, but Cattle simply has no "home" — opening it would hit an empty / terminated sandbox, an experience worse than "not seeing the entry point at all."
 
-> ⚠️ This conflicts with the old decision in [`./agent-type.md`](./agent-type.md) §N7  "Debug nav is identical across Pet/Cattle", and aligns with the direction of PRD-A v1.2 Cattle Terminal hide. A drift note will be flagged when agent-type-prd is merged.
+> ⚠️ This conflicts with the [`./agent-type.md`](./agent-type.md) decision that "Debug nav is identical across Pet/Cattle" (see the user-journey Run row and the After diagram's `Debug ✓ same as Pet` node), and aligns with the direction of PRD-A v1.2 Cattle Terminal hide. A drift note will be flagged when agent-type-prd is merged.
 
 ---
 

@@ -75,7 +75,7 @@ Analogy:
 
 | Term         | Examples                                                                                                                                             |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Provider** | `anthropic` / `openai` / `google` / `moonshot` / `zai` / `deepseek` / `aws-bedrock` / `openai-compatible` — UI copy and the PRD always use this word |
+| **Provider** | `anthropic` / `openai` / `openai-compatible` — UI copy and the PRD always use this word. (See `ALL_VENDORS` in `pkgs/runtime-catalog/src/runtime-catalog.ts` for the shipped set.) |
 | **Runtime**  | The Agent Driver runtime; one Runtime depends on one Provider                                                                                        |
 | **BYOK**     | Bring Your Own Key — a member brings their own key                                                                                                   |
 

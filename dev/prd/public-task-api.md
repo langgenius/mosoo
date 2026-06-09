@@ -73,7 +73,7 @@ Either way, the response centers on the Thread; `run` is present when the create
 {
   "thread": {
     "id": "thread_...",
-    "status": "running",
+    "status": "RUNNING",
     "agent_id": "agent_...",
     "last_run_id": "run_...",
     "client_external_ref": "linear-ENG-123"
@@ -122,16 +122,16 @@ Web users                        -> /threads
 
 This made the product language more complex without giving users any new capability. The Thread is already where users go to continue work, so the public API should deliver a Thread directly.
 
-## 8. What deletion means
+## 8. What deletion meant
 
-The current code already contains the `/tasks` route, the `public_api_task` table, the OpenAPI schema, tests, and publishing-panel copy. These are not the future product truth, and there's no need to keep a compatibility layer for nonexistent production users.
+The Thread-first migration has already landed. The `/tasks` route, the `public_api_task` table, the OpenAPI Task schemas, the `TaskSummary` wrapper, and the publishing-panel Task copy were removed during that migration — the published-agent router (`apps/api/src/adapters/http/routes/published-agent-api-route.ts`) now registers only `/threads` endpoints, and the boundary tests assert the legacy surface stays gone.
 
-Delete the following outright before release:
+The invariants we hold going forward:
 
 - New docs, new CLI, and new PRDs use only `threads`.
-- `/tasks` is not kept as an alias, a deprecated surface, or a shadow route.
-- Thin wrappers like `TaskSummary`, Task links, and Task next action no longer appear in the OpenAPI.
-- The future designs for Channel, System Agent, and CLI are not bound to the Task concept.
+- `/tasks` is not reintroduced as an alias, a deprecated surface, or a shadow route.
+- Thin wrappers like `TaskSummary`, Task links, and Task next action do not reappear in the OpenAPI.
+- Future Channel, System Agent, and CLI designs are not bound to the Task concept.
 
 ## 9. Decision boundaries
 

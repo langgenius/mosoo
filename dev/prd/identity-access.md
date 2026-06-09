@@ -63,7 +63,7 @@ The goal for this cycle is to **organize these fragmented capabilities into a mi
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Account**            | One verified email = one Account. The same email is the same Account whether it comes in via Google or Email OTP.                                                                                                                                                                      |
 | **Organization (Org)** | The "container" a user works in. Each Org has a name, a URL slug, an optional logo, and an optional **primary domain**. Org names can repeat; slug + primary domain are globally unique.                                                                                               |
-| **Origin Org**         | The Org automatically assigned at sign-up. The default name is derived from the email: a company domain yields the capitalized domain prefix (`acme.co` → "Acme"), and a public email yields `${firstName}'s Sandbox` ("Evan's Sandbox"). It is **fully equivalent to any other Org** — it's just that its name is system-assigned and it serves as the backstop of the fallback chain. Once renamed it is no longer "special."  |
+| **Origin Org**         | The Org automatically assigned at sign-up. The default name is derived from the email: a company domain yields the capitalized domain prefix (`acme.co` → "Acme"), and a public email yields `${userName}'s Organization` ("Evan Chen's Organization"). It is **fully equivalent to any other Org** — it's just that its name is system-assigned and it serves as the backstop of the fallback chain. Once renamed it is no longer "special."  |
 | **Primary domain**     | A company email suffix (such as `acme.co`). **Setting a primary domain = this Org is a "company"**; not setting one = a "personal sandbox." Public email suffixes (gmail.com / outlook.com / qq.com and 14 others) cannot be claimed.                                                  |
 | **Membership**         | An Account's role (Owner / Admin / Member) plus status (Active / Disabled) within an Org.                                                                                                                                                                                              |
 | **Invitation**         | A targeted ticket an Admin actively sends to a specific email to join the org; expires in 14 days.                                                                                                                                                                                     |
@@ -283,20 +283,20 @@ The descriptive copy for `Auto join` and `Invite only` is written directly benea
 
 ### 10.1 OTP Code
 
-- Subject: `Your sign-in code`
+- Subject: `Your Mosoo sign-in code`
 - Content: a 6-digit code in 32px monospace (`123 456`, separated 3+3 by a space), valid for 10 minutes
 - **Delivery failure must be surfaced** — the sign-in page shows `Code couldn't be sent. Try again.`
 
 ### 10.2 Invitation
 
-- Subject: `You're invited to {Org Name} on Mosoo`
+- Subject: `Join {Org Name} on Mosoo`
 - Content: the inviter's name + the Org name + an `Accept invitation` button + the expiration date (14 days later, in `Month D, YYYY` en-US format)
 - **Delivery failure is surfaced to the admin** — that row on the Members page shows `Email delivery failed`, but the invitation is already persisted and is not blocked
 
 ### 10.3 Access Decision
 
-- **Approved**: subject `Welcome to {Org Name}` + an `Open organization` button
-- **Rejected**: subject `Update on your access request` + (when the admin filled in a note) a quoted note block + a line reading "You can request again later, or create your own organization on Mosoo."
+- **Approved**: subject `Your request to join {Org Name} was approved` + an `Open organization` button
+- **Rejected**: subject `Your request to join {Org Name} was not approved` + (when the admin filled in a note) a quoted note block + a line reading "You can request again later, or create your own organization on Mosoo."
 - **Delivery failure is not surfaced** — the requester can still see the outcome in their Origin Org / Org Home the next time they sign in
 
 ### 10.4 Constraints from the PM perspective

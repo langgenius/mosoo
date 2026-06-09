@@ -71,7 +71,7 @@ The observable behavior on the user's side:
 - **Delete a file** — the text of historical messages does not change; but from the next turn on, the Agent can no longer read it.
 - **Upload or delete in the middle of a turn the Agent is currently running** — the current turn is not interrupted or restarted; the change takes effect on the **next turn**.
 
-This mechanism has one important side effect: **every runtime adapter (the OpenAI runtime / Claude Agent SDK / Hermes / a future Python runtime) receives an ordinary message with a path manifest** — they need no special-case logic for Session Files. Cross-runtime consistency comes from the session product layer, not from the runtime layer.
+This mechanism has one important side effect: **every runtime adapter (the OpenAI runtime / Claude Agent SDK today; Hermes / a Python runtime / other planned adapters in the future) receives an ordinary message with a path manifest** — they need no special-case logic for Session Files. Cross-runtime consistency comes from the session product layer, not from the runtime layer.
 
 ---
 

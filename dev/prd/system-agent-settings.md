@@ -1,6 +1,6 @@
 # System Agent Settings — for humans
 
-> This is the product-story version for non-engineer readers. For the full engineering contract (field contracts / readiness behavior / self-check trail), see the shipped System Agent Settings PRD.
+> This is the product-story version for non-engineer readers. For the field-level catalog binding (which vendors / model ids are eligible for the copilot today), see `SYSTEM_AGENT_RUNTIME_ID` in `pkgs/runtime-catalog/src/runtime-catalog.ts`.
 
 ---
 
@@ -44,7 +44,7 @@ When this is done, every user should be able to:
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **System Agent** (the copilot)        | The assistant agent in Mosoo that helps you **draft Agent prompts / validate config / recommend models**. It is not the Agent you are configuring — it's the "configuration assistant" standing beside you, helping you.                                                                        |
 | **System Agent Model · per-user**     | "Which model I want the copilot to use when answering me." **One per user, with no cross-impact** — within the same org it's allowed and expected for Wang Qiming to use Sonnet while Yang Yaxin uses Haiku.                                                                                    |
-| **Available Models for System Agent** | The full set of models the copilot can run ∩ the credentials you can access. The former is a platform-technical decision (the three Cloudflare Agents SDK paths: Vercel AI SDK / Workers AI binding / AI Gateway); the latter is the company pool key + any personal key you've added yourself. |
+| **Available Models for System Agent** | The full set of models the copilot can run ∩ the credentials you can access. The former is a platform-technical decision (today, the preset models exposed via the Vercel AI SDK path inside the Cloudflare Agents runtime — see `SYSTEM_AGENT_RUNTIME_ID` in `pkgs/runtime-catalog/src/runtime-catalog.ts`); the latter is the company pool key + any personal key you've added yourself. |
 | **Not Available · needs key**         | A model the copilot can run, but for which you **don't have** the corresponding provider's key on hand. The UI renders it grayed out, with a one-line hint and a deep link that jumps to `/providers`.                                                                                          |
 
 ---
@@ -70,4 +70,4 @@ flowchart LR
 
 ---
 
-> Full engineering contract + field names + change verbs + implementation boundaries (what must follow existing product patterns / what must come back for a question / what not to build even if technically more complete): see the shipped System Agent Settings PRD.
+> Field-level catalog binding + Available/Not-Available rules live in `SYSTEM_AGENT_RUNTIME_ID` in `pkgs/runtime-catalog/src/runtime-catalog.ts` and the resolver at `apps/api/src/modules/vendor-credentials/application/available-models.ts`. The current build scopes the copilot to the OpenAI-vendor preset models; the Anthropic-model personas in §1 describe the intended cross-vendor experience and are not yet wired up.
