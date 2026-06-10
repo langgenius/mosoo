@@ -50,24 +50,12 @@ import { parseRuntimeCommand } from "@mosoo/contracts/runtime-command";
 import {
   AGENT_SESSION_ARCHIVED_READ_ONLY_REASON,
   AGENT_SESSION_TERMINAL_READ_ONLY_REASON,
-  SESSION_RUNTIME_EVENT_FAMILIES,
-  SESSION_SYSTEM_LOG_EVENT_FAMILIES,
   getAgentSessionUserLifecycleProjection,
 } from "@mosoo/contracts/session";
-import type { SessionRuntimeEventFamily } from "@mosoo/contracts/session";
 
 const FILE_ID = "01J00000000000000000000001" as FileId;
 const SESSION_ID = "01J00000000000000000000002" as SessionId;
 const SPACE_ID = "01J00000000000000000000003" as SpaceId;
-const SESSION_LAYER_RUNTIME_EVENT_FAMILIES = [
-  "file",
-  "input",
-  "message",
-  "permission",
-  "tool",
-  "usage",
-] as const satisfies readonly SessionRuntimeEventFamily[];
-
 describe("contracts owner boundaries", () => {
   test("agent kind runtime policy owns Pet and Cattle semantics", () => {
     expect(getAgentKindRuntimeSubjectScope("pet")).toBe("agent");
@@ -478,20 +466,6 @@ describe("contracts owner boundaries", () => {
       `attachment/${FILE_ID}/notes\r.txt`,
     ] as const) {
       expect(() => toSessionResourceMaterializedPath(path)).toThrow();
-    }
-  });
-
-  test("session contract owns the system log family boundary", () => {
-    const allFamilies = new Set<SessionRuntimeEventFamily>(SESSION_RUNTIME_EVENT_FAMILIES);
-    const systemLogFamilies = new Set<SessionRuntimeEventFamily>(SESSION_SYSTEM_LOG_EVENT_FAMILIES);
-
-    expect(systemLogFamilies.size).toBe(SESSION_SYSTEM_LOG_EVENT_FAMILIES.length);
-
-    for (const family of SESSION_SYSTEM_LOG_EVENT_FAMILIES) {
-      expect(allFamilies.has(family)).toBe(true);
-    }
-    for (const family of SESSION_LAYER_RUNTIME_EVENT_FAMILIES) {
-      expect(systemLogFamilies.has(family)).toBe(false);
     }
   });
 

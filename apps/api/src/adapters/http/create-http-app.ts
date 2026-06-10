@@ -10,7 +10,6 @@ import {
 import type { ApiGatewayEnvironment } from "../../platform/cloudflare/worker-types";
 import { requestLoggingMiddleware } from "./request-logging.middleware";
 import { registerAccessTokenRoute } from "./routes/access-token-route";
-import { registerAgentFileRoute } from "./routes/agent-file-route";
 import { registerAuthRoute } from "./routes/auth-route";
 import { registerDiscordEventsRoute } from "./routes/discord-events-route";
 import { registerDriverRoute } from "./routes/driver-route";
@@ -43,7 +42,6 @@ export function createHttpApp() {
   registerRootRoute(app);
   registerHealthRoute(publicApi);
   registerAccessTokenRoute(publicApi);
-  registerAgentFileRoute(publicApi);
   registerAuthRoute(publicApi);
   registerFileRoute(publicApi);
   registerMcpRoute(publicApi);

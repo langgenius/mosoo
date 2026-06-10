@@ -108,17 +108,12 @@ describe("API to driver boundary", () => {
   });
 
   test("uses agent-driver sandbox path contracts", () => {
-    const fileBrowserPath = readText(
-      "../src/modules/runtime/application/agent-file-browser-path.ts",
-    );
     const runtimeProfile = readText("../src/modules/runtime/application/agent-runtime-profile.ts");
     const sandboxLayout = readText("../src/modules/runtime/domain/sandbox-layout.ts");
     const subjectPlatform = readText(
       "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-platform.ts",
     );
 
-    expect(fileBrowserPath).toContain('from "agent-driver/paths"');
-    expect(fileBrowserPath).not.toContain('from "@mosoo/driver-protocol"');
     expect(runtimeProfile).toContain('from "agent-driver/paths"');
     expect(sandboxLayout).toContain('from "agent-driver/paths"');
     expect(subjectPlatform).toContain('from "agent-driver/paths"');

@@ -1,4 +1,3 @@
-export { getAgentRuntimeEvents } from "./agent-runtime-events.service";
 export { getSessionMessages, getThreadSessionMessages } from "./session-message-query.service";
 export {
   getSessionProcessEvents,

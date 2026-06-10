@@ -108,32 +108,6 @@ export type AgentEnvironmentConfigInput = {
   environmentId?: PlatformId | null | undefined;
 };
 
-export type AgentFileEntryKind =
-  | 'directory'
-  | 'file'
-  | 'space_mount'
-  | 'symlink';
-
-export type AgentFilePersistence =
-  | 'persistent'
-  | 'temporary';
-
-export type AgentFilePreview =
-  | 'binary'
-  | 'empty'
-  | 'large_text'
-  | 'text';
-
-export type AgentFileSandboxStatus =
-  | 'active'
-  | 'backing_up'
-  | 'cold'
-  | 'destroying'
-  | 'error'
-  | 'missing'
-  | 'restoring'
-  | 'unsupported';
-
 export type AgentKind =
   | 'cattle'
   | 'pet';
@@ -174,35 +148,6 @@ export type AgentResolutionTargetType =
   | 'runtime'
   | 'skill'
   | 'space';
-
-export type AgentRuntimeEventFamily =
-  | 'config'
-  | 'diagnostics'
-  | 'driver'
-  | 'file'
-  | 'input'
-  | 'lifecycle'
-  | 'message'
-  | 'permission'
-  | 'provisioning'
-  | 'resource'
-  | 'run'
-  | 'sandbox'
-  | 'state'
-  | 'tool'
-  | 'transport'
-  | 'usage';
-
-export type AgentRuntimeEventSource =
-  | 'api'
-  | 'driver'
-  | 'file'
-  | 'system'
-  | 'viewer';
-
-export type AgentRuntimeEventVisibility =
-  | 'all_consumers'
-  | 'owner_debug';
 
 export type AgentSessionActionCapabilityName =
   | 'add_session_resource'
@@ -1149,28 +1094,6 @@ export type UpdateAgentConfigMutationVariables = Exact<{
 
 export type UpdateAgentConfigMutation = { updateAgentConfig: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, packageSharingEnabled: boolean, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
 
-export type AgentFileSessionNodeFieldsFragment = { active: boolean, id: PlatformId, status: SessionStatus, title: string | null, updatedAt: string };
-
-export type AgentFileSpaceMountFieldsFragment = { path: string, spaceId: PlatformId, spaceName: string, url: string };
-
-export type AgentFileEntryFieldsFragment = { kind: AgentFileEntryKind, mimeType: string | null, name: string, path: string, persistence: AgentFilePersistence, preview: AgentFilePreview, sizeBytes: number, session: { active: boolean, id: PlatformId, status: SessionStatus, title: string | null, updatedAt: string } | null, space: { path: string, spaceId: PlatformId, spaceName: string, url: string } | null };
-
-export type AgentFileTreeQueryVariables = Exact<{
-  agentId: PlatformId;
-  path: string;
-}>;
-
-
-export type AgentFileTreeQuery = { agentFileTree: { agentId: PlatformId, lastError: string | null, path: string, sandboxId: PlatformId | null, sandboxStatus: AgentFileSandboxStatus, totalCount: number, truncated: boolean, entries: Array<{ kind: AgentFileEntryKind, mimeType: string | null, name: string, path: string, persistence: AgentFilePersistence, preview: AgentFilePreview, sizeBytes: number, session: { active: boolean, id: PlatformId, status: SessionStatus, title: string | null, updatedAt: string } | null, space: { path: string, spaceId: PlatformId, spaceName: string, url: string } | null }> } };
-
-export type AgentFileContentQueryVariables = Exact<{
-  agentId: PlatformId;
-  path: string;
-}>;
-
-
-export type AgentFileContentQuery = { agentFileContent: { agentId: PlatformId, content: string | null, mimeType: string, name: string, path: string, preview: AgentFilePreview, sandboxId: PlatformId, sizeBytes: number } };
-
 export type AgentManifestQueryVariables = Exact<{
   agentId: PlatformId;
 }>;
@@ -1595,16 +1518,6 @@ export type RemoveOrganizationMemberMutationVariables = Exact<{
 
 
 export type RemoveOrganizationMemberMutation = { removeOrganizationMember: { ok: boolean } };
-
-export type AgentRuntimeEventsQueryVariables = Exact<{
-  agentId: PlatformId;
-  beforeCursor?: string | null | undefined;
-  families?: Array<AgentRuntimeEventFamily> | null | undefined;
-  limit: number;
-}>;
-
-
-export type AgentRuntimeEventsQuery = { agentRuntimeEvents: { nodes: Array<{ createdAt: string, cursor: string, eventType: string, family: AgentRuntimeEventFamily, id: PlatformId, occurredAt: string, sessionId: PlatformId, source: AgentRuntimeEventSource, summary: string, visibility: AgentRuntimeEventVisibility }>, pageInfo: { endCursor: string | null, hasMore: boolean, startCursor: string | null } } };
 
 export type ThreadAgentSessionRetrieveQueryVariables = Exact<{
   sessionId: PlatformId;
@@ -2096,52 +2009,6 @@ export const AgentOwnerFieldsFragmentDoc = new TypedDocumentString(`
   name
 }
     `, {"fragmentName":"AgentOwnerFields"}) as unknown as TypedDocumentString<AgentOwnerFieldsFragment, unknown>;
-export const AgentFileSessionNodeFieldsFragmentDoc = new TypedDocumentString(`
-    fragment AgentFileSessionNodeFields on AgentFileSessionNode {
-  active
-  id
-  status
-  title
-  updatedAt
-}
-    `, {"fragmentName":"AgentFileSessionNodeFields"}) as unknown as TypedDocumentString<AgentFileSessionNodeFieldsFragment, unknown>;
-export const AgentFileSpaceMountFieldsFragmentDoc = new TypedDocumentString(`
-    fragment AgentFileSpaceMountFields on AgentFileSpaceMountNode {
-  path
-  spaceId
-  spaceName
-  url
-}
-    `, {"fragmentName":"AgentFileSpaceMountFields"}) as unknown as TypedDocumentString<AgentFileSpaceMountFieldsFragment, unknown>;
-export const AgentFileEntryFieldsFragmentDoc = new TypedDocumentString(`
-    fragment AgentFileEntryFields on AgentFileEntry {
-  kind
-  mimeType
-  name
-  path
-  persistence
-  preview
-  session {
-    ...AgentFileSessionNodeFields
-  }
-  sizeBytes
-  space {
-    ...AgentFileSpaceMountFields
-  }
-}
-    fragment AgentFileSessionNodeFields on AgentFileSessionNode {
-  active
-  id
-  status
-  title
-  updatedAt
-}
-fragment AgentFileSpaceMountFields on AgentFileSpaceMountNode {
-  path
-  spaceId
-  spaceName
-  url
-}`, {"fragmentName":"AgentFileEntryFields"}) as unknown as TypedDocumentString<AgentFileEntryFieldsFragment, unknown>;
 export const CostAgentFieldsFragmentDoc = new TypedDocumentString(`
     fragment CostAgentFields on CostAgentRow {
   activeUsers
@@ -3138,63 +3005,6 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   summary
   versionNumber
 }`) as unknown as TypedDocumentString<UpdateAgentConfigMutation, UpdateAgentConfigMutationVariables>;
-export const AgentFileTreeDocument = new TypedDocumentString(`
-    query AgentFileTree($agentId: ULID!, $path: String!) {
-  agentFileTree(agentId: $agentId, path: $path) {
-    agentId
-    entries {
-      ...AgentFileEntryFields
-    }
-    lastError
-    path
-    sandboxId
-    sandboxStatus
-    totalCount
-    truncated
-  }
-}
-    fragment AgentFileSessionNodeFields on AgentFileSessionNode {
-  active
-  id
-  status
-  title
-  updatedAt
-}
-fragment AgentFileSpaceMountFields on AgentFileSpaceMountNode {
-  path
-  spaceId
-  spaceName
-  url
-}
-fragment AgentFileEntryFields on AgentFileEntry {
-  kind
-  mimeType
-  name
-  path
-  persistence
-  preview
-  session {
-    ...AgentFileSessionNodeFields
-  }
-  sizeBytes
-  space {
-    ...AgentFileSpaceMountFields
-  }
-}`) as unknown as TypedDocumentString<AgentFileTreeQuery, AgentFileTreeQueryVariables>;
-export const AgentFileContentDocument = new TypedDocumentString(`
-    query AgentFileContent($agentId: ULID!, $path: String!) {
-  agentFileContent(agentId: $agentId, path: $path) {
-    agentId
-    content
-    mimeType
-    name
-    path
-    preview
-    sandboxId
-    sizeBytes
-  }
-}
-    `) as unknown as TypedDocumentString<AgentFileContentQuery, AgentFileContentQueryVariables>;
 export const AgentManifestDocument = new TypedDocumentString(`
     query AgentManifest($agentId: ULID!) {
   agentManifest(agentId: $agentId) {
@@ -4948,34 +4758,6 @@ export const RemoveOrganizationMemberDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<RemoveOrganizationMemberMutation, RemoveOrganizationMemberMutationVariables>;
-export const AgentRuntimeEventsDocument = new TypedDocumentString(`
-    query AgentRuntimeEvents($agentId: ULID!, $beforeCursor: String, $families: [AgentRuntimeEventFamily!], $limit: Int!) {
-  agentRuntimeEvents(
-    agentId: $agentId
-    beforeCursor: $beforeCursor
-    families: $families
-    limit: $limit
-  ) {
-    nodes {
-      createdAt
-      cursor
-      eventType
-      family
-      id
-      occurredAt
-      sessionId
-      source
-      summary
-      visibility
-    }
-    pageInfo {
-      endCursor
-      hasMore
-      startCursor
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<AgentRuntimeEventsQuery, AgentRuntimeEventsQueryVariables>;
 export const ThreadAgentSessionRetrieveDocument = new TypedDocumentString(`
     query ThreadAgentSessionRetrieve($sessionId: ULID!) {
   threadAgentSessionRetrieve(sessionId: $sessionId) {

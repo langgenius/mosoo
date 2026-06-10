@@ -13,9 +13,6 @@ import {
   AGENT_SESSION_RECOVERABILITY_STATUSES,
   SESSION_PROCESS_EVENT_STATUSES,
   SESSION_PROCESS_EVENT_TYPE_CODES,
-  SESSION_RUNTIME_EVENT_FAMILIES,
-  SESSION_RUNTIME_EVENT_SOURCES,
-  SESSION_RUNTIME_EVENT_VISIBILITIES,
   SESSION_STATUSES,
   SESSION_TYPES,
 } from "@mosoo/contracts/session";
@@ -88,42 +85,6 @@ export const sessionSchema = /* GraphQL */ `
     status: SessionProcessEventStatus!
     tokens: Int
     type: SessionProcessEventType!
-  }
-
-  enum AgentRuntimeEventFamily {
-    ${graphQLEnumValues(SESSION_RUNTIME_EVENT_FAMILIES)}
-  }
-
-  enum AgentRuntimeEventSource {
-    ${graphQLEnumValues(SESSION_RUNTIME_EVENT_SOURCES)}
-  }
-
-  enum AgentRuntimeEventVisibility {
-    ${graphQLEnumValues(SESSION_RUNTIME_EVENT_VISIBILITIES)}
-  }
-
-  type AgentRuntimeEvent {
-    createdAt: String!
-    cursor: String!
-    eventType: String!
-    family: AgentRuntimeEventFamily!
-    id: ULID!
-    occurredAt: String!
-    sessionId: ULID!
-    source: AgentRuntimeEventSource!
-    summary: String!
-    visibility: AgentRuntimeEventVisibility!
-  }
-
-  type AgentRuntimeEventPageInfo {
-    endCursor: String
-    hasMore: Boolean!
-    startCursor: String
-  }
-
-  type AgentRuntimeEventConnection {
-    nodes: [AgentRuntimeEvent!]!
-    pageInfo: AgentRuntimeEventPageInfo!
   }
 
   type SessionListPageInfo {

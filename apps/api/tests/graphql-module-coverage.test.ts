@@ -13,9 +13,6 @@ import {
   AGENT_SESSION_RECOVERABILITY_STATUSES,
   SESSION_PROCESS_EVENT_STATUSES,
   SESSION_PROCESS_EVENT_TYPE_CODES,
-  SESSION_RUNTIME_EVENT_FAMILIES,
-  SESSION_RUNTIME_EVENT_SOURCES,
-  SESSION_RUNTIME_EVENT_VISIBILITIES,
   SESSION_STATUSES,
   SESSION_TYPES,
 } from "@mosoo/contracts/session";
@@ -48,15 +45,6 @@ describe("GraphQL module coverage", () => {
     expect(collectEnumValues("SessionProcessEventType")).toEqual(
       Object.values(SESSION_PROCESS_EVENT_TYPE_CODES),
     );
-    expect(collectEnumValues("AgentRuntimeEventFamily")).toEqual([
-      ...SESSION_RUNTIME_EVENT_FAMILIES,
-    ]);
-    expect(collectEnumValues("AgentRuntimeEventSource")).toEqual([
-      ...SESSION_RUNTIME_EVENT_SOURCES,
-    ]);
-    expect(collectEnumValues("AgentRuntimeEventVisibility")).toEqual([
-      ...SESSION_RUNTIME_EVENT_VISIBILITIES,
-    ]);
     expect(collectEnumValues("AgentSessionEventType")).toEqual([...AGENT_SESSION_EVENT_TYPES]);
     expect(collectEnumValues("AgentSessionPermissionDecision")).toEqual([
       ...AGENT_SESSION_PERMISSION_DECISIONS,

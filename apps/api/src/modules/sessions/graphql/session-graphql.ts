@@ -20,7 +20,6 @@ import {
   unarchiveAgentSession,
 } from "../application/session-lifecycle-mutation.service";
 import {
-  getAgentRuntimeEvents,
   getSession,
   getSessionMessages,
   getSessionProcessEvents,
@@ -41,13 +40,6 @@ interface SessionArgs {
 
 interface SessionProcessEventsArgs extends SessionArgs {
   limit?: number | null;
-}
-
-interface AgentRuntimeEventsArgs {
-  agentId: string;
-  beforeCursor?: string | null;
-  families?: Parameters<typeof getAgentRuntimeEvents>[2]["families"];
-  limit: number;
 }
 
 interface SessionsArgs {
@@ -189,13 +181,6 @@ export const sessionGraphQLModule = {
       }),
   },
   authenticatedQueryResolvers: {
-    agentRuntimeEvents: async (_parent, args: AgentRuntimeEventsArgs, context) =>
-      getAgentRuntimeEvents(context.bindings.DB, context.viewer, {
-        agentId: readAgentId(args.agentId),
-        beforeCursor: args.beforeCursor ?? null,
-        families: args.families ?? null,
-        limit: args.limit,
-      }),
     agentSessionDiagnostics: async (_parent, args: AgentSessionRetrieveArgs, context) =>
       getAgentSessionDiagnostics(context.bindings.DB, context.viewer, {
         sessionId: readSessionId(args.sessionId),

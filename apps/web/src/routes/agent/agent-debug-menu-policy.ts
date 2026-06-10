@@ -1,7 +1,7 @@
 import type { AgentKind, AgentViewerRole } from "@mosoo/contracts/agent";
 import { agentKindSupportsOwnerTerminal } from "@mosoo/contracts/agent";
 
-export type AgentDebugMenuItemId = "files" | "system-log" | "terminal";
+export type AgentDebugMenuItemId = "terminal";
 
 export function canShowAgentDebugMenuItem(input: {
   agentKind: AgentKind | null;
@@ -11,10 +11,6 @@ export function canShowAgentDebugMenuItem(input: {
   switch (input.itemId) {
     case "terminal":
       return canShowOwnerDebugTerminalItem(input);
-    case "files":
-    case "system-log":
-      // V1 keeps Assistant Agent Debug scoped to Terminal while File Browser and System Log mature.
-      return false;
   }
 }
 

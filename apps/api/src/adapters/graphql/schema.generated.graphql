@@ -291,85 +291,6 @@ input AgentEnvironmentConfigInput {
   environmentId: ULID
 }
 
-type AgentFileContent {
-  agentId: ULID!
-  content: String
-  mimeType: String!
-  name: String!
-  path: String!
-  preview: AgentFilePreview!
-  sandboxId: ULID!
-  sizeBytes: Int!
-}
-
-type AgentFileEntry {
-  kind: AgentFileEntryKind!
-  mimeType: String
-  name: String!
-  path: String!
-  persistence: AgentFilePersistence!
-  preview: AgentFilePreview!
-  session: AgentFileSessionNode
-  sizeBytes: Int!
-  space: AgentFileSpaceMountNode
-}
-
-enum AgentFileEntryKind {
-  directory
-  file
-  space_mount
-  symlink
-}
-
-enum AgentFilePersistence {
-  persistent
-  temporary
-}
-
-enum AgentFilePreview {
-  binary
-  empty
-  large_text
-  text
-}
-
-enum AgentFileSandboxStatus {
-  active
-  backing_up
-  cold
-  destroying
-  error
-  missing
-  restoring
-  unsupported
-}
-
-type AgentFileSessionNode {
-  active: Boolean!
-  id: ULID!
-  status: SessionStatus!
-  title: String
-  updatedAt: String!
-}
-
-type AgentFileSpaceMountNode {
-  path: String!
-  spaceId: ULID!
-  spaceName: String!
-  url: String!
-}
-
-type AgentFileTree {
-  agentId: ULID!
-  entries: [AgentFileEntry!]!
-  lastError: String
-  path: String!
-  sandboxId: ULID
-  sandboxStatus: AgentFileSandboxStatus!
-  totalCount: Int!
-  truncated: Boolean!
-}
-
 enum AgentKind {
   cattle
   pet
@@ -504,62 +425,6 @@ enum AgentResolutionTargetType {
   runtime
   skill
   space
-}
-
-type AgentRuntimeEvent {
-  createdAt: String!
-  cursor: String!
-  eventType: String!
-  family: AgentRuntimeEventFamily!
-  id: ULID!
-  occurredAt: String!
-  sessionId: ULID!
-  source: AgentRuntimeEventSource!
-  summary: String!
-  visibility: AgentRuntimeEventVisibility!
-}
-
-type AgentRuntimeEventConnection {
-  nodes: [AgentRuntimeEvent!]!
-  pageInfo: AgentRuntimeEventPageInfo!
-}
-
-enum AgentRuntimeEventFamily {
-  config
-  diagnostics
-  driver
-  file
-  input
-  lifecycle
-  message
-  permission
-  provisioning
-  resource
-  run
-  sandbox
-  state
-  tool
-  transport
-  usage
-}
-
-type AgentRuntimeEventPageInfo {
-  endCursor: String
-  hasMore: Boolean!
-  startCursor: String
-}
-
-enum AgentRuntimeEventSource {
-  api
-  driver
-  file
-  system
-  viewer
-}
-
-enum AgentRuntimeEventVisibility {
-  all_consumers
-  owner_debug
 }
 
 type AgentSessionActionCapability {
@@ -1679,10 +1544,7 @@ type Query {
   agentCollaboratorList(agentId: ULID!): [AgentCollaborator!]!
   agentCostCard(agentId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AgentCostCard!
   agentEditorState(agentId: ULID!): AgentEditorState!
-  agentFileContent(agentId: ULID!, path: String!): AgentFileContent!
-  agentFileTree(agentId: ULID!, path: String!): AgentFileTree!
   agentManifest(agentId: ULID!): AgentManifestExport!
-  agentRuntimeEvents(agentId: ULID!, beforeCursor: String, families: [AgentRuntimeEventFamily!], limit: Int!): AgentRuntimeEventConnection!
   agentSessionDiagnostics(sessionId: ULID!): AgentSessionDiagnostics!
   agentSessionList(agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!
   agentSessionRetrieve(sessionId: ULID!): AgentSessionRetrieve!

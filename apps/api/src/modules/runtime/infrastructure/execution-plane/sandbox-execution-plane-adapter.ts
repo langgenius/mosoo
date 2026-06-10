@@ -108,7 +108,7 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
     // Owners can open the terminal before any run has executed prepareRun, so the
     // sandbox container may be live but /workspace/{cache,memory,se} have never
     // been provisioned — ls would show an empty workspace and look broken.
-    // Re-assert the platform roots here, matching the file-browser sandbox guard.
+    // Re-assert the platform roots before opening the sandbox terminal.
     await prepareRuntimeSubjectFilesystem(subject);
 
     if (input.terminalSessionId) {

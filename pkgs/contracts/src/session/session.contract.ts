@@ -231,21 +231,6 @@ export const SESSION_RUNTIME_EVENT_FAMILIES = [
 
 export type SessionRuntimeEventFamily = (typeof SESSION_RUNTIME_EVENT_FAMILIES)[number];
 
-export const SESSION_SYSTEM_LOG_EVENT_FAMILIES = [
-  "provisioning",
-  "sandbox",
-  "driver",
-  "transport",
-  "config",
-  "resource",
-  "lifecycle",
-  "diagnostics",
-  "state",
-  "run",
-] as const satisfies readonly SessionRuntimeEventFamily[];
-
-export type SessionSystemLogEventFamily = (typeof SESSION_SYSTEM_LOG_EVENT_FAMILIES)[number];
-
 export const SESSION_RUNTIME_EVENT_SOURCES = ["api", "driver", "file", "system", "viewer"] as const;
 
 export type SessionRuntimeEventSource = (typeof SESSION_RUNTIME_EVENT_SOURCES)[number];

@@ -68,8 +68,6 @@ export const agentGraphQLSpec = {
     "agent(agentId: ULID!): AgentDetail!",
     "agentCollaboratorList(agentId: ULID!): [AgentCollaborator!]!",
     "agentEditorState(agentId: ULID!): AgentEditorState!",
-    "agentFileContent(agentId: ULID!, path: String!): AgentFileContent!",
-    "agentFileTree(agentId: ULID!, path: String!): AgentFileTree!",
     "agentManifest(agentId: ULID!): AgentManifestExport!",
     "exportAgentPackage(agentId: ULID!): AgentPackageExport!",
   ],
@@ -145,7 +143,6 @@ export const sessionGraphQLSpec = {
     "updateSessionThreadUiState(input: UpdateSessionThreadUiStateInput!): SessionThreadUiState!",
   ],
   queryFields: [
-    "agentRuntimeEvents(agentId: ULID!, beforeCursor: String, families: [AgentRuntimeEventFamily!], limit: Int!): AgentRuntimeEventConnection!",
     "agentSessionDiagnostics(sessionId: ULID!): AgentSessionDiagnostics!",
     "agentSessionRetrieve(sessionId: ULID!): AgentSessionRetrieve!",
     "session(sessionId: ULID!): Session!",

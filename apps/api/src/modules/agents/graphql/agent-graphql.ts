@@ -4,10 +4,6 @@ import type { AgentId, OrganizationId } from "@mosoo/id";
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { agentGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
 import {
-  getAgentFileContent,
-  getAgentFileTree,
-} from "../../runtime/application/agent-file-browser.service";
-import {
   recreateSandbox,
   resetAgentState,
   restartDriver,
@@ -42,11 +38,6 @@ interface OrganizationIdArgs {
 
 interface AgentIdArgs {
   agentId: string;
-}
-
-interface AgentFilePathArgs {
-  agentId: string;
-  path: string;
 }
 
 interface CreateAgentArgs {
@@ -154,10 +145,6 @@ export const agentGraphQLModule = {
       listAgentCollaborators(context.bindings.DB, context.viewer, parseAgentId(args.agentId)),
     agentEditorState: async (_parent, args: AgentIdArgs, context) =>
       getAgentEditorState(context.bindings.DB, context.viewer, parseAgentId(args.agentId)),
-    agentFileContent: async (_parent, args: AgentFilePathArgs, context) =>
-      getAgentFileContent(context.bindings, context.viewer, args),
-    agentFileTree: async (_parent, args: AgentFilePathArgs, context) =>
-      getAgentFileTree(context.bindings, context.viewer, args),
     agentManifest: async (_parent, args: AgentIdArgs, context) =>
       exportAgentManifest(context.bindings.DB, context.viewer, parseAgentId(args.agentId)),
     exportAgentPackage: async (_parent, args: AgentIdArgs, context) =>

@@ -86,36 +86,6 @@ export const agentSchema = /* GraphQL */ `
     restartDriver
   }
 
-  enum AgentFileEntryKind {
-    directory
-    file
-    space_mount
-    symlink
-  }
-
-  enum AgentFilePersistence {
-    persistent
-    temporary
-  }
-
-  enum AgentFilePreview {
-    binary
-    empty
-    large_text
-    text
-  }
-
-  enum AgentFileSandboxStatus {
-    active
-    backing_up
-    cold
-    destroying
-    error
-    missing
-    restoring
-    unsupported
-  }
-
   type AgentSkillReference {
     ownerName: String
     skillId: ULID!
@@ -227,55 +197,6 @@ export const agentSchema = /* GraphQL */ `
     fileName: String!
     manifestYaml: String!
     size: Int!
-  }
-
-  type AgentFileSessionNode {
-    active: Boolean!
-    id: ULID!
-    status: SessionStatus!
-    title: String
-    updatedAt: String!
-  }
-
-  type AgentFileSpaceMountNode {
-    path: String!
-    spaceId: ULID!
-    spaceName: String!
-    url: String!
-  }
-
-  type AgentFileEntry {
-    kind: AgentFileEntryKind!
-    mimeType: String
-    name: String!
-    path: String!
-    persistence: AgentFilePersistence!
-    preview: AgentFilePreview!
-    session: AgentFileSessionNode
-    sizeBytes: Int!
-    space: AgentFileSpaceMountNode
-  }
-
-  type AgentFileTree {
-    agentId: ULID!
-    entries: [AgentFileEntry!]!
-    lastError: String
-    path: String!
-    sandboxId: ULID
-    sandboxStatus: AgentFileSandboxStatus!
-    totalCount: Int!
-    truncated: Boolean!
-  }
-
-  type AgentFileContent {
-    agentId: ULID!
-    content: String
-    mimeType: String!
-    name: String!
-    path: String!
-    preview: AgentFilePreview!
-    sandboxId: ULID!
-    sizeBytes: Int!
   }
 
   type AgentPackageImportResult {
