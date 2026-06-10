@@ -2,6 +2,8 @@
 
 > This is the product-narrative version for non-engineering readers. The full engineering contract (the file-manifest injection mechanism, state machine, corner cases, reasoning review, implementation boundaries, and runtime-adapter constraints) lives in the shipped engineering PRD for this same feature.
 
+> **UI status (2026-06-10)**: the **Files Panel UI in the agent chat header is removed** — the `Files` toggle in `agent-session-panel-header.tsx` and the 320px `session-files-panel.tsx` side panel are deleted. The Session File data model, lifecycle, manifest-injection mechanism, and `session_files.updated` runtime event below are unchanged and still in production; only the panel surface and the "+ in the Files Panel" / "drag-and-drop onto the session page" upload entry points are gone. Today the **composer paperclip** is the only upload entry point in the agent chat, and there is no in-chat list view for what files are currently attached. The "single authoritative view" claim is therefore aspirational — keep it in the PRD as the target, but treat any mention of the Files Panel below as describing a surface that is not currently rendered.
+
 ## In one sentence
 
 This upgrades "dropping a local file at the Agent" from "**an attachment on this one message**" to "**a file that belongs to this session**":

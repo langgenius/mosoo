@@ -2,18 +2,20 @@
 
 > This is the product-story version written for non-engineer readers.
 
+> **UI status (2026-06-10)**: the user-facing labels in the Agent editor and the kind-fork dialog are **Assistant Agent** (kind = `pet`) and **Task Agent** (kind = `cattle`); the on-screen control is now a single-row segmented switch tab with hover tooltips, not the previous "two stacked cards / either-or toggle." The engineering-contract kind keys (`pet` / `cattle`) and the doc / API language below are unchanged. When this PRD says "Pet" or "Cattle," that is the contract term — the UI shows it as "Assistant Agent" / "Task Agent."
+
 ---
 
 ## In one sentence
 
 Mosoo splits Agents into two **kinds**:
 
-- **Pet** — a stable, companion-style agent: "like a coworker or co-pilot" that remembers what you talked about before and what you set up together.
-- **Cattle** — an industrial, task-style agent: "like a disposable worker" that gets a clean environment for every task and is torn down once the run finishes.
+- **Pet** (UI label: **Assistant Agent**) — a stable, companion-style agent: "like a coworker or co-pilot" that remembers what you talked about before and what you set up together.
+- **Cattle** (UI label: **Task Agent**) — an industrial, task-style agent: "like a disposable worker" that gets a clean environment for every task and is torn down once the run finishes.
 
-The Builder explicitly chooses the kind when creating an Agent (today the product surfaces this as a single either/or toggle; the UI/UX may evolve later). **The kind is locked after the first Publish**; to switch, you Fork into a new Agent.
+The Builder explicitly chooses the kind when creating an Agent (today the product surfaces this as a single-row segmented switch tab with hover tooltips on each option; the UI/UX may evolve later). **The kind is locked after the first Publish**; to switch, you Fork into a new Agent.
 
-> This is a product-shape decision, not an internal engineering toggle. Pet / Cattle is a single naming scheme shared across the user-facing surface, the docs, and the engineering contract — analogous to Dify's "Workflow vs Chatflow".
+> This is a product-shape decision, not an internal engineering toggle. Pet / Cattle is the single engineering-contract naming scheme; the user-facing surface today re-labels them as "Assistant Agent" / "Task Agent" but the contract keys are unchanged — analogous to Dify's "Workflow vs Chatflow".
 
 ---
 
@@ -66,7 +68,7 @@ When this is done, the Builder should be able to:
 | Stage                          | What the Builder is doing                                                                    | What they see                                                                                     | Mood         |
 | ------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------ |
 | Create                         | Click "+ Create agent" → fill in Name / Description / Runtime profile                        | Create dialog (**does not expose kind**, to avoid an entry barrier)                               | Anticipation |
-| Pick kind                      | Enter the Configure page; see the Pet / Cattle either/or choice + Compare types ▾ at the top | A one-line scenario description + Examples + comparison table                                     | Learning     |
+| Pick kind                      | Enter the Configure page; see the Assistant Agent (Pet) / Task Agent (Cattle) switch tab + Compare types ▾ at the top | A segmented switch tab with hover tooltips (tagline + description + examples) per option + comparison table                                     | Learning     |
 | Configure                      | Fill in Identity / Model / System Prompt / Skills / MCP                                      | Standard Studio shape (shared by Pet/Cattle)                                                      | Smooth       |
 | Test                           | Click "Test in Chat" → enter Preview                                                         | Multi-turn conversation; **kind can still be switched freely during Draft**, with no side effects | Anticipation |
 | Publish                        | Click "Publish" → choose visibility                                                          | Single-step dialog: Pet copy says "Who can chat?", Cattle copy says "Who can call?"               | Decisive     |
