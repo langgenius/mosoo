@@ -263,10 +263,7 @@ export function AppNavigation({ collapsed, pathname }: { collapsed: boolean; pat
       {NAV_SECTIONS.map((section, index) => (
         <div key={section.label ?? `section-${index}`} className="flex flex-col">
           {collapsed && index > 0 ? (
-            <div
-              aria-hidden="true"
-              className="bg-border-soft mx-auto my-1.5 h-px w-6"
-            />
+            <div aria-hidden="true" className="bg-border-soft mx-auto my-1.5 h-px w-6" />
           ) : null}
           <NavSection collapsed={collapsed} pathname={pathname} section={section} />
         </div>

@@ -1,12 +1,4 @@
-import { getAgentKindRuntimePolicy } from "@mosoo/contracts/agent";
-import {
-  ArrowLeft,
-  ChevronDown,
-  FileText,
-  FolderTree,
-  Settings,
-  TerminalSquare,
-} from "lucide-react";
+import { ArrowLeft, ChevronDown, Settings, TerminalSquare } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -25,24 +17,22 @@ import {
 import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
 
 import { isTruthy } from "../../shared/lib/truthiness";
-import { canShowOwnerDebugTerminalItem } from "./agent-debug-menu-policy";
+import { canShowAgentDebugMenuItem } from "./agent-debug-menu-policy";
 import { mapAgentDetailToView } from "./agent-view.mapper";
 import type { Agent, AgentMode } from "./agent.types";
 import { ConsumeMode } from "./components/consume-mode";
 import { AgentCostTab } from "./components/cost-tab";
 import { DevMode } from "./components/dev-mode";
-import { FileBrowserMode } from "./components/file-browser-mode";
 import { LogsTab } from "./components/logs-tab";
 import { PreviewMode } from "./components/preview-mode";
 import { RuntimeIcon } from "./components/runtime-icon";
 import { SettingsSheet } from "./components/settings-dialog";
-import { SystemLogMode } from "./components/system-log-mode";
 import { TerminalMode } from "./components/terminal-mode";
 import { VersionsTab } from "./components/versions-tab";
 import { LifecycleShell } from "./lifecycle/lifecycle-shell";
 import { getRuntimeInfo } from "./runtime-catalog";
 
-type DetailMode = AgentMode | "cost" | "files" | "logs" | "system-log" | "terminal";
+type DetailMode = AgentMode | "cost" | "logs" | "terminal";
 
 const MODE_TABS: { id: DetailMode; label: string; ownerOnly?: boolean }[] = [
   { id: "dev", label: "Dev", ownerOnly: true },
@@ -51,11 +41,11 @@ const MODE_TABS: { id: DetailMode; label: string; ownerOnly?: boolean }[] = [
   { id: "cost", label: "Cost", ownerOnly: true },
 ];
 
-const DEBUG_MODES = new Set<DetailMode>(["files", "system-log", "terminal"]);
+const DEBUG_MODES = new Set<DetailMode>(["terminal"]);
 
 interface DebugModeItem {
   icon: LucideIcon;
-  id: Extract<DetailMode, "files" | "system-log" | "terminal">;
+  id: Extract<DetailMode, "terminal">;
   label: string;
 }
 
@@ -65,10 +55,8 @@ function toDetailMode(value: string | null): DetailMode | null {
     case "cost":
     case "create":
     case "dev":
-    case "files":
     case "logs":
     case "preview":
-    case "system-log":
     case "terminal":
       return value;
     default:
@@ -250,30 +238,14 @@ export function AgentDetailPage() {
       : null;
   const canManageAgentAccess =
     detailQuery.data?.viewerRole === "owner" || viewerOrgRole === "owner";
-  const canUseTerminal = canShowOwnerDebugTerminalItem({
+  const canUseTerminal = canShowAgentDebugMenuItem({
     agentKind: agent?.kind ?? null,
+    itemId: "terminal",
     viewerRole: detailQuery.data?.viewerRole ?? null,
   });
-  const runtimeKindPolicy = agent ? getAgentKindRuntimePolicy(agent.kind) : null;
-  const usesStableRuntimeSubject = Boolean(runtimeKindPolicy?.subject.stable);
-  const canUseFileBrowser = Boolean(
-    agent && detailQuery.data?.viewerRole === "owner" && usesStableRuntimeSubject,
-  );
-  const canUseSystemLog = Boolean(agent && isOwnerOrAdmin && usesStableRuntimeSubject);
-  const canShowDebugMenu = Boolean(
-    agent &&
-    isOwnerOrAdmin &&
-    (runtimeKindPolicy?.operations.ownerTerminal || runtimeKindPolicy?.subject.stable),
-  );
   const debugItems: DebugModeItem[] = [];
-  if (canShowDebugMenu && canUseTerminal) {
+  if (canUseTerminal) {
     debugItems.push({ icon: TerminalSquare, id: "terminal", label: "Terminal" });
-  }
-  if (canShowDebugMenu && canUseFileBrowser) {
-    debugItems.push({ icon: FolderTree, id: "files", label: "File system" });
-  }
-  if (canShowDebugMenu && canUseSystemLog) {
-    debugItems.push({ icon: FileText, id: "system-log", label: "System log" });
   }
   const urlMode = toDetailMode(searchParams.get("tab") ?? searchParams.get("mode"));
 
@@ -321,11 +293,7 @@ export function AgentDetailPage() {
       ? "consume"
       : requestedMode === "terminal" && !canUseTerminal
         ? defaultMode
-        : requestedMode === "files" && !canUseFileBrowser
-          ? defaultMode
-          : requestedMode === "system-log" && !canUseSystemLog
-            ? defaultMode
-            : requestedMode;
+        : requestedMode;
 
   if (!isTruthy(agentId)) {
     return (
@@ -461,8 +429,6 @@ export function AgentDetailPage() {
           </>
         )}
         {mode === "logs" && <LogsTab agentId={agent.id} />}
-        {mode === "files" && <FileBrowserMode agent={agent} />}
-        {mode === "system-log" && <SystemLogMode agent={agent} />}
         {mode === "cost" && <AgentCostTab agentId={agent.id} />}
         {mode === "terminal" && <TerminalMode key={agent.id} agent={agent} />}
       </div>
