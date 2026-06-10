@@ -1,4 +1,5 @@
 import type {
+  AgentConfigBuilderAgentTypeDecision,
   AgentConfigBuilderMetadata,
   AgentConfigBuilderComponentDecision,
 } from "@mosoo/contracts/agent";
@@ -121,6 +122,14 @@ function readBuilderComponentDecision(value: unknown): AgentConfigBuilderCompone
   throw new Error("Agent stored config builder component decision is invalid.");
 }
 
+function readBuilderAgentTypeDecision(value: unknown): AgentConfigBuilderAgentTypeDecision {
+  if (value === "decided" || value === "skipped") {
+    return value;
+  }
+
+  throw new Error("Agent stored config builder agent type decision is invalid.");
+}
+
 function readBuilderMetadata(value: unknown): AgentConfigBuilderMetadata {
   if (value === undefined) {
     return { componentDecisions: {} };
@@ -134,11 +143,16 @@ function readBuilderMetadata(value: unknown): AgentConfigBuilderMetadata {
   }
 
   const componentDecisions = readRecord(componentDecisionsValue, "builder componentDecisions");
+  const agentType = componentDecisions["agentType"];
   const environment = componentDecisions["environment"];
 
   return {
-    componentDecisions:
-      environment === undefined ? {} : { environment: readBuilderComponentDecision(environment) },
+    componentDecisions: {
+      ...(agentType === undefined ? {} : { agentType: readBuilderAgentTypeDecision(agentType) }),
+      ...(environment === undefined
+        ? {}
+        : { environment: readBuilderComponentDecision(environment) }),
+    },
   };
 }
 

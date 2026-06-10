@@ -1,13 +1,18 @@
 import type {
+  AgentBuilderCreateEnvironmentActionPayload,
+  AgentBuilderCreateRemoteMcpServerActionPayload,
   AgentBuilderExecutableActionToolId,
   AgentBuilderSecureUiAction,
 } from "@mosoo/contracts/agent-builder";
-import type { AgentId, SessionId } from "@mosoo/id";
+import type { McpAuthType } from "@mosoo/contracts/mcp";
+import type { AgentId, EnvironmentId, McpServerId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { ensureAgentEditor } from "../../agents/application/agent-access.service";
 import { updateAgentConfig } from "../../agents/application/agent-command.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import { createEnvironment } from "../../environments/application/environment.service";
+import { createPersonalMcpServer } from "../../mcp/application/mcp-server.service";
 import { deleteAgentSession } from "../../sessions/application/session-lifecycle-mutation.service";
 import { ensureModelAvailableForSelection } from "../../vendor-credentials/application/vendor-credential.service";
 import { toAgentBuilderUpdateAgentConfigInput } from "./agent-builder-lightweight-manifest-projections";
@@ -18,11 +23,27 @@ export type AgentBuilderControlPlaneActionStatus = "applied" | "needs_secure_ui"
 
 export interface ExecuteAgentBuilderControlPlaneActionInput {
   readonly agentId: AgentId;
+  readonly createEnvironmentPayload?: AgentBuilderCreateEnvironmentActionPayload | null;
+  readonly createRemoteMcpServerPayload?: AgentBuilderCreateRemoteMcpServerActionPayload | null;
   readonly draftYaml?: string;
   readonly toolId: AgentBuilderExecutableActionToolId;
 }
 
+export interface AgentBuilderCreatedEnvironmentSummary {
+  readonly id: EnvironmentId;
+  readonly name: string;
+}
+
+export interface AgentBuilderCreatedMcpServerSummary {
+  readonly authType: McpAuthType;
+  readonly id: McpServerId;
+  readonly name: string;
+  readonly url: string;
+}
+
 export interface AgentBuilderControlPlaneActionResult {
+  readonly createdEnvironment?: AgentBuilderCreatedEnvironmentSummary;
+  readonly createdMcpServer?: AgentBuilderCreatedMcpServerSummary;
   readonly message: string;
   readonly secureUi?: AgentBuilderSecureUiAction;
   readonly sessionId?: SessionId;
@@ -139,12 +160,38 @@ async function executeCreateEnvironment(
   viewer: AuthenticatedViewer,
   input: ExecuteAgentBuilderControlPlaneActionInput,
 ): Promise<AgentBuilderControlPlaneActionResult> {
-  await ensureAgentEditor(bindings.DB, viewer.id, input.agentId);
+  const editable = await ensureAgentEditor(bindings.DB, viewer.id, input.agentId);
+  const payload = input.createEnvironmentPayload ?? null;
+
+  if (payload === null) {
+    return {
+      message: "Open the secure Environment creation UI.",
+      secureUi: { kind: "create_environment" },
+      status: "needs_secure_ui",
+      toolId: input.toolId,
+    };
+  }
+
+  // Secret values and executable content never travel through this path: the
+  // Builder payload carries metadata only. Env vars and the setup script are
+  // added later by the user in the Environment UI.
+  const created = await createEnvironment(bindings, viewer, {
+    allowMcpServers: true,
+    allowPackageManagers: true,
+    allowedHosts: [],
+    description: payload.description ?? null,
+    envVars: [],
+    name: payload.name,
+    networkPolicy: "full",
+    organizationId: editable.agent.organizationId,
+    packages: [],
+    setupScript: "",
+  });
 
   return {
-    message: "Open the secure Environment creation UI.",
-    secureUi: { kind: "create_environment" },
-    status: "needs_secure_ui",
+    createdEnvironment: { id: created.id, name: created.name },
+    message: `Environment "${created.name}" created.`,
+    status: "applied",
     toolId: input.toolId,
   };
 }
@@ -154,14 +201,48 @@ async function executeCreateRemoteMcpServer(
   viewer: AuthenticatedViewer,
   input: ExecuteAgentBuilderControlPlaneActionInput,
 ): Promise<AgentBuilderControlPlaneActionResult> {
-  await ensureAgentEditor(bindings.DB, viewer.id, input.agentId);
+  const editable = await ensureAgentEditor(bindings.DB, viewer.id, input.agentId);
+  const payload = input.createRemoteMcpServerPayload ?? null;
 
-  return {
-    message: "Open the secure MCP server creation UI.",
-    secureUi: { kind: "create_remote_mcp_server" },
-    status: "needs_secure_ui",
-    toolId: input.toolId,
-  };
+  if (payload === null) {
+    return {
+      message: "Open the secure MCP server creation UI.",
+      secureUi: { kind: "create_remote_mcp_server" },
+      status: "needs_secure_ui",
+      toolId: input.toolId,
+    };
+  }
+
+  try {
+    const server = await createPersonalMcpServer(bindings, viewer, {
+      authType: payload.authType,
+      description: payload.description ?? null,
+      name: payload.name,
+      organizationId: editable.agent.organizationId,
+      url: payload.url,
+    });
+
+    // The server record exists, but its credential (bearer token or OAuth
+    // grant) must be connected by the user in the secure UI.
+    return {
+      createdMcpServer: {
+        authType: server.authType,
+        id: server.id,
+        name: server.name,
+        url: server.url,
+      },
+      message: `MCP server "${server.name}" created. Connect its credential to authorize it.`,
+      secureUi: { kind: "connect_mcp_credential", mcpServerId: server.id },
+      status: "applied",
+      toolId: input.toolId,
+    };
+  } catch (error) {
+    return {
+      message: `Could not create the MCP server: ${error instanceof Error ? error.message : "unknown error"}`,
+      status: "noop",
+      toolId: input.toolId,
+    };
+  }
 }
 
 export async function executeAgentBuilderControlPlaneAction(

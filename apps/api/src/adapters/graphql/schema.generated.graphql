@@ -61,6 +61,11 @@ type Agent {
   visibility: AgentVisibility!
 }
 
+enum AgentBuilderAgentTypeDecision {
+  decided
+  skipped
+}
+
 enum AgentBuilderComponentDecision {
   bound
   created
@@ -68,14 +73,18 @@ enum AgentBuilderComponentDecision {
 }
 
 type AgentBuilderComponentDecisions {
+  agentType: AgentBuilderAgentTypeDecision
   environment: AgentBuilderComponentDecision
 }
 
 input AgentBuilderComponentDecisionsInput {
+  agentType: AgentBuilderAgentTypeDecision
   environment: AgentBuilderComponentDecision
 }
 
 type AgentBuilderControlPlaneActionResult {
+  createdEnvironment: AgentBuilderCreatedEnvironment
+  createdMcpServer: AgentBuilderCreatedMcpServer
   message: String!
   secureUi: AgentBuilderSecureUiAction
   sessionId: ULID
@@ -87,6 +96,30 @@ enum AgentBuilderControlPlaneActionStatus {
   applied
   needs_secure_ui
   noop
+}
+
+input AgentBuilderCreateEnvironmentPayloadInput {
+  description: String
+  name: String!
+}
+
+input AgentBuilderCreateRemoteMcpServerPayloadInput {
+  authType: McpAuthType!
+  description: String
+  name: String!
+  url: String!
+}
+
+type AgentBuilderCreatedEnvironment {
+  id: ULID!
+  name: String!
+}
+
+type AgentBuilderCreatedMcpServer {
+  authType: McpAuthType!
+  id: ULID!
+  name: String!
+  url: String!
 }
 
 enum AgentBuilderExecutableActionToolId {
@@ -128,9 +161,11 @@ input AgentBuilderMetadataInput {
 
 type AgentBuilderSecureUiAction {
   kind: AgentBuilderSecureUiActionKind!
+  mcpServerId: ULID
 }
 
 enum AgentBuilderSecureUiActionKind {
+  connect_mcp_credential
   create_environment
   create_remote_mcp_server
 }
@@ -1150,6 +1185,8 @@ enum EnvironmentVariableStatus {
 
 input ExecuteAgentBuilderControlPlaneActionInput {
   agentId: ULID!
+  createEnvironmentPayload: AgentBuilderCreateEnvironmentPayloadInput
+  createRemoteMcpServerPayload: AgentBuilderCreateRemoteMcpServerPayloadInput
   draftYaml: String
   toolId: AgentBuilderExecutableActionToolId!
 }

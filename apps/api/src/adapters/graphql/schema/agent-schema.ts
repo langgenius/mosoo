@@ -75,6 +75,11 @@ export const agentSchema = /* GraphQL */ `
     skipped
   }
 
+  enum AgentBuilderAgentTypeDecision {
+    decided
+    skipped
+  }
+
   enum RuntimeStateOperation {
     recreateSandbox
     resetAgentState
@@ -158,6 +163,7 @@ export const agentSchema = /* GraphQL */ `
   }
 
   type AgentBuilderComponentDecisions {
+    agentType: AgentBuilderAgentTypeDecision
     environment: AgentBuilderComponentDecision
   }
 
@@ -394,6 +400,7 @@ export const agentSchema = /* GraphQL */ `
   }
 
   input AgentBuilderComponentDecisionsInput {
+    agentType: AgentBuilderAgentTypeDecision
     environment: AgentBuilderComponentDecision
   }
 

@@ -1,3 +1,6 @@
+import type { McpServerId } from "../id/id.contract";
+import type { McpAuthType } from "../mcp/mcp.contract";
+
 export const AGENT_BUILDER_CONTROL_PLANE_TOOL_ID_VALUES = [
   "inspect_builder_context",
   "search_builder_assets",
@@ -29,13 +32,33 @@ export type AgentBuilderExecutableActionToolId =
 export const AGENT_BUILDER_SECURE_UI_ACTION_KIND_VALUES = [
   "create_environment",
   "create_remote_mcp_server",
-] as const satisfies readonly AgentBuilderExecutableActionToolId[];
+  "connect_mcp_credential",
+] as const;
 
 export type AgentBuilderSecureUiActionKind =
   (typeof AGENT_BUILDER_SECURE_UI_ACTION_KIND_VALUES)[number];
 
 export interface AgentBuilderSecureUiAction {
   readonly kind: AgentBuilderSecureUiActionKind;
+  readonly mcpServerId?: McpServerId;
+}
+
+// Builder actions may create these resources directly, but credentials (bearer
+// tokens, OAuth secrets) must never travel through the planner/control-plane
+// path — credential connection always happens in the dedicated secure UI.
+// Setup scripts are also excluded: they execute with the environment's secret
+// env vars at provisioning time, so they must stay human-authored and visible
+// in the Environment UI rather than LLM-authored behind a button label.
+export interface AgentBuilderCreateEnvironmentActionPayload {
+  readonly description?: string | null;
+  readonly name: string;
+}
+
+export interface AgentBuilderCreateRemoteMcpServerActionPayload {
+  readonly authType: McpAuthType;
+  readonly description?: string | null;
+  readonly name: string;
+  readonly url: string;
 }
 
 export const AGENT_BUILDER_ASK_USER_MODE_VALUES = [
@@ -89,7 +112,13 @@ export type AgentBuilderWorkflowStageStatus = "active" | "completed" | "pending"
 
 export type AgentBuilderComponentDecision = "bound" | "created" | "skipped";
 
+// Records that the agent type (kind) was explicitly chosen or skipped during
+// the Builder stage flow; kind itself always holds a value, so the decision
+// needs its own marker.
+export type AgentBuilderAgentTypeDecision = "decided" | "skipped";
+
 export interface AgentBuilderComponentDecisions {
+  readonly agentType?: AgentBuilderAgentTypeDecision;
   readonly environment?: AgentBuilderComponentDecision;
 }
 

@@ -98,19 +98,124 @@ async function insertPreviewSession(
 }
 
 describe("Agent Builder control-plane action execution", () => {
-  test("keeps resource creation payloads out of the Builder control-plane mutation", () => {
+  test("keeps credential material out of the Builder control-plane mutation", () => {
     expect(agentBuilderSchema).toContain("input ExecuteAgentBuilderControlPlaneActionInput");
     expect(agentBuilderSchema).toContain("enum AgentBuilderExecutableActionToolId");
     expect(agentBuilderSchema).toContain("toolId: AgentBuilderExecutableActionToolId!");
+    expect(agentBuilderSchema).toContain(
+      "createEnvironmentPayload: AgentBuilderCreateEnvironmentPayloadInput",
+    );
+    expect(agentBuilderSchema).toContain(
+      "createRemoteMcpServerPayload: AgentBuilderCreateRemoteMcpServerPayloadInput",
+    );
     expect(agentBuilderSchema).not.toContain("enum AgentBuilderControlPlaneToolId");
     expect(agentBuilderSchema).not.toContain("toolId: AgentBuilderControlPlaneToolId!");
-    expect(agentBuilderSchema).not.toContain("createEnvironment: CreateEnvironmentInput");
-    expect(agentBuilderSchema).not.toContain(
-      "createOrganizationMcpServer: CreateOrganizationMcpServerInput",
-    );
-    expect(agentBuilderSchema).not.toContain(
-      "createPersonalMcpServer: CreatePersonalMcpServerInput",
-    );
+    // The Builder may create resource records, but credentials and secret
+    // values must stay in the dedicated secure UI flows.
+    expect(agentBuilderSchema).not.toContain("oauthClientId");
+    expect(agentBuilderSchema).not.toContain("oauthClientSecret");
+    expect(agentBuilderSchema).not.toContain("sharedBearerToken");
+    expect(agentBuilderSchema).not.toContain("token");
+    expect(agentBuilderSchema).not.toContain("envVars");
+    expect(agentBuilderSchema).not.toContain("apiKey");
+    expect(agentBuilderSchema).not.toContain("setupScript");
+  });
+
+  test("creates an Environment directly when the action carries a payload", async () => {
+    const fixture = await createAgentBuilderApiFixture();
+    const result = await executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+      agentId: fixture.ids.agentId,
+      createEnvironmentPayload: {
+        description: "Build sandbox for the Slack bot.",
+        name: "Slack Bot Environment",
+      },
+      toolId: "create_environment",
+    });
+
+    expect(result).toMatchObject({
+      status: "applied",
+      toolId: "create_environment",
+    });
+    expect(result.secureUi).toBeUndefined();
+    expect(result.createdEnvironment?.name).toBe("Slack Bot Environment");
+
+    const row = await fixture.bindings.DB.prepare(
+      "SELECT description, name, owner_account_id, organization_id FROM environment WHERE id = ?",
+    )
+      .bind(result.createdEnvironment?.id ?? "")
+      .first();
+
+    expect(row).toMatchObject({
+      description: "Build sandbox for the Slack bot.",
+      name: "Slack Bot Environment",
+      organization_id: fixture.ids.organizationId,
+      owner_account_id: fixture.viewer.id,
+    });
+  });
+
+  test("creates an MCP server record directly and routes credential connection to secure UI", async () => {
+    const fixture = await createAgentBuilderApiFixture();
+    const result = await executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+      agentId: fixture.ids.agentId,
+      createRemoteMcpServerPayload: {
+        authType: "bearer",
+        name: "Linear MCP",
+        url: "https://mcp.linear.app/mcp",
+      },
+      toolId: "create_remote_mcp_server",
+    });
+
+    expect(result).toMatchObject({
+      status: "applied",
+      toolId: "create_remote_mcp_server",
+    });
+    expect(result.createdMcpServer).toMatchObject({
+      authType: "bearer",
+      name: "Linear MCP",
+      url: "https://mcp.linear.app/mcp",
+    });
+    expect(result.secureUi).toEqual({
+      kind: "connect_mcp_credential",
+      mcpServerId: result.createdMcpServer?.id,
+    });
+
+    const row = await fixture.bindings.DB.prepare(
+      "SELECT auth_type, name, source, url FROM mcp_server WHERE id = ?",
+    )
+      .bind(result.createdMcpServer?.id ?? "")
+      .first();
+
+    expect(row).toMatchObject({
+      auth_type: "bearer",
+      name: "Linear MCP",
+      source: "personal",
+      url: "https://mcp.linear.app/mcp",
+    });
+
+    const credentialCount = await fixture.bindings.DB.prepare(
+      "SELECT COUNT(*) AS count FROM mcp_credential WHERE server_id = ?",
+    )
+      .bind(result.createdMcpServer?.id ?? "")
+      .first();
+
+    expect(credentialCount).toMatchObject({ count: 0 });
+  });
+
+  test("returns noop when the MCP server payload is rejected", async () => {
+    const fixture = await createAgentBuilderApiFixture();
+    const result = await executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+      agentId: fixture.ids.agentId,
+      createRemoteMcpServerPayload: {
+        authType: "bearer",
+        name: "Insecure MCP",
+        url: "http://mcp.example.com/mcp",
+      },
+      toolId: "create_remote_mcp_server",
+    });
+
+    expect(result.status).toBe("noop");
+    expect(result.createdMcpServer).toBeUndefined();
+    expect(result.message).toContain("Could not create the MCP server");
   });
 
   test("rejects unavailable Manifest model selection before applying config", async () => {

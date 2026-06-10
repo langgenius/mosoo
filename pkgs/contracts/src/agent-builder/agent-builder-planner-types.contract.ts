@@ -14,6 +14,8 @@ import type {
 import type {
   AgentBuilderAskUserMode,
   AgentBuilderComponentDecisions,
+  AgentBuilderCreateEnvironmentActionPayload,
+  AgentBuilderCreateRemoteMcpServerActionPayload,
   AgentBuilderPlanNodeActionKey,
   AgentBuilderPreviewStageSnapshot,
 } from "./agent-builder-control-plane.contract";
@@ -49,6 +51,8 @@ export type AgentBuilderPlanNodeActionStyle = "danger" | "primary" | "secondary"
 
 export interface AgentBuilderPlanNodeAction {
   actionKey: AgentBuilderPlanNodeActionKey;
+  createEnvironmentPayload?: AgentBuilderCreateEnvironmentActionPayload;
+  createRemoteMcpServerPayload?: AgentBuilderCreateRemoteMcpServerActionPayload;
   label: string;
   style: AgentBuilderPlanNodeActionStyle;
 }

@@ -37,12 +37,17 @@ export type AddSessionResourceInput = {
   sessionId: PlatformId;
 };
 
+export type AgentBuilderAgentTypeDecision =
+  | 'decided'
+  | 'skipped';
+
 export type AgentBuilderComponentDecision =
   | 'bound'
   | 'created'
   | 'skipped';
 
 export type AgentBuilderComponentDecisionsInput = {
+  agentType?: AgentBuilderAgentTypeDecision | null | undefined;
   environment?: AgentBuilderComponentDecision | null | undefined;
 };
 
@@ -50,6 +55,18 @@ export type AgentBuilderControlPlaneActionStatus =
   | 'applied'
   | 'needs_secure_ui'
   | 'noop';
+
+export type AgentBuilderCreateEnvironmentPayloadInput = {
+  description?: string | null | undefined;
+  name: string;
+};
+
+export type AgentBuilderCreateRemoteMcpServerPayloadInput = {
+  authType: McpAuthType;
+  description?: string | null | undefined;
+  name: string;
+  url: string;
+};
 
 export type AgentBuilderExecutableActionToolId =
   | 'apply_agent_config'
@@ -70,6 +87,7 @@ export type AgentBuilderMetadataInput = {
 };
 
 export type AgentBuilderSecureUiActionKind =
+  | 'connect_mcp_credential'
   | 'create_environment'
   | 'create_remote_mcp_server';
 
@@ -481,6 +499,8 @@ export type EnvironmentVariableStatus =
 
 export type ExecuteAgentBuilderControlPlaneActionInput = {
   agentId: PlatformId;
+  createEnvironmentPayload?: AgentBuilderCreateEnvironmentPayloadInput | null | undefined;
+  createRemoteMcpServerPayload?: AgentBuilderCreateRemoteMcpServerPayloadInput | null | undefined;
   draftYaml?: string | null | undefined;
   toolId: AgentBuilderExecutableActionToolId;
 };
@@ -971,7 +991,7 @@ export type ExecuteAgentBuilderControlPlaneActionMutationVariables = Exact<{
 }>;
 
 
-export type ExecuteAgentBuilderControlPlaneActionMutation = { executeAgentBuilderControlPlaneAction: { message: string, sessionId: PlatformId | null, status: AgentBuilderControlPlaneActionStatus, toolId: AgentBuilderExecutableActionToolId, secureUi: { kind: AgentBuilderSecureUiActionKind } | null } };
+export type ExecuteAgentBuilderControlPlaneActionMutation = { executeAgentBuilderControlPlaneAction: { message: string, sessionId: PlatformId | null, status: AgentBuilderControlPlaneActionStatus, toolId: AgentBuilderExecutableActionToolId, createdEnvironment: { id: PlatformId, name: string } | null, createdMcpServer: { authType: McpAuthType, id: PlatformId, name: string, url: string } | null, secureUi: { kind: AgentBuilderSecureUiActionKind, mcpServerId: PlatformId | null } | null } };
 
 export type AgentBuilderMessagesQueryVariables = Exact<{
   agentId: PlatformId;
@@ -1120,7 +1140,7 @@ export type AgentEditorStateQueryVariables = Exact<{
 }>;
 
 
-export type AgentEditorStateQuery = { agentEditorState: { id: PlatformId, builder: { componentDecisions: { environment: AgentBuilderComponentDecision | null } }, environment: { boundSpaceIds: Array<PlatformId>, environmentId: PlatformId | null }, packageResolution: { recordedAt: string, source: AgentPackageResolutionSource, report: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, boundSpaceCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } | null, collaborators: Array<{ principal: string, role: AgentCollaboratorRole, name: string | null, email: string | null, imageUrl: string | null }>, mcpBindings: Array<{ authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialMode: AgentMcpCredentialMode, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, credentialSubject: string | null, enabled: boolean, hasSharedCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, serverId: PlatformId, source: McpServerSource, updatedAt: string, url: string }>, readiness: { checkedAt: string, ready: boolean, issues: Array<{ code: string, message: string, severity: AgentReadinessSeverity }> } } };
+export type AgentEditorStateQuery = { agentEditorState: { id: PlatformId, builder: { componentDecisions: { agentType: AgentBuilderAgentTypeDecision | null, environment: AgentBuilderComponentDecision | null } }, environment: { boundSpaceIds: Array<PlatformId>, environmentId: PlatformId | null }, packageResolution: { recordedAt: string, source: AgentPackageResolutionSource, report: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, boundSpaceCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } | null, collaborators: Array<{ principal: string, role: AgentCollaboratorRole, name: string | null, email: string | null, imageUrl: string | null }>, mcpBindings: Array<{ authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialMode: AgentMcpCredentialMode, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, credentialSubject: string | null, enabled: boolean, hasSharedCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, serverId: PlatformId, source: McpServerSource, updatedAt: string, url: string }>, readiness: { checkedAt: string, ready: boolean, issues: Array<{ code: string, message: string, severity: AgentReadinessSeverity }> } } };
 
 export type UpdateAgentConfigMutationVariables = Exact<{
   input: UpdateAgentConfigInput;
@@ -2589,9 +2609,20 @@ export const EnsureAgentBuilderThreadDocument = new TypedDocumentString(`
 export const ExecuteAgentBuilderControlPlaneActionDocument = new TypedDocumentString(`
     mutation ExecuteAgentBuilderControlPlaneAction($input: ExecuteAgentBuilderControlPlaneActionInput!) {
   executeAgentBuilderControlPlaneAction(input: $input) {
+    createdEnvironment {
+      id
+      name
+    }
+    createdMcpServer {
+      authType
+      id
+      name
+      url
+    }
     message
     secureUi {
       kind
+      mcpServerId
     }
     sessionId
     status
@@ -2993,6 +3024,7 @@ export const AgentEditorStateDocument = new TypedDocumentString(`
     id
     builder {
       componentDecisions {
+        agentType
         environment
       }
     }

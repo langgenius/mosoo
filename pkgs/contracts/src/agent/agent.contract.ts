@@ -344,7 +344,10 @@ export interface AgentEditorState {
 
 export type AgentConfigBuilderComponentDecision = "bound" | "created" | "skipped";
 
+export type AgentConfigBuilderAgentTypeDecision = "decided" | "skipped";
+
 export interface AgentConfigBuilderComponentDecisions {
+  agentType?: AgentConfigBuilderAgentTypeDecision;
   environment?: AgentConfigBuilderComponentDecision;
 }
 

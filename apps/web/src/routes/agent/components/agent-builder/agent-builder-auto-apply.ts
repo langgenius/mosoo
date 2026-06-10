@@ -23,7 +23,7 @@ export function createCreatedEnvironmentBuilderPatch(input: {
   readonly baseDraftRevision: string;
   readonly baseEnvironmentDecision: AgentBuilderComponentDecision | null;
   readonly baseEnvironmentId: string | null;
-  readonly environment: EnvironmentSummary;
+  readonly environment: Pick<EnvironmentSummary, "id" | "name">;
 }): AgentBuilderClientPatch {
   return {
     items: [
@@ -58,7 +58,7 @@ export function createCreatedEnvironmentBuilderPatch(input: {
 export function createCreatedMcpServerBuilderPatch(input: {
   readonly baseDraftRevision: string;
   readonly baseMcpServerIds: readonly string[];
-  readonly mcpServer: McpServerWithCredential;
+  readonly mcpServer: Pick<McpServerWithCredential, "id" | "name" | "url">;
 }): AgentBuilderClientPatch {
   const nextMcpServerIds = input.baseMcpServerIds.includes(input.mcpServer.id)
     ? [...input.baseMcpServerIds]

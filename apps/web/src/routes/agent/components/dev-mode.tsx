@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 
 import { useAppSession } from "@/app/session-provider";
 import { CreateEnvironmentDialog } from "@/domains/environment/components/create-environment-dialog";
+import type { McpConnectTargetServer } from "@/routes/integrations/mcp/oauth-connect-dialog";
 import { Button } from "@/shared/ui/button";
 
 import type { Agent, AgentMode } from "../agent.types";
@@ -35,6 +36,7 @@ export function DevMode({
   const model = useAgentEditorModel({ agent });
   const [createEnvironmentOpen, setCreateEnvironmentOpen] = useState(false);
   const [createRemoteMcpOpen, setCreateRemoteMcpOpen] = useState(false);
+  const [connectMcpServer, setConnectMcpServer] = useState<McpConnectTargetServer | null>(null);
   const previewBlocked =
     agent.readiness?.issues.some((issue) => issue.severity === "error") ?? false;
   const previewDisabled = previewBlocked || model.dirty || model.saving;
@@ -44,6 +46,9 @@ export function DevMode({
     draftYaml: model.draftYaml,
     draftYamlHash: model.draftYamlHash,
     markCurrentDraftSaved: model.markCurrentDraftSaved,
+    onConnectMcpCredential: (server) => {
+      setConnectMcpServer(server);
+    },
     onCreateEnvironment:
       organizationId === null
         ? undefined
@@ -56,6 +61,12 @@ export function DevMode({
         : () => {
             setCreateRemoteMcpOpen(true);
           },
+    onEnvironmentCreated: (environment) => {
+      bindCreatedEnvironment(environment);
+    },
+    onMcpServerCreated: (server) => {
+      bindCreatedMcpServer(server);
+    },
     onOpenPreview: () => {
       onSwitchMode("preview");
     },
@@ -63,7 +74,7 @@ export function DevMode({
     saving: model.saving,
   });
 
-  function bindCreatedEnvironment(environment: EnvironmentSummary): void {
+  function bindCreatedEnvironment(environment: Pick<EnvironmentSummary, "id" | "name">): void {
     void model.applyAndSaveBuilderPatch(
       createCreatedEnvironmentBuilderPatch({
         baseDraftRevision: model.draftYamlHash,
@@ -74,7 +85,9 @@ export function DevMode({
     );
   }
 
-  function bindCreatedMcpServer(mcpServer: McpServerWithCredential): void {
+  function bindCreatedMcpServer(
+    mcpServer: Pick<McpServerWithCredential, "id" | "name" | "url">,
+  ): void {
     void model.applyAndSaveBuilderPatch(
       createCreatedMcpServerBuilderPatch({
         baseDraftRevision: model.draftYamlHash,
@@ -95,6 +108,10 @@ export function DevMode({
             organizationId={organizationId}
           />
           <AgentBuilderRemoteMcpSecureDialog
+            connectServer={connectMcpServer}
+            onConnectServerClose={() => {
+              setConnectMcpServer(null);
+            }}
             onCreated={bindCreatedMcpServer}
             onOpenChange={setCreateRemoteMcpOpen}
             open={createRemoteMcpOpen}

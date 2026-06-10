@@ -19,8 +19,14 @@ import { AgentBuilderAskUserCard } from "./agent-builder-ask-user-card";
 import type { AgentBuilderStructuredReply } from "./agent-builder-ask-user-card";
 import { AgentBuilderStreamingText, BuilderStreamCaret } from "./agent-builder-streaming-text";
 import { getEnvironmentConfigLink } from "./environment-config-link";
+import type { AgentBuilderActionPayloads } from "./use-agent-builder-control-plane-actions";
 
 export type AgentBuilderActionDisabled = boolean | ((actionKey: string) => boolean);
+
+export type AgentBuilderActionHandler = (
+  actionKey: string,
+  payloads?: AgentBuilderActionPayloads,
+) => void;
 
 function isAgentBuilderActionDisabled(
   actionDisabled: AgentBuilderActionDisabled,
@@ -42,7 +48,7 @@ export function AgentBuilderMessageCard({
   structuredReplyDisabled,
 }: {
   message: AgentBuilderMessage;
-  onAction?: ((actionKey: string) => void) | undefined;
+  onAction?: AgentBuilderActionHandler | undefined;
   onDraftPatchFocus?: ((sectionId: AgentBuilderDraftPatchSectionId) => void) | undefined;
   onStructuredReply?: ((reply: AgentBuilderStructuredReply) => void) | undefined;
   actionDisabled: AgentBuilderActionDisabled;
@@ -257,7 +263,7 @@ function PlannerNodeCard({
   structuredReplyDisabled,
 }: {
   node: AgentBuilderPlanNode;
-  onAction?: ((actionKey: string) => void) | undefined;
+  onAction?: AgentBuilderActionHandler | undefined;
   onDraftPatchFocus?: ((sectionId: AgentBuilderDraftPatchSectionId) => void) | undefined;
   onStructuredReply?: ((reply: AgentBuilderStructuredReply) => void) | undefined;
   actionDisabled: AgentBuilderActionDisabled;
@@ -306,7 +312,10 @@ function PlannerNodeCard({
                 }
                 key={action.actionKey}
                 onClick={() => {
-                  onAction?.(action.actionKey);
+                  onAction?.(action.actionKey, {
+                    createEnvironmentPayload: action.createEnvironmentPayload,
+                    createRemoteMcpServerPayload: action.createRemoteMcpServerPayload,
+                  });
                 }}
                 size="sm"
                 type="button"
@@ -332,7 +341,7 @@ function PlannerOutputSurface({
   structuredReplyDisabled,
 }: {
   cardsJson: string | null;
-  onAction?: ((actionKey: string) => void) | undefined;
+  onAction?: AgentBuilderActionHandler | undefined;
   onDraftPatchFocus?: ((sectionId: AgentBuilderDraftPatchSectionId) => void) | undefined;
   onStructuredReply?: ((reply: AgentBuilderStructuredReply) => void) | undefined;
   actionDisabled: AgentBuilderActionDisabled;

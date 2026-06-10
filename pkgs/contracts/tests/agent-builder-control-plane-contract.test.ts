@@ -59,6 +59,7 @@ describe("Agent Builder control-plane contract", () => {
     expect(AGENT_BUILDER_SECURE_UI_ACTION_KIND_VALUES).toEqual([
       "create_environment",
       "create_remote_mcp_server",
+      "connect_mcp_credential",
     ]);
   });
 
@@ -266,5 +267,93 @@ describe("Agent Builder control-plane contract", () => {
         version: 1,
       }),
     ).toBeNull();
+  });
+
+  test("parses creation action payloads and rejects credential-shaped or invalid payloads", () => {
+    const output = parseAgentBuilderPlannerOutput({
+      assistantText: "Create the environment and MCP server.",
+      intentSummary: "Create components directly.",
+      mode: "action",
+      nodes: [
+        {
+          actions: [
+            {
+              actionKey: "create_environment",
+              createEnvironmentPayload: {
+                description: null,
+                name: "Slack Bot Environment",
+              },
+              createRemoteMcpServerPayload: null,
+              label: "Create environment",
+              style: "primary",
+            },
+            {
+              actionKey: "create_remote_mcp_server",
+              createEnvironmentPayload: null,
+              createRemoteMcpServerPayload: {
+                authType: "oauth",
+                description: "Linear workspace access.",
+                name: "Linear MCP",
+                url: "https://mcp.linear.app/mcp",
+              },
+              label: "Create MCP server",
+              style: "primary",
+            },
+          ],
+          kind: "action",
+          nodeKey: "show_next_action:create_components",
+          operation: "show",
+          requiresConfirmation: false,
+          status: "pending",
+          summary: "Create the missing components.",
+          targetType: "workflow",
+        },
+      ],
+      plannerRunId: "01J00000000000000000000002",
+      version: 1,
+    });
+
+    expect(output?.nodes[0]?.actions[0]?.createEnvironmentPayload).toEqual({
+      name: "Slack Bot Environment",
+    });
+    expect(output?.nodes[0]?.actions[1]?.createRemoteMcpServerPayload).toEqual({
+      authType: "oauth",
+      description: "Linear workspace access.",
+      name: "Linear MCP",
+      url: "https://mcp.linear.app/mcp",
+    });
+
+    const invalidUrlOutput = parseAgentBuilderPlannerOutput({
+      assistantText: "Create the MCP server.",
+      intentSummary: "Create an MCP server with a non-https url.",
+      mode: "action",
+      nodes: [
+        {
+          actions: [
+            {
+              actionKey: "create_remote_mcp_server",
+              createRemoteMcpServerPayload: {
+                authType: "bearer",
+                name: "Insecure MCP",
+                url: "http://mcp.example.com/mcp",
+              },
+              label: "Create MCP server",
+              style: "primary",
+            },
+          ],
+          kind: "action",
+          nodeKey: "show_next_action:create_remote_mcp_server",
+          operation: "show",
+          requiresConfirmation: false,
+          status: "pending",
+          summary: "Should be rejected.",
+          targetType: "workflow",
+        },
+      ],
+      plannerRunId: "01J00000000000000000000002",
+      version: 1,
+    });
+
+    expect(invalidUrlOutput).toBeNull();
   });
 });

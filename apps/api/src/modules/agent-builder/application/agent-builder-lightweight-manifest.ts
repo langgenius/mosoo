@@ -1,6 +1,7 @@
 import type { AgentConfigBuilderMetadata, AgentKind } from "@mosoo/contracts/agent";
 import { AGENT_KIND_VALUES } from "@mosoo/contracts/agent";
 import type {
+  AgentBuilderAgentTypeDecision,
   AgentBuilderComponentDecision,
   AgentBuilderComponentDecisions,
 } from "@mosoo/contracts/agent-builder";
@@ -159,15 +160,43 @@ function readOptionalAssetStateField(
   throw new Error(`${label}.state must be a string or null.`);
 }
 
+function readOptionalAgentTypeDecisionField(
+  source: Record<string, unknown>,
+  label: string,
+): AgentBuilderAgentTypeDecision | undefined {
+  const value = source["agentType"];
+
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (value === "decided" || value === "skipped") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    throw new Error(`${label} must be one of: decided, skipped.`);
+  }
+
+  throw new Error(`${label} must be a string or null.`);
+}
+
 function readComponentDecisions(value: unknown): AgentBuilderComponentDecisions {
   const decisions = isRecord(value) ? value : {};
+  const agentType = readOptionalAgentTypeDecisionField(
+    decisions,
+    "builder.componentDecisions.agentType",
+  );
   const environment = readOptionalComponentDecisionField(
     decisions,
     "environment",
     "builder.componentDecisions.environment",
   );
 
-  return environment === undefined ? {} : { environment };
+  return {
+    ...(agentType === undefined ? {} : { agentType }),
+    ...(environment === undefined ? {} : { environment }),
+  };
 }
 
 function uniqueStrings(values: readonly string[]): string[] {
@@ -358,8 +387,7 @@ export function parseAgentBuilderLightweightManifestYaml(
       manifest: {
         ...emptyManifest(),
         builder: {
-          componentDecisions:
-            decisions.environment === undefined ? {} : { environment: decisions.environment },
+          componentDecisions: decisions,
         },
         componentDecisions: decisions,
         description: readOptionalStringField(identity, "description", "identity.description"),

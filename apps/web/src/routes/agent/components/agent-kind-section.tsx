@@ -36,15 +36,13 @@ export function AgentKindSection({
   });
   const [forkDialog, setForkDialog] = useState<{ target: AgentKind } | null>(null);
 
+  // Re-selecting the current kind still counts: it confirms the default and
+  // marks the agent-type stage decision in the draft.
   const handleKindChange = useCallback(
     (next: AgentKind) => {
-      if (next === agent.kind) {
-        return;
-      }
-
       onKindChange?.(next);
     },
-    [agent.kind, onKindChange],
+    [onKindChange],
   );
 
   const handleLockedCardClick = useCallback(

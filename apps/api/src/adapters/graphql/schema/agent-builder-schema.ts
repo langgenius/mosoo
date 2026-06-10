@@ -1,4 +1,7 @@
-import { AGENT_BUILDER_EXECUTABLE_ACTION_TOOL_ID_VALUES } from "@mosoo/contracts/agent-builder";
+import {
+  AGENT_BUILDER_EXECUTABLE_ACTION_TOOL_ID_VALUES,
+  AGENT_BUILDER_SECURE_UI_ACTION_KIND_VALUES,
+} from "@mosoo/contracts/agent-builder";
 import { AGENT_BUILDER_MESSAGE_ROLES, AGENT_BUILDER_THREAD_STATUSES } from "@mosoo/db";
 
 function formatEnumValues(values: readonly string[]): string {
@@ -17,12 +20,24 @@ ${formatEnumValues(AGENT_BUILDER_EXECUTABLE_ACTION_TOOL_ID_VALUES)}
   }
 
   enum AgentBuilderSecureUiActionKind {
-    create_environment
-    create_remote_mcp_server
+${formatEnumValues(AGENT_BUILDER_SECURE_UI_ACTION_KIND_VALUES)}
   }
 
   type AgentBuilderSecureUiAction {
     kind: AgentBuilderSecureUiActionKind!
+    mcpServerId: ULID
+  }
+
+  type AgentBuilderCreatedEnvironment {
+    id: ULID!
+    name: String!
+  }
+
+  type AgentBuilderCreatedMcpServer {
+    authType: McpAuthType!
+    id: ULID!
+    name: String!
+    url: String!
   }
 
   enum AgentBuilderThreadStatus {
@@ -59,6 +74,8 @@ ${formatEnumValues(AGENT_BUILDER_MESSAGE_ROLES)}
   }
 
   type AgentBuilderControlPlaneActionResult {
+    createdEnvironment: AgentBuilderCreatedEnvironment
+    createdMcpServer: AgentBuilderCreatedMcpServer
     message: String!
     secureUi: AgentBuilderSecureUiAction
     sessionId: ULID
@@ -66,8 +83,22 @@ ${formatEnumValues(AGENT_BUILDER_MESSAGE_ROLES)}
     toolId: AgentBuilderExecutableActionToolId!
   }
 
+  input AgentBuilderCreateEnvironmentPayloadInput {
+    description: String
+    name: String!
+  }
+
+  input AgentBuilderCreateRemoteMcpServerPayloadInput {
+    authType: McpAuthType!
+    description: String
+    name: String!
+    url: String!
+  }
+
   input ExecuteAgentBuilderControlPlaneActionInput {
     agentId: ULID!
+    createEnvironmentPayload: AgentBuilderCreateEnvironmentPayloadInput
+    createRemoteMcpServerPayload: AgentBuilderCreateRemoteMcpServerPayloadInput
     draftYaml: String
     toolId: AgentBuilderExecutableActionToolId!
   }

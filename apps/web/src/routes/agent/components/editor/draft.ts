@@ -1,4 +1,5 @@
 import type {
+  AgentBuilderAgentTypeDecision,
   AgentBuilderComponentDecision,
   AgentBuilderComponentDecisions,
 } from "@mosoo/contracts/agent-builder";
@@ -266,15 +267,23 @@ function readComponentDecision(value: unknown): AgentBuilderComponentDecision | 
   return value === "bound" || value === "created" || value === "skipped" ? value : null;
 }
 
+function readAgentTypeDecision(value: unknown): AgentBuilderAgentTypeDecision | null {
+  return value === "decided" || value === "skipped" ? value : null;
+}
+
 function hasComponentDecisions(decisions: AgentBuilderComponentDecisions): boolean {
-  return decisions.environment !== undefined;
+  return decisions.agentType !== undefined || decisions.environment !== undefined;
 }
 
 function readComponentDecisions(value: unknown): AgentBuilderComponentDecisions {
   const decisions = asRecord(value);
+  const agentType = readAgentTypeDecision(decisions["agentType"]);
   const environment = readComponentDecision(decisions["environment"]);
 
-  return environment === null ? {} : { environment };
+  return {
+    ...(agentType === null ? {} : { agentType }),
+    ...(environment === null ? {} : { environment }),
+  };
 }
 
 function readSkills(value: unknown, fallback: SkillInfo[]): SkillInfo[] {

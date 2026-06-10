@@ -1,5 +1,11 @@
 import type { AgentBuilderPlannerRunId } from "../id/id.contract";
-import type { AgentBuilderAskUserMode } from "./agent-builder-control-plane.contract";
+import type { McpAuthType } from "../mcp/mcp.contract";
+import { MCP_AUTH_TYPES } from "../mcp/mcp.contract";
+import type {
+  AgentBuilderAskUserMode,
+  AgentBuilderCreateEnvironmentActionPayload,
+  AgentBuilderCreateRemoteMcpServerActionPayload,
+} from "./agent-builder-control-plane.contract";
 import {
   AGENT_BUILDER_ASK_USER_MODE_VALUES,
   isAgentBuilderPlanNodeActionKey,
@@ -126,11 +132,80 @@ function isAskUserMode(value: unknown): value is AgentBuilderAskUserMode {
   return isString(value) && AGENT_BUILDER_ASK_USER_MODES.has(value as AgentBuilderAskUserMode);
 }
 
+const MCP_AUTH_TYPE_SET = new Set<string>(MCP_AUTH_TYPES);
+
+function isMcpAuthType(value: unknown): value is McpAuthType {
+  return isString(value) && MCP_AUTH_TYPE_SET.has(value);
+}
+
+function parseCreateEnvironmentActionPayload(
+  value: unknown,
+): AgentBuilderCreateEnvironmentActionPayload | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const description = value["description"];
+  const name = value["name"];
+
+  if (
+    !isString(name) ||
+    name.trim().length === 0 ||
+    (!isAbsent(description) && !isString(description))
+  ) {
+    return null;
+  }
+
+  return {
+    ...(isAbsent(description) ? {} : { description }),
+    name,
+  };
+}
+
+function parseCreateRemoteMcpServerActionPayload(
+  value: unknown,
+): AgentBuilderCreateRemoteMcpServerActionPayload | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const authType = value["authType"];
+  const description = value["description"];
+  const name = value["name"];
+  const url = value["url"];
+
+  if (
+    !isMcpAuthType(authType) ||
+    !isString(name) ||
+    name.trim().length === 0 ||
+    !isString(url) ||
+    !url.trim().startsWith("https://") ||
+    (!isAbsent(description) && !isString(description))
+  ) {
+    return null;
+  }
+
+  return {
+    authType,
+    ...(isAbsent(description) ? {} : { description }),
+    name,
+    url,
+  };
+}
+
 function parsePlanNodeAction(value: unknown): AgentBuilderPlanNodeAction | null {
   if (!isRecord(value)) {
     return null;
   }
 
+  const rawCreateEnvironmentPayload = value["createEnvironmentPayload"];
+  const rawCreateRemoteMcpServerPayload = value["createRemoteMcpServerPayload"];
+  const createEnvironmentPayload = isAbsent(rawCreateEnvironmentPayload)
+    ? null
+    : parseCreateEnvironmentActionPayload(rawCreateEnvironmentPayload);
+  const createRemoteMcpServerPayload = isAbsent(rawCreateRemoteMcpServerPayload)
+    ? null
+    : parseCreateRemoteMcpServerActionPayload(rawCreateRemoteMcpServerPayload);
   const action = {
     actionKey: value["actionKey"],
     label: value["label"],
@@ -140,13 +215,17 @@ function parsePlanNodeAction(value: unknown): AgentBuilderPlanNodeAction | null 
   if (
     !isAgentBuilderPlanNodeActionKey(action.actionKey) ||
     !isString(action.label) ||
-    !isPlanNodeActionStyle(action.style)
+    !isPlanNodeActionStyle(action.style) ||
+    (!isAbsent(rawCreateEnvironmentPayload) && createEnvironmentPayload === null) ||
+    (!isAbsent(rawCreateRemoteMcpServerPayload) && createRemoteMcpServerPayload === null)
   ) {
     return null;
   }
 
   return {
     actionKey: action.actionKey,
+    ...(createEnvironmentPayload === null ? {} : { createEnvironmentPayload }),
+    ...(createRemoteMcpServerPayload === null ? {} : { createRemoteMcpServerPayload }),
     label: action.label,
     style: action.style,
   };

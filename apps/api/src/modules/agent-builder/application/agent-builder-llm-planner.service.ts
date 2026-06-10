@@ -10,6 +10,7 @@ import {
   AGENT_BUILDER_VISIBLE_ASSET_BINDING_STATE_VALUES,
   parseAgentBuilderPlannerOutput,
 } from "@mosoo/contracts/agent-builder";
+import { MCP_AUTH_TYPES } from "@mosoo/contracts/mcp";
 import {
   SYSTEM_AGENT_RUNTIME_ID,
   getRuntimeCatalogEntry,
@@ -49,17 +50,20 @@ const AGENT_BUILDER_LLM_PLANNER_SYSTEM_PROMPT = [
   "- prompt.",
   "- existing skillIds, mcpServerIds, spaceIds, and environmentId.",
   "- componentDecisions.environment can be bound, created, or skipped.",
+  "- componentDecisions.agentType records that the kind choice happened (set automatically when kind is patched).",
   "",
-  "Workflow:",
-  "Step 1 creates or overwrites the base Agent config fields.",
-  "Step 2 configures existing or new components. Environment is required for Quickstart progress; Skills, MCP servers, and Spaces are optional.",
-  "Preview starts only after Step 1 and the Environment decision are complete.",
+  "Workflow (soft guidance for draft Agents — stages order the conversation, never block the user):",
+  "Stage 1 identity: settle name, description, runtimeId, provider, and model first.",
+  "Stage 2 agent type: ask one single_select question to choose kind — pet (always-on assistant teammate) or cattle (on-demand task worker) — then patch kind with the answer.",
+  "Stage 3 assembly: make the Environment decision (bind, create, or skip), then add optional Skills, MCP servers, and Spaces.",
+  "Recommend Preview (Test in Chat) once the three stages are settled, but the user may skip ahead or test at any time; treat incomplete stages as suggestions, not gates.",
   "Published Agents are refactor targets; never restart Quickstart for a published Agent.",
   "",
   "Control-plane rules:",
   "- Do not configure channels.",
   "- Do not write credentials into planner output, Manifest text, or YAML.",
-  "- For Environment or remote MCP setup that requires credentials, emit an action for the dedicated UI/API surface.",
+  "- To create an Environment, emit a create_environment action with createEnvironmentPayload (name, optional description). Never put env var values, secrets, or setup scripts in the payload; users configure those later in the Environment UI.",
+  "- To create a remote MCP server record, emit a create_remote_mcp_server action with createRemoteMcpServerPayload (name, https url, authType oauth or bearer, optional description). Credentials are always connected by the user in the secure UI afterwards; never ask the user to paste tokens into chat.",
   "- If the user is unclear, ask a focused question with askUser.",
   "- If required data is present, prefer a small draft_patch or action over long explanation.",
   "- Treat the current Manifest draft as the source of truth. Manual form edits win when they appear in the current draft.",
@@ -93,10 +97,26 @@ function createAgentBuilderPlannerResponseFormat(): Record<string, unknown> {
     additionalProperties: false,
     properties: {
       actionKey: stringEnumSchema(AGENT_BUILDER_PLAN_NODE_ACTION_KEY_VALUES),
+      createEnvironmentPayload: nullableObjectSchema({
+        description: nullableStringSchema(),
+        name: { type: "string" },
+      }),
+      createRemoteMcpServerPayload: nullableObjectSchema({
+        authType: stringEnumSchema(MCP_AUTH_TYPES),
+        description: nullableStringSchema(),
+        name: { type: "string" },
+        url: { type: "string" },
+      }),
       label: { type: "string" },
       style: stringEnumSchema(["danger", "primary", "secondary"]),
     },
-    required: ["actionKey", "label", "style"],
+    required: [
+      "actionKey",
+      "createEnvironmentPayload",
+      "createRemoteMcpServerPayload",
+      "label",
+      "style",
+    ],
     type: "object",
   };
   const askUserOptionSchema = {

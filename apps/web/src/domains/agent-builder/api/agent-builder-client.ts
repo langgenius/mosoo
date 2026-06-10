@@ -5,9 +5,12 @@ import type {
   AgentBuilderPlannerRunId,
   AgentBuilderThreadId,
   AgentId,
+  EnvironmentId,
+  McpServerId,
   OrganizationId,
   SessionId,
 } from "@mosoo/contracts/id";
+import type { McpAuthType } from "@mosoo/contracts/mcp";
 import { parseNullablePlatformId, parsePlatformId } from "@mosoo/id";
 
 import type {
@@ -50,7 +53,21 @@ export interface AgentBuilderMessage {
   threadId: AgentBuilderThreadId;
 }
 
+export interface AgentBuilderCreatedEnvironmentSummary {
+  id: EnvironmentId;
+  name: string;
+}
+
+export interface AgentBuilderCreatedMcpServerSummary {
+  authType: McpAuthType;
+  id: McpServerId;
+  name: string;
+  url: string;
+}
+
 export interface AgentBuilderControlPlaneActionResult {
+  createdEnvironment: AgentBuilderCreatedEnvironmentSummary | null;
+  createdMcpServer: AgentBuilderCreatedMcpServerSummary | null;
   message: string;
   secureUi: AgentBuilderSecureUiAction | null;
   sessionId: SessionId | null;
@@ -106,15 +123,44 @@ function parseAgentBuilderThread(thread: {
 }
 
 function parseAgentBuilderControlPlaneActionResult(result: {
+  createdEnvironment: { id: string; name: string } | null;
+  createdMcpServer: { authType: McpAuthType; id: string; name: string; url: string } | null;
   message: string;
-  secureUi: { kind: AgentBuilderSecureUiAction["kind"] } | null;
+  secureUi: { kind: AgentBuilderSecureUiAction["kind"]; mcpServerId: string | null } | null;
   sessionId: string | null;
   status: AgentBuilderControlPlaneActionStatus;
   toolId: AgentBuilderExecutableActionToolId;
 }): AgentBuilderControlPlaneActionResult {
+  const secureUiMcpServerId = parseNullablePlatformId<McpServerId>(
+    result.secureUi?.mcpServerId ?? null,
+    "MCP server ID",
+  );
+
   return {
+    createdEnvironment:
+      result.createdEnvironment === null
+        ? null
+        : {
+            id: parsePlatformId<EnvironmentId>(result.createdEnvironment.id, "Environment ID"),
+            name: result.createdEnvironment.name,
+          },
+    createdMcpServer:
+      result.createdMcpServer === null
+        ? null
+        : {
+            authType: result.createdMcpServer.authType,
+            id: parsePlatformId<McpServerId>(result.createdMcpServer.id, "MCP server ID"),
+            name: result.createdMcpServer.name,
+            url: result.createdMcpServer.url,
+          },
     message: result.message,
-    secureUi: result.secureUi,
+    secureUi:
+      result.secureUi === null
+        ? null
+        : {
+            kind: result.secureUi.kind,
+            ...(secureUiMcpServerId === null ? {} : { mcpServerId: secureUiMcpServerId }),
+          },
     sessionId: parseNullablePlatformId<SessionId>(result.sessionId, "Session ID"),
     status: result.status,
     toolId: result.toolId,

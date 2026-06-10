@@ -385,6 +385,10 @@ export function useAgentEditorModel({
     setKind(kind) {
       updateDraft((current) => ({
         ...current,
+        componentDecisions: {
+          ...current.componentDecisions,
+          agentType: "decided",
+        },
         kind,
       }));
     },

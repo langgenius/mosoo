@@ -6,6 +6,7 @@ export const GET_AGENT_EDITOR_STATE_QUERY = graphql(/* GraphQL */ `
       id
       builder {
         componentDecisions {
+          agentType
           environment
         }
       }

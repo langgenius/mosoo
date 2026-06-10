@@ -80,6 +80,7 @@ function AgentDetailHeader({
   agent,
   debugItems,
   headerActionTargetRef,
+  headerCenterTargetRef,
   isDraftLifecycle,
   isOwnerOrAdmin,
   lifecycleMode,
@@ -93,6 +94,7 @@ function AgentDetailHeader({
   agent: Agent;
   debugItems: DebugModeItem[];
   headerActionTargetRef: (node: HTMLDivElement | null) => void;
+  headerCenterTargetRef: (node: HTMLDivElement | null) => void;
   isDraftLifecycle: boolean;
   isOwnerOrAdmin: boolean;
   lifecycleMode: Extract<DetailMode, "dev" | "preview"> | null;
@@ -134,7 +136,10 @@ function AgentDetailHeader({
       </div>
 
       {isDraftLifecycle && lifecycleMode ? (
-        <div />
+        <div
+          className="absolute left-1/2 flex -translate-x-1/2 items-center"
+          ref={headerCenterTargetRef}
+        />
       ) : (
         <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1">
           {MODE_TABS.flatMap((tab) =>
@@ -220,6 +225,7 @@ export function AgentDetailPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
   const [headerActionTarget, setHeaderActionTarget] = useState<HTMLDivElement | null>(null);
+  const [headerCenterTarget, setHeaderCenterTarget] = useState<HTMLDivElement | null>(null);
 
   const detailQuery = useAgentDetailQuery(agentId ?? null);
   const canEdit = detailQuery.data
@@ -406,6 +412,7 @@ export function AgentDetailPage() {
         agent={agent}
         debugItems={debugItems}
         headerActionTargetRef={setHeaderActionTarget}
+        headerCenterTargetRef={setHeaderCenterTarget}
         isDraftLifecycle={isDraftLifecycle}
         isOwnerOrAdmin={isOwnerOrAdmin}
         lifecycleMode={lifecycleMode}
@@ -428,6 +435,7 @@ export function AgentDetailPage() {
         {isDraftLifecycle && lifecycleMode ? (
           <LifecycleShell
             agent={agent}
+            headerCenterTarget={headerCenterTarget}
             mode={lifecycleMode}
             onSwitchMode={handleSelectMode}
             organizationId={detail.organizationId}

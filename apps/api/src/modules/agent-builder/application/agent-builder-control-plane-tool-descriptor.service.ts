@@ -20,11 +20,12 @@ const DESCRIPTOR_BY_TOOL_ID = {
     description: "Create or overwrite the base Agent Manifest fields for Quickstart Step 1.",
   }),
   create_environment: descriptor("create_environment", "mutation", {
-    description: "Open the Environment creation UI and reference the created resource later.",
+    description:
+      "Create an Environment directly by attaching createEnvironmentPayload { name, description? } to the action. Never include env var values, secrets, or setup scripts; users add those later in the Environment UI. Without a payload the action falls back to opening the creation UI.",
   }),
   create_remote_mcp_server: descriptor("create_remote_mcp_server", "mutation", {
     description:
-      "Open the secure MCP creation UI; bind the created server through Manifest patching.",
+      "Create a remote MCP server record directly by attaching createRemoteMcpServerPayload { name, url (https), authType: oauth|bearer, description? } to the action. Credentials are always connected by the user in the secure UI afterwards; never ask for or include tokens. Without a payload the action falls back to opening the creation UI.",
   }),
   inspect_builder_context: descriptor("inspect_builder_context", "read", {
     description: "Inspect the current Manifest, checklist, Preview state, and visible assets.",

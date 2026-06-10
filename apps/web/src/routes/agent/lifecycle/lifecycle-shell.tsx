@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 
 import { useAppSession } from "@/app/session-provider";
 import { CreateEnvironmentDialog } from "@/domains/environment/components/create-environment-dialog";
+import type { McpConnectTargetServer } from "@/routes/integrations/mcp/oauth-connect-dialog";
 import { Button } from "@/shared/ui/button";
 
 import type { Agent, AgentMode } from "../agent.types";
@@ -21,13 +22,16 @@ import { AgentKindSection } from "../components/agent-kind-section";
 import { AgentFormView } from "../components/editor/form-view";
 import { useAgentEditorModel } from "../components/editor/use-model";
 import { PreviewMode } from "../components/preview-mode";
+import { hasRequiredAgentDraftFields, listAgentDraftStages } from "../draft-stages";
 import { DistributionPanel } from "./distribution-panel";
+import { DraftStageIndicator } from "./draft-stage-indicator";
 
 export type LifecycleMode = Extract<AgentMode, "dev" | "preview"> | "publish";
 
 export interface LifecycleShellProps {
   agent: Agent;
   headerActionTarget: HTMLDivElement | null;
+  headerCenterTarget: HTMLDivElement | null;
   mode: LifecycleMode;
   onSwitchMode: (mode: AgentMode | "logs") => void;
   organizationId: string | null;
@@ -36,6 +40,7 @@ export interface LifecycleShellProps {
 interface ConfigureStageProps {
   agent: Agent;
   headerActionTarget: HTMLDivElement | null;
+  headerCenterTarget: HTMLDivElement | null;
   onSwitchMode: (mode: AgentMode | "logs") => void;
 }
 
@@ -56,6 +61,7 @@ function editedFieldsText(fieldsEdited: number): string | null {
 export function LifecycleShell({
   agent,
   headerActionTarget,
+  headerCenterTarget,
   mode,
   onSwitchMode,
   organizationId,
@@ -68,6 +74,7 @@ export function LifecycleShell({
             agent={agent}
             onSwitchMode={onSwitchMode}
             headerActionTarget={headerActionTarget}
+            headerCenterTarget={headerCenterTarget}
           />
         )}
         {mode === "preview" && (
@@ -88,25 +95,34 @@ function ConfigureStage({
   agent,
   onSwitchMode,
   headerActionTarget,
+  headerCenterTarget,
 }: ConfigureStageProps): ReactElement {
   const { activeOrganization } = useAppSession();
   const organizationId = activeOrganization?.id ?? null;
   const model = useAgentEditorModel({ agent });
   const [createEnvironmentOpen, setCreateEnvironmentOpen] = useState(false);
   const [createRemoteMcpOpen, setCreateRemoteMcpOpen] = useState(false);
+  const [connectMcpServer, setConnectMcpServer] = useState<McpConnectTargetServer | null>(null);
 
-  const readinessReady = agent.readiness?.ready ?? false;
+  // Stages are soft guidance for the Builder path; the manual gate only
+  // checks the fields persistDraft refuses to save without. Readiness issues
+  // (provider keys, environment) are surfaced by the preview composer.
+  const requiredComplete = hasRequiredAgentDraftFields(model.draft);
+  const draftStages = listAgentDraftStages(model.draft);
 
   const fieldsEdited = model.changePlan.fieldLabels.length;
   const editedText = editedFieldsText(fieldsEdited);
   const saveDisabled = !model.dirty || model.saving || model.changePlan.action === "fork-agent";
-  const testDisabled = !readinessReady || model.dirty || model.saving;
+  const testDisabled = !requiredComplete || model.saving;
   const builderActions = useAgentBuilderControlPlaneActions({
     agentId: agent.id,
     agentStatus: agent.status,
     draftYaml: model.draftYaml,
     draftYamlHash: model.draftYamlHash,
     markCurrentDraftSaved: model.markCurrentDraftSaved,
+    onConnectMcpCredential: (server) => {
+      setConnectMcpServer(server);
+    },
     onCreateEnvironment:
       organizationId === null
         ? undefined
@@ -119,6 +135,12 @@ function ConfigureStage({
         : () => {
             setCreateRemoteMcpOpen(true);
           },
+    onEnvironmentCreated: (environment) => {
+      bindCreatedEnvironment(environment);
+    },
+    onMcpServerCreated: (server) => {
+      bindCreatedMcpServer(server);
+    },
     onOpenPreview: () => {
       onSwitchMode("preview");
     },
@@ -126,7 +148,34 @@ function ConfigureStage({
     saving: model.saving,
   });
 
-  function bindCreatedEnvironment(environment: EnvironmentSummary): void {
+  async function handleTestInChat(): Promise<void> {
+    if (model.dirty) {
+      const saved = await model.save();
+
+      if (!saved) {
+        return;
+      }
+    }
+
+    builderActions.onAction("open_preview");
+  }
+
+  // Chat-rendered planner buttons share the same auto-save gate as the header
+  // Test in Chat button; otherwise an open_preview click would unmount this
+  // stage and silently drop unsaved edits.
+  function handleBuilderAction(
+    actionKey: string,
+    payloads?: Parameters<typeof builderActions.onAction>[1],
+  ): void {
+    if (actionKey === "open_preview") {
+      void handleTestInChat();
+      return;
+    }
+
+    builderActions.onAction(actionKey, payloads);
+  }
+
+  function bindCreatedEnvironment(environment: Pick<EnvironmentSummary, "id" | "name">): void {
     void model.applyAndSaveBuilderPatch(
       createCreatedEnvironmentBuilderPatch({
         baseDraftRevision: model.draftYamlHash,
@@ -137,7 +186,9 @@ function ConfigureStage({
     );
   }
 
-  function bindCreatedMcpServer(mcpServer: McpServerWithCredential): void {
+  function bindCreatedMcpServer(
+    mcpServer: Pick<McpServerWithCredential, "id" | "name" | "url">,
+  ): void {
     void model.applyAndSaveBuilderPatch(
       createCreatedMcpServerBuilderPatch({
         baseDraftRevision: model.draftYamlHash,
@@ -158,6 +209,10 @@ function ConfigureStage({
             organizationId={organizationId}
           />
           <AgentBuilderRemoteMcpSecureDialog
+            connectServer={connectMcpServer}
+            onConnectServerClose={() => {
+              setConnectMcpServer(null);
+            }}
             onCreated={bindCreatedMcpServer}
             onOpenChange={setCreateRemoteMcpOpen}
             open={createRemoteMcpOpen}
@@ -165,14 +220,22 @@ function ConfigureStage({
           />
         </>
       ) : null}
+      {headerCenterTarget !== null
+        ? createPortal(<DraftStageIndicator stages={draftStages} />, headerCenterTarget)
+        : null}
       {headerActionTarget !== null
         ? createPortal(
             <Button
               disabled={builderActions.isActionDisabled("open_preview")}
               onClick={() => {
-                builderActions.onAction("open_preview");
+                void handleTestInChat();
               }}
               size="sm"
+              title={
+                requiredComplete
+                  ? undefined
+                  : "Name, model, and provider are required before testing in chat."
+              }
             >
               <Rocket />
               Test in Chat
@@ -181,11 +244,19 @@ function ConfigureStage({
             headerActionTarget,
           )
         : null}
+      {model.saveError !== null ? (
+        <div className="border-destructive/30 bg-destructive/5 text-destructive shrink-0 border-b px-5 py-2 text-[12px]">
+          {model.saveError}
+        </div>
+      ) : null}
       {model.dirty ? (
         <div className="border-amber/30 bg-amber-bg flex shrink-0 items-center justify-between gap-3 border-b px-5 py-2.5">
           <div className="text-amber-fg min-w-0 text-[12px] leading-relaxed">
             {editedText === null ? null : <span className="font-medium">{editedText}</span>}
-            <span className="text-amber-fg/80"> · Save changes before testing in chat.</span>
+            <span className="text-amber-fg/80">
+              {" "}
+              · Changes save automatically when you test in chat.
+            </span>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Button
@@ -219,7 +290,7 @@ function ConfigureStage({
             actionPending={builderActions.actionPending}
             draftRevision={model.draftYamlHash}
             draftYaml={model.draftYaml}
-            onAction={builderActions.onAction}
+            onAction={handleBuilderAction}
             onDraftPatchAutoApply={model.applyAndSaveBuilderPatch}
             onDraftPatchFocus={model.focusBuilderPatchSection}
           />

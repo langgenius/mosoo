@@ -26,14 +26,18 @@ describe("Agent Builder control-plane tool descriptors", () => {
     expect(descriptors.some((descriptor) => descriptor.toolId.includes("terminal"))).toBe(false);
   });
 
-  test("keeps resource creation behind dedicated UI actions", () => {
+  test("allows direct record creation but keeps credentials behind the secure UI", () => {
     const createRemoteMcp = getAgentBuilderControlPlaneToolDescriptor("create_remote_mcp_server");
 
-    expect(createRemoteMcp.description).toContain("secure MCP creation UI");
+    expect(createRemoteMcp.description).toContain("createRemoteMcpServerPayload");
+    expect(createRemoteMcp.description).toContain("secure UI");
     expect(createRemoteMcp.description).not.toContain("Create and bind");
 
-    expect(getAgentBuilderControlPlaneToolDescriptor("create_environment").description).toContain(
-      "Environment creation UI",
+    const createEnvironment = getAgentBuilderControlPlaneToolDescriptor("create_environment");
+
+    expect(createEnvironment.description).toContain("createEnvironmentPayload");
+    expect(createEnvironment.description).toContain(
+      "Never include env var values, secrets, or setup scripts",
     );
   });
 

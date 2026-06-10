@@ -1,14 +1,29 @@
-import type { AgentBuilderExecutableActionToolId } from "@mosoo/contracts/agent-builder";
+import type {
+  AgentBuilderCreateEnvironmentActionPayload,
+  AgentBuilderCreateRemoteMcpServerActionPayload,
+  AgentBuilderExecutableActionToolId,
+} from "@mosoo/contracts/agent-builder";
 import { AGENT_BUILDER_EXECUTABLE_ACTION_TOOL_ID_VALUES } from "@mosoo/contracts/agent-builder";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 
-import type { AgentBuilderControlPlaneActionResult } from "@/domains/agent-builder/api/agent-builder-client";
+import type {
+  AgentBuilderControlPlaneActionResult,
+  AgentBuilderCreatedEnvironmentSummary,
+  AgentBuilderCreatedMcpServerSummary,
+} from "@/domains/agent-builder/api/agent-builder-client";
 import { executeAgentBuilderControlPlaneAction } from "@/domains/agent-builder/api/agent-builder-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
 import { toAgentId } from "@/routes/typed-id";
 
 import type { AgentStatus } from "../../agent.types";
+
+export interface AgentBuilderActionPayloads {
+  readonly createEnvironmentPayload?: AgentBuilderCreateEnvironmentActionPayload | undefined;
+  readonly createRemoteMcpServerPayload?:
+    | AgentBuilderCreateRemoteMcpServerActionPayload
+    | undefined;
+}
 
 const CONTROL_PLANE_ACTION_SET = new Set<string>(AGENT_BUILDER_EXECUTABLE_ACTION_TOOL_ID_VALUES);
 
@@ -50,15 +65,18 @@ export interface AgentBuilderControlPlaneActions {
   readonly actionError: string | null;
   readonly actionPending: boolean;
   readonly isActionDisabled: (actionKey: string) => boolean;
-  readonly onAction: (actionKey: string) => void;
+  readonly onAction: (actionKey: string, payloads?: AgentBuilderActionPayloads) => void;
 }
 
 export function handleAgentBuilderSecureUiAction(input: {
+  readonly onConnectMcpCredential?:
+    | ((server: AgentBuilderCreatedMcpServerSummary) => void)
+    | undefined;
   readonly onCreateEnvironment?: (() => void) | undefined;
   readonly onCreateRemoteMcpServer?: (() => void) | undefined;
   readonly result: AgentBuilderControlPlaneActionResult;
 }): boolean {
-  if (input.result.status !== "needs_secure_ui" || input.result.secureUi === null) {
+  if (input.result.secureUi === null) {
     return false;
   }
 
@@ -75,6 +93,12 @@ export function handleAgentBuilderSecureUiAction(input: {
       }
       input.onCreateRemoteMcpServer();
       return true;
+    case "connect_mcp_credential":
+      if (input.onConnectMcpCredential === undefined || input.result.createdMcpServer === null) {
+        return false;
+      }
+      input.onConnectMcpCredential(input.result.createdMcpServer);
+      return true;
   }
 }
 
@@ -84,8 +108,15 @@ export function useAgentBuilderControlPlaneActions(input: {
   readonly draftYaml: string;
   readonly draftYamlHash: string;
   readonly markCurrentDraftSaved: (draftYamlHash: string) => void;
+  readonly onConnectMcpCredential?:
+    | ((server: AgentBuilderCreatedMcpServerSummary) => void)
+    | undefined;
   readonly onCreateEnvironment?: (() => void) | undefined;
   readonly onCreateRemoteMcpServer?: (() => void) | undefined;
+  readonly onEnvironmentCreated?:
+    | ((environment: AgentBuilderCreatedEnvironmentSummary) => void)
+    | undefined;
+  readonly onMcpServerCreated?: ((server: AgentBuilderCreatedMcpServerSummary) => void) | undefined;
   readonly onOpenPreview: () => void;
   readonly previewDisabled: boolean;
   readonly saving: boolean;
@@ -96,7 +127,18 @@ export function useAgentBuilderControlPlaneActions(input: {
   const actionMutation = useMutation({
     mutationFn: executeAgentBuilderControlPlaneAction,
     onSuccess: async (result, variables) => {
+      // Bind directly created resources into the draft before any follow-up
+      // secure UI opens, so the credential dialog never races the patch.
+      if (result.createdEnvironment !== null) {
+        input.onEnvironmentCreated?.(result.createdEnvironment);
+      }
+
+      if (result.createdMcpServer !== null) {
+        input.onMcpServerCreated?.(result.createdMcpServer);
+      }
+
       const handledSecureUi = handleAgentBuilderSecureUiAction({
+        onConnectMcpCredential: input.onConnectMcpCredential,
         onCreateEnvironment: input.onCreateEnvironment,
         onCreateRemoteMcpServer: input.onCreateRemoteMcpServer,
         result,
@@ -156,7 +198,7 @@ export function useAgentBuilderControlPlaneActions(input: {
       actionMutation.error instanceof Error ? actionMutation.error.message : actionMessage,
     actionPending: actionMutation.isPending,
     isActionDisabled: isDisabled,
-    onAction(actionKey) {
+    onAction(actionKey, payloads) {
       const dispatch = getAgentBuilderActionDispatch(actionKey);
 
       if (dispatch.kind === "planner_only") {
@@ -174,6 +216,14 @@ export function useAgentBuilderControlPlaneActions(input: {
       setActionMessage(null);
       void actionMutation.mutateAsync({
         agentId: toAgentId(input.agentId),
+        ...(dispatch.toolId === "create_environment" &&
+        payloads?.createEnvironmentPayload !== undefined
+          ? { createEnvironmentPayload: payloads.createEnvironmentPayload }
+          : {}),
+        ...(dispatch.toolId === "create_remote_mcp_server" &&
+        payloads?.createRemoteMcpServerPayload !== undefined
+          ? { createRemoteMcpServerPayload: payloads.createRemoteMcpServerPayload }
+          : {}),
         ...(actionRequiresDraftYaml(dispatch.toolId) ? { draftYaml: input.draftYaml } : {}),
         toolId: dispatch.toolId,
       });

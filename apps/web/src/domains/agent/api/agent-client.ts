@@ -190,10 +190,14 @@ function toAgentConfigBuilderMetadata(
   builder: GraphQLAgentEditorState["builder"],
 ): AgentViewConfig["builder"] {
   return {
-    componentDecisions:
-      builder.componentDecisions.environment === null
+    componentDecisions: {
+      ...(builder.componentDecisions.agentType === null
         ? {}
-        : { environment: builder.componentDecisions.environment },
+        : { agentType: builder.componentDecisions.agentType }),
+      ...(builder.componentDecisions.environment === null
+        ? {}
+        : { environment: builder.componentDecisions.environment }),
+    },
   };
 }
 

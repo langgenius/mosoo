@@ -18,9 +18,14 @@ import { isTruthy } from "../../../shared/lib/truthiness";
 import type { McpServerWithCredential } from "./mcp-types";
 type Stage = "confirm" | "pending" | "done";
 
+export type McpConnectTargetServer = Pick<
+  McpServerWithCredential,
+  "authType" | "id" | "name" | "url"
+>;
+
 interface Props {
   open: boolean;
-  server: McpServerWithCredential | null;
+  server: McpConnectTargetServer | null;
   onBearerConnect: (token: string) => Promise<void>;
   onConnected: () => Promise<void> | void;
   onOpenChange: (open: boolean) => void;

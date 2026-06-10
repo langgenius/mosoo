@@ -21,9 +21,20 @@ export const EXECUTE_AGENT_BUILDER_CONTROL_PLANE_ACTION_MUTATION = graphql(/* Gr
     $input: ExecuteAgentBuilderControlPlaneActionInput!
   ) {
     executeAgentBuilderControlPlaneAction(input: $input) {
+      createdEnvironment {
+        id
+        name
+      }
+      createdMcpServer {
+        authType
+        id
+        name
+        url
+      }
       message
       secureUi {
         kind
+        mcpServerId
       }
       sessionId
       status

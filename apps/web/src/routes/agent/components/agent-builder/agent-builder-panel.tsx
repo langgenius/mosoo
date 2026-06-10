@@ -1,11 +1,12 @@
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import type { AgentBuilderDraftPatchSectionId } from "@mosoo/contracts/agent-builder";
 import { SendHorizontal } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import type { ReactElement } from "react";
 
 import type { AgentBuilderMessage } from "@/domains/agent-builder/api/agent-builder-client";
+import { takeAgentBuilderInitialMessage } from "@/domains/agent-builder/initial-message";
 import { useAgentBuilderSystemAgentSession } from "@/domains/agent-builder/query/use-agent-builder-system-agent-session";
 import { Button } from "@/shared/ui/button";
 
@@ -19,7 +20,10 @@ import type {
   AgentBuilderPatchApplyResult,
 } from "./agent-builder-auto-apply";
 import { AgentBuilderMessageCard } from "./agent-builder-message-card";
-import type { AgentBuilderActionDisabled } from "./agent-builder-message-card";
+import type {
+  AgentBuilderActionHandler,
+  AgentBuilderActionDisabled,
+} from "./agent-builder-message-card";
 import { getLatestActionableStructuredReplyMessageId } from "./agent-builder-structured-reply-state";
 import { canSubmitAgentBuilderTurn } from "./agent-builder-submit-gate";
 
@@ -51,7 +55,7 @@ export function AgentBuilderPanel({
   actionPending?: boolean | undefined;
   draftRevision: string;
   draftYaml: string;
-  onAction?: ((actionKey: string) => void) | undefined;
+  onAction?: AgentBuilderActionHandler | undefined;
   onDraftPatchAutoApply?:
     | ((
         patch: AgentBuilderClientPatch,
@@ -115,6 +119,20 @@ export function AgentBuilderPanel({
     },
     [canSubmitBuilderTurn, submitSystemAgentTurn],
   );
+  // The creation flow can stash the user's first Builder message (template or
+  // free text). Send it once the submit gate opens; take() clears the stash,
+  // so the effect stays idempotent under StrictMode.
+  useEffect(() => {
+    if (!canSubmitBuilderTurn) {
+      return;
+    }
+
+    const initialMessage = takeAgentBuilderInitialMessage(agent.id)?.trim() ?? "";
+
+    if (initialMessage.length > 0) {
+      submitBuilderTurn(initialMessage.slice(0, 4000));
+    }
+  }, [agent.id, canSubmitBuilderTurn, submitBuilderTurn]);
   const assistantRuntime = useAgentBuilderAssistantRuntime({
     isBusy: systemAgentSession.isBusy || autoApplyPending,
     isSendDisabled: !canSubmitBuilderTurn,

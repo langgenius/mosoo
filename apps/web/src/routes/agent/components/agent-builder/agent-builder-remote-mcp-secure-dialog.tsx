@@ -11,10 +11,13 @@ import {
 } from "@/domains/mcp/api/mcp-client";
 import { mcpKeys } from "@/domains/mcp/query/mcp-queries";
 import { AddMcpDialog } from "@/routes/integrations/mcp/add-mcp-dialog";
+import type { McpConnectTargetServer } from "@/routes/integrations/mcp/oauth-connect-dialog";
 import { OAuthConnectDialog } from "@/routes/integrations/mcp/oauth-connect-dialog";
 import { toMcpOAuthFlowId, toOrganizationId } from "@/routes/typed-id";
 
 export function AgentBuilderRemoteMcpSecureDialog(input: {
+  readonly connectServer?: McpConnectTargetServer | null | undefined;
+  readonly onConnectServerClose?: (() => void) | undefined;
   readonly onCreated: (server: McpServerWithCredential) => void;
   readonly onOpenChange: (open: boolean) => void;
   readonly open: boolean;
@@ -23,6 +26,9 @@ export function AgentBuilderRemoteMcpSecureDialog(input: {
   const queryClient = useQueryClient();
   const [oauthServer, setOauthServer] = useState<McpServerWithCredential | null>(null);
   const organizationId = toOrganizationId(input.organizationId);
+  // A credential-connect target can come from the local create flow or be
+  // requested externally (Builder direct-created server records).
+  const connectTarget: McpConnectTargetServer | null = oauthServer ?? input.connectServer ?? null;
 
   async function refreshMcpRegistry(): Promise<void> {
     await queryClient.invalidateQueries({
@@ -63,11 +69,11 @@ export function AgentBuilderRemoteMcpSecureDialog(input: {
       />
       <OAuthConnectDialog
         onBearerConnect={async (token) => {
-          if (oauthServer === null) {
+          if (connectTarget === null) {
             return;
           }
           await connectMcpBearer({
-            serverId: oauthServer.id,
+            serverId: connectTarget.id,
             token,
           });
         }}
@@ -75,20 +81,21 @@ export function AgentBuilderRemoteMcpSecureDialog(input: {
         onOpenChange={(next) => {
           if (!next) {
             setOauthServer(null);
+            input.onConnectServerClose?.();
           }
         }}
         onPollOAuthFlow={async (flowId) => getMcpOAuthFlowState(toMcpOAuthFlowId(flowId))}
         onStartOAuth={async () => {
-          if (oauthServer === null) {
+          if (connectTarget === null) {
             throw new Error("MCP server is missing.");
           }
 
           return startMcpOAuth({
-            serverId: oauthServer.id,
+            serverId: connectTarget.id,
           });
         }}
-        open={oauthServer !== null}
-        server={oauthServer}
+        open={connectTarget !== null}
+        server={connectTarget}
       />
     </>
   );

@@ -22,7 +22,7 @@ import { filterAgents, getAgentsForScope, groupAgentsByScope } from "./agent-lis
 import { mapAgentSummaryToListView } from "./agent-view.mapper";
 import { AgentGrid } from "./components/agent-grid";
 import { AgentTable } from "./components/agent-table";
-import { CreateAgentDialog } from "./components/create-agent-dialog";
+import { CreateAgentLauncherDialog } from "./components/create-agent-launcher";
 import { ImportAgentPackageDialog } from "./components/import-agent-package-dialog";
 
 interface AgentListPageState {
@@ -202,7 +202,7 @@ export function AgentListPage() {
         )}
       </ListPageContent>
 
-      <CreateAgentDialog
+      <CreateAgentLauncherDialog
         open={showCreate}
         onOpenChange={(open) => {
           dispatch({ open, type: "setShowCreate" });

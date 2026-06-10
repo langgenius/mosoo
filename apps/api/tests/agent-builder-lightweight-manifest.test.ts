@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { parseAgentBuilderLightweightManifestYaml } from "../src/modules/agent-builder/application/agent-builder-lightweight-manifest";
 import { toAgentBuilderPlannerDraftContext } from "../src/modules/agent-builder/application/agent-builder-lightweight-manifest-projections";
 
 const SPACE_FROM_PATCH_ID = "01J000000000000000000000E1";
@@ -86,13 +87,14 @@ describe("Agent Builder lightweight Manifest reader", () => {
     expect(draft.mcpServerIds).toEqual([MCP_ACTIVE_ID, MCP_DELETED_ID]);
   });
 
-  test("keeps only Environment as a durable Builder component decision", () => {
+  test("keeps only Environment and agent type as durable Builder component decisions", () => {
     const draft = toAgentBuilderPlannerDraftContext(
       [
         "version: 1",
         "kind: pet",
         "builder:",
         "  componentDecisions:",
+        "    agentType: decided",
         "    environment: skipped",
         "    mcpServers: skipped",
         "    skills: skipped",
@@ -100,7 +102,31 @@ describe("Agent Builder lightweight Manifest reader", () => {
       ].join("\n"),
     );
 
-    expect(draft.componentDecisions).toEqual({ environment: "skipped" });
+    expect(draft.componentDecisions).toEqual({ agentType: "decided", environment: "skipped" });
+  });
+
+  test("keeps the agent type decision in the persisted builder metadata projection", () => {
+    const result = parseAgentBuilderLightweightManifestYaml(
+      [
+        "version: 1",
+        "kind: pet",
+        "builder:",
+        "  componentDecisions:",
+        "    agentType: decided",
+        "    environment: skipped",
+      ].join("\n"),
+    );
+
+    if (result.status !== "parsed") {
+      throw new Error(`expected parsed manifest, got: ${result.error}`);
+    }
+
+    // manifest.builder feeds updateAgentConfig — dropping agentType here means
+    // the decision is silently lost on every apply_agent_config save.
+    expect(result.manifest.builder.componentDecisions).toEqual({
+      agentType: "decided",
+      environment: "skipped",
+    });
   });
 
   test("rejects malformed platform IDs in Draft asset bindings", () => {

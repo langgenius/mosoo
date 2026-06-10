@@ -132,7 +132,14 @@ function applyBuilderPatchItem(
         : blocked(current, "Expected an environment id or null.");
     case "kind":
       return item.value === "pet" || item.value === "cattle"
-        ? applied({ ...current, kind: item.value })
+        ? applied({
+            ...current,
+            componentDecisions: {
+              ...current.componentDecisions,
+              agentType: "decided",
+            },
+            kind: item.value,
+          })
         : blocked(current, "Expected agent kind to be pet or cattle.");
     case "model":
       return typeof item.value === "string"
