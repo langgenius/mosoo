@@ -40,8 +40,20 @@ async function sendPreviewMessageAndVerifyRealStream(page: Page, agentId: string
   await expect(toolCard).toBeVisible({
     timeout: 180_000,
   });
-  await maybeClick(toolCard.getByRole("button").first());
-  await expect(toolCard.getByText(/\/[^\s]+/u).first()).toBeVisible({
+  const toolOutputPath = toolCard
+    .locator("pre")
+    .filter({ hasText: /\/[^\s]+/u })
+    .first();
+  await expect(toolOutputPath).toHaveText(/\/[^\s]+/u, {
+    timeout: 180_000,
+  });
+  const toolCardIsOpen = await toolCard.evaluate(
+    (element) => element instanceof HTMLDetailsElement && element.open,
+  );
+  if (!toolCardIsOpen) {
+    await toolCard.locator("summary").click();
+  }
+  await expect(toolOutputPath).toBeVisible({
     timeout: 180_000,
   });
   await expect(page.getByTestId("agent-session-pill")).toContainText("Ready", {

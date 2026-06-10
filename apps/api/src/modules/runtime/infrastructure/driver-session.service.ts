@@ -343,6 +343,21 @@ export async function ensureDriverSessionReady(
           process: provision.process,
         }),
       );
+
+      const runLeaseOutcome = await timing.measure("driver.bindProvisionedRun", () =>
+        runtimeSubjectLifecycle.acquireRunLease({
+          driverInstanceId: provision.driverInstanceId,
+          runtimeSubjectId: input.profile.sandbox.id,
+          sessionId: input.sessionId,
+          sessionRunId: input.sessionRunId,
+        }),
+      );
+
+      if (!isRuntimeRunLeaseAcquireSuccess(runLeaseOutcome)) {
+        await waitForRetryableRunLeaseOutcome(runLeaseOutcome);
+        continue;
+      }
+
       await appendDriverSocketReconnectSucceededIfNeeded(bindings, {
         attempt: reconnectAttempt,
         eventContext: provisionEventContext,

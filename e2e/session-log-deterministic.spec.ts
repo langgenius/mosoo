@@ -108,6 +108,11 @@ const agentDetail = {
   visibility: "private",
 };
 const editorState = {
+  builder: {
+    componentDecisions: {
+      environment: null,
+    },
+  },
   collaborators: [],
   environment: {
     boundSpaceIds: [docsSpaceId],
