@@ -11,13 +11,12 @@ This is a status snapshot, not a dependency graph. Items are grouped into three 
 - **Channel runtime** — Discord / WeChat live smoke / LINE.
 - **Vendor subscription credential** — use model vendors through Claude Max / ChatGPT subscriptions.
 - **Local / BYO runtime environment** — local / self-hosted runtime (under evaluation).
-- **System Agent** — formal PRD plus a controlled Draft patch.
-- **Pet / Cattle** — kind-aware downstream integrations.
-- **Cross-session Memory** — PRD (Pet canonicalization + Cattle no-memory boundary).
+- **Session artifacts** — persist agent-generated files from sandbox sessions and expose them to API consumers, channels, and external users.
+- **Overview / Quickstart** — workspace landing page (replacing agents as the first screen) combining quickstart and global analytics.
 
 ## 🛠️ In Development
 
-- None in active development right now. Items move here from **Planned** once work starts.
+- **Agent Builder** — formal PRD plus a controlled Draft patch.
 
 ## ✅ Done
 
