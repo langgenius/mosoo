@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
-import { Bot, Box, ChevronDown, ChevronRight, Folder, Inbox, KeyRound, Puzzle } from "lucide-react";
+import { Bot, Box, ChevronRight, Folder, Inbox, KeyRound, Puzzle } from "lucide-react";
+import type { MouseEvent } from "react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -18,21 +19,35 @@ interface AppNavItem {
   path: string;
 }
 
-const NAV_ITEMS: AppNavItem[] = [
-  { icon: Inbox, label: "Threads", path: "/threads" },
-  { icon: Bot, label: "Agents", path: "/agent" },
-  { icon: Folder, label: "Spaces", path: "/space" },
-  { icon: Box, label: "Environments", path: "/environment" },
+interface AppNavSection {
+  label?: string;
+  items: AppNavItem[];
+}
+
+const NAV_SECTIONS: AppNavSection[] = [
   {
-    children: [
-      { label: "Skills", path: "/integrations/skills" },
-      { label: "MCP servers", path: "/integrations/mcp" },
+    items: [
+      { icon: Inbox, label: "Threads", path: "/threads" },
+      { icon: Bot, label: "Agents", path: "/agent" },
+      { icon: Folder, label: "Spaces", path: "/space" },
+      { icon: Box, label: "Environments", path: "/environment" },
     ],
-    icon: Puzzle,
-    label: "Integrations",
-    path: "/integrations",
   },
-  { icon: KeyRound, label: "Providers", path: "/providers" },
+  {
+    label: "Configure",
+    items: [
+      {
+        children: [
+          { label: "Skills", path: "/integrations/skills" },
+          { label: "MCP servers", path: "/integrations/mcp" },
+        ],
+        icon: Puzzle,
+        label: "Integrations",
+        path: "/integrations",
+      },
+      { icon: KeyRound, label: "Providers", path: "/providers" },
+    ],
+  },
 ];
 
 function isNavItemActive(pathname: string, path: string): boolean {
@@ -93,53 +108,36 @@ function NavGroup({
   const onPath = isNavItemActive(pathname, item.path);
   const [manuallyExpanded, setManuallyExpanded] = useState<boolean | null>(null);
   const expanded = manuallyExpanded ?? onPath;
+  const parentSelfActive = pathname === item.path;
 
-  function toggleNavigationSection() {
-    if (collapsed) {
-      void navigate(item.path);
-      return;
-    }
-
-    if (!onPath) {
-      void navigate(item.path);
-      setManuallyExpanded(true);
-      return;
-    }
-
+  function toggleExpansion(event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
     setManuallyExpanded(!expanded);
   }
 
-  const parentSelfActive = pathname === item.path;
-
-  const trigger = (
-    <button
-      type="button"
-      aria-label={item.label}
-      aria-expanded={expanded}
-      onClick={toggleNavigationSection}
-      className={cn(
-        "flex items-center rounded-md text-[13.5px] font-semibold transition-colors w-full",
-        collapsed ? "size-9 justify-center self-center" : "gap-2.5 px-2.5 py-2",
-        parentSelfActive
-          ? "bg-ink-100 text-fg-1"
-          : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
-      )}
-    >
-      <Icon className="size-4 shrink-0" />
-      {collapsed ? null : (
-        <>
-          <span className="flex-1 text-left">{item.label}</span>
-          {expanded ? (
-            <ChevronDown className="text-fg-3 size-3.5" />
-          ) : (
-            <ChevronRight className="text-fg-3 size-3.5" />
-          )}
-        </>
-      )}
-    </button>
-  );
+  function handleCollapsedTrigger() {
+    void navigate(item.path);
+  }
 
   if (collapsed) {
+    const trigger = (
+      <button
+        type="button"
+        aria-label={item.label}
+        aria-expanded={expanded}
+        onClick={handleCollapsedTrigger}
+        className={cn(
+          "flex size-9 items-center justify-center self-center rounded-md text-[13.5px] font-semibold transition-colors",
+          parentSelfActive
+            ? "bg-ink-100 text-fg-1"
+            : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
+        )}
+      >
+        <Icon className="size-4 shrink-0" />
+      </button>
+    );
+
     return (
       <Tooltip>
         <TooltipTrigger asChild>{trigger}</TooltipTrigger>
@@ -150,31 +148,74 @@ function NavGroup({
 
   return (
     <div className="flex flex-col">
-      {trigger}
-      {expanded && item.children ? (
-        <div className="relative mt-0.5 pl-[18px]">
-          <span
-            aria-hidden="true"
-            className="bg-border-soft pointer-events-none absolute top-1 bottom-1 left-[18px] w-px"
-          />
-          <div className="flex flex-col gap-0.5 pl-3">
-            {item.children.map((child) => {
-              const childActive = isNavItemActive(pathname, child.path);
-              return (
-                <Link
-                  key={child.path}
-                  to={child.path}
-                  className={cn(
-                    "flex items-center rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
-                    childActive
-                      ? "bg-ink-100 text-fg-1"
-                      : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
-                  )}
-                >
-                  {child.label}
-                </Link>
-              );
-            })}
+      <div
+        className={cn(
+          "group/row flex items-stretch rounded-md transition-colors",
+          parentSelfActive
+            ? "bg-ink-100 text-fg-1"
+            : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
+        )}
+      >
+        <Link
+          to={item.path}
+          aria-label={item.label}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] font-semibold"
+        >
+          <Icon className="size-4 shrink-0" />
+          <span className="flex-1 truncate text-left">{item.label}</span>
+        </Link>
+        {item.children && item.children.length > 0 ? (
+          <button
+            type="button"
+            aria-label={expanded ? `Collapse ${item.label}` : `Expand ${item.label}`}
+            aria-expanded={expanded}
+            onClick={toggleExpansion}
+            className="text-fg-3 hover:text-fg-1 flex w-7 shrink-0 items-center justify-center rounded-md transition-colors"
+          >
+            <ChevronRight
+              className={cn(
+                "size-3.5 transition-transform duration-150 ease-out",
+                expanded ? "rotate-90" : "rotate-0",
+              )}
+            />
+          </button>
+        ) : null}
+      </div>
+
+      {item.children && item.children.length > 0 ? (
+        <div
+          className={cn(
+            "grid transition-[grid-template-rows] duration-200 ease-out",
+            expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+          )}
+        >
+          <div className="overflow-hidden">
+            <div className="mt-0.5 flex flex-col gap-0.5 pl-[34px]">
+              {item.children.map((child) => {
+                const childActive = isNavItemActive(pathname, child.path);
+                return (
+                  <Link
+                    key={child.path}
+                    to={child.path}
+                    className={cn(
+                      "relative flex items-center rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+                      childActive
+                        ? "bg-ink-100 text-fg-1"
+                        : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "mr-2 inline-block size-1 rounded-full transition-colors",
+                        childActive ? "bg-fg-1" : "bg-fg-3/40",
+                      )}
+                    />
+                    {child.label}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         </div>
       ) : null}
@@ -182,10 +223,23 @@ function NavGroup({
   );
 }
 
-export function AppNavigation({ collapsed, pathname }: { collapsed: boolean; pathname: string }) {
+function NavSection({
+  collapsed,
+  pathname,
+  section,
+}: {
+  collapsed: boolean;
+  pathname: string;
+  section: AppNavSection;
+}) {
   return (
     <div className={cn("flex flex-col", collapsed ? "gap-1" : "gap-0.5")}>
-      {NAV_ITEMS.map((item) =>
+      {!collapsed && section.label ? (
+        <div className="text-fg-3 mt-3 mb-1 px-2.5 text-[10.5px] font-semibold tracking-wider uppercase">
+          {section.label}
+        </div>
+      ) : null}
+      {section.items.map((item) =>
         item.children && item.children.length > 0 ? (
           <NavGroup key={item.path} collapsed={collapsed} item={item} pathname={pathname} />
         ) : (
@@ -199,6 +253,24 @@ export function AppNavigation({ collapsed, pathname }: { collapsed: boolean; pat
           />
         ),
       )}
+    </div>
+  );
+}
+
+export function AppNavigation({ collapsed, pathname }: { collapsed: boolean; pathname: string }) {
+  return (
+    <div className={cn("flex flex-col", collapsed ? "gap-1" : "gap-0")}>
+      {NAV_SECTIONS.map((section, index) => (
+        <div key={section.label ?? `section-${index}`} className="flex flex-col">
+          {collapsed && index > 0 ? (
+            <div
+              aria-hidden="true"
+              className="bg-border-soft mx-auto my-1.5 h-px w-6"
+            />
+          ) : null}
+          <NavSection collapsed={collapsed} pathname={pathname} section={section} />
+        </div>
+      ))}
     </div>
   );
 }
