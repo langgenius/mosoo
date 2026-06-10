@@ -20,7 +20,6 @@ const TITLE_STYLE = { letterSpacing: "0" } satisfies CSSProperties;
 
 interface AgentTemplate {
   readonly description: string;
-  readonly emoji: string;
   readonly key: string;
   readonly message: string;
   readonly title: string;
@@ -29,7 +28,6 @@ interface AgentTemplate {
 const AGENT_TEMPLATES: readonly AgentTemplate[] = [
   {
     description: "Answers repeat questions in Slack.",
-    emoji: "💬",
     key: "slack-qa-assistant",
     message:
       "Create a Slack Q&A assistant that answers my team's repeat questions. It should stay concise, cite the source it used, and ask a clarifying question when the request is ambiguous.",
@@ -37,7 +35,6 @@ const AGENT_TEMPLATES: readonly AgentTemplate[] = [
   },
   {
     description: "Captures and routes tasks for you.",
-    emoji: "✅",
     key: "task-triager",
     message:
       "Create a task triager that captures incoming requests, classifies them by urgency and topic, and routes each task to the right owner with a short summary.",
@@ -45,7 +42,6 @@ const AGENT_TEMPLATES: readonly AgentTemplate[] = [
   },
   {
     description: "Writes and sends weekly status updates.",
-    emoji: "📊",
     key: "weekly-status-reporter",
     message:
       "Create a weekly status reporter that collects what shipped this week, drafts a crisp status update grouped by project, and prepares it for review every Friday.",
@@ -53,7 +49,6 @@ const AGENT_TEMPLATES: readonly AgentTemplate[] = [
   },
   {
     description: "Pulls updates from your tools each morning.",
-    emoji: "☀️",
     key: "morning-brief",
     message:
       "Create a morning brief agent that pulls overnight updates from my connected tools and writes a short prioritized digest I can read in two minutes.",
@@ -212,7 +207,7 @@ function CreateAgentLauncherBody({
       </DialogTitle>
 
       <form
-        className="border-brand/40 focus-within:border-brand mx-auto mt-5 flex max-w-[480px] items-end gap-2 rounded-xl border-2 bg-white px-3.5 py-2.5"
+        className="border-brand/40 focus-within:border-brand mx-auto mt-5 flex max-w-[480px] items-center gap-2 rounded-xl border-2 bg-white px-3.5 py-2.5"
         onSubmit={handleFreeTextSubmit}
       >
         <textarea
@@ -267,9 +262,6 @@ function CreateAgentLauncherBody({
               onClick={() => void handleBuilderStart(template.message)}
               type="button"
             >
-              <span aria-hidden className="text-[16px] leading-none">
-                {template.emoji}
-              </span>
               <span className="text-foreground text-[12px] leading-snug font-medium">
                 {template.title}
               </span>
