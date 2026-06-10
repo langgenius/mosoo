@@ -1,7 +1,6 @@
 import type { AuthMethod, AuthSecurityLevel } from "../auth/auth.contract";
 import type { AccountId, OrganizationId } from "../id/id.contract";
 import type {
-  OrganizationCreationSlotStatus,
   OrganizationMemberRole,
   OrganizationSummary,
 } from "../organization/organization.contract";
@@ -70,5 +69,4 @@ export interface Viewer {
   activeOrganization: OrganizationSummary | null;
   auth: ViewerAuth;
   memberships: ViewerOrganizationMembership[];
-  organizationCreationSlot: OrganizationCreationSlotStatus;
 }

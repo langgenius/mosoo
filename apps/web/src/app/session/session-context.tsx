@@ -1,9 +1,5 @@
 import type { AccountProfile } from "@mosoo/contracts/account";
-import type {
-  OrganizationCreationSlotStatus,
-  OrganizationInvitation,
-  OrganizationSummary,
-} from "@mosoo/contracts/organization";
+import type { OrganizationInvitation, OrganizationSummary } from "@mosoo/contracts/organization";
 import { createContext, useCallback, useMemo, use } from "react";
 import type { ReactNode } from "react";
 
@@ -26,7 +22,6 @@ interface AppSessionContextValue {
   activeOrganization: OrganizationSummary | null;
   activeOrganizationId: string | null;
   onboardingState: OnboardingState | null;
-  organizationCreationSlot: OrganizationCreationSlotStatus;
   organizations: OrganizationSummary[];
   organizationsLoading: boolean;
   pendingInvitations: OrganizationInvitation[];
@@ -40,10 +35,6 @@ interface AppSessionContextValue {
 }
 
 const AppSessionContext = createContext<AppSessionContextValue | null>(null);
-const DEFAULT_ORGANIZATION_CREATION_SLOT: OrganizationCreationSlotStatus = {
-  occupied: false,
-  organizationId: null,
-};
 const EMPTY_ORGANIZATIONS: OrganizationSummary[] = [];
 
 function toSessionUser(account: AccountProfile | null): SessionUser | null {
@@ -86,8 +77,6 @@ export function AppSessionProvider({ children }: { children: ReactNode }) {
     [memberships],
   );
   const activeOrganization = viewer?.activeOrganization ?? null;
-  const organizationCreationSlot =
-    viewer?.organizationCreationSlot ?? DEFAULT_ORGANIZATION_CREATION_SLOT;
   const onboardingState = resolveOnboardingState({
     hasOrganizations: organizations.length > 0,
     loading: viewerQuery.isLoading,
@@ -118,7 +107,6 @@ export function AppSessionProvider({ children }: { children: ReactNode }) {
       activeOrganization,
       activeOrganizationId: activeOrganization?.id ?? null,
       onboardingState,
-      organizationCreationSlot,
       organizations,
       organizationsLoading: viewerQuery.isLoading,
       pendingInvitations: pendingInvitationsState.pendingInvitations,
@@ -133,7 +121,6 @@ export function AppSessionProvider({ children }: { children: ReactNode }) {
     [
       activeOrganization,
       onboardingState,
-      organizationCreationSlot,
       organizations,
       pendingInvitationsState.loading,
       pendingInvitationsState.pendingInvitations,

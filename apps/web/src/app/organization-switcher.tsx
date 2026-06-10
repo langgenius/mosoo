@@ -49,7 +49,6 @@ function OrganizationBadge({ name }: { name: string }) {
 export function OrganizationSwitcher({ collapsed }: { collapsed: boolean }) {
   const {
     activeOrganization,
-    organizationCreationSlot,
     organizations,
     organizationsLoading,
     refreshOrganizations,
@@ -61,7 +60,6 @@ export function OrganizationSwitcher({ collapsed }: { collapsed: boolean }) {
   const [createOrganizationError, setCreateOrganizationError] = useState<string | null>(null);
   const activeOrganizationName =
     activeOrganization?.name ?? (organizationsLoading ? "Loading..." : "No organization");
-  const organizationCreationSlotOccupied = organizationCreationSlot.occupied;
 
   function resetCreateOrganizationDialog() {
     setNewOrganizationName("");
@@ -161,21 +159,14 @@ export function OrganizationSwitcher({ collapsed }: { collapsed: boolean }) {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onSelect={() => {
-              if (!organizationCreationSlotOccupied) {
-                setCreateOrganizationDialogOpen(true);
-              }
+              setCreateOrganizationDialogOpen(true);
             }}
-            disabled={creating || organizationCreationSlotOccupied}
+            disabled={creating}
             className="cursor-pointer rounded-md"
           >
             <Plus className="size-3.5" />
             <div className="min-w-0 flex-1">
               <div className="truncate text-[12.5px] font-semibold">Create organization</div>
-              {organizationCreationSlotOccupied ? (
-                <div className="text-muted-foreground mt-0.5 text-[10.5px] leading-snug whitespace-normal">
-                  CE allows one organization you create.
-                </div>
-              ) : null}
             </div>
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -189,7 +180,7 @@ export function OrganizationSwitcher({ collapsed }: { collapsed: boolean }) {
             <DialogHeader>
               <DialogTitle>Create organization</DialogTitle>
               <DialogDescription>
-                CE allows one organization you create; you can still join other organizations by
+                Create a new organization that you own. You can still join other organizations by
                 invite or request access.
               </DialogDescription>
             </DialogHeader>

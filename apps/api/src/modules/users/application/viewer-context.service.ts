@@ -17,7 +17,6 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { getOrganizationCreationSlotStatus } from "../../organizations/domain/organization-creation-slot.policy";
 import { ensureModelAvailableForSelection } from "../../vendor-credentials/application/available-models";
 import { normalizeAccountImageUrl } from "../domain/user-avatar";
 import { normalizeAccountName } from "../domain/user-name";
@@ -159,14 +158,12 @@ export async function getViewer(
       activeOrganization: null,
       auth: getViewerAuth(bindings, null),
       memberships: [],
-      organizationCreationSlot: { occupied: false, organizationId: null },
     };
   }
 
-  const [accountState, memberships, organizationCreationSlot] = await Promise.all([
+  const [accountState, memberships] = await Promise.all([
     getViewerAccountState(database, viewer.id),
     listViewerOrganizationMemberships(database, viewer.id),
-    getOrganizationCreationSlotStatus(database, viewer.id),
   ]);
   const organizationContext = await resolveViewerOrganizationContextFromState(
     database,
@@ -182,7 +179,6 @@ export async function getViewer(
     activeOrganization: organizationContext.activeOrganization,
     auth: getViewerAuth(bindings, viewer),
     memberships: organizationContext.memberships,
-    organizationCreationSlot,
   };
 }
 

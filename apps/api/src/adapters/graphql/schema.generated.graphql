@@ -1449,11 +1449,6 @@ type OrganizationCostCard {
   users: [CostUserRow!]!
 }
 
-type OrganizationCreationSlotStatus {
-  occupied: Boolean!
-  organizationId: ULID
-}
-
 type OrganizationInvitation {
   accountId: ULID
   createdAt: String!
@@ -2296,7 +2291,6 @@ type Viewer {
   activeOrganization: Organization
   auth: ViewerAuth!
   memberships: [ViewerOrganizationMembership!]!
-  organizationCreationSlot: OrganizationCreationSlotStatus!
 }
 
 type ViewerAuth {

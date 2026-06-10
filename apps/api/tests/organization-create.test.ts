@@ -145,7 +145,7 @@ describe("organization creation", () => {
     });
   });
 
-  test("retries slug conflicts without leaking a creation slot", async () => {
+  test("retries on slug conflicts until a unique slug is allocated", async () => {
     const currentViewer = makeViewer("new@example.com");
     const database = createOrganizationCreateDatabase(currentViewer);
     database.execute(`
@@ -191,30 +191,22 @@ describe("organization creation", () => {
     ]);
   });
 
-  test("raises a typed domain error when the CE self-created organization slot is occupied", async () => {
+  test("allows a viewer to create multiple organizations", async () => {
     const currentViewer = makeViewer("new@example.com");
     const database = createOrganizationCreateDatabase(currentViewer);
 
-    await createOrganization(database, currentViewer, {
+    const first = await createOrganization(database, currentViewer, {
       name: "First Team",
     });
-
-    await expect(
-      createOrganization(database, currentViewer, {
-        name: "Second Team",
-      }),
-    ).rejects.toMatchObject({
-      code: "ORGANIZATION_CREATION_SLOT_OCCUPIED",
-      status: 400,
+    const second = await createOrganization(database, currentViewer, {
+      name: "Second Team",
+    });
+    const third = await createOrganization(database, currentViewer, {
+      name: "Third Team",
     });
 
-    await expect(
-      createOrganization(database, currentViewer, {
-        name: "Third Team",
-      }),
-    ).rejects.toMatchObject({
-      code: "ORGANIZATION_CREATION_SLOT_OCCUPIED",
-      status: 400,
-    });
+    expect(first).toMatchObject({ name: "First Team", slug: "first-team", viewerRole: "owner" });
+    expect(second).toMatchObject({ name: "Second Team", slug: "second-team", viewerRole: "owner" });
+    expect(third).toMatchObject({ name: "Third Team", slug: "third-team", viewerRole: "owner" });
   });
 });

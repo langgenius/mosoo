@@ -10,10 +10,6 @@ import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.ser
 import { createOrganizationEnvironmentDefaults } from "../../environments/application/environment.service";
 import { recordLastActiveOrganization } from "../../users/application/account-organization-context.service";
 import { toOrganizationSummaryWithViewerRole } from "../domain/organization-access.policy";
-import {
-  getOrganizationCreationSlotStatus,
-  organizationCreationSlotError,
-} from "../domain/organization-creation-slot.policy";
 import { deriveOrganizationSlugBase } from "../domain/organization-name";
 
 interface ProvisionOrganizationWithOwnerInput {
@@ -75,11 +71,6 @@ export async function provisionOrganizationWithOwner(
   const slugBase = deriveOrganizationSlugBase(input.name);
   const joinPolicy = "auto";
   let slug: string | null = null;
-
-  const creationSlot = await getOrganizationCreationSlotStatus(database, owner.id);
-  if (creationSlot.occupied) {
-    throw organizationCreationSlotError();
-  }
 
   for (let attempt = 1; attempt <= MAX_ORGANIZATION_SLUG_ATTEMPTS; attempt += 1) {
     const candidate = deriveOrganizationSlugCandidate(slugBase, attempt);

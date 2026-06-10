@@ -3,7 +3,7 @@ import type { Viewer } from "@mosoo/contracts/account";
 import { graphql } from "@/gql";
 import type { ViewerQuery } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import { toAccountId, toOrganizationId } from "@/routes/typed-id";
+import { toAccountId } from "@/routes/typed-id";
 
 import { toOrganizationSummary } from "../../organization/api/organization-mappers";
 
@@ -48,10 +48,6 @@ const VIEWER_QUERY = graphql(/* GraphQL */ `
           viewerRole
         }
       }
-      organizationCreationSlot {
-        occupied
-        organizationId
-      }
     }
   }
 `);
@@ -93,13 +89,6 @@ function toViewer(viewer: ViewerQuery["viewer"]): Viewer {
       ...membership,
       organization: toOrganizationSummary(membership.organization),
     })),
-    organizationCreationSlot: {
-      ...viewer.organizationCreationSlot,
-      organizationId:
-        viewer.organizationCreationSlot.organizationId === null
-          ? null
-          : toOrganizationId(viewer.organizationCreationSlot.organizationId),
-    },
   };
 }
 

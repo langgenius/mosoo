@@ -1805,7 +1805,7 @@ export type SpacesQuery = { spaceList: Array<{ createdAt: string, id: PlatformId
 export type ViewerQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ViewerQuery = { viewer: { account: { email: string, id: PlatformId, imageUrl: string | null, name: string, systemAgentModel: { modelId: string, vendor: string } | null } | null, activeOrganization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } | null, auth: { currentSecurityLevel: AuthSecurityLevel, methods: Array<AuthMethod> }, memberships: Array<{ joinedAt: string, role: OrganizationMemberRole, organization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } }>, organizationCreationSlot: { occupied: boolean, organizationId: PlatformId | null } } };
+export type ViewerQuery = { viewer: { account: { email: string, id: PlatformId, imageUrl: string | null, name: string, systemAgentModel: { modelId: string, vendor: string } | null } | null, activeOrganization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } | null, auth: { currentSecurityLevel: AuthSecurityLevel, methods: Array<AuthMethod> }, memberships: Array<{ joinedAt: string, role: OrganizationMemberRole, organization: { avatarUrl: string | null, createdAt: string, id: PlatformId, joinPolicy: OrganizationJoinPolicy, name: string, primaryDomain: string | null, slug: string, viewerRole: OrganizationMemberRole | null } }> } };
 
 export type UpdateProfileMutationVariables = Exact<{
   input: UpdateAccountProfileInput;
@@ -5532,10 +5532,6 @@ export const ViewerDocument = new TypedDocumentString(`
         slug
         viewerRole
       }
-    }
-    organizationCreationSlot {
-      occupied
-      organizationId
     }
   }
 }

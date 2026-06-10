@@ -42,17 +42,11 @@ export const userSchema = /* GraphQL */ `
     role: OrganizationMemberRole!
   }
 
-  type OrganizationCreationSlotStatus {
-    occupied: Boolean!
-    organizationId: ULID
-  }
-
   type Viewer {
     account: Account
     activeOrganization: Organization
     auth: ViewerAuth!
     memberships: [ViewerOrganizationMembership!]!
-    organizationCreationSlot: OrganizationCreationSlotStatus!
   }
 
   input BootstrapOnboardingInput {

@@ -372,10 +372,6 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
               role: "owner",
             },
           ],
-          organizationCreationSlot: {
-            occupied: true,
-            organizationId,
-          },
         },
       });
       return;

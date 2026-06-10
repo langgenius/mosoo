@@ -27,11 +27,6 @@ export interface OrganizationSummary {
   viewerRole: OrganizationMemberRole | null;
 }
 
-export interface OrganizationCreationSlotStatus {
-  occupied: boolean;
-  organizationId: OrganizationId | null;
-}
-
 export interface OrganizationMember {
   accountId: AccountId;
   disabledAt: string | null;
