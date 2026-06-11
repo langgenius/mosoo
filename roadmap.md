@@ -23,8 +23,7 @@ This is a status snapshot, not a dependency graph. Items are grouped by state so
 ## ✅ Done
 
 - **Foundation** — session snapshot / lifecycle / runtime state operations.
-- **Org Kind / CE Slots** — kind + slot enforced.
-- **Agent page operations / runtime diagnostics** — Terminal, Session Log, Runtime Logs.
+- **Agent page operations / runtime diagnostics** — Terminal, Session Log.
 - **Governance foundation** — RBAC trio + error message redaction.
 - **Published API** — hardening plus the Public Thread API (`POST /threads`, `GET /threads/{id}`).
 - **Provider readiness fallback UX** — missing-key / wrong-key states + vendor error pass-through.

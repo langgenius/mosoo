@@ -42,7 +42,7 @@ When complete, the agent owner should be able to:
 
 | Term            | Meaning                                                                                                                                                                                  |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Session Log** | One of the two modes of the Logs tab at the bottom of the Agent Page (the other is the already-shipped System Log "VPS tail-f" mode). Shows the event timeline for a **single session**. |
+| **Session Log** | The only mode of the Logs tab at the bottom of the Agent Page. Shows the event timeline for a **single session**. (The sibling System Log "VPS tail-f" mode described in [`./agent-runtime-logs.md`](./agent-runtime-logs.md) was removed.) |
 | **Turn**        | One loop of user input → complete agent response. Each Turn = one card.                                                                                                                  |
 | **4-domain**    | Sorting all events into four domains — user (input) / agent (output) / session (lifecycle) / span (observability) — borrowing the naming convention from Claude Managed Agents.          |
 | **Email-shape** | The "one event per row" structured shape of a Linear activity feed / GitHub PR review, rather than chat bubbles.                                                                         |

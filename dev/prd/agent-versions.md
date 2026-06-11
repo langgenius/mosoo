@@ -159,7 +159,7 @@ This product has several kinds of "logs / history / versions." Do not mix them u
 | What you want to know                                             | Where to look                                                                  |
 | ----------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | What a given session did (messages / tools / permissions / files) | **Logs tab** → select session                                                  |
-| What recently happened on this agent's machine                    | **Debug → System Log** (a separate PRD, [for-humans](./agent-runtime-logs.md)) |
+| What recently happened on this agent's machine                    | **Debug → System Log** (a separate PRD, [for-humans](./agent-runtime-logs.md); surface removed) |
 | An agent's historical versions + rolling back to an old version   | **Versions tab** (**this PRD, currently deferred**)                            |
 
 ---

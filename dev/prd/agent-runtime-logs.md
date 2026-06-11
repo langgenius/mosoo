@@ -1,5 +1,7 @@
 # Agent Runtime Logs — for humans
 
+> ⚠️ **DEPRECATED — DO NOT IMPLEMENT.** The Debug → System Log surface described below was removed from the product on 2026-06-10, which deleted the `agent-runtime-events` GraphQL field and service, the web `system-log-*` components, and the supporting tests. The same release dropped System Log from the roadmap's `Agent page operations / runtime diagnostics` line. Session-layer events still ship via the Session Log mode of the Logs tab ([`./session-log.md`](./session-log.md)); the machine-layer "VPS tail-f" view this PRD locks does not currently render. This document is retained only for history.
+
 > This is the product-story version for non-engineering readers. For the **complete engineering contract** (event catalog / family enums / visibility rules / signal-source alignment / state-machine coverage matrix / Architecture Impact), see the full PRD.
 >
 > This document is aligned with v2.1 (post-grill).

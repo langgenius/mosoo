@@ -4,6 +4,8 @@
 
 > **UI status (2026-06-10)**: the user-facing labels in the Agent editor and the kind-fork dialog are **Assistant Agent** (kind = `pet`) and **Task Agent** (kind = `cattle`); the on-screen control is now a single-row segmented switch tab with hover tooltips, not the previous "two stacked cards / either-or toggle." The engineering-contract kind keys (`pet` / `cattle`) and the doc / API language below are unchanged. When this PRD says "Pet" or "Cattle," that is the contract term — the UI shows it as "Assistant Agent" / "Task Agent."
 
+> **UI status (2026-06-10, creation flow)**: the `+ New agent` primary CTA no longer opens the previous **Name + Description + Runtime profile** create dialog. It now opens a launcher (`create-agent-launcher.tsx`) that takes a free-text first-message (plus a templates row and a `Start from blank` link), derives the default runtime from the workspace's configured vendor credentials (`runtime-default.ts`), silently creates an `Untitled agent` draft via the existing `createAgent` mutation, and auto-sends the stashed first message to Agent Builder once the submit gate opens. The Configure-page kind selector (Pet/Cattle), the kind lock at first Publish, and the Fork-for-kind-switch path described in the user journey below are unchanged; only the upstream "fill in Name / Description / Runtime profile" framing is stale.
+
 ---
 
 ## In one sentence

@@ -1,5 +1,7 @@
 # Agent File Browser — for humans
 
+> ⚠️ **DEPRECATED — DO NOT IMPLEMENT.** The Agent File Browser surface was removed from the product on 2026-06-10, which deleted the GraphQL field, the `GET /agent/:agentId/file` HTTP route, the `agent-file-browser-*` API services, the web `file-browser-*` components, and the supporting tests. The same release dropped File Browser from the roadmap's `Agent page operations / runtime diagnostics` line. The current Pet debug menu only carries `terminal` (see `apps/web/src/routes/agent/agent-debug-menu-policy.ts`). This document is retained only for history; do not treat the shape described below as the shipping product.
+
 > This is the product-story version aimed at non-engineer readers. For the full engineering contract, see the Agent File Browser PRD.
 
 ---

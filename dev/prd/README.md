@@ -27,9 +27,9 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 - [Session Lifecycle](./session-lifecycle.md)
 - [Session Files](./session-files.md)
 - [Session Log](./session-log.md)
-- [Agent Runtime Logs](./agent-runtime-logs.md)
+- [Agent Runtime Logs](./agent-runtime-logs.md) — **deprecated** (Debug → System Log surface removed; dropped from the roadmap)
 - [Agent Terminal](./agent-terminal.md)
-- [Agent File Browser](./agent-file-browser.md)
+- [Agent File Browser](./agent-file-browser.md) — **deprecated** (File Browser surface removed; dropped from the roadmap)
 
 ### Surfaces & channels
 
