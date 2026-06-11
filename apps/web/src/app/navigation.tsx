@@ -34,7 +34,6 @@ const NAV_SECTIONS: AppNavSection[] = [
     ],
   },
   {
-    label: "Configure",
     items: [
       {
         children: [
