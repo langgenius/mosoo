@@ -1,4 +1,5 @@
 import type { EnvironmentId, McpServerId, SkillId, SpaceId } from "../id/id.contract";
+import type { JsonObject } from "../validation/primitives.contract";
 import type { AgentKind, AgentStatus, RuntimeStateApplyActionKind } from "./agent.contract";
 import { agentKindPreservesRuntimeState } from "./agent.contract";
 
@@ -18,6 +19,7 @@ export interface AgentConfigChangeSnapshot {
   name: string;
   prompt: string;
   provider: string;
+  providerOptions: JsonObject;
   runtimeId: string;
   skills: readonly AgentConfigChangeSkill[];
   spaceIds: readonly SpaceId[];
@@ -133,6 +135,12 @@ export function classifyAgentConfigChanges(input: {
     action: "patch-and-restart",
     changed: input.current.provider !== input.saved.provider,
     label: "Provider",
+    rank: 2,
+  });
+  pushIfChanged(fieldPlans, {
+    action: "patch-and-restart",
+    changed: changed(input.current.providerOptions, input.saved.providerOptions),
+    label: "Advanced settings",
     rank: 2,
   });
   pushIfChanged(fieldPlans, {

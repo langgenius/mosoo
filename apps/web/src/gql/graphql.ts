@@ -3,7 +3,7 @@
 type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
 /** Internal type. DO NOT USE DIRECTLY. */
 export type Incremental<T> = T | { [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never };
-import type { PrimitiveRecord } from '@mosoo/contracts';
+import type { JsonObject, PrimitiveRecord } from '@mosoo/contracts';
 import type { PlatformId } from '@mosoo/id';
 import type { DocumentTypeDecoration } from '@graphql-typed-document-node/core';
 export type AcceptOrganizationInvitationInput = {
@@ -846,6 +846,7 @@ export type UpdateAgentConfigInput = {
   name: string;
   prompt: string;
   provider: string;
+  providerOptions: JsonObject;
   runtimeId: string;
   skillIds: Array<PlatformId>;
 };
@@ -1085,7 +1086,7 @@ export type AgentEditorStateQueryVariables = Exact<{
 }>;
 
 
-export type AgentEditorStateQuery = { agentEditorState: { id: PlatformId, builder: { componentDecisions: { agentType: AgentBuilderAgentTypeDecision | null, environment: AgentBuilderComponentDecision | null } }, environment: { boundSpaceIds: Array<PlatformId>, environmentId: PlatformId | null }, packageResolution: { recordedAt: string, source: AgentPackageResolutionSource, report: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, boundSpaceCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } | null, collaborators: Array<{ principal: string, role: AgentCollaboratorRole, name: string | null, email: string | null, imageUrl: string | null }>, mcpBindings: Array<{ authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialMode: AgentMcpCredentialMode, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, credentialSubject: string | null, enabled: boolean, hasSharedCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, serverId: PlatformId, source: McpServerSource, updatedAt: string, url: string }>, readiness: { checkedAt: string, ready: boolean, issues: Array<{ code: string, message: string, severity: AgentReadinessSeverity }> } } };
+export type AgentEditorStateQuery = { agentEditorState: { id: PlatformId, providerOptions: JsonObject, builder: { componentDecisions: { agentType: AgentBuilderAgentTypeDecision | null, environment: AgentBuilderComponentDecision | null } }, environment: { boundSpaceIds: Array<PlatformId>, environmentId: PlatformId | null }, packageResolution: { recordedAt: string, source: AgentPackageResolutionSource, report: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, boundSpaceCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } | null, collaborators: Array<{ principal: string, role: AgentCollaboratorRole, name: string | null, email: string | null, imageUrl: string | null }>, mcpBindings: Array<{ authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialMode: AgentMcpCredentialMode, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, credentialSubject: string | null, enabled: boolean, hasSharedCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, serverId: PlatformId, source: McpServerSource, updatedAt: string, url: string }>, readiness: { checkedAt: string, ready: boolean, issues: Array<{ code: string, message: string, severity: AgentReadinessSeverity }> } } };
 
 export type UpdateAgentConfigMutationVariables = Exact<{
   input: UpdateAgentConfigInput;
@@ -2923,6 +2924,7 @@ export const AgentEditorStateDocument = new TypedDocumentString(`
         }
       }
     }
+    providerOptions
     collaborators {
       principal
       role

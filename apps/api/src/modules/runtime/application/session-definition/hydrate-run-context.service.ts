@@ -322,6 +322,7 @@ async function hydrateRunContextFromSession(
       model: binding.model,
       prompt: binding.prompt,
       provider: binding.provider,
+      providerOptions: storedConfig.providerOptions,
       readiness: agentReadiness,
       runtimeId,
       sandboxId: runtimeProfileIds.sandboxId,
@@ -388,11 +389,13 @@ async function refreshCachedRunContextVolatileFields(
     throw new Error(`Unsupported runtime: ${binding.runtimeId}.`);
   }
 
-  const agent = await ensureAgentAccess(
-    bindings.DB,
-    session.accessViewer?.id ?? viewer.id,
-    binding.agentId,
-  );
+  const [agent, deploymentVersion] = await Promise.all([
+    ensureAgentAccess(bindings.DB, session.accessViewer?.id ?? viewer.id, binding.agentId),
+    isTruthy(binding.deploymentVersionId)
+      ? getAgentDeploymentVersionRecord(bindings.DB, binding.deploymentVersionId)
+      : Promise.resolve(null),
+  ]);
+  const storedConfig = parseAgentStoredConfig(deploymentVersion?.configJson ?? agent.configJson);
   const catalogEntry = getRuntimeCatalogEntry(runtimeId);
 
   if (catalogEntry === null) {
@@ -482,6 +485,7 @@ async function refreshCachedRunContextVolatileFields(
     model: binding.model,
     prompt: binding.prompt,
     provider: binding.provider,
+    providerOptions: storedConfig.providerOptions,
     readiness: cached.profile.readiness,
     runtimeId,
     sandboxId: runtimeProfileIds.sandboxId,

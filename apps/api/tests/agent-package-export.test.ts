@@ -50,6 +50,7 @@ function createSourceManifest(): AgentManifest {
       id: "openai-runtime",
       model: "gpt-5.4",
       provider: "openai",
+      providerOptions: {},
     },
     skills: [
       {

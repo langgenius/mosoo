@@ -1,3 +1,4 @@
+import type { JsonObject, JsonValue } from "@mosoo/contracts";
 import type {
   AgentBuilderAgentTypeDecision,
   AgentBuilderComponentDecision,
@@ -28,6 +29,7 @@ export interface AgentEditorDraft {
   name: string;
   prompt: string;
   provider: string;
+  providerOptions: JsonObject;
   runtime: RuntimeId;
   skills: SkillInfo[];
   spaces: SpaceBinding[];
@@ -44,6 +46,7 @@ export function createInitialDraft(agent: Agent): AgentEditorDraft {
     name: agent.name,
     prompt: agent.config.prompt,
     provider: agent.provider || getRuntimeInfo(agent.runtime).provider,
+    providerOptions: agent.config.providerOptions,
     runtime: agent.runtime,
     skills: [...agent.config.skills],
     spaces: [...agent.config.spaces],
@@ -77,6 +80,7 @@ export function toAgentConfigChangeSnapshot(draft: AgentEditorDraft): AgentConfi
     name: draft.name,
     prompt: draft.prompt,
     provider: draft.provider,
+    providerOptions: draft.providerOptions,
     runtimeId: draft.runtime,
     skills: draft.skills.map((skill) => ({
       id: toSkillId(skill.id),
@@ -143,6 +147,7 @@ interface AgentDraftYamlShape {
     id: RuntimeId;
     model: string;
     provider: string;
+    providerOptions: JsonObject;
   };
   version: 1;
 }
@@ -178,6 +183,7 @@ function toDraftYamlShape(draft: AgentEditorDraft): AgentDraftYamlShape {
       id: draft.runtime,
       model: draft.model,
       provider: draft.provider,
+      providerOptions: draft.providerOptions,
     },
     version: 1,
   };
@@ -235,6 +241,7 @@ export function parseDraftYaml(yaml: string, fallback: AgentEditorDraft): AgentE
     name: readString(identity["name"], fallback.name),
     prompt: readString(root["prompt"], fallback.prompt),
     provider: readString(runtime["provider"], fallback.provider),
+    providerOptions: readJsonObject(runtime["providerOptions"], fallback.providerOptions),
     runtime: readString(runtime["id"], fallback.runtime),
     skills: readSkills(assets["skills"], fallback.skills),
     spaces: readSpaces(assets["spaces"], fallback.spaces),
@@ -245,6 +252,49 @@ function asRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+function cloneJsonValue(value: JsonValue): JsonValue {
+  if (Array.isArray(value)) {
+    return value.map(cloneJsonValue);
+  }
+
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, cloneJsonValue(entry)]),
+    );
+  }
+
+  return value;
+}
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    (typeof value === "number" && Number.isFinite(value))
+  ) {
+    return true;
+  }
+
+  if (Array.isArray(value)) {
+    return value.every(isJsonValue);
+  }
+
+  if (typeof value === "object" && value !== null) {
+    return Object.values(value).every(isJsonValue);
+  }
+
+  return false;
+}
+
+function readJsonObject(value: unknown, fallback: JsonObject): JsonObject {
+  if (typeof value !== "object" || value === null || Array.isArray(value) || !isJsonValue(value)) {
+    return fallback;
+  }
+
+  return cloneJsonValue(value) as JsonObject;
 }
 
 function readString(value: unknown, fallback: string): string {

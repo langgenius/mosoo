@@ -1,3 +1,4 @@
+import { parseJsonObject } from "../validation/primitives.contract";
 import {
   hasRequiredText,
   isRecord,
@@ -5,6 +6,7 @@ import {
   readBooleanOrDefault,
   readNullableString,
   readParsedArray,
+  readJsonObjectField,
   readRecordField,
   readString,
 } from "./agent-manifest-parser-internals.contract";
@@ -75,6 +77,10 @@ export function buildPackageManifest(input: Record<string, unknown>): AgentManif
       id: runtime,
       model,
       provider,
+      providerOptions: parseJsonObject(
+        readJsonObjectField(input["providerOptions"], "providerOptions"),
+        "Agent package providerOptions",
+      ),
     },
     skills: readParsedArray(input, "skills", readPackageSkill),
     spaces: readParsedArray(input, "spaceBindings", readPackageSpaceBinding),

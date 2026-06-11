@@ -125,6 +125,12 @@ describe("contracts owner boundaries", () => {
         id: "openai-runtime",
         model: "gpt-5",
         provider: "openai",
+        providerOptions: {
+          features: {
+            web_search: true,
+          },
+          reasoning_effort: "high",
+        },
       },
     });
 
@@ -133,6 +139,12 @@ describe("contracts owner boundaries", () => {
       id: "openai-runtime",
       model: "gpt-5",
       provider: "openai",
+      providerOptions: {
+        features: {
+          web_search: true,
+        },
+        reasoning_effort: "high",
+      },
     });
   });
 

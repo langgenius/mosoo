@@ -98,6 +98,18 @@ export function readStringRecord(value: unknown): Record<string, string> {
   return result;
 }
 
+export function readJsonObjectField(value: unknown, label: string): Record<string, unknown> {
+  if (value === null || value === undefined) {
+    return {};
+  }
+
+  if (!isRecord(value)) {
+    throw new Error(`Agent Manifest ${label} must be a JSON object.`);
+  }
+
+  return value;
+}
+
 export function readParsedArray<T>(
   record: Record<string, unknown>,
   key: string,

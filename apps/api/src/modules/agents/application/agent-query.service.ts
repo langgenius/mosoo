@@ -53,6 +53,7 @@ export async function getAgentEditorState(
     id: editable.agent.id,
     mcpBindings: await listAgentMcpBindings(database, viewer, editable.agent.id),
     packageResolution: storedConfig.packageResolution,
+    providerOptions: storedConfig.providerOptions,
     readiness: await computeAgentReadiness(database, editable.agent.ownerId, {
       agentId: editable.agent.id,
       environment,

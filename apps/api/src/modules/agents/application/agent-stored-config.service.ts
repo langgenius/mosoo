@@ -12,6 +12,8 @@ import type {
   AgentResolutionStatus,
   AgentResolutionTargetType,
 } from "@mosoo/contracts/agent-manifest";
+import { parseJsonObject } from "@mosoo/contracts/validation";
+import type { JsonObject } from "@mosoo/contracts/validation";
 import type { SkillId, SkillSnapshotId } from "@mosoo/id";
 
 import { isTruthy } from "../../../shared/truthiness";
@@ -23,6 +25,7 @@ interface StoredAgentConfig {
   packageSkills: AgentStoredPackageSkill[];
   packageSharingEnabled: boolean;
   packageResolution: AgentPackageResolutionState | null;
+  providerOptions: JsonObject;
 }
 
 export interface AgentStoredPackageSkill {
@@ -234,6 +237,7 @@ function createEmptyStoredAgentConfig(): StoredAgentConfig {
     packageSkills: [],
     packageResolution: null,
     packageSharingEnabled: false,
+    providerOptions: {},
   };
 }
 
@@ -375,6 +379,10 @@ export function parseAgentStoredConfig(configJson: string): StoredAgentConfig {
     packageSkills: readPackageSkills(parsed["packageSkills"]),
     packageResolution: readPackageResolutionState(parsed["packageResolution"]),
     packageSharingEnabled: readBoolean(parsed["packageSharingEnabled"], "packageSharingEnabled"),
+    providerOptions:
+      parsed["providerOptions"] === undefined
+        ? {}
+        : parseJsonObject(parsed["providerOptions"], "Agent stored config providerOptions"),
   };
 }
 
@@ -400,6 +408,7 @@ export function serializeAgentStoredConfig(input: StoredAgentConfig): string {
     })),
     packageResolution: input.packageResolution,
     packageSharingEnabled: input.packageSharingEnabled,
+    providerOptions: parseJsonObject(input.providerOptions, "Agent stored config providerOptions"),
   });
 }
 

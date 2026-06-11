@@ -17,6 +17,7 @@ import { vendorCredentialGraphQLModule } from "../../modules/vendor-credentials/
 import type { GraphQLContext } from "./graphql-context";
 import { composeGraphQLModules } from "./graphql-module";
 import { commonGraphQLModule } from "./modules/common-graphql";
+import { jsonObjectScalar } from "./scalars/json-object-scalar";
 import { primitiveRecordScalar } from "./scalars/primitive-record-scalar";
 import { ulidScalar } from "./scalars/ulid-scalar";
 
@@ -53,6 +54,7 @@ export function createGraphQLSchema() {
   return createSchema<GraphQLContext>({
     resolvers: {
       Mutation: composedGraphQLModules.mutationResolvers,
+      JsonObject: jsonObjectScalar,
       PrimitiveRecord: primitiveRecordScalar,
       Query: composedGraphQLModules.queryResolvers,
       SessionProcessEventType: SESSION_PROCESS_EVENT_TYPE_BY_CODE,

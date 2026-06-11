@@ -147,6 +147,7 @@ describe("agent package draft", () => {
       packageSkills: [],
       prompt: "Help",
       provider: "openai",
+      providerOptions: {},
       runtimeId: "openai-runtime",
       skillIds: [DRAFT_IDS.skill, DRAFT_IDS.skill],
       spaceIds: [DRAFT_IDS.space],
@@ -182,6 +183,7 @@ describe("agent package draft", () => {
       packageResolution: null,
       packageSharingEnabled: false,
       packageSkills: [],
+      providerOptions: {},
     });
   });
 
@@ -202,6 +204,7 @@ describe("agent package draft", () => {
         packageSkills: [],
         prompt: "Help",
         provider: "openai",
+        providerOptions: {},
         runtimeId: "openai-runtime",
         skillIds: ["package:docs" as SkillId],
         spaceIds: [],
@@ -240,6 +243,7 @@ describe("agent package draft", () => {
         id: "openai-runtime",
         model: "gpt-5.4",
         provider: "openai",
+        providerOptions: {},
       },
       skills: [
         {

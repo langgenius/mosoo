@@ -1,3 +1,4 @@
+import type { JsonObject } from "@mosoo/contracts";
 import type { AgentConfigBuilderMetadata, AgentEnvironmentConfig } from "@mosoo/contracts/agent";
 import { agentSpaceBindingsTable, agentsTable } from "@mosoo/db";
 import type { AgentId, EnvironmentId, SpaceId } from "@mosoo/id";
@@ -45,6 +46,7 @@ export function prepareAgentEnvironmentConfigWrite(input: {
   builder?: AgentConfigBuilderMetadata;
   currentConfigJson: string;
   environment: AgentEnvironmentConfig;
+  providerOptions?: JsonObject;
   updatedAt: number;
 }): PreparedAgentEnvironmentConfigWrite {
   const normalizedSpaceIds = [...new Set(input.environment.boundSpaceIds)];
@@ -55,6 +57,7 @@ export function prepareAgentEnvironmentConfigWrite(input: {
     packageSkills: stored.packageSkills,
     packageResolution: stored.packageResolution,
     packageSharingEnabled: stored.packageSharingEnabled,
+    providerOptions: input.providerOptions ?? stored.providerOptions,
   });
 
   return {

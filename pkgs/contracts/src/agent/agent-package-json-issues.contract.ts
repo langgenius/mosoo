@@ -25,6 +25,7 @@ const PACKAGE_MANIFEST_TOP_LEVEL_FIELDS = new Set([
   "packageVersion",
   "prompts",
   "provider",
+  "providerOptions",
   "runtime",
   "skills",
   "sourceAgentId",

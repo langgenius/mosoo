@@ -29,6 +29,12 @@ function draft(): AgentEditorDraft {
     name: "Release Review Agent",
     prompt: "Lead with blockers, then recommended fixes.",
     provider: "openai",
+    providerOptions: {
+      features: {
+        web_search: true,
+      },
+      reasoning_effort: "high",
+    },
     runtime: "openai-runtime",
     skills: [
       {
@@ -48,6 +54,8 @@ describe("agent draft YAML codec", () => {
     const parsed = parseDraftYaml(yaml, current);
 
     expect(parsed).toEqual(current);
+    expect(yaml).toContain("providerOptions:");
+    expect(yaml).toContain("reasoning_effort: high");
     expect(createDraftYamlHash(parsed)).toBe(createDraftYamlHash(current));
     expect(createSnapshotHash(parsed)).toBe(createSnapshotHash(current));
   });

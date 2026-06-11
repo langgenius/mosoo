@@ -1,3 +1,4 @@
+import type { JsonObject } from "@mosoo/contracts";
 import type { AgentEnvironmentConfig } from "@mosoo/contracts/agent";
 import { classifyAgentConfigChanges } from "@mosoo/contracts/agent-config-change-plan";
 import type {
@@ -95,7 +96,7 @@ export function createAgentConfigChangeSnapshot(input: {
   agent: Pick<
     AgentRow,
     "description" | "kind" | "model" | "name" | "prompt" | "provider" | "runtimeId"
-  >;
+  > & { providerOptions: JsonObject };
   environment: AgentEnvironmentConfig;
   mcpServerIds: readonly McpServerId[];
   skillIds: readonly SkillId[];
@@ -109,6 +110,7 @@ export function createAgentConfigChangeSnapshot(input: {
     name: input.agent.name,
     prompt: input.agent.prompt,
     provider: input.agent.provider,
+    providerOptions: input.agent.providerOptions,
     runtimeId: input.agent.runtimeId,
     skills: input.skillIds.map((id) => ({ id, state: "active" as const })),
     spaceIds: input.environment.boundSpaceIds,

@@ -108,6 +108,7 @@ export async function importAgentPackage(
     packageSkills: skillResolution.packageSkills,
     prompt: manifest.prompts.system,
     provider: manifest.runtime.provider,
+    providerOptions: manifest.runtime.providerOptions,
     runtimeId: manifest.runtime.id,
     skillIds: skillResolution.skillIds,
     spaceIds,

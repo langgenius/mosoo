@@ -1,3 +1,4 @@
+import type { JsonObject } from "@mosoo/contracts";
 import type {
   AgentDeploymentVersion,
   AgentKind,
@@ -78,6 +79,7 @@ export interface AgentConfig {
   mcpServers: McpServer[];
   model: string;
   prompt: string;
+  providerOptions: JsonObject;
   skills: SkillInfo[];
   spaces: SpaceBinding[];
 }

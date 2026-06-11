@@ -1,4 +1,5 @@
 import type { AgentId, FileId, OrganizationId } from "../id/id.contract";
+import type { JsonObject } from "../validation/primitives.contract";
 import { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION } from "./agent-manifest-version.contract";
 import type { AgentKind } from "./agent.contract";
 
@@ -106,6 +107,7 @@ export interface AgentManifest {
     id: string;
     model: string;
     provider: string;
+    providerOptions: JsonObject;
   };
   skills: AgentManifestSkillReference[];
   spaces: AgentManifestSpaceBinding[];

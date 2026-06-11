@@ -11,6 +11,7 @@ import type {
   SpaceId,
 } from "../id/id.contract";
 import type { AgentMcpBinding } from "../mcp/mcp.contract";
+import type { JsonObject } from "../validation/primitives.contract";
 import type { AgentPackageResolutionState } from "./agent-manifest.contract";
 
 export const AGENT_KIND_VALUES = ["pet", "cattle"] as const;
@@ -339,6 +340,7 @@ export interface AgentEditorState {
   id: AgentId;
   packageResolution: AgentPackageResolutionState | null;
   mcpBindings: AgentMcpBinding[];
+  providerOptions: JsonObject;
   readiness: AgentReadiness;
 }
 
@@ -378,6 +380,7 @@ export interface UpdateAgentConfigInput {
   name: string;
   prompt: string;
   provider: string;
+  providerOptions: JsonObject;
   runtimeId: string;
   skillIds: SkillId[];
 }

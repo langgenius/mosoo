@@ -276,6 +276,7 @@ describe("agent access", () => {
       packageResolution: null,
       packageSharingEnabled: false,
       packageSkills: [],
+      providerOptions: {},
     });
   });
 });

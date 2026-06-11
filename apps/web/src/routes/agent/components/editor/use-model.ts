@@ -1,3 +1,4 @@
+import type { JsonObject } from "@mosoo/contracts";
 import { classifyAgentConfigChanges } from "@mosoo/contracts/agent-config-change-plan";
 import type { AgentConfigChangePlan } from "@mosoo/contracts/agent-config-change-plan";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -79,6 +80,7 @@ export interface AgentEditorModel {
   setModelSelection(selection: { model: string; provider: string }): void;
   setName(name: string): void;
   setPrompt(prompt: string): void;
+  setProviderOptions(providerOptions: JsonObject): void;
   setRuntime(runtime: RuntimeId): void;
   setSkills(skills: SkillInfo[]): void;
   setSpaces(spaces: SpaceBinding[]): void;
@@ -253,6 +255,7 @@ export function useAgentEditorModel({
         name,
         prompt: draftToSave.prompt,
         provider,
+        providerOptions: draftToSave.providerOptions,
         runtimeId: draftToSave.runtime,
         skillIds: draftToSave.skills.flatMap((skill) =>
           skill.state === "tombstone" ? [] : [toSkillId(skill.id)],
@@ -421,6 +424,12 @@ export function useAgentEditorModel({
       updateDraft((current) => ({
         ...current,
         prompt,
+      }));
+    },
+    setProviderOptions(providerOptions) {
+      updateDraft((current) => ({
+        ...current,
+        providerOptions,
       }));
     },
     setRuntime(runtime) {

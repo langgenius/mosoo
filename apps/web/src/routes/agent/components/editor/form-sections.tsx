@@ -1,4 +1,6 @@
-import { AlertTriangle } from "lucide-react";
+import type { JsonObject } from "@mosoo/contracts";
+import { AlertTriangle, ChevronDown } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { getPrimaryProviderReadinessPresentation } from "@/domains/vendor-credential/model/provider-readiness-copy";
 import { cn } from "@/shared/lib/class-names";
@@ -18,6 +20,120 @@ import { SectionHeader } from "./section-header";
 import { AgentSkillsField } from "./skills-field";
 import { AgentSpacesField } from "./spaces-field";
 import type { AgentEditorModel } from "./use-model";
+
+function formatProviderOptions(value: JsonObject): string {
+  return JSON.stringify(value, null, 2);
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function parseProviderOptionsJson(text: string): JsonObject {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) {
+    return {};
+  }
+
+  const parsed: unknown = JSON.parse(trimmed);
+  if (!isJsonObject(parsed)) {
+    throw new Error("Advanced settings must be a JSON object.");
+  }
+
+  return parsed;
+}
+
+function AdvancedProviderOptionsField({
+  model,
+  readOnly,
+}: {
+  model: AgentEditorModel;
+  readOnly: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [text, setText] = useState(() => formatProviderOptions(model.draft.providerOptions));
+  const [error, setError] = useState<string | null>(null);
+  const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
+  const serializedProviderOptions = formatProviderOptions(model.draft.providerOptions);
+
+  useEffect(() => {
+    if (document.activeElement === textAreaRef.current) {
+      return;
+    }
+
+    setText(serializedProviderOptions);
+    setError(null);
+  }, [serializedProviderOptions]);
+
+  function commitProviderOptions(nextText: string): void {
+    try {
+      const providerOptions = parseProviderOptionsJson(nextText);
+      model.setProviderOptions(providerOptions);
+      setText(formatProviderOptions(providerOptions));
+      setError(null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Advanced settings JSON is invalid.");
+    }
+  }
+
+  return (
+    <div className="border-border-subtle rounded-lg border bg-white">
+      <button
+        aria-expanded={expanded}
+        className="focus-visible:ring-brand-ring flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left focus-visible:ring-2 focus-visible:outline-none"
+        onClick={() => {
+          setExpanded((current) => !current);
+        }}
+        type="button"
+      >
+        <span className="min-w-0">
+          <span className="text-foreground block text-[13px] font-medium">
+            Advanced settings (JSON, applied to runtime config)
+          </span>
+          <span className="text-muted-foreground block text-[11px]">
+            Validated by the runtime, not by Mosoo
+          </span>
+        </span>
+        <ChevronDown
+          className={cn("text-muted-foreground size-4 shrink-0 transition-transform", {
+            "rotate-180": expanded,
+          })}
+        />
+      </button>
+
+      {expanded ? (
+        <div className="border-border-subtle border-t px-3 pt-2 pb-3">
+          <textarea
+            aria-invalid={error !== null}
+            aria-label="Advanced settings JSON"
+            className={cn(
+              "border-border focus:ring-brand-ring min-h-[160px] w-full resize-y rounded-lg border bg-white px-3 py-2 font-mono text-[12px] leading-relaxed outline-none focus:ring-2",
+              error !== null ? "border-red-300 focus:ring-red-200" : null,
+            )}
+            onBlur={() => {
+              commitProviderOptions(text);
+            }}
+            onChange={(event) => {
+              setText(event.target.value);
+              if (error !== null) {
+                setError(null);
+              }
+            }}
+            readOnly={readOnly}
+            ref={textAreaRef}
+            spellCheck={false}
+            value={text}
+          />
+          {error !== null ? (
+            <div className="mt-2 text-[12px] leading-relaxed text-red-600" role="alert">
+              {error}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function ReadinessBanner({ agent }: { agent: Agent }) {
   if (!agent.readiness || agent.readiness.ready || agent.readiness.issues.length === 0) {
@@ -224,6 +340,7 @@ export function BasicsSection({
           </div>
 
           <ModelPickerField model={model} readOnly={readOnly} />
+          <AdvancedProviderOptionsField model={model} readOnly={readOnly} />
         </div>
       </div>
 

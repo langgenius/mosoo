@@ -60,6 +60,7 @@ export function createDriverProfile(): DriverProfileConfig {
     model: "gpt-5.1",
     prompt: "You are a helpful runtime.",
     provider: "openai",
+    providerOptions: {},
     readiness: {
       checkedAt: "2026-05-19T00:00:00.000Z",
       issues: [],

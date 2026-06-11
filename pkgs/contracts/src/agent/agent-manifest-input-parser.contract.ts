@@ -1,3 +1,4 @@
+import { parseJsonObject } from "../validation/primitives.contract";
 import {
   collectUnknownTopLevelFields,
   createValidationIssue,
@@ -5,6 +6,7 @@ import {
   hasRequiredText,
   isRecord,
   readAgentKind,
+  readJsonObjectField,
   readMcpServerBinding,
   readNullableString,
   readParsedArray,
@@ -238,6 +240,10 @@ function buildAgentManifest(
       id: sections.runtimeId,
       model: sections.model,
       provider: sections.provider,
+      providerOptions: parseJsonObject(
+        readJsonObjectField(sections.runtime["providerOptions"], "runtime.providerOptions"),
+        "Agent Manifest runtime.providerOptions",
+      ),
     },
     skills: readParsedArray(input, "skills", readSkillReference),
     spaces: readParsedArray(input, "spaces", readSpaceBinding),

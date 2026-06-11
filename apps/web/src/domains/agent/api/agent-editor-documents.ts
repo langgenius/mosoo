@@ -38,6 +38,7 @@ export const GET_AGENT_EDITOR_STATE_QUERY = graphql(/* GraphQL */ `
           }
         }
       }
+      providerOptions
       collaborators {
         principal
         role

@@ -1,3 +1,4 @@
+import type { JsonObject, JsonPrimitive, JsonValue } from "../validation/primitives.contract";
 import type { AgentManifest, AgentPackage } from "./agent-manifest.contract";
 
 function yamlString(value: string | null): string {
@@ -6,6 +7,22 @@ function yamlString(value: string | null): string {
   }
 
   return JSON.stringify(value);
+}
+
+function yamlJsonScalar(value: JsonPrimitive): string {
+  if (typeof value === "string" || value === null) {
+    return yamlString(value);
+  }
+
+  return String(value);
+}
+
+function yamlKey(value: string): string {
+  return /^[a-zA-Z0-9_-]+$/.test(value) ? value : JSON.stringify(value);
+}
+
+function isJsonObject(value: JsonValue): value is JsonObject {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function appendStringRecordYaml(lines: string[], record: Record<string, string>, indent: string) {
@@ -18,6 +35,45 @@ function appendStringRecordYaml(lines: string[], record: Record<string, string>,
 
   for (const [key, value] of entries) {
     lines.push(`${indent}${key}: ${yamlString(value)}`);
+  }
+}
+
+function appendJsonYaml(lines: string[], value: JsonValue, indent: string): void {
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      lines.push(`${indent}[]`);
+      return;
+    }
+
+    for (const entry of value) {
+      if (isJsonObject(entry) || Array.isArray(entry)) {
+        lines.push(`${indent}-`);
+        appendJsonYaml(lines, entry, `${indent}  `);
+      } else {
+        lines.push(`${indent}- ${yamlJsonScalar(entry)}`);
+      }
+    }
+    return;
+  }
+
+  if (!isJsonObject(value)) {
+    lines.push(`${indent}${yamlJsonScalar(value)}`);
+    return;
+  }
+
+  const entries = Object.entries(value);
+  if (entries.length === 0) {
+    lines.push(`${indent}{}`);
+    return;
+  }
+
+  for (const [key, entry] of entries) {
+    if (isJsonObject(entry) || Array.isArray(entry)) {
+      lines.push(`${indent}${yamlKey(key)}:`);
+      appendJsonYaml(lines, entry, `${indent}  `);
+    } else {
+      lines.push(`${indent}${yamlKey(key)}: ${yamlJsonScalar(entry)}`);
+    }
   }
 }
 
@@ -36,9 +92,13 @@ export function serializeAgentManifestToYaml(
     `  id: ${yamlString(manifest.runtime.id)}`,
     `  provider: ${yamlString(manifest.runtime.provider)}`,
     `  model: ${yamlString(manifest.runtime.model)}`,
-    "prompts:",
-    "  system: |",
+    "  providerOptions:",
   ];
+
+  appendJsonYaml(lines, manifest.runtime.providerOptions, "    ");
+
+  lines.push("prompts:");
+  lines.push("  system: |");
 
   const promptLines = manifest.prompts.system.split("\n");
   for (const promptLine of promptLines.length > 0 ? promptLines : [""]) {
@@ -161,6 +221,7 @@ export function toAgentPackageManifestJson(agentPackage: AgentPackage): Record<s
     runtime: manifest.runtime.id,
     model: manifest.runtime.model,
     provider: manifest.runtime.provider,
+    providerOptions: manifest.runtime.providerOptions,
     prompts: manifest.prompts,
     avatar: agentPackage.app.avatarAssetKey,
     skills: manifest.skills.map((skill) => ({

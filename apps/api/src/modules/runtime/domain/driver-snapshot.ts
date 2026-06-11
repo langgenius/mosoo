@@ -1,3 +1,4 @@
+import type { JsonObject } from "@mosoo/contracts";
 import type { AgentKind, AgentReadiness } from "@mosoo/contracts/agent";
 import type {
   ActiveMcpAuthorizationState,
@@ -82,6 +83,7 @@ export interface DriverProfileConfig {
   readonly model: string;
   readonly prompt: string;
   readonly provider: string;
+  readonly providerOptions: JsonObject;
   readonly readiness: AgentReadiness;
   readonly runtimeId: DriverRuntime;
   readonly sandbox: DriverSandboxContext;
@@ -183,6 +185,7 @@ export interface DriverExecutionSpec {
   readonly model: string;
   readonly profilePrompt: string;
   readonly provider: string;
+  readonly providerOptions: JsonObject;
   readonly session: DriverExecutionSessionSpec;
   readonly skillCatalog: DriverSkillCatalogEntry[];
   readonly skills: DriverResolvedSkill[];

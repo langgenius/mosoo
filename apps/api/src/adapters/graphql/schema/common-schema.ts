@@ -3,6 +3,7 @@ import { SESSION_RUN_STATUSES, SESSION_RUN_TRIGGERS } from "@mosoo/contracts/ses
 import { graphQLEnumValues } from "./graphql-enum-values";
 
 export const commonSchema = /* GraphQL */ `
+  scalar JsonObject
   scalar PrimitiveRecord
   scalar ULID
 

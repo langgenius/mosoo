@@ -290,6 +290,7 @@ export const agentSchema = /* GraphQL */ `
     id: ULID!
     packageResolution: AgentPackageResolutionState
     mcpBindings: [AgentMcpBinding!]!
+    providerOptions: JsonObject!
     readiness: AgentReadiness!
   }
 
@@ -316,6 +317,7 @@ export const agentSchema = /* GraphQL */ `
     name: String!
     prompt: String!
     provider: String!
+    providerOptions: JsonObject!
     runtimeId: String!
     skillIds: [ULID!]!
   }

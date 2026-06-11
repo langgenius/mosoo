@@ -183,6 +183,7 @@ export async function buildExecutionSpec(
     model: input.profile.model,
     profilePrompt: input.profile.prompt,
     provider: input.profile.provider,
+    providerOptions: input.profile.providerOptions,
     session: {
       additionalDirectories: listAdditionalDirectories(input.profile, organizationPath),
       context: {

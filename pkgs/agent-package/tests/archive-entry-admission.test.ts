@@ -209,6 +209,7 @@ function createAgentPackageFixture(
         id: "claude-agent-sdk",
         model: "claude-sonnet-4-5",
         provider: "anthropic",
+        providerOptions: {},
       },
       skills: input.skills ?? [],
       spaces: [],

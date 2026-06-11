@@ -20,6 +20,7 @@ function draft(overrides: Partial<AgentEditorDraft> = {}): AgentEditorDraft {
     kind: "pet",
     prompt: "Help",
     provider: "openai",
+    providerOptions: {},
     runtime: "openai-runtime",
     skills: [],
     spaces: [],
@@ -96,6 +97,25 @@ describe("agent config change plan", () => {
     expect(plan.action).toBe("patch-and-restart");
     expect(plan.requiresDeploymentVersion).toBe(true);
     expect(plan.requiresRuntimeOperation).toBe(true);
+  });
+
+  test("classifies advanced provider option edits as patch-and-restart", () => {
+    const plan = classifyAgentConfigChanges({
+      agentStatus: "published",
+      current: toAgentConfigChangeSnapshot(
+        draft({
+          providerOptions: {
+            reasoning_effort: "high",
+          },
+        }),
+      ),
+      saved: toAgentConfigChangeSnapshot(draft()),
+    });
+
+    expect(plan.action).toBe("patch-and-restart");
+    expect(plan.requiresDeploymentVersion).toBe(true);
+    expect(plan.requiresRuntimeOperation).toBe(true);
+    expect(plan.fieldLabels).toEqual(["Advanced settings"]);
   });
 
   test("requires fork-agent for published runtime changes", () => {

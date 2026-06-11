@@ -44,7 +44,7 @@ import {
   listAgentSpecSkillsByIds,
   listAgentSpecSpacesByIds,
 } from "./agent-spec.service";
-import { serializeAgentStoredConfig } from "./agent-stored-config.service";
+import { parseAgentStoredConfig, serializeAgentStoredConfig } from "./agent-stored-config.service";
 import {
   evaluateAgentRuntimeSelection,
   ensureAgentOwnerCanReadBoundSpaces,
@@ -89,6 +89,7 @@ export async function createAgent(
         packageSkills: [],
         packageResolution: null,
         packageSharingEnabled: false,
+        providerOptions: {},
       }),
       createdAt: timestampMs,
       description: input.description ?? null,
@@ -136,6 +137,7 @@ export async function updateAgentConfig(
     editable.agent.environmentId,
   );
   const currentSkillIds = await listAgentSkillIds(database, editable.agent.id);
+  const currentStoredConfig = parseAgentStoredConfig(editable.agent.configJson);
   const currentMcpServerIds = (await listAgentMcpServerIds(database, editable.agent.id)).map(
     (serverId) => readMcpServerId(serverId),
   );
@@ -148,7 +150,10 @@ export async function updateAgentConfig(
   const changePlan = planVersionedAgentConfigChange({
     agentStatus: editable.agent.status,
     current: createAgentConfigChangeSnapshot({
-      agent: editable.agent,
+      agent: {
+        ...editable.agent,
+        providerOptions: currentStoredConfig.providerOptions,
+      },
       environment: currentEnvironment,
       mcpServerIds: currentMcpServerIds,
       skillIds: currentSkillIds,
@@ -162,6 +167,7 @@ export async function updateAgentConfig(
         name: input.name,
         prompt: input.prompt,
         provider: input.provider,
+        providerOptions: input.providerOptions,
         runtimeId,
       },
       environment: input.environment,
@@ -192,6 +198,7 @@ export async function updateAgentConfig(
     builder: input.builder,
     currentConfigJson: editable.agent.configJson,
     environment: input.environment,
+    providerOptions: input.providerOptions,
     updatedAt: timestampMs,
   });
   const nextAgent = {

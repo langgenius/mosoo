@@ -20,6 +20,7 @@ describe("agent stored config", () => {
     );
 
     expect(normalized.builder).toEqual({ componentDecisions: {} });
+    expect(normalized.providerOptions).toEqual({});
   });
 
   test("round-trips Builder component decisions", () => {
@@ -33,11 +34,25 @@ describe("agent stored config", () => {
       packageResolution: null,
       packageSharingEnabled: false,
       packageSkills: [],
+      providerOptions: {
+        model_providers: {
+          "openai-compatible": {
+            wire_api: "chat",
+          },
+        },
+      },
     });
 
     expect(parseAgentStoredConfig(configJson).builder.componentDecisions.environment).toBe(
       "skipped",
     );
+    expect(parseAgentStoredConfig(configJson).providerOptions).toEqual({
+      model_providers: {
+        "openai-compatible": {
+          wire_api: "chat",
+        },
+      },
+    });
   });
 
   test("normalizes Builder metadata while serializing stored config", () => {
@@ -52,6 +67,7 @@ describe("agent stored config", () => {
       packageResolution: null,
       packageSharingEnabled: false,
       packageSkills: [],
+      providerOptions: {},
     };
     const serialized = serializeAgentStoredConfig(staleConfig);
 

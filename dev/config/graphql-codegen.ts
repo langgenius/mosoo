@@ -13,6 +13,7 @@ const config: CodegenConfig = {
     documentMode: "string",
     enumsAsTypes: true,
     scalars: {
+      JsonObject: "@mosoo/contracts#JsonObject",
       PrimitiveRecord: "@mosoo/contracts#PrimitiveRecord",
       ULID: {
         input: "@mosoo/id#PlatformId",

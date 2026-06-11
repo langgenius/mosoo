@@ -12,8 +12,8 @@ import type { AgentEditorModel } from "./use-model";
 //   1. Basics       — name, description, runtime, model, system prompt
 //   2. Integrations — skills, MCP servers
 //   3. Environment  — environment, spaces
-// "Advanced Settings" was removed; runtime-specific options will return as
-// Section-scoped inputs once any runtime declares them.
+// Runtime-native JSON settings live under Basics next to model selection; keep
+// future runtime-specific typed fields section-scoped when they arrive.
 // One renderer for every surface (Draft Configure, Live Preview, Dev): a single
 // continuous scroll with dividers between sections, so the config pane looks
 // identical wherever it is mounted. The earlier "stacked vs tabbed" fork wrapped

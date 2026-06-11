@@ -1,3 +1,4 @@
+import type { JsonObject } from "@mosoo/contracts";
 import type { AgentEnvironmentConfig, AgentKind } from "@mosoo/contracts/agent";
 import type { AgentManifest, AgentManifestMcpServerBinding } from "@mosoo/contracts/agent-manifest";
 import { AGENT_MANIFEST_VERSION } from "@mosoo/contracts/agent-manifest";
@@ -98,6 +99,7 @@ export interface AgentSpec {
   name: string;
   prompt: string;
   provider: string;
+  providerOptions: JsonObject;
   runtimeId: string;
   skills: AgentSpecSkill[];
   spaces: AgentSpecSpaceBinding[];
@@ -353,6 +355,7 @@ function normalizeStoredConfigJson(input: { configJson: string }): string {
     packageSkills: stored.packageSkills,
     packageResolution: stored.packageResolution,
     packageSharingEnabled: stored.packageSharingEnabled,
+    providerOptions: stored.providerOptions,
   });
 }
 
@@ -430,6 +433,7 @@ function buildAgentSpecFromProfile(input: {
     name: input.agent.name,
     prompt: input.agent.prompt,
     provider: input.agent.provider,
+    providerOptions: input.storedConfig.providerOptions,
     runtimeId: input.agent.runtimeId,
     skills: allSkills,
     spaces: input.spaces,
@@ -491,6 +495,7 @@ export function toAgentManifest(spec: AgentSpec): AgentManifest {
       id: spec.runtimeId,
       model: spec.model,
       provider: spec.provider,
+      providerOptions: spec.providerOptions,
     },
     skills: spec.skills.map((skill) => ({
       ownerName: skill.ownerName,

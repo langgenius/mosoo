@@ -85,6 +85,7 @@ export function toAgentBuilderUpdateAgentConfigInput(
     name: manifest.name,
     prompt: manifest.prompt,
     provider: manifest.provider,
+    providerOptions: {},
     runtimeId: manifest.runtimeId,
     skillIds: manifest.activeSkillIds,
   };

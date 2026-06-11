@@ -1,3 +1,4 @@
+import type { JsonObject } from "@mosoo/contracts";
 import type { AgentKind, AgentReadiness } from "@mosoo/contracts/agent";
 import type {
   AccountId,
@@ -61,6 +62,7 @@ export function createAgentRuntimeProfile(input: {
   model: string;
   prompt: string;
   provider: string;
+  providerOptions: JsonObject;
   readiness: AgentReadiness;
   runtimeId: string;
   sandboxId: SandboxId;
@@ -95,6 +97,7 @@ export function createAgentRuntimeProfile(input: {
       model: input.model,
       prompt: input.prompt,
       provider: input.provider,
+      providerOptions: input.providerOptions,
       readiness: input.readiness,
       runtimeId,
       sandbox: {

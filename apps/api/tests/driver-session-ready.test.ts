@@ -54,6 +54,7 @@ const PROFILE: DriverProfileConfig = {
   model: "gpt-5.4",
   prompt: "Help.",
   provider: "openai",
+  providerOptions: {},
   readiness: {
     checkedAt: "2026-05-08T00:00:00.000Z",
     issues: [],

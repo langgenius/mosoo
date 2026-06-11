@@ -278,6 +278,7 @@ type AgentEditorState {
   id: ULID!
   mcpBindings: [AgentMcpBinding!]!
   packageResolution: AgentPackageResolutionState
+  providerOptions: JsonObject!
   readiness: AgentReadiness!
 }
 
@@ -1125,6 +1126,8 @@ input InviteOrganizationMemberInput {
   email: String!
   organizationId: ULID!
 }
+
+scalar JsonObject
 
 type LarkAgentChannelRegistration {
   appId: String
@@ -2190,6 +2193,7 @@ input UpdateAgentConfigInput {
   name: String!
   prompt: String!
   provider: String!
+  providerOptions: JsonObject!
   runtimeId: String!
   skillIds: [ULID!]!
 }

@@ -142,6 +142,7 @@ function createEmptyAgentConfig(): Agent["config"] {
     mcpServers: [],
     model: "",
     prompt: "",
+    providerOptions: {},
     skills: [],
     spaces: [],
   };
@@ -209,6 +210,7 @@ export function mapAgentDetailToView(
       mcpServers: editorDetail?.mcpBindings.map((binding) => toMcpServer(binding)) ?? [],
       model: profile.model,
       prompt: profile.prompt,
+      providerOptions: editorDetail?.providerOptions ?? {},
       skills: profile.skills.map((skill) => toSkillInfo(skill)),
       spaces: environmentConfig.boundSpaceIds.map((spaceId) => toSpaceBinding(spaceId)),
     },

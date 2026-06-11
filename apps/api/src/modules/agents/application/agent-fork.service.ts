@@ -93,6 +93,7 @@ export async function createAgentFork(
     packageSkills: sourceStoredConfig.packageSkills,
     prompt: sourceAgent.prompt,
     provider: sourceAgent.provider,
+    providerOptions: sourceStoredConfig.providerOptions,
     runtimeId: sourceAgent.runtimeId,
     skillIds: skillResolution.skillIds,
     spaceIds,

@@ -20,6 +20,7 @@ const agent = {
   name: "Agent",
   prompt: "Help",
   provider: "openai",
+  providerOptions: {},
   runtimeId: "openai-runtime",
 };
 
@@ -129,6 +130,36 @@ describe("agent versioned config plan", () => {
     expect(plan.requiresRuntimeOperation).toBe(true);
     expect(summarizeVersionedAgentConfigChange(plan)).toBe(
       "Patch native config + restart · MCP Servers",
+    );
+  });
+
+  test("classifies advanced provider option edits as patch-and-restart", () => {
+    const plan = planVersionedAgentConfigChange({
+      agentStatus: "published",
+      current: createAgentConfigChangeSnapshot({
+        agent,
+        environment,
+        mcpServerIds: [],
+        skillIds: [],
+      }),
+      next: createAgentConfigChangeSnapshot({
+        agent: {
+          ...agent,
+          providerOptions: {
+            reasoning_effort: "high",
+          },
+        },
+        environment,
+        mcpServerIds: [],
+        skillIds: [],
+      }),
+    });
+
+    expect(plan.action).toBe("patch-and-restart");
+    expect(plan.requiresDeploymentVersion).toBe(true);
+    expect(plan.requiresRuntimeOperation).toBe(true);
+    expect(summarizeVersionedAgentConfigChange(plan)).toBe(
+      "Patch native config + restart · Advanced settings",
     );
   });
 

@@ -1,3 +1,4 @@
+import type { JsonObject } from "@mosoo/contracts";
 import type { AgentKind } from "@mosoo/contracts/agent";
 import type {
   AgentManifestMcpServerBinding,
@@ -43,6 +44,7 @@ export interface CreateDraftAgentInput {
   packageSkills: AgentStoredPackageSkill[];
   prompt: string;
   provider: string;
+  providerOptions: JsonObject;
   runtimeId: string;
   skillIds: SkillId[];
   spaceIds: SpaceId[];
@@ -79,6 +81,7 @@ export async function createDraftAgentBatch(
         packageSkills: input.packageSkills,
         packageResolution: input.packageResolution,
         packageSharingEnabled: false,
+        providerOptions: input.providerOptions,
       }),
       createdAt: timestampMs,
       description: input.description,
