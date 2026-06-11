@@ -1,6 +1,6 @@
 import type { SessionSummary } from "@mosoo/contracts/session";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronRight, X } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import type { ComponentProps, ReactElement } from "react";
 import { useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -15,7 +15,7 @@ import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { ScrollArea } from "@/shared/ui/scroll-area";
-import { SessionEventFeed, getSessionEventCapabilitySummary } from "@/shared/ui/session-events";
+import { SessionEventFeed } from "@/shared/ui/session-events";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { SessionDiagnosticsPanel } from "./session-diagnostics-panel";
@@ -147,40 +147,6 @@ function getSessionTypeVariant(
 
 function unreachableCase(_value: never, message: string): never {
   throw new Error(message);
-}
-
-function SessionCapabilitySummary({ runtimeId }: { runtimeId: string }): ReactElement | null {
-  const capabilities = getSessionEventCapabilitySummary(runtimeId);
-
-  if (capabilities.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5">
-      <span className="text-muted-foreground text-[10.5px] font-semibold tracking-[0.1em] uppercase">
-        Capabilities
-      </span>
-      {capabilities.map((capability) => {
-        const supported = capability.status === "supported";
-
-        return (
-          <span
-            key={capability.id}
-            className={cn(
-              "inline-flex h-5 items-center gap-1 rounded-sm border px-1.5 text-[10.5px] font-semibold",
-              supported
-                ? "border-green-200 bg-green-50 text-green-800"
-                : "border-border bg-muted/50 text-fg-3",
-            )}
-          >
-            {supported ? <Check className="size-3" /> : <X className="size-3" />}
-            {capability.label}
-          </span>
-        );
-      })}
-    </div>
-  );
 }
 
 function SessionListRow({
@@ -351,7 +317,6 @@ function SessionDetailView({
                 </>
               ) : null}
             </div>
-            <SessionCapabilitySummary runtimeId={selected.runtimeId} />
           </div>
           <Badge variant={getSessionStatusVariant(selected.status)}>{selected.status}</Badge>
         </div>

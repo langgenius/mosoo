@@ -1,5 +1,3 @@
-export { getSessionEventCapabilitySummary } from "./capabilities";
-export type { SessionEventCapabilitySummary } from "./capabilities";
 export {
   SESSION_EVENT_DOMAIN_TONE,
   getSessionEventChipTone,
