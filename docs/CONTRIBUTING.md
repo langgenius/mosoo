@@ -1,7 +1,5 @@
 # Mosoo Contributing Guide
 
-Language: [Simplified Chinese](./CONTRIBUTING.zh-Hans.md)
-
 Mosoo is still in alpha exploration, and the repository moves quickly. This document only describes the development and contribution flow that is currently real and usable in this repository, avoiding stale instructions inherited from older versions.
 
 ## Before You Start

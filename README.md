@@ -1,7 +1,5 @@
 # Mosoo
 
-Language: [Simplified Chinese](./docs/README.zh-Hans.md)
-
 Mosoo is an open-source Agent Cloud project in alpha, built on a Cloudflare-native architecture. The current priority is OPC / personal developers: people should be able to run a lightweight, self-hostable, fast-moving Agent Cloud in their own Cloudflare account with low operational overhead.
 
 In the long term, we want Mosoo to grow from an open-source community edition into Agent infrastructure that supports individuals, OPCs, small teams, and enterprise governance. Personal developers can experiment and fork freely, teams can build shared Agent and Knowledge assets, and enterprises can add permission, cost, version, and runtime-state management.
