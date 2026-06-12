@@ -4,17 +4,17 @@ This is a status snapshot, not a dependency graph. Items are grouped by state so
 
 ## Current Construction Lock
 
-The current pivot is Project/App separation under a single-owner Organization assumption. Organization remains the account / billing / tenant shell; Project is the code and data boundary; App is the console noun.
+The current pivot is Project/App separation under a single-owner Organization assumption. Organization remains the account / billing / tenant shell; Project is the code and data boundary; App is the console noun and Agent capability package boundary.
 
 Near-term construction order:
 
 1. Project model, contracts, GraphQL, and default Project/App provisioning.
 2. Agent ownership under Project, with Threads / Sessions inheriting Project from Agent.
 3. Environment and Provider defaults under Project, with Organization fallback only as migration bridge.
-4. MCP, Skills, Spaces, deployment state, and app-scoped usage/cost under Project/App.
+4. MCP, Skills, Spaces, Channels, Agent exposure state, export, and app-scoped usage/cost under Project/App.
 5. App Overview as the console root; one-App Organizations route directly into the App.
 
-Project members, org-wide shared libraries, role matrices, and enterprise governance are outside this phase.
+Project members, org-wide shared resources, role matrices, and enterprise governance are outside this phase.
 
 ## 📋 Planned
 
@@ -24,7 +24,7 @@ Project members, org-wide shared libraries, role matrices, and enterprise govern
 - **Channel runtime** — Telegram / Discord / WeChat live smoke / LINE.
 - **Local / BYO runtime environment** — local / self-hosted runtime (under evaluation).
 - **Session artifacts** — persist agent-generated files from sandbox sessions and expose them to API consumers, channels, and external users.
-- **Overview / Quickstart** — App landing page (replacing Agents as the first screen for the one-App path) combining quickstart, deployment health, and app-local analytics.
+- **Overview / Quickstart** — App landing page (replacing Agents as the first screen for the one-App path) combining quickstart, Agent exposure health, export, and app-local analytics.
 
 ## 🛠️ In Development
 
@@ -39,7 +39,7 @@ Project members, org-wide shared libraries, role matrices, and enterprise govern
 
 - **Foundation** — session snapshot / lifecycle / runtime state operations.
 - **Agent page operations / runtime diagnostics** — Terminal, Session Log.
-- **Governance foundation** — RBAC trio + error message redaction; multi-member governance is historical foundation / future extension, not part of the current single-owner Project/App cut.
+- **Historical governance foundation** — RBAC trio + error message redaction; multi-member governance is not part of the current single-owner Project/App cut.
 - **Published API** — hardening plus the Public Thread API (`POST /threads`, `GET /threads/{id}`).
 - **Provider readiness fallback UX** — missing-key / wrong-key states + vendor error pass-through.
 - **Cost coverage**.

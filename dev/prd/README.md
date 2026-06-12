@@ -8,6 +8,7 @@ Product contracts and the standards used to write them.
 
 ## Current direction
 
+- [Mosoo Spec](../../SPEC.md): canonical V1 nouns, relationships, non-goals, behavior, and implementation order.
 - [Project / App Boundary](./project-app-boundary.md): active construction lock for the current pivot. Read this before implementing data model, IA, resource ownership, access, or deployment changes.
 
 ## PRDs
@@ -44,7 +45,7 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 - [Skill](./skill-interaction.md)
 - [Space](./space-interaction.md)
 
-### Access, identity & governance
+### Historical / future access, identity & governance
 
 - [Identity & Access](./identity-access.md) — future multi-member governance language must be read through the current single-owner Organization assumption.
 - [RBAC](./rbac.md) — historical / future governance foundation; not a dependency for the current Project/App cut.
