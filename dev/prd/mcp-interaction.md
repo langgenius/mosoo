@@ -3,6 +3,8 @@
 > This is the product-story version for non-engineering readers. For the **complete product contract + protocol index + security baseline + OAuth registration policy**, see the shipped MCP PRD.
 >
 > Adjacent PRDs: [`credentials`](./credentials.md) · [`agent-manifest`](./agent-manifest.md) · [`skill-interaction`](./skill-interaction.md) · [`rbac`](./rbac.md).
+>
+> **Current Project/App boundary note**: New Project/App work should scope MCP servers, bindings, and credentials to Project/App first. Organization-managed servers, per-user credential holder modes, and service-account governance are future extensions unless already required by shipped code. Keep Server / Credential / Binding separation and the rule that credentials never travel with exported Agent packages. See [Project / App Boundary](./project-app-boundary.md).
 
 ---
 

@@ -1,6 +1,8 @@
 # Credentials — for humans
 
 > The Credentials product story for non-engineers. For the **complete engineering contract**, see the shipped Credentials PRD.
+>
+> **Current Project/App boundary note**: New Project/App work should scope Provider keys and MCP credentials to Project first. Organization company pools, member BYOK, and per-member preference switching are future governance or migration concepts unless the implementation already depends on them. Keep the secret-handling rules, but converge runtime resolution toward `(execution_actor, project, provider)`. See [Project / App Boundary](./project-app-boundary.md).
 
 ---
 
@@ -73,11 +75,11 @@ Analogy:
 
 ### Naming lock
 
-| Term         | Examples                                                                                                                                             |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Term         | Examples                                                                                                                                                                           |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Provider** | `anthropic` / `openai` / `openai-compatible` — UI copy and the PRD always use this word. (See `ALL_VENDORS` in `pkgs/runtime-catalog/src/runtime-catalog.ts` for the shipped set.) |
-| **Runtime**  | The Agent Driver runtime; one Runtime depends on one Provider                                                                                        |
-| **BYOK**     | Bring Your Own Key — a member brings their own key                                                                                                   |
+| **Runtime**  | The Agent Driver runtime; one Runtime depends on one Provider                                                                                                                      |
+| **BYOK**     | Bring Your Own Key — a member brings their own key                                                                                                                                 |
 
 ### The Active Key has only 2 states (**core simplification**)
 
@@ -188,4 +190,3 @@ After saving:
 - The new key is written to encrypted storage
 - It is **automatically** set as preferred — the Select immediately switches to `PERSONAL · {label}`
 - The user can immediately run Agents with their own key, without having to go tick a box on some switch
-

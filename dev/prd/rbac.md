@@ -3,6 +3,8 @@
 > The Mosoo RBAC product story for non-engineers. The **complete engineering contract (Action IDs / matrices / field-level permissions)** lives in the full RBAC PRD.
 >
 > This document only answers "who can do what" and "who can stop whom." Action IDs, lookup tables, and schema fields are out of scope here.
+>
+> **Current Project/App boundary note**: RBAC is historical foundation and future governance guidance. The current Project/App cut assumes a single Organization owner; Project access maps to that owner. Owner / Admin / Member matrices, admin reach-through, member requests, and asset takeover must not block Project model, App routing, or Project-owned resource work. See [Project / App Boundary](./project-app-boundary.md).
 
 ---
 
@@ -89,12 +91,12 @@ After the pivot, Mosoo is a self-managed Agent platform for a single organizatio
 
 | Term                           | Plain-language definition                                                                                                                                                                                                     |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Org role**                   | `owner` / `admin` / `member` — three tiers, evaluated only at the Org level. A fourth read-only compliance tier is out of scope for this release.                                                                              |
+| **Org role**                   | `owner` / `admin` / `member` — three tiers, evaluated only at the Org level. A fourth read-only compliance tier is out of scope for this release.                                                                             |
 | **Asset owner**                | The person who created an asset, automatically granted "the highest asset-level role on that asset." This is a dimension **orthogonal** to the Org role.                                                                      |
 | **Asset**                      | An object a user can directly create, share, delete, or select. Mosoo locks this to 5 kinds: **Agent / Space / Skill / MCP Server / Environment.**                                                                            |
 | **AgentSession (work object)** | A single working context between a caller and a given Agent. **It is not an asset** — it has no ACL, cannot be shared, and cannot be transferred. Its lifecycle belongs to the Session creator alone.                         |
 | **Admin reach-through**        | An Org `admin` can edit / publish / run any asset by default, but the "destroy the asset" tier (delete / change ACL / transfer / reset) is locked while the asset owner is still around.                                      |
-| **Org owner break-glass**      | An Org `owner` can delete / change the ACL / transfer any asset **at any time**, without waiting for the asset owner to leave.                                                                                                  |
+| **Org owner break-glass**      | An Org `owner` can delete / change the ACL / transfer any asset **at any time**, without waiting for the asset owner to leave.                                                                                                |
 | **Policy, not state**          | "Owner leaves → Admin auto-unlocks" is a **decision rule**, not a data migration. There is no claim API and no scheduled job that rewrites the owner field. The moment the owner returns, the lock is automatically restored. |
 
 ### Who owns the three key actions (the most frequently asked question)

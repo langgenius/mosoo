@@ -1,6 +1,8 @@
 # Environment — for humans
 
 > This is the product-story version for non-engineer readers. The **full engineering contract** (change-impact matrix / revisions / lifecycle protocol / override-governance details) lives in the shipped Environment PRD.
+>
+> **Current Project/App boundary note**: New Project/App work should make Environment Project-scoped, with a default Environment per App. Organization defaults, org-wide sharing, admin compliance override, and cross-project forks are future governance or migration concerns. Preserve EnvironmentRevision freeze semantics. See [Project / App Boundary](./project-app-boundary.md).
 
 ---
 

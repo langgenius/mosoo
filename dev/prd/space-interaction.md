@@ -1,6 +1,8 @@
 # Space — for humans
 
 > This is the product-story version written for non-engineering readers. The full engineering contract lives in the shipped Space PRD.
+>
+> **Current Project/App boundary note**: New Project/App work should make Space Project-owned. Space collaboration, `Shared with me`, `Add Everyone in organization`, and Owner / Admin pass-through are future multi-member governance unless existing implementation paths still require them. Preserve the mountable file-container model. See [Project / App Boundary](./project-app-boundary.md).
 
 ---
 

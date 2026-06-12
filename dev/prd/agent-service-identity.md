@@ -3,6 +3,8 @@
 > This is the product-story version for non-engineer readers. The companion engineering PRD (state machines, scope matrix, reasoning review) has not yet been written; treat this document as the current source of truth until it lands.
 >
 > This document covers only two things: **service identity** and **versioning**. How the Apply Changes button works, how the driver restarts, how agent-state resets — all of that lives in [`./runtime-state-operations.md`](./runtime-state-operations.md).
+>
+> **Current Project/App boundary note**: Read "Published Agent as stable service identity" as historical Agent-first wording. In the current pivot, the Project/App owns the delivery surface and may contain one or more App-local Agent service/runtime units. Preserve DeploymentVersion, "existing sessions are never interrupted", and "runtime change requires Fork"; move stable public entry points and deployment health toward App-first IA. See [Project / App Boundary](./project-app-boundary.md).
 
 ---
 

@@ -6,9 +6,13 @@ Product contracts and the standards used to write them.
 
 - [Architecture](../architecture.md): stable engineering boundaries and system-level contracts.
 
+## Current direction
+
+- [Project / App Boundary](./project-app-boundary.md): active construction lock for the current pivot. Read this before implementing data model, IA, resource ownership, access, or deployment changes.
+
 ## PRDs
 
-Implementation contracts and shipped product behavior. Each PRD is the high-readability product specification for a capability.
+Implementation contracts and shipped product behavior. Each PRD is the high-readability product specification for a capability. When older PRDs mention Organization-owned business assets, members, Admin reach-through, Workspace, or Agent-first service identity, apply the Project/App Boundary drift rules first.
 
 ### Agents & packaging
 
@@ -42,9 +46,9 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 
 ### Access, identity & governance
 
-- [Identity & Access](./identity-access.md)
-- [RBAC](./rbac.md)
-- [Credentials](./credentials.md)
+- [Identity & Access](./identity-access.md) — future multi-member governance language must be read through the current single-owner Organization assumption.
+- [RBAC](./rbac.md) — historical / future governance foundation; not a dependency for the current Project/App cut.
+- [Credentials](./credentials.md) — current Project/App work moves Provider credentials to Project scope first, preserving Organization fallback only as migration context.
 
 ### Admin & cost
 

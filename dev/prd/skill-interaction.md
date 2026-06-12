@@ -15,7 +15,7 @@ After the pivot, both of these have been retired: the Work page and the Default 
 
 > **Explicitly mount a Skill in a Published Agent's configuration.**
 
-Who mounts which Skills is decided by the Agent owner. This has nothing to do with "which Skill I, as a user, switch on or off." Whether to bring the per-user toggle back will be decided if and when the Default Agent concept returns.
+Who mounts which Skills is decided by the Agent owner. This has nothing to do with "which Skill I, as a user, switch on or off." For current Project/App work, Skills should become App-local resources before they become Organization-wide shared capabilities. Coworker sharing, team-wide distribution, and org-wide libraries are future governance. Whether to bring the per-user toggle back will be decided if and when the Default Agent concept returns. See [Project / App Boundary](./project-app-boundary.md).
 
 Where the word root "Workspace" lingers in this document, it means Organization (the pivot removed the Workspace entity). The term still follows external naming only when referring to a workspace on an external platform (Slack / Lark / Linear, etc.).
 

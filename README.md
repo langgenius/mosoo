@@ -1,8 +1,17 @@
 # Mosoo
 
-Mosoo is an open-source Agent Cloud project in alpha, built on a Cloudflare-native architecture. The current priority is OPC / personal developers: people should be able to run a lightweight, self-hostable, fast-moving Agent Cloud in their own Cloudflare account with low operational overhead.
+Mosoo is an open-source Agent Cloud project in alpha, built on a Cloudflare-native architecture. The current priority is OPC / personal developers: a user should be able to bring a `PRD.md`, invoke `@mosoo`, and get a running Agent App with Mosoo Agent services, app-local resources, Cloudflare-native deployment, and a public preview URL.
 
-In the long term, we want Mosoo to grow from an open-source community edition into Agent infrastructure that supports individuals, OPCs, small teams, and enterprise governance. Personal developers can experiment and fork freely, teams can build shared Agent and Knowledge assets, and enterprises can add permission, cost, version, and runtime-state management.
+During the current construction phase, assume one human owns one Organization. The Organization is the account / billing / tenant shell; the business and delivery boundary is **Project** in code, database, API, and architecture docs, and **App** in console copy. Team membership, project roles, org-wide asset libraries, and enterprise governance remain future extensions after the single-owner Project/App loop is real.
+
+In the long term, we want Mosoo to grow from an open-source community edition into Agent infrastructure that supports individuals, OPCs, small teams, and enterprise governance. Personal developers can experiment and fork freely, teams can build shared Agent and Knowledge assets, and enterprises can add permission, cost, version, and runtime-state management on top of the same boundary model.
+
+## Current Product Lock
+
+- The primary loop is `PRD.md + @mosoo` -> create or select an App -> provision Agent services and app-local resources -> deploy a Web shell -> return a public preview URL.
+- Project is the canonical engineering noun. App is the user-facing console noun. Avoid introducing parallel nouns such as Workspace, Team, Application, or Agent Service for this boundary.
+- Agents, Threads / Sessions, Spaces, Environments, Skills, MCP servers, Provider keys, deployment state, and app-scoped cost belong to the Project/App boundary first.
+- The console should create a default App during onboarding. If an Organization has one App, route directly into that App; the App list only becomes prominent when there is a second App.
 
 ## What Is Mosoo
 
@@ -24,11 +33,11 @@ Mosoo was originally named Dify-Lite. The initial goal was to build a lighter ve
 
 The value proposition at this stage is not to clone a complete large platform. It is to make the Agent Cloud skeleton thin, fast, and open-source first, so personal developers can own infrastructure that is runnable, understandable, and easy to fork.
 
-Mosoo continues to evolve around three planes:
+Mosoo still has three long-term planes, but the current alpha should express them through the Project/App delivery loop first:
 
-- **Consumption plane**: let users access Agents through natural entry points.
-- **Production plane**: let application / Agent developers configure, launch, and distribute Agents faster.
-- **Governance plane**: let administrators manage permissions, cost, versions, and runtime state.
+- **Consumption plane**: let users access an App's published Agent services through natural entry points.
+- **Production plane**: let personal developers configure, launch, and distribute Agent Apps faster.
+- **Governance plane**: start with owner-visible app health, cost, and deployment facts; expand to administrators, members, permissions, and compliance after the single-owner loop works.
 
 During the open-source alpha, the consumption, production, and governance planes are focused on personal developers and small-scale self-hosting first. We will satisfy real individual and OPC needs before extending the same architecture toward team collaboration and enterprise governance.
 
@@ -38,11 +47,11 @@ Mosoo's main direction is still moving quickly. We are currently focusing on the
 
 The current roadmap centers on these goals:
 
-- **OPC / personal developers first**: polish the full loop for deploying, configuring, running, and debugging Agents as an individual developer.
+- **OPC / personal developers first**: polish the full loop for creating, deploying, running, and debugging one Agent App as an individual developer.
 - **Cloudflare-native runtime**: continue converging the architecture around Workers, Durable Objects, D1, R2, and related platform capabilities.
 - **Complete open-source community path**: prioritize the core capabilities required for a self-hostable, modifiable, extensible community edition.
-- **Agent asset management**: gradually turn Agent, Knowledge, Skill, MCP, Space, Credential, and Channel capabilities into manageable assets.
-- **Enterprise capability expansion**: after personal and OPC scenarios work end to end, add team collaboration, permissions, cost, version control, and runtime governance.
+- **Project/App resource boundary**: move Agent, Thread / Session, Space, Environment, Skill, MCP, Provider Credential, deployment state, and app-scoped Cost under one delivery boundary.
+- **Enterprise capability expansion**: after personal and OPC scenarios work end to end, add team collaboration, permissions, cost governance, version control, and runtime governance.
 
 For the current status snapshot — what is **Planned**, **In Development**, and **Done** — see [roadmap.md](./roadmap.md).
 
@@ -56,7 +65,7 @@ For administrators, Mosoo aims to provide an easy-to-use WebUI for understanding
 
 ## Project Status
 
-Mosoo is still in alpha exploration. Product boundaries, data models, deployment methods, and management experience are all evolving quickly. This repository currently prioritizes fast validation and architectural convergence for the open-source version, with no promise of stable APIs or backward compatibility.
+Mosoo is still in alpha exploration. Product boundaries, data models, deployment methods, and management experience are all evolving quickly. During the Project/App separation, treat the current lock above and [Project / App Boundary](./dev/prd/project-app-boundary.md) as newer than older Agent-first, Workspace, member-management, or team-governance language. This repository currently prioritizes fast validation and architectural convergence for the open-source version, with no promise of stable APIs or backward compatibility.
 
 - PRDs and product design: [dev/prd/README.md](./dev/prd/README.md).
 - Architecture design: [dev/architecture.md](./dev/architecture.md).

@@ -11,6 +11,8 @@ Before changing code, read the relevant product and architecture documents:
 
 These documents define system boundaries, module relationships, and design intent. If the PRD, architecture, and implementation disagree, fix the source of truth instead of hiding the mismatch in generated files, local adapters, or temporary branches.
 
+When a change pivots a core noun or ownership boundary, update the documentation anchor first: README, roadmap, architecture, PRD index, and the active boundary PRD. For the current Project/App pivot, [Project / App Boundary](../dev/prd/project-app-boundary.md) is the construction lock that resolves older Organization-owned, member-governance, Workspace, and Agent-first wording.
+
 ## Repository Structure
 
 This repository is a monorepo:

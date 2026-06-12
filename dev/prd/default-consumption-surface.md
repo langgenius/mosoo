@@ -5,6 +5,8 @@
 > This describes the **default consumption surface for published agents** on Mosoo's web client — the UI page is called **Threads**, and a single instance is a **Thread**.
 
 > **UI status (2026-06-10)**: the sidebar no longer carries a `+ New thread` primary CTA — the prominent button now reads `+ New agent` and points at `/agent?create=1`. Threads is still in the sidebar as a regular nav item alongside Agents / Spaces / Environments / Integrations / Providers (the previous `Work` / `Studio` section headers were collapsed into a single flat list). The `+ New thread` compose dialog itself is unchanged; the standard entry is now the **`New thread` button on the `/threads` page header / empty state**, and the locked-agent variant is still reachable from a published agent's `Settings → Distribution → Threads` row (`/threads?compose=1&agent=…&lock=1`). The diagrams and prose below that still position `+ New thread` as the sidebar primary CTA describe the v1 launch shape, not today's shipping UI.
+>
+> **Current Project/App boundary note**: Threads are App-local consumption resources. New routing and data modeling should make Threads / Sessions inherit Project from the selected Agent/App rather than treating `/threads` as a global Organization root. See [Project / App Boundary](./project-app-boundary.md).
 
 ---
 
