@@ -17,7 +17,6 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 - [Agent Import / Export & Fork](./agent-package-import-export-fork.md)
 - [Agent Versions](./agent-versions.md)
 - [Agent Service Identity & Deployment](./agent-service-identity.md)
-- [System Agent Settings](./system-agent-settings.md)
 
 ### Runtime & sessions
 
@@ -49,7 +48,6 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 
 ### Admin & cost
 
-- [Asset Admin Views](./asset-admin-views.md)
 - [Cost Dashboard](./cost-dashboard.md)
 - [Environment](./environment.md)
 
