@@ -133,6 +133,7 @@ my-agent.agent
   "runtime": "claude-agent-sdk",
   "model": "claude-sonnet-4-5",
   "provider": "anthropic",
+  "providerOptions": {},
   "prompts": { "system": "..." },
 
   "avatar": "attachments/avatar.png",
