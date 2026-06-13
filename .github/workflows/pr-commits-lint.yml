@@ -22,10 +22,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version-file: package.json
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+          bun-version: canary
 
       - name: Validate commit messages and authors
-        run: vp exec bun scripts/validate-commit-range.ts ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}
+        run: bun scripts/validate-commit-range.ts ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}
