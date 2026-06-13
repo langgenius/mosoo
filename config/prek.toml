@@ -38,13 +38,6 @@ always_run = true
 pass_filenames = false
 
 [[repos.hooks]]
-id = 'just-tc'
-name = 'just tc'
-entry = 'just tc'
-language = 'system'
-pass_filenames = false
-
-[[repos.hooks]]
 id = 'validate-commit-message'
 name = 'validate commit message'
 entry = 'vp exec bun scripts/validate-commit-message.ts'

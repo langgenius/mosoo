@@ -68,16 +68,16 @@ For administrators, Mosoo aims to provide an easy-to-use WebUI for understanding
 
 ## Project Status
 
-Mosoo is still in alpha exploration. Product boundaries, data models, deployment methods, and management experience are all evolving quickly. During the Project/App separation, treat the current lock above and [Project / App Boundary](./dev/prd/project-app-boundary.md) as newer than older Agent-first, Workspace, member-management, or team-governance language. This repository currently prioritizes fast validation and architectural convergence for the open-source version, with no promise of stable APIs or backward compatibility.
+Mosoo is still in alpha exploration. Product boundaries, data models, deployment methods, and management experience are all evolving quickly. During the Project/App separation, treat the current lock above and [Project / App Boundary](./docs/prd/project-app-boundary.md) as newer than older Agent-first, Workspace, member-management, or team-governance language. This repository currently prioritizes fast validation and architectural convergence for the open-source version, with no promise of stable APIs or backward compatibility.
 
-- PRDs and product design: [dev/prd/README.md](./dev/prd/README.md).
+- PRDs and product design: [docs/prd/README.md](./docs/prd/README.md).
 - Current product spec: [SPEC.md](./SPEC.md).
-- Architecture design: [dev/architecture.md](./dev/architecture.md).
-- Development and contribution guide: [CONTRIBUTING.md](./docs/CONTRIBUTING.md).
+- Architecture design: [docs/architecture.md](./docs/architecture.md).
+- Development and contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Local Development
 
-See [CONTRIBUTING.md](./docs/CONTRIBUTING.md) for the full development flow. The shortest local path is:
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full development flow. The shortest local path is:
 
 ```bash
 just setup

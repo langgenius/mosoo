@@ -2,7 +2,7 @@
 
 > **Status**: Living document · **Maintainer**: Product Team · **Last updated**: 2026-05-09
 
-> This document is not a PRD for any single feature. It defines the writing constraints and acceptance criteria for every PRD under `dev/prd/`.
+> This document is not a PRD for any single feature. It defines the writing constraints and acceptance criteria for every PRD under `docs/prd/`.
 > Audience: product and design people who write PRDs, plus the engineers who pick up and implement them.
 
 ---
@@ -274,14 +274,14 @@ Record the product judgments that first principles and Musk's five steps ultimat
 
 Every PRD must declare this requirement's impact on the architecture. The goal is not to turn the PRD into an engineering design, but to ensure the implementer doesn't have to guess which boundaries, contracts, generated artifacts, and acceptance posture apply.
 
-This section records only the architectural impact triggered by the product requirement — not schema fields, API bodies, call stacks, or deployment details. If this requirement changes a long-term architectural assumption, you must also update or reference the stable source of truth in `dev/architecture.md` or the corresponding PRD / plan memo.
+This section records only the architectural impact triggered by the product requirement — not schema fields, API bodies, call stacks, or deployment details. If this requirement changes a long-term architectural assumption, you must also update or reference the stable source of truth in `docs/architecture.md` or the corresponding PRD / plan memo.
 
 `E2E proof required?` declares only the acceptance posture; it does not ask the PM to write engineering test details. Allowed values are `none` / `deterministic-e2e` / `live-smoke` / `manual-only` / `deferred-with-trigger`.
 
 | Question                                         | This PRD's Conclusion                                                                                                                                                                                                                                   |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Which boundary did this add / change?            | For example Web/API, GraphQL, Public API, Runtime/Driver, Space/File, Credential/Vault, Cost, Organization/Access, etc.                                                                                                                                 |
-| Which contract is the truth source?              | For example `dev/architecture.md`, some `pkgs/contracts/*`, the GraphQL spec, the runtime protocol, the DB schema, an OpenAPI doc, or an existing PRD.                                                                                                  |
+| Which contract is the truth source?              | For example `docs/architecture.md`, some `pkgs/contracts/*`, the GraphQL spec, the runtime protocol, the DB schema, an OpenAPI doc, or an existing PRD.                                                                                                 |
 | Which generated artifacts must run?              | For example `just graphql-codegen`, `just db-regen`, OpenAPI example validation, etc.; write "none" if there are no generated artifacts.                                                                                                                |
 | E2E proof required?                              | For example `none`, `deterministic-e2e`, `live-smoke`, `manual-only`, `deferred-with-trigger`; state clearly why this posture is sufficient.                                                                                                            |
 | Which old architectural assumptions are retired? | For example Workspace is still a product layer, the Driver actively calls back over the public internet, Session state equals Space, the Runtime defaults to a generic protocol, the API targets only the UI, etc.; write "none" if nothing is retired. |
@@ -500,7 +500,7 @@ stateDiagram-v2
 | E2E proof required?                              | none / deterministic-e2e / live-smoke / manual-only / deferred-with-trigger; why it's sufficient: ... |
 | Which old architectural assumptions are retired? | ...                                                                                                   |
 
-> If this PRD changes a long-term architectural assumption, you must update or reference the stable source of truth in `dev/architecture.md` or the corresponding PRD / plan memo. Choose one of the E2E posture values above; don't write engineering implementation details in the PRD.
+> If this PRD changes a long-term architectural assumption, you must update or reference the stable source of truth in `docs/architecture.md` or the corresponding PRD / plan memo. Choose one of the E2E posture values above; don't write engineering implementation details in the PRD.
 
 ## Implementation Boundary
 

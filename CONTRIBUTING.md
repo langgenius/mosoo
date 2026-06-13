@@ -6,27 +6,30 @@ Mosoo is still in alpha exploration, and the repository moves quickly. This docu
 
 Before changing code, read the relevant product and architecture documents:
 
-- PRD index: [dev/prd/README.md](../dev/prd/README.md)
-- Architecture design: [dev/architecture.md](../dev/architecture.md)
+- PRD index: [docs/prd/README.md](./docs/prd/README.md)
+- Architecture design: [docs/architecture.md](./docs/architecture.md)
 
 These documents define system boundaries, module relationships, and design intent. If the PRD, architecture, and implementation disagree, fix the source of truth instead of hiding the mismatch in generated files, local adapters, or temporary branches.
 
-When a change pivots a core noun or ownership boundary, update the documentation anchor first: README, roadmap, architecture, PRD index, and the active boundary PRD. For the current Project/App pivot, [Project / App Boundary](../dev/prd/project-app-boundary.md) is the construction lock that resolves older Organization-owned, member-governance, Workspace, and Agent-first wording.
+When a change pivots a core noun or ownership boundary, update the documentation anchor first: README, roadmap, architecture, PRD index, and the active boundary PRD. For the current Project/App pivot, [Project / App Boundary](./docs/prd/project-app-boundary.md) is the construction lock that resolves older Organization-owned, member-governance, Workspace, and Agent-first wording.
 
 ## Repository Structure
 
 This repository is a monorepo:
 
-| Path             | Description                                                                                                                     |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/api`       | Cloudflare Worker API with GraphQL, auth, sessions, channels, runtime control plane, and D1/R2/DO bindings.                     |
-| `apps/web`       | React web app built with Vite Plus and deployed as Cloudflare Worker assets.                                                    |
-| `apps/driver`    | Agent runtime driver bundle used by API Worker / Sandbox paths.                                                                 |
-| `pkgs/contracts` | Cross-boundary TypeScript contracts and parser surfaces; cross app / package DTOs should go here first.                         |
-| `pkgs/db`        | Drizzle schema and the current generated baseline migration.                                                                    |
-| `pkgs/*`         | Runtime-neutral shared packages for events, policy, package format, observability, dev auth, effects, and related capabilities. |
-| `e2e`            | Playwright local acceptance scripts and runtime signal contract checks.                                                         |
-| `dev/prd`        | Product contracts and writing standards.                                                                                        |
+| Path                   | Description                                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api`             | Cloudflare Worker API with GraphQL, auth, sessions, channels, runtime control plane, and D1/R2/DO bindings.                     |
+| `apps/web`             | React web app built with Vite Plus and deployed as Cloudflare Worker assets.                                                    |
+| `apps/driver`          | Agent runtime driver bundle used by API Worker / Sandbox paths.                                                                 |
+| `pkgs/contracts`       | Cross-boundary TypeScript contracts and parser surfaces; cross app / package DTOs should go here first.                         |
+| `pkgs/db`              | Drizzle schema and the current generated baseline migration.                                                                    |
+| `pkgs/*`               | Runtime-neutral shared packages for events, policy, package format, observability, dev auth, effects, and related capabilities. |
+| `e2e`                  | Playwright local acceptance scripts and runtime signal contract checks.                                                         |
+| `config`               | Shared repository tooling config (prek, GraphQL codegen, TypeScript bases, lint).                                               |
+| `scripts`              | Repository automation scripts (commit policy validation, exports, codegen checks).                                              |
+| `docs/prd`             | Product contracts and writing standards.                                                                                        |
+| `docs/architecture.md` | Stable engineering boundaries and system-level contracts.                                                                       |
 
 The following generated files must not be edited by hand:
 
@@ -262,9 +265,10 @@ Use `!` only for intentional breaking changes. Every Issue and PR must be self-a
 
 Commit quality is enforced by automation, not contributor memory:
 
-- Local `commit-msg` and `pre-push` hooks via `prek` (`config/prek.toml`)
+- Local Git hooks via `prek` (`config/prek.toml`)
 - PR title lint (`.github/workflows/pr-title-lint.yml`)
 - PR commit lint (`.github/workflows/pr-commits-lint.yml`)
+- PR repository check (`.github/workflows/pr-check.yml`)
 - Direct pushes to `main` are rejected locally and by the GitHub ruleset
 
 Reinstall hooks whenever hook config changes:
@@ -273,14 +277,41 @@ Reinstall hooks whenever hook config changes:
 just hooks-install
 ```
 
+#### Local hook stages
+
+Local hooks stay fast so small commits stay cheap:
+
+- `pre-commit`: file hygiene only (whitespace, EOF, JSON/YAML/TOML validity, private-key detection, merge-conflict markers, and similar auto-fix or fail-fast checks). It does **not** run `just tc`, `just lint`, or `just test`.
+- `commit-msg`: validates the commit you are creating — subject format, author identity, committer identity (when different from author), and agent-looking identities in `Co-authored-by:` / `Signed-off-by:` trailers.
+- `pre-push`: runs the same commit-metadata validation for every commit in the push range, plus a hard block on direct pushes to `main`.
+
+Run focused verification while you work (`just tc-package <package>`, `just test-file <path>`, `just lint`, and similar). Before opening or updating a PR, run the full gate locally when your change is ready:
+
+```bash
+just check
+```
+
+CI runs the same full gate on pull requests via `pr-check.yml`.
+
 Rules are defined in `config/commit-policy.ts`:
 
 - Subject must match `type(scope): subject`
-- Scope is required; legacy prefixes such as `[codex]` and `YEF-` are rejected
+- Scope is required; legacy prefixes such as `[codex]`, `YEF-`, `WIP:`, and `Draft:` are rejected
+- Subject must start with a lower-case letter after `: `
 - Subject length must stay at or below 72 characters
-- Author must identify a real human contributor; AI/agent/bot identities are rejected
+- Standard merge commits (`Merge ...`) are exempt from subject rules
+- Author and committer must identify a real human contributor; AI/agent/bot identities are rejected
+- `Co-authored-by:` and `Signed-off-by:` trailers are checked with the same identity rules
 
-To check your branch against `origin/main` locally:
+Rejected identity signals include:
+
+- Tool or automation names such as `claude`, `claude-code`, `codex`, `cursor`, `copilot`, `openai`, `gemini`, `grok`, `aider`, `devin`, `windsurf`, `codegen`, `opencode`, `github actions`, `dependabot`, and `renovate`
+- Bot markers such as `[bot]` or a standalone `bot` token in the name
+- Agent or automation emails such as `agent@multica.local`, `agent@...`, `agents@...`, `* [bot]@users.noreply.github.com`, and `noreply@openai|anthropic|cursor|copilot.*`
+
+This is attribution hygiene, not cryptographic identity proof. Configure `user.name` and `user.email` to your real contributor identity before committing, and do not leave AI tool defaults in author fields or commit trailers.
+
+To check commit metadata on your branch against `origin/main` locally:
 
 ```bash
 just commit-check

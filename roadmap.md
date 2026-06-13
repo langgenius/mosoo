@@ -28,7 +28,7 @@ Project members, org-wide shared resources, role matrices, and enterprise govern
 
 ## 🛠️ In Development
 
-- **Project / App separation** — canonical Project model with App console copy, default App provisioning, Project-owned resources, and App Overview routing. See [Project / App Boundary](./dev/prd/project-app-boundary.md).
+- **Project / App separation** — canonical Project model with App console copy, default App provisioning, Project-owned resources, and App Overview routing. See [Project / App Boundary](./docs/prd/project-app-boundary.md).
 - **Agent Builder** — formal PRD plus a controlled Draft patch, subordinate to the Project/App resource boundary.
 
 ## 🔮 Future

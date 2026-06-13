@@ -2,10 +2,10 @@
 
 ## Project Notes
 
-- Development, verification, commit, and PR rules live in `docs/CONTRIBUTING.md`.
-- Before coding, read the relevant documents under `dev/` to understand system boundaries, module relationships, and design intent.
+- Development, verification, commit, and PR rules live in `CONTRIBUTING.md`.
+- Before coding, read the relevant documents under `docs/` (especially `docs/prd/` and `docs/architecture.md`) to understand system boundaries, module relationships, and design intent.
 - When boundaries are clear and maintenance cost stays reasonable, split subpackages to avoid large modules without clear ownership.
-- Reusable coding-agent skills live under `.claude/skills` (a symlink into the `.skills/mosoo-skills` submodule, sourced from `langgenius/mosoo-skills`). Run `git submodule update --init` once so they resolve. Prefer an existing skill over re-deriving the same guidance; see `docs/CONTRIBUTING.md` → "Agent Skills".
+- Reusable coding-agent skills live under `.claude/skills` (a symlink into the `.skills/mosoo-skills` submodule, sourced from `langgenius/mosoo-skills`). Run `git submodule update --init` once so they resolve. Prefer an existing skill over re-deriving the same guidance; see `CONTRIBUTING.md` → "Agent Skills".
 
 ## Engineering Guidance
 
@@ -21,7 +21,7 @@
 - Keep one canonical naming scheme or command grammar for each user concept, avoiding multiple names that make docs, implementation, and tests drift apart.
 - Commit messages must strictly follow `Conventional Commits`. Avoid vague, casual, or inconsistent titles.
 - Commit messages must at least satisfy `type(scope): subject`. Use `!` only for intentional breaking changes, and keep `type`, `scope`, and `subject` semantically accurate.
-- Commit policy is enforced locally by `prek` (`commit-msg`, `pre-push`) and in CI (`pr-title-lint`, `pr-commits-lint`). Use a real human author identity; never commit as `claude-code`, `[codex]`, a bot, or a ticket-prefixed subject.
+- Commit policy is enforced locally by `prek` (`commit-msg`, `pre-push`) and in CI (`pr-title-lint`, `pr-commits-lint`). `commit-msg` validates subject format plus author, committer, and `Co-authored-by` / `Signed-off-by` identity. Use a real human contributor identity; never commit as `claude-code`, `[codex]`, a bot, or a ticket-prefixed subject.
 
 ## Monorepo Scaling And Performance Constraints
 
