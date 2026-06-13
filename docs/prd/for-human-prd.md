@@ -1,6 +1,6 @@
 ---
 name: for-human-prd
-description: Mirror an existing Mosoo PRD into a high-readability for-human companion that preserves user intent while removing implementation detail. Use when a PRD needs a plain-language companion under `dev/prd/`, or when the user asks for a "for human" / "human-readable" PRD.
+description: Mirror an existing Mosoo PRD into a high-readability for-human companion that preserves user intent while removing implementation detail. Use when a PRD needs a plain-language companion under `docs/prd/`, or when the user asks for a "for human" / "human-readable" PRD.
 ---
 
 # For-Human PRD Companion
@@ -11,19 +11,19 @@ This does not replace [`good-prd.md`](./good-prd.md). The full PRD remains the i
 
 ## When to use
 
-Use when a full PRD exists, the user asks for a "for human" / "human-readable" version, the PRD has valuable grill / QA / user-input intent mixed with implementation detail, and the companion should live in `dev/prd/`.
+Use when a full PRD exists, the user asks for a "for human" / "human-readable" version, the PRD has valuable grill / QA / user-input intent mixed with implementation detail, and the companion should live in `docs/prd/`.
 
 Do not use this to create the original PRD. Draft and grill the full PRD first.
 
 ## Inputs
 
-Read the source PRD, [`good-prd.md`](./good-prd.md), [`pm-reverse-interview.md`](./pm-reverse-interview.md), and existing files in `dev/prd/` as tone / length anchors.
+Read the source PRD, [`good-prd.md`](./good-prd.md), [`pm-reverse-interview.md`](./pm-reverse-interview.md), and existing files in `docs/prd/` as tone / length anchors.
 
 Preserve original user / QA / grill intent. Do not flatten real user language into generic "users need clarity" prose.
 
 ## Output
 
-Create `dev/prd/{prd-slug}.md`, then update `dev/prd/README.md` so the index links to the new companion and the PRD list stays current.
+Create `docs/prd/{prd-slug}.md`, then update `docs/prd/README.md` so the index links to the new companion and the PRD list stays current.
 
 ## Keep
 
@@ -52,14 +52,14 @@ Ask: "Can a non-engineer make a product decision from this?" If not, it belongs 
 2. Translate the contract into what the user can do / see / expect.
 3. Build a small glossary: keep product nouns, remove implementation entities.
 4. Mirror essential relationships with one simple mermaid only if it clarifies the product.
-5. Add a "do not confuse with" table and register the companion in `dev/prd/README.md`.
+5. Add a "do not confuse with" table and register the companion in `docs/prd/README.md`.
 
 ## Quality Gate
 
 Scan the companion for engineering-detail drift:
 
 ```bash
-rg -n "POST |GET |schema|interface|resolver|DB|database|call stack|deployment topology|endpoint|OpenAPI|curl" dev/prd/{prd-slug}.md
+rg -n "POST |GET |schema|interface|resolver|DB|database|call stack|deployment topology|endpoint|OpenAPI|curl" docs/prd/{prd-slug}.md
 ```
 
 Expected: no hits, except deliberate orientation links.

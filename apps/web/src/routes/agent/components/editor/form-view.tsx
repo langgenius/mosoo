@@ -21,7 +21,7 @@ import type { AgentEditorModel } from "./use-model";
 // Quick-Start-vs-Preview style drift and the nested-card clutter.
 // `highlightedSections` + `readOnly` are load-bearing for the deferred PRD-D
 // Agent Versions "frozen v3 view" feature. Do not remove as dead code without
-// reading dev/prd/agent-versions.md §20.B first.
+// reading docs/prd/agent-versions.md §20.B first.
 export interface AgentFormViewProps {
   agent: Agent;
   focusSection?: AgentFormSectionId | null;

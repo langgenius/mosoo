@@ -8,7 +8,7 @@ let a new engineer understand what to build without inferring product meaning fr
 Agent-first, Web-app-first, or Organization-governance language.
 
 If this document conflicts with older PRDs, follow this document first, then
-`dev/prd/project-app-boundary.md`, then `dev/architecture.md`.
+`docs/prd/project-app-boundary.md`, then `docs/architecture.md`.
 
 ## Design Principles
 

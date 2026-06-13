@@ -2,7 +2,7 @@ name: PR Title Lint
 
 # Because main only allows squash merges, a PR's title becomes the squashed
 # commit message on main. Linting the title here keeps the main history aligned
-# with Conventional Commits (see CLAUDE.md).
+# with Conventional Commits (see AGENTS.md and CONTRIBUTING.md).
 
 on:
   pull_request_target:
@@ -24,7 +24,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          # Allowed Conventional Commit types (matches CLAUDE.md).
+          # Allowed Conventional Commit types (matches AGENTS.md / CONTRIBUTING.md).
           types: |
             feat
             fix

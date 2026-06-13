@@ -1,15 +1,13 @@
 import { spawnSync } from "node:child_process";
 
-import {
-  formatViolations,
-  validateAuthorIdentity,
-  validateCommitMessage,
-} from "../config/commit-policy.ts";
+import { formatViolations, validateCommitMetadata } from "../config/commit-policy.ts";
 
 interface CommitRecord {
   hash: string;
   authorName: string;
   authorEmail: string;
+  committerName: string;
+  committerEmail: string;
   message: string;
 }
 
@@ -41,13 +39,22 @@ function parseCommitRecords(output: string): CommitRecord[] {
     const hash = lines[0]?.trim();
     const authorName = lines[1]?.trim();
     const authorEmail = lines[2]?.trim();
-    const message = lines[3] ?? "";
+    const committerName = lines[3]?.trim();
+    const committerEmail = lines[4]?.trim();
+    const message = lines[5] ?? "";
 
-    if (!hash || !authorName || !authorEmail) {
+    if (!hash || !authorName || !authorEmail || !committerName || !committerEmail) {
       continue;
     }
 
-    records.push({ hash, authorName, authorEmail, message });
+    records.push({
+      hash,
+      authorName,
+      authorEmail,
+      committerName,
+      committerEmail,
+      message,
+    });
   }
 
   return records;
@@ -55,7 +62,7 @@ function parseCommitRecords(output: string): CommitRecord[] {
 
 function listCommits(fromRef: string, toRef: string): CommitRecord[] {
   const range = fromRef.length > 0 ? `${fromRef}..${toRef}` : toRef;
-  const output = runGit(["log", `--format=%H%x1f%an%x1f%ae%x1f%B%x1e`, range]);
+  const output = runGit(["log", `--format=%H%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1f%B%x1e`, range]);
 
   return parseCommitRecords(output);
 }
@@ -72,10 +79,13 @@ function main(): void {
   const failures: string[] = [];
 
   for (const commit of commits) {
-    const violations = [
-      ...validateCommitMessage(commit.message),
-      ...validateAuthorIdentity(commit.authorName, commit.authorEmail),
-    ];
+    const violations = validateCommitMetadata({
+      authorName: commit.authorName,
+      authorEmail: commit.authorEmail,
+      committerName: commit.committerName,
+      committerEmail: commit.committerEmail,
+      message: commit.message,
+    });
 
     if (violations.length === 0) {
       continue;
@@ -91,7 +101,7 @@ function main(): void {
         "",
         ...failures,
         "",
-        "See docs/CONTRIBUTING.md and config/commit-policy.ts.",
+        "See CONTRIBUTING.md and config/commit-policy.ts.",
       ].join("\n"),
     );
   }
