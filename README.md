@@ -6,7 +6,7 @@ During the current construction phase, assume one human owns one Organization. T
 
 In the long term, we want Mosoo to grow from an open-source community edition into Agent infrastructure that supports individuals, OPCs, small teams, and enterprise governance. Personal developers can experiment and fork freely, teams can build shared Agent and Knowledge assets, and enterprises can add permission, cost, version, and runtime-state management on top of the same boundary model.
 
-For implementation language and V1 boundaries, read [SPEC.md](./SPEC.md) before using older PRDs or vision language.
+For implementation language and V1 boundaries, read [SPEC.md](./docs/SPEC.md) before using older PRDs or vision language.
 
 ## Current Product Lock
 
@@ -71,7 +71,7 @@ For administrators, Mosoo aims to provide an easy-to-use WebUI for understanding
 Mosoo is still in alpha exploration. Product boundaries, data models, deployment methods, and management experience are all evolving quickly. During the Project/App separation, treat the current lock above and [Project / App Boundary](./docs/prd/project-app-boundary.md) as newer than older Agent-first, Workspace, member-management, or team-governance language. This repository currently prioritizes fast validation and architectural convergence for the open-source version, with no promise of stable APIs or backward compatibility.
 
 - PRDs and product design: [docs/prd/README.md](./docs/prd/README.md).
-- Current product spec: [SPEC.md](./SPEC.md).
+- Current product spec: [SPEC.md](./docs/SPEC.md).
 - Architecture design: [docs/architecture.md](./docs/architecture.md).
 - Development and contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md).
 

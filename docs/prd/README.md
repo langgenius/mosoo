@@ -8,7 +8,7 @@ Product contracts and the standards used to write them.
 
 ## Current direction
 
-- [Mosoo Spec](../../SPEC.md): canonical V1 nouns, relationships, non-goals, behavior, and implementation order.
+- [Mosoo Spec](../SPEC.md): canonical V1 nouns, relationships, non-goals, behavior, and implementation order.
 - [Project / App Boundary](./project-app-boundary.md): active construction lock for the current pivot. Read this before implementing data model, IA, resource ownership, access, or deployment changes.
 
 ## PRDs
