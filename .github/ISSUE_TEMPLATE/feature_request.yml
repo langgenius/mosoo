@@ -1,0 +1,81 @@
+name: Feature request
+description: Propose a product or developer experience improvement.
+title: "feat(scope): "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing an improvement. Please focus on the user problem first, then the solution.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Choose the closest affected area.
+      options:
+        - Web app
+        - API
+        - Agent Driver
+        - Runtime
+        - Database
+        - GraphQL
+        - Documentation
+        - Developer tooling
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or maintainer problem should this solve?
+      placeholder: Describe the current pain point and who experiences it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What change do you suggest?
+      placeholder: Keep the proposal as small and concrete as possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What alternatives or workarounds did you consider?
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and migration
+      description: Note any expected API, data, configuration, deployment, or user workflow impact.
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Are you willing to help implement or validate this?
+      options:
+        - I can submit a PR
+        - I can test an implementation
+        - I can provide product feedback
+        - Not right now
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues before opening this request.
+          required: true
+        - label: I described the problem before the proposed solution.
+          required: true
+        - label: I kept this request focused on one improvement.
+          required: true

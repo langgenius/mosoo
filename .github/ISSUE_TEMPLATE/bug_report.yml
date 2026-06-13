@@ -1,0 +1,105 @@
+name: Bug report
+description: Report reproducible behavior that is broken or unexpected.
+title: "fix(scope): "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please keep the report focused on one problem.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Choose the closest affected area.
+      options:
+        - Web app
+        - API
+        - Agent Driver
+        - Runtime
+        - Database
+        - GraphQL
+        - Documentation
+        - Developer tooling
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is broken?
+      placeholder: Describe the problem in a few sentences.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest reproducible sequence you know.
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Add screenshots, logs, recordings, request IDs, or relevant output. Redact secrets.
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Share the environment if relevant.
+      placeholder: |
+        Browser:
+        OS:
+        Mosoo version or commit:
+        Local or production:
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Are you willing to help with a fix?
+      options:
+        - I can submit a PR
+        - I can test a fix
+        - I can provide more details
+        - Not right now
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues before opening this report.
+          required: true
+        - label: I included a reproducible path or explained why I cannot reproduce it locally.
+          required: true
+        - label: I removed or redacted secrets from logs, screenshots, and config.
+          required: true
