@@ -39,11 +39,11 @@ export function LoginAuthCard({
   step,
 }: LoginAuthCardProps): ReactElement {
   const isOtpStep = step === "otp";
-  const heading = step === "otp" ? "Check your email" : "Continue to Mosoo";
+  const heading = step === "otp" ? "Check your email" : "Start building in 30 seconds";
   const subheading =
     step === "otp"
       ? "Enter the verification code we just sent you."
-      : "Use Google or an email code. No password required.";
+      : "No credit card required. Free to start.";
 
   return (
     <div className="flex flex-1 items-center justify-center px-6 pb-16">
