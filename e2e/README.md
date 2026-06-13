@@ -7,12 +7,12 @@ their required environment is present.
 Run from the repo root:
 
 ```bash
-./e2e/run-deterministic.sh
-vp run e2e:harness-contract
-./e2e/run-preview-smoke.sh
-./e2e/run-preview-smoke.sh --headed
-./e2e/run-preview-latency.sh
-bun run e2e:agent-builder-live-planner
+just e2e-deterministic
+just e2e-harness-contract
+just e2e-preview-smoke
+just e2e-preview-smoke-headed
+just e2e-preview-latency
+just e2e-agent-builder-live-planner
 ```
 
 `run-deterministic.sh` is the L1 no-credential acceptance harness. It runs the
@@ -50,7 +50,7 @@ lightweight System Agent planner. It is skipped unless both variables are set:
 ```bash
 export MOSOO_E2E_OPENAI_API_KEY=...
 export MOSOO_E2E_OPENAI_MODEL=...
-bun run e2e:agent-builder-live-planner
+just e2e-agent-builder-live-planner
 ```
 
 Set `MOSOO_E2E_REQUIRE_LIVE_PLANNER=1` when the run must fail instead of skip if

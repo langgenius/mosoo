@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import codegenConfig from "../../../dev/config/graphql-codegen.ts";
+import codegenConfig from "../../../config/graphql-codegen.ts";
 
 function requireRecord(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {

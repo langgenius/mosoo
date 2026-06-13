@@ -21,6 +21,7 @@
 - Keep one canonical naming scheme or command grammar for each user concept, avoiding multiple names that make docs, implementation, and tests drift apart.
 - Commit messages must strictly follow `Conventional Commits`. Avoid vague, casual, or inconsistent titles.
 - Commit messages must at least satisfy `type(scope): subject`. Use `!` only for intentional breaking changes, and keep `type`, `scope`, and `subject` semantically accurate.
+- Commit policy is enforced locally by `prek` (`commit-msg`, `pre-push`) and in CI (`pr-title-lint`, `pr-commits-lint`). Use a real human author identity; never commit as `claude-code`, `[codex]`, a bot, or a ticket-prefixed subject.
 
 ## Monorepo Scaling And Performance Constraints
 

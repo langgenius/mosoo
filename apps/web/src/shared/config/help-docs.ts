@@ -4,7 +4,7 @@
 // manifest (https://docs.mosoo.ai/llms.txt). To refresh it after the docs change,
 // run:
 //
-//   bun dev/scripts/generate-help-docs-index.ts
+//   just help-docs-index
 //
 // The script rewrites the region between the GENERATED markers in place; keep the
 // markers intact and avoid hand-editing entries inside them.

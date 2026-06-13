@@ -80,10 +80,7 @@ Mosoo is still in alpha exploration. Product boundaries, data models, deployment
 See [CONTRIBUTING.md](./docs/CONTRIBUTING.md) for the full development flow. The shortest local path is:
 
 ```bash
-bun install
-vp run env:init
-vp exec prek -c dev/config/prek.toml install
-vp run db:migrate:local
+just setup
 just dev
 ```
 
