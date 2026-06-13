@@ -44,29 +44,24 @@ Required tools:
 - `just >= 1.51`
 - Vite Plus `vp`: `curl -fsSL https://vite.plus | bash`
 
-The repository already pins Vite Plus and Git hook tooling dependencies. Daily commands should use the global `vp` entry point; scripts that need a stable local entry point should use `node_modules/.bin/vp`.
+The repository already pins Vite Plus and Git hook tooling dependencies. Human-facing repository operations use `just`; the `justfile` delegates to Vite Plus and other internal tools.
 
 Command conventions:
 
-- Use `vp run ...` for task orchestration.
-- Use `vp exec ...` for local tooling.
-- Use `vp exec bun ...` when Bun runtime is required.
-- Bootstrap dependencies with `bun install --frozen-lockfile` before repository dependencies are installed.
-- Install Git hooks with `vp exec prek -c dev/config/prek.toml install` after `bun install`, so the hook installer comes from the repository dependency graph instead of a one-off `dlx` execution.
+- Use `just --list` to discover supported human-facing operations.
+- Use `just <recipe>` for setup, development, generation, verification, and deployment.
+- Treat `vp` commands as implementation details for `justfile`, package scripts, hooks, and CI.
+- Use `just setup` to bootstrap dependencies, initialize the environment, install Git hooks, and apply local migrations.
 
 ## Initialization
 
 Run this from the repository root:
 
 ```bash
-git submodule update --init   # populate .skills/mosoo-skills (clone with --recurse-submodules to skip this)
-bun install --frozen-lockfile
-vp run env:init
-vp exec prek -c dev/config/prek.toml install
-vp run db:migrate:local
+just setup
 ```
 
-`vp run env:init` creates or completes `apps/api/.dev.vars`:
+`just env-init` creates or completes `apps/api/.dev.vars`:
 
 - `VAULT_ROOT_SECRET`, `BETTER_AUTH_SECRET`, and `RUNTIME_ACTION_TOKEN_SECRET` are generated as local random values.
 - Existing real values are not overwritten; placeholder values copied from `apps/api/.dev.vars.example` are replaced with random values.
@@ -105,32 +100,32 @@ Local login:
 
 Local development notes:
 
-- D1 migration is not applied automatically on the first request; run `vp run db:migrate:local` or `vp run db:regen` before starting services.
+- D1 migration is not applied automatically on the first request; run `just db-migrate` or `just db-regen` before starting services.
 - Preview MCP development services use ports `5180+`; ports `5173` and `5174` are reserved for local web / dev flow.
 - Before asserting port conflicts or performance problems, measure with `lsof`, `curl`, timing, or another reproducible command.
 
 ## Common Commands
 
 ```bash
-vp run env:init          # create or complete apps/api/.dev.vars
-vp run dev              # root dev task; just dev calls it after migration
-vp run build            # build driver and web
-vp run fmt              # format
-vp run fmt:check        # check formatting
-vp run lint             # generate Cloudflare types, then run lint
-vp run tc               # run workspace typecheck
-vp run test             # run regular unit tests
-vp run check            # fmt:check + lint + tc + test
-vp run graphql:codegen  # regenerate GraphQL schema and web gql output
-vp run db:regen         # regenerate the Drizzle baseline from the current schema
+just env-init          # create or complete apps/api/.dev.vars
+just dev               # apply local migrations and start the local stack
+just build             # build driver and web
+just fmt               # format
+just fmt-check         # check formatting
+just lint              # generate Cloudflare types, then run lint
+just tc                # run workspace typecheck
+just test              # run regular unit tests
+just check             # fmt:check + lint + tc + test
+just graphql-codegen   # regenerate GraphQL schema and web gql output
+just db-regen          # regenerate the Drizzle baseline from the current schema
 ```
 
 During development, prefer focused commands for faster feedback:
 
 ```bash
-vp run --filter @mosoo/api tc
-vp run --filter @mosoo/web test
-vp exec bun test apps/api/tests/session-run-cancel.test.ts
+just tc-package @mosoo/api
+just test-package @mosoo/web
+just test-file apps/api/tests/session-run-cancel.test.ts
 ```
 
 ## Database And Migrations
@@ -145,8 +140,8 @@ During alpha, historical migrations are not maintained. The database policy stay
 Common commands:
 
 ```bash
-vp run db:regen
-vp run db:migrate:local
+just db-regen
+just db-migrate
 ```
 
 If local database state is dirty, delete the corresponding local database and `.wrangler` state directories, then rebuild. Production release follows the same no-history posture: unless the current schema explicitly supports old data, old data is not considered compatible.
@@ -159,13 +154,13 @@ GraphQL sources of truth are:
 - Runtime resolvers: `apps/api/src/modules/*/graphql/*-graphql.ts`
 - API schema entry point: `apps/api/src/adapters/graphql/create-graphql-schema.ts`
 - Codegen schema input: `apps/api/src/adapters/graphql/codegen-schema.ts`
-- Codegen config: `dev/config/graphql-codegen.ts`
+- Codegen config: `config/graphql-codegen.ts`
 - Web GraphQL documents: `graphql(/* GraphQL */)` in `apps/web/src/**/*.{ts,tsx}`
 
 After changing backend schema, custom scalar mapping, frontend queries, mutations, or fragments, run:
 
 ```bash
-vp run graphql:codegen
+just graphql-codegen
 ```
 
 If generated output exposes type or field drift, fix the spec, resolver, contract, or PRD source instead of patching generated files.
@@ -176,21 +171,21 @@ Choose validation based on risk and blast radius. The project is still alpha, so
 
 Recommended baseline:
 
-- Documentation changes: `vp fmt --check <files>`, plus link / path checks when moving documents.
-- TypeScript package changes: the package `tc` and focused unit tests; run root `vp run tc` when cross-contract behavior changes.
-- API behavior changes: focused `bun test` files; add `@mosoo/api tc` when types or bindings are involved.
-- Web behavior changes: focused web tests and `@mosoo/web tc`; user-visible flows need browser or manual checks.
-- GraphQL changes: `vp run graphql:codegen`.
-- DB schema changes: `vp run db:regen` and relevant API tests.
+- Documentation changes: `just fmt-check-path <path>`, plus link / path checks when moving documents.
+- TypeScript package changes: `just tc-package <package>` and focused unit tests; run root `just tc` when cross-contract behavior changes.
+- API behavior changes: focused `just test-file <path>`; add `just tc-package @mosoo/api` when types or bindings are involved.
+- Web behavior changes: focused `just test-file <path>` and `just tc-package @mosoo/web`; user-visible flows need browser or manual checks.
+- GraphQL changes: `just graphql-codegen`.
+- DB schema changes: `just db-regen` and relevant API tests.
 
 E2E entry points:
 
 ```bash
-vp run e2e:harness-contract
-./e2e/run-deterministic.sh
-./e2e/run-preview-smoke.sh
-./e2e/run-preview-smoke.sh --headed
-./e2e/run-preview-latency.sh
+just e2e-harness-contract
+just e2e-deterministic
+just e2e-preview-smoke
+just e2e-preview-smoke-headed
+just e2e-preview-latency
 ```
 
 `run-deterministic.sh` is the local acceptance path without external credentials. `e2e:harness-contract` covers local harness contracts that do not need live credentials. The preview live harness requires a provider key such as `MOSOO_E2E_OPENAI_API_KEY`, `MOSOO_E2E_ANTHROPIC_API_KEY`, or `MOSOO_E2E_PROVIDER_API_KEY`; set `MOSOO_E2E_PROVIDER=openai|anthropic` to choose the public runtime provider. ACP fallback is an internal transport covered by driver fixture and API integration gates.
@@ -263,14 +258,42 @@ chore/dev-docs-layout
 
 Use `!` only for intentional breaking changes. Every Issue and PR must be self-assigned. PRs should keep a clear scope, describe verification results, and explicitly state whether they include generated files, GraphQL codegen, or DB baseline updates.
 
+### Enforced Commit Policy
+
+Commit quality is enforced by automation, not contributor memory:
+
+- Local `commit-msg` and `pre-push` hooks via `prek` (`config/prek.toml`)
+- PR title lint (`.github/workflows/pr-title-lint.yml`)
+- PR commit lint (`.github/workflows/pr-commits-lint.yml`)
+- Direct pushes to `main` are rejected locally and by the GitHub ruleset
+
+Reinstall hooks whenever hook config changes:
+
+```bash
+just hooks-install
+```
+
+Rules are defined in `config/commit-policy.ts`:
+
+- Subject must match `type(scope): subject`
+- Scope is required; legacy prefixes such as `[codex]` and `YEF-` are rejected
+- Subject length must stay at or below 72 characters
+- Author must identify a real human contributor; AI/agent/bot identities are rejected
+
+To check your branch against `origin/main` locally:
+
+```bash
+just commit-check
+```
+
 ## Deployment Notes
 
 Production deployment scripts exist, but they are not part of the daily contribution flow:
 
 ```bash
-vp run deploy:api
-vp run deploy:web
-vp run deploy
+just deploy-api
+just deploy-web
+just deploy
 ```
 
 API production config lives in `apps/api/wrangler.toml`; web production config lives in `apps/web/wrangler.toml`. Cloudflare routes send `mosoo.ai/api/*` to the API Worker and `mosoo.ai/*` to the web Worker.
