@@ -69,7 +69,7 @@ for (const item of output) {
 }
 
 if (staleFiles.length > 0) {
-  console.error("GraphQL generated outputs are stale. Run `vp run graphql:codegen`.");
+  console.error("GraphQL generated outputs are stale. Run `just graphql-codegen`.");
 
   for (const file of staleFiles) {
     console.error(`- ${file}`);

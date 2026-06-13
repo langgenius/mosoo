@@ -2,7 +2,7 @@
 // the public documentation manifest at https://docs.mosoo.ai/llms.txt.
 //
 // Usage:
-//   bun dev/scripts/generate-help-docs-index.ts
+//   just help-docs-index
 //
 // The script fetches the manifest, derives a section + canonical page URL for each
 // entry, and rewrites the region between the GENERATED markers in help-docs.ts.

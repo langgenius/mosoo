@@ -5,7 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import type { UserConfig } from "vite-plus";
 
-import { createSharedLintConfig, sharedFmtConfig } from "../../dev/config/vite-plus.shared.ts";
+import { createSharedLintConfig, sharedFmtConfig } from "../../config/vite-plus.shared.ts";
 
 const sourceRoot = fileURLToPath(new URL("src", import.meta.url));
 const webDevPort = Number(process.env["WEB_DEV_PORT"] ?? "5173");

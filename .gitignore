@@ -3,6 +3,7 @@ node_modules
 .wrangler
 .dev.vars
 .envrc
+.local/
 dist
 .DS_Store
 playwright-report

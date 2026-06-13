@@ -1,6 +1,6 @@
 import type { UserConfig } from "vite-plus";
 
-import { createSharedLintConfig, sharedFmtConfig } from "./dev/config/vite-plus.shared.ts";
+import { createSharedLintConfig, sharedFmtConfig } from "./config/vite-plus.shared.ts";
 
 const generatedGraphqlIgnorePatterns = [
   "apps/api/src/adapters/graphql/schema.generated.graphql",

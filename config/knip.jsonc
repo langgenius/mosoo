@@ -7,8 +7,8 @@
   "workspaces": {
     ".": {
       "includeEntryExports": false,
-      "entry": ["dev/config/**/*.ts", "dev/scripts/**/*.ts", "vite.config.ts"],
-      "project": ["dev/config/**/*.d.ts", "dev/config/**/*.ts", "dev/scripts/**/*.ts"],
+      "entry": ["config/**/*.ts", "scripts/**/*.ts", "vite.config.ts"],
+      "project": ["config/**/*.d.ts", "config/**/*.ts", "scripts/**/*.ts"],
       "ignoreDependencies": [
         "@graphql-codegen/client-preset",
         "@graphql-codegen/schema-ast",

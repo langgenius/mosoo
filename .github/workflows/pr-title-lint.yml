@@ -43,5 +43,4 @@ jobs:
           subjectPatternError: |
             The subject "{subject}" must start with a lower-case letter
             (Conventional Commits style), e.g. "feat(web): add help search".
-          # Scope is optional and free-form; require the "type(scope): subject" shape.
-          requireScope: false
+          requireScope: true

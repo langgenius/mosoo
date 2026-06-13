@@ -1,4 +1,4 @@
-import type { BunRuntime, BunServer } from "../../../dev/config/bun-script-types";
+import type { BunRuntime, BunServer } from "../../../config/bun-script-types";
 
 declare const Bun: BunRuntime;
 

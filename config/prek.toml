@@ -1,3 +1,5 @@
+default_install_hook_types = ['pre-commit', 'commit-msg', 'pre-push']
+
 [[repos]]
 repo = 'builtin'
 hooks = [
@@ -30,7 +32,7 @@ repo = 'local'
 [[repos.hooks]]
 id = 'prek-validate-config'
 name = 'prek validate-config'
-entry = 'vp exec prek validate-config dev/config/prek.toml'
+entry = 'vp exec prek validate-config config/prek.toml'
 language = 'system'
 always_run = true
 pass_filenames = false
@@ -40,4 +42,21 @@ id = 'just-tc'
 name = 'just tc'
 entry = 'just tc'
 language = 'system'
+pass_filenames = false
+
+[[repos.hooks]]
+id = 'validate-commit-message'
+name = 'validate commit message'
+entry = 'vp exec bun scripts/validate-commit-message.ts'
+language = 'system'
+stages = ['commit-msg']
+always_run = true
+
+[[repos.hooks]]
+id = 'validate-push-commits'
+name = 'validate push commits'
+entry = 'vp exec bun scripts/validate-push-commits.ts'
+language = 'system'
+stages = ['pre-push']
+always_run = true
 pass_filenames = false
