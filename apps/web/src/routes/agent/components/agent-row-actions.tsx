@@ -60,7 +60,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const isEditor = agent.role === "owner" || agent.role === "admin";
+  const isEditor = agent.role === "owner";
   const canDelete = agent.role === "owner";
   const typedAgentId = toAgentId(agent.id);
   const typedAppId = toAppId(agent.appId);

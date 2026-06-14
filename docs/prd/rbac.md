@@ -1,10 +1,10 @@
-# RBAC — for humans
+# RBAC — deprecated future governance archive
 
 > The Mosoo RBAC product story for non-engineers. The **complete engineering contract (Action IDs / matrices / field-level permissions)** lives in the full RBAC PRD.
 >
 > This document only answers "who can do what" and "who can stop whom." Action IDs, lookup tables, and schema fields are out of scope here.
 >
-> **Current App boundary note**: RBAC is historical foundation and future governance guidance. The current App cut assumes a single Organization owner; App access maps to that owner. Owner / Admin / Member matrices, admin reach-through, member requests, and asset takeover must not block App model, App routing, or App-owned resource work. See [App Boundary](./app-boundary.md).
+> **Deprecated for current implementation**: RBAC is future governance archive material, not the V1 permission contract. The current App cut assumes a single Organization owner; App access maps to that owner. Owner / Admin / Member matrices, admin reach-through, member requests, ACL sharing, and asset takeover must not shape App model, App routing, App-owned resources, tests, fixtures, or permission fallbacks. See [App Boundary](./app-boundary.md).
 
 ---
 

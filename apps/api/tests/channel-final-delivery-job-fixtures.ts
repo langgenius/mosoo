@@ -210,7 +210,7 @@ export async function createCompletedLarkFinalDeliveryJob(input: {
 }): Promise<CompletedFinalDeliveryJob> {
   const binding = await createLarkAgentChannelBinding(input.bindings, OWNER_VIEWER, {
     agentId: PUBLIC_API_TEST_IDS.agent,
-    appId: "cli_a",
+    larkAppId: "cli_a",
     appSecret: "secret",
     connectionMode: "webhook",
     domain: "feishu",

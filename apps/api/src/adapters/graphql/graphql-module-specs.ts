@@ -58,7 +58,6 @@ export const agentGraphQLSpec = {
     "restartDriver(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!",
     "unpublishAgent(appId: ULID!, agentId: ULID!): Agent!",
     "updateAgentConfig(input: UpdateAgentConfigInput!): Agent!",
-    "updateAgentPackageSharing(input: UpdateAgentPackageSharingInput!): Agent!",
   ],
   queryFields: [
     "accessibleAgentList(appId: ULID!): [AgentSummary!]!",

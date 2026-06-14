@@ -299,7 +299,6 @@ export async function insertSecondLiveAgent(
   const configJson = JSON.stringify({
     packageMcpServers: [],
     packageResolution: null,
-    packageSharingEnabled: false,
     packageSkills: [],
   });
   const appDatabase = database.app();
@@ -324,7 +323,7 @@ export async function insertSecondLiveAgent(
       runtimeId: "openai-runtime",
       status: "published",
       updatedAt: nowMs,
-      visibility: "organization",
+      visibility: "private",
     })
     .run();
 

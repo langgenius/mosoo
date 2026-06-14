@@ -52,28 +52,17 @@ transfer, SAML, SCIM, domain discovery, or Organization-owned runtime resource p
 
 ### App
 
-A App is the canonical engineering entity for an App.
-
-A App:
-
-- Belongs to one Organization.
-- Has one owner Account in V1.
-- Owns App-local resources.
-- Is the primary database, API, and test boundary.
-
-App and App are the same entity. Do not introduce a separate App table or a
-App-contains-App relationship in V1.
-
-### App
-
-An App is the user-facing name for a App.
+An App is the canonical product and engineering boundary.
 
 An App:
 
 - Is what the user creates, opens, configures, monitors, and exports.
 - Is a boundary for a real-world Agent application.
+- Belongs to one Organization.
+- Has one owner Account in V1.
 - Organizes one or more Agents.
 - Owns shared resources used by those Agents.
+- Is the primary database, API, and test boundary.
 - Aggregates Threads, usage, health, logs, and expose state through its Agents.
 - Can be packaged into one `Skill.md` for coding-agent reuse.
 - Is the default console entry after onboarding when the Organization has one App.
@@ -167,8 +156,7 @@ Storage:
 - Can receive write summaries from runtime file activity.
 - Can be bound by one or more Agents.
 
-Storage collaborators, "Shared with me", and "Everyone in organization" are future
-governance concepts.
+Storage collaborator views and org-wide storage catalogs are future governance concepts.
 
 ### Skill
 
@@ -289,7 +277,6 @@ Account
 Rules:
 
 - Organization owns Apps, not App resources directly.
-- App and App are the same boundary with different names for different audiences.
 - App owns organization, resource, export, and operations scope.
 - App has no runtime.
 - Agent owns runtime, endpoint exposure, channel delivery, and V1 Threads/Sessions.
@@ -329,8 +316,8 @@ V1 must not include:
 - Ownership transfer.
 - Asset takeover.
 - Org-wide shared resource catalogs.
-- "Shared with me".
-- "Everyone in organization".
+- Cross-account shared resource views.
+- Org-wide resource catalogs.
 - Agent collaborator management.
 - Storage collaborator management.
 - Skill sharing.
@@ -474,8 +461,8 @@ Rules:
   old Web-app-first wording unless a later spec reopens the decision.
 - When older docs say App owns delivery surface, read it as App aggregates Agent exposure and
   operations; Agent owns endpoint and channel delivery in V1.
-- When older docs mention member, coworker, shared with me, everyone in organization,
-  Owner/Admin/Member, invitation, or access request, treat it as future governance.
+- When older docs mention cross-account collaboration, org-wide resource catalogs,
+  member role matrices, invitations, or access requests, treat it as future governance.
 - Do not delete compatibility tables until App ownership and owner access replace
   their runtime dependencies.
 

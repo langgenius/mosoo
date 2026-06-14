@@ -14,7 +14,6 @@ import {
   publishAgent,
   unpublishAgent,
   updateAgentConfig,
-  updateAgentPackageSharing,
 } from "../application/agent-command.service";
 import { createAgentFork } from "../application/agent-fork.service";
 import { exportAgentManifest } from "../application/agent-manifest.service";
@@ -59,10 +58,6 @@ interface UpdateAgentConfigArgs {
   input: Parameters<typeof updateAgentConfig>[2];
 }
 
-interface UpdateAgentPackageSharingArgs {
-  input: Parameters<typeof updateAgentPackageSharing>[2];
-}
-
 interface ImportAgentPackageArgs {
   input: Parameters<typeof importAgentPackage>[2];
 }
@@ -103,8 +98,6 @@ export const agentGraphQLModule = {
       }),
     updateAgentConfig: async (_parent, args: UpdateAgentConfigArgs, context) =>
       updateAgentConfig(context.bindings.DB, context.viewer, args.input),
-    updateAgentPackageSharing: async (_parent, args: UpdateAgentPackageSharingArgs, context) =>
-      updateAgentPackageSharing(context.bindings.DB, context.viewer, args.input),
   },
   authenticatedQueryResolvers: {
     accessibleAgentList: async (_parent, args: AppIdArgs, context) =>

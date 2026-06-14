@@ -177,7 +177,6 @@ describe("agent package draft", () => {
       },
       packageMcpServers: [],
       packageResolution: null,
-      packageSharingEnabled: false,
       packageSkills: [],
       providerOptions: {},
     });

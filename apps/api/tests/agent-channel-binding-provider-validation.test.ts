@@ -279,7 +279,7 @@ describe("agent channel provider validation", () => {
         try {
           await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
             agentId: PUBLIC_API_TEST_IDS.agent,
-            appId: "cli-invalid",
+            larkAppId: "cli-invalid",
             appSecret: "invalid-secret",
             connectionMode: "webhook",
             domain: "feishu",
@@ -314,7 +314,7 @@ describe("agent channel provider validation", () => {
     try {
       await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
         agentId: PUBLIC_API_TEST_IDS.agent,
-        appId: "cli_a",
+        larkAppId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "websocket",
         domain: "feishu",

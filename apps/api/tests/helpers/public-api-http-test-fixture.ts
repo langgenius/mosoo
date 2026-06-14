@@ -46,7 +46,6 @@ const CONTRACT_SCHEMA_SQL = readFileSync(
 const INITIAL_AGENT_CONFIG_JSON = JSON.stringify({
   packageMcpServers: [],
   packageResolution: null,
-  packageSharingEnabled: false,
   packageSkills: [],
 });
 
@@ -435,7 +434,7 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
       runtimeId: "openai-runtime",
       status: "published",
       updatedAt: nowMs,
-      visibility: "organization",
+      visibility: "private",
     })
     .run();
 

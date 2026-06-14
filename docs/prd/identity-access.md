@@ -1,10 +1,10 @@
-# Identity & Access — for humans
+# Identity & Access — deprecated future governance archive
 
 > The Identity & Access product story for non-engineers. The **complete engineering contract** (Resolver priority, Org / Account / Membership fields, email skeletons, the decisions column) lives in the full Identity & Access PRD.
 >
 > This document is aligned with v2.2 (Unified Lock, locked on 2026-04-25).
 >
-> **Current App boundary note**: During the current pivot, assume one human owns one Organization and the default App is created for that owner. Member lifecycle, invitations, access requests, primary-domain discovery, and multi-role Organization administration are future governance extensions. Do not use those flows as prerequisites for App data modeling or console IA. See [App Boundary](./app-boundary.md).
+> **Deprecated for current implementation**: During the current App cut, assume one human owns one Organization and the default App is created for that owner. Member lifecycle, invitations, access requests, primary-domain discovery, and multi-role Organization administration are future governance archive material only. Do not use those flows as prerequisites for App data modeling, console IA, tests, fixtures, permission fallbacks, or migration bridges. See [App Boundary](./app-boundary.md).
 
 ---
 

@@ -42,10 +42,10 @@ function toAgentStatus(status: string | null | undefined): AgentStatus {
 }
 
 function toAgentRole(viewerRole: AgentViewerRole): AgentRole {
-  if (viewerRole === "owner" || viewerRole === "admin") {
-    return viewerRole;
+  if (viewerRole === "owner") {
+    return "owner";
   }
-  return "user";
+  return "none";
 }
 
 function toSkillInfo(skill: AgentSkillReference): SkillInfo {
@@ -127,7 +127,7 @@ function toOwner(
   return {
     email: "",
     id: profile.owner.id,
-    name: profile.owner.name ?? "Organization member",
+    name: profile.owner.name ?? "App owner",
     ...(typeof profile.owner.imageUrl === "string" && profile.owner.imageUrl.length > 0
       ? { avatar: profile.owner.imageUrl }
       : {}),
@@ -162,7 +162,6 @@ export function mapAgentSummaryToListView(
     name: profile.name,
     owner: toOwner(profile, currentUser),
     packageResolution: null,
-    packageSharingEnabled: false,
     provider: "",
     readiness: null,
     role: toAgentRole(profile.viewerRole),
@@ -202,7 +201,6 @@ export function mapAgentDetailToView(
     name: profile.name,
     owner: toOwner(profile, currentUser),
     packageResolution: editorDetail?.packageResolution ?? null,
-    packageSharingEnabled: profile.packageSharingEnabled,
     provider: profile.provider,
     readiness: editorDetail?.readiness ?? null,
     role: toAgentRole(profile.viewerRole),

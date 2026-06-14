@@ -1,4 +1,4 @@
-import type { AgentOwnerSummary, AgentToolSummary } from "@mosoo/contracts/agent";
+import type { AgentOwnerSummary, AgentToolSummary, AgentVisibility } from "@mosoo/contracts/agent";
 import {
   accountsTable,
   agentMcpBindingsTable,
@@ -71,8 +71,16 @@ type RawAgentRow = {
   runtimeId: string;
   status: AgentRow["status"];
   updatedAt: number;
-  visibility: AgentRow["visibility"];
+  visibility: string;
 };
+
+function readAgentVisibility(value: string): AgentVisibility {
+  if (value === "private") {
+    return value;
+  }
+
+  throw new Error("Agent visibility must be private for App-scoped Agents.");
+}
 
 function toAgentRow(row: RawAgentRow): AgentRow {
   return {
@@ -93,6 +101,7 @@ function toAgentRow(row: RawAgentRow): AgentRow {
     organizationId: readOrganizationId(row.organizationId, "Agent organization ID"),
     ownerId: readAccountId(row.ownerId, "Agent owner ID"),
     appId: readAppId(row.appId, "Agent app ID"),
+    visibility: readAgentVisibility(row.visibility),
   };
 }
 

@@ -14,7 +14,6 @@ import type {
   RuntimeStateOperationInput,
   RuntimeStateOperationResult,
   UpdateAgentConfigInput,
-  UpdateAgentPackageSharingInput,
 } from "@mosoo/contracts/agent";
 import type {
   AgentManifestExport,
@@ -94,7 +93,6 @@ import {
   EXPORT_AGENT_PACKAGE_QUERY,
   GET_AGENT_MANIFEST_QUERY,
   IMPORT_AGENT_PACKAGE_MUTATION,
-  UPDATE_AGENT_PACKAGE_SHARING_MUTATION,
 } from "./agent-package-documents";
 
 type GraphQLAgentSummary = AccessibleAgentsQuery["accessibleAgentList"][number];
@@ -261,14 +259,6 @@ export async function updateAgentConfig(input: UpdateAgentConfigInput): Promise<
   const payload = await requestGraphQL(UPDATE_AGENT_CONFIG_MUTATION, { input });
 
   return toAgent(payload.updateAgentConfig);
-}
-
-export async function updateAgentPackageSharing(
-  input: UpdateAgentPackageSharingInput,
-): Promise<Agent> {
-  const payload = await requestGraphQL(UPDATE_AGENT_PACKAGE_SHARING_MUTATION, { input });
-
-  return toAgent(payload.updateAgentPackageSharing);
 }
 
 export async function deleteAgent(input: DeleteAgentInput): Promise<void> {

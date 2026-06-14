@@ -25,7 +25,7 @@ describe("Agent runtime lock boundary", () => {
     expect(combinedSource).toContain("Agent type is locked after publishing.");
     expect(combinedSource).toContain("Runtime changes are not allowed in-place after publishing.");
     expect(combinedSource).toContain("Non-owner consume mode.");
-    expect(combinedSource).toContain("Owner/Admin consume mode keeps a config entry point.");
+    expect(combinedSource).toContain("Owner consume mode keeps a config entry point.");
 
     expect(combinedSource.toLowerCase()).not.toContain("published agent");
     expect(combinedSource).not.toContain("Fork Agent to change type or runtime");

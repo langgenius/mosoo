@@ -70,7 +70,7 @@ function AgentDetailHeader({
   headerActionTargetRef,
   headerCenterTargetRef,
   isDraftLifecycle,
-  isOwnerOrAdmin,
+  isOwner,
   lifecycleMode,
   mode,
   onBack,
@@ -84,7 +84,7 @@ function AgentDetailHeader({
   headerActionTargetRef: (node: HTMLDivElement | null) => void;
   headerCenterTargetRef: (node: HTMLDivElement | null) => void;
   isDraftLifecycle: boolean;
-  isOwnerOrAdmin: boolean;
+  isOwner: boolean;
   lifecycleMode: Extract<DetailMode, "dev" | "preview"> | null;
   mode: DetailMode;
   onBack: () => void;
@@ -131,7 +131,7 @@ function AgentDetailHeader({
       ) : (
         <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1">
           {MODE_TABS.flatMap((tab) =>
-            tab.ownerOnly === true && !isOwnerOrAdmin
+            tab.ownerOnly === true && !isOwner
               ? []
               : [
                   <button
@@ -216,9 +216,7 @@ export function AgentDetailPage() {
   const [headerCenterTarget, setHeaderCenterTarget] = useState<HTMLDivElement | null>(null);
 
   const detailQuery = useAgentDetailQuery(activeAppId, agentId ?? null);
-  const canEdit = detailQuery.data
-    ? detailQuery.data.viewerRole === "owner" || detailQuery.data.viewerRole === "admin"
-    : false;
+  const canEdit = detailQuery.data ? detailQuery.data.viewerRole === "owner" : false;
   const editorStateQuery = useAgentEditorStateQuery(activeAppId, agentId ?? null, canEdit);
 
   const agent = useMemo<Agent | null>(() => {
@@ -231,7 +229,7 @@ export function AgentDetailPage() {
 
   const basePath = globalThis.location.pathname.startsWith("/demo") ? "/demo/agent" : "/agent";
   const runtime = useMemo(() => (agent ? getRuntimeInfo(agent.runtime) : null), [agent]);
-  const isOwnerOrAdmin = agent?.role === "owner" || agent?.role === "admin";
+  const isOwner = agent?.role === "owner";
   const canManageAgentAccess = detailQuery.data?.viewerRole === "owner";
   const canUseTerminal = canShowAgentDebugMenuItem({
     agentKind: agent?.kind ?? null,
@@ -277,14 +275,14 @@ export function AgentDetailPage() {
     );
   }, [settingsParam, setSearchParams]);
 
-  // Default mode: Owner/Admin → Dev (config), others → Consume (read-only chat).
+  // Default mode: Owner → Dev (config), others → Consume.
   // Owners can still reach Consume via `?tab=consume` (e.g. the
   // post-publish success modal's "Open Chat" CTA) or the Preview tab for
   // an in-context test chat.
-  const defaultMode: DetailMode = isOwnerOrAdmin ? "dev" : "consume";
+  const defaultMode: DetailMode = isOwner ? "dev" : "consume";
   const requestedMode = selectedMode ?? urlMode ?? defaultMode;
   const mode =
-    !isOwnerOrAdmin && requestedMode !== "consume"
+    !isOwner && requestedMode !== "consume"
       ? "consume"
       : requestedMode === "terminal" && !canUseTerminal
         ? defaultMode
@@ -345,11 +343,11 @@ export function AgentDetailPage() {
   }
 
   // Non-owner consume mode.
-  if (!isOwnerOrAdmin) {
+  if (!isOwner) {
     return <ConsumeMode agent={agent} organizationId={detail.organizationId} />;
   }
 
-  // Owner/Admin consume mode keeps a config entry point.
+  // Owner consume mode keeps a config entry point.
   if (mode === "consume") {
     return (
       <ConsumeMode
@@ -363,7 +361,7 @@ export function AgentDetailPage() {
     );
   }
 
-  // Owner/Admin config modes (Create / Preview / Dev / Logs).
+  // Owner config modes (Create / Preview / Dev / Logs).
   // Lifecycle shell wraps Draft agents in the Configure / Preview / Publish
   // surfaces. Live agents fall through to the existing tabbed UI unchanged.
   const isDraftLifecycle = agent.status === "draft";
@@ -377,7 +375,7 @@ export function AgentDetailPage() {
         headerActionTargetRef={setHeaderActionTarget}
         headerCenterTargetRef={setHeaderCenterTarget}
         isDraftLifecycle={isDraftLifecycle}
-        isOwnerOrAdmin={isOwnerOrAdmin}
+        isOwner={isOwner}
         lifecycleMode={lifecycleMode}
         mode={mode}
         onBack={() => {

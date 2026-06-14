@@ -49,7 +49,7 @@ export function AgentSettingsPackageActions({
       await queryClient.invalidateQueries({ queryKey: agentKeys.lists() });
     },
   });
-  const hasEditorPackageAccess = agent.role === "owner" || agent.role === "admin";
+  const hasEditorPackageAccess = agent.role === "owner";
   const canUsePackageActions = canManageAccess && hasEditorPackageAccess;
   const packageActionError = exportPackageMutation.error ?? forkMutation.error;
 

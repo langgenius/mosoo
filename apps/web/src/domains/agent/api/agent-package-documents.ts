@@ -23,14 +23,6 @@ export const EXPORT_AGENT_PACKAGE_QUERY = graphql(/* GraphQL */ `
   }
 `);
 
-export const UPDATE_AGENT_PACKAGE_SHARING_MUTATION = graphql(/* GraphQL */ `
-  mutation UpdateAgentPackageSharing($input: UpdateAgentPackageSharingInput!) {
-    updateAgentPackageSharing(input: $input) {
-      ...AgentFields
-    }
-  }
-`);
-
 export const IMPORT_AGENT_PACKAGE_MUTATION = graphql(/* GraphQL */ `
   mutation ImportAgentPackage($input: ImportAgentPackageInput!) {
     importAgentPackage(input: $input) {

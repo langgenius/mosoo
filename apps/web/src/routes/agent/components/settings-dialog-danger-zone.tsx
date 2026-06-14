@@ -90,7 +90,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                 </p>
                 <p className="text-muted-foreground text-xs">
                   New sessions stop accepting. Existing sessions, cost, and the live version stay
-                  accessible. You can re-publish anytime; visibility is remembered.
+                  accessible. You can re-publish anytime from the same App.
                 </p>
                 {unpublishMutation.error ? (
                   <div className="text-destructive text-xs">

@@ -211,9 +211,9 @@ export function listAgentKindRuntimeComparisonRows(): readonly AgentKindRuntimeC
 }
 
 export type AgentStatus = "draft" | "published";
-export type AgentVisibility = "private" | "organization";
+export type AgentVisibility = "private";
 export type AgentSkillState = "active" | "tombstone";
-export type AgentViewerRole = "owner" | "admin" | "user" | "none";
+export type AgentViewerRole = "owner" | "none";
 
 export interface AgentSkillReference {
   ownerName: string | null;
@@ -280,7 +280,6 @@ export interface Agent {
   liveVersion: AgentDeploymentVersion | null;
   model: string;
   name: string;
-  packageSharingEnabled: boolean;
   prompt: string;
   provider: string;
   runtimeId: string;
@@ -301,7 +300,6 @@ export interface AgentDetail {
   model: string;
   name: string;
   owner: AgentOwnerSummary;
-  packageSharingEnabled: boolean;
   prompt: string;
   provider: string;
   runtimeId: string;
@@ -387,18 +385,6 @@ export interface DeleteAgentInput {
 
 export interface PublishAgentInput {
   agentId: AgentId;
-  appId: AppId;
-  /**
-   * Optional. Omit on re-publish to inherit the agent's current visibility.
-   * Required on the first publish (when the agent has no prior visibility set,
-   * the DB default `private` applies and backend normalization guarantees a value).
-   */
-  visibility?: AgentVisibility;
-}
-
-export interface UpdateAgentPackageSharingInput {
-  agentId: AgentId;
-  packageSharingEnabled: boolean;
   appId: AppId;
 }
 

@@ -1,4 +1,3 @@
-import type { AgentVisibility } from "@mosoo/contracts/agent";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import type { ReactElement } from "react";
@@ -47,7 +46,6 @@ type PreviewModeAction =
   | { type: "setSuccessModalOpen"; open: boolean };
 
 const DEFAULT_CHANNEL_ID: ChannelId = "slack";
-const DEFAULT_PUBLISH_VISIBILITY: AgentVisibility = "organization";
 const PREVIEW_MODE_INITIAL_STATE: PreviewModeState = {
   apiAccessDialogOpen: false,
   appliedKind: null,
@@ -152,11 +150,10 @@ export function PreviewMode({
   )?.message;
 
   const publishMutation = useMutation({
-    mutationFn: async (nextVisibility?: AgentVisibility) =>
+    mutationFn: async () =>
       publishAgent({
         agentId: toAgentId(agent.id),
         appId: toAppId(agent.appId),
-        ...(nextVisibility !== undefined ? { visibility: nextVisibility } : {}),
       }),
     onSuccess: async () => {
       await Promise.all([
@@ -170,7 +167,6 @@ export function PreviewMode({
     },
   });
 
-  const isLive = agent.status === "published";
   const publishDisabled = publishBlocked || publishMutation.isPending || model.dirty;
   const publishError = publishMutation.error instanceof Error ? publishMutation.error : null;
   const publishStatus = publishStatusMessage({
@@ -196,14 +192,7 @@ export function PreviewMode({
                 dispatch({ open: true, type: "setChannelsDialogOpen" });
               }}
               onPublish={() => {
-                // Re-publish inherits the agent's current visibility (omit). First
-                // publish defaults to organization — audience changes live in
-                // Settings → Collaborators afterward.
-                if (isLive) {
-                  publishMutation.mutate(undefined);
-                } else {
-                  publishMutation.mutate(DEFAULT_PUBLISH_VISIBILITY);
-                }
+                publishMutation.mutate();
               }}
             />,
             headerActionTarget,

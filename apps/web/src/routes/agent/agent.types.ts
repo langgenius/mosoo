@@ -10,7 +10,7 @@ import type { AgentPackageResolutionState } from "@mosoo/contracts/agent-manifes
 import type { McpAuthorizationState, McpCredentialStatus } from "@mosoo/contracts/mcp";
 
 export type AgentStatus = "draft" | "published";
-export type AgentRole = "owner" | "admin" | "user";
+export type AgentRole = "owner" | "none";
 export type AgentMode = "create" | "preview" | "dev" | "consume";
 export type { AgentKind };
 
@@ -103,7 +103,6 @@ export interface Agent {
   versions: AgentDeploymentVersion[];
   visibility: AgentVisibility;
   owner: UserInfo;
-  packageSharingEnabled: boolean;
   packageResolution: AgentPackageResolutionState | null;
   role: AgentRole;
   config: AgentConfig;

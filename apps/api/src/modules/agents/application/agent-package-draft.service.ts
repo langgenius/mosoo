@@ -82,7 +82,6 @@ export async function createDraftAgentBatch(
         packageMcpServers: input.packageMcpServers,
         packageSkills: input.packageSkills,
         packageResolution: input.packageResolution,
-        packageSharingEnabled: false,
         providerOptions: input.providerOptions,
       }),
       createdAt: timestampMs,

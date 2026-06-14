@@ -178,13 +178,10 @@ export type AgentStatus =
   | 'published';
 
 export type AgentViewerRole =
-  | 'admin'
   | 'none'
-  | 'owner'
-  | 'user';
+  | 'owner';
 
 export type AgentVisibility =
-  | 'organization'
   | 'private';
 
 export type AuthMethod =
@@ -513,11 +510,6 @@ export type PollWeChatAgentChannelPairingInput = {
 export type PublishAgentInput = {
   agentId: PlatformId;
   appId: PlatformId;
-  /**
-   * Omit on re-publish to inherit the agent's current visibility. Required only
-   * on the very first publish.
-   */
-  visibility?: AgentVisibility | null | undefined;
 };
 
 export type RemoveSessionResourceInput = {
@@ -690,12 +682,6 @@ export type UpdateAgentConfigInput = {
   skillIds: Array<PlatformId>;
 };
 
-export type UpdateAgentPackageSharingInput = {
-  agentId: PlatformId;
-  appId: PlatformId;
-  packageSharingEnabled: boolean;
-};
-
 export type UpdateEnvironmentInput = {
   allowMcpServers: boolean;
   allowPackageManagers: boolean;
@@ -827,7 +813,7 @@ export type DeleteAgentChannelBindingMutationVariables = Exact<{
 
 export type DeleteAgentChannelBindingMutation = { deleteAgentChannelBinding: { ok: boolean } };
 
-export type AgentFieldsFragment = { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, packageSharingEnabled: boolean, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> };
+export type AgentFieldsFragment = { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> };
 
 export type AgentToolSummaryFieldsFragment = { enabled: boolean, iconUrl: string | null, name: string, serverId: PlatformId };
 
@@ -840,7 +826,7 @@ export type CreateAgentMutationVariables = Exact<{
 }>;
 
 
-export type CreateAgentMutation = { createAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, packageSharingEnabled: boolean, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
+export type CreateAgentMutation = { createAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
 
 export type DeleteAgentMutationVariables = Exact<{
   input: DeleteAgentInput;
@@ -862,7 +848,7 @@ export type AgentQueryVariables = Exact<{
 }>;
 
 
-export type AgentQuery = { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, packageSharingEnabled: boolean, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, viewerRole: AgentViewerRole, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, owner: { id: PlatformId, imageUrl: string | null, name: string | null }, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }>, tools: Array<{ enabled: boolean, iconUrl: string | null, name: string, serverId: PlatformId }>, versions: Array<{ agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number }> } };
+export type AgentQuery = { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, viewerRole: AgentViewerRole, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, owner: { id: PlatformId, imageUrl: string | null, name: string | null }, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }>, tools: Array<{ enabled: boolean, iconUrl: string | null, name: string, serverId: PlatformId }>, versions: Array<{ agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number }> } };
 
 export type AgentEditorStateQueryVariables = Exact<{
   agentId: PlatformId;
@@ -877,7 +863,7 @@ export type UpdateAgentConfigMutationVariables = Exact<{
 }>;
 
 
-export type UpdateAgentConfigMutation = { updateAgentConfig: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, packageSharingEnabled: boolean, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
+export type UpdateAgentConfigMutation = { updateAgentConfig: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
 
 export type AgentManifestQueryVariables = Exact<{
   agentId: PlatformId;
@@ -895,33 +881,26 @@ export type ExportAgentPackageQueryVariables = Exact<{
 
 export type ExportAgentPackageQuery = { exportAgentPackage: { agentId: PlatformId, contentType: string, fileId: PlatformId, fileName: string, manifestYaml: string, size: number } };
 
-export type UpdateAgentPackageSharingMutationVariables = Exact<{
-  input: UpdateAgentPackageSharingInput;
-}>;
-
-
-export type UpdateAgentPackageSharingMutation = { updateAgentPackageSharing: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, packageSharingEnabled: boolean, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
-
 export type ImportAgentPackageMutationVariables = Exact<{
   input: ImportAgentPackageInput;
 }>;
 
 
-export type ImportAgentPackageMutation = { importAgentPackage: { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, packageSharingEnabled: boolean, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, boundSpaceCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
+export type ImportAgentPackageMutation = { importAgentPackage: { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, boundSpaceCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
 
 export type CreateAgentForkMutationVariables = Exact<{
   input: CreateAgentForkInput;
 }>;
 
 
-export type CreateAgentForkMutation = { createAgentFork: { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, packageSharingEnabled: boolean, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, boundSpaceCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
+export type CreateAgentForkMutation = { createAgentFork: { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, boundSpaceCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
 
 export type PublishAgentMutationVariables = Exact<{
   input: PublishAgentInput;
 }>;
 
 
-export type PublishAgentMutation = { publishAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, packageSharingEnabled: boolean, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
+export type PublishAgentMutation = { publishAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
 
 export type UnpublishAgentMutationVariables = Exact<{
   agentId: PlatformId;
@@ -929,7 +908,7 @@ export type UnpublishAgentMutationVariables = Exact<{
 }>;
 
 
-export type UnpublishAgentMutation = { unpublishAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, packageSharingEnabled: boolean, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
+export type UnpublishAgentMutation = { unpublishAgent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, organizationId: PlatformId, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> } };
 
 export type RestartDriverMutationVariables = Exact<{
   input: RuntimeStateOperationInput;
@@ -1535,7 +1514,6 @@ export const AgentFieldsFragmentDoc = new TypedDocumentString(`
   model
   name
   appId
-  packageSharingEnabled
   prompt
   provider
   runtimeId
@@ -2260,7 +2238,6 @@ export const CreateAgentDocument = new TypedDocumentString(`
   model
   name
   appId
-  packageSharingEnabled
   prompt
   provider
   runtimeId
@@ -2346,7 +2323,6 @@ export const AgentDocument = new TypedDocumentString(`
     owner {
       ...AgentOwnerFields
     }
-    packageSharingEnabled
     prompt
     provider
     runtimeId
@@ -2480,7 +2456,6 @@ export const UpdateAgentConfigDocument = new TypedDocumentString(`
   model
   name
   appId
-  packageSharingEnabled
   prompt
   provider
   runtimeId
@@ -2530,52 +2505,6 @@ export const ExportAgentPackageDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ExportAgentPackageQuery, ExportAgentPackageQueryVariables>;
-export const UpdateAgentPackageSharingDocument = new TypedDocumentString(`
-    mutation UpdateAgentPackageSharing($input: UpdateAgentPackageSharingInput!) {
-  updateAgentPackageSharing(input: $input) {
-    ...AgentFields
-  }
-}
-    fragment AgentFields on Agent {
-  createdAt
-  description
-  id
-  kind
-  liveVersion {
-    ...AgentDeploymentVersionFields
-  }
-  model
-  name
-  appId
-  packageSharingEnabled
-  prompt
-  provider
-  runtimeId
-  skills {
-    ownerName
-    skillId
-    skillName
-    state
-  }
-  status
-  updatedAt
-  visibility
-  organizationId
-}
-fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
-  agentId
-  createdAt
-  createdByAccountId
-  environmentId
-  id
-  isLive
-  kind
-  model
-  provider
-  runtimeId
-  summary
-  versionNumber
-}`) as unknown as TypedDocumentString<UpdateAgentPackageSharingMutation, UpdateAgentPackageSharingMutationVariables>;
 export const ImportAgentPackageDocument = new TypedDocumentString(`
     mutation ImportAgentPackage($input: ImportAgentPackageInput!) {
   importAgentPackage(input: $input) {
@@ -2615,7 +2544,6 @@ export const ImportAgentPackageDocument = new TypedDocumentString(`
   model
   name
   appId
-  packageSharingEnabled
   prompt
   provider
   runtimeId
@@ -2683,7 +2611,6 @@ export const CreateAgentForkDocument = new TypedDocumentString(`
   model
   name
   appId
-  packageSharingEnabled
   prompt
   provider
   runtimeId
@@ -2729,7 +2656,6 @@ export const PublishAgentDocument = new TypedDocumentString(`
   model
   name
   appId
-  packageSharingEnabled
   prompt
   provider
   runtimeId
@@ -2775,7 +2701,6 @@ export const UnpublishAgentDocument = new TypedDocumentString(`
   model
   name
   appId
-  packageSharingEnabled
   prompt
   provider
   runtimeId

@@ -124,7 +124,7 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
    - WebSocket requests always enter the Worker first. The Worker resolves the Session key and Organization context, then hands the upgraded connection to the corresponding Session Durable Object.
 
 2. **App Service**
-   App Service owns the business, resource, operations, and export boundary for the current pivot. App is the canonical engineering noun; App is the console noun. A App belongs to an Organization and is owned by the Organization owner during the single-owner phase. App has no runtime; Agent owns runtime, API endpoint exposure, and channel delivery.
+   App Service owns the business, resource, operations, and export boundary for the current pivot. App is the canonical product and engineering noun. An App belongs to an Organization and is owned by the Organization owner during the single-owner phase. App has no runtime; Agent owns runtime, API endpoint exposure, and channel delivery.
    - **Default App provisioning**: Onboarding / Organization provisioning creates a default App. If the Organization has exactly one App, the console routes directly into that App instead of forcing an App picker.
    - **Resource ownership**: Agents, Threads / Sessions, Spaces, Environments, Skills, MCP servers, Provider credentials, Channels, Agent exposure state, App export, app health, logs, and app-scoped cost are App-owned resources. Organization rollups remain for billing and future governance.
    - **Access boundary**: App access maps to the single Organization owner for this phase. App members, App roles, ownership transfer, and org-wide shared resources are future extensions, not prerequisites for the first cut.

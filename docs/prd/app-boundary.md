@@ -10,7 +10,7 @@ The near-term Mosoo wedge is no longer an Agent-first console. The product loop 
 
 1. A personal developer brings `PRD.md`.
 2. They invoke `@mosoo`.
-3. Mosoo creates or selects a App, shown as an App in console copy.
+3. Mosoo creates or selects an App.
 4. Mosoo provisions Agents and app-local resources.
 5. Mosoo exposes an Agent through API or channel when needed.
 6. Mosoo can export the App as one `Skill.md` for coding-agent reuse.
@@ -19,8 +19,7 @@ The current phase deliberately assumes one human owns one Organization. Organiza
 
 ## Naming Lock
 
-- **App** is the canonical engineering noun for code, database schema, API contracts, architecture, tests, and migrations.
-- **App** is the user-facing console noun. Users should feel they are operating an App, not a database entity.
+- **App** is the canonical noun for product copy, code, database schema, API contracts, architecture, tests, and migrations.
 - Do not introduce parallel nouns such as Workspace, Team, Application, Agent Service, Service App, or Product unless a later PRD explicitly reopens the naming decision. "Agent Service" is discussion language for Agent, not a new entity.
 - Existing Agent-first routes and docs are migration context, not the desired final IA.
 
@@ -29,8 +28,8 @@ The current phase deliberately assumes one human owns one Organization. Organiza
 For this phase:
 
 - One Organization has one human owner.
-- A App belongs to an Organization.
-- A App has an owner account, which is the Organization owner during the single-owner phase.
+- An App belongs to an Organization.
+- An App has an owner account, which is the Organization owner during the single-owner phase.
 - There is no App member table, App role matrix, member invitation flow, ownership transfer, or cross-member access request in scope.
 - Access checks may map App access to the single Organization owner. Multi-member access should remain an extension point, not a dependency of the first cut.
 
@@ -88,7 +87,7 @@ Onboarding should create a default App. If an Organization has exactly one App, 
 ## Drift Rules
 
 - If a PRD says Organization-owned for a business resource listed above, read it as historical unless it explicitly says it is describing a future governance layer.
-- If a PRD says member, coworker, shared with me, everyone in organization, Owner / Admin / Member, or access request, treat that text as future multi-member governance unless the current implementation already depends on it.
+- If a PRD describes cross-account collaboration, org-wide resource catalogs, member role matrices, or access-request flows, treat that text as future multi-member governance unless the current implementation already depends on it.
 - If a PRD says Agent Service, read it as Agent.
 - If a PRD says Agent is the stable service identity, read it as the Agent owning runtime and exposure while App aggregates Agent operations.
 - If a PRD says Publish App, App API, Web shell, or public preview URL, treat it as old Web-app-first wording unless a later spec reopens the decision.
