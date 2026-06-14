@@ -29,7 +29,6 @@ const AGENT_ROW: AgentRow = {
   liveDeploymentVersionId: "01J0000000000000000000006A",
   model: "gpt-5.4",
   name: "Agent",
-  appOrganizationId: "01J00000000000000000000006",
   ownerId: "01J00000000000000000000001",
   appId: "01J0000000000000000000000P",
   prompt: "Private prompt",

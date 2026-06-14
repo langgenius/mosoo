@@ -930,7 +930,7 @@ export type AppListQueryVariables = Exact<{
 }>;
 
 
-export type AppListQuery = { appList: Array<{ createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, organizationId: PlatformId, ownerAccountId: PlatformId, slug: string }> };
+export type AppListQuery = { appList: Array<{ createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId, slug: string }> };
 
 type CostTotalsFields_CostAgentRow_Fragment = { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number };
 
@@ -2750,7 +2750,6 @@ export const AppListDocument = new TypedDocumentString(`
     defaultEnvironmentId
     id
     name
-    organizationId
     ownerAccountId
     slug
   }

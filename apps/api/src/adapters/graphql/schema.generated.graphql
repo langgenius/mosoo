@@ -551,7 +551,6 @@ type App {
   defaultEnvironmentId: ULID
   id: ULID!
   name: String!
-  organizationId: ULID!
   ownerAccountId: ULID!
   slug: String!
 }

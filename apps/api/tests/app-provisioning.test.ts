@@ -85,7 +85,6 @@ describe("App provisioning boundary", () => {
         defaultEnvironmentId: "env-1",
         id: "app-1",
         name: "Default App",
-        organizationId: "org-1",
         ownerAccountId: "account-1",
         slug: "default",
       },

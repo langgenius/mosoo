@@ -12,7 +12,6 @@ import type {
   AgentDeploymentVersionId,
   AgentId,
   EnvironmentId,
-  OrganizationId,
   AppId,
   SkillId,
 } from "@mosoo/id";
@@ -26,7 +25,6 @@ import {
   readAgentId,
   readEnvironmentId,
   readMcpServerId,
-  readOrganizationId,
   readAppId,
 } from "./agent-platform-ids";
 import { normalizeAgentSkillIds } from "./agent-skill-resolution.service";
@@ -43,7 +41,6 @@ export const agentRowColumns = {
   liveDeploymentVersionId: agentsTable.liveDeploymentVersionId,
   model: agentsTable.model,
   name: agentsTable.name,
-  appOrganizationId: appsTable.organizationId,
   ownerId: agentsTable.ownerId,
   appId: agentsTable.appId,
   prompt: agentsTable.prompt,
@@ -64,7 +61,6 @@ type RawAgentRow = {
   liveDeploymentVersionId: AgentDeploymentVersionId | null;
   model: string;
   name: string;
-  appOrganizationId: OrganizationId;
   ownerId: AccountId;
   appId: AppId;
   prompt: string;
@@ -99,7 +95,6 @@ function toAgentRow(row: RawAgentRow): AgentRow {
             row.liveDeploymentVersionId,
             "Agent live deployment version ID",
           ),
-    appOrganizationId: readOrganizationId(row.appOrganizationId, "Agent App organization ID"),
     ownerId: readAccountId(row.ownerId, "Agent owner ID"),
     appId: readAppId(row.appId, "Agent app ID"),
     visibility: readAgentVisibility(row.visibility),

@@ -4,7 +4,7 @@ import type { OrganizationId } from "@mosoo/contracts/id";
 import { graphql } from "@/gql";
 import type { AppListQuery } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import { toAccountId, toEnvironmentId, toOrganizationId, toAppId } from "@/routes/typed-id";
+import { toAccountId, toEnvironmentId, toAppId } from "@/routes/typed-id";
 
 const APP_LIST_QUERY = graphql(/* GraphQL */ `
   query AppList($organizationId: ULID!) {
@@ -13,7 +13,6 @@ const APP_LIST_QUERY = graphql(/* GraphQL */ `
       defaultEnvironmentId
       id
       name
-      organizationId
       ownerAccountId
       slug
     }
@@ -26,7 +25,6 @@ function toAppSummary(app: AppListQuery["appList"][number]): AppSummary {
     defaultEnvironmentId:
       app.defaultEnvironmentId === null ? null : toEnvironmentId(app.defaultEnvironmentId),
     id: toAppId(app.id),
-    organizationId: toOrganizationId(app.organizationId),
     ownerAccountId: toAccountId(app.ownerAccountId),
   };
 }

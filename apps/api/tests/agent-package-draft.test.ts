@@ -175,7 +175,6 @@ describe("agent package draft", () => {
       liveDeploymentVersionId: null,
       model: "gpt-5.4",
       name: "Imported Agent",
-      appOrganizationId: DRAFT_IDS.organization,
       ownerId: DRAFT_IDS.owner,
       appId: DRAFT_IDS.app,
       prompt: "Help",
