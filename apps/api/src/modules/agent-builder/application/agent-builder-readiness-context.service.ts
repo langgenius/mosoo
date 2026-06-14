@@ -91,7 +91,7 @@ export async function collectAgentBuilderReadinessContext(
     agent: {
       id: AgentId;
       ownerId: AccountId;
-      organizationId: OrganizationId;
+      appOrganizationId: OrganizationId;
       appId: AppId;
     };
   } & AgentBuilderPlannerDraftInput,
@@ -130,7 +130,7 @@ export async function collectAgentBuilderReadinessContext(
     environment,
     ...(draft.mcpServersRepresented ? { mcpServerIds: draft.mcpServerIds } : {}),
     model,
-    organizationId: input.agent.organizationId,
+    organizationId: input.agent.appOrganizationId,
     appId: input.agent.appId,
     provider,
     runtimeId,

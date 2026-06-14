@@ -26,5 +26,5 @@ export interface AgentRow {
   status: Agent["status"];
   updatedAt: number;
   visibility: Agent["visibility"];
-  organizationId: OrganizationId;
+  appOrganizationId: OrganizationId;
 }

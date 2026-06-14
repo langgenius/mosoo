@@ -24,7 +24,6 @@ const AGENT_FIELDS = graphql(/* GraphQL */ `
     status
     updatedAt
     visibility
-    organizationId
   }
 `);
 
@@ -107,7 +106,6 @@ export const LIST_VISIBLE_AGENTS_QUERY = graphql(/* GraphQL */ `
       updatedAt
       viewerRole
       visibility
-      organizationId
     }
   }
 `);
@@ -147,7 +145,6 @@ export const GET_AGENT_QUERY = graphql(/* GraphQL */ `
       }
       viewerRole
       visibility
-      organizationId
     }
   }
 `);

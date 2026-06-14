@@ -325,7 +325,7 @@ export async function resolvePackageSpaces(input: {
 
 async function findEnvironmentByName(
   database: D1Database,
-  organizationId: OrganizationId,
+  appId: AppId,
   name: string | null,
 ): Promise<{ id: EnvironmentId } | null> {
   if (!isTruthy(name)) {
@@ -338,7 +338,7 @@ async function findEnvironmentByName(
       .from(environmentsTable)
       .where(
         and(
-          eq(environmentsTable.organizationId, organizationId),
+          eq(environmentsTable.appId, appId),
           sql`lower(${environmentsTable.name}) = lower(${name})`,
         ),
       )
@@ -352,7 +352,7 @@ export async function resolvePackageEnvironment(input: {
   database: D1Database;
   issues: AgentResolutionIssue[];
   manifest: AgentManifest;
-  organizationId: OrganizationId;
+  appId: AppId;
 }): Promise<EnvironmentId | null> {
   const manifestEnvironment = input.manifest.environment;
 
@@ -362,7 +362,7 @@ export async function resolvePackageEnvironment(input: {
       readEnvironmentId(manifestEnvironment.environmentId),
     );
 
-    if (row?.organizationId === input.organizationId) {
+    if (row?.appId === input.appId) {
       return row.id;
     }
   }
@@ -370,7 +370,7 @@ export async function resolvePackageEnvironment(input: {
   if (input.allowTargetNameMatch !== false) {
     const matched = await findEnvironmentByName(
       input.database,
-      input.organizationId,
+      input.appId,
       manifestEnvironment.expectedName,
     );
 

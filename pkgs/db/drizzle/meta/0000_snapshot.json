@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c2411d9c-dcab-59cd-813b-4fdae7d09c47",
+  "id": "faa27a1a-4736-5108-8127-718d9b564e95",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_deployment_version": {
@@ -399,13 +399,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "owner_account_id": {
           "name": "owner_account_id",
           "type": "text CHECK (\"owner_account_id\" = upper(\"owner_account_id\") AND length(\"owner_account_id\") = 26 AND substr(\"owner_account_id\", 1, 1) GLOB '[0-7]' AND \"owner_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
@@ -476,19 +469,9 @@
           "columns": ["app_id", "status"],
           "isUnique": false
         },
-        "agent_organization_owner_account_idx": {
-          "name": "agent_organization_owner_account_idx",
-          "columns": ["organization_id", "owner_account_id"],
-          "isUnique": false
-        },
         "agent_environment_idx": {
           "name": "agent_environment_idx",
           "columns": ["environment_id"],
-          "isUnique": false
-        },
-        "agent_organization_status_idx": {
-          "name": "agent_organization_status_idx",
-          "columns": ["organization_id", "status"],
           "isUnique": false
         }
       },

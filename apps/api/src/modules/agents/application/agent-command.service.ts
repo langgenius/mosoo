@@ -63,7 +63,7 @@ export async function createAgent(
 ): Promise<Agent> {
   const database = bindings.DB;
   const appId = readAppId(input.appId);
-  const app = await ensureAppOwnership(database, viewer.id, appId);
+  await ensureAppOwnership(database, viewer.id, appId);
   const environmentId = readEnvironmentId(await getAppDefaultEnvironmentId(database, appId));
   const runtimeSelection = evaluateAgentRuntimeSelection(input);
 
@@ -95,7 +95,6 @@ export async function createAgent(
       kind: input.kind,
       model: input.model,
       name: input.name,
-      organizationId: app.organizationId,
       ownerId: viewer.id,
       appId,
       prompt: input.prompt,

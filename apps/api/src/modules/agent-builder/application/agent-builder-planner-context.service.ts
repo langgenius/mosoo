@@ -12,8 +12,8 @@ import type {
   AgentBuilderPlannerRunId,
   AgentBuilderThreadId,
   AgentId,
-  OrganizationId,
   AppId,
+  OrganizationId,
 } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -36,9 +36,9 @@ export interface AgentBuilderPlannerContextSourceAgent {
   kind: AgentKind;
   model: string;
   name: string;
-  organizationId: OrganizationId;
   ownerId: AccountId;
   prompt: string;
+  appOrganizationId: OrganizationId;
   appId: AppId;
   provider: string;
   runtimeId: string;
@@ -127,7 +127,7 @@ export async function createAgentBuilderPlannerContext(
     collectAgentBuilderVisibleAssets({
       bindings,
       draft: draftContext,
-      organizationId: agent.organizationId,
+      organizationId: agent.appOrganizationId,
       previousAssets: ledger.previousVisibleAssets.assets,
       previousContext: ledger.previousVisibleAssets.context,
       appId: agent.appId,
@@ -136,7 +136,7 @@ export async function createAgentBuilderPlannerContext(
     collectAgentBuilderReadinessContext(bindings, {
       agent: {
         id: agent.id,
-        organizationId: agent.organizationId,
+        appOrganizationId: agent.appOrganizationId,
         ownerId: agent.ownerId,
         appId: agent.appId,
       },
@@ -152,7 +152,7 @@ export async function createAgentBuilderPlannerContext(
         draft: draftContext,
       }),
       kind: agent.kind,
-      organizationId: agent.organizationId,
+      organizationId: agent.appOrganizationId,
       appId: agent.appId,
       status: agent.status,
     },

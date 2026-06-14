@@ -92,7 +92,7 @@ export async function admitPublicThreadCreator(
     creatorViewer: caller.viewer,
     executionOwnerId: agent.ownerId,
     fileViewer: caller.viewer,
-    organizationId: agent.organizationId,
+    organizationId: agent.appOrganizationId,
     appId: agent.appId,
     tokenId: caller.tokenId,
     tokenLabel: caller.tokenLabel,

@@ -59,7 +59,6 @@ import {
   toEnvironmentId,
   toFileId,
   toMcpServerId,
-  toOrganizationId,
   toAppId,
   toSkillId,
   toSpaceId,
@@ -141,7 +140,6 @@ function toAgent(agent: AgentFieldsFragment): Agent {
     ...agent,
     id: toAgentId(agent.id),
     liveVersion: agent.liveVersion === null ? null : toAgentDeploymentVersion(agent.liveVersion),
-    organizationId: toOrganizationId(agent.organizationId),
     appId: toAppId(agent.appId),
     skills: agent.skills.map(toAgentSkillReference),
   };
@@ -151,7 +149,6 @@ function toAgentSummary(agent: GraphQLAgentSummary): AgentSummary {
   return {
     ...agent,
     id: toAgentId(agent.id),
-    organizationId: toOrganizationId(agent.organizationId),
     appId: toAppId(agent.appId),
     owner: toAgentOwnerSummary(agent.owner),
     tools: agent.tools.map(toAgentToolSummary),
@@ -163,7 +160,6 @@ function toAgentDetail(agent: GraphQLAgentDetail): AgentDetail {
     ...agent,
     id: toAgentId(agent.id),
     liveVersion: agent.liveVersion === null ? null : toAgentDeploymentVersion(agent.liveVersion),
-    organizationId: toOrganizationId(agent.organizationId),
     appId: toAppId(agent.appId),
     owner: toAgentOwnerSummary(agent.owner),
     skills: agent.skills.map(toAgentSkillReference),

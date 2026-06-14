@@ -155,7 +155,7 @@ export async function ensureAgentBuilderThreadContext(
       id,
       lastTurnAt: null,
       messageSeqCursor: 0,
-      organizationId: agent.organizationId,
+      organizationId: agent.appOrganizationId,
       previewOpenedAt: null,
       status: "active",
       title: null,

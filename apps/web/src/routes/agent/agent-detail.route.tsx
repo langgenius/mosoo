@@ -344,7 +344,7 @@ export function AgentDetailPage() {
 
   // Non-owner consume mode.
   if (!isOwner) {
-    return <ConsumeMode agent={agent} organizationId={detail.organizationId} />;
+    return <ConsumeMode agent={agent} />;
   }
 
   // Owner consume mode keeps a config entry point.
@@ -356,7 +356,6 @@ export function AgentDetailPage() {
           handleSelectMode("dev");
         }}
         showConfigButton
-        organizationId={detail.organizationId}
       />
     );
   }
@@ -399,7 +398,6 @@ export function AgentDetailPage() {
             headerCenterTarget={headerCenterTarget}
             mode={lifecycleMode}
             onSwitchMode={handleSelectMode}
-            organizationId={detail.organizationId}
             headerActionTarget={headerActionTarget}
           />
         ) : (
@@ -408,7 +406,6 @@ export function AgentDetailPage() {
               <PreviewMode
                 agent={agent}
                 onSwitchMode={handleSelectMode}
-                organizationId={detail.organizationId}
                 headerActionTarget={headerActionTarget}
               />
             )}

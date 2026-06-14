@@ -195,7 +195,7 @@ export async function getAgentCostCard({
     getAgentHeader(database, agentId),
     buildAttributionCard(database, {
       agentId,
-      organizationId: agent.organizationId,
+      organizationId: agent.appOrganizationId,
       appId: agent.appId,
       range,
       runPurposes,

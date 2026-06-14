@@ -17,7 +17,6 @@ import type {
   AgentId,
   EnvironmentId,
   McpServerId,
-  OrganizationId,
   AppId,
   SkillId,
   SpaceId,
@@ -38,7 +37,6 @@ export interface CreateDraftAgentInput {
   environmentId: EnvironmentId | null;
   kind: AgentKind;
   model: string;
-  organizationId: OrganizationId;
   ownerId: AccountId;
   packageMcpServers: AgentManifestMcpServerBinding[];
   packageResolution: AgentPackageResolutionState | null;
@@ -91,7 +89,6 @@ export async function createDraftAgentBatch(
       kind: input.kind,
       model: input.model,
       name: input.agentName,
-      organizationId: input.organizationId,
       ownerId: input.ownerId,
       prompt: input.prompt,
       provider: input.provider,

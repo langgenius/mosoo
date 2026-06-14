@@ -59,7 +59,6 @@ export interface PreviewModeProps {
   agent: Agent;
   headerActionTarget: HTMLDivElement | null;
   onSwitchMode: (mode: AgentMode | "logs") => void;
-  organizationId: string | null;
 }
 
 function publishStatusMessage({
@@ -111,7 +110,6 @@ export function PreviewMode({
   agent,
   headerActionTarget,
   onSwitchMode,
-  organizationId,
 }: PreviewModeProps): ReactElement {
   const queryClient = useQueryClient();
   const model = useAgentEditorModel({ agent });
@@ -216,7 +214,6 @@ export function PreviewMode({
             configurationChangedAt={agent.updatedAt}
             configurationRevisionKey={`${agent.updatedAt}:${agent.liveVersion?.id ?? "draft"}`}
             key={agent.id}
-            organizationId={organizationId}
             appId={agent.appId}
             readiness={agent.readiness}
             tone="preview"

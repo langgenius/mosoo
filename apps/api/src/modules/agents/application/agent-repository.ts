@@ -4,6 +4,7 @@ import {
   agentMcpBindingsTable,
   agentSkillsTable,
   agentsTable,
+  appsTable,
   mcpServersTable,
 } from "@mosoo/db";
 import type {
@@ -42,7 +43,7 @@ export const agentRowColumns = {
   liveDeploymentVersionId: agentsTable.liveDeploymentVersionId,
   model: agentsTable.model,
   name: agentsTable.name,
-  organizationId: agentsTable.organizationId,
+  appOrganizationId: appsTable.organizationId,
   ownerId: agentsTable.ownerId,
   appId: agentsTable.appId,
   prompt: agentsTable.prompt,
@@ -63,7 +64,7 @@ type RawAgentRow = {
   liveDeploymentVersionId: AgentDeploymentVersionId | null;
   model: string;
   name: string;
-  organizationId: OrganizationId;
+  appOrganizationId: OrganizationId;
   ownerId: AccountId;
   appId: AppId;
   prompt: string;
@@ -98,7 +99,7 @@ function toAgentRow(row: RawAgentRow): AgentRow {
             row.liveDeploymentVersionId,
             "Agent live deployment version ID",
           ),
-    organizationId: readOrganizationId(row.organizationId, "Agent organization ID"),
+    appOrganizationId: readOrganizationId(row.appOrganizationId, "Agent App organization ID"),
     ownerId: readAccountId(row.ownerId, "Agent owner ID"),
     appId: readAppId(row.appId, "Agent app ID"),
     visibility: readAgentVisibility(row.visibility),
@@ -110,6 +111,7 @@ export async function getAgentRow(database: D1Database, agentId: string): Promis
   const row = await getAppDatabase(database)
     .select(agentRowColumns)
     .from(agentsTable)
+    .innerJoin(appsTable, eq(appsTable.id, agentsTable.appId))
     .where(eq(agentsTable.id, normalizedAgentId))
     .limit(1)
     .get();
@@ -132,6 +134,7 @@ export async function getAppAgentRow(
     (await getAppDatabase(database)
       .select(agentRowColumns)
       .from(agentsTable)
+      .innerJoin(appsTable, eq(appsTable.id, agentsTable.appId))
       .where(and(eq(agentsTable.id, input.agentId), eq(agentsTable.appId, input.appId)))
       .limit(1)
       .get()) ?? null;
@@ -149,6 +152,7 @@ export async function listAppOwnerAgentRows(
   const rows = await getAppDatabase(database)
     .select(agentRowColumns)
     .from(agentsTable)
+    .innerJoin(appsTable, eq(appsTable.id, agentsTable.appId))
     .where(and(eq(agentsTable.appId, input.appId), eq(agentsTable.ownerId, input.viewerId)))
     .orderBy(desc(agentsTable.updatedAt))
     .all();

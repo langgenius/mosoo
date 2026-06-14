@@ -315,7 +315,6 @@ export async function insertSecondLiveAgent(
       liveDeploymentVersionId: "01J00000000000000000000069",
       model: "gpt-5.4",
       name: "Second Live Agent",
-      organizationId: "01J00000000000000000000006",
       ownerId: "01J00000000000000000000001",
       prompt: "Help again.",
       provider: "openai",

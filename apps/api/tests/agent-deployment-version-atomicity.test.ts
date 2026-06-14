@@ -62,7 +62,6 @@ describe("agent deployment version atomicity", () => {
         liveDeploymentVersionId: null,
         model: "gpt-5.4",
         name: "Draft Agent",
-        organizationId: PUBLIC_API_TEST_IDS.organization,
         ownerId: PUBLIC_API_TEST_IDS.ownerAccount,
         appId: PUBLIC_API_TEST_IDS.app,
         prompt: "Draft help.",
