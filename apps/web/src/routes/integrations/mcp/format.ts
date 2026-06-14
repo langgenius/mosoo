@@ -16,11 +16,8 @@ export function authTypeLabel(t: McpAuthType): string {
 
 export function credentialScopeLabel(scope: McpCredentialScope): string {
   switch (scope) {
-    case "user": {
-      return "per-user";
-    }
-    case "organization_shared": {
-      return "Service Account";
+    case "app": {
+      return "App credential";
     }
     default: {
       return unreachableCase(scope, "Unsupported MCP credential scope.");

@@ -1,5 +1,5 @@
-import type { OrganizationId, SpaceId } from "@mosoo/contracts/id";
-import type { SpaceView, SpaceVisibility } from "@mosoo/contracts/space";
+import type { AppId, SpaceId } from "@mosoo/contracts/id";
+import type { SpaceView } from "@mosoo/contracts/space";
 
 import { graphql } from "@/gql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
@@ -11,46 +11,38 @@ const CREATE_SPACE_MUTATION = graphql(/* GraphQL */ `
     createSpace(input: $input) {
       createdAt
       id
-      isSharedWithViewer
       name
       ownerId
+      appId
       role
       storagePrefix
       canDelete
-      canUpdateAcl
-      creatorMembershipStatus
       viewerAssetRole
-      visibility
     }
   }
 `);
 
 const DELETE_SPACE_MUTATION = graphql(/* GraphQL */ `
-  mutation DeleteSpace($spaceId: ULID!) {
-    deleteSpace(spaceId: $spaceId) {
+  mutation DeleteSpace($appId: ULID!, $spaceId: ULID!) {
+    deleteSpace(appId: $appId, spaceId: $spaceId) {
       ok
     }
   }
 `);
 
-export async function createSpace(
-  organizationId: OrganizationId,
-  name: string,
-  visibility: SpaceVisibility = "private",
-): Promise<SpaceView> {
+export async function createSpace(appId: AppId, name: string): Promise<SpaceView> {
   const payload = await requestGraphQL(CREATE_SPACE_MUTATION, {
     input: {
       name,
-      organizationId,
-      visibility,
+      appId,
     },
   });
 
   return toSpaceView(payload.createSpace);
 }
 
-export async function deleteSpace(spaceId: SpaceId): Promise<{ ok: true }> {
-  await requestGraphQL(DELETE_SPACE_MUTATION, { spaceId });
+export async function deleteSpace(appId: AppId, spaceId: SpaceId): Promise<{ ok: true }> {
+  await requestGraphQL(DELETE_SPACE_MUTATION, { appId, spaceId });
 
   return { ok: true };
 }

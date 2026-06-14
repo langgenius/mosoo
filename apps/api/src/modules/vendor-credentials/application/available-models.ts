@@ -1,20 +1,19 @@
 import { PRESET_MODEL_CATALOG } from "@mosoo/contracts/models";
 import type { PresetModelEntry } from "@mosoo/contracts/models";
-import type { AccountId, OrganizationId } from "@mosoo/id";
+import type { AppId } from "@mosoo/id";
 import { VENDOR_OPENAI_COMPATIBLE, getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 
 import { isTruthy } from "../../../shared/truthiness";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { resolveActiveOrganization } from "../../users/application/account-organization-context.service";
 import { listEffectiveCustomCredentialModelRows } from "./vendor-credential-custom-models";
-import { listVisibleVendorCredentialRows } from "./vendor-credential.repository";
+import { listAppVendorCredentialRows } from "./vendor-credential.repository";
 import { collectAvailableVendorIds } from "./vendor-credential.secret-resolution";
 import type { VendorCredentialRow } from "./vendor-credential.types";
 export interface AvailableModelsInput {
-  accountId: AccountId;
   currentModelId?: string;
   currentVendorId?: string;
-  organizationId: OrganizationId;
+  appId: AppId;
   runtimeId: string;
 }
 
@@ -260,12 +259,8 @@ export async function resolveAvailableModels(
   input: AvailableModelsInput,
 ): Promise<ResolvedModelEntry[]> {
   const scope = runtimeModelScope(input.runtimeId);
-  const credentialRows = await listVisibleVendorCredentialRows(
-    database,
-    input.accountId,
-    input.organizationId,
-  );
-  const availableVendorIds = collectAvailableVendorIds(input.accountId, credentialRows);
+  const credentialRows = await listAppVendorCredentialRows(database, input.appId);
+  const availableVendorIds = collectAvailableVendorIds(credentialRows);
   const customEntries = resolveCustomEntries(
     input,
     scope.acceptsCustomProvider,
@@ -311,20 +306,16 @@ export async function resolveAvailableModelsForViewer(
   input: {
     currentModelId?: string;
     currentVendorId?: string;
+    appId: AppId;
     runtimeId: string;
   },
 ): Promise<ResolvedModelEntry[]> {
-  const activeOrganization = await resolveActiveOrganization(database, viewer.id);
-
-  if (!activeOrganization) {
-    throw new Error("Active organization is required.");
-  }
+  await ensureAppOwnership(database, viewer.id, input.appId);
 
   return resolveAvailableModels(database, {
-    accountId: viewer.id,
     ...(isTruthy(input.currentModelId) ? { currentModelId: input.currentModelId } : {}),
     ...(isTruthy(input.currentVendorId) ? { currentVendorId: input.currentVendorId } : {}),
-    organizationId: activeOrganization.id,
+    appId: input.appId,
     runtimeId: input.runtimeId,
   });
 }
@@ -337,10 +328,9 @@ export async function ensureModelAvailableForSelection(
   },
 ): Promise<void> {
   const entries = await resolveAvailableModels(database, {
-    accountId: input.accountId,
     ...(input.modelId ? { currentModelId: input.modelId } : {}),
     currentVendorId: input.vendorId,
-    organizationId: input.organizationId,
+    appId: input.appId,
     runtimeId: input.runtimeId,
   });
   const entry = entries.find(

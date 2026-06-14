@@ -1,17 +1,9 @@
-import type { OrganizationMemberRole } from "@mosoo/contracts/organization";
-import {
-  accountsTable,
-  mcpCredentialsTable,
-  mcpServersTable,
-  organizationMembersTable,
-  organizationsTable,
-} from "@mosoo/db";
-import type { AccountId, AgentId, CredentialId, McpServerId, OrganizationId } from "@mosoo/id";
-import { and, desc, eq, ne, or, sql } from "drizzle-orm";
+import { accountsTable, mcpCredentialsTable, mcpServersTable, appsTable } from "@mosoo/db";
+import type { AccountId, AgentId, CredentialId, McpServerId, AppId } from "@mosoo/id";
+import { and, desc, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { forbiddenError } from "../../../platform/errors";
 import type { CredentialRow, ServerRow } from "./mcp-types";
 
 const registryViewerAccountsTable = alias(accountsTable, "mcp_registry_viewer_account");
@@ -19,15 +11,15 @@ const registryOwnerAccountsTable = alias(accountsTable, "mcp_registry_owner_acco
 
 export interface McpRegistryServerSnapshot {
   credential: CredentialRow | null;
-  hasSharedCredential: boolean;
+  hasCredential: boolean;
   server: ServerRow;
 }
 
 export interface McpRegistrySnapshot {
   currentUserEmail: string | null;
   currentUserName: string | null;
+  appId: AppId;
   servers: McpRegistryServerSnapshot[];
-  viewerRole: OrganizationMemberRole;
 }
 
 interface McpRegistrySnapshotRow {
@@ -39,6 +31,7 @@ interface McpRegistrySnapshotRow {
   credentialLastRefreshedAt: number | null;
   credentialOauthClientId: string | null;
   credentialOauthClientSecretSecretId: string | null;
+  credentialAppId: AppId | null;
   credentialRefreshSecretId: string | null;
   credentialScope: CredentialRow["scope"] | null;
   credentialScopeValuesJson: string | null;
@@ -48,6 +41,7 @@ interface McpRegistrySnapshotRow {
   credentialSubjectLabel: string | null;
   credentialUpdatedAt: number | null;
   credentialUserId: AccountId | null;
+  appId: AppId;
   serverAuthType: ServerRow["authType"] | null;
   serverByoClientId: string | null;
   serverByoClientSecretSecretId: string | null;
@@ -59,16 +53,15 @@ interface McpRegistrySnapshotRow {
   serverId: McpServerId | null;
   serverName: string | null;
   serverOauthMetadataJson: string | null;
-  serverOrganizationId: OrganizationId | null;
+  serverOrganizationId: ServerRow["organizationId"] | null;
   serverOwnerId: AccountId | null;
   serverOwnerName: string | null;
+  serverAppId: AppId | null;
   serverSource: ServerRow["source"] | null;
   serverUpdatedAt: number | null;
   serverUrl: string | null;
-  viewerDisabledAt: number | null;
   viewerEmail: string | null;
   viewerName: string | null;
-  viewerRole: OrganizationMemberRole;
 }
 
 function requireRegistryValue<T>(value: T | null, fieldName: string): T {
@@ -100,6 +93,7 @@ function toRegistryServerRow(row: McpRegistrySnapshotRow): ServerRow | null {
     organizationId: requireRegistryValue(row.serverOrganizationId, "server_organization_id"),
     ownerId: requireRegistryValue(row.serverOwnerId, "server_owner_id"),
     ownerName: row.serverOwnerName,
+    appId: requireRegistryValue(row.serverAppId, "server_app_id"),
     source: requireRegistryValue(row.serverSource, "server_source"),
     updatedAt: requireRegistryValue(row.serverUpdatedAt, "server_updated_at"),
     url: requireRegistryValue(row.serverUrl, "server_url"),
@@ -120,6 +114,7 @@ function toRegistryCredentialRow(row: McpRegistrySnapshotRow): CredentialRow | n
     lastRefreshedAt: row.credentialLastRefreshedAt,
     oauthClientId: row.credentialOauthClientId,
     oauthClientSecretSecretId: row.credentialOauthClientSecretSecretId,
+    appId: requireRegistryValue(row.credentialAppId, "credential_app_id"),
     refreshSecretId: row.credentialRefreshSecretId,
     scope: requireRegistryValue(row.credentialScope, "credential_scope"),
     scopeValuesJson: row.credentialScopeValuesJson,
@@ -132,19 +127,15 @@ function toRegistryCredentialRow(row: McpRegistrySnapshotRow): CredentialRow | n
   };
 }
 
-function hasActiveSharedCredential(credential: CredentialRow | null): boolean {
-  return credential?.scope === "organization_shared" && credential.status === "active";
+function hasActiveAppCredential(credential: CredentialRow | null): boolean {
+  return credential?.scope === "app" && credential.status === "active";
 }
 
 function toMcpRegistrySnapshot(rows: McpRegistrySnapshotRow[]): McpRegistrySnapshot {
   const firstRow = rows[0] ?? null;
 
   if (firstRow === null) {
-    throw new Error("Organization not found.");
-  }
-
-  if (firstRow.viewerDisabledAt !== null) {
-    throw forbiddenError("Your organization membership is disabled.");
+    throw new Error("App not found.");
   }
 
   const servers: McpRegistryServerSnapshot[] = [];
@@ -160,7 +151,7 @@ function toMcpRegistrySnapshot(rows: McpRegistrySnapshotRow[]): McpRegistrySnaps
 
     servers.push({
       credential,
-      hasSharedCredential: hasActiveSharedCredential(credential),
+      hasCredential: hasActiveAppCredential(credential),
       server,
     });
   }
@@ -168,15 +159,15 @@ function toMcpRegistrySnapshot(rows: McpRegistrySnapshotRow[]): McpRegistrySnaps
   return {
     currentUserEmail: firstRow.viewerEmail,
     currentUserName: firstRow.viewerName,
+    appId: firstRow.appId,
     servers,
-    viewerRole: firstRow.viewerRole,
   };
 }
 
 export async function loadMcpRegistrySnapshot(
   database: D1Database,
   viewerId: AccountId,
-  organizationId: OrganizationId,
+  appId: AppId,
 ): Promise<McpRegistrySnapshot> {
   const rows = await getAppDatabase(database)
     .select({
@@ -188,6 +179,7 @@ export async function loadMcpRegistrySnapshot(
       credentialLastRefreshedAt: mcpCredentialsTable.lastRefreshedAt,
       credentialOauthClientId: mcpCredentialsTable.oauthClientId,
       credentialOauthClientSecretSecretId: mcpCredentialsTable.oauthClientSecretSecretId,
+      credentialAppId: mcpCredentialsTable.appId,
       credentialRefreshSecretId: mcpCredentialsTable.refreshSecretId,
       credentialScope: mcpCredentialsTable.scope,
       credentialScopeValuesJson: mcpCredentialsTable.scopeValuesJson,
@@ -197,6 +189,7 @@ export async function loadMcpRegistrySnapshot(
       credentialSubjectLabel: mcpCredentialsTable.subjectLabel,
       credentialUpdatedAt: mcpCredentialsTable.updatedAt,
       credentialUserId: mcpCredentialsTable.accountId,
+      appId: appsTable.id,
       serverAuthType: mcpServersTable.authType,
       serverByoClientId: mcpServersTable.byoClientId,
       serverByoClientSecretSecretId: mcpServersTable.byoClientSecretSecretId,
@@ -211,29 +204,18 @@ export async function loadMcpRegistrySnapshot(
       serverOrganizationId: mcpServersTable.organizationId,
       serverOwnerId: mcpServersTable.ownerId,
       serverOwnerName: registryOwnerAccountsTable.name,
+      serverAppId: mcpServersTable.appId,
       serverSource: mcpServersTable.source,
       serverUpdatedAt: mcpServersTable.updatedAt,
       serverUrl: mcpServersTable.url,
-      viewerDisabledAt: organizationMembersTable.disabledAt,
       viewerEmail: registryViewerAccountsTable.email,
       viewerName: registryViewerAccountsTable.name,
-      viewerRole: organizationMembersTable.role,
     })
-    .from(organizationMembersTable)
-    .innerJoin(
-      organizationsTable,
-      eq(organizationsTable.id, organizationMembersTable.organizationId),
-    )
+    .from(appsTable)
     .leftJoin(registryViewerAccountsTable, eq(registryViewerAccountsTable.id, viewerId))
     .leftJoin(
       mcpServersTable,
-      and(
-        eq(mcpServersTable.organizationId, organizationMembersTable.organizationId),
-        or(
-          eq(mcpServersTable.source, "organization_shared"),
-          eq(mcpServersTable.ownerId, viewerId),
-        ),
-      ),
+      and(eq(mcpServersTable.appId, appsTable.id), eq(mcpServersTable.ownerId, viewerId)),
     )
     .leftJoin(
       registryOwnerAccountsTable,
@@ -243,30 +225,12 @@ export async function loadMcpRegistrySnapshot(
       mcpCredentialsTable,
       and(
         eq(mcpCredentialsTable.serverId, mcpServersTable.id),
-        or(
-          and(
-            eq(mcpCredentialsTable.scope, "organization_shared"),
-            eq(mcpServersTable.credentialScope, "organization_shared"),
-          ),
-          and(
-            eq(mcpCredentialsTable.scope, "user"),
-            eq(mcpCredentialsTable.accountId, viewerId),
-            ne(mcpServersTable.credentialScope, "organization_shared"),
-            or(ne(mcpServersTable.source, "personal"), eq(mcpServersTable.ownerId, viewerId)),
-          ),
-        ),
+        eq(mcpCredentialsTable.appId, appsTable.id),
+        eq(mcpCredentialsTable.scope, "app"),
       ),
     )
-    .where(
-      and(
-        eq(organizationMembersTable.accountId, viewerId),
-        eq(organizationMembersTable.organizationId, organizationId),
-      ),
-    )
-    .orderBy(
-      sql`CASE ${mcpServersTable.source} WHEN 'personal' THEN 0 ELSE 1 END`,
-      desc(mcpServersTable.updatedAt),
-    )
+    .where(and(eq(appsTable.id, appId), eq(appsTable.ownerAccountId, viewerId)))
+    .orderBy(desc(mcpServersTable.updatedAt))
     .all();
 
   return toMcpRegistrySnapshot(rows);

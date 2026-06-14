@@ -107,7 +107,3 @@ export function enforceCredentialModelShape(
     throw new Error("Preset provider credentials cannot declare custom models.");
   }
 }
-
-export function serializeCredentialModels(models: string[] | null): string | null {
-  return models ? JSON.stringify(models) : null;
-}

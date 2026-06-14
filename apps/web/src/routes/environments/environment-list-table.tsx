@@ -17,7 +17,6 @@ import { EnvironmentBadges } from "./environment-badges";
 
 export interface EnvironmentListTableProps {
   readonly environments: readonly EnvironmentSummary[];
-  readonly isAdmin: boolean;
   readonly onDelete: (environmentId: string) => void;
   readonly onFork: (environmentId: string) => void;
   readonly onSetDefault: (environmentId: string) => void;
@@ -33,7 +32,6 @@ function networkLabel({ allowedHosts, networkPolicy }: EnvironmentSummary): stri
 
 export function EnvironmentListTable({
   environments,
-  isAdmin,
   onDelete,
   onFork,
   onSetDefault,
@@ -92,13 +90,13 @@ export function EnvironmentListTable({
                   Fork
                 </DropdownMenuItem>
               ) : null}
-              {isAdmin && !environment.isDefault ? (
+              {environment.canEdit && !environment.isDefault ? (
                 <DropdownMenuItem
                   onClick={() => {
                     onSetDefault(environment.id);
                   }}
                 >
-                  Set as organization default
+                  Set as App default
                 </DropdownMenuItem>
               ) : null}
               {environment.canDelete ? (

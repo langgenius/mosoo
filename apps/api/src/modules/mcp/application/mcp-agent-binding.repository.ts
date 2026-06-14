@@ -1,6 +1,6 @@
-import { agentMcpBindingsTable, mcpServersTable, resourceAclTable } from "@mosoo/db";
+import { agentMcpBindingsTable, mcpServersTable } from "@mosoo/db";
 import type { AgentId } from "@mosoo/id";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import type { AgentBindingRow } from "./mcp-types";
@@ -84,20 +84,4 @@ export async function listAgentBindingRows(
     .all();
 
   return results.map(toAgentBindingRow);
-}
-
-export async function hasNonOwnerCollaborators(
-  database: D1Database,
-  agentId: AgentId,
-): Promise<boolean> {
-  const row = await getAppDatabase(database)
-    .select({ resourceId: resourceAclTable.resourceId })
-    .from(resourceAclTable)
-    .where(
-      and(eq(resourceAclTable.resourceType, "agent"), eq(resourceAclTable.resourceId, agentId)),
-    )
-    .limit(1)
-    .get();
-
-  return Boolean(row);
 }

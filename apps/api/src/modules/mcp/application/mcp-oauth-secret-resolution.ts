@@ -1,8 +1,6 @@
-import type { OrganizationMemberRole } from "@mosoo/contracts/organization";
-import { Permission, can } from "@mosoo/contracts/permission";
 import { vaultSecretsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, OrganizationId, PlatformId } from "@mosoo/id";
+import type { AccountId, PlatformId, AppId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
@@ -30,24 +28,22 @@ export type McpOAuthSecretStorageKind = "flow_client_secret" | "server_client_se
 export type McpOAuthSecretReadDenialReason =
   | "flow_client_secret_missing"
   | "flow_initiator_mismatch"
-  | "flow_organization_mismatch"
+  | "flow_app_mismatch"
   | "flow_server_mismatch"
   | "flow_status_mismatch"
   | "secret_kind_mismatch"
   | "secret_not_found"
   | "server_auth_type_mismatch"
   | "server_client_secret_missing"
-  | "server_credential_scope_forbidden"
-  | "server_organization_mismatch"
-  | "server_personal_owner_mismatch";
+  | "server_owner_mismatch"
+  | "server_app_mismatch";
 
 export type McpOAuthSecretWriteDenialReason =
   | "flow_initiator_mismatch"
-  | "flow_organization_mismatch"
+  | "flow_app_mismatch"
   | "server_auth_type_mismatch"
-  | "server_manage_forbidden"
-  | "server_organization_mismatch"
-  | "server_personal_owner_mismatch";
+  | "server_owner_mismatch"
+  | "server_app_mismatch";
 
 export type McpOAuthSecretDeleteDenialReason = "secret_kind_mismatch" | "secret_not_found";
 
@@ -77,7 +73,6 @@ export type McpOAuthSecretDeleteOutcome =
 
 export interface McpOAuthUserSecretActor {
   accountId: AccountId;
-  organizationRole: OrganizationMemberRole;
   type: "user";
 }
 
@@ -93,8 +88,8 @@ export type McpOAuthSecretActor =
 
 export interface ReadMcpOAuthServerClientSecretCommand {
   actor: McpOAuthUserSecretActor;
-  organizationId: OrganizationId;
   purpose: "oauth_authorization_client_secret";
+  appId: AppId;
   secretKind: "server_client_secret";
   server: ServerRow;
 }
@@ -102,26 +97,23 @@ export interface ReadMcpOAuthServerClientSecretCommand {
 export interface ReadMcpOAuthFlowClientSecretCommand {
   actor: McpOAuthUserSecretActor;
   flow: OAuthFlowRow;
-  organizationId: OrganizationId;
   purpose: "oauth_callback_client_secret";
+  appId: AppId;
   secretKind: "flow_client_secret";
   server: ServerRow;
 }
 
 type McpOAuthServerSecretOwner = Pick<
   ServerRow,
-  "authType" | "credentialScope" | "id" | "organizationId" | "ownerId" | "source"
+  "authType" | "credentialScope" | "id" | "ownerId" | "appId" | "source"
 >;
 
-type McpOAuthFlowSecretOwner = Pick<
-  OAuthFlowRow,
-  "id" | "initiatorUserId" | "organizationId" | "serverId"
->;
+type McpOAuthFlowSecretOwner = Pick<OAuthFlowRow, "id" | "initiatorUserId" | "appId" | "serverId">;
 
 export interface StoreMcpOAuthServerClientSecretCommand {
   actor: McpOAuthUserSecretActor;
-  organizationId: OrganizationId;
   purpose: "oauth_server_create_client_secret";
+  appId: AppId;
   secretKind: "server_client_secret";
   server: McpOAuthServerSecretOwner;
   value: string;
@@ -130,16 +122,16 @@ export interface StoreMcpOAuthServerClientSecretCommand {
 export interface StoreMcpOAuthFlowClientSecretCommand {
   actor: McpOAuthUserSecretActor;
   flow: McpOAuthFlowSecretOwner;
-  organizationId: OrganizationId;
   purpose: "oauth_flow_start_client_secret";
+  appId: AppId;
   secretKind: "flow_client_secret";
   value: string;
 }
 
 export interface DeleteMcpOAuthServerClientSecretCommand {
   actor: McpOAuthSecretActor;
-  organizationId: OrganizationId;
   purpose: "oauth_server_create_cleanup" | "oauth_server_delete_cleanup";
+  appId: AppId;
   secretId: PlatformId | string | null | undefined;
   secretKind: "server_client_secret";
   server: McpOAuthServerSecretOwner;
@@ -148,35 +140,28 @@ export interface DeleteMcpOAuthServerClientSecretCommand {
 export interface DeleteMcpOAuthFlowClientSecretCommand {
   actor: McpOAuthSecretActor;
   flow: McpOAuthFlowSecretOwner;
-  organizationId: OrganizationId;
   purpose:
     | "oauth_flow_artifact_cleanup"
     | "oauth_flow_insert_cleanup"
     | "oauth_flow_terminal_cleanup";
+  appId: AppId;
   secretId: PlatformId | string | null | undefined;
   secretKind: "flow_client_secret";
 }
 
 function hasServerOAuthAccess(
-  command: Pick<ReadMcpOAuthServerClientSecretCommand, "actor" | "organizationId" | "server">,
+  command: Pick<ReadMcpOAuthServerClientSecretCommand, "actor" | "appId" | "server">,
 ): McpOAuthSecretReadDenialReason | null {
-  if (command.server.organizationId !== command.organizationId) {
-    return "server_organization_mismatch";
+  if (command.server.appId !== command.appId) {
+    return "server_app_mismatch";
   }
 
   if (command.server.authType !== "oauth") {
     return "server_auth_type_mismatch";
   }
 
-  if (command.server.source === "personal" && command.server.ownerId !== command.actor.accountId) {
-    return "server_personal_owner_mismatch";
-  }
-
-  if (
-    command.server.credentialScope === "organization_shared" &&
-    !can(command.actor.organizationRole, Permission.McpOrganizationManage)
-  ) {
-    return "server_credential_scope_forbidden";
+  if (command.server.ownerId !== command.actor.accountId) {
+    return "server_owner_mismatch";
   }
 
   return null;
@@ -185,11 +170,11 @@ function hasServerOAuthAccess(
 function hasServerOAuthWriteAccess(
   command: Pick<
     StoreMcpOAuthServerClientSecretCommand | DeleteMcpOAuthServerClientSecretCommand,
-    "actor" | "organizationId" | "server"
+    "actor" | "appId" | "server"
   >,
 ): McpOAuthSecretWriteDenialReason | null {
-  if (command.server.organizationId !== command.organizationId) {
-    return "server_organization_mismatch";
+  if (command.server.appId !== command.appId) {
+    return "server_app_mismatch";
   }
 
   if (command.server.authType !== "oauth") {
@@ -200,22 +185,14 @@ function hasServerOAuthWriteAccess(
     return null;
   }
 
-  if (command.server.source === "personal") {
-    return command.server.ownerId === command.actor.accountId
-      ? null
-      : "server_personal_owner_mismatch";
-  }
-
-  return can(command.actor.organizationRole, Permission.McpOrganizationManage)
-    ? null
-    : "server_manage_forbidden";
+  return command.server.ownerId === command.actor.accountId ? null : "server_owner_mismatch";
 }
 
 function getFlowOAuthWriteDenial(
-  command: Pick<StoreMcpOAuthFlowClientSecretCommand, "actor" | "flow" | "organizationId">,
+  command: Pick<StoreMcpOAuthFlowClientSecretCommand, "actor" | "flow" | "appId">,
 ): McpOAuthSecretWriteDenialReason | null {
-  if (command.flow.organizationId !== command.organizationId) {
-    return "flow_organization_mismatch";
+  if (command.flow.appId !== command.appId) {
+    return "flow_app_mismatch";
   }
 
   if (command.flow.initiatorUserId !== command.actor.accountId) {
@@ -228,7 +205,7 @@ function getFlowOAuthWriteDenial(
 function assertMcpOAuthServerSecretWriteAllowed(
   command: Pick<
     StoreMcpOAuthServerClientSecretCommand | DeleteMcpOAuthServerClientSecretCommand,
-    "actor" | "organizationId" | "server"
+    "actor" | "appId" | "server"
   >,
 ): void {
   const denial = hasServerOAuthWriteAccess(command);
@@ -239,7 +216,7 @@ function assertMcpOAuthServerSecretWriteAllowed(
 }
 
 function assertMcpOAuthFlowSecretWriteAllowed(
-  command: Pick<StoreMcpOAuthFlowClientSecretCommand, "actor" | "flow" | "organizationId">,
+  command: Pick<StoreMcpOAuthFlowClientSecretCommand, "actor" | "flow" | "appId">,
 ): void {
   const denial = getFlowOAuthWriteDenial(command);
 
@@ -284,7 +261,7 @@ function toMcpOAuthServerClientSecretKind(input: {
   return [
     "mcp_oauth",
     input.secretKind,
-    input.server.organizationId,
+    input.server.appId,
     input.server.id,
     input.server.ownerId,
   ].join(":");
@@ -297,7 +274,7 @@ function toMcpOAuthFlowClientSecretKind(input: {
   return [
     "mcp_oauth",
     input.secretKind,
-    input.flow.organizationId,
+    input.flow.appId,
     input.flow.serverId,
     input.flow.id,
     input.flow.initiatorUserId,
@@ -436,8 +413,8 @@ export async function deleteMcpOAuthFlowClientSecret(
     return { status: "skipped" };
   }
 
-  if (command.flow.organizationId !== command.organizationId) {
-    throw new Error("MCP OAuth flow client secret delete denied: flow_organization_mismatch.");
+  if (command.flow.appId !== command.appId) {
+    throw new Error("MCP OAuth flow client secret delete denied: flow_app_mismatch.");
   }
 
   const expectedKind = toMcpOAuthFlowClientSecretKind(command);
@@ -474,8 +451,8 @@ export async function cleanupStoredMcpOAuthServerClientSecret(input: {
 
     logError("mcp-oauth.server-client-secret-cleanup.denied", {
       ...actorLogContext(input.command.actor),
-      organizationId: input.command.organizationId,
       purpose: outcome.purpose,
+      appId: input.command.appId,
       reason: outcome.reason,
       secretId: input.command.secretId,
       secretKind: outcome.secretKind,
@@ -485,8 +462,8 @@ export async function cleanupStoredMcpOAuthServerClientSecret(input: {
     logError("mcp-oauth.server-client-secret-cleanup.failed", {
       ...createErrorLogContext(error),
       ...actorLogContext(input.command.actor),
-      organizationId: input.command.organizationId,
       purpose: input.command.purpose,
+      appId: input.command.appId,
       secretId: input.command.secretId,
       secretKind: input.command.secretKind,
       serverId: input.command.server.id,
@@ -510,8 +487,8 @@ export async function cleanupStoredMcpOAuthFlowClientSecret(input: {
     logError("mcp-oauth.flow-client-secret-cleanup.denied", {
       ...actorLogContext(input.command.actor),
       flowId: input.command.flow.id,
-      organizationId: input.command.organizationId,
       purpose: outcome.purpose,
+      appId: input.command.appId,
       reason: outcome.reason,
       secretId: input.command.secretId,
       secretKind: outcome.secretKind,
@@ -522,8 +499,8 @@ export async function cleanupStoredMcpOAuthFlowClientSecret(input: {
       ...createErrorLogContext(error),
       ...actorLogContext(input.command.actor),
       flowId: input.command.flow.id,
-      organizationId: input.command.organizationId,
       purpose: input.command.purpose,
+      appId: input.command.appId,
       secretId: input.command.secretId,
       secretKind: input.command.secretKind,
       serverId: input.command.flow.serverId,
@@ -569,8 +546,8 @@ export async function readMcpOAuthFlowClientSecret(
     return denyOAuthSecretRead(command, serverDenial);
   }
 
-  if (command.flow.organizationId !== command.organizationId) {
-    return denyOAuthSecretRead(command, "flow_organization_mismatch");
+  if (command.flow.appId !== command.appId) {
+    return denyOAuthSecretRead(command, "flow_app_mismatch");
   }
 
   if (command.flow.serverId !== command.server.id) {

@@ -8,10 +8,12 @@ import { isTruthy } from "../../shared/lib/truthiness";
 export function useSpaceUploadCompletionRefresh({
   activeSpace,
   currentPath,
+  appId,
   queryClient,
 }: {
   activeSpace: string | null;
   currentPath: string;
+  appId: string | null;
   queryClient: QueryClient;
 }) {
   useEffect(() => {
@@ -20,18 +22,19 @@ export function useSpaceUploadCompletionRefresh({
 
       if (
         !isTruthy(activeSpace) ||
+        !isTruthy(appId) ||
         detail.scopeKind !== "space" ||
         detail.scopeId !== activeSpace
       ) {
         return;
       }
 
-      void refreshSpaceFiles(queryClient, activeSpace, currentPath);
+      void refreshSpaceFiles(queryClient, appId, activeSpace, currentPath);
     }
 
     globalThis.addEventListener(FILE_UPLOAD_COMPLETED_EVENT, handleUploadCompleted);
     return () => {
       globalThis.removeEventListener(FILE_UPLOAD_COMPLETED_EVENT, handleUploadCompleted);
     };
-  }, [activeSpace, currentPath, queryClient]);
+  }, [activeSpace, currentPath, appId, queryClient]);
 }

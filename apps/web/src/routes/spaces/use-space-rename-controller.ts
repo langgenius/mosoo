@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { renameSpaceFile } from "../../domains/file/api/space-file-client";
 import { acquireSpaceFileLock, releaseSpaceFileLock } from "../../domains/space/api/file-locks";
 import { isTruthy } from "../../shared/lib/truthiness";
-import { toSpaceId } from "../typed-id";
+import { toAppId, toSpaceId } from "../typed-id";
 import { getErrorMessage, getFileNameValidationError } from "./use-space-browser-upload";
 interface RenameLockState {
   blockedBy?: string | undefined;
@@ -16,6 +16,7 @@ interface RenameLockState {
 interface UseSpaceRenameControllerInput {
   activeSpace: string | null;
   currentPath: string;
+  appId: string | null;
   refreshFiles: () => Promise<void>;
   setFileActionError: (message: string | null) => void;
 }
@@ -23,6 +24,7 @@ interface UseSpaceRenameControllerInput {
 export function useSpaceRenameController({
   activeSpace,
   currentPath,
+  appId,
   refreshFiles,
   setFileActionError,
 }: UseSpaceRenameControllerInput) {
@@ -38,8 +40,8 @@ export function useSpaceRenameController({
     renameLockRequestRef.current += 1;
     const lock = renameLock;
 
-    if (isTruthy(lock?.lockId)) {
-      void releaseSpaceFileLock(toSpaceId(lock.spaceId), {
+    if (isTruthy(lock?.lockId) && isTruthy(appId)) {
+      void releaseSpaceFileLock(toAppId(appId), toSpaceId(lock.spaceId), {
         lockId: lock.lockId,
         path: lock.path,
       });
@@ -60,11 +62,11 @@ export function useSpaceRenameController({
     setRenameError(null);
     setRenameLock(null);
 
-    if (!isTruthy(activeSpace)) {
+    if (!isTruthy(appId) || !isTruthy(activeSpace)) {
       return;
     }
 
-    void acquireSpaceFileLock(toSpaceId(activeSpace), {
+    void acquireSpaceFileLock(toAppId(appId), toSpaceId(activeSpace), {
       path: file.key,
     })
       .then((result) => {
@@ -104,7 +106,7 @@ export function useSpaceRenameController({
   }
 
   async function handleRenameFile() {
-    if (!renameTarget) {
+    if (!renameTarget || !isTruthy(appId)) {
       return;
     }
 
@@ -149,8 +151,8 @@ export function useSpaceRenameController({
           ? toSpaceId(targetSpaceId)
           : undefined,
       );
-      if (isTruthy(renameLock?.lockId)) {
-        void releaseSpaceFileLock(toSpaceId(renameLock.spaceId), {
+      if (isTruthy(renameLock?.lockId) && isTruthy(appId)) {
+        void releaseSpaceFileLock(toAppId(appId), toSpaceId(renameLock.spaceId), {
           lockId: renameLock.lockId,
           path: renameLock.path,
         });

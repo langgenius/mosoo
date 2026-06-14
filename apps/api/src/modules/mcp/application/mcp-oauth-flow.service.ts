@@ -5,22 +5,16 @@ import type {
   StartMcpOAuthInput,
   StartMcpOAuthPayload,
 } from "@mosoo/contracts/mcp";
-import { Permission, can } from "@mosoo/contracts/permission";
 import { mcpOauthFlowsTable } from "@mosoo/db";
 import type { McpOAuthFlowId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { forbiddenError } from "../../../platform/errors";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureOrganizationMembership } from "../../organizations/domain/organization-access.policy";
-import {
-  getSharedCredentialRow,
-  getUserCredentialRow,
-  writeCredential,
-} from "./mcp-credential.repository";
+import { getAppCredentialRow, writeCredential } from "./mcp-credential.repository";
 import { decodeJsonArray, toOAuthFlowState } from "./mcp-mappers";
 import {
   createPkcePair,
@@ -78,8 +72,11 @@ export async function getMcpOAuthFlowState(
     throw new Error("OAuth flow not found.");
   }
 
-  await ensureOrganizationMembership(bindings.DB, viewerId, flow.organizationId);
+  await ensureAppOwnership(bindings.DB, viewerId, flow.appId);
   const server = await getServerRow(bindings.DB, flow.serverId);
+  if (server.appId !== flow.appId) {
+    throw new Error("OAuth flow server is not available in this app.");
+  }
   return toOAuthFlowState(flow, server);
 }
 
@@ -91,7 +88,7 @@ export async function startMcpOAuth(
 ): Promise<StartMcpOAuthPayload> {
   await cleanupExpiredOAuthFlows(bindings);
   const viewerId = readAccountId(viewer.id);
-  const { membership, server } = await ensureServerAccess(bindings.DB, viewer, input.serverId);
+  const { server } = await ensureServerAccess(bindings.DB, viewer, input.appId, input.serverId);
   const redirectUri = getCallbackUrl(requestUrl);
 
   if (server.authType !== "oauth") {
@@ -106,11 +103,10 @@ export async function startMcpOAuth(
     const secret = await readMcpOAuthServerClientSecret(bindings, {
       actor: {
         accountId: viewerId,
-        organizationRole: membership.role,
         type: "user",
       },
-      organizationId: server.organizationId,
       purpose: "oauth_authorization_client_secret",
+      appId: server.appId,
       secretKind: "server_client_secret",
       server,
     });
@@ -132,13 +128,6 @@ export async function startMcpOAuth(
     throw new Error("OAuth client registration is not configured for this MCP server.");
   }
 
-  if (
-    server.credentialScope === "organization_shared" &&
-    !can(membership.role, Permission.McpOrganizationManage)
-  ) {
-    throw forbiddenError();
-  }
-
   const { challenge, verifier } = await createPkcePair();
   const flowId = createMcpOAuthFlowId();
   const now = currentTimestampMs();
@@ -146,19 +135,19 @@ export async function startMcpOAuth(
     id: flowId,
     initiatorUserId: viewerId,
     organizationId: server.organizationId,
+    appId: server.appId,
     serverId: server.id,
   };
   const actor = {
     accountId: viewerId,
-    organizationRole: membership.role,
     type: "user" as const,
   };
   const clientSecretSecretId = isTruthy(clientSecret)
     ? await storeMcpOAuthFlowClientSecret(bindings, {
         actor,
         flow: flowOwner,
-        organizationId: server.organizationId,
         purpose: "oauth_flow_start_client_secret",
+        appId: server.appId,
         secretKind: "flow_client_secret",
         value: clientSecret,
       })
@@ -180,6 +169,7 @@ export async function startMcpOAuth(
         oauthClientId: clientId,
         oauthClientSecretSecretId: clientSecretSecretId,
         organizationId: server.organizationId,
+        appId: server.appId,
         registrationEndpoint: metadata.registration_endpoint ?? null,
         returnUrl: input.returnUrl ?? null,
         scopeValuesJson: JSON.stringify(metadata.scopes_supported ?? []),
@@ -195,8 +185,8 @@ export async function startMcpOAuth(
       command: {
         actor,
         flow: flowOwner,
-        organizationId: server.organizationId,
         purpose: "oauth_flow_insert_cleanup",
+        appId: server.appId,
         secretId: clientSecretSecretId,
         secretKind: "flow_client_secret",
       },
@@ -297,21 +287,19 @@ export async function completeMcpOAuthCallback(
       throw new Error("This MCP server does not use OAuth authentication.");
     }
 
-    const membership = await ensureOrganizationMembership(
-      bindings.DB,
-      flow.initiatorUserId,
-      flow.organizationId,
-    );
+    await ensureAppOwnership(bindings.DB, flow.initiatorUserId, flow.appId);
+    if (server.appId !== flow.appId) {
+      throw new Error("OAuth flow server is not available in this app.");
+    }
     const clientSecretOutcome = isTruthy(flow.oauthClientSecretSecretId)
       ? await readMcpOAuthFlowClientSecret(bindings, {
           actor: {
             accountId: flow.initiatorUserId,
-            organizationRole: membership.role,
             type: "user",
           },
           flow,
-          organizationId: flow.organizationId,
           purpose: "oauth_callback_client_secret",
+          appId: flow.appId,
           secretKind: "flow_client_secret",
           server,
         })
@@ -336,12 +324,8 @@ export async function completeMcpOAuthCallback(
     const scopeValues = isTruthy(token.scope)
       ? token.scope.split(/\s+/).filter(Boolean)
       : decodeJsonArray(flow.scopeValuesJson);
-    const scope: McpCredentialRecordScope =
-      server.credentialScope === "organization_shared" ? "organization_shared" : "user";
-    const existing =
-      scope === "organization_shared"
-        ? await getSharedCredentialRow(bindings.DB, server.id)
-        : await getUserCredentialRow(bindings.DB, server.id, flow.initiatorUserId);
+    const scope: McpCredentialRecordScope = "app";
+    const existing = await getAppCredentialRow(bindings.DB, server.id);
     const credential = await writeCredential(bindings.DB, bindings, {
       accessToken: token.access_token,
       authType: "oauth",
@@ -354,7 +338,6 @@ export async function completeMcpOAuthCallback(
       server,
       subjectLabel: viewerRow.email ?? viewerRow.name ?? flow.initiatorUserId,
       tokenExpiresAt,
-      ...(scope === "user" ? { userId: flow.initiatorUserId } : {}),
     });
 
     await markOAuthFlowTerminal(bindings.DB, {

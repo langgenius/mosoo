@@ -1,4 +1,4 @@
-import { Folder, Lock, Settings } from "lucide-react";
+import { Folder, Settings } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
@@ -14,12 +14,9 @@ export function SpaceTable({
 }: SpaceListViewProps): ReactElement {
   return (
     <div className="border-border bg-card overflow-hidden rounded-lg border">
-      <div className="border-border grid h-10 grid-cols-[1fr_120px_140px_48px] items-center border-b px-4">
+      <div className="border-border grid h-10 grid-cols-[1fr_140px_48px] items-center border-b px-4">
         <span className="text-fg-3 text-[11px] font-semibold tracking-[0.1em] uppercase">
           Space
-        </span>
-        <span className="text-fg-3 text-[11px] font-semibold tracking-[0.1em] uppercase">
-          Visibility
         </span>
         <span className="text-fg-3 text-[11px] font-semibold tracking-[0.1em] uppercase">
           Created
@@ -34,7 +31,7 @@ export function SpaceTable({
           <div
             key={space.id}
             className={cn(
-              "grid h-14 grid-cols-[1fr_120px_140px_48px] items-center px-4 transition-colors hover:bg-paper-50",
+              "grid h-14 grid-cols-[1fr_140px_48px] items-center px-4 transition-colors hover:bg-paper-50",
               index !== spaces.length - 1 && "border-b border-border-soft",
             )}
           >
@@ -53,16 +50,6 @@ export function SpaceTable({
                 <div className="min-w-0">
                   <div className="text-fg-1 truncate text-[14px] font-semibold">{space.name}</div>
                 </div>
-              </div>
-              <div className="text-fg-2 flex items-center gap-1.5 text-[12px]">
-                {space.visibility === "private" ? (
-                  <>
-                    <Lock className="size-3" />
-                    <span>Private</span>
-                  </>
-                ) : (
-                  <span>Shared</span>
-                )}
               </div>
               <span className="text-fg-3 font-mono text-[12px]" suppressHydrationWarning>
                 {new Date(space.createdAt).toLocaleDateString()}

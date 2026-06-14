@@ -1,32 +1,34 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { toEnvironmentId, toOrganizationId } from "../../../routes/typed-id";
+import { toEnvironmentId, toAppId } from "../../../routes/typed-id";
 import { isTruthy } from "../../../shared/lib/truthiness";
-import { getEnvironment, listOrganizationEnvironments } from "../api/environment-client";
+import { getEnvironment, listAppEnvironments } from "../api/environment-client";
 export const environmentKeys = {
   all: ["environment"] as const,
-  detail: (environmentId: string) => [...environmentKeys.details(), environmentId] as const,
+  detail: (appId: string, environmentId: string) =>
+    [...environmentKeys.details(), appId, environmentId] as const,
   details: () => [...environmentKeys.all, "detail"] as const,
-  list: (organizationId: string) => [...environmentKeys.lists(), organizationId] as const,
+  list: (appId: string) => [...environmentKeys.lists(), appId] as const,
   lists: () => [...environmentKeys.all, "list"] as const,
 };
 
-export function useOrganizationEnvironmentsQuery(organizationId: string | null) {
+export function useAppEnvironmentsQuery(appId: string | null) {
   return useQuery({
-    enabled: organizationId !== null,
-    queryFn: async () => listOrganizationEnvironments(toOrganizationId(organizationId!)),
-    queryKey: isTruthy(organizationId)
-      ? environmentKeys.list(organizationId)
+    enabled: appId !== null,
+    queryFn: async () => listAppEnvironments(toAppId(appId!)),
+    queryKey: isTruthy(appId)
+      ? environmentKeys.list(appId)
       : [...environmentKeys.lists(), "missing"],
   });
 }
 
-export function useEnvironmentDetailQuery(environmentId: string | null) {
+export function useEnvironmentDetailQuery(appId: string | null, environmentId: string | null) {
   return useQuery({
-    enabled: environmentId !== null,
-    queryFn: async () => getEnvironment(toEnvironmentId(environmentId!)),
-    queryKey: isTruthy(environmentId)
-      ? environmentKeys.detail(environmentId)
-      : [...environmentKeys.details(), "missing"],
+    enabled: appId !== null && environmentId !== null,
+    queryFn: async () => getEnvironment(toAppId(appId!), toEnvironmentId(environmentId!)),
+    queryKey:
+      isTruthy(appId) && isTruthy(environmentId)
+        ? environmentKeys.detail(appId, environmentId)
+        : [...environmentKeys.details(), "missing"],
   });
 }

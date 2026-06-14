@@ -19,12 +19,12 @@ export function CreateEnvironmentDialog({
   onCreated,
   onOpenChange,
   open,
-  organizationId,
+  appId,
 }: {
   onCreated?: (environment: EnvironmentSummary) => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
-  organizationId: string;
+  appId: string;
 }) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(() => createEnvironmentDraft());
@@ -33,7 +33,7 @@ export function CreateEnvironmentDialog({
     mutationFn: createEnvironment,
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: environmentKeys.list(organizationId),
+        queryKey: environmentKeys.list(appId),
       });
     },
   });
@@ -42,9 +42,7 @@ export function CreateEnvironmentDialog({
     setError(null);
 
     try {
-      const created = await createMutation.mutateAsync(
-        toCreateEnvironmentInput(organizationId, draft),
-      );
+      const created = await createMutation.mutateAsync(toCreateEnvironmentInput(appId, draft));
       setDraft(createEnvironmentDraft());
       onCreated?.(created);
       onOpenChange(false);

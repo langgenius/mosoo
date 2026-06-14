@@ -1,31 +1,24 @@
-import type { EnvironmentShareTarget } from "@mosoo/contracts/environment";
-import { Permission, can } from "@mosoo/contracts/permission";
 import {
   accountsTable,
   agentsTable,
   environmentRevisionsTable,
   environmentsTable,
-  organizationMembersTable,
-  organizationsTable,
-  resourceAclTable,
+  appsTable,
 } from "@mosoo/db";
-import type { AccountId, EnvironmentId, EnvironmentRevisionId, OrganizationId } from "@mosoo/id";
-import { and, asc, eq, sql } from "drizzle-orm";
+import type {
+  AccountId,
+  EnvironmentId,
+  EnvironmentRevisionId,
+  OrganizationId,
+  AppId,
+} from "@mosoo/id";
+import { and, eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
-import { toIsoString } from "../../../time";
 import type { EnvironmentRecordRow } from "./environment-types";
 
-export interface OrganizationEnvironmentDefaultsRow {
-  creatorAccountId: AccountId | null;
-  defaultEnvironmentId: EnvironmentId | null;
-  id: OrganizationId;
-}
-
 export interface EnvironmentAccessResult {
-  hasOrganizationShare: boolean;
-  isOrganizationAdmin: boolean;
   row: EnvironmentRecordRow;
 }
 
@@ -44,7 +37,7 @@ export function environmentRecordColumns() {
     currentRevisionId: sql<EnvironmentRevisionId>`${environmentsTable.currentRevisionId}`.as(
       "currentRevisionId",
     ),
-    defaultEnvironmentId: sql<EnvironmentId | null>`${organizationsTable.defaultEnvironmentId}`.as(
+    defaultEnvironmentId: sql<EnvironmentId | null>`${appsTable.defaultEnvironmentId}`.as(
       "defaultEnvironmentId",
     ),
     description: sql<string>`${environmentsTable.description}`.as("description"),
@@ -69,224 +62,98 @@ export function environmentRecordColumns() {
     ownerImageUrl: sql<string | null>`${accountsTable.image}`.as("ownerImageUrl"),
     ownerName: sql<string | null>`${accountsTable.name}`.as("ownerName"),
     packagesJson: sql<string>`${environmentRevisionsTable.packagesJson}`.as("packagesJson"),
+    appId: sql<AppId>`${environmentsTable.appId}`.as("appId"),
     setupScript: sql<string>`${environmentRevisionsTable.setupScript}`.as("setupScript"),
     updatedAt: sql<number>`${environmentsTable.updatedAt}`.as("updatedAt"),
     usedByAgentCount: sql<number>`(
       SELECT COUNT(*)
       FROM ${agentsTable}
       WHERE ${agentsTable.environmentId} = ${environmentsTable.id}
+        AND ${agentsTable.appId} = ${environmentsTable.appId}
     )`.as("usedByAgentCount"),
   };
 }
 
-export function environmentShareExistsSql(viewerId: AccountId, organizationId: OrganizationId) {
-  return sql`
-    EXISTS (
-      SELECT 1
-      FROM ${resourceAclTable}
-      WHERE ${resourceAclTable.resourceType} = 'environment'
-        AND ${resourceAclTable.resourceId} = ${environmentsTable.id}
-        AND (
-          (${resourceAclTable.targetKind} = 'user' AND ${resourceAclTable.targetId} = ${viewerId})
-          OR (${resourceAclTable.targetKind} = 'organization' AND ${resourceAclTable.targetId} = ${organizationId})
-        )
+function selectEnvironmentRecord(database: D1Database) {
+  return getAppDatabase(database)
+    .select({
+      ...environmentRecordColumns(),
+      appOwnerAccountId: appsTable.ownerAccountId,
+    })
+    .from(environmentsTable)
+    .innerJoin(
+      environmentRevisionsTable,
+      eq(environmentRevisionsTable.id, environmentsTable.currentRevisionId),
     )
-  `;
-}
-
-function environmentShareAccessSql(viewerId: AccountId) {
-  return sql<number>`
-    EXISTS (
-      SELECT 1
-      FROM ${resourceAclTable}
-      WHERE ${resourceAclTable.resourceType} = 'environment'
-        AND ${resourceAclTable.resourceId} = ${environmentsTable.id}
-        AND (
-          (${resourceAclTable.targetKind} = 'user' AND ${resourceAclTable.targetId} = ${viewerId})
-          OR (${resourceAclTable.targetKind} = 'organization' AND ${resourceAclTable.targetId} = ${environmentsTable.organizationId})
-        )
-    )
-  `;
-}
-
-function environmentOrganizationShareSql() {
-  return sql<number>`
-    EXISTS (
-      SELECT 1
-      FROM ${resourceAclTable}
-      WHERE ${resourceAclTable.resourceType} = 'environment'
-        AND ${resourceAclTable.resourceId} = ${environmentsTable.id}
-        AND ${resourceAclTable.targetKind} = 'organization'
-        AND ${resourceAclTable.targetId} = ${environmentsTable.organizationId}
-    )
-  `;
-}
-
-export async function getOrganizationDefaultsRow(
-  database: D1Database,
-  organizationId: OrganizationId,
-): Promise<OrganizationEnvironmentDefaultsRow> {
-  const row =
-    (await getAppDatabase(database)
-      .select({
-        creatorAccountId: organizationsTable.creatorAccountId,
-        defaultEnvironmentId: organizationsTable.defaultEnvironmentId,
-        id: organizationsTable.id,
-      })
-      .from(organizationsTable)
-      .where(eq(organizationsTable.id, organizationId))
-      .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    throw new Error("Organization not found.");
-  }
-
-  return row;
+    .innerJoin(appsTable, eq(appsTable.id, environmentsTable.appId))
+    .leftJoin(accountsTable, eq(accountsTable.id, environmentsTable.ownerAccountId));
 }
 
 export async function getEnvironmentRecordRow(
   database: D1Database,
   environmentId: EnvironmentId,
 ): Promise<EnvironmentRecordRow | null> {
-  return (
-    (await getAppDatabase(database)
-      .select(environmentRecordColumns())
-      .from(environmentsTable)
-      .innerJoin(
-        environmentRevisionsTable,
-        eq(environmentRevisionsTable.id, environmentsTable.currentRevisionId),
-      )
-      .innerJoin(organizationsTable, eq(organizationsTable.id, environmentsTable.organizationId))
-      .leftJoin(accountsTable, eq(accountsTable.id, environmentsTable.ownerAccountId))
+  const row =
+    (await selectEnvironmentRecord(database)
       .where(eq(environmentsTable.id, environmentId))
       .limit(1)
-      .get()) ?? null
-  );
+      .get()) ?? null;
+
+  if (row === null) {
+    return null;
+  }
+
+  const { appOwnerAccountId: _appOwnerAccountId, ...environmentRow } = row;
+  return environmentRow;
 }
 
 export async function ensureEnvironmentAccess(
   database: D1Database,
   viewerId: AccountId,
-  environmentId: EnvironmentId,
+  input: {
+    environmentId: EnvironmentId;
+    appId: AppId;
+  },
 ): Promise<EnvironmentAccessResult> {
   const row =
-    (await getAppDatabase(database)
-      .select({
-        ...environmentRecordColumns(),
-        hasOrganizationShare: environmentOrganizationShareSql(),
-        hasShareAccess: environmentShareAccessSql(viewerId),
-        viewerMembershipDisabledAt: organizationMembersTable.disabledAt,
-        viewerMembershipRole: organizationMembersTable.role,
-      })
-      .from(environmentsTable)
-      .innerJoin(
-        environmentRevisionsTable,
-        eq(environmentRevisionsTable.id, environmentsTable.currentRevisionId),
-      )
-      .innerJoin(organizationsTable, eq(organizationsTable.id, environmentsTable.organizationId))
-      .leftJoin(accountsTable, eq(accountsTable.id, environmentsTable.ownerAccountId))
-      .leftJoin(
-        organizationMembersTable,
+    (await selectEnvironmentRecord(database)
+      .where(
         and(
-          eq(organizationMembersTable.organizationId, environmentsTable.organizationId),
-          eq(organizationMembersTable.accountId, viewerId),
+          eq(environmentsTable.id, input.environmentId),
+          eq(environmentsTable.appId, input.appId),
         ),
       )
-      .where(eq(environmentsTable.id, environmentId))
       .limit(1)
       .get()) ?? null;
 
-  if (!row) {
+  if (row === null || row.appOwnerAccountId !== viewerId) {
     throw new Error("Environment not found.");
   }
 
-  const {
-    hasOrganizationShare,
-    hasShareAccess,
-    viewerMembershipDisabledAt,
-    viewerMembershipRole,
-    ...environmentRow
-  } = row;
+  const { appOwnerAccountId: _appOwnerAccountId, ...environmentRow } = row;
 
-  if (viewerMembershipRole === null) {
-    throw new Error("Organization not found.");
-  }
-
-  if (viewerMembershipDisabledAt !== null) {
-    throw forbiddenError("Your organization membership is disabled.");
-  }
-
-  const isOrganizationAdmin = can(viewerMembershipRole, Permission.EnvironmentsUpdate);
-
-  if (
-    isOrganizationAdmin ||
-    environmentRow.ownerId === viewerId ||
-    environmentRow.ownerId === null ||
-    hasShareAccess === 1
-  ) {
-    return {
-      hasOrganizationShare: hasOrganizationShare === 1,
-      isOrganizationAdmin,
-      row: environmentRow,
-    };
-  }
-
-  throw new Error("Environment not found.");
+  return {
+    row: environmentRow,
+  };
 }
 
 export async function ensureEnvironmentEditor(
   database: D1Database,
   viewerId: AccountId,
-  environmentId: EnvironmentId,
+  input: {
+    environmentId: EnvironmentId;
+    appId: AppId;
+  },
 ): Promise<EnvironmentAccessResult> {
-  const access = await ensureEnvironmentAccess(database, viewerId, environmentId);
+  const access = await ensureEnvironmentAccess(database, viewerId, input);
 
   if (access.row.ownerId === null) {
     throw forbiddenError("Built-in environments cannot be edited.");
   }
 
-  if (access.row.ownerId === viewerId || access.isOrganizationAdmin) {
+  if (access.row.ownerId === viewerId) {
     return access;
   }
 
   throw forbiddenError();
-}
-
-export async function listShareTargets(
-  database: D1Database,
-  environmentId: EnvironmentId,
-): Promise<EnvironmentShareTarget[]> {
-  const results = await getAppDatabase(database)
-    .select({
-      createdAt: resourceAclTable.createdAt,
-      email: accountsTable.email,
-      id: resourceAclTable.targetId,
-      kind: resourceAclTable.targetKind,
-      name: accountsTable.name,
-    })
-    .from(resourceAclTable)
-    .leftJoin(
-      accountsTable,
-      and(
-        sql`${resourceAclTable.targetKind} = 'user'`,
-        eq(accountsTable.id, resourceAclTable.targetId),
-      ),
-    )
-    .where(
-      and(
-        eq(resourceAclTable.resourceType, "environment"),
-        eq(resourceAclTable.resourceId, environmentId),
-      ),
-    )
-    .orderBy(asc(resourceAclTable.createdAt))
-    .all();
-
-  return results.map((target) => ({
-    createdAt: toIsoString(target.createdAt),
-    email: target.kind === "organization" ? null : target.email,
-    id: target.id,
-    kind: target.kind,
-    name: target.kind === "organization" ? "Everyone in organization" : target.name,
-  }));
 }

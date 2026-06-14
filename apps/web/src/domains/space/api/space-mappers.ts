@@ -6,11 +6,12 @@ import type {
   SpaceView,
 } from "@mosoo/contracts/space";
 
-import { toAccountId, toAgentId, toFileId, toSpaceId } from "@/routes/typed-id";
+import { toAccountId, toAgentId, toFileId, toAppId, toSpaceId } from "@/routes/typed-id";
 
-type GraphQLSpaceView = Omit<SpaceView, "id" | "ownerId"> & {
+type GraphQLSpaceView = Omit<SpaceView, "id" | "ownerId" | "appId"> & {
   id: string;
   ownerId: string;
+  appId: string;
 };
 
 type GraphQLSpaceFileLockHolder = Omit<SpaceFileLockHolder, "id"> & {
@@ -57,6 +58,7 @@ export function toSpaceView(space: GraphQLSpaceView): SpaceView {
     ...space,
     id: toSpaceId(space.id),
     ownerId: toAccountId(space.ownerId),
+    appId: toAppId(space.appId),
   };
 }
 

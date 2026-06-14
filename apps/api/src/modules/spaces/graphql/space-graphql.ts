@@ -1,15 +1,8 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { OrganizationId, SpaceId } from "@mosoo/id";
+import type { AppId, SpaceId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { spaceGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
-import {
-  addCollaborator,
-  addOrganizationCollaborator,
-  getCollaborators,
-  removeCollaborator,
-  updateCollaborator,
-} from "../application/space-collaborator.service";
 import {
   createSpaceDirectory,
   deleteSpaceEntry,
@@ -19,20 +12,22 @@ import {
   createSpace,
   deleteSpace,
   getSpace,
-  listVisibleSpaces,
+  listAppSpaces,
   updateSpace,
 } from "../application/space.service";
 
 interface SpacesArgs {
-  organizationId: string;
+  appId: string;
 }
 
 interface SpaceArgs {
+  appId: string;
   spaceId: string;
 }
 
 interface SpaceFilesArgs {
   path?: string;
+  appId: string;
   spaceId: string;
 }
 
@@ -42,22 +37,6 @@ interface CreateSpaceArgs {
 
 interface UpdateSpaceArgs {
   input: Parameters<typeof updateSpace>[2];
-}
-
-interface AddCollaboratorArgs {
-  input: Parameters<typeof addCollaborator>[2];
-}
-
-interface AddOrganizationCollaboratorArgs {
-  input: Parameters<typeof addOrganizationCollaborator>[2];
-}
-
-interface UpdateCollaboratorArgs {
-  input: Parameters<typeof updateCollaborator>[2];
-}
-
-interface RemoveCollaboratorArgs {
-  input: Parameters<typeof removeCollaborator>[2];
 }
 
 interface CreateSpaceDirectoryArgs {
@@ -71,51 +50,37 @@ interface DeleteSpaceEntryArgs {
 export const spaceGraphQLModule = {
   ...spaceGraphQLSpec,
   authenticatedMutationResolvers: {
-    addCollaborator: async (_parent, args: AddCollaboratorArgs, context) =>
-      addCollaborator(context.bindings.DB, context.viewer, args.input),
-    addOrganizationCollaborator: async (_parent, args: AddOrganizationCollaboratorArgs, context) =>
-      addOrganizationCollaborator(context.bindings.DB, context.viewer, args.input),
     createSpace: async (_parent, args: CreateSpaceArgs, context) =>
       createSpace(context.bindings.DB, context.viewer, args.input),
     createSpaceDirectory: async (_parent, args: CreateSpaceDirectoryArgs, context) =>
       createSpaceDirectory(context.bindings.DB, context.viewer, args.input),
     deleteSpace: async (_parent, args: SpaceArgs, context) => {
+      const appId: AppId = parsePlatformId(args.appId, "app ID");
       const spaceId: SpaceId = parsePlatformId(args.spaceId, "space ID");
-      await deleteSpace(context.bindings, context.viewer, spaceId);
+      await deleteSpace(context.bindings, context.viewer, appId, spaceId);
       return { ok: true } as const;
     },
     deleteSpaceEntry: async (_parent, args: DeleteSpaceEntryArgs, context) => {
       await deleteSpaceEntry(context.bindings, context.viewer, args.input);
       return { ok: true } as const;
     },
-    removeCollaborator: async (_parent, args: RemoveCollaboratorArgs, context) => {
-      await removeCollaborator(context.bindings.DB, context.viewer, args.input);
-      return { ok: true } as const;
-    },
-    updateCollaborator: async (_parent, args: UpdateCollaboratorArgs, context) =>
-      updateCollaborator(context.bindings.DB, context.viewer, args.input),
     updateSpace: async (_parent, args: UpdateSpaceArgs, context) =>
       updateSpace(context.bindings.DB, context.viewer, args.input),
   },
   authenticatedQueryResolvers: {
     space: async (_parent, args: SpaceArgs, context) => {
+      const appId: AppId = parsePlatformId(args.appId, "app ID");
       const spaceId: SpaceId = parsePlatformId(args.spaceId, "space ID");
-      return getSpace(context.bindings.DB, context.viewer, spaceId);
-    },
-    spaceCollaboratorList: async (_parent, args: SpaceArgs, context) => {
-      const spaceId: SpaceId = parsePlatformId(args.spaceId, "space ID");
-      return getCollaborators(context.bindings.DB, context.viewer, spaceId);
+      return getSpace(context.bindings.DB, context.viewer, appId, spaceId);
     },
     spaceFiles: async (_parent, args: SpaceFilesArgs, context) => {
+      const appId: AppId = parsePlatformId(args.appId, "app ID");
       const spaceId: SpaceId = parsePlatformId(args.spaceId, "space ID");
-      return getSpaceFiles(context.bindings, context.viewer, spaceId, args.path);
+      return getSpaceFiles(context.bindings, context.viewer, appId, spaceId, args.path);
     },
     spaceList: async (_parent, args: SpacesArgs, context) => {
-      const organizationId: OrganizationId = parsePlatformId(
-        args.organizationId,
-        "organization ID",
-      );
-      return listVisibleSpaces(context.bindings.DB, context.viewer, organizationId);
+      const appId: AppId = parsePlatformId(args.appId, "app ID");
+      return listAppSpaces(context.bindings.DB, context.viewer, appId);
     },
   },
 } satisfies GraphQLModule;

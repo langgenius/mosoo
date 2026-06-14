@@ -1,4 +1,4 @@
-import { Folder, Lock, Settings } from "lucide-react";
+import { Folder, Settings } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
@@ -61,16 +61,7 @@ export function SpaceGrid({
               ) : null}
             </div>
             <h3 className="text-fg-1 mb-1 truncate text-[14.5px] font-semibold">{space.name}</h3>
-            <div className="text-fg-3 flex items-center gap-1.5 text-[12px]">
-              {space.visibility === "private" ? (
-                <>
-                  <Lock className="size-3" />
-                  <span>Private</span>
-                </>
-              ) : (
-                <span>Shared</span>
-              )}
-            </div>
+            <div className="text-fg-3 text-[12px]">App storage</div>
           </div>
         );
       })}

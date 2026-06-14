@@ -1,4 +1,3 @@
-import { useAppSession } from "../../app/session-provider";
 import { useAuth } from "../../domains/auth/use-auth";
 import { SpaceSidebar } from "./sidebar";
 import {
@@ -15,13 +14,12 @@ import { useSpaceSettings } from "./use-space-settings";
 
 export function SpacePage() {
   const { user } = useAuth();
-  const { activeOrganization } = useAppSession();
   const {
     activeSpace,
     currentPath,
     hoveredSpace,
     loading: spacesLoading,
-    organizationId,
+    appId,
     refreshSpaces,
     selectSpace,
     setCurrentPath,
@@ -31,33 +29,28 @@ export function SpacePage() {
   const browser = useSpaceBrowser({
     activeSpace,
     currentPath,
+    appId,
     spaces,
   });
   const settings = useSpaceSettings({
-    organizationId,
+    appId,
     refreshSpaces,
     selectSpace,
   });
 
   const activeSpaceData = spaces.find((space) => space.id === activeSpace);
   const settingsSpace = spaces.find((space) => space.id === settings.settingsSpaceId);
-  const viewerOrganizationRole =
-    activeOrganization?.id === organizationId ? activeOrganization.viewerRole : null;
   const canWrite = canWriteToSpace(activeSpaceData?.role);
   const canManageSpace = (space: (typeof spaces)[number]) =>
     canManageSpaceSettings({
       space,
       viewerId: user?.id,
-      viewerOrganizationRole,
     });
   const getManageDisabledReason = (space: (typeof spaces)[number]) =>
     getSpaceManagementDisabledReason({
       space,
       viewerId: user?.id,
-      viewerOrganizationRole,
     });
-  const canManageSettingsSpace = settingsSpace ? canManageSpace(settingsSpace) : false;
-
   function handleOpenSettings(spaceId: string) {
     const space = spaces.find((entry) => entry.id === spaceId);
 
@@ -66,6 +59,7 @@ export function SpacePage() {
     }
 
     settings.openSettings(spaceId);
+    settings.handleShowDeleteConfirm(true);
   }
 
   const showHub = !activeSpace;
@@ -75,7 +69,6 @@ export function SpacePage() {
       {showHub ? (
         <SpacesHub
           spaces={spaces}
-          userId={user?.id}
           loading={spacesLoading}
           canManageSpace={canManageSpace}
           getManageDisabledReason={getManageDisabledReason}
@@ -99,7 +92,6 @@ export function SpacePage() {
             onOpenSettings={handleOpenSettings}
             onSelectSpace={selectSpace}
             spaces={spaces}
-            userId={user?.id}
             onBackToHub={() => {
               selectSpace(null);
             }}
@@ -120,14 +112,7 @@ export function SpacePage() {
         </>
       )}
 
-      <SpacePageDialogs
-        browser={browser}
-        canManageSettingsSpace={canManageSettingsSpace}
-        organizationId={organizationId}
-        settings={settings}
-        settingsSpace={settingsSpace}
-        userId={user?.id}
-      />
+      <SpacePageDialogs browser={browser} settings={settings} settingsSpace={settingsSpace} />
     </div>
   );
 }

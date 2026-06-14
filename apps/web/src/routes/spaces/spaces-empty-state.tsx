@@ -3,15 +3,12 @@ import type { ReactElement } from "react";
 
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
-import type { Scope } from "@/shared/ui/scope-tabs";
 
 export function SpacesEmptyState({
   onCreateSpace,
-  scope,
   searching,
 }: {
   onCreateSpace: () => void;
-  scope: Scope;
   searching: boolean;
 }): ReactElement {
   if (searching) {
@@ -24,31 +21,11 @@ export function SpacesEmptyState({
     );
   }
 
-  if (scope === "shared") {
-    return (
-      <EmptyState
-        icon={Folder}
-        title="No spaces shared with you yet"
-        description="Spaces shared with you by teammates will appear here."
-      />
-    );
-  }
-
-  if (scope === "organization") {
-    return (
-      <EmptyState
-        icon={Folder}
-        title="No organization spaces"
-        description="Spaces created by anyone in this organization will appear here."
-      />
-    );
-  }
-
   return (
     <EmptyState
       icon={Folder}
       title="No spaces yet"
-      description="Create a Space to share files with Agents and teammates."
+      description="Create a Space to share files with Agents in this App."
       action={
         <Button onClick={onCreateSpace} size="sm">
           <Plus className="size-3.5" />

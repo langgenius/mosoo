@@ -7,11 +7,8 @@ import { VENDOR_OPENAI_COMPATIBLE, getVendor } from "@mosoo/runtime-catalog";
 
 import { createApiWideEvent, emitApiWideEvent } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import {
-  ensureOrganizationAdmin,
-  ensureOrganizationMembership,
-} from "../../organizations/domain/organization-access.policy";
 import type { ProviderFetchProxyConfig } from "./provider-fetch-proxy";
 import { resolveProviderFetchProxy } from "./provider-fetch-proxy";
 import {
@@ -109,14 +106,7 @@ async function ensureCredentialTestAccess(
   viewer: AuthenticatedViewer,
   input: TestVendorCredentialInput,
 ): Promise<void> {
-  const scope = input.scope ?? "company";
-
-  if (scope === "company") {
-    await ensureOrganizationAdmin(database, viewer.id, input.organizationId);
-    return;
-  }
-
-  await ensureOrganizationMembership(database, viewer.id, input.organizationId);
+  await ensureAppOwnership(database, viewer.id, input.appId);
 }
 
 export async function testVendorCredential(

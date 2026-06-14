@@ -126,20 +126,20 @@ function toCredentialSummary(row: CredentialRow): McpCredentialSummary {
   };
 }
 
-function toServer(row: ServerRow, hasSharedCredential: boolean): McpServer {
+function toServer(row: ServerRow, hasCredential: boolean): McpServer {
   return {
     authType: row.authType,
     createdAt: toIsoString(row.createdAt),
     credentialScope: row.credentialScope,
     description: row.description,
     enabled: row.enabled === 1,
-    hasSharedCredential,
+    hasCredential,
     iconUrl: resolveIconUrl(row),
     id: row.id,
     name: row.name,
-    organizationId: row.organizationId,
     ownerId: row.ownerId,
     ownerName: row.ownerName ?? "Unknown",
+    appId: row.appId,
     source: row.source,
     updatedAt: toIsoString(row.updatedAt),
     url: row.url,
@@ -149,10 +149,10 @@ function toServer(row: ServerRow, hasSharedCredential: boolean): McpServer {
 export function toServerWithCredential(
   row: ServerRow,
   credential: CredentialRow | null,
-  hasSharedCredential: boolean,
+  hasCredential: boolean,
 ): McpServerWithCredential {
   return {
-    ...toServer(row, hasSharedCredential),
+    ...toServer(row, hasCredential),
     authorizationState: toAuthorizationState(row, credential),
     credential: credential ? toCredentialSummary(credential) : null,
     credentialStatus: getCredentialStatus(credential),
@@ -162,7 +162,7 @@ export function toServerWithCredential(
 export function toAgentBinding(
   row: AgentBindingRow,
   credential: CredentialRow | null,
-  hasSharedCredential: boolean,
+  hasCredential: boolean,
 ): AgentMcpBinding {
   const authorizationState =
     row.enabled === 1 && row.serverEnabled === 1
@@ -178,7 +178,7 @@ export function toAgentBinding(
     credentialStatus: getCredentialStatus(credential),
     credentialSubject: credential?.subjectLabel ?? null,
     enabled: row.enabled === 1,
-    hasSharedCredential,
+    hasCredential,
     iconUrl: resolveIconUrl(row),
     id: row.id,
     name: row.name,

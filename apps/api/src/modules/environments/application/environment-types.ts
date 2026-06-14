@@ -2,7 +2,13 @@ import type {
   EnvironmentNetworkPolicy,
   EnvironmentPackageSpec,
 } from "@mosoo/contracts/environment";
-import type { AccountId, EnvironmentId, EnvironmentRevisionId, OrganizationId } from "@mosoo/id";
+import type {
+  AccountId,
+  EnvironmentId,
+  EnvironmentRevisionId,
+  OrganizationId,
+  AppId,
+} from "@mosoo/id";
 
 export interface StoredEnvironmentVariable {
   key: string;
@@ -29,6 +35,7 @@ export interface EnvironmentRecordRow {
   ownerImageUrl: string | null;
   ownerName: string | null;
   packagesJson: string;
+  appId: AppId;
   setupScript: string;
   updatedAt: number;
   organizationId: OrganizationId;

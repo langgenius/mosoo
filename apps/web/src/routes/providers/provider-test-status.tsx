@@ -1,7 +1,7 @@
 import { Check, X } from "lucide-react";
 import type { ReactElement } from "react";
 
-import type { TestConnectionState } from "../../domains/vendor-credential/model/provider-credentials-model";
+type TestConnectionState = "failure" | "idle" | "running" | "success";
 
 export function ProviderTestStatus({
   error,
