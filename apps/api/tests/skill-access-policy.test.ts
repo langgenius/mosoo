@@ -47,7 +47,6 @@ function createSkillAccessDatabase(): SqliteD1Database {
       forked_from_skill_id text,
       forked_from_skill_name text,
       name text NOT NULL,
-      organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       app_id text NOT NULL,
       source_kind text NOT NULL,
@@ -81,7 +80,6 @@ function createSkillAccessDatabase(): SqliteD1Database {
       current_snapshot_id,
       description,
       name,
-      organization_id,
       owner_account_id,
       app_id,
       source_kind,
@@ -90,8 +88,8 @@ function createSkillAccessDatabase(): SqliteD1Database {
       version
     )
     VALUES
-      ('${IDS.skill}', 'Owner One', 'snapshot-1', 'App skill', 'Main Skill', '${IDS.organization}', '${IDS.owner}', '${IDS.app}', 'user', 3, 1, NULL),
-      ('${IDS.otherAppSkill}', 'Owner One', 'snapshot-2', 'Other App skill', 'Other Skill', '${IDS.organization}', '${IDS.owner}', '${IDS.otherApp}', 'user', 4, 2, NULL);
+      ('${IDS.skill}', 'Owner One', 'snapshot-1', 'App skill', 'Main Skill', '${IDS.owner}', '${IDS.app}', 'user', 3, 1, NULL),
+      ('${IDS.otherAppSkill}', 'Owner One', 'snapshot-2', 'Other App skill', 'Other Skill', '${IDS.owner}', '${IDS.otherApp}', 'user', 4, 2, NULL);
   `);
 
   return database;

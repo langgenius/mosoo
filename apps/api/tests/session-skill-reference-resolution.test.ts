@@ -9,7 +9,6 @@ type SessionSkillReference = SessionExecutionPlan["skills"][number];
 const IDS = {
   app: "01J00000000000000000000002",
   otherApp: "01J00000000000000000000003",
-  organization: "01J00000000000000000000006",
 } as const;
 
 function createSessionSkillReferenceDatabase(): SqliteD1Database {
@@ -25,7 +24,6 @@ function createSessionSkillReferenceDatabase(): SqliteD1Database {
       description text NOT NULL,
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
-      organization_id text NOT NULL,
       app_id text NOT NULL,
       skill_markdown_path text NOT NULL,
       uncompressed_size integer NOT NULL,
@@ -41,17 +39,16 @@ function createSessionSkillReferenceDatabase(): SqliteD1Database {
       description,
       id,
       name,
-      organization_id,
       app_id,
       skill_markdown_path,
       uncompressed_size,
       version
     )
     VALUES
-      ('Owner One', 'blob-owned', 'sha-owned', 100, 1, 'Owned', 'snapshot-owned', 'Owned Skill', '${IDS.organization}', '${IDS.app}', 'SKILL.md', 200, '1.0.0'),
-      ('Owner One', 'blob-explicit', 'sha-explicit', 110, 1, 'Explicit', 'snapshot-explicit', 'Explicit Skill', '${IDS.organization}', '${IDS.app}', 'SKILL.md', 210, '1.1.0'),
-      ('Package', 'blob-package', 'sha-package', 120, 1, 'Package', 'snapshot-package', 'Package Skill', '${IDS.organization}', '${IDS.app}', 'SKILL.md', 220, '2.0.0'),
-      ('Package', 'blob-other-app', 'sha-other-app', 130, 1, 'Other', 'snapshot-other-app', 'Other Skill', '${IDS.organization}', '${IDS.otherApp}', 'SKILL.md', 230, NULL);
+      ('Owner One', 'blob-owned', 'sha-owned', 100, 1, 'Owned', 'snapshot-owned', 'Owned Skill', '${IDS.app}', 'SKILL.md', 200, '1.0.0'),
+      ('Owner One', 'blob-explicit', 'sha-explicit', 110, 1, 'Explicit', 'snapshot-explicit', 'Explicit Skill', '${IDS.app}', 'SKILL.md', 210, '1.1.0'),
+      ('Package', 'blob-package', 'sha-package', 120, 1, 'Package', 'snapshot-package', 'Package Skill', '${IDS.app}', 'SKILL.md', 220, '2.0.0'),
+      ('Package', 'blob-other-app', 'sha-other-app', 130, 1, 'Other', 'snapshot-other-app', 'Other Skill', '${IDS.otherApp}', 'SKILL.md', 230, NULL);
   `);
 
   return database;

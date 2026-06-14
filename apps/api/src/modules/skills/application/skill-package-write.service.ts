@@ -21,12 +21,8 @@ export async function createSkillFromUpload(
   input: InspectSkillInput,
 ): Promise<SkillSummary> {
   const viewerId = viewer.id;
-  const app = await ensureAppOwnership(bindings.DB, viewerId, appId);
-  const published = await publishSkillSnapshot(
-    bindings,
-    { organizationId: app.organizationId, appId },
-    input,
-  );
+  await ensureAppOwnership(bindings.DB, viewerId, appId);
+  const published = await publishSkillSnapshot(bindings, { appId }, input);
   const timestampMs = currentTimestampMs();
   const skillId = createPlatformId<SkillId>();
 
@@ -39,7 +35,6 @@ export async function createSkillFromUpload(
       description: published.snapshot.description,
       id: skillId,
       name: published.snapshot.name,
-      organizationId: app.organizationId,
       ownerAccountId: viewerId,
       appId,
       sourceKind: "user",
@@ -59,12 +54,8 @@ export async function updateOwnedSkillPackage(
   input: InspectSkillInput,
 ): Promise<SkillSummary> {
   const viewerId = viewer.id;
-  const skill = await ensureSkillEditor(bindings.DB, viewerId, appId, skillId);
-  const published = await publishSkillSnapshot(
-    bindings,
-    { organizationId: skill.organizationId, appId },
-    input,
-  );
+  await ensureSkillEditor(bindings.DB, viewerId, appId, skillId);
+  const published = await publishSkillSnapshot(bindings, { appId }, input);
   const timestampMs = currentTimestampMs();
 
   await getAppDatabase(bindings.DB)

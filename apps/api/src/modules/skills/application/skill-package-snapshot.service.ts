@@ -1,7 +1,7 @@
 import type { SkillSnapshotEntry, SkillSnapshotRecord } from "@mosoo/contracts/skill";
 import { skillSnapshotEntriesTable, skillSnapshotsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { OrganizationId, AppId, SkillSnapshotId } from "@mosoo/id";
+import type { AppId, SkillSnapshotId } from "@mosoo/id";
 import { createZipArchive, extractZipArchive, normalizeSkillEntries } from "@mosoo/skill-package";
 import type { NormalizedSkillPackage, SkillPackageEntry } from "@mosoo/skill-package";
 import { and, asc, eq, inArray } from "drizzle-orm";
@@ -31,14 +31,12 @@ export interface LoadedSkillSnapshotRow {
   skillMarkdownPath: string;
   uncompressedSize: number;
   version: string | null;
-  organizationId: OrganizationId;
   appId: AppId;
 }
 
 export async function publishSkillSnapshot(
   bindings: ApiBindings,
   owner: {
-    organizationId: OrganizationId;
     appId: AppId;
   },
   input: InspectSkillInput,
@@ -89,7 +87,6 @@ export async function publishSkillSnapshot(
       description: normalized.frontmatter.description,
       id: snapshotId,
       name: normalized.frontmatter.name,
-      organizationId: owner.organizationId,
       appId: owner.appId,
       skillMarkdownPath: normalized.skillMarkdownPath,
       uncompressedSize,
@@ -230,7 +227,6 @@ function skillSnapshotColumns() {
     description: skillSnapshotsTable.description,
     id: skillSnapshotsTable.id,
     name: skillSnapshotsTable.name,
-    organizationId: skillSnapshotsTable.organizationId,
     appId: skillSnapshotsTable.appId,
     skillMarkdownPath: skillSnapshotsTable.skillMarkdownPath,
     uncompressedSize: skillSnapshotsTable.uncompressedSize,

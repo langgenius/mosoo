@@ -26,7 +26,6 @@ function skillRegistryColumns() {
     ),
     id: skillsTable.id,
     name: skillsTable.name,
-    organizationId: skillsTable.organizationId,
     ownerId: sql<AccountId>`${skillsTable.ownerAccountId}`.as("ownerId"),
     ownerName: sql<string | null>`${accountsTable.name}`.as("ownerName"),
     appId: skillsTable.appId,

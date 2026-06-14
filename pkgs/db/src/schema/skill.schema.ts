@@ -1,5 +1,5 @@
 import type { SkillSnapshotEntryKind, SkillSourceKind } from "@mosoo/contracts/skill";
-import type { AccountId, OrganizationId, AppId, SkillId, SkillSnapshotId } from "@mosoo/id";
+import type { AccountId, AppId, SkillId, SkillSnapshotId } from "@mosoo/id";
 import {
   index,
   integer,
@@ -23,7 +23,6 @@ export const skillsTable = sqliteTable(
     forkedFromSkillName: text("forked_from_skill_name"),
     id: platformIdColumn<SkillId>("id").primaryKey(),
     name: text("name").notNull(),
-    organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
     ownerAccountId: platformIdColumn<AccountId>("owner_account_id").notNull(),
     appId: platformIdColumn<AppId>("app_id").notNull(),
     sourceKind: text("source_kind").$type<SkillSourceKind>().notNull(),
@@ -47,7 +46,6 @@ export const skillSnapshotsTable = sqliteTable(
     description: text("description").notNull(),
     id: platformIdColumn<SkillSnapshotId>("id").primaryKey(),
     name: text("name").notNull(),
-    organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
     appId: platformIdColumn<AppId>("app_id").notNull(),
     skillMarkdownPath: text("skill_markdown_path").notNull(),
     uncompressedSize: integer("uncompressed_size").notNull(),

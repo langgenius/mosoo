@@ -34,7 +34,6 @@ export async function createSkillFork(
       forkedFromSkillName: source.name,
       id: skillId,
       name: forkName,
-      organizationId: source.organizationId,
       ownerAccountId: viewerId,
       appId: source.appId,
       sourceKind: "user",
