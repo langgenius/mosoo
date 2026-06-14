@@ -402,4 +402,80 @@ describe("agent package file import", () => {
     expect(await readFileRow(database, fileId)).toBeNull();
     expect(bucket.objects.has(objectKey)).toBe(false);
   });
+
+  test("does not resolve imported Environment IDs outside the target App", async () => {
+    const otherAppId = "01J000000000000000000000B2";
+    const otherEnvironmentId = "01J000000000000000000000B3";
+    const packageFixture = createPackageFixture();
+
+    packageFixture.manifest.environment.environmentId = otherEnvironmentId;
+
+    const { bindings, database, fileId } = await createFixture({
+      archiveBytes: createAgentPackageArchiveBytes(packageFixture),
+    });
+
+    database.execute(`
+      INSERT INTO app (
+        created_at,
+        default_environment_id,
+        id,
+        name,
+        organization_id,
+        owner_account_id,
+        slug,
+        updated_at
+      )
+      VALUES (
+        1,
+        NULL,
+        '${otherAppId}',
+        'Other App',
+        '${ORGANIZATION_ID}',
+        '${OWNER_VIEWER.id}',
+        'other-app',
+        1
+      );
+
+      INSERT INTO environment (
+        created_at,
+        current_revision_id,
+        description,
+        forked_from_environment_id,
+        forked_from_environment_name,
+        forked_from_owner_name,
+        id,
+        name,
+        organization_id,
+        owner_account_id,
+        app_id,
+        updated_at
+      )
+      VALUES
+        (
+          1,
+          NULL,
+          '',
+          NULL,
+          NULL,
+          NULL,
+          '${otherEnvironmentId}',
+          'Portable',
+          '${ORGANIZATION_ID}',
+          '${OWNER_VIEWER.id}',
+          '${otherAppId}',
+          1
+        );
+    `);
+
+    const imported = await importAgentPackage(bindings, OWNER_VIEWER, {
+      fileId,
+      appId: APP_ID,
+    });
+    const row = await database
+      .prepare("SELECT environment_id FROM agent WHERE id = ?")
+      .bind(imported.agent.id)
+      .first<{ environment_id: string | null }>();
+
+    expect(row?.environment_id).toBeNull();
+  });
 });

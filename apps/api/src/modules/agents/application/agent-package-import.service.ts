@@ -84,10 +84,10 @@ export async function importAgentPackage(
     }),
     resolvePackageEnvironment({
       allowTargetNameMatch: false,
+      appId: app.id,
       database: bindings.DB,
       issues,
       manifest,
-      organizationId: app.organizationId,
     }),
     resolvePackageMcpServers({
       issues,
@@ -104,7 +104,6 @@ export async function importAgentPackage(
     kind: manifest.kind,
     mcpServerIds,
     model: manifest.runtime.model,
-    organizationId: app.organizationId,
     ownerId: viewer.id,
     packageMcpServers: manifest.mcpServers,
     packageResolution: createPackageResolutionState("import", resolution),

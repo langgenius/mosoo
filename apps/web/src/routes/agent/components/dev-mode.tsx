@@ -5,7 +5,6 @@ import { useState } from "react";
 import type { ReactElement } from "react";
 import { createPortal } from "react-dom";
 
-import { useAppSession } from "@/app/session-provider";
 import { CreateEnvironmentDialog } from "@/domains/environment/components/create-environment-dialog";
 import type { McpConnectTargetServer } from "@/routes/integrations/mcp/oauth-connect-dialog";
 import { Button } from "@/shared/ui/button";
@@ -31,8 +30,6 @@ export function DevMode({
   headerActionTarget: HTMLDivElement | null;
   onSwitchMode: (mode: AgentMode | "logs") => void;
 }): ReactElement {
-  const { activeOrganization } = useAppSession();
-  const organizationId = activeOrganization?.id ?? null;
   const model = useAgentEditorModel({ agent });
   const [createEnvironmentOpen, setCreateEnvironmentOpen] = useState(false);
   const [createRemoteMcpOpen, setCreateRemoteMcpOpen] = useState(false);
@@ -49,18 +46,12 @@ export function DevMode({
     onConnectMcpCredential: (server) => {
       setConnectMcpServer(server);
     },
-    onCreateEnvironment:
-      organizationId === null
-        ? undefined
-        : () => {
-            setCreateEnvironmentOpen(true);
-          },
-    onCreateRemoteMcpServer:
-      organizationId === null
-        ? undefined
-        : () => {
-            setCreateRemoteMcpOpen(true);
-          },
+    onCreateEnvironment: () => {
+      setCreateEnvironmentOpen(true);
+    },
+    onCreateRemoteMcpServer: () => {
+      setCreateRemoteMcpOpen(true);
+    },
     onEnvironmentCreated: (environment) => {
       bindCreatedEnvironment(environment);
     },
@@ -100,26 +91,22 @@ export function DevMode({
 
   return (
     <>
-      {organizationId !== null ? (
-        <>
-          <CreateEnvironmentDialog
-            onCreated={bindCreatedEnvironment}
-            onOpenChange={setCreateEnvironmentOpen}
-            open={createEnvironmentOpen}
-            appId={agent.appId}
-          />
-          <AgentBuilderRemoteMcpSecureDialog
-            connectServer={connectMcpServer}
-            onConnectServerClose={() => {
-              setConnectMcpServer(null);
-            }}
-            onCreated={bindCreatedMcpServer}
-            onOpenChange={setCreateRemoteMcpOpen}
-            open={createRemoteMcpOpen}
-            appId={agent.appId}
-          />
-        </>
-      ) : null}
+      <CreateEnvironmentDialog
+        onCreated={bindCreatedEnvironment}
+        onOpenChange={setCreateEnvironmentOpen}
+        open={createEnvironmentOpen}
+        appId={agent.appId}
+      />
+      <AgentBuilderRemoteMcpSecureDialog
+        connectServer={connectMcpServer}
+        onConnectServerClose={() => {
+          setConnectMcpServer(null);
+        }}
+        onCreated={bindCreatedMcpServer}
+        onOpenChange={setCreateRemoteMcpOpen}
+        open={createRemoteMcpOpen}
+        appId={agent.appId}
+      />
       {headerActionTarget !== null
         ? createPortal(
             <Button

@@ -60,7 +60,7 @@ export async function publishAgent(
     bindings,
     environment,
     model: agent.model,
-    organizationId: agent.organizationId,
+    organizationId: agent.appOrganizationId,
     packageResolution,
     appId: agent.appId,
     provider: agent.provider,

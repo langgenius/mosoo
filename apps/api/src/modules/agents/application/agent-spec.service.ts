@@ -21,6 +21,7 @@ import type {
   AgentId,
   McpServerId,
   OrganizationId,
+  AppId,
   SkillId,
   SkillSnapshotId,
   SpaceId,
@@ -47,6 +48,7 @@ import { parseAgentStoredConfig, serializeAgentStoredConfig } from "./agent-stor
 import type { AgentRow } from "./agent-types";
 
 interface EnvironmentNameRow {
+  appId: AppId;
   id: EnvironmentId;
   name: string;
   organizationId: OrganizationId;
@@ -129,6 +131,7 @@ export async function getAgentEnvironmentName(
   return (
     (await getAppDatabase(database)
       .select({
+        appId: environmentsTable.appId,
         id: environmentsTable.id,
         name: environmentsTable.name,
         organizationId: environmentsTable.organizationId,

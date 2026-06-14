@@ -115,7 +115,6 @@ export const agentSchema = /* GraphQL */ `
     status: AgentStatus!
     updatedAt: String!
     visibility: AgentVisibility!
-    organizationId: ULID!
     appId: ULID!
   }
 
@@ -242,7 +241,6 @@ export const agentSchema = /* GraphQL */ `
     updatedAt: String!
     viewerRole: AgentViewerRole!
     visibility: AgentVisibility!
-    organizationId: ULID!
     appId: ULID!
   }
 
@@ -265,7 +263,6 @@ export const agentSchema = /* GraphQL */ `
     versions: [AgentDeploymentVersion!]!
     viewerRole: AgentViewerRole!
     visibility: AgentVisibility!
-    organizationId: ULID!
     appId: ULID!
   }
 

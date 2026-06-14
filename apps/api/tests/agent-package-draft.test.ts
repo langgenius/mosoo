@@ -22,6 +22,17 @@ function createAgentPackageDraftDatabase(): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
 
   database.execute(`
+    CREATE TABLE app (
+      created_at integer NOT NULL,
+      default_environment_id text,
+      id text PRIMARY KEY NOT NULL,
+      name text NOT NULL,
+      organization_id text NOT NULL,
+      owner_account_id text NOT NULL,
+      slug text NOT NULL,
+      updated_at integer NOT NULL
+    );
+
     CREATE TABLE agent (
       config_json text NOT NULL,
       created_at integer NOT NULL,
@@ -32,7 +43,6 @@ function createAgentPackageDraftDatabase(): SqliteD1Database {
       live_deployment_version_id text,
       model text NOT NULL,
       name text NOT NULL,
-      organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       app_id text NOT NULL,
       prompt text NOT NULL,
@@ -58,6 +68,18 @@ function createAgentPackageDraftDatabase(): SqliteD1Database {
       space_id text NOT NULL,
       PRIMARY KEY (agent_id, space_id)
     );
+
+    INSERT INTO app (
+      created_at,
+      default_environment_id,
+      id,
+      name,
+      organization_id,
+      owner_account_id,
+      slug,
+      updated_at
+    )
+    VALUES (1, NULL, '${DRAFT_IDS.app}', 'Draft App', '${DRAFT_IDS.organization}', '${DRAFT_IDS.owner}', 'draft', 1);
   `);
 
   return database;
@@ -134,7 +156,6 @@ describe("agent package draft", () => {
       environmentId: null,
       kind: "pet",
       model: "gpt-5.4",
-      organizationId: DRAFT_IDS.organization,
       ownerId: DRAFT_IDS.owner,
       packageMcpServers: [],
       packageResolution: null,
@@ -155,7 +176,7 @@ describe("agent package draft", () => {
       liveDeploymentVersionId: null,
       model: "gpt-5.4",
       name: "Imported Agent",
-      organizationId: DRAFT_IDS.organization,
+      appOrganizationId: DRAFT_IDS.organization,
       ownerId: DRAFT_IDS.owner,
       appId: DRAFT_IDS.app,
       prompt: "Help",
@@ -192,7 +213,6 @@ describe("agent package draft", () => {
         environmentId: null,
         kind: "pet",
         model: "gpt-5.4",
-        organizationId: DRAFT_IDS.organization,
         ownerId: DRAFT_IDS.owner,
         packageMcpServers: [],
         packageResolution: null,

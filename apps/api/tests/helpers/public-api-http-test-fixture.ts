@@ -426,7 +426,6 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
       liveDeploymentVersionId: PUBLIC_API_TEST_IDS.deployment,
       model: "gpt-5.4",
       name: "Public API Agent",
-      organizationId: PUBLIC_API_TEST_IDS.organization,
       ownerId: PUBLIC_API_TEST_IDS.ownerAccount,
       prompt: "Help.",
       provider: "openai",

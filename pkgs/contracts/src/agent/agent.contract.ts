@@ -6,7 +6,6 @@ import type {
   AgentId,
   EnvironmentId,
   McpServerId,
-  OrganizationId,
   AppId,
   SkillId,
   SpaceId,
@@ -268,7 +267,6 @@ export interface AgentSummary {
   updatedAt: string;
   viewerRole: AgentViewerRole;
   visibility: AgentVisibility;
-  organizationId: OrganizationId;
   appId: AppId;
 }
 
@@ -287,7 +285,6 @@ export interface Agent {
   status: AgentStatus;
   updatedAt: string;
   visibility: AgentVisibility;
-  organizationId: OrganizationId;
   appId: AppId;
 }
 
@@ -310,7 +307,6 @@ export interface AgentDetail {
   versions: AgentDeploymentVersion[];
   viewerRole: AgentViewerRole;
   visibility: AgentVisibility;
-  organizationId: OrganizationId;
   appId: AppId;
 }
 

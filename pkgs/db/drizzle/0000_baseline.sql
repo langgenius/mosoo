@@ -66,7 +66,6 @@ CREATE TABLE `agent` (
 	`live_deployment_version_id` text CHECK ("live_deployment_version_id" = upper("live_deployment_version_id") AND length("live_deployment_version_id") = 26 AND substr("live_deployment_version_id", 1, 1) GLOB '[0-7]' AND "live_deployment_version_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`model` text NOT NULL,
 	`name` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`prompt` text NOT NULL,
@@ -80,9 +79,7 @@ CREATE TABLE `agent` (
 --> statement-breakpoint
 CREATE INDEX `agent_app_owner_account_idx` ON `agent` (`app_id`,`owner_account_id`);--> statement-breakpoint
 CREATE INDEX `agent_app_status_idx` ON `agent` (`app_id`,`status`);--> statement-breakpoint
-CREATE INDEX `agent_organization_owner_account_idx` ON `agent` (`organization_id`,`owner_account_id`);--> statement-breakpoint
 CREATE INDEX `agent_environment_idx` ON `agent` (`environment_id`);--> statement-breakpoint
-CREATE INDEX `agent_organization_status_idx` ON `agent` (`organization_id`,`status`);--> statement-breakpoint
 CREATE TABLE `agent_builder_message` (
 	`cards_json` text,
 	`content_text` text NOT NULL,

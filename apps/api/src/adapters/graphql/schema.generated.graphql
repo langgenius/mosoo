@@ -32,7 +32,6 @@ type Agent {
   liveVersion: AgentDeploymentVersion
   model: String!
   name: String!
-  organizationId: ULID!
   prompt: String!
   provider: String!
   runtimeId: String!
@@ -225,7 +224,6 @@ type AgentDetail {
   liveVersion: AgentDeploymentVersion
   model: String!
   name: String!
-  organizationId: ULID!
   owner: AgentOwnerSummary!
   prompt: String!
   provider: String!
@@ -524,7 +522,6 @@ type AgentSummary {
   id: ULID!
   kind: AgentKind!
   name: String!
-  organizationId: ULID!
   owner: AgentOwnerSummary!
   runtimeId: String!
   status: AgentStatus!

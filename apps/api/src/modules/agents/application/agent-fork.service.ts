@@ -40,7 +40,7 @@ export async function createAgentFork(
       actorAccountId: viewer.id,
       codePrefix: "agent.fork",
       database: bindings.DB,
-      organizationId: sourceAgent.organizationId,
+      organizationId: sourceAgent.appOrganizationId,
       appId: sourceAgent.appId,
       selection: {
         model: manifest.runtime.model,
@@ -83,7 +83,6 @@ export async function createAgentFork(
     environmentId: sourceAgent.environmentId,
     kind: forkKind,
     model: sourceAgent.model,
-    organizationId: sourceAgent.organizationId,
     ownerId: viewer.id,
     packageMcpServers: mcpResolution.packageMcpServers,
     packageResolution: createPackageResolutionState("fork", resolution),

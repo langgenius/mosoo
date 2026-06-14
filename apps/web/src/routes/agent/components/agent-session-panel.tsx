@@ -35,7 +35,6 @@ export function AgentSessionPanel({
   configurationChangedAt,
   configurationRevisionKey,
   tone,
-  organizationId,
   appId,
   readiness,
 }: {
@@ -45,14 +44,12 @@ export function AgentSessionPanel({
   configurationRevisionKey?: string | null;
   readiness: AgentReadiness | null;
   tone: "preview" | "consume";
-  organizationId: string | null;
   appId: string | null;
 }) {
   const model = useAgentSessionPanelModel({
     agentId,
     configurationChangedAt: configurationChangedAt ?? null,
     configurationRevisionKey: configurationRevisionKey ?? null,
-    organizationId,
     appId,
     readiness,
     requireFreshConfiguration: tone === "preview",
