@@ -121,7 +121,7 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
 
 1. **API / WS Gateway**
    - Stateless Workers provide the shared HTTP and WebSocket ingress layer. They handle authentication, routing, GraphQL queries and mutations, and WebSocket handshakes.
-   - WebSocket requests always enter the Worker first. The Worker resolves the Session key and Organization context, then hands the upgraded connection to the corresponding Session Durable Object.
+   - WebSocket requests always enter the Worker first. The Worker resolves the Session key and App context, then hands the upgraded connection to the corresponding Session Durable Object.
 
 2. **App Domain**
    App Domain owns the business, resource, operations, and export boundary for the current pivot. App is the canonical product and engineering noun. An App belongs to an Organization and is owned by the Organization owner during the single-owner phase. App has no runtime; Agents own Agent runtime, API endpoint exposure, channel delivery, and Threads / Sessions.
@@ -151,28 +151,28 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
 
 5. **Environment Service**
    Environment is a first-class Agent runtime template asset. Like Agent, Space, Skill, and MCP, new App work scopes it by App boundaries first.
-   - **Data model**: `environment` stores environment asset metadata, owner, fork source, App scope, and `current_revision_id`. `environment_revision` stores immutable configuration versions, including `network_policy`, `allowed_hosts_json`, `packages_json`, `setup_script`, `env_vars_json`, `allow_package_managers`, and `allow_mcp_servers`. App points to its default environment; Organization default environment is migration fallback until backfill is complete.
-   - **Defaults and sharing**: Each App has a system default environment. Users can create App-local Environments. Cross-app sharing, Organization defaults, and Admin compliance override are future governance extensions. Forking creates a new Environment identity and a new revision without mutating the source Environment.
+   - **Data model**: `environment` stores environment asset metadata, owner, fork source, App scope, and `current_revision_id`. `environment_revision` stores immutable configuration versions, including `network_policy`, `allowed_hosts_json`, `packages_json`, `setup_script`, `env_vars_json`, `allow_package_managers`, and `allow_mcp_servers`. App points to its default environment; Organization does not provide a current runtime default.
+   - **Defaults and sharing**: Each App has a system default environment. Users can create App-local Environments. Cross-app sharing and compliance overrides are future governance extensions. Forking creates a new Environment identity and a new revision without mutating the source Environment.
    - **Runtime freeze**: An Agent references an `environment_id`. When a Session is created, Runtime resolves the current EnvironmentRevision and writes it into `session_execution_snapshot.plan_json`. The Session then always uses the environment id/name/revision/network/packages/setup/env vars snapshot captured there. Editing an Environment affects only future Sessions.
    - **Responsibility boundary**: Environment describes rebuildable runtime templates and startup constraints. It does not contain Space files, Skill package content, MCP server definitions, or Session history. Setup scripts, packages, and package manager caches are rebuildable and are not user-visible state.
    - **Execution constraints**: Runtime provisioning installs packages, runs the setup script, injects env vars, and applies network constraints from `network_policy` and `allowed_hosts` according to the frozen snapshot. Missing required environment configuration or setup failure must fail Session startup and enter Runtime diagnostics.
 
 6. **Identity & Access Service**
    - The current construction model is `Account -> Organization owner -> App`. Workspace and Team are not architecture concepts. For this phase, one human owns one Organization and App access maps to that owner.
-   - Core identity entities remain `Account`, `Organization`, and the existing Membership machinery needed for authentication compatibility. `Invitation`, `AccessRequest`, Organization roles beyond owner/admin compatibility, and member lifecycle administration are future multi-member governance, not current App dependencies.
-   - Login fallback uses `lastActiveOrgId` plus active membership fallback, then routes to the default App when the Organization has exactly one App. The system no longer maintains `account.origin_organization_id` or an "Origin Org for life" concept.
+   - Core identity entities remain `Account` and `Organization`; Organization is the account / billing / tenant shell for this cut. `Invitation`, `AccessRequest`, Organization roles beyond the single owner, and member lifecycle administration are future multi-member governance, not current App dependencies.
+   - Login selects the account's Organization shell, then routes to the default App when the Organization has exactly one App. The system no longer maintains `account.origin_organization_id` or an "Origin Org for life" concept.
 
 7. **Auth Service**
    - Authentication is built on Better Auth. Supported authentication methods are **Google OAuth** and **Email OTP**. Both support registration, recovery, and cross-device fallback. Passkey (WebAuthn) is a planned future option but is not enabled in the current build.
    - The same verified email across providers maps to the same Account.
-   - The current version does not support passwords, magic links, enterprise SAML / OIDC, SCIM, enterprise domain discovery, invitation acceptance, or access requests. Any post-auth resolver logic for those flows is future governance or migration compatibility, not the V1 single-owner App path.
+   - The current version does not support passwords, magic links, enterprise SAML / OIDC, SCIM, enterprise domain discovery, invitation acceptance, or access requests. Any post-auth resolver logic for those flows is future governance, not the V1 single-owner App path.
 
 8. **Session Service**
    - The Session Service is backed by Durable Objects, which own upgraded WebSocket connections.
    - It manages the conversation context between user and Agent and acts as the high-frequency event bus. It receives events from Runtime and File Service, then broadcasts them to connected clients. Session Durable Objects do not perform gateway handshake responsibilities; ingress and handoff stay in the Worker.
 
 9. **Credential / Secret Vault Service**
-   - Provider keys, API keys, and MCP credentials are moving to App scope for new App work. Existing Company Credentials and Personal Credentials remain migration context: Company Credentials belong to an Organization, and Personal Credentials belong to `(Account, Organization)`. Runtime should converge on resolving the active key by `(execution_actor, app, provider)`, falling back to `(execution_actor, organization, provider)` only during migration. In Agent execution, the execution actor is the Agent owner; the caller is used only for ingress context.
+   - Provider keys, API keys, and MCP credentials are App-scoped for current App work. Runtime resolves the active key by `(execution_actor, app, provider)` and fails closed when the App-scoped credential cannot be proven. In Agent execution, the execution actor is the Agent owner; the caller is used only for ingress context.
    - API keys, provider keys, and MCP access credentials are encrypted at rest with envelope encryption. Plaintext exists only briefly in runtime memory. Profiles store provider and credential references, never plaintext secrets.
    - Credential CRUD, active key switching, and Agent / MCP binding changes are control-plane changes. High-frequency `resolveCredential()` calls are runtime reads and remain outside mutation workflows.
 
@@ -192,7 +192,7 @@ The **Agent Driver** is a top-level independently built execution component beca
    - **Current public Driver types**: Runtime Catalog exposes `openai-runtime` and `claude-agent-sdk` to users. The OpenAI runtime path uses an app-server / SDK backend. The Claude path uses the native Claude Agent SDK interface.
    - **Current internal Driver transport**: `system-agent` and `acp-fallback` exist in catalog / protocol surfaces, but are internal or disabled and are not exposed as user-selectable runtimes. New provider integrations must add vendor-specific backends and declare capabilities and gaps in Runtime Catalog.
    - **Credential and configuration injection**: Runtime injects critical configuration and one-time access credentials through standard input when starting the process.
-   - **Control flow establishment**: The Driver listens on a sandbox-local port or stdio bridge. API Worker / Runtime uses Cloudflare Sandbox WebSocket connection support to route requests to that local interface. The Driver no longer owns a public API endpoint or calls back to the control plane over the public internet. Authentication, routing, Organization / Membership checks, and asset ACL boundaries stay in Worker / Runtime.
+   - **Control flow establishment**: The Driver listens on a sandbox-local port or stdio bridge. API Worker / Runtime uses Cloudflare Sandbox WebSocket connection support to route requests to that local interface. The Driver no longer owns a public API endpoint or calls back to the control plane over the public internet. Authentication, routing, App access checks, and asset boundaries stay in Worker / Runtime.
    - **Multi-Session isolation**: `AgentSession` is the product-level conversation boundary. Cloudflare Sandbox and container processes are execution resource boundaries. If multiple long-lived Driver / Agent processes in one Sandbox need stronger process, filesystem, or environment isolation, evaluate user-space container tooling such as `bubblewrap` inside the container for narrower per-session namespaces.
 
 2. **Agent Process**

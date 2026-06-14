@@ -23,7 +23,7 @@ The Builder explicitly chooses the kind when creating an Agent (today the produc
 
 ## The user problem
 
-Mosoo currently runs every Agent on a long-lived sandbox by default (the Pet shape). That fits "team assistant / knowledge keeper / personal co-pilot" scenarios where the agent provides ongoing companionship, but it is completely unsuited to high-concurrency, short-task scenarios like "PR auto-review / Linear assign / batch jobs":
+Mosoo currently runs every Agent on a long-lived sandbox by default (the Pet shape). That fits "personal assistant / knowledge keeper / co-pilot" scenarios where the agent provides ongoing continuity, but it is completely unsuited to high-concurrency, short-task scenarios like "PR auto-review / Linear assign / batch jobs":
 
 - A long-lived sandbox hits the container concurrency ceiling under dozens of invocations per second.
 - Every invocation is forced to reuse the same sandbox state, so calls easily contaminate one another.
@@ -56,7 +56,7 @@ When this is done, the Builder should be able to:
 | **Kind**                   | The product shape of an Agent: `pet` / `cattle`. Chosen by the user at creation time (defaults to Pet) and locked after the first Publish.                                                                                                                                      |
 | **Pet**                    | A stable, companion-style Agent. One Agent owns one stable, persistent Sandbox, and multiple Sessions reuse that same Sandbox; suited to long-term companionship.                                                                                                               |
 | **Cattle**                 | An industrialized, session-style Agent. Each Session gets its own Session Sandbox, and the Sandbox itself is the Session boundary; suited to high-concurrency, repeatable tasks.                                                                                                |
-| **Space**                  | A user-managed, shareable, long-lived file / knowledge space. Both Pet and Cattle can mount it; content written to a Space persists across Sessions / Sandboxes.                                                                                                                |
+| **Space**                  | An App-owned, long-lived file / knowledge asset. Both Pet and Cattle can mount Spaces that belong to the same App; content written to a Space persists across Sessions / Sandboxes.                                                                                             |
 | **Non-Space state**        | Content outside a Space follows sandbox semantics: for Pet it stays in the stable Sandbox; for Cattle it disappears when the session ends, unless explicitly persisted.                                                                                                         |
 | **Cattle continuation**    | A user can resume an old Cattle Session; if the old Sandbox has already been destroyed, the platform creates a new Session Sandbox that inherits only the conversation history and explicitly persisted content — not the old Sandbox's temporary files / caches / login state. |
 | **Kind lock**              | The first Publish makes the kind field immutable; during the Draft phase (including after Test in Chat) the kind can be switched freely; after that, switching the kind requires a Fork.                                                                                        |
