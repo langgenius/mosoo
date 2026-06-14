@@ -4,7 +4,7 @@
 >
 > This document is aligned with the 2026-05-28 Thread-first public API lock.
 >
-> **Current Project/App boundary note**: Public API calls still enter an Agent service, but the delivery surface should be owned by Project/App. App routes, tokens, docs, usage attribution, and preview URLs should be designed App-first, with the Agent as the App-local service/runtime target. See [Project / App Boundary](./project-app-boundary.md).
+> **Current Project/App boundary note**: Public API calls still enter an Agent service, but the delivery surface should be owned by Project/App. App routes, tokens, docs, and usage attribution should be designed App-first, with the Agent as the App-local service/runtime target. Public preview URLs are not a V1 App commitment (see `docs/SPEC.md` § Non Goals and [Project / App Boundary](./project-app-boundary.md) § Out Of Scope For This Phase) — do not design around them in this phase. See [Project / App Boundary](./project-app-boundary.md).
 
 ---
 
