@@ -2,9 +2,9 @@
 
 ## 1. Vision And Principles
 
-This project provides a deliberately simple web experience for orchestrating heterogeneous Agents, including CLI tools and SDK-based runtimes.
+This project provides a deliberately simple web experience for orchestrating App-local Agents and concrete resources backed by CLI tools and SDK-based runtimes.
 
-The current priority is OPCs, personal developers, and small self-hosted deployments. A user should be able to bring `PRD.md`, invoke `@mosoo`, and get a running Agent App in their own Cloudflare account with low operational overhead. In the current construction phase, assume one human owns one Organization: Organization is the account / billing / tenant shell, Project is the code and data boundary, and App is the console noun. Team collaboration, enterprise governance, cost management, and stronger compliance controls are extension paths for the same architecture, not default complexity for the current community edition.
+The current priority is OPCs, personal developers, and small self-hosted deployments. A user should be able to bring `PRD.md`, invoke `@mosoo`, and get a running Agent App in their own Cloudflare account with low operational overhead. In the current construction phase, assume one human owns one Organization: Organization is the account / billing / tenant shell, Project is the code and data boundary, and App is the console noun. Project/App owns concrete resources directly; it does not introduce a generic Service entity, `services` table, or polymorphic `service.kind`. Team collaboration, enterprise governance, cost management, and stronger compliance controls are extension paths for the same architecture, not default complexity for the current community edition.
 
 To support lightweight deployment, fast iteration, and future governance expansion, the architecture embraces Serverless and edge computing and follows these baseline principles:
 
@@ -45,7 +45,7 @@ graph TD
 
         Identity[Identity & Access Service<br/>Org / Account / Membership]
         Auth[Auth Service]
-        Project[Project / App Service<br/>Delivery Boundary]
+        Project[Project / App Domain<br/>Resource Boundary]
         Session[Session Service / Event Bus<br/>Durable Objects]
         Vault[Credential / Secret Vault Service]
         File[File Service<br/>Space Control & Snapshots]
@@ -60,7 +60,7 @@ graph TD
 
         Ingress --> |GraphQL Resolver / In-Process Calls| Identity & Auth & Project & Vault & File & Env & Agent_Plane & Cost
         Ingress --> |WS Upgrade Handoff| Session
-        Project --> |Owns App-local resources| Agent_Plane & Vault & File & Env & Cost
+        Project --> |Owns App-local Agents / resources| Agent_Plane & Vault & File & Env & Cost
         File & Agent_Plane --> |Push Events / Session RPC| Session
         Env --> |Resolve frozen EnvironmentRevision| Runtime
         Agent_Plane --> |Usage / Runtime Metrics| Cost
@@ -117,20 +117,22 @@ The Web layer provides the interactive client experience.
 
 The API layer contains business logic, state management, and Agent scheduling. It is the system control plane.
 
-Except for runtime boundaries such as Session Durable Objects and Sandbox instances, the `* Service` terms below refer to domain modules inside the same API Worker codebase, not independently deployed microservices.
+Except for runtime boundaries such as Session Durable Objects and Sandbox instances, the API-layer `* Service` terms below refer to domain modules inside the same API Worker codebase, not independently deployed microservices. Product-level App resources are concrete nouns such as Agent, Channel, Space, Environment, Skill, MCP server, and Provider credential. V1 does not add a generic Service entity, `services` table, or polymorphic `service.kind`.
 
 1. **API / WS Gateway**
    - Stateless Workers provide the shared HTTP and WebSocket ingress layer. They handle authentication, routing, GraphQL queries and mutations, and WebSocket handshakes.
    - WebSocket requests always enter the Worker first. The Worker resolves the Session key and Organization context, then hands the upgraded connection to the corresponding Session Durable Object.
 
-2. **Project / App Service**
-   Project / App Service owns the business, resource, operations, and export boundary for the current pivot. Project is the canonical engineering noun; App is the console noun. A Project belongs to an Organization and is owned by the Organization owner during the single-owner phase. App has no runtime; Agent owns runtime, API endpoint exposure, and channel delivery.
+2. **Project / App Domain**
+   Project / App Domain owns the business, resource, operations, and export boundary for the current pivot. Project is the canonical engineering noun; App is the console noun. A Project belongs to an Organization and is owned by the Organization owner during the single-owner phase. App has no runtime; in V1, Agents own Agent runtime, API endpoint exposure, channel delivery, and Threads / Sessions.
    - **Default App provisioning**: Onboarding / Organization provisioning creates a default Project/App. If the Organization has exactly one App, the console routes directly into that App instead of forcing an App picker.
-   - **Resource ownership**: Agents, Threads / Sessions, Spaces, Environments, Skills, MCP servers, Provider credentials, Channels, Agent exposure state, App export, app health, logs, and app-scoped cost are Project-owned resources. Organization rollups remain for billing and future governance.
+   - **Agent and resource ownership**: Agents, Threads / Sessions, Spaces, Environments, Skills, MCP servers, Provider credentials, Channels, Agent exposure state, App export, app health, logs, and app-scoped cost are Project-owned first. Organization rollups remain for billing and future governance.
+   - **No generic Service entity**: Do not add a unified `services` table, polymorphic `service.kind`, or generic Service CRUD for concrete App resources. If a future Web/API runtime, database service, worker process, or scheduled job is needed, model it with an explicit noun and lifecycle.
+   - **Project Templates**: Common one-Agent, one-Channel Apps should be created from Project Templates that provision a resource graph, not from a required global App type or single Agent type picker.
    - **Access boundary**: Project access maps to the single Organization owner for this phase. Project members, Project roles, ownership transfer, and org-wide shared resources are future extensions, not prerequisites for the first cut.
 
 3. **Agent Plane**
-   The Agent Plane unifies configuration management, lightweight system assistance, and runtime scheduling. The public data entity is the bare `Agent`. Historical terms such as `AgentService` and `PublishedAgent` have been collapsed into `Agent`, and the module name `Agent Plane` avoids a naming collision with the entity itself.
+   The Agent Plane unifies configuration management, lightweight system assistance, and runtime scheduling. The public runtime-backed unit is `Agent`, backed by the existing `Agent` data identity. Historical table or class names such as `AgentService` and `PublishedAgent` have been collapsed into `Agent`; the product noun Agent Service must not be reintroduced as a second Agent table.
    - **Profile management**: Agent definitions are stored under Project in D1 and support CRUD plus import/export flows. The Profile manages Skill availability, MCP bindings, Runtime references, and Provider references for an App-local Agent. Runtime plaintext credentials are not stored in the Profile. New flows resolve them through Credential / Vault by `(execution_actor, project, provider)`, with `(execution_actor, organization, provider)` kept only as migration fallback. In the Runtime Session Kernel, the execution actor is the Agent owner; the caller is used only for ingress context and permission response attribution.
    - **System Agent**: This path helps users create and edit Agent configuration, generate system prompts, choose models and tools, and validate configuration completeness. It uses lightweight LLM calls, does not start a Sandbox, does not launch an Agent Driver or Agent Process, and does not use Skills for dynamic expansion. It is made from model, system prompt, and controlled tool schemas, with Cloudflare Agents SDK used only as a thin session/state/RPC wrapper.
    - **Runtime**: The Runtime validates execution rights and orchestrates Cloudflare Sandbox instances. It does not wait for an in-sandbox Driver to call back to a public endpoint. Instead, it uses Sandbox SDK `wsConnect()` to reach the Driver's local WebSocket / JSON-RPC interface inside the container. It also applies Agent `kind` to choose Pet Sandbox or Cattle Session Sandbox behavior, restores platform conversation history, mounts authorized Spaces, manages Sandbox Backup/Restore and destruction policy, and consumes `sandbox.watch()` file events on the Worker side.

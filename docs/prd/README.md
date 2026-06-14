@@ -9,11 +9,11 @@ Product contracts and the standards used to write them.
 ## Current direction
 
 - [Mosoo Spec](../SPEC.md): canonical V1 nouns, relationships, non-goals, behavior, and implementation order.
-- [Project / App Boundary](./project-app-boundary.md): active construction lock for the current pivot. Read this before implementing data model, IA, resource ownership, access, or deployment changes.
+- [Project / App Boundary](./project-app-boundary.md): active construction lock for the current pivot. Read this before implementing data model, IA, Agent ownership, resource ownership, access, or deployment changes.
 
 ## PRDs
 
-Implementation contracts and shipped product behavior. Each PRD is the high-readability product specification for a capability. When older PRDs mention Organization-owned business assets, members, Admin reach-through, Workspace, or Agent-first service identity, apply the Project/App Boundary drift rules first.
+Implementation contracts and shipped product behavior. Each PRD is the high-readability product specification for a capability. When older PRDs mention Organization-owned business assets, members, Admin reach-through, Workspace, Agent-first service identity, or a required single Agent type picker, apply the Project/App Boundary drift rules first.
 
 ### Agents & packaging
 
