@@ -926,7 +926,6 @@ input EnvironmentPackageSpecInput {
 
 enum EnvironmentRegistryRole {
   owner
-  user
 }
 
 type EnvironmentSummary {

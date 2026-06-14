@@ -58,7 +58,6 @@ function createOnboardingDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       description text NOT NULL,
-      organization_id text NOT NULL,
       owner_account_id text,
       app_id text NOT NULL,
       current_revision_id text NOT NULL,
@@ -72,7 +71,6 @@ function createOnboardingDatabase(): SqliteD1Database {
     CREATE TABLE environment_revision (
       id text PRIMARY KEY NOT NULL,
       environment_id text NOT NULL,
-      organization_id text NOT NULL,
       app_id text NOT NULL,
       network_policy text NOT NULL,
       allow_mcp_servers integer NOT NULL,

@@ -216,7 +216,6 @@ async function hydrateRunContextFromSession(
       environment: snapshotEnvironment,
       mcpServerIds: toolReferences.map((reference) => reference.serverId),
       model: binding.model,
-      organizationId: agent.appOrganizationId,
       packageResolution: storedConfig.packageResolution,
       appId: agent.appId,
       provider: binding.provider,

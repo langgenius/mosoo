@@ -1,4 +1,4 @@
-import type { OrganizationId, PlatformId, AppId, VendorCredentialId } from "@mosoo/id";
+import type { PlatformId, AppId, VendorCredentialId } from "@mosoo/id";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 import { platformIdColumn } from "./id-column";
@@ -18,13 +18,11 @@ export const vendorCredentialsTable = sqliteTable(
     id: platformIdColumn<VendorCredentialId>("id").primaryKey(),
     models: text("models", { mode: "json" }).$type<string[]>(),
     name: text("name").notNull(),
-    organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
     appId: platformIdColumn<AppId>("app_id").notNull(),
     updatedAt: integer("updated_at").notNull(),
     vendorId: text("vendor_id").notNull(),
   },
   (table) => [
-    index("vendor_credential_organization_vendor_idx").on(table.organizationId, table.vendorId),
     index("vendor_credential_app_vendor_idx").on(table.appId, table.vendorId),
     uniqueIndex("vendor_credential_app_vendor_name_idx").on(
       table.appId,

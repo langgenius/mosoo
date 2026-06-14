@@ -50,7 +50,6 @@ export async function createEnvironmentFork(
     forkedFromEnvironmentName: access.row.name,
     forkedFromOwnerName: access.row.ownerName ?? "Organization",
     name: forkName,
-    organizationId: access.row.organizationId,
     ownerId: viewerId,
     appId: access.row.appId,
     timestampMs,

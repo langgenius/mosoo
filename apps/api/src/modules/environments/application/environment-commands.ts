@@ -58,7 +58,6 @@ export async function createEnvironment(
     description: metadata.description,
     environmentId,
     name: metadata.name,
-    organizationId: app.organizationId,
     ownerId: viewerId,
     appId: app.id,
     timestampMs,
@@ -100,7 +99,6 @@ export async function updateEnvironment(
     actorId: viewerId,
     config,
     environmentId: access.row.id,
-    organizationId: access.row.organizationId,
     appId: access.row.appId,
     timestampMs,
   });
@@ -164,7 +162,6 @@ export async function setEnvironmentVariableValue(
       envVars,
     },
     environmentId: access.row.id,
-    organizationId: access.row.organizationId,
     appId: access.row.appId,
     timestampMs,
   });
@@ -190,16 +187,12 @@ export async function setAppDefaultEnvironment(
   input: SetAppDefaultEnvironmentInput,
 ): Promise<EnvironmentSummary> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  const app = await ensureAppOwnership(bindings.DB, viewerId, input.appId);
+  await ensureAppOwnership(bindings.DB, viewerId, input.appId);
 
   const access = await ensureEnvironmentAccess(bindings.DB, viewerId, {
     environmentId: input.environmentId,
     appId: input.appId,
   });
-
-  if (access.row.organizationId !== app.organizationId) {
-    throw forbiddenError("Environment belongs to another organization.");
-  }
 
   if (access.row.appId !== input.appId) {
     throw forbiddenError("Environment belongs to another App.");

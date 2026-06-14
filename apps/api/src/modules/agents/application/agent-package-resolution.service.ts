@@ -7,7 +7,7 @@ import type {
   AgentResolutionIssue,
 } from "@mosoo/contracts/agent-manifest";
 import { environmentsTable, spacesTable } from "@mosoo/db";
-import type { AccountId, EnvironmentId, OrganizationId, AppId, SkillId, SpaceId } from "@mosoo/id";
+import type { AccountId, EnvironmentId, AppId, SkillId, SpaceId } from "@mosoo/id";
 import { and, eq, sql } from "drizzle-orm";
 import { zipSync } from "fflate";
 
@@ -401,7 +401,6 @@ export async function resolvePackageEnvironment(input: {
 export async function collectRuntimeResolutionIssues(
   database: D1Database,
   actorAccountId: AccountId,
-  organizationId: OrganizationId,
   appId: AppId,
   manifest: AgentManifest,
 ): Promise<AgentResolutionIssue[]> {
@@ -409,7 +408,6 @@ export async function collectRuntimeResolutionIssues(
     actorAccountId,
     codePrefix: "agent.import",
     database,
-    organizationId,
     appId,
     selection: {
       model: manifest.runtime.model,

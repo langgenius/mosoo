@@ -238,11 +238,10 @@ export async function insertAgentBuilderVendorCredential(
       id,
       models,
       name,
-      organization_id,
       app_id,
       updated_at,
       vendor_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       input.apiBase ?? null,
@@ -251,7 +250,6 @@ export async function insertAgentBuilderVendorCredential(
       credentialId,
       input.models === undefined || input.models === null ? null : JSON.stringify(input.models),
       input.name ?? `${input.vendorId} test`,
-      fixture.ids.organizationId,
       appId,
       1,
       input.vendorId,
@@ -362,7 +360,6 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       forked_from_owner_name text,
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
-      organization_id text NOT NULL,
       owner_account_id text,
       app_id text NOT NULL,
       updated_at integer NOT NULL
@@ -378,7 +375,6 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       environment_id text NOT NULL,
       id text PRIMARY KEY NOT NULL,
       network_policy text NOT NULL,
-      organization_id text NOT NULL,
       packages_json text NOT NULL,
       app_id text NOT NULL,
       setup_script text NOT NULL
@@ -674,7 +670,6 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       id text PRIMARY KEY NOT NULL,
       models text,
       name text NOT NULL,
-      organization_id text NOT NULL,
       app_id text NOT NULL,
       updated_at integer NOT NULL,
       vendor_id text NOT NULL
@@ -827,11 +822,10 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
         forked_from_owner_name,
         id,
         name,
-        organization_id,
         owner_account_id,
         app_id,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       1,
@@ -842,7 +836,6 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
       null,
       AGENT_BUILDER_TEST_IDS.environmentId,
       "Agent Builder Test Environment",
-      AGENT_BUILDER_TEST_IDS.organizationId,
       AGENT_BUILDER_TEST_VIEWER.id,
       AGENT_BUILDER_TEST_IDS.appId,
       1,
@@ -861,11 +854,10 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
         environment_id,
         id,
         network_policy,
-        organization_id,
         packages_json,
         app_id,
         setup_script
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       1,
@@ -877,7 +869,6 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
       AGENT_BUILDER_TEST_IDS.environmentId,
       AGENT_BUILDER_TEST_IDS.environmentRevisionId,
       "sandbox",
-      AGENT_BUILDER_TEST_IDS.organizationId,
       "[]",
       AGENT_BUILDER_TEST_IDS.appId,
       "",

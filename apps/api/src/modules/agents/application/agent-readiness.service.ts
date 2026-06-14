@@ -13,14 +13,7 @@ import {
   environmentsTable,
   mcpServersTable,
 } from "@mosoo/db";
-import type {
-  AccountId,
-  AgentId,
-  EnvironmentId,
-  McpServerId,
-  OrganizationId,
-  AppId,
-} from "@mosoo/id";
+import type { AccountId, AgentId, EnvironmentId, McpServerId, AppId } from "@mosoo/id";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -396,7 +389,6 @@ export async function computeAgentReadiness(
     agentId: AgentId;
     environment: AgentEnvironmentConfig;
     model: string;
-    organizationId: OrganizationId;
     packageResolution?: AgentPackageResolutionState | null;
     bindings?: ApiBindings;
     mcpServerIds?: readonly McpServerId[];
@@ -421,7 +413,6 @@ export async function computeAgentReadiness(
     ...(input.bindings === undefined ? {} : { bindings: input.bindings }),
     codePrefix: "agent.readiness",
     database,
-    organizationId: input.organizationId,
     appId: input.appId,
     selection: {
       model: input.model,

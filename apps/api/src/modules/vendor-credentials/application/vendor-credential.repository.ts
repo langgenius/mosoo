@@ -13,7 +13,6 @@ function selectVendorCredentialRows(database: D1Database) {
       id: vendorCredentialsTable.id,
       modelsJson: vendorCredentialsTable.models,
       name: vendorCredentialsTable.name,
-      organizationId: vendorCredentialsTable.organizationId,
       appId: vendorCredentialsTable.appId,
       vendorId: vendorCredentialsTable.vendorId,
     })

@@ -15,7 +15,6 @@ export const environmentSchema = /* GraphQL */ `
 
   enum EnvironmentRegistryRole {
     owner
-    user
   }
 
   enum EnvironmentVariableStatus {

@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 
 import { useAppSession } from "@/app/session-provider";
 import {
-  createEnvironmentFork,
   deleteEnvironment,
   setAppDefaultEnvironment,
 } from "@/domains/environment/api/environment-client";
@@ -49,18 +48,6 @@ export function EnvironmentsListPage() {
       });
     },
   });
-  const forkMutation = useMutation({
-    mutationFn: createEnvironmentFork,
-    onSuccess: async () => {
-      if (!isTruthy(appId)) {
-        return;
-      }
-
-      await queryClient.invalidateQueries({
-        queryKey: environmentKeys.list(appId),
-      });
-    },
-  });
   const deleteMutation = useMutation({
     mutationFn: deleteEnvironment,
     onSuccess: async () => {
@@ -93,21 +80,6 @@ export function EnvironmentsListPage() {
       setError(
         caughtError instanceof Error ? caughtError.message : "Failed to set default environment.",
       );
-    }
-  }
-
-  async function handleFork(environmentId: string) {
-    if (!isTruthy(appId)) {
-      return;
-    }
-    setError(null);
-    try {
-      await forkMutation.mutateAsync({
-        environmentId: toEnvironmentId(environmentId),
-        appId: toAppId(appId),
-      });
-    } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Failed to fork environment.");
     }
   }
 
@@ -189,9 +161,6 @@ export function EnvironmentsListPage() {
             environments={filteredEnvironments}
             onDelete={(environmentId) => {
               void handleDelete(environmentId);
-            }}
-            onFork={(environmentId) => {
-              void handleFork(environmentId);
             }}
             onSetDefault={(environmentId) => {
               void handleSetDefault(environmentId);

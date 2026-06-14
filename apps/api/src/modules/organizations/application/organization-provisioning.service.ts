@@ -104,7 +104,6 @@ export async function provisionOrganizationWithOwner(
     { DB: database },
     {
       actorId: owner.id,
-      organizationId,
       appId: defaultAppId,
       timestampMs,
     },

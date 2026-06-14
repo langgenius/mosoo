@@ -130,7 +130,6 @@ export async function collectAgentBuilderReadinessContext(
     environment,
     ...(draft.mcpServersRepresented ? { mcpServerIds: draft.mcpServerIds } : {}),
     model,
-    organizationId: input.agent.appOrganizationId,
     appId: input.agent.appId,
     provider,
     runtimeId,

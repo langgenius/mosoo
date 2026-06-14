@@ -50,7 +50,6 @@ export async function getAgentEditorState(
       agentId: editable.agent.id,
       environment,
       model: editable.agent.model,
-      organizationId: editable.agent.appOrganizationId,
       packageResolution: storedConfig.packageResolution,
       appId: editable.agent.appId,
       provider: editable.agent.provider,

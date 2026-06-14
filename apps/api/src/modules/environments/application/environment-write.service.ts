@@ -1,12 +1,6 @@
 import { environmentRevisionsTable, environmentsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type {
-  AccountId,
-  EnvironmentId,
-  EnvironmentRevisionId,
-  OrganizationId,
-  AppId,
-} from "@mosoo/id";
+import type { AccountId, EnvironmentId, EnvironmentRevisionId, AppId } from "@mosoo/id";
 import { and, eq, inArray } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -24,7 +18,6 @@ export async function createRevision(
     actorId: AccountId | null;
     config: EnvironmentMutableConfig;
     environmentId: EnvironmentId;
-    organizationId: OrganizationId;
     appId: AppId;
     timestampMs: number;
   },
@@ -44,7 +37,6 @@ export async function createRevision(
       environmentId: input.environmentId,
       id: revisionId,
       networkPolicy: input.config.networkPolicy,
-      organizationId: input.organizationId,
       packagesJson: serialized.packagesJson,
       appId: input.appId,
       setupScript: input.config.setupScript,
@@ -66,7 +58,6 @@ export async function createEnvironmentFromConfig(
     environmentId?: EnvironmentId;
     name: string;
     ownerId: AccountId | null;
-    organizationId: OrganizationId;
     appId: AppId;
     timestampMs: number;
   },
@@ -85,7 +76,6 @@ export async function createEnvironmentFromConfig(
       forkedFromOwnerName: input.forkedFromOwnerName ?? null,
       id: environmentId,
       name: input.name,
-      organizationId: input.organizationId,
       ownerAccountId: input.ownerId,
       appId: input.appId,
       updatedAt: input.timestampMs,
@@ -100,7 +90,6 @@ export async function createEnvironmentFromConfig(
       environmentId,
       id: revisionId,
       networkPolicy: input.config.networkPolicy,
-      organizationId: input.organizationId,
       packagesJson: serialized.packagesJson,
       appId: input.appId,
       setupScript: input.config.setupScript,

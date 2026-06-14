@@ -397,7 +397,6 @@ CREATE TABLE `environment_revision` (
 	`environment_id` text CHECK ("environment_id" = upper("environment_id") AND length("environment_id") = 26 AND substr("environment_id", 1, 1) GLOB '[0-7]' AND "environment_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`network_policy` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`packages_json` text NOT NULL,
 	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`setup_script` text NOT NULL,
@@ -405,7 +404,6 @@ CREATE TABLE `environment_revision` (
 );
 --> statement-breakpoint
 CREATE INDEX `environment_revision_environment_created_at_idx` ON `environment_revision` (`environment_id`,`created_at`);--> statement-breakpoint
-CREATE INDEX `environment_revision_organization_created_at_idx` ON `environment_revision` (`organization_id`,`created_at`);--> statement-breakpoint
 CREATE INDEX `environment_revision_app_created_at_idx` ON `environment_revision` (`app_id`,`created_at`);--> statement-breakpoint
 CREATE TABLE `environment` (
 	`created_at` integer NOT NULL,
@@ -416,13 +414,11 @@ CREATE TABLE `environment` (
 	`forked_from_owner_name` text,
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `environment_organization_updated_at_idx` ON `environment` (`organization_id`,`updated_at`);--> statement-breakpoint
 CREATE INDEX `environment_app_updated_at_idx` ON `environment` (`app_id`,`updated_at`);--> statement-breakpoint
 CREATE INDEX `environment_owner_updated_at_idx` ON `environment` (`owner_account_id`,`updated_at`);--> statement-breakpoint
 CREATE UNIQUE INDEX `environment_owner_name_idx` ON `environment` (`app_id`,`owner_account_id`,`name`) WHERE "environment"."owner_account_id" IS NOT NULL;--> statement-breakpoint
@@ -1157,12 +1153,10 @@ CREATE TABLE `vendor_credential` (
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`models` text,
 	`name` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`updated_at` integer NOT NULL,
 	`vendor_id` text NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `vendor_credential_organization_vendor_idx` ON `vendor_credential` (`organization_id`,`vendor_id`);--> statement-breakpoint
 CREATE INDEX `vendor_credential_app_vendor_idx` ON `vendor_credential` (`app_id`,`vendor_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `vendor_credential_app_vendor_name_idx` ON `vendor_credential` (`app_id`,`vendor_id`,`name`);

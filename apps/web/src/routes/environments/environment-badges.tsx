@@ -9,7 +9,7 @@ export function EnvironmentBadges({
     isBuiltIn: boolean;
     isDefault: boolean;
     networkPolicy: "full" | "limited";
-    role: "owner" | "user";
+    role: "owner";
   };
 }) {
   return (

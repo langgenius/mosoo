@@ -383,8 +383,7 @@ export type EnvironmentPackageSpecInput = {
 };
 
 export type EnvironmentRegistryRole =
-  | 'owner'
-  | 'user';
+  | 'owner';
 
 export type EnvironmentVariableInput = {
   key: string;

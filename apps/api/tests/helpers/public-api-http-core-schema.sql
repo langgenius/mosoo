@@ -158,7 +158,6 @@ CREATE TABLE agent_mcp_binding (
 
 CREATE TABLE environment (
   id text PRIMARY KEY NOT NULL,
-  organization_id text NOT NULL,
   app_id text NOT NULL,
   owner_account_id text,
   current_revision_id text NOT NULL,
@@ -174,7 +173,6 @@ CREATE TABLE environment (
 CREATE TABLE environment_revision (
   id text PRIMARY KEY NOT NULL,
   environment_id text NOT NULL,
-  organization_id text NOT NULL,
   app_id text NOT NULL,
   created_by_account_id text,
   setup_script text NOT NULL,
@@ -189,7 +187,6 @@ CREATE TABLE environment_revision (
 
 CREATE TABLE vendor_credential (
   id text PRIMARY KEY NOT NULL,
-  organization_id text NOT NULL,
   app_id text NOT NULL,
   vendor_id text NOT NULL,
   name text NOT NULL,
