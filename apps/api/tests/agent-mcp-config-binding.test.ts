@@ -223,7 +223,6 @@ const agent: AgentRow = {
   liveDeploymentVersionId: null,
   model: "gpt-5.4",
   name: "Agent",
-  appOrganizationId: "01J00000000000000000000006",
   ownerId: "01J00000000000000000000001",
   appId: "01J00000000000000000000007",
   prompt: "Help",

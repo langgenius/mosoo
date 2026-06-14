@@ -16,7 +16,6 @@ export function toAppSummary(row: AppRow): AppSummary {
     defaultEnvironmentId: row.defaultEnvironmentId,
     id: row.id,
     name: row.name,
-    organizationId: row.organizationId,
     ownerAccountId: row.ownerAccountId,
     slug: row.slug,
   };

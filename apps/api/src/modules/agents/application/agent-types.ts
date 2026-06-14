@@ -1,12 +1,5 @@
 import type { Agent } from "@mosoo/contracts/agent";
-import type {
-  AccountId,
-  AgentDeploymentVersionId,
-  AgentId,
-  EnvironmentId,
-  OrganizationId,
-  AppId,
-} from "@mosoo/id";
+import type { AccountId, AgentDeploymentVersionId, AgentId, EnvironmentId, AppId } from "@mosoo/id";
 
 export interface AgentRow {
   configJson: string;
@@ -26,5 +19,4 @@ export interface AgentRow {
   status: Agent["status"];
   updatedAt: number;
   visibility: Agent["visibility"];
-  appOrganizationId: OrganizationId;
 }

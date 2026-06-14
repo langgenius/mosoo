@@ -4,7 +4,6 @@ export const appSchema = /* GraphQL */ `
     defaultEnvironmentId: ULID
     id: ULID!
     name: String!
-    organizationId: ULID!
     ownerAccountId: ULID!
     slug: String!
   }

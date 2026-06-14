@@ -190,12 +190,13 @@ export async function getAgentCostCard({
   runPurposes = [],
   viewer,
 }: AgentCostCardInput): Promise<AgentCostCardView> {
+  const app = await ensureAppOwnership(database, viewer.id, appId);
   const { agent } = await ensureAppAgentOwner(database, viewer.id, { agentId, appId });
   const [header, card] = await Promise.all([
     getAgentHeader(database, agentId),
     buildAttributionCard(database, {
       agentId,
-      organizationId: agent.appOrganizationId,
+      organizationId: app.organizationId,
       appId: agent.appId,
       range,
       runPurposes,
