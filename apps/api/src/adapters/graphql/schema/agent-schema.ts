@@ -26,11 +26,6 @@ export const agentSchema = /* GraphQL */ `
     none
   }
 
-  enum AgentCollaboratorRole {
-    admin
-    user
-  }
-
   enum AgentReadinessSeverity {
     error
     warning
@@ -125,6 +120,7 @@ export const agentSchema = /* GraphQL */ `
     updatedAt: String!
     visibility: AgentVisibility!
     organizationId: ULID!
+    appId: ULID!
   }
 
   type AgentEnvironmentConfig {
@@ -216,19 +212,12 @@ export const agentSchema = /* GraphQL */ `
     agentId: ULID!
     applyActionKind: String
     targetVersion: RuntimeStateTargetVersionInput
+    appId: ULID!
   }
 
   input RuntimeStateTargetVersionInput {
     id: ULID!
     versionNumber: Int!
-  }
-
-  type AgentCollaborator {
-    email: String
-    imageUrl: String
-    name: String
-    principal: String!
-    role: AgentCollaboratorRole!
   }
 
   type AgentOwnerSummary {
@@ -258,6 +247,7 @@ export const agentSchema = /* GraphQL */ `
     viewerRole: AgentViewerRole!
     visibility: AgentVisibility!
     organizationId: ULID!
+    appId: ULID!
   }
 
   type AgentDetail {
@@ -281,11 +271,11 @@ export const agentSchema = /* GraphQL */ `
     viewerRole: AgentViewerRole!
     visibility: AgentVisibility!
     organizationId: ULID!
+    appId: ULID!
   }
 
   type AgentEditorState {
     builder: AgentBuilderMetadata!
-    collaborators: [AgentCollaborator!]!
     environment: AgentEnvironmentConfig!
     id: ULID!
     packageResolution: AgentPackageResolutionState
@@ -303,7 +293,7 @@ export const agentSchema = /* GraphQL */ `
     provider: String!
     runtimeId: String!
     skillIds: [ULID!]!
-    organizationId: ULID!
+    appId: ULID!
   }
 
   input UpdateAgentConfigInput {
@@ -320,6 +310,7 @@ export const agentSchema = /* GraphQL */ `
     providerOptions: JsonObject!
     runtimeId: String!
     skillIds: [ULID!]!
+    appId: ULID!
   }
 
   input AgentBuilderComponentDecisionsInput {
@@ -333,10 +324,12 @@ export const agentSchema = /* GraphQL */ `
 
   input DeleteAgentInput {
     agentId: ULID!
+    appId: ULID!
   }
 
   input PublishAgentInput {
     agentId: ULID!
+    appId: ULID!
     """
     Omit on re-publish to inherit the agent's current visibility. Required only
     on the very first publish.
@@ -347,6 +340,7 @@ export const agentSchema = /* GraphQL */ `
   input UpdateAgentPackageSharingInput {
     agentId: ULID!
     packageSharingEnabled: Boolean!
+    appId: ULID!
   }
 
   input AgentEnvironmentConfigInput {
@@ -356,28 +350,12 @@ export const agentSchema = /* GraphQL */ `
 
   input ImportAgentPackageInput {
     fileId: ULID!
-    organizationId: ULID!
+    appId: ULID!
   }
 
   input CreateAgentForkInput {
     agentId: ULID!
     kind: AgentKind
-  }
-
-  input AddAgentCollaboratorInput {
-    agentId: ULID!
-    principal: String!
-    role: AgentCollaboratorRole!
-  }
-
-  input RemoveAgentCollaboratorInput {
-    agentId: ULID!
-    principal: String!
-  }
-
-  input UpdateAgentCollaboratorInput {
-    agentId: ULID!
-    principal: String!
-    role: AgentCollaboratorRole!
+    appId: ULID!
   }
 `;

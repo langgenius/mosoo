@@ -187,7 +187,7 @@ function PersonalTokenSection({
             API Tokens
           </div>
           <p className="text-muted-foreground mt-1 max-w-2xl text-[12.5px] leading-relaxed">
-            Create API tokens to call published Agents. Requests are tied to your account.
+            Create API tokens to call Agent API endpoints. Requests are tied to your account.
           </p>
         </div>
       </div>

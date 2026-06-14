@@ -25,7 +25,7 @@ const RESOURCE_LINKS: readonly FooterLink[] = [
   { label: "Releases", href: MOSOO_RELEASES_URL },
 ];
 
-const PROJECT_LINKS: readonly FooterLink[] = [
+const APP_LINKS: readonly FooterLink[] = [
   { label: "GitHub", href: MOSOO_GITHUB_URL },
   { label: "License", href: MOSOO_LICENSE_URL },
   { label: "Security", href: MOSOO_SECURITY_URL },
@@ -135,7 +135,7 @@ export function LandingFooter({
               </div>
             </div>
             <FooterColumn heading="Resources" links={RESOURCE_LINKS} />
-            <FooterColumn heading="Project" links={PROJECT_LINKS} />
+            <FooterColumn heading="App" links={APP_LINKS} />
           </div>
 
           <div className="border-paper-100/10 mt-14 flex flex-col items-start justify-between gap-3 border-t pt-6 md:flex-row md:items-center">

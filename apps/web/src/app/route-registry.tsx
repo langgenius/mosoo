@@ -1,15 +1,9 @@
-import { Permission } from "@mosoo/contracts/permission";
 import { lazy } from "react";
 import type { ComponentType, ReactElement, ReactNode } from "react";
 import { Navigate, useParams, useRoutes } from "react-router-dom";
 import type { RouteObject } from "react-router-dom";
 
-import {
-  GuestRoute,
-  OnboardingRoute,
-  OrganizationPermissionRoute,
-  ProtectedRoute,
-} from "./route-guards";
+import { GuestRoute, OnboardingRoute, ProtectedRoute } from "./route-guards";
 
 type RouteModule<TName extends string> = Record<TName, ComponentType>;
 
@@ -43,10 +37,6 @@ const Onboarding = lazyNamed(
   async () => import("../routes/onboarding/onboarding.route"),
   "Onboarding",
 );
-const JoinOrganization = lazyNamed(
-  async () => import("../routes/organization-join/organization-join.route"),
-  "OrganizationJoinPage",
-);
 const Space = lazyNamed(async () => import("../routes/spaces/spaces.route"), "SpacePage");
 const Environments = lazyNamed(
   async () => import("../routes/environments/environments.route"),
@@ -65,7 +55,6 @@ const Providers = lazyNamed(
   async () => import("../routes/providers/providers.route"),
   "ProvidersPage",
 );
-const Members = lazyNamed(async () => import("../routes/members/members.route"), "MembersPage");
 const Cost = lazyNamed(async () => import("../routes/cost/cost.route"), "CostPage");
 const SettingsLayout = lazyNamed(
   async () => import("../routes/settings/settings.route"),
@@ -79,19 +68,7 @@ const SettingsAccessTokens = lazyNamed(
   async () => import("../routes/settings/access-tokens-tab"),
   "AccessTokensTab",
 );
-const SettingsSystemAgent = lazyNamed(
-  async () => import("../routes/settings/system-agent-tab"),
-  "SystemAgentTab",
-);
 const SettingsUsage = lazyNamed(async () => import("../routes/settings/usage-tab"), "UsageTab");
-const SettingsOrganizationGeneral = lazyNamed(
-  async () => import("../routes/settings/organization-general-tab"),
-  "OrganizationGeneralTab",
-);
-const SettingsOrganizationEnvironments = lazyNamed(
-  async () => import("../routes/settings/organization-environments-tab"),
-  "OrganizationEnvironmentsTab",
-);
 const AgentList = lazyNamed(
   async () => import("../routes/agent/agent-list.route"),
   "AgentListPage",
@@ -100,14 +77,11 @@ const AgentDetail = lazyNamed(
   async () => import("../routes/agent/agent-detail.route"),
   "AgentDetailPage",
 );
-const AgentSlackChannelSetup = lazyNamed(
-  async () => import("../routes/agent/slack-channel-setup.route"),
-  "AgentSlackChannelSetupPage",
-);
+const Channels = lazyNamed(async () => import("../routes/channels/channels.route"), "ChannelsPage");
 const Threads = lazyNamed(async () => import("../routes/threads/route"), "ThreadsPage");
-const ProviderDemo = lazyNamed(
-  async () => import("../routes/demo/provider-demo.route"),
-  "ProviderDemoPage",
+const AppOverview = lazyNamed(
+  async () => import("../routes/app-overview/app-overview.route"),
+  "AppOverviewPage",
 );
 
 const appRoutes = [
@@ -127,9 +101,8 @@ const appRoutes = [
     ),
     path: "/onboarding",
   },
-  { element: <JoinOrganization />, path: "/join/:organizationId" },
   { element: <McpOAuthComplete />, path: "/integrations/mcp/oauth-complete" },
-  { element: protectedRoute(<Navigate to="/agent" replace />), path: "/" },
+  { element: protectedRoute(<AppOverview />), path: "/" },
   { element: protectedRoute(<Space />), path: "/space" },
   { element: protectedRoute(<Navigate to="/space" replace />), path: "/spaces" },
   { element: protectedRoute(<Environments />), path: "/environment" },
@@ -149,8 +122,8 @@ const appRoutes = [
   { element: protectedRoute(<SkillsTabRoute />), path: "/integrations/skills" },
   { element: protectedRoute(<McpTabRoute />), path: "/integrations/mcp" },
   { element: protectedRoute(<AgentList />), path: "/agent" },
-  { element: protectedRoute(<AgentSlackChannelSetup />), path: "/agent/:agentId/channels/new" },
   { element: protectedRoute(<AgentDetail />), path: "/agent/:agentId" },
+  { element: protectedRoute(<Channels />), path: "/channels" },
   { element: protectedRoute(<Threads />), path: "/threads" },
   { element: protectedRoute(<Threads />), path: "/threads/:threadId" },
   {
@@ -158,32 +131,17 @@ const appRoutes = [
       { element: <Navigate to="/settings/profile" replace />, index: true },
       { element: <SettingsProfile />, path: "profile" },
       { element: <SettingsAccessTokens />, path: "access-tokens" },
-      { element: <SettingsSystemAgent />, path: "system-agent" },
       { element: <SettingsUsage />, path: "usage" },
-      { element: <SettingsOrganizationGeneral />, path: "general" },
-      { element: <Members />, path: "members" },
-      { element: <SettingsOrganizationEnvironments />, path: "environments" },
-      {
-        element: (
-          <OrganizationPermissionRoute
-            description="Workspace Cost is available to organization admins. You can still review your own usage in Settings."
-            permission={Permission.CostOrganizationRead}
-          >
-            <Cost />
-          </OrganizationPermissionRoute>
-        ),
-        path: "cost",
-      },
+      { element: <Navigate to="/environment" replace />, path: "environments" },
+      { element: <Navigate to="/cost" replace />, path: "cost" },
     ],
     element: protectedRoute(<SettingsLayout />),
     path: "/settings",
   },
   { element: protectedRoute(<Navigate to="/settings/profile" replace />), path: "/profile" },
-  { element: protectedRoute(<Navigate to="/settings/usage" replace />), path: "/usage" },
-  { element: protectedRoute(<Navigate to="/settings/members" replace />), path: "/members" },
+  { element: protectedRoute(<Navigate to="/cost" replace />), path: "/usage" },
   { element: protectedRoute(<Providers />), path: "/providers" },
-  { element: protectedRoute(<Navigate to="/settings/cost" replace />), path: "/cost" },
-  { element: protectedRoute(<ProviderDemo />), path: "/demo/provider" },
+  { element: protectedRoute(<Cost />), path: "/cost" },
 ] satisfies RouteObject[];
 
 export function AppRoutes(): ReactNode {

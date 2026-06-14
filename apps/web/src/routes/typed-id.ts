@@ -11,9 +11,8 @@ import type {
   FileId,
   McpOAuthFlowId,
   McpServerId,
-  OrganizationAccessRequestId,
   OrganizationId,
-  OrganizationInvitationId,
+  AppId,
   SessionRunId,
   SessionId,
   SkillId,
@@ -75,16 +74,12 @@ export function toMcpServerId(id: string): McpServerId {
   return parsePlatformId(id, "MCP server ID") as McpServerId;
 }
 
-export function toOrganizationAccessRequestId(id: string): OrganizationAccessRequestId {
-  return parsePlatformId(id, "Organization access request ID") as OrganizationAccessRequestId;
-}
-
 export function toOrganizationId(id: string): OrganizationId {
   return parsePlatformId(id, "Organization ID") as OrganizationId;
 }
 
-export function toOrganizationInvitationId(id: string): OrganizationInvitationId {
-  return parsePlatformId(id, "Organization invitation ID") as OrganizationInvitationId;
+export function toAppId(id: string): AppId {
+  return parsePlatformId(id, "App ID") as AppId;
 }
 
 export function toSessionId(id: string): SessionId {

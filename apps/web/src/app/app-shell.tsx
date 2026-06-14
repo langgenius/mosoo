@@ -1,6 +1,6 @@
-import { PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
+import { Box, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import { HelpMenu } from "@/features/help/help-menu";
 import { cn } from "@/shared/lib/class-names";
@@ -9,12 +9,52 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import { AccountMenu } from "./account-menu";
 import { AppNavigation } from "./navigation";
-import { OrganizationSwitcher } from "./organization-switcher";
 import { useAppSession } from "./session-provider";
 import { useSidebarCollapsed } from "./use-sidebar-collapsed";
 
+function AppScopePill({
+  collapsed,
+  label,
+  loading,
+}: {
+  collapsed: boolean;
+  label: string | null;
+  loading: boolean;
+}) {
+  const displayLabel = label ?? (loading ? "Loading app" : "No app");
+  const pill = (
+    <div
+      className={cn(
+        "border-border bg-background text-foreground flex items-center rounded-md border text-[13px] font-semibold",
+        collapsed ? "mx-auto mb-3 size-9 justify-center" : "mx-0.5 mb-4 gap-2 px-2.5 py-2",
+      )}
+    >
+      <Box className="size-4 shrink-0" />
+      {collapsed ? null : (
+        <div className="min-w-0">
+          <div className="text-muted-foreground text-[10.5px] leading-3 font-semibold uppercase">
+            App
+          </div>
+          <div className="truncate">{displayLabel}</div>
+        </div>
+      )}
+    </div>
+  );
+
+  if (!collapsed) {
+    return pill;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{pill}</TooltipTrigger>
+      <TooltipContent side="right">{displayLabel}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function Layout({ children }: { children: ReactNode }) {
-  const { user } = useAppSession();
+  const { activeApp, appsLoading, user } = useAppSession();
   const location = useLocation();
   const { collapsed, toggleCollapsed } = useSidebarCollapsed();
 
@@ -54,24 +94,7 @@ export function Layout({ children }: { children: ReactNode }) {
           </Tooltip>
         </div>
 
-        <OrganizationSwitcher collapsed={collapsed} />
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Link
-              to="/agent?create=1"
-              aria-label="New agent"
-              className={cn(
-                "bg-primary text-primary-foreground hover:bg-primary-hover mt-1 inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold shadow-xs transition-colors",
-                collapsed ? "mx-auto size-9 rounded-md" : "mx-0.5 mb-4 h-9 rounded-md px-3",
-              )}
-            >
-              <Plus className="size-3.5" />
-              {collapsed ? null : <span>New agent</span>}
-            </Link>
-          </TooltipTrigger>
-          {collapsed ? <TooltipContent side="right">New agent</TooltipContent> : null}
-        </Tooltip>
+        <AppScopePill collapsed={collapsed} label={activeApp?.name ?? null} loading={appsLoading} />
 
         <AppNavigation collapsed={collapsed} pathname={location.pathname} />
 

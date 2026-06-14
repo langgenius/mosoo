@@ -24,6 +24,7 @@ ${channelProviderEnumValues}
     externalTenantId: String!
     id: ULID!
     lastErrorCode: String
+    appId: ULID!
     provider: ChannelProvider!
     status: AgentChannelBindingStatus!
     updatedAt: String!
@@ -33,17 +34,19 @@ ${channelProviderEnumValues}
     agentId: ULID!
     appLevelToken: String
     botToken: String!
+    appId: ULID!
     signingSecret: String!
     threadRepliesRequireMention: Boolean
   }
 
   input CreateLarkAgentChannelBindingInput {
     agentId: ULID!
-    appId: String!
+    larkAppId: String!
     appSecret: String!
     connectionMode: LarkConnectionMode!
     domain: LarkDomain!
     encryptKey: String
+    appId: ULID!
     verificationToken: String
   }
 
@@ -83,17 +86,20 @@ ${channelProviderEnumValues}
   input StartLarkAgentChannelRegistrationInput {
     agentId: ULID!
     domain: LarkDomain!
+    appId: ULID!
   }
 
   input PollLarkAgentChannelRegistrationInput {
     agentId: ULID!
     deviceCode: String!
     domain: LarkDomain!
+    appId: ULID!
   }
 
   input CreateTelegramAgentChannelBindingInput {
     agentId: ULID!
     botToken: String!
+    appId: ULID!
     webhookSecret: String!
   }
 
@@ -101,6 +107,7 @@ ${channelProviderEnumValues}
     agentId: ULID!
     applicationId: String!
     botToken: String!
+    appId: ULID!
     relaySecret: String!
   }
 
@@ -123,14 +130,17 @@ ${channelProviderEnumValues}
 
   input StartWeChatAgentChannelPairingInput {
     agentId: ULID!
+    appId: ULID!
   }
 
   input PollWeChatAgentChannelPairingInput {
     agentId: ULID!
+    appId: ULID!
     qrToken: String!
   }
 
   input DeleteAgentChannelBindingInput {
     bindingId: ULID!
+    appId: ULID!
   }
 `;

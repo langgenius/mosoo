@@ -56,26 +56,15 @@ function createPersonalTokenDatabase(): SqliteD1Database {
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE organization (
-      id text PRIMARY KEY NOT NULL,
-      avatar_url text,
-      created_at integer NOT NULL,
-      join_policy text NOT NULL,
-      name text NOT NULL,
-      primary_domain text,
-      slug text NOT NULL
-    );
-
-    CREATE TABLE organization_member (
-      organization_id text NOT NULL,
-      account_id text NOT NULL,
-      role text NOT NULL,
-      disabled_at integer,
-      disabled_by_account_id text,
-      created_at integer NOT NULL,
-      joined_at integer NOT NULL,
-      PRIMARY KEY (organization_id, account_id)
-    );
+	    CREATE TABLE organization (
+	      id text PRIMARY KEY NOT NULL,
+	      avatar_url text,
+	      created_at integer NOT NULL,
+	      creator_account_id text,
+	      name text NOT NULL,
+	      slug text NOT NULL,
+	      updated_at integer NOT NULL
+	    );
 
     INSERT INTO account (
       id,
@@ -91,26 +80,15 @@ function createPersonalTokenDatabase(): SqliteD1Database {
     VALUES ('01J00000000000000000000001', 'owner@example.com', 1, NULL, '01J00000000000000000000006', 'Owner', NULL, 1, 1);
 
     INSERT INTO organization (
-      id,
-      avatar_url,
-      created_at,
-      join_policy,
-      name,
-      primary_domain,
-      slug
-    )
-    VALUES ('01J00000000000000000000006', NULL, 1, 'request', 'Acme', NULL, 'acme');
-
-    INSERT INTO organization_member (
-      organization_id,
-      account_id,
-      role,
-      disabled_at,
-      disabled_by_account_id,
-      created_at,
-      joined_at
-    )
-    VALUES ('01J00000000000000000000006', '01J00000000000000000000001', 'owner', NULL, NULL, 1, 1);
+	      id,
+	      avatar_url,
+	      created_at,
+	      creator_account_id,
+	      name,
+	      slug,
+	      updated_at
+	    )
+	    VALUES ('01J00000000000000000000006', NULL, 1, '01J00000000000000000000001', 'Acme', 'acme', 1);
 
     INSERT INTO personal_access_token (
       id,

@@ -13,7 +13,7 @@ const FAQS: readonly Faq[] = [
   },
   {
     q: "Who is Mosoo built for?",
-    a: "Developers building agent-powered products who don't want to rebuild runtime hosting, sandboxing, and session lifecycle for every project. If you're gluing Claude Code, Codex, or OpenClaw into something your own users depend on, Mosoo is the framework-agnostic backend that handles the plumbing so you ship the product.",
+    a: "Developers building agent-powered products who don't want to rebuild runtime hosting, sandboxing, and session lifecycle for every app. If you're gluing Claude Code, Codex, or OpenClaw into something your own users depend on, Mosoo is the framework-agnostic backend that handles the plumbing so you ship the product.",
   },
   {
     q: "Why a backend instead of just running Claude Code or Codex locally?",
