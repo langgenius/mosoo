@@ -54,7 +54,6 @@ function createSessionTypeDatabase(): SqliteD1Database {
 
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
-      organization_id text NOT NULL,
       app_id text NOT NULL,
       creator_account_id text NOT NULL,
       attributed_user_id text,
@@ -159,7 +158,6 @@ function insertSession(
   database.execute(`
     INSERT INTO session (
       id,
-      organization_id,
       app_id,
       creator_account_id,
       agent_id,
@@ -175,7 +173,6 @@ function insertSession(
       updated_at
     ) VALUES (
       '${input.id}',
-      '${ORGANIZATION_ID}',
       '${APP_ID}',
       'account-1',
       '01J00000000000000000000009',

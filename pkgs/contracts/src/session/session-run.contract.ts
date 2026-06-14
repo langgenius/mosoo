@@ -1,12 +1,6 @@
 import { type } from "arktype";
 
-import type {
-  AccountId,
-  AgentDeploymentVersionId,
-  OrganizationId,
-  SessionRunId,
-  SpaceId,
-} from "../id/id.contract";
+import type { AgentDeploymentVersionId, SessionRunId } from "../id/id.contract";
 import { NonEmptyString, PrimitiveRecord } from "../validation/primitives.contract";
 
 export const RunError = type({
@@ -53,10 +47,4 @@ export interface SessionRunSummary {
 export interface UserWarning {
   code: string;
   message: string;
-}
-
-export interface OrganizationContext {
-  activeSpaceId?: SpaceId | null;
-  actorAccountId: AccountId;
-  organizationId: OrganizationId;
 }

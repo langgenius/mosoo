@@ -6,7 +6,6 @@ import type {
   CredentialId,
   FileId,
   McpServerId,
-  OrganizationId,
   PlatformId,
   AppId,
   RuntimeEventId,
@@ -43,7 +42,6 @@ export interface SessionSummary {
   title: string | null;
   type: SessionType;
   updatedAt: string;
-  organizationId: OrganizationId;
   appId: AppId;
 }
 

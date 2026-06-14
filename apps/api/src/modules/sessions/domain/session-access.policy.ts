@@ -1,13 +1,6 @@
 import type { SessionStatus, SessionType } from "@mosoo/contracts/session";
 import { sessionsTable } from "@mosoo/db";
-import type {
-  AccountId,
-  AgentDeploymentVersionId,
-  AgentId,
-  OrganizationId,
-  AppId,
-  SessionId,
-} from "@mosoo/id";
+import type { AccountId, AgentDeploymentVersionId, AgentId, AppId, SessionId } from "@mosoo/id";
 import type { SQL } from "drizzle-orm";
 import { and, eq, or, sql } from "drizzle-orm";
 
@@ -30,7 +23,6 @@ export interface SessionParticipantCapabilityAccessRow {
 
 export interface ActiveSessionParticipantAccessRow {
   archived_at: number | null;
-  organization_id: OrganizationId;
   app_id: AppId;
   status: SessionStatus;
   type: SessionType;
@@ -42,7 +34,6 @@ export interface SessionQueueAccessRow {
   deployment_version_number: number | null;
   id: SessionId;
   model: string;
-  organization_id: OrganizationId;
   app_id: AppId;
   provider: string;
   runtime_id: string;
@@ -195,7 +186,6 @@ export async function getActiveAppSessionParticipantAccess(
     (await getAppDatabase(database)
       .select({
         archived_at: sessionsTable.archivedAt,
-        organization_id: sessionsTable.organizationId,
         app_id: sessionsTable.appId,
         status: sessionsTable.status,
         type: sessionsTable.type,
@@ -241,7 +231,6 @@ export async function getActiveAppSessionQueueAccess(
         deployment_version_number: sessionsTable.deploymentVersionNumber,
         id: sessionsTable.id,
         model: sessionsTable.model,
-        organization_id: sessionsTable.organizationId,
         app_id: sessionsTable.appId,
         provider: sessionsTable.provider,
         runtime_id: sessionsTable.runtimeId,
@@ -273,7 +262,6 @@ export async function getActiveAppSessionQueueAccess(
     deployment_version_number: row.deployment_version_number,
     id: row.id,
     model: row.model,
-    organization_id: row.organization_id,
     app_id: row.app_id,
     provider: row.provider,
     runtime_id: row.runtime_id,

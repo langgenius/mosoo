@@ -32,7 +32,6 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
   database.execute(`
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
-      organization_id text NOT NULL,
       app_id text NOT NULL,
       creator_account_id text NOT NULL,
       attributed_user_id text,
@@ -98,7 +97,6 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
 
     INSERT INTO session (
       id,
-      organization_id,
       app_id,
       creator_account_id,
       attributed_user_id,
@@ -120,7 +118,6 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
       archived_at
     ) VALUES (
       '${SESSION_ID}',
-      '${ORGANIZATION_ID}',
       '${APP_ID}',
       '${VIEWER_ID}',
       NULL,
@@ -142,7 +139,6 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
       NULL
     ), (
       '${ATTRIBUTED_SESSION_ID}',
-      '${ORGANIZATION_ID}',
       '${APP_ID}',
       '${CREATOR_ID}',
       '${VIEWER_ID}',

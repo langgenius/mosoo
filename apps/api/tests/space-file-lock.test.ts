@@ -253,7 +253,6 @@ function createSpaceFileDatabase(): SqliteD1Database {
       attributed_user_id text,
       creator_account_id text NOT NULL,
       id text PRIMARY KEY NOT NULL,
-      organization_id text NOT NULL,
       provider text NOT NULL,
       title text
     );

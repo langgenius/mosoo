@@ -535,7 +535,6 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       message_seq_cursor integer DEFAULT 0 NOT NULL,
       metadata_json text DEFAULT '{}' NOT NULL,
       model text NOT NULL,
-      organization_id text NOT NULL,
       app_id text NOT NULL,
       provider text NOT NULL,
       renamed integer NOT NULL,

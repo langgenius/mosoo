@@ -13,7 +13,6 @@ import type {
   AccountId,
   AgentId,
   DriverInstanceId,
-  OrganizationId,
   PlatformId,
   SandboxId,
   SessionId,
@@ -40,7 +39,6 @@ interface RuntimeSessionLinkRow {
   session_run_id: SessionRunId | null;
   session_run_status: SessionRunStatus | null;
   trace_id: string | null;
-  organization_id: OrganizationId | null;
 }
 
 function resolveRuntimeSessionPrincipalIds(row: RuntimeSessionLinkRow | null): {
@@ -81,7 +79,6 @@ export async function getRuntimeSessionLink(
         agent_owner_account_id: agentsTable.ownerId,
         caller_account_id: sessionRunsTable.createdByAccountId,
         creator_account_id: sessionsTable.creatorAccountId,
-        organization_id: sessionsTable.organizationId,
         origin_json: sandboxSessionsTable.originJson,
         sandbox_id: driverInstancesTable.sandboxId,
         sandbox_kind: sandboxesTable.kind,
@@ -116,7 +113,6 @@ export async function getRuntimeSessionLink(
     callerId: principals.callerId,
     creatorId: row?.creator_account_id ?? null,
     executionOwnerId: principals.executionOwnerId,
-    organizationId: row?.organization_id ?? null,
     sandboxId: row?.sandbox_id ?? null,
     sandboxKind: row?.sandbox_kind ?? null,
     sandboxSubjectKind: row?.sandbox_subject_kind ?? null,

@@ -12,7 +12,6 @@ import type {
   AccountId,
   AgentDeploymentVersionId,
   AgentId,
-  OrganizationId,
   AppId,
   SessionId,
   SessionRunId,
@@ -69,7 +68,6 @@ export interface SessionSummaryRow {
   title: string | null;
   type: SessionType;
   updated_at: number;
-  organization_id: OrganizationId;
 }
 
 export interface SessionSummaryWithLastRunRow extends SessionSummaryRow {
@@ -241,7 +239,6 @@ export function sessionSummaryColumns() {
     last_message_at: sessionsTable.lastMessageAt,
     last_run_id: sessionsTable.lastRunId,
     model: sql`${sessionsTable.model}`.mapWith(sessionsTable.model).as("model"),
-    organization_id: sessionsTable.organizationId,
     provider: sql`${sessionsTable.provider}`.mapWith(sessionsTable.provider).as("provider"),
     app_id: sessionsTable.appId,
     runtime_id: sessionsTable.runtimeId,
@@ -313,7 +310,6 @@ function buildSessionSummaryFromRow(
     lastMessageAt: row.last_message_at === null ? null : toIsoString(row.last_message_at),
     lastRun,
     model: row.model,
-    organizationId: row.organization_id,
     provider: row.provider,
     appId: row.app_id,
     runtimeId: row.runtime_id,

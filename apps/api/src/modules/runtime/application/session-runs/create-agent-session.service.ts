@@ -234,7 +234,6 @@ async function insertAgentSessionSnapshot(input: {
       kind: input.source.kind,
       metadataJson: JSON.stringify(input.metadata ?? {}),
       model: input.source.model,
-      organizationId: input.source.agent.appOrganizationId,
       appId: input.source.agent.appId,
       provider: input.source.provider,
       renamed: false,
@@ -271,7 +270,6 @@ function buildCreatedSessionSummary(input: {
     lastMessageAt: null,
     lastRun: null,
     model: input.source.model,
-    organizationId: input.source.agent.appOrganizationId,
     appId: input.source.agent.appId,
     provider: input.source.provider,
     runtimeId: input.source.runtimeId,
@@ -346,7 +344,6 @@ export async function createAgentSession(
       requestUrl: request.requestUrl,
       session: {
         id: session.id,
-        organizationId: session.organizationId,
         appId: session.appId,
       },
       viewer: request.viewer,

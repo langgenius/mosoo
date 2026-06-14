@@ -122,7 +122,6 @@ async function resetPreviewSession(
   });
   const previewSessions = await listAgentBuilderPreviewSessions(bindings.DB, {
     agent: {
-      appOrganizationId: editable.agent.appOrganizationId,
       appId: editable.agent.appId,
       id: editable.agent.id,
     },

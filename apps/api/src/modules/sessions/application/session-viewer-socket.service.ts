@@ -1,6 +1,6 @@
 import type { SessionType } from "@mosoo/contracts/session";
 import { parsePlatformId } from "@mosoo/id";
-import type { OrganizationId, AppId, SessionId } from "@mosoo/id";
+import type { AppId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
@@ -9,7 +9,6 @@ import { connectSessionViewerWebSocket } from "../infrastructure/session/client"
 
 interface ActiveViewerSocketSession {
   id: SessionId;
-  organizationId: OrganizationId;
   appId: AppId;
   type: SessionType;
 }
@@ -20,7 +19,6 @@ export interface SessionViewerSocketRuntimePrewarmRequest {
   requestUrl: string;
   session: {
     id: SessionId;
-    organizationId: OrganizationId;
     appId: AppId;
   };
   viewer: AuthenticatedViewer;
@@ -95,7 +93,6 @@ function schedulePreviewRuntimePrewarmForViewerSocket(input: {
     requestUrl: input.requestUrl,
     session: {
       id: input.session.id,
-      organizationId: input.session.organizationId,
       appId: input.session.appId,
     },
     viewer: input.viewer,
@@ -139,7 +136,6 @@ export async function connectAuthenticatedSessionViewerWebSocket(
     runtimePrewarmScheduler: input.runtimePrewarmScheduler ?? null,
     session: {
       id: sessionId,
-      organizationId: access.organization_id,
       appId: access.app_id,
       type: access.type,
     },

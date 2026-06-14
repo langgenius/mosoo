@@ -1,5 +1,11 @@
 import type { SessionType } from "@mosoo/contracts/session";
-import { agentsTable, sessionModelCallsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
+import {
+  agentsTable,
+  appsTable,
+  sessionModelCallsTable,
+  sessionRunsTable,
+  sessionsTable,
+} from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type {
   AccountId,
@@ -27,7 +33,7 @@ interface SessionModelCallRunRow {
   actor_user_id: AccountId;
   completed_at: number | null;
   model: string | null;
-  organization_id: OrganizationId;
+  app_organization_id: OrganizationId;
   app_id: AppId;
   provider: string | null;
   runtime_id: string | null;
@@ -97,7 +103,7 @@ async function getSessionModelCallRunRow(
         agent_status: sql<"draft" | "published">`${agentsTable.status}`,
         completed_at: sessionRunsTable.completedAt,
         model: sql`${sessionRunsTable.model}`.mapWith(sessionRunsTable.model).as("model"),
-        organization_id: sessionsTable.organizationId,
+        app_organization_id: appsTable.organizationId,
         app_id: sessionsTable.appId,
         provider: sql`${sessionRunsTable.provider}`
           .mapWith(sessionRunsTable.provider)
@@ -129,6 +135,7 @@ async function getSessionModelCallRunRow(
           eq(agentsTable.appId, sessionsTable.appId),
         ),
       )
+      .innerJoin(appsTable, eq(appsTable.id, sessionsTable.appId))
       .where(eq(sessionRunsTable.id, sessionRunId))
       .limit(1)
       .get()) ?? null
@@ -225,7 +232,7 @@ export async function upsertSessionModelCallUsage(
       agentStatus: run.agent_status,
       createdAtMs: completedAt ?? timestampMs,
       model,
-      organizationId: run.organization_id,
+      organizationId: run.app_organization_id,
       appId: run.app_id,
       provider,
       runtimeId: run.runtime_id ?? run.session_runtime_id,

@@ -48,7 +48,6 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
       attributed_user_id text,
       creator_account_id text NOT NULL,
       id text PRIMARY KEY NOT NULL,
-      organization_id text NOT NULL,
       app_id text NOT NULL,
       provider text NOT NULL,
       title text
@@ -133,7 +132,6 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
       attributed_user_id,
       creator_account_id,
       id,
-      organization_id,
       app_id,
       provider,
       title
@@ -142,7 +140,6 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
       NULL,
       '${VIEWER_ID}',
       '${SESSION_ID}',
-      '${ORGANIZATION_ID}',
       '${APP_ID}',
       'openai',
       'Session'
@@ -278,7 +275,6 @@ async function insertRawFileRouteSessionFixture(
         last_run_id,
         metadata_json,
         model,
-        organization_id,
         app_id,
         provider,
         renamed,
@@ -288,7 +284,7 @@ async function insertRawFileRouteSessionFixture(
         title,
         type,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       input.agentId,
@@ -304,7 +300,6 @@ async function insertRawFileRouteSessionFixture(
       null,
       "{}",
       "gpt-5.4",
-      input.organizationId,
       input.appId,
       "openai",
       0,

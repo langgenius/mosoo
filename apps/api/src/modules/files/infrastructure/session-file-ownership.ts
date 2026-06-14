@@ -1,5 +1,5 @@
 import { sessionsTable } from "@mosoo/db";
-import type { AccountId, OrganizationId, AppId, SessionId } from "@mosoo/id";
+import type { AccountId, AppId, SessionId } from "@mosoo/id";
 import { and, eq, or } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -10,7 +10,6 @@ export interface SessionFileAccessRow {
   id: SessionId;
   provider: string;
   title: string | null;
-  organization_id: OrganizationId;
 }
 
 export interface AppSessionFileAccessRow extends SessionFileAccessRow {
@@ -26,7 +25,6 @@ export async function ensureSessionFileAccess(
     (await getAppDatabase(database)
       .select({
         id: sessionsTable.id,
-        organization_id: sessionsTable.organizationId,
         provider: sessionsTable.provider,
         title: sessionsTable.title,
       })
@@ -64,7 +62,6 @@ export async function ensureAppSessionFileAccess(
     (await getAppDatabase(database)
       .select({
         id: sessionsTable.id,
-        organization_id: sessionsTable.organizationId,
         app_id: sessionsTable.appId,
         provider: sessionsTable.provider,
         title: sessionsTable.title,

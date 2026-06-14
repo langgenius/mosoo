@@ -56,7 +56,6 @@ const SESSIONS_QUERY = graphql(/* GraphQL */ `
         title
         type
         updatedAt
-        organizationId
       }
     }
   }
@@ -108,7 +107,6 @@ const THREAD_AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
           title
           type
           updatedAt
-          organizationId
         }
       }
     }

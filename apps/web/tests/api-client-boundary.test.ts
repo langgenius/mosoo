@@ -12,7 +12,6 @@ import { toAppId, toVendorCredentialId } from "../src/routes/typed-id";
 
 const originalFetch = globalThis.fetch;
 const AGENT_ID = "01J000000000000000000000C1";
-const ORGANIZATION_ID = "01J000000000000000000000C2";
 const SESSION_ID = "01J000000000000000000000C3";
 const APP_ID = "01J000000000000000000000C4";
 const VENDOR_CREDENTIAL_ID = "01J000000000000000000000C5";
@@ -29,7 +28,6 @@ const createSessionResponse = {
       lastMessageAt: null,
       lastRun: null,
       model: "gpt-5.4",
-      organizationId: ORGANIZATION_ID,
       appId: APP_ID,
       provider: "openai",
       runtimeId: "openai-runtime",

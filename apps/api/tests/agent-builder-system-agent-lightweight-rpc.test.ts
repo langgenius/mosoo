@@ -239,7 +239,6 @@ async function insertPreviewSession(
       message_seq_cursor,
       metadata_json,
       model,
-      organization_id,
       app_id,
       provider,
       renamed,
@@ -248,7 +247,7 @@ async function insertPreviewSession(
       title,
       type,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       fixture.ids.agentId,
@@ -262,7 +261,6 @@ async function insertPreviewSession(
       input.messageSeqCursor,
       "{}",
       "claude-sonnet-4-5",
-      fixture.ids.organizationId,
       fixture.ids.appId,
       "anthropic",
       0,

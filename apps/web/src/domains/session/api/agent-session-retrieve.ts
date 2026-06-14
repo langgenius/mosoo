@@ -50,7 +50,6 @@ const THREAD_AGENT_SESSION_RETRIEVE_QUERY = graphql(/* GraphQL */ `
           updatedAt
         }
         model
-        organizationId
         provider
         appId
         runtimeId

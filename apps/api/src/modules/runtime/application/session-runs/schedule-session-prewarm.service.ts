@@ -54,7 +54,6 @@ export async function scheduleSessionPrewarm(
     requestUrl: request.requestUrl,
     session: {
       id: session.id,
-      organizationId: session.organizationId,
       appId: session.appId,
     },
     viewer: request.viewer,
