@@ -19,7 +19,8 @@ import { OWNER_VIEWER, withSlackAuthTestMock } from "./agent-channel-binding-fix
 import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
-} from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
 describe("agent channel bindings", () => {
   test("loads channel activity for all bindings", async () => {
     const database = await createPublicHttpContractDatabase();
@@ -43,6 +44,7 @@ describe("agent channel bindings", () => {
           externalTenantId: "slack-tenant",
           id: "binding-slack",
           lastErrorCode: null,
+          appId: PUBLIC_API_TEST_IDS.app,
           provider: "slack",
           status: "active",
           updatedAt: nowMs,
@@ -56,6 +58,7 @@ describe("agent channel bindings", () => {
           externalTenantId: "telegram-tenant",
           id: "binding-telegram",
           lastErrorCode: null,
+          appId: PUBLIC_API_TEST_IDS.app,
           provider: "telegram",
           status: "active",
           updatedAt: nowMs,
@@ -69,6 +72,7 @@ describe("agent channel bindings", () => {
           externalTenantId: "discord-tenant",
           id: "binding-discord",
           lastErrorCode: null,
+          appId: PUBLIC_API_TEST_IDS.app,
           provider: "discord",
           status: "active",
           updatedAt: nowMs,
@@ -95,6 +99,7 @@ describe("agent channel bindings", () => {
           metadataJson: JSON.stringify({ triggered_by: { binding_id: "binding-slack" } }),
           model: "gpt-5.4",
           organizationId: "01J00000000000000000000006",
+          appId: PUBLIC_API_TEST_IDS.app,
           provider: "openai",
           renamed: false,
           runtimeId: "openai-runtime",
@@ -118,6 +123,7 @@ describe("agent channel bindings", () => {
           metadataJson: JSON.stringify({ triggered_by: { binding_id: "binding-slack" } }),
           model: "gpt-5.4",
           organizationId: "01J00000000000000000000006",
+          appId: PUBLIC_API_TEST_IDS.app,
           provider: "openai",
           renamed: false,
           runtimeId: "openai-runtime",
@@ -141,6 +147,7 @@ describe("agent channel bindings", () => {
           metadataJson: JSON.stringify({ triggered_by: { binding_id: "binding-telegram" } }),
           model: "gpt-5.4",
           organizationId: "01J00000000000000000000006",
+          appId: PUBLIC_API_TEST_IDS.app,
           provider: "openai",
           renamed: false,
           runtimeId: "openai-runtime",
@@ -151,11 +158,10 @@ describe("agent channel bindings", () => {
         },
       ])
       .run();
-    const results = await listAgentChannelBindings(
-      database,
-      OWNER_VIEWER,
-      "01J00000000000000000000009",
-    );
+    const results = await listAgentChannelBindings(database, OWNER_VIEWER, {
+      agentId: PUBLIC_API_TEST_IDS.agent,
+      appId: PUBLIC_API_TEST_IDS.app,
+    });
     expect(results).toContainEqual(
       expect.objectContaining({
         activityLastTriggeredAt: new Date(nowMs).toISOString(),
@@ -185,8 +191,9 @@ describe("agent channel bindings", () => {
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
 
       const binding = await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "xoxb-secret-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         signingSecret: "signing-secret",
       });
 
@@ -220,7 +227,7 @@ describe("agent channel bindings", () => {
         bindingId: binding.id,
         expectedOwner: {
           agentId: binding.agentId,
-          organizationId: "01J00000000000000000000006",
+          appId: PUBLIC_API_TEST_IDS.app,
         },
         provider: "slack",
         purpose: "channel_callback",
@@ -242,7 +249,7 @@ describe("agent channel bindings", () => {
           bindingId: binding.id,
           expectedOwner: {
             agentId: binding.agentId,
-            organizationId: "01J00000000000000000000006",
+            appId: PUBLIC_API_TEST_IDS.app,
           },
           provider: "slack",
           purpose: "channel_callback",
@@ -254,7 +261,7 @@ describe("agent channel bindings", () => {
           bindingId: binding.id,
           expectedOwner: {
             agentId: binding.agentId,
-            organizationId: "01J00000000000000000000099",
+            appId: "01J00000000000000000000099",
           },
           provider: "slack",
           purpose: "channel_callback",
@@ -272,7 +279,7 @@ describe("agent channel bindings", () => {
           bindingId: binding.id,
           expectedOwner: {
             agentId: binding.agentId,
-            organizationId: "01J00000000000000000000006",
+            appId: PUBLIC_API_TEST_IDS.app,
           },
           provider: "slack",
           purpose: "channel_callback",
@@ -286,24 +293,24 @@ describe("agent channel bindings", () => {
     const database = await createPublicHttpContractDatabase();
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
     const slackSecretId = await storeAgentChannelBindingCredentialSecret(bindings, {
-      agentId: "01J00000000000000000000009",
+      agentId: PUBLIC_API_TEST_IDS.agent,
       credentialsJson: "{}",
-      organizationId: "01J00000000000000000000006",
+      appId: PUBLIC_API_TEST_IDS.app,
       provider: "slack",
       purpose: "channel_binding_create",
     });
     const telegramSecretId = await storeAgentChannelBindingCredentialSecret(bindings, {
-      agentId: "01J00000000000000000000009",
+      agentId: PUBLIC_API_TEST_IDS.agent,
       credentialsJson: "{}",
-      organizationId: "01J00000000000000000000006",
+      appId: PUBLIC_API_TEST_IDS.app,
       provider: "telegram",
       purpose: "channel_binding_create",
     });
 
     await expect(
       deleteAgentChannelBindingCredentialSecret(database, {
-        agentId: "01J00000000000000000000009",
-        organizationId: "01J00000000000000000000006",
+        agentId: PUBLIC_API_TEST_IDS.agent,
+        appId: PUBLIC_API_TEST_IDS.app,
         provider: "slack",
         purpose: "channel_binding_delete",
         secretId: telegramSecretId,
@@ -322,8 +329,8 @@ describe("agent channel bindings", () => {
 
     await expect(
       deleteAgentChannelBindingCredentialSecret(database, {
-        agentId: "01J00000000000000000000009",
-        organizationId: "01J00000000000000000000006",
+        agentId: PUBLIC_API_TEST_IDS.agent,
+        appId: PUBLIC_API_TEST_IDS.app,
         provider: "slack",
         purpose: "channel_binding_delete",
         secretId: slackSecretId,
@@ -344,8 +351,9 @@ describe("agent channel bindings", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "xoxb-secret-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         signingSecret: "signing-secret",
       });
       const oldBindingRow = await database
@@ -360,9 +368,9 @@ describe("agent channel bindings", () => {
       }
 
       const replacementSecretId = await storeAgentChannelBindingCredentialSecret(bindings, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         credentialsJson: "{}",
-        organizationId: "01J00000000000000000000006",
+        appId: PUBLIC_API_TEST_IDS.app,
         provider: "slack",
         purpose: "channel_binding_update",
       });

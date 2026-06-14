@@ -105,8 +105,10 @@ async function listPublishedWeChatPollingAccountPage(
 ): Promise<WeChatPollingAccountPageRow[]> {
   const predicates = [
     eq(agentChannelBindingsTable.provider, "wechat"),
+    eq(agentChannelBindingsTable.appId, agentsTable.appId),
     eq(agentChannelBindingsTable.status, "active"),
     eq(agentsTable.status, "published"),
+    eq(wechatChannelAccountsTable.appId, agentChannelBindingsTable.appId),
     or(
       ...WECHAT_POLLING_OWNER_RETRY_STATUSES.map((status) =>
         eq(wechatChannelAccountsTable.status, status),

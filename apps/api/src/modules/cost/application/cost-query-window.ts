@@ -1,13 +1,10 @@
-import type { AccountId, AgentId, OrganizationId } from "@mosoo/id";
+import type { AgentId, OrganizationId, AppId } from "@mosoo/id";
 
 import { isTruthy } from "../../../shared/truthiness";
 import type { AggregateRow, CostRange, CostTotalsView, CostWindow } from "./cost-query.types";
 
 interface CostWhereInput {
-  actorUserId?: AccountId;
   agentId?: AgentId;
-  externalChannel?: boolean;
-  ownerUserId?: AccountId;
   runPurposes?: readonly string[];
 }
 
@@ -77,16 +74,24 @@ export function toTotalsView(row: AggregateRow | null): CostTotalsView {
 
 export function buildUsageSourceCte(
   window: CostWindow,
-  organizationId: OrganizationId,
+  scope: {
+    organizationId: OrganizationId;
+    appId?: AppId;
+  },
 ): {
   bindings: (number | string)[];
   sql: string;
 } {
+  const detailAppFilter = isTruthy(scope.appId) ? "AND app_id = ?" : "";
+  const rollupAppFilter = isTruthy(scope.appId) ? "AND app_id = ?" : "";
+
   return {
     bindings: [
-      organizationId,
+      scope.organizationId,
+      ...(isTruthy(scope.appId) ? [scope.appId] : []),
       window.detailSinceMs,
-      organizationId,
+      scope.organizationId,
+      ...(isTruthy(scope.appId) ? [scope.appId] : []),
       window.sinceDate,
       window.dailyBeforeDate,
     ],
@@ -94,6 +99,7 @@ export function buildUsageSourceCte(
       WITH usage_source AS (
         SELECT
           organization_id,
+          app_id,
           agent_id,
           actor_user_id,
           agent_owner_user_id,
@@ -119,10 +125,12 @@ export function buildUsageSourceCte(
         FROM usage_event
         LEFT JOIN session ON session.id = usage_event.session_id
         WHERE organization_id = ?
+          ${detailAppFilter}
           AND created_at >= ?
         UNION ALL
         SELECT
           organization_id,
+          app_id,
           agent_id,
           actor_user_id,
           agent_owner_user_id,
@@ -141,6 +149,7 @@ export function buildUsageSourceCte(
           unpriced_request_count
         FROM usage_daily_rollup
         WHERE organization_id = ?
+          ${rollupAppFilter}
           AND date >= ?
           AND date < ?
       )
@@ -155,21 +164,6 @@ export function buildWhere(input: CostWhereInput): { bindings: string[]; sql: st
   if (isTruthy(input.agentId)) {
     filters.push("usage_source.agent_id = ?");
     bindings.push(input.agentId);
-  }
-
-  if (isTruthy(input.actorUserId)) {
-    filters.push("usage_source.actor_user_id = ?");
-    bindings.push(input.actorUserId);
-    filters.push("usage_source.is_external_channel = 0");
-  }
-
-  if (input.externalChannel !== undefined) {
-    filters.push(`usage_source.is_external_channel = ${input.externalChannel ? "1" : "0"}`);
-  }
-
-  if (isTruthy(input.ownerUserId)) {
-    filters.push("usage_source.agent_owner_user_id = ?");
-    bindings.push(input.ownerUserId);
   }
 
   if (input.runPurposes && input.runPurposes.length > 0) {

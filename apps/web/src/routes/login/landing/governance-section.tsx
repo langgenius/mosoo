@@ -21,7 +21,7 @@ const CAPABILITIES: readonly Capability[] = [
   {
     Icon: Coins,
     tag: "Metering",
-    body: "Spend rolls up to a project, a user, or a single run, so you can price and bill what you build with receipts.",
+    body: "Spend rolls up to a app, a user, or a single run, so you can price and bill what you build with receipts.",
   },
   {
     Icon: History,

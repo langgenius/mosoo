@@ -2,7 +2,7 @@ import { createErrorLogContext, logError } from "../../../platform/cloudflare/lo
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { validationError } from "../../../platform/errors";
 import { isTruthy } from "../../../shared/truthiness";
-import { ensureAgentEditor } from "../../agents/application/agent-access.service";
+import { ensureAppAgentOwner } from "../../agents/application/agent-access.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
   normalizeDiscordCredentials,
@@ -113,7 +113,10 @@ export async function createSlackAgentChannelBinding(
   viewer: AuthenticatedViewer,
   input: CreateSlackAgentChannelBindingInput,
 ): Promise<AgentChannelBinding> {
-  const access = await ensureAgentEditor(bindings.DB, viewer.id, input.agentId);
+  const access = await ensureAppAgentOwner(bindings.DB, viewer.id, {
+    agentId: input.agentId,
+    appId: input.appId,
+  });
 
   if (access.agent.status !== "published") {
     throw validationError("Publish the Agent before connecting Slack.", "AGENT_NOT_PUBLISHED");
@@ -123,6 +126,7 @@ export async function createSlackAgentChannelBinding(
 
   await ensureProviderBindingAvailable(bindings.DB, {
     agentId: input.agentId,
+    appId: input.appId,
     provider: "slack",
   });
 
@@ -166,7 +170,10 @@ export async function createLarkAgentChannelBinding(
   viewer: AuthenticatedViewer,
   input: CreateLarkAgentChannelBindingInput,
 ): Promise<AgentChannelBinding> {
-  const access = await ensureAgentEditor(bindings.DB, viewer.id, input.agentId);
+  const access = await ensureAppAgentOwner(bindings.DB, viewer.id, {
+    agentId: input.agentId,
+    appId: input.appId,
+  });
 
   if (access.agent.status !== "published") {
     throw validationError(
@@ -177,10 +184,18 @@ export async function createLarkAgentChannelBinding(
 
   await ensureProviderBindingAvailable(bindings.DB, {
     agentId: input.agentId,
+    appId: input.appId,
     provider: "lark",
   });
 
-  const credentials = normalizeLarkCredentials(input);
+  const credentials = normalizeLarkCredentials({
+    appId: input.larkAppId,
+    appSecret: input.appSecret,
+    connectionMode: input.connectionMode,
+    domain: input.domain,
+    encryptKey: input.encryptKey,
+    verificationToken: input.verificationToken,
+  });
   const identity = await testLarkIdentity(credentials);
 
   return createProviderAgentChannelBinding({
@@ -204,7 +219,10 @@ export async function createTelegramAgentChannelBinding(
   viewer: AuthenticatedViewer,
   input: CreateTelegramAgentChannelBindingInput,
 ): Promise<AgentChannelBinding> {
-  const access = await ensureAgentEditor(bindings.DB, viewer.id, input.agentId);
+  const access = await ensureAppAgentOwner(bindings.DB, viewer.id, {
+    agentId: input.agentId,
+    appId: input.appId,
+  });
 
   if (access.agent.status !== "published") {
     throw validationError("Publish the Agent before connecting Telegram.", "AGENT_NOT_PUBLISHED");
@@ -212,6 +230,7 @@ export async function createTelegramAgentChannelBinding(
 
   await ensureProviderBindingAvailable(bindings.DB, {
     agentId: input.agentId,
+    appId: input.appId,
     provider: "telegram",
   });
 
@@ -238,7 +257,10 @@ export async function createDiscordAgentChannelBinding(
   viewer: AuthenticatedViewer,
   input: CreateDiscordAgentChannelBindingInput,
 ): Promise<AgentChannelBinding> {
-  const access = await ensureAgentEditor(bindings.DB, viewer.id, input.agentId);
+  const access = await ensureAppAgentOwner(bindings.DB, viewer.id, {
+    agentId: input.agentId,
+    appId: input.appId,
+  });
 
   if (access.agent.status !== "published") {
     throw validationError("Publish the Agent before connecting Discord.", "AGENT_NOT_PUBLISHED");
@@ -246,6 +268,7 @@ export async function createDiscordAgentChannelBinding(
 
   await ensureProviderBindingAvailable(bindings.DB, {
     agentId: input.agentId,
+    appId: input.appId,
     provider: "discord",
   });
 

@@ -1,4 +1,4 @@
-import type { CostAttributionCard, MemberCostCard } from "./cost-model";
+import type { CostAttributionCard } from "./cost-model";
 
 export function downloadCsv(filename: string, rows: string[][]) {
   const body = rows
@@ -36,14 +36,6 @@ function attributionCsvRows(label: string, card: CostAttributionCard): string[][
       String(model.totalCostUsd),
       `${model.requestCount} requests; unpriced ${model.unpricedRequestCount}`,
     ]),
-    ...card.recentSessions.map((session) => [
-      label,
-      "session",
-      session.actorName,
-      session.model,
-      String(session.totalCostUsd),
-      String(session.inputTokens + session.outputTokens),
-    ]),
   ];
 }
 
@@ -55,17 +47,5 @@ export function exportAttributionCostCsv(filename: string, card: CostAttribution
   downloadCsv(filename, [
     ["scope", "kind", "name", "secondary", "cost", "quantity"],
     ...attributionCsvRows("cost", card),
-  ]);
-}
-
-export function exportMemberUsageCsv(card: MemberCostCard | undefined) {
-  if (!card) {
-    return;
-  }
-
-  downloadCsv("my-usage.csv", [
-    ["scope", "kind", "name", "secondary", "cost", "quantity"],
-    ...attributionCsvRows("used_by_me", card.used),
-    ...attributionCsvRows("owned_by_me", card.owned),
   ]);
 }

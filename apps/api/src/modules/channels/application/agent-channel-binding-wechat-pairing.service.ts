@@ -1,7 +1,7 @@
 import { wechatChannelPairingsTable } from "@mosoo/db";
 import type { WeChatChannelPairingId } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { AccountId, AgentId } from "@mosoo/id";
+import type { AccountId, AgentId, AppId } from "@mosoo/id";
 import { and, eq, gte, isNull } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -10,7 +10,7 @@ import { ApiError, validationError } from "../../../platform/errors";
 import type { ApiErrorCode } from "../../../platform/errors";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
-import { ensureAgentEditor } from "../../agents/application/agent-access.service";
+import { ensureAppAgentOwner } from "../../agents/application/agent-access.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
   WeChatIlinkApiError,
@@ -61,6 +61,7 @@ async function storeWeChatPendingPairing(
     agentId: AgentId;
     createdByAccountId: AccountId;
     nowMs: number;
+    appId: AppId;
     qrToken: string;
   },
 ): Promise<void> {
@@ -73,6 +74,7 @@ async function storeWeChatPendingPairing(
       createdByAccountId: input.createdByAccountId,
       expiresAt: input.nowMs + WECHAT_QR_PAIRING_TTL_MS,
       id: createPlatformId<WeChatChannelPairingId>(),
+      appId: input.appId,
       qrTokenHash: await hashWeChatQrToken(input.qrToken),
       updatedAt: input.nowMs,
     })
@@ -85,6 +87,7 @@ async function ensureWeChatPendingPairing(
     agentId: AgentId;
     createdByAccountId: AccountId;
     nowMs: number;
+    appId: AppId;
     qrToken: string;
   },
 ): Promise<void> {
@@ -96,6 +99,7 @@ async function ensureWeChatPendingPairing(
         and(
           eq(wechatChannelPairingsTable.agentId, input.agentId),
           eq(wechatChannelPairingsTable.createdByAccountId, input.createdByAccountId),
+          eq(wechatChannelPairingsTable.appId, input.appId),
           eq(wechatChannelPairingsTable.qrTokenHash, await hashWeChatQrToken(input.qrToken)),
           isNull(wechatChannelPairingsTable.consumedAt),
           gte(wechatChannelPairingsTable.expiresAt, input.nowMs),
@@ -115,6 +119,7 @@ async function consumeWeChatPendingPairing(
     agentId: AgentId;
     createdByAccountId: AccountId;
     nowMs: number;
+    appId: AppId;
     qrToken: string;
   },
 ): Promise<void> {
@@ -128,6 +133,7 @@ async function consumeWeChatPendingPairing(
       and(
         eq(wechatChannelPairingsTable.agentId, input.agentId),
         eq(wechatChannelPairingsTable.createdByAccountId, input.createdByAccountId),
+        eq(wechatChannelPairingsTable.appId, input.appId),
         eq(wechatChannelPairingsTable.qrTokenHash, await hashWeChatQrToken(input.qrToken)),
         isNull(wechatChannelPairingsTable.consumedAt),
         gte(wechatChannelPairingsTable.expiresAt, input.nowMs),
@@ -190,17 +196,21 @@ function mapWeChatPairingError(error: unknown, code: ApiErrorCode): Error {
 async function ensureAgentCanConnectWeChat(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  agentId: AgentId,
+  input: {
+    agentId: AgentId;
+    appId: AppId;
+  },
 ): Promise<void> {
   const viewerId = viewer.id;
-  const access = await ensureAgentEditor(database, viewerId, agentId);
+  const access = await ensureAppAgentOwner(database, viewerId, input);
 
   if (access.agent.status !== "published") {
     throw validationError("Publish the Agent before connecting WeChat.", "AGENT_NOT_PUBLISHED");
   }
 
   await ensureProviderBindingAvailable(database, {
-    agentId,
+    agentId: input.agentId,
+    appId: input.appId,
     provider: "wechat",
   });
 }
@@ -216,7 +226,7 @@ export async function startWeChatAgentChannelPairing(
   viewer: AuthenticatedViewer,
   input: StartWeChatAgentChannelPairingInput,
 ): Promise<WeChatAgentChannelPairing> {
-  await ensureAgentCanConnectWeChat(bindings.DB, viewer, input.agentId);
+  await ensureAgentCanConnectWeChat(bindings.DB, viewer, input);
   const viewerId = viewer.id;
 
   let qr: Awaited<ReturnType<WeChatIlinkClient["getBotQr"]>>;
@@ -234,6 +244,7 @@ export async function startWeChatAgentChannelPairing(
     agentId: input.agentId,
     createdByAccountId: viewerId,
     nowMs,
+    appId: input.appId,
     qrToken,
   });
 
@@ -251,7 +262,7 @@ export async function pollWeChatAgentChannelPairing(
   viewer: AuthenticatedViewer,
   input: PollWeChatAgentChannelPairingInput,
 ): Promise<WeChatAgentChannelPairing> {
-  await ensureAgentCanConnectWeChat(bindings.DB, viewer, input.agentId);
+  await ensureAgentCanConnectWeChat(bindings.DB, viewer, input);
   const viewerId = viewer.id;
 
   const nowMs = currentTimestampMs();
@@ -261,6 +272,7 @@ export async function pollWeChatAgentChannelPairing(
     agentId: input.agentId,
     createdByAccountId: viewerId,
     nowMs,
+    appId: input.appId,
     qrToken,
   });
 
@@ -286,6 +298,7 @@ export async function pollWeChatAgentChannelPairing(
         agentId: input.agentId,
         createdByAccountId: viewerId,
         nowMs,
+        appId: input.appId,
         qrToken,
       });
     }
@@ -297,11 +310,13 @@ export async function pollWeChatAgentChannelPairing(
     agentId: input.agentId,
     createdByAccountId: viewerId,
     nowMs,
+    appId: input.appId,
     qrToken,
   });
 
   const account = await persistConfirmedWeChatQrPairing(bindings, viewer, {
     agentId: input.agentId,
+    appId: input.appId,
     snapshot,
   });
 

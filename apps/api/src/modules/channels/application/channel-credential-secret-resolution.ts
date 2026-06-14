@@ -1,6 +1,6 @@
 import { agentChannelBindingsTable, agentsTable, vaultSecretsTable } from "@mosoo/db";
 import type { AgentChannelBindingProvider } from "@mosoo/db";
-import type { AgentId, ChannelBindingId, OrganizationId, PlatformId } from "@mosoo/id";
+import type { AgentId, ChannelBindingId, PlatformId, AppId } from "@mosoo/id";
 import { parsePlatformId } from "@mosoo/id";
 import { and, eq } from "drizzle-orm";
 
@@ -37,8 +37,8 @@ export type ChannelCredentialSecretDeleteOutcome =
     }
   | {
       agentId: AgentId;
-      organizationId: OrganizationId;
       provider: AgentChannelBindingProvider;
+      appId: AppId;
       purpose: ChannelCredentialSecretDeletePurpose;
       reason: "secret_kind_mismatch" | "secret_not_found";
       status: "denied";
@@ -75,14 +75,14 @@ function assertChannelCredentialWritePurpose(purpose: ChannelCredentialSecretWri
 
 interface AgentChannelBindingCredentialSecretOwner {
   readonly agentId: AgentId;
-  readonly organizationId: OrganizationId;
   readonly provider: AgentChannelBindingProvider;
+  readonly appId: AppId;
 }
 
 function toAgentChannelBindingCredentialSecretKind(
   owner: AgentChannelBindingCredentialSecretOwner,
 ): string {
-  return ["channel_binding", owner.organizationId, owner.agentId, owner.provider].join(":");
+  return ["channel_binding", owner.appId, owner.agentId, owner.provider].join(":");
 }
 
 function isAgentChannelBindingProvider(value: string): value is AgentChannelBindingProvider {
@@ -92,11 +92,11 @@ function isAgentChannelBindingProvider(value: string): value is AgentChannelBind
 export function parseAgentChannelBindingCredentialSecretKind(
   kind: string,
 ): AgentChannelBindingCredentialSecretOwner | null {
-  const [prefix, organizationId, agentId, provider, extra] = kind.split(":");
+  const [prefix, appId, agentId, provider, extra] = kind.split(":");
 
   if (
     prefix !== "channel_binding" ||
-    organizationId === undefined ||
+    appId === undefined ||
     agentId === undefined ||
     provider === undefined ||
     extra !== undefined ||
@@ -108,8 +108,8 @@ export function parseAgentChannelBindingCredentialSecretKind(
   try {
     return {
       agentId: parsePlatformId<AgentId>(agentId, "agent ID"),
-      organizationId: parsePlatformId<OrganizationId>(organizationId, "organization ID"),
       provider,
+      appId: parsePlatformId<AppId>(appId, "app ID"),
     };
   } catch {
     return null;
@@ -152,7 +152,7 @@ export async function readAgentChannelBindingCredentialSecret(
     bindingId: ChannelBindingId;
     expectedOwner: {
       readonly agentId: AgentId;
-      readonly organizationId: OrganizationId;
+      readonly appId: AppId;
     };
     provider: AgentChannelBindingProvider;
     purpose: ChannelCredentialSecretReadPurpose;
@@ -165,7 +165,8 @@ export async function readAgentChannelBindingCredentialSecret(
     (await getAppDatabase(bindings.DB)
       .select({
         agentId: agentChannelBindingsTable.agentId,
-        organizationId: agentsTable.organizationId,
+        agentAppId: agentsTable.appId,
+        appId: agentChannelBindingsTable.appId,
         secretKind: vaultSecretsTable.kind,
       })
       .from(agentChannelBindingsTable)
@@ -188,12 +189,13 @@ export async function readAgentChannelBindingCredentialSecret(
   if (
     !row ||
     row.agentId !== input.expectedOwner.agentId ||
-    row.organizationId !== input.expectedOwner.organizationId ||
+    row.appId !== input.expectedOwner.appId ||
+    row.agentAppId !== row.appId ||
     row.secretKind !==
       toAgentChannelBindingCredentialSecretKind({
         agentId: row.agentId,
-        organizationId: row.organizationId,
         provider: input.provider,
+        appId: row.appId,
       })
   ) {
     throw validationError("Channel binding credential is unavailable.");
@@ -216,8 +218,8 @@ function denyAgentChannelBindingCredentialSecretDelete(
 ): ChannelCredentialSecretDeleteOutcome {
   return {
     agentId: command.agentId,
-    organizationId: command.organizationId,
     provider: command.provider,
+    appId: command.appId,
     purpose: command.purpose,
     reason,
     status: "denied",
@@ -266,8 +268,8 @@ export async function cleanupStoredAgentChannelBindingCredentialSecret(input: {
 
     logError("agent-channel-binding.credential-secret-cleanup.denied", {
       agentId: outcome.agentId,
-      organizationId: outcome.organizationId,
       provider: outcome.provider,
+      appId: outcome.appId,
       purpose: outcome.purpose,
       reason: outcome.reason,
       secretId: input.command.secretId,
@@ -276,8 +278,8 @@ export async function cleanupStoredAgentChannelBindingCredentialSecret(input: {
     logError("agent-channel-binding.credential-secret-cleanup.failed", {
       ...createErrorLogContext(error),
       agentId: input.command.agentId,
-      organizationId: input.command.organizationId,
       provider: input.command.provider,
+      appId: input.command.appId,
       purpose: input.command.purpose,
       secretId: input.command.secretId,
     });

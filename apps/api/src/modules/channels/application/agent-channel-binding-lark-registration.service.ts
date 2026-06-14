@@ -1,9 +1,10 @@
 import type { AgentId } from "@mosoo/id";
+import type { AppId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { ApiError, validationError } from "../../../platform/errors";
 import type { ApiErrorCode } from "../../../platform/errors";
-import { ensureAgentEditor } from "../../agents/application/agent-access.service";
+import { ensureAppAgentOwner } from "../../agents/application/agent-access.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { pollLarkAppRegistration, startLarkAppRegistration } from "../lark/lark-app-registration";
 import { ensureProviderBindingAvailable } from "./agent-channel-binding-records";
@@ -31,10 +32,13 @@ function mapLarkRegistrationError(error: unknown, code: ApiErrorCode): Error {
 async function ensureAgentCanRegisterLarkChannel(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  agentId: AgentId,
+  input: {
+    agentId: AgentId;
+    appId: AppId;
+  },
 ): Promise<void> {
   const viewerId = viewer.id;
-  const access = await ensureAgentEditor(database, viewerId, agentId);
+  const access = await ensureAppAgentOwner(database, viewerId, input);
 
   if (access.agent.status !== "published") {
     throw validationError(
@@ -44,7 +48,8 @@ async function ensureAgentCanRegisterLarkChannel(
   }
 
   await ensureProviderBindingAvailable(database, {
-    agentId,
+    agentId: input.agentId,
+    appId: input.appId,
     provider: "lark",
   });
 }
@@ -54,7 +59,7 @@ export async function startLarkAgentChannelRegistration(
   viewer: AuthenticatedViewer,
   input: StartLarkAgentChannelRegistrationInput,
 ): Promise<LarkAgentChannelRegistration> {
-  await ensureAgentCanRegisterLarkChannel(bindings.DB, viewer, input.agentId);
+  await ensureAgentCanRegisterLarkChannel(bindings.DB, viewer, input);
 
   try {
     const registration = await startLarkAppRegistration(input.domain);
@@ -82,7 +87,7 @@ export async function pollLarkAgentChannelRegistration(
   viewer: AuthenticatedViewer,
   input: PollLarkAgentChannelRegistrationInput,
 ): Promise<LarkAgentChannelRegistration> {
-  await ensureAgentCanRegisterLarkChannel(bindings.DB, viewer, input.agentId);
+  await ensureAgentCanRegisterLarkChannel(bindings.DB, viewer, input);
 
   try {
     const registration = await pollLarkAppRegistration({

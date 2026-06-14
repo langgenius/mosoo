@@ -7,18 +7,15 @@ import type {
   CostRecentSession,
   CostRunPurpose,
   CostTotals,
-  CostUserRow,
-  MemberCostCard,
-  OrganizationCostCard,
+  OrganizationBillingCostCard,
+  AppCostCard,
 } from "@/domains/cost/api/cost-client";
 
 export const COST_RANGES = ["7d", "30d", "mtd", "90d"] as const;
 
 export type CostRange = (typeof COST_RANGES)[number];
-export type CostTab = "overview" | "agents" | "users" | "models";
-export type UserCostMode = "owned_by" | "used_by";
+export type CostTab = "overview" | "agents" | "models";
 export type AgentCostSort = "cost_asc" | "cost_desc" | "runs_desc" | "spike_desc";
-export type UserCostSort = "cost_asc" | "cost_desc" | "runs_desc" | "spike_desc" | "top_agent";
 
 export interface CostVendorRow {
   modelCount: number;
@@ -44,7 +41,6 @@ export interface ModelPricingSummary {
 export const COST_TABS: { id: CostTab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "agents", label: "By Agent" },
-  { id: "users", label: "By User" },
   { id: "models", label: "By Model" },
 ];
 
@@ -156,14 +152,6 @@ export function agentCostChange(agent: CostAgentRow): number | null {
   return (agent.totalCostUsd - agent.previousCostUsd) / agent.previousCostUsd;
 }
 
-export function userCostChange(user: CostUserRow): number | null {
-  if (user.previousCostUsd === null || user.previousCostUsd <= 0) {
-    return null;
-  }
-
-  return (user.totalCostUsd - user.previousCostUsd) / user.previousCostUsd;
-}
-
 export function sortCostAgents(agents: CostAgentRow[], sort: AgentCostSort): CostAgentRow[] {
   return [...agents].toSorted((left, right) => {
     if (sort === "cost_asc") {
@@ -180,42 +168,6 @@ export function sortCostAgents(agents: CostAgentRow[], sort: AgentCostSort): Cos
 
     return right.totalCostUsd - left.totalCostUsd;
   });
-}
-
-export function sortCostUsers(users: CostUserRow[], sort: UserCostSort): CostUserRow[] {
-  return [...users].toSorted((left, right) => {
-    if (sort === "cost_asc") {
-      return left.totalCostUsd - right.totalCostUsd;
-    }
-
-    if (sort === "runs_desc") {
-      return right.requestCount - left.requestCount;
-    }
-
-    if (sort === "spike_desc") {
-      return (userCostChange(right) ?? -Infinity) - (userCostChange(left) ?? -Infinity);
-    }
-
-    if (sort === "top_agent") {
-      return (left.topAgentName ?? "\uFFFF").localeCompare(right.topAgentName ?? "\uFFFF");
-    }
-
-    return right.totalCostUsd - left.totalCostUsd;
-  });
-}
-
-export function filterCostUsers(users: CostUserRow[], query: string): CostUserRow[] {
-  const normalized = query.trim().toLowerCase();
-
-  if (!normalized) {
-    return users;
-  }
-
-  return users.filter((user) =>
-    [user.userName, user.userEmail, user.topAgentName]
-      .filter((value): value is string => Boolean(value))
-      .some((value) => value.toLowerCase().includes(normalized)),
-  );
 }
 
 export function runMixSegments(agent: CostAgentRow): RunMixSegment[] {
@@ -273,10 +225,9 @@ export type {
   CostAttributionCard,
   CostDailyPoint,
   CostRunPurpose,
-  MemberCostCard,
   CostModelRow,
   CostRecentSession,
   CostTotals,
-  CostUserRow,
-  OrganizationCostCard,
+  OrganizationBillingCostCard,
+  AppCostCard,
 };

@@ -1,4 +1,4 @@
-import type { AccountId, AgentId, SessionId, SessionRunId } from "@mosoo/contracts/id";
+import type { AccountId, AgentId, AppId, SessionId, SessionRunId } from "@mosoo/contracts/id";
 
 export type CostRangeInput = "LAST_7_DAYS" | "LAST_30_DAYS" | "MONTH_TO_DATE" | "LAST_90_DAYS";
 export type CostRunPurpose = "debug" | "eval" | "preview" | "production" | "scheduled";
@@ -32,16 +32,6 @@ export interface CostAgentRow extends CostTotals {
   scheduledCostUsd: number;
 }
 
-export interface CostUserRow extends CostTotals {
-  agentCount: number;
-  previousCostUsd: number | null;
-  topAgentId: AgentId | null;
-  topAgentName: string | null;
-  userEmail: string | null;
-  userId: AccountId;
-  userName: string;
-}
-
 export interface CostModelRow extends CostTotals {
   cacheReadUsdPerMillion: number | null;
   cacheWriteUsdPerMillion: number | null;
@@ -55,7 +45,6 @@ export interface CostModelRow extends CostTotals {
 export interface CostRecentSession {
   actorEmail: string | null;
   actorName: string;
-  actorUserId: AccountId;
   cacheCreationTokens: number;
   cacheReadTokens: number;
   createdAt: string;
@@ -77,10 +66,17 @@ export interface CostAttributionCard {
   totals: CostTotals;
 }
 
-export interface OrganizationCostCard extends CostAttributionCard {
-  ownerUsers: CostUserRow[];
+export interface OrganizationBillingCostCard {
+  daily: CostDailyPoint[];
   previousTotals: CostTotals;
-  users: CostUserRow[];
+  models: CostModelRow[];
+  totals: CostTotals;
+}
+
+export interface AppCostCard extends CostAttributionCard {
+  previousTotals: CostTotals;
+  appId: AppId;
+  appName: string;
 }
 
 export interface AgentCostCard extends CostAttributionCard {
@@ -88,10 +84,4 @@ export interface AgentCostCard extends CostAttributionCard {
   agentName: string;
   ownerId: AccountId;
   ownerName: string;
-  users: CostUserRow[];
-}
-
-export interface MemberCostCard {
-  owned: CostAttributionCard;
-  used: CostAttributionCard;
 }

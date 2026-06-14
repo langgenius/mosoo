@@ -13,7 +13,8 @@ import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   createTestExecutionContext,
-} from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
 
 const OWNER_VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",
@@ -71,8 +72,9 @@ describe("Telegram channel events route", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createTelegramAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "telegram-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         webhookSecret: "telegram-webhook-secret",
       });
       const response = await app.request(
@@ -104,14 +106,15 @@ describe("Telegram channel events route", () => {
     });
   });
 
-  test("accepts signed Telegram message updates for a published Agent binding", async () => {
+  test("accepts signed Telegram message updates for a Agent API Endpoint binding", async () => {
     await withTelegramFetchMock(async () => {
       const app = createTelegramRouteTestApp();
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createTelegramAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "telegram-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         webhookSecret: "telegram-webhook-secret",
       });
       const response = await app.request(
@@ -150,8 +153,9 @@ describe("Telegram channel events route", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createTelegramAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "telegram-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         webhookSecret: "telegram-webhook-secret",
       });
       const response = await app.request(

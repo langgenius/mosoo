@@ -1,38 +1,32 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AgentId, OrganizationId } from "@mosoo/id";
+import type { AgentId, OrganizationId, AppId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { costGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
 import {
   getAgentCostCard,
-  getMemberCostCard,
-  getOrganizationCostCard,
-  getOwnerCostCard,
+  getOrganizationBillingCostCard,
+  getAppCostCard,
 } from "../application/cost-query.service";
 import type { CostRange } from "../application/cost-query.service";
 
-interface OrganizationCostCardArgs {
+interface OrganizationBillingCostCardArgs {
   organizationId: string;
+  range: CostRange;
+  runPurposes?: string[] | null;
+}
+
+interface AppCostCardArgs {
+  appId: string;
   range: CostRange;
   runPurposes?: string[] | null;
 }
 
 interface AgentCostCardArgs {
   agentId: string;
+  appId: string;
   range: CostRange;
   runPurposes?: string[] | null;
-}
-
-interface MemberCostCardArgs extends OrganizationCostCardArgs {
-  memberId: string;
-}
-
-interface OwnerCostCardArgs extends OrganizationCostCardArgs {
-  ownerUserId: string;
-}
-
-function readAccountId(value: string, label: string): AccountId {
-  return parsePlatformId<AccountId>(value, label);
 }
 
 function readAgentId(value: string, label: string): AgentId {
@@ -43,6 +37,10 @@ function readOrganizationId(value: string, label: string): OrganizationId {
   return parsePlatformId<OrganizationId>(value, label);
 }
 
+function readAppId(value: string, label: string): AppId {
+  return parsePlatformId<AppId>(value, label);
+}
+
 export const costGraphQLModule = {
   ...costGraphQLSpec,
   authenticatedQueryResolvers: {
@@ -50,32 +48,25 @@ export const costGraphQLModule = {
       getAgentCostCard({
         agentId: readAgentId(args.agentId, "agent ID"),
         database: context.bindings.DB,
+        appId: readAppId(args.appId, "app ID"),
         range: args.range,
         runPurposes: args.runPurposes ?? [],
         viewer: context.viewer,
       }),
-    memberCostCard: async (_parent, args: MemberCostCardArgs, context) =>
-      getMemberCostCard({
-        database: context.bindings.DB,
-        memberId: readAccountId(args.memberId, "member account ID"),
-        organizationId: readOrganizationId(args.organizationId, "organization ID"),
-        range: args.range,
-        viewer: context.viewer,
-      }),
-    organizationCostCard: async (_parent, args: OrganizationCostCardArgs, context) =>
-      getOrganizationCostCard({
+    organizationBillingCostCard: async (_parent, args: OrganizationBillingCostCardArgs, context) =>
+      getOrganizationBillingCostCard({
         database: context.bindings.DB,
         organizationId: readOrganizationId(args.organizationId, "organization ID"),
         range: args.range,
         runPurposes: args.runPurposes ?? [],
         viewer: context.viewer,
       }),
-    ownerCostCard: async (_parent, args: OwnerCostCardArgs, context) =>
-      getOwnerCostCard({
+    appCostCard: async (_parent, args: AppCostCardArgs, context) =>
+      getAppCostCard({
         database: context.bindings.DB,
-        organizationId: readOrganizationId(args.organizationId, "organization ID"),
-        ownerUserId: readAccountId(args.ownerUserId, "owner account ID"),
+        appId: readAppId(args.appId, "app ID"),
         range: args.range,
+        runPurposes: args.runPurposes ?? [],
         viewer: context.viewer,
       }),
   },

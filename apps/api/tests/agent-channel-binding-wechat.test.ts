@@ -28,13 +28,14 @@ import { isApiError } from "../src/platform/errors";
 import {
   OWNER_VIEWER,
   WECHAT_QR_WAIT_RESPONSE,
-  insertSecondPublishedAgent,
+  insertSecondLiveAgent,
   withWeChatQrMock,
 } from "./agent-channel-binding-fixtures";
 import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
-} from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
 
 describe("agent channel WeChat bindings", () => {
   test("starts and confirms Personal WeChat QR pairing into a channel binding", async () => {
@@ -44,7 +45,8 @@ describe("agent channel WeChat bindings", () => {
         const bindings = createPublicHttpTestBindings(database) as ApiBindings;
 
         const started = await startWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
         });
 
         expect(started).toEqual({
@@ -56,7 +58,8 @@ describe("agent channel WeChat bindings", () => {
         });
 
         const confirmed = await pollWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
           qrToken: "wechat-qr-token",
         });
 
@@ -129,7 +132,10 @@ describe("agent channel WeChat bindings", () => {
         });
 
         await expect(
-          listAgentChannelBindings(database, OWNER_VIEWER, "01J00000000000000000000009"),
+          listAgentChannelBindings(database, OWNER_VIEWER, {
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            appId: PUBLIC_API_TEST_IDS.app,
+          }),
         ).resolves.toMatchObject([
           {
             externalBotId: "wechat-bot-1",
@@ -148,10 +154,12 @@ describe("agent channel WeChat bindings", () => {
         const database = await createPublicHttpContractDatabase();
         const bindings = createPublicHttpTestBindings(database) as ApiBindings;
         const started = await startWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
         });
         const confirmed = await pollWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
           qrToken: started.qrToken ?? "",
         });
         const bindingId = confirmed.binding?.id;
@@ -243,10 +251,12 @@ describe("agent channel WeChat bindings", () => {
         const database = await createPublicHttpContractDatabase();
         const bindings = createPublicHttpTestBindings(database) as ApiBindings;
         const started = await startWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
         });
         const confirmed = await pollWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
           qrToken: started.qrToken ?? "",
         });
         const bindingId = confirmed.binding?.id;
@@ -267,7 +277,8 @@ describe("agent channel WeChat bindings", () => {
         }
 
         await persistConfirmedWeChatQrPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
           snapshot: {
             accountId: null,
             baseUrl: "https://ilinkai.weixin.qq.com",
@@ -318,11 +329,13 @@ describe("agent channel WeChat bindings", () => {
         const database = await createPublicHttpContractDatabase();
         const bindings = createPublicHttpTestBindings(database) as ApiBindings;
         const started = await startWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
         });
 
         await pollWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
           qrToken: started.qrToken ?? "",
         });
 
@@ -330,7 +343,8 @@ describe("agent channel WeChat bindings", () => {
 
         try {
           await startWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-            agentId: "01J00000000000000000000009",
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            appId: PUBLIC_API_TEST_IDS.app,
           });
         } catch (error) {
           caughtError = error;
@@ -352,16 +366,18 @@ describe("agent channel WeChat bindings", () => {
       operation: async () => {
         const database = await createPublicHttpContractDatabase();
         const bindings = createPublicHttpTestBindings(database) as ApiBindings;
-        await insertSecondPublishedAgent(database);
+        await insertSecondLiveAgent(database);
 
         const started = await startWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
         });
         let caughtError: unknown = null;
 
         try {
           await pollWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
             agentId: "01J00000000000000000000068",
+            appId: PUBLIC_API_TEST_IDS.app,
             qrToken: started.qrToken ?? "",
           });
         } catch (error) {
@@ -396,7 +412,8 @@ describe("agent channel WeChat bindings", () => {
 
         try {
           await startWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-            agentId: "01J00000000000000000000009",
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            appId: PUBLIC_API_TEST_IDS.app,
           });
         } catch (error) {
           caughtError = error;
@@ -421,13 +438,15 @@ describe("agent channel WeChat bindings", () => {
         const database = await createPublicHttpContractDatabase();
         const bindings = createPublicHttpTestBindings(database) as ApiBindings;
         const started = await startWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
         });
         let caughtError: unknown = null;
 
         try {
           await pollWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-            agentId: "01J00000000000000000000009",
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            appId: PUBLIC_API_TEST_IDS.app,
             qrToken: started.qrToken ?? "",
           });
         } catch (error) {
@@ -457,7 +476,8 @@ describe("agent channel WeChat bindings", () => {
 
         try {
           await startWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-            agentId: "01J00000000000000000000009",
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            appId: PUBLIC_API_TEST_IDS.app,
           });
         } catch (error) {
           caughtError = error;
@@ -481,11 +501,13 @@ describe("agent channel WeChat bindings", () => {
         const database = await createPublicHttpContractDatabase();
         const bindings = createPublicHttpTestBindings(database) as ApiBindings;
         const started = await startWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
         });
 
         const pending = await pollWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
           qrToken: started.qrToken ?? "",
         });
 
@@ -524,12 +546,14 @@ describe("agent channel WeChat bindings", () => {
         const database = await createPublicHttpContractDatabase();
         const bindings = createPublicHttpTestBindings(database) as ApiBindings;
         const started = await startWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
         });
 
         await expect(
           pollWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-            agentId: "01J00000000000000000000009",
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            appId: PUBLIC_API_TEST_IDS.app,
             qrToken: started.qrToken ?? "",
           }),
         ).resolves.toMatchObject({
@@ -556,10 +580,12 @@ describe("agent channel WeChat bindings", () => {
         const database = await createPublicHttpContractDatabase();
         const bindings = createPublicHttpTestBindings(database) as ApiBindings;
         const started = await startWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
         });
         const confirmed = await pollWeChatAgentChannelPairing(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
           qrToken: started.qrToken ?? "",
         });
         const bindingId = confirmed.binding?.id;
@@ -591,7 +617,10 @@ describe("agent channel WeChat bindings", () => {
           .get();
         expect(contextRowsBefore?.count).toBe(1);
 
-        await deleteAgentChannelBinding(bindings, OWNER_VIEWER, { bindingId });
+        await deleteAgentChannelBinding(bindings, OWNER_VIEWER, {
+          bindingId,
+          appId: PUBLIC_API_TEST_IDS.app,
+        });
 
         const bindingCount = await database
           .app()

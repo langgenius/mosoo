@@ -26,7 +26,7 @@ const KPIS: readonly Kpi[] = [
   { label: "Total spend", value: "US$4.82K", delta: "−12.3%", down: true, Icon: Wallet },
   { label: "Requests", value: "18.9K", delta: "+8.1%", down: false, Icon: Activity },
   { label: "Tokens", value: "142M", sub: "94% cache hit", Icon: Coins },
-  { label: "Active members", value: "27", sub: "of 31", Icon: Users },
+  { label: "Active apps", value: "7", sub: "of 9", Icon: Users },
 ];
 
 const SPEND_TREND = [
@@ -176,51 +176,51 @@ const AGENTS: readonly AgentRow[] = [
   },
 ];
 
-type MemberRow = {
+type AppRow = {
   name: string;
-  dept: string;
+  app: string;
   topAgent: string;
   agents: number;
   cost: string;
   share: string;
 };
 
-const MEMBERS: readonly MemberRow[] = [
+const APPS: readonly AppRow[] = [
   {
-    name: "Rina Kato",
-    dept: "Platform Eng",
+    name: "Support Console",
+    app: "Customer Ops",
     topAgent: "Support copilot",
     agents: 8,
     cost: "US$1.46K",
     share: "30%",
   },
   {
-    name: "Amir Shah",
-    dept: "Legal",
+    name: "Contract Desk",
+    app: "Legal Ops",
     topAgent: "Contract reviewer",
     agents: 3,
     cost: "US$0.98K",
     share: "20%",
   },
   {
-    name: "Lena Ortiz",
-    dept: "IT",
+    name: "IT Intake",
+    app: "Internal Tools",
     topAgent: "IT helpdesk",
     agents: 5,
     cost: "US$0.74K",
     share: "15%",
   },
   {
-    name: "Tom Vogel",
-    dept: "Sales",
+    name: "Sales Research",
+    app: "Revenue",
     topAgent: "Sales researcher",
     agents: 4,
     cost: "US$0.55K",
     share: "11%",
   },
   {
-    name: "Priya Nair",
-    dept: "Customer Success",
+    name: "Onboarding Hub",
+    app: "Customer Ops",
     topAgent: "Onboarding bot",
     agents: 6,
     cost: "US$0.49K",
@@ -230,7 +230,7 @@ const MEMBERS: readonly MemberRow[] = [
 
 const TABS = [
   { value: "agent", label: "By Agent" },
-  { value: "member", label: "By User" },
+  { value: "app", label: "By App" },
   { value: "model", label: "By Model" },
 ] as const;
 
@@ -287,7 +287,7 @@ function HeadCell({
   );
 }
 
-function MemberAvatar({ name }: { name: string }): ReactElement {
+function AppAvatar({ name }: { name: string }): ReactElement {
   return (
     <span className="shrink-0 overflow-hidden rounded-full">
       <Avatar name={name} variant="beam" size={28} colors={AVATAR_COLORS} />
@@ -416,8 +416,8 @@ export function CostSection(): ReactElement {
           Know the unit cost of every run.
         </h2>
         <p className="text-fg-2 mt-4 text-[15px] leading-[1.6]">
-          See exactly where spend goes: by agent, by user, by model. Roll cost up to a project or a
-          run, compare against last period, and know the unit economics of every agent you ship.
+          See exactly where spend goes: by app, by agent, by model. Roll cost up to an app or a run,
+          compare against last period, and know the unit economics of every agent you ship.
         </p>
       </Reveal>
 
@@ -465,9 +465,7 @@ export function CostSection(): ReactElement {
           <div className="border-border-soft flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3.5">
             <div>
               <p className="text-fg-1 text-[15px] font-semibold tracking-[-0.01em]">Breakdown</p>
-              <p className="text-fg-3 text-[12px]">
-                Pivot the same spend by agent, member, or model
-              </p>
+              <p className="text-fg-3 text-[12px]">Pivot the same spend by app, agent, or model</p>
             </div>
             <span className="border-border-soft text-fg-2 inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12px] font-medium">
               <Download className="size-3.5" />
@@ -533,39 +531,39 @@ export function CostSection(): ReactElement {
               </div>
             </Tabs.Panel>
 
-            {/* By Member */}
-            <Tabs.Panel value="member" className="overflow-x-auto">
+            {/* By App */}
+            <Tabs.Panel value="app" className="overflow-x-auto">
               <div className={TABLE_SHELL}>
                 <div className="border-border-soft grid grid-cols-[1.6fr_1fr_1.2fr_80px_110px] items-center gap-3 border-b px-5 py-2.5">
-                  <HeadCell>User</HeadCell>
-                  <HeadCell>Team</HeadCell>
+                  <HeadCell>App</HeadCell>
+                  <HeadCell>App</HeadCell>
                   <HeadCell>Top agent</HeadCell>
                   <HeadCell>Agents</HeadCell>
                   <HeadCell className="text-right">Cost</HeadCell>
                 </div>
-                {MEMBERS.map((member) => (
+                {APPS.map((app) => (
                   <div
-                    key={member.name}
+                    key={app.name}
                     className="border-border-soft hover:bg-bg-sunken/50 grid grid-cols-[1.6fr_1fr_1.2fr_80px_110px] items-center gap-3 border-b px-5 py-3 transition-colors"
                   >
                     <div className="flex min-w-0 items-center gap-2.5">
-                      <MemberAvatar name={member.name} />
+                      <AppAvatar name={app.name} />
                       <span className="text-fg-1 truncate text-[13.5px] font-semibold">
-                        {member.name}
+                        {app.name}
                       </span>
                     </div>
                     <div>
                       <span className="bg-bg-sunken text-fg-2 inline-flex max-w-full truncate rounded-[5px] px-2 py-0.5 text-[11.5px] font-medium">
-                        {member.dept}
+                        {app.app}
                       </span>
                     </div>
-                    <div className="text-fg-2 truncate text-[13px]">{member.topAgent}</div>
-                    <div className="text-fg-2 text-[13px]">{member.agents}</div>
-                    <CostCell value={member.cost} share={member.share} />
+                    <div className="text-fg-2 truncate text-[13px]">{app.topAgent}</div>
+                    <div className="text-fg-2 text-[13px]">{app.agents}</div>
+                    <CostCell value={app.cost} share={app.share} />
                   </div>
                 ))}
                 <div className="bg-bg-sunken/40 text-fg-3 grid grid-cols-[1.6fr_1fr_1.2fr_80px_110px] items-center gap-3 px-5 py-3 text-[12.5px]">
-                  <div className="col-span-4">External · channel-triggered</div>
+                  <div className="col-span-4">External · API-triggered</div>
                   <div className="text-right">
                     <span className="text-fg-2 font-mono text-[13px] font-semibold">US$0.41K</span>
                     <span className="text-fg-3 ml-1.5 text-[11.5px]">9%</span>

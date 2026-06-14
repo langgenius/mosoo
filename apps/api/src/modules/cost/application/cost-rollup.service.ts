@@ -25,6 +25,7 @@ export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): P
         INSERT INTO ${usageDailyRollupsTable}
           (
             organization_id,
+            app_id,
             agent_id,
             actor_user_id,
             agent_owner_user_id,
@@ -43,6 +44,7 @@ export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): P
           )
         SELECT
           ${usageEventsTable.organizationId},
+          ${usageEventsTable.appId},
           ${usageEventsTable.agentId},
           ${usageEventsTable.actorUserId},
           ${usageEventsTable.agentOwnerUserId},
@@ -63,6 +65,7 @@ export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): P
         WHERE ${usageEventsTable.createdAt} < ${cutoffMs}
         GROUP BY
           ${usageEventsTable.organizationId},
+          ${usageEventsTable.appId},
           ${usageEventsTable.agentId},
           ${usageEventsTable.actorUserId},
           ${usageEventsTable.agentOwnerUserId},
@@ -73,6 +76,7 @@ export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): P
           ${usageEventsTable.model}
         ON CONFLICT(
           organization_id,
+          app_id,
           agent_id,
           actor_user_id,
           agent_owner_user_id,

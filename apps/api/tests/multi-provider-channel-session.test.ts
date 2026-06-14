@@ -19,7 +19,8 @@ import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   createTestExecutionContext,
-} from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
 
 async function withProviderFetchMock<T>(operation: () => Promise<T>): Promise<T> {
   const originalFetch = globalThis.fetch;
@@ -79,8 +80,9 @@ describe("multi-provider channel sessions", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createTelegramAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "telegram-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         webhookSecret: "telegram-webhook-secret",
       });
 
@@ -229,12 +231,13 @@ describe("multi-provider channel sessions", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         appId: "cli_feishu",
         appSecret: "app-secret",
         connectionMode: "webhook",
         domain: "feishu",
         encryptKey: "encrypt-key",
+        appId: PUBLIC_API_TEST_IDS.app,
         verificationToken: "verification-token",
       });
 

@@ -4,8 +4,9 @@ import { agentDeploymentVersionsTable, agentsTable } from "@mosoo/db";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { readFetchUrl } from "./helpers/fetch-request-url";
-import type { createPublicHttpContractDatabase } from "./helpers/published-agent-http-test-fixture";
-import { nowMsForTest } from "./helpers/published-agent-http-test-fixture";
+import type { createPublicHttpContractDatabase } from "./helpers/public-api-http-test-fixture";
+import { PUBLIC_API_TEST_IDS } from "./helpers/public-api-http-test-fixture";
+import { nowMsForTest } from "./helpers/public-api-http-test-fixture";
 
 export const OWNER_VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",
@@ -291,7 +292,7 @@ export async function withWeChatQrMock<T>(input: {
   }
 }
 
-export async function insertSecondPublishedAgent(
+export async function insertSecondLiveAgent(
   database: Awaited<ReturnType<typeof createPublicHttpContractDatabase>>,
 ): Promise<void> {
   const nowMs = nowMsForTest();
@@ -314,11 +315,12 @@ export async function insertSecondPublishedAgent(
       kind: "pet",
       liveDeploymentVersionId: "01J00000000000000000000069",
       model: "gpt-5.4",
-      name: "Second Published Agent",
+      name: "Second Live Agent",
       organizationId: "01J00000000000000000000006",
       ownerId: "01J00000000000000000000001",
       prompt: "Help again.",
       provider: "openai",
+      appId: PUBLIC_API_TEST_IDS.app,
       runtimeId: "openai-runtime",
       status: "published",
       updatedAt: nowMs,

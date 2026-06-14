@@ -1,5 +1,5 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AgentId, ChannelBindingId } from "@mosoo/id";
+import type { AgentId, ChannelBindingId, AppId } from "@mosoo/id";
 
 import { createErrorLogContext, logError, logInfo } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -70,6 +70,7 @@ interface ActiveDiscordGatewayConnection {
   agentId: AgentId;
   bindingId: ChannelBindingId;
   owner: DiscordGatewayRuntimeOwner;
+  appId: AppId;
   socket: DiscordGatewaySocket;
 }
 
@@ -225,7 +226,13 @@ export class DiscordGatewayConnectionRuntimeService {
       };
     }
 
-    const active = { agentId: binding.agentId, bindingId: requestedBindingId, owner, socket };
+    const active = {
+      agentId: binding.agentId,
+      bindingId: requestedBindingId,
+      owner,
+      appId: binding.appId,
+      socket,
+    };
     this.#active = active;
     this.#attachSocketListeners(active);
     await this.#state.storage.put(DISCORD_GATEWAY_BINDING_STORAGE_KEY, requestedBindingId);
@@ -430,6 +437,7 @@ export class DiscordGatewayConnectionRuntimeService {
           agentId: active.agentId,
           bindingId: active.bindingId,
           errorCode: getFatalGatewayCloseErrorCode(event.code),
+          appId: active.appId,
         });
       } catch (error) {
         logError("discord-gateway-do.fatal_close_persist_failed", {
