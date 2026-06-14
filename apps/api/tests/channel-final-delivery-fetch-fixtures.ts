@@ -2,12 +2,12 @@ import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer
 import type { ChannelFinalDeliveryMessage } from "../src/modules/channels/application/channel-final-delivery-message";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { readFetchUrl } from "./helpers/fetch-request-url";
-import type { ChannelFinalDeliveryQueueStub } from "./helpers/published-agent-http-test-fixture";
+import type { ChannelFinalDeliveryQueueStub } from "./helpers/public-api-http-test-fixture";
 import {
   createChannelFinalDeliveryQueueStub,
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
 export const OWNER_VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",

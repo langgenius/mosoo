@@ -9,6 +9,7 @@ import type {
   AgentId,
   DriverInstanceId,
   OrganizationId,
+  AppId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
@@ -32,6 +33,7 @@ export interface RuntimeUsageRunContext {
   createdAtMs: number;
   model: string;
   organizationId: OrganizationId;
+  appId: AppId;
   provider: string;
   runtimeId: string | null;
   sessionId: SessionId;
@@ -178,6 +180,7 @@ export async function recordRuntimeUsageEvent(
       inputTokens: tokens.inputTokens,
       model,
       organizationId: input.run.organizationId,
+      appId: input.run.appId,
       outputTokens: tokens.outputTokens,
       priceSnapshotJson: cost.priceSnapshotJson,
       pricingStatus: cost.pricingStatus,

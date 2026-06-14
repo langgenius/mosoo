@@ -15,7 +15,8 @@ import { readFetchUrl } from "./helpers/fetch-request-url";
 import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
-} from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
 
 const OWNER_VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",
@@ -151,9 +152,10 @@ export async function createDiscordBindingFixture(): Promise<{
 
   try {
     const binding = await createDiscordAgentChannelBinding(bindings, OWNER_VIEWER, {
-      agentId: "01J00000000000000000000009",
+      agentId: PUBLIC_API_TEST_IDS.agent,
       applicationId: "discord-app-1",
       botToken: "discord-token",
+      appId: PUBLIC_API_TEST_IDS.app,
       relaySecret: "discord-relay-secret",
     });
 

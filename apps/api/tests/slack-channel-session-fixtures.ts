@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 
 import type { SlackWorkTrigger } from "../src/modules/channels/slack/slack-events";
 import { readFetchUrl } from "./helpers/fetch-request-url";
-import type { createPublicHttpContractDatabase } from "./helpers/published-agent-http-test-fixture";
+import type { createPublicHttpContractDatabase } from "./helpers/public-api-http-test-fixture";
 
 export { OWNER_VIEWER, parseJsonRecord, readRecord } from "./channel-session-fixtures";
 

@@ -75,7 +75,6 @@ const RECENT_SESSION_FRAGMENT = graphql(/* GraphQL */ `
   fragment CostRecentSessionFields on CostRecentSession {
     actorEmail
     actorName
-    actorUserId
     cacheCreationTokens
     cacheReadTokens
     createdAt
@@ -117,17 +116,11 @@ void MODEL_FRAGMENT;
 void RECENT_SESSION_FRAGMENT;
 void ATTRIBUTION_FRAGMENT;
 
-export const ORGANIZATION_COST_QUERY = graphql(/* GraphQL */ `
-  query OrganizationCostCard(
-    $organizationId: ULID!
-    $range: CostRange!
-    $runPurposes: [CostRunPurpose!]
-  ) {
-    organizationCostCard(
-      organizationId: $organizationId
-      range: $range
-      runPurposes: $runPurposes
-    ) {
+export const APP_COST_QUERY = graphql(/* GraphQL */ `
+  query AppCostCard($appId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
+    appCostCard(appId: $appId, range: $range, runPurposes: $runPurposes) {
+      appId
+      appName
       agents {
         ...CostAgentFields
       }
@@ -136,23 +129,6 @@ export const ORGANIZATION_COST_QUERY = graphql(/* GraphQL */ `
       }
       models {
         ...CostModelFields
-      }
-      ownerUsers {
-        activeUsers
-        agentCount
-        cacheCreationTokens
-        cacheReadTokens
-        inputTokens
-        outputTokens
-        previousCostUsd
-        requestCount
-        topAgentId
-        topAgentName
-        totalCostUsd
-        unpricedRequestCount
-        userEmail
-        userId
-        userName
       }
       previousTotals {
         ...CostTotalsFields
@@ -163,30 +139,18 @@ export const ORGANIZATION_COST_QUERY = graphql(/* GraphQL */ `
       totals {
         ...CostTotalsFields
       }
-      users {
-        activeUsers
-        agentCount
-        cacheCreationTokens
-        cacheReadTokens
-        inputTokens
-        outputTokens
-        previousCostUsd
-        requestCount
-        topAgentId
-        topAgentName
-        totalCostUsd
-        unpricedRequestCount
-        userEmail
-        userId
-        userName
-      }
     }
   }
 `);
 
 export const AGENT_COST_QUERY = graphql(/* GraphQL */ `
-  query AgentCostCard($agentId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
-    agentCostCard(agentId: $agentId, range: $range, runPurposes: $runPurposes) {
+  query AgentCostCard(
+    $appId: ULID!
+    $agentId: ULID!
+    $range: CostRange!
+    $runPurposes: [CostRunPurpose!]
+  ) {
+    agentCostCard(appId: $appId, agentId: $agentId, range: $range, runPurposes: $runPurposes) {
       agentId
       agentName
       agents {
@@ -206,35 +170,32 @@ export const AGENT_COST_QUERY = graphql(/* GraphQL */ `
       totals {
         ...CostTotalsFields
       }
-      users {
-        activeUsers
-        agentCount
-        cacheCreationTokens
-        cacheReadTokens
-        inputTokens
-        outputTokens
-        previousCostUsd
-        requestCount
-        topAgentId
-        topAgentName
-        totalCostUsd
-        unpricedRequestCount
-        userEmail
-        userId
-        userName
-      }
     }
   }
 `);
 
-export const MEMBER_COST_QUERY = graphql(/* GraphQL */ `
-  query MemberCostCard($organizationId: ULID!, $memberId: ULID!, $range: CostRange!) {
-    memberCostCard(organizationId: $organizationId, memberId: $memberId, range: $range) {
-      owned {
-        ...CostAttributionFields
+export const ORGANIZATION_BILLING_COST_QUERY = graphql(/* GraphQL */ `
+  query OrganizationBillingCostCard(
+    $organizationId: ULID!
+    $range: CostRange!
+    $runPurposes: [CostRunPurpose!]
+  ) {
+    organizationBillingCostCard(
+      organizationId: $organizationId
+      range: $range
+      runPurposes: $runPurposes
+    ) {
+      daily {
+        ...CostDailyFields
       }
-      used {
-        ...CostAttributionFields
+      models {
+        ...CostModelFields
+      }
+      previousTotals {
+        ...CostTotalsFields
+      }
+      totals {
+        ...CostTotalsFields
       }
     }
   }

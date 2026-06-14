@@ -1,7 +1,7 @@
 import { accountsTable, agentChannelBindingsTable, agentsTable } from "@mosoo/db";
 import type { AgentChannelBindingProvider } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, ChannelBindingId, OrganizationId } from "@mosoo/id";
+import type { AccountId, ChannelBindingId } from "@mosoo/id";
 import { and, eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -38,18 +38,19 @@ export async function resolveAgentChannelBindingContextById(
     (await getAppDatabase(bindings.DB)
       .select({
         agentId: agentChannelBindingsTable.agentId,
+        agentAppId: agentsTable.appId,
         agentStatus: agentsTable.status,
         bindingId: agentChannelBindingsTable.id,
         displayMetadataJson: agentChannelBindingsTable.displayMetadataJson,
         encryptedCredsSecretId: agentChannelBindingsTable.encryptedCredsSecretId,
         externalBotId: agentChannelBindingsTable.externalBotId,
         externalTenantId: agentChannelBindingsTable.externalTenantId,
-        organizationId: agentsTable.organizationId,
         ownerEmail: accountsTable.email,
         ownerEmailVerified: accountsTable.emailVerified,
         ownerId: accountsTable.id,
         ownerImageUrl: accountsTable.image,
         ownerName: accountsTable.name,
+        appId: agentChannelBindingsTable.appId,
         provider: agentChannelBindingsTable.provider,
       })
       .from(agentChannelBindingsTable)
@@ -69,6 +70,10 @@ export async function resolveAgentChannelBindingContextById(
     return null;
   }
 
+  if (row.agentAppId !== row.appId) {
+    return null;
+  }
+
   return {
     agentId: row.agentId,
     agentStatus: row.agentStatus,
@@ -77,7 +82,7 @@ export async function resolveAgentChannelBindingContextById(
       bindingId: row.bindingId,
       expectedOwner: {
         agentId: row.agentId,
-        organizationId: parsePlatformId<OrganizationId>(row.organizationId, "organization ID"),
+        appId: row.appId,
       },
       provider: row.provider,
       purpose: "channel_context",
@@ -93,6 +98,7 @@ export async function resolveAgentChannelBindingContextById(
       imageUrl: row.ownerImageUrl,
       name: row.ownerName,
     }),
+    appId: row.appId,
     provider: row.provider,
   };
 }

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { agentChannelBindingsTable } from "@mosoo/db";
+import { agentChannelBindingsTable, appsTable } from "@mosoo/db";
+import type { AppId } from "@mosoo/id";
 import { count, eq } from "drizzle-orm";
 
 import {
@@ -20,7 +21,8 @@ import {
 import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
-} from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
 
 describe("agent channel binding deletion", () => {
   test("marks Discord bindings inactive before stopping the Gateway connection during delete", async () => {
@@ -48,13 +50,17 @@ describe("agent channel binding deletion", () => {
         }),
       } as ApiBindings;
       const binding = await createDiscordAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         applicationId: "discord-app-1",
         botToken: "discord-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         relaySecret: "discord-relay-secret",
       });
 
-      await deleteAgentChannelBinding(bindings, OWNER_VIEWER, { bindingId: binding.id });
+      await deleteAgentChannelBinding(bindings, OWNER_VIEWER, {
+        bindingId: binding.id,
+        appId: PUBLIC_API_TEST_IDS.app,
+      });
 
       expect(stoppedRows).toEqual([{ lastErrorCode: "binding_deleting", status: "error" }]);
       const bindingCount = await database
@@ -76,13 +82,17 @@ describe("agent channel binding deletion", () => {
         }),
       } as ApiBindings;
       const binding = await createDiscordAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         applicationId: "discord-app-1",
         botToken: "discord-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         relaySecret: "discord-relay-secret",
       });
 
-      await deleteAgentChannelBinding(bindings, OWNER_VIEWER, { bindingId: binding.id });
+      await deleteAgentChannelBinding(bindings, OWNER_VIEWER, {
+        bindingId: binding.id,
+        appId: PUBLIC_API_TEST_IDS.app,
+      });
 
       const bindingCount = await database
         .app()
@@ -94,24 +104,34 @@ describe("agent channel binding deletion", () => {
     });
   });
 
-  test("allows readable users to list but only editors to delete bindings", async () => {
+  test("requires owner access to list or delete bindings", async () => {
     await withSlackAuthTestMock(async () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "xoxb-secret-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         signingSecret: "signing-secret",
       });
 
       await expect(
-        listAgentChannelBindings(database, COLLABORATOR_VIEWER, "01J00000000000000000000009"),
-      ).resolves.toHaveLength(1);
+        listAgentChannelBindings(database, COLLABORATOR_VIEWER, {
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
+        }),
+      ).rejects.toThrow();
       await expect(
-        deleteAgentChannelBinding(bindings, COLLABORATOR_VIEWER, { bindingId: binding.id }),
+        deleteAgentChannelBinding(bindings, COLLABORATOR_VIEWER, {
+          bindingId: binding.id,
+          appId: PUBLIC_API_TEST_IDS.app,
+        }),
       ).rejects.toThrow();
 
-      await deleteAgentChannelBinding(bindings, OWNER_VIEWER, { bindingId: binding.id });
+      await deleteAgentChannelBinding(bindings, OWNER_VIEWER, {
+        bindingId: binding.id,
+        appId: PUBLIC_API_TEST_IDS.app,
+      });
 
       const bindingCount = await database
         .app()
@@ -120,6 +140,59 @@ describe("agent channel binding deletion", () => {
         .get();
 
       expect(bindingCount?.count).toBe(0);
+    });
+  });
+
+  test("rejects owner operations when the Agent belongs to another App", async () => {
+    await withSlackAuthTestMock(async () => {
+      const database = await createPublicHttpContractDatabase();
+      const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+      const nowMs = Date.now();
+      const otherAppId = "01J000000000000000000000ZZ" as AppId;
+
+      await database
+        .app()
+        .insert(appsTable)
+        .values({
+          createdAt: nowMs,
+          defaultEnvironmentId: PUBLIC_API_TEST_IDS.environment,
+          id: otherAppId,
+          name: "Other App",
+          organizationId: PUBLIC_API_TEST_IDS.organization,
+          ownerAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
+          slug: "other-app",
+          updatedAt: nowMs,
+        })
+        .run();
+
+      await expect(
+        createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          botToken: "xoxb-secret-token",
+          appId: otherAppId,
+          signingSecret: "signing-secret",
+        }),
+      ).rejects.toThrow();
+
+      const binding = await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
+        agentId: PUBLIC_API_TEST_IDS.agent,
+        botToken: "xoxb-secret-token",
+        appId: PUBLIC_API_TEST_IDS.app,
+        signingSecret: "signing-secret",
+      });
+
+      await expect(
+        listAgentChannelBindings(database, OWNER_VIEWER, {
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: otherAppId,
+        }),
+      ).rejects.toThrow();
+      await expect(
+        deleteAgentChannelBinding(bindings, OWNER_VIEWER, {
+          bindingId: binding.id,
+          appId: otherAppId,
+        }),
+      ).rejects.toThrow();
     });
   });
 });

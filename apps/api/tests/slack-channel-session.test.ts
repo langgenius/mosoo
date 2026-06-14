@@ -23,7 +23,8 @@ import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   createTestExecutionContext,
-} from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
 import {
   OWNER_VIEWER,
   buildSlackTrigger,
@@ -40,8 +41,9 @@ describe("Slack channel sessions", () => {
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const threadTs = "1700000000.000100";
       await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "xoxb-secret-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         signingSecret: "signing-secret",
       });
       const binding = await resolveSlackChannelBindingContext(bindings, {
@@ -144,7 +146,10 @@ describe("Slack channel sessions", () => {
       expect(messageCountAfterDuplicate?.value).toBe(1);
 
       await expect(
-        listAgentChannelBindings(database, OWNER_VIEWER, "01J00000000000000000000009"),
+        listAgentChannelBindings(database, OWNER_VIEWER, {
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
+        }),
       ).resolves.toEqual([
         expect.objectContaining({
           activityLastTriggeredAt: expect.any(String),
@@ -268,8 +273,9 @@ describe("Slack channel sessions", () => {
 
     await withChannelFetchMock(async () => {
       const firstBinding = await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "xoxb-first-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         signingSecret: "first-signing-secret",
       });
       const binding = await resolveSlackChannelBindingContext(bindings, {
@@ -297,14 +303,18 @@ describe("Slack channel sessions", () => {
       });
       firstSessionId = first.sessionId ?? "";
 
-      await deleteAgentChannelBinding(bindings, OWNER_VIEWER, { bindingId: firstBinding.id });
+      await deleteAgentChannelBinding(bindings, OWNER_VIEWER, {
+        bindingId: firstBinding.id,
+        appId: PUBLIC_API_TEST_IDS.app,
+      });
     });
 
     await withChannelFetchMock(
       async () => {
         await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
           botToken: "xoxb-second-token",
+          appId: PUBLIC_API_TEST_IDS.app,
           signingSecret: "second-signing-secret",
         });
         const binding = await resolveSlackChannelBindingContext(bindings, {
@@ -366,8 +376,9 @@ describe("Slack channel sessions", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "xoxb-secret-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         signingSecret: "signing-secret",
       });
       const binding = await resolveSlackChannelBindingContext(bindings, {

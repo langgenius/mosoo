@@ -16,7 +16,8 @@ import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   createTestExecutionContext,
-} from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
 
 const OWNER_VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",
@@ -126,12 +127,13 @@ describe("Lark channel events route", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         appId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "webhook",
         domain: "feishu",
         encryptKey: "encrypt-key",
+        appId: PUBLIC_API_TEST_IDS.app,
         verificationToken: "verification-token",
       });
       const body = JSON.stringify({
@@ -172,12 +174,13 @@ describe("Lark channel events route", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         appId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "webhook",
         domain: "feishu",
         encryptKey: "encrypt-key",
+        appId: PUBLIC_API_TEST_IDS.app,
         verificationToken: "verification-token",
       });
       const encrypted = await encryptLarkBody({
@@ -222,12 +225,13 @@ describe("Lark channel events route", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         appId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "webhook",
         domain: "feishu",
         encryptKey: "encrypt-key",
+        appId: PUBLIC_API_TEST_IDS.app,
         verificationToken: "verification-token",
       });
       const body = JSON.stringify({
@@ -271,12 +275,13 @@ describe("Lark channel events route", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         appId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "webhook",
         domain: "feishu",
         encryptKey: "encrypt-key",
+        appId: PUBLIC_API_TEST_IDS.app,
         verificationToken: "verification-token",
       });
       const body = JSON.stringify({
@@ -311,12 +316,13 @@ describe("Lark channel events route", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         appId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "webhook",
         domain: "feishu",
         encryptKey: "encrypt-key",
+        appId: PUBLIC_API_TEST_IDS.app,
         verificationToken: "verification-token",
       });
       const body = JSON.stringify({
@@ -348,12 +354,13 @@ describe("Lark channel events route", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         appId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "webhook",
         domain: "feishu",
         encryptKey: "encrypt-key",
+        appId: PUBLIC_API_TEST_IDS.app,
         verificationToken: "verification-token",
       });
       const body = JSON.stringify({
@@ -398,7 +405,7 @@ describe("Lark channel events route", () => {
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const bindingId = "01J00000000000000000000100";
       const secretId = await storeAgentChannelBindingCredentialSecret(bindings, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         credentialsJson: serializeLarkCredentials({
           appId: "cli_a",
           appSecret: "app-secret",
@@ -407,7 +414,7 @@ describe("Lark channel events route", () => {
           encryptKey: null,
           verificationToken: null,
         }),
-        organizationId: "01J00000000000000000000006",
+        appId: PUBLIC_API_TEST_IDS.app,
         provider: "lark",
         purpose: "channel_binding_create",
       });
@@ -415,7 +422,7 @@ describe("Lark channel events route", () => {
         .app()
         .insert(agentChannelBindingsTable)
         .values({
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
           createdAt: Date.now(),
           displayMetadataJson: "{}",
           encryptedCredsSecretId: secretId,
@@ -423,6 +430,7 @@ describe("Lark channel events route", () => {
           externalTenantId: "feishu:cli_a",
           id: bindingId,
           lastErrorCode: null,
+          appId: PUBLIC_API_TEST_IDS.app,
           provider: "lark",
           status: "active",
           updatedAt: Date.now(),
@@ -449,12 +457,13 @@ describe("Lark channel events route", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         appId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "webhook",
         domain: "feishu",
         encryptKey: "encrypt-key",
+        appId: PUBLIC_API_TEST_IDS.app,
         verificationToken: "verification-token",
       });
       const body = JSON.stringify({

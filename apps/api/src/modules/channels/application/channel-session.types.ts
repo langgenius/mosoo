@@ -1,6 +1,6 @@
 import type { PrimitiveRecord } from "@mosoo/contracts";
 import type { AgentChannelBindingProvider } from "@mosoo/db";
-import type { AgentId, ChannelBindingId, SessionId, SessionRunId } from "@mosoo/id";
+import type { AgentId, ChannelBindingId, AppId, SessionId, SessionRunId } from "@mosoo/id";
 
 import type { AgentRow } from "../../agents/application/agent-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
@@ -15,6 +15,7 @@ export interface AgentChannelBindingContext {
   externalBotId: string;
   externalTenantId: string;
   owner: AuthenticatedViewer;
+  appId: AppId;
   provider: AgentChannelBindingProvider;
 }
 

@@ -12,7 +12,7 @@ import {
   formatModelPricingSummary,
   rangeLabel,
 } from "./cost-model";
-import type { CostRange, CostRunPurpose, CostTab, OrganizationCostCard } from "./cost-model";
+import type { CostRange, CostRunPurpose, CostTab, AppCostCard } from "./cost-model";
 
 export function CostPageHeader({
   card,
@@ -22,7 +22,7 @@ export function CostPageHeader({
   setRange,
   setRunPurpose,
 }: {
-  card: OrganizationCostCard | undefined;
+  card: AppCostCard | undefined;
   effectiveTab: CostTab;
   range: CostRange;
   runPurpose: CostRunPurpose | "all";
@@ -32,8 +32,8 @@ export function CostPageHeader({
   return (
     <PageHeader
       className="border-border-subtle border-b"
-      title="Cost"
-      description={`${rangeLabel(range)} · ${formatCurrency(card?.totals.totalCostUsd ?? 0)}`}
+      title="App Usage"
+      description={`${card?.appName ?? "App"} · ${rangeLabel(range)} · ${formatCurrency(card?.totals.totalCostUsd ?? 0)}`}
     >
       <div className="border-border bg-card flex rounded-md border p-0.5">
         {RUN_PURPOSE_FILTERS.map((item) => (
@@ -84,7 +84,7 @@ export function CostPageHeader({
   );
 }
 
-function exportCostCsv(effectiveTab: CostTab, card: OrganizationCostCard | undefined) {
+function exportCostCsv(effectiveTab: CostTab, card: AppCostCard | undefined) {
   if (!card) {
     return;
   }
@@ -116,39 +116,6 @@ function exportCostCsv(effectiveTab: CostTab, card: OrganizationCostCard | undef
         String(row.inputTokens),
         String(row.outputTokens),
         String(row.cacheReadTokens),
-      ]),
-    ]);
-    return;
-  }
-
-  if (effectiveTab === "users") {
-    const rows = [
-      ...card.users.map((row) => ["used_by", row] as const),
-      ...card.ownerUsers.map((row) => ["owned_by", row] as const),
-    ];
-
-    downloadCsv("user-costs.csv", [
-      [
-        "attribution",
-        "user",
-        "email",
-        "top_agent",
-        "agent_count",
-        "cost",
-        "previous_cost",
-        "requests",
-        "tokens",
-      ],
-      ...rows.map(([attribution, row]) => [
-        attribution,
-        row.userName,
-        row.userEmail ?? "",
-        row.topAgentName ?? "",
-        String(row.agentCount),
-        String(row.totalCostUsd),
-        String(row.previousCostUsd ?? ""),
-        String(row.requestCount),
-        String(row.inputTokens + row.outputTokens),
       ]),
     ]);
     return;

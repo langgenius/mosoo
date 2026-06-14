@@ -1,29 +1,27 @@
-import { Permission } from "@mosoo/contracts/permission";
 import { accountsTable, agentsTable } from "@mosoo/db";
-import type { AccountId, AgentId, OrganizationId } from "@mosoo/id";
+import type { AccountId, AgentId, OrganizationId, AppId } from "@mosoo/id";
 import { eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
-import { ensureAgentCostAccess } from "../../agents/application/agent-access.service";
+import { ensureAppAgentOwner } from "../../agents/application/agent-access.service";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureOrganizationPermission } from "../../organizations/domain/organization-access.policy";
+import { ensureOrganizationOwnership } from "../../organizations/domain/organization-ownership.policy";
 import { resolveCostWindow } from "./cost-query-window";
 import {
   queryAgents,
   queryDaily,
-  queryExternalChannelAttribution,
   queryModels,
   queryRecentSessions,
   queryTotals,
-  queryUsers,
 } from "./cost-query.repository";
 import type {
   AgentCostCardView,
   CostAttributionCardView,
   CostRange,
-  MemberCostCardView,
-  OrganizationCostCardView,
+  OrganizationBillingCostCardView,
+  AppCostCardView,
 } from "./cost-query.types";
 
 export type { CostRange } from "./cost-query.types";
@@ -33,37 +31,31 @@ interface CostCardAccessInput {
   viewer: AuthenticatedViewer;
 }
 
-export interface OrganizationCostCardInput extends CostCardAccessInput {
+export interface OrganizationBillingCostCardInput extends CostCardAccessInput {
   organizationId: OrganizationId;
+  range: CostRange;
+  runPurposes?: readonly string[];
+}
+
+export interface AppCostCardInput extends CostCardAccessInput {
+  appId: AppId;
   range: CostRange;
   runPurposes?: readonly string[];
 }
 
 export interface AgentCostCardInput extends CostCardAccessInput {
   agentId: AgentId;
+  appId: AppId;
   range: CostRange;
   runPurposes?: readonly string[];
-}
-
-export interface MemberCostCardInput extends CostCardAccessInput {
-  memberId: AccountId;
-  organizationId: OrganizationId;
-  range: CostRange;
-}
-
-export interface OwnerCostCardInput extends CostCardAccessInput {
-  organizationId: OrganizationId;
-  ownerUserId: AccountId;
-  range: CostRange;
 }
 
 async function buildAttributionCard(
   database: D1Database,
   input: {
-    actorUserId?: AccountId;
     agentId?: AgentId;
     organizationId: OrganizationId;
-    ownerUserId?: AccountId;
+    appId?: AppId;
     range: CostRange;
     runPurposes?: readonly string[];
   },
@@ -127,103 +119,18 @@ function previousRange(range: CostRange): CostRange {
   return "LAST_30_DAYS";
 }
 
-function attachPreviousAgentCosts(
-  agents: Awaited<ReturnType<typeof queryAgents>>,
-  previousAgents: Awaited<ReturnType<typeof queryAgents>>,
-): Awaited<ReturnType<typeof queryAgents>> {
-  const previousByAgentId = new Map(
-    previousAgents.map((agent) => [agent.agentId, agent.totalCostUsd]),
-  );
-
-  return agents.map((agent) => ({
-    ...agent,
-    previousCostUsd: previousByAgentId.get(agent.agentId) ?? 0,
-  }));
-}
-
-function attachPreviousUserCosts(
-  users: Awaited<ReturnType<typeof queryUsers>>,
-  previousUsers: Awaited<ReturnType<typeof queryUsers>>,
-): Awaited<ReturnType<typeof queryUsers>> {
-  const previousByUserId = new Map(previousUsers.map((user) => [user.userId, user.totalCostUsd]));
-
-  return users.map((user) => ({
-    ...user,
-    previousCostUsd: previousByUserId.get(user.userId) ?? 0,
-  }));
-}
-
-export async function getOrganizationCostCard({
+export async function getOrganizationBillingCostCard({
   database,
   organizationId,
   range,
   runPurposes = [],
   viewer,
-}: OrganizationCostCardInput): Promise<OrganizationCostCardView> {
-  await ensureOrganizationPermission(
-    database,
-    viewer.id,
-    organizationId,
-    Permission.CostOrganizationRead,
-  );
+}: OrganizationBillingCostCardInput): Promise<OrganizationBillingCostCardView> {
+  await ensureOrganizationOwnership(database, viewer.id, organizationId);
 
   const window = resolveCostWindow(range);
   const previousWindow = resolveCostWindow(previousRange(range), new Date(window.sinceMs - 1));
-  const [
-    agents,
-    previousAgents,
-    users,
-    previousUsers,
-    externalChannel,
-    previousExternalChannel,
-    ownerUsers,
-    previousOwnerUsers,
-    daily,
-    models,
-    previousTotals,
-    recentSessions,
-    totals,
-  ] = await Promise.all([
-    queryAgents(database, { organizationId, runPurposes, window }),
-    queryAgents(database, {
-      organizationId,
-      runPurposes,
-      window: previousWindow,
-    }),
-    queryUsers(database, {
-      mode: "used_by",
-      organizationId,
-      runPurposes,
-      window,
-    }),
-    queryUsers(database, {
-      mode: "used_by",
-      organizationId,
-      runPurposes,
-      window: previousWindow,
-    }),
-    queryExternalChannelAttribution(database, {
-      organizationId,
-      runPurposes,
-      window,
-    }),
-    queryExternalChannelAttribution(database, {
-      organizationId,
-      runPurposes,
-      window: previousWindow,
-    }),
-    queryUsers(database, {
-      mode: "owned_by",
-      organizationId,
-      runPurposes,
-      window,
-    }),
-    queryUsers(database, {
-      mode: "owned_by",
-      organizationId,
-      runPurposes,
-      window: previousWindow,
-    }),
+  const [daily, models, previousTotals, totals] = await Promise.all([
     queryDaily(database, { organizationId, runPurposes, window }),
     queryModels(database, { organizationId, runPurposes, window }),
     queryTotals(database, {
@@ -231,49 +138,67 @@ export async function getOrganizationCostCard({
       runPurposes,
       window: previousWindow,
     }),
-    queryRecentSessions(database, { organizationId, runPurposes }),
     queryTotals(database, { organizationId, runPurposes, window }),
   ]);
 
   return {
-    agents: attachPreviousAgentCosts(agents, previousAgents),
     daily,
-    externalChannel: {
-      ...externalChannel,
-      previousCostUsd: previousExternalChannel.totalCostUsd,
-    },
     models,
-    ownerUsers: attachPreviousUserCosts(ownerUsers, previousOwnerUsers),
     previousTotals,
-    recentSessions,
     totals,
-    users: attachPreviousUserCosts(users, previousUsers),
+  };
+}
+
+export async function getAppCostCard({
+  database,
+  appId,
+  range,
+  runPurposes = [],
+  viewer,
+}: AppCostCardInput): Promise<AppCostCardView> {
+  const app = await ensureAppOwnership(database, viewer.id, appId);
+  const window = resolveCostWindow(range);
+  const previousWindow = resolveCostWindow(previousRange(range), new Date(window.sinceMs - 1));
+  const [card, previousTotals] = await Promise.all([
+    buildAttributionCard(database, {
+      organizationId: app.organizationId,
+      appId: app.id,
+      range,
+      runPurposes,
+    }),
+    queryTotals(database, {
+      organizationId: app.organizationId,
+      appId: app.id,
+      runPurposes,
+      window: previousWindow,
+    }),
+  ]);
+
+  return {
+    ...card,
+    previousTotals,
+    appId: app.id,
+    appName: app.name,
   };
 }
 
 export async function getAgentCostCard({
   agentId,
   database,
+  appId,
   range,
   runPurposes = [],
   viewer,
 }: AgentCostCardInput): Promise<AgentCostCardView> {
-  const { agent } = await ensureAgentCostAccess(database, viewer.id, agentId);
-  const window = resolveCostWindow(range);
-  const [header, card, users] = await Promise.all([
+  const { agent } = await ensureAppAgentOwner(database, viewer.id, { agentId, appId });
+  const [header, card] = await Promise.all([
     getAgentHeader(database, agentId),
     buildAttributionCard(database, {
       agentId,
       organizationId: agent.organizationId,
+      appId: agent.appId,
       range,
       runPurposes,
-    }),
-    queryUsers(database, {
-      agentId,
-      mode: "used_by",
-      organizationId: agent.organizationId,
-      runPurposes,
-      window,
     }),
   ]);
 
@@ -283,59 +208,5 @@ export async function getAgentCostCard({
     agentName: header.agentName,
     ownerId: header.ownerId,
     ownerName: header.ownerName,
-    users,
   };
-}
-
-export async function getMemberCostCard({
-  database,
-  memberId,
-  organizationId,
-  range,
-  viewer,
-}: MemberCostCardInput): Promise<MemberCostCardView> {
-  await ensureOrganizationPermission(
-    database,
-    viewer.id,
-    organizationId,
-    Permission.CostOrganizationRead,
-  );
-  const [owned, used] = await Promise.all([
-    buildAttributionCard(database, {
-      organizationId,
-      ownerUserId: memberId,
-      range,
-    }),
-    buildAttributionCard(database, {
-      actorUserId: memberId,
-      organizationId,
-      range,
-    }),
-  ]);
-
-  return {
-    owned,
-    used,
-  };
-}
-
-export async function getOwnerCostCard({
-  database,
-  organizationId,
-  ownerUserId,
-  range,
-  viewer,
-}: OwnerCostCardInput): Promise<CostAttributionCardView> {
-  await ensureOrganizationPermission(
-    database,
-    viewer.id,
-    organizationId,
-    Permission.CostOrganizationRead,
-  );
-
-  return buildAttributionCard(database, {
-    organizationId,
-    ownerUserId,
-    range,
-  });
 }

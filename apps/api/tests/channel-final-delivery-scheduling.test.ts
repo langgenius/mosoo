@@ -27,10 +27,7 @@ import {
   createCompletedTelegramFinalDeliveryJob,
 } from "./channel-final-delivery-job-fixtures";
 import { readFetchUrl } from "./helpers/fetch-request-url";
-import {
-  createRecordedQueueMessage,
-  nowMsForTest,
-} from "./helpers/published-agent-http-test-fixture";
+import { createRecordedQueueMessage, nowMsForTest } from "./helpers/public-api-http-test-fixture";
 
 function readJsonObjectBody(body: string): Record<string, unknown> {
   const parsed: unknown = JSON.parse(body);

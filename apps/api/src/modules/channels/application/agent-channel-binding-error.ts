@@ -19,6 +19,7 @@ export async function recordAgentChannelBindingError(
       and(
         eq(agentChannelBindingsTable.id, input.bindingId),
         eq(agentChannelBindingsTable.agentId, input.agentId),
+        eq(agentChannelBindingsTable.appId, input.appId),
       ),
     )
     .limit(1)
@@ -40,6 +41,12 @@ export async function recordAgentChannelBindingError(
       status: "error",
       updatedAt: timestampMs,
     })
-    .where(eq(agentChannelBindingsTable.id, input.bindingId))
+    .where(
+      and(
+        eq(agentChannelBindingsTable.id, input.bindingId),
+        eq(agentChannelBindingsTable.agentId, input.agentId),
+        eq(agentChannelBindingsTable.appId, input.appId),
+      ),
+    )
     .run();
 }

@@ -13,14 +13,14 @@ import {
   rangeLabel,
   tokensTotal,
 } from "./cost-model";
-import type { CostRange, CostTab, OrganizationCostCard } from "./cost-model";
+import type { CostRange, CostTab, AppCostCard } from "./cost-model";
 
 export function CostOverviewPanel({
   card,
   range,
   setActiveTab,
 }: {
-  card: OrganizationCostCard | undefined;
+  card: AppCostCard | undefined;
   range: CostRange;
   setActiveTab: (tab: CostTab) => void;
 }) {
@@ -42,7 +42,7 @@ export function CostOverviewPanel({
             formatCompactNumber(totals ? tokensTotal(totals) : 0),
             `${Math.round((totals ? cacheHitRate(totals) : 0) * 100)}% cache hit`,
           ],
-          ["Active Users", String(totals?.activeUsers ?? 0), "members this period"],
+          ["Active Actors", String(totals?.activeUsers ?? 0), "non-channel usage"],
         ].map(([label, value, detail], index) => (
           <div
             key={label}
@@ -97,36 +97,7 @@ export function CostOverviewPanel({
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="border-border bg-card rounded-lg border p-4">
-          <h2 className="text-foreground mb-3 text-sm font-semibold">Top users</h2>
-          {(card?.users ?? []).length === 0 ? (
-            <PanelEmpty>No user spend in this range.</PanelEmpty>
-          ) : null}
-          <div className="space-y-2">
-            {(card?.users ?? []).slice(0, 5).map((user) => (
-              <button
-                key={user.userId}
-                type="button"
-                onClick={() => {
-                  setActiveTab("users");
-                }}
-                className="hover:bg-muted/50 flex w-full items-center justify-between rounded-md p-2 text-left"
-              >
-                <div className="min-w-0">
-                  <div className="text-foreground truncate text-sm font-medium">
-                    {user.userName}
-                  </div>
-                  <div className="text-muted-foreground truncate text-xs">
-                    {user.topAgentName ?? "No agent usage"}
-                  </div>
-                </div>
-                <div className="font-mono text-sm">{formatCurrency(user.totalCostUsd)}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-
+      <section>
         <div className="border-border bg-card rounded-lg border p-4">
           <h2 className="text-foreground mb-3 text-sm font-semibold">Spend by model</h2>
           {(card?.models ?? []).length === 0 ? (

@@ -8,7 +8,8 @@ import { persistConfirmedWeChatQrPairing } from "../src/modules/channels/wechat/
 import {
   createTestExecutionContext,
   nowMsForTest,
-} from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
 import {
   OWNER_VIEWER,
   createConfirmedWeChatQrSnapshot,
@@ -26,7 +27,8 @@ describe("WeChat channel polling maintenance", () => {
     try {
       const bindings = await createWeChatTestBindings();
       const account = await persistConfirmedWeChatQrPairing(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
+        appId: PUBLIC_API_TEST_IDS.app,
         snapshot: createConfirmedWeChatQrSnapshot(),
       });
       let nowMs = nowMsForTest();
@@ -154,7 +156,8 @@ describe("WeChat channel polling maintenance", () => {
   test("scheduled maintenance retries WeChat accounts stuck in failed status", async () => {
     const bindings = await createWeChatTestBindings();
     const account = await persistConfirmedWeChatQrPairing(bindings, OWNER_VIEWER, {
-      agentId: "01J00000000000000000000009",
+      agentId: PUBLIC_API_TEST_IDS.agent,
+      appId: PUBLIC_API_TEST_IDS.app,
       snapshot: createConfirmedWeChatQrSnapshot(),
     });
 
@@ -208,7 +211,8 @@ describe("WeChat channel polling maintenance", () => {
   test("scheduled WeChat polling owner rejects overlapping poll attempts for the same account", async () => {
     const bindings = await createWeChatTestBindings();
     const account = await persistConfirmedWeChatQrPairing(bindings, OWNER_VIEWER, {
-      agentId: "01J00000000000000000000009",
+      agentId: PUBLIC_API_TEST_IDS.agent,
+      appId: PUBLIC_API_TEST_IDS.app,
       snapshot: createConfirmedWeChatQrSnapshot(),
     });
     const nowMs = nowMsForTest();

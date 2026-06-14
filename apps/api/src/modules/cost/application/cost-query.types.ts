@@ -1,7 +1,6 @@
-import type { AccountId, AgentId, SessionId, SessionRunId } from "@mosoo/id";
+import type { AccountId, AgentId, AppId, SessionId, SessionRunId } from "@mosoo/id";
 
 export type CostRange = "LAST_7_DAYS" | "LAST_30_DAYS" | "MONTH_TO_DATE" | "LAST_90_DAYS";
-export type CostUserAttributionMode = "owned_by" | "used_by";
 
 export interface CostWindow {
   dailyBeforeDate: string;
@@ -9,10 +8,6 @@ export interface CostWindow {
   label: string;
   sinceDate: string;
   sinceMs: number;
-}
-
-export interface CostExternalChannelAttributionView extends CostTotalsView {
-  previousCostUsd: number | null;
 }
 
 export interface AggregateRow {
@@ -41,15 +36,6 @@ export interface AgentAggregateRow extends AggregateRow {
   preview_cost_usd: number | null;
   production_cost_usd: number | null;
   scheduled_cost_usd: number | null;
-}
-
-export interface UserAggregateRow extends AggregateRow {
-  agent_count: number;
-  top_agent_id: string | null;
-  top_agent_name: string | null;
-  user_email: string | null;
-  user_id: string;
-  user_name: string | null;
 }
 
 export interface ModelAggregateRow extends AggregateRow {
@@ -103,16 +89,6 @@ export interface CostAgentRowView extends CostTotalsView {
   scheduledCostUsd: number;
 }
 
-export interface CostUserRowView extends CostTotalsView {
-  agentCount: number;
-  previousCostUsd: number | null;
-  topAgentId: AgentId | null;
-  topAgentName: string | null;
-  userEmail: string | null;
-  userId: AccountId;
-  userName: string;
-}
-
 export interface CostModelRowView extends CostTotalsView {
   cacheReadUsdPerMillion: number | null;
   cacheWriteUsdPerMillion: number | null;
@@ -126,7 +102,6 @@ export interface CostModelRowView extends CostTotalsView {
 export interface CostRecentSessionView {
   actorEmail: string | null;
   actorName: string;
-  actorUserId: AccountId;
   cacheCreationTokens: number;
   cacheReadTokens: number;
   createdAt: string;
@@ -148,11 +123,17 @@ export interface CostAttributionCardView {
   totals: CostTotalsView;
 }
 
-export interface OrganizationCostCardView extends CostAttributionCardView {
-  externalChannel: CostExternalChannelAttributionView;
-  ownerUsers: CostUserRowView[];
+export interface OrganizationBillingCostCardView {
+  daily: CostDailyPointView[];
+  models: CostModelRowView[];
   previousTotals: CostTotalsView;
-  users: CostUserRowView[];
+  totals: CostTotalsView;
+}
+
+export interface AppCostCardView extends CostAttributionCardView {
+  previousTotals: CostTotalsView;
+  appId: AppId;
+  appName: string;
 }
 
 export interface AgentCostCardView extends CostAttributionCardView {
@@ -160,10 +141,4 @@ export interface AgentCostCardView extends CostAttributionCardView {
   agentName: string;
   ownerId: AccountId;
   ownerName: string;
-  users: CostUserRowView[];
-}
-
-export interface MemberCostCardView {
-  owned: CostAttributionCardView;
-  used: CostAttributionCardView;
 }
