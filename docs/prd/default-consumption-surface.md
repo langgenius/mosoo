@@ -2,11 +2,11 @@
 
 > A product-narrative version for non-engineer readers.
 >
-> This describes the **default consumption surface for published agents** on Mosoo's web client — the UI page is called **Threads**, and a single instance is a **Thread**.
+> This describes Mosoo WebUI's default consumption surface for App-local Agents: the UI page is called **Threads**, and a single instance is a **Thread**. In V1, Threads creates or resumes Agent-owned Sessions inside the active App; Agent API Endpoints and Channels are separate Agent Exposure surfaces.
 
-> **UI status (2026-06-10)**: the sidebar no longer carries a `+ New thread` primary CTA — the prominent button now reads `+ New agent` and points at `/agent?create=1`. Threads is still in the sidebar as a regular nav item alongside Agents / Spaces / Environments / Integrations / Providers (the previous `Work` / `Studio` section headers were collapsed into a single flat list). The `+ New thread` compose dialog itself is unchanged; the standard entry is now the **`New thread` button on the `/threads` page header / empty state**, and the locked-agent variant is still reachable from a published agent's `Settings → Distribution → Threads` row (`/threads?compose=1&agent=…&lock=1`). The diagrams and prose below that still position `+ New thread` as the sidebar primary CTA describe the v1 launch shape, not today's shipping UI.
+> **UI status (2026-06-10)**: the sidebar no longer carries a `+ New thread` primary CTA — the prominent button now reads `+ New agent` and points at `/agent?create=1`. Threads is still in the sidebar as a regular nav item alongside Agents / Spaces / Environments / Integrations / Providers (the previous `Work` / `Studio` section headers were collapsed into a single flat list). The `+ New thread` compose dialog itself is unchanged; the standard entry is now the **`New thread` button on the `/threads` page header / empty state**, and the locked-agent variant is still reachable from an Agent's Settings → Distribution → `Threads` row (`/threads?compose=1&agent=…&lock=1`). The diagrams and prose below that still position `+ New thread` as the sidebar primary CTA are historical IA notes, not the current V1 console IA.
 >
-> **Current Project/App boundary note**: Threads are App-local consumption resources. New routing and data modeling should make Threads / Sessions inherit Project from the selected Agent/App rather than treating `/threads` as a global Organization root. See [Project / App Boundary](./project-app-boundary.md).
+> **Current App boundary note**: Threads are App-local consumption resources. New routing and data modeling should make Threads / Sessions inherit App from the selected Agent/App rather than treating `/threads` as a global Organization root. See [App Boundary](./app-boundary.md).
 
 ---
 
@@ -31,7 +31,7 @@ That's why the v1 investment is deliberately restrained: don't fight for the syn
 
 ## 1. User problem
 
-The reader: an **enterprise IT admin / operator** — someone who has published a few agents in their organization and needs to continuously dispatch tasks and review results from the web client.
+The reader: an **App owner / operator** — someone who has configured one or more Agents inside an App, may expose an Agent through an Agent API Endpoint or Channel, and needs to continuously dispatch tasks and review Thread results from the web client.
 
 Current pain points:
 
@@ -41,7 +41,7 @@ Current pain points:
 - **Process black box** — the user doesn't know what the agent is doing and can only guess intuitively at "whether it's stuck."
 - **No cross-channel fallback** — when external channels such as Slack / Linear / GitHub aren't connected, the user has no self-contained consumption entry point.
 
-The result is that when the user returns to Mosoo, they don't know where to look for their own work, and the reuse rate of agents within the organization is held back by UX.
+The result is that when the user returns to Mosoo, they don't know where to look for their own work, and Agent reuse inside the active App is held back by UX.
 
 > **TL;DR** — Mosoo lacks a task-first, three-state, notification-recallable private consumption surface. ChatUI is not the answer.
 
@@ -94,23 +94,23 @@ flowchart LR
     BChat -.- BMiss3[× no push recall]
   end
   subgraph After
-    ANav[Nav: + New thread / Threads / STUDIO / GOVERNANCE] --> AThreads[/threads three buckets/]
+    ANav[Nav: App Overview / Threads / Agents] --> AThreads[/threads three buckets/]
     AThreads --> ADetail[/threads/:id activity stream/]
     ADetail --> AProcess[Process modal · on demand]
     AThreads --> APush[System notification]
-    BChat2[Preview ChatUI] -.demoted.-> APreview[pre-publish debug only]
+    BChat2[Preview ChatUI] -.demoted.-> APreview[pre-exposure debug only]
   end
   Before ==> After
 ```
 
 The core changes:
 
-- **Entry point** — from "pick an agent first" to "look at Threads first." `+ New thread` is promoted to the top-level nav.
+- **Entry point** — from "pick an agent first" to "look at Threads first." The standard New thread action lives on `/threads`; the primary console CTA can remain App-building oriented.
 - **Form factor** — from "IM metaphor" to "Inbox + ticket detail." The three-state buckets make working / completed / archived recognizable at a glance.
 - **Recall** — add a push channel (v1 = browser system notifications), so the user no longer needs daily-open.
-- **ChatUI doesn't disappear** — it is merely demoted from the "default consumption surface" to a "pre-publish debug" tool, kept inside Studio Preview.
+- **ChatUI doesn't disappear** — it is merely demoted from the "default consumption surface" to a "pre-exposure debug" tool, kept inside Studio Preview.
 
-> **TL;DR** — `+ New thread` is promoted to the top-level nav; ChatUI is demoted to Studio Preview; we add three layers — Threads list / Thread detail / Process modal — plus push notifications.
+> **TL;DR** — Threads becomes an App-level consumption view; ChatUI is demoted to Studio Preview; we add three layers — Threads list / Thread detail / Process modal — plus push notifications.
 
 ---
 
@@ -162,7 +162,7 @@ A single-field compose dialog: a body textarea + an Assign-to agent picker + att
 Two entry points:
 
 - The `New thread` button on the `/threads` page header / empty state — the standard variant, where you freely pick an agent. (Originally framed as a sidebar `+ New thread` primary CTA; the sidebar primary CTA was reassigned to `+ New agent`, but the compose dialog itself is unchanged.)
-- A published agent's Settings → Distribution → `Threads` row — the locked-agent variant, where the agent is already locked.
+- An Agent's Settings → Distribution → `Threads` row — the locked-agent variant, where the Agent is already locked.
 
 > **TL;DR** — A single-field brief + pick an agent + ⌘↵ to send. No title field, no AI polishing.
 

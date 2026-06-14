@@ -2,7 +2,7 @@
 
 > This is the product-story version for non-engineer readers. The field-level package contract lives in `pkgs/agent-package/src/archive-path-policy.ts` and `pkgs/contracts/src/agent/agent-manifest-serializer.contract.ts`; the export/import services are under `apps/api/src/modules/agents/application/agent-package-*.service.ts`.
 >
-> **Current Project/App boundary note**: `.agent` packages remain the portable Agent runtime/config unit. They are not the full Project/App package. App metadata, deployment state, Provider keys, app-scoped cost, and Project ownership live outside the Agent Manifest unless a later App package PRD defines a wider bundle. See [Project / App Boundary](./project-app-boundary.md).
+> **Current App boundary note**: `.agent` packages remain the portable Agent runtime/config unit. They are not the full App package. App metadata, deployment state, Provider keys, app-scoped cost, and App ownership live outside the Agent Manifest unless a later App package PRD defines a wider bundle. See [App Boundary](./app-boundary.md).
 
 ---
 

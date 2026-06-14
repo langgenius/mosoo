@@ -13,7 +13,7 @@ import {
   createPublicHttpTestBindings,
   createTestExecutionContext,
   PUBLIC_API_TEST_IDS,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
 const OWNER_VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",

@@ -4,17 +4,17 @@ This is a status snapshot, not a dependency graph. Items are grouped by state so
 
 ## Current Construction Lock
 
-The current pivot is Project/App separation under a single-owner Organization assumption. Organization remains the account / billing / tenant shell; Project is the code and data boundary; App is the console noun and Agent capability package boundary.
+The current pivot is App boundary consolidation under a single-owner Organization assumption. Organization remains the account / billing / tenant shell; App is the code, data, console, and Agent capability package boundary.
 
 Near-term construction order:
 
-1. Project model, contracts, GraphQL, and default Project/App provisioning.
-2. Agent ownership under Project, with Threads / Sessions inheriting Project from Agent.
-3. Environment and Provider defaults under Project, with Organization fallback only as migration bridge.
-4. MCP, Skills, Spaces, Channels, Agent exposure state, export, and app-scoped usage/cost under Project/App.
+1. App model, contracts, GraphQL, and default App provisioning.
+2. Agent ownership under App, with Threads / Sessions inheriting App from Agent.
+3. Environment and Provider defaults under App, with no Organization fallback.
+4. MCP, Skills, Spaces, Channels, Agent exposure state, export, and app-scoped usage/cost under App.
 5. App Overview as the console root; one-App Organizations route directly into the App.
 
-Project members, org-wide shared resources, role matrices, and enterprise governance are outside this phase.
+App members, org-wide shared resources, role matrices, and enterprise governance are outside this phase.
 
 ## 📋 Planned
 
@@ -28,8 +28,8 @@ Project members, org-wide shared resources, role matrices, and enterprise govern
 
 ## 🛠️ In Development
 
-- **Project / App separation** — canonical Project model with App console copy, default App provisioning, Project-owned resources, and App Overview routing. See [Project / App Boundary](./docs/prd/project-app-boundary.md).
-- **Agent Builder** — formal PRD plus a controlled Draft patch, subordinate to the Project/App resource boundary.
+- **App boundary consolidation** — canonical App model, default App provisioning, App-owned resources, and App Overview routing. See [App Boundary](./docs/prd/app-boundary.md).
+- **Agent Builder** — formal PRD plus a controlled Draft patch, subordinate to the App resource boundary.
 
 ## 🔮 Future
 
@@ -39,7 +39,7 @@ Project members, org-wide shared resources, role matrices, and enterprise govern
 
 - **Foundation** — session snapshot / lifecycle / runtime state operations.
 - **Agent page operations / runtime diagnostics** — Terminal, Session Log.
-- **Historical governance foundation** — RBAC trio + error message redaction; multi-member governance is not part of the current single-owner Project/App cut.
+- **Historical governance foundation** — RBAC trio + error message redaction; multi-member governance is not part of the current single-owner App cut.
 - **Published API** — hardening plus the Public Thread API (`POST /threads`, `GET /threads/{id}`).
 - **Provider readiness fallback UX** — missing-key / wrong-key states + vendor error pass-through.
 - **Cost coverage**.

@@ -4,7 +4,7 @@
 >
 > This document only answers "who can do what" and "who can stop whom." Action IDs, lookup tables, and schema fields are out of scope here.
 >
-> **Current Project/App boundary note**: RBAC is historical foundation and future governance guidance. The current Project/App cut assumes a single Organization owner; Project access maps to that owner. Owner / Admin / Member matrices, admin reach-through, member requests, and asset takeover must not block Project model, App routing, or Project-owned resource work. See [Project / App Boundary](./project-app-boundary.md).
+> **Current App boundary note**: RBAC is historical foundation and future governance guidance. The current App cut assumes a single Organization owner; App access maps to that owner. Owner / Admin / Member matrices, admin reach-through, member requests, and asset takeover must not block App model, App routing, or App-owned resource work. See [App Boundary](./app-boundary.md).
 
 ---
 
@@ -69,7 +69,7 @@ After the pivot, Mosoo is a self-managed Agent platform for a single organizatio
 
 - Create their own Agent / Space / Skill / personal MCP / Environment; **creating it makes them the owner.**
 - Manage the ACLs of the assets they created, transfer them to someone else, and delete their own assets.
-- Use assets others have shared with them (browse the visible list / call a Published Agent / read and write an authorized Space).
+- Use assets others have shared with them (browse the visible list / call a Public API Agent / read and write an authorized Space).
 - See their own My Usage, and the per-collaborator cost breakdown of their own Agents.
 - Configure / test / delete their own Personal Provider keys (when the BYOK toggle is on and the vendor allows it).
 - Connect / disconnect their own per-user MCP credentials.

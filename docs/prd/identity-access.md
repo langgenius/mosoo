@@ -4,7 +4,7 @@
 >
 > This document is aligned with v2.2 (Unified Lock, locked on 2026-04-25).
 >
-> **Current Project/App boundary note**: During the current pivot, assume one human owns one Organization and the default Project/App is created for that owner. Member lifecycle, invitations, access requests, primary-domain discovery, and multi-role Organization administration are future governance extensions. Do not use those flows as prerequisites for Project/App data modeling or console IA. See [Project / App Boundary](./project-app-boundary.md).
+> **Current App boundary note**: During the current pivot, assume one human owns one Organization and the default App is created for that owner. Member lifecycle, invitations, access requests, primary-domain discovery, and multi-role Organization administration are future governance extensions. Do not use those flows as prerequisites for App data modeling or console IA. See [App Boundary](./app-boundary.md).
 
 ---
 

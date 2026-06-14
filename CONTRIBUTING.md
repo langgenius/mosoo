@@ -11,7 +11,7 @@ Before changing code, read the relevant product and architecture documents:
 
 These documents define system boundaries, module relationships, and design intent. If the PRD, architecture, and implementation disagree, fix the source of truth instead of hiding the mismatch in generated files, local adapters, or temporary branches.
 
-When a change pivots a core noun or ownership boundary, update the documentation anchor first: README, roadmap, architecture, PRD index, and the active boundary PRD. For the current Project/App pivot, [Project / App Boundary](./docs/prd/project-app-boundary.md) is the construction lock that resolves older Organization-owned, member-governance, Workspace, and Agent-first wording.
+When a change pivots a core noun or ownership boundary, update the documentation anchor first: README, roadmap, architecture, PRD index, and the active boundary PRD. For the current App boundary cut, [App Boundary](./docs/prd/app-boundary.md) is the construction lock that resolves older Organization-owned, member-governance, Workspace, and Agent-first wording.
 
 ## Repository Structure
 
@@ -170,7 +170,7 @@ If generated output exposes type or field drift, fix the spec, resolver, contrac
 
 ## Verification Strategy
 
-Choose validation based on risk and blast radius. The project is still alpha, so every small change does not need new tests, but high-risk behavior changes need focused coverage.
+Choose validation based on risk and blast radius. The repository is still alpha, so every small change does not need new tests, but high-risk behavior changes need focused coverage.
 
 Recommended baseline:
 
@@ -197,7 +197,7 @@ just e2e-preview-latency
 
 Keep changes small, direct, and aligned with existing boundaries.
 
-- Prefer existing project patterns over new abstractions.
+- Prefer existing repository patterns over new abstractions.
 - Separate pure transformation logic from I/O, framework lifecycle, and platform APIs.
 - Put shared contracts, cross-package payloads, and public schemas in shared packages only when they truly cross boundaries.
 - Keep app-local types, view models, and implementation details inside their owning module.

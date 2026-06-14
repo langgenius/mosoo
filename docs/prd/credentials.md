@@ -1,192 +1,182 @@
-# Credentials — for humans
+# Credentials - for humans
 
-> The Credentials product story for non-engineers. For the **complete engineering contract**, see the shipped Credentials PRD.
+> The Credentials product story for non-engineering readers. For interface details, schema names, and implementation checks, use the shipped Credentials contract and current Provider/MCP implementation.
 >
-> **Current Project/App boundary note**: New Project/App work should scope Provider keys and MCP credentials to Project first. Organization company pools, member BYOK, and per-member preference switching are future governance or migration concepts unless the implementation already depends on them. Keep the secret-handling rules, but converge runtime resolution toward `(execution_actor, project, provider)`. See [Project / App Boundary](./project-app-boundary.md).
+> Adjacent PRDs: [`app-boundary`](./app-boundary.md), [`environment`](./environment.md), [`mcp-interaction`](./mcp-interaction.md), [`agent-type`](./agent-type.md).
+>
+> Current boundary note: V1 credentials are App-owned runtime dependencies. App is the implementation namespace; App is the product boundary. A Provider key or MCP secret must belong to one App, and runtime must resolve it from that same App boundary. Credential inheritance from outside the App and caller-specific key selection are not V1 product behavior.
 
 ---
 
-## One-line positioning
+## One-Line Positioning
 
-Let both kinds of role in an organization comfortably connect "their own LLM credentials" to Mosoo:
+> Store Provider and MCP secrets inside the active App, then let Agents in that App resolve only those secrets at runtime.
 
-- **Admins** configure a **company key pool** so that every Agent in the organization has a key available by default.
-- **Members** can **bring their own key (BYOK)**, using their own subscription or department key to run specific Agents on their own, with the bill charged to them.
+Credentials are how an App gives its Agents access to model providers and external tools without putting plaintext secrets into Agent profiles, packages, logs, diagnostics, or the Web UI. The App owner configures keys in the App, Agents reference providers or connectors, and runtime resolves the necessary secret only when an Agent run needs it.
 
-When an Agent runs, the system automatically picks "which key this person should use right now on this Provider" by following one simple rule, so users never have to agonize over which of several company keys to use.
-
-Analogy:
-
-> Like company Wi-Fi. The admin sets up the "shared company Wi-Fi" that everyone can connect to by default; anyone who wants to use their own mobile hotspot can switch over at any time, and switching back to company Wi-Fi next time is just as easy. The system remembers your last choice, and it won't kick you off midway.
+The current product path is intentionally narrow: one owner, one App boundary, one App-local credential set.
 
 ---
 
-## 1. User problems
+## 1. User Problem
 
-**Admins** often say:
+The App owner needs to answer four direct questions:
 
-- "I want to configure the company's OpenAI / Anthropic keys so the whole team can run Agents without everyone having to bring their own key."
-- "Some people will want to run Agents on their own Claude Pro quota, so they can just add their own key."
+| Need                                                    | Product answer                                                                              |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| "Can this App call OpenAI or Anthropic?"                | Add a Provider key in the active App's Providers surface.                                   |
+| "Can this App use a custom OpenAI-compatible endpoint?" | Add an App-local custom Provider credential with a base URL and model list.                 |
+| "Can this Agent use a connector?"                       | Configure the MCP server and secret inside the same App, then bind it to the Agent.         |
+| "Can a package or imported Agent carry secrets?"        | No. Export only references and reconnect intent; configure secrets again in the target App. |
 
-**Members** often say:
-
-- "I have a personal OpenAI subscription and want to run Agents on my own quota without consuming the company pool."
-- "After I add my own key, it should be used immediately, not require me to go tick a box in some settings page."
-- "There are several keys in the company pool — how would I know which one to pick? Just let the admin decide."
-
-**At Agent runtime**, all the system wants to do is one thing:
-
-- "Give me `(whose identity, in which organization, using which Provider)`, and just tell me which available key to use right now."
+The owner should never need to choose a tenant pool, a caller key, or a person-specific runtime preference. If the App cannot prove a matching credential exists, the Agent should fail with a configuration error.
 
 ---
 
-## 2. Goals
+## 2. Credential Concepts
 
-### What admins can do
+| Concept                 | Plain-language definition                                                                         | Boundary                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **Provider Credential** | A named API key for one model provider, optionally with a custom endpoint and declared model ids. | Belongs to exactly one App.                                    |
+| **MCP Credential**      | Bearer or OAuth material for one App-local MCP server.                                            | Belongs to the same App as the MCP server.                     |
+| **Vault Secret**        | Encrypted secret payload referenced by a credential row.                                          | Read only through the owning credential row and purpose-specific checks. |
+| **Agent Reference**     | An Agent's selected model/provider or MCP binding.                                                | References App-owned resources; it does not contain plaintext secrets.   |
 
-- Configure company keys in `/providers` (Provider, name, API Key, optional custom endpoint)
-- Mark a company key as the **default**, making it the default choice for that Provider
-- Edit and delete company keys (deletion is a hard delete — the secret is destroyed immediately)
-
-### What members can do
-
-- Add their own personal key for a Provider in `/providers` (it is automatically set as "my preferred key for this Provider")
-- Switch back to **Company default** at any time from the dropdown, or switch to another one of their own personal keys
-- Delete their own personal key (after deletion, the next Agent run automatically falls back to Company default)
-- Cannot see or modify anyone else's personal key — this is a privacy boundary that not even admins can cross
-
-### What the Agent runtime receives
-
-- A **deterministic** plaintext key that is usable (only briefly available within a controlled call, never echoed back to the frontend, and never written to diagnostics in cleartext)
-- A scope marker indicating whether it is `company` or `personal`, to support cost attribution down the line
+Credential rows are metadata. The secret value lives in the vault and is addressed by a scoped secret kind. The UI may display masked values, never the raw stored secret.
 
 ---
 
-## 3. Concept lock
+## 3. Provider Key Journey
 
-### Two resource types
+The active App owns the Providers surface:
 
-| Resource                | Owned by                     | Visible to                           | Editable by   |
-| ----------------------- | ---------------------------- | ------------------------------------ | ------------- |
-| **Company Credential**  | Organization                 | All members of the same Org (masked) | Owner / Admin |
-| **Personal Credential** | (member, organization) tuple | Owner only                           | Owner only    |
-
-> The uniqueness boundary for a personal key is `(member, organization, Provider)`. The same person adding a key for the same Provider in different organizations doesn't affect either one; when a person leaves an organization, all of their personal keys under that organization are deleted outright — no soft delete, no recovery on re-invitation.
-
-### Naming lock
-
-| Term         | Examples                                                                                                                                                                           |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Provider** | `anthropic` / `openai` / `openai-compatible` — UI copy and the PRD always use this word. (See `ALL_VENDORS` in `pkgs/runtime-catalog/src/runtime-catalog.ts` for the shipped set.) |
-| **Runtime**  | The Agent Driver runtime; one Runtime depends on one Provider                                                                                                                      |
-| **BYOK**     | Bring Your Own Key — a member brings their own key                                                                                                                                 |
-
-### The Active Key has only 2 states (**core simplification**)
-
-| State               | Meaning                                               | UI display                                                    |
-| ------------------- | ----------------------------------------------------- | ------------------------------------------------------------- |
-| **Personal**        | I have selected one of my own personal keys           | `PERSONAL · {label}` (green badge)                            |
-| **Company default** | I haven't selected a personal key (the default state) | `COMPANY · {default key name}` or `COMPANY · No key selected` |
-
-> We **deliberately do not let** members pick a specific key from among multiple company keys — members neither need to nor are able to tell the difference between the keys in the company pool. Which one is the default is decided by the Admin.
-
----
-
-## 4. Relationship lock
-
-### 4.1 Product relationship diagram
-
-```mermaid
-flowchart LR
-  Org["Organization"] --> Company["Company credential pool"]
-  Account["Account"] --> Personal["Personal credentials"]
-  Company --> Choose["Runtime picks Company default or Personal"]
-  Personal --> Choose
-  Choose --> Agent["Agent run"]
+```text
+App
+  Providers
+    Add key
+      Provider
+      Name
+      API key
+      Optional base URL
+      Optional model ids for OpenAI-compatible providers
+    Test
+    Save
 ```
 
-### 4.2 State machine for the Active selection
+Visible behavior:
 
-```mermaid
-stateDiagram-v2
-  [*] --> CompanyDefault: Default (no personal key preferred)
-  CompanyDefault --> Personal: Select a personal key
-  Personal --> CompanyDefault: Switch back / personal key deleted
-  Personal --> Personal: Switch to another personal key
-```
+| State                 | Meaning                                                                 |
+| --------------------- | ----------------------------------------------------------------------- |
+| **No key configured** | Agents that require this Provider cannot run that model yet.            |
+| **Key saved**         | The App can resolve that Provider for Agents in the same App.           |
+| **Test failed**       | The typed endpoint/key/model probe failed before or during save.        |
+| **Needs reconnect**   | The stored key no longer unlocks or the provider rejects it at runtime. |
 
----
-
-## 5. Runtime how-to-use (the part the product makes visible)
-
-> This is an **internal capability, not exposed to the frontend**, but the behavior is part of the product guarantee — users can feel when it is right or wrong.
-
-Given an `(actor, organization, provider)` triple, the runtime picks a key along this decision path:
-
-```mermaid
-flowchart TD
-  Start["Start: actor / org / provider"] --> Pref["Does this actor have a preferred<br/>personal key for this org/provider?"]
-  Pref --> HasPref{"Yes?"}
-
-  HasPref -->|Yes| UsePersonal["Use personal · scope=personal"]
-
-  HasPref -->|No| FindDefault["Find the default company key for this Provider"]
-  FindDefault --> FoundDef{"default found"}
-  FoundDef -->|Yes| UseDefault["Use default · scope=company"]
-  FoundDef -->|No| AnyOne["Any key for this Provider in the company pool"]
-  AnyOne --> HasAny{"At least 1 found"}
-  HasAny -->|Yes| UseAny["Use any one · scope=company"]
-  HasAny -->|No| Fail["Throw No credential available"]
-```
-
-### Key behaviors (which users can feel)
-
-- **No usable key at all**: the Agent fails to start, and a UI banner shows `No credential available for {Provider}. Configure in Providers.`
-- **Decryption failure** (an extreme case): the Agent is interrupted, and the UI shows `Credential could not be unlocked. Re-add in Providers.`
-
-### Who runs the Agent
-
-Locked by [`runtime-session-kernel.md`](./runtime-session-kernel.md): **Execution Actor = Agent Owner**. Even if someone else triggers the Agent, the "identity" used to pick the key is still the Agent's owner; the trigger merely enters the ingress and permission context and never gets hold of someone else's Provider key.
+The App owner can create, edit, test, and delete keys. Delete destroys the credential row and its vault secret. There is no separate App default selector in V1; when multiple App credentials match a Provider, the current implementation resolves deterministically by the App's stored credential ordering.
 
 ---
 
-## 6. User journeys
+## 4. Runtime Resolution
 
-### 6.1 Main view — Providers page
+Runtime resolution uses App proof:
 
-The whole page is centered, with one card per Provider:
+```text
+Agent run
+  -> Agent has App
+  -> selected Provider or MCP binding has App
+  -> credential row has matching App and provider/server
+  -> vault secret kind matches the credential owner tuple
+  -> plaintext secret is passed only to the runtime call
+```
 
-- At the top, vendor info + the Admin `Add Key` action (visible only to admins)
-- In the middle, the company key list + Edit / Remove
-- At the bottom, an `ACTIVE KEY FOR ME` divider + a Select dropdown
+Provider key lookup is `(app, provider, optional model)`. MCP lookup is `(app, server, binding mode)`. The execution owner is the Agent owner; the caller or trigger source does not select a different Provider key in V1.
 
-The Active Select has only 2 badges:
+If no matching App credential exists, runtime returns no credential and the Agent run fails readiness or hydration. It must not search a tenant-level fallback, infer access from people records, or reuse an imported package id as ownership proof.
 
-| State                                                     | Badge                              |
-| --------------------------------------------------------- | ---------------------------------- |
-| **COMPANY** (grey, default state)                         | `COMPANY`                          |
-| **PERSONAL** (green, the member's preferred personal key) | Same layout, different badge color |
+---
 
-### 6.2 The dropdown has only 2 sections
+## 5. Secret Handling
 
-| Section     | Content                                             | On click                                                |
-| ----------- | --------------------------------------------------- | ------------------------------------------------------- |
-| **Top**     | `Company default · {key name}` or `No key selected` | Switch back to Company default                          |
-| **MY KEYS** | The personal keys you've added, each with a 🗑      | Switch to that key / click 🗑 for a confirm-then-delete |
-| **Bottom**  | `+ Add my {Provider} key…`                          | Expand the inline Add Form in place                     |
+Credentials are security-sensitive even in the single-owner V1 path.
 
-### 6.3 Inline Add Form (no Dialog, no page navigation)
+| Rule                 | Required behavior                                                                                    |
+| -------------------- | ---------------------------------------------------------------------------------------------------- |
+| Plaintext scope      | Plaintext exists only during create/update/test/runtime read paths.                                  |
+| UI display           | The UI may show a masked key, not the raw stored secret.                                             |
+| Agent profile        | Agent config stores Provider/MCP references, not secret material.                                    |
+| Package export       | Exported packages carry reconnect metadata, not secret rows or vault payloads.                       |
+| Logs and diagnostics | Logs, runtime events, and readiness messages must not print raw keys.                                |
+| Secret reads         | Reads require matching App, provider or MCP server, credential id, secret kind, and purpose. |
+| Secret deletes       | Deletes require the same scoped owner tuple as the stored vault secret.                              |
 
-After clicking `+ Add my {Provider} key…`, the Select turns into an outlined form card in place:
+When any proof is missing or mismatched, deny the read/delete or resolve no credential.
 
-- **Label** (optional, with a default placeholder)
-- **API Key** (password input, with Show / Hide)
-- At the bottom, `Cancel` / `Save & use`
+---
 
-### 6.4 Save & Use, unified
+## 6. Fail-Closed Invariants
 
-After saving:
+| Invariant               | Required behavior                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------- |
+| App id required     | Provider list/create/test and MCP connect/list flows require explicit App proof.           |
+| Owner proof required    | The caller must own the App. A tenant people record is not enough.                     |
+| Provider proof required | A Provider credential must match the requested App and provider.                           |
+| MCP proof required      | An MCP credential must match the requested App, server, binding shape, and secret purpose. |
+| Runtime proof required  | Agent App, Session App, selected Provider/MCP, and credential App must match.      |
+| Package proof rejected  | Runtime ids from packages are metadata only; they never grant credential access.               |
+| Missing credential      | No App credential means no runtime secret. Do not fall back to another boundary.               |
 
-- The new key is written to encrypted storage
-- It is **automatically** set as preferred — the Select immediately switches to `PERSONAL · {label}`
-- The user can immediately run Agents with their own key, without having to go tick a box on some switch
+These checks should be direct. Do not add compatibility adapters that derive credential authority from old tenant ownership, package snapshots, or access state.
+
+---
+
+## 7. Usage And Cost
+
+Usage and cost attribution belong to the App first.
+
+| Dimension    | V1 behavior                                                                    |
+| ------------ | ------------------------------------------------------------------------------ |
+| App  | Primary business dimension for usage and cost.                                 |
+| Agent        | Runtime and delivery unit that incurred the usage.                             |
+| Session Run  | Execution record for retries, failures, interrupts, and run-level attribution. |
+| Organization | Billing rollup only.                                                           |
+| Credential   | Not a V1 cost dimension.                                                       |
+
+The system records provider/model usage, but it does not split cost by credential owner or caller identity.
+
+---
+
+## 8. Out Of Scope
+
+The following are not V1 product behavior:
+
+- Tenant-level Provider key pools.
+- Person-scoped Provider keys.
+- Caller-selected Provider keys.
+- Caller-specific key selection.
+- Provider key inheritance from tenant settings.
+- Credential catalogs outside the App.
+- Cross-person usage or cost reports.
+- Provider-key governance roles.
+- Automatic migration from legacy key ownership into runtime authority.
+
+If one of these concepts is needed later, it should be reopened as a governance feature with a new data model instead of being hidden behind current App credential APIs.
+
+---
+
+## 9. Relationship To MCP Credentials
+
+Provider keys and MCP credentials use the same security posture:
+
+| Aspect           | Provider key                                                     | MCP credential                                     |
+| ---------------- | ---------------------------------------------------------------- | -------------------------------------------------- |
+| Product owner    | App                                                              | App                                                |
+| Runtime consumer | Agent run                                                        | Agent MCP binding                                  |
+| Secret storage   | Vault secret referenced by App credential row                    | Vault secret referenced by App MCP credential row  |
+| Package behavior | Reconnect in target App                                          | Reconnect in target App                            |
+| Failure mode     | Missing key blocks Provider/model readiness or runtime hydration | Missing secret blocks connector runtime resolution |
+
+Both are runtime dependencies of Agents inside the App. Neither is an Organization resource pool.
+
+---
+
+This for-human version reflects the current App credential boundary. Older multi-scope credential stories are historical governance context and must not be used as V1 requirements.

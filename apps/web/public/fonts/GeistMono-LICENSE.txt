@@ -1,4 +1,4 @@
-Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font.git)
+Copyright 2024 The Geist App Authors (https://github.com/vercel/geist-font.git)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:
@@ -11,7 +11,7 @@ SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
 
 PREAMBLE
 The goals of the Open Font License (OFL) are to stimulate worldwide
-development of collaborative font projects, to support the font creation
+development of collaborative font apps, to support the font creation
 efforts of academic and linguistic communities, and to provide a free and
 open framework in which fonts may be shared and improved in partnership
 with others.

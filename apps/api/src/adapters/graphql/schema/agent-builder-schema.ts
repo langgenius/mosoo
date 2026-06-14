@@ -100,6 +100,7 @@ ${formatEnumValues(AGENT_BUILDER_MESSAGE_ROLES)}
     createEnvironmentPayload: AgentBuilderCreateEnvironmentPayloadInput
     createRemoteMcpServerPayload: AgentBuilderCreateRemoteMcpServerPayloadInput
     draftYaml: String
+    appId: ULID!
     toolId: AgentBuilderExecutableActionToolId!
   }
 `;

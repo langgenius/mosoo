@@ -1,118 +1,128 @@
-# Space — for humans
+# Space - for humans
 
 > This is the product-story version written for non-engineering readers. The full engineering contract lives in the shipped Space PRD.
 >
-> **Current Project/App boundary note**: New Project/App work should make Space Project-owned. Space collaboration, `Shared with me`, `Add Everyone in organization`, and Owner / Admin pass-through are future multi-member governance unless existing implementation paths still require them. Preserve the mountable file-container model. See [Project / App Boundary](./project-app-boundary.md).
+> **Current App boundary note**: Space is the current UI name for App-owned Storage. It belongs to one App, and Agents in that App bind it through their manifest. Multi-user resource access, global catalogs, and resource transfer are future governance, not V1 behavior. Preserve the mountable file-container model. See [App Boundary](./app-boundary.md).
 
 ---
 
 ## One-line positioning
 
-After the pivot, **Space does exactly one thing**: it is a file container that an Agent "mounts" into its own manifest to consume.
+After the pivot, **Space does exactly one thing**: it is persistent App-local file storage that an Agent mounts into its own manifest to consume.
 
-The Space page itself **no longer hosts chat, no longer starts tasks, and no longer stores session history**. Open in Work, Default Agent, Archived Sessions, local-directory mounts — all of these v1-era entry points have been retired.
+The Space page itself **does not host chat, start tasks, or store session history**. Work-page entry points, Default Agent chat, archived Space sessions, and local-directory mounts are retired product shapes.
 
-> **The scope of this PRD is NOT a "team network drive."** Readers expecting something "like Google Drive / Notion, where you can both store files and open them for collaboration directly" will be disappointed — Space behaves more like a GitHub repository pulled by CI: the **production side** is the Space page (create the container, upload files, manage collaborators), while the **consumption side** always lives over on the Agent.
+> **The scope of this PRD is not a shared drive.** Space behaves more like a repository of files that an execution target can read: the production side is the Space page, where the App owner creates the container and manages files; the consumption side is always the Agent, where the App owner binds the Space in `spaces[]`.
 
 ---
 
 ## User problem
 
-Riley is a non-technical Member who wants a particular published Agent on her team to be able to read a batch of materials: contract templates, SOPs, and design files.
+Riley is an App owner/operator who wants a particular Agent API Endpoint in her App to read a batch of materials: contract templates, SOPs, and design files.
 
 After the pivot, there is **no "open a Space and chat directly" entry point** in the product for her. The only path she can take:
 
-1. Create a Space under `/space` and upload the files into it
-2. Switch to `/agent`, open the target Agent, and add this Space to the `spaces[]` array in the Agent manifest
-3. Once the Agent goes live, it reads these files according to the Space permissions granted to the Agent creator
+1. Create a Space in the active App and upload files into it
+2. Open an Agent in the same App and add this Space to the Agent manifest's `spaces[]`
+3. When that Agent runs through Web Threads, an Agent API Endpoint, or a Channel delivery path, runtime resolves the Space through the Agent's App
 
-The old PRD treated Space as a "standalone workbench" — offering Open in Work, picking your own Default Agent to chat with, and toggling between Files / Archived Sessions tabs — **all of which conflict with the post-pivot product shape**. This version narrows Space back to a single responsibility: **providing a mountable file container for Agents**.
+The old PRD treated Space as an independent work surface. This version narrows Space back to a single responsibility: **providing an App-owned, mountable file container for Agents**.
 
 ---
 
 ## Concept definitions
 
-| Term                          | Definition                                                                                                                                                                                                                       |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Space**                     | A file container plus a sharing boundary. **Its only consumption path is being mounted via the `spaces[]` array in an Agent manifest.**                                                                                          |
-| **Space admin**               | The highest permission within a Space. Can read/write files, change collaborators, change settings, and delete the Space. This is the Space-level `admin` role (one of `admin`, `edit`, or `read`) — **not** an Org-level admin. |
-| **edit**                      | The mid-tier permission for a Space collaborator: can read/write files but cannot change collaborators.                                                                                                                          |
-| **read**                      | The low-tier permission for a Space collaborator: can only list / download files.                                                                                                                                                |
-| **Creator**                   | The user who created the Space. While they remain on the team, they are the sole owner of that Space's ACL (even an Org admin cannot perform destructive actions).                                                               |
-| **Visibility**                | The Space's current sharing state. Derived from the collaborator list: creator only → `private`; any other user or the everyone-wildcard → `shared`.                                                                             |
-| **Everyone-wildcard (`'*'`)** | A single ACL row that shares the Space with "everyone in the organization." Its role is forced to `read` and it covers every member of the Org. The copy must strictly read `Add Everyone in organization`.                      |
-| **Shared with me**            | A Space where the current user is not the creator but has gained access through the ACL (an exact entry or the everyone-wildcard). Does not include private Spaces visible only through Admin governance pass-through.           |
-| **All organization spaces**   | Appears only in the Owner / Admin pass-through view. Spaces where the user is neither the creator nor an ACL-matched collaborator, but which are visible because of Governance Access.                                           |
-| **Mount**                     | Writing a Space id into the `spaces[]` array in an Agent manifest. This step **does not happen on the Space page.**                                                                                                              |
+| Term                      | Definition                                                                                                                       |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Space / Storage**       | Persistent files and directories owned by one App. Existing UI may say Space; the boundary is App Storage.               |
+| **App owner**             | The V1 actor who can create, read, update, delete, and mount Spaces in the App.                                                  |
+| **Mount**                 | Writing a Space id into the `spaces[]` array in an Agent manifest. This step belongs to Agent configuration, not Space setup.    |
+| **Runtime resolution**    | Session execution resolves the mounted Space through the Agent's App and fails closed if ownership proof is missing.     |
+| **Runtime file activity** | Files written or summarized by execution can be attached back to App-owned Storage when the runtime path explicitly supports it. |
 
 ---
 
-## Information architecture: v1 vs v2
+## Information architecture: retired vs current
 
 ```mermaid
 flowchart LR
-  subgraph Before["v1 (retired)"]
-    B1[SPACES + SHARED WITH ME, two groups]
-    B2[Top-bar Open in Work button -> Work page]
-    B3[Files / Archived Sessions tab toggle]
-    B4[Default Agent chat inside the Space]
+  subgraph Before["retired"]
+    B1[Standalone Space workbench]
+    B2[Open in Work button]
+    B3[Files / archived sessions toggle]
+    B4[Default Agent chat inside Space]
+    B5[Multi-user resource groups]
   end
 
-  subgraph After["v2 (current)"]
-    A1[Sidebar: Spaces group]
-    A1 --> A2[Shared with me group]
-    A1 --> A2b[Admin-only: All organization spaces group]
-    A3[Main area is just a file browser + empty state]
-    A4[Hover gear -> Settings sheet]
-    A5[Consumption happens in /agent -> manifest spaces array]
+  subgraph Current["V1"]
+    A1[App Overview]
+    A1 --> A2[Spaces / Storage]
+    A2 --> A3[File browser and upload]
+    A1 --> A4[Agents]
+    A4 --> A5[Agent manifest spaces array]
+    A5 --> A6[Session resolves Space through App]
   end
 
-  Before ==> After
+  Before ==> Current
 ```
 
-**Semantics of the three sidebar groups:**
+**Current sidebar semantics:**
 
-- **Spaces**: the ones you created yourself
-- **Shared with me**: the ones someone invited you to, or where an everyone-wildcard matches you
-- **All organization spaces**: visible only to Owner / Admin; these are the non-shared Spaces seen through "governance pass-through" and are **not mixed into Shared with me**
-
----
-
-## User journey map (the single linear flow)
-
-> After the pivot, Space has no parallel journeys. Every Member follows the same path: **create → fill → go to the Agent and mount.**
-
-| Phase                                      | User Actions                                                                             | Touchpoint   | Pain point → opportunity                                                                                                                                                       |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1. Create                                  | Sidebar `Spaces` group `+` → enter a name / choose visibility → Create                   | `/space`     | v1's multiple consumption entry points made people think they could chat directly → a clean sidebar with only two groups (Member) / three groups (Admin)                       |
-| 2. Fill                                    | Drag files / Upload / create a new folder                                                | Main area    | v1 made people think they had to Open in Work before uploading → no prerequisite action; once you finish uploading, you're done                                                |
-| 3. (Optional) Invite collaborators         | Hover the sidebar → gear → Settings sheet → add an email or Add Everyone in organization | Sheet        | v1's "workspace" copy was ambiguous → the copy strictly uses "organization"; the wildcard can only be read                                                                     |
-| 4. Leave                                   | Close the page and head to `/agent`                                                      | —            | v1 implied she would "start working" on the Space page → the PRD states it plainly: **consumption happens over on the Agent.** The empty-state subcopy gives the path directly |
-| 5. Mount the Space in the Agent            | Open the Agent manifest editor and add the Space you just created to `spaces[]`          | `/agent/:id` | Once mounted, it is immediately readable in the Agent's dev / preview / channel                                                                                                |
-| 6. (Later) Return to Space for maintenance | Add files / change the ACL / delete old files                                            | `/space`     | Changes take effect in real time for every Agent that has mounted it                                                                                                           |
-
-**Key design decision**: steps 4 → 5 form a **cross-page jump**, but the Space page **does not provide** a "Mount to agent" button. The reasoning: the Agent is the consumer, and the mount semantics belong to the Agent manifest editing action; offering a reverse entry point on the Space page would let the two sides' source of truth drift apart.
+- **Spaces**: App-owned Storage containers in the active App
+- No received-resource group in V1
+- No governance pass-through group in V1
 
 ---
 
-## Permission semantics (product view)
+## User journey map
 
-> For the complete RBAC table, see [`./rbac.md`](./rbac.md) §3.3; this section only aligns product behavior.
+> After the pivot, Space has one path: **create in App -> fill with files -> mount on an Agent in the same App**.
 
-| Capability                                | admin      | edit | read               | Org owner / admin pass-through                   |
-| ----------------------------------------- | ---------- | ---- | ------------------ | ------------------------------------------------ |
-| Browse files                              | ✅         | ✅   | ✅                 | ✅ all Spaces                                    |
-| Upload / create / delete files            | ✅         | ✅   | ❌                 | ✅                                               |
-| Rename / download files                   | ✅         | ✅   | ✅ (download only) | ✅                                               |
-| Change Space settings (name / visibility) | ✅         | ❌   | ❌                 | ✅                                               |
-| View the Settings sheet                   | ✅         | ❌   | ❌                 | ✅                                               |
-| Change collaborator ACL                   | ✅ Creator | ❌   | ❌                 | ✅ Creator has left<br/>❌ Creator still on team |
-| Delete the Space                          | ✅ Creator | ❌   | ❌                 | ✅ Creator has left<br/>❌ Creator still on team |
+| Phase       | User actions                                                                     | Touchpoint      | Design consequence                                                                                                                   |
+| ----------- | -------------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 1. Create   | Open the active App's Spaces surface, enter a name, and create the container     | App Spaces      | Creation always has App context; no Organization-level default bucket is implied                                                     |
+| 2. Fill     | Drag files, upload files, create folders, rename or delete files                 | Space file view | File work stays on Space; no chat or task entry point appears here                                                                   |
+| 3. Mount    | Open an Agent in the same App and add the Space to `spaces[]`                    | Agent editor    | The Agent is the consumer, so the mount action stays in Agent configuration                                                          |
+| 4. Run      | Use Web Threads, an Agent API Endpoint, or a Channel path that targets the Agent | Agent runtime   | Runtime resolves Space through the Agent's App and rejects cross-App or legacy ownership gaps                                |
+| 5. Maintain | Return to Space for file updates or deletion                                     | App Spaces      | Mounted Agents see current file contents when runtime resolves the Space; missing Spaces must be explicit rather than silently fixed |
 
-**Two hard rules:**
+**Key design decision**: the Space page does **not** provide a reverse "mount this to an Agent" shortcut. The Agent manifest remains the source of truth for runtime dependencies.
 
-- **The everyone-wildcard can only be read**: `Add Everyone in organization` is always Can view; the UI dropdown does not show edit.
-- **Creator-status lock**: while the creator is still on the team, an Org Admin **cannot** touch the ACL or delete the Space; once the creator leaves, this unlocks automatically — no "claim" action is required.
+---
+
+## V1 access semantics
+
+> For current implementation details, use App owner access checks. Older permission tables are future-governance context only.
+
+| Capability                       | V1 behavior                                                                                                    |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Browse Space files               | App owner only                                                                                                 |
+| Upload / create / delete files   | App owner only                                                                                                 |
+| Rename / download files          | App owner only                                                                                                 |
+| Change Space settings            | App owner only                                                                                                 |
+| Bind Space to Agent              | App owner only, and only for Agents in the same App                                                            |
+| Runtime reads mounted Space      | Allowed only when Agent and Space resolve to the same App                                              |
+| Cross-App or legacy Space id use | Fail closed; do not infer access from Organization membership, snapshots, package metadata, or old access rows |
+
+**Hard rules:**
+
+- Space belongs to one App. Organization is not a runtime resource bucket.
+- Agent configuration is the only V1 consumption path for Space.
+- Any missing or mismatched App proof must become an explicit UI/runtime error, not a compatibility fallback.
+
+---
+
+## Future governance, not V1
+
+The following topics can be revisited only after the V1 App boundary is stable:
+
+- Multi-user access to a Space
+- Global resource catalogs
+- Human role matrices for Storage
+- Resource transfer
+- Enterprise governance views
+
+Do not keep dormant routes, schema fields, or tests for these topics in the current V1 surface.
 
 ---
 
