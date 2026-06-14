@@ -1,15 +1,16 @@
 import type { SessionType } from "@mosoo/contracts/session";
 import { parsePlatformId } from "@mosoo/id";
-import type { OrganizationId, SessionId } from "@mosoo/id";
+import type { OrganizationId, AppId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { getActiveSessionParticipantAccess } from "../domain/session-access.policy";
+import { getActiveAppSessionParticipantAccess } from "../domain/session-access.policy";
 import { connectSessionViewerWebSocket } from "../infrastructure/session/client";
 
 interface ActiveViewerSocketSession {
   id: SessionId;
   organizationId: OrganizationId;
+  appId: AppId;
   type: SessionType;
 }
 
@@ -20,6 +21,7 @@ export interface SessionViewerSocketRuntimePrewarmRequest {
   session: {
     id: SessionId;
     organizationId: OrganizationId;
+    appId: AppId;
   };
   viewer: AuthenticatedViewer;
 }
@@ -32,6 +34,7 @@ export type SessionViewerSocketConnector = (
   bindings: ApiBindings,
   input: {
     request: Request;
+    appId: AppId;
     sessionId: SessionId;
     viewer: AuthenticatedViewer;
   },
@@ -93,6 +96,7 @@ function schedulePreviewRuntimePrewarmForViewerSocket(input: {
     session: {
       id: input.session.id,
       organizationId: input.session.organizationId,
+      appId: input.session.appId,
     },
     viewer: input.viewer,
   });
@@ -102,6 +106,7 @@ export async function connectAuthenticatedSessionViewerWebSocket(
   bindings: ApiBindings,
   input: {
     executionContext?: Pick<ExecutionContext, "waitUntil"> | null;
+    appId: string;
     request: Request;
     runtimePrewarmScheduler?: SessionViewerSocketRuntimePrewarmScheduler | null;
     sessionViewerSocketConnector?: SessionViewerSocketConnector | null;
@@ -110,12 +115,17 @@ export async function connectAuthenticatedSessionViewerWebSocket(
   },
 ): Promise<Response> {
   const sessionId = parsePlatformId<SessionId>(input.sessionId, "Session viewer socket session ID");
+  const appId = parsePlatformId<AppId>(input.appId, "Session viewer socket app ID");
   const viewer = input.viewer;
   const viewerId = viewer.id;
-  const access = await getActiveSessionParticipantAccess(bindings.DB, viewerId, sessionId);
+  const access = await getActiveAppSessionParticipantAccess(bindings.DB, viewerId, {
+    appId,
+    sessionId,
+  });
   const sessionViewerSocketConnector =
     input.sessionViewerSocketConnector ?? connectSessionViewerWebSocket;
   const response = await sessionViewerSocketConnector(bindings, {
+    appId,
     request: input.request,
     sessionId,
     viewer,
@@ -130,6 +140,7 @@ export async function connectAuthenticatedSessionViewerWebSocket(
     session: {
       id: sessionId,
       organizationId: access.organization_id,
+      appId: access.app_id,
       type: access.type,
     },
     viewer,

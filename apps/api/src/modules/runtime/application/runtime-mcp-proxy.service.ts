@@ -78,6 +78,14 @@ export async function resolveRuntimeMcpProxyTarget(
     });
   }
 
+  if (server.appId !== grant.appId || credential.appId !== grant.appId) {
+    throw createRuntimeMcpProxyError({
+      code: "mcp_proxy_forbidden",
+      message: "MCP proxy grant is not allowed for this app.",
+      status: 403,
+    });
+  }
+
   if (server.enabled !== 1) {
     throw createRuntimeMcpProxyError({
       code: "mcp_policy_disabled",
@@ -98,8 +106,8 @@ export async function resolveRuntimeMcpProxyTarget(
 
   const accessToken = await readMcpCredentialSecret(bindings, {
     credential,
-    organizationId: server.organizationId,
     purpose: "runtime_access_token",
+    appId: grant.appId,
     server,
   });
 

@@ -5,7 +5,7 @@ import type { FormEvent } from "react";
 
 import { createSlackAgentChannelBinding } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
-import { toAgentId } from "@/routes/typed-id";
+import { toAgentId, toAppId } from "@/routes/typed-id";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -107,7 +107,9 @@ export function SlackChannelInlineSetup({
   const mutation = useMutation({
     mutationFn: createSlackAgentChannelBinding,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: agentKeys.channelBindings(agent.id) });
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.channelBindings(agent.appId, agent.id),
+      });
       onSuccess?.();
     },
   });
@@ -137,6 +139,7 @@ export function SlackChannelInlineSetup({
       agentId: toAgentId(agent.id),
       appLevelToken: appLevelToken.trim() || null,
       botToken: botToken.trim(),
+      appId: toAppId(agent.appId),
       signingSecret: signingSecret.trim(),
       threadRepliesRequireMention,
     });

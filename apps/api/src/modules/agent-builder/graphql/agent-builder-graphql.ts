@@ -1,3 +1,6 @@
+import { parsePlatformId } from "@mosoo/id";
+import type { AppId } from "@mosoo/id";
+
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { agentBuilderGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
 import type { ExecuteAgentBuilderControlPlaneActionInput } from "../application/agent-builder-control-plane-action.service";
@@ -20,6 +23,7 @@ interface AgentBuilderMessagesArgs extends AgentIdArgs {
 interface ExecuteAgentBuilderControlPlaneActionArgs {
   input: Omit<ExecuteAgentBuilderControlPlaneActionInput, "agentId"> & {
     readonly agentId: string;
+    readonly appId: string;
   };
 }
 
@@ -40,6 +44,7 @@ export const agentBuilderGraphQLModule = {
       executeAgentBuilderControlPlaneAction(context.bindings, context.viewer, {
         ...args.input,
         agentId: parseAgentId(args.input.agentId, "input.agentId"),
+        appId: parsePlatformId<AppId>(args.input.appId, "input.appId"),
       }),
   },
   authenticatedQueryResolvers: {

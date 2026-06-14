@@ -11,7 +11,7 @@ import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   insertMemberSession,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
 function createRuntimeTarget(
   input: Omit<RuntimeSessionTarget, "sessionStatusOperationId" | "sessionStatusSeq"> & {
@@ -256,7 +256,7 @@ describe("runtime state operation phases", () => {
     );
   });
 
-  test("complete does not project terminal runs from another outcome as cancelled", async () => {
+  test("complete does not app terminal runs from another outcome as cancelled", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertMemberSession(database);
     await insertRunningSessionRun(database);

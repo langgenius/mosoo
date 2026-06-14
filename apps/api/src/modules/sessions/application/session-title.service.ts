@@ -5,7 +5,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureSessionParticipantAccess } from "../domain/session-access.policy";
+import { ensureAppSessionParticipantAccess } from "../domain/session-access.policy";
 import { normalizeSessionTitle } from "../domain/session-title";
 import {
   getSessionSummaryById,
@@ -38,7 +38,10 @@ export async function renameSession({
   input,
   viewer,
 }: RenameSessionRequest): Promise<SessionSummary> {
-  await ensureSessionParticipantAccess(database, viewer.id, input.sessionId);
+  await ensureAppSessionParticipantAccess(database, viewer.id, {
+    appId: input.appId,
+    sessionId: input.sessionId,
+  });
   const normalizedTitle = normalizeSessionTitle(input.title);
   const timestampMs = currentTimestampMs();
 
@@ -50,7 +53,7 @@ export async function renameSession({
         title: normalizedTitle,
         updatedAt: timestampMs,
       })
-      .where(eq(sessionsTable.id, input.sessionId))
+      .where(and(eq(sessionsTable.id, input.sessionId), eq(sessionsTable.appId, input.appId)))
       .returning(sessionSummaryColumns())
       .get()) ?? null;
 
@@ -66,7 +69,10 @@ export async function autoTitleSession(
   viewer: AuthenticatedViewer,
   input: RenameSessionInput,
 ): Promise<SessionSummary> {
-  await ensureSessionParticipantAccess(database, viewer.id, input.sessionId);
+  await ensureAppSessionParticipantAccess(database, viewer.id, {
+    appId: input.appId,
+    sessionId: input.sessionId,
+  });
   const normalizedTitle = normalizeSessionTitle(input.title);
 
   const updated =
@@ -79,6 +85,7 @@ export async function autoTitleSession(
       .where(
         and(
           eq(sessionsTable.id, input.sessionId),
+          eq(sessionsTable.appId, input.appId),
           isNull(sessionsTable.title),
           eq(sessionsTable.renamed, false),
         ),
@@ -87,7 +94,10 @@ export async function autoTitleSession(
       .get()) ?? null;
 
   if (!updated) {
-    return getSessionSummaryById(database, viewer.id, input.sessionId);
+    return getSessionSummaryById(database, viewer.id, {
+      appId: input.appId,
+      sessionId: input.sessionId,
+    });
   }
 
   return hydrateUpdatedSessionSummary(database, updated);

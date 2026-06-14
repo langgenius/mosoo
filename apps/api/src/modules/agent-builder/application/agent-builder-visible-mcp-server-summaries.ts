@@ -6,7 +6,7 @@ import type {
   McpCredentialStatus,
   McpServerSource,
 } from "@mosoo/contracts/mcp";
-import type { McpServerId, OrganizationId } from "@mosoo/id";
+import type { McpServerId, AppId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
@@ -33,8 +33,7 @@ export interface AgentBuilderVisibleMcpServerRecord {
 }
 
 export interface AgentBuilderVisibleMcpServerRecords {
-  organizationShared: readonly AgentBuilderVisibleMcpServerRecord[];
-  personal: readonly AgentBuilderVisibleMcpServerRecord[];
+  servers: readonly AgentBuilderVisibleMcpServerRecord[];
 }
 
 export function createAgentBuilderVisibleMcpServerSummaries(
@@ -44,7 +43,7 @@ export function createAgentBuilderVisibleMcpServerSummaries(
   },
   records: AgentBuilderVisibleMcpServerRecords,
 ): AgentBuilderVisibleMcpServerSummary[] {
-  return [...records.personal, ...records.organizationShared]
+  return records.servers
     .map((server) =>
       withHash({
         authType: server.authType,
@@ -68,10 +67,10 @@ export async function collectAgentBuilderVisibleMcpServerSummaries(input: {
   bindingRepresented: boolean;
   bindings: ApiBindings;
   boundMcpServerIds: ReadonlySet<McpServerId>;
-  organizationId: OrganizationId;
+  appId: AppId;
   viewer: AuthenticatedViewer;
 }): Promise<AgentBuilderVisibleMcpServerSummary[]> {
-  const registry = await getMcpRegistry(input.bindings.DB, input.viewer, input.organizationId);
+  const registry = await getMcpRegistry(input.bindings.DB, input.viewer, input.appId);
 
   return createAgentBuilderVisibleMcpServerSummaries(
     {

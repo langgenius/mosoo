@@ -8,6 +8,7 @@ import type {
   FileId,
   McpServerId,
   OrganizationId,
+  AppId,
   SkillId,
   SkillSnapshotId,
   SpaceId,
@@ -42,6 +43,10 @@ export function readMcpServerId(value: unknown, label = "MCP server ID"): McpSer
 
 export function readOrganizationId(value: unknown, label = "Organization ID"): OrganizationId {
   return parsePlatformId<OrganizationId>(value, label);
+}
+
+export function readAppId(value: unknown, label = "App ID"): AppId {
+  return parsePlatformId<AppId>(value, label);
 }
 
 export function readSkillId(value: unknown, label = "Skill ID"): SkillId {

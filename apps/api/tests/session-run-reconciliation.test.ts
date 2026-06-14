@@ -4,7 +4,7 @@ import { reconcileStaleActiveSessionRun } from "../src/modules/runtime/applicati
 import {
   createPublicHttpContractDatabase,
   insertMemberSession,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
 describe("session run reconciliation", () => {
   test("fails stale active runs", async () => {

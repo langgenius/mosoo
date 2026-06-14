@@ -8,7 +8,7 @@ import {
 import {
   createPublicHttpContractDatabase,
   insertMemberSession,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
 async function insertSessionRun(
   database: D1Database,

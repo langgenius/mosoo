@@ -10,17 +10,14 @@ import type {
 } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
-import type {
-  DriverOrganizationAccessSnapshotOutput,
-  DriverRuntime,
-} from "../../domain/driver-snapshot";
+import type { DriverAppAccessSnapshotOutput, DriverRuntime } from "../../domain/driver-snapshot";
 import type { HydratedSessionRunContext } from "../session-definition/session-execution.types";
 import type { RuntimeTimingSnapshot } from "../session-runs/session-runtime-timing";
 import type { DriverBootPayloadPreparedHandler } from "./driver-boot-payload-prepared";
 
 export interface RuntimeExecutionPlaneRunLease {
   driverInstanceId: DriverInstanceId;
-  organizationAccessSnapshot: DriverOrganizationAccessSnapshotOutput;
+  appAccessSnapshot: DriverAppAccessSnapshotOutput;
   timing: RuntimeTimingSnapshot;
   release(): void;
 }
@@ -36,14 +33,14 @@ export interface PrepareRuntimeRunInput {
   sessionId: SessionId;
   sessionRunId: SessionRunId;
   traceId: string;
-  organizationAccessSnapshot: HydratedSessionRunContext["organizationAccessSnapshot"];
+  appAccessSnapshot: HydratedSessionRunContext["appAccessSnapshot"];
   onBootPayloadPrepared?: DriverBootPayloadPreparedHandler;
 }
 
 export interface DispatchRuntimeTurnInput {
   attachmentIds: FileId[];
   driverInstanceId: DriverInstanceId;
-  organizationAccessSnapshot: DriverOrganizationAccessSnapshotOutput;
+  appAccessSnapshot: DriverAppAccessSnapshotOutput;
   prompt: string;
   sessionRunId: SessionRunId;
 }

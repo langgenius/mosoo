@@ -13,6 +13,7 @@ import type {
   AgentDeploymentVersionId,
   AgentId,
   OrganizationId,
+  AppId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
@@ -22,9 +23,9 @@ import { and, desc, eq, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError, validationError } from "../../../platform/errors";
 import { toIsoString } from "../../../time";
-import { ensureAgentEditor } from "../../agents/application/agent-access.service";
+import { ensureAppAgentOwner } from "../../agents/application/agent-access.service";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureOrganizationMembership } from "../../organizations/domain/organization-access.policy";
 import {
   getSessionRunSummariesByIds,
   toSessionRunSummary,
@@ -62,6 +63,7 @@ export interface SessionSummaryRow {
   last_run_id: SessionRunId | null;
   model: string;
   provider: string;
+  app_id: AppId;
   runtime_id: string;
   status: SessionStatus;
   title: string | null;
@@ -241,6 +243,7 @@ export function sessionSummaryColumns() {
     model: sql`${sessionsTable.model}`.mapWith(sessionsTable.model).as("model"),
     organization_id: sessionsTable.organizationId,
     provider: sql`${sessionsTable.provider}`.mapWith(sessionsTable.provider).as("provider"),
+    app_id: sessionsTable.appId,
     runtime_id: sessionsTable.runtimeId,
     status: sql`${sessionsTable.status}`.mapWith(sessionsTable.status).as("status"),
     title: sessionsTable.title,
@@ -312,6 +315,7 @@ function buildSessionSummaryFromRow(
     model: row.model,
     organizationId: row.organization_id,
     provider: row.provider,
+    appId: row.app_id,
     runtimeId: row.runtime_id,
     status: row.status,
     title: row.title,
@@ -353,14 +357,18 @@ function buildSessionSummaryAccessFromJoinedRow(
 export async function getSessionSummaryAccessById(
   database: D1Database,
   viewerId: AccountId,
-  sessionId: SessionId,
+  input: {
+    appId: AppId;
+    sessionId: SessionId;
+  },
 ): Promise<SessionSummaryAccess> {
+  await ensureAppOwnership(database, viewerId, input.appId);
   const row =
     (await getAppDatabase(database)
       .select(sessionSummaryAccessWithLastRunColumns(viewerId))
       .from(sessionsTable)
       .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
-      .where(eq(sessionsTable.id, sessionId))
+      .where(and(eq(sessionsTable.id, input.sessionId), eq(sessionsTable.appId, input.appId)))
       .limit(1)
       .get()) ?? null;
 
@@ -369,7 +377,10 @@ export async function getSessionSummaryAccessById(
   }
 
   if (row.is_session_participant !== 1) {
-    await ensureAgentEditor(database, viewerId, row.agent_id);
+    await ensureAppAgentOwner(database, viewerId, {
+      agentId: row.agent_id,
+      appId: input.appId,
+    });
   }
 
   return buildSessionSummaryAccessFromJoinedRow(row);
@@ -378,22 +389,35 @@ export async function getSessionSummaryAccessById(
 export async function getSessionSummaryById(
   database: D1Database,
   viewerId: AccountId,
-  sessionId: SessionId,
+  input: {
+    appId: AppId;
+    sessionId: SessionId;
+  },
 ): Promise<SessionSummary> {
-  return (await getSessionSummaryAccessById(database, viewerId, sessionId)).session;
+  return (await getSessionSummaryAccessById(database, viewerId, input)).session;
 }
 
 export async function getParticipantSessionSummaryById(
   database: D1Database,
   viewerId: AccountId,
-  sessionId: SessionId,
+  input: {
+    appId: AppId;
+    sessionId: SessionId;
+  },
 ): Promise<SessionSummary> {
+  await ensureAppOwnership(database, viewerId, input.appId);
   const row =
     (await getAppDatabase(database)
       .select(sessionSummaryWithLastRunColumns())
       .from(sessionsTable)
       .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
-      .where(and(eq(sessionsTable.id, sessionId), sessionParticipantCondition(viewerId)))
+      .where(
+        and(
+          eq(sessionsTable.id, input.sessionId),
+          eq(sessionsTable.appId, input.appId),
+          sessionParticipantCondition(viewerId),
+        ),
+      )
       .limit(1)
       .get()) ?? null;
 
@@ -407,14 +431,24 @@ export async function getParticipantSessionSummaryById(
 export async function getParticipantSessionSummaryAccessById(
   database: D1Database,
   viewerId: AccountId,
-  sessionId: SessionId,
+  input: {
+    appId: AppId;
+    sessionId: SessionId;
+  },
 ): Promise<SessionSummaryAccess> {
+  await ensureAppOwnership(database, viewerId, input.appId);
   const row =
     (await getAppDatabase(database)
       .select(participantSessionSummaryAccessWithLastRunColumns(viewerId))
       .from(sessionsTable)
       .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
-      .where(and(eq(sessionsTable.id, sessionId), sessionParticipantCondition(viewerId)))
+      .where(
+        and(
+          eq(sessionsTable.id, input.sessionId),
+          eq(sessionsTable.appId, input.appId),
+          sessionParticipantCondition(viewerId),
+        ),
+      )
       .limit(1)
       .get()) ?? null;
 
@@ -428,14 +462,24 @@ export async function getParticipantSessionSummaryAccessById(
 export async function getSessionSummaryForCreator(
   database: D1Database,
   viewerId: AccountId,
-  sessionId: SessionId,
+  input: {
+    appId: AppId;
+    sessionId: SessionId;
+  },
 ): Promise<SessionSummary> {
+  await ensureAppOwnership(database, viewerId, input.appId);
   const row =
     (await getAppDatabase(database)
       .select(sessionSummaryWithLastRunColumns())
       .from(sessionsTable)
       .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
-      .where(and(eq(sessionsTable.id, sessionId), sessionCreatorCondition(viewerId)))
+      .where(
+        and(
+          eq(sessionsTable.id, input.sessionId),
+          eq(sessionsTable.appId, input.appId),
+          sessionCreatorCondition(viewerId),
+        ),
+      )
       .limit(1)
       .get()) ?? null;
 
@@ -451,14 +495,14 @@ export async function listSessions(
   viewer: AuthenticatedViewer,
   input: SessionSummaryListOptions & {
     archived?: boolean | null;
-    organizationId: OrganizationId;
+    appId: AppId;
   },
 ): Promise<SessionSummaryConnection> {
   const archived = input.archived ?? false;
-  await ensureOrganizationMembership(database, viewer.id, input.organizationId);
+  await ensureAppOwnership(database, viewer.id, input.appId);
 
   const filters: SQL[] = [
-    eq(sessionsTable.organizationId, input.organizationId),
+    eq(sessionsTable.appId, input.appId),
     sessionParticipantCondition(viewer.id),
     archived ? isNotNull(sessionsTable.archivedAt) : isNull(sessionsTable.archivedAt),
   ];
@@ -478,9 +522,12 @@ export async function listSessions(
 export async function getSession(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  sessionId: SessionId,
+  input: {
+    appId: AppId;
+    sessionId: SessionId;
+  },
 ): Promise<SessionSummary> {
-  return getSessionSummaryById(database, viewer.id, sessionId);
+  return getSessionSummaryById(database, viewer.id, input);
 }
 
 function requireJoinedRunValue<T>(value: T | null, fieldName: string): T {

@@ -2,7 +2,7 @@ import type { SessionSummary } from "@mosoo/contracts/session";
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import type { ResolvedRunSkill } from "@mosoo/contracts/skill";
 import { createPlatformId } from "@mosoo/id";
-import type { AgentId, PlatformId, SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
+import type { AgentId, PlatformId, AppId, SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
 import { getRuntimeCatalogEntry, getRuntimeCatalogVendorForProvider } from "@mosoo/runtime-catalog";
 import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
@@ -11,7 +11,7 @@ import { getSessionOrganizationPath } from "agent-driver/paths";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { validationError } from "../../../../platform/errors";
 import { isTruthy } from "../../../../shared/truthiness";
-import { ensureAgentAccess } from "../../../agents/application/agent-access.service";
+import { ensureAppAgentOwner } from "../../../agents/application/agent-access.service";
 import { getAgentDeploymentVersionRecord } from "../../../agents/application/agent-deployment-version.service";
 import {
   computeAgentReadiness,
@@ -168,6 +168,7 @@ async function hydrateRunContextFromSession(
   viewer: AuthenticatedViewer,
   session: Pick<SessionSummary, "id" | "organizationId"> & {
     accessViewer?: AuthenticatedViewer;
+    appId: AppId;
   },
 ): Promise<HydratedSessionRunContext> {
   const executionPlan = await getSessionExecutionPlan(bindings.DB, session.id);
@@ -188,7 +189,10 @@ async function hydrateRunContextFromSession(
   }
 
   const [agent, deploymentVersion] = await Promise.all([
-    ensureAgentAccess(bindings.DB, session.accessViewer?.id ?? viewer.id, binding.agentId),
+    ensureAppAgentOwner(bindings.DB, session.accessViewer?.id ?? viewer.id, {
+      agentId: binding.agentId,
+      appId: session.appId,
+    }).then((access) => access.agent),
     isTruthy(binding.deploymentVersionId)
       ? getAgentDeploymentVersionRecord(bindings.DB, binding.deploymentVersionId)
       : Promise.resolve(null),
@@ -214,10 +218,16 @@ async function hydrateRunContextFromSession(
       model: binding.model,
       organizationId: agent.organizationId,
       packageResolution: storedConfig.packageResolution,
+      appId: agent.appId,
       provider: binding.provider,
       runtimeId,
     }),
-    resolveAgentSpaceBindings(bindings.DB, agent.ownerId, snapshotEnvironment.boundSpaceIds),
+    resolveAgentSpaceBindings(
+      bindings.DB,
+      agent.ownerId,
+      agent.appId,
+      snapshotEnvironment.boundSpaceIds,
+    ),
   ]);
 
   if (!agentReadiness.ready) {
@@ -231,7 +241,7 @@ async function hydrateRunContextFromSession(
 
   const resolvedSkillReferences = await resolveSessionSkillReferences({
     database: bindings.DB,
-    sessionOrganizationId: session.organizationId,
+    sessionAppId: session.appId,
     skillMountRoot,
     skillReferences,
   });
@@ -256,10 +266,10 @@ async function hydrateRunContextFromSession(
 
   const [credential, snapshotEnvVars] = await Promise.all([
     resolveVendorApiKey({
-      actorAccountId: agent.ownerId,
       bindings,
+      executionOwnerUserId: agent.ownerId,
       options: { modelId: binding.model },
-      organizationId: session.organizationId,
+      appId: session.appId,
       vendorId: vendor.vendorId,
     }),
     decryptEnvironmentVariables(bindings, {
@@ -362,7 +372,7 @@ async function hydrateRunContextFromSession(
 
   return {
     mcpServers,
-    organizationAccessSnapshot: runtimeProfileResult.organizationAccessSnapshot,
+    appAccessSnapshot: runtimeProfileResult.appAccessSnapshot,
     profile,
     skillCatalog,
     skills,
@@ -375,6 +385,7 @@ async function refreshCachedRunContextVolatileFields(
   viewer: AuthenticatedViewer,
   session: Pick<SessionSummary, "id" | "organizationId"> & {
     accessViewer?: AuthenticatedViewer;
+    appId: AppId;
   },
   cached: HydratedSessionRunContext,
 ): Promise<HydratedSessionRunContext> {
@@ -390,7 +401,10 @@ async function refreshCachedRunContextVolatileFields(
   }
 
   const [agent, deploymentVersion] = await Promise.all([
-    ensureAgentAccess(bindings.DB, session.accessViewer?.id ?? viewer.id, binding.agentId),
+    ensureAppAgentOwner(bindings.DB, session.accessViewer?.id ?? viewer.id, {
+      agentId: binding.agentId,
+      appId: session.appId,
+    }).then((access) => access.agent),
     isTruthy(binding.deploymentVersionId)
       ? getAgentDeploymentVersionRecord(bindings.DB, binding.deploymentVersionId)
       : Promise.resolve(null),
@@ -417,10 +431,10 @@ async function refreshCachedRunContextVolatileFields(
   );
   const [credential, snapshotEnvVars, agentMounts, mcpServers] = await Promise.all([
     resolveVendorApiKey({
-      actorAccountId: agent.ownerId,
       bindings,
+      executionOwnerUserId: agent.ownerId,
       options: { modelId: binding.model },
-      organizationId: session.organizationId,
+      appId: session.appId,
       vendorId: vendor.vendorId,
     }),
     decryptEnvironmentVariables(bindings, {
@@ -430,6 +444,7 @@ async function refreshCachedRunContextVolatileFields(
     resolveAgentSpaceBindings(
       bindings.DB,
       agent.ownerId,
+      session.appId,
       spaceReferences.map((reference) => reference.spaceId),
     ),
     toolReferences.length > 0
@@ -497,7 +512,7 @@ async function refreshCachedRunContextVolatileFields(
   return {
     ...cached,
     mcpServers,
-    organizationAccessSnapshot: runtimeProfileResult.organizationAccessSnapshot,
+    appAccessSnapshot: runtimeProfileResult.appAccessSnapshot,
     profile: runtimeProfileResult.profile,
   };
 }
@@ -507,6 +522,7 @@ export async function hydrateCachedRunContextFromSession(
   viewer: AuthenticatedViewer,
   session: Pick<SessionSummary, "id" | "organizationId"> & {
     accessViewer?: AuthenticatedViewer;
+    appId: AppId;
   },
 ): Promise<{ cacheHit: boolean; value: HydratedSessionRunContext }> {
   const nowMs = Date.now();

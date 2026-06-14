@@ -30,7 +30,7 @@ export async function resolveRuntimeOperationTargetVersion(
   if (!input.targetVersion) {
     throw createApiError(
       API_ERROR_CODE.agentLiveVersionRequired,
-      "Published Agent runtime operations require the observed live deployment version.",
+      "Public API Agent runtime operations require the observed live deployment version.",
     );
   }
 
@@ -47,7 +47,7 @@ export async function resolveRuntimeOperationTargetVersion(
   ) {
     throw createApiError(
       API_ERROR_CODE.agentLiveVersionConflict,
-      "Published Agent live deployment version changed. Reload the Agent and retry.",
+      "Public API Agent live deployment version changed. Reload the Agent and retry.",
     );
   }
 

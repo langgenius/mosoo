@@ -112,7 +112,7 @@ export async function dispatchSessionRun(
     sessionId: SessionId;
     sessionRunId: SessionRunId;
     traceId: string;
-    organizationAccessSnapshot: HydratedSessionRunContext["organizationAccessSnapshot"];
+    appAccessSnapshot: HydratedSessionRunContext["appAccessSnapshot"];
   },
 ): Promise<void> {
   const sandboxId = input.profile.sandbox.id;
@@ -176,7 +176,7 @@ export async function dispatchSessionRun(
           traceId: input.traceId,
         });
       },
-      organizationAccessSnapshot: input.organizationAccessSnapshot,
+      appAccessSnapshot: input.appAccessSnapshot,
       profile: input.profile,
       resolvedMcpServers: input.resolvedMcpServers,
       resolvedSkillCatalog: input.resolvedSkillCatalog,
@@ -215,7 +215,7 @@ export async function dispatchSessionRun(
       executionPlane.dispatchTurn(bindings, {
         attachmentIds: input.attachmentIds,
         driverInstanceId: preparedDriverInstanceId,
-        organizationAccessSnapshot: preparedRunLease.organizationAccessSnapshot,
+        appAccessSnapshot: preparedRunLease.appAccessSnapshot,
         prompt: input.prompt,
         sessionRunId: input.sessionRunId,
       }),

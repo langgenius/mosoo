@@ -1,10 +1,11 @@
-import type { Agent, AgentCollaborator } from "@mosoo/contracts/agent";
+import type { Agent } from "@mosoo/contracts/agent";
 import type {
   AccountId,
   AgentDeploymentVersionId,
   AgentId,
   EnvironmentId,
   OrganizationId,
+  AppId,
 } from "@mosoo/id";
 
 export interface AgentRow {
@@ -18,6 +19,7 @@ export interface AgentRow {
   model: string;
   name: string;
   ownerId: AccountId;
+  appId: AppId;
   prompt: string;
   provider: string;
   runtimeId: string;
@@ -25,10 +27,4 @@ export interface AgentRow {
   updatedAt: number;
   visibility: Agent["visibility"];
   organizationId: OrganizationId;
-}
-
-export interface CollaboratorRow {
-  createdAt: number;
-  principal: string;
-  role: AgentCollaborator["role"];
 }

@@ -11,7 +11,7 @@ import type {
 } from "@mosoo/contracts/session";
 import { getAgentSessionUserLifecycleProjection } from "@mosoo/contracts/session";
 import { nativeResumeRefsTable } from "@mosoo/db";
-import type { SessionId } from "@mosoo/id";
+import type { AppId, SessionId } from "@mosoo/id";
 import { getAgentSessionActionCapabilities } from "@mosoo/session-policy";
 import { eq } from "drizzle-orm";
 
@@ -26,6 +26,7 @@ import {
 } from "./session-summary-query.service";
 
 interface AgentSessionLookupInput {
+  appId: AppId;
   sessionId: SessionId;
 }
 
@@ -78,7 +79,7 @@ export async function retrieveAgentSession(
   viewer: AuthenticatedViewer,
   input: AgentSessionLookupInput,
 ): Promise<AgentSessionRetrieveResult> {
-  const access = await getSessionSummaryAccessById(database, viewer.id, input.sessionId);
+  const access = await getSessionSummaryAccessById(database, viewer.id, input);
 
   return toAgentSessionRetrieveResult(access);
 }
@@ -88,7 +89,7 @@ export async function retrieveThreadAgentSession(
   viewer: AuthenticatedViewer,
   input: AgentSessionLookupInput,
 ): Promise<AgentSessionRetrieveResult> {
-  const session = await getSessionSummaryForCreator(database, viewer.id, input.sessionId);
+  const session = await getSessionSummaryForCreator(database, viewer.id, input);
 
   return toAgentSessionRetrieveResult({
     isSessionCreator: true,
@@ -121,7 +122,7 @@ export async function getAgentSessionDiagnostics(
   viewer: AuthenticatedViewer,
   input: AgentSessionLookupInput,
 ): Promise<AgentSessionDiagnostics> {
-  const session = await getSessionSummaryById(database, viewer.id, input.sessionId);
+  const session = await getSessionSummaryById(database, viewer.id, input);
   const [execution, viewerState, nativeRuntimeRef] = await Promise.all([
     loadSessionExecutionDiagnostics(database, input.sessionId),
     loadSessionViewerState(database, {

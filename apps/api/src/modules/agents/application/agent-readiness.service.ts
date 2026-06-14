@@ -13,7 +13,14 @@ import {
   environmentsTable,
   mcpServersTable,
 } from "@mosoo/db";
-import type { AccountId, AgentId, EnvironmentId, McpServerId, OrganizationId } from "@mosoo/id";
+import type {
+  AccountId,
+  AgentId,
+  EnvironmentId,
+  McpServerId,
+  OrganizationId,
+  AppId,
+} from "@mosoo/id";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -46,11 +53,17 @@ function isSqliteEnabled(value: boolean | number | string): boolean {
 async function collectBoundSpaceIssues(
   database: D1Database,
   permissionPrincipalUserId: AccountId,
+  appId: AppId,
   environment: AgentEnvironmentConfig,
 ): Promise<AgentReadinessIssue[]> {
   const issues: AgentReadinessIssue[] = [];
   const boundSpaceIds = [...new Set(environment.boundSpaceIds)];
-  const access = await listSpaceAccessRows(database, permissionPrincipalUserId, boundSpaceIds);
+  const access = await listSpaceAccessRows(
+    database,
+    permissionPrincipalUserId,
+    appId,
+    boundSpaceIds,
+  );
 
   for (const spaceId of boundSpaceIds) {
     const row = access.accessibleRowsById.get(spaceId);
@@ -387,6 +400,7 @@ export async function computeAgentReadiness(
     packageResolution?: AgentPackageResolutionState | null;
     bindings?: ApiBindings;
     mcpServerIds?: readonly McpServerId[];
+    appId: AppId;
     provider: string;
     runtimeId: string;
   },
@@ -408,6 +422,7 @@ export async function computeAgentReadiness(
     codePrefix: "agent.readiness",
     database,
     organizationId: input.organizationId,
+    appId: input.appId,
     selection: {
       model: input.model,
       provider: input.provider,
@@ -430,7 +445,12 @@ export async function computeAgentReadiness(
     ...(await collectPendingEnvironmentSecretIssues(database, input.environment.environmentId)),
   );
   issues.push(
-    ...(await collectBoundSpaceIssues(database, permissionPrincipalUserId, input.environment)),
+    ...(await collectBoundSpaceIssues(
+      database,
+      permissionPrincipalUserId,
+      input.appId,
+      input.environment,
+    )),
   );
   issues.push(...(await collectMcpIssues(database, input.agentId, input.mcpServerIds)));
   const dedupedIssues = dedupeReadinessIssues(issues);

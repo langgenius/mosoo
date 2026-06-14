@@ -3,7 +3,7 @@ import type {
   AgentBuilderPreviousVisibleAssetsContext,
   AgentBuilderVisibleAssetsContext,
 } from "@mosoo/contracts/agent-builder";
-import type { OrganizationId } from "@mosoo/id";
+import type { OrganizationId, AppId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { currentTimestampMs, toIsoString } from "../../../time";
@@ -59,6 +59,7 @@ export function createAgentBuilderVisibleAssetProviderInput(
   input: {
     bindings: ApiBindings;
     organizationId: OrganizationId;
+    appId: AppId;
     viewer: AuthenticatedViewer;
   } & AgentBuilderPlannerDraftInput,
 ): AgentBuilderVisibleAssetProviderInput {
@@ -71,6 +72,7 @@ export function createAgentBuilderVisibleAssetProviderInput(
     boundSpaceIds: new Set(draftBindings.spaceIds),
     draft: draftBindings,
     organizationId: input.organizationId,
+    appId: input.appId,
     viewer: input.viewer,
   };
 }
@@ -82,6 +84,7 @@ export async function collectAgentBuilderVisibleAssets(
     organizationId: OrganizationId;
     previousAssets: AgentBuilderVisibleAssetsContext | null;
     previousContext?: AgentBuilderPreviousVisibleAssetsContext | undefined;
+    appId: AppId;
     viewer: AuthenticatedViewer;
   } & AgentBuilderPlannerDraftInput,
 ): Promise<AgentBuilderVisibleAssetsContext> {
@@ -105,6 +108,7 @@ export async function collectAgentBuilderVisibleAssets(
     bindings: input.bindings,
     draft: draftBindings,
     organizationId: input.organizationId,
+    appId: input.appId,
     viewer: input.viewer,
   });
   const collectSummaries = input.collectSummaries ?? collectAgentBuilderVisibleAssetSummaries;

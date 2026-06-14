@@ -5,6 +5,6 @@ export function enforceAgentKindChangeAllowed(agent: AgentRow, nextKind: AgentRo
   const kindLocked = agent.status === "published" || isTruthy(agent.liveDeploymentVersionId);
 
   if (kindLocked && agent.kind !== nextKind) {
-    throw new Error("Agent type is locked for this published agent. Fork to switch type.");
+    throw new Error("Agent type is locked after publishing. Fork to switch type.");
   }
 }

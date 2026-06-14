@@ -1,7 +1,6 @@
 import { CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 
-import { useAppSession } from "@/app/session-provider";
 import { Button } from "@/shared/ui/button";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
@@ -38,7 +37,7 @@ function getApplyDialogSubtitle(model: AgentEditorModel): string {
 
 function getPendingChangeCopy(model: AgentEditorModel): string {
   if (model.changePlan.action === "fork-agent") {
-    return "Fork Agent to change type or runtime on a published Agent.";
+    return "Fork the Agent to change type or runtime after publishing.";
   }
 
   if (!model.changePlan.requiresRuntimeOperation) {
@@ -52,17 +51,15 @@ function ConfigPanelContent({
   agent,
   externalModel,
   readOnly = false,
-  showChannels = true,
+  showChannels = false,
 }: {
   agent: Agent;
   externalModel: AgentEditorModel | undefined;
   readOnly?: boolean;
   showChannels?: boolean;
 }) {
-  const { activeOrganization } = useAppSession();
   const internalModel = useAgentEditorModel({ agent, readOnly });
   const model = externalModel ?? internalModel;
-  const organizationId = activeOrganization?.id ?? null;
   const [confirmingApply, setConfirmingApply] = useState(false);
   const editedFieldText =
     model.changePlan.fieldLabels.length === 1
@@ -131,7 +128,6 @@ function ConfigPanelContent({
           highlightedSections={model.highlightedSections}
           model={model}
           readOnly={readOnly}
-          organizationId={organizationId}
           showChannels={showChannels}
         />
       </div>
@@ -143,7 +139,7 @@ function ConfigPanelContent({
               <span className="text-destructive">{model.saveError}</span>
             ) : model.changePlan.action === "fork-agent" ? (
               <span className="text-muted-foreground">
-                Fork Agent to change type or runtime on a published Agent.
+                Fork the Agent to change type or runtime after publishing.
               </span>
             ) : model.dirty ? (
               <span className="text-muted-foreground">
@@ -225,7 +221,7 @@ export function ConfigPanel({
   agent,
   model,
   readOnly = false,
-  showChannels = true,
+  showChannels = false,
 }: {
   agent: Agent;
   model?: AgentEditorModel;

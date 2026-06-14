@@ -7,7 +7,7 @@ import type {
   AgentResolutionIssue,
 } from "@mosoo/contracts/agent-manifest";
 import { environmentsTable, spacesTable } from "@mosoo/db";
-import type { AccountId, EnvironmentId, OrganizationId, SkillId, SpaceId } from "@mosoo/id";
+import type { AccountId, EnvironmentId, OrganizationId, AppId, SkillId, SpaceId } from "@mosoo/id";
 import { and, eq, sql } from "drizzle-orm";
 import { zipSync } from "fflate";
 
@@ -15,7 +15,7 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { listAccessibleSkillRows } from "../../skills/application/skill-access.service";
+import { listAppSkillRows } from "../../skills/application/skill-access.service";
 import { createSkillFromUpload } from "../../skills/application/skill-package-write.service";
 import {
   isSpaceRoleRankSufficient,
@@ -63,7 +63,7 @@ export function collectPackageDeclarationIssues(
       createResolutionIssue({
         actionLabel: "Fill secret",
         code: "agent.import.environment_secret.missing",
-        message: `Environment variable ${envVarKey} must be re-entered in the target Organization.`,
+        message: `Environment variable ${envVarKey} must be re-entered in the target App.`,
         targetLabel: envVarKey,
         targetType: "environment",
       }),
@@ -79,19 +79,15 @@ export async function resolvePackageSkills(input: {
   database: D1Database;
   issues: AgentResolutionIssue[];
   manifest: AgentManifest;
-  organizationId: OrganizationId;
   packageAssets?: AgentPackageAsset[];
+  appId: AppId;
   summary: AgentPackageResolutionSummary;
   viewer?: AuthenticatedViewer;
   viewerId: AccountId;
 }): Promise<PackageSkillResolution> {
   const skillIds: SkillId[] = [];
   const packageSkills: AgentStoredPackageSkill[] = [];
-  const accessibleSkills = await listAccessibleSkillRows(
-    input.database,
-    input.viewerId,
-    input.organizationId,
-  );
+  const accessibleSkills = await listAppSkillRows(input.database, input.viewerId, input.appId);
   const accessibleSkillsByName = new Map<string, (typeof accessibleSkills)[number]>();
   const accessibleSkillsById = new Map<string, (typeof accessibleSkills)[number]>();
 
@@ -188,8 +184,8 @@ async function createPackageOwnedSkillIfPresent(
   input: {
     bindings?: ApiBindings;
     manifest: AgentManifest;
-    organizationId: OrganizationId;
     packageAssets?: AgentPackageAsset[];
+    appId: AppId;
     viewer?: AuthenticatedViewer;
   },
   skill: AgentManifest["skills"][number],
@@ -226,7 +222,7 @@ async function createPackageOwnedSkillIfPresent(
   }
 
   const packagePath = skillPath;
-  const created = await createSkillFromUpload(input.bindings, input.viewer, input.organizationId, {
+  const created = await createSkillFromUpload(input.bindings, input.viewer, input.appId, {
     file: {
       bytes: zipSync(files),
       name: `${skill.skillName}.skill`,
@@ -245,12 +241,12 @@ async function createPackageOwnedSkillIfPresent(
 
 async function listTargetSpacesByName(
   database: D1Database,
-  organizationId: OrganizationId,
+  appId: AppId,
 ): Promise<Map<string, { id: SpaceId }>> {
   const rows = await getAppDatabase(database)
     .select({ id: spacesTable.id, name: spacesTable.name })
     .from(spacesTable)
-    .where(eq(spacesTable.organizationId, organizationId))
+    .where(eq(spacesTable.appId, appId))
     .all();
 
   return new Map(rows.map((row) => [row.name.toLowerCase(), { id: row.id }]));
@@ -261,7 +257,7 @@ export async function resolvePackageSpaces(input: {
   database: D1Database;
   issues: AgentResolutionIssue[];
   manifest: AgentManifest;
-  organizationId: OrganizationId;
+  appId: AppId;
   summary: AgentPackageResolutionSummary;
   viewerId: AccountId;
 }): Promise<SpaceId[]> {
@@ -274,13 +270,14 @@ export async function resolvePackageSpaces(input: {
   const requestedSpaceAccess = await listSpaceAccessRows(
     input.database,
     input.viewerId,
+    input.appId,
     requestedSpaceIds,
   );
   const shouldMatchByName =
     input.allowTargetNameMatch !== false &&
     manifestSpaces.some((space) => isTruthy(space.expectedName));
   const targetSpacesByName = shouldMatchByName
-    ? await listTargetSpacesByName(input.database, input.organizationId)
+    ? await listTargetSpacesByName(input.database, input.appId)
     : new Map<string, { id: SpaceId }>();
 
   for (const space of manifestSpaces) {
@@ -292,7 +289,7 @@ export async function resolvePackageSpaces(input: {
 
       if (
         !access ||
-        access.organization_id !== input.organizationId ||
+        access.app_id !== input.appId ||
         !isSpaceRoleRankSufficient(access.role_rank, "read")
       ) {
         targetSpaceId = null;
@@ -310,7 +307,7 @@ export async function resolvePackageSpaces(input: {
         createResolutionIssue({
           actionLabel: "Rebind Space",
           code: "agent.import.space.missing",
-          message: `Space binding ${space.alias} needs a target Space in this Organization.`,
+          message: `Space binding ${space.alias} needs a target Space in this App.`,
           required,
           targetLabel: space.expectedName ?? space.alias,
           targetType: "space",
@@ -405,6 +402,7 @@ export async function collectRuntimeResolutionIssues(
   database: D1Database,
   actorAccountId: AccountId,
   organizationId: OrganizationId,
+  appId: AppId,
   manifest: AgentManifest,
 ): Promise<AgentResolutionIssue[]> {
   return collectRuntimeCapabilityIssues({
@@ -412,6 +410,7 @@ export async function collectRuntimeResolutionIssues(
     codePrefix: "agent.import",
     database,
     organizationId,
+    appId,
     selection: {
       model: manifest.runtime.model,
       provider: manifest.runtime.provider,

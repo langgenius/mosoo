@@ -3,11 +3,11 @@ import type {
   EnvironmentNetworkPolicy,
   EnvironmentPackageManager,
 } from "@mosoo/contracts/environment";
-import type { EnvironmentId, OrganizationId } from "@mosoo/id";
+import type { EnvironmentId, AppId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { listOrganizationEnvironments } from "../../environments/application/environment-queries";
+import { listAppEnvironments } from "../../environments/application/environment-queries";
 import {
   compareByNameThenId,
   normalizeUnique,
@@ -68,14 +68,10 @@ export function createAgentBuilderVisibleEnvironmentSummaries(
 export async function collectAgentBuilderVisibleEnvironmentSummaries(input: {
   bindings: ApiBindings;
   environmentId: EnvironmentId | null;
-  organizationId: OrganizationId;
+  appId: AppId;
   viewer: AuthenticatedViewer;
 }): Promise<AgentBuilderVisibleEnvironmentSummary[]> {
-  const environments = await listOrganizationEnvironments(
-    input.bindings,
-    input.viewer,
-    input.organizationId,
-  );
+  const environments = await listAppEnvironments(input.bindings, input.viewer, input.appId);
 
   return createAgentBuilderVisibleEnvironmentSummaries(
     { environmentId: input.environmentId },

@@ -1,5 +1,5 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AgentId, OrganizationId } from "@mosoo/id";
+import type { AgentId, AppId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { agentGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
@@ -8,12 +8,6 @@ import {
   resetAgentState,
   restartDriver,
 } from "../../runtime/application/runtime-state-operations.service";
-import {
-  addAgentCollaborator,
-  listAgentCollaborators,
-  removeAgentCollaborator,
-  updateAgentCollaborator,
-} from "../application/agent-collaborator.service";
 import {
   createAgent,
   deleteAgent,
@@ -32,12 +26,13 @@ import {
   listVisibleAgents,
 } from "../application/agent-query.service";
 
-interface OrganizationIdArgs {
-  organizationId: string;
+interface AppIdArgs {
+  appId: string;
 }
 
-interface AgentIdArgs {
+interface AppAgentIdArgs {
   agentId: string;
+  appId: string;
 }
 
 interface CreateAgentArgs {
@@ -60,18 +55,6 @@ interface RuntimeStateOperationArgs {
   input: Parameters<typeof restartDriver>[2];
 }
 
-interface AddAgentCollaboratorArgs {
-  input: Parameters<typeof addAgentCollaborator>[2];
-}
-
-interface RemoveAgentCollaboratorArgs {
-  input: Parameters<typeof removeAgentCollaborator>[2];
-}
-
-interface UpdateAgentCollaboratorArgs {
-  input: Parameters<typeof updateAgentCollaborator>[2];
-}
-
 interface UpdateAgentConfigArgs {
   input: Parameters<typeof updateAgentConfig>[2];
 }
@@ -88,17 +71,13 @@ function parseAgentId(value: string): AgentId {
   return parsePlatformId<AgentId>(value, "Agent ID");
 }
 
-function parseOrganizationId(value: string): OrganizationId {
-  return parsePlatformId<OrganizationId>(value, "Organization ID");
+function parseAppId(value: string): AppId {
+  return parsePlatformId<AppId>(value, "App ID");
 }
 
 export const agentGraphQLModule = {
   ...agentGraphQLSpec,
   authenticatedMutationResolvers: {
-    addAgentCollaborator: async (_parent, args: AddAgentCollaboratorArgs, context) => {
-      await addAgentCollaborator(context.bindings.DB, context.viewer, args.input);
-      return { ok: true } as const;
-    },
     createAgent: async (_parent, args: CreateAgentArgs, context) =>
       createAgent(context.bindings, context.viewer, args.input),
     createAgentFork: async (_parent, args: CreateAgentForkArgs, context) =>
@@ -113,41 +92,42 @@ export const agentGraphQLModule = {
       publishAgent(context.bindings, context.viewer, args.input),
     recreateSandbox: async (_parent, args: RuntimeStateOperationArgs, context) =>
       recreateSandbox(context.bindings, context.viewer, args.input),
-    removeAgentCollaborator: async (_parent, args: RemoveAgentCollaboratorArgs, context) => {
-      await removeAgentCollaborator(context.bindings.DB, context.viewer, args.input);
-      return { ok: true } as const;
-    },
     resetAgentState: async (_parent, args: RuntimeStateOperationArgs, context) =>
       resetAgentState(context.bindings, context.viewer, args.input),
     restartDriver: async (_parent, args: RuntimeStateOperationArgs, context) =>
       restartDriver(context.bindings, context.viewer, args.input),
-    unpublishAgent: async (_parent, args: AgentIdArgs, context) =>
-      unpublishAgent(context.bindings.DB, context.viewer, parseAgentId(args.agentId)),
-    updateAgentCollaborator: async (_parent, args: UpdateAgentCollaboratorArgs, context) => {
-      await updateAgentCollaborator(context.bindings.DB, context.viewer, args.input);
-      return { ok: true } as const;
-    },
+    unpublishAgent: async (_parent, args: AppAgentIdArgs, context) =>
+      unpublishAgent(context.bindings.DB, context.viewer, {
+        agentId: parseAgentId(args.agentId),
+        appId: parseAppId(args.appId),
+      }),
     updateAgentConfig: async (_parent, args: UpdateAgentConfigArgs, context) =>
       updateAgentConfig(context.bindings.DB, context.viewer, args.input),
     updateAgentPackageSharing: async (_parent, args: UpdateAgentPackageSharingArgs, context) =>
       updateAgentPackageSharing(context.bindings.DB, context.viewer, args.input),
   },
   authenticatedQueryResolvers: {
-    accessibleAgentList: async (_parent, args: OrganizationIdArgs, context) =>
-      listVisibleAgents(
-        context.bindings.DB,
-        context.viewer,
-        parseOrganizationId(args.organizationId),
-      ),
-    agent: async (_parent, args: AgentIdArgs, context) =>
-      getAgent(context.bindings.DB, context.viewer, parseAgentId(args.agentId)),
-    agentCollaboratorList: async (_parent, args: AgentIdArgs, context) =>
-      listAgentCollaborators(context.bindings.DB, context.viewer, parseAgentId(args.agentId)),
-    agentEditorState: async (_parent, args: AgentIdArgs, context) =>
-      getAgentEditorState(context.bindings.DB, context.viewer, parseAgentId(args.agentId)),
-    agentManifest: async (_parent, args: AgentIdArgs, context) =>
-      exportAgentManifest(context.bindings.DB, context.viewer, parseAgentId(args.agentId)),
-    exportAgentPackage: async (_parent, args: AgentIdArgs, context) =>
-      exportAgentPackage(context.bindings, context.viewer, parseAgentId(args.agentId)),
+    accessibleAgentList: async (_parent, args: AppIdArgs, context) =>
+      listVisibleAgents(context.bindings.DB, context.viewer, parseAppId(args.appId)),
+    agent: async (_parent, args: AppAgentIdArgs, context) =>
+      getAgent(context.bindings.DB, context.viewer, {
+        agentId: parseAgentId(args.agentId),
+        appId: parseAppId(args.appId),
+      }),
+    agentEditorState: async (_parent, args: AppAgentIdArgs, context) =>
+      getAgentEditorState(context.bindings.DB, context.viewer, {
+        agentId: parseAgentId(args.agentId),
+        appId: parseAppId(args.appId),
+      }),
+    agentManifest: async (_parent, args: AppAgentIdArgs, context) =>
+      exportAgentManifest(context.bindings.DB, context.viewer, {
+        agentId: parseAgentId(args.agentId),
+        appId: parseAppId(args.appId),
+      }),
+    exportAgentPackage: async (_parent, args: AppAgentIdArgs, context) =>
+      exportAgentPackage(context.bindings, context.viewer, {
+        agentId: parseAgentId(args.agentId),
+        appId: parseAppId(args.appId),
+      }),
   },
 } satisfies GraphQLModule;

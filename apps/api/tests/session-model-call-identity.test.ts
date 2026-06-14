@@ -8,6 +8,7 @@ import type {
   AgentId,
   DriverInstanceId,
   OrganizationId,
+  AppId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
@@ -22,6 +23,7 @@ const ORGANIZATION_ID = parsePlatformId<OrganizationId>(
   "01J00000000000000000000014",
   "organization ID",
 );
+const APP_ID = parsePlatformId<AppId>("01J00000000000000000000019", "app ID");
 const SESSION_ID = parsePlatformId<SessionId>("01J00000000000000000000015", "session ID");
 const SESSION_RUN_ID = parsePlatformId<SessionRunId>(
   "01J00000000000000000000016",
@@ -47,6 +49,7 @@ interface UsageEventProjection {
   model: string;
   price_snapshot_json: string | null;
   pricing_status: string;
+  app_id: string;
   provider: string;
   run_purpose: string;
   runtime_id: string | null;
@@ -61,6 +64,7 @@ function createSessionModelCallDatabase(): SqliteD1Database {
     CREATE TABLE agent (
       id text PRIMARY KEY NOT NULL,
       owner_account_id text NOT NULL,
+      app_id text NOT NULL,
       status text NOT NULL
     );
 
@@ -69,6 +73,7 @@ function createSessionModelCallDatabase(): SqliteD1Database {
       metadata_json text DEFAULT '{}' NOT NULL,
       model text NOT NULL,
       organization_id text NOT NULL,
+      app_id text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
       type text DEFAULT 'ui' NOT NULL
@@ -128,6 +133,7 @@ function createSessionModelCallDatabase(): SqliteD1Database {
       input_tokens integer NOT NULL,
       model text NOT NULL,
       organization_id text NOT NULL,
+      app_id text NOT NULL,
       output_tokens integer NOT NULL,
       price_snapshot_json text,
       pricing_status text NOT NULL,
@@ -164,11 +170,11 @@ async function seedRunIdentity(
   await database
     .prepare(
       `
-        INSERT INTO agent (id, owner_account_id, status)
-        VALUES (?, ?, 'published')
+        INSERT INTO agent (id, owner_account_id, app_id, status)
+        VALUES (?, ?, ?, 'published')
       `,
     )
-    .bind(AGENT_ID, OWNER_ID)
+    .bind(AGENT_ID, OWNER_ID, APP_ID)
     .run();
   await database
     .prepare(
@@ -178,14 +184,15 @@ async function seedRunIdentity(
           metadata_json,
           model,
           organization_id,
+          app_id,
           provider,
           runtime_id,
           type
         )
-        VALUES (?, ?, 'session-model', ?, 'session-provider', 'session-runtime', ?)
+        VALUES (?, ?, 'session-model', ?, ?, 'session-provider', 'session-runtime', ?)
       `,
     )
-    .bind(SESSION_ID, sessionMetadataJson, ORGANIZATION_ID, sessionType)
+    .bind(SESSION_ID, sessionMetadataJson, ORGANIZATION_ID, APP_ID, sessionType)
     .run();
   await database
     .prepare(
@@ -252,6 +259,7 @@ describe("session model call identity", () => {
             model,
             price_snapshot_json,
             pricing_status,
+            app_id,
             provider,
             run_purpose,
             runtime_id,
@@ -273,6 +281,7 @@ describe("session model call identity", () => {
     expect(usageEvent).toMatchObject({
       model: "gpt-5.4",
       pricing_status: "priced",
+      app_id: APP_ID,
       provider: "openai",
       run_purpose: "preview",
       runtime_id: "openai-runtime",
@@ -285,7 +294,7 @@ describe("session model call identity", () => {
     });
   });
 
-  test("projects Telegram channel session usage into external run purpose", async () => {
+  test("apps Telegram channel session usage into external run purpose", async () => {
     const database = createSessionModelCallDatabase();
     await seedRunIdentity(database, {
       createdByAccountId: OWNER_ID,
@@ -337,5 +346,41 @@ describe("session model call identity", () => {
       actor_user_id: OWNER_ID,
       run_purpose: "channel",
     });
+  });
+
+  test("fails closed when a usage run cannot prove Agent and Session App equality", async () => {
+    const database = createSessionModelCallDatabase();
+    await seedRunIdentity(database);
+    await database
+      .prepare(
+        `
+          UPDATE agent
+          SET app_id = '01J00000000000000000000020'
+          WHERE id = ?
+        `,
+      )
+      .bind(AGENT_ID)
+      .run();
+
+    const usage = {
+      cachedReadTokens: 0,
+      cachedWriteTokens: 0,
+      callId: "wrong-app-call",
+      inputTokens: 50,
+      outputTokens: 20,
+      source: "prompt_response",
+      usageContract: "openai_total_with_cached_breakdown",
+    } satisfies SessionUsageSummary;
+
+    await expect(
+      upsertSessionModelCallUsage(database, {
+        driverInstanceId: DRIVER_INSTANCE_ID,
+        sessionId: SESSION_ID,
+        sessionRunId: SESSION_RUN_ID,
+        status: "completed",
+        traceId: "trace-wrong-app",
+        usage,
+      }),
+    ).rejects.toThrow("Session run not found for model call usage.");
   });
 });

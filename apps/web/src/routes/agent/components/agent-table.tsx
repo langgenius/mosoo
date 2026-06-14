@@ -26,13 +26,11 @@ function getOwnerInitial(name: string): string {
 export function AgentTable({
   agents,
   onSelect,
-  organizationId,
   showOwner = false,
   className,
 }: {
   agents: Agent[];
   onSelect: (id: string) => void;
-  organizationId: string | null;
   showOwner?: boolean;
   className?: string;
 }): ReactElement {
@@ -125,7 +123,7 @@ export function AgentTable({
                 </span>
               </button>
 
-              <AgentRowActions agent={agent} organizationId={organizationId} />
+              <AgentRowActions agent={agent} />
             </div>
           );
         })}

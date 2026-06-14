@@ -5,6 +5,7 @@ import type {
   ChannelBindingId,
   FileId,
   OrganizationId,
+  AppId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
@@ -57,13 +58,13 @@ export interface ScheduledMaintenanceCommandPayload {
 export interface SessionRunDispatchCommandPayload {
   accessViewer?: AuthenticatedViewer;
   attachmentIds: FileId[];
-  draftAttachmentOrganizationId: OrganizationId | null;
   prompt: string;
   queuedAtMs: number;
   requestUrl: string;
   session: {
     id: SessionId;
     organization_id: OrganizationId;
+    app_id: AppId;
   };
   sessionRunId: SessionRunId;
   traceId: string;
@@ -187,7 +188,6 @@ function readViewer(value: unknown, label: string): AuthenticatedViewer {
 function parseSessionRunDispatchPayload(value: unknown): SessionRunDispatchCommandPayload {
   const record = requireRecord(value, "session_run_dispatch payload");
   const session = requireRecord(record["session"], "session_run_dispatch payload.session");
-  const draftAttachmentOrganizationId = record["draftAttachmentOrganizationId"];
   const accessViewer = record["accessViewer"];
 
   return {
@@ -197,13 +197,6 @@ function parseSessionRunDispatchPayload(value: unknown): SessionRunDispatchComma
     attachmentIds: readStringArray(record, "attachmentIds", "session_run_dispatch payload").map(
       (id, index) => parsePlatformId<FileId>(id, `attachmentIds[${index}]`),
     ),
-    draftAttachmentOrganizationId:
-      draftAttachmentOrganizationId === null || draftAttachmentOrganizationId === undefined
-        ? null
-        : parsePlatformId<OrganizationId>(
-            draftAttachmentOrganizationId,
-            "session_run_dispatch payload.draftAttachmentOrganizationId",
-          ),
     prompt: readString(record, "prompt", "session_run_dispatch payload"),
     queuedAtMs: readInteger(record, "queuedAtMs", "session_run_dispatch payload"),
     requestUrl: readNonEmptyString(record, "requestUrl", "session_run_dispatch payload"),
@@ -212,6 +205,10 @@ function parseSessionRunDispatchPayload(value: unknown): SessionRunDispatchComma
       organization_id: parsePlatformId<OrganizationId>(
         session["organization_id"],
         "session_run_dispatch payload.session.organization_id",
+      ),
+      app_id: parsePlatformId<AppId>(
+        session["app_id"],
+        "session_run_dispatch payload.session.app_id",
       ),
     },
     sessionRunId: parsePlatformId<SessionRunId>(

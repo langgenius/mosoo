@@ -5,7 +5,7 @@ import type { FormEvent } from "react";
 
 import { createTelegramAgentChannelBinding } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
-import { toAgentId } from "@/routes/typed-id";
+import { toAgentId, toAppId } from "@/routes/typed-id";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -26,7 +26,9 @@ export function TelegramChannelInlineSetup({
   const mutation = useMutation({
     mutationFn: createTelegramAgentChannelBinding,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: agentKeys.channelBindings(agent.id) });
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.channelBindings(agent.appId, agent.id),
+      });
       onSuccess?.();
     },
   });
@@ -47,6 +49,7 @@ export function TelegramChannelInlineSetup({
     mutation.mutate({
       agentId: toAgentId(agent.id),
       botToken: botToken.trim(),
+      appId: toAppId(agent.appId),
       webhookSecret: webhookSecret.trim(),
     });
   }

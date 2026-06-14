@@ -1,6 +1,6 @@
 import { sessionsTable } from "@mosoo/db";
-import type { AccountId, AgentId, SessionId } from "@mosoo/id";
-import { eq } from "drizzle-orm";
+import type { AccountId, AgentId, AppId, SessionId } from "@mosoo/id";
+import { and, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { ensureAgentEditor } from "../../agents/application/agent-access.service";
@@ -15,7 +15,10 @@ export interface SessionReadAccess {
 export async function getSessionReadAccess(
   database: D1Database,
   viewerId: AccountId,
-  sessionId: SessionId,
+  input: {
+    appId: AppId;
+    sessionId: SessionId;
+  },
 ): Promise<SessionReadAccess> {
   const row =
     (await getAppDatabase(database)
@@ -26,7 +29,7 @@ export async function getSessionReadAccess(
         updatedAt: sessionsTable.updatedAt,
       })
       .from(sessionsTable)
-      .where(eq(sessionsTable.id, sessionId))
+      .where(and(eq(sessionsTable.id, input.sessionId), eq(sessionsTable.appId, input.appId)))
       .limit(1)
       .get()) ?? null;
 

@@ -8,14 +8,8 @@ export interface DefaultAgentRuntimeSelection {
   readonly runtimeId: string;
 }
 
-// Same availability semantics as the Providers page: a vendor is configured
-// when a company credential exists or the viewer has a preferred personal one.
 function isVendorConfigured(credentials: readonly VendorCredential[], vendorId: string): boolean {
-  return credentials.some(
-    (credential) =>
-      credential.vendorId === vendorId &&
-      (credential.scope === "company" || credential.isPreferred),
-  );
+  return credentials.some((credential) => credential.vendorId === vendorId);
 }
 
 export function resolveDefaultAgentRuntime(
@@ -38,7 +32,6 @@ export function resolveDefaultAgentRuntime(
   const customCredential = credentials.find(
     (credential) =>
       credential.vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId &&
-      (credential.scope === "company" || credential.isPreferred) &&
       (credential.models?.length ?? 0) > 0,
   );
   const customRuntime = PUBLIC_RUNTIME_CATALOG.find((entry) => entry.acceptsCustomProvider);

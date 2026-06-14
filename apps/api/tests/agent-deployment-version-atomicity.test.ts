@@ -13,7 +13,7 @@ import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   nowMsForTest,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
 const OWNER_VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",
@@ -65,6 +65,7 @@ describe("agent deployment version atomicity", () => {
         name: "Draft Agent",
         organizationId: PUBLIC_API_TEST_IDS.organization,
         ownerId: PUBLIC_API_TEST_IDS.ownerAccount,
+        appId: PUBLIC_API_TEST_IDS.app,
         prompt: "Draft help.",
         provider: "openai",
         runtimeId: "openai-runtime",
@@ -77,7 +78,8 @@ describe("agent deployment version atomicity", () => {
     const published = await withProviderProbeMock(() =>
       publishAgent(createPublicHttpTestBindings(database) as ApiBindings, OWNER_VIEWER, {
         agentId: DRAFT_AGENT_ID,
-        visibility: "organization",
+        appId: PUBLIC_API_TEST_IDS.app,
+        visibility: "private",
       }),
     );
 
@@ -88,21 +90,15 @@ describe("agent deployment version atomicity", () => {
                  agent.status,
                  agent.visibility,
                  version.prompt,
-                 version.version_number,
-                 acl.target_id AS acl_target_id
+                 version.version_number
           FROM agent
           INNER JOIN agent_deployment_version version
             ON version.id = agent.live_deployment_version_id
-          LEFT JOIN resource_acl acl
-            ON acl.resource_type = 'agent'
-           AND acl.resource_id = agent.id
-           AND acl.target_kind = 'organization'
           WHERE agent.id = ?
         `,
       )
       .bind(DRAFT_AGENT_ID)
       .first<{
-        acl_target_id: string | null;
         live_deployment_version_id: string;
         prompt: string;
         status: string;
@@ -113,7 +109,7 @@ describe("agent deployment version atomicity", () => {
     expect(published).toMatchObject({
       id: DRAFT_AGENT_ID,
       status: "published",
-      visibility: "organization",
+      visibility: "private",
     });
     expect(published.liveVersion).toMatchObject({
       agentId: DRAFT_AGENT_ID,
@@ -121,11 +117,10 @@ describe("agent deployment version atomicity", () => {
       versionNumber: 1,
     });
     expect(row).toMatchObject({
-      acl_target_id: PUBLIC_API_TEST_IDS.organization,
       prompt: "Draft help.",
       status: "published",
       version_number: 1,
-      visibility: "organization",
+      visibility: "private",
     });
     expect(row?.live_deployment_version_id).toBe(published.liveVersion?.id);
   });
@@ -143,8 +138,9 @@ describe("agent deployment version atomicity", () => {
       kind: "pet",
       mcpServerIds: [],
       model: "gpt-5.4",
-      name: "Published HTTP Agent",
+      name: "Public API Agent",
       prompt: "Help more.",
+      appId: PUBLIC_API_TEST_IDS.app,
       provider: "openai",
       runtimeId: "openai-runtime",
       skillIds: [],

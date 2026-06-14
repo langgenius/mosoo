@@ -1,5 +1,5 @@
 import { Inbox, Plus } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type { ReactElement } from "react";
 
 import { useAppSession } from "@/app/session-provider";
@@ -26,20 +26,20 @@ import { useThreadActions } from "./model/use-actions";
 import { useThreadQueries } from "./model/use-queries";
 
 interface ThreadsWorkspaceProps {
-  activeOrganizationId: string | null;
+  activeAppId: string | null;
   userId: string | null;
   viewerImage: string | null;
   viewerName: string;
 }
 
 export function ThreadsController(): ReactElement {
-  const { activeOrganizationId, user } = useAppSession();
-  const scopeKey = `${user?.id ?? "guest"}:${activeOrganizationId ?? "none"}`;
+  const { activeAppId, user } = useAppSession();
+  const scopeKey = `${user?.id ?? "guest"}:${activeAppId ?? "none"}`;
 
   return (
     <ThreadsWorkspace
       key={scopeKey}
-      activeOrganizationId={activeOrganizationId}
+      activeAppId={activeAppId}
       userId={user?.id ?? null}
       viewerImage={user?.image ?? null}
       viewerName={user?.name ?? "You"}
@@ -48,27 +48,37 @@ export function ThreadsController(): ReactElement {
 }
 
 function ThreadsWorkspace({
-  activeOrganizationId,
+  activeAppId,
   userId,
   viewerImage,
   viewerName,
 }: ThreadsWorkspaceProps): ReactElement {
   const route = useThreadRouteState();
   const ui = useThreadUiState({
-    organizationId: activeOrganizationId,
+    appId: activeAppId,
     userId,
   });
+  const threadUiSnapshot = useMemo(
+    () => ({
+      pinnedThreadIds: new Set(ui.state.pinnedThreadIds),
+      readAtByThreadId: ui.state.readAtByThreadId,
+    }),
+    [ui.state.pinnedThreadIds, ui.state.readAtByThreadId],
+  );
   const threads = useThreadQueries({
-    activeOrganizationId,
+    activeAppId,
     activeThreadId: route.activeThreadId,
     filter: ui.state.filter,
+    ui: threadUiSnapshot,
   });
   const actions = useThreadActions({
-    activeOrganizationId,
+    activeAppId,
     activeThreadId: route.activeThreadId,
     allThreads: threads.allThreads,
     closeComposeDialog: route.closeComposeDialog,
+    markThreadReadLocal: ui.markThreadRead,
     navigateToList: route.backToList,
+    togglePinnedThreadLocal: ui.togglePinnedThread,
   });
   const handleReadSyncError = useCallback(
     (error: unknown) => {

@@ -1,4 +1,4 @@
-import type { OrganizationId } from "@mosoo/contracts/id";
+import type { AppId } from "@mosoo/contracts/id";
 import type {
   AgentSessionActionCapability,
   SessionSummary,
@@ -17,8 +17,8 @@ export interface ThreadSessionListItem {
 }
 
 const SESSIONS_QUERY = graphql(/* GraphQL */ `
-  query Sessions($organizationId: ULID!, $archived: Boolean, $type: SessionType) {
-    sessionList(organizationId: $organizationId, archived: $archived, type: $type) {
+  query Sessions($appId: ULID!, $archived: Boolean, $type: SessionType) {
+    sessionList(appId: $appId, archived: $archived, type: $type) {
       nodes {
         agentId
         archivedAt
@@ -50,6 +50,7 @@ const SESSIONS_QUERY = graphql(/* GraphQL */ `
         }
         model
         provider
+        appId
         runtimeId
         status
         title
@@ -62,8 +63,8 @@ const SESSIONS_QUERY = graphql(/* GraphQL */ `
 `);
 
 const THREAD_AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
-  query ThreadAgentSessionList($organizationId: ULID!, $archived: Boolean, $type: SessionType) {
-    threadAgentSessionList(organizationId: $organizationId, archived: $archived, type: $type) {
+  query ThreadAgentSessionList($appId: ULID!, $archived: Boolean, $type: SessionType) {
+    threadAgentSessionList(appId: $appId, archived: $archived, type: $type) {
       nodes {
         capabilities {
           action
@@ -101,6 +102,7 @@ const THREAD_AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
           }
           model
           provider
+          appId
           runtimeId
           status
           title
@@ -114,24 +116,21 @@ const THREAD_AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
 `);
 
 async function fetchSessions(
-  organizationId: OrganizationId,
+  appId: AppId,
   archived: boolean,
   type?: SessionType | null,
 ): Promise<SessionSummary[]> {
   const payload = await requestGraphQL(SESSIONS_QUERY, {
     archived,
-    organizationId,
+    appId,
     type: type ?? null,
   });
 
   return payload.sessionList.nodes.map(toSessionSummary);
 }
 
-export async function sessions(
-  organizationId: OrganizationId,
-  type?: SessionType | null,
-): Promise<SessionSummary[]> {
-  return fetchSessions(organizationId, false, type);
+export async function sessions(appId: AppId, type?: SessionType | null): Promise<SessionSummary[]> {
+  return fetchSessions(appId, false, type);
 }
 
 function toThreadSessionListItem(
@@ -144,13 +143,13 @@ function toThreadSessionListItem(
 }
 
 async function fetchThreadSessions(
-  organizationId: OrganizationId,
+  appId: AppId,
   archived: boolean,
   type?: SessionType | null,
 ): Promise<ThreadSessionListItem[]> {
   const payload = await requestGraphQL(THREAD_AGENT_SESSION_LIST_QUERY, {
     archived,
-    organizationId,
+    appId,
     type: type ?? null,
   });
 
@@ -158,15 +157,15 @@ async function fetchThreadSessions(
 }
 
 export async function threadSessions(
-  organizationId: OrganizationId,
+  appId: AppId,
   type?: SessionType | null,
 ): Promise<ThreadSessionListItem[]> {
-  return fetchThreadSessions(organizationId, false, type);
+  return fetchThreadSessions(appId, false, type);
 }
 
 export async function archivedThreadSessions(
-  organizationId: OrganizationId,
+  appId: AppId,
   type?: SessionType | null,
 ): Promise<ThreadSessionListItem[]> {
-  return fetchThreadSessions(organizationId, true, type);
+  return fetchThreadSessions(appId, true, type);
 }

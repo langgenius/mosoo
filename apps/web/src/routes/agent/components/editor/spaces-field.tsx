@@ -24,19 +24,19 @@ export function AgentSpacesField({
   readOnly = false,
   selectedSpaces,
   setSpaces,
-  organizationId,
+  appId,
 }: {
   readOnly?: boolean;
   selectedSpaces: SpaceBinding[];
   setSpaces: (spaces: SpaceBinding[]) => void;
-  organizationId: string | null;
+  appId: string | null;
 }): ReactElement {
   const [open, setOpen] = useState(false);
   const listboxId = useId();
-  const spacesQuery = useSpacesQuery(organizationId);
+  const spacesQuery = useSpacesQuery(appId);
   const availableSpaces = spacesQuery.data ?? EMPTY_SPACES;
-  const hasOrganization = organizationId !== null && organizationId !== "";
-  const triggerDisabled = readOnly || !hasOrganization;
+  const hasApp = appId !== null && appId !== "";
+  const triggerDisabled = readOnly || !hasApp;
   const resolvedSelectedSpaces = useMemo(
     () =>
       selectedSpaces.map((space) => {

@@ -14,7 +14,7 @@ import type {
 } from "@/domains/agent-builder/api/agent-builder-client";
 import { executeAgentBuilderControlPlaneAction } from "@/domains/agent-builder/api/agent-builder-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
-import { toAgentId } from "@/routes/typed-id";
+import { toAgentId, toAppId } from "@/routes/typed-id";
 
 import type { AgentStatus } from "../../agent.types";
 
@@ -119,6 +119,7 @@ export function useAgentBuilderControlPlaneActions(input: {
   readonly onMcpServerCreated?: ((server: AgentBuilderCreatedMcpServerSummary) => void) | undefined;
   readonly onOpenPreview: () => void;
   readonly previewDisabled: boolean;
+  readonly appId: string;
   readonly saving: boolean;
 }): AgentBuilderControlPlaneActions {
   const queryClient = useQueryClient();
@@ -158,8 +159,12 @@ export function useAgentBuilderControlPlaneActions(input: {
 
       if (result.status === "applied") {
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: agentKeys.detail(variables.agentId) }),
-          queryClient.invalidateQueries({ queryKey: agentKeys.editorState(variables.agentId) }),
+          queryClient.invalidateQueries({
+            queryKey: agentKeys.detail(variables.appId, variables.agentId),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: agentKeys.editorState(variables.appId, variables.agentId),
+          }),
           queryClient.invalidateQueries({ queryKey: agentKeys.lists() }),
         ]);
       }
@@ -216,6 +221,7 @@ export function useAgentBuilderControlPlaneActions(input: {
       setActionMessage(null);
       void actionMutation.mutateAsync({
         agentId: toAgentId(input.agentId),
+        appId: toAppId(input.appId),
         ...(dispatch.toolId === "create_environment" &&
         payloads?.createEnvironmentPayload !== undefined
           ? { createEnvironmentPayload: payloads.createEnvironmentPayload }

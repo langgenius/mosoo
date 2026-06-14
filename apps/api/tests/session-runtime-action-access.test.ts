@@ -1,10 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-  ensureActiveSessionParticipantAccess,
-  getActiveSessionQueueAccess,
+  getActiveAppSessionParticipantAccess,
+  getActiveAppSessionQueueAccess,
 } from "../src/modules/sessions/domain/session-access.policy";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
+
+const APP_ID = "01J0000000000000000000000Q";
+const WRONG_APP_ID = "01J0000000000000000000000R";
 
 function createRuntimeActionAccessDatabase(): SqliteD1Database {
   const database = new SqliteD1Database();
@@ -21,6 +24,7 @@ function createRuntimeActionAccessDatabase(): SqliteD1Database {
       model text NOT NULL,
       metadata_json text DEFAULT '{}' NOT NULL,
       organization_id text NOT NULL,
+      app_id text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
       status text NOT NULL,
@@ -28,12 +32,15 @@ function createRuntimeActionAccessDatabase(): SqliteD1Database {
       type text NOT NULL
     );
 
-    CREATE TABLE organization_member (
+    CREATE TABLE app (
+      id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
-      account_id text NOT NULL,
-      role text NOT NULL,
-      disabled_at integer,
-      PRIMARY KEY (organization_id, account_id)
+      owner_account_id text NOT NULL,
+      name text NOT NULL,
+      slug text NOT NULL,
+      default_environment_id text,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL
     );
 
     INSERT INTO session (
@@ -46,6 +53,7 @@ function createRuntimeActionAccessDatabase(): SqliteD1Database {
       deployment_version_number,
       model,
       organization_id,
+      app_id,
       provider,
       runtime_id,
       status,
@@ -61,6 +69,7 @@ function createRuntimeActionAccessDatabase(): SqliteD1Database {
       1,
       'gpt-5.4',
       '01J00000000000000000000006',
+      '${APP_ID}',
       'openai',
       'openai-runtime',
       'IDLE',
@@ -68,16 +77,33 @@ function createRuntimeActionAccessDatabase(): SqliteD1Database {
       'preview'
     );
 
-    INSERT INTO organization_member (
+    INSERT INTO app (
+      id,
       organization_id,
-      account_id,
-      role,
-      disabled_at
+      owner_account_id,
+      name,
+      slug,
+      default_environment_id,
+      created_at,
+      updated_at
     ) VALUES (
+      '${APP_ID}',
       '01J00000000000000000000006',
       'viewer-1',
-      'member',
-      NULL
+      'Default App',
+      'default',
+      NULL,
+      1,
+      1
+    ), (
+      '${WRONG_APP_ID}',
+      '01J00000000000000000000006',
+      'viewer-1',
+      'Wrong App',
+      'wrong',
+      NULL,
+      1,
+      1
     );
   `);
 
@@ -89,14 +115,22 @@ describe("session runtime action access", () => {
     const database = createRuntimeActionAccessDatabase();
 
     await expect(
-      ensureActiveSessionParticipantAccess(database, "viewer-1", "session-1"),
-    ).resolves.toBeUndefined();
+      getActiveAppSessionParticipantAccess(database, "viewer-1", {
+        appId: APP_ID,
+        sessionId: "session-1",
+      }),
+    ).resolves.toMatchObject({
+      app_id: APP_ID,
+    });
   });
 
   test("queue access returns the execution payload", async () => {
     const database = createRuntimeActionAccessDatabase();
 
-    const access = await getActiveSessionQueueAccess(database, "viewer-1", "session-1");
+    const access = await getActiveAppSessionQueueAccess(database, "viewer-1", {
+      appId: APP_ID,
+      sessionId: "session-1",
+    });
 
     expect(access).toEqual({
       agent_id: "01J00000000000000000000009",
@@ -105,46 +139,34 @@ describe("session runtime action access", () => {
       id: "session-1",
       model: "gpt-5.4",
       organization_id: "01J00000000000000000000006",
+      app_id: APP_ID,
       provider: "openai",
       runtime_id: "openai-runtime",
     });
   });
 
-  test("denies historical participants after membership is disabled or removed", async () => {
+  test("fails closed when the requested App does not own the session", async () => {
     const database = createRuntimeActionAccessDatabase();
 
-    await database
-      .prepare(
-        `
-          UPDATE organization_member
-             SET disabled_at = 2
-           WHERE organization_id = ?
-             AND account_id = ?
-        `,
-      )
-      .bind("01J00000000000000000000006", "viewer-1")
-      .run();
-
     await expect(
-      ensureActiveSessionParticipantAccess(database, "viewer-1", "session-1"),
+      getActiveAppSessionParticipantAccess(database, "viewer-1", {
+        appId: WRONG_APP_ID,
+        sessionId: "session-1",
+      }),
     ).rejects.toMatchObject({
       code: "FORBIDDEN",
       status: 403,
     });
+  });
 
-    await database
-      .prepare(
-        `
-          DELETE FROM organization_member
-           WHERE organization_id = ?
-             AND account_id = ?
-        `,
-      )
-      .bind("01J00000000000000000000006", "viewer-1")
-      .run();
+  test("fails closed when the viewer does not own the App", async () => {
+    const database = createRuntimeActionAccessDatabase();
 
     await expect(
-      ensureActiveSessionParticipantAccess(database, "viewer-1", "session-1"),
+      getActiveAppSessionQueueAccess(database, "outsider-1", {
+        appId: APP_ID,
+        sessionId: "session-1",
+      }),
     ).rejects.toMatchObject({
       code: "FORBIDDEN",
       status: 403,

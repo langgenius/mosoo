@@ -11,6 +11,7 @@ import type {
 } from "@mosoo/contracts/agent-manifest";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { toAgentModel } from "./agent-models";
 import { createDraftAgentBatch } from "./agent-package-draft.service";
@@ -26,17 +27,18 @@ import {
   resolvePackageSkills,
   resolvePackageSpaces,
 } from "./agent-package-resolution.service";
-import { readFileId } from "./agent-platform-ids";
+import { readFileId, readAppId } from "./agent-platform-ids";
 export async function importAgentPackage(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   input: ImportAgentPackageInput,
 ): Promise<AgentPackageImportResult<Agent>> {
   const fileId = readFileId(input.fileId, "Agent package file ID");
+  const app = await ensureAppOwnership(bindings.DB, viewer.id, readAppId(input.appId));
   const packageFile = await readAgentPackageArchiveFile({
     bindings,
     fileId,
-    organizationId: input.organizationId,
+    appId: app.id,
     viewer,
   });
   const parsed = parseAgentPackageArchiveBytes(packageFile.archiveBytes);
@@ -53,7 +55,8 @@ export async function importAgentPackage(
     ...(await collectRuntimeResolutionIssues(
       bindings.DB,
       viewer.id,
-      input.organizationId,
+      app.organizationId,
+      app.id,
       manifest,
     )),
   );
@@ -64,8 +67,8 @@ export async function importAgentPackage(
       database: bindings.DB,
       issues,
       manifest,
-      organizationId: input.organizationId,
       packageAssets: parsed.package.assets,
+      appId: app.id,
       summary,
       viewer,
       viewerId: viewer.id,
@@ -75,7 +78,7 @@ export async function importAgentPackage(
       database: bindings.DB,
       issues,
       manifest,
-      organizationId: input.organizationId,
+      appId: app.id,
       summary,
       viewerId: viewer.id,
     }),
@@ -84,7 +87,7 @@ export async function importAgentPackage(
       database: bindings.DB,
       issues,
       manifest,
-      organizationId: input.organizationId,
+      organizationId: app.organizationId,
     }),
     resolvePackageMcpServers({
       issues,
@@ -101,7 +104,7 @@ export async function importAgentPackage(
     kind: manifest.kind,
     mcpServerIds,
     model: manifest.runtime.model,
-    organizationId: input.organizationId,
+    organizationId: app.organizationId,
     ownerId: viewer.id,
     packageMcpServers: manifest.mcpServers,
     packageResolution: createPackageResolutionState("import", resolution),
@@ -109,6 +112,7 @@ export async function importAgentPackage(
     prompt: manifest.prompts.system,
     provider: manifest.runtime.provider,
     providerOptions: manifest.runtime.providerOptions,
+    appId: app.id,
     runtimeId: manifest.runtime.id,
     skillIds: skillResolution.skillIds,
     spaceIds,

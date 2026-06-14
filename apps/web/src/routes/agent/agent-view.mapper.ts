@@ -10,7 +10,6 @@ import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 
 import type { AuthUser } from "@/domains/auth/use-auth";
 
-import { isTruthy } from "../../shared/lib/truthiness";
 import type {
   Agent,
   AgentRole,
@@ -153,11 +152,11 @@ export function mapAgentSummaryToListView(
   currentUser: AuthUser | null,
 ): Agent {
   return {
-    collaborators: [],
     config: createEmptyAgentConfig(),
     createdAt: profile.createdAt,
     description: profile.description ?? "",
     id: profile.id,
+    appId: profile.appId,
     kind: profile.kind,
     liveVersion: null,
     name: profile.name,
@@ -184,26 +183,6 @@ export function mapAgentDetailToView(
   const environmentConfig = editorDetail?.environment ?? DEFAULT_ENVIRONMENT_CONFIG;
 
   return {
-    collaborators:
-      editorDetail?.collaborators
-        // The org-wide "*" principal is surfaced by the dedicated "Everyone in
-        // organization" row (driven by visibility). Excluding it here avoids a
-        // duplicate entry with inconsistent controls in the collaborators list.
-        .filter((collaborator) => collaborator.principal !== "*")
-        .map((collaborator) => {
-          const collaboratorUser: UserInfo = {
-            email: collaborator.email ?? "",
-            id: collaborator.principal,
-            name: collaborator.name ?? collaborator.principal,
-          };
-          if (isTruthy(collaborator.imageUrl)) {
-            collaboratorUser.avatar = collaborator.imageUrl;
-          }
-          return {
-            role: collaborator.role,
-            user: collaboratorUser,
-          };
-        }) ?? [],
     config: {
       builder: editorDetail?.builder ?? { componentDecisions: {} },
       environmentId: environmentConfig.environmentId,
@@ -217,6 +196,7 @@ export function mapAgentDetailToView(
     createdAt: profile.createdAt,
     description: profile.description ?? "",
     id: profile.id,
+    appId: profile.appId,
     kind: profile.kind,
     liveVersion: profile.liveVersion,
     name: profile.name,

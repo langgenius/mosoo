@@ -18,8 +18,8 @@ const AGENT_CHANNEL_BINDING_FIELDS = graphql(/* GraphQL */ `
 `);
 
 export const AGENT_CHANNEL_BINDINGS_QUERY = graphql(/* GraphQL */ `
-  query AgentChannelBindings($agentId: ULID!) {
-    agentChannelBindingList(agentId: $agentId) {
+  query AgentChannelBindings($appId: ULID!, $agentId: ULID!) {
+    agentChannelBindingList(appId: $appId, agentId: $agentId) {
       ...AgentChannelBindingFields
     }
   }

@@ -1,10 +1,7 @@
 import type { SkillSummary } from "@mosoo/contracts/skill";
 import { useMemo, useState } from "react";
 
-import {
-  useOrganizationSkillsQuery,
-  useSkillSourceQuery,
-} from "@/domains/skill/query/skill-queries";
+import { useAppSkillsQuery, useSkillSourceQuery } from "@/domains/skill/query/skill-queries";
 
 import type { SkillInfo } from "../../agent.types";
 
@@ -33,15 +30,16 @@ function toSkillInfo(skill: SkillSummary): SkillInfo {
 export function useAgentSkillsFieldModel({
   selectedSkills,
   setSkills,
-  organizationId,
+  appId,
 }: {
   selectedSkills: SkillInfo[];
   setSkills: (skills: SkillInfo[]) => void;
-  organizationId: string | null;
+  appId: string | null;
 }): AgentSkillsFieldModel {
   const [previewSkill, setPreviewSkill] = useState<SkillInfo | null>(null);
-  const skillsQuery = useOrganizationSkillsQuery(organizationId);
+  const skillsQuery = useAppSkillsQuery(appId);
   const previewQuery = useSkillSourceQuery(
+    appId,
     previewSkill?.state === "tombstone" ? null : (previewSkill?.id ?? null),
     previewSkill !== null && previewSkill.state !== "tombstone",
   );
@@ -51,8 +49,8 @@ export function useAgentSkillsFieldModel({
     [selectedSkills],
   );
   const availableSkills = (skillsQuery.data ?? []).filter((skill) => !selectedIds.has(skill.id));
-  const availablePersonalSkills = availableSkills.filter((skill) => skill.role === "owner");
-  const availableSharedSkills = availableSkills.filter((skill) => skill.role === "user");
+  const availablePersonalSkills = availableSkills;
+  const availableSharedSkills: SkillSummary[] = [];
 
   function handleAddSkill(skill: SkillSummary): void {
     setSkills([...selectedSkills, toSkillInfo(skill)]);

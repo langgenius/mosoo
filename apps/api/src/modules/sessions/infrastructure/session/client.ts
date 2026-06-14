@@ -1,5 +1,5 @@
 import type { AgUiSessionEvent } from "@mosoo/ag-ui-session";
-import type { SessionId } from "@mosoo/id";
+import type { AppId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
@@ -28,6 +28,7 @@ function createSessionDoRequest(sessionId: SessionId, path: string, init?: Reque
 export async function connectSessionViewerWebSocket(
   env: ApiBindings,
   input: {
+    appId: AppId;
     request: Request;
     sessionId: SessionId;
     viewer: AuthenticatedViewer;
@@ -38,6 +39,7 @@ export async function connectSessionViewerWebSocket(
 
   writeSessionViewerSocketHeaders(headers, {
     publicOrigin: requestUrl.origin,
+    appId: input.appId,
     sessionId: input.sessionId,
     viewer: input.viewer,
   });

@@ -1,5 +1,4 @@
 import type {
-  AddAgentCollaboratorInput,
   Agent,
   AgentDeploymentVersion,
   AgentDetail,
@@ -12,10 +11,8 @@ import type {
   CreateAgentInput,
   DeleteAgentInput,
   PublishAgentInput,
-  RemoveAgentCollaboratorInput,
   RuntimeStateOperationInput,
   RuntimeStateOperationResult,
-  UpdateAgentCollaboratorInput,
   UpdateAgentConfigInput,
   UpdateAgentPackageSharingInput,
 } from "@mosoo/contracts/agent";
@@ -26,7 +23,7 @@ import type {
   CreateAgentForkInput,
   ImportAgentPackageInput,
 } from "@mosoo/contracts/agent-manifest";
-import type { AgentId, OrganizationId } from "@mosoo/contracts/id";
+import type { AgentId, AppId } from "@mosoo/contracts/id";
 
 import type {
   AgentChannelBindingFieldsFragment,
@@ -64,12 +61,12 @@ import {
   toFileId,
   toMcpServerId,
   toOrganizationId,
+  toAppId,
   toSkillId,
   toSpaceId,
 } from "@/routes/typed-id";
 
 import {
-  ADD_AGENT_COLLABORATOR_MUTATION,
   AGENT_CHANNEL_BINDINGS_QUERY,
   CREATE_AGENT_MUTATION,
   CREATE_DISCORD_AGENT_CHANNEL_BINDING_MUTATION,
@@ -85,13 +82,11 @@ import {
   POLL_WECHAT_AGENT_CHANNEL_PAIRING_MUTATION,
   PUBLISH_AGENT_MUTATION,
   RECREATE_SANDBOX_MUTATION,
-  REMOVE_AGENT_COLLABORATOR_MUTATION,
   RESET_AGENT_STATE_MUTATION,
   RESTART_DRIVER_MUTATION,
   START_LARK_AGENT_CHANNEL_REGISTRATION_MUTATION,
   START_WECHAT_AGENT_CHANNEL_PAIRING_MUTATION,
   UNPUBLISH_AGENT_MUTATION,
-  UPDATE_AGENT_COLLABORATOR_MUTATION,
   UPDATE_AGENT_CONFIG_MUTATION,
 } from "./agent-documents";
 import {
@@ -149,6 +144,7 @@ function toAgent(agent: AgentFieldsFragment): Agent {
     id: toAgentId(agent.id),
     liveVersion: agent.liveVersion === null ? null : toAgentDeploymentVersion(agent.liveVersion),
     organizationId: toOrganizationId(agent.organizationId),
+    appId: toAppId(agent.appId),
     skills: agent.skills.map(toAgentSkillReference),
   };
 }
@@ -158,6 +154,7 @@ function toAgentSummary(agent: GraphQLAgentSummary): AgentSummary {
     ...agent,
     id: toAgentId(agent.id),
     organizationId: toOrganizationId(agent.organizationId),
+    appId: toAppId(agent.appId),
     owner: toAgentOwnerSummary(agent.owner),
     tools: agent.tools.map(toAgentToolSummary),
   };
@@ -169,6 +166,7 @@ function toAgentDetail(agent: GraphQLAgentDetail): AgentDetail {
     id: toAgentId(agent.id),
     liveVersion: agent.liveVersion === null ? null : toAgentDeploymentVersion(agent.liveVersion),
     organizationId: toOrganizationId(agent.organizationId),
+    appId: toAppId(agent.appId),
     owner: toAgentOwnerSummary(agent.owner),
     skills: agent.skills.map(toAgentSkillReference),
     tools: agent.tools.map(toAgentToolSummary),
@@ -277,28 +275,32 @@ export async function deleteAgent(input: DeleteAgentInput): Promise<void> {
   await requestGraphQL(DELETE_AGENT_MUTATION, { input });
 }
 
-export async function listVisibleAgents(organizationId: OrganizationId): Promise<AgentSummary[]> {
-  const payload = await requestGraphQL(LIST_VISIBLE_AGENTS_QUERY, { organizationId });
+export async function listVisibleAgents(appId: AppId): Promise<AgentSummary[]> {
+  const payload = await requestGraphQL(LIST_VISIBLE_AGENTS_QUERY, { appId });
 
   return payload.accessibleAgentList.map(toAgentSummary);
 }
 
-export async function getAgent(agentId: AgentId): Promise<AgentDetail> {
-  const payload = await requestGraphQL(GET_AGENT_QUERY, { agentId });
+export async function getAgent(appId: AppId, agentId: AgentId): Promise<AgentDetail> {
+  const payload = await requestGraphQL(GET_AGENT_QUERY, { agentId, appId });
 
   return toAgentDetail(payload.agent);
 }
 
-export async function getAgentEditorState(agentId: AgentId): Promise<AgentEditorState> {
-  const payload = await requestGraphQL(GET_AGENT_EDITOR_STATE_QUERY, { agentId });
+export async function getAgentEditorState(
+  appId: AppId,
+  agentId: AgentId,
+): Promise<AgentEditorState> {
+  const payload = await requestGraphQL(GET_AGENT_EDITOR_STATE_QUERY, { agentId, appId });
 
   return toAgentEditorState(payload.agentEditorState);
 }
 
 export async function listAgentChannelBindings(
+  appId: AppId,
   agentId: AgentId,
 ): Promise<AgentChannelBindingFieldsFragment[]> {
-  const payload = await requestGraphQL(AGENT_CHANNEL_BINDINGS_QUERY, { agentId });
+  const payload = await requestGraphQL(AGENT_CHANNEL_BINDINGS_QUERY, { agentId, appId });
 
   return payload.agentChannelBindingList;
 }
@@ -373,14 +375,20 @@ export async function deleteAgentChannelBinding(
   await requestGraphQL(DELETE_AGENT_CHANNEL_BINDING_MUTATION, { input });
 }
 
-export async function getAgentManifest(agentId: AgentId): Promise<AgentManifestExport> {
-  const payload = await requestGraphQL(GET_AGENT_MANIFEST_QUERY, { agentId });
+export async function getAgentManifest(
+  appId: AppId,
+  agentId: AgentId,
+): Promise<AgentManifestExport> {
+  const payload = await requestGraphQL(GET_AGENT_MANIFEST_QUERY, { agentId, appId });
 
   return toAgentManifest(payload.agentManifest);
 }
 
-export async function exportAgentPackage(agentId: AgentId): Promise<AgentPackageExport> {
-  const payload = await requestGraphQL(EXPORT_AGENT_PACKAGE_QUERY, { agentId });
+export async function exportAgentPackage(
+  appId: AppId,
+  agentId: AgentId,
+): Promise<AgentPackageExport> {
+  const payload = await requestGraphQL(EXPORT_AGENT_PACKAGE_QUERY, { agentId, appId });
 
   return toAgentPackageExport(payload.exportAgentPackage);
 }
@@ -391,8 +399,8 @@ export async function publishAgent(input: PublishAgentInput): Promise<Agent> {
   return toAgent(payload.publishAgent);
 }
 
-export async function unpublishAgent(agentId: AgentId): Promise<Agent> {
-  const payload = await requestGraphQL(UNPUBLISH_AGENT_MUTATION, { agentId });
+export async function unpublishAgent(appId: AppId, agentId: AgentId): Promise<Agent> {
+  const payload = await requestGraphQL(UNPUBLISH_AGENT_MUTATION, { agentId, appId });
 
   return toAgent(payload.unpublishAgent);
 }
@@ -411,18 +419,6 @@ export async function createAgentFork(
   const payload = await requestGraphQL(CREATE_AGENT_FORK_MUTATION, { input });
 
   return toAgentPackageImportResult(payload.createAgentFork);
-}
-
-export async function addAgentCollaborator(input: AddAgentCollaboratorInput): Promise<void> {
-  await requestGraphQL(ADD_AGENT_COLLABORATOR_MUTATION, { input });
-}
-
-export async function removeAgentCollaborator(input: RemoveAgentCollaboratorInput): Promise<void> {
-  await requestGraphQL(REMOVE_AGENT_COLLABORATOR_MUTATION, { input });
-}
-
-export async function updateAgentCollaborator(input: UpdateAgentCollaboratorInput): Promise<void> {
-  await requestGraphQL(UPDATE_AGENT_COLLABORATOR_MUTATION, { input });
 }
 
 export async function restartDriver(

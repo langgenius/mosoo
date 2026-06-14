@@ -8,7 +8,7 @@ import {
   createPublicHttpTestBindings,
   createTestExecutionContext,
   insertOwnerSession,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
 describe("send agent session events", () => {
   test("returns user message response summaries", async () => {
@@ -27,6 +27,7 @@ describe("send agent session events", () => {
             type: "user_message",
           },
         ],
+        appId: PUBLIC_API_TEST_IDS.app,
         sessionId: "01J0000000000000000000000C",
       },
       requestUrl: "https://api.example.com/api/v1/sessions/01J0000000000000000000000C/events",
@@ -68,6 +69,7 @@ describe("send agent session events", () => {
               type: "user_message",
             },
           ],
+          appId: PUBLIC_API_TEST_IDS.app,
           sessionId: PUBLIC_API_TEST_IDS.ownerSession,
         },
         requestUrl: `https://api.example.com/api/v1/sessions/${PUBLIC_API_TEST_IDS.ownerSession}/events`,

@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 
 import { publishAgent } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
-import { toAgentId } from "@/routes/typed-id";
+import { toAgentId, toAppId } from "@/routes/typed-id";
 
 import type { Agent, AgentMode } from "../agent.types";
 import { AgentApiAccessDialog } from "../lifecycle/api-access-panel";
@@ -155,12 +155,15 @@ export function PreviewMode({
     mutationFn: async (nextVisibility?: AgentVisibility) =>
       publishAgent({
         agentId: toAgentId(agent.id),
+        appId: toAppId(agent.appId),
         ...(nextVisibility !== undefined ? { visibility: nextVisibility } : {}),
       }),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: agentKeys.detail(agent.id) }),
-        queryClient.invalidateQueries({ queryKey: agentKeys.editorState(agent.id) }),
+        queryClient.invalidateQueries({ queryKey: agentKeys.detail(agent.appId, agent.id) }),
+        queryClient.invalidateQueries({
+          queryKey: agentKeys.editorState(agent.appId, agent.id),
+        }),
         queryClient.invalidateQueries({ queryKey: agentKeys.lists() }),
       ]);
       dispatch({ open: true, type: "setSuccessModalOpen" });
@@ -225,6 +228,7 @@ export function PreviewMode({
             configurationRevisionKey={`${agent.updatedAt}:${agent.liveVersion?.id ?? "draft"}`}
             key={agent.id}
             organizationId={organizationId}
+            appId={agent.appId}
             readiness={agent.readiness}
             tone="preview"
           />
@@ -252,7 +256,7 @@ export function PreviewMode({
         />
 
         <div className="min-h-0 flex-1 overflow-y-auto bg-white p-5" data-agent-editor-scroll>
-          <AgentFormView agent={agent} model={model} organizationId={organizationId} />
+          <AgentFormView agent={agent} model={model} />
         </div>
 
         {publishStatus ? (

@@ -7,7 +7,7 @@ import {
   PUBLIC_API_TEST_IDS,
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
 const OWNER_VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",
@@ -18,12 +18,13 @@ const OWNER_VIEWER: AuthenticatedViewer = {
 };
 
 describe("runtime state operation target version", () => {
-  test("requires the observed live version for published Agents", async () => {
+  test("requires the observed live version for Agent API Endpoints", async () => {
     const database = await createPublicHttpContractDatabase();
 
     await expect(
       restartDriver(createPublicHttpTestBindings(database) as ApiBindings, OWNER_VIEWER, {
         agentId: PUBLIC_API_TEST_IDS.agent,
+        appId: PUBLIC_API_TEST_IDS.app,
       }),
     ).rejects.toMatchObject({
       code: "AGENT_LIVE_VERSION_REQUIRED",
@@ -37,6 +38,7 @@ describe("runtime state operation target version", () => {
     await expect(
       restartDriver(createPublicHttpTestBindings(database) as ApiBindings, OWNER_VIEWER, {
         agentId: PUBLIC_API_TEST_IDS.agent,
+        appId: PUBLIC_API_TEST_IDS.app,
         targetVersion: {
           id: PUBLIC_API_TEST_IDS.deployment,
           versionNumber: 0,
@@ -56,6 +58,7 @@ describe("runtime state operation target version", () => {
       OWNER_VIEWER,
       {
         agentId: PUBLIC_API_TEST_IDS.agent,
+        appId: PUBLIC_API_TEST_IDS.app,
         targetVersion: {
           id: PUBLIC_API_TEST_IDS.deployment,
           versionNumber: 1,

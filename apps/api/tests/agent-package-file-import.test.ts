@@ -6,7 +6,7 @@ import {
 } from "@mosoo/agent-package";
 import type { AgentPackage } from "@mosoo/contracts/agent-manifest";
 import { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION } from "@mosoo/contracts/agent-manifest";
-import type { AccountId, FileId, OrganizationId } from "@mosoo/id";
+import type { AccountId, FileId, OrganizationId, AppId } from "@mosoo/id";
 import { zipSync } from "fflate";
 
 import { createAgentPackageFile } from "../src/modules/agents/application/agent-package-file.service";
@@ -17,7 +17,7 @@ import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   PUBLIC_API_TEST_IDS,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 import type { SqliteD1Database } from "./helpers/sqlite-d1";
 
 interface StoredObject {
@@ -36,6 +36,7 @@ const OWNER_VIEWER: AuthenticatedViewer = {
   name: "Owner",
 };
 const ORGANIZATION_ID = PUBLIC_API_TEST_IDS.organization as OrganizationId;
+const APP_ID = PUBLIC_API_TEST_IDS.app as AppId;
 
 class MemoryByteBucket {
   readonly objects = new Map<string, StoredObject>();
@@ -238,18 +239,10 @@ async function createFixture(input: { archiveBytes?: Uint8Array } = {}) {
       name text NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
+      app_id text NOT NULL,
       source_kind text NOT NULL,
       updated_at integer NOT NULL,
       version text
-    );
-
-    CREATE TABLE IF NOT EXISTS skill_preference (
-      account_id text NOT NULL,
-      auto_enabled integer NOT NULL,
-      created_at integer NOT NULL,
-      skill_id text NOT NULL,
-      updated_at integer NOT NULL,
-      PRIMARY KEY (skill_id, account_id)
     );
 
     CREATE TABLE IF NOT EXISTS agent_skill (
@@ -270,7 +263,7 @@ async function createFixture(input: { archiveBytes?: Uint8Array } = {}) {
     archiveBytes,
     bindings,
     fileName: "portable.agent",
-    organizationId: ORGANIZATION_ID,
+    appId: APP_ID,
     viewer: OWNER_VIEWER,
   });
   const row = await readFileRow(database, file.fileId);
@@ -315,7 +308,7 @@ async function expectImportRejected(input: {
   await expect(
     importAgentPackage(input.bindings, OWNER_VIEWER, {
       fileId: input.fileId,
-      organizationId: ORGANIZATION_ID,
+      appId: APP_ID,
     }),
   ).rejects.toThrow(input.message);
 }
@@ -325,7 +318,7 @@ describe("agent package file import", () => {
     {
       message: "Agent package file purpose must be agent_package.",
       name: "rejects wrong purpose",
-      updateSql: "UPDATE file_record SET purpose = 'organization_draft' WHERE id = ?",
+      updateSql: "UPDATE file_record SET purpose = 'app_draft' WHERE id = ?",
     },
     {
       message: "Agent package file is not ready.",
@@ -343,9 +336,14 @@ describe("agent package file import", () => {
       updateSql: `UPDATE file_record SET created_by_account_id = '${PUBLIC_API_TEST_IDS.memberAccount}' WHERE id = ?`,
     },
     {
-      message: "Agent package file does not belong to the target organization.",
-      name: "rejects cross-organization files",
+      message: "Agent package file does not belong to the target App.",
+      name: "rejects cross-app files",
       updateSql: "UPDATE file_record SET scope_id = '01J0000000000000000000000Z' WHERE id = ?",
+    },
+    {
+      message: "Agent package file does not belong to the target App.",
+      name: "rejects legacy org-owned package files",
+      updateSql: `UPDATE file_record SET owner_kind = 'organization', owner_id = '${ORGANIZATION_ID}', scope_id = '${ORGANIZATION_ID}' WHERE id = ?`,
     },
     {
       message: "Agent package file is too large.",
@@ -397,7 +395,7 @@ describe("agent package file import", () => {
 
     const imported = await importAgentPackage(bindings, OWNER_VIEWER, {
       fileId,
-      organizationId: ORGANIZATION_ID,
+      appId: APP_ID,
     });
 
     expect(imported.agent.name).toBe("Imported Package Agent");

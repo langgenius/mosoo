@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { createSessionRuntimeTimelineEvent, parseAgUiSessionEventJson } from "@mosoo/ag-ui-session";
 
 describe("session runtime timeline AG UI event", () => {
-  test("projects runtime timing into a public timeline event", () => {
+  test("apps runtime timing into a public timeline event", () => {
     const event = createSessionRuntimeTimelineEvent({
       completedAtMs: 150,
       path: "cold",

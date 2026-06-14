@@ -1,5 +1,5 @@
 import type { AgentBuilderSelectedSpaceFilesSummary } from "@mosoo/contracts/agent-builder";
-import type { SpaceId } from "@mosoo/id";
+import type { AppId, SpaceId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
@@ -105,12 +105,14 @@ export async function createAgentBuilderSelectedSpaceFileSummaries(input: {
 export async function collectAgentBuilderSelectedSpaceFileSummaries(input: {
   bindings: ApiBindings;
   draftSpaces: readonly DraftSpaceBinding[];
+  appId: AppId;
   viewer: AuthenticatedViewer;
   visibleSpaces: readonly VisibleSpaceIdentity[];
 }): Promise<AgentBuilderSelectedSpaceFilesSummary[]> {
   return createAgentBuilderSelectedSpaceFileSummaries({
     draftSpaces: input.draftSpaces,
-    listSpaceFiles: (spaceIds) => getSpaceRootFileSummaries(input.bindings, input.viewer, spaceIds),
+    listSpaceFiles: (spaceIds) =>
+      getSpaceRootFileSummaries(input.bindings, input.viewer, input.appId, spaceIds),
     visibleSpaces: input.visibleSpaces,
   });
 }

@@ -348,7 +348,7 @@ export async function getAgentLiveDeploymentVersionRecord(
     if (agent.status === "published") {
       throw createApiError(
         API_ERROR_CODE.agentLiveVersionRequired,
-        "Published Agent is missing a live deployment version.",
+        "Public API Agent is missing a live deployment version.",
       );
     }
 
@@ -377,7 +377,7 @@ export async function requireAgentLiveDeploymentVersionRecord(
   if (!isTruthy(agent.liveDeploymentVersionId)) {
     throw createApiError(
       API_ERROR_CODE.agentLiveVersionRequired,
-      "Published Agent is missing a live deployment version.",
+      "Public API Agent is missing a live deployment version.",
     );
   }
 
@@ -389,7 +389,7 @@ export async function requireAgentLiveDeploymentVersionRecord(
   if (!liveVersion) {
     throw createApiError(
       API_ERROR_CODE.agentLiveVersionRequired,
-      "Published Agent live deployment version is missing.",
+      "Public API Agent live deployment version is missing.",
     );
   }
 

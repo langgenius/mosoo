@@ -19,6 +19,7 @@ import type {
   EnvironmentRevisionId,
   McpServerId,
   PlatformId,
+  AppId,
   SandboxId,
   SandboxSessionId,
   SessionId,
@@ -31,15 +32,15 @@ import type { DriverNativeRuntimeRef, DriverRuntime } from "agent-driver/runtime
 
 export type { DriverRuntime };
 
-export interface DriverOrganizationAccessSnapshotEntry {
+export interface DriverAppAccessSnapshotEntry {
   readonly mountPath: string;
   readonly role: "admin" | "edit" | "read";
   readonly spaceId: SpaceId;
   readonly type: "space";
 }
 
-export interface DriverOrganizationAccessSnapshotOutput {
-  readonly entries: DriverOrganizationAccessSnapshotEntry[];
+export interface DriverAppAccessSnapshotOutput {
+  readonly entries: DriverAppAccessSnapshotEntry[];
 }
 
 export interface DriverOrigin {
@@ -127,6 +128,7 @@ export interface AuthorizedDriverResolvedMcpServer {
   readonly credentialScope: McpCredentialScope;
   readonly credentialStatus: ActiveMcpCredentialStatus;
   readonly name: string;
+  readonly appId: AppId;
   readonly serverId: McpServerId;
   readonly subjectLabel?: string | null | undefined;
 }
@@ -137,6 +139,7 @@ export interface UnavailableDriverResolvedMcpServer {
   readonly credentialScope: McpCredentialScope;
   readonly credentialStatus: UnavailableMcpCredentialStatus;
   readonly name: string;
+  readonly appId: AppId;
   readonly serverId: McpServerId;
   readonly subjectLabel?: string | null | undefined;
 }
@@ -161,7 +164,7 @@ export interface DriverExecutionEnvironment {
 export interface DriverExecutionSessionContext {
   readonly sandboxSessionId: SandboxSessionId;
   readonly homePath: string;
-  readonly organizationAccessSnapshot: DriverOrganizationAccessSnapshotOutput;
+  readonly appAccessSnapshot: DriverAppAccessSnapshotOutput;
   readonly origin: DriverOrigin;
   readonly sandboxId: SandboxId;
   readonly sandboxKind: AgentKind;

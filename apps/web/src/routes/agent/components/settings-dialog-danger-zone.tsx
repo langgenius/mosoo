@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { resetAgentState, unpublishAgent } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
-import { toAgentDeploymentVersionId, toAgentId } from "@/routes/typed-id";
+import { toAgentDeploymentVersionId, toAgentId, toAppId } from "@/routes/typed-id";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -36,18 +36,21 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
   const [confirmUnpublish, setConfirmUnpublish] = useState(false);
   const [resetConfirmValue, setResetConfirmValue] = useState("");
   const typedAgentId = toAgentId(agent.id);
+  const typedAppId = toAppId(agent.appId);
   const resetAgentStateMutation = useMutation({
     mutationFn: resetAgentState,
     onSuccess: async (_data, variables) => {
-      await queryClient.invalidateQueries({ queryKey: agentKeys.detail(variables.agentId) });
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.detail(variables.appId, variables.agentId),
+      });
     },
   });
   const unpublishMutation = useMutation({
-    mutationFn: async () => unpublishAgent(typedAgentId),
+    mutationFn: async () => unpublishAgent(typedAppId, typedAgentId),
     onSuccess: async () => {
       setConfirmUnpublish(false);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: agentKeys.detail(agent.id) }),
+        queryClient.invalidateQueries({ queryKey: agentKeys.detail(agent.appId, agent.id) }),
         queryClient.invalidateQueries({ queryKey: agentKeys.lists() }),
       ]);
     },
@@ -58,6 +61,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
   async function handleResetAgentState() {
     await resetAgentStateMutation.mutateAsync({
       agentId: typedAgentId,
+      appId: typedAppId,
       targetVersion: toRuntimeOperationTargetVersion(agent),
     });
     setResetConfirmValue("");

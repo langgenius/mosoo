@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureAgentDestructiveAccess } from "./agent-access.service";
+import { ensureAppAgentOwner } from "./agent-access.service";
 import { toAgentModel } from "./agent-models";
 import { getAgentRow } from "./agent-repository";
 import { parseAgentStoredConfig, serializeAgentStoredConfig } from "./agent-stored-config.service";
@@ -15,7 +15,10 @@ export async function updateAgentPackageSharing(
   viewer: AuthenticatedViewer,
   input: UpdateAgentPackageSharingInput,
 ): Promise<Agent> {
-  const editable = await ensureAgentDestructiveAccess(database, viewer.id, input.agentId);
+  const editable = await ensureAppAgentOwner(database, viewer.id, {
+    agentId: input.agentId,
+    appId: input.appId,
+  });
   const stored = parseAgentStoredConfig(editable.agent.configJson);
   const timestampMs = currentTimestampMs();
   const configJson = serializeAgentStoredConfig({

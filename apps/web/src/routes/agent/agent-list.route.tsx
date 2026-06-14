@@ -14,11 +14,9 @@ import {
   ListPageToolbarSpacer,
 } from "@/shared/ui/list-page";
 import { PageHeader } from "@/shared/ui/page-header";
-import { ScopeTabs } from "@/shared/ui/scope-tabs";
-import type { Scope } from "@/shared/ui/scope-tabs";
 import { ViewToggle } from "@/shared/ui/view-toggle";
 
-import { filterAgents, getAgentsForScope, groupAgentsByScope } from "./agent-list-model";
+import { filterAgents } from "./agent-list-model";
 import { mapAgentSummaryToListView } from "./agent-view.mapper";
 import { AgentGrid } from "./components/agent-grid";
 import { AgentTable } from "./components/agent-table";
@@ -26,7 +24,6 @@ import { CreateAgentLauncherDialog } from "./components/create-agent-launcher";
 import { ImportAgentPackageDialog } from "./components/import-agent-package-dialog";
 
 interface AgentListPageState {
-  scope: Scope;
   search: string;
   showCreate: boolean;
   showImport: boolean;
@@ -34,14 +31,12 @@ interface AgentListPageState {
 }
 
 type AgentListPageAction =
-  | { type: "setScope"; scope: Scope }
   | { type: "setSearch"; search: string }
   | { type: "setShowCreate"; open: boolean }
   | { type: "setShowImport"; open: boolean }
   | { type: "setView"; view: "list" | "grid" };
 
 const AGENT_LIST_PAGE_INITIAL_STATE: AgentListPageState = {
-  scope: "mine",
   search: "",
   showCreate: false,
   showImport: false,
@@ -53,8 +48,6 @@ function agentListPageReducer(
   action: AgentListPageAction,
 ): AgentListPageState {
   switch (action.type) {
-    case "setScope":
-      return { ...state, scope: action.scope };
     case "setSearch":
       return { ...state, search: action.search };
     case "setShowCreate":
@@ -69,12 +62,12 @@ function agentListPageReducer(
 export function AgentListPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { activeOrganization } = useAppSession();
+  const { activeApp } = useAppSession();
   const [searchParams, setSearchParams] = useSearchParams();
   const [state, dispatch] = useReducer(agentListPageReducer, AGENT_LIST_PAGE_INITIAL_STATE);
-  const { scope, search, showCreate, showImport, view } = state;
-  const organizationId = activeOrganization?.id ?? null;
-  const agentsQuery = useVisibleAgentsQuery(organizationId);
+  const { search, showCreate, showImport, view } = state;
+  const appId = activeApp?.id ?? null;
+  const agentsQuery = useVisibleAgentsQuery(appId);
 
   useEffect(() => {
     if (searchParams.get("create") !== "1") return;
@@ -89,17 +82,15 @@ export function AgentListPage() {
     [agentsQuery.data, user],
   );
 
-  const agentScopes = useMemo(() => groupAgentsByScope(agents), [agents]);
-
   const basePath = globalThis.location.pathname.startsWith("/demo") ? "/demo/agent" : "/agent";
 
-  const scopeAgents = getAgentsForScope(agentScopes, scope);
-  const filteredAgents = filterAgents(scopeAgents, search);
+  const filteredAgents = filterAgents(agents, search);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <PageHeader title="Agents" description="Reusable workers your whole team can run.">
+      <PageHeader title="Agents" description="Reusable workers for this App.">
         <Button
+          disabled={appId === null}
           onClick={() => {
             dispatch({ open: true, type: "setShowCreate" });
           }}
@@ -111,17 +102,6 @@ export function AgentListPage() {
       </PageHeader>
 
       <ListPageToolbar>
-        <ScopeTabs
-          value={scope}
-          onChange={(nextScope) => {
-            dispatch({ scope: nextScope, type: "setScope" });
-          }}
-          tabs={[
-            { count: agentScopes.myAgents.length, label: "Mine", value: "mine" },
-            { count: agentScopes.sharedAgents.length, label: "Shared with me", value: "shared" },
-          ]}
-        />
-
         <ListPageToolbarSpacer />
 
         <ListPageSearch
@@ -134,6 +114,7 @@ export function AgentListPage() {
 
         <Button
           variant="outline"
+          disabled={appId === null}
           onClick={() => {
             dispatch({ open: true, type: "setShowImport" });
           }}
@@ -163,24 +144,19 @@ export function AgentListPage() {
         ) : filteredAgents.length === 0 ? (
           <EmptyState
             icon={Bot}
-            title={scope === "mine" ? "No agents yet" : "No agents shared with you yet"}
-            description={
-              scope === "mine"
-                ? "Create your first agent to put a reusable worker in your team's hands."
-                : "Agents shared with you by teammates will appear here."
-            }
+            title="No agents yet"
+            description="Create your first agent for this App."
           >
-            {scope === "mine" ? (
-              <Button
-                onClick={() => {
-                  dispatch({ open: true, type: "setShowCreate" });
-                }}
-                size="sm"
-              >
-                <Plus className="size-3.5" />
-                Create agent
-              </Button>
-            ) : null}
+            <Button
+              disabled={appId === null}
+              onClick={() => {
+                dispatch({ open: true, type: "setShowCreate" });
+              }}
+              size="sm"
+            >
+              <Plus className="size-3.5" />
+              Create agent
+            </Button>
           </EmptyState>
         ) : view === "list" ? (
           <AgentTable
@@ -188,8 +164,7 @@ export function AgentListPage() {
             onSelect={(id) => {
               void navigate(`${basePath}/${id}`);
             }}
-            organizationId={organizationId}
-            showOwner={scope === "shared"}
+            showOwner={false}
           />
         ) : (
           <AgentGrid
@@ -197,7 +172,7 @@ export function AgentListPage() {
             onSelect={(id) => {
               void navigate(`${basePath}/${id}`);
             }}
-            showOwner={scope === "shared"}
+            showOwner={false}
           />
         )}
       </ListPageContent>
@@ -216,7 +191,7 @@ export function AgentListPage() {
           dispatch({ open, type: "setShowImport" });
         }}
         open={showImport}
-        organizationId={organizationId}
+        appId={appId}
       />
     </div>
   );

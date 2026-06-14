@@ -1,5 +1,5 @@
 import type { UpdateAgentConfigInput } from "@mosoo/contracts/agent";
-import type { AgentId } from "@mosoo/id";
+import type { AgentId, AppId } from "@mosoo/id";
 
 import type {
   AgentBuilderLightweightPlannerDraftContext,
@@ -35,6 +35,7 @@ function emptyPlannerDraftContext(
 }
 
 export function toAgentBuilderUpdateAgentConfigInput(
+  appId: AppId,
   agentId: AgentId,
   draftYaml: string,
 ): UpdateAgentConfigInput {
@@ -86,6 +87,7 @@ export function toAgentBuilderUpdateAgentConfigInput(
     prompt: manifest.prompt,
     provider: manifest.provider,
     providerOptions: {},
+    appId,
     runtimeId: manifest.runtimeId,
     skillIds: manifest.activeSkillIds,
   };

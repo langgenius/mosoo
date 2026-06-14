@@ -1,8 +1,8 @@
 import { graphql } from "@/gql";
 
 export const GET_AGENT_EDITOR_STATE_QUERY = graphql(/* GraphQL */ `
-  query AgentEditorState($agentId: ULID!) {
-    agentEditorState(agentId: $agentId) {
+  query AgentEditorState($agentId: ULID!, $appId: ULID!) {
+    agentEditorState(agentId: $agentId, appId: $appId) {
       id
       builder {
         componentDecisions {
@@ -39,13 +39,6 @@ export const GET_AGENT_EDITOR_STATE_QUERY = graphql(/* GraphQL */ `
         }
       }
       providerOptions
-      collaborators {
-        principal
-        role
-        name
-        email
-        imageUrl
-      }
       mcpBindings {
         authType
         authorizationState
@@ -55,7 +48,7 @@ export const GET_AGENT_EDITOR_STATE_QUERY = graphql(/* GraphQL */ `
         credentialStatus
         credentialSubject
         enabled
-        hasSharedCredential
+        hasCredential
         iconUrl
         id
         name

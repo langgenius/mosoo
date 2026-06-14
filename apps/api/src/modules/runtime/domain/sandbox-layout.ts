@@ -5,7 +5,7 @@ import type { DriverInstanceId, SessionId, SpaceId } from "@mosoo/id";
 import { DRIVER_CONTROL_PORT_COUNT, DRIVER_CONTROL_PORT_MIN } from "agent-driver/boot";
 import { getGlobalSpaceMountPath, getSessionAliasPath } from "agent-driver/paths";
 
-import type { DriverOrganizationAccessSnapshotOutput } from "./driver-snapshot";
+import type { DriverAppAccessSnapshotOutput } from "./driver-snapshot";
 
 export interface FrozenSandboxSpaceBinding {
   role: "admin" | "edit" | "read";
@@ -75,7 +75,7 @@ export function freezeSandboxSpaceBindings(input: {
   sessionId: SessionId;
 }): {
   spaceAliases: SpaceAliasBinding[];
-  organizationAccessSnapshot: DriverOrganizationAccessSnapshotOutput;
+  appAccessSnapshot: DriverAppAccessSnapshotOutput;
 } {
   enforceUniqueSpaceNames(input.bindings);
 
@@ -86,7 +86,7 @@ export function freezeSandboxSpaceBindings(input: {
     spaceName: binding.spaceName,
   }));
   const roleBySpaceId = new Map(input.bindings.map((binding) => [binding.spaceId, binding]));
-  const entries: DriverOrganizationAccessSnapshotOutput["entries"] = [];
+  const entries: DriverAppAccessSnapshotOutput["entries"] = [];
 
   for (const alias of spaceAliases) {
     const binding = roleBySpaceId.get(alias.spaceId);
@@ -110,15 +110,15 @@ export function freezeSandboxSpaceBindings(input: {
   }
 
   return {
-    organizationAccessSnapshot: { entries },
+    appAccessSnapshot: { entries },
     spaceAliases,
   };
 }
 
-export function buildOrganizationAccessSnapshotFromAliases(input: {
-  currentSnapshot: DriverOrganizationAccessSnapshotOutput;
+export function buildAppAccessSnapshotFromAliases(input: {
+  currentSnapshot: DriverAppAccessSnapshotOutput;
   spaceAliases: SpaceAliasBinding[];
-}): DriverOrganizationAccessSnapshotOutput {
+}): DriverAppAccessSnapshotOutput {
   const accessBySpaceId = new Map<
     SpaceId,
     {
@@ -128,7 +128,7 @@ export function buildOrganizationAccessSnapshotFromAliases(input: {
   >();
 
   for (const entry of input.currentSnapshot.entries) {
-    const spaceId: SpaceId = parsePlatformId(entry.spaceId, "organization access space id");
+    const spaceId: SpaceId = parsePlatformId(entry.spaceId, "app access space id");
 
     if (!accessBySpaceId.has(spaceId)) {
       accessBySpaceId.set(spaceId, {
@@ -138,7 +138,7 @@ export function buildOrganizationAccessSnapshotFromAliases(input: {
     }
   }
 
-  const entries: DriverOrganizationAccessSnapshotOutput["entries"] = [];
+  const entries: DriverAppAccessSnapshotOutput["entries"] = [];
 
   for (const alias of input.spaceAliases) {
     const access = accessBySpaceId.get(alias.spaceId);

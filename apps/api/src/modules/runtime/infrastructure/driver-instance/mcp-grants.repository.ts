@@ -1,6 +1,12 @@
 import type { McpAuthType, McpAuthorizationState } from "@mosoo/contracts/mcp";
 import { driverInstanceMcpGrantsTable, sessionRunsTable, sessionRunSkillsTable } from "@mosoo/db";
-import type { CredentialId, DriverInstanceId, McpServerId, SkillSnapshotId } from "@mosoo/id";
+import type {
+  CredentialId,
+  DriverInstanceId,
+  McpServerId,
+  AppId,
+  SkillSnapshotId,
+} from "@mosoo/id";
 import { and, eq, inArray } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../../platform/db/drizzle";
@@ -12,6 +18,7 @@ export interface DriverInstanceMcpGrantRecord {
   canInvalidate: boolean;
   canRefresh: boolean;
   credentialId: CredentialId | null;
+  appId: AppId;
   serverId: McpServerId;
 }
 
@@ -48,6 +55,7 @@ async function readDriverInstanceMcpProxyGrant(
         canRefresh: driverInstanceMcpGrantsTable.canRefresh,
         credentialId: driverInstanceMcpGrantsTable.credentialId,
         driverInstanceId: driverInstanceMcpGrantsTable.driverInstanceId,
+        appId: driverInstanceMcpGrantsTable.appId,
         serverId: driverInstanceMcpGrantsTable.serverId,
       })
       .from(driverInstanceMcpGrantsTable)
@@ -70,6 +78,7 @@ async function readDriverInstanceMcpProxyGrant(
     canInvalidate: grant.canInvalidate,
     canRefresh: grant.canRefresh,
     credentialId: grant.credentialId,
+    appId: grant.appId,
     serverId: grant.serverId,
   };
 }
@@ -121,6 +130,7 @@ export async function requireDriverInstanceGrant(
         canRefresh: driverInstanceMcpGrantsTable.canRefresh,
         credentialId: driverInstanceMcpGrantsTable.credentialId,
         driverInstanceId: driverInstanceMcpGrantsTable.driverInstanceId,
+        appId: driverInstanceMcpGrantsTable.appId,
         serverId: driverInstanceMcpGrantsTable.serverId,
       })
       .from(driverInstanceMcpGrantsTable)
@@ -181,6 +191,7 @@ async function requireDriverInstanceMcpProxyGrant(
     canInvalidate: grant.canInvalidate,
     canRefresh: grant.canRefresh,
     credentialId: grant.credentialId,
+    appId: grant.appId,
     serverId: grant.serverId,
   };
 }

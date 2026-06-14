@@ -4,10 +4,9 @@ import {
   agentSkillsTable,
   agentSpaceBindingsTable,
   agentsTable,
-  resourceAclTable,
 } from "@mosoo/db";
-import type { AgentId } from "@mosoo/id";
-import { and, eq } from "drizzle-orm";
+import type { AgentId, AppId } from "@mosoo/id";
+import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
@@ -16,12 +15,13 @@ import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { removeAllAgentMcpBindings } from "../../mcp/application/mcp-agent-binding.service";
-import { ensureAgentDestructiveAccess, ensureAgentEditor } from "./agent-access.service";
+import { ensureAppAgentOwner } from "./agent-access.service";
 import { prepareAgentDeploymentVersionCandidate } from "./agent-deployment-version.service";
 import { loadAgentEnvironmentConfig } from "./agent-environment.service";
 import { toAgentModel } from "./agent-models";
+import { readAgentId, readAppId } from "./agent-platform-ids";
 import { computeAgentReadiness } from "./agent-readiness.service";
-import { getAgentRow, hasPersonalMcpBindings } from "./agent-repository";
+import { getAgentRow } from "./agent-repository";
 import { buildAgentSpec } from "./agent-spec.service";
 import { parseAgentStoredConfig } from "./agent-stored-config.service";
 export async function deleteAgent(
@@ -29,18 +29,16 @@ export async function deleteAgent(
   viewer: AuthenticatedViewer,
   input: DeleteAgentInput,
 ): Promise<void> {
-  const { agent } = await ensureAgentDestructiveAccess(database, viewer.id, input.agentId);
+  const { agent } = await ensureAppAgentOwner(database, viewer.id, {
+    agentId: readAgentId(input.agentId),
+    appId: readAppId(input.appId),
+  });
 
   await removeAllAgentMcpBindings(database, agent.id);
 
   await runAppDatabaseBatch(database, (db) => [
     db.delete(agentSkillsTable).where(eq(agentSkillsTable.agentId, agent.id)),
     db.delete(agentSpaceBindingsTable).where(eq(agentSpaceBindingsTable.agentId, agent.id)),
-    db
-      .delete(resourceAclTable)
-      .where(
-        and(eq(resourceAclTable.resourceType, "agent"), eq(resourceAclTable.resourceId, agent.id)),
-      ),
     db.delete(agentsTable).where(eq(agentsTable.id, agent.id)),
   ]);
 }
@@ -51,7 +49,10 @@ export async function publishAgent(
   input: PublishAgentInput,
 ): Promise<Agent> {
   const database = bindings.DB;
-  const { agent } = await ensureAgentEditor(database, viewer.id, input.agentId);
+  const { agent } = await ensureAppAgentOwner(database, viewer.id, {
+    agentId: readAgentId(input.agentId),
+    appId: readAppId(input.appId),
+  });
   const environment = await loadAgentEnvironmentConfig(database, agent.id, agent.environmentId);
   const { packageResolution } = parseAgentStoredConfig(agent.configJson);
   const readiness = await computeAgentReadiness(database, agent.ownerId, {
@@ -61,6 +62,7 @@ export async function publishAgent(
     model: agent.model,
     organizationId: agent.organizationId,
     packageResolution,
+    appId: agent.appId,
     provider: agent.provider,
     runtimeId: agent.runtimeId,
   });
@@ -70,10 +72,10 @@ export async function publishAgent(
   // DB default ("private"), so we always have a concrete visibility.
   const targetVisibility = input.visibility ?? agent.visibility;
 
-  if (targetVisibility !== "private" && (await hasPersonalMcpBindings(database, agent.id))) {
+  if (targetVisibility !== "private") {
     throw validationError(
-      "An agent with personal MCP bindings can only be used privately.",
-      "AGENT_PUBLISH_PERSONAL_MCP",
+      "Organization-wide Agent publishing is not supported for App-scoped Apps.",
+      "AGENT_PUBLISH_ORG_VISIBILITY_DISABLED",
     );
   }
 
@@ -104,41 +106,6 @@ export async function publishAgent(
         visibility: targetVisibility,
       })
       .where(eq(agentsTable.id, agent.id)),
-    targetVisibility === "organization"
-      ? db
-          .insert(resourceAclTable)
-          .values({
-            assignedByAccountId: viewer.id,
-            createdAt: timestampMs,
-            resourceId: agent.id,
-            resourceType: "agent",
-            role: "user",
-            targetId: agent.organizationId,
-            targetKind: "organization",
-          })
-          .onConflictDoUpdate({
-            set: {
-              assignedByAccountId: viewer.id,
-              createdAt: timestampMs,
-              role: "user",
-            },
-            target: [
-              resourceAclTable.resourceType,
-              resourceAclTable.resourceId,
-              resourceAclTable.targetKind,
-              resourceAclTable.targetId,
-            ],
-          })
-      : db
-          .delete(resourceAclTable)
-          .where(
-            and(
-              eq(resourceAclTable.resourceType, "agent"),
-              eq(resourceAclTable.resourceId, agent.id),
-              eq(resourceAclTable.targetKind, "organization"),
-              eq(resourceAclTable.targetId, agent.organizationId),
-            ),
-          ),
   ]);
 
   return toAgentModel(database, viewer, await getAgentRow(database, agent.id));
@@ -147,9 +114,12 @@ export async function publishAgent(
 export async function unpublishAgent(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  agentId: AgentId,
+  input: {
+    agentId: AgentId;
+    appId: AppId;
+  },
 ): Promise<Agent> {
-  const { agent } = await ensureAgentEditor(database, viewer.id, agentId);
+  const { agent } = await ensureAppAgentOwner(database, viewer.id, input);
   const timestampMs = currentTimestampMs();
 
   await getAppDatabase(database)

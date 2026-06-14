@@ -15,6 +15,7 @@ import {
   toAgentDeploymentVersionId,
   toEnvironmentId,
   toMcpServerId,
+  toAppId,
   toSkillId,
   toSpaceId,
 } from "@/routes/typed-id";
@@ -121,12 +122,17 @@ export function useAgentEditorModel({
   const [savedSnapshot, setSavedSnapshot] = useState(() => createEditorSaveSnapshot(initialDraft));
   const [saveError, setSaveError] = useState<string | null>(null);
   const typedAgentId = toAgentId(agent.id);
+  const typedAppId = toAppId(agent.appId);
   const configMutation = useMutation({
     mutationFn: updateAgentConfig,
     onSuccess: async (_data, variables) => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: agentKeys.detail(variables.agentId) }),
-        queryClient.invalidateQueries({ queryKey: agentKeys.editorState(variables.agentId) }),
+        queryClient.invalidateQueries({
+          queryKey: agentKeys.detail(variables.appId, variables.agentId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: agentKeys.editorState(variables.appId, variables.agentId),
+        }),
         queryClient.invalidateQueries({ queryKey: agentKeys.lists() }),
       ]);
     },
@@ -134,13 +140,17 @@ export function useAgentEditorModel({
   const restartDriverMutation = useMutation({
     mutationFn: restartDriver,
     onSuccess: async (_data, variables) => {
-      await queryClient.invalidateQueries({ queryKey: agentKeys.detail(variables.agentId) });
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.detail(variables.appId, variables.agentId),
+      });
     },
   });
   const recreateSandboxMutation = useMutation({
     mutationFn: recreateSandbox,
     onSuccess: async (_data, variables) => {
-      await queryClient.invalidateQueries({ queryKey: agentKeys.detail(variables.agentId) });
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.detail(variables.appId, variables.agentId),
+      });
     },
   });
 
@@ -228,7 +238,7 @@ export function useAgentEditorModel({
     });
 
     if (draftChangePlan.action === "fork-agent") {
-      const error = "Fork Agent to change type or runtime on a published Agent.";
+      const error = "Fork the Agent to change type or runtime after publishing.";
       setSaveError(error);
       return { error, ok: false };
     }
@@ -256,6 +266,7 @@ export function useAgentEditorModel({
         prompt: draftToSave.prompt,
         provider,
         providerOptions: draftToSave.providerOptions,
+        appId: typedAppId,
         runtimeId: draftToSave.runtime,
         skillIds: draftToSave.skills.flatMap((skill) =>
           skill.state === "tombstone" ? [] : [toSkillId(skill.id)],
@@ -269,6 +280,7 @@ export function useAgentEditorModel({
             affectedFields: draftChangePlan.fieldLabels,
             agentId: typedAgentId,
             applyActionKind: "recreate-preserving-state",
+            appId: typedAppId,
             targetVersion,
           });
         } else if (
@@ -279,6 +291,7 @@ export function useAgentEditorModel({
             affectedFields: draftChangePlan.fieldLabels,
             agentId: typedAgentId,
             applyActionKind: draftChangePlan.action,
+            appId: typedAppId,
             targetVersion,
           });
         }

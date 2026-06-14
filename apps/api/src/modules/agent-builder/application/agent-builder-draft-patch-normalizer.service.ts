@@ -73,13 +73,7 @@ export async function normalizeAgentBuilderDraftPatchNodes(input: {
     return normalized;
   });
 
-  return ensureRuntimeAndModelPatchAvailable(
-    input.bindings,
-    input.actorAccountId,
-    input.context,
-    draft,
-    nodes,
-  );
+  return ensureRuntimeAndModelPatchAvailable(input.bindings, input.context, draft, nodes);
 }
 
 function readDraftPatchBaseValue(
