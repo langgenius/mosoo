@@ -170,8 +170,8 @@ function readPackageMcpServer(value: unknown): AgentManifestMcpServerBinding | n
 
   if (
     (authType !== "oauth" && authType !== "bearer") ||
-    (credentialScope !== "organization_shared" && credentialScope !== "user") ||
-    (source !== "organization_shared" && source !== "personal")
+    credentialScope !== "app" ||
+    source !== "app"
   ) {
     return null;
   }

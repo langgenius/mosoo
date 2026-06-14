@@ -1,6 +1,7 @@
 import type { GraphQLModule } from "./graphql-module.ts";
 import { agentBuilderSchema } from "./schema/agent-builder-schema.ts";
 import { agentSchema } from "./schema/agent-schema.ts";
+import { appSchema } from "./schema/app-schema.ts";
 import { channelSchema } from "./schema/channel-schema.ts";
 import { commonSchema } from "./schema/common-schema.ts";
 import { costSchema } from "./schema/cost-schema.ts";
@@ -32,44 +33,39 @@ export const channelGraphQLSpec = {
     "startWeChatAgentChannelPairing(input: StartWeChatAgentChannelPairingInput!): WeChatAgentChannelPairing!",
     "deleteAgentChannelBinding(input: DeleteAgentChannelBindingInput!): OperationResult!",
   ],
-  queryFields: ["agentChannelBindingList(agentId: ULID!): [AgentChannelBinding!]!"],
+  queryFields: ["agentChannelBindingList(appId: ULID!, agentId: ULID!): [AgentChannelBinding!]!"],
   typeDefs: channelSchema,
 } satisfies GraphQLModuleSpec;
 
 export const costGraphQLSpec = {
   queryFields: [
-    "agentCostCard(agentId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AgentCostCard!",
-    "memberCostCard(organizationId: ULID!, memberId: ULID!, range: CostRange!): MemberCostCard!",
-    "organizationCostCard(organizationId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): OrganizationCostCard!",
-    "ownerCostCard(organizationId: ULID!, ownerUserId: ULID!, range: CostRange!): CostAttributionCard!",
+    "agentCostCard(appId: ULID!, agentId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AgentCostCard!",
+    "organizationBillingCostCard(organizationId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): OrganizationBillingCostCard!",
+    "appCostCard(appId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AppCostCard!",
   ],
   typeDefs: costSchema,
 } satisfies GraphQLModuleSpec;
 
 export const agentGraphQLSpec = {
   mutationFields: [
-    "addAgentCollaborator(input: AddAgentCollaboratorInput!): OperationResult!",
     "createAgentFork(input: CreateAgentForkInput!): AgentPackageImportResult!",
     "createAgent(input: CreateAgentInput!): Agent!",
     "deleteAgent(input: DeleteAgentInput!): OperationResult!",
     "importAgentPackage(input: ImportAgentPackageInput!): AgentPackageImportResult!",
     "publishAgent(input: PublishAgentInput!): Agent!",
     "recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!",
-    "removeAgentCollaborator(input: RemoveAgentCollaboratorInput!): OperationResult!",
     "resetAgentState(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!",
     "restartDriver(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!",
-    "unpublishAgent(agentId: ULID!): Agent!",
-    "updateAgentCollaborator(input: UpdateAgentCollaboratorInput!): OperationResult!",
+    "unpublishAgent(appId: ULID!, agentId: ULID!): Agent!",
     "updateAgentConfig(input: UpdateAgentConfigInput!): Agent!",
     "updateAgentPackageSharing(input: UpdateAgentPackageSharingInput!): Agent!",
   ],
   queryFields: [
-    "accessibleAgentList(organizationId: ULID!): [AgentSummary!]!",
-    "agent(agentId: ULID!): AgentDetail!",
-    "agentCollaboratorList(agentId: ULID!): [AgentCollaborator!]!",
-    "agentEditorState(agentId: ULID!): AgentEditorState!",
-    "agentManifest(agentId: ULID!): AgentManifestExport!",
-    "exportAgentPackage(agentId: ULID!): AgentPackageExport!",
+    "accessibleAgentList(appId: ULID!): [AgentSummary!]!",
+    "agent(appId: ULID!, agentId: ULID!): AgentDetail!",
+    "agentEditorState(appId: ULID!, agentId: ULID!): AgentEditorState!",
+    "agentManifest(appId: ULID!, agentId: ULID!): AgentManifestExport!",
+    "exportAgentPackage(appId: ULID!, agentId: ULID!): AgentPackageExport!",
   ],
   typeDefs: agentSchema,
 } satisfies GraphQLModuleSpec;
@@ -91,71 +87,68 @@ export const environmentGraphQLSpec = {
     "createEnvironmentFork(input: CreateEnvironmentForkInput!): EnvironmentSummary!",
     "deleteEnvironment(input: DeleteEnvironmentInput!): OperationResult!",
     "setEnvironmentVariableValue(input: SetEnvironmentVariableValueInput!): EnvironmentDetail!",
-    "setOrganizationDefaultEnvironment(input: SetOrganizationDefaultEnvironmentInput!): EnvironmentSummary!",
-    "shareEnvironmentWithOrganization(input: ShareEnvironmentWithOrganizationInput!): EnvironmentShareTarget!",
-    "shareEnvironmentWithUser(input: ShareEnvironmentWithUserInput!): EnvironmentShareTarget!",
-    "unshareEnvironmentTarget(input: UnshareEnvironmentTargetInput!): OperationResult!",
+    "setAppDefaultEnvironment(input: SetAppDefaultEnvironmentInput!): EnvironmentSummary!",
     "updateEnvironment(input: UpdateEnvironmentInput!): EnvironmentDetail!",
   ],
   queryFields: [
-    "environment(environmentId: ULID!): EnvironmentDetail!",
-    "organizationEnvironmentList(organizationId: ULID!): [EnvironmentSummary!]!",
+    "environment(appId: ULID!, environmentId: ULID!): EnvironmentDetail!",
+    "appEnvironmentList(appId: ULID!): [EnvironmentSummary!]!",
   ],
   typeDefs: environmentSchema,
 } satisfies GraphQLModuleSpec;
 
 export const mcpGraphQLSpec = {
   mutationFields: [
-    "clearOrganizationSharedCredential(serverId: ULID!): McpServerWithCredential!",
     "connectMcpBearer(input: ConnectMcpBearerInput!): McpServerWithCredential!",
-    "createPersonalMcpServer(input: CreatePersonalMcpServerInput!): McpServerWithCredential!",
-    "createOrganizationMcpServer(input: CreateOrganizationMcpServerInput!): McpServerWithCredential!",
-    "deleteMcpServer(serverId: ULID!): OperationResult!",
-    "revokeMcpUserCredential(serverId: ULID!): McpServerWithCredential!",
-    "setMcpServerEnabled(serverId: ULID!, enabled: Boolean!): McpServerWithCredential!",
-    "setOrganizationSharedBearer(input: SetOrganizationSharedMcpBearerInput!): McpServerWithCredential!",
+    "createAppMcpServer(input: CreateAppMcpServerInput!): McpServerWithCredential!",
+    "deleteMcpServer(appId: ULID!, serverId: ULID!): OperationResult!",
+    "revokeMcpCredential(appId: ULID!, serverId: ULID!): McpServerWithCredential!",
+    "setMcpServerEnabled(appId: ULID!, serverId: ULID!, enabled: Boolean!): McpServerWithCredential!",
     "startMcpOAuth(input: StartMcpOAuthInput!): StartMcpOAuthPayload!",
   ],
   queryFields: [
     "mcpOAuthFlowStatus(flowId: ULID!): McpOAuthFlowState!",
-    "mcpRegistry(organizationId: ULID!): McpRegistry!",
+    "mcpRegistry(appId: ULID!): McpRegistry!",
   ],
   typeDefs: mcpSchema,
 } satisfies GraphQLModuleSpec;
 
 export const onboardingGraphQLSpec = {
   mutationFields: ["onboardingBootstrap(input: BootstrapOnboardingInput!): OnboardingStatus!"],
-  queryFields: ["onboardingDiscovery: OnboardingDiscovery!"],
+  queryFields: [],
+} satisfies GraphQLModuleSpec;
+
+export const appGraphQLSpec = {
+  queryFields: ["appList(organizationId: ULID!): [App!]!"],
+  typeDefs: appSchema,
 } satisfies GraphQLModuleSpec;
 
 export const sessionGraphQLSpec = {
   mutationFields: [
     "addSessionResource(input: AddSessionResourceInput!): SessionResourceUpload!",
     "createAgentSession(input: CreateAgentSessionInput!): Session!",
-    "prewarmAgentSession(sessionId: ULID!): SessionRuntimePrewarmAck!",
-    "sendAgentSessionEvents(sessionId: ULID!, events: [AgentSessionEventInput!]!): AgentSessionEventBatch!",
-    "archiveAgentSession(sessionId: ULID!): OperationResult!",
+    "prewarmAgentSession(appId: ULID!, sessionId: ULID!): SessionRuntimePrewarmAck!",
+    "sendAgentSessionEvents(appId: ULID!, sessionId: ULID!, events: [AgentSessionEventInput!]!): AgentSessionEventBatch!",
+    "archiveAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!",
     "autoTitleSession(input: RenameSessionInput!): Session!",
-    "deleteAgentSession(sessionId: ULID!): OperationResult!",
+    "deleteAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!",
     "renameSession(input: RenameSessionInput!): Session!",
     "removeSessionResource(input: RemoveSessionResourceInput!): OperationResult!",
-    "unarchiveAgentSession(sessionId: ULID!): OperationResult!",
-    "updateSessionThreadUiState(input: UpdateSessionThreadUiStateInput!): SessionThreadUiState!",
+    "unarchiveAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!",
   ],
   queryFields: [
-    "agentSessionDiagnostics(sessionId: ULID!): AgentSessionDiagnostics!",
-    "agentSessionRetrieve(sessionId: ULID!): AgentSessionRetrieve!",
-    "session(sessionId: ULID!): Session!",
-    "sessionMessages(sessionId: ULID!): [SessionMessage!]!",
-    "sessionProcessEvents(limit: Int, sessionId: ULID!): [SessionProcessEvent!]!",
-    "sessionThreadUiStateList(organizationId: ULID!): [SessionThreadUiState!]!",
-    "threadAgentSessionList(archived: Boolean, beforeCursor: String, limit: Int, organizationId: ULID!, type: SessionType): AgentSessionRetrieveConnection!",
-    "threadAgentSessionRetrieve(sessionId: ULID!): AgentSessionRetrieve!",
-    "threadSessionMessages(sessionId: ULID!): [SessionMessage!]!",
-    "threadSessionProcessEvents(limit: Int, sessionId: ULID!): [SessionProcessEvent!]!",
-    "listSessionResources(sessionId: ULID!): [SessionResource!]!",
-    "sessionList(archived: Boolean, beforeCursor: String, limit: Int, organizationId: ULID!, type: SessionType): SessionConnection!",
-    "agentSessionList(agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!",
+    "agentSessionDiagnostics(appId: ULID!, sessionId: ULID!): AgentSessionDiagnostics!",
+    "agentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!",
+    "session(appId: ULID!, sessionId: ULID!): Session!",
+    "sessionMessages(appId: ULID!, sessionId: ULID!): [SessionMessage!]!",
+    "sessionProcessEvents(appId: ULID!, limit: Int, sessionId: ULID!): [SessionProcessEvent!]!",
+    "threadAgentSessionList(archived: Boolean, beforeCursor: String, limit: Int, appId: ULID!, type: SessionType): AgentSessionRetrieveConnection!",
+    "threadAgentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!",
+    "threadSessionMessages(appId: ULID!, sessionId: ULID!): [SessionMessage!]!",
+    "threadSessionProcessEvents(appId: ULID!, limit: Int, sessionId: ULID!): [SessionProcessEvent!]!",
+    "listSessionResources(appId: ULID!, sessionId: ULID!): [SessionResource!]!",
+    "sessionList(archived: Boolean, beforeCursor: String, limit: Int, appId: ULID!, type: SessionType): SessionConnection!",
+    "agentSessionList(appId: ULID!, agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!",
   ],
   typeDefs: sessionSchema,
 } satisfies GraphQLModuleSpec;
@@ -163,37 +156,27 @@ export const sessionGraphQLSpec = {
 export const skillGraphQLSpec = {
   mutationFields: [
     "createSkillFork(input: CreateSkillForkInput!): SkillSummary!",
-    "deleteOwnedSkill(skillId: ULID!): OperationResult!",
-    "setSkillAutoEnabled(input: SetSkillAutoEnabledInput!): SkillAutoPreference!",
-    "shareSkillWithUser(input: ShareSkillWithUserInput!): SkillShareTarget!",
-    "shareSkillWithOrganization(input: ShareSkillWithOrganizationInput!): SkillShareTarget!",
-    "unshareSkillTarget(input: UnshareSkillTargetInput!): OperationResult!",
+    "deleteOwnedSkill(appId: ULID!, skillId: ULID!): OperationResult!",
   ],
   queryFields: [
-    "skillDetail(skillId: ULID!): SkillDetail!",
-    "skillShareTargetList(skillId: ULID!): [SkillShareTarget!]!",
-    "organizationSkillList(organizationId: ULID!): [SkillSummary!]!",
+    "appSkillList(appId: ULID!): [SkillSummary!]!",
+    "skillDetail(appId: ULID!, skillId: ULID!): SkillDetail!",
   ],
   typeDefs: skillSchema,
 } satisfies GraphQLModuleSpec;
 
 export const spaceGraphQLSpec = {
   mutationFields: [
-    "addCollaborator(input: AddCollaboratorInput!): Collaborator!",
-    "addOrganizationCollaborator(input: AddOrganizationCollaboratorInput!): Collaborator!",
     "createSpace(input: CreateSpaceInput!): SpaceView!",
     "createSpaceDirectory(input: CreateSpaceDirectoryInput!): DirectoryEntry!",
-    "deleteSpace(spaceId: ULID!): OperationResult!",
+    "deleteSpace(appId: ULID!, spaceId: ULID!): OperationResult!",
     "deleteSpaceEntry(input: DeleteSpaceEntryInput!): OperationResult!",
-    "removeCollaborator(input: RemoveCollaboratorInput!): OperationResult!",
-    "updateCollaborator(input: UpdateCollaboratorInput!): Collaborator!",
     "updateSpace(input: UpdateSpaceInput!): Space!",
   ],
   queryFields: [
-    "space(spaceId: ULID!): Space!",
-    "spaceCollaboratorList(spaceId: ULID!): [Collaborator!]!",
-    "spaceFiles(path: String, spaceId: ULID!): SpaceFileListing!",
-    "spaceList(organizationId: ULID!): [SpaceView!]!",
+    "space(appId: ULID!, spaceId: ULID!): Space!",
+    "spaceFiles(path: String, appId: ULID!, spaceId: ULID!): SpaceFileListing!",
+    "spaceList(appId: ULID!): [SpaceView!]!",
   ],
   typeDefs: spaceSchema,
 } satisfies GraphQLModuleSpec;
@@ -215,36 +198,15 @@ export const vendorCredentialGraphQLSpec = {
     "updateVendorCredential(input: UpdateVendorCredentialInput!): VendorCredential!",
   ],
   queryFields: [
-    "availableAgentModels(runtimeId: String!, currentModelId: String, currentVendorId: String): [ResolvedModelEntry!]!",
-    "vendorCredentialList(organizationId: ULID!): [VendorCredential!]!",
+    "availableAgentModels(appId: ULID!, runtimeId: String!, currentModelId: String, currentVendorId: String): [ResolvedModelEntry!]!",
+    "vendorCredentialList(appId: ULID!): [VendorCredential!]!",
   ],
   typeDefs: vendorCredentialSchema,
 } satisfies GraphQLModuleSpec;
 
 export const organizationGraphQLSpec = {
-  mutationFields: [
-    "acceptOrganizationInvitation(input: AcceptOrganizationInvitationInput!): Organization!",
-    "cancelOrganizationInvitation(input: CancelOrganizationInvitationInput!): OrganizationInvitation!",
-    "createOrganization(input: CreateOrganizationInput!): Organization!",
-    "inviteOrganizationMember(input: InviteOrganizationMemberInput!): OrganizationInvitation!",
-    "removeOrganizationMember(input: RemoveOrganizationMemberInput!): OperationResult!",
-    "requestOrganizationAccess(input: RequestOrganizationAccessInput!): OrganizationAccessRequest!",
-    "requestOrganizationInvitation(input: RequestOrganizationInvitationInput!): OrganizationAccessRequest!",
-    "reviewOrganizationAccessRequest(input: ReviewOrganizationAccessRequestInput!): OrganizationAccessRequest!",
-    "setActiveOrganization(input: SetActiveOrganizationInput!): Organization!",
-    "setOrganizationMemberStatus(input: SetOrganizationMemberStatusInput!): OrganizationMember!",
-    "updateOrganizationJoinPolicy(input: UpdateOrganizationJoinPolicyInput!): Organization!",
-    "updateOrganizationMemberRole(input: UpdateOrganizationMemberRoleInput!): OrganizationMember!",
-    "updateOrganizationPrimaryDomain(input: UpdateOrganizationPrimaryDomainInput!): Organization!",
-    "updateOrganizationProfile(input: UpdateOrganizationProfileInput!): Organization!",
-  ],
-  queryFields: [
-    "pendingOrganizationInvitationList: [OrganizationInvitation!]!",
-    "organizationAccessRequestList(organizationId: ULID!): [OrganizationAccessRequest!]!",
-    "organizationInvitationList(organizationId: ULID!): [OrganizationInvitation!]!",
-    "organizationJoinTarget(organizationId: ULID!): OrganizationJoinTarget!",
-    "organizationMemberList(organizationId: ULID!): [OrganizationMember!]!",
-  ],
+  mutationFields: [],
+  queryFields: [],
   typeDefs: organizationSchema,
 } satisfies GraphQLModuleSpec;
 
@@ -257,6 +219,7 @@ export const graphqlModuleSpecs = [
   environmentGraphQLSpec,
   mcpGraphQLSpec,
   onboardingGraphQLSpec,
+  appGraphQLSpec,
   sessionGraphQLSpec,
   skillGraphQLSpec,
   spaceGraphQLSpec,

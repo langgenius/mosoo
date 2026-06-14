@@ -1,5 +1,5 @@
 import type { SkillSnapshotEntryKind, SkillSourceKind } from "@mosoo/contracts/skill";
-import type { AccountId, OrganizationId, SkillId, SkillSnapshotId } from "@mosoo/id";
+import type { AccountId, OrganizationId, AppId, SkillId, SkillSnapshotId } from "@mosoo/id";
 import {
   index,
   integer,
@@ -25,12 +25,13 @@ export const skillsTable = sqliteTable(
     name: text("name").notNull(),
     organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
     ownerAccountId: platformIdColumn<AccountId>("owner_account_id").notNull(),
+    appId: platformIdColumn<AppId>("app_id").notNull(),
     sourceKind: text("source_kind").$type<SkillSourceKind>().notNull(),
     updatedAt: integer("updated_at").notNull(),
     version: text("version"),
   },
   (table) => [
-    index("skill_organization_updated_at_idx").on(table.organizationId, table.updatedAt),
+    index("skill_app_updated_at_idx").on(table.appId, table.updatedAt),
     index("skill_owner_account_updated_at_idx").on(table.ownerAccountId, table.updatedAt),
   ],
 );
@@ -47,13 +48,14 @@ export const skillSnapshotsTable = sqliteTable(
     id: platformIdColumn<SkillSnapshotId>("id").primaryKey(),
     name: text("name").notNull(),
     organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
+    appId: platformIdColumn<AppId>("app_id").notNull(),
     skillMarkdownPath: text("skill_markdown_path").notNull(),
     uncompressedSize: integer("uncompressed_size").notNull(),
     version: text("version"),
   },
   (table) => [
-    index("skill_snapshot_organization_created_at_idx").on(table.organizationId, table.createdAt),
-    uniqueIndex("skill_snapshot_blob_sha256_idx").on(table.organizationId, table.blobSha256),
+    index("skill_snapshot_app_created_at_idx").on(table.appId, table.createdAt),
+    uniqueIndex("skill_snapshot_blob_sha256_idx").on(table.appId, table.blobSha256),
   ],
 );
 
@@ -75,22 +77,6 @@ export const skillSnapshotEntriesTable = sqliteTable(
   ],
 );
 
-export const skillPreferencesTable = sqliteTable(
-  "skill_preference",
-  {
-    accountId: platformIdColumn<AccountId>("account_id").notNull(),
-    autoEnabled: integer("auto_enabled", { mode: "boolean" }).notNull(),
-    createdAt: integer("created_at").notNull(),
-    skillId: platformIdColumn<SkillId>("skill_id").notNull(),
-    updatedAt: integer("updated_at").notNull(),
-  },
-  (table) => [
-    primaryKey({
-      columns: [table.skillId, table.accountId],
-    }),
-  ],
-);
-export type SkillPreferenceRow = typeof skillPreferencesTable.$inferSelect;
 export type SkillRow = typeof skillsTable.$inferSelect;
 export type SkillSnapshotEntryRow = typeof skillSnapshotEntriesTable.$inferSelect;
 export type SkillSnapshotRow = typeof skillSnapshotsTable.$inferSelect;

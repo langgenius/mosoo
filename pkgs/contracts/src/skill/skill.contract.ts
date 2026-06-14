@@ -1,12 +1,9 @@
-import type { AccountId, OrganizationId, SkillId, SkillSnapshotId } from "../id/id.contract";
+import type { AccountId, AppId, SkillId, SkillSnapshotId } from "../id/id.contract";
 
 export type SkillSourceKind = "official" | "user";
-export type SkillRegistryRole = "owner" | "user";
-export type SkillShareTargetKind = "user" | "organization";
 export type SkillSnapshotEntryKind = "directory" | "file";
 export type SkillResolutionMode = "auto" | "explicit" | "tombstone";
 export type SkillMaterializationStatus = "failed" | "pending" | "ready" | "skipped";
-export type SkillShareTargetId = AccountId | OrganizationId;
 
 export interface SkillForkOrigin {
   name: string;
@@ -39,17 +36,8 @@ export interface SkillSnapshotRecord {
   version: string | null;
 }
 
-export interface SkillShareTarget {
-  createdAt: string;
-  email: string | null;
-  id: SkillShareTargetId;
-  kind: SkillShareTargetKind;
-  name: string | null;
-}
-
 export interface SkillSummary {
   author: string;
-  autoEnabled: boolean;
   createdAt: string;
   description: string;
   forkOrigin: SkillForkOrigin | null;
@@ -57,17 +45,15 @@ export interface SkillSummary {
   name: string;
   ownerId: AccountId;
   ownerName: string;
-  role: SkillRegistryRole;
+  appId: AppId;
   snapshotId: SkillSnapshotId;
   sourceKind: SkillSourceKind;
   updatedAt: string;
-  organizationId: OrganizationId;
 }
 
 export interface SkillDetail extends SkillSummary {
   currentSnapshot: SkillSnapshotRecord;
   entries: SkillSnapshotEntry[];
-  shareTargets: SkillShareTarget[];
 }
 
 export interface SkillInspectResult {
@@ -81,11 +67,6 @@ export interface SkillInspectResult {
   normalizedFileName: string;
   skillMarkdownPath: string;
   warnings: string[];
-}
-
-export interface SkillAutoPreference {
-  autoEnabled: boolean;
-  skillId: SkillId;
 }
 
 export interface ResolvedRunSkill {
@@ -102,26 +83,7 @@ export interface ResolvedRunSkill {
   warningCode: string | null;
 }
 
-export interface SetSkillAutoEnabledInput {
-  autoEnabled: boolean;
-  skillId: SkillId;
-}
-
 export interface CreateSkillForkInput {
+  appId: AppId;
   skillId: SkillId;
-}
-
-export interface ShareSkillWithUserInput {
-  email: string;
-  skillId: SkillId;
-}
-
-export interface ShareSkillWithOrganizationInput {
-  skillId: SkillId;
-}
-
-export interface UnshareSkillTargetInput {
-  skillId: SkillId;
-  targetId: SkillShareTargetId;
-  targetKind: SkillShareTargetKind;
 }

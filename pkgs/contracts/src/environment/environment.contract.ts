@@ -1,15 +1,8 @@
-import type {
-  AccountId,
-  EnvironmentId,
-  EnvironmentRevisionId,
-  OrganizationId,
-} from "../id/id.contract";
+import type { AccountId, EnvironmentId, EnvironmentRevisionId, AppId } from "../id/id.contract";
 
 export type EnvironmentNetworkPolicy = "full" | "limited";
 export type EnvironmentPackageManager = "apt" | "cargo" | "gem" | "go" | "npm" | "pip";
 export type EnvironmentRegistryRole = "owner" | "user";
-export type EnvironmentShareTargetKind = "organization" | "user";
-export type EnvironmentShareTargetId = AccountId | OrganizationId;
 
 export interface EnvironmentOwnerSummary {
   id: AccountId | null;
@@ -62,20 +55,10 @@ export interface EnvironmentSummary extends EnvironmentRevisionConfig {
   role: EnvironmentRegistryRole;
   updatedAt: string;
   usedByAgentCount: number;
-  organizationId: OrganizationId;
+  appId: AppId;
 }
 
-export interface EnvironmentShareTarget {
-  createdAt: string;
-  email: string | null;
-  id: EnvironmentShareTargetId;
-  kind: EnvironmentShareTargetKind;
-  name: string | null;
-}
-
-export interface EnvironmentDetail extends EnvironmentSummary {
-  shareTargets: EnvironmentShareTarget[];
-}
+export interface EnvironmentDetail extends EnvironmentSummary {}
 
 export interface EnvironmentVariableInput {
   key: string;
@@ -85,6 +68,7 @@ export interface EnvironmentVariableInput {
 export interface SetEnvironmentVariableValueInput {
   environmentId: EnvironmentId;
   key: string;
+  appId: AppId;
   value: string;
 }
 
@@ -101,41 +85,29 @@ export interface EnvironmentConfigInput {
 export interface CreateEnvironmentInput extends EnvironmentConfigInput {
   description?: string | null;
   name: string;
-  organizationId: OrganizationId;
+  appId: AppId;
 }
 
 export interface UpdateEnvironmentInput extends EnvironmentConfigInput {
   description?: string | null;
   environmentId: EnvironmentId;
   name: string;
+  appId: AppId;
 }
 
 export interface CreateEnvironmentForkInput {
   environmentId: EnvironmentId;
+  appId: AppId;
 }
 
 export interface DeleteEnvironmentInput {
   environmentId: EnvironmentId;
+  appId: AppId;
 }
 
-export interface SetOrganizationDefaultEnvironmentInput {
+export interface SetAppDefaultEnvironmentInput {
   environmentId: EnvironmentId;
-  organizationId: OrganizationId;
-}
-
-export interface ShareEnvironmentWithUserInput {
-  email: string;
-  environmentId: EnvironmentId;
-}
-
-export interface ShareEnvironmentWithOrganizationInput {
-  environmentId: EnvironmentId;
-}
-
-export interface UnshareEnvironmentTargetInput {
-  environmentId: EnvironmentId;
-  targetId: EnvironmentShareTargetId;
-  targetKind: EnvironmentShareTargetKind;
+  appId: AppId;
 }
 
 export interface SessionEnvironmentSnapshot extends EnvironmentRevisionConfig {

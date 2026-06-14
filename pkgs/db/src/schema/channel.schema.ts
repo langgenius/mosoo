@@ -4,6 +4,7 @@ import type {
   AgentId,
   ChannelBindingId,
   PlatformId,
+  AppId,
   SemanticPlatformId,
   SessionId,
   SessionRunId,
@@ -11,6 +12,7 @@ import type {
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 import { agentsTable } from "./agent.schema";
+import { appsTable } from "./app.schema";
 import { platformIdColumn } from "./id-column";
 import { vaultSecretsTable } from "./mcp.schema";
 import { sessionsTable } from "./session/core.schema";
@@ -55,6 +57,9 @@ export const agentChannelBindingsTable = sqliteTable(
     id: platformIdColumn<ChannelBindingId>("id").primaryKey(),
     lastErrorCode: text("last_error_code"),
     provider: text("provider").$type<AgentChannelBindingProvider>().notNull(),
+    appId: platformIdColumn<AppId>("app_id")
+      .notNull()
+      .references(() => appsTable.id, { onDelete: "cascade" }),
     status: text("status").$type<AgentChannelBindingStatus>().notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
@@ -66,6 +71,7 @@ export const agentChannelBindingsTable = sqliteTable(
       table.externalBotId,
     ),
     index("agent_channel_binding_agent_status_idx").on(table.agentId, table.status),
+    index("agent_channel_binding_app_status_idx").on(table.appId, table.status),
   ],
 );
 
@@ -207,6 +213,9 @@ export const wechatChannelAccountsTable = sqliteTable(
     ownerAccountId: platformIdColumn<AccountId>("owner_account_id")
       .notNull()
       .references(() => accountsTable.id, { onDelete: "cascade" }),
+    appId: platformIdColumn<AppId>("app_id")
+      .notNull()
+      .references(() => appsTable.id, { onDelete: "cascade" }),
     runtimeStateJson: text("runtime_state_json").notNull().default("{}"),
     status: text("status").$type<WeChatChannelAccountStatus>().notNull(),
     statusChangedAt: integer("status_changed_at").notNull(),
@@ -219,6 +228,7 @@ export const wechatChannelAccountsTable = sqliteTable(
       table.externalBotId,
     ),
     index("wechat_channel_account_status_idx").on(table.status, table.updatedAt),
+    index("wechat_channel_account_app_status_idx").on(table.appId, table.status),
   ],
 );
 
@@ -235,6 +245,9 @@ export const wechatChannelPairingsTable = sqliteTable(
       .references(() => accountsTable.id, { onDelete: "cascade" }),
     expiresAt: integer("expires_at").notNull(),
     id: platformIdColumn<WeChatChannelPairingId>("id").primaryKey(),
+    appId: platformIdColumn<AppId>("app_id")
+      .notNull()
+      .references(() => appsTable.id, { onDelete: "cascade" }),
     qrTokenHash: text("qr_token_hash").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
@@ -242,6 +255,11 @@ export const wechatChannelPairingsTable = sqliteTable(
     uniqueIndex("wechat_channel_pairing_qr_token_hash_idx").on(table.qrTokenHash),
     index("wechat_channel_pairing_agent_creator_idx").on(
       table.agentId,
+      table.createdByAccountId,
+      table.consumedAt,
+    ),
+    index("wechat_channel_pairing_app_creator_idx").on(
+      table.appId,
       table.createdByAccountId,
       table.consumedAt,
     ),

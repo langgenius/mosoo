@@ -1,5 +1,4 @@
-import type { SpaceVisibility } from "@mosoo/contracts/space";
-import type { AccountId, OrganizationId, SemanticPlatformId, SpaceId } from "@mosoo/id";
+import type { AccountId, AppId, SemanticPlatformId, SpaceId } from "@mosoo/id";
 import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
@@ -13,14 +12,13 @@ export const spacesTable = sqliteTable(
     createdAt: integer("created_at").notNull(),
     id: platformIdColumn<SpaceId>("id").primaryKey(),
     name: text("name").notNull(),
-    organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
     ownerAccountId: platformIdColumn<AccountId>("owner_account_id").notNull(),
+    appId: platformIdColumn<AppId>("app_id").notNull(),
     updatedAt: integer("updated_at").notNull(),
-    visibility: text("visibility").$type<SpaceVisibility>().notNull(),
   },
   (table) => [
-    uniqueIndex("space_organization_name_idx").on(table.organizationId, sql`lower(${table.name})`),
-    index("space_organization_owner_idx").on(table.organizationId, table.ownerAccountId),
+    uniqueIndex("space_app_name_idx").on(table.appId, sql`lower(${table.name})`),
+    index("space_app_owner_idx").on(table.appId, table.ownerAccountId),
   ],
 );
 

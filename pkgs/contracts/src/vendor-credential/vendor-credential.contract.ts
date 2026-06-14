@@ -1,19 +1,13 @@
-import type { AccountId, OrganizationId, VendorCredentialId } from "../id/id.contract";
-
-export type VendorCredentialScope = "company" | "personal";
+import type { AppId, VendorCredentialId } from "../id/id.contract";
 
 export interface VendorCredential {
   apiBase: string | null;
   id: VendorCredentialId;
-  isDefault: boolean;
-  isPreferred: boolean;
   maskedApiKey: string;
   models: string[] | null;
   name: string;
-  ownerUserId: AccountId | null;
-  scope: VendorCredentialScope;
+  appId: AppId;
   vendorId: string;
-  organizationId: OrganizationId;
 }
 
 export interface VendorCredentialSummary {
@@ -25,31 +19,26 @@ export interface VendorCredentialSummary {
 export interface CreateVendorCredentialInput {
   apiBase?: string | null;
   apiKey: string;
-  isDefault?: boolean;
-  isPreferred?: boolean;
   models?: string[] | null;
   name: string;
-  scope?: VendorCredentialScope;
+  appId: AppId;
   vendorId: string;
-  organizationId: OrganizationId;
 }
 
 export interface UpdateVendorCredentialInput {
   apiBase?: string | null;
   apiKey?: string;
   id: VendorCredentialId;
-  isDefault?: boolean;
-  isPreferred?: boolean;
   models?: string[] | null;
   name?: string;
+  appId: AppId;
 }
 
 export interface TestVendorCredentialInput {
   apiBase?: string | null;
   apiKey: string;
   modelId?: string | null;
-  organizationId: OrganizationId;
-  scope?: VendorCredentialScope;
+  appId: AppId;
   vendorId: string;
 }
 
@@ -61,4 +50,5 @@ export interface TestVendorCredentialResult {
 
 export interface DeleteVendorCredentialInput {
   id: VendorCredentialId;
+  appId: AppId;
 }

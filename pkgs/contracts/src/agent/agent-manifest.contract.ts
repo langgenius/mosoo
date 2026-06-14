@@ -1,4 +1,4 @@
-import type { AgentId, FileId, OrganizationId } from "../id/id.contract";
+import type { AgentId, FileId, AppId } from "../id/id.contract";
 import type { JsonObject } from "../validation/primitives.contract";
 import { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION } from "./agent-manifest-version.contract";
 import type { AgentKind } from "./agent.contract";
@@ -62,12 +62,12 @@ export interface AgentManifestSkillReference {
 export interface AgentManifestMcpServerBinding {
   authType: "bearer" | "oauth";
   credentialMode: "agent_bound" | "runtime_resolved";
-  credentialScope: "organization_shared" | "user";
+  credentialScope: "app";
   enabled: boolean;
   iconUrl: string | null;
   name: string;
   serverId: string | null;
-  source: "organization_shared" | "personal";
+  source: "app";
   url: string;
 }
 
@@ -181,12 +181,13 @@ export interface AgentPackageExport {
 
 export interface ImportAgentPackageInput {
   fileId: FileId;
-  organizationId: OrganizationId;
+  appId: AppId;
 }
 
 export interface CreateAgentForkInput {
   agentId: AgentId;
   kind?: AgentKind;
+  appId: AppId;
 }
 
 export interface AgentPackageImportResult<AgentModel = unknown> {

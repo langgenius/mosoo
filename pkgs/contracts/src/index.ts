@@ -24,4 +24,4 @@ export * from "./space/space.contract";
 export * from "./validation/primitives.contract";
 export type * from "./vendor-credential/vendor-credential.contract";
 export type * from "./organization/organization.contract";
-export * from "./permission/permission.contract";
+export type * from "./app/app.contract";

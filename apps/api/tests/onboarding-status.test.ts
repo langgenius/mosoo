@@ -16,50 +16,29 @@ function createOnboardingStatusDatabase(): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
 
   database.execute(`
-    CREATE TABLE organization (
-      avatar_url text,
-      created_at integer NOT NULL,
-      id text PRIMARY KEY NOT NULL,
-      join_policy text NOT NULL,
-      name text NOT NULL,
-      primary_domain text,
-      slug text NOT NULL
-    );
-
-    CREATE TABLE organization_member (
-      account_id text NOT NULL,
-      disabled_at integer,
-      joined_at integer NOT NULL,
-      organization_id text NOT NULL,
-      role text NOT NULL,
-      PRIMARY KEY (organization_id, account_id)
-    );
+	    CREATE TABLE organization (
+	      avatar_url text,
+	      created_at integer NOT NULL,
+	      creator_account_id text,
+	      id text PRIMARY KEY NOT NULL,
+	      name text NOT NULL,
+	      slug text NOT NULL,
+	      updated_at integer NOT NULL
+	    );
 
     INSERT INTO organization (
-      avatar_url,
-      created_at,
-      id,
-      join_policy,
-      name,
-      primary_domain,
-      slug
-    )
-    VALUES
-      (NULL, 1, 'org-old', 'invite_only', 'Old Org', NULL, 'old-org'),
-      (NULL, 2, 'org-current', 'auto', 'Current Org', NULL, 'current-org'),
-      (NULL, 3, 'org-disabled', 'auto', 'Disabled Org', NULL, 'disabled-org');
-
-    INSERT INTO organization_member (
-      account_id,
-      disabled_at,
-      joined_at,
-      organization_id,
-      role
-    )
-    VALUES
-      ('viewer-1', NULL, 10, 'org-old', 'member'),
-      ('viewer-1', NULL, 20, 'org-current', 'admin'),
-      ('viewer-1', 30, 30, 'org-disabled', 'member');
+	      avatar_url,
+	      created_at,
+	      creator_account_id,
+	      id,
+	      name,
+	      slug,
+	      updated_at
+	    )
+	    VALUES
+	      (NULL, 1, 'viewer-1', 'org-old', 'Old Org', 'old-org', 1),
+	      (NULL, 2, 'viewer-1', 'org-current', 'Current Org', 'current-org', 2),
+	      (NULL, 3, 'other-owner', 'org-other-owner', 'Other Owner Org', 'other-owner-org', 3);
   `);
 
   return database;
@@ -73,6 +52,6 @@ describe("onboarding status", () => {
 
     expect(status.completed).toBe(true);
     expect(status.organization?.id).toBe("org-current");
-    expect(status.organization?.viewerRole).toBe("admin");
+    expect(status.organization).not.toHaveProperty("viewerRole");
   });
 });

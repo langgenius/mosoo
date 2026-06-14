@@ -6,10 +6,10 @@ import type {
   CredentialId,
   McpOAuthFlowId,
   McpServerId,
-  OrganizationId,
+  AppId,
 } from "../id/id.contract";
 
-export const MCP_SERVER_SOURCES = ["personal", "organization_shared"] as const;
+export const MCP_SERVER_SOURCES = ["app"] as const;
 export const McpServerSource = type.enumerated(...MCP_SERVER_SOURCES);
 export type McpServerSource = typeof McpServerSource.infer;
 
@@ -17,7 +17,7 @@ export const MCP_AUTH_TYPES = ["oauth", "bearer"] as const;
 export const McpAuthType = type.enumerated(...MCP_AUTH_TYPES);
 export type McpAuthType = typeof McpAuthType.infer;
 
-export const MCP_CREDENTIAL_SCOPES = ["user", "organization_shared"] as const;
+export const MCP_CREDENTIAL_SCOPES = ["app"] as const;
 export const McpCredentialScope = type.enumerated(...MCP_CREDENTIAL_SCOPES);
 export type McpCredentialScope = typeof McpCredentialScope.infer;
 
@@ -100,16 +100,16 @@ export interface McpServer {
   credentialScope: McpCredentialScope;
   description: string | null;
   enabled: boolean;
-  hasSharedCredential: boolean;
+  hasCredential: boolean;
   id: McpServerId;
   iconUrl: string | null;
   name: string;
   ownerId: AccountId;
   ownerName: string;
+  appId: AppId;
   source: McpServerSource;
   updatedAt: string;
   url: string;
-  organizationId: OrganizationId;
 }
 
 export interface McpServerWithCredential extends McpServer {
@@ -122,10 +122,8 @@ export interface McpRegistry {
   currentUserEmail: string;
   currentUserId: AccountId;
   currentUserName: string;
-  isAdmin: boolean;
-  personal: McpServerWithCredential[];
-  organizationId: OrganizationId;
-  organizationShared: McpServerWithCredential[];
+  appId: AppId;
+  servers: McpServerWithCredential[];
 }
 
 export interface AgentMcpBinding {
@@ -137,7 +135,7 @@ export interface AgentMcpBinding {
   credentialStatus: McpCredentialStatus;
   credentialSubject: string | null;
   enabled: boolean;
-  hasSharedCredential: boolean;
+  hasCredential: boolean;
   iconUrl: string | null;
   id: AgentMcpBindingId;
   name: string;
@@ -147,43 +145,26 @@ export interface AgentMcpBinding {
   url: string;
 }
 
-export interface CreatePersonalMcpServerInput {
+export interface CreateAppMcpServerInput {
   authType: McpAuthType;
   description?: string | null;
   iconUrl?: string | null;
   name: string;
   oauthClientId?: string | null;
   oauthClientSecret?: string | null;
+  appId: AppId;
   url: string;
-  organizationId: OrganizationId;
-}
-
-export interface CreateOrganizationMcpServerInput {
-  authType: McpAuthType;
-  credentialScope: McpCredentialScope;
-  description?: string | null;
-  iconUrl?: string | null;
-  name: string;
-  oauthClientId?: string | null;
-  oauthClientSecret?: string | null;
-  sharedBearerToken?: string | null;
-  url: string;
-  organizationId: OrganizationId;
 }
 
 export interface ConnectMcpBearerInput {
-  serverId: McpServerId;
-  subjectLabel?: string | null;
-  token: string;
-}
-
-export interface SetOrganizationSharedMcpBearerInput {
+  appId: AppId;
   serverId: McpServerId;
   subjectLabel?: string | null;
   token: string;
 }
 
 export interface StartMcpOAuthInput {
+  appId: AppId;
   returnUrl?: string | null;
   serverId: McpServerId;
 }

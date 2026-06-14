@@ -227,11 +227,11 @@ export function readMcpServerBinding(value: unknown): AgentManifestMcpServerBind
     throw new Error("Agent Manifest MCP credentialMode is invalid.");
   }
 
-  if (credentialScope !== "organization_shared" && credentialScope !== "user") {
+  if (credentialScope !== "app") {
     throw new Error("Agent Manifest MCP credentialScope is invalid.");
   }
 
-  if (source !== "organization_shared" && source !== "personal") {
+  if (source !== "app") {
     throw new Error("Agent Manifest MCP source is invalid.");
   }
 
