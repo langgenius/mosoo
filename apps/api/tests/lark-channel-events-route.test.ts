@@ -128,7 +128,7 @@ describe("Lark channel events route", () => {
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
         agentId: PUBLIC_API_TEST_IDS.agent,
-        appId: "cli_a",
+        larkAppId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "webhook",
         domain: "feishu",
@@ -175,7 +175,7 @@ describe("Lark channel events route", () => {
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
         agentId: PUBLIC_API_TEST_IDS.agent,
-        appId: "cli_a",
+        larkAppId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "webhook",
         domain: "feishu",
@@ -226,7 +226,7 @@ describe("Lark channel events route", () => {
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
         agentId: PUBLIC_API_TEST_IDS.agent,
-        appId: "cli_a",
+        larkAppId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "webhook",
         domain: "feishu",
@@ -276,7 +276,7 @@ describe("Lark channel events route", () => {
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
         agentId: PUBLIC_API_TEST_IDS.agent,
-        appId: "cli_a",
+        larkAppId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "webhook",
         domain: "feishu",
@@ -317,7 +317,7 @@ describe("Lark channel events route", () => {
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
         agentId: PUBLIC_API_TEST_IDS.agent,
-        appId: "cli_a",
+        larkAppId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "webhook",
         domain: "feishu",
@@ -355,7 +355,7 @@ describe("Lark channel events route", () => {
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
         agentId: PUBLIC_API_TEST_IDS.agent,
-        appId: "cli_a",
+        larkAppId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "webhook",
         domain: "feishu",
@@ -458,7 +458,7 @@ describe("Lark channel events route", () => {
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
         agentId: PUBLIC_API_TEST_IDS.agent,
-        appId: "cli_a",
+        larkAppId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "webhook",
         domain: "feishu",

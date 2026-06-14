@@ -47,10 +47,10 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 
 Surface boundary: public HTTPS exposure is an Agent API Endpoint inside one App. Thread is the public conversation object, Session is the runtime record, and Thread files are scoped to the admitted Thread/backing Session. Organization remains account and billing context, not a public API authorization boundary.
 
-### Historical / future access, identity & governance
+### Deprecated / future access, identity & governance
 
-- [Identity & Access](./identity-access.md) — future multi-member governance language must be read through the current single-owner Organization assumption.
-- [RBAC](./rbac.md) — historical / future governance foundation; not a dependency for the current App cut.
+- [Identity & Access](./identity-access.md) — deprecated for the current App cut; keep only as future multi-member governance archive.
+- [RBAC](./rbac.md) — deprecated for the current App cut; do not use it to justify V1 permissions, UI, fixtures, or fallbacks.
 - [Credentials](./credentials.md) — current App work moves Provider credentials to App scope first, preserving Organization fallback only as migration context.
 
 ### Admin & cost

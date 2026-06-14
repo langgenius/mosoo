@@ -73,7 +73,7 @@ export function CreateAgentLauncherDialog({
       >
         {activeOrganization === null ? (
           <div className="text-muted-foreground px-7 py-10 text-center text-[13px]">
-            Join an organization to create agents.
+            Finish App setup before creating agents.
           </div>
         ) : activeApp === null ? (
           <div className="text-muted-foreground px-7 py-10 text-center text-[13px]">

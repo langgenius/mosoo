@@ -170,7 +170,7 @@ function SpacesMenuContent({
   if (availableSpaces.length === 0) {
     return (
       <div className="text-muted-foreground p-3 text-[12px]">
-        No spaces are available in this organization.
+        No spaces are available in this App.
       </div>
     );
   }

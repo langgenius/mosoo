@@ -23,15 +23,14 @@ import {
 } from "./agent-repository";
 import { toAgentRuntimeModelProjection } from "./agent-runtime-model-identity";
 import { listResolvedAgentSkills } from "./agent-skill-resolution.service";
-import { parseAgentStoredConfig } from "./agent-stored-config.service";
 import type { AgentRow } from "./agent-types";
 
 function visibleAgentPrompt(prompt: string, viewerRole: AgentViewerRole): string {
-  return viewerRole === "user" ? "" : prompt;
+  return viewerRole === "owner" ? prompt : "";
 }
 
 function canReadAgentEditorState(viewerRole: AgentViewerRole): boolean {
-  return viewerRole === "owner" || viewerRole === "admin";
+  return viewerRole === "owner";
 }
 
 interface AgentDetailEditorData {
@@ -63,7 +62,6 @@ function toAgentModelFromLoadedData(
     skills: AgentSkillReference[];
   },
 ): Agent {
-  const storedConfig = parseAgentStoredConfig(agent.configJson);
   const runtimeModel = toAgentRuntimeModelProjection(agent);
 
   return {
@@ -76,7 +74,6 @@ function toAgentModelFromLoadedData(
     name: agent.name,
     organizationId: agent.organizationId,
     appId: agent.appId,
-    packageSharingEnabled: storedConfig.packageSharingEnabled,
     prompt: agent.prompt,
     provider: runtimeModel.provider,
     runtimeId: runtimeModel.runtimeId,
@@ -168,7 +165,6 @@ export async function toAgentDetailModel(
   owner: AgentOwnerSummary,
   viewerRole: AgentViewerRole,
 ): Promise<AgentDetail> {
-  const storedConfig = parseAgentStoredConfig(agent.configJson);
   const canReadEditorState = canReadAgentEditorState(viewerRole);
   const runtimeModel = toAgentRuntimeModelProjection(agent);
   const editorDataPromise: Promise<AgentDetailEditorData> = canReadEditorState
@@ -212,7 +208,6 @@ export async function toAgentDetailModel(
     organizationId: agent.organizationId,
     appId: agent.appId,
     owner,
-    packageSharingEnabled: canReadEditorState ? storedConfig.packageSharingEnabled : false,
     prompt: visibleAgentPrompt(agent.prompt, viewerRole),
     provider: visibleAgentCatalogValue(runtimeModel.provider, viewerRole),
     runtimeId: visibleAgentCatalogValue(runtimeModel.runtimeId, viewerRole),

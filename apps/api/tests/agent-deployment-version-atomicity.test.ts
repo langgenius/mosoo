@@ -27,7 +27,6 @@ const DRAFT_AGENT_ID = "01J0000000000000000000000G";
 const INITIAL_CONFIG_JSON = JSON.stringify({
   packageMcpServers: [],
   packageResolution: null,
-  packageSharingEnabled: false,
   packageSkills: [],
 });
 

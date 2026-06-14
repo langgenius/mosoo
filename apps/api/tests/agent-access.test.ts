@@ -178,7 +178,6 @@ describe("app agent access", () => {
       },
       packageMcpServers: [],
       packageResolution: null,
-      packageSharingEnabled: false,
       packageSkills: [],
       providerOptions: {},
     });

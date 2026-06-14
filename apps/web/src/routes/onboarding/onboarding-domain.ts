@@ -3,7 +3,7 @@ export function getOnboardingDomainOrganizationName(domain: string | undefined):
   const normalized = label.trim();
 
   if (!normalized) {
-    return "New organization";
+    return "New App";
   }
 
   return normalized.slice(0, 1).toUpperCase() + normalized.slice(1);

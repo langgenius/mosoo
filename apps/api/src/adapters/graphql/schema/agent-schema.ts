@@ -16,13 +16,10 @@ export const agentSchema = /* GraphQL */ `
 
   enum AgentVisibility {
     private
-    organization
   }
 
   enum AgentViewerRole {
     owner
-    admin
-    user
     none
   }
 
@@ -111,7 +108,6 @@ export const agentSchema = /* GraphQL */ `
     liveVersion: AgentDeploymentVersion
     model: String!
     name: String!
-    packageSharingEnabled: Boolean!
     prompt: String!
     provider: String!
     runtimeId: String!
@@ -259,7 +255,6 @@ export const agentSchema = /* GraphQL */ `
     model: String!
     name: String!
     owner: AgentOwnerSummary!
-    packageSharingEnabled: Boolean!
     prompt: String!
     provider: String!
     runtimeId: String!
@@ -329,17 +324,6 @@ export const agentSchema = /* GraphQL */ `
 
   input PublishAgentInput {
     agentId: ULID!
-    appId: ULID!
-    """
-    Omit on re-publish to inherit the agent's current visibility. Required only
-    on the very first publish.
-    """
-    visibility: AgentVisibility
-  }
-
-  input UpdateAgentPackageSharingInput {
-    agentId: ULID!
-    packageSharingEnabled: Boolean!
     appId: ULID!
   }
 

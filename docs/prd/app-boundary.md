@@ -28,7 +28,7 @@ The current phase deliberately assumes one human owns one Organization. Organiza
 - **Service** is not a V1 domain entity. Do not add a unified `services` table,
   polymorphic `service.kind`, or generic Service CRUD for App resources.
 - Do not introduce parallel boundary nouns such as Workspace, Team, Application, Service App,
-  or Product unless a later PRD explicitly reopens the naming decision.
+  Agent Service, or Product unless a later PRD explicitly reopens the naming decision.
 - Existing Agent-first routes and docs are migration context, not the desired final IA.
 
 ## Ownership Model
@@ -85,12 +85,12 @@ Onboarding should create a default App. If an Organization has exactly one App, 
 8. Keep API endpoint exposure on Agent. Do not add Publish App, App runtime, or App-level API endpoint.
 9. Make the console root an App Overview. Keep the single-App direct-entry behavior before expanding multi-App management.
 10. Add App export to one `Skill.md`.
-11. Only after the above is real, reopen App members, org-wide shared resources, role matrices, ownership transfer, and enterprise governance.
+11. Only after the above is real, reopen App members, org-wide resource catalogs, role matrices, ownership transfer, and enterprise governance.
 
 ## Out Of Scope For This Phase
 
 - App members, App roles, and App invitation flows.
-- Org-wide shared resources, pin / link semantics, and cross-app shared asset catalogs.
+- Org-wide resource catalogs, pin / link semantics, and cross-app asset catalogs.
 - Multi-user ownership transfer or asset takeover.
 - Enterprise domain discovery expansion, SAML / SCIM, or rich member lifecycle administration.
 - Publish App, App runtime, App-level API endpoint, Web shell, or public preview URL as V1 commitments.
@@ -104,7 +104,8 @@ Onboarding should create a default App. If an Organization has exactly one App, 
 ## Drift Rules
 
 - If a PRD says Organization-owned for a business resource listed above, read it as historical unless it explicitly says it is describing a future governance layer.
-- If a PRD says member, coworker, shared with me, everyone in organization, Owner / Admin / Member, or access request, treat that text as future multi-member governance unless the current implementation already depends on it.
+- If a PRD says member, coworker, everyone in organization, Owner / Admin / Member, or access request, treat that text as future multi-member governance unless the current implementation already depends on it.
+- If a PRD describes cross-account collaboration, org-wide resource catalogs, member role matrices, or access-request flows, treat that text as future multi-member governance unless the current implementation already depends on it.
 - If a PRD says Agent Service, read it as the existing Agent identity, not as a second Agent
   table or a separate App boundary.
 - If a PRD says Service is the App-local capability/resource unit, treat that as historical

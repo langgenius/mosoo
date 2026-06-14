@@ -33,7 +33,6 @@ type Agent {
   model: String!
   name: String!
   organizationId: ULID!
-  packageSharingEnabled: Boolean!
   prompt: String!
   provider: String!
   runtimeId: String!
@@ -228,7 +227,6 @@ type AgentDetail {
   name: String!
   organizationId: ULID!
   owner: AgentOwnerSummary!
-  packageSharingEnabled: Boolean!
   prompt: String!
   provider: String!
   runtimeId: String!
@@ -544,14 +542,11 @@ type AgentToolSummary {
 }
 
 enum AgentViewerRole {
-  admin
   none
   owner
-  user
 }
 
 enum AgentVisibility {
-  organization
   private
 }
 
@@ -1253,7 +1248,6 @@ type Mutation {
   unarchiveAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!
   unpublishAgent(agentId: ULID!, appId: ULID!): Agent!
   updateAgentConfig(input: UpdateAgentConfigInput!): Agent!
-  updateAgentPackageSharing(input: UpdateAgentPackageSharingInput!): Agent!
   updateEnvironment(input: UpdateEnvironmentInput!): EnvironmentDetail!
   updateProfile(input: UpdateAccountProfileInput!): Account!
   updateSpace(input: UpdateSpaceInput!): Space!
@@ -1302,11 +1296,6 @@ scalar PrimitiveRecord
 input PublishAgentInput {
   agentId: ULID!
   appId: ULID!
-  """
-  Omit on re-publish to inherit the agent's current visibility. Required only
-  on the very first publish.
-  """
-  visibility: AgentVisibility
 }
 
 type Query {
@@ -1836,12 +1825,6 @@ input UpdateAgentConfigInput {
   providerOptions: JsonObject!
   runtimeId: String!
   skillIds: [ULID!]!
-}
-
-input UpdateAgentPackageSharingInput {
-  agentId: ULID!
-  appId: ULID!
-  packageSharingEnabled: Boolean!
 }
 
 input UpdateEnvironmentInput {

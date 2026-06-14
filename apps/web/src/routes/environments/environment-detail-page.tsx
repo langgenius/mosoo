@@ -222,7 +222,7 @@ export function EnvironmentDetailPage({ environmentId }: { environmentId: string
           {!environment.canEdit ? (
             <div className="bg-secondary text-fg-3 mt-3 flex items-center gap-2 rounded-md px-3 py-2 text-[12px]">
               <Lock className="size-3.5" />
-              Shared environments are read-only. Fork it from the list to customize.
+              This App environment is read-only. Fork it from the list to customize.
             </div>
           ) : null}
         </section>

@@ -67,18 +67,6 @@ export async function publishAgent(
     runtimeId: agent.runtimeId,
   });
 
-  // Re-publish inherits the agent's current visibility when input omits it.
-  // First publish either receives an explicit value or falls through to the
-  // DB default ("private"), so we always have a concrete visibility.
-  const targetVisibility = input.visibility ?? agent.visibility;
-
-  if (targetVisibility !== "private") {
-    throw validationError(
-      "Organization-wide Agent publishing is not supported for App-scoped Apps.",
-      "AGENT_PUBLISH_ORG_VISIBILITY_DISABLED",
-    );
-  }
-
   if (!readiness.ready) {
     throw validationError(
       `Agent is not ready to publish: ${readiness.issues.map((issue) => issue.message).join(" ")}`,
@@ -103,7 +91,7 @@ export async function publishAgent(
         liveDeploymentVersionId: version.record.id,
         status: "published",
         updatedAt: timestampMs,
-        visibility: targetVisibility,
+        visibility: "private",
       })
       .where(eq(agentsTable.id, agent.id)),
   ]);

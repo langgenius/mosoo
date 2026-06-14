@@ -129,7 +129,7 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
    - **Agent and resource ownership**: Agents, Threads / Sessions, Spaces, Environments, Skills, MCP servers, Provider credentials, Channels, Agent exposure state, App export, app health, logs, and app-scoped cost are App-owned resources. Organization rollups remain for billing and future governance.
    - **No generic Service entity**: Do not add a unified `services` table, polymorphic `service.kind`, or generic Service CRUD for concrete App resources. If a future Web/API runtime, database service, worker process, or scheduled job is needed, model it with an explicit noun and lifecycle.
    - **App Templates**: Common one-Agent, one-Channel Apps should be created from App Templates that provision a resource graph, not from a required global App type or single Agent type picker.
-   - **Access boundary**: App access maps to the single Organization owner for this phase. App members, App roles, ownership transfer, and org-wide shared resources are future extensions, not prerequisites for the first cut.
+   - **Access boundary**: App access maps to the single Organization owner for this phase. App members, App roles, ownership transfer, and org-wide resource catalogs are future extensions, not prerequisites for the first cut.
 
 3. **Agent Plane**
    The Agent Plane unifies configuration management, lightweight system assistance, and runtime scheduling. The public data entity is the bare `Agent`. Historical terms such as `AgentService` and `PublishedAgent` have been collapsed into `Agent`, and the module name `Agent Plane` avoids a naming collision with the entity itself.

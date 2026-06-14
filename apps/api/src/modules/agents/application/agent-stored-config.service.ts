@@ -23,7 +23,6 @@ interface StoredAgentConfig {
   builder: AgentConfigBuilderMetadata;
   packageMcpServers: AgentManifestMcpServerBinding[];
   packageSkills: AgentStoredPackageSkill[];
-  packageSharingEnabled: boolean;
   packageResolution: AgentPackageResolutionState | null;
   providerOptions: JsonObject;
 }
@@ -236,7 +235,6 @@ function createEmptyStoredAgentConfig(): StoredAgentConfig {
     packageMcpServers: [],
     packageSkills: [],
     packageResolution: null,
-    packageSharingEnabled: false,
     providerOptions: {},
   };
 }
@@ -378,7 +376,6 @@ export function parseAgentStoredConfig(configJson: string): StoredAgentConfig {
     packageMcpServers: readPackageMcpServers(parsed["packageMcpServers"]),
     packageSkills: readPackageSkills(parsed["packageSkills"]),
     packageResolution: readPackageResolutionState(parsed["packageResolution"]),
-    packageSharingEnabled: readBoolean(parsed["packageSharingEnabled"], "packageSharingEnabled"),
     providerOptions:
       parsed["providerOptions"] === undefined
         ? {}
@@ -407,7 +404,6 @@ export function serializeAgentStoredConfig(input: StoredAgentConfig): string {
       sortOrder: skill.sortOrder,
     })),
     packageResolution: input.packageResolution,
-    packageSharingEnabled: input.packageSharingEnabled,
     providerOptions: parseJsonObject(input.providerOptions, "Agent stored config providerOptions"),
   });
 }

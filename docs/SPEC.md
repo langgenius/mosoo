@@ -22,7 +22,7 @@ If this document conflicts with older PRDs, follow this document first, then
    resources.
 7. Agent is the App-local unit that owns Agent runtime and delivery.
 8. Thread is the product name for an Agent Session in V1.
-9. App resources are shared at App scope; Agents bind the resources they need.
+9. App resources are owned at App scope; Agents bind the resources they need.
 10. Common one-Agent, one-Channel shapes should come from App Templates, not from a
     required App or Agent type decision.
 11. V1 optimizes for delivery and reuse, not administration.
@@ -66,7 +66,7 @@ An App:
 - Is what the user creates, opens, configures, monitors, and exports.
 - Is a boundary for a real-world Agent application.
 - Organizes one or more App-local Agents.
-- Owns shared resources used by those Agents.
+- Owns concrete resources that those Agents can bind.
 - Is the primary database, API, and test boundary.
 - Aggregates Threads, usage, health, logs, and expose state through its Agents and
   resources.
@@ -113,7 +113,7 @@ Rules:
   database service, scheduled job, or worker process, model it with an explicit noun and
   add a dedicated contract for its lifecycle.
 - API-layer names such as File Service or Environment Service are implementation modules
-  and do not imply a generic App Service entity.
+  and do not imply a generic Service domain entity.
 
 ### App Template
 
@@ -126,7 +126,7 @@ An App Template:
 - Can represent larger shapes such as multiple Agents plus Storage, MCP, Provider, and
   Channel resources.
 - Selects defaults and wiring, but does not create `app.type` as a runtime
-  drivers.
+  driver.
 - Is the preferred path for simple chatbot-style Apps and other repeatable resource graphs.
 
 ### Thread
@@ -195,8 +195,7 @@ Storage:
 - Can receive write summaries from runtime file activity.
 - Can be bound by one or more Agents.
 
-Storage collaborators, "Shared with me", and "Everyone in organization" are future
-governance concepts.
+Storage collaborator views and org-wide storage catalogs are future governance concepts.
 
 ### Skill
 
@@ -362,8 +361,8 @@ V1 must not include:
 - Ownership transfer.
 - Asset takeover.
 - Org-wide shared resource catalogs.
-- "Shared with me".
-- "Everyone in organization".
+- Cross-account shared resource views.
+- Org-wide resource catalogs.
 - Agent collaborator management.
 - Storage collaborator management.
 - Skill sharing.
@@ -528,10 +527,10 @@ Rules:
 - When older docs ask users to choose one Agent type as the creation path, prefer an App
   Template or an Agent setting, depending on whether the choice describes an App shape or a
   runtime behavior.
-- When older docs mention member, coworker, shared with me, everyone in organization,
-  Owner/Admin/Member, invitation, or access request, treat it as future governance.
-- Do not delete compatibility tables until App ownership and owner access replace
-  their runtime dependencies.
+- When older docs mention cross-account collaboration, org-wide resource catalogs,
+  member role matrices, invitations, or access requests, treat it as future governance.
+- Remove old governance tables as soon as App ownership and owner access replace their runtime
+  dependencies.
 
 ## Implementation Order
 

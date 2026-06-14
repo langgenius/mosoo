@@ -354,7 +354,6 @@ function normalizeStoredConfigJson(input: { configJson: string }): string {
     packageMcpServers: stored.packageMcpServers,
     packageSkills: stored.packageSkills,
     packageResolution: stored.packageResolution,
-    packageSharingEnabled: stored.packageSharingEnabled,
     providerOptions: stored.providerOptions,
   });
 }

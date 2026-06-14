@@ -16,7 +16,6 @@ const VIEWER: AuthenticatedViewer = {
 const AGENT_CONFIG_JSON = JSON.stringify({
   packageMcpServers: [],
   packageResolution: null,
-  packageSharingEnabled: true,
   packageSkills: [],
 });
 
@@ -180,7 +179,6 @@ describe("agent detail model", () => {
     expect(detail.versions.map((version) => version.id)).toEqual(["01J0000000000000000000006A"]);
     expect(detail.prompt).toBe("Private prompt");
     expect(detail.model).toBe("gpt-5.4");
-    expect(detail.packageSharingEnabled).toBe(true);
   });
 
   test("apps runtime model fields from admitted identity values", async () => {
@@ -232,7 +230,7 @@ describe("agent detail model", () => {
   test("redacts deployment details for non-editor viewers", async () => {
     const database = createAgentDetailModelDatabase();
 
-    const detail = await toAgentDetailModel(database, VIEWER, AGENT_ROW, OWNER_SUMMARY, "user");
+    const detail = await toAgentDetailModel(database, VIEWER, AGENT_ROW, OWNER_SUMMARY, "none");
 
     expect(detail.liveVersion).toBeNull();
     expect(detail.versions).toEqual([]);

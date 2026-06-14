@@ -209,13 +209,20 @@ describe("API to web boundary", () => {
     const schema = createGraphQLSchema();
     const query = schema.getQueryType();
     const mutation = schema.getMutationType();
+    const agentVisibility = schema.getType("AgentVisibility");
+    const agentViewerRole = schema.getType("AgentViewerRole");
 
-    if (!query || !mutation) {
-      throw new Error("Expected Query and Mutation in the GraphQL schema.");
+    if (!query || !mutation || !isEnumType(agentVisibility) || !isEnumType(agentViewerRole)) {
+      throw new Error("Expected Query, Mutation, AgentVisibility, and AgentViewerRole.");
     }
 
     const queryFields = query.getFields();
     const mutationFields = mutation.getFields();
+    const visibilityValues = agentVisibility.getValues().map((value) => value.name);
+    const viewerRoleValues = agentViewerRole.getValues().map((value) => value.name);
+
+    expect(visibilityValues).toEqual(["private"]);
+    expect(viewerRoleValues).toEqual(["owner", "none"]);
 
     for (const fieldName of [
       "agentCollaboratorList",
@@ -228,6 +235,7 @@ describe("API to web boundary", () => {
     for (const fieldName of [
       "addAgentCollaborator",
       "removeAgentCollaborator",
+      "updateAgentPackageSharing",
       "updateAgentCollaborator",
       "updateSessionThreadUiState",
     ] as const) {
@@ -240,6 +248,7 @@ describe("API to web boundary", () => {
       "AddAgentCollaboratorInput",
       "RemoveAgentCollaboratorInput",
       "UpdateAgentCollaboratorInput",
+      "UpdateAgentPackageSharingInput",
       "SessionThreadUiState",
       "UpdateSessionThreadUiStateInput",
     ] as const) {

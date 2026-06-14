@@ -12,7 +12,6 @@ const AGENT_FIELDS = graphql(/* GraphQL */ `
     model
     name
     appId
-    packageSharingEnabled
     prompt
     provider
     runtimeId
@@ -129,7 +128,6 @@ export const GET_AGENT_QUERY = graphql(/* GraphQL */ `
       owner {
         ...AgentOwnerFields
       }
-      packageSharingEnabled
       prompt
       provider
       runtimeId

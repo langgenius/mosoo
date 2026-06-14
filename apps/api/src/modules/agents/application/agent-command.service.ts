@@ -55,7 +55,6 @@ import {
   summarizeVersionedAgentConfigChange,
 } from "./agent-versioned-config.service";
 export { deleteAgent, publishAgent, unpublishAgent } from "./agent-lifecycle-command.service";
-export { updateAgentPackageSharing } from "./agent-package-sharing-command.service";
 
 export async function createAgent(
   bindings: Pick<ApiBindings, "DB">,
@@ -87,7 +86,6 @@ export async function createAgent(
         packageMcpServers: [],
         packageSkills: [],
         packageResolution: null,
-        packageSharingEnabled: false,
         providerOptions: {},
       }),
       createdAt: timestampMs,
