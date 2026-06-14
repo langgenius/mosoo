@@ -16,10 +16,8 @@ import type { VisibleVendor } from "./provider-card-types";
 
 function ActiveKey({
   activePersonal,
-  companyDefault,
 }: {
   activePersonal: VendorCredential | undefined;
-  companyDefault: VendorCredential | undefined;
 }): ReactElement {
   if (activePersonal !== undefined) {
     return (
@@ -30,29 +28,20 @@ function ActiveKey({
     );
   }
 
-  return (
-    <span className="inline-flex min-w-0 items-center gap-2">
-      <Badge variant="secondary">COMPANY</Badge>
-      <span className="truncate">{companyDefault?.name ?? "No key selected"}</span>
-    </span>
-  );
+  return <span className="text-muted-foreground truncate">No key selected</span>;
 }
 
 export function ProviderActiveKeyMenu({
   activePersonal,
-  companyDefault,
   onDelete,
   onStartAddingPersonalKey,
-  onUseCompanyDefault,
   onUsePersonal,
   personalCredentials,
   vendor,
 }: {
   activePersonal: VendorCredential | undefined;
-  companyDefault: VendorCredential | undefined;
   onDelete: (credential: VendorCredential) => void;
   onStartAddingPersonalKey: (vendorId: string) => void;
-  onUseCompanyDefault: (vendorId: string) => void;
   onUsePersonal: (credential: VendorCredential) => void;
   personalCredentials: VendorCredential[];
   vendor: VisibleVendor;
@@ -71,22 +60,12 @@ export function ProviderActiveKeyMenu({
             className="border-border bg-background hover:bg-muted/40 flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm"
           >
             <span className="min-w-0">
-              <ActiveKey activePersonal={activePersonal} companyDefault={companyDefault} />
+              <ActiveKey activePersonal={activePersonal} />
             </span>
             <ChevronDown className="text-muted-foreground size-4 shrink-0" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-[320px] rounded-lg p-1">
-          <DropdownMenuItem
-            className="cursor-pointer rounded-md"
-            onSelect={() => {
-              onUseCompanyDefault(vendor.vendorId);
-            }}
-          >
-            <Check className={activePersonal ? "size-3.5 opacity-0" : "size-3.5"} />
-            Company default · {companyDefault?.name ?? "No key selected"}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
           <DropdownMenuLabel>MY KEYS</DropdownMenuLabel>
           {personalCredentials.length > 0 ? (
             personalCredentials.map((credential) => (

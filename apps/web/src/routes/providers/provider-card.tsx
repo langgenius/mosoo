@@ -1,9 +1,7 @@
-import { Plus } from "lucide-react";
-import { useMemo } from "react";
 import type { ReactElement } from "react";
+import { useMemo } from "react";
 
 import { VendorIcon, hasVendorIcon } from "@/shared/ui/brand-icons";
-import { Button } from "@/shared/ui/button";
 
 import type { VendorCredential } from "../../domains/vendor-credential/api/vendor-credential-client";
 import type {
@@ -11,34 +9,18 @@ import type {
   PersonalForm,
   TestConnectionState,
 } from "../../domains/vendor-credential/model/provider-credentials-model";
-import {
-  ProviderActiveKeyMenu,
-  ProviderCompanyCredentials,
-  ProviderPersonalCredentialForm,
-} from "./provider-card-sections";
+import { ProviderActiveKeyMenu, ProviderPersonalCredentialForm } from "./provider-card-sections";
 import type { VisibleVendor } from "./provider-card-types";
 
 export function ProviderCard({
   activePersonalByVendor,
-  companyForm,
-  companyProviderError,
-  companyProviderTest,
   credentials,
-  defaultCredentialByVendor,
-  isAdmin,
-  onCompanyFormChange,
   onDelete,
   onPersonalFormChange,
-  onSaveCompanyCredential,
   onSavePersonalCredential,
-  onSetCompanyDefault,
   onShowPersonalKeyChange,
-  onStartAddingCompanyKey,
   onStartAddingPersonalKey,
-  onStartEditingCompanyKey,
-  onTestCompanyCredential,
   onTestPersonalCredential,
-  onUseCompanyDefault,
   onUsePersonal,
   personalForm,
   personalProviderError,
@@ -48,47 +30,19 @@ export function ProviderCard({
   showPersonalKey,
   vendor,
 }: ProviderCardProperties): ReactElement {
-  const companyCredentials = useMemo(
-    () => credentials.filter((credential) => credential.scope === "company"),
-    [credentials],
-  );
   const personalCredentials = useMemo(
     () => credentials.filter((credential) => credential.scope === "personal"),
     [credentials],
   );
-  const companyDefault = defaultCredentialByVendor.get(vendor.vendorId);
 
   return (
     <section className="border-border bg-card space-y-3 rounded-lg border p-4">
-      <ProviderCardHeader
-        isAdmin={isAdmin}
-        onStartAddingCompanyKey={onStartAddingCompanyKey}
-        runtimes={runtimes}
-        vendor={vendor}
-      />
-
-      <ProviderCompanyCredentials
-        companyCredentials={companyCredentials}
-        companyForm={companyForm}
-        isAdmin={isAdmin}
-        onCompanyFormChange={onCompanyFormChange}
-        onDelete={onDelete}
-        onSaveCompanyCredential={onSaveCompanyCredential}
-        onSetCompanyDefault={onSetCompanyDefault}
-        onStartEditingCompanyKey={onStartEditingCompanyKey}
-        onTestCompanyCredential={onTestCompanyCredential}
-        saving={saving}
-        testError={companyProviderError}
-        testState={companyProviderTest}
-        vendor={vendor}
-      />
+      <ProviderCardHeader runtimes={runtimes} vendor={vendor} />
 
       <ProviderActiveKeyMenu
         activePersonal={activePersonalByVendor.get(vendor.vendorId)}
-        companyDefault={companyDefault}
         onDelete={onDelete}
         onStartAddingPersonalKey={onStartAddingPersonalKey}
-        onUseCompanyDefault={onUseCompanyDefault}
         onUsePersonal={onUsePersonal}
         personalCredentials={personalCredentials}
         vendor={vendor}
@@ -110,6 +64,9 @@ export function ProviderCard({
   );
 }
 
+// The provider credential model still surfaces company/app-level fields; the
+// console intentionally only renders personal-key management, so the unused
+// company props are accepted here but not threaded into the card UI.
 interface ProviderCardProperties {
   activePersonalByVendor: Map<string, VendorCredential>;
   companyForm: CompanyForm;
@@ -142,13 +99,9 @@ interface ProviderCardProperties {
 }
 
 function ProviderCardHeader({
-  isAdmin,
-  onStartAddingCompanyKey,
   runtimes,
   vendor,
 }: {
-  isAdmin: boolean;
-  onStartAddingCompanyKey: (vendorId: string) => void;
   runtimes: string[];
   vendor: VisibleVendor;
 }): ReactElement {
@@ -171,18 +124,6 @@ function ProviderCardHeader({
           </p>
         </div>
       </div>
-      {isAdmin ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            onStartAddingCompanyKey(vendor.vendorId);
-          }}
-        >
-          <Plus className="size-3.5" />
-          Add key
-        </Button>
-      ) : null}
     </div>
   );
 }

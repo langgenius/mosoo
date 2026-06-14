@@ -5,10 +5,7 @@ export interface ComingSoonRuntime {
 }
 
 export const COMING_SOON_RUNTIMES: ComingSoonRuntime[] = [
-  { label: "OpenCode", provider: "sst", runtimeId: "opencode" },
-  { label: "OpenClaw", provider: "OpenClaw", runtimeId: "openclaw" },
-  { label: "Hermes", provider: "Hermes", runtimeId: "hermes" },
-  { label: "Gemini", provider: "Google", runtimeId: "gemini" },
   { label: "Pi", provider: "Inflection AI", runtimeId: "pi" },
-  { label: "Cursor Agent", provider: "Cursor", runtimeId: "cursor-agent" },
+  { label: "Hermes", provider: "Hermes", runtimeId: "hermes" },
+  { label: "OpenClaw", provider: "OpenClaw", runtimeId: "openclaw" },
 ];
