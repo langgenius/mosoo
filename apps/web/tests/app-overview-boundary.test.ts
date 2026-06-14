@@ -12,7 +12,7 @@ describe("App overview boundary", () => {
     const combinedSource = `${routeSource}\n${modelSource}`;
 
     expect(routeSource).toContain("Quickstart");
-    expect(routeSource).toContain("App setup steps complete");
+    expect(routeSource).toContain("quickstart steps complete");
     expect(routeSource).toContain("No threads have run in this App yet.");
     expect(routeSource).toContain("Last 30 days in this App");
     expect(routeSource).toContain('to="/channels"');

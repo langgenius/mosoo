@@ -13,7 +13,7 @@ import {
 import type { AgentKind } from "../agent.types";
 
 const KIND_LABELS: Record<AgentKind, { title: string; tagline: string; icon: typeof Bot }> = {
-  pet: { title: "Assistant Agent", tagline: "Always-on teammate", icon: Bot },
+  pet: { title: "Assistant Agent", tagline: "Always-on assistant", icon: Bot },
   cattle: { title: "Task Agent", tagline: "On-demand worker", icon: Zap },
 };
 

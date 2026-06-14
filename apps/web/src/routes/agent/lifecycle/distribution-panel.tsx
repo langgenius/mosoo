@@ -58,7 +58,7 @@ export function DistributionPanel({
             <span className="text-foreground font-medium">
               {isLive ? "live" : "draft (publish to enable)"}
             </span>
-            . Personal-token authenticated, access-gated, executes under owner's shadow RBAC.
+            . Personal-token authenticated, access-gated, and executed as the App owner's Agent.
           </p>
         </div>
         {onOpenSettings ? (
