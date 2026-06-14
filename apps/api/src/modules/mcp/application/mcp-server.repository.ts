@@ -27,7 +27,6 @@ const serverColumns = {
   oauthMetadataJson: sql<string | null>`${mcpServersTable.oauthMetadataJson}`.as(
     "oauthMetadataJson",
   ),
-  organizationId: mcpServersTable.organizationId,
   ownerId: mcpServersTable.ownerId,
   ownerName: sql<string | null>`${accountsTable.name}`.as("ownerName"),
   appId: mcpServersTable.appId,

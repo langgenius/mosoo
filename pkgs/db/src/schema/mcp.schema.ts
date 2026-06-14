@@ -11,7 +11,6 @@ import type {
   CredentialId,
   McpOAuthFlowId,
   McpServerId,
-  OrganizationId,
   PlatformId,
   AppId,
 } from "@mosoo/id";
@@ -50,7 +49,6 @@ export const mcpServersTable = sqliteTable(
     id: platformIdColumn<McpServerId>("id").primaryKey(),
     name: text("name").notNull(),
     oauthMetadataJson: text("oauth_metadata_json"),
-    organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
     ownerId: platformIdColumn<AccountId>("owner_account_id").notNull(),
     appId: platformIdColumn<AppId>("app_id").notNull(),
     source: text("source").$type<McpServerSource>().notNull(),
@@ -61,11 +59,6 @@ export const mcpServersTable = sqliteTable(
     check(
       "mcp_server_source_scope_check",
       sql`${table.source} = 'app' AND ${table.credentialScope} = 'app'`,
-    ),
-    index("mcp_server_organization_source_enabled_idx").on(
-      table.organizationId,
-      table.source,
-      table.enabled,
     ),
     index("mcp_server_app_enabled_idx").on(table.appId, table.enabled),
     index("mcp_server_owner_app_idx").on(table.ownerId, table.appId),
@@ -146,7 +139,6 @@ export const mcpOauthFlowsTable = sqliteTable(
     initiatorUserId: platformIdColumn<AccountId>("initiator_account_id").notNull(),
     oauthClientId: text("oauth_client_id").notNull(),
     oauthClientSecretSecretId: text("oauth_client_secret_secret_id"),
-    organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
     appId: platformIdColumn<AppId>("app_id").notNull(),
     registrationEndpoint: text("registration_endpoint"),
     returnUrl: text("return_url"),

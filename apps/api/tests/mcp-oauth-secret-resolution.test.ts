@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { AccountId, McpOAuthFlowId, McpServerId, OrganizationId, AppId } from "@mosoo/id";
+import type { AccountId, McpOAuthFlowId, McpServerId, AppId } from "@mosoo/id";
 
 import {
   deleteMcpOAuthFlowClientSecret,
@@ -14,7 +14,6 @@ import type { OAuthFlowRow, ServerRow } from "../src/modules/mcp/application/mcp
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
-const ORGANIZATION_ID = "01J00000000000000000000001" as OrganizationId;
 const APP_ID = "01J00000000000000000000002" as AppId;
 const OTHER_APP_ID = "01J00000000000000000000009" as AppId;
 const OWNER_ID = "01J00000000000000000000003" as AccountId;
@@ -71,7 +70,6 @@ function createServer(input: Partial<ServerRow> = {}): ServerRow {
     id: SERVER_ID,
     name: "MCP",
     oauthMetadataJson: null,
-    organizationId: ORGANIZATION_ID,
     ownerId: OWNER_ID,
     ownerName: "Owner",
     appId: APP_ID,
@@ -92,7 +90,6 @@ function createFlow(input: Partial<OAuthFlowRow> = {}): OAuthFlowRow {
     initiatorUserId: OWNER_ID,
     oauthClientId: "client",
     oauthClientSecretSecretId: MISSING_SECRET_ID,
-    organizationId: ORGANIZATION_ID,
     appId: APP_ID,
     returnUrl: null,
     scopeValuesJson: "[]",

@@ -50,7 +50,6 @@ function createMcpServerAccessDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       oauth_metadata_json text,
-      organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       app_id text NOT NULL,
       source text NOT NULL,
@@ -84,7 +83,6 @@ function createMcpServerAccessDatabase(): SqliteD1Database {
       enabled,
       id,
       name,
-      organization_id,
       owner_account_id,
       app_id,
       source,
@@ -92,8 +90,8 @@ function createMcpServerAccessDatabase(): SqliteD1Database {
       url
     )
     VALUES
-      ('bearer', 1, 'app', 1, '${APP_MCP_SERVER_ID}', 'App MCP', '01J00000000000000000000006', '${OWNER_ID}', '${APP_ID}', 'app', 1, 'https://mcp.example.com/app'),
-      ('bearer', 1, 'app', 1, '${OTHER_APP_MCP_SERVER_ID}', 'Other App MCP', '01J00000000000000000000006', '${MEMBER_ID}', '${OTHER_APP_ID}', 'app', 1, 'https://mcp.example.com/other-app');
+      ('bearer', 1, 'app', 1, '${APP_MCP_SERVER_ID}', 'App MCP', '${OWNER_ID}', '${APP_ID}', 'app', 1, 'https://mcp.example.com/app'),
+      ('bearer', 1, 'app', 1, '${OTHER_APP_MCP_SERVER_ID}', 'Other App MCP', '${MEMBER_ID}', '${OTHER_APP_ID}', 'app', 1, 'https://mcp.example.com/other-app');
   `);
 
   return database;

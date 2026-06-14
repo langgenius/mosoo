@@ -13,7 +13,6 @@ import type {
   CredentialId,
   McpOAuthFlowId,
   McpServerId,
-  OrganizationId,
   AppId,
 } from "@mosoo/id";
 
@@ -35,7 +34,6 @@ export interface ServerRow {
   id: McpServerId;
   name: string;
   oauthMetadataJson: string | null;
-  organizationId: OrganizationId;
   ownerId: AccountId;
   ownerName: string | null;
   appId: AppId;
@@ -113,7 +111,6 @@ export interface OAuthFlowRow {
   status: McpOAuthFlowStatus;
   subjectLabel: string | null;
   tokenEndpoint: string;
-  organizationId: OrganizationId;
   appId: AppId;
 }
 

@@ -125,7 +125,6 @@ CREATE TABLE agent_skill (
 
 CREATE TABLE mcp_server (
   id text PRIMARY KEY NOT NULL,
-  organization_id text NOT NULL,
   owner_account_id text NOT NULL,
   name text NOT NULL,
   description text,

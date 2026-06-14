@@ -6,7 +6,6 @@ import type {
   CredentialId,
   McpOAuthFlowId,
   McpServerId,
-  OrganizationId,
   PlatformId,
   AppId,
 } from "@mosoo/id";
@@ -39,10 +38,6 @@ export function readMcpOAuthFlowId(value: IdInput, label = "flowId"): McpOAuthFl
 
 export function readMcpServerId(value: IdInput, label = "serverId"): McpServerId {
   return readPlatformSemanticId(value, label) as McpServerId;
-}
-
-export function readOrganizationId(value: IdInput, label = "organizationId"): OrganizationId {
-  return readPlatformSemanticId(value, label) as OrganizationId;
 }
 
 export function readAppId(value: IdInput, label = "appId"): AppId {

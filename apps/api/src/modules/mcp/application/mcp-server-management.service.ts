@@ -32,7 +32,7 @@ export async function createAppMcpServer(
   input: CreateAppMcpServerInput,
 ): Promise<McpServerWithCredential> {
   const viewerId = readAccountId(viewer.id);
-  const app = await ensureAppOwnership(bindings.DB, viewerId, input.appId);
+  await ensureAppOwnership(bindings.DB, viewerId, input.appId);
   const now = currentTimestampMs();
   const serverId = createMcpServerId();
   const serverOwner = {
@@ -40,7 +40,7 @@ export async function createAppMcpServer(
     credentialScope: "app" as const,
     id: serverId,
     ownerId: viewerId,
-    appId: app.id,
+    appId: input.appId,
     source: "app" as const,
   };
   const actor = {
@@ -54,7 +54,7 @@ export async function createAppMcpServer(
       ? await storeMcpOAuthServerClientSecret(bindings, {
           actor,
           purpose: "oauth_server_create_client_secret",
-          appId: app.id,
+          appId: input.appId,
           secretKind: "server_client_secret",
           server: serverOwner,
           value: input.oauthClientSecret,
@@ -75,9 +75,8 @@ export async function createAppMcpServer(
         iconUrl: input.iconUrl ?? null,
         id: serverId,
         name: input.name,
-        organizationId: app.organizationId,
         ownerId: viewerId,
-        appId: app.id,
+        appId: input.appId,
         source: "app",
         updatedAt: now,
         url: parseHttpsUrl(input.url),
@@ -88,7 +87,7 @@ export async function createAppMcpServer(
       command: {
         actor,
         purpose: "oauth_server_create_cleanup",
-        appId: app.id,
+        appId: input.appId,
         secretId: byoClientSecretSecretId,
         secretKind: "server_client_secret",
         server: serverOwner,
