@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
 
-export type Scope = "mine" | "shared" | "organization";
+export type Scope = "mine" | "organization";
 
 export interface ScopeTabItem {
   value: Scope;

@@ -9,8 +9,6 @@ import {
 import type { SkillInfo } from "../../agent.types";
 
 export interface AgentSkillsFieldModel {
-  availablePersonalSkills: SkillSummary[];
-  availableSharedSkills: SkillSummary[];
   availableSkills: SkillSummary[];
   handleAddSkill(skill: SkillSummary): void;
   handleRemoveSkill(skillId: string): void;
@@ -50,9 +48,9 @@ export function useAgentSkillsFieldModel({
     () => new Set(selectedSkills.map((skill) => skill.id)),
     [selectedSkills],
   );
-  const availableSkills = (skillsQuery.data ?? []).filter((skill) => !selectedIds.has(skill.id));
-  const availablePersonalSkills = availableSkills.filter((skill) => skill.role === "owner");
-  const availableSharedSkills = availableSkills.filter((skill) => skill.role === "user");
+  const availableSkills = (skillsQuery.data ?? []).filter(
+    (skill) => !selectedIds.has(skill.id) && skill.role === "owner",
+  );
 
   function handleAddSkill(skill: SkillSummary): void {
     setSkills([...selectedSkills, toSkillInfo(skill)]);
@@ -63,8 +61,6 @@ export function useAgentSkillsFieldModel({
   }
 
   return {
-    availablePersonalSkills,
-    availableSharedSkills,
     availableSkills,
     handleAddSkill,
     handleRemoveSkill,

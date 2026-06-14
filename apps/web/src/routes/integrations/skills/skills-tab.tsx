@@ -6,8 +6,6 @@ import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
-import { ScopeTabs } from "@/shared/ui/scope-tabs";
-import type { Scope } from "@/shared/ui/scope-tabs";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { SkillCard } from "./skill-card";
@@ -16,12 +14,11 @@ import { UploadSkillDialog } from "./upload-skill-dialog";
 import { useSkillRegistry } from "./use-skill-registry";
 export function SkillsTab() {
   const registry = useSkillRegistry();
-  const [scope, setScope] = useState<Scope>("mine");
   const [search, setSearch] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [detailSkillId, setDetailSkillId] = useState<string | null>(null);
 
-  const scopeSkills = scope === "mine" ? registry.personal : registry.shared;
+  const scopeSkills = registry.personal;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -41,7 +38,6 @@ export function SkillsTab() {
   async function handleUpload(file: File) {
     const created = await registry.publishFromFile(file);
     if (created) {
-      setScope("mine");
       setDetailSkillId(created.id);
     }
   }
@@ -61,15 +57,6 @@ export function SkillsTab() {
       </PageHeader>
 
       <div className="flex shrink-0 items-center gap-2.5 px-8 pb-4">
-        <ScopeTabs
-          value={scope}
-          onChange={setScope}
-          tabs={[
-            { count: registry.personal.length, label: "Mine", value: "mine" },
-            { count: registry.shared.length, label: "Shared with me", value: "shared" },
-          ]}
-        />
-
         <div className="flex-1" />
 
         <div className="relative w-[260px]">
@@ -90,7 +77,6 @@ export function SkillsTab() {
           <div className="text-fg-3 py-12 text-center text-[13px]">Loading skills…</div>
         ) : filtered.length === 0 ? (
           <SkillsEmptyState
-            kind={scope}
             searching={search.length > 0}
             onUpload={() => {
               setUploadOpen(true);
@@ -138,31 +124,13 @@ export function SkillsTab() {
   );
 }
 
-function SkillsEmptyState({
-  kind,
-  onUpload,
-  searching,
-}: {
-  kind: Scope;
-  onUpload: () => void;
-  searching: boolean;
-}) {
+function SkillsEmptyState({ onUpload, searching }: { onUpload: () => void; searching: boolean }) {
   if (searching) {
     return (
       <EmptyState
         icon={Search}
         title="No matching skills"
         description="Try a different search term."
-      />
-    );
-  }
-
-  if (kind === "shared") {
-    return (
-      <EmptyState
-        icon={Sparkles}
-        title="No skills shared with you yet"
-        description="Skills shared with you by teammates will appear here."
       />
     );
   }

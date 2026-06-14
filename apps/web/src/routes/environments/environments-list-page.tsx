@@ -17,23 +17,12 @@ import {
 import { toEnvironmentId, toOrganizationId } from "@/routes/typed-id";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
-import {
-  ListPageContent,
-  ListPageSearch,
-  ListPageToolbar,
-  ListPageToolbarSpacer,
-} from "@/shared/ui/list-page";
+import { ListPageContent, ListPageSearch, ListPageToolbar } from "@/shared/ui/list-page";
 import { PageHeader } from "@/shared/ui/page-header";
-import { ScopeTabs } from "@/shared/ui/scope-tabs";
-import type { Scope } from "@/shared/ui/scope-tabs";
 
 import { isTruthy } from "../../shared/lib/truthiness";
 import { EnvironmentListTable } from "./environment-list-table";
-import {
-  filterEnvironments,
-  getEnvironmentsForScope,
-  groupEnvironmentsByScope,
-} from "./environments-list-model";
+import { filterEnvironments, selectPersonalEnvironments } from "./environments-list-model";
 
 export function EnvironmentsListPage() {
   const { activeOrganization, activeOrganizationId } = useAppSession();
@@ -42,7 +31,6 @@ export function EnvironmentsListPage() {
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [scope, setScope] = useState<Scope>("mine");
   const [search, setSearch] = useState("");
 
   const defaultMutation = useMutation({
@@ -83,12 +71,13 @@ export function EnvironmentsListPage() {
   });
   const isAdmin = can(activeOrganization?.viewerRole, Permission.ProvidersCompanyManage);
   const environments = useMemo(() => environmentsQuery.data ?? [], [environmentsQuery.data]);
-  const environmentScopes = useMemo(() => groupEnvironmentsByScope(environments), [environments]);
-
-  const scopeEnvironments = getEnvironmentsForScope(environmentScopes, scope);
+  const personalEnvironments = useMemo(
+    () => selectPersonalEnvironments(environments),
+    [environments],
+  );
   const filteredEnvironments = useMemo(
-    () => filterEnvironments(scopeEnvironments, search),
-    [scopeEnvironments, search],
+    () => filterEnvironments(personalEnvironments, search),
+    [personalEnvironments, search],
   );
 
   async function handleSetDefault(environmentId: string) {
@@ -147,21 +136,6 @@ export function EnvironmentsListPage() {
       </PageHeader>
 
       <ListPageToolbar>
-        <ScopeTabs
-          value={scope}
-          onChange={setScope}
-          tabs={[
-            { count: environmentScopes.personalEnvironments.length, label: "Mine", value: "mine" },
-            {
-              count: environmentScopes.sharedEnvironments.length,
-              label: "Shared with me",
-              value: "shared",
-            },
-          ]}
-        />
-
-        <ListPageToolbarSpacer />
-
         <ListPageSearch value={search} onChange={setSearch} placeholder="Search environments…" />
       </ListPageToolbar>
 
@@ -183,24 +157,18 @@ export function EnvironmentsListPage() {
         ) : filteredEnvironments.length === 0 ? (
           <EmptyState
             icon={Box}
-            title={scope === "mine" ? "No environments yet" : "No environments shared with you yet"}
-            description={
-              scope === "mine"
-                ? "Create an environment to define the runtime your Agents run inside."
-                : "Environments shared with you will show up here."
-            }
+            title="No environments yet"
+            description="Create an environment to define the runtime your Agents run inside."
             action={
-              scope === "mine" ? (
-                <Button
-                  onClick={() => {
-                    setCreateOpen(true);
-                  }}
-                  size="sm"
-                >
-                  <Plus className="size-3.5" />
-                  Create environment
-                </Button>
-              ) : undefined
+              <Button
+                onClick={() => {
+                  setCreateOpen(true);
+                }}
+                size="sm"
+              >
+                <Plus className="size-3.5" />
+                Create environment
+              </Button>
             }
           />
         ) : (

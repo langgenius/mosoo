@@ -118,7 +118,7 @@ function McpAddDropdown({
               <>
                 {availablePersonal.length > 0 ? <DropdownMenuSeparator /> : null}
                 <DropdownMenuLabel className="text-muted-foreground text-[10px] tracking-wider uppercase">
-                  Shared with me
+                  Organization
                 </DropdownMenuLabel>
                 {availableOrganization.map((server) => (
                   <McpPickerItem key={server.id} server={server} onPick={() => onPick(server)} />

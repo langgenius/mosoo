@@ -178,9 +178,8 @@ export function ShareSkillDialog({ onOpenChange, open, registry, skill }: Props)
         <DialogHeader>
           <DialogTitle>Share skill</DialogTitle>
           <DialogDescription>
-            Invited members will see this skill in their "Share with me" section. They can enable or
-            disable it and create a fork, but they cannot edit, delete, or remove the share
-            themselves.
+            Invited members can enable or disable this skill and create a fork, but they cannot
+            edit, delete, or remove the share themselves.
           </DialogDescription>
         </DialogHeader>
 

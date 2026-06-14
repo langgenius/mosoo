@@ -18,13 +18,7 @@ import { ServiceAccountCredentialDialog } from "./service-account-credential-dia
 import { useMcpRegistry } from "./use-mcp-registry";
 
 function scopeToView(scope: Scope): McpViewMode {
-  if (scope === "mine") {
-    return "personal";
-  }
-  if (scope === "shared") {
-    return "shared";
-  }
-  return "managed";
+  return scope === "mine" ? "personal" : "managed";
 }
 
 interface McpTabState {
@@ -174,11 +168,6 @@ export function McpTab() {
           }}
           tabs={[
             { count: registry.personal.length, label: "Mine", value: "mine" },
-            {
-              count: registry.organizationShared.length,
-              label: "Shared with me",
-              value: "shared",
-            },
             {
               count: registry.organizationShared.length,
               label: "All organization",

@@ -30,12 +30,7 @@ export function SpaceSidebar({
   userId: string | undefined;
 }) {
   const ownedSpaces = spaces.filter((space) => space.ownerId === userId);
-  const sharedSpaces = spaces.filter(
-    (space) => space.ownerId !== userId && space.isSharedWithViewer,
-  );
-  const organizationSpaces = spaces.filter(
-    (space) => space.ownerId !== userId && !space.isSharedWithViewer,
-  );
+  const organizationSpaces = spaces.filter((space) => space.ownerId !== userId);
 
   return (
     <aside className="border-border-soft flex w-[220px] flex-col border-r">
@@ -75,22 +70,6 @@ export function SpaceSidebar({
             onSelectSpace={onSelectSpace}
             spaces={ownedSpaces}
           />
-        ) : null}
-
-        {sharedSpaces.length > 0 ? (
-          <>
-            <div className="t-eyebrow px-2.5 pt-4 pb-1">Shared with me</div>
-            <SpaceSidebarList
-              activeSpaceId={activeSpaceId}
-              canManageSpace={canManageSpace}
-              getManageDisabledReason={getManageDisabledReason}
-              hoveredSpaceId={hoveredSpaceId}
-              onHoverSpace={onHoverSpace}
-              onOpenSettings={onOpenSettings}
-              onSelectSpace={onSelectSpace}
-              spaces={sharedSpaces}
-            />
-          </>
         ) : null}
 
         {organizationSpaces.length > 0 ? (

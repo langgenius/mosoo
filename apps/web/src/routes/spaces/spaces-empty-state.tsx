@@ -24,16 +24,6 @@ export function SpacesEmptyState({
     );
   }
 
-  if (scope === "shared") {
-    return (
-      <EmptyState
-        icon={Folder}
-        title="No spaces shared with you yet"
-        description="Spaces shared with you by teammates will appear here."
-      />
-    );
-  }
-
   if (scope === "organization") {
     return (
       <EmptyState

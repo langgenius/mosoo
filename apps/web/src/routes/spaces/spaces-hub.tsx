@@ -64,7 +64,6 @@ export function SpacesHub({
           onChange={setScope}
           tabs={[
             { count: spaceScopes.ownedSpaces.length, label: "Mine", value: "mine" },
-            { count: spaceScopes.sharedSpaces.length, label: "Shared with me", value: "shared" },
             {
               count: spaceScopes.organizationSpaces.length,
               label: "All organization",

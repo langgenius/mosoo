@@ -4,7 +4,6 @@ import type { Scope } from "@/shared/ui/scope-tabs";
 
 export interface SpaceScopeGroups {
   ownedSpaces: SpaceView[];
-  sharedSpaces: SpaceView[];
   organizationSpaces: SpaceView[];
 }
 
@@ -13,20 +12,13 @@ export function groupSpacesByScope(
   userId: string | undefined,
 ): SpaceScopeGroups {
   return {
-    organizationSpaces: spaces.filter(
-      (space) => space.ownerId !== userId && !space.isSharedWithViewer,
-    ),
+    organizationSpaces: spaces.filter((space) => space.ownerId !== userId),
     ownedSpaces: spaces.filter((space) => space.ownerId === userId),
-    sharedSpaces: spaces.filter((space) => space.ownerId !== userId && space.isSharedWithViewer),
   };
 }
 
 export function getSpacesForScope(groups: SpaceScopeGroups, scope: Scope): SpaceView[] {
-  if (scope === "organization") {
-    return groups.organizationSpaces;
-  }
-
-  return scope === "shared" ? groups.sharedSpaces : groups.ownedSpaces;
+  return scope === "organization" ? groups.organizationSpaces : groups.ownedSpaces;
 }
 
 export function filterSpaces(spaces: SpaceView[], search: string): SpaceView[] {

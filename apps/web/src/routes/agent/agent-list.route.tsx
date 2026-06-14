@@ -14,11 +14,9 @@ import {
   ListPageToolbarSpacer,
 } from "@/shared/ui/list-page";
 import { PageHeader } from "@/shared/ui/page-header";
-import { ScopeTabs } from "@/shared/ui/scope-tabs";
-import type { Scope } from "@/shared/ui/scope-tabs";
 import { ViewToggle } from "@/shared/ui/view-toggle";
 
-import { filterAgents, getAgentsForScope, groupAgentsByScope } from "./agent-list-model";
+import { filterAgents, selectOwnedAgents } from "./agent-list-model";
 import { mapAgentSummaryToListView } from "./agent-view.mapper";
 import { AgentGrid } from "./components/agent-grid";
 import { AgentTable } from "./components/agent-table";
@@ -26,7 +24,6 @@ import { CreateAgentLauncherDialog } from "./components/create-agent-launcher";
 import { ImportAgentPackageDialog } from "./components/import-agent-package-dialog";
 
 interface AgentListPageState {
-  scope: Scope;
   search: string;
   showCreate: boolean;
   showImport: boolean;
@@ -34,14 +31,12 @@ interface AgentListPageState {
 }
 
 type AgentListPageAction =
-  | { type: "setScope"; scope: Scope }
   | { type: "setSearch"; search: string }
   | { type: "setShowCreate"; open: boolean }
   | { type: "setShowImport"; open: boolean }
   | { type: "setView"; view: "list" | "grid" };
 
 const AGENT_LIST_PAGE_INITIAL_STATE: AgentListPageState = {
-  scope: "mine",
   search: "",
   showCreate: false,
   showImport: false,
@@ -53,8 +48,6 @@ function agentListPageReducer(
   action: AgentListPageAction,
 ): AgentListPageState {
   switch (action.type) {
-    case "setScope":
-      return { ...state, scope: action.scope };
     case "setSearch":
       return { ...state, search: action.search };
     case "setShowCreate":
@@ -72,7 +65,7 @@ export function AgentListPage() {
   const { activeOrganization } = useAppSession();
   const [searchParams, setSearchParams] = useSearchParams();
   const [state, dispatch] = useReducer(agentListPageReducer, AGENT_LIST_PAGE_INITIAL_STATE);
-  const { scope, search, showCreate, showImport, view } = state;
+  const { search, showCreate, showImport, view } = state;
   const organizationId = activeOrganization?.id ?? null;
   const agentsQuery = useVisibleAgentsQuery(organizationId);
 
@@ -89,12 +82,11 @@ export function AgentListPage() {
     [agentsQuery.data, user],
   );
 
-  const agentScopes = useMemo(() => groupAgentsByScope(agents), [agents]);
+  const ownedAgents = useMemo(() => selectOwnedAgents(agents), [agents]);
 
   const basePath = globalThis.location.pathname.startsWith("/demo") ? "/demo/agent" : "/agent";
 
-  const scopeAgents = getAgentsForScope(agentScopes, scope);
-  const filteredAgents = filterAgents(scopeAgents, search);
+  const filteredAgents = filterAgents(ownedAgents, search);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -111,19 +103,6 @@ export function AgentListPage() {
       </PageHeader>
 
       <ListPageToolbar>
-        <ScopeTabs
-          value={scope}
-          onChange={(nextScope) => {
-            dispatch({ scope: nextScope, type: "setScope" });
-          }}
-          tabs={[
-            { count: agentScopes.myAgents.length, label: "Mine", value: "mine" },
-            { count: agentScopes.sharedAgents.length, label: "Shared with me", value: "shared" },
-          ]}
-        />
-
-        <ListPageToolbarSpacer />
-
         <ListPageSearch
           value={search}
           onChange={(nextSearch) => {
@@ -131,6 +110,8 @@ export function AgentListPage() {
           }}
           placeholder="Search agents…"
         />
+
+        <ListPageToolbarSpacer />
 
         <Button
           variant="outline"
@@ -163,24 +144,18 @@ export function AgentListPage() {
         ) : filteredAgents.length === 0 ? (
           <EmptyState
             icon={Bot}
-            title={scope === "mine" ? "No agents yet" : "No agents shared with you yet"}
-            description={
-              scope === "mine"
-                ? "Create your first agent to put a reusable worker in your team's hands."
-                : "Agents shared with you by teammates will appear here."
-            }
+            title="No agents yet"
+            description="Create your first agent to put a reusable worker in your team's hands."
           >
-            {scope === "mine" ? (
-              <Button
-                onClick={() => {
-                  dispatch({ open: true, type: "setShowCreate" });
-                }}
-                size="sm"
-              >
-                <Plus className="size-3.5" />
-                Create agent
-              </Button>
-            ) : null}
+            <Button
+              onClick={() => {
+                dispatch({ open: true, type: "setShowCreate" });
+              }}
+              size="sm"
+            >
+              <Plus className="size-3.5" />
+              Create agent
+            </Button>
           </EmptyState>
         ) : view === "list" ? (
           <AgentTable
@@ -189,7 +164,7 @@ export function AgentListPage() {
               void navigate(`${basePath}/${id}`);
             }}
             organizationId={organizationId}
-            showOwner={scope === "shared"}
+            showOwner={false}
           />
         ) : (
           <AgentGrid
@@ -197,7 +172,7 @@ export function AgentListPage() {
             onSelect={(id) => {
               void navigate(`${basePath}/${id}`);
             }}
-            showOwner={scope === "shared"}
+            showOwner={false}
           />
         )}
       </ListPageContent>

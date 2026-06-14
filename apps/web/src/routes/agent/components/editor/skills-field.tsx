@@ -178,15 +178,7 @@ function renderSkillsDropdownContent({
     return <div className="text-muted-foreground p-3 text-[12px]">{message}</div>;
   }
 
-  return (
-    <>
-      <SkillPickerGroup label="Personal" onAdd={onAdd} skills={model.availablePersonalSkills} />
-      {model.availablePersonalSkills.length > 0 && model.availableSharedSkills.length > 0 ? (
-        <DropdownMenuSeparator />
-      ) : null}
-      <SkillPickerGroup label="Shared with me" onAdd={onAdd} skills={model.availableSharedSkills} />
-    </>
-  );
+  return <SkillPickerGroup label="Skills" onAdd={onAdd} skills={model.availableSkills} />;
 }
 
 function SkillPickerGroup({
