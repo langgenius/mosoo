@@ -1,33 +1,15 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  ensureAgentAccess,
-  ensureAgentCostAccess,
-  ensureAgentDestructiveAccess,
-  ensureAgentEditor,
-} from "../src/modules/agents/application/agent-access.service";
+import { ensureAppAgentOwner } from "../src/modules/agents/application/agent-access.service";
 import { getAgentRow } from "../src/modules/agents/application/agent-repository";
-import {
-  admitPublishedAgentCaller,
-  ensurePublishedAgentCallerAccess,
-} from "../src/modules/public-api/published-agent-admission.service";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const AGENT_ACCESS_IDS = {
-  adminAccount: "01J00000000000000000000013",
-  collabAdminAccount: "01J00000000000000000000012",
-  liveVersion: "01J00000000000000000000041",
   organization: "01J00000000000000000000006",
-  organizationAclAgent: "01J00000000000000000000026",
-  organizationOwnerAccount: "01J00000000000000000000014",
-  organizationVisibleNoAclAgent: "01J00000000000000000000025",
+  otherApp: "01J0000000000000000000000R",
   ownerAccount: "01J00000000000000000000001",
   ownerAgent: "01J00000000000000000000021",
-  personalMcpAgent: "01J00000000000000000000023",
-  personalMcpServer: "01J00000000000000000000031",
-  removedOwnerAccount: "01J00000000000000000000015",
-  removedOwnerAgent: "01J00000000000000000000024",
-  sharedAgent: "01J00000000000000000000022",
+  app: "01J0000000000000000000000Q",
   viewerAccount: "01J00000000000000000000011",
 } as const;
 
@@ -39,6 +21,17 @@ function createAgentAccessDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       image_url text,
       name text
+    );
+
+    CREATE TABLE app (
+      id text PRIMARY KEY NOT NULL,
+      organization_id text NOT NULL,
+      owner_account_id text NOT NULL,
+      name text NOT NULL,
+      slug text NOT NULL,
+      default_environment_id text,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL
     );
 
     CREATE TABLE agent (
@@ -53,6 +46,7 @@ function createAgentAccessDatabase(): SqliteD1Database {
       name text NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
+      app_id text NOT NULL,
       prompt text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
@@ -61,46 +55,39 @@ function createAgentAccessDatabase(): SqliteD1Database {
       visibility text NOT NULL
     );
 
-    CREATE TABLE organization_member (
-      account_id text NOT NULL,
-      disabled_at integer,
-      organization_id text NOT NULL,
-      role text NOT NULL,
-      PRIMARY KEY (organization_id, account_id)
-    );
-
-    CREATE TABLE resource_acl (
-      created_at integer NOT NULL,
-      resource_id text NOT NULL,
-      resource_type text NOT NULL,
-      role text NOT NULL,
-      target_id text NOT NULL,
-      target_kind text NOT NULL,
-      PRIMARY KEY (resource_type, resource_id, target_kind, target_id)
-    );
-
-    CREATE TABLE agent_mcp_binding (
-      agent_id text NOT NULL,
-      server_id text NOT NULL
-    );
-
-    CREATE TABLE mcp_server (
-      id text PRIMARY KEY NOT NULL,
-      source text NOT NULL
-    );
-
-    INSERT INTO organization_member (organization_id, account_id, role, disabled_at)
-    VALUES
-      ('${AGENT_ACCESS_IDS.organization}', '${AGENT_ACCESS_IDS.ownerAccount}', 'member', NULL),
-      ('${AGENT_ACCESS_IDS.organization}', '${AGENT_ACCESS_IDS.viewerAccount}', 'member', NULL),
-      ('${AGENT_ACCESS_IDS.organization}', '${AGENT_ACCESS_IDS.collabAdminAccount}', 'member', NULL),
-      ('${AGENT_ACCESS_IDS.organization}', '${AGENT_ACCESS_IDS.adminAccount}', 'admin', NULL),
-      ('${AGENT_ACCESS_IDS.organization}', '${AGENT_ACCESS_IDS.organizationOwnerAccount}', 'owner', NULL);
-
     INSERT INTO account (id, image_url, name)
     VALUES
       ('${AGENT_ACCESS_IDS.ownerAccount}', NULL, 'Owner'),
-      ('${AGENT_ACCESS_IDS.removedOwnerAccount}', NULL, 'Removed Owner');
+      ('${AGENT_ACCESS_IDS.viewerAccount}', NULL, 'Viewer');
+
+    INSERT INTO app (
+      id,
+      organization_id,
+      owner_account_id,
+      name,
+      slug,
+      created_at,
+      updated_at
+    )
+    VALUES
+      (
+        '${AGENT_ACCESS_IDS.app}',
+        '${AGENT_ACCESS_IDS.organization}',
+        '${AGENT_ACCESS_IDS.ownerAccount}',
+        'Default App',
+        'default',
+        1,
+        1
+      ),
+      (
+        '${AGENT_ACCESS_IDS.otherApp}',
+        '${AGENT_ACCESS_IDS.organization}',
+        '${AGENT_ACCESS_IDS.ownerAccount}',
+        'Other App',
+        'other',
+        1,
+        1
+      );
 
     INSERT INTO agent (
       config_json,
@@ -111,6 +98,7 @@ function createAgentAccessDatabase(): SqliteD1Database {
       name,
       organization_id,
       owner_account_id,
+      app_id,
       prompt,
       provider,
       runtime_id,
@@ -118,156 +106,72 @@ function createAgentAccessDatabase(): SqliteD1Database {
       updated_at,
       visibility
     )
-    VALUES
-      ('{}', 1, '${AGENT_ACCESS_IDS.ownerAgent}', 'pet', 'gpt-5.4', 'Owner Agent', '${AGENT_ACCESS_IDS.organization}', '${AGENT_ACCESS_IDS.ownerAccount}', 'Help', 'openai', 'openai-runtime', 'draft', 1, 'private'),
-      ('{}', 2, '${AGENT_ACCESS_IDS.sharedAgent}', 'pet', 'gpt-5.4', 'Shared Agent', '${AGENT_ACCESS_IDS.organization}', '${AGENT_ACCESS_IDS.ownerAccount}', 'Help', 'openai', 'openai-runtime', 'published', 2, 'private'),
-      ('{}', 3, '${AGENT_ACCESS_IDS.personalMcpAgent}', 'pet', 'gpt-5.4', 'Personal MCP Agent', '${AGENT_ACCESS_IDS.organization}', '${AGENT_ACCESS_IDS.ownerAccount}', 'Help', 'openai', 'openai-runtime', 'published', 3, 'private'),
-      ('{}', 4, '${AGENT_ACCESS_IDS.removedOwnerAgent}', 'pet', 'gpt-5.4', 'Removed Owner Agent', '${AGENT_ACCESS_IDS.organization}', '${AGENT_ACCESS_IDS.removedOwnerAccount}', 'Help', 'openai', 'openai-runtime', 'draft', 4, 'private'),
-      ('{}', 5, '${AGENT_ACCESS_IDS.organizationVisibleNoAclAgent}', 'pet', 'gpt-5.4', 'Visible Without ACL Agent', '${AGENT_ACCESS_IDS.organization}', '${AGENT_ACCESS_IDS.ownerAccount}', 'Help', 'openai', 'openai-runtime', 'published', 5, 'organization'),
-      ('{}', 6, '${AGENT_ACCESS_IDS.organizationAclAgent}', 'pet', 'gpt-5.4', 'Organization ACL Agent', '${AGENT_ACCESS_IDS.organization}', '${AGENT_ACCESS_IDS.ownerAccount}', 'Help', 'openai', 'openai-runtime', 'published', 6, 'organization');
-
-    INSERT INTO resource_acl (created_at, resource_id, resource_type, role, target_id, target_kind)
-    VALUES
-      (1, '${AGENT_ACCESS_IDS.sharedAgent}', 'agent', 'user', '${AGENT_ACCESS_IDS.viewerAccount}', 'user'),
-      (1, '${AGENT_ACCESS_IDS.personalMcpAgent}', 'agent', 'user', '${AGENT_ACCESS_IDS.viewerAccount}', 'user'),
-      (1, '${AGENT_ACCESS_IDS.organizationAclAgent}', 'agent', 'user', '${AGENT_ACCESS_IDS.organization}', 'organization');
-
-    INSERT INTO mcp_server (id, source)
-    VALUES ('${AGENT_ACCESS_IDS.personalMcpServer}', 'personal');
-
-    INSERT INTO agent_mcp_binding (agent_id, server_id)
-    VALUES ('${AGENT_ACCESS_IDS.personalMcpAgent}', '${AGENT_ACCESS_IDS.personalMcpServer}');
-
-    UPDATE agent
-       SET live_deployment_version_id = '${AGENT_ACCESS_IDS.liveVersion}'
-     WHERE id = '${AGENT_ACCESS_IDS.sharedAgent}';
+    VALUES (
+      '{}',
+      1,
+      '${AGENT_ACCESS_IDS.ownerAgent}',
+      'pet',
+      'gpt-5.4',
+      'Owner Agent',
+      '${AGENT_ACCESS_IDS.organization}',
+      '${AGENT_ACCESS_IDS.ownerAccount}',
+      '${AGENT_ACCESS_IDS.app}',
+      'Help',
+      'openai',
+      'openai-runtime',
+      'draft',
+      1,
+      'private'
+    );
   `);
 
   return database;
 }
 
-describe("agent access", () => {
-  test("resolves owner editor access", async () => {
+describe("app agent access", () => {
+  test("resolves owner access with explicit App proof", async () => {
     const database = createAgentAccessDatabase();
 
-    const access = await ensureAgentEditor(
-      database,
-      AGENT_ACCESS_IDS.ownerAccount,
-      AGENT_ACCESS_IDS.ownerAgent,
-    );
+    const access = await ensureAppAgentOwner(database, AGENT_ACCESS_IDS.ownerAccount, {
+      agentId: AGENT_ACCESS_IDS.ownerAgent,
+      appId: AGENT_ACCESS_IDS.app,
+    });
 
     expect(access.agent.id).toBe(AGENT_ACCESS_IDS.ownerAgent);
+    expect(access.agent.appId).toBe(AGENT_ACCESS_IDS.app);
+    expect(access.owner).toMatchObject({
+      id: AGENT_ACCESS_IDS.ownerAccount,
+      name: "Owner",
+    });
     expect(access.viewerRole).toBe("owner");
   });
 
-  test("resolves shared published access with ACL and personal MCP state", async () => {
-    const database = createAgentAccessDatabase();
-
-    const agent = await ensureAgentAccess(
-      database,
-      AGENT_ACCESS_IDS.viewerAccount,
-      AGENT_ACCESS_IDS.sharedAgent,
-    );
-
-    expect(agent.id).toBe(AGENT_ACCESS_IDS.sharedAgent);
-  });
-
-  test("resolves shared cost access without listing collaborators", async () => {
-    const database = createAgentAccessDatabase();
-
-    const access = await ensureAgentCostAccess(
-      database,
-      AGENT_ACCESS_IDS.viewerAccount,
-      AGENT_ACCESS_IDS.sharedAgent,
-    );
-
-    expect(access.agent.id).toBe(AGENT_ACCESS_IDS.sharedAgent);
-    expect(access.viewerRole).toBe("user");
-  });
-
-  test("treats organization visibility as display state and requires organization ACL", async () => {
+  test("fails closed for non-owner access even inside the same organization", async () => {
     const database = createAgentAccessDatabase();
 
     await expect(
-      ensureAgentAccess(
-        database,
-        AGENT_ACCESS_IDS.viewerAccount,
-        AGENT_ACCESS_IDS.organizationVisibleNoAclAgent,
-      ),
+      ensureAppAgentOwner(database, AGENT_ACCESS_IDS.viewerAccount, {
+        agentId: AGENT_ACCESS_IDS.ownerAgent,
+        appId: AGENT_ACCESS_IDS.app,
+      }),
     ).rejects.toThrow();
-
-    const agent = await ensureAgentAccess(
-      database,
-      AGENT_ACCESS_IDS.viewerAccount,
-      AGENT_ACCESS_IDS.organizationAclAgent,
-    );
-
-    expect(agent.id).toBe(AGENT_ACCESS_IDS.organizationAclAgent);
   });
 
-  test("denies shared access to agents with personal MCP bindings", async () => {
+  test("fails closed when the App proof does not match the Agent", async () => {
     const database = createAgentAccessDatabase();
 
     await expect(
-      ensureAgentAccess(
-        database,
-        AGENT_ACCESS_IDS.viewerAccount,
-        AGENT_ACCESS_IDS.personalMcpAgent,
-      ),
+      ensureAppAgentOwner(database, AGENT_ACCESS_IDS.ownerAccount, {
+        agentId: AGENT_ACCESS_IDS.ownerAgent,
+        appId: AGENT_ACCESS_IDS.otherApp,
+      }),
     ).rejects.toThrow();
-  });
-
-  test("allows admin destructive access when the agent owner is no longer active", async () => {
-    const database = createAgentAccessDatabase();
-
-    const access = await ensureAgentDestructiveAccess(
-      database,
-      AGENT_ACCESS_IDS.adminAccount,
-      AGENT_ACCESS_IDS.removedOwnerAgent,
-    );
-
-    expect(access.agent.id).toBe(AGENT_ACCESS_IDS.removedOwnerAgent);
-    expect(access.viewerRole).toBe("admin");
-  });
-
-  test("admits published API callers", async () => {
-    const database = createAgentAccessDatabase();
-
-    const agent = await admitPublishedAgentCaller(
-      database,
-      {
-        email: "viewer@example.com",
-        emailVerified: true,
-        id: AGENT_ACCESS_IDS.viewerAccount,
-        imageUrl: null,
-        name: "Viewer",
-      },
-      AGENT_ACCESS_IDS.sharedAgent,
-    );
-
-    expect(agent.id).toBe(AGENT_ACCESS_IDS.sharedAgent);
-  });
-
-  test("checks known published Agent caller access", async () => {
-    const database = createAgentAccessDatabase();
-    const agent = await getAgentRow(database, AGENT_ACCESS_IDS.sharedAgent);
-
-    await ensurePublishedAgentCallerAccess(
-      database,
-      {
-        email: "viewer@example.com",
-        emailVerified: true,
-        id: AGENT_ACCESS_IDS.viewerAccount,
-        imageUrl: null,
-        name: "Viewer",
-      },
-      agent,
-    );
   });
 
   test("normalizes legacy empty stored config when reading Agent rows", async () => {
     const agent = await getAgentRow(createAgentAccessDatabase(), AGENT_ACCESS_IDS.ownerAgent);
 
+    expect(agent.appId).toBe(AGENT_ACCESS_IDS.app);
     expect(JSON.parse(agent.configJson)).toEqual({
       builder: {
         componentDecisions: {},

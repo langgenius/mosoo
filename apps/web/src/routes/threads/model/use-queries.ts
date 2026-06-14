@@ -6,11 +6,8 @@ import { useVisibleAgentsQuery } from "@/domains/agent/query/agent-queries";
 import { getThreadSessionMessages } from "@/domains/session/api/agent-session";
 import { retrieveThreadAgentSession } from "@/domains/session/api/agent-session-retrieve";
 import { archivedThreadSessions, threadSessions } from "@/domains/session/api/list";
-import {
-  getSessionProcessEvents,
-  listSessionThreadUiStates,
-} from "@/domains/session/api/thread-projections";
-import { toOrganizationId, toSessionId } from "@/routes/typed-id";
+import { getSessionProcessEvents } from "@/domains/session/api/thread-projections";
+import { toAppId, toSessionId } from "@/routes/typed-id";
 
 import { threadKeys } from "./query-keys";
 import {
@@ -21,80 +18,47 @@ import {
   summarizeThreads,
   toThreadListItem,
 } from "./thread";
-import type { ThreadFilter, ThreadListItem, ThreadSection } from "./thread";
-
-function toThreadUiSnapshot(
-  states: Awaited<ReturnType<typeof listSessionThreadUiStates>> | undefined,
-) {
-  const pinnedThreadIds = new Set<string>();
-  const readAtByThreadId: Record<string, string> = {};
-
-  for (const state of states ?? []) {
-    if (state.pinned) {
-      pinnedThreadIds.add(state.sessionId);
-    }
-
-    if (state.readAt !== null) {
-      readAtByThreadId[state.sessionId] = state.readAt;
-    }
-  }
-
-  return { pinnedThreadIds, readAtByThreadId };
-}
+import type { ThreadFilter, ThreadListItem, ThreadSection, ThreadUiSnapshot } from "./thread";
 
 export function useThreadQueries({
-  activeOrganizationId,
+  activeAppId,
   activeThreadId,
   filter,
+  ui,
 }: {
-  activeOrganizationId: string | null;
+  activeAppId: string | null;
   activeThreadId: string | null;
   filter: ThreadFilter;
+  ui: ThreadUiSnapshot;
 }) {
-  const agentsQuery = useVisibleAgentsQuery(activeOrganizationId);
+  const agentsQuery = useVisibleAgentsQuery(activeAppId);
   const activeSessionsQuery = useQuery({
-    enabled: activeOrganizationId !== null,
+    enabled: activeAppId !== null,
     queryFn: async () => {
-      if (activeOrganizationId === null) {
-        throw new Error("Organization id is required to list threads.");
+      if (activeAppId === null) {
+        throw new Error("App id is required to list threads.");
       }
 
-      return threadSessions(toOrganizationId(activeOrganizationId), "ui");
+      return threadSessions(toAppId(activeAppId), "ui");
     },
-    queryKey: threadKeys.list(activeOrganizationId),
+    queryKey: threadKeys.list(activeAppId),
     refetchInterval: 10_000,
   });
   const archivedSessionsQuery = useQuery({
-    enabled: activeOrganizationId !== null,
+    enabled: activeAppId !== null,
     queryFn: async () => {
-      if (activeOrganizationId === null) {
-        throw new Error("Organization id is required to list archived threads.");
+      if (activeAppId === null) {
+        throw new Error("App id is required to list archived threads.");
       }
 
-      return archivedThreadSessions(toOrganizationId(activeOrganizationId), "ui");
+      return archivedThreadSessions(toAppId(activeAppId), "ui");
     },
-    queryKey: threadKeys.archivedList(activeOrganizationId),
-    refetchInterval: 10_000,
-  });
-  const threadUiStateQuery = useQuery({
-    enabled: activeOrganizationId !== null,
-    queryFn: async () => {
-      if (activeOrganizationId === null) {
-        throw new Error("Organization id is required to list thread UI state.");
-      }
-
-      return listSessionThreadUiStates(toOrganizationId(activeOrganizationId));
-    },
-    queryKey: threadKeys.uiStates(activeOrganizationId),
+    queryKey: threadKeys.archivedList(activeAppId),
     refetchInterval: 10_000,
   });
   const agentsById = useMemo(
     () => new Map<string, AgentSummary>((agentsQuery.data ?? []).map((agent) => [agent.id, agent])),
     [agentsQuery.data],
-  );
-  const threadUiSnapshot = useMemo(
-    () => toThreadUiSnapshot(threadUiStateQuery.data),
-    [threadUiStateQuery.data],
   );
   const allThreads = useMemo(() => {
     const sessionList = [
@@ -108,11 +72,11 @@ export function useThreadQueries({
           actionCapabilities: node.capabilities,
           agentsById,
           session: node.session,
-          ui: threadUiSnapshot,
+          ui,
         }),
       )
       .toSorted(compareThreads);
-  }, [activeSessionsQuery.data, agentsById, archivedSessionsQuery.data, threadUiSnapshot]);
+  }, [activeSessionsQuery.data, agentsById, archivedSessionsQuery.data, ui]);
   const selectedThread = allThreads.find((thread) => thread.id === activeThreadId) ?? null;
   const messagesQuery = useQuery({
     enabled: selectedThread !== null,
@@ -121,7 +85,7 @@ export function useThreadQueries({
         throw new Error("Thread id is required to load messages.");
       }
 
-      return getThreadSessionMessages(toSessionId(selectedThread.id));
+      return getThreadSessionMessages(selectedThread.session.appId, toSessionId(selectedThread.id));
     },
     queryKey: threadKeys.detailMessages(activeThreadId),
     refetchInterval:
@@ -134,7 +98,7 @@ export function useThreadQueries({
         throw new Error("Thread id is required to load process events.");
       }
 
-      return getSessionProcessEvents(toSessionId(selectedThread.id));
+      return getSessionProcessEvents(selectedThread.session.appId, toSessionId(selectedThread.id));
     },
     queryKey: threadKeys.processEvents(activeThreadId),
     refetchInterval:
@@ -147,7 +111,10 @@ export function useThreadQueries({
         throw new Error("Thread id is required to retrieve thread state.");
       }
 
-      return retrieveThreadAgentSession({ sessionId: toSessionId(selectedThread.id) });
+      return retrieveThreadAgentSession({
+        appId: selectedThread.session.appId,
+        sessionId: toSessionId(selectedThread.id),
+      });
     },
     queryKey: threadKeys.retrieve(activeThreadId),
     refetchInterval:
@@ -172,16 +139,9 @@ export function useThreadQueries({
 
     return result;
   }, [filteredThreads]);
-  const loadError =
-    activeSessionsQuery.error ??
-    archivedSessionsQuery.error ??
-    agentsQuery.error ??
-    threadUiStateQuery.error;
+  const loadError = activeSessionsQuery.error ?? archivedSessionsQuery.error ?? agentsQuery.error;
   const isLoading =
-    activeSessionsQuery.isLoading ||
-    archivedSessionsQuery.isLoading ||
-    agentsQuery.isLoading ||
-    threadUiStateQuery.isLoading;
+    activeSessionsQuery.isLoading || archivedSessionsQuery.isLoading || agentsQuery.isLoading;
 
   return {
     agentsQuery,

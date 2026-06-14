@@ -6,6 +6,7 @@ import type {
   AgentId,
   FileId,
   OrganizationId,
+  AppId,
   SessionId,
 } from "@mosoo/id";
 
@@ -35,7 +36,6 @@ interface QueueSessionRunInput {
   accessViewer?: AuthenticatedViewer;
   attachmentIds: FileId[];
   clientRequestId: string | null;
-  draftAttachmentOrganizationId?: OrganizationId | null;
   prompt: string;
   session: {
     agent_id: AgentId;
@@ -44,6 +44,7 @@ interface QueueSessionRunInput {
     id: SessionId;
     model: string;
     organization_id: OrganizationId;
+    app_id: AppId;
     provider: string;
     runtime_id: string;
   };
@@ -137,13 +138,13 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
 
   await enqueueSessionRunDispatchCommand(bindings, {
     attachmentIds: input.attachmentIds,
-    draftAttachmentOrganizationId: input.draftAttachmentOrganizationId ?? null,
     prompt: input.prompt,
     queuedAtMs,
     requestUrl,
     session: {
       id: input.session.id,
       organization_id: input.session.organization_id,
+      app_id: input.session.app_id,
     },
     sessionRunId: createdRun.id,
     traceId: createdRun.traceId,

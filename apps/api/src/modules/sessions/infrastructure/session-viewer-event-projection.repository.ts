@@ -165,7 +165,7 @@ async function clearRunPermissionRequests(
     .run();
 }
 
-async function projectPermissionResolution(
+async function appPermissionResolution(
   database: D1Database,
   record: SessionViewerProjectionRuntimeEvent,
 ): Promise<void> {
@@ -215,7 +215,7 @@ async function upsertReadinessSnapshot(
     .run();
 }
 
-export async function projectSessionViewerRuntimeEvents(
+export async function appSessionViewerRuntimeEvents(
   database: D1Database,
   records: readonly SessionViewerProjectionRuntimeEvent[],
 ): Promise<void> {
@@ -226,7 +226,7 @@ export async function projectSessionViewerRuntimeEvents(
         break;
       }
       case "permission.resolved": {
-        await projectPermissionResolution(database, record);
+        await appPermissionResolution(database, record);
         break;
       }
       case "run.cancelled":

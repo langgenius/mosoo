@@ -11,6 +11,7 @@ const AGENT_FIELDS = graphql(/* GraphQL */ `
     }
     model
     name
+    appId
     packageSharingEnabled
     prompt
     provider
@@ -88,13 +89,14 @@ export const DELETE_AGENT_MUTATION = graphql(/* GraphQL */ `
 `);
 
 export const LIST_VISIBLE_AGENTS_QUERY = graphql(/* GraphQL */ `
-  query AccessibleAgents($organizationId: ULID!) {
-    accessibleAgentList(organizationId: $organizationId) {
+  query AccessibleAgents($appId: ULID!) {
+    accessibleAgentList(appId: $appId) {
       createdAt
       description
       id
       kind
       name
+      appId
       owner {
         ...AgentOwnerFields
       }
@@ -112,8 +114,8 @@ export const LIST_VISIBLE_AGENTS_QUERY = graphql(/* GraphQL */ `
 `);
 
 export const GET_AGENT_QUERY = graphql(/* GraphQL */ `
-  query Agent($agentId: ULID!) {
-    agent(agentId: $agentId) {
+  query Agent($agentId: ULID!, $appId: ULID!) {
+    agent(agentId: $agentId, appId: $appId) {
       createdAt
       description
       id
@@ -123,6 +125,7 @@ export const GET_AGENT_QUERY = graphql(/* GraphQL */ `
       }
       model
       name
+      appId
       owner {
         ...AgentOwnerFields
       }

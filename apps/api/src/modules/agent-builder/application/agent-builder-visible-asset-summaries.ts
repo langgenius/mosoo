@@ -18,31 +18,32 @@ export async function collectAgentBuilderVisibleAssetSummaries(
     collectAgentBuilderVisibleEnvironmentSummaries({
       bindings: input.bindings,
       environmentId: input.draft.environmentId,
-      organizationId: input.organizationId,
+      appId: input.appId,
       viewer: input.viewer,
     }),
     collectAgentBuilderVisibleMcpServerSummaries({
       bindingRepresented: input.draft.mcpServersRepresented,
       bindings: input.bindings,
       boundMcpServerIds: input.boundMcpServerIds,
-      organizationId: input.organizationId,
+      appId: input.appId,
       viewer: input.viewer,
     }),
     collectAgentBuilderVisibleSkillSummaries({
       bindings: input.bindings,
       boundSkillIds: input.boundSkillIds,
-      organizationId: input.organizationId,
+      appId: input.appId,
       viewer: input.viewer,
     }),
     listAgentBuilderVisibleSpaceRecords({
       bindings: input.bindings,
-      organizationId: input.organizationId,
+      appId: input.appId,
       viewer: input.viewer,
     }),
   ]);
   const selectedSpaceFiles = await collectAgentBuilderSelectedSpaceFileSummaries({
     bindings: input.bindings,
     draftSpaces: input.draft.spaces,
+    appId: input.appId,
     viewer: input.viewer,
     visibleSpaces: visibleSpaceRecords,
   });

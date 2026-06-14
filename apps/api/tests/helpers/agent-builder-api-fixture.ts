@@ -7,7 +7,7 @@ import type { AuthenticatedViewer } from "../../src/modules/auth/application/vie
 import { getViewer } from "../../src/modules/users/application/viewer-context.service";
 import { storeVendorCredentialSecret } from "../../src/modules/vendor-credentials/application/vendor-credential.secret-resolution";
 import type { ApiBindings } from "../../src/platform/cloudflare/worker-types";
-import { createPublicHttpTestBindings } from "./published-agent-http-test-fixture";
+import { createPublicHttpTestBindings } from "./public-api-http-test-fixture";
 import { SqliteD1Database } from "./sqlite-d1";
 
 const AGENT_BUILDER_TEST_VIEWER = {
@@ -20,7 +20,10 @@ const AGENT_BUILDER_TEST_VIEWER = {
 
 export const AGENT_BUILDER_TEST_IDS = {
   agentId: "01J00000000000000000000053",
+  environmentId: "01J00000000000000000000055",
+  environmentRevisionId: "01J00000000000000000000056",
   organizationId: "01J00000000000000000000052",
+  appId: "01J00000000000000000000054",
 } as const;
 
 export interface AgentBuilderApiFixture {
@@ -211,25 +214,20 @@ export async function insertAgentBuilderVendorCredential(
     readonly apiBase?: string | null;
     readonly apiKey?: string;
     readonly credentialId?: string;
-    readonly isDefault?: boolean;
-    readonly isPreferred?: boolean;
     readonly models?: readonly string[] | null;
     readonly name?: string;
-    readonly ownerAccountId?: string | null;
+    readonly appId?: string;
     readonly vendorId: string;
   },
 ): Promise<void> {
   const credentialId = input.credentialId ?? "01J000000000000000000000C1";
-  const ownerAccountId = input.ownerAccountId ?? null;
+  const appId = input.appId ?? fixture.ids.appId;
   const apiKeySecretId = await storeVendorCredentialSecret(fixture.bindings, {
-    actorAccountId: fixture.viewer.id,
     apiKey: input.apiKey ?? "sk-test",
     credentialId,
-    organizationId: fixture.ids.organizationId,
-    ownerAccountId,
+    appId,
     providerId: input.vendorId,
     purpose: "credential_create_api_key",
-    scope: ownerAccountId === null ? "company" : "personal",
   });
 
   await fixture.bindings.DB.prepare(
@@ -238,27 +236,23 @@ export async function insertAgentBuilderVendorCredential(
       api_key_secret_id,
       created_at,
       id,
-      is_default,
-      is_preferred,
       models,
       name,
       organization_id,
-      owner_account_id,
+      app_id,
       updated_at,
       vendor_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       input.apiBase ?? null,
       apiKeySecretId,
       1,
       credentialId,
-      input.isDefault === false ? 0 : 1,
-      input.isPreferred === true ? 1 : 0,
       input.models === undefined || input.models === null ? null : JSON.stringify(input.models),
       input.name ?? `${input.vendorId} test`,
       fixture.ids.organizationId,
-      ownerAccountId,
+      appId,
       1,
       input.vendorId,
     )
@@ -317,28 +311,25 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       value text NOT NULL
     );
 
-    CREATE TABLE organization (
-      avatar_url text,
+	    CREATE TABLE organization (
+	      avatar_url text,
+	      created_at integer NOT NULL,
+	      creator_account_id text,
+	      id text PRIMARY KEY NOT NULL,
+	      name text NOT NULL,
+	      slug text NOT NULL,
+	      updated_at integer NOT NULL
+	    );
+
+    CREATE TABLE app (
       created_at integer NOT NULL,
-      creator_account_id text,
       default_environment_id text,
       id text PRIMARY KEY NOT NULL,
-      join_policy text NOT NULL,
       name text NOT NULL,
-      primary_domain text,
+      organization_id text NOT NULL,
+      owner_account_id text NOT NULL,
       slug text NOT NULL,
       updated_at integer NOT NULL
-    );
-
-    CREATE TABLE organization_member (
-      account_id text NOT NULL,
-      created_at integer NOT NULL,
-      disabled_at integer,
-      disabled_by_account_id text,
-      joined_at integer NOT NULL,
-      organization_id text NOT NULL,
-      role text NOT NULL,
-      PRIMARY KEY (organization_id, account_id)
     );
 
     CREATE TABLE agent (
@@ -353,6 +344,7 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       name text NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
+      app_id text NOT NULL,
       prompt text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
@@ -372,6 +364,7 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       name text NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text,
+      app_id text NOT NULL,
       updated_at integer NOT NULL
     );
 
@@ -387,6 +380,7 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       network_policy text NOT NULL,
       organization_id text NOT NULL,
       packages_json text NOT NULL,
+      app_id text NOT NULL,
       setup_script text NOT NULL
     );
 
@@ -404,6 +398,7 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       oauth_metadata_json text,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
+      app_id text NOT NULL,
       source text NOT NULL,
       updated_at integer NOT NULL,
       url text NOT NULL
@@ -421,28 +416,19 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       name text NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
+      app_id text NOT NULL,
       source_kind text NOT NULL,
       updated_at integer NOT NULL,
       version text
-    );
-
-    CREATE TABLE skill_preference (
-      account_id text NOT NULL,
-      auto_enabled integer NOT NULL,
-      created_at integer NOT NULL,
-      skill_id text NOT NULL,
-      updated_at integer NOT NULL,
-      PRIMARY KEY (skill_id, account_id)
     );
 
     CREATE TABLE space (
       created_at integer NOT NULL,
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
-      organization_id text NOT NULL,
       owner_account_id text NOT NULL,
-      updated_at integer NOT NULL,
-      visibility text NOT NULL
+      app_id text NOT NULL,
+      updated_at integer NOT NULL
     );
 
     CREATE TABLE space_directory (
@@ -550,6 +536,7 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       metadata_json text DEFAULT '{}' NOT NULL,
       model text NOT NULL,
       organization_id text NOT NULL,
+      app_id text NOT NULL,
       provider text NOT NULL,
       renamed integer NOT NULL,
       runtime_id text NOT NULL,
@@ -670,6 +657,7 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       last_refreshed_at integer,
       oauth_client_id text,
       oauth_client_secret_secret_id text,
+      app_id text NOT NULL,
       refresh_secret_id text,
       scope text NOT NULL,
       scope_values_json text,
@@ -680,27 +668,15 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE resource_acl (
-      assigned_by_account_id text,
-      created_at integer DEFAULT 1 NOT NULL,
-      resource_id text NOT NULL,
-      resource_type text NOT NULL,
-      role text NOT NULL,
-      target_id text NOT NULL,
-      target_kind text NOT NULL
-    );
-
     CREATE TABLE vendor_credential (
       api_base text,
       api_key_secret_id text NOT NULL,
       created_at integer NOT NULL,
       id text PRIMARY KEY NOT NULL,
-      is_default integer DEFAULT false NOT NULL,
-      is_preferred integer DEFAULT false NOT NULL,
       models text,
       name text NOT NULL,
       organization_id text NOT NULL,
-      owner_account_id text,
+      app_id text NOT NULL,
       updated_at integer NOT NULL,
       vendor_id text NOT NULL
     );
@@ -800,20 +776,18 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
   await database
     .prepare(
       `INSERT INTO organization (
-        created_at,
-        creator_account_id,
-        id,
-        join_policy,
-        name,
-        slug,
-        updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+	        created_at,
+	        creator_account_id,
+	        id,
+	        name,
+	        slug,
+	        updated_at
+	      ) VALUES (?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       1,
       AGENT_BUILDER_TEST_VIEWER.id,
       AGENT_BUILDER_TEST_IDS.organizationId,
-      "invite_only",
       "Mosoo Agent Builder Test",
       "mosoo-agent-builder-test",
       1,
@@ -822,15 +796,93 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
 
   await database
     .prepare(
-      `INSERT INTO organization_member (
-        account_id,
+      `INSERT INTO app (
         created_at,
-        joined_at,
+        id,
+        name,
         organization_id,
-        role
-      ) VALUES (?, ?, ?, ?, ?)`,
+        owner_account_id,
+        slug,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(AGENT_BUILDER_TEST_VIEWER.id, 1, 1, AGENT_BUILDER_TEST_IDS.organizationId, "owner")
+    .bind(
+      1,
+      AGENT_BUILDER_TEST_IDS.appId,
+      "Default App",
+      AGENT_BUILDER_TEST_IDS.organizationId,
+      AGENT_BUILDER_TEST_VIEWER.id,
+      "default",
+      1,
+    )
+    .run();
+
+  await database
+    .prepare(
+      `INSERT INTO environment (
+        created_at,
+        current_revision_id,
+        description,
+        forked_from_environment_id,
+        forked_from_environment_name,
+        forked_from_owner_name,
+        id,
+        name,
+        organization_id,
+        owner_account_id,
+        app_id,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      1,
+      AGENT_BUILDER_TEST_IDS.environmentRevisionId,
+      "Reusable Agent Builder test environment.",
+      null,
+      null,
+      null,
+      AGENT_BUILDER_TEST_IDS.environmentId,
+      "Agent Builder Test Environment",
+      AGENT_BUILDER_TEST_IDS.organizationId,
+      AGENT_BUILDER_TEST_VIEWER.id,
+      AGENT_BUILDER_TEST_IDS.appId,
+      1,
+    )
+    .run();
+
+  await database
+    .prepare(
+      `INSERT INTO environment_revision (
+        allow_mcp_servers,
+        allow_package_managers,
+        allowed_hosts_json,
+        created_at,
+        created_by_account_id,
+        env_vars_json,
+        environment_id,
+        id,
+        network_policy,
+        organization_id,
+        packages_json,
+        app_id,
+        setup_script
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      1,
+      1,
+      "[]",
+      1,
+      AGENT_BUILDER_TEST_VIEWER.id,
+      "[]",
+      AGENT_BUILDER_TEST_IDS.environmentId,
+      AGENT_BUILDER_TEST_IDS.environmentRevisionId,
+      "sandbox",
+      AGENT_BUILDER_TEST_IDS.organizationId,
+      "[]",
+      AGENT_BUILDER_TEST_IDS.appId,
+      "",
+    )
     .run();
 
   await database
@@ -845,13 +897,14 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
         name,
         organization_id,
         owner_account_id,
+        app_id,
         prompt,
         provider,
         runtime_id,
         status,
         updated_at,
         visibility
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       JSON.stringify({
@@ -868,6 +921,7 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
       "Agent Builder Fixture",
       AGENT_BUILDER_TEST_IDS.organizationId,
       AGENT_BUILDER_TEST_VIEWER.id,
+      AGENT_BUILDER_TEST_IDS.appId,
       "Help the user assemble an Agent starter pack.",
       "openai",
       "openai-runtime",

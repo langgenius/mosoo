@@ -10,7 +10,7 @@ import {
   listAgentSessions,
 } from "@/domains/session/api/agent-session";
 import { getAgentSessionDiagnostics } from "@/domains/session/api/agent-session-retrieve";
-import { toAgentId } from "@/routes/typed-id";
+import { toAgentId, toAppId } from "@/routes/typed-id";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -251,12 +251,16 @@ function SessionDetailView({
 }): ReactElement {
   const sessionLive = isSessionLive(selected.status);
   const processEventsQuery = useQuery({
-    queryFn: async () => getAgentSessionProcessEvents(selected.id),
+    queryFn: async () => getAgentSessionProcessEvents(selected.appId, selected.id),
     queryKey: ["session-process-events", selected.id],
     refetchInterval: sessionLive ? SESSION_EVENTS_REFRESH_MS : false,
   });
   const sessionDiagnosticsQuery = useQuery({
-    queryFn: async () => getAgentSessionDiagnostics({ sessionId: selected.id }),
+    queryFn: async () =>
+      getAgentSessionDiagnostics({
+        appId: selected.appId,
+        sessionId: selected.id,
+      }),
     queryKey: ["agent-session-diagnostics", selected.id],
     refetchInterval: sessionLive ? SESSION_DIAGNOSTICS_REFRESH_MS : false,
   });
@@ -349,12 +353,12 @@ function SessionDetailView({
   );
 }
 
-export function LogsTab({ agentId }: { agentId: string }): ReactElement {
+export function LogsTab({ agentId, appId }: { agentId: string; appId: string }): ReactElement {
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionParam = searchParams.get(SESSION_QUERY_PARAM);
   const sessionsQuery = useQuery({
-    queryFn: async () => listAgentSessions(toAgentId(agentId)),
-    queryKey: ["agent-session-list", agentId, "all"],
+    queryFn: async () => listAgentSessions(toAppId(appId), toAgentId(agentId)),
+    queryKey: ["agent-session-list", appId, agentId, "all"],
     refetchInterval: SESSION_LIST_REFRESH_MS,
   });
   const agentSessions = sessionsQuery.data ?? [];

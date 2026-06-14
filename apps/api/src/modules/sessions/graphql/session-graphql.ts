@@ -1,5 +1,5 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AgentId, OrganizationId, SessionId } from "@mosoo/id";
+import type { AgentId, AppId, SessionId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { sessionGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
@@ -25,9 +25,7 @@ import {
   getSessionProcessEvents,
   getThreadSessionMessages,
   getThreadSessionProcessEvents,
-  listSessionThreadUiStates,
   listSessions,
-  updateSessionThreadUiState,
 } from "../application/session-query.service";
 import { removeSessionResource } from "../application/session-resource-removal.service";
 import { addSessionResource, listSessionResources } from "../application/session-resource.service";
@@ -35,6 +33,7 @@ import { autoTitleSession, renameSession } from "../application/session-title.se
 import { listThreadAgentSessions } from "../application/thread-agent-session-list.service";
 
 interface SessionArgs {
+  appId: string;
   sessionId: string;
 }
 
@@ -46,16 +45,12 @@ interface SessionsArgs {
   archived?: Parameters<typeof listSessions>[2]["archived"];
   beforeCursor?: string | null;
   limit?: number | null;
-  organizationId: string;
+  appId: string;
   type?: Parameters<typeof listSessions>[2]["type"];
 }
 
 interface RenameSessionArgs {
   input: Parameters<typeof renameSession>[0]["input"];
-}
-
-interface UpdateSessionThreadUiStateArgs {
-  input: Parameters<typeof updateSessionThreadUiState>[0]["input"];
 }
 
 interface CreateAgentSessionArgs {
@@ -72,6 +67,7 @@ interface RemoveSessionResourceArgs {
 
 interface SendAgentSessionEventsArgs {
   events: Parameters<typeof sendAgentSessionEvents>[0]["input"]["events"];
+  appId: string;
   sessionId: string;
 }
 
@@ -81,10 +77,12 @@ interface AgentSessionListArgs {
   beforeCursor?: string | null;
   limit?: number | null;
   participantOnly?: Parameters<typeof listAgentSessions>[2]["participantOnly"];
+  appId: string;
   type?: Parameters<typeof listAgentSessions>[2]["type"];
 }
 
 interface AgentSessionRetrieveArgs {
+  appId: string;
   sessionId: string;
 }
 
@@ -92,8 +90,8 @@ function readAgentId(value: string): AgentId {
   return parsePlatformId<AgentId>(value, "Agent ID");
 }
 
-function readOrganizationId(value: string): OrganizationId {
-  return parsePlatformId<OrganizationId>(value, "Organization ID");
+function readAppId(value: string): AppId {
+  return parsePlatformId<AppId>(value, "App ID");
 }
 
 function readSessionId(value: string): SessionId {
@@ -109,6 +107,7 @@ export const sessionGraphQLModule = {
       const sessionId = readSessionId(args.sessionId);
       await archiveAgentSession({
         bindings: context.bindings,
+        appId: readAppId(args.appId),
         sessionId,
         viewer: context.viewer,
       });
@@ -128,6 +127,7 @@ export const sessionGraphQLModule = {
       const sessionId = readSessionId(args.sessionId);
       await deleteAgentSession({
         bindings: context.bindings,
+        appId: readAppId(args.appId),
         sessionId,
         viewer: context.viewer,
       });
@@ -148,6 +148,7 @@ export const sessionGraphQLModule = {
         bindings: context.bindings,
         executionContext: context.executionContext,
         input: {
+          appId: readAppId(args.appId),
           sessionId: readSessionId(args.sessionId),
         },
         requestUrl: context.request.url,
@@ -159,6 +160,7 @@ export const sessionGraphQLModule = {
         executionContext: context.executionContext,
         input: {
           events: args.events,
+          appId: readAppId(args.appId),
           sessionId: readSessionId(args.sessionId),
         },
         requestUrl: context.request.url,
@@ -168,21 +170,17 @@ export const sessionGraphQLModule = {
       const sessionId = readSessionId(args.sessionId);
       await unarchiveAgentSession({
         database: context.bindings.DB,
+        appId: readAppId(args.appId),
         sessionId,
         viewer: context.viewer,
       });
       return { ok: true } as const;
     },
-    updateSessionThreadUiState: async (_parent, args: UpdateSessionThreadUiStateArgs, context) =>
-      updateSessionThreadUiState({
-        database: context.bindings.DB,
-        input: args.input,
-        viewer: context.viewer,
-      }),
   },
   authenticatedQueryResolvers: {
     agentSessionDiagnostics: async (_parent, args: AgentSessionRetrieveArgs, context) =>
       getAgentSessionDiagnostics(context.bindings.DB, context.viewer, {
+        appId: readAppId(args.appId),
         sessionId: readSessionId(args.sessionId),
       }),
     agentSessionList: async (_parent, args: AgentSessionListArgs, context) =>
@@ -192,55 +190,75 @@ export const sessionGraphQLModule = {
         beforeCursor: args.beforeCursor ?? null,
         limit: args.limit ?? null,
         participantOnly: args.participantOnly ?? null,
+        appId: readAppId(args.appId),
         type: args.type ?? null,
       }),
     agentSessionRetrieve: async (_parent, args: AgentSessionRetrieveArgs, context) =>
       retrieveAgentSession(context.bindings.DB, context.viewer, {
+        appId: readAppId(args.appId),
         sessionId: readSessionId(args.sessionId),
       }),
     listSessionResources: async (_parent, args: SessionArgs, context) =>
-      listSessionResources(context.bindings.DB, context.viewer, readSessionId(args.sessionId)),
+      listSessionResources(context.bindings.DB, context.viewer, {
+        appId: readAppId(args.appId),
+        sessionId: readSessionId(args.sessionId),
+      }),
     session: async (_parent, args: SessionArgs, context) =>
-      getSession(context.bindings.DB, context.viewer, readSessionId(args.sessionId)),
+      getSession(context.bindings.DB, context.viewer, {
+        appId: readAppId(args.appId),
+        sessionId: readSessionId(args.sessionId),
+      }),
     sessionList: async (_parent, args: SessionsArgs, context) =>
       listSessions(context.bindings.DB, context.viewer, {
         archived: args.archived ?? null,
         beforeCursor: args.beforeCursor ?? null,
         limit: args.limit ?? null,
-        organizationId: readOrganizationId(args.organizationId),
+        appId: readAppId(args.appId),
         type: args.type ?? null,
       }),
     sessionMessages: async (_parent, args: SessionArgs, context) =>
-      getSessionMessages(context.bindings.DB, context.viewer, readSessionId(args.sessionId)),
-    sessionProcessEvents: async (_parent, args: SessionProcessEventsArgs, context) =>
-      getSessionProcessEvents(context.bindings.DB, context.viewer, readSessionId(args.sessionId), {
-        limit: args.limit ?? null,
+      getSessionMessages(context.bindings.DB, context.viewer, {
+        appId: readAppId(args.appId),
+        sessionId: readSessionId(args.sessionId),
       }),
-    sessionThreadUiStateList: async (_parent, args: SessionsArgs, context) =>
-      listSessionThreadUiStates(
+    sessionProcessEvents: async (_parent, args: SessionProcessEventsArgs, context) =>
+      getSessionProcessEvents(
         context.bindings.DB,
         context.viewer,
-        readOrganizationId(args.organizationId),
+        {
+          appId: readAppId(args.appId),
+          sessionId: readSessionId(args.sessionId),
+        },
+        {
+          limit: args.limit ?? null,
+        },
       ),
     threadAgentSessionList: async (_parent, args: SessionsArgs, context) =>
       listThreadAgentSessions(context.bindings.DB, context.viewer, {
         archived: args.archived ?? null,
         beforeCursor: args.beforeCursor ?? null,
         limit: args.limit ?? null,
-        organizationId: readOrganizationId(args.organizationId),
+        appId: readAppId(args.appId),
         type: args.type ?? null,
       }),
     threadAgentSessionRetrieve: async (_parent, args: AgentSessionRetrieveArgs, context) =>
       retrieveThreadAgentSession(context.bindings.DB, context.viewer, {
+        appId: readAppId(args.appId),
         sessionId: readSessionId(args.sessionId),
       }),
     threadSessionMessages: async (_parent, args: SessionArgs, context) =>
-      getThreadSessionMessages(context.bindings.DB, context.viewer, readSessionId(args.sessionId)),
+      getThreadSessionMessages(context.bindings.DB, context.viewer, {
+        appId: readAppId(args.appId),
+        sessionId: readSessionId(args.sessionId),
+      }),
     threadSessionProcessEvents: async (_parent, args: SessionProcessEventsArgs, context) =>
       getThreadSessionProcessEvents(
         context.bindings.DB,
         context.viewer,
-        readSessionId(args.sessionId),
+        {
+          appId: readAppId(args.appId),
+          sessionId: readSessionId(args.sessionId),
+        },
         {
           limit: args.limit ?? null,
         },

@@ -1,4 +1,4 @@
-import type { AgentId } from "@mosoo/contracts/id";
+import type { AgentId, AppId } from "@mosoo/contracts/id";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -17,7 +17,7 @@ import type {
   LarkDomain,
   PollLarkAgentChannelRegistrationInput,
 } from "@/gql/graphql";
-import { toAgentId } from "@/routes/typed-id";
+import { toAgentId, toAppId } from "@/routes/typed-id";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -53,8 +53,8 @@ function getLarkDomainLabel(domain: LarkDomain): string {
   return domain === "feishu" ? "Feishu" : "Lark";
 }
 
-function getLarkEventConfigUrl(domain: LarkDomain, appId: string): string | null {
-  const trimmed = appId.trim();
+function getLarkEventConfigUrl(domain: LarkDomain, larkAppId: string): string | null {
+  const trimmed = larkAppId.trim();
   if (trimmed.length === 0) {
     return null;
   }
@@ -117,6 +117,7 @@ function useLarkRegistrationPolling({
   deviceCode,
   domain,
   poll,
+  appId,
   shouldPoll,
   status,
 }: {
@@ -124,6 +125,7 @@ function useLarkRegistrationPolling({
   deviceCode: string | null;
   domain: LarkDomain;
   poll: (input: PollLarkAgentChannelRegistrationInput) => void;
+  appId: AppId;
   shouldPoll: boolean;
   status: LarkAgentChannelRegistrationFieldsFragment["status"] | null;
 }) {
@@ -137,17 +139,17 @@ function useLarkRegistrationPolling({
         ? LARK_REGISTRATION_POLL_INTERVAL_MS * 2
         : LARK_REGISTRATION_POLL_INTERVAL_MS;
     const timeoutId = globalThis.setTimeout(() => {
-      poll({ agentId, deviceCode, domain });
+      poll({ agentId, deviceCode, domain, appId });
     }, delayMs);
 
     return () => {
       globalThis.clearTimeout(timeoutId);
     };
-  }, [agentId, deviceCode, domain, poll, shouldPoll, status]);
+  }, [agentId, deviceCode, domain, poll, appId, shouldPoll, status]);
 }
 
 interface LarkChannelInlineSetupState {
-  appId: string;
+  larkAppId: string;
   appSecret: string;
   connectionMode: LarkConnectionMode;
   domain: LarkDomain;
@@ -157,7 +159,7 @@ interface LarkChannelInlineSetupState {
 }
 
 type LarkChannelInlineSetupAction =
-  | { type: "changeAppId"; appId: string }
+  | { type: "changeLarkAppId"; larkAppId: string }
   | { type: "changeAppSecret"; appSecret: string }
   | { type: "changeConnectionMode"; connectionMode: LarkConnectionMode }
   | { type: "changeDomain"; domain: LarkDomain }
@@ -169,7 +171,7 @@ type LarkChannelInlineSetupAction =
 type LarkChannelInlineSetupDispatch = Dispatch<LarkChannelInlineSetupAction>;
 
 const LARK_CHANNEL_INLINE_SETUP_INITIAL_STATE: LarkChannelInlineSetupState = {
-  appId: "",
+  larkAppId: "",
   appSecret: "",
   connectionMode: "webhook",
   domain: "feishu",
@@ -183,8 +185,8 @@ function larkChannelInlineSetupReducer(
   action: LarkChannelInlineSetupAction,
 ): LarkChannelInlineSetupState {
   switch (action.type) {
-    case "changeAppId":
-      return { ...state, appId: action.appId };
+    case "changeLarkAppId":
+      return { ...state, larkAppId: action.larkAppId };
     case "changeAppSecret":
       return { ...state, appSecret: action.appSecret };
     case "changeConnectionMode":
@@ -209,7 +211,7 @@ function larkChannelInlineSetupReducer(
       ) {
         return {
           ...nextState,
-          appId: action.registration.appId,
+          larkAppId: action.registration.appId,
           appSecret: action.registration.appSecret,
         };
       }
@@ -237,35 +239,49 @@ export function LarkChannelInlineSetup({
     larkChannelInlineSetupReducer,
     LARK_CHANNEL_INLINE_SETUP_INITIAL_STATE,
   );
-  const { appId, appSecret, connectionMode, domain, encryptKey, registration, verificationToken } =
-    state;
+  const {
+    larkAppId,
+    appSecret,
+    connectionMode,
+    domain,
+    encryptKey,
+    registration,
+    verificationToken,
+  } = state;
   const typedAgentId = toAgentId(agent.id);
+  const typedAppId = toAppId(agent.appId);
 
   const registrationStartMutation = useMutation({
     mutationFn: startLarkAgentChannelRegistration,
     onSuccess: async (result) => {
       dispatch({ registration: result, type: "registrationStarted" });
-      await queryClient.invalidateQueries({ queryKey: agentKeys.channelBindings(agent.id) });
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.channelBindings(agent.appId, agent.id),
+      });
     },
   });
   const registrationPollMutation = useMutation({
     mutationFn: pollLarkAgentChannelRegistration,
     onSuccess: async (result) => {
       dispatch({ registration: result, type: "registrationPolled" });
-      await queryClient.invalidateQueries({ queryKey: agentKeys.channelBindings(agent.id) });
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.channelBindings(agent.appId, agent.id),
+      });
     },
   });
   const saveMutation = useMutation({
     mutationFn: createLarkAgentChannelBinding,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: agentKeys.channelBindings(agent.id) });
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.channelBindings(agent.appId, agent.id),
+      });
       onSuccess?.();
     },
   });
 
   const canSubmit =
     agent.status === "published" &&
-    appId.trim().length > 0 &&
+    larkAppId.trim().length > 0 &&
     appSecret.trim().length > 0 &&
     encryptKey.trim().length > 0 &&
     verificationToken.trim().length > 0 &&
@@ -287,6 +303,7 @@ export function LarkChannelInlineSetup({
     deviceCode: registrationDeviceCode,
     domain: registrationDomain,
     poll: pollRegistration,
+    appId: typedAppId,
     shouldPoll: shouldPollRegistration,
     status: registration?.status ?? null,
   });
@@ -295,6 +312,7 @@ export function LarkChannelInlineSetup({
     registrationStartMutation.mutate({
       agentId: typedAgentId,
       domain,
+      appId: typedAppId,
     });
   }
 
@@ -307,6 +325,7 @@ export function LarkChannelInlineSetup({
       agentId: typedAgentId,
       deviceCode: registrationDeviceCode,
       domain: registrationDomain,
+      appId: typedAppId,
     });
   }
 
@@ -319,11 +338,12 @@ export function LarkChannelInlineSetup({
 
     saveMutation.mutate({
       agentId: typedAgentId,
-      appId: appId.trim(),
+      larkAppId: larkAppId.trim(),
       appSecret: appSecret.trim(),
       connectionMode,
       domain,
       encryptKey: connectionMode === "webhook" ? encryptKey.trim() : null,
+      appId: typedAppId,
       verificationToken: connectionMode === "webhook" ? verificationToken.trim() : null,
     });
   }
@@ -333,7 +353,7 @@ export function LarkChannelInlineSetup({
     registrationStartMutation.error ??
     registrationPollMutation.error ??
     (registration?.lastErrorCode ? new Error(registration.lastErrorCode) : null);
-  const eventConfigUrl = getLarkEventConfigUrl(domain, appId);
+  const eventConfigUrl = getLarkEventConfigUrl(domain, larkAppId);
   const domainLabel = getLarkDomainLabel(domain);
 
   return (
@@ -485,7 +505,7 @@ function LarkConfigurationSection({
   savePending: boolean;
   state: LarkChannelInlineSetupState;
 }) {
-  const { appId, appSecret, connectionMode, domain, encryptKey, verificationToken } = state;
+  const { larkAppId, appSecret, connectionMode, domain, encryptKey, verificationToken } = state;
 
   return (
     <section className="border-border bg-card rounded-lg border p-4">
@@ -549,9 +569,9 @@ function LarkConfigurationSection({
             autoComplete="off"
             id="lark-app-id"
             onChange={(event) => {
-              dispatch({ appId: event.target.value, type: "changeAppId" });
+              dispatch({ larkAppId: event.target.value, type: "changeLarkAppId" });
             }}
-            value={appId}
+            value={larkAppId}
           />
         </div>
 

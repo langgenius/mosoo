@@ -145,6 +145,7 @@ function ConfigureStage({
       onSwitchMode("preview");
     },
     previewDisabled: testDisabled,
+    appId: agent.appId,
     saving: model.saving,
   });
 
@@ -206,7 +207,7 @@ function ConfigureStage({
             onCreated={bindCreatedEnvironment}
             onOpenChange={setCreateEnvironmentOpen}
             open={createEnvironmentOpen}
-            organizationId={organizationId}
+            appId={agent.appId}
           />
           <AgentBuilderRemoteMcpSecureDialog
             connectServer={connectMcpServer}
@@ -216,7 +217,7 @@ function ConfigureStage({
             onCreated={bindCreatedMcpServer}
             onOpenChange={setCreateRemoteMcpOpen}
             open={createRemoteMcpOpen}
-            organizationId={organizationId}
+            appId={agent.appId}
           />
         </>
       ) : null}
@@ -308,7 +309,6 @@ function ConfigureStage({
             focusSection={model.focusSection}
             highlightedSections={model.highlightedSections}
             model={model}
-            organizationId={organizationId}
           />
         </div>
       </div>

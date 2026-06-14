@@ -36,7 +36,7 @@ export function PublishMenu({
   onApiAccessClick,
   onChannelClick,
   onPublish,
-  showChannelSetup = true,
+  showChannelSetup = false,
 }: PublishMenuProps): ReactElement {
   const isLive = agent.status === "published";
   const distribution = useMemo(() => buildAgentDistribution(agent), [agent]);

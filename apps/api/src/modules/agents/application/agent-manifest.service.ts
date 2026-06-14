@@ -3,10 +3,10 @@ import {
   serializeAgentManifestToJson,
   serializeAgentManifestToYaml,
 } from "@mosoo/contracts/agent-manifest-serializer";
-import type { AgentId } from "@mosoo/id";
+import type { AgentId, AppId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureAgentEditor } from "./agent-access.service";
+import { ensureAppAgentOwner } from "./agent-access.service";
 import { buildAgentSpec, toAgentManifest } from "./agent-spec.service";
 import type { AgentRow } from "./agent-types";
 
@@ -20,9 +20,12 @@ export async function buildAgentManifest(
 export async function exportAgentManifest(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  agentId: AgentId,
+  input: {
+    agentId: AgentId;
+    appId: AppId;
+  },
 ): Promise<AgentManifestExport> {
-  const editable = await ensureAgentEditor(database, viewer.id, agentId);
+  const editable = await ensureAppAgentOwner(database, viewer.id, input);
   const manifest = await buildAgentManifest(database, editable.agent);
 
   return {

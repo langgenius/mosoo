@@ -7,14 +7,14 @@ import type {
 } from "@mosoo/contracts/session";
 import { sessionExecutionSnapshotsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId, parseNullablePlatformId, parsePlatformId } from "@mosoo/id";
-import type { AccountId, AgentId, CredentialId, SessionId } from "@mosoo/id";
+import type { AccountId, AgentId, CredentialId, AppId, SessionId } from "@mosoo/id";
 import { getAvailableAgentSessionActionCapability } from "@mosoo/session-policy";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { runAppDatabaseBatch } from "../../../../platform/db/drizzle";
 import { validationError } from "../../../../platform/errors";
 import { currentTimestampMs, toIsoString } from "../../../../time";
-import { ensureAgentAccess } from "../../../agents/application/agent-access.service";
+import { ensureAppAgentOwner } from "../../../agents/application/agent-access.service";
 import {
   listAgentSkillReferences,
   listAgentToolReferences,
@@ -89,9 +89,13 @@ async function resolveAgentSessionExecutionSource(input: {
   accessViewer: AuthenticatedViewer;
   bindings: ApiBindings;
   agentId: AgentId;
+  appId: AppId;
 }): Promise<AgentSessionExecutionSource> {
   const accessViewerId = parsePlatformId<AccountId>(input.accessViewer.id, "access viewer id");
-  const agent = await ensureAgentAccess(input.bindings.DB, accessViewerId, input.agentId);
+  const { agent } = await ensureAppAgentOwner(input.bindings.DB, accessViewerId, {
+    agentId: input.agentId,
+    appId: input.appId,
+  });
   const liveVersion =
     agent.status === "published"
       ? await requireAgentLiveDeploymentVersionRecord(input.bindings.DB, agent)
@@ -129,6 +133,7 @@ async function ensureAgentReadyToCreateSession(input: {
     model: input.source.model,
     organizationId: input.source.agent.organizationId,
     packageResolution: parseAgentStoredConfig(input.source.configJson).packageResolution,
+    appId: input.source.agent.appId,
     provider: input.source.provider,
     runtimeId: input.source.runtimeId,
   });
@@ -168,7 +173,7 @@ async function buildSessionExecutionPlan(input: {
     resolveAgentEnvironmentSnapshot(input.bindings, {
       agentEnvironmentId: input.source.environment.environmentId,
       agentOwnerId: input.source.agent.ownerId,
-      organizationId: input.source.agent.organizationId,
+      appId: input.source.agent.appId,
     }),
   ]);
 
@@ -230,6 +235,7 @@ async function insertAgentSessionSnapshot(input: {
       metadataJson: JSON.stringify(input.metadata ?? {}),
       model: input.source.model,
       organizationId: input.source.agent.organizationId,
+      appId: input.source.agent.appId,
       provider: input.source.provider,
       renamed: false,
       runtimeId: input.source.runtimeId,
@@ -266,6 +272,7 @@ function buildCreatedSessionSummary(input: {
     lastRun: null,
     model: input.source.model,
     organizationId: input.source.agent.organizationId,
+    appId: input.source.agent.appId,
     provider: input.source.provider,
     runtimeId: input.source.runtimeId,
     status: "IDLE",
@@ -281,10 +288,12 @@ export async function createAgentSession(
   const options = request.options ?? {};
   const accessViewer = options.accessViewer ?? request.viewer;
   const agentId = parsePlatformId<AgentId>(request.input.agentId, "agent id");
+  const appId = parsePlatformId<AppId>(request.input.appId, "app id");
   const source = await resolveAgentSessionExecutionSource({
     accessViewer,
     agentId,
     bindings: request.bindings,
+    appId,
   });
   await ensureAgentReadyToCreateSession({
     bindings: request.bindings,
@@ -338,6 +347,7 @@ export async function createAgentSession(
       session: {
         id: session.id,
         organizationId: session.organizationId,
+        appId: session.appId,
       },
       viewer: request.viewer,
     };

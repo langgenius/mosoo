@@ -23,7 +23,7 @@ import type {
   SessionRuntimeEventRecord,
   SessionRuntimeEventSourceReceipt,
 } from "./session-runtime-event-store.types";
-import { projectSessionViewerRuntimeEvents } from "./session-viewer-event-projection.repository";
+import { appSessionViewerRuntimeEvents } from "./session-viewer-event-projection.repository";
 
 export type {
   OneRuntimeEventPerSessionInput,
@@ -472,7 +472,7 @@ export async function persistOneRuntimeEventPerSession(
       const insertedSessionIds = new Set(insertResult.insertedSessionIds);
       const insertedKeys = new Set(insertResult.insertedRows.map(sessionSourceEventKey));
 
-      await projectSessionViewerRuntimeEvents(
+      await appSessionViewerRuntimeEvents(
         database,
         rows.flatMap((row) =>
           insertedKeys.has(
@@ -651,7 +651,7 @@ export async function persistSessionRuntimeEvents(
   });
   const insertedSourceEventIds = new Set(result.insertedSourceEventIds);
 
-  await projectSessionViewerRuntimeEvents(
+  await appSessionViewerRuntimeEvents(
     database,
     rows.flatMap((row) =>
       insertedSourceEventIds.has(row.sourceEventId)

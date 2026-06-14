@@ -284,7 +284,7 @@ export function BasicsSection({
               {agent.status === "published" ? (
                 <span
                   className="text-muted-foreground text-[11px]"
-                  title="Runtime cannot be changed in-place once an Agent is published. Fork Agent to switch."
+                  title="Runtime cannot be changed in-place after publishing. Fork the Agent to switch."
                 >
                   Locked · Fork Agent to switch
                 </span>
@@ -333,13 +333,13 @@ export function BasicsSection({
             </div>
             {agent.status === "published" ? (
               <div className="border-amber/30 bg-amber-bg text-amber-fg rounded-lg border px-3 py-2.5 text-[12px] leading-relaxed">
-                Runtime is locked for this published Agent. Fork Agent to switch runtime; existing
+                Runtime is locked after publishing. Fork the Agent to switch runtime; existing
                 sessions, cost, logs, and agent-state stay attached here.
               </div>
             ) : null}
           </div>
 
-          <ModelPickerField model={model} readOnly={readOnly} />
+          <ModelPickerField model={model} appId={agent.appId} readOnly={readOnly} />
           <AdvancedProviderOptionsField model={model} readOnly={readOnly} />
         </div>
       </div>
@@ -367,11 +367,11 @@ You are a concise operations agent. Confirm scope before changing production dat
 
 export function IntegrationsSection({
   model,
-  organizationId,
+  appId,
   readOnly,
 }: {
   model: AgentEditorModel;
-  organizationId: string | null;
+  appId: string | null;
   readOnly: boolean;
 }) {
   return (
@@ -379,7 +379,7 @@ export function IntegrationsSection({
       <div>
         <SectionHeader>Skills</SectionHeader>
         <AgentSkillsField
-          organizationId={organizationId}
+          appId={appId}
           readOnly={readOnly}
           selectedSkills={model.draft.skills}
           setSkills={model.setSkills}
@@ -389,7 +389,7 @@ export function IntegrationsSection({
       <div className="scroll-mt-24" id="agent-mcp-bindings">
         <SectionHeader>MCP servers</SectionHeader>
         <AgentMcpBindingsField
-          organizationId={organizationId}
+          appId={appId}
           readOnly={readOnly}
           selectedServers={model.draft.mcpServers}
           setServers={model.setMcpServers}
@@ -402,13 +402,11 @@ export function IntegrationsSection({
 export function EnvironmentSection({
   agent,
   model,
-  organizationId,
   readOnly,
   showChannels,
 }: {
   agent: Agent;
   model: AgentEditorModel;
-  organizationId: string | null;
   readOnly: boolean;
   showChannels: boolean;
 }) {
@@ -416,13 +414,13 @@ export function EnvironmentSection({
     <div className="space-y-5">
       <div>
         <SectionHeader>Environment</SectionHeader>
-        <EnvironmentPicker model={model} organizationId={organizationId} readOnly={readOnly} />
+        <EnvironmentPicker model={model} appId={agent.appId} readOnly={readOnly} />
       </div>
 
       <div>
         <SectionHeader>Spaces</SectionHeader>
         <AgentSpacesField
-          organizationId={organizationId}
+          appId={agent.appId}
           readOnly={readOnly}
           selectedSpaces={model.draft.spaces}
           setSpaces={model.setSpaces}

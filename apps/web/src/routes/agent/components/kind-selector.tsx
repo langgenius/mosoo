@@ -45,7 +45,7 @@ export function KindSelector({
           <h2 className="text-foreground text-[13px] font-semibold">Agent type</h2>
           <p className="text-fg-3 mt-0.5 text-[12px] leading-relaxed">
             {locked
-              ? "Locked on this published agent. Fork to switch type."
+              ? "Locked after publishing. Fork to switch type."
               : "Choose how this agent runs. You can change this freely until you publish."}
           </p>
         </div>

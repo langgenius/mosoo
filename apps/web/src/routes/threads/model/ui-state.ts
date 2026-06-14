@@ -7,14 +7,18 @@ export interface ThreadUiState {
   dismissedNotificationPrompt: boolean;
   filter: ThreadFilter;
   lastAgentId: string | null;
+  pinnedThreadIds: string[];
+  readAtByThreadId: Record<string, string>;
 }
 
 export interface ThreadUiStateController {
+  markThreadRead: (input: { readAt: string; threadId: string }) => void;
   setDismissedNotificationPrompt: (dismissed: boolean) => void;
   setFilter: (filter: ThreadFilter) => void;
   setLastAgentId: (agentId: string | null) => void;
   setSectionCollapsed: (section: ThreadSection, collapsed: boolean) => void;
   state: ThreadUiState;
+  togglePinnedThread: (threadId: string) => void;
 }
 
 const DEFAULT_THREAD_UI_STATE: ThreadUiState = {
@@ -27,6 +31,8 @@ const DEFAULT_THREAD_UI_STATE: ThreadUiState = {
   dismissedNotificationPrompt: false,
   filter: "all",
   lastAgentId: null,
+  pinnedThreadIds: [],
+  readAtByThreadId: {},
 };
 
 const THREAD_FILTERS = new Set<ThreadFilter>(["all", "failed", "pinned", "unread"]);
@@ -59,15 +65,44 @@ function readThreadFilter(value: unknown): ThreadFilter {
     : DEFAULT_THREAD_UI_STATE.filter;
 }
 
-function toStorageKey(input: {
-  organizationId: string | null;
-  userId: string | null;
-}): string | null {
-  if (input.organizationId === null || input.userId === null) {
+function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const result = new Set<string>();
+
+  for (const item of value) {
+    if (typeof item === "string" && item.length > 0) {
+      result.add(item);
+    }
+  }
+
+  return Array.from(result).toSorted();
+}
+
+function readStringRecord(value: unknown): Record<string, string> {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  const result: Record<string, string> = {};
+
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === "string" && item.length > 0) {
+      result[key] = item;
+    }
+  }
+
+  return result;
+}
+
+function toStorageKey(input: { appId: string | null; userId: string | null }): string | null {
+  if (input.appId === null || input.userId === null) {
     return null;
   }
 
-  return `mosoo.threads.ui:${input.userId}:${input.organizationId}`;
+  return `mosoo.threads.ui.v2:${input.userId}:${input.appId}`;
 }
 
 function loadThreadUiState(storageKey: string | null): ThreadUiState {
@@ -93,6 +128,8 @@ function loadThreadUiState(storageKey: string | null): ThreadUiState {
       dismissedNotificationPrompt: parsed["dismissedNotificationPrompt"] === true,
       filter: readThreadFilter(parsed["filter"]),
       lastAgentId: typeof parsed["lastAgentId"] === "string" ? parsed["lastAgentId"] : null,
+      pinnedThreadIds: readStringArray(parsed["pinnedThreadIds"]),
+      readAtByThreadId: readStringRecord(parsed["readAtByThreadId"]),
     };
   } catch {
     globalThis.localStorage.removeItem(storageKey);
@@ -109,14 +146,11 @@ function persistThreadUiState(storageKey: string | null, state: ThreadUiState): 
 }
 
 export function useThreadUiState(input: {
-  organizationId: string | null;
+  appId: string | null;
   userId: string | null;
 }): ThreadUiStateController {
-  const { organizationId, userId } = input;
-  const storageKey = useMemo(
-    () => toStorageKey({ organizationId, userId }),
-    [organizationId, userId],
-  );
+  const { appId, userId } = input;
+  const storageKey = useMemo(() => toStorageKey({ appId, userId }), [appId, userId]);
   const [state, setState] = useState<ThreadUiState>(() => loadThreadUiState(storageKey));
 
   const updateState = useCallback(
@@ -180,14 +214,63 @@ export function useThreadUiState(input: {
     [updateState],
   );
 
+  const markThreadRead = useCallback(
+    (nextRead: { readAt: string; threadId: string }) => {
+      updateState((current) => {
+        if (current.readAtByThreadId[nextRead.threadId] === nextRead.readAt) {
+          return current;
+        }
+
+        return {
+          ...current,
+          readAtByThreadId: {
+            ...current.readAtByThreadId,
+            [nextRead.threadId]: nextRead.readAt,
+          },
+        };
+      });
+    },
+    [updateState],
+  );
+
+  const togglePinnedThread = useCallback(
+    (threadId: string) => {
+      updateState((current) => {
+        const pinnedThreadIds = new Set(current.pinnedThreadIds);
+
+        if (pinnedThreadIds.has(threadId)) {
+          pinnedThreadIds.delete(threadId);
+        } else {
+          pinnedThreadIds.add(threadId);
+        }
+
+        return {
+          ...current,
+          pinnedThreadIds: Array.from(pinnedThreadIds).toSorted(),
+        };
+      });
+    },
+    [updateState],
+  );
+
   return useMemo(
     () => ({
+      markThreadRead,
       setDismissedNotificationPrompt,
       setFilter,
       setLastAgentId,
       setSectionCollapsed,
       state,
+      togglePinnedThread,
     }),
-    [setDismissedNotificationPrompt, setFilter, setLastAgentId, setSectionCollapsed, state],
+    [
+      markThreadRead,
+      setDismissedNotificationPrompt,
+      setFilter,
+      setLastAgentId,
+      setSectionCollapsed,
+      state,
+      togglePinnedThread,
+    ],
   );
 }

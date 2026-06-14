@@ -71,6 +71,7 @@ export function DevMode({
       onSwitchMode("preview");
     },
     previewDisabled,
+    appId: agent.appId,
     saving: model.saving,
   });
 
@@ -105,7 +106,7 @@ export function DevMode({
             onCreated={bindCreatedEnvironment}
             onOpenChange={setCreateEnvironmentOpen}
             open={createEnvironmentOpen}
-            organizationId={organizationId}
+            appId={agent.appId}
           />
           <AgentBuilderRemoteMcpSecureDialog
             connectServer={connectMcpServer}
@@ -115,7 +116,7 @@ export function DevMode({
             onCreated={bindCreatedMcpServer}
             onOpenChange={setCreateRemoteMcpOpen}
             open={createRemoteMcpOpen}
-            organizationId={organizationId}
+            appId={agent.appId}
           />
         </>
       ) : null}

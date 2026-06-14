@@ -57,7 +57,7 @@ const AGENT_BUILDER_LLM_PLANNER_SYSTEM_PROMPT = [
   "Stage 2 agent type: ask one single_select question to choose kind — pet (always-on assistant teammate) or cattle (on-demand task worker) — then patch kind with the answer.",
   "Stage 3 assembly: make the Environment decision (bind, create, or skip), then add optional Skills, MCP servers, and Spaces.",
   "Recommend Preview (Test in Chat) once the three stages are settled, but the user may skip ahead or test at any time; treat incomplete stages as suggestions, not gates.",
-  "Published Agents are refactor targets; never restart Quickstart for a published Agent.",
+  "Public API Agents are refactor targets; never restart Quickstart for a Agent API Endpoint.",
   "",
   "Control-plane rules:",
   "- Do not configure channels.",
@@ -499,10 +499,10 @@ export function createAgentBuilderLlmPlanner(input: {
       }
 
       const credential = await resolveVendorApiKey({
-        actorAccountId: input.viewer.id,
         bindings: input.bindings,
+        executionOwnerUserId: input.viewer.id,
         options: { modelId: selectedModel.modelId },
-        organizationId: plannerInput.context.agent.organizationId,
+        appId: plannerInput.context.agent.appId,
         vendorId: selectedModel.provider,
       });
 

@@ -20,7 +20,7 @@ function draft(): AgentEditorDraft {
         enabled: true,
         id: "01J000000000000000000000E3",
         name: "Linear MCP",
-        source: "organization_shared",
+        source: "app",
         type: "web",
         url: "https://mcp.linear.app",
       },

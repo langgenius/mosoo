@@ -1,10 +1,11 @@
 import type { SessionStatus, SessionType } from "@mosoo/contracts/session";
-import { organizationMembersTable, sessionsTable } from "@mosoo/db";
+import { sessionsTable } from "@mosoo/db";
 import type {
   AccountId,
   AgentDeploymentVersionId,
   AgentId,
   OrganizationId,
+  AppId,
   SessionId,
 } from "@mosoo/id";
 import type { SQL } from "drizzle-orm";
@@ -12,6 +13,7 @@ import { and, eq, or, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import { enforceSessionCanAcceptEvents } from "./session-lifecycle";
 
 export interface SessionParticipantTimelineAccessRow {
@@ -29,6 +31,7 @@ export interface SessionParticipantCapabilityAccessRow {
 export interface ActiveSessionParticipantAccessRow {
   archived_at: number | null;
   organization_id: OrganizationId;
+  app_id: AppId;
   status: SessionStatus;
   type: SessionType;
 }
@@ -40,6 +43,7 @@ export interface SessionQueueAccessRow {
   id: SessionId;
   model: string;
   organization_id: OrganizationId;
+  app_id: AppId;
   provider: string;
   runtime_id: string;
 }
@@ -51,16 +55,6 @@ export function resolveSessionActionCreatorFlag(input: {
   isSessionCreator: boolean;
 }): boolean {
   return input.authorization === "admitted" || input.isSessionCreator;
-}
-
-function activeSessionMembershipCondition(viewerId: AccountId): SQL {
-  return sql`EXISTS (
-    SELECT 1
-      FROM ${organizationMembersTable}
-     WHERE ${organizationMembersTable.organizationId} = ${sessionsTable.organizationId}
-       AND ${organizationMembersTable.accountId} = ${viewerId}
-       AND ${organizationMembersTable.disabledAt} IS NULL
-  )`;
 }
 
 function humanSessionCreatorCondition(viewerId: AccountId): SQL {
@@ -77,14 +71,11 @@ function humanSessionCreatorCondition(viewerId: AccountId): SQL {
 }
 
 export function sessionCreatorCondition(viewerId: AccountId): SQL {
-  return and(humanSessionCreatorCondition(viewerId), activeSessionMembershipCondition(viewerId))!;
+  return humanSessionCreatorCondition(viewerId);
 }
 
 export function sessionParticipantCondition(viewerId: AccountId): SQL {
-  return and(
-    or(humanSessionCreatorCondition(viewerId), eq(sessionsTable.attributedUserId, viewerId)),
-    activeSessionMembershipCondition(viewerId),
-  )!;
+  return or(humanSessionCreatorCondition(viewerId), eq(sessionsTable.attributedUserId, viewerId))!;
 }
 
 export function sessionCreatorFlag(viewerId: AccountId): SQL<number> {
@@ -95,16 +86,26 @@ export function sessionParticipantFlag(viewerId: AccountId): SQL<number> {
   return sql<number>`CASE WHEN ${sessionParticipantCondition(viewerId)} THEN 1 ELSE 0 END`;
 }
 
-export async function ensureSessionParticipantAccess(
+export async function ensureAppSessionParticipantAccess(
   database: D1Database,
   viewerId: AccountId,
-  sessionId: SessionId,
+  input: {
+    appId: AppId;
+    sessionId: SessionId;
+  },
 ): Promise<void> {
+  await ensureAppOwnership(database, viewerId, input.appId);
   const row =
     (await getAppDatabase(database)
       .select({ id: sessionsTable.id })
       .from(sessionsTable)
-      .where(and(eq(sessionsTable.id, sessionId), sessionParticipantCondition(viewerId)))
+      .where(
+        and(
+          eq(sessionsTable.id, input.sessionId),
+          eq(sessionsTable.appId, input.appId),
+          sessionParticipantCondition(viewerId),
+        ),
+      )
       .limit(1)
       .get()) ?? null;
 
@@ -113,11 +114,15 @@ export async function ensureSessionParticipantAccess(
   }
 }
 
-export async function getSessionParticipantTimelineAccess(
+export async function getAppSessionParticipantTimelineAccess(
   database: D1Database,
   viewerId: AccountId,
-  sessionId: SessionId,
+  input: {
+    appId: AppId;
+    sessionId: SessionId;
+  },
 ): Promise<SessionParticipantTimelineAccessRow> {
+  await ensureAppOwnership(database, viewerId, input.appId);
   const row =
     (await getAppDatabase(database)
       .select({
@@ -125,7 +130,13 @@ export async function getSessionParticipantTimelineAccess(
         updated_at: sessionsTable.updatedAt,
       })
       .from(sessionsTable)
-      .where(and(eq(sessionsTable.id, sessionId), sessionParticipantCondition(viewerId)))
+      .where(
+        and(
+          eq(sessionsTable.id, input.sessionId),
+          eq(sessionsTable.appId, input.appId),
+          sessionParticipantCondition(viewerId),
+        ),
+      )
       .limit(1)
       .get()) ?? null;
 
@@ -136,11 +147,15 @@ export async function getSessionParticipantTimelineAccess(
   return row;
 }
 
-export async function getSessionParticipantCapabilityAccess(
+export async function getAppSessionParticipantCapabilityAccess(
   database: D1Database,
   viewerId: AccountId,
-  sessionId: SessionId,
+  input: {
+    appId: AppId;
+    sessionId: SessionId;
+  },
 ): Promise<SessionParticipantCapabilityAccessRow> {
+  await ensureAppOwnership(database, viewerId, input.appId);
   const row =
     (await getAppDatabase(database)
       .select({
@@ -150,7 +165,13 @@ export async function getSessionParticipantCapabilityAccess(
         status: sessionsTable.status,
       })
       .from(sessionsTable)
-      .where(and(eq(sessionsTable.id, sessionId), sessionParticipantCondition(viewerId)))
+      .where(
+        and(
+          eq(sessionsTable.id, input.sessionId),
+          eq(sessionsTable.appId, input.appId),
+          sessionParticipantCondition(viewerId),
+        ),
+      )
       .limit(1)
       .get()) ?? null;
 
@@ -161,47 +182,32 @@ export async function getSessionParticipantCapabilityAccess(
   return row;
 }
 
-export async function ensureActiveSessionParticipantAccess(
+export async function getActiveAppSessionParticipantAccess(
   database: D1Database,
   viewerId: AccountId,
-  sessionId: SessionId,
-): Promise<void> {
-  const row =
-    (await getAppDatabase(database)
-      .select({
-        archived_at: sessionsTable.archivedAt,
-        status: sessionsTable.status,
-      })
-      .from(sessionsTable)
-      .where(and(eq(sessionsTable.id, sessionId), sessionParticipantCondition(viewerId)))
-      .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    throw forbiddenError();
-  }
-
-  enforceSessionCanAcceptEvents({
-    archivedAt: row.archived_at,
-    status: row.status,
-  });
-}
-
-export async function getActiveSessionParticipantAccess(
-  database: D1Database,
-  viewerId: AccountId,
-  sessionId: SessionId,
+  input: {
+    appId: AppId;
+    sessionId: SessionId;
+  },
 ): Promise<ActiveSessionParticipantAccessRow> {
+  await ensureAppOwnership(database, viewerId, input.appId);
   const row =
     (await getAppDatabase(database)
       .select({
         archived_at: sessionsTable.archivedAt,
         organization_id: sessionsTable.organizationId,
+        app_id: sessionsTable.appId,
         status: sessionsTable.status,
         type: sessionsTable.type,
       })
       .from(sessionsTable)
-      .where(and(eq(sessionsTable.id, sessionId), sessionParticipantCondition(viewerId)))
+      .where(
+        and(
+          eq(sessionsTable.id, input.sessionId),
+          eq(sessionsTable.appId, input.appId),
+          sessionParticipantCondition(viewerId),
+        ),
+      )
       .limit(1)
       .get()) ?? null;
 
@@ -217,11 +223,15 @@ export async function getActiveSessionParticipantAccess(
   return row;
 }
 
-export async function getActiveSessionQueueAccess(
+export async function getActiveAppSessionQueueAccess(
   database: D1Database,
   viewerId: AccountId,
-  sessionId: SessionId,
+  input: {
+    appId: AppId;
+    sessionId: SessionId;
+  },
 ): Promise<SessionQueueAccessRow> {
+  await ensureAppOwnership(database, viewerId, input.appId);
   const row =
     (await getAppDatabase(database)
       .select({
@@ -232,12 +242,19 @@ export async function getActiveSessionQueueAccess(
         id: sessionsTable.id,
         model: sessionsTable.model,
         organization_id: sessionsTable.organizationId,
+        app_id: sessionsTable.appId,
         provider: sessionsTable.provider,
         runtime_id: sessionsTable.runtimeId,
         status: sessionsTable.status,
       })
       .from(sessionsTable)
-      .where(and(eq(sessionsTable.id, sessionId), sessionParticipantCondition(viewerId)))
+      .where(
+        and(
+          eq(sessionsTable.id, input.sessionId),
+          eq(sessionsTable.appId, input.appId),
+          sessionParticipantCondition(viewerId),
+        ),
+      )
       .limit(1)
       .get()) ?? null;
 
@@ -257,6 +274,7 @@ export async function getActiveSessionQueueAccess(
     id: row.id,
     model: row.model,
     organization_id: row.organization_id,
+    app_id: row.app_id,
     provider: row.provider,
     runtime_id: row.runtime_id,
   };

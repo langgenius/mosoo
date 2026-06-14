@@ -4,7 +4,6 @@ import type {
   AgentBuilderPlannerContext,
 } from "@mosoo/contracts/agent-builder";
 import { PRESET_MODEL_CATALOG } from "@mosoo/contracts/models";
-import type { AccountId } from "@mosoo/id";
 import { ALL_VENDORS, PUBLIC_RUNTIME_CATALOG } from "@mosoo/runtime-catalog";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -146,7 +145,6 @@ function isAppliedRuntimeOrModelPatch(node: AgentBuilderPlanNode): boolean {
 
 export async function ensureRuntimeAndModelPatchAvailable(
   bindings: ApiBindings,
-  actorAccountId: AccountId,
   context: AgentBuilderPlannerContext,
   draft: AgentBuilderLightweightPlannerDraftContext,
   nodes: AgentBuilderPlanNode[],
@@ -227,9 +225,8 @@ export async function ensureRuntimeAndModelPatchAvailable(
 
   try {
     await ensureModelAvailableForSelection(bindings.DB, {
-      accountId: actorAccountId,
       modelId: selection.model,
-      organizationId: context.agent.organizationId,
+      appId: context.agent.appId,
       runtimeId: selection.runtimeId,
       vendorId: selection.provider,
     });

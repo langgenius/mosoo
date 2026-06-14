@@ -9,8 +9,8 @@ export const PUBLISH_AGENT_MUTATION = graphql(/* GraphQL */ `
 `);
 
 export const UNPUBLISH_AGENT_MUTATION = graphql(/* GraphQL */ `
-  mutation UnpublishAgent($agentId: ULID!) {
-    unpublishAgent(agentId: $agentId) {
+  mutation UnpublishAgent($agentId: ULID!, $appId: ULID!) {
+    unpublishAgent(agentId: $agentId, appId: $appId) {
       ...AgentFields
     }
   }

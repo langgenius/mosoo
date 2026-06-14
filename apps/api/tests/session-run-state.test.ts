@@ -4,7 +4,7 @@ import { updateSessionRunStatusIfActive } from "../src/modules/runtime/applicati
 import {
   createPublicHttpContractDatabase,
   insertMemberSession,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
 async function insertQueuedSessionRun(database: D1Database): Promise<void> {
   await database

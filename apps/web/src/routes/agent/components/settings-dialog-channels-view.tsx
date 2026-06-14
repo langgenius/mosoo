@@ -416,7 +416,7 @@ export function AgentSettingsChannelsView({
             </div>
           ) : !canManageChannels ? (
             <div className="border-border bg-muted/20 text-muted-foreground rounded-md border px-3 py-2 text-xs">
-              Only Owners and Admins can connect channels for this agent.
+              Only the Agent owner in this App can connect channels.
             </div>
           ) : selectedChannel.id === "slack" ? (
             <SlackChannelInlineSetup agent={agent} />

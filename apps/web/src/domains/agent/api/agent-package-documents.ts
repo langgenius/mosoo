@@ -1,8 +1,8 @@
 import { graphql } from "@/gql";
 
 export const GET_AGENT_MANIFEST_QUERY = graphql(/* GraphQL */ `
-  query AgentManifest($agentId: ULID!) {
-    agentManifest(agentId: $agentId) {
+  query AgentManifest($agentId: ULID!, $appId: ULID!) {
+    agentManifest(agentId: $agentId, appId: $appId) {
       agentId
       json
       yaml
@@ -11,8 +11,8 @@ export const GET_AGENT_MANIFEST_QUERY = graphql(/* GraphQL */ `
 `);
 
 export const EXPORT_AGENT_PACKAGE_QUERY = graphql(/* GraphQL */ `
-  query ExportAgentPackage($agentId: ULID!) {
-    exportAgentPackage(agentId: $agentId) {
+  query ExportAgentPackage($agentId: ULID!, $appId: ULID!) {
+    exportAgentPackage(agentId: $agentId, appId: $appId) {
       agentId
       contentType
       fileId

@@ -48,12 +48,7 @@ export interface McpServer {
   authorizationState?: McpAuthorizationState;
   iconUrl?: string; // Connector icon
   type?: "web" | "custom";
-  /**
-   * Source pool this server was added from.
-   * personal = the owner's Integration pool.
-   * organization_shared = Admin-managed Organization pool.
-   */
-  source?: "personal" | "organization_shared";
+  source?: "app";
   /**
    * Credential resolution mode for this Agent × Server binding.
    * runtime_resolved = resolve at runtime from the active credential source.
@@ -93,6 +88,7 @@ export interface UserInfo {
 
 export interface Agent {
   id: string;
+  appId: string;
   kind: AgentKind;
   liveVersion: AgentDeploymentVersion | null;
   name: string;
@@ -111,5 +107,4 @@ export interface Agent {
   packageResolution: AgentPackageResolutionState | null;
   role: AgentRole;
   config: AgentConfig;
-  collaborators: { user: UserInfo; role: "admin" | "user" }[];
 }

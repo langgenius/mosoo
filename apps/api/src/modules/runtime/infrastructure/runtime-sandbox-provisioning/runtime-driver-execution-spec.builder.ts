@@ -11,7 +11,7 @@ import type { DriverNativeRuntimeRef } from "agent-driver/runtime";
 import type {
   DriverBootMcpServer,
   DriverExecutionSpec,
-  DriverOrganizationAccessSnapshotOutput,
+  DriverAppAccessSnapshotOutput,
   DriverProfileConfig,
   DriverResolvedMcpServer,
   DriverResolvedSkill,
@@ -55,6 +55,7 @@ export function toDriverInstanceMcpGrantRecord(
       "credentialId" in server
         ? parsePlatformId<CredentialId>(server.credentialId, "MCP credential id")
         : null,
+    appId: server.appId,
     serverId: parsePlatformId<McpServerId>(server.serverId, "MCP server id"),
   };
 }
@@ -79,6 +80,7 @@ async function withRuntimeMcpProxy(
       credentialScope: server.credentialScope,
       credentialStatus: server.credentialStatus,
       name: server.name,
+      appId: server.appId,
       serverId,
       subjectLabel: server.subjectLabel ?? null,
     };
@@ -93,6 +95,7 @@ async function withRuntimeMcpProxy(
     credentialScope: server.credentialScope,
     credentialStatus: "active",
     name: server.name,
+    appId: server.appId,
     proxyGrantId: await createRuntimeActionToken(context.bindings, {
       action: "mcp_proxy",
       driverInstanceId: context.driverInstanceId,
@@ -154,7 +157,7 @@ export async function buildExecutionSpec(
     resolvedSkillCatalog: DriverSkillCatalogEntry[];
     resolvedSkills: Omit<DriverResolvedSkill, "downloadUrl">[];
     sessionRunId?: SessionRunId | null;
-    organizationAccessSnapshot: DriverOrganizationAccessSnapshotOutput;
+    appAccessSnapshot: DriverAppAccessSnapshotOutput;
   },
 ): Promise<DriverExecutionSpec> {
   const organizationPath = getOrganizationPath(input.profile);
@@ -189,7 +192,7 @@ export async function buildExecutionSpec(
       context: {
         sandboxSessionId: input.profile.session.sandboxSessionId,
         homePath: input.profile.session.homePath,
-        organizationAccessSnapshot: input.organizationAccessSnapshot,
+        appAccessSnapshot: input.appAccessSnapshot,
         origin: input.profile.session.origin,
         sandboxId: input.profile.sandbox.id,
         sandboxKind: input.profile.kind,

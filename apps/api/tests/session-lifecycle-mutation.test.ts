@@ -19,14 +19,14 @@ import {
   createPublicHttpTestBindings,
   insertOwnerSession,
   insertMemberSession,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
-const MEMBER_VIEWER: AuthenticatedViewer = {
-  email: "member@example.com",
+const OWNER_VIEWER: AuthenticatedViewer = {
+  email: "owner@example.com",
   emailVerified: true,
-  id: PUBLIC_API_TEST_IDS.memberAccount,
+  id: PUBLIC_API_TEST_IDS.ownerAccount,
   imageUrl: null,
-  name: "Org Member",
+  name: "Org Owner",
 };
 
 const FAILED_DRIVER_ID = "01J0000000000000000000000G";
@@ -128,7 +128,10 @@ async function ensureRuntimeLifecycleTables(database: D1Database): Promise<void>
     .run();
 }
 
-async function insertSandboxSession(database: D1Database): Promise<void> {
+async function insertSandboxSession(
+  database: D1Database,
+  sessionId: string = PUBLIC_API_TEST_IDS.memberSession,
+): Promise<void> {
   await ensureRuntimeLifecycleTables(database);
   await database
     .prepare(
@@ -170,7 +173,7 @@ async function insertSandboxSession(database: D1Database): Promise<void> {
       "session-cwd",
       "{}",
       PUBLIC_API_TEST_IDS.sandbox,
-      PUBLIC_API_TEST_IDS.memberSession,
+      sessionId,
       "[]",
       "closed",
       1,
@@ -181,10 +184,14 @@ async function insertSandboxSession(database: D1Database): Promise<void> {
 async function insertSessionRun(
   database: D1Database,
   input: {
+    createdByAccountId?: string;
     runId: string;
+    sessionId?: string;
     status?: string;
   },
 ): Promise<void> {
+  const sessionId = input.sessionId ?? PUBLIC_API_TEST_IDS.memberSession;
+
   await database
     .prepare(
       `
@@ -207,9 +214,9 @@ async function insertSessionRun(
     )
     .bind(
       input.runId,
-      PUBLIC_API_TEST_IDS.memberSession,
+      sessionId,
       PUBLIC_API_TEST_IDS.agent,
-      PUBLIC_API_TEST_IDS.memberAccount,
+      input.createdByAccountId ?? PUBLIC_API_TEST_IDS.memberAccount,
       "user_prompt",
       input.status ?? "running",
       "openai",
@@ -222,11 +229,7 @@ async function insertSessionRun(
     .run();
   await database
     .prepare("UPDATE session SET last_run_id = ?, status = ? WHERE id = ?")
-    .bind(
-      input.runId,
-      input.status === "completed" ? "IDLE" : "RUNNING",
-      PUBLIC_API_TEST_IDS.memberSession,
-    )
+    .bind(input.runId, input.status === "completed" ? "IDLE" : "RUNNING", sessionId)
     .run();
 }
 
@@ -418,17 +421,23 @@ describe("session lifecycle mutations", () => {
 
   test("archive cancels active runs and exposes an idle archived session", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertOwnerSession(database);
     await ensureRuntimeLifecycleTables(database);
-    await insertSessionRun(database, { runId: PUBLIC_API_TEST_IDS.run });
+    await insertSandboxSession(database, PUBLIC_API_TEST_IDS.ownerSession);
+    await insertSessionRun(database, {
+      createdByAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
+      runId: PUBLIC_API_TEST_IDS.run,
+      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+    });
     const bindings = withSessionLifecycleBinding(
       createPublicHttpTestBindings(database) as ApiBindings,
     );
 
     const outcomes = await archiveAgentSession({
       bindings,
-      sessionId: PUBLIC_API_TEST_IDS.memberSession,
-      viewer: MEMBER_VIEWER,
+      appId: PUBLIC_API_TEST_IDS.app,
+      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+      viewer: OWNER_VIEWER,
     });
 
     const row = await database
@@ -442,7 +451,7 @@ describe("session lifecycle mutations", () => {
           WHERE session.id = ?
         `,
       )
-      .bind(PUBLIC_API_TEST_IDS.memberSession)
+      .bind(PUBLIC_API_TEST_IDS.ownerSession)
       .first<{
         archived_at: number | null;
         run_status: string;
@@ -459,8 +468,12 @@ describe("session lifecycle mutations", () => {
 
   test("unarchive normalizes stale rescheduling state before exposing the session", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
-    await insertSessionRun(database, { runId: PUBLIC_API_TEST_IDS.run });
+    await insertOwnerSession(database);
+    await insertSessionRun(database, {
+      createdByAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
+      runId: PUBLIC_API_TEST_IDS.run,
+      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+    });
     await database
       .prepare(
         `
@@ -471,13 +484,14 @@ describe("session lifecycle mutations", () => {
            WHERE id = ?
         `,
       )
-      .bind(1, "RESCHEDULING", PUBLIC_API_TEST_IDS.operation, PUBLIC_API_TEST_IDS.memberSession)
+      .bind(1, "RESCHEDULING", PUBLIC_API_TEST_IDS.operation, PUBLIC_API_TEST_IDS.ownerSession)
       .run();
 
     await unarchiveAgentSession({
       database,
-      sessionId: PUBLIC_API_TEST_IDS.memberSession,
-      viewer: MEMBER_VIEWER,
+      appId: PUBLIC_API_TEST_IDS.app,
+      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+      viewer: OWNER_VIEWER,
     });
 
     const row = await database
@@ -492,7 +506,7 @@ describe("session lifecycle mutations", () => {
           WHERE session.id = ?
         `,
       )
-      .bind(PUBLIC_API_TEST_IDS.memberSession)
+      .bind(PUBLIC_API_TEST_IDS.ownerSession)
       .first<{
         archived_at: number | null;
         run_status: string;
@@ -512,8 +526,12 @@ describe("session lifecycle mutations", () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
     await database
-      .prepare("UPDATE session SET attributed_user_id = ? WHERE id = ?")
-      .bind(PUBLIC_API_TEST_IDS.memberAccount, PUBLIC_API_TEST_IDS.ownerSession)
+      .prepare("UPDATE session SET creator_account_id = ?, attributed_user_id = ? WHERE id = ?")
+      .bind(
+        PUBLIC_API_TEST_IDS.memberAccount,
+        PUBLIC_API_TEST_IDS.ownerAccount,
+        PUBLIC_API_TEST_IDS.ownerSession,
+      )
       .run();
     const bindings = withSessionLifecycleBinding(
       createPublicHttpTestBindings(database) as ApiBindings,
@@ -522,8 +540,9 @@ describe("session lifecycle mutations", () => {
     await expect(
       archiveAgentSession({
         bindings,
+        appId: PUBLIC_API_TEST_IDS.app,
         sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-        viewer: MEMBER_VIEWER,
+        viewer: OWNER_VIEWER,
       }),
     ).rejects.toThrow();
 
@@ -535,16 +554,18 @@ describe("session lifecycle mutations", () => {
     await expect(
       unarchiveAgentSession({
         database,
+        appId: PUBLIC_API_TEST_IDS.app,
         sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-        viewer: MEMBER_VIEWER,
+        viewer: OWNER_VIEWER,
       }),
     ).rejects.toThrow();
 
     await expect(
       deleteAgentSession({
         bindings,
+        appId: PUBLIC_API_TEST_IDS.app,
         sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-        viewer: MEMBER_VIEWER,
+        viewer: OWNER_VIEWER,
       }),
     ).rejects.toThrow();
   });

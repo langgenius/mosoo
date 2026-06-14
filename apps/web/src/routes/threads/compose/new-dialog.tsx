@@ -348,7 +348,7 @@ export function NewThreadDialog({
             <div className="min-w-0">
               <DialogTitle className="text-fg-1 text-[14px] font-semibold">New thread</DialogTitle>
               <DialogDescription className="sr-only">
-                Assign one brief to one published agent.
+                Start a Thread for one Agent.
               </DialogDescription>
             </div>
             <Button
@@ -428,13 +428,13 @@ export function NewThreadDialog({
 
           {missingLockedAgent ? (
             <div className="border-destructive/20 bg-destructive/[0.06] text-destructive rounded-md border px-3 py-2 text-[12.5px]">
-              This agent is not available to your current organization.
+              This Agent is not available in this App.
             </div>
           ) : null}
 
           {draftSelected ? (
             <div className="border-amber/30 bg-amber-bg text-amber-fg rounded-md border px-3 py-2 text-[12.5px]">
-              Publish this agent before assigning a Thread.
+              Publish this Agent before starting a Thread.
             </div>
           ) : null}
 

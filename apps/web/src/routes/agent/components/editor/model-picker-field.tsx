@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import type { ReactElement } from "react";
 
+import { toAppId } from "@/routes/typed-id";
 import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
@@ -29,17 +30,25 @@ import type { AgentEditorModel } from "./use-model";
 
 export function ModelPickerField({
   model,
+  appId,
   readOnly,
 }: {
   model: AgentEditorModel;
+  appId: string;
   readOnly: boolean;
 }): ReactElement {
   const runtimeId = model.draft.runtime;
   const currentModelId = model.draft.model === "" ? null : model.draft.model;
   const currentVendorId = model.draft.provider === "" ? null : model.draft.provider;
   const entriesQuery = useQuery({
-    queryFn: async () => listAvailableAgentModels({ currentModelId, currentVendorId, runtimeId }),
-    queryKey: ["available-agent-models", runtimeId, currentModelId, currentVendorId],
+    queryFn: async () =>
+      listAvailableAgentModels({
+        currentModelId,
+        currentVendorId,
+        appId: toAppId(appId),
+        runtimeId,
+      }),
+    queryKey: ["available-agent-models", appId, runtimeId, currentModelId, currentVendorId],
   });
   const entries = entriesQuery.data ?? [];
   const loading = entriesQuery.isLoading;

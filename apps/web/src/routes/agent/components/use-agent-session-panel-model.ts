@@ -9,7 +9,7 @@ import type { PermissionRequest } from "@/domains/runtime/use-session-stream";
 import { listAgentSessions } from "@/domains/session/api/agent-session";
 import { appendSessionResourceMentionsToMessage } from "@/features/session-chat/session-resource-mentions";
 import { useSessionChatLayoutState } from "@/features/session-chat/use-session-chat-layout-state";
-import { toAgentId, toSessionId } from "@/routes/typed-id";
+import { toAgentId, toAppId, toSessionId } from "@/routes/typed-id";
 
 import type {
   AgentSessionPanelModel,
@@ -32,11 +32,18 @@ import {
 } from "./agent-session-panel-session-actions";
 
 async function autoTitleSessionAndRefresh(input: {
+  appId: string | null;
   refreshSessions: () => Promise<void>;
   sessionId: string;
   title: string;
 }): Promise<void> {
-  await autoTitleSession(toSessionId(input.sessionId), input.title).catch(ignorePromiseRejection);
+  if (input.appId === null) {
+    return;
+  }
+
+  await autoTitleSession(toAppId(input.appId), toSessionId(input.sessionId), input.title).catch(
+    ignorePromiseRejection,
+  );
   void input.refreshSessions();
 }
 
@@ -83,11 +90,11 @@ export function useAgentSessionPanelModel(
   const [sending, setSending] = useState(false);
 
   const sessionsQuery = useQuery({
-    enabled: input.organizationId !== null,
+    enabled: input.appId !== null,
     queryFn: async () =>
-      input.organizationId === null
+      input.appId === null
         ? []
-        : listAgentSessions(toAgentId(input.agentId), {
+        : listAgentSessions(toAppId(input.appId), toAgentId(input.agentId), {
             archived: false,
             participantOnly: true,
             type: input.sessionType,
@@ -111,7 +118,7 @@ export function useAgentSessionPanelModel(
     configurationRevisionKey: input.configurationRevisionKey,
     requireFreshConfiguration: input.requireFreshConfiguration,
   });
-  const stream = useSessionStream(activeSessionId);
+  const stream = useSessionStream(input.appId, activeSessionId);
   const readiness = stream.readiness ?? input.readiness;
   const readinessBlockMessage = getReadinessBlockMessage(readiness);
   const permissionScrollSignal = useMemo(
@@ -121,7 +128,7 @@ export function useAgentSessionPanelModel(
   const layout = useSessionChatLayoutState(stream.messages, permissionScrollSignal);
 
   async function refreshSessions(): Promise<void> {
-    if (input.organizationId === null) {
+    if (input.appId === null) {
       return;
     }
 
@@ -135,9 +142,18 @@ export function useAgentSessionPanelModel(
   async function createSessionAndSelect(
     options: { waitForRuntimeReady?: boolean } = {},
   ): Promise<string> {
-    const createdSession = await createAgentSession(toAgentId(input.agentId), input.sessionType, {
-      waitForRuntimeReady: options.waitForRuntimeReady === true,
-    });
+    if (input.appId === null) {
+      throw new Error("App id is required to create an agent session.");
+    }
+
+    const createdSession = await createAgentSession(
+      toAppId(input.appId),
+      toAgentId(input.agentId),
+      input.sessionType,
+      {
+        waitForRuntimeReady: options.waitForRuntimeReady === true,
+      },
+    );
     const revisionKey = input.configurationRevisionKey;
 
     if (revisionKey !== null && revisionKey.length > 0) {
@@ -187,6 +203,11 @@ export function useAgentSessionPanelModel(
     clearComposerError();
 
     try {
+      if (input.appId === null) {
+        throw new Error("App id is required to reset agent sessions.");
+      }
+
+      const appId = toAppId(input.appId);
       const resetSessionIds = getResetSessionIds({
         activeSessionId,
         sessionType: input.sessionType,
@@ -194,7 +215,7 @@ export function useAgentSessionPanelModel(
       });
 
       for (const sessionId of resetSessionIds) {
-        await deleteAgentSession(toSessionId(sessionId));
+        await deleteAgentSession(appId, toSessionId(sessionId));
       }
 
       if (resetSessionIds.length > 0) {
@@ -294,6 +315,7 @@ export function useAgentSessionPanelModel(
 
         globalThis.setTimeout(() => {
           void autoTitleSessionAndRefresh({
+            appId: input.appId,
             refreshSessions,
             sessionId: titledSessionId,
             title,

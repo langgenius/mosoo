@@ -313,7 +313,6 @@ async function processSessionRunDispatchCommand(
     bindings,
     input: {
       attachmentIds: payload.attachmentIds,
-      draftAttachmentOrganizationId: payload.draftAttachmentOrganizationId,
       prompt: payload.prompt,
       queuedAtMs: payload.queuedAtMs,
       session: payload.session,

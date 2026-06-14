@@ -1,11 +1,11 @@
 import type { FileUploadSummary } from "@mosoo/contracts/file";
-import type { FileId, SessionId } from "@mosoo/contracts/id";
+import type { FileId, AppId, SessionId } from "@mosoo/contracts/id";
 import type { SessionResource } from "@mosoo/contracts/session";
 
 import { graphql } from "@/gql";
 import type { AddSessionResourceMutation, ListSessionResourcesQuery } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import { toAccountId, toFileId, toOrganizationId, toSessionId, toSpaceId } from "@/routes/typed-id";
+import { toAccountId, toFileId, toAppId, toSessionId, toSpaceId } from "@/routes/typed-id";
 
 const ADD_SESSION_RESOURCE_MUTATION = graphql(/* GraphQL */ `
   mutation AddSessionResource($input: AddSessionResourceInput!) {
@@ -32,8 +32,8 @@ const ADD_SESSION_RESOURCE_MUTATION = graphql(/* GraphQL */ `
 `);
 
 const LIST_SESSION_RESOURCES_QUERY = graphql(/* GraphQL */ `
-  query ListSessionResources($sessionId: ULID!) {
-    listSessionResources(sessionId: $sessionId) {
+  query ListSessionResources($appId: ULID!, $sessionId: ULID!) {
+    listSessionResources(appId: $appId, sessionId: $sessionId) {
       createdAt
       id
       mimeType
@@ -52,8 +52,11 @@ const REMOVE_SESSION_RESOURCE_MUTATION = graphql(/* GraphQL */ `
   }
 `);
 
-export function sessionResourcesQueryKey(sessionId: SessionId | null): readonly unknown[] {
-  return ["session-resources", sessionId];
+export function sessionResourcesQueryKey(
+  appId: AppId | null,
+  sessionId: SessionId | null,
+): readonly unknown[] {
+  return ["session-resources", appId, sessionId];
 }
 
 function toFileUploadScope(
@@ -61,9 +64,8 @@ function toFileUploadScope(
 ): FileUploadSummary["scope"] {
   switch (scope.kind) {
     case "agent_package":
-    case "organization_avatar":
-    case "organization_draft":
-      return { id: toOrganizationId(scope.id), kind: scope.kind };
+    case "app_draft":
+      return { id: toAppId(scope.id), kind: scope.kind };
     case "session":
       return { id: toSessionId(scope.id), kind: scope.kind };
     case "space":
@@ -77,8 +79,8 @@ function toFileUploadOwner(
   switch (owner.kind) {
     case "account":
       return { id: toAccountId(owner.id), kind: owner.kind };
-    case "organization":
-      return { id: toOrganizationId(owner.id), kind: owner.kind };
+    case "app":
+      return { id: toAppId(owner.id), kind: owner.kind };
     case "session":
       return { id: toSessionId(owner.id), kind: owner.kind };
     case "space":
@@ -118,6 +120,7 @@ function toSessionResource(
 }
 
 export async function addSessionResourceUpload(
+  appId: AppId,
   sessionId: SessionId,
   file: File,
 ): Promise<FileUploadSummary> {
@@ -128,6 +131,7 @@ export async function addSessionResourceUpload(
         name: file.name,
         size: file.size,
       },
+      appId,
       sessionId,
     },
   });
@@ -135,8 +139,12 @@ export async function addSessionResourceUpload(
   return toFileUploadSummary(payload.addSessionResource);
 }
 
-export async function listSessionResources(sessionId: SessionId): Promise<SessionResource[]> {
+export async function listSessionResources(
+  appId: AppId,
+  sessionId: SessionId,
+): Promise<SessionResource[]> {
   const payload = await requestGraphQL(LIST_SESSION_RESOURCES_QUERY, {
+    appId,
     sessionId,
   });
 
@@ -144,11 +152,13 @@ export async function listSessionResources(sessionId: SessionId): Promise<Sessio
 }
 
 export async function removeSessionResource(
+  appId: AppId,
   sessionId: SessionId,
   resourceId: FileId,
 ): Promise<void> {
   await requestGraphQL(REMOVE_SESSION_RESOURCE_MUTATION, {
     input: {
+      appId,
       resourceId,
       sessionId,
     },

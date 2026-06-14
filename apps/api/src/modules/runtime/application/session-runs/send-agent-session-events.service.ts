@@ -8,7 +8,7 @@ import type {
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import { sessionsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, SessionId, SessionRunId } from "@mosoo/id";
+import type { AccountId, FileId, AppId, SessionId, SessionRunId } from "@mosoo/id";
 import { getAvailableAgentSessionActionCapability } from "@mosoo/session-policy";
 import { and, eq, isNull } from "drizzle-orm";
 
@@ -31,6 +31,7 @@ import { startRuns } from "./start-runs.service";
 
 interface SendAgentSessionEventsInput {
   events: AgentSessionEventInput[];
+  appId: string;
   sessionId: string;
 }
 
@@ -194,6 +195,7 @@ async function handleAgentSessionEvent(input: {
   executionContext: Pick<ExecutionContext, "waitUntil"> | null;
   options: AgentSessionEventsOptions;
   requestUrl: string;
+  appId: AppId;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
 }): Promise<{
@@ -220,6 +222,7 @@ async function handleAgentSessionEvent(input: {
               prompt: {
                 content: text,
               },
+              appId: input.appId,
               sessionId: input.sessionId,
               ...(input.event.clientRequestId !== null && input.event.clientRequestId !== undefined
                 ? { clientRequestId: input.event.clientRequestId }
@@ -252,6 +255,7 @@ async function handleAgentSessionEvent(input: {
         cachedState: input.options.cachedState ?? null,
         decision,
         requestId,
+        appId: input.appId,
         sessionId: input.sessionId,
         viewer: input.viewer,
       });
@@ -280,7 +284,11 @@ async function handleAgentSessionEvent(input: {
         runId: input.event.runId,
         sessionId: input.sessionId,
       });
-      const cancelled = await cancelRun(input.bindings, input.viewer, { runId });
+      const cancelled = await cancelRun(input.bindings, input.viewer, {
+        appId: input.appId,
+        runId,
+        sessionId: input.sessionId,
+      });
 
       return {
         result: {
@@ -304,17 +312,17 @@ export async function sendAgentSessionEvents(
 ): Promise<AgentSessionEventBatch> {
   const options = request.options ?? {};
   const sessionId = parsePlatformId<SessionId>(request.input.sessionId, "session id");
+  const appId = parsePlatformId<AppId>(request.input.appId, "app id");
   const viewerId = parsePlatformId<AccountId>(request.viewer.id, "viewer id");
 
   if (request.input.events.length === 0) {
     throw new Error("At least one session event is required.");
   }
 
-  const access = await getParticipantSessionSummaryAccessById(
-    request.bindings.DB,
-    viewerId,
+  const access = await getParticipantSessionSummaryAccessById(request.bindings.DB, viewerId, {
+    appId,
     sessionId,
-  );
+  });
   const session = access.session;
   const isSessionCreator = resolveSessionActionCreatorFlag({
     authorization: options.actionAuthorization,
@@ -346,6 +354,7 @@ export async function sendAgentSessionEvents(
         event,
         executionContext: request.executionContext,
         options,
+        appId,
         requestUrl: request.requestUrl,
         sessionId,
         viewer: request.viewer,

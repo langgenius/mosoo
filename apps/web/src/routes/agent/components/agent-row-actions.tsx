@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 import { createAgentFork, deleteAgent, getAgentManifest } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
-import { toAgentId, toOrganizationId } from "@/routes/typed-id";
+import { toAgentId, toAppId } from "@/routes/typed-id";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -54,13 +54,7 @@ function getActionErrorMessage(error: unknown, defaultMessage: string): string {
   return error instanceof Error ? error.message : defaultMessage;
 }
 
-export function AgentRowActions({
-  agent,
-  organizationId,
-}: {
-  agent: Agent;
-  organizationId: string | null;
-}): ReactElement {
+export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -69,30 +63,26 @@ export function AgentRowActions({
   const isEditor = agent.role === "owner" || agent.role === "admin";
   const canDelete = agent.role === "owner";
   const typedAgentId = toAgentId(agent.id);
-  const typedOrganizationId = organizationId === null ? null : toOrganizationId(organizationId);
+  const typedAppId = toAppId(agent.appId);
 
   const forkMutation = useMutation({
     mutationFn: createAgentFork,
     onSuccess: async () => {
-      const queryKey =
-        typedOrganizationId === null ? agentKeys.lists() : agentKeys.list(typedOrganizationId);
-
-      await queryClient.invalidateQueries({ queryKey });
+      await queryClient.invalidateQueries({ queryKey: agentKeys.list(agent.appId) });
     },
   });
   const exportMutation = useMutation({
-    mutationFn: getAgentManifest,
-    onSuccess: async (_data, agentId) => {
-      await queryClient.invalidateQueries({ queryKey: agentKeys.manifest(agentId) });
+    mutationFn: async () => getAgentManifest(typedAppId, typedAgentId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.manifest(agent.appId, agent.id),
+      });
     },
   });
   const deleteMutation = useMutation({
     mutationFn: deleteAgent,
     onSuccess: async () => {
-      const queryKey =
-        typedOrganizationId === null ? agentKeys.lists() : agentKeys.list(typedOrganizationId);
-
-      await queryClient.invalidateQueries({ queryKey });
+      await queryClient.invalidateQueries({ queryKey: agentKeys.list(agent.appId) });
     },
   });
 
@@ -107,7 +97,10 @@ export function AgentRowActions({
   async function handleDuplicate(): Promise<void> {
     try {
       setActionError(null);
-      const result = await forkMutation.mutateAsync({ agentId: typedAgentId });
+      const result = await forkMutation.mutateAsync({
+        agentId: typedAgentId,
+        appId: typedAppId,
+      });
 
       void navigate(`${getBasePath()}/${result.agent.id}`);
     } catch (error) {
@@ -118,7 +111,7 @@ export function AgentRowActions({
   async function handleExport(): Promise<void> {
     try {
       setActionError(null);
-      const manifest = await exportMutation.mutateAsync(typedAgentId);
+      const manifest = await exportMutation.mutateAsync();
       downloadTextFile(
         `${sanitizeFileSegment(agent.name)}.manifest.yaml`,
         "text/yaml",
@@ -130,7 +123,7 @@ export function AgentRowActions({
   }
 
   async function handleConfirmDelete(): Promise<void> {
-    await deleteMutation.mutateAsync({ agentId: typedAgentId });
+    await deleteMutation.mutateAsync({ agentId: typedAgentId, appId: typedAppId });
     setConfirmDelete(false);
   }
 

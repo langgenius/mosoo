@@ -15,8 +15,8 @@ import type { ChannelId } from "./settings-dialog-model";
  */
 export function AgentChannelsField({ agent }: { agent: Agent }) {
   const [activeChannelId, setActiveChannelId] = useState<ChannelId | null>(null);
-  const channelBindingsQuery = useAgentChannelBindingsQuery(agent.id);
-  const canManageChannels = agent.role === "owner" || agent.role === "admin";
+  const channelBindingsQuery = useAgentChannelBindingsQuery(agent.appId, agent.id);
+  const canManageChannels = agent.role === "owner";
   const isPublished = agent.status === "published";
 
   return (

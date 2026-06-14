@@ -17,7 +17,7 @@ import {
   createPublicHttpTestBindings,
   insertMemberSession,
   insertOwnerSession,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
 async function insertRunningSessionRun(
   database: D1Database,

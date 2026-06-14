@@ -8,7 +8,7 @@ import type { DriverBootPayloadPreparedHandler } from "../application/execution-
 import { createRuntimeTimingRecorder } from "../application/session-runs/session-runtime-timing";
 import type { RuntimeTimingSnapshot } from "../application/session-runs/session-runtime-timing";
 import type {
-  DriverOrganizationAccessSnapshotOutput,
+  DriverAppAccessSnapshotOutput,
   DriverProfileConfig,
   DriverResolvedMcpServer,
   DriverResolvedSkill,
@@ -140,7 +140,7 @@ export async function ensureDriverSessionReady(
     sessionRunId: SessionRunId;
     traceId: string;
     onBootPayloadPrepared?: DriverBootPayloadPreparedHandler;
-    organizationAccessSnapshot: DriverOrganizationAccessSnapshotOutput;
+    appAccessSnapshot: DriverAppAccessSnapshotOutput;
   },
 ): Promise<{
   driverInstanceId: DriverInstanceId;
@@ -291,7 +291,7 @@ export async function ensureDriverSessionReady(
       cloudflareSession: input.cloudflareSession,
       driverRecordConflictStrategy: "insert-only" as const,
       driverInstanceId,
-      organizationAccessSnapshot: input.organizationAccessSnapshot,
+      appAccessSnapshot: input.appAccessSnapshot,
       profile: input.profile,
       requestUrl,
       resolvedMcpServers: input.resolvedMcpServers,
@@ -416,7 +416,7 @@ export async function prewarmDriverSession(
     sandbox: SandboxHandle;
     sandboxSessionId: SessionId;
     sessionId: SessionId;
-    organizationAccessSnapshot: DriverOrganizationAccessSnapshotOutput;
+    appAccessSnapshot: DriverAppAccessSnapshotOutput;
   },
 ): Promise<{
   driverInstanceId: DriverInstanceId;
@@ -490,7 +490,7 @@ export async function prewarmDriverSession(
       cloudflareSession: input.cloudflareSession,
       driverRecordConflictStrategy: "insert-only" as const,
       driverInstanceId,
-      organizationAccessSnapshot: input.organizationAccessSnapshot,
+      appAccessSnapshot: input.appAccessSnapshot,
       profile: input.profile,
       requestUrl,
       resolvedMcpServers: input.resolvedMcpServers,
@@ -592,7 +592,7 @@ export async function dispatchDriverTurn(
     attachmentIds: FileId[];
     driverInstanceId: DriverInstanceId;
     prompt: string;
-    organizationAccessSnapshot: DriverOrganizationAccessSnapshotOutput;
+    appAccessSnapshot: DriverAppAccessSnapshotOutput;
     sessionRunId: SessionRunId;
   },
 ): Promise<void> {
@@ -603,7 +603,7 @@ export async function dispatchDriverTurn(
       text: input.prompt,
     },
     kind: "input.start",
-    organizationAccessSnapshot: input.organizationAccessSnapshot,
+    appAccessSnapshot: input.appAccessSnapshot,
     requestId: createPlatformId(),
     runId: input.sessionRunId,
   });

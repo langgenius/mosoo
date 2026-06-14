@@ -12,7 +12,7 @@ import type {
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureAgentPackageAccess } from "./agent-access.service";
+import { ensureAppAgentOwner } from "./agent-access.service";
 import { buildAgentManifest } from "./agent-manifest.service";
 import { toAgentModel } from "./agent-models";
 import { bindDraftAgentMcpServers, createDraftAgent } from "./agent-package-draft.service";
@@ -25,11 +25,10 @@ export async function createAgentFork(
   viewer: AuthenticatedViewer,
   input: CreateAgentForkInput,
 ): Promise<AgentPackageImportResult<Agent>> {
-  const { agent: sourceAgent } = await ensureAgentPackageAccess(
-    bindings.DB,
-    viewer.id,
-    input.agentId,
-  );
+  const { agent: sourceAgent } = await ensureAppAgentOwner(bindings.DB, viewer.id, {
+    agentId: input.agentId,
+    appId: input.appId,
+  });
   const forkKind = input.kind ?? sourceAgent.kind;
   const manifest = await buildAgentManifest(bindings.DB, sourceAgent);
   const summary = createEmptyResolutionSummary();
@@ -42,6 +41,7 @@ export async function createAgentFork(
       codePrefix: "agent.fork",
       database: bindings.DB,
       organizationId: sourceAgent.organizationId,
+      appId: sourceAgent.appId,
       selection: {
         model: manifest.runtime.model,
         provider: manifest.runtime.provider,
@@ -56,7 +56,7 @@ export async function createAgentFork(
       database: bindings.DB,
       issues,
       manifest,
-      organizationId: sourceAgent.organizationId,
+      appId: sourceAgent.appId,
       summary,
       viewerId: viewer.id,
     }),
@@ -64,17 +64,14 @@ export async function createAgentFork(
       database: bindings.DB,
       issues,
       manifest,
-      organizationId: sourceAgent.organizationId,
+      appId: sourceAgent.appId,
       summary,
       viewerId: viewer.id,
     }),
     resolveForkMcpServers({
-      database: bindings.DB,
       issues,
       manifest,
-      organizationId: sourceAgent.organizationId,
       summary,
-      viewerId: viewer.id,
     }),
   ]);
   summary.boundSkillCount += sourceStoredConfig.packageSkills.length;
@@ -94,6 +91,7 @@ export async function createAgentFork(
     prompt: sourceAgent.prompt,
     provider: sourceAgent.provider,
     providerOptions: sourceStoredConfig.providerOptions,
+    appId: sourceAgent.appId,
     runtimeId: sourceAgent.runtimeId,
     skillIds: skillResolution.skillIds,
     spaceIds,

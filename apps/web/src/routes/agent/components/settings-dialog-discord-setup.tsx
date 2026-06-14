@@ -5,7 +5,7 @@ import type { FormEvent } from "react";
 
 import { createDiscordAgentChannelBinding } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
-import { toAgentId } from "@/routes/typed-id";
+import { toAgentId, toAppId } from "@/routes/typed-id";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -34,7 +34,9 @@ export function DiscordChannelInlineSetup({
   const mutation = useMutation({
     mutationFn: createDiscordAgentChannelBinding,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: agentKeys.channelBindings(agent.id) });
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.channelBindings(agent.appId, agent.id),
+      });
       onSuccess?.();
     },
   });
@@ -57,6 +59,7 @@ export function DiscordChannelInlineSetup({
       agentId: toAgentId(agent.id),
       applicationId: applicationId.trim(),
       botToken: botToken.trim(),
+      appId: toAppId(agent.appId),
       relaySecret: relaySecret.trim(),
     });
   }

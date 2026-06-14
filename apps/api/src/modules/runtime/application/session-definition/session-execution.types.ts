@@ -10,7 +10,7 @@ import type { ResolvedRunSkill } from "@mosoo/contracts/skill";
 import type { EnvironmentId, EnvironmentRevisionId } from "@mosoo/id";
 
 import type {
-  DriverOrganizationAccessSnapshotOutput,
+  DriverAppAccessSnapshotOutput,
   DriverProfileConfig,
   DriverResolvedMcpServer,
   DriverSkillCatalogEntry,
@@ -40,6 +40,6 @@ export interface HydratedSessionRunContext {
   profile: DriverProfileConfig;
   skillCatalog: DriverSkillCatalogEntry[];
   skills: Omit<ResolvedRunSkill, "downloadUrl">[];
-  organizationAccessSnapshot: DriverOrganizationAccessSnapshotOutput;
+  appAccessSnapshot: DriverAppAccessSnapshotOutput;
   warnings: UserWarning[];
 }

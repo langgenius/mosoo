@@ -1,4 +1,4 @@
-import type { OrganizationId } from "@mosoo/contracts/id";
+import type { AppId } from "@mosoo/contracts/id";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, PenLine } from "lucide-react";
 import { useState } from "react";
@@ -44,7 +44,7 @@ const AGENT_TEMPLATES: readonly AgentTemplate[] = [
     description: "Writes and sends weekly status updates.",
     key: "weekly-status-reporter",
     message:
-      "Create a weekly status reporter that collects what shipped this week, drafts a crisp status update grouped by project, and prepares it for review every Friday.",
+      "Create a weekly status reporter that collects what shipped this week, drafts a crisp status update grouped by app, and prepares it for review every Friday.",
     title: "Weekly status reporter",
   },
   {
@@ -63,7 +63,7 @@ export function CreateAgentLauncherDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }): ReactElement {
-  const { activeOrganization } = useAppSession();
+  const { activeOrganization, activeApp } = useAppSession();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -75,11 +75,12 @@ export function CreateAgentLauncherDialog({
           <div className="text-muted-foreground px-7 py-10 text-center text-[13px]">
             Join an organization to create agents.
           </div>
+        ) : activeApp === null ? (
+          <div className="text-muted-foreground px-7 py-10 text-center text-[13px]">
+            Create an App before creating agents.
+          </div>
         ) : (
-          <CreateAgentLauncherBody
-            onOpenChange={onOpenChange}
-            organizationId={activeOrganization.id}
-          />
+          <CreateAgentLauncherBody onOpenChange={onOpenChange} appId={activeApp.id} />
         )}
       </DialogContent>
     </Dialog>
@@ -88,14 +89,14 @@ export function CreateAgentLauncherDialog({
 
 function CreateAgentLauncherBody({
   onOpenChange,
-  organizationId,
+  appId,
 }: {
   onOpenChange: (open: boolean) => void;
-  organizationId: OrganizationId;
+  appId: AppId;
 }): ReactElement {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { credentials, loading: credentialsLoading } = useVendorCredentialsQuery(organizationId);
+  const { credentials, loading: credentialsLoading } = useVendorCredentialsQuery(appId);
   const [freeText, setFreeText] = useState("");
   const [pendingSource, setPendingSource] = useState<"blank" | "builder" | null>(null);
   const createAgentMutation = useMutation({
@@ -126,7 +127,7 @@ function CreateAgentLauncherBody({
       kind: "pet",
       model: runtime.model,
       name: DEFAULT_AGENT_NAME,
-      organizationId,
+      appId,
       prompt: "",
       provider: runtime.provider,
       runtimeId: runtime.runtimeId,

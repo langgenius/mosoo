@@ -5,7 +5,7 @@ import type { ReactElement } from "react";
 
 import {
   connectMcpBearer,
-  createPersonalMcpServer,
+  createAppMcpServer,
   getMcpOAuthFlowState,
   startMcpOAuth,
 } from "@/domains/mcp/api/mcp-client";
@@ -13,7 +13,7 @@ import { mcpKeys } from "@/domains/mcp/query/mcp-queries";
 import { AddMcpDialog } from "@/routes/integrations/mcp/add-mcp-dialog";
 import type { McpConnectTargetServer } from "@/routes/integrations/mcp/oauth-connect-dialog";
 import { OAuthConnectDialog } from "@/routes/integrations/mcp/oauth-connect-dialog";
-import { toMcpOAuthFlowId, toOrganizationId } from "@/routes/typed-id";
+import { toMcpOAuthFlowId, toAppId } from "@/routes/typed-id";
 
 export function AgentBuilderRemoteMcpSecureDialog(input: {
   readonly connectServer?: McpConnectTargetServer | null | undefined;
@@ -21,18 +21,18 @@ export function AgentBuilderRemoteMcpSecureDialog(input: {
   readonly onCreated: (server: McpServerWithCredential) => void;
   readonly onOpenChange: (open: boolean) => void;
   readonly open: boolean;
-  readonly organizationId: string;
+  readonly appId: string;
 }): ReactElement {
   const queryClient = useQueryClient();
   const [oauthServer, setOauthServer] = useState<McpServerWithCredential | null>(null);
-  const organizationId = toOrganizationId(input.organizationId);
+  const appId = toAppId(input.appId);
   // A credential-connect target can come from the local create flow or be
   // requested externally (Builder direct-created server records).
   const connectTarget: McpConnectTargetServer | null = oauthServer ?? input.connectServer ?? null;
 
   async function refreshMcpRegistry(): Promise<void> {
     await queryClient.invalidateQueries({
-      queryKey: mcpKeys.registry(organizationId),
+      queryKey: mcpKeys.registry(appId),
     });
   }
 
@@ -45,10 +45,10 @@ export function AgentBuilderRemoteMcpSecureDialog(input: {
     readonly oauthClientSecret?: string;
     readonly url: string;
   }): Promise<void> {
-    const created = await createPersonalMcpServer({
+    const created = await createAppMcpServer({
       authType: addInput.authType,
       name: addInput.name,
-      organizationId,
+      appId,
       url: addInput.url,
       ...(addInput.description && { description: addInput.description }),
       ...(addInput.iconUrl && { iconUrl: addInput.iconUrl }),
@@ -73,6 +73,7 @@ export function AgentBuilderRemoteMcpSecureDialog(input: {
             return;
           }
           await connectMcpBearer({
+            appId,
             serverId: connectTarget.id,
             token,
           });
@@ -91,6 +92,7 @@ export function AgentBuilderRemoteMcpSecureDialog(input: {
           }
 
           return startMcpOAuth({
+            appId,
             serverId: connectTarget.id,
           });
         }}

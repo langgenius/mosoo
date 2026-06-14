@@ -207,7 +207,7 @@ export function AgentDetailPage() {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { activeOrganization } = useAppSession();
+  const { activeAppId } = useAppSession();
   const { user } = useAuth();
   const [selectedMode, setSelectedMode] = useState<DetailMode | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -215,11 +215,11 @@ export function AgentDetailPage() {
   const [headerActionTarget, setHeaderActionTarget] = useState<HTMLDivElement | null>(null);
   const [headerCenterTarget, setHeaderCenterTarget] = useState<HTMLDivElement | null>(null);
 
-  const detailQuery = useAgentDetailQuery(agentId ?? null);
+  const detailQuery = useAgentDetailQuery(activeAppId, agentId ?? null);
   const canEdit = detailQuery.data
     ? detailQuery.data.viewerRole === "owner" || detailQuery.data.viewerRole === "admin"
     : false;
-  const editorStateQuery = useAgentEditorStateQuery(agentId ?? null, canEdit);
+  const editorStateQuery = useAgentEditorStateQuery(activeAppId, agentId ?? null, canEdit);
 
   const agent = useMemo<Agent | null>(() => {
     if (!detailQuery.data) {
@@ -232,12 +232,7 @@ export function AgentDetailPage() {
   const basePath = globalThis.location.pathname.startsWith("/demo") ? "/demo/agent" : "/agent";
   const runtime = useMemo(() => (agent ? getRuntimeInfo(agent.runtime) : null), [agent]);
   const isOwnerOrAdmin = agent?.role === "owner" || agent?.role === "admin";
-  const viewerOrgRole =
-    activeOrganization && activeOrganization.id === detailQuery.data?.organizationId
-      ? activeOrganization.viewerRole
-      : null;
-  const canManageAgentAccess =
-    detailQuery.data?.viewerRole === "owner" || viewerOrgRole === "owner";
+  const canManageAgentAccess = detailQuery.data?.viewerRole === "owner";
   const canUseTerminal = canShowAgentDebugMenuItem({
     agentKind: agent?.kind ?? null,
     itemId: "terminal",
@@ -349,12 +344,12 @@ export function AgentDetailPage() {
     );
   }
 
-  // ── User role on published agent → pure Consume mode ──
+  // Non-owner consume mode.
   if (!isOwnerOrAdmin) {
     return <ConsumeMode agent={agent} organizationId={detail.organizationId} />;
   }
 
-  // ── Owner/Admin on published agent in consume mode → Chat + Config button ──
+  // Owner/Admin consume mode keeps a config entry point.
   if (mode === "consume") {
     return (
       <ConsumeMode
@@ -368,7 +363,7 @@ export function AgentDetailPage() {
     );
   }
 
-  // ── Owner/Admin config modes (Create / Preview / Dev / Logs) ──
+  // Owner/Admin config modes (Create / Preview / Dev / Logs).
   // Lifecycle shell wraps Draft agents in the Configure / Preview / Publish
   // surfaces. Live agents fall through to the existing tabbed UI unchanged.
   const isDraftLifecycle = agent.status === "draft";
@@ -428,8 +423,8 @@ export function AgentDetailPage() {
             )}
           </>
         )}
-        {mode === "logs" && <LogsTab agentId={agent.id} />}
-        {mode === "cost" && <AgentCostTab agentId={agent.id} />}
+        {mode === "logs" && <LogsTab agentId={agent.id} appId={agent.appId} />}
+        {mode === "cost" && <AgentCostTab agentId={agent.id} appId={agent.appId} />}
         {mode === "terminal" && <TerminalMode key={agent.id} agent={agent} />}
       </div>
 
@@ -437,7 +432,6 @@ export function AgentDetailPage() {
         agent={agent}
         open={showSettings}
         onOpenChange={setShowSettings}
-        organizationId={detail.organizationId}
         canManageAccess={canManageAgentAccess}
       />
 

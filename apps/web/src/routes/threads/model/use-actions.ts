@@ -1,3 +1,4 @@
+import type { AppId, SessionId } from "@mosoo/contracts/id";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 
@@ -7,9 +8,8 @@ import {
   deleteAgentSession,
   unarchiveAgentSession,
 } from "@/domains/session/api/mutations";
-import { updateSessionThreadUiState } from "@/domains/session/api/thread-projections";
 import { uploadSessionResource } from "@/features/session-files/session-resource-upload";
-import { toAgentId, toFileId, toSessionId } from "@/routes/typed-id";
+import { toAgentId, toFileId, toAppId, toSessionId } from "@/routes/typed-id";
 
 import type { NewThreadSubmitInput } from "../compose/new-dialog";
 import type { ThreadFollowUpInput } from "./action-types";
@@ -18,35 +18,38 @@ import { threadKeys } from "./query-keys";
 import type { ThreadListItem } from "./thread";
 
 export function useThreadActions({
-  activeOrganizationId,
+  activeAppId,
   activeThreadId,
   allThreads,
   closeComposeDialog,
+  markThreadReadLocal,
   navigateToList,
+  togglePinnedThreadLocal,
 }: {
-  activeOrganizationId: string | null;
+  activeAppId: string | null;
   activeThreadId: string | null;
   allThreads: readonly ThreadListItem[];
   closeComposeDialog: () => void;
+  markThreadReadLocal: (input: { readAt: string; threadId: string }) => void;
   navigateToList: () => void;
+  togglePinnedThreadLocal: (threadId: string) => void;
 }) {
   const queryClient = useQueryClient();
   const [actionError, setActionError] = useState<string | null>(null);
-  const threadStateMutation = useMutation({
-    mutationFn: updateSessionThreadUiState,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: threadKeys.uiStates(activeOrganizationId),
-      });
-    },
-  });
   const createMutation = useMutation({
     mutationFn: async (input: NewThreadSubmitInput) => {
-      const createdSession = await createAgentSession(toAgentId(input.agentId), "ui");
+      if (activeAppId === null) {
+        throw new Error("App id is required to create threads.");
+      }
+
+      const appId = toAppId(activeAppId);
+      const createdSession = await createAgentSession(appId, toAgentId(input.agentId), "ui");
 
       try {
         const uploadedResources = await Promise.all(
-          input.files.map(async (file) => uploadSessionResource(createdSession.id, file)),
+          input.files.map(async (file) =>
+            uploadSessionResource(activeAppId, createdSession.id, file),
+          ),
         );
         await sendAgentSessionEvents({
           events: [
@@ -57,11 +60,12 @@ export function useThreadActions({
               type: "user_message",
             },
           ],
+          appId,
           sessionId: createdSession.id,
         });
       } catch (error) {
         try {
-          await deleteAgentSession(createdSession.id);
+          await deleteAgentSession(appId, createdSession.id);
         } catch (cleanupError) {
           throw new Error(
             `${getMutationErrorMessage(error, "Failed to dispatch thread.")} Cleanup failed: ${getMutationErrorMessage(cleanupError, "created session could not be deleted.")}`,
@@ -77,37 +81,36 @@ export function useThreadActions({
     onSuccess: async (session) => {
       setActionError(null);
       closeComposeDialog();
-      await threadStateMutation.mutateAsync({
+      markThreadReadLocal({
         readAt: new Date().toISOString(),
-        sessionId: session.id,
+        threadId: session.id,
       });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: threadKeys.lists(activeOrganizationId) }),
-        queryClient.invalidateQueries({ queryKey: threadKeys.uiStates(activeOrganizationId) }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: threadKeys.lists(activeAppId) });
       navigateToList();
     },
   });
   const archiveMutation = useMutation({
-    mutationFn: archiveAgentSession,
+    mutationFn: async (input: { appId: AppId; sessionId: SessionId }) =>
+      archiveAgentSession(input.appId, input.sessionId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: threadKeys.lists(activeOrganizationId),
+        queryKey: threadKeys.lists(activeAppId),
       });
     },
   });
   const deleteMutation = useMutation({
-    mutationFn: deleteAgentSession,
+    mutationFn: async (input: { appId: AppId; sessionId: SessionId }) =>
+      deleteAgentSession(input.appId, input.sessionId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: threadKeys.lists(activeOrganizationId),
+        queryKey: threadKeys.lists(activeAppId),
       });
     },
   });
   const followUpMutation = useMutation({
     mutationFn: async (input: ThreadFollowUpInput) => {
       if (input.thread.bucket === "archived") {
-        await unarchiveAgentSession(toSessionId(input.thread.id));
+        await unarchiveAgentSession(input.thread.session.appId, toSessionId(input.thread.id));
       }
 
       await sendAgentSessionEvents({
@@ -119,20 +122,20 @@ export function useThreadActions({
             type: "user_message",
           },
         ],
+        appId: input.thread.session.appId,
         sessionId: toSessionId(input.thread.id),
       });
     },
     onSuccess: async (_result, input) => {
       setActionError(null);
-      await threadStateMutation.mutateAsync({
+      markThreadReadLocal({
         readAt: new Date().toISOString(),
-        sessionId: toSessionId(input.thread.id),
+        threadId: input.thread.id,
       });
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: threadKeys.lists(activeOrganizationId) }),
+        queryClient.invalidateQueries({ queryKey: threadKeys.lists(activeAppId) }),
         queryClient.invalidateQueries({ queryKey: threadKeys.detailMessages(input.thread.id) }),
         queryClient.invalidateQueries({ queryKey: threadKeys.processEvents(input.thread.id) }),
-        queryClient.invalidateQueries({ queryKey: threadKeys.uiStates(activeOrganizationId) }),
       ]);
     },
   });
@@ -146,12 +149,9 @@ export function useThreadActions({
 
   const markThreadRead = useCallback(
     async (input: { readAt: string; threadId: string }): Promise<void> => {
-      await threadStateMutation.mutateAsync({
-        readAt: input.readAt,
-        sessionId: toSessionId(input.threadId),
-      });
+      markThreadReadLocal(input);
     },
-    [threadStateMutation],
+    [markThreadReadLocal],
   );
 
   const togglePinnedThread = useCallback(
@@ -164,27 +164,33 @@ export function useThreadActions({
 
       try {
         setActionError(null);
-        await threadStateMutation.mutateAsync({
-          pinned: !thread.pinned,
-          sessionId: toSessionId(threadId),
-        });
+        togglePinnedThreadLocal(threadId);
       } catch (error) {
         setActionError(getMutationErrorMessage(error, "Failed to update pinned state."));
       }
     },
-    [allThreads, threadStateMutation],
+    [allThreads, togglePinnedThreadLocal],
   );
 
   const archiveThread = useCallback(
     async (threadId: string): Promise<void> => {
+      const thread = allThreads.find((candidate) => candidate.id === threadId) ?? null;
+
       try {
+        if (thread === null) {
+          throw new Error("Thread not found.");
+        }
+
         setActionError(null);
-        await archiveMutation.mutateAsync(toSessionId(threadId));
+        await archiveMutation.mutateAsync({
+          appId: thread.session.appId,
+          sessionId: toSessionId(threadId),
+        });
       } catch (error) {
         setActionError(getMutationErrorMessage(error, "Failed to archive thread."));
       }
     },
-    [archiveMutation],
+    [allThreads, archiveMutation],
   );
 
   const deleteThread = useCallback(
@@ -195,8 +201,17 @@ export function useThreadActions({
       }
 
       try {
+        const thread = allThreads.find((candidate) => candidate.id === threadId) ?? null;
+
+        if (thread === null) {
+          throw new Error("Thread not found.");
+        }
+
         setActionError(null);
-        await deleteMutation.mutateAsync(toSessionId(threadId));
+        await deleteMutation.mutateAsync({
+          appId: thread.session.appId,
+          sessionId: toSessionId(threadId),
+        });
 
         if (activeThreadId === threadId) {
           navigateToList();
@@ -205,7 +220,7 @@ export function useThreadActions({
         setActionError(getMutationErrorMessage(error, "Failed to delete thread."));
       }
     },
-    [activeThreadId, deleteMutation, navigateToList],
+    [activeThreadId, allThreads, deleteMutation, navigateToList],
   );
 
   const sendFollowUp = useCallback(

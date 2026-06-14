@@ -15,7 +15,7 @@ import {
   getRuntimeSubjectInactiveDeadline,
   runtimeCheckpointRulesInclude,
 } from "../../domain/runtime-kind-policy";
-import { buildOrganizationAccessSnapshotFromAliases } from "../../domain/sandbox-layout";
+import { buildAppAccessSnapshotFromAliases } from "../../domain/sandbox-layout";
 import type { RuntimeConversationSessionRecord } from "../runtime-subject-lifecycle/runtime-subject-store";
 import {
   ensureRuntimeConversationSessionRecord,
@@ -148,8 +148,8 @@ export async function ensureSandboxConversationSession(
     }),
   );
   const sandboxSessionId = continuation.sandboxSessionId ?? sessionRecord.sandboxSessionId;
-  const organizationAccessSnapshot = buildOrganizationAccessSnapshotFromAliases({
-    currentSnapshot: input.currentOrganizationAccessSnapshot,
+  const appAccessSnapshot = buildAppAccessSnapshotFromAliases({
+    currentSnapshot: input.currentAppAccessSnapshot,
     spaceAliases: frozenAliases,
   });
 
@@ -252,7 +252,7 @@ export async function ensureSandboxConversationSession(
     cloudflareSession,
     sandboxSessionId,
     cwd,
-    organizationAccessSnapshot,
+    appAccessSnapshot,
     origin: frozenOrigin,
     spaceAliases: frozenAliases,
   };

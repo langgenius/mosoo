@@ -19,7 +19,8 @@ function createAgentVersionedConfigDatabase(): D1Database {
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       current_snapshot_id text NOT NULL,
-      owner_account_id text NOT NULL
+      owner_account_id text NOT NULL,
+      app_id text NOT NULL
     );
 
     CREATE TABLE agent_skill (
@@ -33,8 +34,8 @@ function createAgentVersionedConfigDatabase(): D1Database {
     INSERT INTO account (id, name)
     VALUES ('01J00000000000000000000001', 'Alex Example');
 
-    INSERT INTO skill (id, name, current_snapshot_id, owner_account_id)
-    VALUES ('01J0000000000000000000006B', 'registry skill', '01J0000000000000000000006C', '01J00000000000000000000001');
+    INSERT INTO skill (id, name, current_snapshot_id, owner_account_id, app_id)
+    VALUES ('01J0000000000000000000006B', 'registry skill', '01J0000000000000000000006C', '01J00000000000000000000001', '01J00000000000000000000002');
 
     INSERT INTO agent_skill (agent_id, skill_id, sort_order, created_at)
     VALUES ('01J00000000000000000000009', '01J0000000000000000000006B', 0, 1);

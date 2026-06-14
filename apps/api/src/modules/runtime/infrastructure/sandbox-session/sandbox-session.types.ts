@@ -4,13 +4,13 @@ import type { SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
 
 import type { RuntimeTimingRecorder } from "../../application/session-runs/session-runtime-timing";
 import type {
-  DriverOrganizationAccessSnapshotOutput,
+  DriverAppAccessSnapshotOutput,
   DriverOrigin as DriverOriginValue,
 } from "../../domain/driver-snapshot";
 import type { ExecutionSessionHandle, SandboxHandle } from "../sandbox-handles";
 
 export interface EnsureSandboxConversationSessionInput {
-  currentOrganizationAccessSnapshot: DriverOrganizationAccessSnapshotOutput;
+  currentAppAccessSnapshot: DriverAppAccessSnapshotOutput;
   kind: AgentKind;
   mountSessionResources: boolean;
   origin: DriverOriginValue;
@@ -27,5 +27,5 @@ export interface SandboxConversationSessionResult {
   cwd: string;
   origin: DriverOriginValue;
   spaceAliases: SpaceAliasBinding[];
-  organizationAccessSnapshot: DriverOrganizationAccessSnapshotOutput;
+  appAccessSnapshot: DriverAppAccessSnapshotOutput;
 }

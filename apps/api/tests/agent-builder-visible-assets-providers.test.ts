@@ -95,18 +95,17 @@ describe("Agent Builder visible asset providers", () => {
         boundMcpServerIds: new Set([VISIBLE_ASSET_IDS.mcpBound]),
       },
       {
-        organizationShared: [],
-        personal: [
+        servers: [
           {
             authType: "oauth",
             authorizationState: "active",
-            credentialScope: "user",
+            credentialScope: "app",
             credentialStatus: "active",
             description: "Slack tools",
             enabled: true,
             id: VISIBLE_ASSET_IDS.mcpBound,
             name: "slack",
-            source: "personal",
+            source: "app",
             updatedAt: "2026-05-20T00:00:00.000Z",
             url: "https://mcp.example.com/slack",
           },

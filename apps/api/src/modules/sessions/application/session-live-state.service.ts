@@ -1,5 +1,5 @@
 import type { AgUiSessionEvent } from "@mosoo/ag-ui-session";
-import { projectRuntimeEventToAgUiSessionEvents } from "@mosoo/runtime-events";
+import { appRuntimeEventToAgUiSessionEvents } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 
 import { applyAgUiEventsToSessionLiveState } from "../infrastructure/session-live-state.reducer";
@@ -21,16 +21,16 @@ export {
 
 export type SessionDeliveryEvent = AgUiSessionEvent;
 
-export function projectRuntimeEventToSessionDeliveryEvents(
+export function appRuntimeEventToSessionDeliveryEvents(
   event: RuntimeEventEnvelope,
 ): SessionDeliveryEvent[] {
-  return projectRuntimeEventToAgUiSessionEvents(event);
+  return appRuntimeEventToAgUiSessionEvents(event);
 }
 
-export function projectRuntimeEventsToSessionDeliveryEvents(
+export function appRuntimeEventsToSessionDeliveryEvents(
   events: readonly RuntimeEventEnvelope[],
 ): SessionDeliveryEvent[] {
-  return events.flatMap((event) => projectRuntimeEventToSessionDeliveryEvents(event));
+  return events.flatMap((event) => appRuntimeEventToSessionDeliveryEvents(event));
 }
 
 export function applyRuntimeEventToSessionLiveState(
@@ -44,8 +44,5 @@ function applyRuntimeEventsToSessionLiveState(
   state: SessionLiveState,
   events: readonly RuntimeEventEnvelope[],
 ): SessionLiveState {
-  return applyAgUiEventsToSessionLiveState(
-    state,
-    projectRuntimeEventsToSessionDeliveryEvents(events),
-  );
+  return applyAgUiEventsToSessionLiveState(state, appRuntimeEventsToSessionDeliveryEvents(events));
 }

@@ -12,14 +12,17 @@ import {
   PUBLIC_API_TEST_IDS,
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
-  insertMemberSession,
-} from "./helpers/published-agent-http-test-fixture";
+  insertOwnerSession,
+} from "./helpers/public-api-http-test-fixture";
 
-const MEMBER_ACCOUNT_ID = parsePlatformId<AccountId>(
-  "01J00000000000000000000002",
-  "member account id",
+const OWNER_ACCOUNT_ID = parsePlatformId<AccountId>(
+  "01J00000000000000000000001",
+  "owner account id",
 );
-const SESSION_ID = parsePlatformId<SessionId>("01J0000000000000000000000B", "session id");
+const OWNER_SESSION_ID = parsePlatformId<SessionId>(
+  "01J0000000000000000000000C",
+  "owner session id",
+);
 const RUN_ID = parsePlatformId<SessionRunId>("01J0000000000000000000000N", "run id");
 const SANDBOX_ID = parsePlatformId<SandboxId>("01J0000000000000000000000D", "sandbox id");
 const DRIVER_INSTANCE_ID = parsePlatformId<DriverInstanceId>(
@@ -27,12 +30,12 @@ const DRIVER_INSTANCE_ID = parsePlatformId<DriverInstanceId>(
   "driver instance id",
 );
 
-const memberViewer: AuthenticatedViewer = {
-  email: "member@example.com",
+const ownerViewer: AuthenticatedViewer = {
+  email: "owner@example.com",
   emailVerified: true,
-  id: MEMBER_ACCOUNT_ID,
+  id: OWNER_ACCOUNT_ID,
   imageUrl: null,
-  name: "Member",
+  name: "Owner",
 };
 
 function createDriverConnectionBinding(requests: unknown[]) {
@@ -84,7 +87,13 @@ async function ensureRuntimeLeaseTables(database: D1Database): Promise<void> {
     .run();
 }
 
-async function insertRunningSessionRun(database: D1Database): Promise<void> {
+async function insertRunningSessionRun(
+  database: D1Database,
+  input: {
+    createdByAccountId: AccountId;
+    sessionId: SessionId;
+  },
+): Promise<void> {
   await database
     .prepare(
       `
@@ -107,9 +116,9 @@ async function insertRunningSessionRun(database: D1Database): Promise<void> {
     )
     .bind(
       RUN_ID,
-      SESSION_ID,
+      input.sessionId,
       "01J00000000000000000000009",
-      MEMBER_ACCOUNT_ID,
+      input.createdByAccountId,
       "user_prompt",
       "running",
       "openai",
@@ -122,13 +131,13 @@ async function insertRunningSessionRun(database: D1Database): Promise<void> {
     .run();
   await database
     .prepare("UPDATE session SET last_run_id = ?, status = ? WHERE id = ?")
-    .bind(RUN_ID, "RUNNING", SESSION_ID)
+    .bind(RUN_ID, "RUNNING", input.sessionId)
     .run();
 }
 
 async function insertRunDriverInstance(
   database: D1Database,
-  input: { bindRun?: boolean; status?: string } = { bindRun: true },
+  input: { bindRun?: boolean; sessionId: SessionId; status?: string },
 ): Promise<void> {
   await database
     .prepare(
@@ -155,7 +164,7 @@ async function insertRunDriverInstance(
     .bind(
       DRIVER_INSTANCE_ID,
       SANDBOX_ID,
-      SESSION_ID,
+      input.sessionId,
       "cloudflare-container",
       "driver-ws",
       1,
@@ -181,12 +190,18 @@ async function insertRunDriverInstance(
 describe("session run cancel", () => {
   test("cancels an owned run and emits the cancellation event", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
-    await insertRunningSessionRun(database);
-
+    await insertOwnerSession(database);
+    await insertRunningSessionRun(database, {
+      createdByAccountId: OWNER_ACCOUNT_ID,
+      sessionId: OWNER_SESSION_ID,
+    });
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
 
-    const result = await cancelRun(bindings, memberViewer, { runId: RUN_ID });
+    const result = await cancelRun(bindings, ownerViewer, {
+      appId: PUBLIC_API_TEST_IDS.app,
+      runId: RUN_ID,
+      sessionId: OWNER_SESSION_ID,
+    });
 
     expect(result.run.status).toBe("cancelled");
     const run = await database
@@ -196,15 +211,18 @@ describe("session run cancel", () => {
     expect(run).toEqual({ status: "cancelled" });
     const event = await database
       .prepare("SELECT id FROM session_event WHERE session_id = ?")
-      .bind(SESSION_ID)
+      .bind(OWNER_SESSION_ID)
       .first<{ id: string }>();
     expect(event).not.toBeNull();
   });
 
   test("cancels a cold-start run after the runtime lease binds the driver from the run", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
-    await insertRunningSessionRun(database);
+    await insertOwnerSession(database);
+    await insertRunningSessionRun(database, {
+      createdByAccountId: OWNER_ACCOUNT_ID,
+      sessionId: OWNER_SESSION_ID,
+    });
     await ensureRuntimeLeaseTables(database);
     await database
       .prepare(
@@ -222,7 +240,7 @@ describe("session run cancel", () => {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `,
       )
-      .bind(SANDBOX_ID, 1, "cattle", "session", SESSION_ID, "active", 1, 1)
+      .bind(SANDBOX_ID, 1, "cattle", "session", OWNER_SESSION_ID, "active", 1, 1)
       .run();
     await database
       .prepare(
@@ -247,19 +265,23 @@ describe("session run cancel", () => {
         "/workspace",
         "{}",
         SANDBOX_ID,
-        SESSION_ID,
+        OWNER_SESSION_ID,
         "[]",
         "active",
         1,
       )
       .run();
-    await insertRunDriverInstance(database, { bindRun: false, status: "provisioning" });
+    await insertRunDriverInstance(database, {
+      bindRun: false,
+      sessionId: OWNER_SESSION_ID,
+      status: "provisioning",
+    });
 
     await expect(
       recordRuntimeRunLeaseAcquired(database, {
         driverInstanceId: DRIVER_INSTANCE_ID,
         runtimeSubjectId: SANDBOX_ID,
-        sessionId: SESSION_ID,
+        sessionId: OWNER_SESSION_ID,
         sessionRunId: RUN_ID,
       }),
     ).resolves.toBe(true);
@@ -276,71 +298,42 @@ describe("session run cancel", () => {
       driverRequests,
     );
 
-    const result = await cancelRun(bindings, memberViewer, { runId: RUN_ID });
+    const result = await cancelRun(bindings, ownerViewer, {
+      appId: PUBLIC_API_TEST_IDS.app,
+      runId: RUN_ID,
+      sessionId: OWNER_SESSION_ID,
+    });
 
     expect(result.run.status).toBe("cancelled");
     expect(driverRequests).toHaveLength(1);
   });
 
-  test("denies historical participants after membership is disabled or removed", async () => {
+  test("resolves permission requests for the App owner without Organization membership", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
-    await insertRunningSessionRun(database);
-    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
-
-    await database
-      .prepare(
-        `
-          UPDATE organization_member
-             SET disabled_at = 2
-           WHERE organization_id = ?
-             AND account_id = ?
-        `,
-      )
-      .bind(PUBLIC_API_TEST_IDS.organization, MEMBER_ACCOUNT_ID)
-      .run();
-
-    await expect(cancelRun(bindings, memberViewer, { runId: RUN_ID })).rejects.toThrow();
-
-    await database
-      .prepare(
-        `
-          DELETE FROM organization_member
-           WHERE organization_id = ?
-             AND account_id = ?
-        `,
-      )
-      .bind(PUBLIC_API_TEST_IDS.organization, MEMBER_ACCOUNT_ID)
-      .run();
-
-    await expect(cancelRun(bindings, memberViewer, { runId: RUN_ID })).rejects.toThrow();
-  });
-
-  test("denies permission resolution after membership is disabled", async () => {
-    const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
-    await insertRunningSessionRun(database);
-    await insertRunDriverInstance(database);
-    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
-
-    await database
-      .prepare(
-        `
-          UPDATE organization_member
-             SET disabled_at = 2
-           WHERE organization_id = ?
-             AND account_id = ?
-        `,
-      )
-      .bind(PUBLIC_API_TEST_IDS.organization, MEMBER_ACCOUNT_ID)
-      .run();
+    await insertOwnerSession(database);
+    await insertRunningSessionRun(database, {
+      createdByAccountId: OWNER_ACCOUNT_ID,
+      sessionId: OWNER_SESSION_ID,
+    });
+    await insertRunDriverInstance(database, {
+      bindRun: true,
+      sessionId: OWNER_SESSION_ID,
+    });
+    const driverRequests: unknown[] = [];
+    const bindings = withDriverConnection(
+      createPublicHttpTestBindings(database) as ApiBindings,
+      driverRequests,
+    );
 
     await expect(
-      resolvePermissionRequest(bindings, memberViewer, {
+      resolvePermissionRequest(bindings, ownerViewer, {
         decision: "allow_once",
         driverInstanceId: DRIVER_INSTANCE_ID,
+        appId: PUBLIC_API_TEST_IDS.app,
         requestId: "permission-1",
+        sessionId: OWNER_SESSION_ID,
       }),
-    ).rejects.toThrow();
+    ).resolves.toBeUndefined();
+    expect(driverRequests).toHaveLength(1);
   });
 });

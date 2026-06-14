@@ -1,32 +1,38 @@
 import type { SessionMessage } from "@mosoo/contracts/session";
 import { sessionMessagesTable } from "@mosoo/db";
-import type { SessionId } from "@mosoo/id";
+import type { AppId, SessionId } from "@mosoo/id";
 import { asc, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureSessionParticipantAccess } from "../domain/session-access.policy";
+import { ensureAppSessionParticipantAccess } from "../domain/session-access.policy";
 import { toSessionMessage } from "./session-message-mappers";
 import { getSessionReadAccess } from "./session-read-access.service";
 
 export async function getSessionMessages(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  sessionId: SessionId,
+  input: {
+    appId: AppId;
+    sessionId: SessionId;
+  },
 ): Promise<SessionMessage[]> {
-  await getSessionReadAccess(database, viewer.id, sessionId);
+  await getSessionReadAccess(database, viewer.id, input);
 
-  return listSessionMessages(database, sessionId);
+  return listSessionMessages(database, input.sessionId);
 }
 
 export async function getThreadSessionMessages(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  sessionId: SessionId,
+  input: {
+    appId: AppId;
+    sessionId: SessionId;
+  },
 ): Promise<SessionMessage[]> {
-  await ensureSessionParticipantAccess(database, viewer.id, sessionId);
+  await ensureAppSessionParticipantAccess(database, viewer.id, input);
 
-  return listSessionMessages(database, sessionId);
+  return listSessionMessages(database, input.sessionId);
 }
 
 async function listSessionMessages(

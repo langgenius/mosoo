@@ -4,16 +4,11 @@ import type { ReactElement } from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import {
-  createAgentFork,
-  exportAgentPackage,
-  updateAgentPackageSharing,
-} from "@/domains/agent/api/agent-client";
+import { createAgentFork, exportAgentPackage } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
 import { createFileDownload } from "@/domains/file/api/file-download-client";
-import { toAgentId } from "@/routes/typed-id";
+import { toAgentId, toAppId } from "@/routes/typed-id";
 import { Button } from "@/shared/ui/button";
-import { Switch } from "@/shared/ui/switch";
 
 import type { Agent } from "../agent.types";
 import { ImportAgentPackageDialog } from "./import-agent-package-dialog";
@@ -29,22 +24,23 @@ function packageErrorMessage(error: unknown): string {
 export function AgentSettingsPackageActions({
   agent,
   canManageAccess,
-  organizationId,
   onSettingsOpenChange,
 }: {
   agent: Agent;
   canManageAccess: boolean;
-  organizationId: string | null;
   onSettingsOpenChange: (open: boolean) => void;
 }): ReactElement {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const typedAgentId = toAgentId(agent.id);
+  const typedAppId = toAppId(agent.appId);
   const [showImportPackage, setShowImportPackage] = useState(false);
   const exportPackageMutation = useMutation({
-    mutationFn: exportAgentPackage,
-    onSuccess: async (_data, agentId) => {
-      await queryClient.invalidateQueries({ queryKey: agentKeys.manifest(agentId) });
+    mutationFn: async () => exportAgentPackage(typedAppId, typedAgentId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.manifest(agent.appId, agent.id),
+      });
     },
   });
   const forkMutation = useMutation({
@@ -53,29 +49,21 @@ export function AgentSettingsPackageActions({
       await queryClient.invalidateQueries({ queryKey: agentKeys.lists() });
     },
   });
-  const updatePackageSharingMutation = useMutation({
-    mutationFn: updateAgentPackageSharing,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: agentKeys.detail(agent.id) });
-      void queryClient.invalidateQueries({ queryKey: agentKeys.lists() });
-    },
-  });
-
-  const isPublished = agent.status === "published";
   const hasEditorPackageAccess = agent.role === "owner" || agent.role === "admin";
-  const canUsePackageActions =
-    hasEditorPackageAccess || (isPublished && agent.packageSharingEnabled);
-  const packageActionError =
-    exportPackageMutation.error ?? forkMutation.error ?? updatePackageSharingMutation.error;
+  const canUsePackageActions = canManageAccess && hasEditorPackageAccess;
+  const packageActionError = exportPackageMutation.error ?? forkMutation.error;
 
   async function handleExportPackage(): Promise<void> {
-    const agentPackage = await exportPackageMutation.mutateAsync(typedAgentId);
+    const agentPackage = await exportPackageMutation.mutateAsync();
     const { url } = createFileDownload(agentPackage.fileId);
     globalThis.location.assign(url);
   }
 
   async function handleForkAgent(): Promise<void> {
-    const result = await forkMutation.mutateAsync({ agentId: typedAgentId });
+    const result = await forkMutation.mutateAsync({
+      agentId: typedAgentId,
+      appId: typedAppId,
+    });
     onSettingsOpenChange(false);
     void navigate(`${currentAgentBasePath()}/${result.agent.id}`);
   }
@@ -99,6 +87,7 @@ export function AgentSettingsPackageActions({
         </Button>
         <Button
           className="gap-1.5 rounded-lg text-[12px]"
+          disabled={!canManageAccess}
           onClick={() => {
             setShowImportPackage(true);
           }}
@@ -122,37 +111,11 @@ export function AgentSettingsPackageActions({
       {packageActionError !== null ? (
         <div className="text-destructive text-xs">{packageErrorMessage(packageActionError)}</div>
       ) : null}
-      {canManageAccess ? (
-        <label
-          className="border-border-subtle bg-card flex items-center justify-between gap-4 rounded-lg border px-3 py-2.5"
-          htmlFor={`agent-package-sharing-${agent.id}`}
-        >
-          <div>
-            <div className="text-foreground text-sm font-medium">
-              Allow users to fork and export
-            </div>
-            <div className="text-muted-foreground mt-0.5 text-xs">
-              Published Agent users can fork and download a portable .agent file.
-            </div>
-          </div>
-          <Switch
-            checked={agent.packageSharingEnabled}
-            disabled={updatePackageSharingMutation.isPending}
-            id={`agent-package-sharing-${agent.id}`}
-            onCheckedChange={(checked) =>
-              void updatePackageSharingMutation.mutateAsync({
-                agentId: typedAgentId,
-                packageSharingEnabled: checked,
-              })
-            }
-          />
-        </label>
-      ) : null}
       <ImportAgentPackageDialog
         onImportedAgentOpen={handleImportedAgentOpen}
         onOpenChange={setShowImportPackage}
         open={showImportPackage}
-        organizationId={organizationId}
+        appId={agent.appId}
       />
     </>
   );

@@ -61,7 +61,7 @@ export interface RuntimeDriverRunTransition {
   status: "cancelled" | "completed" | "failed" | "running";
 }
 
-export interface ProjectRuntimeDriverEventsResult {
+export interface AppRuntimeDriverEventsResult {
   link: RuntimeSessionLink;
   liveStateChanged: boolean;
   nextLiveState: SessionLiveState | null;

@@ -7,7 +7,7 @@ import {
   createProcessDraftFromRuntimeEvent,
   createRuntimeEvent,
   parseRuntimeEventEnvelope,
-  projectRuntimeEventToAgUiSessionEvents,
+  appRuntimeEventToAgUiSessionEvents,
   toRuntimeEventInput,
 } from "@mosoo/runtime-events";
 import type { RuntimeEventBuildContext } from "@mosoo/runtime-events";
@@ -73,9 +73,9 @@ describe("runtime event AG-UI adapter", () => {
     expect(event.runId).toBe(PLATFORM_ID_FIXTURES.sessionRun);
   });
 
-  test("projects runtime run events through session run updates", () => {
+  test("apps runtime run events through session run updates", () => {
     const started = first(
-      projectRuntimeEventToAgUiSessionEvents(
+      appRuntimeEventToAgUiSessionEvents(
         createRuntimeEvent({
           id: createPlatformId(),
           kind: "run.started",
@@ -91,7 +91,7 @@ describe("runtime event AG-UI adapter", () => {
     );
     const failedAt = "2026-05-26T00:00:02.000Z";
     const failed = first(
-      projectRuntimeEventToAgUiSessionEvents(
+      appRuntimeEventToAgUiSessionEvents(
         createRuntimeEvent({
           id: createPlatformId(),
           kind: "run.failed",
@@ -141,10 +141,10 @@ describe("runtime event AG-UI adapter", () => {
     });
   });
 
-  test("projects nested run lifecycle payloads with envelope-owned identity", () => {
+  test("apps nested run lifecycle payloads with envelope-owned identity", () => {
     const completedAt = "2026-05-26T00:00:03.000Z";
     const completed = first(
-      projectRuntimeEventToAgUiSessionEvents(
+      appRuntimeEventToAgUiSessionEvents(
         createRuntimeEvent({
           id: createPlatformId(),
           kind: "run.completed",
@@ -197,7 +197,7 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    expect(() => projectRuntimeEventToAgUiSessionEvents(failed)).toThrow();
+    expect(() => appRuntimeEventToAgUiSessionEvents(failed)).toThrow();
     expect(() => createProcessDraftFromRuntimeEvent(failed)).toThrow();
   });
 
@@ -402,7 +402,7 @@ describe("runtime event AG-UI adapter", () => {
       traceId: "envelope-trace",
     });
 
-    const deliveryEvents = projectRuntimeEventToAgUiSessionEvents(event);
+    const deliveryEvents = appRuntimeEventToAgUiSessionEvents(event);
 
     expect(deliveryEvents[0]).toMatchObject({
       value: {
@@ -443,7 +443,7 @@ describe("runtime event AG-UI adapter", () => {
       },
     });
 
-    const deliveryEvent = first(projectRuntimeEventToAgUiSessionEvents(event));
+    const deliveryEvent = first(appRuntimeEventToAgUiSessionEvents(event));
 
     if (deliveryEvent.type !== EventType.CUSTOM) {
       throw new Error("Expected a custom delivery event.");
@@ -462,7 +462,7 @@ describe("runtime event AG-UI adapter", () => {
     });
   });
 
-  test("projects permission resolution through the same session permission event", () => {
+  test("apps permission resolution through the same session permission event", () => {
     const event = createRuntimeEvent({
       id: createPlatformId(),
       kind: "permission.resolved",
@@ -474,7 +474,7 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    const [deliveryEvent] = projectRuntimeEventToAgUiSessionEvents(event);
+    const [deliveryEvent] = appRuntimeEventToAgUiSessionEvents(event);
 
     expect(deliveryEvent).toMatchObject({
       name: MOSOO_CUSTOM_EVENT.sessionPermissionsUpdated.name,
@@ -496,10 +496,10 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    expect(() => projectRuntimeEventToAgUiSessionEvents(event)).toThrow();
+    expect(() => appRuntimeEventToAgUiSessionEvents(event)).toThrow();
   });
 
-  test("does not project owner diagnostics into participant delivery by default", () => {
+  test("does not app owner diagnostics into participant delivery by default", () => {
     const defaultDiagnostic = createRuntimeEvent({
       id: createPlatformId(),
       kind: "diagnostic.reported",
@@ -522,11 +522,11 @@ describe("runtime event AG-UI adapter", () => {
       visibility: "owner_debug",
     });
 
-    expect(projectRuntimeEventToAgUiSessionEvents(defaultDiagnostic)).toEqual([]);
-    expect(projectRuntimeEventToAgUiSessionEvents(ownerDebugDiagnostic)).toEqual([]);
+    expect(appRuntimeEventToAgUiSessionEvents(defaultDiagnostic)).toEqual([]);
+    expect(appRuntimeEventToAgUiSessionEvents(ownerDebugDiagnostic)).toEqual([]);
   });
 
-  test("does not project system internal events into participant run success", () => {
+  test("does not app system internal events into participant run success", () => {
     const event = createRuntimeEvent({
       id: createPlatformId(),
       kind: "driver.heartbeat",
@@ -546,10 +546,10 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([]);
+    expect(appRuntimeEventToAgUiSessionEvents(event)).toEqual([]);
   });
 
-  test("projects diagnostics only when the event explicitly opts into participant delivery", () => {
+  test("apps diagnostics only when the event explicitly opts into participant delivery", () => {
     const event = createRuntimeEvent({
       id: createPlatformId(),
       kind: "diagnostic.reported",
@@ -562,10 +562,10 @@ describe("runtime event AG-UI adapter", () => {
       visibility: "participant",
     });
 
-    expect(projectRuntimeEventToAgUiSessionEvents(event)).toHaveLength(1);
+    expect(appRuntimeEventToAgUiSessionEvents(event)).toHaveLength(1);
   });
 
-  test("projects runtime timing payloads without losing detailed timing fields", () => {
+  test("apps runtime timing payloads without losing detailed timing fields", () => {
     const event = createRuntimeEvent({
       id: createPlatformId(),
       kind: "runtime.timing.recorded",
@@ -590,7 +590,7 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    const deliveryEvents = projectRuntimeEventToAgUiSessionEvents(event);
+    const deliveryEvents = appRuntimeEventToAgUiSessionEvents(event);
     const [timelineEvent, timingEvent] = deliveryEvents;
 
     expect(timelineEvent).toMatchObject({
@@ -633,7 +633,7 @@ describe("runtime event AG-UI adapter", () => {
       sessionId: PLATFORM_ID_FIXTURES.session,
     });
 
-    expect(() => projectRuntimeEventToAgUiSessionEvents(event)).toThrow();
+    expect(() => appRuntimeEventToAgUiSessionEvents(event)).toThrow();
   });
 
   test("creates process drafts directly from canonical runtime timing payloads", () => {

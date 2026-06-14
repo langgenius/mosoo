@@ -13,7 +13,7 @@ import {
   createPublicHttpTestBindings,
   createRecordedQueueMessage,
   nowMsForTest,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
 describe("API command queue", () => {
   test("dedupes producer-side and sends only the command id", async () => {

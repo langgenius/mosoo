@@ -23,6 +23,7 @@ export interface UseAgentSessionPanelModelInput {
   configurationChangedAt: string | null;
   configurationRevisionKey: string | null;
   organizationId: string | null;
+  appId: string | null;
   readiness: AgentReadiness | null;
   requireFreshConfiguration: boolean;
   sessionType: SessionType;

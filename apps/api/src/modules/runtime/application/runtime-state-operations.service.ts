@@ -5,7 +5,7 @@ import type {
 } from "@mosoo/contracts/agent";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { ensureAgentRuntimeOperationAccess } from "../../agents/application/agent-access.service";
+import { ensureAppAgentOwner } from "../../agents/application/agent-access.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { getRuntimeKindPolicy } from "../domain/runtime-kind-policy";
 import { createSandboxExecutionPlaneAdapter } from "../infrastructure/execution-plane/sandbox-execution-plane-adapter";
@@ -34,12 +34,10 @@ async function executeRuntimeStateOperation(context: {
   viewer: AuthenticatedViewer;
 }): Promise<RuntimeStateOperationResult> {
   const { bindings, input, operation, viewer } = context;
-  const { agent } = await ensureAgentRuntimeOperationAccess(
-    bindings.DB,
-    viewer.id,
-    input.agentId,
-    operation,
-  );
+  const { agent } = await ensureAppAgentOwner(bindings.DB, viewer.id, {
+    agentId: input.agentId,
+    appId: input.appId,
+  });
   const targetVersion = await resolveRuntimeOperationTargetVersion(bindings.DB, {
     agent,
     ...(input.targetVersion === undefined ? {} : { targetVersion: input.targetVersion }),

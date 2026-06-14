@@ -3,7 +3,7 @@ import type {
   AgentBuilderReadinessContext,
   AgentBuilderReadinessIssueSummary,
 } from "@mosoo/contracts/agent-builder";
-import type { AccountId, AgentId, OrganizationId } from "@mosoo/id";
+import type { AccountId, AgentId, OrganizationId, AppId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { currentTimestampMs, toIsoString } from "../../../time";
@@ -92,6 +92,7 @@ export async function collectAgentBuilderReadinessContext(
       id: AgentId;
       ownerId: AccountId;
       organizationId: OrganizationId;
+      appId: AppId;
     };
   } & AgentBuilderPlannerDraftInput,
 ): Promise<AgentBuilderReadinessContext> {
@@ -130,6 +131,7 @@ export async function collectAgentBuilderReadinessContext(
     ...(draft.mcpServersRepresented ? { mcpServerIds: draft.mcpServerIds } : {}),
     model,
     organizationId: input.agent.organizationId,
+    appId: input.agent.appId,
     provider,
     runtimeId,
   });

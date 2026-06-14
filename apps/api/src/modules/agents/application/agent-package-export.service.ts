@@ -10,7 +10,7 @@ import {
   createAgentPackageSkillPath,
   serializeAgentManifestToYaml,
 } from "@mosoo/contracts/agent-manifest-serializer";
-import type { AgentId } from "@mosoo/id";
+import type { AgentId, AppId } from "@mosoo/id";
 import { unzipSync } from "fflate";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -18,7 +18,7 @@ import { isTruthy } from "../../../shared/truthiness";
 import { toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { readSkillPackageBytesFromSnapshot } from "../../skills/application/skill-package-snapshot.service";
-import { ensureAgentPackageAccess } from "./agent-access.service";
+import { ensureAppAgentOwner } from "./agent-access.service";
 import { createAgentPackageFile } from "./agent-package-file.service";
 import { buildAgentSpec, toAgentManifest } from "./agent-spec.service";
 import type { AgentSpecSkill } from "./agent-spec.service";
@@ -91,9 +91,12 @@ async function appendSkillPackageAssets(input: {
 export async function exportAgentPackage(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  agentId: AgentId,
+  input: {
+    agentId: AgentId;
+    appId: AppId;
+  },
 ): Promise<AgentPackageExport> {
-  const packageAccess = await ensureAgentPackageAccess(bindings.DB, viewer.id, agentId);
+  const packageAccess = await ensureAppAgentOwner(bindings.DB, viewer.id, input);
   const sourceSpec = await buildAgentSpec(bindings.DB, packageAccess.agent);
   const sourceManifest = toAgentManifest(sourceSpec);
   const manifest = createPortableAgentPackageManifest(sourceManifest);
@@ -126,7 +129,7 @@ export async function exportAgentPackage(
     archiveBytes,
     bindings,
     fileName,
-    organizationId: packageAccess.agent.organizationId,
+    appId: packageAccess.agent.appId,
     viewer,
   });
 

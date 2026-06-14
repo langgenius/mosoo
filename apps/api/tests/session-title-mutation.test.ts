@@ -16,6 +16,8 @@ const VIEWER: AuthenticatedViewer = {
   imageUrl: null,
   name: "Viewer",
 };
+const ORGANIZATION_ID = "01J00000000000000000000006";
+const APP_ID = "01J0000000000000000000000Q";
 const SESSION_ID = "01J0000000000000000000000B";
 const OTHER_SESSION_ID = "01J0000000000000000000000C";
 
@@ -38,6 +40,7 @@ function createSessionTitleMutationDatabase(): SqliteD1Database {
       metadata_json text DEFAULT '{}' NOT NULL,
       model text NOT NULL,
       organization_id text NOT NULL,
+      app_id text NOT NULL,
       provider text NOT NULL,
       renamed integer DEFAULT false NOT NULL,
       runtime_id text NOT NULL,
@@ -47,12 +50,15 @@ function createSessionTitleMutationDatabase(): SqliteD1Database {
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE organization_member (
+    CREATE TABLE app (
+      id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
-      account_id text NOT NULL,
-      role text NOT NULL,
-      disabled_at integer,
-      PRIMARY KEY (organization_id, account_id)
+      owner_account_id text NOT NULL,
+      name text NOT NULL,
+      slug text NOT NULL,
+      default_environment_id text,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL
     );
 
     CREATE TABLE session_run (
@@ -85,6 +91,7 @@ function createSessionTitleMutationDatabase(): SqliteD1Database {
       metadata_json,
       model,
       organization_id,
+      app_id,
       provider,
       runtime_id,
       status,
@@ -101,7 +108,8 @@ function createSessionTitleMutationDatabase(): SqliteD1Database {
       'pet',
       '{}',
       'gpt-5.4',
-      '01J00000000000000000000006',
+      '${ORGANIZATION_ID}',
+      '${APP_ID}',
       'openai',
       'openai-runtime',
       'IDLE',
@@ -110,16 +118,24 @@ function createSessionTitleMutationDatabase(): SqliteD1Database {
       1
     );
 
-    INSERT INTO organization_member (
+    INSERT INTO app (
+      id,
       organization_id,
-      account_id,
-      role,
-      disabled_at
+      owner_account_id,
+      name,
+      slug,
+      default_environment_id,
+      created_at,
+      updated_at
     ) VALUES (
-      '01J00000000000000000000006',
+      '${APP_ID}',
+      '${ORGANIZATION_ID}',
       '${VIEWER.id}',
-      'member',
-      NULL
+      'Default App',
+      'default',
+      NULL,
+      1,
+      1
     );
   `);
 
@@ -142,7 +158,8 @@ function createSummaryRow(input: {
     last_message_at: null,
     last_run_id: input.lastRunId,
     model: "gpt-5.4",
-    organization_id: "01J00000000000000000000006",
+    organization_id: ORGANIZATION_ID,
+    app_id: APP_ID,
     provider: "openai",
     runtime_id: "openai-runtime",
     status: "IDLE",
@@ -159,6 +176,7 @@ describe("session title mutations", () => {
     const session = await renameSession({
       database,
       input: {
+        appId: APP_ID,
         sessionId: SESSION_ID,
         title: "Renamed session",
       },
@@ -172,6 +190,7 @@ describe("session title mutations", () => {
     const database = createSessionTitleMutationDatabase();
 
     const session = await autoTitleSession(database, VIEWER, {
+      appId: APP_ID,
       sessionId: SESSION_ID,
       title: "Auto title",
     });

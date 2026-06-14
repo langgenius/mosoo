@@ -176,7 +176,7 @@ function readMcpAuthType(value: unknown): AgentManifestMcpServerBinding["authTyp
 }
 
 function readMcpCredentialScope(value: unknown): AgentManifestMcpServerBinding["credentialScope"] {
-  if (value === "organization_shared" || value === "user") {
+  if (value === "app") {
     return value;
   }
 
@@ -184,7 +184,7 @@ function readMcpCredentialScope(value: unknown): AgentManifestMcpServerBinding["
 }
 
 function readMcpSource(value: unknown): AgentManifestMcpServerBinding["source"] {
-  if (value === "organization_shared" || value === "personal") {
+  if (value === "app") {
     return value;
   }
 

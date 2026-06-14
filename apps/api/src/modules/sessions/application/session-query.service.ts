@@ -11,7 +11,3 @@ export {
   listSessions,
   sessionSummaryColumns,
 } from "./session-summary-query.service";
-export {
-  listSessionThreadUiStates,
-  updateSessionThreadUiState,
-} from "./session-thread-ui-state.service";
