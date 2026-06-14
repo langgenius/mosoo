@@ -15,7 +15,7 @@ import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   createTestExecutionContext,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
 function createDriverRouteTestApp(): Hono<ApiGatewayEnvironment> {
   const app = new Hono<ApiGatewayEnvironment>();

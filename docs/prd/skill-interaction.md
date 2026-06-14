@@ -10,14 +10,15 @@ The product described in §1 / §11 / §13 of the full PRD looks like this:
 
 - An account-level **Default Agent** automatically picks Skills on the Work page.
 - Each user controls "does my Default Agent automatically invoke a given Skill" through a **per-user toggle**.
+- Skill sharing is a visible collaboration model with separate user-owned and received groups.
 
-After the pivot, both of these have been retired: the Work page and the Default Agent concept have been removed, and the per-user toggle has neither UI nor persistence in the mainline code. The "toggle / automatic invocation / uninstall (Owner = delete)" behaviors that appear in this document are v1 thinking — treat them as historical for now. The **only** Skill consumption path that is actually in effect today is:
+After the App pivot, all of these are retired for V1: the Work page and Default Agent concept have been removed, the per-user toggle has neither UI nor persistence in the mainline code, and user-visible Skill sharing is future governance. The **only** Skill consumption path in the current product is:
 
-> **Explicitly mount a Skill in a Published Agent's configuration.**
+> **Explicitly bind an App-owned Skill to an Agent inside the same App.**
 
-Who mounts which Skills is decided by the Agent owner. This has nothing to do with "which Skill I, as a user, switch on or off." For current Project/App work, Skills should become App-local resources before they become Organization-wide shared capabilities. Coworker sharing, team-wide distribution, and org-wide libraries are future governance. Whether to bring the per-user toggle back will be decided if and when the Default Agent concept returns. See [Project / App Boundary](./project-app-boundary.md).
+The App owner controls Agent bindings. End-user Skill toggles, cross-account sharing, shared catalogs, and cascade-fork collaboration are not V1 behavior. Whether to bring any of them back will be decided in a future governance phase. See [App Boundary](./app-boundary.md).
 
-Where the word root "Workspace" lingers in this document, it means Organization (the pivot removed the Workspace entity). The term still follows external naming only when referring to a workspace on an external platform (Slack / Lark / Linear, etc.).
+Where legacy words such as Workspace, Organization, team, or sharing appear in older source material, treat them as historical or future-governance context unless the section explicitly says App-owned V1. The term still follows external naming only when referring to a workspace on an external platform (Slack / Lark / Linear, etc.).
 
 ---
 
@@ -25,11 +26,11 @@ Where the word root "Workspace" lingers in this document, it means Organization 
 
 A Skill is a **stateless capability unit** (a prompt plus optional scripts / reference material) that an Agent invokes on demand.
 
-The registry entrypoint lives at `/integrations → Skills`, split into two groups: **Personal** and **Share with me**. It sits alongside Agent / Space / MCP / Environment as a first-class, Organization-level asset.
+The registry entrypoint is the active App's Skills surface. Skills are App-owned resources alongside Agents, Spaces, MCP servers, Environments, Providers, and Channels.
 
 By analogy:
 
-> Like a skill file in Claude Code, but living inside a team where it can be shared and forked. Its relationship to an Agent is similar to an Agent referencing a "capability pack" — each execution pulls the latest version from the current Owner.
+> Like a capability package stored in an App and explicitly bound by one or more Agents in that App. A Session resolves the Agent's configured Skill references through the same App boundary at execution time.
 
 ---
 
@@ -38,11 +39,10 @@ By analogy:
 Sentences Agent owners / configurators often say:
 
 - "I have a few prompts I've tuned. I want to bundle them into a reusable 'skill' so I can just attach it the next time I configure a new Agent."
-- "A coworker wrote a really good translation skill — can I just use it directly?"
-- "He updated the skill; do I need to copy it again?" — No. What you reference is always the owner's latest version.
-- "I want to change a couple of lines on top of his skill without affecting his own version." — Fork it.
-- "If he deletes that skill, will my Agent suddenly break?" — No. A Fork copy is automatically kept for you.
-- "Our team wants to share this skill across the entire organization without adding people one by one."
+- "I imported an Agent package. Which Skills are now App-local and safe to mount?"
+- "I want to change a couple of lines without affecting the original package." — Copy it into a separate App-local Skill.
+- "If I delete that Skill, I need every affected Agent reference to become visible instead of silently falling back."
+- "A packaged Skill id from another App should not prove access here." — Reject it.
 - "Why is there no icon / avatar on the skill card?" — Intentional. A Skill is a tool, not a person.
 
 ---
@@ -51,95 +51,81 @@ Sentences Agent owners / configurators often say:
 
 When this is done, an Agent owner should be able to:
 
-- Upload a `.md` / `.zip` / `.skill` file at `/integrations → Skills` and have it appear immediately in the **Personal** group
-- Share it with individual coworkers by email, or share it with the whole Organization in one click via "Add everyone in organization"
-- Mount accessible Skills in a Published Agent's configuration
-- Fork a copy when they want to experiment on someone else's skill, breaking the link to evolve it independently
-- Delete one of their own team skills, and — **after confirmation** — have the system automatically generate a Fork copy for every coworker who is using it, so no one experiences a "feature mysteriously disappeared" moment
-
-A coworker the skill has been shared with should be able to:
-
-- See the skill in the **Share with me** group
-- Open its detail view to read the full `SKILL.md`, or download the `.skill` archive to modify it themselves
-- Not be able to edit, delete, or "actively leave the collaboration" — they can only Fork an independent copy, or wait for the Owner to delete it
+- Upload a `.md` / `.zip` / `.skill` file into the active App's Skill registry
+- Open an App-local Skill detail view to read `SKILL.md` or download the `.skill` archive
+- Mount App-local Skills in an Agent configuration
+- Copy or fork an App-local Skill when they want an independent package to edit
+- Delete an App-local Skill after confirmation, with no cross-user cascade; affected Agent references must show an explicit tombstone or fail closed at runtime
+- Import package Skills only after reconnecting them to the active App; legacy runtime ids from another ownership boundary are not enough
 
 ---
 
-## 3. Roles: deliberately only two tiers
+## 3. V1 access model: owner-only App resources
 
-| Role      | What I can do                                                                                      |
-| --------- | -------------------------------------------------------------------------------------------------- |
-| **Owner** | Create, edit (re-upload), delete, share / unshare, Fork their own                                  |
-| **User**  | View / preview / download / Fork; **cannot edit, cannot delete, cannot "leave the collaboration"** |
+| Actor             | What I can do                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **App owner**     | Create, read, download, re-upload, copy/fork, delete, and mount Skills on Agents inside the same App               |
+| **Everyone else** | Not a V1 access class for Skills; there is no received-Skill registry and no cross-account Skill permission matrix |
 
-> Why can't a User "leave the collaboration"?
-> — Keep the mental model simple. A User doesn't worry about the collaboration relationship; they just consume. The Owner is the sole controller of the collaboration relationship. If you don't want to receive the owner's updates, Fork an independent copy and you'll have no further relationship with the source skill.
-
-We deliberately do **not** reuse Space's three-tier admin / edit / read model; three permission levels would be over-engineering for a fine-grained capability unit like a Skill.
+We deliberately do **not** reuse Space's old three-tier admin / edit / read model. V1 Skill access is App-owner access only. Additional human roles belong to future governance.
 
 ---
 
-## 4. Two groups: Personal vs Share with me
+## 4. Registry: App-owned Skills
 
-The registry has only two groups:
+The current registry has one product group:
 
-| Group             | Who's in it                                                                                                                   |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| **Personal**      | Skills where the current user is the Owner (self-created + self-forked + skills cascade-downgraded into a Fork by the system) |
-| **Share with me** | Skills where the current user is a User (invited by a coworker / shared with the whole Organization)                          |
+| Group          | Who's in it                                                                                                       |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **App Skills** | Skills whose `app_id` is the active App, including uploaded, generated, imported, and copied packages |
 
-A "team skill," in product semantics, simply means the contents of the **Share with me** group; there is no longer a separate "personal / team" tag.
+Future multi-user governance may add additional views, but V1 should not expose them or keep dormant route/API entrypoints for them.
 
 ---
 
-## 5. Collaboration model (core semantics)
+## 5. Ownership model (core semantics)
 
-### 5.1 Invitation: visible immediately
+### 5.1 Upload/import: visible inside the active App
 
-- On the detail page, an Owner clicks "Share," searches for users by email to add them, or clicks "Add everyone in organization" (which writes an organization-wide wildcard)
-- Once added, the skill **appears immediately in the invitee's Share with me group**
+- The App owner uploads a `.md`, `.zip`, or `.skill` package, or imports one from an Agent package
+- The Skill row belongs to the active App
+- The Skill appears in the active App's Skill registry and nowhere else
 
-### 5.2 Reference by default, no upstream contribution
+### 5.2 Agent binding: reference by id, resolved by App boundary
 
-- What a User sees is a **reference to the Owner's skill**, not a copy
-- Each time the Owner saves an update, **every User automatically gets the latest version on their next use** — zero action required
-- What's mounted in an Agent's configuration is also a reference → it syncs automatically too
-- **No upstream contribution**: a User **cannot** submit a PR / suggestion back to the Owner; to make changes, Fork
+- What an Agent stores is an explicit Skill id reference
+- At Session start, runtime resolves that reference through the Agent's App
+- Cross-App, legacy package, or missing ownership proof fails closed instead of deriving access from Organization state or package metadata
+- There is no upstream contribution workflow in V1; to edit, create an independent App-local copy
 
-### 5.3 Fork: deliberately breaking the link
+### 5.3 Copy/fork: deliberately independent
 
-Any User can click "Fork" on the detail page:
+The App owner can copy or fork a Skill:
 
-- Copies the current version into their own "Personal" group
-- The current user becomes the new Owner and can Fork again or share again
-- **Completely independent** from the source skill: source updates no longer sync to the copy, and changes to the copy don't affect the source
-- The UI may show "Forked from X @ {time}" as a provenance hint, but this is **not** a sync indicator
+- Copies the current package into a new App-local Skill row
+- The copy is independent from the source
+- The UI may show "Forked from X @ {time}" as a provenance hint, but this is not a sync indicator
 
-### 5.4 Delete + cascade-downgrade Fork (the essence of the design)
+### 5.4 Delete: explicit fallout, no cascade
 
-When an Owner deletes a **team skill** (one that Users are using):
+When the App owner deletes a Skill:
 
-1. A confirmation dialog shows "N users are using this Skill"
-2. The Owner confirms → the skill disappears from the Owner's registry
-3. **Automatic cascade**: each User no longer sees it under Share with me either, **but** each of them automatically gets a Fork copy added to their own "Personal" group, labeled "Forked from {original Owner}'s deleted Skill"
-4. Each User becomes the new Owner and can evolve / delete it independently
+1. A confirmation dialog shows the impacted Agent bindings when they are known
+2. The owner confirms and the Skill disappears from the active App registry
+3. Any mounted Agent reference becomes an explicit deleted/missing reference or fails closed at runtime
 
-The effect: **no one loses a feature just because the Owner silently deleted the skill; but anyone who still wants to use it takes ownership themselves.**
+The effect: nothing invents ownership for another user or App, and no compatibility layer silently recreates the deleted package.
 
-When an Owner deletes a **personal skill** (no one is using it): it's deleted directly, with no cascade.
+### 5.5 Who can do what
 
-A User cannot delete any skill.
-
-### 5.5 Who can do what (one table)
-
-| Action                                   | Personal (I'm the Owner)                   | Share with me (I'm a User)                                         |
-| ---------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------ |
-| View / preview / download `.skill`       | ✅                                         | ✅                                                                 |
-| Edit (re-upload)                         | ✅                                         | ❌                                                                 |
-| Manage collaborators / change visibility | ✅                                         | ❌                                                                 |
-| Fork                                     | ✅                                         | ✅                                                                 |
-| Delete                                   | ✅ (team skill triggers cascade-downgrade) | ❌ (when the Owner deletes, a Fork copy is auto-generated for me)  |
-| Actively leave the collaboration         | —                                          | ❌ (not supported by design; Fork or wait for the Owner to delete) |
+| Action                             | App owner  | Other user |
+| ---------------------------------- | ---------- | ---------- |
+| View / preview / download `.skill` | Yes        | No V1 path |
+| Edit by re-uploading               | Yes        | No V1 path |
+| Copy/fork                          | Yes        | No V1 path |
+| Mount on an Agent                  | Yes        | No V1 path |
+| Delete                             | Yes        | No V1 path |
+| Manage collaborators               | No V1 path | No V1 path |
 
 ---
 
@@ -147,7 +133,7 @@ A User cannot delete any skill.
 
 ### 6.1 No in-app editor
 
-**Users edit locally and re-upload.** This path is simple enough and avoids the awkwardness of "the product has an editor, but a weak one."
+**App owners edit locally and re-upload.** This path is simple enough and avoids the awkwardness of "the product has an editor, but a weak one."
 
 A Skill's contents include at least one `SKILL.md` (with frontmatter). It can be packaged as a `.zip` / `.skill` (synonyms) together with scripts, reference material, and assets. The detail dialog only renders `SKILL.md`; the other assets come bundled with the download.
 
@@ -165,24 +151,26 @@ Whether to reconnect "in-conversation editing" will be decided if and when the D
 
 ## 8. The relationship between Skill and Agent
 
-What's mounted in an Agent's configuration is a **Skill id reference**, not a copy of the content:
+What's mounted in an Agent's configuration is an **App-owned Skill id reference**, not a copy of the content:
 
-- At execution time, the Agent pulls the Owner's latest version live from the reference
-- If the Skill is deleted → the Agent's reference downgrades to a "(deleted)" tombstone, and the Agent doesn't break
+- The Agent config stores explicit references to Skills in the same App
+- At Session start, runtime resolves and freezes the configured Skill bindings through the Agent's App
+- Legacy package runtime ids or cross-App references fail closed instead of deriving ownership from snapshots or Organization membership
+- If a Skill is deleted or unavailable, the UI/runtime must surface a tombstone or explicit failure; no shared-owner fallback is allowed
 
-### 8.1 User-level "toggle" vs Published Agent mounting (drift)
+### 8.1 User-level "toggle" vs Agent mounting (drift)
 
-What §11.1 of the full PRD intended to express: when a user toggles a skill OFF in the Skills list, it **only affects whether that user's Default Agent automatically invokes it**; it does not affect a Published Agent's `skills[]` ("the creator says this skill is required for it to work").
+What §11.1 of the full PRD intended to express: when a user toggles a skill OFF in the Skills list, it **only affects whether that user's Default Agent automatically invokes it**; it does not affect an Agent's `skills[]` ("the creator says this skill is required for it to work").
 
-| Invocation method                                        | Does the per-user toggle take effect?         |
-| -------------------------------------------------------- | --------------------------------------------- |
-| Auto-selected within the Default Agent                   | ✅ In effect (OFF means it won't be selected) |
-| `@mention`-ed within the Default Agent                   | ⚠️ "Explicit wins" — if you @ it, it's used   |
-| **Explicitly mounted in a Published Agent's `skills[]`** | ❌ **Not in effect; the Owner's intent wins** |
+| Invocation method                               | Does the per-user toggle take effect?    |
+| ----------------------------------------------- | ---------------------------------------- |
+| Auto-selected within the Default Agent          | Yes in the old model                     |
+| `@mention`-ed within the Default Agent          | Explicit use won in the old model        |
+| **Explicitly mounted in an Agent's `skills[]`** | No; the Agent owner's configuration wins |
 
-But the Default Agent has been retired, so neither of the first two rows currently exists; today, **explicit mounting in a Published Agent** is the only real path. This actually makes it simpler to reason about:
+But the Default Agent has been retired, so neither of the first two rows currently exists; today, **explicit mounting in an Agent** is the only real path. This actually makes it simpler to reason about:
 
-> Whether you can reach a given Skill on a given Published Agent **depends entirely on whether the Agent owner has mounted it in the configuration, and whether the Skill has been shared with the owner**. It has nothing to do with you as an end user.
+> Whether a Skill can be reached through Web Threads, an Agent API Endpoint, or a Channel delivery path depends on whether the Agent has mounted an App-local Skill and whether runtime can resolve that Skill through the Agent's App. It has nothing to do with end-user toggles.
 
 ---
 
@@ -190,31 +178,25 @@ But the Default Agent has been retired, so neither of the first two rows current
 
 ```mermaid
 flowchart TD
-    U(("User creates Skill")) --> CREATE["Upload .md / .zip / .skill"]
-    CREATE --> OWNED["Personal group<br/>Owner = me"]
+    OWNER(("App owner")) --> CREATE["Upload / generate / import Skill package"]
+    CREATE --> REGISTRY["App Skill registry<br/>app_id = active App"]
 
-    OWNED --> Q1{"Share it?"}
-    Q1 -->|"Not yet"| USE1["Use it myself / mount on my own Agent"]
-    Q1 -->|"Invite specific people"| SHARE_P["Share → add emails<br/>appears in their Share with me immediately"]
-    Q1 -->|"Whole Organization"| SHARE_WS["Add everyone<br/>(organization-wide)"]
+    REGISTRY --> BIND["Agent config binds Skill id<br/>same App"]
+    BIND --> RUN["Session start<br/>resolve and freeze binding"]
+    RUN --> EXECUTE["Execution uses resolved Skill snapshot/reference"]
 
-    SHARE_P --> SHARED["Shared state<br/>Owner can edit, User only consumes"]
-    SHARE_WS --> SHARED
+    REGISTRY --> COPY["Copy or fork<br/>new independent App-local Skill"]
+    COPY --> REGISTRY
 
-    SHARED --> Q2{"Who's acting?"}
-    Q2 -->|"Owner updates"| UPDATE["Re-upload<br/>every User automatically gets<br/>the new version on next use"]
-    Q2 -->|"User wants to change independently"| FORK["Fork<br/>→ my Personal<br/>link to source broken"]
-    Q2 -->|"User wants to leave"| NA["Not supported<br/>(can only Fork or wait for Owner to delete)"]
-    Q2 -->|"Owner deletes"| DELETE["Skill disappears<br/>a Fork copy is auto-generated for each User<br/>landing in each one's Personal group"]
+    REGISTRY --> DELETE_Q{"Delete Skill?"}
+    DELETE_Q --> CONFIRM["Confirm impacted Agent bindings"]
+    CONFIRM --> DELETE["Remove Skill from App registry"]
+    DELETE --> TOMBSTONE["Mounted references show tombstone<br/>or fail closed at runtime"]
 
-    UPDATE --> SHARED
-    FORK --> OWNED
-    DELETE --> FORKED_USERS["each User's own Personal<br/>they become the new Owner"]
-
-    style SHARED fill:#e3f2fd,stroke:#1976d2
-    style FORK fill:#fff3e0,stroke:#ff9800
+    style REGISTRY fill:#e3f2fd,stroke:#1976d2
+    style BIND fill:#fff3e0,stroke:#ff9800
     style DELETE fill:#fce4ec,stroke:#e91e63
-    style FORKED_USERS fill:#e8f5e9,stroke:#4caf50
+    style TOMBSTONE fill:#fce4ec,stroke:#e91e63
 ```
 
 ---

@@ -3,17 +3,17 @@
 Status: active product and engineering spec for the current MVP.
 
 This document defines the nouns, relationships, boundaries, and required behavior for the
-current Mosoo Project/App pivot. It is not a vision, pitch, or strategy document. It should
+current Mosoo App pivot. It is not a vision, pitch, or strategy document. It should
 let a new engineer understand what to build without inferring product meaning from older
 Agent-first, Web-app-first, or Organization-governance language.
 
 If this document conflicts with older PRDs, follow this document first, then
-`docs/prd/project-app-boundary.md`, then `docs/architecture.md`.
+`docs/prd/app-boundary.md`, then `docs/architecture.md`.
 
 ## Design Principles
 
 1. App is the user-facing product boundary.
-2. Project is the engineering name for the same boundary.
+2. App is the engineering name for the same boundary.
 3. App is an Agent and resource package, not a Web deployment unit.
 4. Organization is only the account, billing, tenant, and future-governance shell.
 5. App owns concrete App-local concepts directly; V1 does not introduce a generic
@@ -23,7 +23,7 @@ If this document conflicts with older PRDs, follow this document first, then
 7. Agent is the App-local unit that owns Agent runtime and delivery.
 8. Thread is the product name for an Agent Session in V1.
 9. App resources are shared at App scope; Agents bind the resources they need.
-10. Common one-Agent, one-Channel shapes should come from Project Templates, not from a
+10. Common one-Agent, one-Channel shapes should come from App Templates, not from a
     required App or Agent type decision.
 11. V1 optimizes for delivery and reuse, not administration.
 12. Owner-only access is the default for V1.
@@ -39,7 +39,7 @@ An Account:
 
 - Authenticates with supported login methods.
 - Owns exactly one Organization during the V1 single-owner phase.
-- Is the execution owner for Project/App resources created in that Organization.
+- Is the execution owner for App resources created in that Organization.
 
 ### Organization
 
@@ -47,7 +47,7 @@ An Organization is the tenant shell.
 
 An Organization:
 
-- Contains Projects.
+- Contains Apps.
 - Has one human owner in V1.
 - Owns billing rollups and future governance settings.
 - Must not be used as the default bucket for business resources.
@@ -55,37 +55,26 @@ An Organization:
 An Organization does not have V1 members, roles, invitations, access requests, ownership
 transfer, SAML, SCIM, domain discovery, or Organization-owned runtime resource pools.
 
-### Project
-
-A Project is the canonical engineering entity for an App.
-
-A Project:
-
-- Belongs to one Organization.
-- Has one owner Account in V1.
-- Owns App-local resources.
-- Is the primary database, API, and test boundary.
-
-Project and App are the same entity. Do not introduce a separate App table or a
-Project-contains-App relationship in V1.
-
 ### App
 
-An App is the user-facing name for a Project.
+An App is the canonical product and engineering boundary.
 
 An App:
 
+- Belongs to one Organization.
+- Has one owner Account in V1.
 - Is what the user creates, opens, configures, monitors, and exports.
 - Is a boundary for a real-world Agent application.
 - Organizes one or more App-local Agents.
 - Owns shared resources used by those Agents.
+- Is the primary database, API, and test boundary.
 - Aggregates Threads, usage, health, logs, and expose state through its Agents and
   resources.
-- Can be created blank or from a Project Template that provisions a concrete resource set.
+- Can be created blank or from an App Template that provisions a concrete resource set.
 - Can be packaged into one `Skill.md` for coding-agent reuse.
 - Is the default console entry after onboarding when the Organization has one App.
 
-An App is not a Supabase-style database project, a Vercel-style frontend deployment, a
+An App is not a Supabase-style database app, a Vercel-style frontend deployment, a
 GitHub repository, a Web shell, or a runtime process.
 
 ### Agent
@@ -126,17 +115,17 @@ Rules:
 - API-layer names such as File Service or Environment Service are implementation modules
   and do not imply a generic App Service entity.
 
-### Project Template
+### App Template
 
-A Project Template is a reusable App blueprint.
+An App Template is a reusable App blueprint.
 
-A Project Template:
+An App Template:
 
-- Creates a Project/App plus one or more preconfigured concrete resources.
+- Creates an App plus one or more preconfigured concrete resources.
 - Can represent common shapes such as one Pet Agent bound to one Channel.
 - Can represent larger shapes such as multiple Agents plus Storage, MCP, Provider, and
   Channel resources.
-- Selects defaults and wiring, but does not create `app.type` or `project.type` as runtime
+- Selects defaults and wiring, but does not create `app.type` as a runtime
   drivers.
 - Is the preferred path for simple chatbot-style Apps and other repeatable resource graphs.
 
@@ -161,7 +150,7 @@ A Session is the implementation and runtime boundary behind a Thread.
 A Session:
 
 - Belongs to one Agent in V1.
-- Inherits App/Project through that Agent.
+- Inherits App through that Agent.
 - Stores conversation history, runtime events, files attached to the Session, and run
   state.
 - Freezes the Agent execution snapshot when it is created.
@@ -305,7 +294,7 @@ V1 exports the whole App, not one `Skill.md` per Agent.
 ```text
 Account
 +-- Organization
-    +-- Project / App
+    +-- App
         +-- Agents
         |   +-- Threads / Sessions
         |   |   +-- Session Runs
@@ -328,13 +317,13 @@ Account
 
 Rules:
 
-- Organization owns Projects, not App resources directly.
-- Project and App are the same boundary with different names for different audiences.
+- Organization owns Apps, not App resources directly.
+- App is the product, database, API, and console boundary.
 - App owns business resources, export, and operations scope.
 - App has no runtime.
 - Agents own Agent runtime, endpoint exposure, channel delivery, and Threads/Sessions in V1.
 - Thread is a product name for Agent Session in V1.
-- Usage has Project/App as the business dimension and Organization as the billing rollup.
+- Usage has App as the business dimension and Organization as the billing rollup.
 - V1 has no unified `services` table or generic Service lifecycle.
 
 ## V1 Goals
@@ -344,7 +333,7 @@ V1 must support:
 - A personal developer signs in.
 - The system creates or selects the developer's Organization shell.
 - The system creates a default App.
-- The user can start from a blank App or a Project Template.
+- The user can start from a blank App or an App Template.
 - The user can create or configure one or more concrete App resources.
 - The user can create or configure one or more Agents when the App needs runtime.
 - The Agent can reference an Environment.
@@ -362,8 +351,8 @@ V1 must support:
 
 V1 must not include:
 
-- Project members.
-- Project roles.
+- App members.
+- App roles.
 - Organization member management.
 - RBAC matrices.
 - Member invitations.
@@ -383,7 +372,7 @@ V1 must not include:
 - Per-member BYOK.
 - Cross-member cost reporting.
 - Audit logs.
-- `app.type` or `project.type` as runtime, access, or ownership drivers.
+- `app.type` as runtime, access, or ownership driver.
 - A required single Agent type picker as the App creation path.
 - Persistence-layer limits driven by App type or Agent type.
 - Generic `services` table, polymorphic `service.kind`, or generic Service CRUD.
@@ -414,13 +403,13 @@ V1 must not include:
 
 ### Create App
 
-1. User chooses New App, or chooses a Project Template.
-2. System creates a Project.
+1. User chooses New App, or chooses an App Template.
+2. System creates an App.
 3. Console displays it as an App.
 4. System creates or assigns default App-local resource sets for Agents, Storage,
    Environments, Skills, MCP servers, Provider credentials, Channels, operations, and
    export.
-5. If a Project Template is selected, system provisions the template's concrete resource
+5. If an App Template is selected, system provisions the template's concrete resource
    graph, such as one Pet Agent bound to one Channel.
 6. System does not create Web shell, GitHub repository, App runtime, App API endpoint, or
    database tables as a consequence of App creation.
@@ -438,7 +427,7 @@ V1 must not include:
 
 1. User starts a Thread for one Agent.
 2. System creates a Session for that Agent.
-3. Session inherits Project/App through the Agent.
+3. Session inherits App through the Agent.
 4. Runtime freezes Environment revision, Provider references, Skill bindings, MCP bindings,
    Storage mounts, and Channel metadata when applicable.
 5. Runtime events stream back to the Thread.
@@ -470,7 +459,7 @@ V1 must not include:
 ### App Operations
 
 1. Runtime emits normalized model usage.
-2. Cost service writes usage events with Project/App as the primary business dimension.
+2. Cost service writes usage events with App as the primary business dimension.
 3. Organization is retained as a billing rollup.
 4. App views show Agent detail, resource lists, Thread history, expose state, spend, request
    count, token/cache usage, model breakdown, recent runs, logs, health, and unpriced usage
@@ -479,9 +468,9 @@ V1 must not include:
 
 ## Access Rules
 
-- The Organization owner can access all Projects in that Organization.
-- The Project owner is the Organization owner in V1.
-- New access checks should be Project owner checks.
+- The Organization owner can access all Apps in that Organization.
+- The App owner is the Organization owner in V1.
+- New access checks should be App owner checks.
 - Existing Organization membership checks are migration compatibility only.
 - New code must not add admin/member branches for V1 behavior.
 
@@ -512,7 +501,7 @@ Rules:
 
 - A one-App Organization routes directly to App Overview.
 - Apps list exists for creating or switching Apps, not as a blocking first screen.
-- Project Templates can create a simple one-Agent, one-Channel App without teaching the user
+- App Templates can create a simple one-Agent, one-Channel App without teaching the user
   the full resource graph first.
 - Members does not appear in V1 navigation.
 - Organization settings stay thin.
@@ -525,7 +514,7 @@ Rules:
 
 ## Migration Rules
 
-- When older docs say Organization-owned resource, read it as Project/App-owned unless it is
+- When older docs say Organization-owned resource, read it as App-owned unless it is
   explicitly about billing or future governance.
 - When older docs say Workspace or Team, do not introduce those nouns.
 - When older docs say Agent Service, read it as the existing Agent identity, not as a second
@@ -536,26 +525,26 @@ Rules:
   old Web-app-first wording unless a later spec reopens the decision.
 - When older docs say App owns delivery surface, read it as App aggregates Agent exposure and
   operations; Agent owns endpoint and channel delivery in V1.
-- When older docs ask users to choose one Agent type as the creation path, prefer a Project
+- When older docs ask users to choose one Agent type as the creation path, prefer an App
   Template or an Agent setting, depending on whether the choice describes an App shape or a
   runtime behavior.
 - When older docs mention member, coworker, shared with me, everyone in organization,
   Owner/Admin/Member, invitation, or access request, treat it as future governance.
-- Do not delete compatibility tables until Project/App ownership and owner access replace
+- Do not delete compatibility tables until App ownership and owner access replace
   their runtime dependencies.
 
 ## Implementation Order
 
-1. Add Project/App ID, contract, database table, GraphQL surface, and default provisioning.
-2. Add Project owner access helpers and keep Organization membership only as a migration bridge.
-3. Move Agent creation, reads, updates, and readiness under Project/App without introducing a
+1. Add App ID, contract, database table, GraphQL surface, and default provisioning.
+2. Add App owner access helpers and fail closed when a resource cannot prove App ownership.
+3. Move Agent creation, reads, updates, and readiness under App without introducing a
    generic Service table.
-4. Keep Thread as Agent Session in V1; add Project/App inheritance through Agent and
+4. Keep Thread as Agent Session in V1; add App inheritance through Agent and
    App-level aggregation.
-5. Move Environment defaults and Provider credentials under Project/App.
-6. Move MCP servers, Skills, Storage/Spaces, and Channels under Project/App resource ownership.
+5. Move Environment defaults and Provider credentials under App.
+6. Move MCP servers, Skills, Storage/Spaces, and Channels under App resource ownership.
 7. Keep Agent API endpoint exposure and Channel delivery on Agent.
-8. Add Project Templates for common simple shapes such as Pet Agent plus Channel.
+8. Add App Templates for common simple shapes such as Pet Agent plus Channel.
 9. Add App usage, health, logs, and Organization billing rollup.
 10. Make App Overview the console root.
 11. Add App export to one `Skill.md`.
@@ -573,18 +562,18 @@ An implementation is aligned with this Spec when:
 - Creating an Agent requires an App context.
 - Creating concrete resources requires an App context.
 - There is no generic `services` table, `service.kind`, or generic Service CRUD.
-- A simple one-Agent, one-Channel App can be created from a Project Template instead of a
+- A simple one-Agent, one-Channel App can be created from an App Template instead of a
   required App or Agent type picker.
 - App creation does not create Web shell, GitHub repository, App runtime, App API endpoint, or
   database tables.
 - Thread creation targets one Agent and creates a Session.
 - App aggregates Threads from its Agents.
 - Session Run is the execution record inside a Session.
-- Provider credentials and default Environment resolve through App/Project.
+- Provider credentials and default Environment resolve through App.
 - Storage, Skills, MCP servers, and Channels are App-owned resources that Agents bind.
 - Agent exposure owns API endpoint and channel delivery.
 - There is no Publish App action in the V1 path.
 - Export creates one `Skill.md` for the whole App.
 - Usage, health, and logs are visible at App scope.
 - Organization remains present only as tenant, billing rollup, and future governance shell.
-- No new V1 code introduces Project members, RBAC, invitations, or access requests.
+- No new V1 code introduces App members, RBAC, invitations, or access requests.

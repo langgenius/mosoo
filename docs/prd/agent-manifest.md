@@ -4,7 +4,7 @@
 >
 > **Contract status (2026-06-12, advanced provider options)**: the Manifest contract adds `runtime.providerOptions: JsonObject` — a free-form JSON escape hatch that is serialized into the exported agent.yaml and into the package `manifest.json`. It is surfaced in the Agent editor's Basics section as a collapsed `Advanced settings (JSON, applied to runtime config) — Validated by the runtime, not by Mosoo` disclosure. Treat the "vendor-private knobs (reasoning_effort / thinking level / …) live only in the Sandbox / Terminal" wording in §4 Principle 2 and the `❌ → Runtime / Advanced` row in §6 as the **default** rule for fields we model in the form — they no longer forbid using `providerOptions` as a pass-through; Mosoo still does not validate the JSON, it just hands it to the runtime.
 >
-> **Current Project/App boundary note**: Agent Manifest is still the App-local Agent runtime/config contract. It should not absorb Project/App metadata, Provider key ownership, deployment health, App Overview state, or app-scoped cost. Project/App owns those boundaries and references Agent Manifests as resources. See [Project / App Boundary](./project-app-boundary.md).
+> **Current App boundary note**: Agent Manifest is still the App-local Agent runtime/config contract. It should not absorb App metadata, Provider key ownership, deployment health, App Overview state, or app-scoped cost. App owns those boundaries and references Agent Manifests as resources. See [App Boundary](./app-boundary.md).
 
 ---
 
@@ -19,7 +19,7 @@ The Agent Manifest is the **declarative product configuration** of a Mosoo Agent
 It is **not** a "super `agent.yaml`" that unifies the vendor configuration files of OpenAI runtime, Claude Agent SDK, OpenCode, Cursor, and so on. Those vendors have their own full-featured configuration formats, and we do not try to swallow them.
 
 > Analogy:
-> The Manifest is to an Agent what `package.json` is to a frontend project — it pins down "which framework this project uses, which packages it depends on, and where the entry point is." But it does **not** write every webpack plugin option for you, and it does **not** manage the internal config of each dependency inside `node_modules`.
+> The Manifest is to an Agent what `package.json` is to a frontend app — it pins down "which framework this app uses, which packages it depends on, and where the entry point is." But it does **not** write every webpack plugin option for you, and it does **not** manage the internal config of each dependency inside `node_modules`.
 
 ---
 

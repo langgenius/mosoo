@@ -9,11 +9,11 @@ Product contracts and the standards used to write them.
 ## Current direction
 
 - [Mosoo Spec](../SPEC.md): canonical V1 nouns, relationships, non-goals, behavior, and implementation order.
-- [Project / App Boundary](./project-app-boundary.md): active construction lock for the current pivot. Read this before implementing data model, IA, Agent ownership, resource ownership, access, or deployment changes.
+- [App Boundary](./app-boundary.md): active construction lock for the current pivot. Read this before implementing data model, IA, Agent ownership, resource ownership, access, or deployment changes.
 
 ## PRDs
 
-Implementation contracts and shipped product behavior. Each PRD is the high-readability product specification for a capability. When older PRDs mention Organization-owned business assets, members, Admin reach-through, Workspace, Agent-first service identity, or a required single Agent type picker, apply the Project/App Boundary drift rules first.
+Implementation contracts and shipped product behavior. Each PRD is the high-readability product specification for a capability. When older PRDs mention Organization-owned business assets, members, Admin reach-through, Workspace, Agent-first service identity, or a required single Agent type picker, apply the App Boundary drift rules first.
 
 ### Agents & packaging
 
@@ -21,7 +21,7 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 - [Agent Manifest](./agent-manifest.md)
 - [Agent Import / Export & Fork](./agent-package-import-export-fork.md)
 - [Agent Versions](./agent-versions.md)
-- [Agent Service Identity & Deployment](./agent-service-identity.md)
+- [Agent Exposure Identity & Deployment Version](./agent-service-identity.md)
 
 ### Runtime & sessions
 
@@ -39,17 +39,19 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 
 - [Default Consumption Surface (Threads)](./default-consumption-surface.md)
 - [Channels](./channels.md)
-- [Published Agent API Surface](./published-agent-api-surface.md)
-- [Public Thread API](./public-task-api.md)
+- [Public Thread API Surface](./public-thread-api-surface.md)
+- [Public Thread API legacy link](./public-task-api.md) — old filename kept readable; use the surface PRD above as the canonical contract.
 - [MCP (Connector)](./mcp-interaction.md)
 - [Skill](./skill-interaction.md)
 - [Space](./space-interaction.md)
 
+Surface boundary: public HTTPS exposure is an Agent API Endpoint inside one App. Thread is the public conversation object, Session is the runtime record, and Thread files are scoped to the admitted Thread/backing Session. Organization remains account and billing context, not a public API authorization boundary.
+
 ### Historical / future access, identity & governance
 
 - [Identity & Access](./identity-access.md) — future multi-member governance language must be read through the current single-owner Organization assumption.
-- [RBAC](./rbac.md) — historical / future governance foundation; not a dependency for the current Project/App cut.
-- [Credentials](./credentials.md) — current Project/App work moves Provider credentials to Project scope first, preserving Organization fallback only as migration context.
+- [RBAC](./rbac.md) — historical / future governance foundation; not a dependency for the current App cut.
+- [Credentials](./credentials.md) — current App work moves Provider credentials to App scope first, preserving Organization fallback only as migration context.
 
 ### Admin & cost
 

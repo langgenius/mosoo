@@ -1,40 +1,40 @@
-# Agent Service Identity & Deployment Version — for humans
+# Agent Exposure Identity & Deployment Version - for humans
 
-> This is the product-story version for non-engineer readers. The companion engineering PRD (state machines, scope matrix, reasoning review) has not yet been written; treat this document as the current source of truth until it lands.
+> This is the product-story version for non-engineer readers. The companion engineering PRD for state machines and detailed scope matrices has not yet been written; treat this document as the current source of truth until it lands.
 >
-> This document covers only two things: **service identity** and **versioning**. How the Apply Changes button works, how the driver restarts, how agent-state resets — all of that lives in [`./runtime-state-operations.md`](./runtime-state-operations.md).
+> This document covers two boundaries: **App-scoped operations identity** and **Agent-owned exposure/versioning**. How Apply Changes works, how the driver restarts, and how agent-state resets live in [`./runtime-state-operations.md`](./runtime-state-operations.md).
 >
-> **Current Project/App boundary note**: Read "Published Agent as stable service identity" as historical Agent-first wording. In the current pivot, the Project/App owns the delivery surface and may contain one or more App-local Agent service/runtime units. Preserve DeploymentVersion, "existing sessions are never interrupted", and "runtime change requires Fork"; move stable public entry points and deployment health toward App-first IA. See [Project / App Boundary](./project-app-boundary.md).
+> **Current App boundary note**: App is the V1 boundary. The App owns product navigation, resources, operations visibility, export scope, and usage/cost rollups. An App-local Agent owns runtime execution, Agent API Endpoint exposure, channel delivery, DeploymentVersions, and Sessions. See [App Boundary](./app-boundary.md) and [`../SPEC.md`](../SPEC.md).
 
 ---
 
 ## One-line positioning
 
-Lock a **Published Agent** into a **stable service identity** — like a Vercel project + domain, not the rollout of a single build. Web / API / Channel / Cost all hang off this bare-name Agent; **every config save = one DeploymentVersion snapshot**; **new sessions use the new version, existing sessions are never interrupted**; **you cannot swap the runtime in place — you must Fork into a new Agent**.
+An owner creates an App, runs an App-local Agent, and can expose that Agent through an Agent-owned endpoint or channel route. The App remains the visible operations and cost boundary; the Agent keeps a stable exposure identity inside that App; every versioned config save creates a DeploymentVersion snapshot for new Sessions; existing Sessions keep the snapshot they started with; runtime or type changes require Fork.
 
-Analogy:
+The product promise is:
 
-> Vercel's `my-app.vercel.app` is always `my-app.vercel.app`; which deployment is running behind it is a separate matter. An Agent works the same way — once published, that Agent is the Agent. Change the prompt today, swap the model tomorrow: the URL doesn't change, the bindings don't change, and the Slack bot doesn't drop offline.
+> The App is where the owner manages resources, health, logs, exports, and spend. An exposed Agent is the callable unit inside that App. Changing prompt/model/tool bindings creates a new runnable snapshot for future Sessions; it does not rewrite running or historical Sessions. Changing runtime identity creates a new Agent.
 
 ---
 
-## 1. User problem
+## 1. User Problem
 
-After an Agent owner publishes an Agent, they run into a handful of questions nobody answers for them:
+After an owner exposes an Agent, they need concrete answers to a few operational questions:
 
-- **"Will changing the prompt interrupt sessions that are currently running?"** — A customer is chatting with the agent right now; if I go change a model option, will their conversation suddenly switch personalities mid-sentence?
-- **"I come back from a meeting and keep chatting — why am I seeing the prompt I edited later?"** — A user keeps asking questions in a thread and the agent suddenly "changes its face," and nobody can explain it.
-- **"Switching the runtime from OpenAI to Claude Agent SDK looks like just editing a field — why does it tell me to Fork?"** — Swapping the runtime actually swaps native state, resume behavior, tool behavior, logs, and cost attribution. That's not editing a field; it's a different agent.
-- **"Which version are Channel / API users bound to?"** — Is the Slack bot connected to this Agent, or to a snapshot of one particular build? If it drifts, do I have to reconnect it?
-- **"Which config did this session actually run last Wednesday?"** — When I see a charge in Cost, I need to be able to trace whether it ran v3 or v5 at the time.
+- **"Will changing the prompt interrupt Sessions that are currently running?"** A customer is chatting with the Agent right now; editing a model option must not silently swap that Session to a different behavior.
+- **"Why did this later Thread use a newer prompt?"** A user starts or continues work after an owner change; the owner needs to explain which DeploymentVersion was selected at Session creation.
+- **"Why does switching from OpenAI Runtime to Claude Agent SDK require Fork?"** Swapping runtime changes native state, resume behavior, tool behavior, logs, and cost attribution. It is not a field edit on the same running subject.
+- **"Which version are endpoint or channel callers using?"** External callers target the Agent exposure identity; each new Session binds the live DeploymentVersion at creation time.
+- **"Which config produced this charge?"** App Usage must roll up cost to the App while preserving Agent, DeploymentVersion, Session, and Run drilldowns.
 
 What the owner actually wants to do:
 
-1. Create an Agent and confirm it runs.
-2. Get a **stable service entry point immediately after publishing** (Web / API / Channel).
-3. When changing config, have **new sessions pick up the new version while existing sessions are not interrupted**.
-4. When they want to swap the runtime, have the system **clearly say "this is a Fork, not an in-place save."**
-5. When reviewing historical sessions / cost, be able to **see which version ran at that time**.
+1. Create an App and confirm an App-local Agent runs.
+2. Expose that Agent through an Agent API Endpoint or channel route without creating another product boundary.
+3. Change prompt/model/tool bindings so new Sessions pick up the new DeploymentVersion while existing Sessions keep their own snapshot.
+4. Try to change runtime/type and get a clear Fork path instead of an in-place save.
+5. Review App Usage and historical Sessions with enough Agent/version/run attribution to explain what happened.
 
 ---
 
@@ -42,95 +42,108 @@ What the owner actually wants to do:
 
 When this is done, the owner should be able to:
 
-- Understand that **Published = the service is reachable**, not the rollout of a single build — there is no Deploying / Failed / health check / rollout copy.
-- Get a **stable service entry point on the very first Publish**: Web UI / API endpoint always-on, with Channel left for the owner to connect later on demand.
-- See the **current live version** and the **list of historical versions** (Versions Sheet) on the Agent page.
-- After changing prompt / model / Skills / MCP / Environment / Space, **understand that "new sessions use the new version, existing sessions each keep their own"** — without worrying about disrupting production traffic.
-- Be **blocked** when switching the runtime, with the UI clearly stating "Runtime change is not allowed in place. We'll clone this Agent to a new identity." Sessions / logs / cost / agent-state stay with the original Agent.
-- Find **version attribution** in Session details / Cost, so they can explain "which Agent + which version this call belongs to."
+- Understand that App is the product and operations boundary, while Agent exposure is the callable delivery promise inside that App.
+- See the current live DeploymentVersion and historical DeploymentVersions from the Agent detail surface, with App Overview aggregating operational status.
+- Save prompt/model/Skill/MCP/Environment/Storage binding changes and understand that future Sessions use the new snapshot while existing Sessions keep the snapshot they started with.
+- Be blocked when changing runtime or Agent type in place, with copy that says Fork creates a new Agent identity and leaves existing Sessions, logs, usage, and agent-state attached to the original Agent.
+- Read App Usage as the primary cost view, then drill into Agent, DeploymentVersion, Session, Run, model, and provider attribution.
 
-What external consumers (API / Channel / Web Threads users) experience:
+What external callers experience:
 
-- **A Published Agent's URL / Channel binding does not drift.** Changing config doesn't change the address; to swap the runtime, the system prompts the owner to Fork rather than quietly migrating consumers over.
-- **Sessions currently running are not silently reconfigured.** After a change, signals the caller can perceive appear — updating / ready / reconnect (the details of this live in the runtime-state-operations PRD, not here).
-
----
-
-## 3. Concept definitions
-
-| Term                     | Plain-language explanation                                                                                                                                                                                                                                                         |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Agent**                | A single Agent entity. While in Draft it's an editable draft; after Publish it also takes on the **service identity**: Web / API / Channel entry points and Cost attribution all hang off it. This id never changes.                                                               |
-| **Service identity**     | "Who that Agent is to the outside world after it's published." It carries the entry points, bindings, permissions, and cost. **It is not the name of a database entity** — it's a product-level stability promise.                                                                 |
-| **Draft Agent**          | An Agent not yet published. It can be Previewed, but API / Channel users can't reach it.                                                                                                                                                                                           |
-| **Published Agent**      | An Agent that has been published and is reachable. **It's purely a "reachability" switch**, not a rollout phase.                                                                                                                                                                   |
-| **DeploymentVersion**    | A **snapshot** of one runnable configuration: prompt + model + Skills + MCP + Environment ref + Space binding. A new session binds to a DeploymentVersion.                                                                                                                         |
-| **Live Version**         | The version the current Published Agent uses for **new sessions**. There is exactly one at any moment.                                                                                                                                                                             |
-| **Versioned Config**     | Fields that create a new DeploymentVersion when changed: prompt / model / Skills / MCP / Environment ref / Space binding.                                                                                                                                                          |
-| **Metadata-only Config** | Fields that do **not** create a new version when changed: name / description. The display refreshes immediately.                                                                                                                                                                   |
-| **Runtime Driver**       | Which runtime the Agent runs on, for example `openai-runtime` or `claude-agent-sdk`. **It cannot be swapped in place after Publish.**                                                                                                                                              |
-| **Fork Agent**           | Copies the migratable Manifest intent and creates a **new Agent identity**. The original Agent's sessions / logs / cost / agent-state / Channel binding **all stay in place and are not migrated**. This is an owner-initiated action path, not an automatic background migration. |
-| **Existing Session**     | A session that has already started running. At creation it bound a DeploymentVersion + EnvironmentRevision + mount snapshot, and **it won't be swapped out even if the owner changes config afterward**.                                                                           |
-| **New Session**          | A session created after a config change, which **uses the current live version**.                                                                                                                                                                                                  |
+- **The Agent-owned endpoint or channel route stays stable.** Config changes do not change the address or provider route; runtime/type changes require the owner to create a new Agent identity.
+- **Running Sessions are not silently reconfigured.** Any reconnect/update behavior belongs to the runtime operations model, but the execution snapshot for a started Session stays fixed.
 
 ---
 
-## 4. Relationship lock: the three layers of service identity / version / session
+## 3. Concept Definitions
+
+| Term                           | Plain-language explanation                                                                                                                                                                                     |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **App**              | The V1 product, resource, operations, export, and usage/cost boundary. App is the user-facing name; App is the engineering name.                                                                           |
+| **Agent**                      | An App-local execution and delivery unit. It owns runtime execution, endpoint exposure, channel delivery, DeploymentVersions, and V1 Sessions.                                                                 |
+| **Agent Exposure**             | The fact that one Agent is callable through an Agent API Endpoint or channel route. The App summarizes exposure and operations; it does not become the runtime subject.                                        |
+| **Exposure Identity**          | The stable delivery promise for a single Agent inside an App: callers keep targeting the same Agent-owned endpoint or channel route while config versions change underneath new Session creation.              |
+| **DeploymentVersion**          | An immutable snapshot of one runnable Agent configuration: prompt, model, Skill bindings, MCP bindings, Environment revision, and Storage bindings.                                                            |
+| **Live DeploymentVersion**     | The DeploymentVersion selected for new Sessions at the moment they are created. There is exactly one live DeploymentVersion for an exposed Agent at a time.                                                    |
+| **Versioned Config**           | Fields that create a new DeploymentVersion when changed: prompt, model, Skills, MCP, Environment revision, and Storage bindings.                                                                               |
+| **Metadata-only Config**       | Fields that do not create a DeploymentVersion when changed, such as display name or description.                                                                                                               |
+| **Runtime Driver**             | The runtime implementation the Agent runs on, for example `openai-runtime` or `claude-agent-sdk`. After exposure/live-version lock, it cannot be swapped in place.                                             |
+| **Fork Agent**                 | Creates a new Agent identity from the migratable intent of the source Agent. The source Agent keeps its Sessions, logs, usage, agent-state, endpoint identity, and channel route history.                      |
+| **Session Execution Snapshot** | The frozen execution context selected when a Session starts: Agent id, App id, DeploymentVersion, Environment revision, resource bindings, provider/model references, and channel metadata if present. |
+| **New Session**                | A Session created after a config change. It uses the live DeploymentVersion at creation time.                                                                                                                  |
+
+---
+
+## 4. Relationship Lock
 
 ```mermaid
 flowchart TD
-  Agent["Agent<br/>bare-name entity / stable service identity"] --> Endpoint["Web UI / API endpoint"]
-  Agent --> Channel["Channel bindings"]
-  Agent --> Cost["Cost attribution"]
-  Agent --> Live["Current live DeploymentVersion"]
+  App["App<br/>resources, operations, usage rollup"] --> Agents["App-local Agents"]
+  App --> Usage["App Usage<br/>Agent / Version / Session / Run drilldowns"]
+  App --> Ops["Health, logs, exports"]
 
-  Live --> Manifest["Agent Manifest snapshot"]
-  Live --> EnvRef["Environment reference"]
-  Live --> SpaceRefs["Space mount snapshot"]
+  Agents --> Exposure["Agent Exposure<br/>endpoint or channel route"]
+  Agents --> Live["Live DeploymentVersion"]
+  Agents --> Runtime["Runtime Driver"]
+
+  Live --> Manifest["Agent manifest snapshot"]
+  Live --> EnvRef["Environment revision"]
+  Live --> StorageRefs["Storage binding snapshot"]
   Live --> ToolRefs["Skill / MCP binding snapshot"]
 
-  SessionA["Existing session"] --> Version1["DeploymentVersion v1"]
-  SessionB["New session"] --> Live
+  SessionA["Existing Session"] --> Version1["DeploymentVersion v1"]
+  SessionB["New Session"] --> Live
 
-  Version1 -.same service identity.-> Agent
-  Live -.same service identity.-> Agent
+  SessionA --> App
+  SessionB --> App
 ```
 
-**Three sentences to remember the relationship:**
+**Three rules for the relationship:**
 
-- **The Agent id never changes** — after Publish, the Web URL / API endpoint / Channel binding / Cost all hang off it.
-- **Every save of a versioned config leaves one DeploymentVersion snapshot** — new sessions use the new one, existing sessions keep their own.
-- **The runtime can't be changed in place; to change it you Fork** — Fork creates a **new** Agent, and the original Agent's service identity and history stay completely untouched.
+- **The App is the business boundary** - resources, operations visibility, exports, and usage/cost roll up there.
+- **The Agent is the delivery/runtime subject** - its endpoint or channel route stays stable while DeploymentVersions change for new Sessions.
+- **Runtime/type changes require Fork** - Fork creates a new Agent identity; the original Agent keeps its Sessions, logs, usage attribution, endpoint history, and agent-state.
 
 ---
 
-## 5. User journey map
+## 5. Fail-closed Invariants
 
-| Stage                   | What the owner is doing                   | Touchpoint                    | Mood                                      |
-| ----------------------- | ----------------------------------------- | ----------------------------- | ----------------------------------------- |
-| Preview succeeds        | Confirming in Preview that the Agent runs | Agent detail / Preview        | High                                      |
-| First Publish           | Clicking Publish                          | Publish modal                 | High (afraid of complex deployment)       |
-| Being consumed          | Users / API / Channel create a session    | Web UI / API / Channel        | Medium                                    |
-| Changing config         | Changing prompt / model / Skills          | Agent editor / Versions Sheet | Medium (afraid of affecting what's live)  |
-| Reviewing problems      | Admin checks which version a session ran  | Sessions / Cost               | Medium                                    |
-| Wanting to swap runtime | Switching from OpenAI to Claude Agent SDK | Runtime picker                | Medium (thinks it's just editing a field) |
+- Session creation must prove the Agent belongs to the requested App before any runtime snapshot is created.
+- Endpoint tokens, channel provider metadata, runtime ids, historical package ids, or Session snapshots cannot prove App ownership by themselves.
+- A cost or usage event without App proof is rejected instead of attributed through an inferred owner.
+- A runtime/type change after exposure/live-version lock is rejected in place; the only current path is Fork.
+- A channel event that cannot resolve to one AgentChannelBinding inside one App is rejected instead of routed through a default.
+- App Overview may summarize exposure and health, but it does not create an App-owned runtime endpoint.
+
+---
+
+## 6. User Journey Map
+
+| Stage                   | What the owner is doing                  | Touchpoint                    | Product rule                                                |
+| ----------------------- | ---------------------------------------- | ----------------------------- | ----------------------------------------------------------- |
+| Preview succeeds        | Confirming the Agent runs inside the App | Agent detail / Preview        | No exposure required yet                                    |
+| First exposure          | Enabling endpoint or channel delivery    | Agent detail / Consume        | Agent exposure is created inside the App boundary           |
+| Being consumed          | Callers create Threads/Sessions          | Agent API Endpoint / Channel  | Each Session binds the live DeploymentVersion               |
+| Changing config         | Editing prompt/model/Skills/MCP/Storage  | Agent editor / Versions Sheet | Save creates a new DeploymentVersion for future Sessions    |
+| Reviewing operations    | Explaining a historical issue or charge  | App Usage / Session details   | App rollup plus Agent/version/session/run attribution       |
+| Wanting to swap runtime | Switching runtime driver or Agent type   | Runtime picker                | In-place save is blocked; Fork creates a new Agent identity |
 
 ```mermaid
 flowchart TD
-  A["Owner confirms ready in Preview"] --> B{"Readiness OK?"}
+  A["Owner confirms Agent readiness in the App"] --> B{"Ready to expose?"}
   B -->|No| C["Fix blocking items"]
   C --> A
-  B -->|Yes| D["Click Publish"]
-  D --> E["Agent reachable immediately<br/>Web UI / API entry points always-on"]
-  E --> F["New session binds the live DeploymentVersion"]
-  E --> G["Owner changes prompt / model / Skills"]
-  G --> H{"Is the change a runtime?"}
-  H -->|No| I["Save = new live DeploymentVersion"]
-  I --> J["New sessions use the new version<br/>existing sessions keep their own"]
-  H -->|Yes| K["UI blocks the save<br/>prompts Fork Agent"]
-  K --> L["On confirm, create a new Agent identity<br/>original Agent's sessions/cost untouched"]
+  B -->|Yes| D["Enable Agent exposure"]
+  D --> E["Endpoint or channel route targets the Agent"]
+  E --> F["New Session binds live DeploymentVersion"]
+  E --> G["Owner changes versioned config"]
+  G --> H{"Runtime or type change?"}
+  H -->|No| I["Save creates a new live DeploymentVersion"]
+  I --> J["New Sessions use new snapshot<br/>existing Sessions keep their snapshot"]
+  H -->|Yes| K["Save is blocked"]
+  K --> L["Fork creates a new Agent identity<br/>source Agent history stays in App rollup"]
 ```
 
 ---
 
-> The companion engineering PRD with the full state machines, scope matrix, and reasoning review is still pending — until it ships, this document is the single source of truth.
+> The companion engineering PRD with full state machines and scope matrices is still pending. Until it ships, this document defines the V1 product semantics for App-scoped operations identity plus Agent-owned exposure and DeploymentVersion behavior.

@@ -1,186 +1,227 @@
-# Cost Dashboard — for human
+# App Usage - for humans
 
-> This is the product-story version for non-engineering readers. The **complete engineering contract** (ledger semantics, attribution tables, cost formulas, unknown-pricing handling, rollup strategy, role-gating implementation) lives in the full shipped PRD.
+> This is the product-story version for non-engineering readers. The engineering
+> contract follows the boundary in `docs/SPEC.md`: usage is recorded with
+> App as the primary business dimension, while Organization remains a
+> billing rollup and future governance shell.
 >
-> **Current Project/App boundary note**: Current Project/App work should add Project/App as the primary business-cost dimension. Organization totals remain rollups for billing and future governance; member rows, admin-only Settings cost views, and cross-member FinOps are future multi-member surfaces. See [Project / App Boundary](./project-app-boundary.md).
+> See [App Boundary](./app-boundary.md).
 
 ---
 
 ## One-line positioning
 
-Give a Mosoo Organization a dashboard that can answer "**who is spending money**." Three entry points, three audiences: admins review the whole organization, Agent owners explain their own Agent's spend, and individual members self-serve "how much did I use."
+Give the App owner one place to understand how an App is spending money: total
+spend, requests, tokens, cache behavior, model mix, Agent contribution, recent
+Session Runs, health, logs, and unpriced usage.
 
-An analogy: it compresses the product shape of AWS Cost Explorer down onto a single Agent runtime — the same cost facts, viewed through four dimensions: **Organization / Agent / member / model**.
+The product shape is closer to a small App-local Cost Explorer than a tenant-wide
+finance console. The same cost facts can later roll up for billing, but V1 starts
+where the user works: inside the App.
 
 ---
 
 ## 1. The user problem
 
-Today a Mosoo Organization is completely blind to "who is spending money." Every LLM call goes through the organization's own provider credential, but the only place you can see token counts is the per-session log — so an admin can't answer any of these questions:
+An App can run multiple Agents, expose Agent API Endpoints, open Threads, and
+receive channel-triggered runs. Without an App Usage view, the owner can see a
+bill after the fact but cannot answer the operational questions that change
+behavior:
 
-- _"Which Agent / which Agent owner burned the most this month?"_
-- _"Which member is pushing the curve up?"_
-- _"Was this money spent on real usage, or by builders debugging unpublished Agents?"_
-- _"Is Claude Opus 4.7 really worth 48% of the bill?"_
-- _"I want to compile my own consumption into an expense report — where do I look?"_
+- _"Which Agent or Session Run drove the spike this week?"_
+- _"Did cost rise because request volume changed, or because the model mix changed?"_
+- _"Did a prompt change break cache reuse?"_
+- _"Which model/provider is unpriced and therefore missing dollar attribution?"_
+- _"Are preview/debug runs distorting what looks like production demand?"_
 
-Ordinary members can't self-serve the answer either: "How much did **I** use this month?"
+The missing boundary is not a person-reporting problem. It is an App operations
+problem: cost must be legible at App, Agent, Session Run, model/provider, trigger,
+and purpose level.
 
 ---
 
 ## 2. Goals
 
-After ship, each of the three user types can do the following:
+### App Usage
 
-### Admin
+- Show App-level KPIs for spend, requests, tokens, cache usage, model/provider
+  mix, recent runs, health, logs, and unpriced usage count.
+- Let the App owner drill from App total to Agent contribution and then to recent
+  Session Runs without leaving the App context.
+- Treat preview, debug, scheduled, channel, eval, and endpoint-triggered runs as
+  filterable run purposes on the same App ledger.
+- Keep the primary business dimension App for every cost fact.
+- Preserve Organization only as a billing rollup so later billing operations can
+  aggregate Apps without becoming the product access boundary.
 
-- An admin-only Settings surface at `/settings/cost` (Settings → Cost) with four tabs (Overview / By Agent / By User / By Model) that answer cross-Agent, cross-member, and cross-model budget questions
-- See, at a glance, four KPIs — Total Spend / Requests / Tokens / Active Users — compared against the previous period
-- In the By Agent / By User tables, **sort by column and scan for runaway cost by color** (ember for increases, green-700 for decreases)
-- Export CSV from all three views, so there is hard data to bring to a conversation with finance
+### Agent Cost Tab
 
-### Agent owner
+- Show Agent-scoped spend, run count, average tokens per run, cache hit
+  percentage, model/provider mix, and recent Session Runs.
+- Make cache regressions visible enough that an owner can connect a cost spike to
+  a prompt or manifest change.
+- Keep Agent cost diagnostics subordinate to the active App; the tab must not
+  become a second tenant-wide cost surface.
 
-- Open their own Agent detail page → Cost tab to answer "who is running my Agent, with which model, and how much did it cost me"
-- See **leading signals** like Cache Hit — when cache hit drops, it often means someone changed the system prompt and broke the prefix match
+### Ledger
 
-### Ordinary member
-
-- Open `Settings → Usage` to self-serve "how much did I use / how much did the Agents I built burn," without bothering an admin
-- The UI uses warm brown (`--soil`) instead of the admin view's green, a visual cue that "this is **your** data, not the organization's"
+- Record each normalized provider/runtime usage event exactly once.
+- Never derive App ownership from old runtime identifiers or historical package
+  labels. If a usage event cannot prove its App, reject it or mark it
+  unpriced/unattributed at App ingestion time.
+- Do not create a compatibility layer that maps old tenant-level resource
+  assumptions into current App access.
 
 ---
 
 ## 3. Concept definitions
 
-| Term                                 | Definition                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Cost Fact**                        | A single real runtime / provider usage event enters the ledger exactly once. Different dashboards merely interpret the same fact along different dimensions; there is **no double-counting**                                                                                                                                                                      |
-| **Used by (usage attribution)**      | How much usage / cost this member triggered **as a consumer** — answers "who is spending money using Agents"                                                                                                                                                                                                                                                      |
-| **Owned by (ownership attribution)** | How much cost was produced by Agents under this member **as their Agent owner / developer** — answers "whose developed and maintained Agents are consuming budget"                                                                                                                                                                                                |
-| **Run scenario**                     | The source label for a single Agent run: production / debug / preview / scheduled / channel / eval (all six count toward the Organization total, but can be filtered individually; `eval` is a backend label used for evaluation runs and shows up in the `CostRunPurpose` GraphQL enum)                                                                          |
-| **Channel-triggered**                | Triggered by an external user from an external collaboration platform such as Slack / Discord / Lark. For these calls the Agent owner is still in this organization, but the **Actor is an external user** — these do not land in any member row of the By User tab; instead they go into a separate footer row at the bottom. See [`channels.md`](./channels.md) |
-| **Cache-adjusted**                   | When billing, input tokens that already hit the prompt cache are deducted from base input, so cache-read tokens aren't charged again at the base input price                                                                                                                                                                                                      |
-| **Cache Hit %**                      | The health metric for whether the system prompt is being reused correctly. A sudden drop in cache hit for the same Agent → very likely someone changed the system prompt and broke the prefix match                                                                                                                                                               |
-| **Unknown pricing**                  | When a model appears for which the dashboard has no pricing record, **usage is not lost** — the dashboard shows this unpriced usage and gives the admin a way to backfill the pricing                                                                                                                                                                             |
-| **Cost Service**                     | The cost service behind the dashboard. It only accepts already-normalized usage; it does not guess the field semantics of different providers                                                                                                                                                                                                                     |
+| Term                            | Definition                                                                                                                                          |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Cost Fact**                   | A single normalized runtime/provider usage event recorded exactly once. Dashboards filter and group the same fact; they do not duplicate it.        |
+| **App Usage**                   | The primary V1 product surface for cost, requests, tokens, cache behavior, model/provider mix, recent runs, health, logs, and unpriced usage.       |
+| **Organization Billing Rollup** | A billing aggregation over Apps. It exists for account and invoice semantics, not as a user-visible resource or permission boundary in V1.          |
+| **Run Purpose**                 | The App-local source label for a Session Run, such as production, debug, preview, scheduled, channel, eval, or endpoint-triggered.                  |
+| **Agent Cost Tab**              | A diagnostic view nested under one Agent in the active App. It explains that Agent's contribution to App usage.                                     |
+| **Cache-adjusted**              | Billing deducts cache-read input from base input before charging the base input price, then adds cache-read and cache-creation prices separately.   |
+| **Cache Hit %**                 | The health metric for prompt-prefix reuse. A sudden drop for the same Agent often points to a prompt or manifest change.                            |
+| **Unknown pricing**             | Usage for a model/provider with no pricing record. The usage remains visible and contributes to the unpriced count, but dollar cost is not guessed. |
+| **Cost Service**                | The service that accepts normalized usage, writes App cost facts, and exposes App and billing-rollup queries.                               |
 
 ---
 
-## 4. The three entry points (product story)
+## 4. Entry points
 
-### ① `/settings/cost` (Settings → Cost) · for admins
+### App Usage surface
 
-Four tabs with a unified header: **title + period switcher (7d / 30d / MTD / 90d) + Export CSV**.
+The current Web console routes App usage through `/cost`; `/usage` and the old
+settings cost path redirect there. The page belongs to the active App context and
+has a unified header:
 
-| Tab          | Question it answers                                                                           | Key presentation                                                                                   |
-| ------------ | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Overview** | How much was spent in this period? Who is contributing?                                       | 4 KPIs + 30-day bar chart + Top Agents + Top Users + Spend by model donut                          |
-| **By Agent** | Which Agent is burning? Who is the owner? Is it production or debug driving the cost?         | Sortable table: Owner / Run mix / Trend 30d sparkbar / vs. Prev / Cost + share                     |
-| **By User**  | Who is using it / whose developed Agents are burning? How much is external channel-triggered? | Sortable table + toggle between Used by / Owned by modes + External channel-triggered footer       |
-| **By Model** | Where is the money going by model / by provider? Is this model expensive?                     | Donut + By vendor horizontal bars + pricing table (list price per 1M tokens · cache hit % · share) |
+- Period switcher: `7d`, `30d`, `MTD`, `90d`.
+- KPI strip: spend, requests, tokens, cache usage, unpriced usage.
+- Overview: 30-day spend bars, top Agents, model/provider breakdown, recent runs,
+  health and log shortcuts.
+- Agents: sortable Agent contribution with run mix, trend, spend, and cache hit.
+- Models: provider/model spend, token buckets, cache behavior, and pricing state.
 
-Why not merge ① and ②? An admin's review needs (cross-Agent, cross-member) and an Agent owner's diagnostic needs ("who is using my Agent") are **two different shapes of data** — force them together and the second need gets hidden.
+### Agent detail Cost tab
 
-Why is ① in Settings rather than a top-level nav entry? Cost Governance is an admin-only surface and was consolidated under Settings alongside the other organization controls (Members, Environments, General). The four-tab layout still gets a full-width content area inside the Settings layout — the Settings sidebar only carries the section switcher, not the dashboard chrome.
+The Agent tab answers: _"How is this Agent contributing to App usage?"_
 
-**Role gating**: `/settings/cost` is visible (in the Settings sidebar) only to organization owners and admins, who are the holders of the `cost.organization.overview` permission (the `Permission.CostOrganizationRead` constant in `pkgs/contracts/src/permission/permission.contract.ts`). The legacy `/cost` URL permanent-redirects to `/settings/cost`; a non-admin who lands there is blocked by the organization permission guard and shown an "Admins only" empty state that points them to _Settings → Usage_.
+- Scoped KPIs: Agent spend, runs, average tokens per run, cache hit.
+- Purpose filter: production, debug, preview, scheduled, channel, eval, endpoint.
+- Model usage: whether a run used the intended model/provider or resolved a
+  different runtime model.
+- Recent Session Runs: run id, purpose, trigger, tokens, cache buckets, cost, and
+  pricing state.
+- Link back to the App Usage overview, not to a tenant-wide cost console.
 
-### ② Agent detail page → Cost tab · for Agent owners
+### Billing rollup
 
-The owner wants to answer: "**Who is running my Agent, with which model, and how much did it cost me?**"
-
-- Scoped KPIs: Agent Spend / Runs / Avg Tokens per Run / **Cache Hit**
-- A `production / debug / preview / scheduled` filter in the top-right corner
-- Two columns: **Who is running this Agent** (session counts by member) + **Model usage** (whether the default model is pinned, or whether it fell back to something else)
-- A Recent sessions list at the bottom showing the most recent 5 runs (member + tokens + cost), without having to switch to the Logs tab
-- A top-right link, `Open Organization Cost` — admins can always jump back to the global view from the Agent view in one click
-
-### ③ Settings → Usage · for every member
-
-Every member sees themselves. The default is **Used by me**: how much I triggered as a consumer. If this member owns Agents, an **Owned by me** section also appears: how much the Agents under me as their owner produced. The two are **different attributions of the same set of usage events, and are not additive**.
-
-Deliberately simpler than the admin view:
-
-- 3 KPIs instead of 4 (no "Active Users" — meaningless at n=1)
-- The accent color is warm brown (`--soil`) instead of green — this is _your_ data, not the organization's
-- An "Agents I use most" ranking, each row annotated with "what share of my own usage"
-- "My owned agents" appears only when the member owns Agents
-- A one-line footnote: "Admins can open the Cost dashboard" — telling members the admin view exists, without making it feel gated off
+Organization rollup is retained for invoice/account aggregation and future
+governance. It should consume App cost facts after they are written; it should not
+be the first surface a product user opens, and it should not own resource access.
 
 ---
 
-## 5. The attribution model (read it in one table)
+## 5. Attribution model
 
-| Run scenario                                                         | Counts toward Organization total? | Who owns the Owner dimension | Who owns the Actor dimension                                                                  | Label           |
-| -------------------------------------------------------------------- | --------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------- | --------------- |
-| Published Agent used normally by a member                            | Yes                               | Agent owner                  | The triggering member                                                                         | production      |
-| Unpublished Agent debugged by a builder                              | Yes                               | Agent owner                  | The debugger                                                                                  | debug           |
-| Draft revision of a published Agent in preview / debug               | Yes                               | Agent owner                  | The debugger                                                                                  | preview / debug |
-| Scheduled Agent running automatically                                | Yes                               | Agent owner                  | Schedule owner (falls into the system bucket when there is no explicit person)                | scheduled       |
-| Channel-triggered (external users from Slack / Discord / Lark, etc.) | Yes                               | Agent owner                  | **NULL** (external users are not Mosoo members; they go into the separate By User footer row) | channel         |
+| Run source                              | Counts toward App usage? | Primary dimension | Secondary drilldown        | Run purpose           |
+| --------------------------------------- | ------------------------ | ----------------- | -------------------------- | --------------------- |
+| Web Thread targeting an Agent           | Yes                      | App       | Agent, Thread, Session Run | production or debug   |
+| Agent API Endpoint request              | Yes                      | App       | Agent, endpoint, run       | endpoint              |
+| Draft or preview execution              | Yes                      | App       | Agent, draft, run          | preview or debug      |
+| Scheduled execution                     | Yes                      | App       | Agent, schedule, run       | scheduled             |
+| Channel-triggered execution             | Yes                      | App       | Agent, channel, run        | channel               |
+| Evaluation or readiness run             | Yes                      | App       | Agent, eval batch, run     | eval                  |
+| Event with missing App evidence | No                       | Rejected          | Error record               | ingestion-fail-closed |
 
-**Two invariants**:
+**Invariants**:
 
-1. An Agent's publish status, owner transfers, and revision archiving **must never rewrite the interpretation of historical cost**. Sarah is the owner today, so the old records stay under Sarah; hand off to Tom tomorrow, and only new records go to Tom.
-2. **Used by** and **Owned by** are different attributions of the same set of usage events, and there is **no double-counting**. Switching attribution mode in the By User tab ≠ switching to a different ledger.
+1. App attribution is immutable after the cost fact is written. Later Agent edits,
+   endpoint changes, or package exports must not rewrite historical App usage.
+2. Agent, Thread, Session Run, model/provider, trigger, and purpose are drilldown
+   dimensions over the same fact. They are not separate ledgers.
+3. Runtime/package ids that cannot prove App ownership fail closed. V1
+   must not infer ownership from legacy snapshots.
 
 ---
 
-## 6. How cost is calculated (plain version)
+## 6. Cost calculation
 
-The USD you see on the dashboard is determined by four kinds of tokens:
+The USD shown in App Usage comes from four token buckets:
 
-```
-total_cost
-  = billable_input_cost       ← the part actually charged at the base input price (cache_read deducted first)
+```text
+total_cost =
+  billable_input_cost
   + output_cost
-  + cache_read_cost           ← input that hit the cache, charged at a separate, cheaper rate
-  + cache_creation_cost       ← input written into the cache for the first time
+  + cache_read_cost
+  + cache_creation_cost
 ```
 
-In plain words: "**only input that did not hit the cache is charged at the base input price**." This matters a lot — many teams' cost dashboards charge cache_read tokens again at the base input price, and it's common for the bill to be inflated by 30–50%. Mosoo's cost formula locks onto the cache-adjusted version.
+`billable_input_cost` is calculated from input tokens that did not hit the prompt
+cache. Cache-read tokens are charged using the cache-read price, not charged
+again at the base input price.
 
-The bottom of every tab spells out the complete formula — so anyone looking over your shoulder at the dashboard can trust the numbers.
+Every visible cost view should expose enough formula detail for a user to trust
+that cache reuse is priced correctly. The UI can summarize this, but the backend
+must remain the single interpreter of provider token semantics and pricing.
 
-### What about models with unknown pricing
+### Unknown pricing
 
-The dashboard **never drops** usage for an unknown model. It labels that usage separately as "unpriced usage" and gives the admin an action to backfill the pricing. The frontend only displays results; it **does not re-interpret the price table** — when a price is wrong, the admin fixes it in exactly one place.
+The dashboard never drops usage for an unknown model/provider. It shows:
+
+- unpriced usage count;
+- affected model/provider;
+- tokens and request counts;
+- recent runs that produced the usage.
+
+The frontend displays the pricing state it receives. It does not reinterpret
+price tables or guess dollar cost.
 
 ---
 
-## 7. User journey maps
+## 7. User journeys
 
-### A · Admin's end-of-month review
+### A. App owner reviews the month
 
-| Stage               | What the admin is doing                                                          | What they see                                                               | Mood      |
-| ------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | --------- |
-| 1 Trigger           | At month's end, wants to see how much was spent                                  | Opens Settings → Cost                                                       | Neutral   |
-| 2 Overview          | On the Overview tab, looks at the 4 KPIs + 30-day bar chart                      | "$4.82K · -12.3% vs. prior 30 days" — answers the main question at a glance | Reassured |
-| 3 Drill in          | Clicks the Top Agents ranking → jumps to the By Agent tab                        | Sees the customer-support agent at 28%                                      | Alert     |
-| 4 Locate the person | Switches to the By Agent tab, sorts by vs. Prev to find the spiking row          | Sarah's research-bot is +180% week over week                                | Zeroed in |
-| 5 Close the loop    | Exports CSV to attach to the monthly report; @-mentions Sarah about research-bot | Has the raw data to show                                                    | Efficient |
+| Stage      | Action                                             | What they see                                                      |
+| ---------- | -------------------------------------------------- | ------------------------------------------------------------------ |
+| 1 Trigger  | Opens App Usage at month end                       | Spend, requests, tokens, cache usage, and unpriced usage count     |
+| 2 Overview | Checks the 30-day trend and model/provider mix     | A spike tied to one support Agent and one expensive model          |
+| 3 Drill in | Opens the Agent contribution row                   | Run mix shows preview/debug traffic grew faster than production    |
+| 4 Verify   | Opens recent Session Runs                          | Token buckets and cache state explain which runs changed the curve |
+| 5 Act      | Opens Agent configuration, logs, or health context | Owner can tune the Agent without leaving the App boundary          |
 
-### B · Agent owner explains a cache-hit anomaly
+### B. Cache-hit anomaly
 
-1. The owner notices the customer-support agent's cost doubled this week
-2. Opens the Agent detail page → Cost tab
-3. Sees Cache Hit drop from 78% to 12%
-4. Infers: someone must have changed the system prompt and fragmented the prompt prefix
-5. Opens the Manifest history — discovers Tom changed the second paragraph of the system prompt yesterday
-6. Rolls back / talks to Tom, and cache hit recovers the next day
+1. The owner notices an Agent's spend doubled this week.
+2. The Agent Cost tab shows Cache Hit % dropped from 78% to 12%.
+3. Recent Session Runs show similar request volume but larger billable input.
+4. Manifest history shows the prompt prefix changed yesterday.
+5. The owner rolls back or edits the prompt, and cache hit recovers.
 
-### C · Personal expense report
+### C. Unpriced model investigation
 
-1. At month's end, an individual wants to know "how much did I use"
-2. Opens `Settings → Usage`
-3. In the **Used by me** section, sees "$42.18 this month"
-4. The "Recent sessions" list shows the most recent 7 sessions + cache tokens
-5. Takes a screenshot / exports CSV for the expense report
+1. App Usage shows `unpriced usage: 18`.
+2. The Models view groups the usage under one model/provider pair.
+3. Recent runs identify the Agent and endpoint that selected the model.
+4. Billing operations can backfill pricing later; the product view already made
+   the operational source visible.
 
-### D · External channel cost attribution
+### D. Channel cost as an App run purpose
 
-1. The admin looks at the By User tab and finds that summing across users only reaches $4.1K, but the Org Total is $4.83K
-2. No panic — a fixed row at the bottom of the table reads `External (channel-triggered): $730 · 15.1% of Org Total`
-3. This portion was triggered by external users via Slack `@bot` / Lark DM, etc., with no Mosoo member attribution
-4. The admin knows where the difference comes from, and the books reconcile
+1. App Usage shows channel-triggered runs as one filterable purpose.
+2. The owner drills into the Agent and channel that generated the spend.
+3. The cost stays attached to the App and Agent, with channel as trigger context.
+4. There is no separate person-row footer or alternate ledger in V1.
+
+---
+
+## 8. Future governance
+
+Future governance can add tenant finance dashboards, human-actor drilldowns,
+budget policy, exports for finance teams, and per-person credential policy. Those
+surfaces must consume App cost facts after the App ledger is correct; they must
+not reintroduce Organization as the resource boundary for V1.
