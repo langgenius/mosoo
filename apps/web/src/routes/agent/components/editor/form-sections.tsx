@@ -9,7 +9,6 @@ import { Label } from "@/shared/ui/label";
 
 import type { Agent } from "../../agent.types";
 import { isRuntimeSelectable, listRuntimeOptions } from "../../runtime-catalog";
-import { AgentChannelsField } from "../channels-field";
 import { PackageResolutionIssueCard } from "../package-resolution-issue-card";
 import { RuntimeIcon } from "../runtime-icon";
 import { EnvironmentPicker } from "./environment-picker";
@@ -400,17 +399,13 @@ export function IntegrationsSection({
 }
 
 export function EnvironmentSection({
-  agent,
   model,
   organizationId,
   readOnly,
-  showChannels,
 }: {
-  agent: Agent;
   model: AgentEditorModel;
   organizationId: string | null;
   readOnly: boolean;
-  showChannels: boolean;
 }) {
   return (
     <div className="space-y-5">
@@ -428,13 +423,6 @@ export function EnvironmentSection({
           setSpaces={model.setSpaces}
         />
       </div>
-
-      {showChannels ? (
-        <div>
-          <SectionHeader>Channels</SectionHeader>
-          <AgentChannelsField agent={agent} />
-        </div>
-      ) : null}
     </div>
   );
 }

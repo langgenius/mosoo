@@ -1,4 +1,4 @@
-import { ChevronDown, Code, FileDown, Inbox, MessageSquare, Upload } from "lucide-react";
+import { ChevronDown, Code, FileDown, Inbox, Upload } from "lucide-react";
 import type { ReactElement } from "react";
 import { useMemo } from "react";
 
@@ -23,9 +23,7 @@ export interface PublishMenuProps {
   disabled: boolean;
   errorMessage: string | null;
   onApiAccessClick: () => void;
-  onChannelClick?: () => void;
   onPublish: () => void;
-  showChannelSetup?: boolean;
 }
 
 export function PublishMenu({
@@ -34,9 +32,7 @@ export function PublishMenu({
   disabled,
   errorMessage,
   onApiAccessClick,
-  onChannelClick,
   onPublish,
-  showChannelSetup = true,
 }: PublishMenuProps): ReactElement {
   const isLive = agent.status === "published";
   const distribution = useMemo(() => buildAgentDistribution(agent), [agent]);
@@ -142,24 +138,6 @@ export function PublishMenu({
             </span>
           </div>
         </DropdownMenuItem>
-        {showChannelSetup ? (
-          <DropdownMenuItem
-            className="items-start gap-2.5 py-2"
-            disabled={!isLive}
-            onSelect={(event) => {
-              event.preventDefault();
-              onChannelClick?.();
-            }}
-          >
-            <MessageSquare className="mt-0.5 size-4" />
-            <div className="flex min-w-0 flex-col">
-              <span className="text-[13px] font-medium">Channel</span>
-              <span className="text-muted-foreground text-[11.5px] leading-snug">
-                Slack · Lark · Discord · Telegram · WeChat
-              </span>
-            </div>
-          </DropdownMenuItem>
-        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

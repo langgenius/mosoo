@@ -34,13 +34,13 @@ describe("Agent Builder surface boundary", () => {
     );
   });
 
-  test("Builder Preview keeps manual Channel setup outside Builder planner control", () => {
+  test("Builder Preview no longer wires the removed manual Channel setup", () => {
     const source = readSurfaceSource("../src/routes/agent/components/preview-mode.tsx");
 
-    expect(source).toContain("ChannelsConfigDialog");
-    expect(source).toContain("onChannelClick");
-    expect(source).not.toContain("showChannels={false}");
-    expect(source).not.toContain("showChannelSetup={false}");
+    // The Channel tab was removed pending a product direction; the Builder
+    // Preview surface must not re-introduce manual channel wiring.
+    expect(source).not.toContain("ChannelsConfigDialog");
+    expect(source).not.toContain("onChannelClick");
   });
 
   test("Builder auto-applied patches use the normal runtime operation save path", () => {

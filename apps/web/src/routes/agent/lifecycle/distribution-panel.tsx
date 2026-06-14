@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, Check, Code, Copy, ExternalLink, Inbox, Plug } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Code, Copy, ExternalLink, Inbox } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
@@ -157,20 +157,6 @@ export function DistributionPanel({
             </p>
           </div>
         ) : null}
-
-        <DistributionCard
-          icon={<Plug className="text-fg-3 size-4" />}
-          title="Channels"
-          subtitle={
-            <span className="text-fg-3 text-[12px]">
-              Slack / Lark / Discord integrations · coming after publish-flow GA
-            </span>
-          }
-        >
-          <Button disabled className="text-[11.5px]" size="xs" variant="outline">
-            Coming soon
-          </Button>
-        </DistributionCard>
 
         <div className="border-border-subtle bg-card rounded-lg border px-3.5 py-3">
           <div className="text-foreground text-[13px] font-medium">Cooperators</div>

@@ -52,12 +52,10 @@ function ConfigPanelContent({
   agent,
   externalModel,
   readOnly = false,
-  showChannels = true,
 }: {
   agent: Agent;
   externalModel: AgentEditorModel | undefined;
   readOnly?: boolean;
-  showChannels?: boolean;
 }) {
   const { activeOrganization } = useAppSession();
   const internalModel = useAgentEditorModel({ agent, readOnly });
@@ -132,7 +130,6 @@ function ConfigPanelContent({
           model={model}
           readOnly={readOnly}
           organizationId={organizationId}
-          showChannels={showChannels}
         />
       </div>
 
@@ -225,12 +222,10 @@ export function ConfigPanel({
   agent,
   model,
   readOnly = false,
-  showChannels = true,
 }: {
   agent: Agent;
   model?: AgentEditorModel;
   readOnly?: boolean;
-  showChannels?: boolean;
 }) {
   return (
     <ConfigPanelContent
@@ -238,7 +233,6 @@ export function ConfigPanel({
       externalModel={model ?? undefined}
       key={agent.id}
       readOnly={readOnly}
-      showChannels={showChannels}
     />
   );
 }
