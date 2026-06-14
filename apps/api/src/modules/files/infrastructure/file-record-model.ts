@@ -11,7 +11,6 @@ import type {
 } from "@mosoo/contracts/file";
 import { toSessionResourceMaterializedPath } from "@mosoo/contracts/file";
 import type { SessionFile } from "@mosoo/contracts/session";
-import type { SpaceRole } from "@mosoo/contracts/space";
 import { fileRecordsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type { AccountId, FileId, PlatformId, AppId, SessionId, SpaceId, UploadId } from "@mosoo/id";
@@ -19,6 +18,7 @@ import { sql } from "drizzle-orm";
 
 import { toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import type { SpaceAccessIntent } from "../../spaces/domain/space-access.policy";
 import { createScope } from "./file-paths";
 
 export interface FileRecordRow {
@@ -109,14 +109,14 @@ export interface FilePathLookupRequest {
 export interface UploadAccessRequest {
   database: D1Database;
   fileId: FileId;
-  requiredRole: SpaceRole;
+  requiredIntent: SpaceAccessIntent;
   viewer: AuthenticatedViewer;
 }
 
 export interface FileAccessRequest {
   database: D1Database;
   fileId: FileId;
-  requiredRole: SpaceRole;
+  requiredIntent: SpaceAccessIntent;
   viewer: AuthenticatedViewer;
 }
 
@@ -134,7 +134,8 @@ function toFileScopeId(scopeKind: FileScopeKind, scopeId: PlatformId): FileScope
   }
 
   const unsupported: never = scopeKind;
-  throw new Error(`Unsupported file scope kind: ${unsupported}`);
+  void unsupported;
+  throw new Error("Unsupported file scope kind.");
 }
 
 function toFileOwnerId(ownerKind: FileOwnerKind, ownerId: PlatformId): FileOwnerId {

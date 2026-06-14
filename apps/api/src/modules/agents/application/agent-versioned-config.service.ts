@@ -10,10 +10,7 @@ import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 import { isSupportedDriverRuntime } from "agent-driver/runtime";
 import type { DriverRuntime } from "agent-driver/runtime";
 
-import {
-  isSpaceRoleRankSufficient,
-  listSpaceAccessRows,
-} from "../../spaces/domain/space-access.policy";
+import { listSpaceAccessRows } from "../../spaces/domain/space-access.policy";
 import { listEditableAgentSkillReferences } from "./agent-deployment-version.service";
 import type { AgentRow } from "./agent-types";
 
@@ -79,8 +76,8 @@ export async function ensureAgentOwnerCanReadBoundSpaces(
       throw new Error(`Cannot bind Space ${spaceId}: Space not found.`);
     }
 
-    if (!row || !isSpaceRoleRankSufficient(row.role_rank, "read")) {
-      throw new Error(`Cannot bind Space ${spaceId}: Insufficient space permission.`);
+    if (!row) {
+      throw new Error(`Cannot bind Space ${spaceId}: App owner access required.`);
     }
   }
 }

@@ -173,7 +173,7 @@ export async function acquireSpaceFileLock(
   input: AcquireSpaceFileLockRequest,
 ): Promise<AcquireSpaceFileLockResponse> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureSpaceAccess(bindings.DB, viewerId, appId, spaceId, "edit");
+  await ensureSpaceAccess(bindings.DB, viewerId, appId, spaceId, "write");
 
   const path = normalizeSpaceFilePath(input.path);
   const holder = createHolder(viewer);
@@ -262,7 +262,7 @@ export async function releaseSpaceFileLock(
   input: ReleaseSpaceFileLockRequest,
 ): Promise<ReleaseSpaceFileLockResponse> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureSpaceAccess(bindings.DB, viewerId, appId, spaceId, "edit");
+  await ensureSpaceAccess(bindings.DB, viewerId, appId, spaceId, "write");
 
   const path = normalizeSpaceFilePath(input.path);
   const objectKey = createLockObjectKey(spaceId, path);

@@ -356,7 +356,7 @@ describe("file upload access", () => {
     const context = await ensureUploadAccess({
       database,
       fileId: FILE_ID,
-      requiredRole: "edit",
+      requiredIntent: "write",
       viewer: VIEWER,
     });
 
@@ -371,7 +371,7 @@ describe("file upload access", () => {
       ensureUploadAccess({
         database,
         fileId: FILE_ID,
-        requiredRole: "edit",
+        requiredIntent: "write",
         viewer: { ...VIEWER, id: OTHER_VIEWER_ID },
       }),
     ).rejects.toThrow();
@@ -408,7 +408,7 @@ describe("file upload access", () => {
       ensureUploadAccess({
         database,
         fileId: upload.fileId,
-        requiredRole: "edit",
+        requiredIntent: "write",
         viewer: { ...VIEWER, id: OTHER_VIEWER_ID },
       }),
     ).rejects.toThrow();
@@ -474,7 +474,7 @@ describe("file upload access", () => {
       ensureUploadAccess({
         database,
         fileId: upload.fileId,
-        requiredRole: "edit",
+        requiredIntent: "write",
         viewer: { ...VIEWER, id: OTHER_VIEWER_ID },
       }),
     ).rejects.toThrow();
@@ -482,7 +482,7 @@ describe("file upload access", () => {
       ensureFileAccess({
         database,
         fileId: upload.fileId,
-        requiredRole: "edit",
+        requiredIntent: "write",
         viewer: { ...VIEWER, id: OTHER_VIEWER_ID },
       }),
     ).rejects.toThrow();

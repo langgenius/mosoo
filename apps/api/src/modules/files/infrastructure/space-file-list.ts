@@ -21,7 +21,7 @@ export async function listSpaceFiles(
   path?: string,
 ): Promise<SpaceFileListing> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureSpaceAccess(bindings.DB, viewerId, appId, spaceId, "read");
+  await ensureSpaceAccess(bindings.DB, viewerId, appId, spaceId, "view");
   const parentPath = normalizeSpaceDirectoryPath(path);
 
   const directoryRows = await getAppDatabase(bindings.DB)

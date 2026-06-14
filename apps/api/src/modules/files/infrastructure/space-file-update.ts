@@ -57,7 +57,7 @@ export async function updateSpaceFile(
     bindings.DB,
     viewerId,
     sourceSpaceId,
-    "edit",
+    "write",
   );
 
   if (file.status !== "ready") {
@@ -84,7 +84,7 @@ export async function updateSpaceFile(
       bindings.DB,
       viewerId,
       targetSpaceId,
-      "edit",
+      "write",
     );
 
     if (targetSpace.app_id !== sourceSpace.app_id) {

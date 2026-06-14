@@ -8,7 +8,7 @@ import { getGlobalSpaceMountPath, getSessionAliasPath } from "agent-driver/paths
 import type { DriverAppAccessSnapshotOutput } from "./driver-snapshot";
 
 export interface FrozenSandboxSpaceBinding {
-  role: "admin" | "edit" | "read";
+  canWrite: boolean;
   spaceId: SpaceId;
   spaceName: string;
   type: "space";
@@ -85,25 +85,25 @@ export function freezeSandboxSpaceBindings(input: {
     spaceId: binding.spaceId,
     spaceName: binding.spaceName,
   }));
-  const roleBySpaceId = new Map(input.bindings.map((binding) => [binding.spaceId, binding]));
+  const accessBySpaceId = new Map(input.bindings.map((binding) => [binding.spaceId, binding]));
   const entries: DriverAppAccessSnapshotOutput["entries"] = [];
 
   for (const alias of spaceAliases) {
-    const binding = roleBySpaceId.get(alias.spaceId);
+    const binding = accessBySpaceId.get(alias.spaceId);
 
     if (!binding) {
       throw new Error(`Missing frozen sandbox binding for space ${alias.spaceId}.`);
     }
 
     entries.push({
+      canWrite: binding.canWrite,
       mountPath: alias.aliasPath,
-      role: binding.role,
       spaceId: alias.spaceId,
       type: binding.type,
     });
     entries.push({
+      canWrite: binding.canWrite,
       mountPath: alias.globalMountPath,
-      role: binding.role,
       spaceId: alias.spaceId,
       type: binding.type,
     });
@@ -122,7 +122,7 @@ export function buildAppAccessSnapshotFromAliases(input: {
   const accessBySpaceId = new Map<
     SpaceId,
     {
-      role: "admin" | "edit" | "read";
+      canWrite: boolean;
       type: "space";
     }
   >();
@@ -132,7 +132,7 @@ export function buildAppAccessSnapshotFromAliases(input: {
 
     if (!accessBySpaceId.has(spaceId)) {
       accessBySpaceId.set(spaceId, {
-        role: entry.role,
+        canWrite: entry.canWrite,
         type: entry.type,
       });
     }
@@ -148,14 +148,14 @@ export function buildAppAccessSnapshotFromAliases(input: {
     }
 
     entries.push({
+      canWrite: access.canWrite,
       mountPath: alias.aliasPath,
-      role: access.role,
       spaceId: alias.spaceId,
       type: access.type,
     });
     entries.push({
+      canWrite: access.canWrite,
       mountPath: alias.globalMountPath,
-      role: access.role,
       spaceId: alias.spaceId,
       type: access.type,
     });

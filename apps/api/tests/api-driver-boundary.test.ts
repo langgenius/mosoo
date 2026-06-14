@@ -263,8 +263,8 @@ describe("API to driver boundary", () => {
       appAccessSnapshot: {
         entries: [
           {
+            canWrite: true,
             mountPath: "/workspace/docs",
-            role: "edit",
             spaceId: API_DRIVER_BOUNDARY_IDS.space,
             type: "space",
           },
@@ -284,8 +284,8 @@ describe("API to driver boundary", () => {
     });
     expect(execution.session.context.appAccessSnapshot.entries).toEqual([
       {
+        canWrite: true,
         mountPath: "/workspace/docs",
-        role: "edit",
         spaceId: API_DRIVER_BOUNDARY_IDS.space,
         type: "space",
       },

@@ -27,7 +27,7 @@ export async function uploadFileContent(
   const context = await ensureUploadAccess({
     database: bindings.DB,
     fileId,
-    requiredRole: "edit",
+    requiredIntent: "write",
     viewer,
   });
   const { upload } = context;
@@ -68,7 +68,7 @@ export async function uploadFilePart(
   const context = await ensureUploadAccess({
     database: bindings.DB,
     fileId,
-    requiredRole: "edit",
+    requiredIntent: "write",
     viewer,
   });
   const { upload } = context;
@@ -114,7 +114,7 @@ export async function abortFileUpload(
   const context = await ensureUploadAccess({
     database: bindings.DB,
     fileId,
-    requiredRole: "edit",
+    requiredIntent: "write",
     viewer,
   });
   await expireUploadIfNeeded(bindings.DB, context);

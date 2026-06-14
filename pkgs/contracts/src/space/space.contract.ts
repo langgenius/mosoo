@@ -1,7 +1,5 @@
 import type { AccountId, AgentId, FileId, AppId, SessionId, SpaceId } from "../id/id.contract";
 
-export type SpaceRole = "admin" | "edit" | "read";
-
 export const SPACE_NAME_MAX_LENGTH = 64;
 export const SPACE_NAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
 export const SPACE_NAME_RULE_DESCRIPTION =
@@ -25,24 +23,27 @@ export function getSpaceNameValidationError(spaceName: string): string | null {
 
 export interface SpaceView {
   canDelete: boolean;
+  canManage: boolean;
+  canRead: boolean;
+  canWrite: boolean;
   createdAt: string;
   id: SpaceId;
   name: string;
   ownerId: AccountId;
   appId: AppId;
-  role: SpaceRole;
   storagePrefix: string;
-  viewerAssetRole: SpaceRole;
 }
 
 export interface SpaceDetail {
   canDelete: boolean;
+  canManage: boolean;
+  canRead: boolean;
+  canWrite: boolean;
   createdAt: string;
   id: SpaceId;
   name: string;
   ownerId: AccountId;
   appId: AppId;
-  viewerAssetRole: SpaceRole;
 }
 
 export interface SpaceWriteActor {

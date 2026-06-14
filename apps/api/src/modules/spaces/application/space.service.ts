@@ -35,7 +35,6 @@ export async function listAppSpaces(
       name: spacesTable.name,
       owner_account_id: spacesTable.ownerAccountId,
       app_id: spacesTable.appId,
-      role_rank: sql<number>`3`.as("role_rank"),
     })
     .from(spacesTable)
     .where(eq(spacesTable.appId, appId))
@@ -69,7 +68,7 @@ export async function createSpace(
     })
     .run();
 
-  const createdSpace = await ensureSpaceAccess(database, viewerId, input.appId, spaceId, "read");
+  const createdSpace = await ensureSpaceAccess(database, viewerId, input.appId, spaceId, "view");
 
   return toSpaceView(createdSpace);
 }
@@ -81,7 +80,7 @@ export async function getSpace(
   spaceId: SpaceId,
 ): Promise<SpaceDetail> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  const space = await ensureSpaceAccess(database, viewerId, appId, spaceId, "read");
+  const space = await ensureSpaceAccess(database, viewerId, appId, spaceId, "view");
   return toSpaceDetail(space);
 }
 
@@ -91,7 +90,7 @@ export async function updateSpace(
   input: UpdateSpaceInput,
 ): Promise<SpaceDetail> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureSpaceAccess(database, viewerId, input.appId, input.spaceId, "admin");
+  await ensureSpaceAccess(database, viewerId, input.appId, input.spaceId, "manage");
 
   const updates: Partial<typeof spacesTable.$inferInsert> = {};
 
@@ -124,7 +123,7 @@ export async function deleteSpace(
   spaceId: SpaceId,
 ): Promise<void> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureSpaceAccess(bindings.DB, viewerId, appId, spaceId, "admin");
+  await ensureSpaceAccess(bindings.DB, viewerId, appId, spaceId, "manage");
 
   await deleteFilesForScope(bindings, {
     actorAccountId: viewerId,

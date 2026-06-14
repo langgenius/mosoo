@@ -27,8 +27,8 @@ export const InputStartCommand = type({
   kind: '"input.start"',
   "appAccessSnapshot?": type({
     entries: type({
+      canWrite: "boolean",
       mountPath: NonEmptyString,
-      role: '"admin" | "edit" | "read"',
       spaceId: NonEmptyString,
       type: '"space"',
     }).array(),
@@ -68,8 +68,8 @@ export const AccessRefreshCommand = type({
   kind: '"access.refresh"',
   appAccessSnapshot: type({
     entries: type({
+      canWrite: "boolean",
       mountPath: NonEmptyString,
-      role: '"admin" | "edit" | "read"',
       spaceId: NonEmptyString,
       type: '"space"',
     }).array(),

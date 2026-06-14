@@ -50,7 +50,7 @@ export async function createSpaceDirectory(
   input: CreateSpaceDirectoryInput,
 ): Promise<DirectoryEntry> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureSpaceAccess(database, viewerId, input.appId, input.spaceId, "edit");
+  await ensureSpaceAccess(database, viewerId, input.appId, input.spaceId, "write");
 
   const path = joinPath(normalizeSpaceDirectoryPath(input.path), normalizeFileName(input.name));
   const parentPath = getParentPath(path);

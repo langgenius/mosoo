@@ -33,7 +33,7 @@ async function ensureAgentPackageFileAccess(
 export async function ensureUploadAccess({
   database,
   fileId,
-  requiredRole,
+  requiredIntent,
   viewer,
 }: UploadAccessRequest): Promise<FileUploadContext> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
@@ -48,7 +48,7 @@ export async function ensureUploadAccess({
       database,
       viewerId,
       parsePlatformId(context.upload.scope_id, "upload space ID"),
-      requiredRole,
+      requiredIntent,
     );
   } else if (context.upload.scope_kind === "session") {
     if (!context.sessionAccess) {
@@ -75,7 +75,7 @@ export async function ensureUploadAccess({
 export async function ensureFileAccess({
   database,
   fileId,
-  requiredRole,
+  requiredIntent,
   viewer,
 }: FileAccessRequest): Promise<FileRecordRow> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
@@ -90,7 +90,7 @@ export async function ensureFileAccess({
       database,
       viewerId,
       parsePlatformId(file.scope_id, "file space ID"),
-      requiredRole,
+      requiredIntent,
     );
   } else if (file.scope_kind === "session") {
     await ensureSessionFileAccess(

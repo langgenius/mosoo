@@ -107,12 +107,12 @@ type Documents = {
     "\n  query AppSkills($appId: ULID!) {\n    appSkillList(appId: $appId) {\n      ...SkillSummaryFields\n    }\n  }\n": typeof types.AppSkillsDocument,
     "\n  mutation CreateSkillFork($input: CreateSkillForkInput!) {\n    createSkillFork(input: $input) {\n      ...SkillSummaryFields\n    }\n  }\n": typeof types.CreateSkillForkDocument,
     "\n  mutation DeleteOwnedSkill($appId: ULID!, $skillId: ULID!) {\n    deleteOwnedSkill(appId: $appId, skillId: $skillId) {\n      ok\n    }\n  }\n": typeof types.DeleteOwnedSkillDocument,
-    "\n  mutation CreateSpace($input: CreateSpaceInput!) {\n    createSpace(input: $input) {\n      createdAt\n      id\n      name\n      ownerId\n      appId\n      role\n      storagePrefix\n      canDelete\n      viewerAssetRole\n    }\n  }\n": typeof types.CreateSpaceDocument,
+    "\n  mutation CreateSpace($input: CreateSpaceInput!) {\n    createSpace(input: $input) {\n      createdAt\n      id\n      name\n      ownerId\n      appId\n      storagePrefix\n      canDelete\n      canManage\n      canRead\n      canWrite\n    }\n  }\n": typeof types.CreateSpaceDocument,
     "\n  mutation DeleteSpace($appId: ULID!, $spaceId: ULID!) {\n    deleteSpace(appId: $appId, spaceId: $spaceId) {\n      ok\n    }\n  }\n": typeof types.DeleteSpaceDocument,
     "\n  query SpaceFiles($appId: ULID!, $spaceId: ULID!, $path: String) {\n    spaceFiles(appId: $appId, spaceId: $spaceId, path: $path) {\n      directories {\n        key\n      }\n      files {\n        etag\n        id\n        key\n        lock {\n          expiresAt\n          holder {\n            displayName\n            id\n            type\n          }\n          path\n        }\n        mimeType\n        size\n        uploadedAt\n        version\n      }\n    }\n  }\n": typeof types.SpaceFilesDocument,
     "\n  mutation CreateSpaceDirectory($input: CreateSpaceDirectoryInput!) {\n    createSpaceDirectory(input: $input) {\n      key\n    }\n  }\n": typeof types.CreateSpaceDirectoryDocument,
     "\n  mutation DeleteSpaceEntry($input: DeleteSpaceEntryInput!) {\n    deleteSpaceEntry(input: $input) {\n      ok\n    }\n  }\n": typeof types.DeleteSpaceEntryDocument,
-    "\n  query Spaces($appId: ULID!) {\n    spaceList(appId: $appId) {\n      createdAt\n      id\n      name\n      ownerId\n      appId\n      role\n      storagePrefix\n      canDelete\n      viewerAssetRole\n    }\n  }\n": typeof types.SpacesDocument,
+    "\n  query Spaces($appId: ULID!) {\n    spaceList(appId: $appId) {\n      createdAt\n      id\n      name\n      ownerId\n      appId\n      storagePrefix\n      canDelete\n      canManage\n      canRead\n      canWrite\n    }\n  }\n": typeof types.SpacesDocument,
     "\n  query Viewer {\n    viewer {\n      account {\n        email\n        id\n        imageUrl\n        name\n        systemAgentModel {\n          modelId\n          vendor\n        }\n      }\n      activeOrganization {\n        avatarUrl\n        createdAt\n        id\n        name\n        slug\n      }\n      auth {\n        currentSecurityLevel\n        methods\n      }\n      organizations {\n        avatarUrl\n        createdAt\n        id\n        name\n        slug\n      }\n    }\n  }\n": typeof types.ViewerDocument,
     "\n  mutation UpdateProfile($input: UpdateAccountProfileInput!) {\n    updateProfile(input: $input) {\n      imageUrl\n      name\n    }\n  }\n": typeof types.UpdateProfileDocument,
     "\n  mutation SetSystemAgentModel($input: SetSystemAgentModelInput!) {\n    setSystemAgentModel(input: $input) {\n      id\n      systemAgentModel {\n        modelId\n        vendor\n      }\n    }\n  }\n": typeof types.SetSystemAgentModelDocument,
@@ -216,12 +216,12 @@ const documents: Documents = {
     "\n  query AppSkills($appId: ULID!) {\n    appSkillList(appId: $appId) {\n      ...SkillSummaryFields\n    }\n  }\n": types.AppSkillsDocument,
     "\n  mutation CreateSkillFork($input: CreateSkillForkInput!) {\n    createSkillFork(input: $input) {\n      ...SkillSummaryFields\n    }\n  }\n": types.CreateSkillForkDocument,
     "\n  mutation DeleteOwnedSkill($appId: ULID!, $skillId: ULID!) {\n    deleteOwnedSkill(appId: $appId, skillId: $skillId) {\n      ok\n    }\n  }\n": types.DeleteOwnedSkillDocument,
-    "\n  mutation CreateSpace($input: CreateSpaceInput!) {\n    createSpace(input: $input) {\n      createdAt\n      id\n      name\n      ownerId\n      appId\n      role\n      storagePrefix\n      canDelete\n      viewerAssetRole\n    }\n  }\n": types.CreateSpaceDocument,
+    "\n  mutation CreateSpace($input: CreateSpaceInput!) {\n    createSpace(input: $input) {\n      createdAt\n      id\n      name\n      ownerId\n      appId\n      storagePrefix\n      canDelete\n      canManage\n      canRead\n      canWrite\n    }\n  }\n": types.CreateSpaceDocument,
     "\n  mutation DeleteSpace($appId: ULID!, $spaceId: ULID!) {\n    deleteSpace(appId: $appId, spaceId: $spaceId) {\n      ok\n    }\n  }\n": types.DeleteSpaceDocument,
     "\n  query SpaceFiles($appId: ULID!, $spaceId: ULID!, $path: String) {\n    spaceFiles(appId: $appId, spaceId: $spaceId, path: $path) {\n      directories {\n        key\n      }\n      files {\n        etag\n        id\n        key\n        lock {\n          expiresAt\n          holder {\n            displayName\n            id\n            type\n          }\n          path\n        }\n        mimeType\n        size\n        uploadedAt\n        version\n      }\n    }\n  }\n": types.SpaceFilesDocument,
     "\n  mutation CreateSpaceDirectory($input: CreateSpaceDirectoryInput!) {\n    createSpaceDirectory(input: $input) {\n      key\n    }\n  }\n": types.CreateSpaceDirectoryDocument,
     "\n  mutation DeleteSpaceEntry($input: DeleteSpaceEntryInput!) {\n    deleteSpaceEntry(input: $input) {\n      ok\n    }\n  }\n": types.DeleteSpaceEntryDocument,
-    "\n  query Spaces($appId: ULID!) {\n    spaceList(appId: $appId) {\n      createdAt\n      id\n      name\n      ownerId\n      appId\n      role\n      storagePrefix\n      canDelete\n      viewerAssetRole\n    }\n  }\n": types.SpacesDocument,
+    "\n  query Spaces($appId: ULID!) {\n    spaceList(appId: $appId) {\n      createdAt\n      id\n      name\n      ownerId\n      appId\n      storagePrefix\n      canDelete\n      canManage\n      canRead\n      canWrite\n    }\n  }\n": types.SpacesDocument,
     "\n  query Viewer {\n    viewer {\n      account {\n        email\n        id\n        imageUrl\n        name\n        systemAgentModel {\n          modelId\n          vendor\n        }\n      }\n      activeOrganization {\n        avatarUrl\n        createdAt\n        id\n        name\n        slug\n      }\n      auth {\n        currentSecurityLevel\n        methods\n      }\n      organizations {\n        avatarUrl\n        createdAt\n        id\n        name\n        slug\n      }\n    }\n  }\n": types.ViewerDocument,
     "\n  mutation UpdateProfile($input: UpdateAccountProfileInput!) {\n    updateProfile(input: $input) {\n      imageUrl\n      name\n    }\n  }\n": types.UpdateProfileDocument,
     "\n  mutation SetSystemAgentModel($input: SetSystemAgentModelInput!) {\n    setSystemAgentModel(input: $input) {\n      id\n      systemAgentModel {\n        modelId\n        vendor\n      }\n    }\n  }\n": types.SetSystemAgentModelDocument,
@@ -604,7 +604,7 @@ export function graphql(source: "\n  mutation DeleteOwnedSkill($appId: ULID!, $s
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  mutation CreateSpace($input: CreateSpaceInput!) {\n    createSpace(input: $input) {\n      createdAt\n      id\n      name\n      ownerId\n      appId\n      role\n      storagePrefix\n      canDelete\n      viewerAssetRole\n    }\n  }\n"): typeof import('./graphql').CreateSpaceDocument;
+export function graphql(source: "\n  mutation CreateSpace($input: CreateSpaceInput!) {\n    createSpace(input: $input) {\n      createdAt\n      id\n      name\n      ownerId\n      appId\n      storagePrefix\n      canDelete\n      canManage\n      canRead\n      canWrite\n    }\n  }\n"): typeof import('./graphql').CreateSpaceDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -624,7 +624,7 @@ export function graphql(source: "\n  mutation DeleteSpaceEntry($input: DeleteSpa
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query Spaces($appId: ULID!) {\n    spaceList(appId: $appId) {\n      createdAt\n      id\n      name\n      ownerId\n      appId\n      role\n      storagePrefix\n      canDelete\n      viewerAssetRole\n    }\n  }\n"): typeof import('./graphql').SpacesDocument;
+export function graphql(source: "\n  query Spaces($appId: ULID!) {\n    spaceList(appId: $appId) {\n      createdAt\n      id\n      name\n      ownerId\n      appId\n      storagePrefix\n      canDelete\n      canManage\n      canRead\n      canWrite\n    }\n  }\n"): typeof import('./graphql').SpacesDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

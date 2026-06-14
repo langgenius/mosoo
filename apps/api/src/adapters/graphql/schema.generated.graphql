@@ -1709,11 +1709,13 @@ type SkillSummary {
 type Space {
   appId: ULID!
   canDelete: Boolean!
+  canManage: Boolean!
+  canRead: Boolean!
+  canWrite: Boolean!
   createdAt: String!
   id: ULID!
   name: String!
   ownerId: ULID!
-  viewerAssetRole: SpaceRole!
 }
 
 type SpaceFileListing {
@@ -1738,22 +1740,17 @@ enum SpaceFileLockHolderType {
   user
 }
 
-enum SpaceRole {
-  admin
-  edit
-  read
-}
-
 type SpaceView {
   appId: ULID!
   canDelete: Boolean!
+  canManage: Boolean!
+  canRead: Boolean!
+  canWrite: Boolean!
   createdAt: String!
   id: ULID!
   name: String!
   ownerId: ULID!
-  role: SpaceRole!
   storagePrefix: String!
-  viewerAssetRole: SpaceRole!
 }
 
 input StartLarkAgentChannelRegistrationInput {

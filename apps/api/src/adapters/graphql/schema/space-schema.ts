@@ -1,24 +1,27 @@
 export const spaceSchema = /* GraphQL */ `
   type SpaceView {
     canDelete: Boolean!
+    canManage: Boolean!
+    canRead: Boolean!
+    canWrite: Boolean!
     createdAt: String!
     id: ULID!
     name: String!
     ownerId: ULID!
     appId: ULID!
-    role: SpaceRole!
     storagePrefix: String!
-    viewerAssetRole: SpaceRole!
   }
 
   type Space {
     canDelete: Boolean!
+    canManage: Boolean!
+    canRead: Boolean!
+    canWrite: Boolean!
     createdAt: String!
     id: ULID!
     name: String!
     ownerId: ULID!
     appId: ULID!
-    viewerAssetRole: SpaceRole!
   }
 
   type DirectoryEntry {
@@ -56,12 +59,6 @@ export const spaceSchema = /* GraphQL */ `
   type SpaceFileListing {
     directories: [DirectoryEntry!]!
     files: [FileEntry!]!
-  }
-
-  enum SpaceRole {
-    admin
-    edit
-    read
   }
 
   input CreateSpaceInput {

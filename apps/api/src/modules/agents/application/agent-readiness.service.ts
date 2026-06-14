@@ -21,10 +21,7 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { toIsoString } from "../../../time";
 import { parseStoredEnvVarsJson } from "../../environments/application/environment-config";
 import { getSupportedRuntimeId } from "../../runtime/domain/runtime-config";
-import {
-  isSpaceRoleRankSufficient,
-  listSpaceAccessRows,
-} from "../../spaces/domain/space-access.policy";
+import { listSpaceAccessRows } from "../../spaces/domain/space-access.policy";
 import { collectRuntimeCapabilityIssues } from "./agent-runtime-capability-resolution.service";
 
 function createIssue(
@@ -71,11 +68,11 @@ async function collectBoundSpaceIssues(
       continue;
     }
 
-    if (!row || !isSpaceRoleRankSufficient(row.role_rank, "read")) {
+    if (!row) {
       issues.push(
         createIssue(
           "agent.bound_space.forbidden",
-          `Bound Space ${spaceId} is not available: Insufficient space permission.`,
+          `Bound Space ${spaceId} is not available: App owner access required.`,
         ),
       );
     }
