@@ -77,7 +77,7 @@ export function CostPage() {
       />
       <CostTabBar effectiveTab={activeTab} setActiveTab={setActiveTab} />
 
-      <main className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+      <main className="min-h-0 flex-1 overflow-y-auto px-5 py-6">
         <div className="mx-auto max-w-6xl space-y-5">
           {costQuery.isLoading ? (
             <div className="border-border bg-card text-muted-foreground rounded-lg border px-4 py-10 text-center text-sm">
