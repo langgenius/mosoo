@@ -18,13 +18,11 @@ export const mcpSchema = /* GraphQL */ `
   }
 
   enum McpCredentialScope {
-    user
-    organization_shared
+    app
   }
 
   enum McpCredentialRecordScope {
-    user
-    organization_shared
+    app
     agent
   }
 
@@ -43,8 +41,7 @@ export const mcpSchema = /* GraphQL */ `
   }
 
   enum McpServerSource {
-    personal
-    organization_shared
+    app
   }
 
   type McpCredentialSummary {
@@ -65,16 +62,16 @@ export const mcpSchema = /* GraphQL */ `
     credentialScope: McpCredentialScope!
     description: String
     enabled: Boolean!
-    hasSharedCredential: Boolean!
+    hasCredential: Boolean!
     iconUrl: String
     id: ULID!
     name: String!
     ownerId: ULID!
     ownerName: String!
+    appId: ULID!
     source: McpServerSource!
     updatedAt: String!
     url: String!
-    organizationId: ULID!
   }
 
   type McpServerWithCredential {
@@ -86,26 +83,24 @@ export const mcpSchema = /* GraphQL */ `
     credentialStatus: McpCredentialStatus!
     description: String
     enabled: Boolean!
-    hasSharedCredential: Boolean!
+    hasCredential: Boolean!
     iconUrl: String
     id: ULID!
     name: String!
     ownerId: ULID!
     ownerName: String!
+    appId: ULID!
     source: McpServerSource!
     updatedAt: String!
     url: String!
-    organizationId: ULID!
   }
 
   type McpRegistry {
     currentUserEmail: String!
     currentUserId: ULID!
     currentUserName: String!
-    isAdmin: Boolean!
-    personal: [McpServerWithCredential!]!
-    organizationId: ULID!
-    organizationShared: [McpServerWithCredential!]!
+    appId: ULID!
+    servers: [McpServerWithCredential!]!
   }
 
   type AgentMcpBinding {
@@ -117,7 +112,7 @@ export const mcpSchema = /* GraphQL */ `
     credentialStatus: McpCredentialStatus!
     credentialSubject: String
     enabled: Boolean!
-    hasSharedCredential: Boolean!
+    hasCredential: Boolean!
     iconUrl: String
     id: ULID!
     name: String!
@@ -141,43 +136,26 @@ export const mcpSchema = /* GraphQL */ `
     subjectLabel: String
   }
 
-  input CreatePersonalMcpServerInput {
+  input CreateAppMcpServerInput {
     authType: McpAuthType!
     description: String
     iconUrl: String
     name: String!
     oauthClientId: String
     oauthClientSecret: String
+    appId: ULID!
     url: String!
-    organizationId: ULID!
-  }
-
-  input CreateOrganizationMcpServerInput {
-    authType: McpAuthType!
-    credentialScope: McpCredentialScope!
-    description: String
-    iconUrl: String
-    name: String!
-    oauthClientId: String
-    oauthClientSecret: String
-    sharedBearerToken: String
-    url: String!
-    organizationId: ULID!
   }
 
   input ConnectMcpBearerInput {
-    serverId: ULID!
-    subjectLabel: String
-    token: String!
-  }
-
-  input SetOrganizationSharedMcpBearerInput {
+    appId: ULID!
     serverId: ULID!
     subjectLabel: String
     token: String!
   }
 
   input StartMcpOAuthInput {
+    appId: ULID!
     returnUrl: String
     serverId: ULID!
   }

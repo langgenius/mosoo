@@ -14,7 +14,7 @@ const UNICORN_SDK_URL =
  * itself so the section's own background shows through — the copy on top stays
  * readable instead of sitting on a black canvas.
  */
-export function UnicornBackground({ projectId }: { projectId: string }): ReactElement | null {
+export function UnicornBackground({ sceneId }: { sceneId: string }): ReactElement | null {
   const [failed, setFailed] = useState(false);
 
   if (failed) {
@@ -27,7 +27,7 @@ export function UnicornBackground({ projectId }: { projectId: string }): ReactEl
       className="pointer-events-none absolute inset-0 z-0 [&>div]:!h-full [&>div]:!w-full"
     >
       <UnicornScene
-        projectId={projectId}
+        projectId={sceneId}
         sdkUrl={UNICORN_SDK_URL}
         width="100%"
         height="100%"

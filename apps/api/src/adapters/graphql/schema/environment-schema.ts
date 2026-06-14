@@ -18,11 +18,6 @@ export const environmentSchema = /* GraphQL */ `
     user
   }
 
-  enum EnvironmentShareTargetKind {
-    organization
-    user
-  }
-
   enum EnvironmentVariableStatus {
     configured
     pending
@@ -74,15 +69,7 @@ export const environmentSchema = /* GraphQL */ `
     setupScript: String!
     updatedAt: String!
     usedByAgentCount: Int!
-    organizationId: ULID!
-  }
-
-  type EnvironmentShareTarget {
-    createdAt: String!
-    email: String
-    id: ULID!
-    kind: EnvironmentShareTargetKind!
-    name: String
+    appId: ULID!
   }
 
   type EnvironmentDetail {
@@ -106,10 +93,9 @@ export const environmentSchema = /* GraphQL */ `
     packages: [EnvironmentPackageSpec!]!
     role: EnvironmentRegistryRole!
     setupScript: String!
-    shareTargets: [EnvironmentShareTarget!]!
     updatedAt: String!
     usedByAgentCount: Int!
-    organizationId: ULID!
+    appId: ULID!
   }
 
   input EnvironmentPackageSpecInput {
@@ -130,7 +116,7 @@ export const environmentSchema = /* GraphQL */ `
     envVars: [EnvironmentVariableInput!]!
     name: String!
     networkPolicy: EnvironmentNetworkPolicy!
-    organizationId: ULID!
+    appId: ULID!
     packages: [EnvironmentPackageSpecInput!]!
     setupScript: String!
   }
@@ -145,40 +131,29 @@ export const environmentSchema = /* GraphQL */ `
     name: String!
     networkPolicy: EnvironmentNetworkPolicy!
     packages: [EnvironmentPackageSpecInput!]!
+    appId: ULID!
     setupScript: String!
   }
 
   input CreateEnvironmentForkInput {
     environmentId: ULID!
+    appId: ULID!
   }
 
   input DeleteEnvironmentInput {
     environmentId: ULID!
+    appId: ULID!
   }
 
-  input SetOrganizationDefaultEnvironmentInput {
+  input SetAppDefaultEnvironmentInput {
     environmentId: ULID!
-    organizationId: ULID!
+    appId: ULID!
   }
 
   input SetEnvironmentVariableValueInput {
     environmentId: ULID!
     key: String!
+    appId: ULID!
     value: String!
-  }
-
-  input ShareEnvironmentWithUserInput {
-    email: String!
-    environmentId: ULID!
-  }
-
-  input ShareEnvironmentWithOrganizationInput {
-    environmentId: ULID!
-  }
-
-  input UnshareEnvironmentTargetInput {
-    environmentId: ULID!
-    targetId: ULID!
-    targetKind: EnvironmentShareTargetKind!
   }
 `;

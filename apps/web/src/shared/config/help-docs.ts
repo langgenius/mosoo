@@ -48,7 +48,7 @@ export const HELP_DOCS: readonly HelpDoc[] = [
   },
   {
     section: "API reference",
-    title: "Create a Thread for a published Agent",
+    title: "Create a Thread for an Agent API Endpoint",
     url: "https://docs.mosoo.ai/api-reference/create-a-thread-for-a-published-agent",
   },
   {
@@ -68,7 +68,7 @@ export const HELP_DOCS: readonly HelpDoc[] = [
   },
   {
     section: "API reference",
-    title: "List Threads for a published Agent",
+    title: "List Threads for an Agent API Endpoint",
     url: "https://docs.mosoo.ai/api-reference/list-threads-for-a-published-agent",
   },
   {

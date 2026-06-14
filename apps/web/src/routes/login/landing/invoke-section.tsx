@@ -50,7 +50,7 @@ function SkillMock(): ReactElement {
         <span className="bg-bg-sunken text-fg-2 rounded-[4px] px-1.5 py-0.5 font-mono text-[10px]">
           ⌘K
         </span>
-        Run an agent skill
+        Run exported Skill.md
       </div>
       <ul className="p-1.5">
         {SKILLS.map((skill, index) => (
@@ -109,13 +109,13 @@ function ChannelsMock(): ReactElement {
 const CARDS = [
   {
     visual: <SkillMock />,
-    title: "Run it as a skill",
-    desc: "Invoke a published agent as a /skill inside Claude Code or any compatible CLI: no context-switching, no glue code.",
+    title: "Reuse as Skill.md",
+    desc: "Export the App to one Skill.md, then reuse it as a /skill inside Claude Code or any compatible CLI: no context-switching, no glue code.",
   },
   {
     visual: <ApiMock />,
     title: "Call it over the API",
-    desc: "Every agent gets a typed HTTP endpoint. Wire it into your backend, a cron job, or another agent.",
+    desc: "Every App-local Agent gets a typed HTTP endpoint. Wire it into your backend, a cron job, or another agent.",
   },
   {
     visual: <ChannelsMock />,
@@ -141,14 +141,13 @@ export function InvokeSection(): ReactElement {
       <div className="relative z-10 mx-auto w-full max-w-[1080px]">
         <Reveal className="mx-auto max-w-[680px] text-center">
           <h2 className="text-fg-1" style={HEADING_STYLE}>
-            Publish once.
+            Build one App.
             <br />
-            Call it anywhere.
+            Invoke its agents anywhere.
           </h2>
           <p className="text-fg-2 mt-5 text-[15px] leading-[1.6]">
-            A published agent isn&apos;t trapped in a dashboard. Run it as a skill in Claude Code,
-            call it over a typed API, or drop it into the chat tools your users already live in:
-            same agent, every surface.
+            Export the App for Skill.md reuse, expose an App-local Agent through a typed API, or
+            bind that Agent to the chat tools your users already live in: one App, every surface.
           </p>
         </Reveal>
 

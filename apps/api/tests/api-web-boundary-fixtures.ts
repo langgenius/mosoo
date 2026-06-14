@@ -1,9 +1,9 @@
-import type { PublishedThreadSummary } from "@mosoo/contracts/public-api";
+import type { PublicThreadSummary } from "@mosoo/contracts/public-api";
 import type { SessionFile, SessionSummary } from "@mosoo/contracts/session";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
 
-import { createPublishedAgentOpenApiDocument } from "../src/adapters/http/routes/published-agent-openapi";
-import { PUBLIC_API_TEST_IDS } from "./helpers/published-agent-http-test-fixture";
+import { createPublicApiOpenApiDocument } from "../src/adapters/http/routes/public-api-openapi";
+import { PUBLIC_API_TEST_IDS } from "./helpers/public-api-http-test-fixture";
 
 export function createSessionSummary(): SessionSummary {
   return {
@@ -67,7 +67,7 @@ export function createChunkedJsonRequest(url: string, value: unknown, chunkSize:
   });
 }
 
-export function createThreadSummary(): PublishedThreadSummary {
+export function createThreadSummary(): PublicThreadSummary {
   return {
     agent_id: PUBLIC_API_TEST_IDS.agent,
     attributed_user: { id: PUBLIC_API_TEST_IDS.memberAccount },
@@ -98,7 +98,7 @@ function objectSchemaProperties(schema: Record<string, unknown>): Record<string,
 }
 
 export function openApiSchemaProperties(schemaName: string): Record<string, unknown> {
-  const document = createPublishedAgentOpenApiDocument("https://api.example.com");
+  const document = createPublicApiOpenApiDocument("https://api.example.com");
   const schema = document.components.schemas[schemaName];
 
   if (!schema) {
@@ -109,7 +109,7 @@ export function openApiSchemaProperties(schemaName: string): Record<string, unkn
 }
 
 export function openApiJsonRequestExample(path: string, method: "post"): unknown {
-  const document = createPublishedAgentOpenApiDocument("https://api.example.com");
+  const document = createPublicApiOpenApiDocument("https://api.example.com");
   const operation = document.paths[path]?.[method];
 
   if (!operation) {
@@ -128,7 +128,7 @@ function openApiJsonResponseContent(
   method: "get" | "post",
   status: string,
 ): Record<string, unknown> {
-  const document = createPublishedAgentOpenApiDocument("https://api.example.com");
+  const document = createPublicApiOpenApiDocument("https://api.example.com");
   const operation = document.paths[path]?.[method];
 
   if (!operation) {
@@ -156,8 +156,8 @@ function requireRecord(value: unknown, description: string): Record<string, unkn
   return value as Record<string, unknown>;
 }
 
-export function publishedThreadRequestExamples(): Array<[string, unknown]> {
-  const document = createPublishedAgentOpenApiDocument("https://api.example.com");
+export function publicThreadRequestExamples(): Array<[string, unknown]> {
+  const document = createPublicApiOpenApiDocument("https://api.example.com");
   const threadOperation = document.paths["/agents/{agentId}/threads"]?.post;
 
   if (!threadOperation) {

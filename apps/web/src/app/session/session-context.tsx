@@ -1,13 +1,13 @@
 import type { AccountProfile } from "@mosoo/contracts/account";
-import type { OrganizationInvitation, OrganizationSummary } from "@mosoo/contracts/organization";
+import type { AppSummary } from "@mosoo/contracts/app";
+import type { OrganizationSummary } from "@mosoo/contracts/organization";
 import { createContext, useCallback, useMemo, use } from "react";
 import type { ReactNode } from "react";
 
-import { setActiveOrganization as setActiveOrganizationRemote } from "@/domains/organization/api/organization-client";
+import { useOrganizationAppsQuery } from "@/domains/app/query/app-queries";
 import { useViewerQuery } from "@/domains/user/query/user-queries";
-import { toOrganizationId } from "@/routes/typed-id";
 
-import { usePendingOrganizationInvitationsState } from "./use-pending-organization-invitations";
+import { resolveActiveApp } from "./active-app";
 
 export type OnboardingState = "complete" | "loading" | "pending";
 
@@ -21,15 +21,15 @@ interface SessionUser {
 interface AppSessionContextValue {
   activeOrganization: OrganizationSummary | null;
   activeOrganizationId: string | null;
+  activeApp: AppSummary | null;
+  activeAppId: string | null;
   onboardingState: OnboardingState | null;
   organizations: OrganizationSummary[];
   organizationsLoading: boolean;
-  pendingInvitations: OrganizationInvitation[];
-  pendingInvitationsLoading: boolean;
+  apps: AppSummary[];
+  appsLoading: boolean;
   refreshOnboardingState(): Promise<boolean>;
   refreshOrganizations(): Promise<OrganizationSummary[]>;
-  refreshPendingInvitations(): Promise<OrganizationInvitation[]>;
-  setActiveOrganizationId(organizationId: string): Promise<void>;
   user: SessionUser | null;
   userLoading: boolean;
 }
@@ -70,13 +70,11 @@ export function AppSessionProvider({ children }: { children: ReactNode }) {
   const viewerQuery = useViewerQuery();
   const viewer = viewerQuery.data ?? null;
   const user = toSessionUser(viewer?.account ?? null);
-  const pendingInvitationsState = usePendingOrganizationInvitationsState(user?.id ?? null);
-  const memberships = viewer?.memberships;
-  const organizations = useMemo(
-    () => memberships?.map((membership) => membership.organization) ?? EMPTY_ORGANIZATIONS,
-    [memberships],
-  );
+  const organizations = useMemo(() => viewer?.organizations ?? EMPTY_ORGANIZATIONS, [viewer]);
   const activeOrganization = viewer?.activeOrganization ?? null;
+  const appsQuery = useOrganizationAppsQuery(activeOrganization?.id ?? null);
+  const apps = activeOrganization === null ? [] : (appsQuery.data ?? []);
+  const activeApp = resolveActiveApp(apps);
   const onboardingState = resolveOnboardingState({
     hasOrganizations: organizations.length > 0,
     loading: viewerQuery.isLoading,
@@ -86,7 +84,7 @@ export function AppSessionProvider({ children }: { children: ReactNode }) {
   const refetchViewer = viewerQuery.refetch;
   const refreshViewer = useCallback(async (): Promise<OrganizationSummary[]> => {
     const result = await refetchViewer();
-    return result.data?.memberships.map((membership) => membership.organization) ?? [];
+    return result.data?.organizations ?? [];
   }, [refetchViewer]);
 
   const refreshOnboardingState = useCallback(async (): Promise<boolean> => {
@@ -94,41 +92,32 @@ export function AppSessionProvider({ children }: { children: ReactNode }) {
     return nextOrganizations.length > 0;
   }, [refreshViewer]);
 
-  const setActiveOrganizationId = useCallback(
-    async (organizationId: string): Promise<void> => {
-      await setActiveOrganizationRemote(toOrganizationId(organizationId));
-      await refreshViewer();
-    },
-    [refreshViewer],
-  );
-
   const value = useMemo<AppSessionContextValue>(
     () => ({
       activeOrganization,
       activeOrganizationId: activeOrganization?.id ?? null,
+      activeApp,
+      activeAppId: activeApp?.id ?? null,
       onboardingState,
       organizations,
       organizationsLoading: viewerQuery.isLoading,
-      pendingInvitations: pendingInvitationsState.pendingInvitations,
-      pendingInvitationsLoading: pendingInvitationsState.loading,
+      apps,
+      appsLoading: appsQuery.isLoading,
       refreshOnboardingState,
       refreshOrganizations: refreshViewer,
-      refreshPendingInvitations: pendingInvitationsState.refresh,
-      setActiveOrganizationId,
       user,
       userLoading: viewerQuery.isLoading,
     }),
     [
       activeOrganization,
+      activeApp,
       onboardingState,
       organizations,
-      pendingInvitationsState.loading,
-      pendingInvitationsState.pendingInvitations,
-      pendingInvitationsState.refresh,
       refreshOnboardingState,
       refreshViewer,
-      setActiveOrganizationId,
       user,
+      apps,
+      appsQuery.isLoading,
       viewerQuery.isLoading,
     ],
   );

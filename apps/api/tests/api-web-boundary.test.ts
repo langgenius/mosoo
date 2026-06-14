@@ -3,18 +3,18 @@ import { describe, expect, test } from "bun:test";
 import { PUBLIC_API_ERROR_CODES } from "@mosoo/contracts/public-api";
 import type { AgentSessionEventBatch } from "@mosoo/contracts/session";
 import { PLATFORM_ID_INPUT_PATTERN } from "@mosoo/id";
-import { isInputObjectType, isObjectType } from "graphql";
+import { isEnumType, isInputObjectType, isObjectType } from "graphql";
 
 import { createGraphQLSchema } from "../src/adapters/graphql/create-graphql-schema";
+import { createPublicApiOpenApiDocument } from "../src/adapters/http/routes/public-api-openapi";
 import {
   parseOptionalBoolean,
   readCreateThreadRequest,
   readCreateThreadFileRequest,
   readSendEventsRequest,
-} from "../src/adapters/http/routes/published-agent-api-request";
-import { createPublishedAgentOpenApiDocument } from "../src/adapters/http/routes/published-agent-openapi";
-import { PublishedAgentApiError } from "../src/modules/public-api/published-agent-api-errors";
-import { toPublishedEventBatch } from "../src/modules/public-api/published-agent-api-presenter";
+} from "../src/adapters/http/routes/public-thread-api-request";
+import { PublicApiError } from "../src/modules/public-api/public-api-errors";
+import { toPublicThreadEventBatch } from "../src/modules/public-api/public-thread-api-presenter";
 import {
   createChunkedJsonRequest,
   createRunSummary,
@@ -24,9 +24,9 @@ import {
   openApiJsonRequestExample,
   openApiJsonResponseExample,
   openApiSchemaProperties,
-  publishedThreadRequestExamples,
+  publicThreadRequestExamples,
 } from "./api-web-boundary-fixtures";
-import { PUBLIC_API_TEST_IDS } from "./helpers/published-agent-http-test-fixture";
+import { PUBLIC_API_TEST_IDS } from "./helpers/public-api-http-test-fixture";
 
 function hasOwnProperty(value: object, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
@@ -100,26 +100,155 @@ describe("API to web boundary", () => {
 
     expect(createSessionInput.getFields().waitForRuntimeReady).toBeDefined();
 
-    const publicDocument = createPublishedAgentOpenApiDocument("https://api.example.com");
+    const publicDocument = createPublicApiOpenApiDocument("https://api.example.com");
     expect(publicDocument.paths["/agents/{agentId}/sessions"]).toBeUndefined();
     expect(openApiSchemaProperties("CreateThreadRequest")["waitForRuntimeReady"]).toBeUndefined();
   });
 
   test("keeps platform ID fields on the GraphQL ULID scalar", () => {
     const schema = createGraphQLSchema();
-    const collaborator = schema.getType("Collaborator");
+    const session = schema.getType("Session");
     const mutation = schema.getMutationType();
 
-    if (!isObjectType(collaborator) || !mutation) {
-      throw new Error("Expected Collaborator and Mutation in the GraphQL schema.");
+    if (!isObjectType(session) || !mutation) {
+      throw new Error("Expected Session and Mutation in the GraphQL schema.");
     }
 
-    expect(String(collaborator.getFields().assignedBy?.type)).toBe("ULID");
+    expect(String(session.getFields().appId?.type)).toBe("ULID!");
     expect(String(mutation.getFields().prewarmAgentSession?.args[0]?.type)).toBe("ULID!");
+    expect(String(mutation.getFields().archiveAgentSession?.args[0]?.type)).toBe("ULID!");
   });
 
-  test("keeps the published HTTP contract aligned with the shared public API schema", () => {
-    const document = createPublishedAgentOpenApiDocument("https://api.example.com");
+  test("keeps Provider credential mutations explicitly App-scoped", () => {
+    const schema = createGraphQLSchema();
+    const updateInput = schema.getType("UpdateVendorCredentialInput");
+    const deleteInput = schema.getType("DeleteVendorCredentialInput");
+
+    if (!isInputObjectType(updateInput) || !isInputObjectType(deleteInput)) {
+      throw new Error("Expected Provider credential mutation inputs in the GraphQL schema.");
+    }
+
+    expect(String(updateInput.getFields().appId?.type)).toBe("ULID!");
+    expect(String(deleteInput.getFields().appId?.type)).toBe("ULID!");
+  });
+
+  test("keeps cost GraphQL App-scoped and Organization billing-only", () => {
+    const schema = createGraphQLSchema();
+    const query = schema.getQueryType();
+
+    if (!query) {
+      throw new Error("Expected Query in the GraphQL schema.");
+    }
+
+    const fields = query.getFields();
+    const agentCostCard = fields.agentCostCard;
+
+    expect(fields.appCostCard).toBeDefined();
+    expect(fields.organizationBillingCostCard).toBeDefined();
+    expect(String(agentCostCard?.args.find((arg) => arg.name === "appId")?.type)).toBe("ULID!");
+    expect(fields.memberCostCard).toBeUndefined();
+    expect(fields.organizationCostCard).toBeUndefined();
+    expect(fields.ownerCostCard).toBeUndefined();
+  });
+
+  test("keeps Channel GraphQL setup App-scoped with Agent-owned delivery", () => {
+    const schema = createGraphQLSchema();
+
+    for (const typeName of [
+      "CreateSlackAgentChannelBindingInput",
+      "CreateLarkAgentChannelBindingInput",
+      "StartLarkAgentChannelRegistrationInput",
+      "PollLarkAgentChannelRegistrationInput",
+      "CreateTelegramAgentChannelBindingInput",
+      "CreateDiscordAgentChannelBindingInput",
+      "StartWeChatAgentChannelPairingInput",
+      "PollWeChatAgentChannelPairingInput",
+    ] as const) {
+      const input = schema.getType(typeName);
+
+      if (!isInputObjectType(input)) {
+        throw new Error(`Expected ${typeName} to be a GraphQL input object.`);
+      }
+
+      expect(String(input.getFields().appId?.type)).toBe("ULID!");
+      expect(String(input.getFields().agentId?.type)).toBe("ULID!");
+      expect(input.getFields().organizationId).toBeUndefined();
+    }
+
+    const deleteInput = schema.getType("DeleteAgentChannelBindingInput");
+
+    if (!isInputObjectType(deleteInput)) {
+      throw new Error("Expected DeleteAgentChannelBindingInput to be a GraphQL input object.");
+    }
+
+    expect(String(deleteInput.getFields().appId?.type)).toBe("ULID!");
+    expect(String(deleteInput.getFields().bindingId?.type)).toBe("ULID!");
+    expect(deleteInput.getFields().agentId).toBeUndefined();
+    expect(deleteInput.getFields().organizationId).toBeUndefined();
+  });
+
+  test("keeps file draft GraphQL enums App-scoped", () => {
+    const schema = createGraphQLSchema();
+    const scopeKind = schema.getType("FileScopeKind");
+    const purpose = schema.getType("FilePurpose");
+
+    if (!isEnumType(scopeKind) || !isEnumType(purpose)) {
+      throw new Error("Expected file GraphQL enums.");
+    }
+
+    const scopeValues = scopeKind.getValues().map((value) => value.name);
+    const purposeValues = purpose.getValues().map((value) => value.name);
+
+    expect(scopeValues).toContain("app_draft");
+    expect(scopeValues).not.toContain("organization_draft");
+    expect(purposeValues).toContain("app_draft");
+    expect(purposeValues).not.toContain("organization_draft");
+  });
+
+  test("keeps V1 GraphQL free of Organization collaboration surfaces", () => {
+    const schema = createGraphQLSchema();
+    const query = schema.getQueryType();
+    const mutation = schema.getMutationType();
+
+    if (!query || !mutation) {
+      throw new Error("Expected Query and Mutation in the GraphQL schema.");
+    }
+
+    const queryFields = query.getFields();
+    const mutationFields = mutation.getFields();
+
+    for (const fieldName of [
+      "agentCollaboratorList",
+      "onboardingDiscovery",
+      "sessionThreadUiStateList",
+    ] as const) {
+      expect(queryFields[fieldName]).toBeUndefined();
+    }
+
+    for (const fieldName of [
+      "addAgentCollaborator",
+      "removeAgentCollaborator",
+      "updateAgentCollaborator",
+      "updateSessionThreadUiState",
+    ] as const) {
+      expect(mutationFields[fieldName]).toBeUndefined();
+    }
+
+    for (const typeName of [
+      "AgentCollaborator",
+      "AgentCollaboratorRole",
+      "AddAgentCollaboratorInput",
+      "RemoveAgentCollaboratorInput",
+      "UpdateAgentCollaboratorInput",
+      "SessionThreadUiState",
+      "UpdateSessionThreadUiStateInput",
+    ] as const) {
+      expect(schema.getType(typeName)).toBeUndefined();
+    }
+  });
+
+  test("keeps the public HTTP contract aligned with the shared public API schema", () => {
+    const document = createPublicApiOpenApiDocument("https://api.example.com");
 
     expect(document.openapi).toBe("3.1.0");
     expect(document.servers).toEqual([{ url: "https://api.example.com/api/v1" }]);
@@ -162,7 +291,7 @@ describe("API to web boundary", () => {
   });
 
   test("documents bare ULID public IDs in OpenAPI", () => {
-    const document = createPublishedAgentOpenApiDocument("https://api.example.com");
+    const document = createPublicApiOpenApiDocument("https://api.example.com");
     const agentIdParameter = document.paths["/agents/{agentId}/threads"]?.post?.parameters?.find(
       (parameter) => parameter.name === "agentId",
     );
@@ -185,8 +314,8 @@ describe("API to web boundary", () => {
     }
   });
 
-  test("documents every visible Published Agent OpenAPI field", () => {
-    const document = createPublishedAgentOpenApiDocument("https://api.example.com");
+  test("documents every visible Agent API Endpoint OpenAPI field", () => {
+    const document = createPublicApiOpenApiDocument("https://api.example.com");
     const gaps: string[] = [];
 
     for (const [path, pathItem] of Object.entries(document.paths)) {
@@ -392,8 +521,8 @@ describe("API to web boundary", () => {
     });
   });
 
-  test("keeps published thread OpenAPI request examples parseable by the public reader", async () => {
-    const examples = publishedThreadRequestExamples();
+  test("keeps Public Thread API request examples parseable by the public reader", async () => {
+    const examples = publicThreadRequestExamples();
     let hasFileExample = false;
 
     expect(examples.length).toBeGreaterThanOrEqual(3);
@@ -424,7 +553,7 @@ describe("API to web boundary", () => {
     expect(hasFileExample).toBe(true);
   });
 
-  test("keeps published session file OpenAPI examples aligned with public readers and responses", async () => {
+  test("keeps Public Thread file OpenAPI examples aligned with public readers and responses", async () => {
     const requestExample = openApiJsonRequestExample("/threads/{threadId}/files", "post");
     const sessionFile = createSessionFile();
 
@@ -499,7 +628,7 @@ describe("API to web boundary", () => {
     });
   });
 
-  test("rejects unsupported Published Agent public request fields", async () => {
+  test("rejects unsupported Public API request fields", async () => {
     await expect(
       readSendEventsRequest({
         req: {
@@ -571,7 +700,7 @@ describe("API to web boundary", () => {
       parseOptionalBoolean("yes");
       throw new Error("Expected parseOptionalBoolean to reject.");
     } catch (error) {
-      expect(error).toBeInstanceOf(PublishedAgentApiError);
+      expect(error).toBeInstanceOf(PublicApiError);
       expect(error).toMatchObject({
         code: "invalid_request",
         status: 400,
@@ -606,17 +735,17 @@ describe("API to web boundary", () => {
       warnings: [],
     } satisfies AgentSessionEventBatch;
 
-    const published = toPublishedEventBatch({
+    const publicBatch = toPublicThreadEventBatch({
       batch,
       thread: createThreadSummary(),
     });
 
-    expect(published.thread).toMatchObject({
+    expect(publicBatch.thread).toMatchObject({
       agent_id: PUBLIC_API_TEST_IDS.agent,
       id: PUBLIC_API_TEST_IDS.memberSession,
       source: "api",
     });
-    expectNoProperties(published.thread, [
+    expectNoProperties(publicBatch.thread, [
       "deploymentVersionId",
       "deploymentVersionNumber",
       "lastMessageAt",
@@ -627,9 +756,9 @@ describe("API to web boundary", () => {
       "type",
     ]);
 
-    const eventRun = published.events[0]?.run;
+    const eventRun = publicBatch.events[0]?.run;
     if (!eventRun) {
-      throw new Error("Expected published event run.");
+      throw new Error("Expected public event run.");
     }
 
     expect(eventRun).toMatchObject({
