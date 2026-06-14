@@ -293,7 +293,6 @@ describe("runtime event AG-UI adapter", () => {
         deploymentVersionId: PLATFORM_ID_FIXTURES.agentDeploymentVersion.toLowerCase(),
         environmentRevisionId: PLATFORM_ID_FIXTURES.environmentRevision.toLowerCase(),
         executionActorId: PLATFORM_ID_FIXTURES.account.toLowerCase(),
-        organizationId: PLATFORM_ID_FIXTURES.organization.toLowerCase(),
       },
       delivery: "lossless",
       driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance.toLowerCase(),
@@ -317,7 +316,6 @@ describe("runtime event AG-UI adapter", () => {
         deploymentVersionId: PLATFORM_ID_FIXTURES.agentDeploymentVersion,
         environmentRevisionId: PLATFORM_ID_FIXTURES.environmentRevision,
         executionActorId: PLATFORM_ID_FIXTURES.account,
-        organizationId: PLATFORM_ID_FIXTURES.organization,
       },
       driverInstanceId: PLATFORM_ID_FIXTURES.driverInstance,
       id: PLATFORM_ID_FIXTURES.runtimeEvent,
@@ -326,6 +324,15 @@ describe("runtime event AG-UI adapter", () => {
     });
 
     expect(() => parseRuntimeEventEnvelope({ ...event, runId: "run-1" })).toThrow();
+    expect(() =>
+      parseRuntimeEventEnvelope({
+        ...event,
+        context: {
+          ...event.context,
+          organizationId: PLATFORM_ID_FIXTURES.organization,
+        },
+      }),
+    ).toThrow("Runtime event context organizationId is not supported.");
   });
 
   test("rejects malformed public runtime event payloads at ingress", () => {

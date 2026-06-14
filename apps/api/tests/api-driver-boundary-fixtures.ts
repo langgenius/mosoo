@@ -193,7 +193,6 @@ export function createRuntimeSessionLink(): RuntimeSessionLink {
     callerId: API_DRIVER_BOUNDARY_IDS.account,
     creatorId: API_DRIVER_BOUNDARY_IDS.account,
     executionOwnerId: API_DRIVER_BOUNDARY_IDS.account,
-    organizationId: API_DRIVER_BOUNDARY_IDS.organization,
     sandboxId: API_DRIVER_BOUNDARY_IDS.sandbox,
     sandboxKind: "cattle",
     sandboxSubjectKind: "session",

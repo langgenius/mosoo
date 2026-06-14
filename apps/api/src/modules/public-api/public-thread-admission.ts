@@ -1,11 +1,4 @@
-import type {
-  AccountId,
-  AgentId,
-  OrganizationId,
-  PersonalAccessTokenId,
-  PlatformId,
-  AppId,
-} from "@mosoo/id";
+import type { AccountId, AgentId, PersonalAccessTokenId, PlatformId, AppId } from "@mosoo/id";
 
 import type { PublicApiCaller } from "../auth/application/public-api-caller.service";
 import { getAccountViewer } from "../auth/application/public-api-caller.service";
@@ -23,7 +16,6 @@ export interface ThreadCreationAdmission {
   creatorViewer: AuthenticatedViewer;
   executionOwnerId: AccountId;
   fileViewer: AuthenticatedViewer;
-  organizationId: OrganizationId;
   appId: AppId;
   tokenId: PersonalAccessTokenId;
   tokenLabel: string;
@@ -92,7 +84,6 @@ export async function admitPublicThreadCreator(
     creatorViewer: caller.viewer,
     executionOwnerId: agent.ownerId,
     fileViewer: caller.viewer,
-    organizationId: agent.appOrganizationId,
     appId: agent.appId,
     tokenId: caller.tokenId,
     tokenLabel: caller.tokenLabel,
