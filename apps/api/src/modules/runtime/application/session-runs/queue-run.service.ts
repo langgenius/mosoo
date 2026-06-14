@@ -5,7 +5,6 @@ import type {
   AgentDeploymentVersionId,
   AgentId,
   FileId,
-  OrganizationId,
   AppId,
   SessionId,
 } from "@mosoo/id";
@@ -43,7 +42,6 @@ interface QueueSessionRunInput {
     deployment_version_number: number | null;
     id: SessionId;
     model: string;
-    organization_id: OrganizationId;
     app_id: AppId;
     provider: string;
     runtime_id: string;
@@ -143,7 +141,6 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     requestUrl,
     session: {
       id: input.session.id,
-      organization_id: input.session.organization_id,
       app_id: input.session.app_id,
     },
     sessionRunId: createdRun.id,

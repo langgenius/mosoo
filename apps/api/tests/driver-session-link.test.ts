@@ -38,9 +38,8 @@ function createDriverSessionLinkDatabase(): SqliteD1Database {
     CREATE TABLE session (
       agent_id text,
       creator_account_id text NOT NULL,
-      id text PRIMARY KEY NOT NULL,
-      organization_id text NOT NULL
-    );
+      id text PRIMARY KEY NOT NULL
+);
 
     CREATE TABLE agent (
       id text PRIMARY KEY NOT NULL,
@@ -61,8 +60,8 @@ function createDriverSessionLinkDatabase(): SqliteD1Database {
     INSERT INTO agent (id, owner_account_id)
     VALUES ('${AGENT_ID}', '${OWNER_ID}');
 
-    INSERT INTO session (agent_id, creator_account_id, id, organization_id)
-    VALUES ('${AGENT_ID}', '${CREATOR_ID}', '${SESSION_ID}', '${ORGANIZATION_ID}');
+    INSERT INTO session (agent_id, creator_account_id, id)
+    VALUES ('${AGENT_ID}', '${CREATOR_ID}', '${SESSION_ID}');
 
     INSERT INTO sandbox (id, kind, subject_kind)
     VALUES ('${SANDBOX_ID}', 'cattle', 'session');
@@ -90,7 +89,6 @@ describe("driver runtime session link", () => {
       agentId: AGENT_ID,
       callerId: CALLER_FROM_ORIGIN_ID,
       executionOwnerId: EXECUTION_OWNER_FROM_ORIGIN_ID,
-      organizationId: ORGANIZATION_ID,
       sandboxId: SANDBOX_ID,
       sessionId: SESSION_ID,
       sessionRunId: null,

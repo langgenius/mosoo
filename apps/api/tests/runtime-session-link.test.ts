@@ -25,9 +25,8 @@ function createRuntimeSessionLinkDatabase(): SqliteD1Database {
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
       agent_id text NOT NULL,
-      creator_account_id text NOT NULL,
-      organization_id text NOT NULL
-    );
+      creator_account_id text NOT NULL
+);
 
     CREATE TABLE agent (
       id text PRIMARY KEY NOT NULL,
@@ -48,8 +47,8 @@ function createRuntimeSessionLinkDatabase(): SqliteD1Database {
     INSERT INTO agent (id, owner_account_id)
     VALUES ('01J00000000000000000000009', '01J00000000000000000000001');
 
-    INSERT INTO session (id, agent_id, creator_account_id, organization_id)
-    VALUES ('session-1', '01J00000000000000000000009', 'creator-1', '01J00000000000000000000006');
+    INSERT INTO session (id, agent_id, creator_account_id)
+    VALUES ('session-1', '01J00000000000000000000009', 'creator-1');
 
     INSERT INTO session_run (driver_instance_id, id, session_id, created_by_account_id, trace_id, status)
     VALUES ('driver-1', 'run-1', 'session-1', 'caller-1', 'trace-1', 'running');

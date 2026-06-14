@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "faa27a1a-4736-5108-8127-718d9b564e95",
+  "id": "8a9f2819-b9f8-5103-87b7-b9e6a18ac722",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_deployment_version": {
@@ -5171,13 +5171,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "app_id": {
           "name": "app_id",
           "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
@@ -5293,50 +5286,6 @@
         "session_status_updated_idx": {
           "name": "session_status_updated_idx",
           "columns": ["status", "updated_at", "id"],
-          "isUnique": false
-        },
-        "session_organization_creator_status_updated_idx": {
-          "name": "session_organization_creator_status_updated_idx",
-          "columns": ["organization_id", "creator_account_id", "status", "updated_at", "id"],
-          "isUnique": false
-        },
-        "session_organization_attributed_status_updated_idx": {
-          "name": "session_organization_attributed_status_updated_idx",
-          "columns": ["organization_id", "attributed_user_id", "status", "updated_at", "id"],
-          "isUnique": false
-        },
-        "session_organization_creator_archived_updated_idx": {
-          "name": "session_organization_creator_archived_updated_idx",
-          "columns": ["organization_id", "creator_account_id", "archived_at", "updated_at", "id"],
-          "isUnique": false
-        },
-        "session_organization_attributed_archived_updated_idx": {
-          "name": "session_organization_attributed_archived_updated_idx",
-          "columns": ["organization_id", "attributed_user_id", "archived_at", "updated_at", "id"],
-          "isUnique": false
-        },
-        "session_organization_creator_type_archived_updated_idx": {
-          "name": "session_organization_creator_type_archived_updated_idx",
-          "columns": [
-            "organization_id",
-            "creator_account_id",
-            "type",
-            "archived_at",
-            "updated_at",
-            "id"
-          ],
-          "isUnique": false
-        },
-        "session_organization_attributed_type_archived_updated_idx": {
-          "name": "session_organization_attributed_type_archived_updated_idx",
-          "columns": [
-            "organization_id",
-            "attributed_user_id",
-            "type",
-            "archived_at",
-            "updated_at",
-            "id"
-          ],
           "isUnique": false
         }
       },

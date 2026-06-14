@@ -1,4 +1,4 @@
-import type { OrganizationId, AppId, SessionId } from "@mosoo/id";
+import type { AppId, SessionId } from "@mosoo/id";
 
 import { logError, logInfo } from "../../../../platform/cloudflare/logger";
 import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
@@ -24,7 +24,6 @@ interface AgentSessionRuntimePrewarmRequest {
   requestUrl: string;
   session: {
     id: SessionId;
-    organizationId: OrganizationId;
     appId: AppId;
   };
   viewer: AuthenticatedViewer;
@@ -62,7 +61,6 @@ export async function prewarmAgentSessionRuntime(
     const hydrated = await timing.measure("hydrateRunContext", () =>
       hydrateCachedRunContextFromSession(bindings, viewer, {
         id: session.id,
-        organizationId: session.organizationId,
         appId: session.appId,
         ...(accessViewer ? { accessViewer } : {}),
       }),

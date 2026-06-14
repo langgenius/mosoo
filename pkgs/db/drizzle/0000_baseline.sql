@@ -838,7 +838,6 @@ CREATE TABLE `session` (
 	`message_seq_cursor` integer DEFAULT 0 NOT NULL,
 	`metadata_json` text DEFAULT '{}' NOT NULL,
 	`model` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`provider` text NOT NULL,
 	`renamed` integer NOT NULL,
@@ -861,12 +860,6 @@ CREATE INDEX `session_app_creator_type_archived_updated_idx` ON `session` (`app_
 CREATE INDEX `session_app_attributed_type_archived_updated_idx` ON `session` (`app_id`,`attributed_user_id`,`type`,`archived_at`,`updated_at`,`id`);--> statement-breakpoint
 CREATE INDEX `session_status_operation_updated_idx` ON `session` (`status`,`status_operation_id`,`updated_at`);--> statement-breakpoint
 CREATE INDEX `session_status_updated_idx` ON `session` (`status`,`updated_at`,`id`);--> statement-breakpoint
-CREATE INDEX `session_organization_creator_status_updated_idx` ON `session` (`organization_id`,`creator_account_id`,`status`,`updated_at`,`id`);--> statement-breakpoint
-CREATE INDEX `session_organization_attributed_status_updated_idx` ON `session` (`organization_id`,`attributed_user_id`,`status`,`updated_at`,`id`);--> statement-breakpoint
-CREATE INDEX `session_organization_creator_archived_updated_idx` ON `session` (`organization_id`,`creator_account_id`,`archived_at`,`updated_at`,`id`);--> statement-breakpoint
-CREATE INDEX `session_organization_attributed_archived_updated_idx` ON `session` (`organization_id`,`attributed_user_id`,`archived_at`,`updated_at`,`id`);--> statement-breakpoint
-CREATE INDEX `session_organization_creator_type_archived_updated_idx` ON `session` (`organization_id`,`creator_account_id`,`type`,`archived_at`,`updated_at`,`id`);--> statement-breakpoint
-CREATE INDEX `session_organization_attributed_type_archived_updated_idx` ON `session` (`organization_id`,`attributed_user_id`,`type`,`archived_at`,`updated_at`,`id`);--> statement-breakpoint
 CREATE TABLE `session_execution_snapshot` (
 	`created_at` integer NOT NULL,
 	`plan_json` text NOT NULL,

@@ -67,7 +67,6 @@ describe("createAgentSession", () => {
       kind: "pet",
       lastRun: null,
       model: "gpt-5.4",
-      organizationId: PUBLIC_API_TEST_IDS.organization,
       provider: "openai",
       appId: PUBLIC_API_TEST_IDS.app,
       runtimeId: "openai-runtime",

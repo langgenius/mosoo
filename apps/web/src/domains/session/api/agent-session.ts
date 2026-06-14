@@ -53,7 +53,6 @@ const CREATE_AGENT_SESSION_MUTATION = graphql(/* GraphQL */ `
       title
       type
       updatedAt
-      organizationId
     }
   }
 `);
@@ -110,7 +109,6 @@ const AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
         title
         type
         updatedAt
-        organizationId
       }
     }
   }

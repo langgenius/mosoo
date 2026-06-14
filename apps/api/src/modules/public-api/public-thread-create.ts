@@ -123,7 +123,6 @@ export async function createPublicThread(
           deployment_version_number: session.deploymentVersionNumber,
           id: sessionId,
           model: session.model,
-          organization_id: session.organizationId,
           app_id: session.appId,
           provider: session.provider,
           runtime_id: session.runtimeId,

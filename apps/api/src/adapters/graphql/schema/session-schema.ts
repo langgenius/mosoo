@@ -119,7 +119,6 @@ export const sessionSchema = /* GraphQL */ `
     title: String
     type: SessionType!
     updatedAt: String!
-    organizationId: ULID!
     appId: ULID!
   }
 

@@ -4,7 +4,6 @@ import type {
   AccountId,
   ChannelBindingId,
   FileId,
-  OrganizationId,
   AppId,
   SessionId,
   SessionRunId,
@@ -63,7 +62,6 @@ export interface SessionRunDispatchCommandPayload {
   requestUrl: string;
   session: {
     id: SessionId;
-    organization_id: OrganizationId;
     app_id: AppId;
   };
   sessionRunId: SessionRunId;
@@ -202,10 +200,6 @@ function parseSessionRunDispatchPayload(value: unknown): SessionRunDispatchComma
     requestUrl: readNonEmptyString(record, "requestUrl", "session_run_dispatch payload"),
     session: {
       id: parsePlatformId<SessionId>(session["id"], "session_run_dispatch payload.session.id"),
-      organization_id: parsePlatformId<OrganizationId>(
-        session["organization_id"],
-        "session_run_dispatch payload.session.organization_id",
-      ),
       app_id: parsePlatformId<AppId>(
         session["app_id"],
         "session_run_dispatch payload.session.app_id",

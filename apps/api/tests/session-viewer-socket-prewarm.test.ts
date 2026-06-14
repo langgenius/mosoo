@@ -50,7 +50,6 @@ function createSessionViewerSocketPrewarmDatabase(input: {
       attributed_user_id text,
       creator_account_id text NOT NULL,
       metadata_json text DEFAULT '{}' NOT NULL,
-      organization_id text NOT NULL,
       app_id text NOT NULL,
       status text NOT NULL,
       type text NOT NULL
@@ -73,7 +72,6 @@ function createSessionViewerSocketPrewarmDatabase(input: {
       attributed_user_id,
       creator_account_id,
       metadata_json,
-      organization_id,
       app_id,
       status,
       type
@@ -83,7 +81,6 @@ function createSessionViewerSocketPrewarmDatabase(input: {
       NULL,
       '${VIEWER_ID}',
       '{}',
-      '${ORGANIZATION_ID}',
       '${APP_ID}',
       'IDLE',
       '${input.type}'
@@ -180,7 +177,6 @@ describe("session viewer socket runtime prewarm", () => {
     expect(scheduledRequest.requestUrl).toBe(SESSION_VIEWER_SOCKET_URL);
     expect(scheduledRequest.session).toEqual({
       id: SESSION_ID,
-      organizationId: ORGANIZATION_ID,
       appId: APP_ID,
     });
     expect(scheduledRequest.viewer).toBe(VIEWER);

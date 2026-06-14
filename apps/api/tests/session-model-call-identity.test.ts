@@ -61,6 +61,11 @@ function createSessionModelCallDatabase(): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
 
   database.execute(`
+    CREATE TABLE app (
+      id text PRIMARY KEY NOT NULL,
+      organization_id text NOT NULL
+    );
+
     CREATE TABLE agent (
       id text PRIMARY KEY NOT NULL,
       owner_account_id text NOT NULL,
@@ -72,7 +77,6 @@ function createSessionModelCallDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       metadata_json text DEFAULT '{}' NOT NULL,
       model text NOT NULL,
-      organization_id text NOT NULL,
       app_id text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
@@ -170,6 +174,15 @@ async function seedRunIdentity(
   await database
     .prepare(
       `
+        INSERT INTO app (id, organization_id)
+        VALUES (?, ?)
+      `,
+    )
+    .bind(APP_ID, ORGANIZATION_ID)
+    .run();
+  await database
+    .prepare(
+      `
         INSERT INTO agent (id, owner_account_id, app_id, status)
         VALUES (?, ?, ?, 'published')
       `,
@@ -183,16 +196,15 @@ async function seedRunIdentity(
           id,
           metadata_json,
           model,
-          organization_id,
           app_id,
           provider,
           runtime_id,
           type
         )
-        VALUES (?, ?, 'session-model', ?, ?, 'session-provider', 'session-runtime', ?)
+        VALUES (?, ?, 'session-model', ?, 'session-provider', 'session-runtime', ?)
       `,
     )
-    .bind(SESSION_ID, sessionMetadataJson, ORGANIZATION_ID, APP_ID, sessionType)
+    .bind(SESSION_ID, sessionMetadataJson, APP_ID, sessionType)
     .run();
   await database
     .prepare(

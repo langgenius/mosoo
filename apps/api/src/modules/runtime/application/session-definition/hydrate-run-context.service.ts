@@ -166,7 +166,7 @@ export function buildRuntimeVendorEnvVars(
 async function hydrateRunContextFromSession(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  session: Pick<SessionSummary, "id" | "organizationId"> & {
+  session: Pick<SessionSummary, "id"> & {
     accessViewer?: AuthenticatedViewer;
     appId: AppId;
   },
@@ -383,7 +383,7 @@ async function hydrateRunContextFromSession(
 async function refreshCachedRunContextVolatileFields(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  session: Pick<SessionSummary, "id" | "organizationId"> & {
+  session: Pick<SessionSummary, "id"> & {
     accessViewer?: AuthenticatedViewer;
     appId: AppId;
   },
@@ -520,7 +520,7 @@ async function refreshCachedRunContextVolatileFields(
 export async function hydrateCachedRunContextFromSession(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  session: Pick<SessionSummary, "id" | "organizationId"> & {
+  session: Pick<SessionSummary, "id"> & {
     accessViewer?: AuthenticatedViewer;
     appId: AppId;
   },
