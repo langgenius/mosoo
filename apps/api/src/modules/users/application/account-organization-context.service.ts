@@ -1,13 +1,12 @@
-import type { ViewerOrganizationMembership } from "@mosoo/contracts/account";
 import type { OrganizationSummary } from "@mosoo/contracts/organization";
-import { accountsTable, organizationMembersTable, organizationsTable } from "@mosoo/db";
+import { accountsTable, organizationsTable } from "@mosoo/db";
 import type { AccountId, OrganizationId } from "@mosoo/id";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
-import { currentTimestampMs, toIsoString } from "../../../time";
-import { toOrganizationSummary } from "../../organizations/domain/organization-access.policy";
+import { currentTimestampMs } from "../../../time";
+import { toOrganizationSummary } from "../../organizations/domain/organization-ownership.policy";
 
 export interface AccountOrganizationState {
   id: AccountId;
@@ -16,7 +15,7 @@ export interface AccountOrganizationState {
 
 export interface ViewerOrganizationContext {
   activeOrganization: OrganizationSummary | null;
-  memberships: ViewerOrganizationMembership[];
+  organizations: OrganizationSummary[];
 }
 
 async function getAccountOrganizationState(
@@ -64,41 +63,24 @@ export async function recordLastActiveOrganization(
   await writeLastActiveOrganizationId(database, accountId, organizationId);
 }
 
-export async function listViewerOrganizationMemberships(
+export async function listViewerOrganizations(
   database: D1Database,
   accountId: AccountId,
-): Promise<ViewerOrganizationMembership[]> {
+): Promise<OrganizationSummary[]> {
   const results = await getAppDatabase(database)
     .select({
       avatar_url: organizationsTable.avatarUrl,
       created_at: organizationsTable.createdAt,
       id: organizationsTable.id,
-      joined_at: organizationMembersTable.joinedAt,
-      join_policy: organizationsTable.joinPolicy,
       name: organizationsTable.name,
-      primary_domain: organizationsTable.primaryDomain,
-      role: organizationMembersTable.role,
       slug: organizationsTable.slug,
     })
-    .from(organizationMembersTable)
-    .innerJoin(
-      organizationsTable,
-      eq(organizationsTable.id, organizationMembersTable.organizationId),
-    )
-    .where(
-      and(
-        eq(organizationMembersTable.accountId, accountId),
-        isNull(organizationMembersTable.disabledAt),
-      ),
-    )
-    .orderBy(desc(organizationMembersTable.joinedAt))
+    .from(organizationsTable)
+    .where(eq(organizationsTable.creatorAccountId, accountId))
+    .orderBy(desc(organizationsTable.createdAt))
     .all();
 
-  return results.map((row) => ({
-    joinedAt: toIsoString(row.joined_at),
-    organization: toOrganizationSummary({ ...row, viewer_role: row.role }),
-    role: row.role,
-  }));
+  return results.map(toOrganizationSummary);
 }
 
 export async function resolveActiveOrganization(
@@ -112,39 +94,38 @@ async function resolveViewerOrganizationContext(
   database: D1Database,
   accountId: AccountId,
 ): Promise<ViewerOrganizationContext> {
-  const [account, memberships] = await Promise.all([
+  const [account, organizations] = await Promise.all([
     getAccountOrganizationState(database, accountId),
-    listViewerOrganizationMemberships(database, accountId),
+    listViewerOrganizations(database, accountId),
   ]);
 
-  return resolveViewerOrganizationContextFromState(database, account, memberships);
+  return resolveViewerOrganizationContextFromState(database, account, organizations);
 }
 
 export async function resolveViewerOrganizationContextFromState(
   database: D1Database,
   account: AccountOrganizationState,
-  memberships: ViewerOrganizationMembership[],
+  organizations: OrganizationSummary[],
 ): Promise<ViewerOrganizationContext> {
-  if (memberships.length === 0) {
+  if (organizations.length === 0) {
     if (isTruthy(account.lastActiveOrganizationId)) {
       await writeLastActiveOrganizationId(database, account.id, null);
     }
 
-    return { activeOrganization: null, memberships };
+    return { activeOrganization: null, organizations };
   }
 
-  const activeMembership =
-    memberships.find(
-      (membership) => membership.organization.id === account.lastActiveOrganizationId,
-    ) ?? memberships[0];
+  const activeOrganization =
+    organizations.find((organization) => organization.id === account.lastActiveOrganizationId) ??
+    organizations[0];
 
-  if (!activeMembership) {
-    return { activeOrganization: null, memberships };
+  if (!activeOrganization) {
+    return { activeOrganization: null, organizations };
   }
 
-  if (activeMembership.organization.id !== account.lastActiveOrganizationId) {
-    await writeLastActiveOrganizationId(database, account.id, activeMembership.organization.id);
+  if (activeOrganization.id !== account.lastActiveOrganizationId) {
+    await writeLastActiveOrganizationId(database, account.id, activeOrganization.id);
   }
 
-  return { activeOrganization: activeMembership.organization, memberships };
+  return { activeOrganization, organizations };
 }

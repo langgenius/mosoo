@@ -12,20 +12,6 @@ export const userSchema = /* GraphQL */ `
     vendor: String!
   }
 
-  type OnboardingDiscoveryOrganization {
-    creator: String!
-    id: ULID!
-    joinPolicy: OrganizationJoinPolicy!
-    memberCount: Int!
-    name: String!
-  }
-
-  type OnboardingDiscovery {
-    domain: String!
-    isPublicEmail: Boolean!
-    orgs: [OnboardingDiscoveryOrganization!]!
-  }
-
   type OnboardingStatus {
     completed: Boolean!
     organization: Organization
@@ -36,23 +22,15 @@ export const userSchema = /* GraphQL */ `
     methods: [AuthMethod!]!
   }
 
-  type ViewerOrganizationMembership {
-    joinedAt: String!
-    organization: Organization!
-    role: OrganizationMemberRole!
-  }
-
   type Viewer {
     account: Account
     activeOrganization: Organization
     auth: ViewerAuth!
-    memberships: [ViewerOrganizationMembership!]!
+    organizations: [Organization!]!
   }
 
   input BootstrapOnboardingInput {
-    action: String!
     name: String
-    organizationId: ULID
   }
 
   input UpdateAccountProfileInput {

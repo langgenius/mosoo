@@ -1,13 +1,5 @@
-import type {
-  AccountId,
-  AgentId,
-  FileId,
-  OrganizationId,
-  SessionId,
-  SpaceId,
-} from "../id/id.contract";
+import type { AccountId, AgentId, FileId, AppId, SessionId, SpaceId } from "../id/id.contract";
 
-export type SpaceVisibility = "private" | "shared";
 export type SpaceRole = "admin" | "edit" | "read";
 
 export const SPACE_NAME_MAX_LENGTH = 64;
@@ -33,41 +25,24 @@ export function getSpaceNameValidationError(spaceName: string): string | null {
 
 export interface SpaceView {
   canDelete: boolean;
-  canUpdateAcl: boolean;
   createdAt: string;
-  creatorMembershipStatus: "active" | "disabled" | "removed";
   id: SpaceId;
-  isSharedWithViewer: boolean;
   name: string;
   ownerId: AccountId;
+  appId: AppId;
   role: SpaceRole;
   storagePrefix: string;
   viewerAssetRole: SpaceRole;
-  visibility: SpaceVisibility;
 }
 
 export interface SpaceDetail {
   canDelete: boolean;
-  canUpdateAcl: boolean;
   createdAt: string;
-  creatorMembershipStatus: "active" | "disabled" | "removed";
   id: SpaceId;
-  isSharedWithViewer: boolean;
   name: string;
   ownerId: AccountId;
+  appId: AppId;
   viewerAssetRole: SpaceRole;
-  visibility: SpaceVisibility;
-  organizationId: OrganizationId;
-}
-
-export interface Collaborator {
-  assignedBy: AccountId | null;
-  createdAt: string;
-  email: string | null;
-  imageUrl: string | null;
-  name: string | null;
-  principal: string;
-  role: SpaceRole;
 }
 
 export interface SpaceWriteActor {
@@ -145,44 +120,24 @@ export interface SpaceFileListing {
 
 export interface CreateSpaceInput {
   name: string;
-  visibility?: SpaceVisibility;
-  organizationId: OrganizationId;
+  appId: AppId;
 }
 
 export interface UpdateSpaceInput {
   name?: string;
-  spaceId: SpaceId;
-  visibility?: SpaceVisibility;
-}
-
-export interface AddCollaboratorInput {
-  email: string;
-  role: SpaceRole;
-  spaceId: SpaceId;
-}
-
-export interface AddOrganizationCollaboratorInput {
-  spaceId: SpaceId;
-}
-
-export interface UpdateCollaboratorInput {
-  role: SpaceRole;
-  spaceId: SpaceId;
-  userId: AccountId;
-}
-
-export interface RemoveCollaboratorInput {
-  principal: string;
+  appId: AppId;
   spaceId: SpaceId;
 }
 
 export interface CreateSpaceDirectoryInput {
   name: string;
   path?: string;
+  appId: AppId;
   spaceId: SpaceId;
 }
 
 export interface DeleteSpaceEntryInput {
   key: string;
+  appId: AppId;
   spaceId: SpaceId;
 }

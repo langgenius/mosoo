@@ -25,7 +25,7 @@ export const InputStartCommand = type({
   commandId: NonEmptyString,
   input: RuntimeCommandInput,
   kind: '"input.start"',
-  "organizationAccessSnapshot?": type({
+  "appAccessSnapshot?": type({
     entries: type({
       mountPath: NonEmptyString,
       role: '"admin" | "edit" | "read"',
@@ -66,7 +66,7 @@ export type PermissionResolveCommand = typeof PermissionResolveCommand.infer;
 export const AccessRefreshCommand = type({
   commandId: NonEmptyString,
   kind: '"access.refresh"',
-  organizationAccessSnapshot: type({
+  appAccessSnapshot: type({
     entries: type({
       mountPath: NonEmptyString,
       role: '"admin" | "edit" | "read"',

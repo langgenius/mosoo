@@ -8,6 +8,7 @@ import type {
   McpServerId,
   OrganizationId,
   PlatformId,
+  AppId,
   RuntimeEventId,
   SessionId,
   SessionMessageId,
@@ -43,6 +44,7 @@ export interface SessionSummary {
   type: SessionType;
   updatedAt: string;
   organizationId: OrganizationId;
+  appId: AppId;
 }
 
 export interface SessionListPageInfo {
@@ -128,19 +130,6 @@ export interface SessionMessage {
   plan: SessionMessagePlanEntry[];
   role: "assistant" | "user";
   segments: SessionMessageSegment[];
-}
-
-export interface SessionThreadUiState {
-  pinned: boolean;
-  readAt: string | null;
-  sessionId: SessionId;
-  updatedAt: string;
-}
-
-export interface UpdateSessionThreadUiStateInput {
-  pinned?: boolean | null;
-  readAt?: string | null;
-  sessionId: SessionId;
 }
 
 export const SESSION_PROCESS_EVENT_TYPES = [
@@ -264,10 +253,12 @@ export interface AddSessionResourceInput {
     name: string;
     size: number;
   };
+  appId: AppId;
   sessionId: SessionId;
 }
 
 export interface RemoveSessionResourceInput {
+  appId: AppId;
   resourceId: FileId;
   sessionId: SessionId;
 }
@@ -276,6 +267,7 @@ export type AddSessionResourceResult = FileUploadSummary;
 
 export interface CreateAgentSessionInput {
   agentId: AgentId;
+  appId: AppId;
   type?: SessionType | null;
   waitForRuntimeReady?: boolean | null;
 }
@@ -460,6 +452,7 @@ export interface AgentSessionRetrieveConnection {
 }
 
 export interface RenameSessionInput {
+  appId: AppId;
   sessionId: SessionId;
   title: string;
 }

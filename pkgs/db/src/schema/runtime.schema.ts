@@ -16,6 +16,7 @@ import type {
   DriverInstanceId,
   McpServerId,
   PlatformId,
+  AppId,
   RuntimeOperationId,
   SandboxBackupId,
   SandboxId,
@@ -225,6 +226,7 @@ export const driverInstanceMcpGrantsTable = sqliteTable(
     driverInstanceId: platformIdColumn<DriverInstanceId>("driver_instance_id")
       .notNull()
       .references(() => driverInstancesTable.id, { onDelete: "cascade" }),
+    appId: platformIdColumn<AppId>("app_id").notNull(),
     serverId: platformIdColumn<McpServerId>("server_id").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
