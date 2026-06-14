@@ -54,7 +54,6 @@ ${formatEnumValues(AGENT_BUILDER_MESSAGE_ROLES)}
     creatorAccountId: ULID!
     id: ULID!
     lastTurnAt: String
-    organizationId: ULID!
     status: AgentBuilderThreadStatus!
     title: String
     updatedAt: String!

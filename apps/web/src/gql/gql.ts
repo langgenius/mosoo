@@ -15,7 +15,7 @@ import * as types from './graphql';
  * Learn more about it here: https://the-guild.dev/graphql/codegen/plugins/presets/preset-client#reducing-bundle-size
  */
 type Documents = {
-    "\n  mutation EnsureAgentBuilderThread($agentId: ULID!) {\n    ensureAgentBuilderThread(agentId: $agentId) {\n      agentId\n      createdAt\n      creatorAccountId\n      id\n      lastTurnAt\n      organizationId\n      status\n      title\n      updatedAt\n    }\n  }\n": typeof types.EnsureAgentBuilderThreadDocument,
+    "\n  mutation EnsureAgentBuilderThread($agentId: ULID!) {\n    ensureAgentBuilderThread(agentId: $agentId) {\n      agentId\n      createdAt\n      creatorAccountId\n      id\n      lastTurnAt\n      status\n      title\n      updatedAt\n    }\n  }\n": typeof types.EnsureAgentBuilderThreadDocument,
     "\n  mutation ExecuteAgentBuilderControlPlaneAction(\n    $input: ExecuteAgentBuilderControlPlaneActionInput!\n  ) {\n    executeAgentBuilderControlPlaneAction(input: $input) {\n      createdEnvironment {\n        id\n        name\n      }\n      createdMcpServer {\n        authType\n        id\n        name\n        url\n      }\n      message\n      secureUi {\n        kind\n        mcpServerId\n      }\n      sessionId\n      status\n      toolId\n    }\n  }\n": typeof types.ExecuteAgentBuilderControlPlaneActionDocument,
     "\n  query AgentBuilderMessages($agentId: ULID!, $beforeSeq: Int, $limit: Int) {\n    agentBuilderMessages(agentId: $agentId, beforeSeq: $beforeSeq, limit: $limit) {\n      cardsJson\n      contentText\n      createdAt\n      createdByAccountId\n      id\n      inputKind\n      plannerRunId\n      role\n      seq\n      threadId\n    }\n  }\n": typeof types.AgentBuilderMessagesDocument,
     "\n  fragment AgentChannelBindingFields on AgentChannelBinding {\n    activityLastTriggeredAt\n    activitySessionCount7d\n    agentId\n    createdAt\n    displayMetadata\n    externalBotId\n    externalTenantId\n    id\n    lastErrorCode\n    provider\n    status\n    updatedAt\n  }\n": typeof types.AgentChannelBindingFieldsFragmentDoc,
@@ -124,7 +124,7 @@ type Documents = {
     "\n  mutation TestVendorCredential($input: TestVendorCredentialInput!) {\n    testVendorCredential(input: $input) {\n      errorCode\n      latencyMs\n      ok\n    }\n  }\n": typeof types.TestVendorCredentialDocument,
 };
 const documents: Documents = {
-    "\n  mutation EnsureAgentBuilderThread($agentId: ULID!) {\n    ensureAgentBuilderThread(agentId: $agentId) {\n      agentId\n      createdAt\n      creatorAccountId\n      id\n      lastTurnAt\n      organizationId\n      status\n      title\n      updatedAt\n    }\n  }\n": types.EnsureAgentBuilderThreadDocument,
+    "\n  mutation EnsureAgentBuilderThread($agentId: ULID!) {\n    ensureAgentBuilderThread(agentId: $agentId) {\n      agentId\n      createdAt\n      creatorAccountId\n      id\n      lastTurnAt\n      status\n      title\n      updatedAt\n    }\n  }\n": types.EnsureAgentBuilderThreadDocument,
     "\n  mutation ExecuteAgentBuilderControlPlaneAction(\n    $input: ExecuteAgentBuilderControlPlaneActionInput!\n  ) {\n    executeAgentBuilderControlPlaneAction(input: $input) {\n      createdEnvironment {\n        id\n        name\n      }\n      createdMcpServer {\n        authType\n        id\n        name\n        url\n      }\n      message\n      secureUi {\n        kind\n        mcpServerId\n      }\n      sessionId\n      status\n      toolId\n    }\n  }\n": types.ExecuteAgentBuilderControlPlaneActionDocument,
     "\n  query AgentBuilderMessages($agentId: ULID!, $beforeSeq: Int, $limit: Int) {\n    agentBuilderMessages(agentId: $agentId, beforeSeq: $beforeSeq, limit: $limit) {\n      cardsJson\n      contentText\n      createdAt\n      createdByAccountId\n      id\n      inputKind\n      plannerRunId\n      role\n      seq\n      threadId\n    }\n  }\n": types.AgentBuilderMessagesDocument,
     "\n  fragment AgentChannelBindingFields on AgentChannelBinding {\n    activityLastTriggeredAt\n    activitySessionCount7d\n    agentId\n    createdAt\n    displayMetadata\n    externalBotId\n    externalTenantId\n    id\n    lastErrorCode\n    provider\n    status\n    updatedAt\n  }\n": types.AgentChannelBindingFieldsFragmentDoc,
@@ -236,7 +236,7 @@ const documents: Documents = {
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  mutation EnsureAgentBuilderThread($agentId: ULID!) {\n    ensureAgentBuilderThread(agentId: $agentId) {\n      agentId\n      createdAt\n      creatorAccountId\n      id\n      lastTurnAt\n      organizationId\n      status\n      title\n      updatedAt\n    }\n  }\n"): typeof import('./graphql').EnsureAgentBuilderThreadDocument;
+export function graphql(source: "\n  mutation EnsureAgentBuilderThread($agentId: ULID!) {\n    ensureAgentBuilderThread(agentId: $agentId) {\n      agentId\n      createdAt\n      creatorAccountId\n      id\n      lastTurnAt\n      status\n      title\n      updatedAt\n    }\n  }\n"): typeof import('./graphql').EnsureAgentBuilderThreadDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

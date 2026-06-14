@@ -717,7 +717,7 @@ export type EnsureAgentBuilderThreadMutationVariables = Exact<{
 }>;
 
 
-export type EnsureAgentBuilderThreadMutation = { ensureAgentBuilderThread: { agentId: PlatformId, createdAt: string, creatorAccountId: PlatformId, id: PlatformId, lastTurnAt: string | null, organizationId: PlatformId, status: AgentBuilderThreadStatus, title: string | null, updatedAt: string } };
+export type EnsureAgentBuilderThreadMutation = { ensureAgentBuilderThread: { agentId: PlatformId, createdAt: string, creatorAccountId: PlatformId, id: PlatformId, lastTurnAt: string | null, status: AgentBuilderThreadStatus, title: string | null, updatedAt: string } };
 
 export type ExecuteAgentBuilderControlPlaneActionMutationVariables = Exact<{
   input: ExecuteAgentBuilderControlPlaneActionInput;
@@ -1969,7 +1969,6 @@ export const EnsureAgentBuilderThreadDocument = new TypedDocumentString(`
     creatorAccountId
     id
     lastTurnAt
-    organizationId
     status
     title
     updatedAt

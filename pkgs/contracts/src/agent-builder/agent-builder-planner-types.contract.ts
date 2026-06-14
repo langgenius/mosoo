@@ -6,7 +6,6 @@ import type {
   AgentId,
   EnvironmentId,
   McpServerId,
-  OrganizationId,
   AppId,
   SkillId,
   SkillSnapshotId,
@@ -606,7 +605,6 @@ export interface AgentBuilderPlannerAgentContext {
   agentId: AgentId;
   baseConfigApplied: boolean;
   kind: AgentKind;
-  organizationId: OrganizationId;
   appId: AppId;
   status: AgentStatus;
 }

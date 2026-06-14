@@ -8,7 +8,6 @@ export const ENSURE_AGENT_BUILDER_THREAD_MUTATION = graphql(/* GraphQL */ `
       creatorAccountId
       id
       lastTurnAt
-      organizationId
       status
       title
       updatedAt

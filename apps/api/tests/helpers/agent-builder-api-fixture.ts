@@ -340,7 +340,6 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       live_deployment_version_id text,
       model text NOT NULL,
       name text NOT NULL,
-      organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       app_id text NOT NULL,
       prompt text NOT NULL,
@@ -692,7 +691,6 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       id text PRIMARY KEY NOT NULL,
       last_turn_at integer,
       message_seq_cursor integer DEFAULT 0 NOT NULL,
-      organization_id text NOT NULL,
       preview_opened_at integer,
       status text DEFAULT 'active' NOT NULL,
       title text,
@@ -724,7 +722,6 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       error_message text,
       id text PRIMARY KEY NOT NULL,
       model text NOT NULL,
-      organization_id text NOT NULL,
       output_json text,
       provider text NOT NULL,
       request_digest text NOT NULL,
@@ -883,7 +880,6 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
         kind,
         model,
         name,
-        organization_id,
         owner_account_id,
         app_id,
         prompt,
@@ -892,7 +888,7 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
         status,
         updated_at,
         visibility
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       JSON.stringify({
@@ -906,7 +902,6 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
       "pet",
       "gpt-5.4",
       "Agent Builder Fixture",
-      AGENT_BUILDER_TEST_IDS.organizationId,
       AGENT_BUILDER_TEST_VIEWER.id,
       AGENT_BUILDER_TEST_IDS.appId,
       "Help the user assemble an Agent starter pack.",
