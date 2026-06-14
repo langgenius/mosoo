@@ -118,6 +118,7 @@ export async function createSessionResourceUpload(
       id: input.sessionId,
       kind: "session",
       name: input.file.name,
+      appId: input.appId,
     },
   });
 }

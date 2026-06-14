@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, SessionId, SpaceId } from "@mosoo/id";
+import type { AccountId, FileId, AppId, SessionId, SpaceId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import {
@@ -21,6 +21,7 @@ const VIEWER_ID = parsePlatformId<AccountId>("01J00000000000000000000001", "view
 const SESSION_ID = parsePlatformId<SessionId>("01J00000000000000000000002", "session ID");
 const FILE_ID = parsePlatformId<FileId>("01J00000000000000000000003", "file ID");
 const SPACE_ID = parsePlatformId<SpaceId>("01J00000000000000000000004", "space ID");
+const APP_ID = parsePlatformId<AppId>("01J00000000000000000000005", "app ID");
 
 const VIEWER: AuthenticatedViewer = {
   email: "viewer@example.com",
@@ -43,6 +44,7 @@ describe("file upload boundary", () => {
           id: SESSION_ID,
           kind: "session",
           name: "notes.txt",
+          appId: APP_ID,
         },
       }),
     ).rejects.toMatchObject({
@@ -61,8 +63,30 @@ describe("file upload boundary", () => {
           id: SESSION_ID,
           kind: "session",
           name: "notes.txt",
+          appId: APP_ID,
         },
       }),
+    ).rejects.toMatchObject({
+      code: "file_invalid_request",
+      status: 400,
+    });
+  });
+
+  test("rejects removed Organization draft targets before ownership lookup", async () => {
+    await expect(
+      createFileUpload({} as ApiBindings, VIEWER, {
+        file: {
+          contentType: "text/plain",
+          name: "notes.txt",
+          size: 1,
+        },
+        purpose: "organization_draft",
+        target: {
+          id: APP_ID,
+          kind: "organization_draft",
+          name: "notes.txt",
+        },
+      } as unknown as Parameters<typeof createFileUpload>[2]),
     ).rejects.toMatchObject({
       code: "file_invalid_request",
       status: 400,

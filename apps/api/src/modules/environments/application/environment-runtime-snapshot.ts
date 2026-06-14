@@ -1,10 +1,10 @@
-import type { AccountId, EnvironmentId, OrganizationId } from "@mosoo/id";
+import type { AccountId, EnvironmentId, AppId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { ensureEnvironmentAccess } from "./environment-access.service";
 import { decryptEnvironmentVariables, makePackageSetupScript } from "./environment-config";
 import { toConfig } from "./environment-config-mapping";
-import { ensureOrganizationEnvironmentDefaults } from "./environment-defaults";
+import { getAppDefaultEnvironmentId } from "./environment-defaults";
 import type { EnvironmentRecordRow } from "./environment-types";
 
 async function resolveAgentEnvironmentRecord(
@@ -12,13 +12,15 @@ async function resolveAgentEnvironmentRecord(
   input: {
     agentEnvironmentId: EnvironmentId | null;
     agentOwnerId: AccountId;
-    organizationId: OrganizationId;
+    appId: AppId;
   },
 ): Promise<EnvironmentRecordRow> {
   const environmentId =
-    input.agentEnvironmentId ??
-    (await ensureOrganizationEnvironmentDefaults(bindings, input.organizationId));
-  const access = await ensureEnvironmentAccess(bindings.DB, input.agentOwnerId, environmentId);
+    input.agentEnvironmentId ?? (await getAppDefaultEnvironmentId(bindings.DB, input.appId));
+  const access = await ensureEnvironmentAccess(bindings.DB, input.agentOwnerId, {
+    environmentId,
+    appId: input.appId,
+  });
 
   return access.row;
 }
@@ -28,7 +30,7 @@ export async function resolveAgentEnvironmentSnapshot(
   input: {
     agentEnvironmentId: EnvironmentId | null;
     agentOwnerId: AccountId;
-    organizationId: OrganizationId;
+    appId: AppId;
   },
 ): Promise<{
   envVars: Record<string, string>;

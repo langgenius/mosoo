@@ -7,51 +7,36 @@ import type {
 import { vendorCredentialsTable } from "@mosoo/db";
 import { ignorePromiseRejection } from "@mosoo/effects";
 import { createPlatformId } from "@mosoo/id";
-import type { AccountId, VendorCredentialId } from "@mosoo/id";
+import type { VendorCredentialId } from "@mosoo/id";
 import { getVendor } from "@mosoo/runtime-catalog";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import {
-  ensureOrganizationAdmin,
-  ensureOrganizationMembership,
-} from "../../organizations/domain/organization-access.policy";
 import {
   enforceApiBaseAllowed,
   enforceCredentialModelShape,
   normalizeApiBase,
   normalizeCredentialModels,
   normalizeCredentialName,
-  serializeCredentialModels,
 } from "./vendor-credential-validation";
-import {
-  credentialScope,
-  parseCredentialModels,
-  toVendorCredentialWithSecret,
-} from "./vendor-credential.mapper";
-import {
-  getCredentialRow,
-  hasDefaultCompanyCredential,
-  setCompanyCredentialAsDefault,
-  setPersonalCredentialAsPreferred,
-} from "./vendor-credential.repository";
+import { parseCredentialModels, toVendorCredentialWithSecret } from "./vendor-credential.mapper";
+import { getCredentialRow, getAppCredentialRow } from "./vendor-credential.repository";
 import {
   deleteVendorCredentialSecret,
   readVendorCredentialSecret,
   storeVendorCredentialSecret,
 } from "./vendor-credential.secret-resolution";
 import type { VendorCredentialRow } from "./vendor-credential.types";
-function toSecretOwnerCommand(input: { actorAccountId: AccountId; row: VendorCredentialRow }) {
+
+function toSecretOwnerCommand(row: VendorCredentialRow) {
   return {
-    actorAccountId: input.actorAccountId,
-    credentialId: input.row.id,
-    organizationId: input.row.organizationId,
-    ownerAccountId: input.row.ownerUserId,
-    providerId: input.row.vendorId,
-    scope: credentialScope(input.row),
+    credentialId: row.id,
+    appId: row.appId,
+    providerId: row.vendorId,
   };
 }
 
@@ -65,13 +50,11 @@ function ensureVendorCredentialSecretDeleted(
 
 async function toVisibleVendorCredential(
   bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
   row: VendorCredentialRow,
 ): Promise<VendorCredential> {
   const secret = await readVendorCredentialSecret(bindings, {
-    actorAccountId: viewer.id,
     credential: row,
-    organizationId: row.organizationId,
+    appId: row.appId,
     providerId: row.vendorId,
     purpose: "credential_display_api_key",
   });
@@ -88,7 +71,7 @@ export async function createVendorCredential(
   viewer: AuthenticatedViewer,
   input: CreateVendorCredentialInput,
 ): Promise<VendorCredential> {
-  const scope = input.scope ?? "company";
+  const app = await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
   const name = normalizeCredentialName(input.name);
   const apiKey = input.apiKey.trim();
   const apiBase = normalizeApiBase(input.apiBase);
@@ -104,60 +87,17 @@ export async function createVendorCredential(
     throw new Error("API key is required.");
   }
 
-  if (scope === "company") {
-    await ensureOrganizationAdmin(bindings.DB, viewer.id, input.organizationId);
-  } else {
-    await ensureOrganizationMembership(bindings.DB, viewer.id, input.organizationId);
-  }
-
   const id = createPlatformId<VendorCredentialId>();
   const timestampMs = currentTimestampMs();
-  const ownerUserId = scope === "personal" ? viewer.id : null;
-  const shouldDefault =
-    scope === "company" &&
-    (input.isDefault === true ||
-      !(await hasDefaultCompanyCredential(bindings.DB, input.organizationId, input.vendorId)));
-  const shouldPreferred = scope === "personal" && input.isPreferred !== false;
   const secretId = await storeVendorCredentialSecret(bindings, {
-    actorAccountId: viewer.id,
     apiKey,
     credentialId: id,
-    organizationId: input.organizationId,
-    ownerAccountId: ownerUserId,
+    appId: app.id,
     providerId: input.vendorId,
     purpose: "credential_create_api_key",
-    scope,
   });
 
   try {
-    if (shouldDefault) {
-      await getAppDatabase(bindings.DB)
-        .update(vendorCredentialsTable)
-        .set({ isDefault: false, updatedAt: timestampMs })
-        .where(
-          and(
-            eq(vendorCredentialsTable.organizationId, input.organizationId),
-            eq(vendorCredentialsTable.vendorId, input.vendorId),
-            isNull(vendorCredentialsTable.ownerAccountId),
-          ),
-        )
-        .run();
-    }
-
-    if (shouldPreferred && ownerUserId !== null) {
-      await getAppDatabase(bindings.DB)
-        .update(vendorCredentialsTable)
-        .set({ isPreferred: false, updatedAt: timestampMs })
-        .where(
-          and(
-            eq(vendorCredentialsTable.organizationId, input.organizationId),
-            eq(vendorCredentialsTable.vendorId, input.vendorId),
-            eq(vendorCredentialsTable.ownerAccountId, ownerUserId),
-          ),
-        )
-        .run();
-    }
-
     await getAppDatabase(bindings.DB)
       .insert(vendorCredentialsTable)
       .values({
@@ -165,25 +105,20 @@ export async function createVendorCredential(
         apiKeySecretId: secretId,
         createdAt: timestampMs,
         id,
-        isDefault: shouldDefault,
-        isPreferred: shouldPreferred,
-        models: sql`${serializeCredentialModels(models)}`,
+        models,
         name,
-        organizationId: input.organizationId,
-        ownerAccountId: ownerUserId,
+        organizationId: app.organizationId,
+        appId: app.id,
         updatedAt: timestampMs,
         vendorId: input.vendorId,
       })
       .run();
   } catch (error) {
     await deleteVendorCredentialSecret(bindings.DB, {
-      actorAccountId: viewer.id,
       credentialId: id,
-      organizationId: input.organizationId,
-      ownerAccountId: ownerUserId,
+      appId: app.id,
       providerId: input.vendorId,
       purpose: "credential_create_rollback",
-      scope,
       secretId,
     }).catch(ignorePromiseRejection);
     throw error;
@@ -195,7 +130,7 @@ export async function createVendorCredential(
     throw new Error("Vendor credential could not be loaded.");
   }
 
-  return toVisibleVendorCredential(bindings, viewer, row);
+  return toVisibleVendorCredential(bindings, row);
 }
 
 export async function updateVendorCredential(
@@ -203,20 +138,11 @@ export async function updateVendorCredential(
   viewer: AuthenticatedViewer,
   input: UpdateVendorCredentialInput,
 ): Promise<VendorCredential> {
-  const row = await getCredentialRow(bindings.DB, input.id);
+  await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
+  const row = await getAppCredentialRow(bindings.DB, input.appId, input.id);
 
   if (!row) {
     throw new Error("Vendor credential not found.");
-  }
-
-  const scope = credentialScope(row);
-
-  if (scope === "company") {
-    await ensureOrganizationAdmin(bindings.DB, viewer.id, row.organizationId);
-  } else if (row.ownerUserId !== viewer.id) {
-    throw new Error("Vendor credential not found.");
-  } else {
-    await ensureOrganizationMembership(bindings.DB, viewer.id, row.organizationId);
   }
 
   const name = input.name !== undefined ? normalizeCredentialName(input.name) : row.name;
@@ -232,7 +158,7 @@ export async function updateVendorCredential(
     input.apiKey?.trim() !== undefined &&
     input.apiKey?.trim() !== ""
       ? await storeVendorCredentialSecret(bindings, {
-          ...toSecretOwnerCommand({ actorAccountId: viewer.id, row }),
+          ...toSecretOwnerCommand(row),
           apiKey: input.apiKey.trim(),
           purpose: "credential_update_api_key",
         })
@@ -244,36 +170,18 @@ export async function updateVendorCredential(
       .set({
         apiBase,
         apiKeySecretId: nextSecretId,
-        models: sql`${serializeCredentialModels(models)}`,
+        models,
         name,
         updatedAt: currentTimestampMs(),
       })
-      .where(eq(vendorCredentialsTable.id, input.id))
+      .where(
+        and(eq(vendorCredentialsTable.id, input.id), eq(vendorCredentialsTable.appId, input.appId)),
+      )
       .run();
-
-    if (scope === "company" && input.isDefault === true) {
-      await setCompanyCredentialAsDefault(bindings.DB, row);
-    } else if (scope === "company" && input.isDefault === false && row.isDefault === 1) {
-      await getAppDatabase(bindings.DB)
-        .update(vendorCredentialsTable)
-        .set({ isDefault: false, updatedAt: currentTimestampMs() })
-        .where(eq(vendorCredentialsTable.id, row.id))
-        .run();
-    }
-
-    if (scope === "personal" && input.isPreferred === true) {
-      await setPersonalCredentialAsPreferred(bindings.DB, row);
-    } else if (scope === "personal" && input.isPreferred === false && row.isPreferred === 1) {
-      await getAppDatabase(bindings.DB)
-        .update(vendorCredentialsTable)
-        .set({ isPreferred: false, updatedAt: currentTimestampMs() })
-        .where(eq(vendorCredentialsTable.id, row.id))
-        .run();
-    }
   } catch (error) {
     if (nextSecretId !== row.apiKeySecretId) {
       await deleteVendorCredentialSecret(bindings.DB, {
-        ...toSecretOwnerCommand({ actorAccountId: viewer.id, row }),
+        ...toSecretOwnerCommand(row),
         purpose: "credential_update_rollback",
         secretId: nextSecretId,
       }).catch(ignorePromiseRejection);
@@ -284,20 +192,20 @@ export async function updateVendorCredential(
   if (nextSecretId !== row.apiKeySecretId) {
     ensureVendorCredentialSecretDeleted(
       await deleteVendorCredentialSecret(bindings.DB, {
-        ...toSecretOwnerCommand({ actorAccountId: viewer.id, row }),
+        ...toSecretOwnerCommand(row),
         purpose: "credential_update_replaced",
         secretId: row.apiKeySecretId,
       }),
     );
   }
 
-  const updated = await getCredentialRow(bindings.DB, input.id);
+  const updated = await getAppCredentialRow(bindings.DB, input.appId, input.id);
 
   if (!updated) {
     throw new Error("Vendor credential could not be loaded.");
   }
 
-  return toVisibleVendorCredential(bindings, viewer, updated);
+  return toVisibleVendorCredential(bindings, updated);
 }
 
 export async function deleteVendorCredential(
@@ -305,29 +213,22 @@ export async function deleteVendorCredential(
   viewer: AuthenticatedViewer,
   input: DeleteVendorCredentialInput,
 ): Promise<void> {
-  const row = await getCredentialRow(bindings.DB, input.id);
+  await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
+  const row = await getAppCredentialRow(bindings.DB, input.appId, input.id);
 
   if (!row) {
     throw new Error("Vendor credential not found.");
   }
 
-  const scope = credentialScope(row);
-
-  if (scope === "company") {
-    await ensureOrganizationAdmin(bindings.DB, viewer.id, row.organizationId);
-  } else if (row.ownerUserId !== viewer.id) {
-    throw new Error("Vendor credential not found.");
-  } else {
-    await ensureOrganizationMembership(bindings.DB, viewer.id, row.organizationId);
-  }
-
   await getAppDatabase(bindings.DB)
     .delete(vendorCredentialsTable)
-    .where(eq(vendorCredentialsTable.id, input.id))
+    .where(
+      and(eq(vendorCredentialsTable.id, input.id), eq(vendorCredentialsTable.appId, input.appId)),
+    )
     .run();
   ensureVendorCredentialSecretDeleted(
     await deleteVendorCredentialSecret(bindings.DB, {
-      ...toSecretOwnerCommand({ actorAccountId: viewer.id, row }),
+      ...toSecretOwnerCommand(row),
       purpose: "credential_delete",
       secretId: row.apiKeySecretId,
     }),

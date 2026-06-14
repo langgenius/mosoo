@@ -5,7 +5,6 @@ import type {
   McpCredentialStatus,
   McpRegistry,
   McpServer,
-  McpServerSource,
   McpServerWithCredential,
 } from "@mosoo/contracts/mcp";
 
@@ -16,8 +15,5 @@ export type {
   McpCredentialStatus,
   McpRegistry,
   McpServer,
-  McpServerSource,
   McpServerWithCredential,
 };
-
-export type McpViewMode = "personal" | "shared" | "managed";

@@ -1,25 +1,25 @@
-import { environmentsTable, organizationsTable } from "@mosoo/db";
+import { appsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { AccountId, EnvironmentId, OrganizationId } from "@mosoo/id";
-import { and, eq, isNull } from "drizzle-orm";
+import type { AccountId, EnvironmentId, OrganizationId, AppId } from "@mosoo/id";
+import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
-import { getOrganizationDefaultsRow } from "./environment-access.service";
+import { getAppRow } from "../../apps/application/app.service";
 import { SYSTEM_DEFAULT_NAME } from "./environment-config-mapping";
 import { createEnvironmentFromConfig } from "./environment-write.service";
 
-interface CreateOrganizationEnvironmentDefaultsInput {
+interface CreateAppEnvironmentDefaultsInput {
   actorId: AccountId | null;
   organizationId: OrganizationId;
+  appId: AppId;
   timestampMs?: number;
 }
 
 async function createBuiltInEnvironment(
   bindings: Pick<ApiBindings, "DB">,
-  input: Required<CreateOrganizationEnvironmentDefaultsInput>,
+  input: Required<CreateAppEnvironmentDefaultsInput>,
 ): Promise<EnvironmentId> {
   const environmentId = createPlatformId<EnvironmentId>();
 
@@ -39,74 +39,46 @@ async function createBuiltInEnvironment(
     name: SYSTEM_DEFAULT_NAME,
     organizationId: input.organizationId,
     ownerId: null,
+    appId: input.appId,
     timestampMs: input.timestampMs,
   });
 
   return environmentId;
 }
 
-export async function createOrganizationEnvironmentDefaults(
+export async function createAppEnvironmentDefaults(
   bindings: Pick<ApiBindings, "DB">,
-  input: CreateOrganizationEnvironmentDefaultsInput,
+  input: CreateAppEnvironmentDefaultsInput,
 ): Promise<EnvironmentId> {
   const timestampMs = input.timestampMs ?? currentTimestampMs();
   const environmentId = await createBuiltInEnvironment(bindings, {
     actorId: input.actorId,
     organizationId: input.organizationId,
+    appId: input.appId,
     timestampMs,
   });
 
   await getAppDatabase(bindings.DB)
-    .update(organizationsTable)
+    .update(appsTable)
     .set({
       defaultEnvironmentId: environmentId,
       updatedAt: timestampMs,
     })
-    .where(eq(organizationsTable.id, input.organizationId))
+    .where(eq(appsTable.id, input.appId))
     .run();
 
   return environmentId;
 }
 
-export async function ensureOrganizationEnvironmentDefaults(
-  bindings: Pick<ApiBindings, "DB">,
-  organizationId: OrganizationId,
+export async function getAppDefaultEnvironmentId(
+  database: D1Database,
+  appId: AppId,
 ): Promise<EnvironmentId> {
-  const organization = await getOrganizationDefaultsRow(bindings.DB, organizationId);
-  const existingSystem =
-    (await getAppDatabase(bindings.DB)
-      .select({ id: environmentsTable.id })
-      .from(environmentsTable)
-      .where(
-        and(
-          eq(environmentsTable.organizationId, organizationId),
-          isNull(environmentsTable.ownerAccountId),
-        ),
-      )
-      .limit(1)
-      .get()) ?? null;
+  const app = await getAppRow(database, appId);
 
-  let systemEnvironmentId = existingSystem?.id ?? null;
-  const timestampMs = currentTimestampMs();
-
-  if (!isTruthy(systemEnvironmentId)) {
-    systemEnvironmentId = await createBuiltInEnvironment(bindings, {
-      actorId: organization.creatorAccountId,
-      organizationId,
-      timestampMs,
-    });
+  if (app.defaultEnvironmentId === null) {
+    throw new Error("App default Environment is not configured.");
   }
 
-  if (!isTruthy(organization.defaultEnvironmentId)) {
-    await getAppDatabase(bindings.DB)
-      .update(organizationsTable)
-      .set({
-        defaultEnvironmentId: systemEnvironmentId,
-        updatedAt: timestampMs,
-      })
-      .where(eq(organizationsTable.id, organizationId))
-      .run();
-  }
-
-  return organization.defaultEnvironmentId ?? systemEnvironmentId;
+  return app.defaultEnvironmentId;
 }

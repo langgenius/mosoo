@@ -1,15 +1,49 @@
 import { describe, expect, test } from "bun:test";
 
+import { parsePlatformId } from "@mosoo/id";
+import type { AppId } from "@mosoo/id";
 import { VENDOR_ANTHROPIC, VENDOR_OPENAI, VENDOR_OPENAI_COMPATIBLE } from "@mosoo/runtime-catalog";
 
 import {
   createVendorCredential,
+  deleteVendorCredential,
   updateVendorCredential,
 } from "../src/modules/vendor-credentials/application/vendor-credential-commands";
 import {
   createAgentBuilderApiFixture,
   insertAgentBuilderVendorCredential,
 } from "./helpers/agent-builder-api-fixture";
+
+const OTHER_APP_ID = parsePlatformId<AppId>("01J000000000000000000000C9", "other app ID");
+const OTHER_ACCOUNT_ID = "01J000000000000000000000CA";
+
+async function insertOtherApp(
+  fixture: Awaited<ReturnType<typeof createAgentBuilderApiFixture>>,
+  input: { ownerAccountId?: string } = {},
+) {
+  await fixture.database
+    .prepare(
+      `INSERT INTO app (
+        created_at,
+        id,
+        name,
+        organization_id,
+        owner_account_id,
+        slug,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      1,
+      OTHER_APP_ID,
+      "Other App",
+      fixture.ids.organizationId,
+      input.ownerAccountId ?? fixture.viewer.id,
+      "other-app",
+      1,
+    )
+    .run();
+}
 
 describe("vendor credential commands", () => {
   test("rejects public HTTP custom API bases before storing a credential", async () => {
@@ -21,7 +55,7 @@ describe("vendor credential commands", () => {
         apiKey: "sk-create",
         models: ["custom-model"],
         name: "Unsafe custom provider",
-        organizationId: fixture.ids.organizationId,
+        appId: fixture.ids.appId,
         vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
       }),
     ).rejects.toThrow("Custom endpoint must use HTTPS.");
@@ -44,7 +78,7 @@ describe("vendor credential commands", () => {
         apiBase: VENDOR_ANTHROPIC.defaultApiBase,
         apiKey: "sk-create",
         name: "OpenAI pointed at Anthropic",
-        organizationId: fixture.ids.organizationId,
+        appId: fixture.ids.appId,
         vendorId: VENDOR_OPENAI.vendorId,
       }),
     ).rejects.toThrow("Custom endpoint for openai cannot target Anthropic.");
@@ -68,7 +102,7 @@ describe("vendor credential commands", () => {
         apiKey: "sk-create",
         models: ["custom-model"],
         name: "Unsafe custom provider",
-        organizationId: fixture.ids.organizationId,
+        appId: fixture.ids.appId,
         vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
       }),
     ).rejects.toThrow(
@@ -99,6 +133,7 @@ describe("vendor credential commands", () => {
       updateVendorCredential(fixture.bindings, fixture.viewer, {
         apiBase: "http://10.0.0.2/v1",
         id: credentialId,
+        appId: fixture.ids.appId,
       }),
     ).rejects.toThrow(
       "Custom endpoint cannot target local, private, metadata, or credential-bearing URLs.",
@@ -127,6 +162,7 @@ describe("vendor credential commands", () => {
       updateVendorCredential(fixture.bindings, fixture.viewer, {
         apiBase: VENDOR_ANTHROPIC.defaultApiBase,
         id: credentialId,
+        appId: fixture.ids.appId,
       }),
     ).rejects.toThrow("Custom endpoint for openai cannot target Anthropic.");
 
@@ -135,5 +171,107 @@ describe("vendor credential commands", () => {
       .bind(credentialId)
       .first<{ apiBase: string | null }>();
     expect(row?.apiBase).toBeNull();
+  });
+
+  test("rejects update when the credential is not in the requested App", async () => {
+    const fixture = await createAgentBuilderApiFixture();
+    await insertOtherApp(fixture);
+    const credentialId = "01J000000000000000000000C4";
+    await insertAgentBuilderVendorCredential(fixture, {
+      credentialId,
+      vendorId: VENDOR_OPENAI.vendorId,
+    });
+
+    await expect(
+      updateVendorCredential(fixture.bindings, fixture.viewer, {
+        id: credentialId,
+        name: "Should not update",
+        appId: OTHER_APP_ID,
+      }),
+    ).rejects.toThrow("Vendor credential not found.");
+
+    const row = await fixture.database
+      .prepare("SELECT name FROM vendor_credential WHERE id = ?")
+      .bind(credentialId)
+      .first<{ name: string }>();
+    expect(row?.name).not.toBe("Should not update");
+  });
+
+  test("rejects delete when the credential is not in the requested App", async () => {
+    const fixture = await createAgentBuilderApiFixture();
+    await insertOtherApp(fixture);
+    const credentialId = "01J000000000000000000000C5";
+    await insertAgentBuilderVendorCredential(fixture, {
+      credentialId,
+      vendorId: VENDOR_OPENAI.vendorId,
+    });
+
+    await expect(
+      deleteVendorCredential(fixture.bindings, fixture.viewer, {
+        id: credentialId,
+        appId: OTHER_APP_ID,
+      }),
+    ).rejects.toThrow("Vendor credential not found.");
+
+    const credentialCount = await fixture.database
+      .prepare("SELECT COUNT(*) AS count FROM vendor_credential WHERE id = ?")
+      .bind(credentialId)
+      .first<{ count: number }>();
+    const secretCount = await fixture.database
+      .prepare("SELECT COUNT(*) AS count FROM vault_secret")
+      .first<{ count: number }>();
+    expect(credentialCount?.count).toBe(1);
+    expect(secretCount?.count).toBe(1);
+  });
+
+  test("rejects update before row lookup when the requested App is not owned", async () => {
+    const fixture = await createAgentBuilderApiFixture();
+    await insertOtherApp(fixture, { ownerAccountId: OTHER_ACCOUNT_ID });
+    const credentialId = "01J000000000000000000000C6";
+    await insertAgentBuilderVendorCredential(fixture, {
+      credentialId,
+      vendorId: VENDOR_OPENAI.vendorId,
+    });
+
+    await expect(
+      updateVendorCredential(fixture.bindings, fixture.viewer, {
+        id: credentialId,
+        name: "Should not update",
+        appId: OTHER_APP_ID,
+      }),
+    ).rejects.toThrow("permission");
+
+    const row = await fixture.database
+      .prepare("SELECT name FROM vendor_credential WHERE id = ?")
+      .bind(credentialId)
+      .first<{ name: string }>();
+    expect(row?.name).not.toBe("Should not update");
+  });
+
+  test("rejects delete before row lookup when the requested App is not owned", async () => {
+    const fixture = await createAgentBuilderApiFixture();
+    await insertOtherApp(fixture, { ownerAccountId: OTHER_ACCOUNT_ID });
+    const credentialId = "01J000000000000000000000C7";
+    await insertAgentBuilderVendorCredential(fixture, {
+      credentialId,
+      vendorId: VENDOR_OPENAI.vendorId,
+    });
+
+    await expect(
+      deleteVendorCredential(fixture.bindings, fixture.viewer, {
+        id: credentialId,
+        appId: OTHER_APP_ID,
+      }),
+    ).rejects.toThrow("permission");
+
+    const credentialCount = await fixture.database
+      .prepare("SELECT COUNT(*) AS count FROM vendor_credential WHERE id = ?")
+      .bind(credentialId)
+      .first<{ count: number }>();
+    const secretCount = await fixture.database
+      .prepare("SELECT COUNT(*) AS count FROM vault_secret")
+      .first<{ count: number }>();
+    expect(credentialCount?.count).toBe(1);
+    expect(secretCount?.count).toBe(1);
   });
 });

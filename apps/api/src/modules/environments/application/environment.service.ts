@@ -1,22 +1,14 @@
 export {
   createEnvironment,
   setEnvironmentVariableValue,
-  setOrganizationDefaultEnvironment,
+  setAppDefaultEnvironment,
   updateEnvironment,
 } from "./environment-commands";
-export {
-  createOrganizationEnvironmentDefaults,
-  ensureOrganizationEnvironmentDefaults,
-} from "./environment-defaults";
+export { createAppEnvironmentDefaults, getAppDefaultEnvironmentId } from "./environment-defaults";
 export { createEnvironmentFork, deleteEnvironment } from "./environment-forks";
 export {
   canUseEnvironment,
   getEnvironmentDetail,
-  listOrganizationEnvironments,
+  listAppEnvironments,
 } from "./environment-queries";
 export { resolveAgentEnvironmentSnapshot } from "./environment-runtime-snapshot";
-export {
-  shareEnvironmentWithOrganization,
-  shareEnvironmentWithUser,
-  unshareEnvironmentTarget,
-} from "./environment-sharing";

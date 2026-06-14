@@ -6,7 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { useAppSession } from "../../app/session-provider";
 import { spaces as listSpaces } from "../../domains/space/api/list";
 import { spaceKeys, useSpacesQuery } from "../../domains/space/query/space-queries";
-import { toOrganizationId } from "../typed-id";
+import { toAppId } from "../typed-id";
 
 interface SpaceUiState {
   activeSpace: string | null;
@@ -19,8 +19,8 @@ interface SpaceListModel {
   currentPath: string;
   hoveredSpace: string | null;
   loading: boolean;
-  organizationId: string | null;
-  refreshSpaces: (nextOrganizationId?: string | null) => Promise<SpaceView[]>;
+  appId: string | null;
+  refreshSpaces: (nextAppId?: string | null) => Promise<SpaceView[]>;
   selectSpace: (spaceId: string | null) => void;
   setCurrentPath: (currentPath: string) => void;
   setHoveredSpace: (hoveredSpace: string | null) => void;
@@ -38,54 +38,50 @@ const EMPTY_SPACES: SpaceView[] = [];
 export function useSpaceList(): SpaceListModel {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { activeOrganization } = useAppSession();
-  const [uiByOrganization, setUiByOrganization] = useState<Record<string, SpaceUiState>>({});
-  const organizationId = activeOrganization?.id ?? null;
-  const spacesQuery = useSpacesQuery(organizationId);
+  const { activeApp } = useAppSession();
+  const [uiByApp, setUiByApp] = useState<Record<string, SpaceUiState>>({});
+  const appId = activeApp?.id ?? null;
+  const spacesQuery = useSpacesQuery(appId);
   const spaces = spacesQuery.data ?? EMPTY_SPACES;
   const currentUiState =
-    organizationId === null
-      ? DEFAULT_SPACE_UI_STATE
-      : (uiByOrganization[organizationId] ?? DEFAULT_SPACE_UI_STATE);
+    appId === null ? DEFAULT_SPACE_UI_STATE : (uiByApp[appId] ?? DEFAULT_SPACE_UI_STATE);
   const requestedSpaceId = searchParams.get("space");
   const activeSpaceFromUrl =
-    organizationId !== null &&
+    appId !== null &&
     requestedSpaceId !== null &&
     spaces.some((space) => space.id === requestedSpaceId)
       ? requestedSpaceId
       : null;
   const activeSpaceFromState =
-    organizationId !== null &&
+    appId !== null &&
     currentUiState.activeSpace !== null &&
     spaces.some((space) => space.id === currentUiState.activeSpace)
       ? currentUiState.activeSpace
       : null;
   const activeSpace = activeSpaceFromUrl ?? activeSpaceFromState;
 
-  function updateOrganizationUi(transform: (current: SpaceUiState) => SpaceUiState): void {
-    if (organizationId === null) {
+  function updateAppUi(transform: (current: SpaceUiState) => SpaceUiState): void {
+    if (appId === null) {
       return;
     }
 
-    setUiByOrganization((current) => ({
+    setUiByApp((current) => ({
       ...current,
-      [organizationId]: transform(current[organizationId] ?? DEFAULT_SPACE_UI_STATE),
+      [appId]: transform(current[appId] ?? DEFAULT_SPACE_UI_STATE),
     }));
   }
 
-  async function refreshSpaces(
-    nextOrganizationId: string | null = organizationId,
-  ): Promise<SpaceView[]> {
-    if (nextOrganizationId === null) {
+  async function refreshSpaces(nextAppId: string | null = appId): Promise<SpaceView[]> {
+    if (nextAppId === null) {
       return [];
     }
 
     await queryClient.invalidateQueries({
-      queryKey: spaceKeys.list(toOrganizationId(nextOrganizationId)),
+      queryKey: spaceKeys.list(toAppId(nextAppId)),
     });
     const nextSpaces = await queryClient.fetchQuery({
-      queryFn: async () => listSpaces(toOrganizationId(nextOrganizationId)),
-      queryKey: spaceKeys.list(toOrganizationId(nextOrganizationId)),
+      queryFn: async () => listSpaces(toAppId(nextAppId)),
+      queryKey: spaceKeys.list(toAppId(nextAppId)),
     });
     return nextSpaces;
   }
@@ -105,7 +101,7 @@ export function useSpaceList(): SpaceListModel {
       },
       { replace: false },
     );
-    updateOrganizationUi((current) => ({
+    updateAppUi((current) => ({
       ...current,
       activeSpace: spaceId,
       currentPath: "",
@@ -117,17 +113,17 @@ export function useSpaceList(): SpaceListModel {
     currentPath: currentUiState.currentPath,
     hoveredSpace: currentUiState.hoveredSpace,
     loading: spacesQuery.isLoading,
-    organizationId,
+    appId,
     refreshSpaces,
     selectSpace,
     setCurrentPath(currentPath: string) {
-      updateOrganizationUi((current) => ({
+      updateAppUi((current) => ({
         ...current,
         currentPath,
       }));
     },
     setHoveredSpace(hoveredSpace: string | null) {
-      updateOrganizationUi((current) => ({
+      updateAppUi((current) => ({
         ...current,
         hoveredSpace,
       }));

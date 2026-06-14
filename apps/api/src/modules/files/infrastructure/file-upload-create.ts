@@ -10,12 +10,13 @@ import type {
 } from "@mosoo/contracts/file";
 import { fileRecordsTable, fileUploadsTable } from "@mosoo/db";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, SpaceId, UploadId } from "@mosoo/id";
+import type { AccountId, FileId, AppId, SpaceId, UploadId } from "@mosoo/id";
 
 import { logInfo } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
   FileControlError,
@@ -42,12 +43,8 @@ import {
   toUploadSummary,
 } from "./file-record-store";
 import type { FileRecordRow } from "./file-record-store";
-import {
-  ensureOrganizationAvatarAccess,
-  ensureOrganizationMembership,
-} from "./organization-file-access";
 import { createMultipartUpload, normalizeR2Etag } from "./r2-s3-client";
-import { ensureSessionFileAccess } from "./session-file-ownership";
+import { ensureAppSessionFileAccess } from "./session-file-ownership";
 import { ensureSpaceAccess } from "./space-access";
 import { ensureSpaceParentDirectories } from "./space-directory-store";
 import { ensureSpaceFileWriteUnlocked } from "./space-file-lock";
@@ -82,7 +79,8 @@ async function resolveFileUploadTargetContext(
     const scopeId = target.id;
 
     const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-    await ensureSpaceAccess(bindings.DB, viewerId, scopeId, "edit");
+    const appId: AppId = parsePlatformId(target.appId, "upload space app ID");
+    await ensureSpaceAccess(bindings.DB, viewerId, appId, scopeId, "edit");
     await ensureSpaceParentDirectories(bindings.DB, viewerId, scopeId, parentPath);
 
     return {
@@ -102,7 +100,11 @@ async function resolveFileUploadTargetContext(
 
   if (target.kind === "session") {
     const scopeId = target.id;
-    await ensureSessionFileAccess(bindings.DB, viewerId, scopeId);
+    const appId: AppId = parsePlatformId(target.appId, "upload session app ID");
+    await ensureAppSessionFileAccess(bindings.DB, viewerId, {
+      appId,
+      sessionId: scopeId,
+    });
     const logicalPath = createAttachmentPath(fileId, name);
 
     return {
@@ -117,33 +119,16 @@ async function resolveFileUploadTargetContext(
     };
   }
 
-  if (target.kind === "organization_avatar") {
-    const logicalPath = createAttachmentPath(fileId, name);
-    const scopeId = target.id;
-    await ensureOrganizationAvatarAccess(bindings.DB, viewerId, scopeId, "edit");
-
-    return {
-      logicalPath,
-      name,
-      ownerId: scopeId,
-      ownerKind: "organization",
-      parentPath: getParentPath(logicalPath),
-      scopeId,
-      scopeKind: target.kind,
-      sessionKind: null,
-    };
-  }
-
   if (target.kind === "agent_package") {
     const logicalPath = createAttachmentPath(fileId, name);
-    const scopeId = target.id;
-    await ensureOrganizationMembership(bindings.DB, viewerId, scopeId);
+    const scopeId: AppId = parsePlatformId(target.id, "upload agent package app ID");
+    await ensureAppOwnership(bindings.DB, viewerId, scopeId);
 
     return {
       logicalPath,
       name,
       ownerId: scopeId,
-      ownerKind: "organization",
+      ownerKind: "app",
       parentPath: getParentPath(logicalPath),
       scopeId,
       scopeKind: target.kind,
@@ -152,14 +137,14 @@ async function resolveFileUploadTargetContext(
   }
 
   const logicalPath = createAttachmentPath(fileId, name);
-  const scopeId = target.id;
-  await ensureOrganizationMembership(bindings.DB, viewerId, scopeId);
+  const scopeId: AppId = parsePlatformId(target.id, "upload app draft app ID");
+  await ensureAppOwnership(bindings.DB, viewerId, scopeId);
 
   return {
     logicalPath,
     name,
     ownerId: scopeId,
-    ownerKind: "organization",
+    ownerKind: "app",
     parentPath: getParentPath(logicalPath),
     scopeId,
     scopeKind: target.kind,
@@ -170,8 +155,7 @@ async function resolveFileUploadTargetContext(
 function resolveFileUploadPurpose(input: CreateFileUploadRequest): FilePurpose {
   const expectedPurposeByTargetKind = {
     agent_package: "agent_package",
-    organization_avatar: "organization_avatar",
-    organization_draft: "organization_draft",
+    app_draft: "app_draft",
     session: "session_attachment",
     space: "space_file",
   } satisfies Record<CreateFileUploadRequest["target"]["kind"], FilePurpose>;

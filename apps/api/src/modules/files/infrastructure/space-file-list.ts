@@ -1,7 +1,7 @@
 import type { SpaceFileListing } from "@mosoo/contracts/space";
 import { fileRecordsTable, spaceDirectoriesTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, SpaceId } from "@mosoo/id";
+import type { AccountId, AppId, SpaceId } from "@mosoo/id";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -16,11 +16,12 @@ import { listActiveSpaceFileLocks } from "./space-file-lock";
 export async function listSpaceFiles(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
+  appId: AppId,
   spaceId: SpaceId,
   path?: string,
 ): Promise<SpaceFileListing> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureSpaceAccess(bindings.DB, viewerId, spaceId, "read");
+  await ensureSpaceAccess(bindings.DB, viewerId, appId, spaceId, "read");
   const parentPath = normalizeSpaceDirectoryPath(path);
 
   const directoryRows = await getAppDatabase(bindings.DB)
@@ -95,10 +96,11 @@ export interface SpaceRootFileSummaryListing {
 export async function listSpaceRootFileSummaries(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
+  appId: AppId,
   spaceIds: readonly SpaceId[],
 ): Promise<Map<SpaceId, SpaceRootFileSummaryListing>> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  const access = await listSpaceAccessRows(bindings.DB, viewerId, spaceIds);
+  const access = await listSpaceAccessRows(bindings.DB, viewerId, appId, spaceIds);
   const accessibleSpaceIds = [...access.accessibleRowsById.keys()];
 
   if (accessibleSpaceIds.length === 0) {

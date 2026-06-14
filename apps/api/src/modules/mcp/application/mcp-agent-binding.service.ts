@@ -9,13 +9,12 @@ import { ensureAgentEditor } from "../../agents/application/agent-access.service
 import type { AgentSpecMcpBinding } from "../../agents/application/agent-spec.service";
 import type { AgentRow } from "../../agents/application/agent-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureAgentCanUsePersonalServer } from "./mcp-agent-binding.policy";
 import { listAgentBindingRows } from "./mcp-agent-binding.repository";
 import {
   deleteCredentialArtifactsBatch,
   listCredentialsForAgentBindingDeletion,
   listCredentialsForAgentBindings,
-  listServerIdsWithSharedCredentials,
+  listServerIdsWithAppCredentials,
 } from "./mcp-credential.repository";
 import { toAgentBinding } from "./mcp-mappers";
 import { createAgentMcpBindingId, normalizeMcpServerIds, readAccountId } from "./mcp-platform-ids";
@@ -56,15 +55,13 @@ async function ensureConfigMcpServerAccess(input: {
       throw new Error(`Cannot bind MCP server ${serverId}: MCP server not found.`);
     }
 
-    if (server.organizationId !== input.agent.organizationId) {
-      throw forbiddenError("MCP server and agent profile must belong to the same organization.");
+    if (server.appId !== input.agent.appId) {
+      throw forbiddenError("MCP server and agent profile must belong to the same app.");
     }
 
-    if (server.source === "personal" && server.ownerId !== viewerId) {
-      throw forbiddenError("You can only bind your own personal MCP servers.");
+    if (server.ownerId !== viewerId || input.agent.ownerId !== viewerId) {
+      throw forbiddenError("You can only bind MCP servers owned by this app owner.");
     }
-
-    await ensureAgentCanUsePersonalServer(input.database, input.agent, server);
   }
 
   return serversById;
@@ -78,9 +75,9 @@ export async function listAgentMcpBindings(
   const viewerId = readAccountId(viewer.id);
   const { agent } = await ensureAgentEditor(database, viewerId, agentId);
   const rows = await listAgentBindingRows(database, agent.id);
-  const [credentialsByBindingId, sharedCredentialServerIds] = await Promise.all([
-    listCredentialsForAgentBindings(database, rows, viewerId),
-    listServerIdsWithSharedCredentials(
+  const [credentialsByBindingId, appCredentialServerIds] = await Promise.all([
+    listCredentialsForAgentBindings(database, rows),
+    listServerIdsWithAppCredentials(
       database,
       rows.map((row) => row.serverId),
     ),
@@ -90,7 +87,7 @@ export async function listAgentMcpBindings(
     toAgentBinding(
       row,
       credentialsByBindingId.get(row.id) ?? null,
-      sharedCredentialServerIds.has(row.serverId),
+      appCredentialServerIds.has(row.serverId),
     ),
   );
 }

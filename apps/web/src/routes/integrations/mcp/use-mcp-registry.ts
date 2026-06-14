@@ -1,36 +1,27 @@
 import type {
   ConnectMcpBearerInput,
-  CreateOrganizationMcpServerInput,
-  CreatePersonalMcpServerInput,
+  CreateAppMcpServerInput,
   McpRegistry,
   McpServerWithCredential,
-  SetOrganizationSharedMcpBearerInput,
   StartMcpOAuthPayload,
 } from "@mosoo/contracts/mcp";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useAppSession } from "@/app/session-provider";
 import {
-  clearOrganizationSharedCredential,
   connectMcpBearer,
-  createOrganizationMcpServer,
-  createPersonalMcpServer,
+  createAppMcpServer,
   deleteMcpServer,
   getMcpOAuthFlowState,
   getMcpRegistry,
-  revokeMcpUserCredential,
+  revokeMcpCredential,
   setMcpServerEnabled,
-  setOrganizationSharedBearer,
   startMcpOAuth,
 } from "@/domains/mcp/api/mcp-client";
 import { mcpKeys, useMcpRegistryQuery } from "@/domains/mcp/query/mcp-queries";
-import { toMcpOAuthFlowId, toMcpServerId, toOrganizationId } from "@/routes/typed-id";
+import { toMcpOAuthFlowId, toMcpServerId, toAppId } from "@/routes/typed-id";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
-
-async function startOAuthFlow(serverId: string): Promise<StartMcpOAuthPayload> {
-  return startMcpOAuth({ serverId: toMcpServerId(serverId) });
-}
 
 async function getOAuthFlowState(flowId: string) {
   return getMcpOAuthFlowState(toMcpOAuthFlowId(flowId));
@@ -38,86 +29,71 @@ async function getOAuthFlowState(flowId: string) {
 
 export function useMcpRegistry() {
   const queryClient = useQueryClient();
-  const { activeOrganization, organizationsLoading } = useAppSession();
-  const organizationId = activeOrganization?.id ?? null;
-  const registryQuery = useMcpRegistryQuery(organizationId);
+  const { activeAppId, appsLoading } = useAppSession();
+  const appId = activeAppId;
+  const registryQuery = useMcpRegistryQuery(appId);
   const registry = registryQuery.data;
 
   async function refresh(): Promise<McpRegistry> {
-    if (!isTruthy(organizationId)) {
-      throw new Error("Organization is not ready.");
+    if (!isTruthy(appId)) {
+      throw new Error("App is not ready.");
     }
 
     await queryClient.invalidateQueries({
-      queryKey: mcpKeys.registry(toOrganizationId(organizationId)),
+      queryKey: mcpKeys.registry(appId),
     });
-    const nextRegistry = await queryClient.fetchQuery({
-      queryFn: async () => getMcpRegistry(toOrganizationId(organizationId)),
-      queryKey: mcpKeys.registry(toOrganizationId(organizationId)),
+    return queryClient.fetchQuery({
+      queryFn: async () => getMcpRegistry(toAppId(appId)),
+      queryKey: mcpKeys.registry(appId),
     });
-    return nextRegistry;
   }
 
-  async function addPersonalServer(
-    input: Omit<CreatePersonalMcpServerInput, "organizationId">,
+  async function addServer(
+    input: Omit<CreateAppMcpServerInput, "appId">,
   ): Promise<McpServerWithCredential> {
-    if (!isTruthy(organizationId)) {
+    if (!isTruthy(appId)) {
       throw new Error("MCP registry is not ready.");
     }
 
-    const created = await createPersonalMcpServer({
+    const created = await createAppMcpServer({
       ...input,
-      organizationId: toOrganizationId(organizationId),
-    });
-    await refresh();
-    return created;
-  }
-
-  async function addOrganizationServer(
-    input: Omit<CreateOrganizationMcpServerInput, "organizationId">,
-  ): Promise<McpServerWithCredential> {
-    if (!isTruthy(organizationId)) {
-      throw new Error("MCP registry is not ready.");
-    }
-
-    const created = await createOrganizationMcpServer({
-      ...input,
-      organizationId: toOrganizationId(organizationId),
+      appId: toAppId(appId),
     });
     await refresh();
     return created;
   }
 
   async function connectBearerCredential(
-    input: ConnectMcpBearerInput,
+    input: Omit<ConnectMcpBearerInput, "appId">,
   ): Promise<McpServerWithCredential> {
-    const nextServer = await connectMcpBearer(input);
+    if (!isTruthy(appId)) {
+      throw new Error("MCP registry is not ready.");
+    }
+
+    const nextServer = await connectMcpBearer({
+      ...input,
+      appId: toAppId(appId),
+    });
     await refresh();
     return nextServer;
   }
 
   async function revokeCredential(serverId: string): Promise<McpServerWithCredential> {
-    const nextServer = await revokeMcpUserCredential(toMcpServerId(serverId));
-    await refresh();
-    return nextServer;
-  }
+    if (!isTruthy(appId)) {
+      throw new Error("MCP registry is not ready.");
+    }
 
-  async function configureOrganizationSharedCredential(
-    input: SetOrganizationSharedMcpBearerInput,
-  ): Promise<McpServerWithCredential> {
-    const nextServer = await setOrganizationSharedBearer(input);
-    await refresh();
-    return nextServer;
-  }
-
-  async function clearSharedCredential(serverId: string): Promise<McpServerWithCredential> {
-    const nextServer = await clearOrganizationSharedCredential(toMcpServerId(serverId));
+    const nextServer = await revokeMcpCredential(toAppId(appId), toMcpServerId(serverId));
     await refresh();
     return nextServer;
   }
 
   async function removeServerById(serverId: string): Promise<void> {
-    await deleteMcpServer(toMcpServerId(serverId));
+    if (!isTruthy(appId)) {
+      throw new Error("MCP registry is not ready.");
+    }
+
+    await deleteMcpServer(toAppId(appId), toMcpServerId(serverId));
     await refresh();
   }
 
@@ -125,15 +101,28 @@ export function useMcpRegistry() {
     serverId: string,
     enabled: boolean,
   ): Promise<McpServerWithCredential> {
-    const nextServer = await setMcpServerEnabled(toMcpServerId(serverId), enabled);
+    if (!isTruthy(appId)) {
+      throw new Error("MCP registry is not ready.");
+    }
+
+    const nextServer = await setMcpServerEnabled(toAppId(appId), toMcpServerId(serverId), enabled);
     await refresh();
     return nextServer;
   }
 
+  async function startOAuthFlow(serverId: string): Promise<StartMcpOAuthPayload> {
+    if (!isTruthy(appId)) {
+      throw new Error("MCP registry is not ready.");
+    }
+
+    return startMcpOAuth({
+      appId: toAppId(appId),
+      serverId: toMcpServerId(serverId),
+    });
+  }
+
   return {
-    addOrganizationServer,
-    addPersonalServer,
-    clearOrganizationSharedCredential: clearSharedCredential,
+    addServer,
     connectBearer: connectBearerCredential,
     currentUserId: registry?.currentUserId ?? "",
     currentUserName: registry?.currentUserName ?? "",
@@ -145,14 +134,11 @@ export function useMcpRegistry() {
           ? "Failed to load MCP registry."
           : null,
     getOAuthFlowState,
-    isAdmin: registry?.isAdmin ?? false,
-    loading: isTruthy(organizationId) ? registryQuery.isLoading : organizationsLoading,
-    organizationId: registry?.organizationId ?? "",
-    organizationShared: registry?.organizationShared ?? [],
-    personal: registry?.personal ?? [],
+    loading: isTruthy(appId) ? registryQuery.isLoading : appsLoading,
+    appId: registry?.appId ?? "",
     refresh,
     revokeCredential,
-    setOrganizationSharedCredential: configureOrganizationSharedCredential,
+    servers: registry?.servers ?? [],
     setServerEnabled: toggleServerEnabled,
     startOAuth: startOAuthFlow,
   };

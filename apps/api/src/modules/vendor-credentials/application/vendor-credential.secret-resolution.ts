@@ -1,22 +1,21 @@
-import type { VendorCredentialScope } from "@mosoo/contracts/vendor-credential";
 import { vaultSecretsTable } from "@mosoo/db";
-import type { AccountId, OrganizationId, PlatformId, VendorCredentialId } from "@mosoo/id";
+import type { AccountId, PlatformId, AppId, VendorCredentialId } from "@mosoo/id";
 import { VENDOR_OPENAI_COMPATIBLE } from "@mosoo/runtime-catalog";
 import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
+import { isApiError } from "../../../platform/errors";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import {
   deleteSecret,
   readSecretOutcome,
   storeSecret,
 } from "../../mcp/application/mcp-secret-store";
 import { findCustomCredentialRowForModel } from "./vendor-credential-custom-models";
-import { credentialScope } from "./vendor-credential.mapper";
 import {
-  getCompanyCredentialRow,
-  getPreferredPersonalCredentialRow,
-  listReachableCustomCredentialRows,
+  getAppVendorCredentialRow,
+  listAppCustomCredentialRows,
 } from "./vendor-credential.repository";
 import type { ResolvedVendorCredential, VendorCredentialRow } from "./vendor-credential.types";
 
@@ -25,10 +24,10 @@ export interface ResolveVendorApiKeyOptions {
 }
 
 export interface ResolveVendorApiKeyRequest {
-  actorAccountId: AccountId;
   bindings: ApiBindings;
+  executionOwnerUserId: AccountId;
   options?: ResolveVendorApiKeyOptions;
-  organizationId: OrganizationId;
+  appId: AppId;
   vendorId: string;
 }
 
@@ -48,30 +47,22 @@ export type VendorCredentialSecretDeletePurpose =
   | "credential_update_rollback";
 
 export type VendorCredentialSecretReadDenialReason =
-  | "credential_organization_mismatch"
-  | "credential_owner_mismatch"
+  | "credential_app_mismatch"
   | "credential_provider_mismatch"
   | "secret_kind_mismatch"
   | "secret_not_found";
 
-export type VendorCredentialSecretDeleteDenialReason =
-  | "credential_owner_mismatch"
-  | "secret_kind_mismatch"
-  | "secret_not_found";
+export type VendorCredentialSecretDeleteDenialReason = "secret_kind_mismatch" | "secret_not_found";
 
 interface VendorCredentialSecretOwner {
-  actorAccountId: AccountId;
   credentialId: VendorCredentialId;
-  organizationId: OrganizationId;
-  ownerAccountId: AccountId | null;
+  appId: AppId;
   providerId: string;
-  scope: VendorCredentialScope;
 }
 
 export interface ReadVendorCredentialSecretCommand {
-  actorAccountId: AccountId;
   credential: VendorCredentialRow;
-  organizationId: OrganizationId;
+  appId: AppId;
   providerId: string;
   purpose: VendorCredentialSecretReadPurpose;
 }
@@ -112,32 +103,7 @@ export type VendorCredentialSecretDeleteOutcome =
     };
 
 function toVendorCredentialSecretKind(owner: VendorCredentialSecretOwner): string {
-  if (owner.scope === "company" && owner.ownerAccountId !== null) {
-    throw new Error("Company vendor credential secret cannot have an owner.");
-  }
-
-  if (owner.scope === "personal" && owner.ownerAccountId === null) {
-    throw new Error("Personal vendor credential secret requires an owner.");
-  }
-
-  return [
-    "vendor_credential",
-    owner.organizationId,
-    owner.providerId,
-    owner.scope,
-    owner.ownerAccountId ?? "company",
-    owner.credentialId,
-  ].join(":");
-}
-
-function getVendorCredentialSecretActorDenial(
-  command: VendorCredentialSecretOwner,
-): "credential_owner_mismatch" | null {
-  if (command.scope === "personal" && command.ownerAccountId !== command.actorAccountId) {
-    return "credential_owner_mismatch";
-  }
-
-  return null;
+  return ["vendor_credential", owner.appId, owner.providerId, owner.credentialId].join(":");
 }
 
 async function readVaultSecretKind(
@@ -154,63 +120,19 @@ async function readVaultSecretKind(
   return row?.kind ?? null;
 }
 
-export function collectAvailableVendorIds(
-  actorAccountId: string,
-  rows: readonly VendorCredentialRow[],
-): Set<string> {
-  const availabilityByVendorId = new Map<
-    string,
-    { hasCompanyCredential: boolean; hasPreferredPersonalCredential: boolean }
-  >();
-  const availableVendorIds = new Set<string>();
-
-  for (const row of rows) {
-    const vendorId = row.vendorId;
-    let availability = availabilityByVendorId.get(vendorId);
-
-    if (availability === undefined) {
-      availability = {
-        hasCompanyCredential: false,
-        hasPreferredPersonalCredential: false,
-      };
-      availabilityByVendorId.set(vendorId, availability);
-    }
-
-    if (row.ownerUserId === null) {
-      availability.hasCompanyCredential = true;
-      continue;
-    }
-
-    if (row.ownerUserId === actorAccountId && row.isPreferred === 1) {
-      availability.hasPreferredPersonalCredential = true;
-    }
-  }
-
-  for (const [vendorId, availability] of availabilityByVendorId) {
-    if (availability.hasCompanyCredential || availability.hasPreferredPersonalCredential) {
-      availableVendorIds.add(vendorId);
-    }
-  }
-
-  return availableVendorIds;
+export function collectAvailableVendorIds(rows: readonly VendorCredentialRow[]): Set<string> {
+  return new Set(rows.map((row) => row.vendorId));
 }
 
 export function getVendorCredentialSecretReadDenial(
   command: ReadVendorCredentialSecretCommand,
 ): VendorCredentialSecretReadDenialReason | null {
-  if (command.credential.organizationId !== command.organizationId) {
-    return "credential_organization_mismatch";
+  if (command.credential.appId !== command.appId) {
+    return "credential_app_mismatch";
   }
 
   if (command.credential.vendorId !== command.providerId) {
     return "credential_provider_mismatch";
-  }
-
-  if (
-    command.credential.ownerUserId !== null &&
-    command.credential.ownerUserId !== command.actorAccountId
-  ) {
-    return "credential_owner_mismatch";
   }
 
   return null;
@@ -233,12 +155,6 @@ export async function storeVendorCredentialSecret(
   bindings: ApiBindings,
   command: StoreVendorCredentialSecretCommand,
 ): Promise<PlatformId> {
-  const denial = getVendorCredentialSecretActorDenial(command);
-
-  if (denial !== null) {
-    throw new Error(`Vendor credential secret write denied: ${denial}.`);
-  }
-
   return storeSecret(bindings.DB, bindings, {
     kind: toVendorCredentialSecretKind(command),
     value: command.apiKey,
@@ -255,14 +171,10 @@ export async function readVendorCredentialSecret(
     return denyVendorCredentialSecretRead(command, denial);
   }
 
-  const scope = credentialScope(command.credential);
   const expectedKind = toVendorCredentialSecretKind({
-    actorAccountId: command.actorAccountId,
     credentialId: command.credential.id,
-    organizationId: command.organizationId,
-    ownerAccountId: command.credential.ownerUserId,
+    appId: command.appId,
     providerId: command.providerId,
-    scope,
   });
   const actualKind = await readVaultSecretKind(bindings.DB, command.credential.apiKeySecretId);
 
@@ -300,12 +212,6 @@ export async function deleteVendorCredentialSecret(
   database: D1Database,
   command: DeleteVendorCredentialSecretCommand,
 ): Promise<VendorCredentialSecretDeleteOutcome> {
-  const actorDenial = getVendorCredentialSecretActorDenial(command);
-
-  if (actorDenial !== null) {
-    return denyVendorCredentialSecretDelete(command, actorDenial);
-  }
-
   const expectedKind = toVendorCredentialSecretKind(command);
   const actualKind = await readVaultSecretKind(database, command.secretId);
 
@@ -335,25 +241,46 @@ async function resolveCredentialFromRow(
     apiBase: command.credential.apiBase,
     apiKey: secret.apiKey,
     credentialId: command.credential.id,
-    scope: credentialScope(command.credential),
   };
 }
 
+async function canResolveRuntimeCredentialForExecutionOwner(input: {
+  bindings: ApiBindings;
+  executionOwnerUserId: AccountId;
+  appId: AppId;
+}): Promise<boolean> {
+  try {
+    await ensureAppOwnership(input.bindings.DB, input.executionOwnerUserId, input.appId);
+    return true;
+  } catch (error) {
+    if (isApiError(error)) {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
 export async function resolveVendorApiKey({
-  actorAccountId,
   bindings,
+  executionOwnerUserId,
   options = {},
-  organizationId,
+  appId,
   vendorId,
 }: ResolveVendorApiKeyRequest): Promise<ResolvedVendorCredential | null> {
   const modelId = options.modelId;
+  const canResolveCredential = await canResolveRuntimeCredentialForExecutionOwner({
+    bindings,
+    executionOwnerUserId,
+    appId,
+  });
+
+  if (!canResolveCredential) {
+    return null;
+  }
 
   if (vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId && modelId !== undefined) {
-    const rows = await listReachableCustomCredentialRows(
-      bindings.DB,
-      actorAccountId,
-      organizationId,
-    );
+    const rows = await listAppCustomCredentialRows(bindings.DB, appId);
     const row = findCustomCredentialRowForModel(rows, modelId);
 
     if (!row) {
@@ -361,30 +288,22 @@ export async function resolveVendorApiKey({
     }
 
     return resolveCredentialFromRow(bindings, {
-      actorAccountId,
       credential: row,
-      organizationId,
+      appId,
       providerId: vendorId,
       purpose: "custom_model_runtime_api_key",
     });
   }
 
-  const personal = await getPreferredPersonalCredentialRow({
-    actorAccountId,
-    database: bindings.DB,
-    organizationId,
-    vendorId,
-  });
-  const row = personal ?? (await getCompanyCredentialRow(bindings.DB, organizationId, vendorId));
+  const row = await getAppVendorCredentialRow(bindings.DB, appId, vendorId);
 
   if (!row) {
     return null;
   }
 
   return resolveCredentialFromRow(bindings, {
-    actorAccountId,
     credential: row,
-    organizationId,
+    appId,
     providerId: vendorId,
     purpose: "runtime_api_key",
   });

@@ -1,29 +1,54 @@
 import { describe, expect, test } from "bun:test";
 
+import { parsePlatformId } from "@mosoo/id";
+import type { AccountId, EnvironmentId, OrganizationId, AppId } from "@mosoo/id";
+
 import { ensureEnvironmentAccess } from "../src/modules/environments/application/environment-access.service";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
+
+const OWNER_ID = parsePlatformId<AccountId>("01J00000000000000000000001", "owner ID");
+const OTHER_ACCOUNT_ID = parsePlatformId<AccountId>(
+  "01J00000000000000000000002",
+  "other account ID",
+);
+const ORGANIZATION_ID = parsePlatformId<OrganizationId>(
+  "01J00000000000000000000006",
+  "organization ID",
+);
+const APP_ID = parsePlatformId<AppId>("01J00000000000000000000009", "app ID");
+const OTHER_APP_ID = parsePlatformId<AppId>("01J0000000000000000000000A", "other app ID");
+const APP_ENVIRONMENT_ID = parsePlatformId<EnvironmentId>(
+  "01J0000000000000000000000B",
+  "App environment ID",
+);
+const BUILT_IN_ENVIRONMENT_ID = parsePlatformId<EnvironmentId>(
+  "01J0000000000000000000000C",
+  "built-in environment ID",
+);
 
 function createEnvironmentAccessDatabase(): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
 
   database.execute(`
-    CREATE TABLE organization (
-      id text PRIMARY KEY NOT NULL,
-      default_environment_id text
-    );
-
-    CREATE TABLE organization_member (
-      organization_id text NOT NULL,
-      account_id text NOT NULL,
-      role text NOT NULL,
-      disabled_at integer,
-      PRIMARY KEY (organization_id, account_id)
-    );
-
     CREATE TABLE account (
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       image_url text
+    );
+
+    CREATE TABLE organization (
+      id text PRIMARY KEY NOT NULL
+    );
+
+    CREATE TABLE app (
+      id text PRIMARY KEY NOT NULL,
+      organization_id text NOT NULL,
+      owner_account_id text NOT NULL,
+      name text NOT NULL,
+      slug text NOT NULL,
+      default_environment_id text,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL
     );
 
     CREATE TABLE environment (
@@ -31,6 +56,7 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
       name text NOT NULL,
       description text NOT NULL,
       organization_id text NOT NULL,
+      app_id text NOT NULL,
       owner_account_id text,
       current_revision_id text NOT NULL,
       forked_from_environment_id text,
@@ -44,6 +70,7 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       environment_id text NOT NULL,
       organization_id text NOT NULL,
+      app_id text NOT NULL,
       network_policy text NOT NULL,
       allow_mcp_servers integer NOT NULL,
       allow_package_managers integer NOT NULL,
@@ -55,112 +82,157 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
       created_at integer NOT NULL
     );
 
-    CREATE TABLE resource_acl (
-      resource_type text NOT NULL,
-      resource_id text NOT NULL,
-      target_kind text NOT NULL,
-      target_id text NOT NULL,
-      role text NOT NULL,
-      assigned_by_account_id text,
-      created_at integer NOT NULL,
-      PRIMARY KEY (resource_type, resource_id, target_kind, target_id)
-    );
-
     CREATE TABLE agent (
-      environment_id text
+      environment_id text,
+      app_id text
     );
-
-    INSERT INTO organization (id, default_environment_id)
-    VALUES ('01J00000000000000000000006', 'env-org-share');
-
-    INSERT INTO organization_member (organization_id, account_id, role, disabled_at)
-    VALUES
-      ('01J00000000000000000000006', 'viewer-1', 'member', NULL),
-      ('01J00000000000000000000006', 'admin-1', 'admin', NULL),
-      ('01J00000000000000000000006', '01J00000000000000000000004', 'member', 10);
-
-    INSERT INTO account (id, name, image_url)
-    VALUES ('01J00000000000000000000001', 'Owner', NULL);
-
-    INSERT INTO environment (
-      id,
-      name,
-      description,
-      organization_id,
-      owner_account_id,
-      current_revision_id,
-      forked_from_environment_id,
-      forked_from_environment_name,
-      forked_from_owner_name,
-      created_at,
-      updated_at
-    )
-    VALUES
-      ('env-org-share', 'Shared', '', '01J00000000000000000000006', '01J00000000000000000000001', 'rev-org-share', NULL, NULL, NULL, 1, 1),
-      ('env-user-share', 'User Shared', '', '01J00000000000000000000006', '01J00000000000000000000001', 'rev-user-share', NULL, NULL, NULL, 1, 1),
-      ('env-built-in', 'System Default', '', '01J00000000000000000000006', NULL, 'rev-built-in', NULL, NULL, NULL, 1, 1);
-
-    INSERT INTO environment_revision (
-      id,
-      environment_id,
-      organization_id,
-      network_policy,
-      allow_mcp_servers,
-      allow_package_managers,
-      allowed_hosts_json,
-      packages_json,
-      setup_script,
-      env_vars_json,
-      created_by_account_id,
-      created_at
-    )
-    VALUES
-      ('rev-org-share', 'env-org-share', '01J00000000000000000000006', 'full', 1, 1, '[]', '[]', '', '[]', '01J00000000000000000000001', 1),
-      ('rev-user-share', 'env-user-share', '01J00000000000000000000006', 'full', 1, 1, '[]', '[]', '', '[]', '01J00000000000000000000001', 1),
-      ('rev-built-in', 'env-built-in', '01J00000000000000000000006', 'full', 1, 1, '[]', '[]', '', '[]', NULL, 1);
-
-    INSERT INTO resource_acl (
-      resource_type,
-      resource_id,
-      target_kind,
-      target_id,
-      role,
-      assigned_by_account_id,
-      created_at
-    )
-    VALUES
-      ('environment', 'env-org-share', 'organization', '01J00000000000000000000006', 'user', '01J00000000000000000000001', 1),
-      ('environment', 'env-user-share', 'user', 'viewer-1', 'user', '01J00000000000000000000001', 1);
   `);
+
+  database
+    .prepare(
+      `
+        INSERT INTO account (id, name, image_url)
+        VALUES (?, 'Owner', NULL), (?, 'Other', NULL)
+      `,
+    )
+    .bind(OWNER_ID, OTHER_ACCOUNT_ID)
+    .run();
+
+  database.prepare("INSERT INTO organization (id) VALUES (?)").bind(ORGANIZATION_ID).run();
+
+  database
+    .prepare(
+      `
+        INSERT INTO app (
+          id,
+          organization_id,
+          owner_account_id,
+          name,
+          slug,
+          default_environment_id,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, 'Default App', 'default', ?, 1, 1)
+      `,
+    )
+    .bind(APP_ID, ORGANIZATION_ID, OWNER_ID, BUILT_IN_ENVIRONMENT_ID)
+    .run();
+
+  database
+    .prepare(
+      `
+        INSERT INTO environment (
+          id,
+          name,
+          description,
+          organization_id,
+          app_id,
+          owner_account_id,
+          current_revision_id,
+          forked_from_environment_id,
+          forked_from_environment_name,
+          forked_from_owner_name,
+          created_at,
+          updated_at
+        )
+        VALUES
+          (?, 'App Local', '', ?, ?, ?, 'rev-app', NULL, NULL, NULL, 1, 1),
+          (?, 'System Default', '', ?, ?, NULL, 'rev-built-in', NULL, NULL, NULL, 1, 1)
+      `,
+    )
+    .bind(
+      APP_ENVIRONMENT_ID,
+      ORGANIZATION_ID,
+      APP_ID,
+      OWNER_ID,
+      BUILT_IN_ENVIRONMENT_ID,
+      ORGANIZATION_ID,
+      APP_ID,
+    )
+    .run();
+
+  database
+    .prepare(
+      `
+        INSERT INTO environment_revision (
+          id,
+          environment_id,
+          organization_id,
+          app_id,
+          network_policy,
+          allow_mcp_servers,
+          allow_package_managers,
+          allowed_hosts_json,
+          packages_json,
+          setup_script,
+          env_vars_json,
+          created_by_account_id,
+          created_at
+        )
+        VALUES
+          ('rev-app', ?, ?, ?, 'full', 1, 1, '[]', '[]', '', '[]', ?, 1),
+          ('rev-built-in', ?, ?, ?, 'full', 1, 1, '[]', '[]', '', '[]', NULL, 1)
+      `,
+    )
+    .bind(
+      APP_ENVIRONMENT_ID,
+      ORGANIZATION_ID,
+      APP_ID,
+      OWNER_ID,
+      BUILT_IN_ENVIRONMENT_ID,
+      ORGANIZATION_ID,
+      APP_ID,
+    )
+    .run();
 
   return database;
 }
 
 describe("environment access", () => {
-  test("resolves organization share access", async () => {
+  test("allows the App owner to read App-local environments", async () => {
     const database = createEnvironmentAccessDatabase();
 
-    const access = await ensureEnvironmentAccess(database, "viewer-1", "env-org-share");
+    const access = await ensureEnvironmentAccess(database, OWNER_ID, {
+      environmentId: APP_ENVIRONMENT_ID,
+      appId: APP_ID,
+    });
 
-    expect(access.hasOrganizationShare).toBe(true);
-    expect(access.isOrganizationAdmin).toBe(false);
-    expect(access.row.id).toBe("env-org-share");
+    expect(access.row.id).toBe(APP_ENVIRONMENT_ID);
+    expect(access.row.appId).toBe(APP_ID);
   });
 
-  test("keeps user share distinct from organization share", async () => {
+  test("allows the App owner to read the App default built-in environment", async () => {
     const database = createEnvironmentAccessDatabase();
 
-    const access = await ensureEnvironmentAccess(database, "viewer-1", "env-user-share");
-
-    expect(access.hasOrganizationShare).toBe(false);
-    expect(access.row.id).toBe("env-user-share");
-  });
-
-  test("allows built-in environment for active organization members", async () => {
-    const database = createEnvironmentAccessDatabase();
-
-    const access = await ensureEnvironmentAccess(database, "viewer-1", "env-built-in");
+    const access = await ensureEnvironmentAccess(database, OWNER_ID, {
+      environmentId: BUILT_IN_ENVIRONMENT_ID,
+      appId: APP_ID,
+    });
 
     expect(access.row.ownerId).toBeNull();
+    expect(access.row.defaultEnvironmentId).toBe(BUILT_IN_ENVIRONMENT_ID);
+  });
+
+  test("fails closed when the viewer is not the App owner", async () => {
+    const database = createEnvironmentAccessDatabase();
+
+    await expect(
+      ensureEnvironmentAccess(database, OTHER_ACCOUNT_ID, {
+        environmentId: APP_ENVIRONMENT_ID,
+        appId: APP_ID,
+      }),
+    ).rejects.toThrow("Environment not found.");
+  });
+
+  test("fails closed when the environment is requested through another App", async () => {
+    const database = createEnvironmentAccessDatabase();
+
+    await expect(
+      ensureEnvironmentAccess(database, OWNER_ID, {
+        environmentId: APP_ENVIRONMENT_ID,
+        appId: OTHER_APP_ID,
+      }),
+    ).rejects.toThrow("Environment not found.");
   });
 });

@@ -15,7 +15,6 @@ import { StaticMarkdown } from "@/shared/ui/static-markdown";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { DeleteSkillDialog } from "./delete-skill-dialog";
-import { ShareSkillDialog } from "./share-skill-dialog";
 import type { useSkillRegistry } from "./use-skill-registry";
 type Registry = ReturnType<typeof useSkillRegistry>;
 
@@ -33,7 +32,6 @@ interface SkillDetailDialogState {
   detail: SkillDetail | null;
   forking: boolean;
   showDelete: boolean;
-  showShare: boolean;
 }
 
 type SkillDetailDialogAction =
@@ -41,8 +39,7 @@ type SkillDetailDialogAction =
   | { type: "contentLoaded"; content: string; detail: SkillDetail }
   | { type: "setActionError"; error: string | null }
   | { type: "setForking"; forking: boolean }
-  | { type: "setShowDelete"; open: boolean }
-  | { type: "setShowShare"; open: boolean };
+  | { type: "setShowDelete"; open: boolean };
 
 const SKILL_DETAIL_DIALOG_INITIAL_STATE: SkillDetailDialogState = {
   actionError: null,
@@ -52,7 +49,6 @@ const SKILL_DETAIL_DIALOG_INITIAL_STATE: SkillDetailDialogState = {
   detail: null,
   forking: false,
   showDelete: false,
-  showShare: false,
 };
 
 function skillDetailDialogReducer(
@@ -75,23 +71,12 @@ function skillDetailDialogReducer(
       return { ...state, forking: action.forking };
     case "setShowDelete":
       return { ...state, showDelete: action.open };
-    case "setShowShare":
-      return { ...state, showShare: action.open };
   }
 }
 
 export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
   const [state, dispatch] = useReducer(skillDetailDialogReducer, SKILL_DETAIL_DIALOG_INITIAL_STATE);
-  const {
-    actionError,
-    content,
-    contentError,
-    contentLoading,
-    detail,
-    forking,
-    showDelete,
-    showShare,
-  } = state;
+  const { actionError, content, contentError, contentLoading, detail, forking, showDelete } = state;
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -141,10 +126,10 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
   }
 
   function handleDownload() {
-    globalThis.location.href = skillPackageUrl(skill.id);
+    globalThis.location.href = skillPackageUrl(skill.appId, skill.id);
   }
 
-  const canManageSkill = skill.role === "owner";
+  const canManageSkill = true;
   const displaySkill = detail ?? skill;
 
   return (
@@ -210,17 +195,6 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
               ) : null}
             </div>
             <div className="flex items-center gap-1.5">
-              {canManageSkill ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    dispatch({ open: true, type: "setShowShare" });
-                  }}
-                >
-                  Share
-                </Button>
-              ) : null}
               <Button variant="outline" size="sm" onClick={handleDownload}>
                 Download
               </Button>
@@ -239,16 +213,6 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
 
       {canManageSkill ? (
         <>
-          {showShare ? (
-            <ShareSkillDialog
-              skill={skill}
-              open={showShare}
-              onOpenChange={(open) => {
-                dispatch({ open, type: "setShowShare" });
-              }}
-              registry={registry}
-            />
-          ) : null}
           {showDelete ? (
             <DeleteSkillDialog
               skill={skill}

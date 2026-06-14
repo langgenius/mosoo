@@ -23,16 +23,16 @@ const MCP_SERVER_FIELDS = graphql(/* GraphQL */ `
     credentialStatus
     description
     enabled
-    hasSharedCredential
+    hasCredential
     iconUrl
     id
     name
     ownerId
     ownerName
+    appId
     source
     updatedAt
     url
-    organizationId
     credential {
       ...McpCredentialFields
     }
@@ -44,34 +44,22 @@ const retainGraphQLFragments = (documents: readonly unknown[]): number => docume
 retainGraphQLFragments([MCP_CREDENTIAL_FIELDS, MCP_SERVER_FIELDS]);
 
 export const MCP_REGISTRY_QUERY = graphql(/* GraphQL */ `
-  query McpRegistry($organizationId: ULID!) {
-    mcpRegistry(organizationId: $organizationId) {
+  query McpRegistry($appId: ULID!) {
+    mcpRegistry(appId: $appId) {
       currentUserEmail
       currentUserId
       currentUserName
-      isAdmin
-      personal {
-        ...McpServerFields
-      }
-      organizationId
-      organizationShared {
+      appId
+      servers {
         ...McpServerFields
       }
     }
   }
 `);
 
-export const CREATE_PERSONAL_MCP_SERVER_MUTATION = graphql(/* GraphQL */ `
-  mutation CreatePersonalMcpServer($input: CreatePersonalMcpServerInput!) {
-    createPersonalMcpServer(input: $input) {
-      ...McpServerFields
-    }
-  }
-`);
-
-export const CREATE_ORGANIZATION_MCP_SERVER_MUTATION = graphql(/* GraphQL */ `
-  mutation CreateOrganizationMcpServer($input: CreateOrganizationMcpServerInput!) {
-    createOrganizationMcpServer(input: $input) {
+export const CREATE_APP_MCP_SERVER_MUTATION = graphql(/* GraphQL */ `
+  mutation CreateAppMcpServer($input: CreateAppMcpServerInput!) {
+    createAppMcpServer(input: $input) {
       ...McpServerFields
     }
   }
@@ -85,41 +73,25 @@ export const CONNECT_MCP_BEARER_MUTATION = graphql(/* GraphQL */ `
   }
 `);
 
-export const SET_ORGANIZATION_SHARED_BEARER_MUTATION = graphql(/* GraphQL */ `
-  mutation SetOrganizationSharedBearer($input: SetOrganizationSharedMcpBearerInput!) {
-    setOrganizationSharedBearer(input: $input) {
-      ...McpServerFields
-    }
-  }
-`);
-
-export const CLEAR_ORGANIZATION_SHARED_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
-  mutation ClearOrganizationSharedCredential($serverId: ULID!) {
-    clearOrganizationSharedCredential(serverId: $serverId) {
-      ...McpServerFields
-    }
-  }
-`);
-
-export const REVOKE_MCP_USER_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
-  mutation RevokeMcpUserCredential($serverId: ULID!) {
-    revokeMcpUserCredential(serverId: $serverId) {
+export const REVOKE_MCP_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
+  mutation RevokeMcpCredential($appId: ULID!, $serverId: ULID!) {
+    revokeMcpCredential(appId: $appId, serverId: $serverId) {
       ...McpServerFields
     }
   }
 `);
 
 export const SET_MCP_SERVER_ENABLED_MUTATION = graphql(/* GraphQL */ `
-  mutation SetMcpServerEnabled($serverId: ULID!, $enabled: Boolean!) {
-    setMcpServerEnabled(serverId: $serverId, enabled: $enabled) {
+  mutation SetMcpServerEnabled($appId: ULID!, $serverId: ULID!, $enabled: Boolean!) {
+    setMcpServerEnabled(appId: $appId, serverId: $serverId, enabled: $enabled) {
       ...McpServerFields
     }
   }
 `);
 
 export const DELETE_MCP_SERVER_MUTATION = graphql(/* GraphQL */ `
-  mutation DeleteMcpServer($serverId: ULID!) {
-    deleteMcpServer(serverId: $serverId) {
+  mutation DeleteMcpServer($appId: ULID!, $serverId: ULID!) {
+    deleteMcpServer(appId: $appId, serverId: $serverId) {
       ok
     }
   }

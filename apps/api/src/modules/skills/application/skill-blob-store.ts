@@ -1,7 +1,7 @@
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 
-export function buildSkillBlobKey(organizationId: string, blobSha256: string): string {
-  return `organization/${organizationId}/skill-blob/${blobSha256}.skill`;
+export function buildSkillBlobKey(appId: string, blobSha256: string): string {
+  return `app/${appId}/skill-blob/${blobSha256}.skill`;
 }
 
 export async function writeSkillBlob(

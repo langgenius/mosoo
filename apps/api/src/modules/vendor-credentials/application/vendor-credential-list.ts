@@ -1,27 +1,26 @@
 import type { VendorCredential } from "@mosoo/contracts/vendor-credential";
-import type { OrganizationId } from "@mosoo/id";
+import type { AppId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureOrganizationMembership } from "../../organizations/domain/organization-access.policy";
 import { toVendorCredentialWithSecret } from "./vendor-credential.mapper";
-import { listVisibleVendorCredentialRows } from "./vendor-credential.repository";
+import { listAppVendorCredentialRows } from "./vendor-credential.repository";
 import { readVendorCredentialSecret } from "./vendor-credential.secret-resolution";
 
 export async function listVendorCredentials(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  organizationId: OrganizationId,
+  appId: AppId,
 ): Promise<VendorCredential[]> {
-  await ensureOrganizationMembership(bindings.DB, viewer.id, organizationId);
-  const rows = await listVisibleVendorCredentialRows(bindings.DB, viewer.id, organizationId);
+  await ensureAppOwnership(bindings.DB, viewer.id, appId);
+  const rows = await listAppVendorCredentialRows(bindings.DB, appId);
 
   return Promise.all(
     rows.map(async (row) => {
       const secret = await readVendorCredentialSecret(bindings, {
-        actorAccountId: viewer.id,
         credential: row,
-        organizationId,
+        appId,
         providerId: row.vendorId,
         purpose: "credential_display_api_key",
       });

@@ -1,4 +1,4 @@
-import type { SpaceId } from "@mosoo/contracts/id";
+import type { AppId, SpaceId } from "@mosoo/contracts/id";
 import type { SpaceFileListing } from "@mosoo/contracts/space";
 
 import { graphql } from "@/gql";
@@ -7,8 +7,8 @@ import { requestGraphQL } from "@/platform/http/graphql-client";
 import { toSpaceFileListing } from "./space-mappers";
 
 const SPACE_FILES_QUERY = graphql(/* GraphQL */ `
-  query SpaceFiles($spaceId: ULID!, $path: String) {
-    spaceFiles(spaceId: $spaceId, path: $path) {
+  query SpaceFiles($appId: ULID!, $spaceId: ULID!, $path: String) {
+    spaceFiles(appId: $appId, spaceId: $spaceId, path: $path) {
       directories {
         key
       }
@@ -50,9 +50,14 @@ const DELETE_SPACE_ENTRY_MUTATION = graphql(/* GraphQL */ `
   }
 `);
 
-export async function spaceFiles(spaceId: SpaceId, path?: string): Promise<SpaceFileListing> {
+export async function spaceFiles(
+  appId: AppId,
+  spaceId: SpaceId,
+  path?: string,
+): Promise<SpaceFileListing> {
   const payload = await requestGraphQL(SPACE_FILES_QUERY, {
     path: path ?? null,
+    appId,
     spaceId,
   });
 
@@ -60,6 +65,7 @@ export async function spaceFiles(spaceId: SpaceId, path?: string): Promise<Space
 }
 
 export async function createFolder(
+  appId: AppId,
   spaceId: SpaceId,
   name: string,
   path?: string,
@@ -68,6 +74,7 @@ export async function createFolder(
     input: {
       name,
       path: path ?? null,
+      appId,
       spaceId,
     },
   });
@@ -77,10 +84,15 @@ export async function createFolder(
   };
 }
 
-export async function deleteSpaceEntry(spaceId: SpaceId, key: string): Promise<{ ok: true }> {
+export async function deleteSpaceEntry(
+  appId: AppId,
+  spaceId: SpaceId,
+  key: string,
+): Promise<{ ok: true }> {
   await requestGraphQL(DELETE_SPACE_ENTRY_MUTATION, {
     input: {
       key,
+      appId,
       spaceId,
     },
   });

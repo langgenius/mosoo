@@ -8,7 +8,7 @@ import type {
   UpdateEnvironmentInput,
 } from "@mosoo/contracts/environment";
 
-import { toEnvironmentId, toOrganizationId } from "@/routes/typed-id";
+import { toEnvironmentId, toAppId } from "@/routes/typed-id";
 
 type EnvironmentLike = EnvironmentSummary | EnvironmentDetail;
 
@@ -166,7 +166,7 @@ export function hasPackageManagerError(rows: EditablePackageRow[]): boolean {
 }
 
 export function toCreateEnvironmentInput(
-  organizationId: string,
+  appId: string,
   draft: EnvironmentDraft,
 ): CreateEnvironmentInput {
   return {
@@ -178,13 +178,14 @@ export function toCreateEnvironmentInput(
     envVars: toEnvVarInputs(draft.envVars),
     name: draft.name.trim(),
     networkPolicy: draft.networkPolicy,
-    organizationId: toOrganizationId(organizationId),
     packages: parsePackages(draft.packages),
+    appId: toAppId(appId),
     setupScript: draft.setupScript,
   };
 }
 
 export function toUpdateEnvironmentInput(
+  appId: string,
   environmentId: string,
   draft: EnvironmentDraft,
 ): UpdateEnvironmentInput {
@@ -199,6 +200,7 @@ export function toUpdateEnvironmentInput(
     name: draft.name.trim(),
     networkPolicy: draft.networkPolicy,
     packages: parsePackages(draft.packages),
+    appId: toAppId(appId),
     setupScript: draft.setupScript,
   };
 }

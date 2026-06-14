@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
-import type { AccountId, AgentId, CredentialId, McpServerId, OrganizationId } from "@mosoo/id";
+import type {
+  AccountId,
+  AgentId,
+  CredentialId,
+  McpServerId,
+  OrganizationId,
+  AppId,
+} from "@mosoo/id";
 
 import {
   deleteMcpCredentialSecret,
@@ -14,7 +21,8 @@ import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const ORGANIZATION_ID = "01J00000000000000000000001" as OrganizationId;
-const OTHER_ORGANIZATION_ID = "01J00000000000000000000002" as OrganizationId;
+const APP_ID = "01J00000000000000000000002" as AppId;
+const OTHER_APP_ID = "01J0000000000000000000000A" as AppId;
 const OWNER_ID = "01J00000000000000000000003" as AccountId;
 const AGENT_ID = "01J00000000000000000000004" as AgentId;
 const SERVER_ID = "01J00000000000000000000005" as McpServerId;
@@ -56,7 +64,7 @@ function createServer(input: Partial<ServerRow> = {}): ServerRow {
     byoClientId: null,
     byoClientSecretSecretId: null,
     createdAt: 1,
-    credentialScope: "user",
+    credentialScope: "app",
     description: null,
     enabled: 1,
     iconUrl: null,
@@ -66,7 +74,8 @@ function createServer(input: Partial<ServerRow> = {}): ServerRow {
     organizationId: ORGANIZATION_ID,
     ownerId: OWNER_ID,
     ownerName: "Owner",
-    source: "organization_shared",
+    appId: APP_ID,
+    source: "app",
     updatedAt: 1,
     url: "https://mcp.example.com",
     ...input,
@@ -83,15 +92,16 @@ function createCredential(input: Partial<CredentialRow> = {}): CredentialRow {
     lastRefreshedAt: null,
     oauthClientId: "client",
     oauthClientSecretSecretId: null,
+    appId: APP_ID,
     refreshSecretId: MISSING_SECRET_ID,
-    scope: "user",
+    scope: "app",
     scopeValuesJson: "[]",
     secretId: MISSING_SECRET_ID,
     serverId: SERVER_ID,
     status: "active",
     subjectLabel: null,
     updatedAt: 1,
-    userId: OWNER_ID,
+    userId: null,
     ...input,
   };
 }
@@ -106,17 +116,17 @@ describe("MCP credential secret resolution", () => {
       credentialId: CREDENTIAL_ID,
       currentSecretId: null,
       purpose: "credential_refresh_token",
-      scope: "user",
+      scope: "app",
       secretKind: "refresh_token",
       server,
-      userId: OWNER_ID,
+      userId: null,
       value: "refresh-token",
     });
     const credential = createCredential({ refreshSecretId });
     const outcome = await readMcpCredentialSecret(bindings, {
       credential,
-      organizationId: ORGANIZATION_ID,
       purpose: "runtime_refresh_token",
+      appId: APP_ID,
       server,
     });
 
@@ -132,15 +142,15 @@ describe("MCP credential secret resolution", () => {
 
     const cases: {
       credential?: Partial<CredentialRow>;
-      organizationId?: OrganizationId;
       purpose: McpCredentialSecretReadPurpose;
+      appId?: AppId;
       reason: string;
       server?: Partial<ServerRow>;
     }[] = [
       {
-        organizationId: OTHER_ORGANIZATION_ID,
         purpose: "runtime_access_token",
-        reason: "server_organization_mismatch",
+        appId: OTHER_APP_ID,
+        reason: "server_app_mismatch",
       },
       {
         credential: { serverId: OTHER_SERVER_ID },
@@ -148,15 +158,14 @@ describe("MCP credential secret resolution", () => {
         reason: "credential_server_mismatch",
       },
       {
-        credential: { agentId: AGENT_ID, scope: "user", userId: null },
+        credential: { agentId: AGENT_ID, scope: "app", userId: null },
         purpose: "runtime_access_token",
         reason: "credential_scope_owner_mismatch",
       },
       {
-        credential: { scope: "organization_shared", userId: null },
+        credential: { scope: "agent", userId: null },
         purpose: "runtime_access_token",
-        reason: "credential_scope_mismatch",
-        server: { credentialScope: "user" },
+        reason: "credential_scope_owner_mismatch",
       },
       {
         credential: { authType: "bearer" },
@@ -177,8 +186,8 @@ describe("MCP credential secret resolution", () => {
     for (const testCase of cases) {
       const outcome = await readMcpCredentialSecret(bindings, {
         credential: createCredential(testCase.credential),
-        organizationId: testCase.organizationId ?? ORGANIZATION_ID,
         purpose: testCase.purpose,
+        appId: testCase.appId ?? APP_ID,
         server: createServer(testCase.server),
       });
 
@@ -197,17 +206,17 @@ describe("MCP credential secret resolution", () => {
       credentialId: OTHER_CREDENTIAL_ID,
       currentSecretId: null,
       purpose: "credential_refresh_token",
-      scope: "user",
+      scope: "app",
       secretKind: "refresh_token",
       server: createServer(),
-      userId: OWNER_ID,
+      userId: null,
       value: "refresh-token",
     });
 
     const outcome = await readMcpCredentialSecret(bindings, {
       credential: createCredential({ refreshSecretId }),
-      organizationId: ORGANIZATION_ID,
       purpose: "runtime_refresh_token",
+      appId: APP_ID,
       server: createServer(),
     });
 
@@ -226,10 +235,10 @@ describe("MCP credential secret resolution", () => {
       credentialId: CREDENTIAL_ID,
       currentSecretId: null,
       purpose: "credential_access_token",
-      scope: "user",
+      scope: "app",
       secretKind: "access_token",
       server,
-      userId: OWNER_ID,
+      userId: null,
       value: "access-token",
     });
 
@@ -237,11 +246,11 @@ describe("MCP credential secret resolution", () => {
       agentId: null,
       credentialId: CREDENTIAL_ID,
       purpose: "credential_revoke",
-      scope: "user",
+      scope: "app",
       secretId,
       secretKind: "access_token",
       server,
-      userId: OWNER_ID,
+      userId: null,
     });
 
     expect(outcome).toEqual({ status: "deleted" });

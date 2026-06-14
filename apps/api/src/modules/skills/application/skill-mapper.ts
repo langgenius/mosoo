@@ -1,5 +1,4 @@
 import type { SkillSummary } from "@mosoo/contracts/skill";
-import type { AccountId } from "@mosoo/id";
 
 import { toIsoString } from "../../../time";
 import type { SkillRegistryRow } from "./skill-types";
@@ -14,14 +13,13 @@ function toTimestampIsoString(value: number | string): string {
   return toIsoString(timestampMs);
 }
 
-export function toSkillSummary(row: SkillRegistryRow, viewerId: AccountId): SkillSummary {
+export function toSkillSummary(row: SkillRegistryRow): SkillSummary {
   const forkedFromOwnerName = row.forkedFromOwnerName;
   const forkedFromSkillId = row.forkedFromSkillId;
   const forkedFromSkillName = row.forkedFromSkillName;
 
   return {
     author: row.author,
-    autoEnabled: row.autoEnabled === 1,
     createdAt: toTimestampIsoString(row.createdAt),
     description: row.description,
     forkOrigin:
@@ -34,10 +32,9 @@ export function toSkillSummary(row: SkillRegistryRow, viewerId: AccountId): Skil
         : null,
     id: row.id,
     name: row.name,
-    organizationId: row.organizationId,
     ownerId: row.ownerId,
     ownerName: row.ownerName ?? row.author,
-    role: row.ownerId === viewerId ? "owner" : "user",
+    appId: row.appId,
     snapshotId: row.currentSnapshotId,
     sourceKind: row.sourceKind,
     updatedAt: toTimestampIsoString(row.updatedAt),

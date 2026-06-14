@@ -1,5 +1,5 @@
 import type { SpaceView } from "@mosoo/contracts/space";
-import { ArrowLeft, Folder, Lock, Plus, Settings } from "lucide-react";
+import { ArrowLeft, Folder, Plus, Settings } from "lucide-react";
 
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
@@ -15,7 +15,6 @@ export function SpaceSidebar({
   onOpenSettings,
   onSelectSpace,
   spaces,
-  userId,
 }: {
   activeSpaceId: string | null;
   canManageSpace: ((space: SpaceView) => boolean) | undefined;
@@ -27,16 +26,7 @@ export function SpaceSidebar({
   onOpenSettings: (spaceId: string) => void;
   onSelectSpace: (spaceId: string) => void;
   spaces: SpaceView[];
-  userId: string | undefined;
 }) {
-  const ownedSpaces = spaces.filter((space) => space.ownerId === userId);
-  const sharedSpaces = spaces.filter(
-    (space) => space.ownerId !== userId && space.isSharedWithViewer,
-  );
-  const organizationSpaces = spaces.filter(
-    (space) => space.ownerId !== userId && !space.isSharedWithViewer,
-  );
-
   return (
     <aside className="border-border-soft flex w-[220px] flex-col border-r">
       {onBackToHub ? (
@@ -64,7 +54,7 @@ export function SpaceSidebar({
       </div>
 
       <div className="flex-1 overflow-x-hidden overflow-y-auto px-2">
-        {ownedSpaces.length > 0 ? (
+        {spaces.length > 0 ? (
           <SpaceSidebarList
             activeSpaceId={activeSpaceId}
             canManageSpace={canManageSpace}
@@ -73,40 +63,8 @@ export function SpaceSidebar({
             onHoverSpace={onHoverSpace}
             onOpenSettings={onOpenSettings}
             onSelectSpace={onSelectSpace}
-            spaces={ownedSpaces}
+            spaces={spaces}
           />
-        ) : null}
-
-        {sharedSpaces.length > 0 ? (
-          <>
-            <div className="t-eyebrow px-2.5 pt-4 pb-1">Shared with me</div>
-            <SpaceSidebarList
-              activeSpaceId={activeSpaceId}
-              canManageSpace={canManageSpace}
-              getManageDisabledReason={getManageDisabledReason}
-              hoveredSpaceId={hoveredSpaceId}
-              onHoverSpace={onHoverSpace}
-              onOpenSettings={onOpenSettings}
-              onSelectSpace={onSelectSpace}
-              spaces={sharedSpaces}
-            />
-          </>
-        ) : null}
-
-        {organizationSpaces.length > 0 ? (
-          <>
-            <div className="t-eyebrow px-2.5 pt-4 pb-1">All organization spaces</div>
-            <SpaceSidebarList
-              activeSpaceId={activeSpaceId}
-              canManageSpace={canManageSpace}
-              getManageDisabledReason={getManageDisabledReason}
-              hoveredSpaceId={hoveredSpaceId}
-              onHoverSpace={onHoverSpace}
-              onOpenSettings={onOpenSettings}
-              onSelectSpace={onSelectSpace}
-              spaces={organizationSpaces}
-            />
-          </>
         ) : null}
       </div>
     </aside>
@@ -189,9 +147,6 @@ function SpaceSidebarItem({
         <div className="flex min-w-0 items-center gap-2">
           <Folder className="size-4 shrink-0" />
           <span className="flex-1 truncate text-[13px]">{space.name}</span>
-          {space.visibility === "private" ? (
-            <Lock className="text-fg-muted size-3 shrink-0" />
-          ) : null}
         </div>
       </Button>
       {hovered && (canManage || Boolean(disabledManageReason)) ? (

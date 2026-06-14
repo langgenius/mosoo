@@ -1,5 +1,5 @@
 import type { FileRecord } from "@mosoo/contracts/file";
-import type { FileId, SpaceId } from "@mosoo/contracts/id";
+import type { FileId, AppId, SpaceId } from "@mosoo/contracts/id";
 
 import { requestJson } from "@/platform/http/file-request";
 import { createFileApiError, FileApiError } from "@/shared/lib/file-api-error";
@@ -72,6 +72,7 @@ async function uploadOneSpaceFile(input: {
   conflictMode: UploadConflictMode;
   file: File;
   logicalPath: string;
+  appId: AppId;
   replaceIfMatchEtag?: string | undefined;
   spaceId: SpaceId;
 }): Promise<{ fileId: FileId }> {
@@ -95,6 +96,7 @@ async function uploadOneSpaceFile(input: {
           id: input.spaceId,
           kind: "space",
           path: input.logicalPath,
+          appId: input.appId,
         },
       },
       input.file,
@@ -116,6 +118,7 @@ async function uploadSpaceFileCopy(
   input: {
     file: File;
     logicalPath: string;
+    appId: AppId;
     replaceIfMatchEtag?: string | undefined;
     spaceId: SpaceId;
   },
@@ -142,6 +145,7 @@ async function uploadSpaceFileCopy(
 }
 
 export async function uploadSpaceFiles(
+  appId: AppId,
   spaceId: SpaceId,
   files: FileList | File[],
   parentPath?: string,
@@ -172,6 +176,7 @@ export async function uploadSpaceFiles(
         conflictMode,
         file,
         logicalPath,
+        appId,
         replaceIfMatchEtag:
           index === 0 && conflictMode === "replace" ? options.replaceIfMatchEtag : undefined,
         spaceId,

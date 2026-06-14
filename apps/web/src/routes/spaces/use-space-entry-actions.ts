@@ -5,12 +5,13 @@ import { deleteFileRecordWithPrecondition } from "../../domains/file/api/space-f
 import { downloadFile, openFileInline } from "../../domains/file/file-open";
 import { createFolder, deleteSpaceEntry } from "../../domains/space/api/files";
 import { isTruthy } from "../../shared/lib/truthiness";
-import { toFileId, toSpaceId } from "../typed-id";
+import { toFileId, toAppId, toSpaceId } from "../typed-id";
 import { getErrorMessage } from "./use-space-browser-upload";
 interface UseSpaceEntryActionsInput {
   activeSpace: string | null;
   currentPath: string;
   files: FileEntry[];
+  appId: string | null;
   refreshFiles: () => Promise<void>;
 }
 
@@ -18,6 +19,7 @@ export function useSpaceEntryActions({
   activeSpace,
   currentPath,
   files,
+  appId,
   refreshFiles,
 }: UseSpaceEntryActionsInput) {
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -26,14 +28,19 @@ export function useSpaceEntryActions({
   const [fileActionError, setFileActionError] = useState<string | null>(null);
 
   async function handleCreateFolder() {
-    if (!isTruthy(activeSpace) || !newFolderName.trim()) {
+    if (!isTruthy(appId) || !isTruthy(activeSpace) || !newFolderName.trim()) {
       return;
     }
 
     setFileActionError(null);
 
     try {
-      await createFolder(toSpaceId(activeSpace), newFolderName.trim(), currentPath || undefined);
+      await createFolder(
+        toAppId(appId),
+        toSpaceId(activeSpace),
+        newFolderName.trim(),
+        currentPath || undefined,
+      );
       await refreshFiles();
       setShowNewFolder(false);
       setNewFolderName("");
@@ -44,12 +51,12 @@ export function useSpaceEntryActions({
   }
 
   async function handleDeleteDirectory(key: string) {
-    if (!isTruthy(activeSpace)) {
+    if (!isTruthy(appId) || !isTruthy(activeSpace)) {
       return;
     }
 
     try {
-      await deleteSpaceEntry(toSpaceId(activeSpace), key);
+      await deleteSpaceEntry(toAppId(appId), toSpaceId(activeSpace), key);
       await refreshFiles();
       setFileActionError(null);
     } catch (error) {

@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import type { AccountId, AgentId, CredentialId, McpServerId } from "@mosoo/id";
+import type { AgentId, CredentialId, McpServerId, AppId } from "@mosoo/id";
 
 import { resolveCredentialsForMcpBindings } from "../src/modules/mcp/application/mcp-credential.repository";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
-const OWNER_ID = "01J00000000000000000000001" as AccountId;
+const APP_ID = "01J00000000000000000000001" as AppId;
 const AGENT_ID = "01J00000000000000000000002" as AgentId;
 const OTHER_AGENT_ID = "01J00000000000000000000003" as AgentId;
 const SERVER_ID = "01J00000000000000000000004" as McpServerId;
@@ -13,7 +13,7 @@ const OTHER_SERVER_ID = "01J00000000000000000000005" as McpServerId;
 const MATCHING_CREDENTIAL_ID = "01J00000000000000000000006" as CredentialId;
 const WRONG_AGENT_CREDENTIAL_ID = "01J00000000000000000000007" as CredentialId;
 const WRONG_SERVER_CREDENTIAL_ID = "01J00000000000000000000008" as CredentialId;
-const USER_CREDENTIAL_ID = "01J00000000000000000000009" as CredentialId;
+const APP_CREDENTIAL_ID = "01J00000000000000000000009" as CredentialId;
 
 function createCredentialResolutionDatabase(): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
@@ -29,6 +29,7 @@ function createCredentialResolutionDatabase(): SqliteD1Database {
       last_refreshed_at integer,
       oauth_client_id text,
       oauth_client_secret_secret_id text,
+      app_id text NOT NULL,
       refresh_secret_id text,
       scope text NOT NULL,
       scope_values_json text,
@@ -46,10 +47,9 @@ function createCredentialResolutionDatabase(): SqliteD1Database {
 async function insertCredential(
   database: SqliteD1Database,
   input: {
-    accountId?: AccountId | null;
     agentId?: AgentId | null;
     credentialId: CredentialId;
-    scope: "agent" | "organization_shared" | "user";
+    scope: "agent" | "app";
     serverId: McpServerId;
   },
 ): Promise<void> {
@@ -66,6 +66,7 @@ async function insertCredential(
           last_refreshed_at,
           oauth_client_id,
           oauth_client_secret_secret_id,
+          app_id,
           refresh_secret_id,
           scope,
           scope_values_json,
@@ -75,13 +76,13 @@ async function insertCredential(
           subject_label,
           updated_at
         )
-        VALUES (?, ?, 'bearer', 1, NULL, ?, NULL, NULL, NULL, NULL, ?, '[]', ?, ?, 'active', NULL, 1)
+        VALUES (NULL, ?, 'bearer', 1, NULL, ?, NULL, NULL, NULL, ?, NULL, ?, '[]', ?, ?, 'active', NULL, 1)
       `,
     )
     .bind(
-      input.accountId ?? null,
       input.agentId ?? null,
       input.credentialId,
+      APP_ID,
       input.scope,
       `${input.credentialId}:secret`,
       input.serverId,
@@ -112,46 +113,41 @@ describe("MCP runtime credential resolution", () => {
       serverId: OTHER_SERVER_ID,
     });
     await insertCredential(database, {
-      accountId: OWNER_ID,
-      credentialId: USER_CREDENTIAL_ID,
-      scope: "user",
+      credentialId: APP_CREDENTIAL_ID,
+      scope: "app",
       serverId: SERVER_ID,
     });
 
-    const credentials = await resolveCredentialsForMcpBindings(
-      database,
-      [
-        {
-          agentCredentialId: MATCHING_CREDENTIAL_ID,
-          agentId: AGENT_ID,
-          credentialMode: "agent_bound",
-          credentialScope: "user",
-          serverId: SERVER_ID,
-        },
-        {
-          agentCredentialId: WRONG_AGENT_CREDENTIAL_ID,
-          agentId: AGENT_ID,
-          credentialMode: "agent_bound",
-          credentialScope: "user",
-          serverId: SERVER_ID,
-        },
-        {
-          agentCredentialId: WRONG_SERVER_CREDENTIAL_ID,
-          agentId: AGENT_ID,
-          credentialMode: "agent_bound",
-          credentialScope: "user",
-          serverId: SERVER_ID,
-        },
-        {
-          agentCredentialId: USER_CREDENTIAL_ID,
-          agentId: AGENT_ID,
-          credentialMode: "agent_bound",
-          credentialScope: "user",
-          serverId: SERVER_ID,
-        },
-      ],
-      OWNER_ID,
-    );
+    const credentials = await resolveCredentialsForMcpBindings(database, [
+      {
+        agentCredentialId: MATCHING_CREDENTIAL_ID,
+        agentId: AGENT_ID,
+        credentialMode: "agent_bound",
+        credentialScope: "app",
+        serverId: SERVER_ID,
+      },
+      {
+        agentCredentialId: WRONG_AGENT_CREDENTIAL_ID,
+        agentId: AGENT_ID,
+        credentialMode: "agent_bound",
+        credentialScope: "app",
+        serverId: SERVER_ID,
+      },
+      {
+        agentCredentialId: WRONG_SERVER_CREDENTIAL_ID,
+        agentId: AGENT_ID,
+        credentialMode: "agent_bound",
+        credentialScope: "app",
+        serverId: SERVER_ID,
+      },
+      {
+        agentCredentialId: APP_CREDENTIAL_ID,
+        agentId: AGENT_ID,
+        credentialMode: "agent_bound",
+        credentialScope: "app",
+        serverId: SERVER_ID,
+      },
+    ]);
 
     expect(credentials.map((credential) => credential?.id ?? null)).toEqual([
       MATCHING_CREDENTIAL_ID,

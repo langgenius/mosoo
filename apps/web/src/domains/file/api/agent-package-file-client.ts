@@ -1,9 +1,9 @@
-import type { FileId, OrganizationId } from "@mosoo/contracts/id";
+import type { FileId, AppId } from "@mosoo/contracts/id";
 
 import { createAndRunFileUpload } from "./file-upload-client";
 
 export async function uploadAgentPackageFile(
-  organizationId: OrganizationId,
+  appId: AppId,
   file: File,
 ): Promise<{ fileId: FileId }> {
   return createAndRunFileUpload(
@@ -16,7 +16,7 @@ export async function uploadAgentPackageFile(
       overwrite: true,
       purpose: "agent_package",
       target: {
-        id: organizationId,
+        id: appId,
         kind: "agent_package",
         name: file.name,
       },

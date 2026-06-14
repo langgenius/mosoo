@@ -1,12 +1,13 @@
-import {
-  environmentRevisionsTable,
-  environmentsTable,
-  organizationMembersTable,
-  resourceAclTable,
-} from "@mosoo/db";
-import { createPlatformId, parsePlatformId } from "@mosoo/id";
-import type { AccountId, EnvironmentId, EnvironmentRevisionId, OrganizationId } from "@mosoo/id";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { environmentRevisionsTable, environmentsTable } from "@mosoo/db";
+import { createPlatformId } from "@mosoo/id";
+import type {
+  AccountId,
+  EnvironmentId,
+  EnvironmentRevisionId,
+  OrganizationId,
+  AppId,
+} from "@mosoo/id";
+import { and, eq, inArray } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
@@ -15,7 +16,7 @@ import {
   decryptEnvironmentVariables,
   serializeConfig,
 } from "./environment-config";
-import type { EnvironmentMutableConfig, EnvironmentRecordRow } from "./environment-types";
+import type { EnvironmentMutableConfig } from "./environment-types";
 
 export async function createRevision(
   bindings: Pick<ApiBindings, "DB">,
@@ -24,6 +25,7 @@ export async function createRevision(
     config: EnvironmentMutableConfig;
     environmentId: EnvironmentId;
     organizationId: OrganizationId;
+    appId: AppId;
     timestampMs: number;
   },
 ): Promise<EnvironmentRevisionId> {
@@ -44,6 +46,7 @@ export async function createRevision(
       networkPolicy: input.config.networkPolicy,
       organizationId: input.organizationId,
       packagesJson: serialized.packagesJson,
+      appId: input.appId,
       setupScript: input.config.setupScript,
     })
     .run();
@@ -64,6 +67,7 @@ export async function createEnvironmentFromConfig(
     name: string;
     ownerId: AccountId | null;
     organizationId: OrganizationId;
+    appId: AppId;
     timestampMs: number;
   },
 ): Promise<EnvironmentId> {
@@ -83,6 +87,7 @@ export async function createEnvironmentFromConfig(
       name: input.name,
       organizationId: input.organizationId,
       ownerAccountId: input.ownerId,
+      appId: input.appId,
       updatedAt: input.timestampMs,
     }),
     db.insert(environmentRevisionsTable).values({
@@ -97,6 +102,7 @@ export async function createEnvironmentFromConfig(
       networkPolicy: input.config.networkPolicy,
       organizationId: input.organizationId,
       packagesJson: serialized.packagesJson,
+      appId: input.appId,
       setupScript: input.config.setupScript,
     }),
   ]);
@@ -122,19 +128,14 @@ function allocateCopyNameFromTaken(taken: ReadonlySet<string>, sourceName: strin
 
 export async function allocateCopyName(
   database: D1Database,
-  organizationId: OrganizationId,
+  appId: AppId,
   ownerId: AccountId,
   sourceName: string,
 ): Promise<string> {
   const results = await getAppDatabase(database)
     .select({ name: environmentsTable.name })
     .from(environmentsTable)
-    .where(
-      and(
-        eq(environmentsTable.organizationId, organizationId),
-        eq(environmentsTable.ownerAccountId, ownerId),
-      ),
-    )
+    .where(and(eq(environmentsTable.appId, appId), eq(environmentsTable.ownerAccountId, ownerId)))
     .all();
   const taken = new Set(results.map((row) => row.name));
   return allocateCopyNameFromTaken(taken, sourceName);
@@ -142,7 +143,7 @@ export async function allocateCopyName(
 
 export async function allocateCopyNamesByOwner(
   database: D1Database,
-  organizationId: OrganizationId,
+  appId: AppId,
   ownerIds: readonly AccountId[],
   sourceName: string,
 ): Promise<Map<AccountId, string>> {
@@ -163,7 +164,7 @@ export async function allocateCopyNamesByOwner(
     .from(environmentsTable)
     .where(
       and(
-        eq(environmentsTable.organizationId, organizationId),
+        eq(environmentsTable.appId, appId),
         inArray(environmentsTable.ownerAccountId, uniqueOwnerIds),
       ),
     )
@@ -205,59 +206,4 @@ export async function cloneConfigWithNewSecrets(
     ...input.config,
     envVars,
   };
-}
-
-export async function collectCascadeForkUsers(
-  database: D1Database,
-  row: EnvironmentRecordRow,
-): Promise<AccountId[]> {
-  const userIds = new Set<AccountId>();
-  const results = await getAppDatabase(database)
-    .select({
-      targetId: resourceAclTable.targetId,
-      targetKind: resourceAclTable.targetKind,
-    })
-    .from(resourceAclTable)
-    .where(
-      and(
-        eq(resourceAclTable.resourceType, "environment"),
-        eq(resourceAclTable.resourceId, row.id),
-      ),
-    )
-    .all();
-  const includesOrganizationShare = results.some((share) => share.targetKind === "organization");
-
-  for (const share of results) {
-    if (share.targetKind === "user") {
-      const targetUserId = parsePlatformId<AccountId>(
-        share.targetId,
-        "environment ACL target account ID",
-      );
-
-      if (targetUserId !== row.ownerId) {
-        userIds.add(targetUserId);
-      }
-    }
-  }
-
-  if (includesOrganizationShare) {
-    const members = await getAppDatabase(database)
-      .select({ userId: organizationMembersTable.accountId })
-      .from(organizationMembersTable)
-      .where(
-        and(
-          eq(organizationMembersTable.organizationId, row.organizationId),
-          isNull(organizationMembersTable.disabledAt),
-        ),
-      )
-      .all();
-
-    for (const member of members) {
-      if (member.userId !== row.ownerId) {
-        userIds.add(member.userId);
-      }
-    }
-  }
-
-  return [...userIds];
 }

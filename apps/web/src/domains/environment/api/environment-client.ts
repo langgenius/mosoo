@@ -3,29 +3,19 @@ import type {
   CreateEnvironmentInput,
   DeleteEnvironmentInput,
   EnvironmentDetail,
-  EnvironmentShareTarget,
   EnvironmentSummary,
-  SetOrganizationDefaultEnvironmentInput,
-  ShareEnvironmentWithOrganizationInput,
-  ShareEnvironmentWithUserInput,
-  UnshareEnvironmentTargetInput,
+  SetAppDefaultEnvironmentInput,
   UpdateEnvironmentInput,
 } from "@mosoo/contracts/environment";
-import type { EnvironmentId, OrganizationId } from "@mosoo/contracts/id";
+import type { EnvironmentId, AppId } from "@mosoo/contracts/id";
 
 import { graphql } from "@/gql";
 import type {
   EnvironmentDetailFieldsFragment,
-  EnvironmentShareTargetFieldsFragment,
   EnvironmentSummaryFieldsFragment,
 } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import {
-  toAccountId,
-  toEnvironmentId,
-  toEnvironmentRevisionId,
-  toOrganizationId,
-} from "@/routes/typed-id";
+import { toAccountId, toEnvironmentId, toEnvironmentRevisionId, toAppId } from "@/routes/typed-id";
 
 const ENVIRONMENT_PACKAGE_FIELDS = graphql(/* GraphQL */ `
   fragment EnvironmentPackageFields on EnvironmentPackageSpec {
@@ -84,17 +74,7 @@ const ENVIRONMENT_SUMMARY_FIELDS = graphql(/* GraphQL */ `
     setupScript
     updatedAt
     usedByAgentCount
-    organizationId
-  }
-`);
-
-const ENVIRONMENT_SHARE_TARGET_FIELDS = graphql(/* GraphQL */ `
-  fragment EnvironmentShareTargetFields on EnvironmentShareTarget {
-    createdAt
-    email
-    id
-    kind
-    name
+    appId
   }
 `);
 
@@ -130,12 +110,9 @@ const ENVIRONMENT_DETAIL_FIELDS = graphql(/* GraphQL */ `
     }
     role
     setupScript
-    shareTargets {
-      ...EnvironmentShareTargetFields
-    }
     updatedAt
     usedByAgentCount
-    organizationId
+    appId
   }
 `);
 
@@ -146,18 +123,8 @@ retainGraphQLFragments([
   ENVIRONMENT_ENV_VAR_FIELDS,
   ENVIRONMENT_OWNER_FIELDS,
   ENVIRONMENT_PACKAGE_FIELDS,
-  ENVIRONMENT_SHARE_TARGET_FIELDS,
   ENVIRONMENT_SUMMARY_FIELDS,
 ]);
-
-function toEnvironmentShareTarget(
-  target: EnvironmentShareTargetFieldsFragment,
-): EnvironmentShareTarget {
-  return {
-    ...target,
-    id: target.kind === "user" ? toAccountId(target.id) : toOrganizationId(target.id),
-  };
-}
 
 function toEnvironmentSummary(environment: EnvironmentSummaryFieldsFragment): EnvironmentSummary {
   return {
@@ -171,32 +138,29 @@ function toEnvironmentSummary(environment: EnvironmentSummaryFieldsFragment): En
             environmentId: toEnvironmentId(environment.forkOrigin.environmentId),
           },
     id: toEnvironmentId(environment.id),
-    organizationId: toOrganizationId(environment.organizationId),
     owner: {
       ...environment.owner,
       id: environment.owner.id === null ? null : toAccountId(environment.owner.id),
     },
+    appId: toAppId(environment.appId),
   };
 }
 
 function toEnvironmentDetail(environment: EnvironmentDetailFieldsFragment): EnvironmentDetail {
-  return {
-    ...toEnvironmentSummary(environment),
-    shareTargets: environment.shareTargets.map(toEnvironmentShareTarget),
-  };
+  return toEnvironmentSummary(environment);
 }
 
 const LIST_ENVIRONMENTS_QUERY = graphql(/* GraphQL */ `
-  query OrganizationEnvironments($organizationId: ULID!) {
-    organizationEnvironmentList(organizationId: $organizationId) {
+  query AppEnvironments($appId: ULID!) {
+    appEnvironmentList(appId: $appId) {
       ...EnvironmentSummaryFields
     }
   }
 `);
 
 const GET_ENVIRONMENT_QUERY = graphql(/* GraphQL */ `
-  query EnvironmentDetail($environmentId: ULID!) {
-    environment(environmentId: $environmentId) {
+  query EnvironmentDetail($appId: ULID!, $environmentId: ULID!) {
+    environment(appId: $appId, environmentId: $environmentId) {
       ...EnvironmentDetailFields
     }
   }
@@ -234,47 +198,24 @@ const DELETE_ENVIRONMENT_MUTATION = graphql(/* GraphQL */ `
   }
 `);
 
-const SET_ORG_DEFAULT_ENVIRONMENT_MUTATION = graphql(/* GraphQL */ `
-  mutation SetOrganizationDefaultEnvironment($input: SetOrganizationDefaultEnvironmentInput!) {
-    setOrganizationDefaultEnvironment(input: $input) {
+const SET_APP_DEFAULT_ENVIRONMENT_MUTATION = graphql(/* GraphQL */ `
+  mutation SetAppDefaultEnvironment($input: SetAppDefaultEnvironmentInput!) {
+    setAppDefaultEnvironment(input: $input) {
       ...EnvironmentSummaryFields
     }
   }
 `);
 
-const SHARE_ENVIRONMENT_WITH_USER_MUTATION = graphql(/* GraphQL */ `
-  mutation ShareEnvironmentWithUser($input: ShareEnvironmentWithUserInput!) {
-    shareEnvironmentWithUser(input: $input) {
-      ...EnvironmentShareTargetFields
-    }
-  }
-`);
-
-const SHARE_ENVIRONMENT_WITH_ORG_MUTATION = graphql(/* GraphQL */ `
-  mutation ShareEnvironmentWithOrganization($input: ShareEnvironmentWithOrganizationInput!) {
-    shareEnvironmentWithOrganization(input: $input) {
-      ...EnvironmentShareTargetFields
-    }
-  }
-`);
-
-const UNSHARE_ENVIRONMENT_TARGET_MUTATION = graphql(/* GraphQL */ `
-  mutation UnshareEnvironmentTarget($input: UnshareEnvironmentTargetInput!) {
-    unshareEnvironmentTarget(input: $input) {
-      ok
-    }
-  }
-`);
-
-export async function listOrganizationEnvironments(
-  organizationId: OrganizationId,
-): Promise<EnvironmentSummary[]> {
-  const payload = await requestGraphQL(LIST_ENVIRONMENTS_QUERY, { organizationId });
-  return payload.organizationEnvironmentList.map(toEnvironmentSummary);
+export async function listAppEnvironments(appId: AppId): Promise<EnvironmentSummary[]> {
+  const payload = await requestGraphQL(LIST_ENVIRONMENTS_QUERY, { appId });
+  return payload.appEnvironmentList.map(toEnvironmentSummary);
 }
 
-export async function getEnvironment(environmentId: EnvironmentId): Promise<EnvironmentDetail> {
-  const payload = await requestGraphQL(GET_ENVIRONMENT_QUERY, { environmentId });
+export async function getEnvironment(
+  appId: AppId,
+  environmentId: EnvironmentId,
+): Promise<EnvironmentDetail> {
+  const payload = await requestGraphQL(GET_ENVIRONMENT_QUERY, { environmentId, appId });
   return toEnvironmentDetail(payload.environment);
 }
 
@@ -301,29 +242,9 @@ export async function deleteEnvironment(input: DeleteEnvironmentInput): Promise<
   await requestGraphQL(DELETE_ENVIRONMENT_MUTATION, { input });
 }
 
-export async function setOrganizationDefaultEnvironment(
-  input: SetOrganizationDefaultEnvironmentInput,
+export async function setAppDefaultEnvironment(
+  input: SetAppDefaultEnvironmentInput,
 ): Promise<EnvironmentSummary> {
-  const payload = await requestGraphQL(SET_ORG_DEFAULT_ENVIRONMENT_MUTATION, { input });
-  return toEnvironmentSummary(payload.setOrganizationDefaultEnvironment);
-}
-
-export async function shareEnvironmentWithUser(
-  input: ShareEnvironmentWithUserInput,
-): Promise<EnvironmentShareTarget> {
-  const payload = await requestGraphQL(SHARE_ENVIRONMENT_WITH_USER_MUTATION, { input });
-  return toEnvironmentShareTarget(payload.shareEnvironmentWithUser);
-}
-
-export async function shareEnvironmentWithOrganization(
-  input: ShareEnvironmentWithOrganizationInput,
-): Promise<EnvironmentShareTarget> {
-  const payload = await requestGraphQL(SHARE_ENVIRONMENT_WITH_ORG_MUTATION, { input });
-  return toEnvironmentShareTarget(payload.shareEnvironmentWithOrganization);
-}
-
-export async function unshareEnvironmentTarget(
-  input: UnshareEnvironmentTargetInput,
-): Promise<void> {
-  await requestGraphQL(UNSHARE_ENVIRONMENT_TARGET_MUTATION, { input });
+  const payload = await requestGraphQL(SET_APP_DEFAULT_ENVIRONMENT_MUTATION, { input });
+  return toEnvironmentSummary(payload.setAppDefaultEnvironment);
 }

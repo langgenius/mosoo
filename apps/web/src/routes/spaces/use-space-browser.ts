@@ -16,14 +16,16 @@ import { useSpaceUploadController } from "./use-space-upload-controller";
 export function useSpaceBrowser({
   activeSpace,
   currentPath,
+  appId,
   spaces,
 }: {
   activeSpace: string | null;
   currentPath: string;
+  appId: string | null;
   spaces: SpaceView[];
 }) {
   const queryClient = useQueryClient();
-  const fileListingQuery = useSpaceFilesQuery(activeSpace, currentPath);
+  const fileListingQuery = useSpaceFilesQuery(appId, activeSpace, currentPath);
   const files = fileListingQuery.data?.files ?? [];
   const dirs = fileListingQuery.data?.directories ?? [];
   const listingError = fileListingQuery.error
@@ -36,32 +38,36 @@ export function useSpaceBrowser({
   useSpaceUploadCompletionRefresh({
     activeSpace,
     currentPath,
+    appId,
     queryClient,
   });
 
   async function refreshFiles(): Promise<void> {
-    if (!isTruthy(activeSpace)) {
+    if (!isTruthy(appId) || !isTruthy(activeSpace)) {
       return;
     }
 
-    await refreshSpaceFiles(queryClient, activeSpace, currentPath);
+    await refreshSpaceFiles(queryClient, appId, activeSpace, currentPath);
   }
 
   const entryActions = useSpaceEntryActions({
     activeSpace,
     currentPath,
     files,
+    appId,
     refreshFiles,
   });
   const uploads = useSpaceUploadController({
     activeSpace,
     currentPath,
+    appId,
     refreshFiles,
     setFileActionError: entryActions.setFileActionError,
   });
   const renames = useSpaceRenameController({
     activeSpace,
     currentPath,
+    appId,
     refreshFiles,
     setFileActionError: entryActions.setFileActionError,
   });

@@ -7,7 +7,7 @@ import type {
   SpaceFileLockView,
 } from "@mosoo/contracts/space";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AgentId, SpaceId } from "@mosoo/id";
+import type { AccountId, AgentId, AppId, SpaceId } from "@mosoo/id";
 
 import { createErrorLogContext, logWarn } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -168,11 +168,12 @@ function isSameHolder(left: SpaceFileLockHolder, right: SpaceFileLockHolder): bo
 export async function acquireSpaceFileLock(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
+  appId: AppId,
   spaceId: SpaceId,
   input: AcquireSpaceFileLockRequest,
 ): Promise<AcquireSpaceFileLockResponse> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureSpaceAccess(bindings.DB, viewerId, spaceId, "edit");
+  await ensureSpaceAccess(bindings.DB, viewerId, appId, spaceId, "edit");
 
   const path = normalizeSpaceFilePath(input.path);
   const holder = createHolder(viewer);
@@ -256,11 +257,12 @@ export async function acquireSpaceFileLock(
 export async function releaseSpaceFileLock(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
+  appId: AppId,
   spaceId: SpaceId,
   input: ReleaseSpaceFileLockRequest,
 ): Promise<ReleaseSpaceFileLockResponse> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureSpaceAccess(bindings.DB, viewerId, spaceId, "edit");
+  await ensureSpaceAccess(bindings.DB, viewerId, appId, spaceId, "edit");
 
   const path = normalizeSpaceFilePath(input.path);
   const objectKey = createLockObjectKey(spaceId, path);

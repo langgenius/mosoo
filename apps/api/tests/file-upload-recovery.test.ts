@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, SpaceFileVersionId, SpaceId, UploadId } from "@mosoo/id";
+import type { AccountId, FileId, AppId, SpaceFileVersionId, SpaceId, UploadId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import type { FileUploadContext } from "../src/modules/files/infrastructure/file-record-store";
@@ -15,7 +15,7 @@ const OWNER_ID = parsePlatformId<AccountId>("01J00000000000000000000001", "owner
 const SPACE_ID = parsePlatformId<SpaceId>("01J00000000000000000000002", "space ID");
 const STALE_FILE_ID = parsePlatformId<FileId>("01J00000000000000000000003", "stale file ID");
 const STALE_UPLOAD_ID = parsePlatformId<UploadId>("01J00000000000000000000004", "stale upload ID");
-const ORGANIZATION_ID = "01J00000000000000000000006";
+const APP_ID = parsePlatformId<AppId>("01J00000000000000000000006", "app ID");
 const READY_FILE_ID = parsePlatformId<FileId>("01J00000000000000000000007", "ready file ID");
 const READY_UPLOAD_ID = parsePlatformId<UploadId>("01J00000000000000000000008", "ready upload ID");
 const PENDING_VERSION_ID = parsePlatformId<SpaceFileVersionId>(
@@ -171,33 +171,24 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
 
   database.execute(`
-    CREATE TABLE space (
+    CREATE TABLE app (
       id text PRIMARY KEY NOT NULL,
-      name text NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
-      visibility text NOT NULL,
+      name text NOT NULL,
+      slug text NOT NULL,
+      default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE organization_member (
-      organization_id text NOT NULL,
-      account_id text NOT NULL,
-      role text NOT NULL,
-      disabled_at integer,
-      PRIMARY KEY (organization_id, account_id)
-    );
-
-    CREATE TABLE resource_acl (
-      resource_type text NOT NULL,
-      resource_id text NOT NULL,
-      target_kind text NOT NULL,
-      target_id text NOT NULL,
-      role text NOT NULL,
-      assigned_by_account_id text,
+    CREATE TABLE space (
+      id text PRIMARY KEY NOT NULL,
+      name text NOT NULL,
+      app_id text NOT NULL,
+      owner_account_id text NOT NULL,
       created_at integer NOT NULL,
-      PRIMARY KEY (resource_type, resource_id, target_kind, target_id)
+      updated_at integer NOT NULL
     );
 
     CREATE TABLE session (
@@ -270,35 +261,36 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
       version integer NOT NULL
     );
 
-    INSERT INTO space (
+    INSERT INTO app (
       id,
       name,
       organization_id,
       owner_account_id,
-      visibility,
+      slug,
+      default_environment_id,
       created_at,
       updated_at
     )
-    VALUES ('${SPACE_ID}', 'Docs', '${ORGANIZATION_ID}', '${OWNER_ID}', 'shared', 1, 1);
+    VALUES (
+      '${APP_ID}',
+      'Default App',
+      '01J0000000000000000000000A',
+      '${OWNER_ID}',
+      'default',
+      NULL,
+      1,
+      1
+    );
 
-    INSERT INTO organization_member (
-      organization_id,
-      account_id,
-      role,
-      disabled_at
+    INSERT INTO space (
+      id,
+      name,
+      app_id,
+      owner_account_id,
+      created_at,
+      updated_at
     )
-    VALUES ('${ORGANIZATION_ID}', '${OWNER_ID}', 'owner', NULL);
-
-    INSERT INTO resource_acl (
-      resource_type,
-      resource_id,
-      target_kind,
-      target_id,
-      role,
-      assigned_by_account_id,
-      created_at
-    )
-    VALUES ('space', '${SPACE_ID}', 'user', '${OWNER_ID}', 'admin', '${OWNER_ID}', 1);
+    VALUES ('${SPACE_ID}', 'Docs', '${APP_ID}', '${OWNER_ID}', 1, 1);
 
     INSERT INTO file_record (
       id,
@@ -474,6 +466,7 @@ describe("file upload recovery", () => {
         id: SPACE_ID,
         kind: "space",
         path: "report.csv",
+        appId: APP_ID,
       },
     });
 
@@ -489,6 +482,78 @@ describe("file upload recovery", () => {
     expect(upload.path).toBe("report.csv");
     expect(staleUpload?.status).toBe("expired");
     expect(staleFile?.status).toBe("failed");
+  });
+
+  test("keeps completed App draft uploads expiring until they are claimed", async () => {
+    const database = createUploadRecoveryDatabase();
+    const bucket = new MemoryFileBucket();
+
+    const upload = await createFileUpload(createBindings(database, bucket), OWNER, {
+      file: {
+        contentType: "text/plain",
+        name: "launch-note.txt",
+        size: 12,
+      },
+      purpose: "app_draft",
+      target: {
+        id: APP_ID,
+        kind: "app_draft",
+        name: "launch-note.txt",
+      },
+    });
+    const stagingObjectKey = `staging/app_draft/${APP_ID}/${upload.fileId}`;
+
+    bucket.putHead(stagingObjectKey, {
+      body: "draft bytes!",
+      contentLength: 12,
+      contentType: "text/plain",
+      etag: "app-draft-etag",
+    });
+
+    const result = await completeFileUpload({
+      bindings: createBindings(database, bucket),
+      input: {},
+      fileId: upload.fileId,
+      viewer: OWNER,
+    });
+    const file = await database
+      .prepare(
+        `SELECT committed, expires_at, object_key, owner_id, owner_kind, purpose, scope_id, scope_kind, status
+           FROM file_record
+          WHERE id = ?`,
+      )
+      .bind(upload.fileId)
+      .first<{
+        committed: number;
+        expires_at: number | null;
+        object_key: string;
+        owner_id: string;
+        owner_kind: string;
+        purpose: string;
+        scope_id: string;
+        scope_kind: string;
+        status: string;
+      }>();
+
+    expect(result.file.scope).toEqual({
+      id: APP_ID,
+      kind: "app_draft",
+    });
+    expect(file).toMatchObject({
+      committed: 0,
+      owner_id: APP_ID,
+      owner_kind: "app",
+      purpose: "app_draft",
+      scope_id: APP_ID,
+      scope_kind: "app_draft",
+      status: "ready",
+    });
+    expect(file?.expires_at).toBeNumber();
+    expect(file?.object_key).toBe(
+      `app-draft/${APP_ID}/attachment/${upload.fileId}/launch-note.txt`,
+    );
+    expect(bucket.has(stagingObjectKey)).toBe(false);
+    expect(bucket.has(file?.object_key ?? "")).toBe(true);
   });
 
   test("recovers when final object copy succeeded before the file row was finalized", async () => {

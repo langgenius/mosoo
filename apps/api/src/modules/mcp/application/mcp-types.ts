@@ -14,6 +14,7 @@ import type {
   McpOAuthFlowId,
   McpServerId,
   OrganizationId,
+  AppId,
 } from "@mosoo/id";
 
 export interface ViewerRow {
@@ -34,12 +35,13 @@ export interface ServerRow {
   id: McpServerId;
   name: string;
   oauthMetadataJson: string | null;
+  organizationId: OrganizationId;
   ownerId: AccountId;
   ownerName: string | null;
+  appId: AppId;
   source: McpServerSource;
   updatedAt: number;
   url: string;
-  organizationId: OrganizationId;
 }
 
 export interface CredentialRow {
@@ -51,6 +53,7 @@ export interface CredentialRow {
   lastRefreshedAt: number | null;
   oauthClientId: string | null;
   oauthClientSecretSecretId: string | null;
+  appId: AppId;
   refreshSecretId: string | null;
   scope: McpCredentialRecordScope;
   scopeValuesJson: string | null;
@@ -111,6 +114,7 @@ export interface OAuthFlowRow {
   subjectLabel: string | null;
   tokenEndpoint: string;
   organizationId: OrganizationId;
+  appId: AppId;
 }
 
 export interface RefreshedRuntimeCredential {
