@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "6a95a4a4-d335-5e7a-8934-13d2152b273c",
+  "id": "78fea867-c8f8-55da-8968-690eb137e033",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_deployment_version": {
@@ -6311,13 +6311,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "app_id": {
           "name": "app_id",
           "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
@@ -6426,13 +6419,6 @@
         "name": {
           "name": "name",
           "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false

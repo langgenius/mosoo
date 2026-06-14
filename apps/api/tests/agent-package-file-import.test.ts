@@ -237,7 +237,6 @@ async function createFixture(input: { archiveBytes?: Uint8Array } = {}) {
       forked_from_skill_name text,
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
-      organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       app_id text NOT NULL,
       source_kind text NOT NULL,

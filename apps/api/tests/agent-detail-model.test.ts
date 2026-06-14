@@ -102,7 +102,6 @@ function createAgentDetailModelDatabase(
     CREATE TABLE skill (
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
-      organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       app_id text NOT NULL
     );
