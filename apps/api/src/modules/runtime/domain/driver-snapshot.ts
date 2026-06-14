@@ -33,8 +33,8 @@ import type { DriverNativeRuntimeRef, DriverRuntime } from "agent-driver/runtime
 export type { DriverRuntime };
 
 export interface DriverAppAccessSnapshotEntry {
+  readonly canWrite: boolean;
   readonly mountPath: string;
-  readonly role: "admin" | "edit" | "read";
   readonly spaceId: SpaceId;
   readonly type: "space";
 }

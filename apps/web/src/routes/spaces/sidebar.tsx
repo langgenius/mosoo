@@ -94,7 +94,7 @@ function SpaceSidebarList({
     <SpaceSidebarItem
       key={space.id}
       active={space.id === activeSpaceId}
-      canManage={canManageSpace?.(space) ?? space.role === "admin"}
+      canManage={canManageSpace?.(space) ?? space.canManage}
       disabledManageReason={getManageDisabledReason?.(space) ?? null}
       hovered={hoveredSpaceId === space.id}
       onHover={onHoverSpace}

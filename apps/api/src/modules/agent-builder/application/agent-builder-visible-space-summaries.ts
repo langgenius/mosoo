@@ -1,5 +1,4 @@
 import type { AgentBuilderVisibleSpaceSummary } from "@mosoo/contracts/agent-builder";
-import type { SpaceRole } from "@mosoo/contracts/space";
 import type { AppId, SpaceId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -10,7 +9,6 @@ import { compareByNameThenId, toBindingState, withHash } from "./agent-builder-v
 export interface AgentBuilderVisibleSpaceRecord {
   id: SpaceId;
   name: string;
-  role: SpaceRole;
 }
 
 export async function listAgentBuilderVisibleSpaceRecords(input: {
@@ -33,7 +31,6 @@ export function createAgentBuilderVisibleSpaceSummaries(
         bindingState: toBindingState(space.id, input.boundSpaceIds),
         id: space.id,
         name: space.name,
-        role: space.role,
       }),
     )
     .toSorted((left, right) => compareByNameThenId(left, right));

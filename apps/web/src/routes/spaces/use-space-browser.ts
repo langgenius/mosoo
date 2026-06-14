@@ -33,7 +33,7 @@ export function useSpaceBrowser({
     : null;
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [dragOver, setDragOver] = useState(false);
-  const writableSpaces = spaces.filter((space) => space.role === "edit" || space.role === "admin");
+  const writableSpaces = spaces.filter((space) => space.canWrite);
 
   useSpaceUploadCompletionRefresh({
     activeSpace,

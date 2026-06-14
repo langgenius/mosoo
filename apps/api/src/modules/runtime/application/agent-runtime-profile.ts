@@ -11,11 +11,7 @@ import type {
 } from "@mosoo/id";
 import { getSessionOrganizationPath, getSessionRuntimeStatePath } from "agent-driver/paths";
 
-import {
-  isSpaceRoleRankSufficient,
-  listSpaceAccessRows,
-  rankToSpaceRole,
-} from "../../spaces/domain/space-access.policy";
+import { listSpaceAccessRows } from "../../spaces/domain/space-access.policy";
 import type {
   DriverConfigRevision,
   DriverAppAccessSnapshotOutput,
@@ -45,12 +41,12 @@ export async function resolveAgentSpaceBindings(
       throw new Error("Space not found.");
     }
 
-    if (!row || !isSpaceRoleRankSufficient(row.role_rank, "read")) {
+    if (!row) {
       throw new Error("Space not found.");
     }
 
     return {
-      role: rankToSpaceRole(row.role_rank),
+      canWrite: true,
       spaceId,
       spaceName: row.name,
       type: "space",

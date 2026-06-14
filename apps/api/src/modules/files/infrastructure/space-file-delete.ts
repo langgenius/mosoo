@@ -36,7 +36,7 @@ export async function deleteSpaceEntry(
   input: { key: string; spaceId: SpaceId },
 ): Promise<void> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureSpaceAccessBySpaceId(bindings.DB, viewerId, input.spaceId, "edit");
+  await ensureSpaceAccessBySpaceId(bindings.DB, viewerId, input.spaceId, "write");
   const normalizedKey = normalizeSpaceDirectoryPath(input.key);
   const escapedKey = escapeLikePattern(normalizedKey);
 

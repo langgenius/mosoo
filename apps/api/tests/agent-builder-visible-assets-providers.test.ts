@@ -134,8 +134,6 @@ describe("Agent Builder visible asset providers", () => {
         {
           id: VISIBLE_ASSET_IDS.spaceBound,
           name: "support-kb",
-          role: "read",
-          visibility: "shared",
         },
       ],
     );
@@ -495,8 +493,6 @@ describe("Agent Builder visible asset providers", () => {
             hash: "space-new-hash",
             id: VISIBLE_ASSET_IDS.spaceBound,
             name: "Support KB",
-            role: "admin",
-            visibility: "private",
           },
         ],
       }),
@@ -534,8 +530,6 @@ describe("Agent Builder visible asset providers", () => {
         hash: "space-new-hash",
         id: VISIBLE_ASSET_IDS.spaceBound,
         name: "Support KB",
-        role: "admin",
-        visibility: "private",
       },
     ]);
   });

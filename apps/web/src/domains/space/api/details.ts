@@ -14,10 +14,11 @@ const CREATE_SPACE_MUTATION = graphql(/* GraphQL */ `
       name
       ownerId
       appId
-      role
       storagePrefix
       canDelete
-      viewerAssetRole
+      canManage
+      canRead
+      canWrite
     }
   }
 `);

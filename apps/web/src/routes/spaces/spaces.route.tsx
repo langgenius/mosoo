@@ -1,10 +1,6 @@
 import { useAuth } from "../../domains/auth/use-auth";
 import { SpaceSidebar } from "./sidebar";
-import {
-  canManageSpaceSettings,
-  canWriteToSpace,
-  getSpaceManagementDisabledReason,
-} from "./space-access";
+import { canManageSpaceSettings, getSpaceManagementDisabledReason } from "./space-access";
 import { SpaceFilesView } from "./space-files-view";
 import { SpacePageDialogs } from "./space-page-dialogs";
 import { SpacesHub } from "./spaces-hub";
@@ -40,7 +36,7 @@ export function SpacePage() {
 
   const activeSpaceData = spaces.find((space) => space.id === activeSpace);
   const settingsSpace = spaces.find((space) => space.id === settings.settingsSpaceId);
-  const canWrite = canWriteToSpace(activeSpaceData?.role);
+  const canWrite = activeSpaceData?.canWrite ?? false;
   const canManageSpace = (space: (typeof spaces)[number]) =>
     canManageSpaceSettings({
       space,

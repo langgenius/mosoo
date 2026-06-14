@@ -190,7 +190,7 @@ export async function deleteSessionResource(
   const file = await ensureFileAccess({
     database: bindings.DB,
     fileId: input.resourceId,
-    requiredRole: "edit",
+    requiredIntent: "write",
     viewer,
   });
 

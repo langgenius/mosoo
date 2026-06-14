@@ -1,13 +1,11 @@
 import { getParentPath, normalizeOptionalPath } from "@mosoo/contracts/file";
-import type { SpaceRole } from "@mosoo/contracts/space";
 import { appsTable, spaceDirectoriesTable, spacesTable } from "@mosoo/db";
 import type { SpaceDirectoryId } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type { AccountId, AppId, SpaceId } from "@mosoo/id";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
 
 export interface SpaceAccessRow {
@@ -16,7 +14,6 @@ export interface SpaceAccessRow {
   name: string;
   owner_account_id: AccountId;
   app_id: AppId;
-  role_rank: number;
 }
 
 export interface SpaceAccessLookup {
@@ -24,31 +21,7 @@ export interface SpaceAccessLookup {
   existingSpaceIds: Set<SpaceId>;
 }
 
-const ROLE_RANK: Record<SpaceRole, number> = {
-  admin: 3,
-  edit: 2,
-  read: 1,
-};
-
-export function rankToSpaceRole(rank: number): SpaceRole {
-  if (rank >= ROLE_RANK.admin) {
-    return "admin";
-  }
-
-  if (rank >= ROLE_RANK.edit) {
-    return "edit";
-  }
-
-  return "read";
-}
-
-function isSpaceRoleSufficient(actual: SpaceRole, required: SpaceRole): boolean {
-  return ROLE_RANK[actual] >= ROLE_RANK[required];
-}
-
-export function isSpaceRoleRankSufficient(actualRank: number, required: SpaceRole): boolean {
-  return actualRank >= ROLE_RANK[required];
-}
+export type SpaceAccessIntent = "manage" | "view" | "write";
 
 export async function listSpaceAccessRows(
   database: D1Database,
@@ -72,7 +45,6 @@ export async function listSpaceAccessRows(
       name: spacesTable.name,
       owner_account_id: spacesTable.ownerAccountId,
       app_id: spacesTable.appId,
-      role_rank: sql<number>`${ROLE_RANK.admin}`.as("role_rank"),
     })
     .from(spacesTable)
     .innerJoin(
@@ -94,8 +66,9 @@ export async function ensureSpaceAccess(
   viewerId: AccountId,
   appId: AppId,
   spaceId: SpaceId,
-  requiredRole: SpaceRole,
+  intent: SpaceAccessIntent,
 ): Promise<SpaceAccessRow> {
+  void intent;
   const row =
     (await getAppDatabase(database)
       .select({
@@ -104,7 +77,6 @@ export async function ensureSpaceAccess(
         name: spacesTable.name,
         owner_account_id: spacesTable.ownerAccountId,
         app_id: spacesTable.appId,
-        role_rank: sql<number>`${ROLE_RANK.admin}`.as("role_rank"),
       })
       .from(spacesTable)
       .innerJoin(
@@ -119,12 +91,6 @@ export async function ensureSpaceAccess(
     throw new Error("Space not found.");
   }
 
-  const actualRole = rankToSpaceRole(row.role_rank);
-
-  if (!isSpaceRoleSufficient(actualRole, requiredRole)) {
-    throw forbiddenError();
-  }
-
   return row;
 }
 
@@ -132,8 +98,9 @@ export async function ensureSpaceAccessBySpaceId(
   database: D1Database,
   viewerId: AccountId,
   spaceId: SpaceId,
-  requiredRole: SpaceRole,
+  intent: SpaceAccessIntent,
 ): Promise<SpaceAccessRow> {
+  void intent;
   const row =
     (await getAppDatabase(database)
       .select({
@@ -142,7 +109,6 @@ export async function ensureSpaceAccessBySpaceId(
         name: spacesTable.name,
         owner_account_id: spacesTable.ownerAccountId,
         app_id: spacesTable.appId,
-        role_rank: sql<number>`${ROLE_RANK.admin}`.as("role_rank"),
       })
       .from(spacesTable)
       .innerJoin(
@@ -155,10 +121,6 @@ export async function ensureSpaceAccessBySpaceId(
 
   if (!row) {
     throw new Error("Space not found.");
-  }
-
-  if (!isSpaceRoleSufficient(rankToSpaceRole(row.role_rank), requiredRole)) {
-    throw forbiddenError();
   }
 
   return row;

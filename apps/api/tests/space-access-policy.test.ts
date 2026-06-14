@@ -84,13 +84,12 @@ describe("space access policy", () => {
   test("resolves owner access through App proof", async () => {
     const database = createSpaceAccessDatabase();
 
-    const row = await ensureSpaceAccess(database, OWNER_ID, APP_ID, SPACE_ID, "read");
+    const row = await ensureSpaceAccess(database, OWNER_ID, APP_ID, SPACE_ID, "view");
 
     expect(row).toMatchObject({
       id: SPACE_ID,
       owner_account_id: OWNER_ID,
       app_id: APP_ID,
-      role_rank: 3,
     });
   });
 
@@ -98,7 +97,7 @@ describe("space access policy", () => {
     const database = createSpaceAccessDatabase();
 
     await expect(
-      ensureSpaceAccess(database, OTHER_OWNER_ID, APP_ID, SPACE_ID, "read"),
+      ensureSpaceAccess(database, OTHER_OWNER_ID, APP_ID, SPACE_ID, "view"),
     ).rejects.toThrow("Space not found.");
   });
 
@@ -119,17 +118,16 @@ describe("space access policy", () => {
   test("space-id lookup resolves the owning App for file-scoped flows", async () => {
     const database = createSpaceAccessDatabase();
 
-    const row = await ensureSpaceAccessBySpaceId(database, OWNER_ID, SPACE_ID, "edit");
+    const row = await ensureSpaceAccessBySpaceId(database, OWNER_ID, SPACE_ID, "write");
 
     expect(row.app_id).toBe(APP_ID);
-    expect(row.role_rank).toBe(3);
   });
 
   test("space-id lookup rejects non-owner viewers", async () => {
     const database = createSpaceAccessDatabase();
 
     await expect(
-      ensureSpaceAccessBySpaceId(database, OTHER_OWNER_ID, SPACE_ID, "read"),
+      ensureSpaceAccessBySpaceId(database, OTHER_OWNER_ID, SPACE_ID, "view"),
     ).rejects.toThrow("Space not found.");
   });
 });

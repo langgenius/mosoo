@@ -80,7 +80,7 @@ async function resolveFileUploadTargetContext(
 
     const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
     const appId: AppId = parsePlatformId(target.appId, "upload space app ID");
-    await ensureSpaceAccess(bindings.DB, viewerId, appId, scopeId, "edit");
+    await ensureSpaceAccess(bindings.DB, viewerId, appId, scopeId, "write");
     await ensureSpaceParentDirectories(bindings.DB, viewerId, scopeId, parentPath);
 
     return {
@@ -410,7 +410,7 @@ export async function getFileUpload(
   const context = await ensureUploadAccess({
     database: bindings.DB,
     fileId,
-    requiredRole: "edit",
+    requiredIntent: "write",
     viewer,
   });
   await expireUploadIfNeeded(bindings.DB, context);

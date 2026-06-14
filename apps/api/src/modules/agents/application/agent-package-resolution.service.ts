@@ -17,10 +17,7 @@ import { isTruthy } from "../../../shared/truthiness";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { listAppSkillRows } from "../../skills/application/skill-access.service";
 import { createSkillFromUpload } from "../../skills/application/skill-package-write.service";
-import {
-  isSpaceRoleRankSufficient,
-  listSpaceAccessRows,
-} from "../../spaces/domain/space-access.policy";
+import { listSpaceAccessRows } from "../../spaces/domain/space-access.policy";
 import {
   readEnvironmentId,
   readSkillId,
@@ -287,11 +284,7 @@ export async function resolvePackageSpaces(input: {
     if (isTruthy(targetSpaceId)) {
       const access = requestedSpaceAccess.accessibleRowsById.get(targetSpaceId);
 
-      if (
-        !access ||
-        access.app_id !== input.appId ||
-        !isSpaceRoleRankSufficient(access.role_rank, "read")
-      ) {
+      if (!access || access.app_id !== input.appId) {
         targetSpaceId = null;
       }
     }

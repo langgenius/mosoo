@@ -515,7 +515,6 @@ export interface AgentBuilderVisibleSpaceSummary {
   hash: string;
   id: SpaceId;
   name: string;
-  role: string;
 }
 
 export interface AgentBuilderSelectedSpaceFilesSummary {

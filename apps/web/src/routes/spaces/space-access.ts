@@ -1,9 +1,6 @@
-import type { SpaceRole, SpaceView } from "@mosoo/contracts/space";
+import type { SpaceView } from "@mosoo/contracts/space";
 
 import { isTruthy } from "../../shared/lib/truthiness";
-export function canWriteToSpace(role: SpaceRole | null | undefined): boolean {
-  return role === "edit" || role === "admin";
-}
 
 export function getSpaceManagementDisabledReason({
   space,
@@ -12,7 +9,7 @@ export function getSpaceManagementDisabledReason({
   space: SpaceView;
   viewerId: string | null | undefined;
 }): string | null {
-  if (isTruthy(viewerId) && space.canDelete) {
+  if (isTruthy(viewerId) && space.canManage) {
     return null;
   }
 
@@ -27,5 +24,5 @@ export function canManageSpaceSettings(input: {
     return false;
   }
 
-  return input.space.canDelete;
+  return input.space.canManage;
 }

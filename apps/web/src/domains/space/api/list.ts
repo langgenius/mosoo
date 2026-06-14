@@ -14,10 +14,11 @@ const SPACES_QUERY = graphql(/* GraphQL */ `
       name
       ownerId
       appId
-      role
       storagePrefix
       canDelete
-      viewerAssetRole
+      canManage
+      canRead
+      canWrite
     }
   }
 `);

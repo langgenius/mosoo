@@ -629,11 +629,6 @@ export type SpaceFileLockHolderType =
   | 'agent'
   | 'user';
 
-export type SpaceRole =
-  | 'admin'
-  | 'edit'
-  | 'read';
-
 export type StartLarkAgentChannelRegistrationInput = {
   agentId: PlatformId;
   appId: PlatformId;
@@ -1308,7 +1303,7 @@ export type CreateSpaceMutationVariables = Exact<{
 }>;
 
 
-export type CreateSpaceMutation = { createSpace: { createdAt: string, id: PlatformId, name: string, ownerId: PlatformId, appId: PlatformId, role: SpaceRole, storagePrefix: string, canDelete: boolean, viewerAssetRole: SpaceRole } };
+export type CreateSpaceMutation = { createSpace: { createdAt: string, id: PlatformId, name: string, ownerId: PlatformId, appId: PlatformId, storagePrefix: string, canDelete: boolean, canManage: boolean, canRead: boolean, canWrite: boolean } };
 
 export type DeleteSpaceMutationVariables = Exact<{
   appId: PlatformId;
@@ -1346,7 +1341,7 @@ export type SpacesQueryVariables = Exact<{
 }>;
 
 
-export type SpacesQuery = { spaceList: Array<{ createdAt: string, id: PlatformId, name: string, ownerId: PlatformId, appId: PlatformId, role: SpaceRole, storagePrefix: string, canDelete: boolean, viewerAssetRole: SpaceRole }> };
+export type SpacesQuery = { spaceList: Array<{ createdAt: string, id: PlatformId, name: string, ownerId: PlatformId, appId: PlatformId, storagePrefix: string, canDelete: boolean, canManage: boolean, canRead: boolean, canWrite: boolean }> };
 
 export type ViewerQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -4146,10 +4141,11 @@ export const CreateSpaceDocument = new TypedDocumentString(`
     name
     ownerId
     appId
-    role
     storagePrefix
     canDelete
-    viewerAssetRole
+    canManage
+    canRead
+    canWrite
   }
 }
     `) as unknown as TypedDocumentString<CreateSpaceMutation, CreateSpaceMutationVariables>;
@@ -4209,10 +4205,11 @@ export const SpacesDocument = new TypedDocumentString(`
     name
     ownerId
     appId
-    role
     storagePrefix
     canDelete
-    viewerAssetRole
+    canManage
+    canRead
+    canWrite
   }
 }
     `) as unknown as TypedDocumentString<SpacesQuery, SpacesQueryVariables>;
