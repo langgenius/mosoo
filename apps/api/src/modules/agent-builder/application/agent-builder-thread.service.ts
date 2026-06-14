@@ -6,7 +6,6 @@ import type {
   AgentBuilderPlannerRunId,
   AgentBuilderThreadId,
   AgentId,
-  OrganizationId,
 } from "@mosoo/id";
 import { and, desc, eq, lt, sql } from "drizzle-orm";
 
@@ -23,7 +22,6 @@ export interface AgentBuilderThreadModel {
   creatorAccountId: AccountId;
   id: AgentBuilderThreadId;
   lastTurnAt: string | null;
-  organizationId: OrganizationId;
   previewOpenedAt: string | null;
   status: string;
   title: string | null;
@@ -66,7 +64,6 @@ function toAgentBuilderThreadModel(row: AgentBuilderThreadRow): AgentBuilderThre
     creatorAccountId: row.creatorAccountId,
     id: row.id,
     lastTurnAt: row.lastTurnAt === null ? null : toIsoString(row.lastTurnAt),
-    organizationId: row.organizationId,
     previewOpenedAt: row.previewOpenedAt === null ? null : toIsoString(row.previewOpenedAt),
     status: row.status,
     title: row.title,
@@ -155,7 +152,6 @@ export async function ensureAgentBuilderThreadContext(
       id,
       lastTurnAt: null,
       messageSeqCursor: 0,
-      organizationId: agent.appOrganizationId,
       previewOpenedAt: null,
       status: "active",
       title: null,

@@ -105,7 +105,6 @@ CREATE TABLE `agent_builder_planner_run` (
 	`error_message` text,
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`model` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`output_json` text,
 	`provider` text NOT NULL,
 	`request_digest` text NOT NULL,
@@ -128,7 +127,6 @@ CREATE TABLE `agent_builder_thread` (
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`last_turn_at` integer,
 	`message_seq_cursor` integer DEFAULT 0 NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`preview_opened_at` integer,
 	`status` text DEFAULT 'active' NOT NULL,
 	`title` text,
@@ -137,7 +135,7 @@ CREATE TABLE `agent_builder_thread` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `agent_builder_thread_agent_idx` ON `agent_builder_thread` (`agent_id`);--> statement-breakpoint
-CREATE INDEX `agent_builder_thread_creator_updated_idx` ON `agent_builder_thread` (`organization_id`,`creator_account_id`,`updated_at`);--> statement-breakpoint
+CREATE INDEX `agent_builder_thread_creator_updated_idx` ON `agent_builder_thread` (`creator_account_id`,`updated_at`);--> statement-breakpoint
 CREATE TABLE `api_command` (
 	`attempt_count` integer DEFAULT 0 NOT NULL,
 	`claim_expires_at` integer,

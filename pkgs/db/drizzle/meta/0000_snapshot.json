@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "01409eb5-9b65-5958-8172-9ce2693c534e",
+  "id": "a2de6f2c-c111-54bf-874e-4c83740bf301",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_deployment_version": {
@@ -645,13 +645,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "output_json": {
           "name": "output_json",
           "type": "text",
@@ -796,13 +789,6 @@
           "autoincrement": false,
           "default": 0
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "preview_opened_at": {
           "name": "preview_opened_at",
           "type": "integer",
@@ -841,7 +827,7 @@
         },
         "agent_builder_thread_creator_updated_idx": {
           "name": "agent_builder_thread_creator_updated_idx",
-          "columns": ["organization_id", "creator_account_id", "updated_at"],
+          "columns": ["creator_account_id", "updated_at"],
           "isUnique": false
         }
       },

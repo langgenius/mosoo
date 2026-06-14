@@ -7,7 +7,6 @@ import type {
   AgentId,
   EnvironmentId,
   McpServerId,
-  OrganizationId,
   SessionId,
 } from "@mosoo/contracts/id";
 import type { McpAuthType } from "@mosoo/contracts/mcp";
@@ -32,7 +31,6 @@ export interface AgentBuilderThread {
   creatorAccountId: AccountId;
   id: AgentBuilderThreadId;
   lastTurnAt: string | null;
-  organizationId: OrganizationId;
   status: string;
   title: string | null;
   updatedAt: string;
@@ -104,7 +102,6 @@ function parseAgentBuilderThread(thread: {
   creatorAccountId: string;
   id: string;
   lastTurnAt: string | null;
-  organizationId: string;
   status: string;
   title: string | null;
   updatedAt: string;
@@ -115,7 +112,6 @@ function parseAgentBuilderThread(thread: {
     creatorAccountId: parsePlatformId<AccountId>(thread.creatorAccountId, "Account ID"),
     id: parsePlatformId<AgentBuilderThreadId>(thread.id, "Agent Builder thread ID"),
     lastTurnAt: thread.lastTurnAt,
-    organizationId: parsePlatformId<OrganizationId>(thread.organizationId, "Organization ID"),
     status: thread.status,
     title: thread.title,
     updatedAt: thread.updatedAt,

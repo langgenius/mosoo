@@ -23,6 +23,8 @@ const viewer: AuthenticatedViewer = {
   name: "Agent Builder User",
 };
 
+const APP_ID = "01J00000000000000000000006";
+
 const VISIBLE_ASSET_IDS = {
   environmentBound: "01J00000000000000000000303",
   environmentOld: "01J00000000000000000000304",
@@ -299,7 +301,7 @@ describe("Agent Builder visible asset providers", () => {
       collectSummaries: async () => emptySummaries(),
       draft: toAgentBuilderPlannerDraftContext(draftYaml),
       draftYaml: "draft",
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       previousAssets: null,
       viewer,
     };
@@ -318,7 +320,7 @@ describe("Agent Builder visible asset providers", () => {
         throw new Error("visible asset providers should not run for invalid Draft YAML");
       },
       draftYaml: "draft",
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       previousAssets: null,
       viewer,
     });
@@ -380,7 +382,7 @@ describe("Agent Builder visible asset providers", () => {
         };
       },
       draftYaml,
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       previousAssets: null,
       viewer,
     });
@@ -499,7 +501,7 @@ describe("Agent Builder visible asset providers", () => {
         ],
       }),
       draftYaml,
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       previousAssets,
       viewer,
     });
@@ -627,7 +629,7 @@ describe("Agent Builder visible asset providers", () => {
         ],
       }),
       draftYaml,
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       previousAssets: previous.assets,
       previousContext: previous.context,
       viewer,
@@ -664,7 +666,7 @@ describe("Agent Builder visible asset providers", () => {
         ],
       }),
       draftYaml,
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       previousAssets: previous.assets,
       previousContext: previous.context,
       viewer,

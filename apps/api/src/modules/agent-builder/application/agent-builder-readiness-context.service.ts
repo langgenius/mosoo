@@ -3,7 +3,7 @@ import type {
   AgentBuilderReadinessContext,
   AgentBuilderReadinessIssueSummary,
 } from "@mosoo/contracts/agent-builder";
-import type { AccountId, AgentId, OrganizationId, AppId } from "@mosoo/id";
+import type { AccountId, AgentId, AppId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { currentTimestampMs, toIsoString } from "../../../time";
@@ -91,7 +91,6 @@ export async function collectAgentBuilderReadinessContext(
     agent: {
       id: AgentId;
       ownerId: AccountId;
-      appOrganizationId: OrganizationId;
       appId: AppId;
     };
   } & AgentBuilderPlannerDraftInput,
