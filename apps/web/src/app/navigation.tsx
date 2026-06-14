@@ -1,5 +1,14 @@
 import type { LucideIcon } from "lucide-react";
-import { Bot, Box, ChevronRight, Folder, Inbox, KeyRound, Puzzle } from "lucide-react";
+import {
+  Bot,
+  Box,
+  ChevronRight,
+  Folder,
+  Inbox,
+  KeyRound,
+  LayoutDashboard,
+  Puzzle,
+} from "lucide-react";
 import type { MouseEvent } from "react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -27,6 +36,7 @@ interface AppNavSection {
 const NAV_SECTIONS: AppNavSection[] = [
   {
     items: [
+      { icon: LayoutDashboard, label: "Overview", path: "/overview" },
       { icon: Inbox, label: "Threads", path: "/threads" },
       { icon: Bot, label: "Agents", path: "/agent" },
       { icon: Folder, label: "Spaces", path: "/space" },

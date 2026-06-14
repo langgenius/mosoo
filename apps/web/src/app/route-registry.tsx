@@ -47,6 +47,7 @@ const JoinOrganization = lazyNamed(
   async () => import("../routes/organization-join/organization-join.route"),
   "OrganizationJoinPage",
 );
+const Overview = lazyNamed(async () => import("../routes/overview/overview.route"), "OverviewPage");
 const Space = lazyNamed(async () => import("../routes/spaces/spaces.route"), "SpacePage");
 const Environments = lazyNamed(
   async () => import("../routes/environments/environments.route"),
@@ -100,10 +101,6 @@ const AgentDetail = lazyNamed(
   async () => import("../routes/agent/agent-detail.route"),
   "AgentDetailPage",
 );
-const AgentSlackChannelSetup = lazyNamed(
-  async () => import("../routes/agent/slack-channel-setup.route"),
-  "AgentSlackChannelSetupPage",
-);
 const Threads = lazyNamed(async () => import("../routes/threads/route"), "ThreadsPage");
 const ProviderDemo = lazyNamed(
   async () => import("../routes/demo/provider-demo.route"),
@@ -129,7 +126,8 @@ const appRoutes = [
   },
   { element: <JoinOrganization />, path: "/join/:organizationId" },
   { element: <McpOAuthComplete />, path: "/integrations/mcp/oauth-complete" },
-  { element: protectedRoute(<Navigate to="/agent" replace />), path: "/" },
+  { element: protectedRoute(<Navigate to="/overview" replace />), path: "/" },
+  { element: protectedRoute(<Overview />), path: "/overview" },
   { element: protectedRoute(<Space />), path: "/space" },
   { element: protectedRoute(<Navigate to="/space" replace />), path: "/spaces" },
   { element: protectedRoute(<Environments />), path: "/environment" },
@@ -149,7 +147,6 @@ const appRoutes = [
   { element: protectedRoute(<SkillsTabRoute />), path: "/integrations/skills" },
   { element: protectedRoute(<McpTabRoute />), path: "/integrations/mcp" },
   { element: protectedRoute(<AgentList />), path: "/agent" },
-  { element: protectedRoute(<AgentSlackChannelSetup />), path: "/agent/:agentId/channels/new" },
   { element: protectedRoute(<AgentDetail />), path: "/agent/:agentId" },
   { element: protectedRoute(<Threads />), path: "/threads" },
   { element: protectedRoute(<Threads />), path: "/threads/:threadId" },
