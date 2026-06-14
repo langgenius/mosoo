@@ -5,7 +5,6 @@ import type {
   AgentId,
   DriverInstanceId,
   EnvironmentRevisionId,
-  OrganizationId,
   PlatformId,
   RuntimeEventId,
   SessionId,
@@ -140,7 +139,6 @@ export interface RuntimeEventContext {
   readonly deploymentVersionId?: AgentDeploymentVersionId | undefined;
   readonly environmentRevisionId?: EnvironmentRevisionId | undefined;
   readonly executionActorId?: AccountId | undefined;
-  readonly organizationId?: OrganizationId | undefined;
   readonly surface?:
     | {
         readonly id?: string | undefined;
@@ -497,6 +495,10 @@ function parseRuntimeEventContext(value: unknown): RuntimeEventContext {
     throw new Error("Runtime event context must be an object when provided.");
   }
 
+  if ("organizationId" in value) {
+    throw new Error("Runtime event context organizationId is not supported.");
+  }
+
   const surface =
     value["surface"] === undefined ? null : parseRuntimeEventSurfaceContext(value["surface"]);
   const agentId = readOptionalPlatformId(value, "agentId") as AgentId | undefined;
@@ -510,9 +512,6 @@ function parseRuntimeEventContext(value: unknown): RuntimeEventContext {
   const executionActorId = readOptionalPlatformId(value, "executionActorId") as
     | AccountId
     | undefined;
-  const organizationId = readOptionalPlatformId(value, "organizationId") as
-    | OrganizationId
-    | undefined;
 
   return {
     ...(agentId === undefined ? {} : { agentId }),
@@ -520,7 +519,6 @@ function parseRuntimeEventContext(value: unknown): RuntimeEventContext {
     ...(deploymentVersionId === undefined ? {} : { deploymentVersionId }),
     ...(environmentRevisionId === undefined ? {} : { environmentRevisionId }),
     ...(executionActorId === undefined ? {} : { executionActorId }),
-    ...(organizationId === undefined ? {} : { organizationId }),
     ...(surface === null ? {} : { surface }),
   };
 }

@@ -203,7 +203,6 @@ async function insertPublicThread(
         },
       }),
       model: "gpt-5.4",
-      organizationId: PUBLIC_API_TEST_IDS.organization,
       appId: PUBLIC_API_TEST_IDS.app,
       provider: "openai",
       renamed: false,
