@@ -131,7 +131,6 @@ async function ensureAgentReadyToCreateSession(input: {
     bindings: input.bindings,
     environment: input.source.environment,
     model: input.source.model,
-    organizationId: input.source.agent.appOrganizationId,
     packageResolution: parseAgentStoredConfig(input.source.configJson).packageResolution,
     appId: input.source.agent.appId,
     provider: input.source.provider,

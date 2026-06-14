@@ -1,4 +1,4 @@
-import type { OrganizationId, PlatformId, AppId, VendorCredentialId } from "@mosoo/id";
+import type { PlatformId, AppId, VendorCredentialId } from "@mosoo/id";
 
 export interface VendorCredentialRow {
   apiBase: string | null;
@@ -6,7 +6,6 @@ export interface VendorCredentialRow {
   id: VendorCredentialId;
   modelsJson: string[] | null;
   name: string;
-  organizationId: OrganizationId;
   appId: AppId;
   vendorId: string;
 }

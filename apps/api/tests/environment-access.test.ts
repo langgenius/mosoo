@@ -55,7 +55,6 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       description text NOT NULL,
-      organization_id text NOT NULL,
       app_id text NOT NULL,
       owner_account_id text,
       current_revision_id text NOT NULL,
@@ -69,7 +68,6 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
     CREATE TABLE environment_revision (
       id text PRIMARY KEY NOT NULL,
       environment_id text NOT NULL,
-      organization_id text NOT NULL,
       app_id text NOT NULL,
       network_policy text NOT NULL,
       allow_mcp_servers integer NOT NULL,
@@ -126,7 +124,6 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
           id,
           name,
           description,
-          organization_id,
           app_id,
           owner_account_id,
           current_revision_id,
@@ -137,19 +134,11 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
           updated_at
         )
         VALUES
-          (?, 'App Local', '', ?, ?, ?, 'rev-app', NULL, NULL, NULL, 1, 1),
-          (?, 'System Default', '', ?, ?, NULL, 'rev-built-in', NULL, NULL, NULL, 1, 1)
+          (?, 'App Local', '', ?, ?, 'rev-app', NULL, NULL, NULL, 1, 1),
+          (?, 'System Default', '', ?, NULL, 'rev-built-in', NULL, NULL, NULL, 1, 1)
       `,
     )
-    .bind(
-      APP_ENVIRONMENT_ID,
-      ORGANIZATION_ID,
-      APP_ID,
-      OWNER_ID,
-      BUILT_IN_ENVIRONMENT_ID,
-      ORGANIZATION_ID,
-      APP_ID,
-    )
+    .bind(APP_ENVIRONMENT_ID, APP_ID, OWNER_ID, BUILT_IN_ENVIRONMENT_ID, APP_ID)
     .run();
 
   database
@@ -158,7 +147,6 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
         INSERT INTO environment_revision (
           id,
           environment_id,
-          organization_id,
           app_id,
           network_policy,
           allow_mcp_servers,
@@ -171,19 +159,11 @@ function createEnvironmentAccessDatabase(): SqliteD1Database {
           created_at
         )
         VALUES
-          ('rev-app', ?, ?, ?, 'full', 1, 1, '[]', '[]', '', '[]', ?, 1),
-          ('rev-built-in', ?, ?, ?, 'full', 1, 1, '[]', '[]', '', '[]', NULL, 1)
+          ('rev-app', ?, ?, 'full', 1, 1, '[]', '[]', '', '[]', ?, 1),
+          ('rev-built-in', ?, ?, 'full', 1, 1, '[]', '[]', '', '[]', NULL, 1)
       `,
     )
-    .bind(
-      APP_ENVIRONMENT_ID,
-      ORGANIZATION_ID,
-      APP_ID,
-      OWNER_ID,
-      BUILT_IN_ENVIRONMENT_ID,
-      ORGANIZATION_ID,
-      APP_ID,
-    )
+    .bind(APP_ENVIRONMENT_ID, APP_ID, OWNER_ID, BUILT_IN_ENVIRONMENT_ID, APP_ID)
     .run();
 
   return database;

@@ -1,6 +1,6 @@
 import { appsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { AccountId, EnvironmentId, OrganizationId, AppId } from "@mosoo/id";
+import type { AccountId, EnvironmentId, AppId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -12,7 +12,6 @@ import { createEnvironmentFromConfig } from "./environment-write.service";
 
 interface CreateAppEnvironmentDefaultsInput {
   actorId: AccountId | null;
-  organizationId: OrganizationId;
   appId: AppId;
   timestampMs?: number;
 }
@@ -37,7 +36,6 @@ async function createBuiltInEnvironment(
     description: "",
     environmentId,
     name: SYSTEM_DEFAULT_NAME,
-    organizationId: input.organizationId,
     ownerId: null,
     appId: input.appId,
     timestampMs: input.timestampMs,
@@ -53,7 +51,6 @@ export async function createAppEnvironmentDefaults(
   const timestampMs = input.timestampMs ?? currentTimestampMs();
   const environmentId = await createBuiltInEnvironment(bindings, {
     actorId: input.actorId,
-    organizationId: input.organizationId,
     appId: input.appId,
     timestampMs,
   });

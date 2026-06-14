@@ -5,13 +5,7 @@ import {
   environmentsTable,
   appsTable,
 } from "@mosoo/db";
-import type {
-  AccountId,
-  EnvironmentId,
-  EnvironmentRevisionId,
-  OrganizationId,
-  AppId,
-} from "@mosoo/id";
+import type { AccountId, EnvironmentId, EnvironmentRevisionId, AppId } from "@mosoo/id";
 import { and, eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -57,7 +51,6 @@ export function environmentRecordColumns() {
     networkPolicy: sql<
       EnvironmentRecordRow["networkPolicy"]
     >`${environmentRevisionsTable.networkPolicy}`.as("networkPolicy"),
-    organizationId: sql<OrganizationId>`${environmentsTable.organizationId}`.as("organizationId"),
     ownerId: sql<AccountId | null>`${environmentsTable.ownerAccountId}`.as("ownerId"),
     ownerImageUrl: sql<string | null>`${accountsTable.image}`.as("ownerImageUrl"),
     ownerName: sql<string | null>`${accountsTable.name}`.as("ownerName"),

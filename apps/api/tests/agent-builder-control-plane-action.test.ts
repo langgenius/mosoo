@@ -152,15 +152,15 @@ describe("Agent Builder control-plane action execution", () => {
     expect(result.createdEnvironment?.name).toBe("Slack Bot Environment");
 
     const row = await fixture.bindings.DB.prepare(
-      "SELECT description, name, owner_account_id, organization_id FROM environment WHERE id = ?",
+      "SELECT app_id, description, name, owner_account_id FROM environment WHERE id = ?",
     )
       .bind(result.createdEnvironment?.id ?? "")
       .first();
 
     expect(row).toMatchObject({
+      app_id: fixture.ids.appId,
       description: "Build sandbox for the Slack bot.",
       name: "Slack Bot Environment",
-      organization_id: fixture.ids.organizationId,
       owner_account_id: fixture.viewer.id,
     });
   });

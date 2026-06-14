@@ -64,7 +64,6 @@ function createCredentialRuntimeDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       models text,
       name text NOT NULL,
-      organization_id text NOT NULL,
       app_id text NOT NULL,
       updated_at integer NOT NULL,
       vendor_id text NOT NULL
@@ -128,12 +127,11 @@ async function insertVendorCredential(
           id,
           models,
           name,
-          organization_id,
           app_id,
           updated_at,
           vendor_id
         )
-        VALUES (?, ?, 1, ?, ?, ?, ?, ?, 1, ?)
+        VALUES (?, ?, 1, ?, ?, ?, ?, 1, ?)
       `,
     )
     .bind(
@@ -142,7 +140,6 @@ async function insertVendorCredential(
       input.credentialId,
       input.models === null ? null : JSON.stringify(input.models),
       input.name,
-      ORGANIZATION_ID,
       APP_ID,
       input.vendorId,
     )
@@ -292,7 +289,6 @@ describe("vendor credential runtime selection", () => {
       actorAccountId: OTHER_ACCOUNT_ID,
       codePrefix: "agent.readiness",
       database,
-      organizationId: ORGANIZATION_ID,
       appId: APP_ID,
       selection: {
         model: "gpt-5.4",

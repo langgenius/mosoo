@@ -18,7 +18,6 @@ import { EnvironmentBadges } from "./environment-badges";
 export interface EnvironmentListTableProps {
   readonly environments: readonly EnvironmentSummary[];
   readonly onDelete: (environmentId: string) => void;
-  readonly onFork: (environmentId: string) => void;
   readonly onSetDefault: (environmentId: string) => void;
 }
 
@@ -33,7 +32,6 @@ function networkLabel({ allowedHosts, networkPolicy }: EnvironmentSummary): stri
 export function EnvironmentListTable({
   environments,
   onDelete,
-  onFork,
   onSetDefault,
 }: EnvironmentListTableProps): ReactElement {
   return (
@@ -81,15 +79,6 @@ export function EnvironmentListTable({
               <DropdownMenuItem asChild>
                 <Link to={`/environment/${environment.id}`}>Open</Link>
               </DropdownMenuItem>
-              {environment.role === "user" && !environment.isBuiltIn ? (
-                <DropdownMenuItem
-                  onClick={() => {
-                    onFork(environment.id);
-                  }}
-                >
-                  Fork
-                </DropdownMenuItem>
-              ) : null}
               {environment.canEdit && !environment.isDefault ? (
                 <DropdownMenuItem
                   onClick={() => {

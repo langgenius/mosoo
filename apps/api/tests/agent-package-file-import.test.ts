@@ -445,7 +445,6 @@ describe("agent package file import", () => {
         forked_from_owner_name,
         id,
         name,
-        organization_id,
         owner_account_id,
         app_id,
         updated_at
@@ -460,7 +459,6 @@ describe("agent package file import", () => {
           NULL,
           '${otherEnvironmentId}',
           'Portable',
-          '${ORGANIZATION_ID}',
           '${OWNER_VIEWER.id}',
           '${otherAppId}',
           1

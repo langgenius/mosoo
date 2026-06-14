@@ -2,7 +2,7 @@ import type { AccountId, EnvironmentId, EnvironmentRevisionId, AppId } from "../
 
 export type EnvironmentNetworkPolicy = "full" | "limited";
 export type EnvironmentPackageManager = "apt" | "cargo" | "gem" | "go" | "npm" | "pip";
-export type EnvironmentRegistryRole = "owner" | "user";
+export type EnvironmentRegistryRole = "owner";
 
 export interface EnvironmentOwnerSummary {
   id: AccountId | null;

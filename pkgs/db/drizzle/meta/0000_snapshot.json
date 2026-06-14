@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "8a9f2819-b9f8-5103-87b7-b9e6a18ac722",
+  "id": "6a95a4a4-d335-5e7a-8934-13d2152b273c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_deployment_version": {
@@ -2501,13 +2501,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "packages_json": {
           "name": "packages_json",
           "type": "text",
@@ -2534,11 +2527,6 @@
         "environment_revision_environment_created_at_idx": {
           "name": "environment_revision_environment_created_at_idx",
           "columns": ["environment_id", "created_at"],
-          "isUnique": false
-        },
-        "environment_revision_organization_created_at_idx": {
-          "name": "environment_revision_organization_created_at_idx",
-          "columns": ["organization_id", "created_at"],
           "isUnique": false
         },
         "environment_revision_app_created_at_idx": {
@@ -2616,13 +2604,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "owner_account_id": {
           "name": "owner_account_id",
           "type": "text CHECK (\"owner_account_id\" = upper(\"owner_account_id\") AND length(\"owner_account_id\") = 26 AND substr(\"owner_account_id\", 1, 1) GLOB '[0-7]' AND \"owner_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
@@ -2646,11 +2627,6 @@
         }
       },
       "indexes": {
-        "environment_organization_updated_at_idx": {
-          "name": "environment_organization_updated_at_idx",
-          "columns": ["organization_id", "updated_at"],
-          "isUnique": false
-        },
         "environment_app_updated_at_idx": {
           "name": "environment_app_updated_at_idx",
           "columns": ["app_id", "updated_at"],
@@ -7175,13 +7151,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "app_id": {
           "name": "app_id",
           "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
@@ -7205,11 +7174,6 @@
         }
       },
       "indexes": {
-        "vendor_credential_organization_vendor_idx": {
-          "name": "vendor_credential_organization_vendor_idx",
-          "columns": ["organization_id", "vendor_id"],
-          "isUnique": false
-        },
         "vendor_credential_app_vendor_idx": {
           "name": "vendor_credential_app_vendor_idx",
           "columns": ["app_id", "vendor_id"],

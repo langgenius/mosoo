@@ -40,7 +40,6 @@ export async function createAgentFork(
       actorAccountId: viewer.id,
       codePrefix: "agent.fork",
       database: bindings.DB,
-      organizationId: sourceAgent.appOrganizationId,
       appId: sourceAgent.appId,
       selection: {
         model: manifest.runtime.model,

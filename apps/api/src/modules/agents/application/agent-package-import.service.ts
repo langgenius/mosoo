@@ -51,15 +51,7 @@ export async function importAgentPackage(
 
   const { manifest } = parsed;
   issues.push(...collectPackageDeclarationIssues(parsed.package));
-  issues.push(
-    ...(await collectRuntimeResolutionIssues(
-      bindings.DB,
-      viewer.id,
-      app.organizationId,
-      app.id,
-      manifest,
-    )),
-  );
+  issues.push(...(await collectRuntimeResolutionIssues(bindings.DB, viewer.id, app.id, manifest)));
 
   const [skillResolution, spaceIds, environmentId, mcpServerIds] = await Promise.all([
     resolvePackageSkills({

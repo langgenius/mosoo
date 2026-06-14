@@ -29,7 +29,6 @@ function createAvailableModelsDatabase(): SqliteD1Database {
 
     CREATE TABLE vendor_credential (
       id text PRIMARY KEY NOT NULL,
-      organization_id text NOT NULL,
       app_id text NOT NULL,
       vendor_id text NOT NULL,
       name text NOT NULL,
@@ -63,7 +62,6 @@ function createAvailableModelsDatabase(): SqliteD1Database {
 
     INSERT INTO vendor_credential (
       id,
-      organization_id,
       app_id,
       vendor_id,
       name,
@@ -73,7 +71,6 @@ function createAvailableModelsDatabase(): SqliteD1Database {
     )
     VALUES (
       'credential-1',
-      '01J00000000000000000000006',
       '${APP_ID}',
       'openai',
       'OpenAI default',
@@ -83,7 +80,6 @@ function createAvailableModelsDatabase(): SqliteD1Database {
     ),
     (
       'credential-custom',
-      '01J00000000000000000000006',
       '${APP_ID}',
       'openai-compatible',
       'Custom default',

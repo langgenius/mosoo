@@ -4,7 +4,7 @@ import type {
   AgentResolutionTargetType,
 } from "@mosoo/contracts/agent-manifest";
 import { vendorCredentialsTable } from "@mosoo/db";
-import type { AccountId, OrganizationId, AppId } from "@mosoo/id";
+import type { AccountId, AppId } from "@mosoo/id";
 import {
   VENDOR_OPENAI,
   VENDOR_OPENAI_COMPATIBLE,
@@ -36,7 +36,6 @@ interface RuntimeCapabilityIssueInput {
   bindings?: ApiBindings;
   codePrefix: "agent.fork" | "agent.import" | "agent.readiness";
   database: D1Database;
-  organizationId: OrganizationId;
   appId: AppId;
   selection: RuntimeCapabilitySelection;
 }

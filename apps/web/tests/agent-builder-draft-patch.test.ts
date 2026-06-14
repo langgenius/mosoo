@@ -484,7 +484,6 @@ describe("Agent Builder draft patch application", () => {
           isEditable: true,
           name: "Created Environment",
           networkPolicy: "full",
-          organizationId: "org_builder",
           owner: {
             id: "acct_owner",
             imageUrl: null,
@@ -495,6 +494,7 @@ describe("Agent Builder draft patch application", () => {
           setupScript: "",
           updatedAt: "2026-06-06T00:00:00.000Z",
           usedByAgentCount: 0,
+          appId: "app_builder",
         },
       }),
     );

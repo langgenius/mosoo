@@ -71,7 +71,7 @@ export async function createVendorCredential(
   viewer: AuthenticatedViewer,
   input: CreateVendorCredentialInput,
 ): Promise<VendorCredential> {
-  const app = await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
+  await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
   const name = normalizeCredentialName(input.name);
   const apiKey = input.apiKey.trim();
   const apiBase = normalizeApiBase(input.apiBase);
@@ -92,7 +92,7 @@ export async function createVendorCredential(
   const secretId = await storeVendorCredentialSecret(bindings, {
     apiKey,
     credentialId: id,
-    appId: app.id,
+    appId: input.appId,
     providerId: input.vendorId,
     purpose: "credential_create_api_key",
   });
@@ -107,8 +107,7 @@ export async function createVendorCredential(
         id,
         models,
         name,
-        organizationId: app.organizationId,
-        appId: app.id,
+        appId: input.appId,
         updatedAt: timestampMs,
         vendorId: input.vendorId,
       })
@@ -116,7 +115,7 @@ export async function createVendorCredential(
   } catch (error) {
     await deleteVendorCredentialSecret(bindings.DB, {
       credentialId: id,
-      appId: app.id,
+      appId: input.appId,
       providerId: input.vendorId,
       purpose: "credential_create_rollback",
       secretId,

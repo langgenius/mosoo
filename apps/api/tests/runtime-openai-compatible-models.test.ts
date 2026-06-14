@@ -35,7 +35,6 @@ function createAvailableModelsDatabase(): D1Database {
       id TEXT PRIMARY KEY,
       models TEXT,
       name TEXT NOT NULL,
-      organization_id TEXT NOT NULL,
       app_id TEXT NOT NULL,
       updated_at INTEGER NOT NULL,
       vendor_id TEXT NOT NULL

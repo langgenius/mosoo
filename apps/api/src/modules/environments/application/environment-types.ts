@@ -2,13 +2,7 @@ import type {
   EnvironmentNetworkPolicy,
   EnvironmentPackageSpec,
 } from "@mosoo/contracts/environment";
-import type {
-  AccountId,
-  EnvironmentId,
-  EnvironmentRevisionId,
-  OrganizationId,
-  AppId,
-} from "@mosoo/id";
+import type { AccountId, EnvironmentId, EnvironmentRevisionId, AppId } from "@mosoo/id";
 
 export interface StoredEnvironmentVariable {
   key: string;
@@ -38,7 +32,6 @@ export interface EnvironmentRecordRow {
   appId: AppId;
   setupScript: string;
   updatedAt: number;
-  organizationId: OrganizationId;
   usedByAgentCount?: number;
 }
 
