@@ -77,7 +77,6 @@ describe("agent deployment version atomicity", () => {
       publishAgent(createPublicHttpTestBindings(database) as ApiBindings, OWNER_VIEWER, {
         agentId: DRAFT_AGENT_ID,
         appId: PUBLIC_API_TEST_IDS.app,
-        visibility: "private",
       }),
     );
 

@@ -87,7 +87,7 @@ const CARDS = [
     tag: "Web UI",
     visual: <WebUiMock />,
     title: "Or click through the console",
-    desc: "Manage agents, spaces, credentials, and cost from a console your whole team can use, no terminal required.",
+    desc: "Manage agents, spaces, credentials, and cost from a console you can operate, no terminal required.",
   },
   {
     tag: "Self-host",

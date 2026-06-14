@@ -136,7 +136,7 @@ function OnboardingProvisioningScreen() {
     <div className="bg-background fixed inset-0 flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
         <Loader2 className="text-primary size-8 animate-spin" />
-        <p className="text-muted-foreground text-sm">Creating your App workspace…</p>
+        <p className="text-muted-foreground text-sm">Creating your default App…</p>
       </div>
     </div>
   );
@@ -151,11 +151,9 @@ function OnboardingErrorScreen({ error, onRetry }: { error: string | null; onRet
 
       <div className="flex flex-1 items-center justify-center">
         <div className="w-full max-w-[520px] px-6">
-          <h2 className="text-foreground text-center text-2xl font-semibold">
-            Workspace setup failed
-          </h2>
+          <h2 className="text-foreground text-center text-2xl font-semibold">App setup failed</h2>
           <p className="text-muted-foreground mt-2 text-center text-sm">
-            {isTruthy(error) ? error : "Mosoo could not create your default App workspace."}
+            {isTruthy(error) ? error : "Mosoo could not create your default App."}
           </p>
 
           <div className="mt-6">

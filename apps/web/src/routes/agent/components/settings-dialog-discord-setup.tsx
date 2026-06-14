@@ -15,7 +15,7 @@ import type { ChannelInlineSetupAgent } from "./settings-dialog-channel-agent";
 const DISCORD_RELAY_SECRET_LABEL = "Relay Secret";
 const DISCORD_DEVELOPER_PORTAL_URL = "https://discord.com/developers/applications";
 const DiscordSetupCaveat =
-  "Save validates the bot token with Discord. The Gateway connection starts after the binding exists; send a real DM or guild mention after saving to verify delivery in your workspace.";
+  "Save validates the bot token with Discord. The Gateway connection starts after the binding exists; send a real DM or guild mention after saving to verify delivery in your Discord server.";
 const DiscordIntentsPrerequisite =
   "Before connecting, open your app in the Discord Developer Portal → Bot → Privileged Gateway Intents and enable Message Content Intent. Without it Discord closes the Gateway with discord_gateway_disallowed_intents and the bot cannot read message text.";
 

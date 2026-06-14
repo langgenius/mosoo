@@ -72,7 +72,7 @@ function QuickstartPanel({ metrics }: { metrics: AppOverviewMetrics }) {
         <div>
           <h2 className="text-foreground text-sm font-semibold">Quickstart</h2>
           <p className="text-muted-foreground mt-0.5 text-xs">
-            {completeCount} of {items.length} App setup steps complete
+            {completeCount} of {items.length} quickstart steps complete
           </p>
         </div>
       </div>
@@ -285,7 +285,7 @@ export function AppOverviewPage() {
   if (activeApp === null) {
     return (
       <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-        {appsLoading ? "Loading app…" : "No app available."}
+        {appsLoading ? "Loading App…" : "No App available."}
       </div>
     );
   }

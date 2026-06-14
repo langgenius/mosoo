@@ -30,7 +30,7 @@ const AGENT_TEMPLATES: readonly AgentTemplate[] = [
     description: "Answers repeat questions in Slack.",
     key: "slack-qa-assistant",
     message:
-      "Create a Slack Q&A assistant that answers my team's repeat questions. It should stay concise, cite the source it used, and ask a clarifying question when the request is ambiguous.",
+      "Create a Slack Q&A assistant that answers repeat questions from my support notes. It should stay concise, cite the source it used, and ask a clarifying question when the request is ambiguous.",
     title: "Slack Q&A assistant",
   },
   {
