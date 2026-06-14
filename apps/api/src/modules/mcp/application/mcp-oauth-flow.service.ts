@@ -134,7 +134,6 @@ export async function startMcpOAuth(
   const flowOwner = {
     id: flowId,
     initiatorUserId: viewerId,
-    organizationId: server.organizationId,
     appId: server.appId,
     serverId: server.id,
   };
@@ -168,7 +167,6 @@ export async function startMcpOAuth(
         initiatorUserId: viewerId,
         oauthClientId: clientId,
         oauthClientSecretSecretId: clientSecretSecretId,
-        organizationId: server.organizationId,
         appId: server.appId,
         registrationEndpoint: metadata.registration_endpoint ?? null,
         returnUrl: input.returnUrl ?? null,

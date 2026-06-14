@@ -53,7 +53,6 @@ interface McpRegistrySnapshotRow {
   serverId: McpServerId | null;
   serverName: string | null;
   serverOauthMetadataJson: string | null;
-  serverOrganizationId: ServerRow["organizationId"] | null;
   serverOwnerId: AccountId | null;
   serverOwnerName: string | null;
   serverAppId: AppId | null;
@@ -90,7 +89,6 @@ function toRegistryServerRow(row: McpRegistrySnapshotRow): ServerRow | null {
     id: row.serverId,
     name: requireRegistryValue(row.serverName, "server_name"),
     oauthMetadataJson: row.serverOauthMetadataJson,
-    organizationId: requireRegistryValue(row.serverOrganizationId, "server_organization_id"),
     ownerId: requireRegistryValue(row.serverOwnerId, "server_owner_id"),
     ownerName: row.serverOwnerName,
     appId: requireRegistryValue(row.serverAppId, "server_app_id"),
@@ -201,7 +199,6 @@ export async function loadMcpRegistrySnapshot(
       serverId: mcpServersTable.id,
       serverName: mcpServersTable.name,
       serverOauthMetadataJson: mcpServersTable.oauthMetadataJson,
-      serverOrganizationId: mcpServersTable.organizationId,
       serverOwnerId: mcpServersTable.ownerId,
       serverOwnerName: registryOwnerAccountsTable.name,
       serverAppId: mcpServersTable.appId,

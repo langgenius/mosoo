@@ -50,7 +50,6 @@ function createMcpRegistryDatabase(input: { includeServers?: boolean } = {}): Sq
       icon_url text,
       name text NOT NULL,
       oauth_metadata_json text,
-      organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       app_id text NOT NULL,
       source text NOT NULL,
@@ -109,7 +108,6 @@ function createMcpRegistryDatabase(input: { includeServers?: boolean } = {}): Sq
       description,
       enabled,
       name,
-      organization_id,
       owner_account_id,
       app_id,
       source,
@@ -117,9 +115,9 @@ function createMcpRegistryDatabase(input: { includeServers?: boolean } = {}): Sq
       url
     )
     VALUES
-      ('${APP_MCP_SERVER_ID}', 'bearer', 1, 'app', NULL, 1, 'App MCP', '01J00000000000000000000006', '${VIEWER_ID}', '${APP_ID}', 'app', 1, 'https://app.example.com/mcp'),
-      ('${APP_MCP_SERVER_WITHOUT_CREDENTIAL_ID}', 'bearer', 2, 'app', NULL, 1, 'Unconfigured MCP', '01J00000000000000000000006', '${VIEWER_ID}', '${APP_ID}', 'app', 2, 'https://unconfigured.example.com/mcp'),
-      ('${OTHER_OWNER_MCP_SERVER_ID}', 'bearer', 3, 'app', NULL, 1, 'Other Owner MCP', '01J00000000000000000000006', '01J00000000000000000000001', '${APP_ID}', 'app', 3, 'https://other-owner.example.com/mcp');
+      ('${APP_MCP_SERVER_ID}', 'bearer', 1, 'app', NULL, 1, 'App MCP', '${VIEWER_ID}', '${APP_ID}', 'app', 1, 'https://app.example.com/mcp'),
+      ('${APP_MCP_SERVER_WITHOUT_CREDENTIAL_ID}', 'bearer', 2, 'app', NULL, 1, 'Unconfigured MCP', '${VIEWER_ID}', '${APP_ID}', 'app', 2, 'https://unconfigured.example.com/mcp'),
+      ('${OTHER_OWNER_MCP_SERVER_ID}', 'bearer', 3, 'app', NULL, 1, 'Other Owner MCP', '01J00000000000000000000001', '${APP_ID}', 'app', 3, 'https://other-owner.example.com/mcp');
 
     INSERT INTO mcp_credential (
       id,

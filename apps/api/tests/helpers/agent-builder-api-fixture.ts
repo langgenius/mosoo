@@ -392,7 +392,6 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       oauth_metadata_json text,
-      organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       app_id text NOT NULL,
       source text NOT NULL,

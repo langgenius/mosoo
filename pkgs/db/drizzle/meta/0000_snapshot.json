@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "78fea867-c8f8-55da-8968-690eb137e033",
+  "id": "01409eb5-9b65-5958-8172-9ce2693c534e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_deployment_version": {
@@ -3367,13 +3367,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "app_id": {
           "name": "app_id",
           "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
@@ -3551,13 +3544,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "owner_account_id": {
           "name": "owner_account_id",
           "type": "text CHECK (\"owner_account_id\" = upper(\"owner_account_id\") AND length(\"owner_account_id\") = 26 AND substr(\"owner_account_id\", 1, 1) GLOB '[0-7]' AND \"owner_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
@@ -3595,11 +3581,6 @@
         }
       },
       "indexes": {
-        "mcp_server_organization_source_enabled_idx": {
-          "name": "mcp_server_organization_source_enabled_idx",
-          "columns": ["organization_id", "source", "enabled"],
-          "isUnique": false
-        },
         "mcp_server_app_enabled_idx": {
           "name": "mcp_server_app_enabled_idx",
           "columns": ["app_id", "enabled"],

@@ -549,7 +549,6 @@ CREATE TABLE `mcp_oauth_flow` (
 	`initiator_account_id` text CHECK ("initiator_account_id" = upper("initiator_account_id") AND length("initiator_account_id") = 26 AND substr("initiator_account_id", 1, 1) GLOB '[0-7]' AND "initiator_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`oauth_client_id` text NOT NULL,
 	`oauth_client_secret_secret_id` text,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`registration_endpoint` text,
 	`return_url` text,
@@ -581,7 +580,6 @@ CREATE TABLE `mcp_server` (
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
 	`oauth_metadata_json` text,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`source` text NOT NULL,
@@ -590,7 +588,6 @@ CREATE TABLE `mcp_server` (
 	CONSTRAINT "mcp_server_source_scope_check" CHECK("mcp_server"."source" = 'app' AND "mcp_server"."credential_scope" = 'app')
 );
 --> statement-breakpoint
-CREATE INDEX `mcp_server_organization_source_enabled_idx` ON `mcp_server` (`organization_id`,`source`,`enabled`);--> statement-breakpoint
 CREATE INDEX `mcp_server_app_enabled_idx` ON `mcp_server` (`app_id`,`enabled`);--> statement-breakpoint
 CREATE INDEX `mcp_server_owner_app_idx` ON `mcp_server` (`owner_account_id`,`app_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `mcp_server_app_url_idx` ON `mcp_server` (`app_id`,`url`);--> statement-breakpoint
