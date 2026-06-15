@@ -2,7 +2,6 @@ import type { AppSummary } from "@mosoo/contracts/app";
 import type { OrganizationId } from "@mosoo/contracts/id";
 
 import { graphql } from "@/gql";
-import type { AppListQuery } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
 import { toAccountId, toEnvironmentId, toAppId } from "@/routes/typed-id";
 
@@ -19,7 +18,29 @@ const APP_LIST_QUERY = graphql(/* GraphQL */ `
   }
 `);
 
-function toAppSummary(app: AppListQuery["appList"][number]): AppSummary {
+const CREATE_APP_MUTATION = graphql(/* GraphQL */ `
+  mutation CreateApp($input: CreateAppInput!) {
+    createApp(input: $input) {
+      createdAt
+      defaultEnvironmentId
+      id
+      name
+      ownerAccountId
+      slug
+    }
+  }
+`);
+
+interface AppFields {
+  createdAt: string;
+  defaultEnvironmentId: string | null;
+  id: string;
+  name: string;
+  ownerAccountId: string;
+  slug: string;
+}
+
+function toAppSummary(app: AppFields): AppSummary {
   return {
     ...app,
     defaultEnvironmentId:
@@ -33,4 +54,13 @@ export async function listOrganizationApps(organizationId: OrganizationId): Prom
   const payload = await requestGraphQL(APP_LIST_QUERY, { organizationId });
 
   return payload.appList.map(toAppSummary);
+}
+
+export async function createApp(input: {
+  name: string;
+  organizationId: OrganizationId;
+}): Promise<AppSummary> {
+  const payload = await requestGraphQL(CREATE_APP_MUTATION, { input });
+
+  return toAppSummary(payload.createApp);
 }

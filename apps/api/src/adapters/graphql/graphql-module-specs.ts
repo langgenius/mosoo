@@ -118,6 +118,7 @@ export const onboardingGraphQLSpec = {
 } satisfies GraphQLModuleSpec;
 
 export const appGraphQLSpec = {
+  mutationFields: ["createApp(input: CreateAppInput!): App!"],
   queryFields: ["appList(organizationId: ULID!): [App!]!"],
   typeDefs: appSchema,
 } satisfies GraphQLModuleSpec;
@@ -193,6 +194,7 @@ export const vendorCredentialGraphQLSpec = {
   mutationFields: [
     "createVendorCredential(input: CreateVendorCredentialInput!): VendorCredential!",
     "deleteVendorCredential(input: DeleteVendorCredentialInput!): OperationResult!",
+    "setDefaultVendorCredential(input: SetDefaultVendorCredentialInput!): VendorCredential!",
     "testVendorCredential(input: TestVendorCredentialInput!): TestVendorCredentialResult!",
     "updateVendorCredential(input: UpdateVendorCredentialInput!): VendorCredential!",
   ],

@@ -34,13 +34,23 @@ describe("App session boundary", () => {
     const secondApp = appSummary("01J000000000000000000000A4", "Second App");
 
     expect(resolveActiveApp([])).toBeNull();
+    // Multiple Apps with no selection routes to the Org-layer Apps list.
     expect(resolveActiveApp([firstApp, secondApp])).toBeNull();
+  });
+
+  test("honors an explicit App selection when switching Apps", () => {
+    const firstApp = appSummary("01J000000000000000000000A5", "First App");
+    const secondApp = appSummary("01J000000000000000000000A6", "Second App");
+
+    expect(resolveActiveApp([firstApp, secondApp], secondApp.id)).toBe(secondApp);
+    // A stale selection that no longer exists does not pin a wrong App.
+    expect(resolveActiveApp([firstApp, secondApp], "01J000000000000000000000A7")).toBeNull();
   });
 
   test("does not derive active App by App list order", () => {
     const source = readSource("../src/app/session/session-context.tsx");
 
-    expect(source).toContain("resolveActiveApp(apps)");
+    expect(source).toContain("resolveActiveApp(apps, selectedAppId)");
     expect(source).not.toContain("apps[0]");
   });
 });

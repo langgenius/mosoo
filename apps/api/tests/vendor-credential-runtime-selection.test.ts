@@ -62,6 +62,7 @@ function createCredentialRuntimeDatabase(): SqliteD1Database {
       api_key_secret_id text NOT NULL,
       created_at integer NOT NULL,
       id text PRIMARY KEY NOT NULL,
+      is_default integer DEFAULT false NOT NULL,
       models text,
       name text NOT NULL,
       app_id text NOT NULL,

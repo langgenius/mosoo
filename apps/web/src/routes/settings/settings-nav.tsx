@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { BarChart3, KeyRound, User } from "lucide-react";
+import { BarChart3, Box, KeyRound, User } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { cn } from "@/shared/lib/class-names";
@@ -15,14 +15,22 @@ interface SettingsNavSection {
   label: string;
 }
 
+// Settings split by ownership: account-global controls vs the active App's own
+// controls. Org-level settings live in the account/billing shell, not here.
 const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
   {
     items: [
       { icon: User, label: "Profile", path: "/settings/profile" },
       { icon: KeyRound, label: "API tokens", path: "/settings/access-tokens" },
-      { icon: BarChart3, label: "App usage", path: "/cost" },
     ],
     label: "Account",
+  },
+  {
+    items: [
+      { icon: Box, label: "General", path: "/settings/app" },
+      { icon: BarChart3, label: "App usage", path: "/settings/usage" },
+    ],
+    label: "App",
   },
 ];
 

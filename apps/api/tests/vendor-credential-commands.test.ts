@@ -7,6 +7,7 @@ import { VENDOR_ANTHROPIC, VENDOR_OPENAI, VENDOR_OPENAI_COMPATIBLE } from "@moso
 import {
   createVendorCredential,
   deleteVendorCredential,
+  setDefaultVendorCredential,
   updateVendorCredential,
 } from "../src/modules/vendor-credentials/application/vendor-credential-commands";
 import {
@@ -273,5 +274,81 @@ describe("vendor credential commands", () => {
       .first<{ count: number }>();
     expect(credentialCount?.count).toBe(1);
     expect(secretCount?.count).toBe(1);
+  });
+});
+
+describe("vendor credential default selection", () => {
+  async function readIsDefault(
+    fixture: Awaited<ReturnType<typeof createAgentBuilderApiFixture>>,
+    id: string,
+  ): Promise<number | undefined> {
+    const row = await fixture.database
+      .prepare("SELECT is_default AS isDefault FROM vendor_credential WHERE id = ?")
+      .bind(id)
+      .first<{ isDefault: number }>();
+
+    return row?.isDefault;
+  }
+
+  async function createAnthropicKey(
+    fixture: Awaited<ReturnType<typeof createAgentBuilderApiFixture>>,
+    name: string,
+  ) {
+    return createVendorCredential(fixture.bindings, fixture.viewer, {
+      apiKey: `sk-${name}`,
+      name,
+      appId: fixture.ids.appId,
+      vendorId: VENDOR_ANTHROPIC.vendorId,
+    });
+  }
+
+  test("marks the first credential for a vendor as default and later ones non-default", async () => {
+    const fixture = await createAgentBuilderApiFixture();
+    const first = await createAnthropicKey(fixture, "A");
+    const second = await createAnthropicKey(fixture, "B");
+
+    expect(first.isDefault).toBe(true);
+    expect(second.isDefault).toBe(false);
+  });
+
+  test("setDefaultVendorCredential moves the default to the chosen credential", async () => {
+    const fixture = await createAgentBuilderApiFixture();
+    const first = await createAnthropicKey(fixture, "A");
+    const second = await createAnthropicKey(fixture, "B");
+
+    const promoted = await setDefaultVendorCredential(fixture.bindings, fixture.viewer, {
+      id: second.id,
+      appId: fixture.ids.appId,
+    });
+
+    expect(promoted.isDefault).toBe(true);
+    expect(await readIsDefault(fixture, first.id)).toBe(0);
+    expect(await readIsDefault(fixture, second.id)).toBe(1);
+  });
+
+  test("deleting the default promotes the next remaining credential", async () => {
+    const fixture = await createAgentBuilderApiFixture();
+    const first = await createAnthropicKey(fixture, "A");
+    const second = await createAnthropicKey(fixture, "B");
+
+    await deleteVendorCredential(fixture.bindings, fixture.viewer, {
+      id: first.id,
+      appId: fixture.ids.appId,
+    });
+
+    expect(await readIsDefault(fixture, second.id)).toBe(1);
+  });
+
+  test("keeps the existing default when a non-default credential is deleted", async () => {
+    const fixture = await createAgentBuilderApiFixture();
+    const first = await createAnthropicKey(fixture, "A");
+    const second = await createAnthropicKey(fixture, "B");
+
+    await deleteVendorCredential(fixture.bindings, fixture.viewer, {
+      id: second.id,
+      appId: fixture.ids.appId,
+    });
+
+    expect(await readIsDefault(fixture, first.id)).toBe(1);
   });
 });

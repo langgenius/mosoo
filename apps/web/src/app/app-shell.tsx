@@ -1,62 +1,218 @@
-import { Box, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import type { AppSummary } from "@mosoo/contracts/app";
+import {
+  Box,
+  Check,
+  ChevronLeft,
+  ChevronsUpDown,
+  LayoutGrid,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  Settings,
+} from "lucide-react";
 import type { ReactNode } from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { HelpMenu } from "@/features/help/help-menu";
+import { MOSOO_GITHUB_URL } from "@/shared/config/external-links";
 import { cn } from "@/shared/lib/class-names";
+import { Button } from "@/shared/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu";
 import { Separator } from "@/shared/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import { AccountMenu } from "./account-menu";
 import { AppNavigation } from "./navigation";
+import { OrgNavigation } from "./org-navigation";
 import { useAppSession } from "./session-provider";
 import { useSidebarCollapsed } from "./use-sidebar-collapsed";
 
-function AppScopePill({
-  collapsed,
-  label,
-  loading,
-}: {
-  collapsed: boolean;
-  label: string | null;
-  loading: boolean;
-}) {
-  const displayLabel = label ?? (loading ? "Loading app" : "No app");
-  const pill = (
-    <div
+// One-click return to the parent Org layer (the Apps list).
+function BackToOrgLink({ collapsed, orgName }: { collapsed: boolean; orgName: string | null }) {
+  const label = orgName ?? "Apps";
+  const link = (
+    <Link
+      to="/apps"
+      aria-label={`Back to ${label}`}
       className={cn(
-        "border-border bg-background text-foreground flex items-center rounded-md border text-[13px] font-semibold",
+        "text-fg-3 hover:text-fg-1 flex items-center gap-1 rounded-md transition-colors",
+        collapsed
+          ? "mx-auto mb-1 size-9 justify-center"
+          : "mx-0.5 mb-1.5 px-1.5 py-1 text-[12px] font-medium",
+      )}
+    >
+      <ChevronLeft className="size-3.5 shrink-0" />
+      {collapsed ? null : <span className="truncate">{label}</span>}
+    </Link>
+  );
+
+  if (!collapsed) {
+    return link;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{link}</TooltipTrigger>
+      <TooltipContent side="right">Back to {label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+// App switcher: shows the active App and switches Apps inline via a dropdown,
+// plus shortcuts to manage Apps and open App settings.
+function AppSwitcher({
+  activeApp,
+  apps,
+  collapsed,
+  loading,
+  onSwitch,
+}: {
+  activeApp: AppSummary | null;
+  apps: AppSummary[];
+  collapsed: boolean;
+  loading: boolean;
+  onSwitch: (appId: string) => void;
+}) {
+  const displayLabel = activeApp?.name ?? (loading ? "Loading app" : "No app");
+
+  const trigger = (
+    <button
+      type="button"
+      aria-label="Switch app"
+      className={cn(
+        "border-border bg-background text-foreground hover:border-border-strong flex items-center rounded-md border text-[13px] font-semibold transition-colors",
         collapsed ? "mx-auto mb-3 size-9 justify-center" : "mx-0.5 mb-4 gap-2 px-2.5 py-2",
       )}
     >
       <Box className="size-4 shrink-0" />
       {collapsed ? null : (
-        <div className="min-w-0">
-          <div className="text-muted-foreground text-[10.5px] leading-3 font-semibold uppercase">
-            App
+        <>
+          <div className="min-w-0 flex-1 text-left">
+            <div className="text-muted-foreground text-[10.5px] leading-3 font-semibold uppercase">
+              App
+            </div>
+            <div className="truncate">{displayLabel}</div>
           </div>
-          <div className="truncate">{displayLabel}</div>
-        </div>
+          <ChevronsUpDown className="text-fg-3 size-3.5 shrink-0" />
+        </>
       )}
-    </div>
+    </button>
+  );
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        side={collapsed ? "right" : "bottom"}
+        className="w-[224px] rounded-lg p-1"
+      >
+        <DropdownMenuLabel className="text-fg-3 px-2 py-1 text-[10.5px] font-semibold tracking-wider uppercase">
+          Apps
+        </DropdownMenuLabel>
+        {apps.map((app) => (
+          <DropdownMenuItem
+            key={app.id}
+            className="cursor-pointer gap-2 rounded-md"
+            onSelect={() => onSwitch(app.id)}
+          >
+            <Box className="text-fg-3 size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">{app.name}</span>
+            {activeApp !== null && app.id === activeApp.id ? (
+              <Check className="text-accent-press size-4 shrink-0" />
+            ) : null}
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild className="cursor-pointer rounded-md">
+          <Link to="/apps">
+            <LayoutGrid className="size-4" />
+            Manage apps
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="cursor-pointer rounded-md">
+          <Link to="/settings/app">
+            <Settings className="size-4" />
+            App settings
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function GithubLink() {
+  return (
+    <a
+      href={MOSOO_GITHUB_URL}
+      target="_blank"
+      rel="noreferrer noopener"
+      aria-label="Mosoo on GitHub"
+      title="Mosoo on GitHub"
+      className="text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1 flex size-9 items-center justify-center rounded-md transition-colors"
+    >
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="size-[18px]">
+        <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56 0-.28-.01-1.01-.02-1.99-3.2.7-3.87-1.54-3.87-1.54-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.74-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.21-1.49 3.18-1.18 3.18-1.18.62 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14 0 1.55-.01 2.8-.01 3.18 0 .31.21.67.8.55C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5Z" />
+      </svg>
+    </a>
+  );
+}
+
+function NewAgentCta({ collapsed, disabled }: { collapsed: boolean; disabled: boolean }) {
+  const className = cn("mb-4", collapsed ? "mx-auto size-9 p-0" : "w-full justify-center");
+  const label = "New agent";
+
+  if (disabled) {
+    return (
+      <Button disabled aria-label={label} className={className}>
+        <Plus className="size-4" />
+        {collapsed ? null : label}
+      </Button>
+    );
+  }
+
+  const cta = (
+    <Button asChild aria-label={label} className={className}>
+      <Link to="/agent?create=1">
+        <Plus className="size-4" />
+        {collapsed ? null : label}
+      </Link>
+    </Button>
   );
 
   if (!collapsed) {
-    return pill;
+    return cta;
   }
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>{pill}</TooltipTrigger>
-      <TooltipContent side="right">{displayLabel}</TooltipContent>
+      <TooltipTrigger asChild>{cta}</TooltipTrigger>
+      <TooltipContent side="right">{label}</TooltipContent>
     </Tooltip>
   );
 }
 
-export function Layout({ children }: { children: ReactNode }) {
-  const { activeApp, appsLoading, user } = useAppSession();
-  const location = useLocation();
-  const { collapsed, toggleCollapsed } = useSidebarCollapsed();
+// Shared console chrome (brand, collapse toggle, help, account, content area).
+// The middle `sidebar` slot is what differs between the App and Org layers.
+function ConsoleShell({
+  children,
+  collapsed,
+  onToggleCollapsed,
+  sidebar,
+}: {
+  children: ReactNode;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+  sidebar: ReactNode;
+}) {
+  const { user } = useAppSession();
 
   const ToggleIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
   const toggleLabel = collapsed ? "Expand sidebar" : "Collapse sidebar";
@@ -82,7 +238,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <TooltipTrigger asChild>
               <button
                 type="button"
-                onClick={toggleCollapsed}
+                onClick={onToggleCollapsed}
                 aria-label={toggleLabel}
                 aria-pressed={collapsed}
                 className="text-fg-3 hover:bg-ink-900/[0.04] hover:text-fg-1 flex size-7 items-center justify-center rounded-md transition-colors"
@@ -94,9 +250,7 @@ export function Layout({ children }: { children: ReactNode }) {
           </Tooltip>
         </div>
 
-        <AppScopePill collapsed={collapsed} label={activeApp?.name ?? null} loading={appsLoading} />
-
-        <AppNavigation collapsed={collapsed} pathname={location.pathname} />
+        {sidebar}
 
         <div className="flex-1" />
         <div className={cn("pb-2", collapsed ? "flex justify-center" : "px-0.5")}>
@@ -110,6 +264,78 @@ export function Layout({ children }: { children: ReactNode }) {
         <main className="bg-background md:border-border-soft flex min-w-0 flex-1 flex-col overflow-hidden md:rounded-xl md:border md:shadow-sm">
           {children}
         </main>
+      </div>
+    </div>
+  );
+}
+
+// App-layer shell: scoped to the active App's resources.
+export function Layout({ children }: { children: ReactNode }) {
+  const { activeApp, activeOrganization, apps, appsLoading, setActiveApp } = useAppSession();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { collapsed, toggleCollapsed } = useSidebarCollapsed();
+
+  function switchApp(appId: string) {
+    setActiveApp(appId);
+    void navigate("/");
+  }
+
+  return (
+    <ConsoleShell
+      collapsed={collapsed}
+      onToggleCollapsed={toggleCollapsed}
+      sidebar={
+        <>
+          <BackToOrgLink collapsed={collapsed} orgName={activeOrganization?.name ?? null} />
+          <AppSwitcher
+            activeApp={activeApp}
+            apps={apps}
+            collapsed={collapsed}
+            loading={appsLoading}
+            onSwitch={switchApp}
+          />
+          <NewAgentCta collapsed={collapsed} disabled={activeApp === null} />
+          <AppNavigation collapsed={collapsed} pathname={location.pathname} />
+        </>
+      }
+    >
+      {children}
+    </ConsoleShell>
+  );
+}
+
+// Org-layer shell: a horizontal top bar (logo + org switcher + account) over a
+// dedicated Org sidebar. Deliberately distinct from the App shell so the Apps
+// list / pre-App console reads as the account layer, not an App detail page.
+export function OrgLayout({ children }: { children: ReactNode }) {
+  const { activeOrganization, user } = useAppSession();
+  const location = useLocation();
+
+  return (
+    <div className="bg-background flex h-screen flex-col">
+      <header className="border-border-soft flex h-14 shrink-0 items-center gap-2 border-b px-4">
+        <Link to="/apps" aria-label="Apps" className="flex items-center">
+          <img src="/brand/logo-mark.svg" alt="Mosoo" className="block size-6" />
+        </Link>
+        {activeOrganization === null ? null : (
+          <>
+            <span className="text-fg-muted text-base font-light">/</span>
+            <span className="text-foreground max-w-[240px] truncate text-sm font-semibold">
+              {activeOrganization.name}
+            </span>
+          </>
+        )}
+        <div className="flex-1" />
+        <GithubLink />
+        <HelpMenu collapsed />
+        <AccountMenu collapsed placement="topbar" user={user} />
+      </header>
+      <div className="flex min-h-0 flex-1">
+        <aside className="border-border-soft w-[224px] shrink-0 border-r px-3 py-4">
+          <OrgNavigation collapsed={false} pathname={location.pathname} />
+        </aside>
+        <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
       </div>
     </div>
   );

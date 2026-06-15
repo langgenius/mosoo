@@ -23,12 +23,12 @@ describe("App route registry boundary", () => {
     expect(source).not.toContain('path: "/join/:organizationId"');
   });
 
-  test("exposes Channels as an App-scoped setup entry only", () => {
+  test("drops the standalone Channels route and per-agent channel setup routes", () => {
     const source = readSource("../src/app/route-registry.tsx");
 
-    expect(source).toContain("ChannelsPage");
-    expect(source).toContain('path: "/channels"');
-    expect(source).toContain("protectedRoute(<Channels />)");
+    expect(source).not.toContain("ChannelsPage");
+    expect(source).not.toContain('path: "/channels"');
+    expect(source).not.toContain("protectedRoute(<Channels />)");
     expect(source).not.toContain('path: "/agent/:agentId/channels"');
     expect(source).not.toContain('path: "/agent/:agentId/channels/new"');
     expect(source).not.toContain("slack-channel-setup");

@@ -2,6 +2,7 @@ export const vendorCredentialSchema = /* GraphQL */ `
   type VendorCredential {
     apiBase: String
     id: ULID!
+    isDefault: Boolean!
     maskedApiKey: String!
     models: [String!]
     name: String!
@@ -28,6 +29,11 @@ export const vendorCredentialSchema = /* GraphQL */ `
   }
 
   input DeleteVendorCredentialInput {
+    id: ULID!
+    appId: ULID!
+  }
+
+  input SetDefaultVendorCredentialInput {
     id: ULID!
     appId: ULID!
   }

@@ -7,6 +7,7 @@ export {
 export {
   createVendorCredential,
   deleteVendorCredential,
+  setDefaultVendorCredential,
   updateVendorCredential,
 } from "./vendor-credential-commands";
 

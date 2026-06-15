@@ -34,6 +34,7 @@ function createAvailableModelsDatabase(): SqliteD1Database {
       name text NOT NULL,
       api_key_secret_id text NOT NULL,
       api_base text,
+      is_default integer DEFAULT false NOT NULL,
       models text
     );
 

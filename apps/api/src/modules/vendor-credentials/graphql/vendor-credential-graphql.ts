@@ -9,6 +9,7 @@ import {
   deleteVendorCredential,
   listVendorCredentials,
   resolveAvailableModelsForViewer,
+  setDefaultVendorCredential,
   testVendorCredential,
   updateVendorCredential,
 } from "../application/vendor-credential.service";
@@ -27,6 +28,10 @@ interface UpdateVendorCredentialArgs {
 
 interface DeleteVendorCredentialArgs {
   input: Parameters<typeof deleteVendorCredential>[2];
+}
+
+interface SetDefaultVendorCredentialArgs {
+  input: Parameters<typeof setDefaultVendorCredential>[2];
 }
 
 interface AvailableAgentModelsArgs {
@@ -53,6 +58,8 @@ export const vendorCredentialGraphQLModule = {
       await deleteVendorCredential(context.bindings, context.viewer, args.input);
       return { ok: true };
     },
+    setDefaultVendorCredential: async (_parent, args: SetDefaultVendorCredentialArgs, context) =>
+      setDefaultVendorCredential(context.bindings, context.viewer, args.input),
     testVendorCredential: async (_parent, args: TestVendorCredentialArgs, context) =>
       testVendorCredential(context.bindings, context.viewer, args.input),
     updateVendorCredential: async (_parent, args: UpdateVendorCredentialArgs, context) =>

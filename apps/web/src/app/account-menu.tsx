@@ -1,4 +1,4 @@
-import { ChevronsUpDown, LogOut, Settings } from "lucide-react";
+import { ChevronsUpDown, LayoutGrid, LogOut, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { cn } from "@/shared/lib/class-names";
@@ -58,11 +58,19 @@ function UserAvatar({
 
 export function AccountMenu({
   collapsed,
+  placement = "sidebar",
   user,
 }: {
   collapsed: boolean;
+  placement?: "sidebar" | "topbar";
   user: AccountMenuUser | null;
 }) {
+  const wrapperClassName =
+    placement === "topbar"
+      ? ""
+      : cn(collapsed ? "flex justify-center pb-3 pt-2" : "px-2 pb-3 pt-2");
+  const menuSide = placement === "topbar" ? "bottom" : "top";
+  const menuAlign = placement === "topbar" ? "end" : "start";
   const trigger = collapsed ? (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -91,16 +99,22 @@ export function AccountMenu({
   );
 
   return (
-    <div className={cn(collapsed ? "flex justify-center pb-3 pt-2" : "px-2 pb-3 pt-2")}>
+    <div className={wrapperClassName}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
 
-        <DropdownMenuContent align="start" side="top" className="w-[220px] rounded-lg p-1">
+        <DropdownMenuContent align={menuAlign} side={menuSide} className="w-[220px] rounded-lg p-1">
           <DropdownMenuLabel className="px-2 pb-1">
             <div className="text-fg-1 text-[13px] font-semibold">{user?.name}</div>
             <div className="text-fg-3 mt-0.5 text-[11.5px] font-normal">{user?.email}</div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem asChild className="cursor-pointer rounded-md">
+            <Link to="/apps">
+              <LayoutGrid className="size-4" />
+              Apps
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuItem asChild className="cursor-pointer rounded-md">
             <Link to="/settings">
               <Settings className="size-4" />

@@ -1,5 +1,7 @@
-import { Navigate } from "react-router-dom";
+import { CostPage } from "../cost/cost.route";
 
+// App usage renders the cost report inside the Settings shell, so it behaves
+// like the Profile and API tokens tabs instead of jumping to a standalone page.
 export function UsageTab() {
-  return <Navigate to="/cost" replace />;
+  return <CostPage />;
 }

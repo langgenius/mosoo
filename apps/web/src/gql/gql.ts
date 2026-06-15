@@ -51,6 +51,7 @@ type Documents = {
     "\n  mutation RecreateSandbox($input: RuntimeStateOperationInput!) {\n    recreateSandbox(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": typeof types.RecreateSandboxDocument,
     "\n  mutation ResetAgentState($input: RuntimeStateOperationInput!) {\n    resetAgentState(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": typeof types.ResetAgentStateDocument,
     "\n  query AppList($organizationId: ULID!) {\n    appList(organizationId: $organizationId) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n      slug\n    }\n  }\n": typeof types.AppListDocument,
+    "\n  mutation CreateApp($input: CreateAppInput!) {\n    createApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n      slug\n    }\n  }\n": typeof types.CreateAppDocument,
     "\n  fragment CostTotalsFields on CostAggregate {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostTotalsFieldsFragmentDoc,
     "\n  fragment CostDailyFields on CostDailyPoint {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    date\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostDailyFieldsFragmentDoc,
     "\n  fragment CostAgentFields on CostAgentRow {\n    activeUsers\n    agentId\n    agentName\n    cacheCreationTokens\n    cacheReadTokens\n    debugCostUsd\n    evalCostUsd\n    inputTokens\n    outputTokens\n    ownerEmail\n    ownerId\n    ownerName\n    previousCostUsd\n    previewCostUsd\n    productionCostUsd\n    requestCount\n    scheduledCostUsd\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostAgentFieldsFragmentDoc,
@@ -116,10 +117,11 @@ type Documents = {
     "\n  query Viewer {\n    viewer {\n      account {\n        email\n        id\n        imageUrl\n        name\n        systemAgentModel {\n          modelId\n          vendor\n        }\n      }\n      activeOrganization {\n        avatarUrl\n        createdAt\n        id\n        name\n        slug\n      }\n      auth {\n        currentSecurityLevel\n        methods\n      }\n      organizations {\n        avatarUrl\n        createdAt\n        id\n        name\n        slug\n      }\n    }\n  }\n": typeof types.ViewerDocument,
     "\n  mutation UpdateProfile($input: UpdateAccountProfileInput!) {\n    updateProfile(input: $input) {\n      imageUrl\n      name\n    }\n  }\n": typeof types.UpdateProfileDocument,
     "\n  mutation SetSystemAgentModel($input: SetSystemAgentModelInput!) {\n    setSystemAgentModel(input: $input) {\n      id\n      systemAgentModel {\n        modelId\n        vendor\n      }\n    }\n  }\n": typeof types.SetSystemAgentModelDocument,
-    "\n  query VendorCredentialList($appId: ULID!) {\n    vendorCredentialList(appId: $appId) {\n      apiBase\n      id\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n": typeof types.VendorCredentialListDocument,
-    "\n  mutation CreateVendorCredential($input: CreateVendorCredentialInput!) {\n    createVendorCredential(input: $input) {\n      apiBase\n      id\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n": typeof types.CreateVendorCredentialDocument,
-    "\n  mutation UpdateVendorCredential($input: UpdateVendorCredentialInput!) {\n    updateVendorCredential(input: $input) {\n      apiBase\n      id\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n": typeof types.UpdateVendorCredentialDocument,
+    "\n  query VendorCredentialList($appId: ULID!) {\n    vendorCredentialList(appId: $appId) {\n      apiBase\n      id\n      isDefault\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n": typeof types.VendorCredentialListDocument,
+    "\n  mutation CreateVendorCredential($input: CreateVendorCredentialInput!) {\n    createVendorCredential(input: $input) {\n      apiBase\n      id\n      isDefault\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n": typeof types.CreateVendorCredentialDocument,
+    "\n  mutation UpdateVendorCredential($input: UpdateVendorCredentialInput!) {\n    updateVendorCredential(input: $input) {\n      apiBase\n      id\n      isDefault\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n": typeof types.UpdateVendorCredentialDocument,
     "\n  mutation DeleteVendorCredential($input: DeleteVendorCredentialInput!) {\n    deleteVendorCredential(input: $input) {\n      ok\n    }\n  }\n": typeof types.DeleteVendorCredentialDocument,
+    "\n  mutation SetDefaultVendorCredential($input: SetDefaultVendorCredentialInput!) {\n    setDefaultVendorCredential(input: $input) {\n      apiBase\n      id\n      isDefault\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n": typeof types.SetDefaultVendorCredentialDocument,
     "\n  query AvailableAgentModels(\n    $appId: ULID!\n    $runtimeId: String!\n    $currentModelId: String\n    $currentVendorId: String\n  ) {\n    availableAgentModels(\n      appId: $appId\n      runtimeId: $runtimeId\n      currentModelId: $currentModelId\n      currentVendorId: $currentVendorId\n    ) {\n      available\n      displayName\n      modelId\n      reason\n      source\n      statusDetail\n      statusLabel\n      vendorId\n      vendorLabel\n    }\n  }\n": typeof types.AvailableAgentModelsDocument,
     "\n  mutation TestVendorCredential($input: TestVendorCredentialInput!) {\n    testVendorCredential(input: $input) {\n      errorCode\n      latencyMs\n      ok\n    }\n  }\n": typeof types.TestVendorCredentialDocument,
 };
@@ -160,6 +162,7 @@ const documents: Documents = {
     "\n  mutation RecreateSandbox($input: RuntimeStateOperationInput!) {\n    recreateSandbox(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": types.RecreateSandboxDocument,
     "\n  mutation ResetAgentState($input: RuntimeStateOperationInput!) {\n    resetAgentState(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": types.ResetAgentStateDocument,
     "\n  query AppList($organizationId: ULID!) {\n    appList(organizationId: $organizationId) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n      slug\n    }\n  }\n": types.AppListDocument,
+    "\n  mutation CreateApp($input: CreateAppInput!) {\n    createApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n      slug\n    }\n  }\n": types.CreateAppDocument,
     "\n  fragment CostTotalsFields on CostAggregate {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostTotalsFieldsFragmentDoc,
     "\n  fragment CostDailyFields on CostDailyPoint {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    date\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostDailyFieldsFragmentDoc,
     "\n  fragment CostAgentFields on CostAgentRow {\n    activeUsers\n    agentId\n    agentName\n    cacheCreationTokens\n    cacheReadTokens\n    debugCostUsd\n    evalCostUsd\n    inputTokens\n    outputTokens\n    ownerEmail\n    ownerId\n    ownerName\n    previousCostUsd\n    previewCostUsd\n    productionCostUsd\n    requestCount\n    scheduledCostUsd\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostAgentFieldsFragmentDoc,
@@ -225,10 +228,11 @@ const documents: Documents = {
     "\n  query Viewer {\n    viewer {\n      account {\n        email\n        id\n        imageUrl\n        name\n        systemAgentModel {\n          modelId\n          vendor\n        }\n      }\n      activeOrganization {\n        avatarUrl\n        createdAt\n        id\n        name\n        slug\n      }\n      auth {\n        currentSecurityLevel\n        methods\n      }\n      organizations {\n        avatarUrl\n        createdAt\n        id\n        name\n        slug\n      }\n    }\n  }\n": types.ViewerDocument,
     "\n  mutation UpdateProfile($input: UpdateAccountProfileInput!) {\n    updateProfile(input: $input) {\n      imageUrl\n      name\n    }\n  }\n": types.UpdateProfileDocument,
     "\n  mutation SetSystemAgentModel($input: SetSystemAgentModelInput!) {\n    setSystemAgentModel(input: $input) {\n      id\n      systemAgentModel {\n        modelId\n        vendor\n      }\n    }\n  }\n": types.SetSystemAgentModelDocument,
-    "\n  query VendorCredentialList($appId: ULID!) {\n    vendorCredentialList(appId: $appId) {\n      apiBase\n      id\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n": types.VendorCredentialListDocument,
-    "\n  mutation CreateVendorCredential($input: CreateVendorCredentialInput!) {\n    createVendorCredential(input: $input) {\n      apiBase\n      id\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n": types.CreateVendorCredentialDocument,
-    "\n  mutation UpdateVendorCredential($input: UpdateVendorCredentialInput!) {\n    updateVendorCredential(input: $input) {\n      apiBase\n      id\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n": types.UpdateVendorCredentialDocument,
+    "\n  query VendorCredentialList($appId: ULID!) {\n    vendorCredentialList(appId: $appId) {\n      apiBase\n      id\n      isDefault\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n": types.VendorCredentialListDocument,
+    "\n  mutation CreateVendorCredential($input: CreateVendorCredentialInput!) {\n    createVendorCredential(input: $input) {\n      apiBase\n      id\n      isDefault\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n": types.CreateVendorCredentialDocument,
+    "\n  mutation UpdateVendorCredential($input: UpdateVendorCredentialInput!) {\n    updateVendorCredential(input: $input) {\n      apiBase\n      id\n      isDefault\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n": types.UpdateVendorCredentialDocument,
     "\n  mutation DeleteVendorCredential($input: DeleteVendorCredentialInput!) {\n    deleteVendorCredential(input: $input) {\n      ok\n    }\n  }\n": types.DeleteVendorCredentialDocument,
+    "\n  mutation SetDefaultVendorCredential($input: SetDefaultVendorCredentialInput!) {\n    setDefaultVendorCredential(input: $input) {\n      apiBase\n      id\n      isDefault\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n": types.SetDefaultVendorCredentialDocument,
     "\n  query AvailableAgentModels(\n    $appId: ULID!\n    $runtimeId: String!\n    $currentModelId: String\n    $currentVendorId: String\n  ) {\n    availableAgentModels(\n      appId: $appId\n      runtimeId: $runtimeId\n      currentModelId: $currentModelId\n      currentVendorId: $currentVendorId\n    ) {\n      available\n      displayName\n      modelId\n      reason\n      source\n      statusDetail\n      statusLabel\n      vendorId\n      vendorLabel\n    }\n  }\n": types.AvailableAgentModelsDocument,
     "\n  mutation TestVendorCredential($input: TestVendorCredentialInput!) {\n    testVendorCredential(input: $input) {\n      errorCode\n      latencyMs\n      ok\n    }\n  }\n": types.TestVendorCredentialDocument,
 };
@@ -377,6 +381,10 @@ export function graphql(source: "\n  mutation ResetAgentState($input: RuntimeSta
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query AppList($organizationId: ULID!) {\n    appList(organizationId: $organizationId) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n      slug\n    }\n  }\n"): typeof import('./graphql').AppListDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation CreateApp($input: CreateAppInput!) {\n    createApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n      slug\n    }\n  }\n"): typeof import('./graphql').CreateAppDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -640,19 +648,23 @@ export function graphql(source: "\n  mutation SetSystemAgentModel($input: SetSys
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query VendorCredentialList($appId: ULID!) {\n    vendorCredentialList(appId: $appId) {\n      apiBase\n      id\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n"): typeof import('./graphql').VendorCredentialListDocument;
+export function graphql(source: "\n  query VendorCredentialList($appId: ULID!) {\n    vendorCredentialList(appId: $appId) {\n      apiBase\n      id\n      isDefault\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n"): typeof import('./graphql').VendorCredentialListDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  mutation CreateVendorCredential($input: CreateVendorCredentialInput!) {\n    createVendorCredential(input: $input) {\n      apiBase\n      id\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n"): typeof import('./graphql').CreateVendorCredentialDocument;
+export function graphql(source: "\n  mutation CreateVendorCredential($input: CreateVendorCredentialInput!) {\n    createVendorCredential(input: $input) {\n      apiBase\n      id\n      isDefault\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n"): typeof import('./graphql').CreateVendorCredentialDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  mutation UpdateVendorCredential($input: UpdateVendorCredentialInput!) {\n    updateVendorCredential(input: $input) {\n      apiBase\n      id\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n"): typeof import('./graphql').UpdateVendorCredentialDocument;
+export function graphql(source: "\n  mutation UpdateVendorCredential($input: UpdateVendorCredentialInput!) {\n    updateVendorCredential(input: $input) {\n      apiBase\n      id\n      isDefault\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n"): typeof import('./graphql').UpdateVendorCredentialDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation DeleteVendorCredential($input: DeleteVendorCredentialInput!) {\n    deleteVendorCredential(input: $input) {\n      ok\n    }\n  }\n"): typeof import('./graphql').DeleteVendorCredentialDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SetDefaultVendorCredential($input: SetDefaultVendorCredentialInput!) {\n    setDefaultVendorCredential(input: $input) {\n      apiBase\n      id\n      isDefault\n      maskedApiKey\n      models\n      name\n      appId\n      vendorId\n    }\n  }\n"): typeof import('./graphql').SetDefaultVendorCredentialDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

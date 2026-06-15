@@ -16,6 +16,7 @@ export const vendorCredentialsTable = sqliteTable(
     apiKeySecretId: platformIdColumn<PlatformId>("api_key_secret_id").notNull(),
     createdAt: integer("created_at").notNull(),
     id: platformIdColumn<VendorCredentialId>("id").primaryKey(),
+    isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
     models: text("models", { mode: "json" }).$type<string[]>(),
     name: text("name").notNull(),
     appId: platformIdColumn<AppId>("app_id").notNull(),
