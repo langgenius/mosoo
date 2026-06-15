@@ -6,7 +6,7 @@ import { platformIdColumn } from "./id-column";
 /**
  * Stores App-owned vendor API credentials.
  *
- * Each row represents one named credential for a vendor within a App.
+ * Each row represents one named credential for a vendor within an App.
  * Secret material is stored in vault_secret and only referenced here.
  */
 export const vendorCredentialsTable = sqliteTable(

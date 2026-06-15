@@ -14,7 +14,7 @@ Near-term construction order:
 4. MCP, Skills, Spaces, Channels, Agent exposure state, export, and app-scoped usage/cost under App.
 5. App Overview as the console root; one-App Organizations route directly into the App.
 
-App members, org-wide shared resources, role matrices, and enterprise governance are outside this phase.
+Role matrices, cross-account resource catalogs, and enterprise governance are outside this phase.
 
 ## 📋 Planned
 
@@ -39,7 +39,7 @@ App members, org-wide shared resources, role matrices, and enterprise governance
 
 - **Foundation** — session snapshot / lifecycle / runtime state operations.
 - **Agent page operations / runtime diagnostics** — Terminal, Session Log.
-- **Historical governance foundation** — RBAC trio + error message redaction; multi-member governance is not part of the current single-owner App cut.
+- **Historical governance cleanup** — legacy role/error surfaces are no longer part of the current single-owner App cut.
 - **Published API** — hardening plus the Public Thread API (`POST /threads`, `GET /threads/{id}`).
 - **Provider readiness fallback UX** — missing-key / wrong-key states + vendor error pass-through.
 - **Cost coverage**.

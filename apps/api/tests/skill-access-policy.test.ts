@@ -96,7 +96,7 @@ function createSkillAccessDatabase(): SqliteD1Database {
 }
 
 describe("skill access policy", () => {
-  test("allows app owner to read and edit a App Skill", async () => {
+  test("allows app owner to read and edit an App Skill", async () => {
     const database = createSkillAccessDatabase();
 
     const readable = await ensureSkillAccess(database, IDS.owner, IDS.app, IDS.skill);

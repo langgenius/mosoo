@@ -2,7 +2,7 @@
 
 Mosoo is an open-source Agent Cloud product in alpha, built on a Cloudflare-native architecture. The current priority is OPC / personal developers: a user should be able to bring a `PRD.md`, invoke `@mosoo`, and get an Agent App that organizes Agents, app-local resources, Threads, Agent exposure, operations, and an exportable `Skill.md`.
 
-During the current construction phase, assume one human owns one Organization. The Organization is the account / billing / tenant shell; the business, resource, operations, and export boundary is **App** in code, database, API, architecture docs, and console copy. Team membership, app roles, org-wide shared resources, and enterprise governance remain future extensions after the single-owner App loop is real.
+During the current construction phase, assume one human owns one Organization. The Organization is the account / billing / tenant shell; the business, resource, operations, and export boundary is **App** in code, database, API, architecture docs, and console copy. Role matrices, cross-account resource catalogs, and governance extensions stay outside the single-owner App loop.
 
 In the long term, we want Mosoo to grow from an open-source community edition into Agent infrastructure that supports individuals, OPCs, small teams, and enterprise governance. Personal developers can experiment and fork freely, teams can build shared Agent and Knowledge assets, and enterprises can add permission, cost, version, and runtime-state management on top of the same boundary model.
 
