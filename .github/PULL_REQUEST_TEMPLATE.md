@@ -1,5 +1,7 @@
 Skip inapplicable sections. Fill Summary, Why, Verification, and Required Checks. External contributors may mark repository-maintainer-only items as N/A.
 
+**Ship PR only:** base `main` (or `release/*`); branch `type/scope-subject` (no tool/agent prefixes). See `CONTRIBUTING.md` → *Pull Requests*.
+
 First-time human contributors may be asked by CLA Assistant to sign `CLA.md`. If prompted, reply in the PR conversation with exactly: `I have read the CLA Document and I hereby sign the CLA`. Do not paste the signature into this PR description.
 
 ## Summary
