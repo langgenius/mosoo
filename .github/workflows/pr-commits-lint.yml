@@ -1,6 +1,12 @@
 name: PR Commits Lint
 
 on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
   pull_request_target:
     types:
       - opened
@@ -13,14 +19,24 @@ permissions:
 jobs:
   lint-pr-commits:
     name: Validate PR commits
+    if: >-
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - if: github.event_name == 'pull_request_target'
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
 
       - name: Fetch pull request head
+        if: github.event_name == 'pull_request_target'
         run: git fetch --no-tags origin ${{ github.event.pull_request.head.sha }}
 
       - uses: oven-sh/setup-bun@v2

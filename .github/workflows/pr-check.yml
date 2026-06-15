@@ -1,13 +1,12 @@
 name: PR Check
 
 on:
-  pull_request_target:
+  pull_request:
     types:
       - opened
       - synchronize
       - reopened
       - ready_for_review
-      - converted_to_draft
 
 permissions:
   contents: read
@@ -19,15 +18,11 @@ concurrency:
 jobs:
   check:
     name: Repository check
-    if: >-
-      github.event.pull_request.draft == false ||
-      github.event.pull_request.base.ref == 'main' ||
-      startsWith(github.event.pull_request.base.ref, 'release/')
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
           submodules: true
           persist-credentials: false
