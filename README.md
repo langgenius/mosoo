@@ -11,9 +11,10 @@ For implementation language and V1 boundaries, read [SPEC.md](./docs/SPEC.md) be
 ## Current Product Lock
 
 - The primary loop is `PRD.md + @mosoo` -> create or select an App -> provision Agents and app-local resources -> expose an Agent through API or channel when needed -> export the App as `Skill.md`.
-- Project is the canonical engineering noun. App is the user-facing console noun. Avoid introducing parallel nouns such as Workspace, Team, Application, or Agent Service for this boundary.
+- Project is the canonical engineering noun. App is the user-facing console noun. Avoid introducing parallel boundary nouns such as Workspace, Team, Application, Service App, or Product.
 - Agents, Threads / Sessions, Spaces, Environments, Skills, MCP servers, Provider keys, Channels, Agent exposure state, export, and app-scoped cost belong to the Project/App boundary first.
-- App is not a Web shell, GitHub repository, App runtime, or App-level API endpoint in V1. Agent owns runtime, API endpoint exposure, and channel delivery.
+- App is not a Web shell, GitHub repository, App runtime, App-level API endpoint, or generic Service container in V1. Do not add a unified `services` table or polymorphic `service.kind`.
+- Agents own runtime, API endpoint exposure, and channel delivery.
 - The console should create a default App during onboarding. If an Organization has one App, route directly into that App; the App list only becomes prominent when there is a second App.
 
 ## What Is Mosoo
@@ -53,7 +54,7 @@ The current roadmap centers on these goals:
 - **OPC / personal developers first**: polish the full loop for creating, exposing, running, debugging, and exporting one Agent App as an individual developer.
 - **Cloudflare-native runtime**: continue converging the architecture around Workers, Durable Objects, D1, R2, and related platform capabilities.
 - **Complete open-source community path**: prioritize the core capabilities required for a self-hostable, modifiable, extensible community edition.
-- **Project/App resource boundary**: move Agent, Thread / Session, Space, Environment, Skill, MCP, Provider Credential, Channel, Agent exposure state, export, and app-scoped Cost under one boundary.
+- **Project/App resource boundary**: move Agent, Thread / Session, Space, Environment, Skill, MCP, Provider Credential, Channel, Agent exposure state, export, and app-scoped Cost under one boundary without adding a generic Service entity.
 - **Enterprise capability expansion**: after personal and OPC scenarios work end to end, add team collaboration, permissions, cost governance, version control, and runtime governance.
 
 For the current status snapshot — what is **Planned**, **In Development**, and **Done** — see [roadmap.md](./roadmap.md).
