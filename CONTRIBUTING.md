@@ -45,15 +45,14 @@ Required tools:
 
 - `bun >= 1.4.0-canary.1` with text `bun.lock` `lockfileVersion: 2` support.
 - `just >= 1.51`
-- Vite Plus `vp`: `curl -fsSL https://vite.plus | bash`
 
-The repository already pins Vite Plus and Git hook tooling dependencies. Human-facing repository operations use `just`; the `justfile` delegates to Vite Plus and other internal tools.
+The repository already pins Vite Plus and Git hook tooling dependencies. Human-facing repository operations use `just`; the `justfile` delegates to `bun run`, which resolves the pinned local Vite Plus binary after `bun install`. A global Vite Plus install is optional for direct shell use: `curl -fsSL https://vite.plus | bash`.
 
 Command conventions:
 
 - Use `just --list` to discover supported human-facing operations.
 - Use `just <recipe>` for setup, development, generation, verification, and deployment.
-- Treat `vp` commands as implementation details for `justfile`, package scripts, hooks, and CI.
+- Treat `vp` commands as implementation details for package scripts, hooks, and CI.
 - Use `just setup` to bootstrap dependencies, initialize the environment, install Git hooks, and apply local migrations.
 
 ## Initialization
