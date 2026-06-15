@@ -37,7 +37,18 @@ export const DEFAULT_MULTIPART_PART_SIZE_BYTES = 16 * 1024 * 1024;
 export const MIN_MULTIPART_PART_SIZE_BYTES = 5 * 1024 * 1024;
 
 function trimSlashes(value: string): string {
-  return value.replace(/^\/+/, "").replace(/\/+$/, "");
+  let start = 0;
+  let end = value.length;
+
+  while (start < end && value.charCodeAt(start) === 0x2f) {
+    start += 1;
+  }
+
+  while (end > start && value.charCodeAt(end - 1) === 0x2f) {
+    end -= 1;
+  }
+
+  return value.slice(start, end);
 }
 
 function assertRelativePathOriginal(path: string): void {
