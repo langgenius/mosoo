@@ -601,7 +601,7 @@ function LarkConfigurationSection({
 
       {agentStatus !== "published" ? (
         <div className="border-amber/30 bg-amber-bg text-amber-fg mt-4 rounded-md border px-3 py-2 text-xs">
-          Publish this Agent before connecting Lark / 飞书.
+          Publish this Agent before connecting Feishu.
         </div>
       ) : null}
       {saveError ? (
