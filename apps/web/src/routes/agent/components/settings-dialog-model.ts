@@ -8,7 +8,7 @@ export const DISTRIBUTION_CHANNELS: {
   label: string;
 }[] = [
   { enabled: true, id: "slack", label: "Slack" },
-  { enabled: true, id: "lark", label: "Lark / 飞书" },
+  { enabled: true, id: "lark", label: "Feishu" },
   { enabled: true, id: "discord", label: "Discord" },
   { enabled: true, id: "telegram", label: "Telegram" },
   { enabled: true, id: "wechat", label: "WeChat" },

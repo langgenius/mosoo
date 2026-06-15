@@ -226,7 +226,7 @@ function DraftPatchValuePreview({
             className="text-fg-1 hover:text-fg-2 inline-flex max-w-full flex-wrap text-[11px] leading-relaxed font-semibold break-words whitespace-normal"
             href={environmentConfigLink.href}
           >
-            配置环境变量
+            Configure environment variables
             {environmentConfigLink.environmentName === null
               ? ""
               : ` · ${environmentConfigLink.environmentName}`}
