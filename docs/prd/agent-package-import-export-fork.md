@@ -2,7 +2,7 @@
 
 > This is the product-story version for non-engineer readers. The field-level package contract lives in `pkgs/agent-package/src/archive-path-policy.ts` and `pkgs/contracts/src/agent/agent-manifest-serializer.contract.ts`; the export/import services are under `apps/api/src/modules/agents/application/agent-package-*.service.ts`.
 >
-> **Current Project/App boundary note**: `.agent` packages remain the portable Agent runtime/config unit. They are not the full Project/App package. App metadata, deployment state, Provider keys, app-scoped cost, and Project ownership live outside the Agent Manifest unless a later App package PRD defines a wider bundle. See [Project / App Boundary](./project-app-boundary.md).
+> **Current App boundary note**: `.agent` packages remain the portable Agent runtime/config unit. They are not the full App package. App metadata, deployment state, Provider keys, app-scoped cost, and App ownership live outside the Agent Manifest unless a later App package PRD defines a wider bundle. See [App Boundary](./app-boundary.md).
 
 ---
 
@@ -30,19 +30,19 @@ The real problems are:
 - A user needs to **Fork** an Agent in one click and get an editable copy.
 - A user needs to **Export** a complete Agent for backup, migration, or template distribution.
 - A user needs to **Import** an Agent and clearly understand which dependencies can be restored automatically and which must be re-bound or re-authorized.
-- An import may happen in a different Organization, or between different users in the same Organization; the permissions, references, and credentials of the source environment cannot be assumed to still hold.
+- An import may happen into a different App, Mosoo instance, or owner account; the permissions, references, and credentials of the source App cannot be assumed to still hold.
 - Persisted content inside the sandbox execution environment may be valuable, but it must not be mixed into ordinary import/export by default.
 
 ## Goals
 
 Users should be able to:
 
-- **U1**: Fork an Agent within the same Organization and get their own editable Agent draft.
+- **U1**: Fork an Agent within the same App and get an editable Agent draft.
 - **U2**: Export an Agent and get a `.agent` file; the file contains the declarative definition, controlled assets, and a dependency manifest.
 - **U3**: Import an Agent, create a new Agent draft from the `.agent` file, and fill in missing dependencies through a clear repair flow.
 - **U4**: Understand that Fork / Export / Import copies an Agent definition — **not a computer that has already been running**.
 - **U5**: See, after import, which of MCP, Space, Environment, Credential, and so on are available, missing, or need to reconnect.
-- **U6**: When importing into another Organization or under another user, confirm item by item whether runtime, model, MCP, Integration, Environment, and Space can hold in the target context.
+- **U6**: When importing into another App or Mosoo instance, confirm item by item whether runtime, model, MCP, Integration, Environment, and Space can hold in the target App context.
 
 ---
 
@@ -53,18 +53,18 @@ Users should be able to:
 | **Agent Manifest**            | The product desired state of an Agent. Defines how the Agent behaves.                                                                                                                                                                                           |
 | **Portable Agent (`.agent`)** | The complete, importable/exportable Agent file. Contains App metadata, the Agent Manifest, asset files, and a resource catalog. On the user surface it is simply called an Agent; the internal implementation may handle it as a ZIP bundle / package contract. |
 | **App Metadata**              | The application information shown to users: name, description, avatar / icon.                                                                                                                                                                                   |
-| **Package Asset**             | A controlled file asset carried inside the Package, such as the avatar, custom Skill, custom MCP, or Environment definition. On import, a new asset id must be generated under the target Organization / new Agent.                                             |
+| **Package Asset**             | A controlled file asset carried inside the Package, such as the avatar, custom Skill, custom MCP, or Environment definition. On import, a new asset id must be generated under the target App / new Agent.                                                      |
 | **Fork Agent**                | Creating a new Agent draft based on an existing Agent within the Mosoo control plane. By default it copies the Agent definition, not the session runtime state or Agent memory.                                                                                 |
 | **Export Agent**              | Packaging an Agent's definition, controlled assets, and dependency manifest into a portable `.agent` file.                                                                                                                                                      |
 | **Import Agent**              | Creating a new Agent from a `.agent` file and entering the dependency repair flow.                                                                                                                                                                              |
 | **Resource Catalog**          | The minimal declaration in `manifest.json` of the resources inside the zip and the external intents; it does not include import-time readiness state.                                                                                                           |
 | **Package-owned Resource**    | A resource carried in full with the `.agent` file and managed under the new Agent's private resource domain after import, such as a custom Skill, custom MCP, or custom Environment.                                                                            |
-| **External Reference Intent** | A resource for which the Package only records the reference intent and which must be resolved or repaired in the target Organization at import time, such as runtime, model, marketplace MCP, or Space binding.                                                 |
+| **External Reference Intent** | A resource for which the Package only records the reference intent and which must be resolved or repaired in the target App at import time, such as runtime, model, marketplace MCP, or Space binding.                                                          |
 | **Needs Reconnect**           | A dependency whose declaration exists but whose credential or external connection must be re-authorized, such as an MCP credential.                                                                                                                             |
 | **Repair Flow**               | The flow after import for filling in missing dependencies, replacing resources, re-authorizing, or skipping a given binding.                                                                                                                                    |
-| **Import Context**            | The target Organization, target user, role, available runtime, available model, and existing Integration / Environment / Space / Credential at the time of import. All package content must be re-resolved within this context.                                 |
-| **Resolve**                   | The process of converting declarative material in the package into governable resources within the target Organization. The core of Import is resolve, not restore.                                                                                             |
-| **Recreated Resource**        | A resource re-created in the target Organization from a package declaration, such as a copy of an MCP Server or Environment.                                                                                                                                    |
+| **Import Context**            | The target App, App owner, available runtime, available model, and existing Integration / Environment / Space / Credential at the time of import. All package content must be re-resolved within this context.                                                  |
+| **Resolve**                   | The process of converting declarative material in the package into App-owned resources within the target App. The core of Import is resolve, not restore.                                                                                                       |
+| **Recreated Resource**        | A resource re-created in the target App from a package declaration, such as a copy of an MCP Server or Environment.                                                                                                                                             |
 | **Floating Config**           | Transient config that is not managed by the package, asset store, or domain service and is merely scattered inside the Agent config. This PRD prohibits such uncontrolled floating config; what V1 allows is an Agent-private package-owned resource.           |
 | **Runtime State Clone**       | The advanced capability of copying the Agent Manifest plus a runtime snapshot. This PRD explicitly does not do this.                                                                                                                                            |
 
@@ -78,7 +78,7 @@ Users should be able to:
 | Avatar / icon                        |          Yes |        Yes | Copied as an asset                                                                                                          |
 | Agent Manifest                       |          Yes |        Yes | Core desired state                                                                                                          |
 | System prompt                        |          Yes |        Yes | Manifest field                                                                                                              |
-| Runtime intent                       |          Yes |        Yes | Carried losslessly; enters a runtime-disabled grayed-out state when the target Organization has not enabled it              |
+| Runtime intent                       |          Yes |        Yes | Carried losslessly; enters a runtime-disabled grayed-out state when the target App cannot resolve it                        |
 | Skills binding                       |          Yes |        Yes | Carried losslessly as a non-mandatory capability; shows a missing optional skill if the package was manually stripped of it |
 | MCP binding                          |          Yes |        Yes | Does not carry credential plaintext                                                                                         |
 | Environment binding                  |          Yes |        Yes | Reference may be preserved; requires replacement when missing                                                               |
@@ -159,20 +159,20 @@ my-agent.agent
 
 ### Key constraints
 
-| Constraint                                                                                                                                                                                                                                  | Rationale                                                                                                                                                                 |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A Skill must be a `skills/<name>/SKILL.md` directory** (frontmatter `name` = parent dir name)                                                                                                                                             | A multi-file unit (SKILL.md + scripts/ + references/)                                                                                                                     |
-| **MCP server config lives in `.mcp.json`** using the remote HTTP/SSE subset                                                                                                                                                                 | First guarantee no secrets, no arbitrary command execution, and target reconnect-ability                                                                                  |
-| **The Environment template lives in `environment/definition.json`** as a full definition, without secret values                                                                                                                             | Secrets go through needs_reconnect                                                                                                                                        |
-| **Space binding intent goes into `manifest.json`**                                                                                                                                                                                          | Carries only alias / expectedName, not Space files, source Space id, blocking policy, or permission state                                                                 |
-| **Space permissions are computed by target-side RBAC**                                                                                                                                                                                      | Determined in real time at import repair / preview / publish / session start, based on the target user, Agent owner, and the selected Space                               |
-| **The only source ULID that may appear is `manifest.json#sourceAgentId`** (provenance pointer to the exporting Agent); no other source ULIDs (Organization id, user id, asset ids, Space ids, MCP server ids) appear in any file in the zip | Resolution is still by name; `sourceAgentId` is provenance only — the importer does not look it up against the target Organization, and a mismatch never blocks an import |
+| Constraint                                                                                                                                                                                                                                  | Rationale                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A Skill must be a `skills/<name>/SKILL.md` directory** (frontmatter `name` = parent dir name)                                                                                                                                             | A multi-file unit (SKILL.md + scripts/ + references/)                                                                                                            |
+| **MCP server config lives in `.mcp.json`** using the remote HTTP/SSE subset                                                                                                                                                                 | First guarantee no secrets, no arbitrary command execution, and target reconnect-ability                                                                         |
+| **The Environment template lives in `environment/definition.json`** as a full definition, without secret values                                                                                                                             | Secrets go through needs_reconnect                                                                                                                               |
+| **Space binding intent goes into `manifest.json`**                                                                                                                                                                                          | Carries only alias / expectedName, not Space files, source Space id, blocking policy, or permission state                                                        |
+| **Space bindings resolve through target App ownership**                                                                                                                                                                                     | Determined in real time at import repair / preview / publish / session start, based on the target App owner and selected App-owned Space                         |
+| **The only source ULID that may appear is `manifest.json#sourceAgentId`** (provenance pointer to the exporting Agent); no other source ULIDs (Organization id, user id, asset ids, Space ids, MCP server ids) appear in any file in the zip | Resolution is still by name; `sourceAgentId` is provenance only — the importer does not look it up against the target App, and a mismatch never blocks an import |
 
 ---
 
 ## Import Resolution
 
-The goal of Import is not to restore the source Organization, but to reconstruct a **governable, authorizable, runnable** Agent App on the target Organization / User.
+The goal of Import is not to restore the source App, but to reconstruct a **governable, authorizable, runnable** Agent App in the target App context.
 
 ```text
 Import = Parse package
@@ -180,7 +180,7 @@ Import = Parse package
        + Create Agent draft with explicit unresolved items
 ```
 
-Therefore every item in the package must land within the real resource boundary of the target Organization / target Agent, without producing uncontrolled floating config. Agent-private package-owned resources are controlled resources, not equivalent to arbitrary scattered config.
+Therefore every item in the package must land within the real resource boundary of the target App / target Agent, without producing uncontrolled floating config. Agent-private package-owned resources are controlled resources, not equivalent to arbitrary scattered config.
 
 > See the engineering contract for the full resolution matrix, collision policy, and MCP / Space invariants.
 

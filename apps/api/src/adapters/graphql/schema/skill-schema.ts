@@ -4,16 +4,6 @@ export const skillSchema = /* GraphQL */ `
     user
   }
 
-  enum SkillRegistryRole {
-    owner
-    user
-  }
-
-  enum SkillShareTargetKind {
-    user
-    organization
-  }
-
   enum SkillSnapshotEntryKind {
     directory
     file
@@ -50,17 +40,8 @@ export const skillSchema = /* GraphQL */ `
     version: String
   }
 
-  type SkillShareTarget {
-    createdAt: String!
-    email: String
-    id: ULID!
-    kind: SkillShareTargetKind!
-    name: String
-  }
-
   type SkillSummary {
     author: String!
-    autoEnabled: Boolean!
     createdAt: String!
     description: String!
     forkOrigin: SkillForkOrigin
@@ -68,16 +49,14 @@ export const skillSchema = /* GraphQL */ `
     name: String!
     ownerId: ULID!
     ownerName: String!
-    role: SkillRegistryRole!
+    appId: ULID!
     snapshotId: ULID!
     sourceKind: SkillSourceKind!
     updatedAt: String!
-    organizationId: ULID!
   }
 
   type SkillDetail {
     author: String!
-    autoEnabled: Boolean!
     createdAt: String!
     currentSnapshot: SkillSnapshotRecord!
     description: String!
@@ -87,40 +66,14 @@ export const skillSchema = /* GraphQL */ `
     name: String!
     ownerId: ULID!
     ownerName: String!
-    role: SkillRegistryRole!
-    shareTargets: [SkillShareTarget!]!
+    appId: ULID!
     snapshotId: ULID!
     sourceKind: SkillSourceKind!
     updatedAt: String!
-    organizationId: ULID!
-  }
-
-  type SkillAutoPreference {
-    autoEnabled: Boolean!
-    skillId: ULID!
-  }
-
-  input SetSkillAutoEnabledInput {
-    autoEnabled: Boolean!
-    skillId: ULID!
   }
 
   input CreateSkillForkInput {
+    appId: ULID!
     skillId: ULID!
-  }
-
-  input ShareSkillWithUserInput {
-    email: String!
-    skillId: ULID!
-  }
-
-  input ShareSkillWithOrganizationInput {
-    skillId: ULID!
-  }
-
-  input UnshareSkillTargetInput {
-    skillId: ULID!
-    targetId: ULID!
-    targetKind: SkillShareTargetKind!
   }
 `;

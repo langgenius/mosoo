@@ -1,41 +1,27 @@
 export const spaceSchema = /* GraphQL */ `
   type SpaceView {
     canDelete: Boolean!
-    canUpdateAcl: Boolean!
+    canManage: Boolean!
+    canRead: Boolean!
+    canWrite: Boolean!
     createdAt: String!
-    creatorMembershipStatus: CreatorMembershipStatus!
     id: ULID!
-    isSharedWithViewer: Boolean!
     name: String!
     ownerId: ULID!
-    role: SpaceRole!
+    appId: ULID!
     storagePrefix: String!
-    viewerAssetRole: SpaceRole!
-    visibility: SpaceVisibility!
   }
 
   type Space {
     canDelete: Boolean!
-    canUpdateAcl: Boolean!
+    canManage: Boolean!
+    canRead: Boolean!
+    canWrite: Boolean!
     createdAt: String!
-    creatorMembershipStatus: CreatorMembershipStatus!
     id: ULID!
-    isSharedWithViewer: Boolean!
     name: String!
     ownerId: ULID!
-    viewerAssetRole: SpaceRole!
-    visibility: SpaceVisibility!
-    organizationId: ULID!
-  }
-
-  type Collaborator {
-    assignedBy: ULID
-    createdAt: String!
-    email: String
-    imageUrl: String
-    name: String
-    principal: String!
-    role: SpaceRole!
+    appId: ULID!
   }
 
   type DirectoryEntry {
@@ -75,64 +61,27 @@ export const spaceSchema = /* GraphQL */ `
     files: [FileEntry!]!
   }
 
-  enum CreatorMembershipStatus {
-    active
-    disabled
-    removed
-  }
-
-  enum SpaceVisibility {
-    private
-    shared
-  }
-
-  enum SpaceRole {
-    admin
-    edit
-    read
-  }
-
   input CreateSpaceInput {
     name: String!
-    visibility: SpaceVisibility
-    organizationId: ULID!
+    appId: ULID!
   }
 
   input UpdateSpaceInput {
     name: String
-    spaceId: ULID!
-    visibility: SpaceVisibility
-  }
-
-  input AddCollaboratorInput {
-    email: String!
-    role: SpaceRole!
-    spaceId: ULID!
-  }
-
-  input AddOrganizationCollaboratorInput {
-    spaceId: ULID!
-  }
-
-  input UpdateCollaboratorInput {
-    role: SpaceRole!
-    spaceId: ULID!
-    userId: ULID!
-  }
-
-  input RemoveCollaboratorInput {
-    principal: String!
+    appId: ULID!
     spaceId: ULID!
   }
 
   input CreateSpaceDirectoryInput {
     name: String!
     path: String
+    appId: ULID!
     spaceId: ULID!
   }
 
   input DeleteSpaceEntryInput {
     key: String!
+    appId: ULID!
     spaceId: ULID!
   }
 `;

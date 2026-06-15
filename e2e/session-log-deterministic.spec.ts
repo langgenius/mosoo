@@ -365,38 +365,7 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
             currentSecurityLevel: "low",
             methods: ["email_otp"],
           },
-          memberships: [
-            {
-              joinedAt: now,
-              organization,
-              role: "owner",
-            },
-          ],
         },
-      });
-      return;
-    }
-    case "PendingOrganizationInvitations": {
-      await fulfillJson(route, {
-        pendingOrganizationInvitationList: [],
-      });
-      return;
-    }
-    case "OrganizationMembers": {
-      await fulfillJson(route, {
-        organizationMemberList: [
-          {
-            accountId: owner.id,
-            disabledAt: null,
-            disabledByAccountId: null,
-            email: viewerEmail,
-            imageUrl: null,
-            joinedAt: now,
-            name: owner.name,
-            role: "owner",
-            status: "active",
-          },
-        ],
       });
       return;
     }

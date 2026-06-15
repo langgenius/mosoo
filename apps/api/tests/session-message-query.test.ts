@@ -8,6 +8,7 @@ import { SqliteD1Database } from "./helpers/sqlite-d1";
 const MESSAGE_ID_1 = "01J000000000000000000000G1";
 const MESSAGE_ID_2 = "01J000000000000000000000G2";
 const ORGANIZATION_ID = "01J00000000000000000000006";
+const APP_ID = "01J0000000000000000000000Q";
 const RUN_ID = "01J000000000000000000000G3";
 const SESSION_ID = "01J000000000000000000000G4";
 const VIEWER_ID = "01J000000000000000000000G5";
@@ -34,19 +35,22 @@ function createSessionMessageQueryDatabase(): SqliteD1Database {
       deployment_version_number integer,
       metadata_json text DEFAULT '{}' NOT NULL,
       model text NOT NULL,
-      organization_id text NOT NULL,
+      app_id text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
       status text NOT NULL,
       title text
     );
 
-    CREATE TABLE organization_member (
+    CREATE TABLE app (
+      id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
-      account_id text NOT NULL,
-      role text NOT NULL,
-      disabled_at integer,
-      PRIMARY KEY (organization_id, account_id)
+      owner_account_id text NOT NULL,
+      name text NOT NULL,
+      slug text NOT NULL,
+      default_environment_id text,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL
     );
 
     CREATE TABLE session_message (
@@ -72,7 +76,7 @@ function createSessionMessageQueryDatabase(): SqliteD1Database {
       deployment_version_number,
       metadata_json,
       model,
-      organization_id,
+      app_id,
       provider,
       runtime_id,
       status,
@@ -87,23 +91,31 @@ function createSessionMessageQueryDatabase(): SqliteD1Database {
       NULL,
       '{}',
       'model-1',
-      '${ORGANIZATION_ID}',
+      '${APP_ID}',
       'openai',
       'openai-runtime',
       'IDLE',
       'Thread session'
     );
 
-    INSERT INTO organization_member (
+    INSERT INTO app (
+      id,
       organization_id,
-      account_id,
-      role,
-      disabled_at
+      owner_account_id,
+      name,
+      slug,
+      default_environment_id,
+      created_at,
+      updated_at
     ) VALUES (
+      '${APP_ID}',
       '${ORGANIZATION_ID}',
       '${VIEWER_ID}',
-      'member',
-      NULL
+      'Default App',
+      'default',
+      NULL,
+      1,
+      1
     );
 
     INSERT INTO session_message (
@@ -149,7 +161,10 @@ describe("session message query", () => {
   test("admits thread transcript reads in message sequence order", async () => {
     const database = createSessionMessageQueryDatabase();
 
-    const messages = await getThreadSessionMessages(database, VIEWER, SESSION_ID);
+    const messages = await getThreadSessionMessages(database, VIEWER, {
+      appId: APP_ID,
+      sessionId: SESSION_ID,
+    });
 
     expect(messages).toEqual([
       {

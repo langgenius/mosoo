@@ -13,7 +13,7 @@ const FAQS: readonly Faq[] = [
   },
   {
     q: "Who is Mosoo built for?",
-    a: "Developers building agent-powered products who don't want to rebuild runtime hosting, sandboxing, and session lifecycle for every project. If you're gluing Claude Code, Codex, or OpenClaw into something your own users depend on, Mosoo is the framework-agnostic backend that handles the plumbing so you ship the product.",
+    a: "Developers building agent-powered products who don't want to rebuild runtime hosting, sandboxing, and session lifecycle for every app. If you're gluing Claude Code, Codex, or OpenClaw into something your own users depend on, Mosoo is the framework-agnostic backend that handles the plumbing so you ship the product.",
   },
   {
     q: "Why a backend instead of just running Claude Code or Codex locally?",
@@ -25,7 +25,7 @@ const FAQS: readonly Faq[] = [
   },
   {
     q: "What happens to an agent once it moves off my laptop?",
-    a: "A local agent only reproduces if someone else has your exact files, session history, context, MCP tools, and Skills. Mosoo makes the agent, its Skills, and its Knowledge first-class cloud resources instead of fragments on a personal machine, so a run reproduces from the API rather than a copy of your disk. Mosoo is alpha, so treat fine-grained access and key-rotation flows as still maturing.",
+    a: "A local agent only reproduces if the same files, session history, context, MCP tools, and Skills are available again. Mosoo makes the agent, its Skills, and its Knowledge first-class App resources instead of fragments on a personal machine, so a run reproduces from the API rather than a copy of your disk. Mosoo is alpha, so expect rough edges and breaking changes.",
   },
   {
     q: "Which runtimes does Mosoo support, and am I locked to one vendor?",
@@ -37,11 +37,11 @@ const FAQS: readonly Faq[] = [
   },
   {
     q: "What does the dashboard show me?",
-    a: "An agent inventory with lifecycle status, the users and sessions invoking each agent, and cost rolled up by agent, user, and model with token and cache breakdowns and CSV export. These are shipping views, not mockups; fine-grained per-agent ACLs and deeper per-run failure diagnostics are still being filled in during alpha.",
+    a: "An App overview with agent lifecycle status, recent threads, provider keys, runtime dependencies, and App usage broken down by agent and model with token and cache details. These are shipping views, not mockups; deeper per-run failure diagnostics are still being filled in during alpha.",
   },
   {
     q: "How do my users reach an agent once it's published?",
-    a: "Through whichever surface you bind to it: a typed HTTP API, a /skill in Claude Code, Web Threads, Slack, Lark, GitHub, or your own app. An agent is a managed endpoint, not a single shared link, so you call it where your product already lives.",
+    a: "Through whichever surface you bind to it: a typed HTTP API, a /skill in Claude Code, Web Threads, Slack, Lark, GitHub, or your own app. An agent is a managed endpoint inside an App, so you call it where your product already lives.",
   },
   {
     q: "What does a developer configure when building an agent, and how do changes go live?",
@@ -49,7 +49,7 @@ const FAQS: readonly Faq[] = [
   },
   {
     q: "How is Mosoo different from Dify, n8n, OpenClaw, Claude Code, or building this in-house?",
-    a: "Dify and n8n are strong at deterministic workflows; OpenClaw, Claude Code, and Hermes are strong as general agent runtimes. Mosoo doesn't replace them. It sits above them as the backend that runs both kinds as deployable services — with versioning, permissions, sandboxing, and cost handled for you — instead of you rebuilding that plane yourself.",
+    a: "Dify and n8n are strong at deterministic workflows; OpenClaw, Claude Code, and Hermes are strong as general agent runtimes. Mosoo doesn't replace them. It sits above them as the backend that runs both kinds as deployable services with versioning, sandboxing, and App usage handled for you instead of you rebuilding that plane yourself.",
   },
   {
     q: "What's the license and cost, and is it production-ready?",

@@ -20,7 +20,7 @@
     "./mcp": "./src/mcp/mcp.contract.ts",
     "./models": "./models/index.ts",
     "./operation-result": "./src/transport/operation-result.contract.ts",
-    "./permission": "./src/permission/permission.contract.ts",
+    "./app": "./src/app/app.contract.ts",
     "./public-api": "./src/http/public-api.contract.ts",
     "./id": "./src/id/id.contract.ts",
     "./runtime-command": "./src/runtime/runtime-command.contract.ts",

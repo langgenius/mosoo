@@ -6,7 +6,7 @@ import type {
   AgentId,
   EnvironmentId,
   McpServerId,
-  OrganizationId,
+  AppId,
   SkillId,
   SpaceId,
 } from "../id/id.contract";
@@ -210,10 +210,9 @@ export function listAgentKindRuntimeComparisonRows(): readonly AgentKindRuntimeC
 }
 
 export type AgentStatus = "draft" | "published";
-export type AgentVisibility = "private" | "organization";
+export type AgentVisibility = "private";
 export type AgentSkillState = "active" | "tombstone";
-export type AgentCollaboratorRole = "admin" | "user";
-export type AgentViewerRole = "owner" | "admin" | "user" | "none";
+export type AgentViewerRole = "owner" | "none";
 
 export interface AgentSkillReference {
   ownerName: string | null;
@@ -225,14 +224,6 @@ export interface AgentSkillReference {
 export interface AgentEnvironmentConfig {
   boundSpaceIds: SpaceId[];
   environmentId: EnvironmentId | null;
-}
-
-export interface AgentCollaborator {
-  email: string | null;
-  imageUrl: string | null;
-  name: string | null;
-  principal: string;
-  role: AgentCollaboratorRole;
 }
 
 export interface AgentOwnerSummary {
@@ -276,7 +267,7 @@ export interface AgentSummary {
   updatedAt: string;
   viewerRole: AgentViewerRole;
   visibility: AgentVisibility;
-  organizationId: OrganizationId;
+  appId: AppId;
 }
 
 export interface Agent {
@@ -287,7 +278,6 @@ export interface Agent {
   liveVersion: AgentDeploymentVersion | null;
   model: string;
   name: string;
-  packageSharingEnabled: boolean;
   prompt: string;
   provider: string;
   runtimeId: string;
@@ -295,7 +285,7 @@ export interface Agent {
   status: AgentStatus;
   updatedAt: string;
   visibility: AgentVisibility;
-  organizationId: OrganizationId;
+  appId: AppId;
 }
 
 export interface AgentDetail {
@@ -307,7 +297,6 @@ export interface AgentDetail {
   model: string;
   name: string;
   owner: AgentOwnerSummary;
-  packageSharingEnabled: boolean;
   prompt: string;
   provider: string;
   runtimeId: string;
@@ -318,7 +307,7 @@ export interface AgentDetail {
   versions: AgentDeploymentVersion[];
   viewerRole: AgentViewerRole;
   visibility: AgentVisibility;
-  organizationId: OrganizationId;
+  appId: AppId;
 }
 
 export interface AgentReadinessIssue {
@@ -335,7 +324,6 @@ export interface AgentReadiness {
 
 export interface AgentEditorState {
   builder: AgentConfigBuilderMetadata;
-  collaborators: AgentCollaborator[];
   environment: AgentEnvironmentConfig;
   id: AgentId;
   packageResolution: AgentPackageResolutionState | null;
@@ -366,7 +354,7 @@ export interface CreateAgentInput {
   provider: string;
   runtimeId: string;
   skillIds: SkillId[];
-  organizationId: OrganizationId;
+  appId: AppId;
 }
 
 export interface UpdateAgentConfigInput {
@@ -383,25 +371,17 @@ export interface UpdateAgentConfigInput {
   providerOptions: JsonObject;
   runtimeId: string;
   skillIds: SkillId[];
+  appId: AppId;
 }
 
 export interface DeleteAgentInput {
   agentId: AgentId;
+  appId: AppId;
 }
 
 export interface PublishAgentInput {
   agentId: AgentId;
-  /**
-   * Optional. Omit on re-publish to inherit the agent's current visibility.
-   * Required on the first publish (when the agent has no prior visibility set,
-   * the DB default `private` applies and backend normalization guarantees a value).
-   */
-  visibility?: AgentVisibility;
-}
-
-export interface UpdateAgentPackageSharingInput {
-  agentId: AgentId;
-  packageSharingEnabled: boolean;
+  appId: AppId;
 }
 
 export type RuntimeStateOperationName = "restartDriver" | "recreateSandbox" | "resetAgentState";
@@ -419,6 +399,7 @@ export interface RuntimeStateOperationInput {
   affectedFields?: string[] | null;
   agentId: AgentId;
   applyActionKind?: RuntimeStateApplyActionKind | null;
+  appId: AppId;
   targetVersion?: RuntimeStateTargetVersionInput | null;
 }
 
@@ -427,21 +408,4 @@ export interface RuntimeStateOperationResult {
   agentId: AgentId;
   ok: boolean;
   operation: RuntimeStateOperationName;
-}
-
-export interface AddAgentCollaboratorInput {
-  agentId: AgentId;
-  principal: string;
-  role: AgentCollaboratorRole;
-}
-
-export interface RemoveAgentCollaboratorInput {
-  agentId: AgentId;
-  principal: string;
-}
-
-export interface UpdateAgentCollaboratorInput {
-  agentId: AgentId;
-  principal: string;
-  role: AgentCollaboratorRole;
 }

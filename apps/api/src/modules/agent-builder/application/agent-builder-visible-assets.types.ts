@@ -10,7 +10,7 @@ import type {
   AgentBuilderVisibleSkillSummary,
   AgentBuilderVisibleSpaceSummary,
 } from "@mosoo/contracts/agent-builder";
-import type { McpServerId, OrganizationId, SkillId, SpaceId } from "@mosoo/id";
+import type { McpServerId, AppId, SkillId, SpaceId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
@@ -36,7 +36,7 @@ export interface AgentBuilderVisibleAssetProviderInput {
   boundSkillIds: ReadonlySet<SkillId>;
   boundSpaceIds: ReadonlySet<SpaceId>;
   draft: AgentBuilderLightweightPlannerDraftContext;
-  organizationId: OrganizationId;
+  appId: AppId;
   viewer: AuthenticatedViewer;
 }
 

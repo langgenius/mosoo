@@ -60,7 +60,7 @@ export async function completeFileUpload(
   const context = await ensureUploadAccess({
     database: bindings.DB,
     fileId,
-    requiredRole: "edit",
+    requiredIntent: "write",
     viewer,
   });
   const { file, upload } = context;

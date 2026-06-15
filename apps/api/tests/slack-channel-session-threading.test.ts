@@ -18,7 +18,8 @@ import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   createTestExecutionContext,
-} from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
 import {
   OWNER_VIEWER,
   buildSlackTrigger,
@@ -33,8 +34,9 @@ describe("Slack channel session threading", () => {
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const threadTs = "1700000000.000800";
       await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "xoxb-secret-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         signingSecret: "signing-secret",
         threadRepliesRequireMention: true,
       });
@@ -104,8 +106,9 @@ describe("Slack channel session threading", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "xoxb-secret-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         signingSecret: "signing-secret",
       });
       const binding = await resolveSlackChannelBindingContext(bindings, {
@@ -164,8 +167,9 @@ describe("Slack channel session threading", () => {
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const threadTs = "1700000000.000700";
       await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "xoxb-secret-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         signingSecret: "signing-secret",
       });
       const binding = await resolveSlackChannelBindingContext(bindings, {
@@ -245,8 +249,9 @@ describe("Slack channel session threading", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "xoxb-secret-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         signingSecret: "signing-secret",
       });
       const binding = await resolveSlackChannelBindingContext(bindings, {

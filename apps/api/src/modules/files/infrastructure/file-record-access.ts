@@ -1,6 +1,7 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId } from "@mosoo/id";
+import type { AccountId, AppId } from "@mosoo/id";
 
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import { createFileNotFoundError } from "./file-errors";
 import type {
   FileAccessRequest,
@@ -10,17 +11,29 @@ import type {
 } from "./file-record-model";
 import { getFileRecordById } from "./file-record-queries";
 import { getFileUploadAccessContextByFileId } from "./file-upload-context-store";
-import {
-  ensureOrganizationAvatarAccess,
-  ensureOrganizationDraftOwnership,
-} from "./organization-file-access";
 import { ensureSessionFileAccess } from "./session-file-ownership";
-import { ensureSpaceAccess } from "./space-access";
+import { ensureSpaceAccessBySpaceId } from "./space-access";
+
+async function ensureAgentPackageFileAccess(
+  database: D1Database,
+  viewerId: AccountId,
+  appId: AppId,
+  createdBy: AccountId,
+  resourceKind: "file" | "upload",
+): Promise<void> {
+  await ensureAppOwnership(database, viewerId, appId);
+
+  if (createdBy !== viewerId) {
+    throw createFileNotFoundError(
+      resourceKind === "file" ? "File not found." : "Upload not found.",
+    );
+  }
+}
 
 export async function ensureUploadAccess({
   database,
   fileId,
-  requiredRole,
+  requiredIntent,
   viewer,
 }: UploadAccessRequest): Promise<FileUploadContext> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
@@ -31,31 +44,29 @@ export async function ensureUploadAccess({
   }
 
   if (context.upload.scope_kind === "space") {
-    await ensureSpaceAccess(
+    await ensureSpaceAccessBySpaceId(
       database,
       viewerId,
       parsePlatformId(context.upload.scope_id, "upload space ID"),
-      requiredRole,
+      requiredIntent,
     );
   } else if (context.upload.scope_kind === "session") {
     if (!context.sessionAccess) {
       throw createFileNotFoundError("Session not found.");
     }
-  } else if (context.upload.scope_kind === "organization_avatar") {
-    await ensureOrganizationAvatarAccess(
+  } else if (
+    context.upload.scope_kind === "agent_package" ||
+    context.upload.scope_kind === "app_draft"
+  ) {
+    await ensureAgentPackageFileAccess(
       database,
       viewerId,
-      parsePlatformId(context.upload.scope_id, "upload organization ID"),
-      requiredRole,
-    );
-  } else {
-    await ensureOrganizationDraftOwnership(
-      database,
-      viewerId,
-      parsePlatformId(context.upload.scope_id, "upload organization ID"),
+      parsePlatformId<AppId>(context.upload.scope_id, "upload app ID"),
       context.upload.created_by_account_id,
       "upload",
     );
+  } else {
+    throw createFileNotFoundError("Upload not found.");
   }
 
   return context;
@@ -64,7 +75,7 @@ export async function ensureUploadAccess({
 export async function ensureFileAccess({
   database,
   fileId,
-  requiredRole,
+  requiredIntent,
   viewer,
 }: FileAccessRequest): Promise<FileRecordRow> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
@@ -75,11 +86,11 @@ export async function ensureFileAccess({
   }
 
   if (file.scope_kind === "space") {
-    await ensureSpaceAccess(
+    await ensureSpaceAccessBySpaceId(
       database,
       viewerId,
       parsePlatformId(file.scope_id, "file space ID"),
-      requiredRole,
+      requiredIntent,
     );
   } else if (file.scope_kind === "session") {
     await ensureSessionFileAccess(
@@ -87,21 +98,16 @@ export async function ensureFileAccess({
       viewerId,
       parsePlatformId(file.scope_id, "file session ID"),
     );
-  } else if (file.scope_kind === "organization_avatar") {
-    await ensureOrganizationAvatarAccess(
+  } else if (file.scope_kind === "agent_package" || file.scope_kind === "app_draft") {
+    await ensureAgentPackageFileAccess(
       database,
       viewerId,
-      parsePlatformId(file.scope_id, "file organization ID"),
-      requiredRole,
-    );
-  } else {
-    await ensureOrganizationDraftOwnership(
-      database,
-      viewerId,
-      parsePlatformId(file.scope_id, "file organization ID"),
+      parsePlatformId<AppId>(file.scope_id, "file app ID"),
       file.created_by_account_id,
       "file",
     );
+  } else {
+    throw createFileNotFoundError("File not found.");
   }
 
   return file;

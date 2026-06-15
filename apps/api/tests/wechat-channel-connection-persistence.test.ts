@@ -13,7 +13,7 @@ import {
   readWeChatChannelAccountWithCredentials,
   readWeChatContextTokenForPeer,
 } from "../src/modules/channels/wechat/wechat-runtime-store";
-import { nowMsForTest } from "./helpers/published-agent-http-test-fixture";
+import { nowMsForTest, PUBLIC_API_TEST_IDS } from "./helpers/public-api-http-test-fixture";
 import {
   OWNER_VIEWER,
   createConfirmedWeChatQrSnapshot,
@@ -25,7 +25,8 @@ describe("WeChat channel runtime persistence", () => {
   test("persists confirmed QR credentials as an encrypted channel binding account runtime", async () => {
     const bindings = await createWeChatTestBindings();
     const account = await persistConfirmedWeChatQrPairing(bindings, OWNER_VIEWER, {
-      agentId: "01J00000000000000000000009",
+      agentId: PUBLIC_API_TEST_IDS.agent,
+      appId: PUBLIC_API_TEST_IDS.app,
       snapshot: createConfirmedWeChatQrSnapshot({
         baseUrl: "https://ilinkai.weixin.qq.com/",
       }),
@@ -59,7 +60,8 @@ describe("WeChat channel runtime persistence", () => {
 
     await expect(
       persistConfirmedWeChatQrPairing(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
+        appId: PUBLIC_API_TEST_IDS.app,
         snapshot: createConfirmedWeChatQrSnapshot({
           baseUrl: "https://untrusted.example",
         }),
@@ -76,7 +78,8 @@ describe("WeChat channel runtime persistence", () => {
   test("clears stale context-token secrets when QR pairing is rebound", async () => {
     const bindings = await createWeChatTestBindings();
     const account = await persistConfirmedWeChatQrPairing(bindings, OWNER_VIEWER, {
-      agentId: "01J00000000000000000000009",
+      agentId: PUBLIC_API_TEST_IDS.agent,
+      appId: PUBLIC_API_TEST_IDS.app,
       snapshot: createConfirmedWeChatQrSnapshot({ botToken: "bot-secret-1" }),
     });
     const store = createWeChatPollingOwnerDatabaseStore(bindings);
@@ -105,7 +108,8 @@ describe("WeChat channel runtime persistence", () => {
     });
 
     const rebound = await persistConfirmedWeChatQrPairing(bindings, OWNER_VIEWER, {
-      agentId: "01J00000000000000000000009",
+      agentId: PUBLIC_API_TEST_IDS.agent,
+      appId: PUBLIC_API_TEST_IDS.app,
       snapshot: createConfirmedWeChatQrSnapshot({
         accountId: "account-2",
         botToken: "bot-secret-2",
@@ -132,7 +136,8 @@ describe("WeChat channel runtime persistence", () => {
   test("database polling store persists cursor/runtime/context token and stored-token replies", async () => {
     const bindings = await createWeChatTestBindings();
     const account = await persistConfirmedWeChatQrPairing(bindings, OWNER_VIEWER, {
-      agentId: "01J00000000000000000000009",
+      agentId: PUBLIC_API_TEST_IDS.agent,
+      appId: PUBLIC_API_TEST_IDS.app,
       snapshot: createConfirmedWeChatQrSnapshot(),
     });
     const store = createWeChatPollingOwnerDatabaseStore(bindings);

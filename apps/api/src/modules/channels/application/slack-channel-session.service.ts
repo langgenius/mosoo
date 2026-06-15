@@ -1,6 +1,6 @@
 import { accountsTable, agentChannelBindingsTable, agentsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AgentId, ChannelBindingId, OrganizationId } from "@mosoo/id";
+import type { AccountId, AgentId, ChannelBindingId, AppId } from "@mosoo/id";
 import { and, eq } from "drizzle-orm";
 
 import { logInfo } from "../../../platform/cloudflare/logger";
@@ -29,6 +29,7 @@ export interface SlackChannelBindingContext {
   externalBotId: string;
   externalTenantId: string;
   owner: AuthenticatedViewer;
+  appId: AppId;
   threadRepliesRequireMention: boolean;
   workspaceName: string | null;
 }
@@ -90,6 +91,7 @@ function toAgentChannelBindingContext(
     externalBotId: binding.externalBotId,
     externalTenantId: binding.externalTenantId,
     owner: binding.owner,
+    appId: binding.appId,
     provider: "slack",
   };
 }
@@ -121,12 +123,12 @@ async function toSlackChannelBindingContext(
     encryptedCredsSecretId: string;
     externalBotId: string;
     externalTenantId: string;
-    organizationId: OrganizationId;
     ownerEmail: string;
     ownerEmailVerified: boolean | number;
     ownerId: AccountId;
     ownerImageUrl: string | null;
     ownerName: string;
+    appId: AppId;
   },
 ): Promise<SlackChannelBindingContext> {
   const metadata = parseSlackDisplayMetadata(row.displayMetadataJson);
@@ -135,7 +137,7 @@ async function toSlackChannelBindingContext(
       bindingId: row.bindingId,
       expectedOwner: {
         agentId: row.agentId,
-        organizationId: row.organizationId,
+        appId: row.appId,
       },
       provider: "slack",
       purpose: "channel_callback",
@@ -158,6 +160,7 @@ async function toSlackChannelBindingContext(
       imageUrl: row.ownerImageUrl,
       name: row.ownerName,
     }),
+    appId: row.appId,
     threadRepliesRequireMention: credentials.threadRepliesRequireMention,
     workspaceName: metadata.workspace_name,
   };
@@ -187,12 +190,13 @@ export async function resolveSlackChannelBindingContext(
         encryptedCredsSecretId: agentChannelBindingsTable.encryptedCredsSecretId,
         externalBotId: agentChannelBindingsTable.externalBotId,
         externalTenantId: agentChannelBindingsTable.externalTenantId,
-        organizationId: agentsTable.organizationId,
+        agentAppId: agentsTable.appId,
         ownerEmail: accountsTable.email,
         ownerEmailVerified: accountsTable.emailVerified,
         ownerId: accountsTable.id,
         ownerImageUrl: accountsTable.image,
         ownerName: accountsTable.name,
+        appId: agentChannelBindingsTable.appId,
       })
       .from(agentChannelBindingsTable)
       .innerJoin(agentsTable, eq(agentsTable.id, agentChannelBindingsTable.agentId))
@@ -212,10 +216,11 @@ export async function resolveSlackChannelBindingContext(
     return null;
   }
 
-  return toSlackChannelBindingContext(bindings, {
-    ...row,
-    organizationId: row.organizationId as OrganizationId,
-  });
+  if (row.agentAppId !== row.appId) {
+    return null;
+  }
+
+  return toSlackChannelBindingContext(bindings, row);
 }
 
 export async function resolveSlackChannelBindingContextById(
@@ -234,12 +239,13 @@ export async function resolveSlackChannelBindingContextById(
         encryptedCredsSecretId: agentChannelBindingsTable.encryptedCredsSecretId,
         externalBotId: agentChannelBindingsTable.externalBotId,
         externalTenantId: agentChannelBindingsTable.externalTenantId,
-        organizationId: agentsTable.organizationId,
+        agentAppId: agentsTable.appId,
         ownerEmail: accountsTable.email,
         ownerEmailVerified: accountsTable.emailVerified,
         ownerId: accountsTable.id,
         ownerImageUrl: accountsTable.image,
         ownerName: accountsTable.name,
+        appId: agentChannelBindingsTable.appId,
       })
       .from(agentChannelBindingsTable)
       .innerJoin(agentsTable, eq(agentsTable.id, agentChannelBindingsTable.agentId))
@@ -258,10 +264,11 @@ export async function resolveSlackChannelBindingContextById(
     return null;
   }
 
-  return toSlackChannelBindingContext(bindings, {
-    ...row,
-    organizationId: row.organizationId as OrganizationId,
-  });
+  if (row.agentAppId !== row.appId) {
+    return null;
+  }
+
+  return toSlackChannelBindingContext(bindings, row);
 }
 
 export function createSlackAdapterConfig(input: {

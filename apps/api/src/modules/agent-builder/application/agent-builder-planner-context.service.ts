@@ -12,7 +12,7 @@ import type {
   AgentBuilderPlannerRunId,
   AgentBuilderThreadId,
   AgentId,
-  OrganizationId,
+  AppId,
 } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -35,9 +35,9 @@ export interface AgentBuilderPlannerContextSourceAgent {
   kind: AgentKind;
   model: string;
   name: string;
-  organizationId: OrganizationId;
   ownerId: AccountId;
   prompt: string;
+  appId: AppId;
   provider: string;
   runtimeId: string;
   status: AgentStatus;
@@ -48,7 +48,7 @@ const AGENT_BUILDER_BOUNDARY_POLICY = {
   forbiddenWrites: [
     "secret_plaintext",
     "provider_key",
-    "collaborator_permission",
+    "human_access_control",
     "publish_state",
     "terminal_command_to_draft",
     "other_agent_draft",
@@ -125,16 +125,16 @@ export async function createAgentBuilderPlannerContext(
     collectAgentBuilderVisibleAssets({
       bindings,
       draft: draftContext,
-      organizationId: agent.organizationId,
       previousAssets: ledger.previousVisibleAssets.assets,
       previousContext: ledger.previousVisibleAssets.context,
+      appId: agent.appId,
       viewer,
     }),
     collectAgentBuilderReadinessContext(bindings, {
       agent: {
         id: agent.id,
-        organizationId: agent.organizationId,
         ownerId: agent.ownerId,
+        appId: agent.appId,
       },
       draft: draftContext,
     }),
@@ -148,7 +148,7 @@ export async function createAgentBuilderPlannerContext(
         draft: draftContext,
       }),
       kind: agent.kind,
-      organizationId: agent.organizationId,
+      appId: agent.appId,
       status: agent.status,
     },
     assets,

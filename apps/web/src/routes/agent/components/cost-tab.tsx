@@ -17,7 +17,7 @@ import {
   tokensTotal,
 } from "@/routes/cost/cost-model";
 import type { CostRange } from "@/routes/cost/cost-model";
-import { toAgentId } from "@/routes/typed-id";
+import { toAgentId, toAppId } from "@/routes/typed-id";
 import { cn } from "@/shared/lib/class-names";
 
 const RUN_PURPOSES: { label: string; value: CostRunPurpose | "all" }[] = [
@@ -27,7 +27,7 @@ const RUN_PURPOSES: { label: string; value: CostRunPurpose | "all" }[] = [
   { label: "Preview", value: "preview" },
 ];
 
-export function AgentCostTab({ agentId }: { agentId: string }): ReactElement {
+export function AgentCostTab({ agentId, appId }: { agentId: string; appId: string }): ReactElement {
   const [range, setRange] = useState<CostRange>("30d");
   const [purpose, setPurpose] = useState<CostRunPurpose | "all">("all");
   const runPurposes = purpose === "all" ? [] : [purpose];
@@ -35,10 +35,11 @@ export function AgentCostTab({ agentId }: { agentId: string }): ReactElement {
     queryFn: async () =>
       fetchAgentCost({
         agentId: toAgentId(agentId),
+        appId: toAppId(appId),
         range: rangeToInput(range),
         runPurposes,
       }),
-    queryKey: ["cost", "agent-card", agentId, range, purpose],
+    queryKey: ["cost", "agent-card", appId, agentId, range, purpose],
   });
   const card = costQuery.data;
   const totals = card?.totals;
@@ -72,11 +73,11 @@ export function AgentCostTab({ agentId }: { agentId: string }): ReactElement {
               ))}
             </div>
             <Link
-              to="/settings/cost"
+              to="/cost"
               className="border-border hover:bg-muted inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm font-semibold"
             >
               <ExternalLink className="size-3.5" />
-              Open workspace Cost
+              Open App Usage
             </Link>
             <button
               type="button"
@@ -151,32 +152,7 @@ export function AgentCostTab({ agentId }: { agentId: string }): ReactElement {
           ))}
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-2">
-          <Panel title="Who is running this Agent">
-            {(card?.users ?? []).length === 0 ? (
-              <div className="text-muted-foreground px-4 py-8 text-sm">
-                No runner usage in this range.
-              </div>
-            ) : null}
-            {(card?.users ?? []).map((user) => (
-              <div
-                key={user.userId}
-                className="border-border flex items-center justify-between border-b px-4 py-3 text-sm last:border-b-0"
-              >
-                <div className="min-w-0">
-                  <div className="text-foreground truncate font-medium">{user.userName}</div>
-                  <div className="text-muted-foreground truncate text-xs">{user.userEmail}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono font-semibold">{formatCurrency(user.totalCostUsd)}</div>
-                  <div className="text-muted-foreground text-xs">
-                    {formatCompactNumber(user.requestCount)} sessions
-                  </div>
-                </div>
-              </div>
-            ))}
-          </Panel>
-
+        <section>
           <Panel title="Model usage">
             {(card?.models ?? []).length === 0 ? (
               <div className="text-muted-foreground px-4 py-8 text-sm">

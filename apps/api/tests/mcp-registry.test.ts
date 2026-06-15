@@ -4,30 +4,31 @@ import { getMcpRegistry } from "../src/modules/mcp/application/mcp-registry.serv
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const VIEWER_ID = "01J00000000000000000000002";
-const PERSONAL_MCP_SERVER_ID = "01J0000000000000000000000A";
-const SHARED_MCP_SERVER_ID = "01J0000000000000000000000B";
-const ORG_USER_MCP_SERVER_ID = "01J0000000000000000000000C";
-const PERSONAL_CREDENTIAL_ID = "01J0000000000000000000000D";
-const SHARED_CREDENTIAL_ID = "01J0000000000000000000000E";
-const PERSONAL_SECRET_ID = "01J0000000000000000000000F";
-const SHARED_SECRET_ID = "01J0000000000000000000000G";
+const APP_ID = "01J00000000000000000000006";
+const APP_MCP_SERVER_ID = "01J0000000000000000000000A";
+const APP_MCP_SERVER_WITHOUT_CREDENTIAL_ID = "01J0000000000000000000000B";
+const OTHER_OWNER_MCP_SERVER_ID = "01J0000000000000000000000C";
+const APP_CREDENTIAL_ID = "01J0000000000000000000000D";
+const APP_SECRET_ID = "01J0000000000000000000000F";
 
 function createMcpRegistryDatabase(input: { includeServers?: boolean } = {}): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
   const includeServers = input.includeServers ?? true;
 
   database.execute(`
-    CREATE TABLE organization (
-      id text PRIMARY KEY NOT NULL,
-      join_policy text NOT NULL
-    );
+	    CREATE TABLE organization (
+	      id text PRIMARY KEY NOT NULL
+	    );
 
-    CREATE TABLE organization_member (
+    CREATE TABLE app (
+      id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
-      account_id text NOT NULL,
-      role text NOT NULL,
-      disabled_at integer,
-      PRIMARY KEY (organization_id, account_id)
+      owner_account_id text NOT NULL,
+      slug text NOT NULL,
+      name text NOT NULL,
+      default_environment_id text,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL
     );
 
     CREATE TABLE account (
@@ -49,8 +50,8 @@ function createMcpRegistryDatabase(input: { includeServers?: boolean } = {}): Sq
       icon_url text,
       name text NOT NULL,
       oauth_metadata_json text,
-      organization_id text NOT NULL,
       owner_account_id text NOT NULL,
+      app_id text NOT NULL,
       source text NOT NULL,
       updated_at integer NOT NULL,
       url text NOT NULL
@@ -66,6 +67,7 @@ function createMcpRegistryDatabase(input: { includeServers?: boolean } = {}): Sq
       last_refreshed_at integer,
       oauth_client_id text,
       oauth_client_secret_secret_id text,
+      app_id text NOT NULL,
       refresh_secret_id text,
       scope text NOT NULL,
       scope_values_json text,
@@ -76,11 +78,19 @@ function createMcpRegistryDatabase(input: { includeServers?: boolean } = {}): Sq
       updated_at integer NOT NULL
     );
 
-    INSERT INTO organization (id, join_policy)
-    VALUES ('01J00000000000000000000006', 'invite_only');
+	    INSERT INTO organization (id)
+	    VALUES ('01J00000000000000000000006');
 
-    INSERT INTO organization_member (organization_id, account_id, role, disabled_at)
-    VALUES ('01J00000000000000000000006', '${VIEWER_ID}', 'member', NULL);
+    INSERT INTO app (
+      id,
+      organization_id,
+      owner_account_id,
+      slug,
+      name,
+      created_at,
+      updated_at
+    )
+    VALUES ('${APP_ID}', '01J00000000000000000000006', '${VIEWER_ID}', 'app', 'App', 1, 1);
 
     INSERT INTO account (id, email, image_url, name)
     VALUES
@@ -98,16 +108,16 @@ function createMcpRegistryDatabase(input: { includeServers?: boolean } = {}): Sq
       description,
       enabled,
       name,
-      organization_id,
       owner_account_id,
+      app_id,
       source,
       updated_at,
       url
     )
     VALUES
-      ('${PERSONAL_MCP_SERVER_ID}', 'bearer', 1, 'user', NULL, 1, 'Personal', '01J00000000000000000000006', '${VIEWER_ID}', 'personal', 1, 'https://personal.example.com/mcp'),
-      ('${SHARED_MCP_SERVER_ID}', 'bearer', 2, 'organization_shared', NULL, 1, 'Shared', '01J00000000000000000000006', '01J00000000000000000000001', 'organization_shared', 2, 'https://shared.example.com/mcp'),
-      ('${ORG_USER_MCP_SERVER_ID}', 'bearer', 3, 'user', NULL, 1, 'Org User', '01J00000000000000000000006', '01J00000000000000000000001', 'organization_shared', 3, 'https://org-user.example.com/mcp');
+      ('${APP_MCP_SERVER_ID}', 'bearer', 1, 'app', NULL, 1, 'App MCP', '${VIEWER_ID}', '${APP_ID}', 'app', 1, 'https://app.example.com/mcp'),
+      ('${APP_MCP_SERVER_WITHOUT_CREDENTIAL_ID}', 'bearer', 2, 'app', NULL, 1, 'Unconfigured MCP', '${VIEWER_ID}', '${APP_ID}', 'app', 2, 'https://unconfigured.example.com/mcp'),
+      ('${OTHER_OWNER_MCP_SERVER_ID}', 'bearer', 3, 'app', NULL, 1, 'Other Owner MCP', '01J00000000000000000000001', '${APP_ID}', 'app', 3, 'https://other-owner.example.com/mcp');
 
     INSERT INTO mcp_credential (
       id,
@@ -117,6 +127,7 @@ function createMcpRegistryDatabase(input: { includeServers?: boolean } = {}): Sq
       created_at,
       expires_at,
       last_refreshed_at,
+      app_id,
       scope,
       scope_values_json,
       secret_id,
@@ -126,8 +137,7 @@ function createMcpRegistryDatabase(input: { includeServers?: boolean } = {}): Sq
       updated_at
     )
     VALUES
-      ('${PERSONAL_CREDENTIAL_ID}', '${VIEWER_ID}', NULL, 'bearer', 1, NULL, NULL, 'user', '[]', '${PERSONAL_SECRET_ID}', '${PERSONAL_MCP_SERVER_ID}', 'active', 'Viewer token', 1),
-      ('${SHARED_CREDENTIAL_ID}', NULL, NULL, 'bearer', 2, NULL, NULL, 'organization_shared', '[]', '${SHARED_SECRET_ID}', '${SHARED_MCP_SERVER_ID}', 'active', 'Service account', 2);
+      ('${APP_CREDENTIAL_ID}', NULL, NULL, 'bearer', 1, NULL, NULL, '${APP_ID}', 'app', '[]', '${APP_SECRET_ID}', '${APP_MCP_SERVER_ID}', 'active', 'App token', 1);
   `);
   }
 
@@ -147,22 +157,21 @@ describe("MCP registry", () => {
         imageUrl: null,
         name: "Viewer",
       },
-      "01J00000000000000000000006",
+      APP_ID,
     );
 
-    expect(registry.personal).toHaveLength(1);
-    expect(registry.organizationShared).toHaveLength(2);
+    expect(registry.servers).toHaveLength(2);
+    expect(registry.servers.find((server) => server.id === APP_MCP_SERVER_ID)?.hasCredential).toBe(
+      true,
+    );
     expect(
-      registry.organizationShared.find((server) => server.id === SHARED_MCP_SERVER_ID)
-        ?.hasSharedCredential,
-    ).toBe(true);
-    expect(
-      registry.organizationShared.find((server) => server.id === ORG_USER_MCP_SERVER_ID)
-        ?.hasSharedCredential,
+      registry.servers.find((server) => server.id === APP_MCP_SERVER_WITHOUT_CREDENTIAL_ID)
+        ?.hasCredential,
     ).toBe(false);
+    expect(registry.servers.some((server) => server.id === OTHER_OWNER_MCP_SERVER_ID)).toBe(false);
   });
 
-  test("loads empty registries for active members", async () => {
+  test("loads empty registries for app owners", async () => {
     const database = createMcpRegistryDatabase({ includeServers: false });
 
     const registry = await getMcpRegistry(
@@ -174,11 +183,10 @@ describe("MCP registry", () => {
         imageUrl: null,
         name: "Viewer",
       },
-      "01J00000000000000000000006",
+      APP_ID,
     );
 
-    expect(registry.personal).toEqual([]);
-    expect(registry.organizationShared).toEqual([]);
+    expect(registry.servers).toEqual([]);
     expect(registry.currentUserName).toBe("Viewer");
   });
 });

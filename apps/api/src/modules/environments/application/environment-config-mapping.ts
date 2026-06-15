@@ -1,5 +1,4 @@
 import type { EnvironmentConfigInput, EnvironmentSummary } from "@mosoo/contracts/environment";
-import type { AccountId } from "@mosoo/id";
 
 import { toIsoString } from "../../../time";
 import {
@@ -41,14 +40,10 @@ export function normalizeConfigForCreate(
   return normalizeEnvironmentConfigInput(input);
 }
 
-export function toEnvironmentSummary(
-  row: EnvironmentRecordRow,
-  viewerId: AccountId,
-  isOrganizationAdmin: boolean,
-): EnvironmentSummary {
+export function toEnvironmentSummary(row: EnvironmentRecordRow): EnvironmentSummary {
   const config = toConfig(row);
   const isBuiltIn = row.ownerId === null;
-  const canEdit = !isBuiltIn && (row.ownerId === viewerId || isOrganizationAdmin);
+  const canEdit = !isBuiltIn;
   const isDefault = row.defaultEnvironmentId === row.id;
   const publicConfig = toPublicRevisionConfig(config);
   const forkedFromEnvironmentId = row.forkedFromEnvironmentId;
@@ -75,13 +70,13 @@ export function toEnvironmentSummary(
     isDefault,
     isEditable: !isBuiltIn,
     name: row.name,
-    organizationId: row.organizationId,
     owner: {
       id: row.ownerId,
       imageUrl: row.ownerImageUrl,
       name: row.ownerName,
     },
-    role: row.ownerId === viewerId ? "owner" : "user",
+    appId: row.appId,
+    role: "owner",
     updatedAt: toIsoString(row.updatedAt),
     usedByAgentCount: row.usedByAgentCount ?? 0,
   };

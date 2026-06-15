@@ -1,7 +1,6 @@
 import type { SpaceView } from "@mosoo/contracts/space";
 import type { ReactElement } from "react";
 
-import { SpaceSettingsDialog } from "../../features/spaces/share-space/dialog";
 import { DeleteSpaceDialog, NewSpaceDialog, RenameFileDialog } from "./dialogs";
 import type { useSpaceBrowser } from "./use-space-browser";
 import type { useSpaceSettings } from "./use-space-settings";
@@ -11,32 +10,18 @@ type SpaceSettingsModel = ReturnType<typeof useSpaceSettings>;
 
 export function SpacePageDialogs({
   browser,
-  canManageSettingsSpace,
-  organizationId,
   settings,
   settingsSpace,
-  userId,
 }: {
   browser: SpaceBrowserModel;
-  canManageSettingsSpace: boolean;
-  organizationId: string | null;
   settings: SpaceSettingsModel;
   settingsSpace: SpaceView | undefined;
-  userId: string | undefined;
 }): ReactElement {
-  const showSettingsDialog =
-    settings.settingsSpaceId !== null &&
-    settingsSpace !== undefined &&
-    organizationId !== null &&
-    userId !== undefined;
   const renameBlockedBy = browser.renameLock?.blockedBy ?? null;
   const renameReadOnlyReason =
     renameBlockedBy !== null && renameBlockedBy.length > 0
       ? `${renameBlockedBy} is editing this file.`
       : null;
-  const handleSelectNewSpaceVisibility = (visibility: "shared" | "private"): void => {
-    settings.setNewSpaceVisibility(visibility);
-  };
   const handleRenameValueChange = (value: string): void => {
     browser.setRenameValue(value);
   };
@@ -51,35 +36,8 @@ export function SpacePageDialogs({
   };
   const deleteSpaceName = settingsSpace?.name;
 
-  const settingsDialog = showSettingsDialog ? (
-    <SpaceSettingsDialog
-      key={settingsSpace.id}
-      open={showSettingsDialog}
-      onOpenChange={(open) => {
-        if (!open) {
-          settings.setSettingsSpaceId(null);
-        }
-      }}
-      spaceId={settingsSpace.id}
-      spaceName={settingsSpace.name}
-      spaceOwnerId={settingsSpace.ownerId}
-      organizationId={organizationId}
-      currentUserId={userId}
-      isAdmin={canManageSettingsSpace}
-      {...(canManageSettingsSpace
-        ? {
-            onDeleteSpace: () => {
-              settings.handleShowDeleteConfirm(true);
-            },
-          }
-        : {})}
-    />
-  ) : null;
-
   return (
     <>
-      {settingsDialog}
-
       <NewSpaceDialog
         creating={settings.creatingSpace}
         error={settings.createSpaceError ?? settings.newSpaceNameError}
@@ -90,9 +48,7 @@ export function SpacePageDialogs({
         }}
         onCreate={() => void settings.handleCreateSpace()}
         onOpenChange={settings.handleShowNewSpace}
-        onSelectVisibility={handleSelectNewSpaceVisibility}
         open={settings.showNewSpace}
-        visibility={settings.newSpaceVisibility}
       />
 
       <RenameFileDialog

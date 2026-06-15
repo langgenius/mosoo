@@ -18,7 +18,7 @@ const oauthFlowColumns = {
   initiatorUserId: mcpOauthFlowsTable.initiatorUserId,
   oauthClientId: mcpOauthFlowsTable.oauthClientId,
   oauthClientSecretSecretId: mcpOauthFlowsTable.oauthClientSecretSecretId,
-  organizationId: mcpOauthFlowsTable.organizationId,
+  appId: mcpOauthFlowsTable.appId,
   returnUrl: mcpOauthFlowsTable.returnUrl,
   scopeValuesJson: mcpOauthFlowsTable.scopeValuesJson,
   serverId: mcpOauthFlowsTable.serverId,
@@ -119,7 +119,7 @@ export async function destroyOAuthFlowArtifactsBatch(
   database: D1Database,
   flows: readonly Pick<
     OAuthFlowRow,
-    "id" | "initiatorUserId" | "oauthClientSecretSecretId" | "organizationId" | "serverId"
+    "id" | "initiatorUserId" | "oauthClientSecretSecretId" | "appId" | "serverId"
   >[],
   actor: McpOAuthSecretActor = {
     name: "mcp_oauth_flow_retention_cleanup",
@@ -133,8 +133,8 @@ export async function destroyOAuthFlowArtifactsBatch(
       command: {
         actor,
         flow,
-        organizationId: flow.organizationId,
         purpose: "oauth_flow_artifact_cleanup",
+        appId: flow.appId,
         secretId: flow.oauthClientSecretSecretId,
         secretKind: "flow_client_secret",
       },
@@ -162,7 +162,7 @@ export async function clearOAuthFlowSecret(
   database: D1Database,
   flow: Pick<
     OAuthFlowRow,
-    "id" | "initiatorUserId" | "oauthClientSecretSecretId" | "organizationId" | "serverId"
+    "id" | "initiatorUserId" | "oauthClientSecretSecretId" | "appId" | "serverId"
   >,
 ): Promise<void> {
   const cleanupSucceeded = await cleanupStoredMcpOAuthFlowClientSecret({
@@ -172,8 +172,8 @@ export async function clearOAuthFlowSecret(
         type: "system",
       },
       flow,
-      organizationId: flow.organizationId,
       purpose: "oauth_flow_terminal_cleanup",
+      appId: flow.appId,
       secretId: flow.oauthClientSecretSecretId,
       secretKind: "flow_client_secret",
     },

@@ -37,7 +37,7 @@ export function Hero({ onContinue }: { onContinue: () => void }): ReactElement {
       style={HERO_PANEL_STYLE}
     >
       {/* WebGL aurora — the brand's signature hero motion */}
-      <UnicornBackground projectId={HERO_SCENE_ID} />
+      <UnicornBackground sceneId={HERO_SCENE_ID} />
 
       <m.div
         className="relative z-10 flex w-full max-w-[1080px] flex-col items-center text-center"

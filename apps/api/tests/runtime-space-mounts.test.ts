@@ -122,7 +122,7 @@ describe("runtime space mounts", () => {
     ).toThrow("Runtime Space mount path must not contain traversal segments.");
   });
 
-  test("projects runtime space paths only after canonical admission", () => {
+  test("apps runtime space paths only after canonical admission", () => {
     expect(
       createRuntimeSpaceObjectKey({
         relativePath: "docs/notes.txt",

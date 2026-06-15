@@ -1,28 +1,18 @@
-import type {
-  CreateOrganizationMcpServerInput,
-  CreatePersonalMcpServerInput,
-  McpServerWithCredential,
-} from "@mosoo/contracts/mcp";
-import { Permission } from "@mosoo/contracts/permission";
+import type { CreateAppMcpServerInput, McpServerWithCredential } from "@mosoo/contracts/mcp";
 import { agentMcpBindingsTable, mcpServersTable } from "@mosoo/db";
-import type { McpServerId } from "@mosoo/id";
+import type { McpServerId, AppId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
-  ensureOrganizationMembership,
-  ensureOrganizationPermission,
-} from "../../organizations/domain/organization-access.policy";
-import {
   deleteCredentialArtifactsBatch,
-  getSharedCredentialRow,
-  hasSharedCredential,
+  hasAppCredential,
   listCredentialRowsByServerId,
   resolveRegistryCredential,
-  writeCredential,
 } from "./mcp-credential.repository";
 import { parseHttpsUrl, toServerWithCredential } from "./mcp-mappers";
 import {
@@ -36,30 +26,25 @@ import {
 } from "./mcp-oauth-secret-resolution";
 import { createMcpServerId, readAccountId } from "./mcp-platform-ids";
 import { ensureServerManageAccess, getServerRow } from "./mcp-server.repository";
-export async function createPersonalMcpServer(
+export async function createAppMcpServer(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  input: CreatePersonalMcpServerInput,
+  input: CreateAppMcpServerInput,
 ): Promise<McpServerWithCredential> {
   const viewerId = readAccountId(viewer.id);
-  const membership = await ensureOrganizationMembership(
-    bindings.DB,
-    viewerId,
-    input.organizationId,
-  );
+  await ensureAppOwnership(bindings.DB, viewerId, input.appId);
   const now = currentTimestampMs();
   const serverId = createMcpServerId();
   const serverOwner = {
     authType: input.authType,
-    credentialScope: "user" as const,
+    credentialScope: "app" as const,
     id: serverId,
-    organizationId: input.organizationId,
     ownerId: viewerId,
-    source: "personal" as const,
+    appId: input.appId,
+    source: "app" as const,
   };
   const actor = {
     accountId: viewerId,
-    organizationRole: membership.role,
     type: "user" as const,
   };
   const byoClientSecretSecretId =
@@ -68,8 +53,8 @@ export async function createPersonalMcpServer(
     input.oauthClientSecret !== undefined
       ? await storeMcpOAuthServerClientSecret(bindings, {
           actor,
-          organizationId: input.organizationId,
           purpose: "oauth_server_create_client_secret",
+          appId: input.appId,
           secretKind: "server_client_secret",
           server: serverOwner,
           value: input.oauthClientSecret,
@@ -84,15 +69,15 @@ export async function createPersonalMcpServer(
         byoClientId: input.oauthClientId ?? null,
         byoClientSecretSecretId,
         createdAt: now,
-        credentialScope: "user",
+        credentialScope: "app",
         description: input.description ?? null,
         enabled: true,
         iconUrl: input.iconUrl ?? null,
         id: serverId,
         name: input.name,
-        organizationId: input.organizationId,
         ownerId: viewerId,
-        source: "personal",
+        appId: input.appId,
+        source: "app",
         updatedAt: now,
         url: parseHttpsUrl(input.url),
       })
@@ -101,8 +86,8 @@ export async function createPersonalMcpServer(
     await cleanupStoredMcpOAuthServerClientSecret({
       command: {
         actor,
-        organizationId: input.organizationId,
         purpose: "oauth_server_create_cleanup",
+        appId: input.appId,
         secretId: byoClientSecretSecretId,
         secretKind: "server_client_secret",
         server: serverOwner,
@@ -116,125 +101,14 @@ export async function createPersonalMcpServer(
   return toServerWithCredential(server, null, false);
 }
 
-export async function createOrganizationMcpServer(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  input: CreateOrganizationMcpServerInput,
-): Promise<McpServerWithCredential> {
-  const viewerId = readAccountId(viewer.id);
-  const membership = await ensureOrganizationPermission(
-    bindings.DB,
-    viewerId,
-    input.organizationId,
-    Permission.McpOrganizationManage,
-  );
-
-  if (input.credentialScope === "organization_shared" && input.authType !== "bearer") {
-    throw new Error("Organization shared MCP servers only support bearer authentication.");
-  }
-
-  const now = currentTimestampMs();
-  const serverId = createMcpServerId();
-  const serverOwner = {
-    authType: input.authType,
-    credentialScope: input.credentialScope,
-    id: serverId,
-    organizationId: input.organizationId,
-    ownerId: viewerId,
-    source: "organization_shared" as const,
-  };
-  const actor = {
-    accountId: viewerId,
-    organizationRole: membership.role,
-    type: "user" as const,
-  };
-  const byoClientSecretSecretId =
-    input.authType === "oauth" &&
-    input.oauthClientSecret !== null &&
-    input.oauthClientSecret !== undefined
-      ? await storeMcpOAuthServerClientSecret(bindings, {
-          actor,
-          organizationId: input.organizationId,
-          purpose: "oauth_server_create_client_secret",
-          secretKind: "server_client_secret",
-          server: serverOwner,
-          value: input.oauthClientSecret,
-        })
-      : null;
-
-  try {
-    await getAppDatabase(bindings.DB)
-      .insert(mcpServersTable)
-      .values({
-        authType: input.authType,
-        byoClientId: input.oauthClientId ?? null,
-        byoClientSecretSecretId,
-        createdAt: now,
-        credentialScope: input.credentialScope,
-        description: input.description ?? null,
-        enabled: true,
-        iconUrl: input.iconUrl ?? null,
-        id: serverId,
-        name: input.name,
-        organizationId: input.organizationId,
-        ownerId: viewerId,
-        source: "organization_shared",
-        updatedAt: now,
-        url: parseHttpsUrl(input.url),
-      })
-      .run();
-  } catch (error) {
-    await cleanupStoredMcpOAuthServerClientSecret({
-      command: {
-        actor,
-        organizationId: input.organizationId,
-        purpose: "oauth_server_create_cleanup",
-        secretId: byoClientSecretSecretId,
-        secretKind: "server_client_secret",
-        server: serverOwner,
-      },
-      database: bindings.DB,
-    });
-    throw error;
-  }
-
-  const server = await getServerRow(bindings.DB, serverId);
-
-  if (
-    input.sharedBearerToken !== null &&
-    input.sharedBearerToken !== undefined &&
-    input.authType === "bearer" &&
-    input.credentialScope === "organization_shared"
-  ) {
-    await writeCredential(bindings.DB, bindings, {
-      accessToken: input.sharedBearerToken,
-      authType: "bearer",
-      scope: "organization_shared",
-      scopeValues: [],
-      server,
-      subjectLabel: null,
-    });
-  }
-
-  const credential =
-    server.credentialScope === "organization_shared"
-      ? await getSharedCredentialRow(bindings.DB, server.id)
-      : null;
-
-  return toServerWithCredential(
-    server,
-    credential,
-    await hasSharedCredential(bindings.DB, server.id),
-  );
-}
-
 export async function setMcpServerEnabled(
   database: D1Database,
   viewer: AuthenticatedViewer,
+  appId: AppId,
   serverId: McpServerId,
   enabled: boolean,
 ): Promise<McpServerWithCredential> {
-  await ensureServerManageAccess(database, viewer, serverId);
+  await ensureServerManageAccess(database, viewer, appId, serverId);
   await getAppDatabase(database)
     .update(mcpServersTable)
     .set({ enabled, updatedAt: currentTimestampMs() })
@@ -242,20 +116,21 @@ export async function setMcpServerEnabled(
     .run();
 
   const server = await getServerRow(database, serverId);
-  const [credential, shared] = await Promise.all([
-    resolveRegistryCredential(database, server, viewer.id),
-    hasSharedCredential(database, server.id),
+  const [credential, hasCredential] = await Promise.all([
+    resolveRegistryCredential(database, server),
+    hasAppCredential(database, server.id),
   ]);
 
-  return toServerWithCredential(server, credential, shared);
+  return toServerWithCredential(server, credential, hasCredential);
 }
 
 export async function deleteMcpServer(
   database: D1Database,
   viewer: AuthenticatedViewer,
+  appId: AppId,
   serverId: McpServerId,
 ): Promise<void> {
-  const { membership, server } = await ensureServerManageAccess(database, viewer, serverId);
+  const { server } = await ensureServerManageAccess(database, viewer, appId, serverId);
   const [credentialRows, oauthFlowRows] = await Promise.all([
     listCredentialRowsByServerId(database, serverId),
     listOAuthFlowRowsByServerId(database, serverId),
@@ -265,11 +140,10 @@ export async function deleteMcpServer(
   const serverSecretDelete = await deleteMcpOAuthServerClientSecret(database, {
     actor: {
       accountId: readAccountId(viewer.id),
-      organizationRole: membership.role,
       type: "user",
     },
-    organizationId: server.organizationId,
     purpose: "oauth_server_delete_cleanup",
+    appId,
     secretId: server.byoClientSecretSecretId,
     secretKind: "server_client_secret",
     server,

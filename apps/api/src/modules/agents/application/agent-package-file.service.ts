@@ -2,12 +2,13 @@ import { MAX_AGENT_PACKAGE_ARCHIVE_BYTES } from "@mosoo/agent-package";
 import { getParentPath } from "@mosoo/contracts/file";
 import { fileRecordsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { AccountId, FileId, OrganizationId } from "@mosoo/id";
+import type { AccountId, FileId, AppId } from "@mosoo/id";
 
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
   deleteObject,
@@ -22,7 +23,6 @@ import {
 import { getFileRecordById } from "../../files/application/file-record-read.service";
 import type { FileRecordRow } from "../../files/application/file-record-read.service";
 import { deleteFileById } from "../../files/infrastructure/file-content-service";
-import { ensureOrganizationMembership } from "../../organizations/domain/organization-access.policy";
 
 const AGENT_PACKAGE_FILE_TTL_MS = 24 * 60 * 60 * 1000;
 export const AGENT_PACKAGE_CONTENT_TYPE = "application/zip";
@@ -60,7 +60,7 @@ function createPackageRecordShape(input: {
   createdBy: AccountId;
   fileId: FileId;
   fileName: string;
-  organizationId: OrganizationId;
+  appId: AppId;
 }) {
   const path = createAttachmentPath(input.fileId, input.fileName);
 
@@ -69,7 +69,7 @@ function createPackageRecordShape(input: {
     id: input.fileId,
     name: input.fileName,
     path,
-    scope_id: input.organizationId,
+    scope_id: input.appId,
     scope_kind: "agent_package" as const,
   };
 }
@@ -82,8 +82,8 @@ function toRecordValues(input: {
   fileId: FileId;
   fileName: string;
   objectKey: string;
-  organizationId: OrganizationId;
   purpose: "agent_asset" | "agent_package";
+  appId: AppId;
   size: number;
   timestampMs: number;
 }): FileRecordInsert {
@@ -99,12 +99,12 @@ function toRecordValues(input: {
     mimeType: input.contentType,
     name: input.fileName,
     objectKey: input.objectKey,
-    ownerId: input.organizationId,
-    ownerKind: "organization",
+    ownerId: input.appId,
+    ownerKind: "app",
     parentPath: getParentPath(path),
     path,
     purpose: input.purpose,
-    scopeId: input.organizationId,
+    scopeId: input.appId,
     scopeKind: "agent_package",
     sessionKind: null,
     size: input.size,
@@ -132,10 +132,10 @@ export async function createAgentPackageFile(input: {
   archiveBytes: Uint8Array;
   bindings: ApiBindings;
   fileName: string;
-  organizationId: OrganizationId;
+  appId: AppId;
   viewer: AuthenticatedViewer;
 }): Promise<CreatedAgentPackageFile> {
-  await ensureOrganizationMembership(input.bindings.DB, input.viewer.id, input.organizationId);
+  await ensureAppOwnership(input.bindings.DB, input.viewer.id, input.appId);
   assertAgentPackageFileSize(input.archiveBytes.byteLength);
 
   const fileId = createPlatformId<FileId>();
@@ -145,7 +145,7 @@ export async function createAgentPackageFile(input: {
     createdBy: input.viewer.id,
     fileId,
     fileName,
-    organizationId: input.organizationId,
+    appId: input.appId,
   });
   const objectKey = createFinalObjectKey(recordShape);
   const head = await putObject({
@@ -165,8 +165,8 @@ export async function createAgentPackageFile(input: {
     fileId,
     fileName,
     objectKey,
-    organizationId: input.organizationId,
     purpose: "agent_package",
+    appId: input.appId,
     size: head.contentLength,
     timestampMs,
   });
@@ -178,7 +178,7 @@ export async function createAgentPackageFile(input: {
       bindings: input.bindings,
       context: {
         fileId,
-        organizationId: input.organizationId,
+        appId: input.appId,
       },
       objectKey,
     });
@@ -196,7 +196,7 @@ export async function createAgentPackageFile(input: {
 function assertPackageFileAdmitted(input: {
   file: FileRecordRow;
   nowMs: number;
-  organizationId: OrganizationId;
+  appId: AppId;
   viewerId: AccountId;
 }): void {
   const { file } = input;
@@ -209,12 +209,8 @@ function assertPackageFileAdmitted(input: {
     throw new Error("Agent package file must use the agent_package scope.");
   }
 
-  if (
-    file.scope_id !== input.organizationId ||
-    file.owner_kind !== "organization" ||
-    file.owner_id !== input.organizationId
-  ) {
-    throw new Error("Agent package file does not belong to the target organization.");
+  if (file.scope_id !== input.appId || file.owner_kind !== "app" || file.owner_id !== input.appId) {
+    throw new Error("Agent package file does not belong to the target App.");
   }
 
   if (file.created_by_account_id !== input.viewerId) {
@@ -239,10 +235,10 @@ function assertPackageFileAdmitted(input: {
 export async function readAgentPackageArchiveFile(input: {
   bindings: ApiBindings;
   fileId: FileId;
-  organizationId: OrganizationId;
+  appId: AppId;
   viewer: AuthenticatedViewer;
 }): Promise<{ archiveBytes: Uint8Array; file: FileRecordRow }> {
-  await ensureOrganizationMembership(input.bindings.DB, input.viewer.id, input.organizationId);
+  await ensureAppOwnership(input.bindings.DB, input.viewer.id, input.appId);
 
   const file = await getFileRecordById(input.bindings.DB, input.fileId);
 
@@ -253,7 +249,7 @@ export async function readAgentPackageArchiveFile(input: {
   assertPackageFileAdmitted({
     file,
     nowMs: currentTimestampMs(),
-    organizationId: input.organizationId,
+    appId: input.appId,
     viewerId: input.viewer.id,
   });
 

@@ -17,7 +17,7 @@ import type {
   AgentId,
   EnvironmentId,
   McpServerId,
-  OrganizationId,
+  AppId,
   SkillId,
   SpaceId,
 } from "@mosoo/id";
@@ -37,7 +37,6 @@ export interface CreateDraftAgentInput {
   environmentId: EnvironmentId | null;
   kind: AgentKind;
   model: string;
-  organizationId: OrganizationId;
   ownerId: AccountId;
   packageMcpServers: AgentManifestMcpServerBinding[];
   packageResolution: AgentPackageResolutionState | null;
@@ -45,6 +44,7 @@ export interface CreateDraftAgentInput {
   prompt: string;
   provider: string;
   providerOptions: JsonObject;
+  appId: AppId;
   runtimeId: string;
   skillIds: SkillId[];
   spaceIds: SpaceId[];
@@ -80,7 +80,6 @@ export async function createDraftAgentBatch(
         packageMcpServers: input.packageMcpServers,
         packageSkills: input.packageSkills,
         packageResolution: input.packageResolution,
-        packageSharingEnabled: false,
         providerOptions: input.providerOptions,
       }),
       createdAt: timestampMs,
@@ -90,10 +89,10 @@ export async function createDraftAgentBatch(
       kind: input.kind,
       model: input.model,
       name: input.agentName,
-      organizationId: input.organizationId,
       ownerId: input.ownerId,
       prompt: input.prompt,
       provider: input.provider,
+      appId: input.appId,
       runtimeId: input.runtimeId,
       status: "draft",
       updatedAt: timestampMs,

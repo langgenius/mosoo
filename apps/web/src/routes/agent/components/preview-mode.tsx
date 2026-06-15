@@ -1,4 +1,3 @@
-import type { AgentVisibility } from "@mosoo/contracts/agent";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import type { ReactElement } from "react";
@@ -7,7 +6,7 @@ import { createPortal } from "react-dom";
 
 import { publishAgent } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
-import { toAgentId } from "@/routes/typed-id";
+import { toAgentId, toAppId } from "@/routes/typed-id";
 
 import type { Agent, AgentMode } from "../agent.types";
 import { AgentApiAccessDialog } from "../lifecycle/api-access-panel";
@@ -47,7 +46,6 @@ type PreviewModeAction =
   | { type: "setSuccessModalOpen"; open: boolean };
 
 const DEFAULT_CHANNEL_ID: ChannelId = "slack";
-const DEFAULT_PUBLISH_VISIBILITY: AgentVisibility = "organization";
 const PREVIEW_MODE_INITIAL_STATE: PreviewModeState = {
   apiAccessDialogOpen: false,
   appliedKind: null,
@@ -61,7 +59,6 @@ export interface PreviewModeProps {
   agent: Agent;
   headerActionTarget: HTMLDivElement | null;
   onSwitchMode: (mode: AgentMode | "logs") => void;
-  organizationId: string | null;
 }
 
 function publishStatusMessage({
@@ -113,7 +110,6 @@ export function PreviewMode({
   agent,
   headerActionTarget,
   onSwitchMode,
-  organizationId,
 }: PreviewModeProps): ReactElement {
   const queryClient = useQueryClient();
   const model = useAgentEditorModel({ agent });
@@ -152,22 +148,23 @@ export function PreviewMode({
   )?.message;
 
   const publishMutation = useMutation({
-    mutationFn: async (nextVisibility?: AgentVisibility) =>
+    mutationFn: async () =>
       publishAgent({
         agentId: toAgentId(agent.id),
-        ...(nextVisibility !== undefined ? { visibility: nextVisibility } : {}),
+        appId: toAppId(agent.appId),
       }),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: agentKeys.detail(agent.id) }),
-        queryClient.invalidateQueries({ queryKey: agentKeys.editorState(agent.id) }),
+        queryClient.invalidateQueries({ queryKey: agentKeys.detail(agent.appId, agent.id) }),
+        queryClient.invalidateQueries({
+          queryKey: agentKeys.editorState(agent.appId, agent.id),
+        }),
         queryClient.invalidateQueries({ queryKey: agentKeys.lists() }),
       ]);
       dispatch({ open: true, type: "setSuccessModalOpen" });
     },
   });
 
-  const isLive = agent.status === "published";
   const publishDisabled = publishBlocked || publishMutation.isPending || model.dirty;
   const publishError = publishMutation.error instanceof Error ? publishMutation.error : null;
   const publishStatus = publishStatusMessage({
@@ -193,14 +190,7 @@ export function PreviewMode({
                 dispatch({ open: true, type: "setChannelsDialogOpen" });
               }}
               onPublish={() => {
-                // Re-publish inherits the agent's current visibility (omit). First
-                // publish defaults to organization — audience changes live in
-                // Settings → Collaborators afterward.
-                if (isLive) {
-                  publishMutation.mutate(undefined);
-                } else {
-                  publishMutation.mutate(DEFAULT_PUBLISH_VISIBILITY);
-                }
+                publishMutation.mutate();
               }}
             />,
             headerActionTarget,
@@ -224,7 +214,7 @@ export function PreviewMode({
             configurationChangedAt={agent.updatedAt}
             configurationRevisionKey={`${agent.updatedAt}:${agent.liveVersion?.id ?? "draft"}`}
             key={agent.id}
-            organizationId={organizationId}
+            appId={agent.appId}
             readiness={agent.readiness}
             tone="preview"
           />
@@ -252,7 +242,7 @@ export function PreviewMode({
         />
 
         <div className="min-h-0 flex-1 overflow-y-auto bg-white p-5" data-agent-editor-scroll>
-          <AgentFormView agent={agent} model={model} organizationId={organizationId} />
+          <AgentFormView agent={agent} model={model} />
         </div>
 
         {publishStatus ? (

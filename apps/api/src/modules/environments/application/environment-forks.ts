@@ -3,12 +3,7 @@ import type {
   DeleteEnvironmentInput,
   EnvironmentSummary,
 } from "@mosoo/contracts/environment";
-import {
-  agentsTable,
-  environmentRevisionsTable,
-  environmentsTable,
-  resourceAclTable,
-} from "@mosoo/db";
+import { agentsTable, environmentRevisionsTable, environmentsTable } from "@mosoo/db";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
 import type { AccountId, EnvironmentId } from "@mosoo/id";
 import { and, eq } from "drizzle-orm";
@@ -26,9 +21,7 @@ import {
 import { toConfig, toEnvironmentSummary } from "./environment-config-mapping";
 import {
   allocateCopyName,
-  allocateCopyNamesByOwner,
   cloneConfigWithNewSecrets,
-  collectCascadeForkUsers,
   createEnvironmentFromConfig,
 } from "./environment-write.service";
 export async function createEnvironmentFork(
@@ -37,19 +30,17 @@ export async function createEnvironmentFork(
   input: CreateEnvironmentForkInput,
 ): Promise<EnvironmentSummary> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  const access = await ensureEnvironmentAccess(bindings.DB, viewerId, input.environmentId);
+  const access = await ensureEnvironmentAccess(bindings.DB, viewerId, {
+    environmentId: input.environmentId,
+    appId: input.appId,
+  });
   const environmentId = createPlatformId<EnvironmentId>();
   const config = await cloneConfigWithNewSecrets(bindings, {
     config: toConfig(access.row),
     environmentId,
   });
   const timestampMs = currentTimestampMs();
-  const forkName = await allocateCopyName(
-    bindings.DB,
-    access.row.organizationId,
-    viewerId,
-    access.row.name,
-  );
+  const forkName = await allocateCopyName(bindings.DB, access.row.appId, viewerId, access.row.name);
   const forkId = await createEnvironmentFromConfig(bindings, {
     actorId: viewerId,
     config,
@@ -59,8 +50,8 @@ export async function createEnvironmentFork(
     forkedFromEnvironmentName: access.row.name,
     forkedFromOwnerName: access.row.ownerName ?? "Organization",
     name: forkName,
-    organizationId: access.row.organizationId,
     ownerId: viewerId,
+    appId: access.row.appId,
     timestampMs,
   });
 
@@ -70,7 +61,7 @@ export async function createEnvironmentFork(
     throw new Error("Environment fork could not be loaded.");
   }
 
-  return toEnvironmentSummary(fork, viewerId, false);
+  return toEnvironmentSummary(fork);
 }
 
 export async function deleteEnvironment(
@@ -79,14 +70,17 @@ export async function deleteEnvironment(
   input: DeleteEnvironmentInput,
 ): Promise<void> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  const access = await ensureEnvironmentEditor(bindings.DB, viewerId, input.environmentId);
+  const access = await ensureEnvironmentEditor(bindings.DB, viewerId, {
+    environmentId: input.environmentId,
+    appId: input.appId,
+  });
 
   if (access.row.ownerId === null) {
     throw forbiddenError("Built-in environments cannot be deleted.");
   }
 
   if (access.row.defaultEnvironmentId === access.row.id) {
-    throw new Error("This environment is the organization default.");
+    throw new Error("This environment is the App default.");
   }
 
   const ownerId = access.row.ownerId;
@@ -107,62 +101,6 @@ export async function deleteEnvironment(
     throw new Error("This environment is still used by one or more of the owner's agents.");
   }
 
-  const targetUserIds = await collectCascadeForkUsers(bindings.DB, access.row);
-  const sourceConfig = toConfig(access.row);
-  const timestampMs = currentTimestampMs();
-  const forkNamesByTargetUserId = await allocateCopyNamesByOwner(
-    bindings.DB,
-    access.row.organizationId,
-    targetUserIds,
-    access.row.name,
-  );
-
-  for (const targetUserId of targetUserIds) {
-    const forkEnvironmentId = createPlatformId<EnvironmentId>();
-    const config = await cloneConfigWithNewSecrets(bindings, {
-      config: sourceConfig,
-      environmentId: forkEnvironmentId,
-    });
-    const forkName = forkNamesByTargetUserId.get(targetUserId) ?? `${access.row.name} copy`;
-    const forkId = await createEnvironmentFromConfig(bindings, {
-      actorId: viewerId,
-      config,
-      description: `Forked from ${access.row.ownerName ?? "a member"}'s deleted Environment.`,
-      environmentId: forkEnvironmentId,
-      forkedFromEnvironmentId: access.row.id,
-      forkedFromEnvironmentName: access.row.name,
-      forkedFromOwnerName: access.row.ownerName ?? "Organization",
-      name: forkName,
-      organizationId: access.row.organizationId,
-      ownerId: targetUserId,
-      timestampMs,
-    });
-
-    await getAppDatabase(bindings.DB)
-      .update(agentsTable)
-      .set({
-        environmentId: forkId,
-        updatedAt: timestampMs,
-      })
-      .where(
-        and(
-          eq(agentsTable.environmentId, access.row.id),
-          eq(agentsTable.ownerId, targetUserId),
-          eq(agentsTable.organizationId, access.row.organizationId),
-        ),
-      )
-      .run();
-  }
-
-  await getAppDatabase(bindings.DB)
-    .delete(resourceAclTable)
-    .where(
-      and(
-        eq(resourceAclTable.resourceType, "environment"),
-        eq(resourceAclTable.resourceId, access.row.id),
-      ),
-    )
-    .run();
   await getAppDatabase(bindings.DB)
     .delete(environmentRevisionsTable)
     .where(eq(environmentRevisionsTable.environmentId, access.row.id))

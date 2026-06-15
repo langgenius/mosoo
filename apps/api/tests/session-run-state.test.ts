@@ -3,8 +3,8 @@ import { describe, expect, test } from "bun:test";
 import { updateSessionRunStatusIfActive } from "../src/modules/runtime/application/session-runs/session-run-state.repository";
 import {
   createPublicHttpContractDatabase,
-  insertMemberSession,
-} from "./helpers/published-agent-http-test-fixture";
+  insertNonOwnerSession,
+} from "./helpers/public-api-http-test-fixture";
 
 async function insertQueuedSessionRun(database: D1Database): Promise<void> {
   await database
@@ -51,7 +51,7 @@ async function insertQueuedSessionRun(database: D1Database): Promise<void> {
 describe("session run state", () => {
   test("returns active status transitions", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertQueuedSessionRun(database);
 
     const run = await updateSessionRunStatusIfActive(database, {

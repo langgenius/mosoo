@@ -1,19 +1,18 @@
 import {
   agentChannelBindingsTable,
-  agentsTable,
   wechatChannelAccountsTable,
   wechatContextTokensTable,
 } from "@mosoo/db";
 import type { WeChatChannelAccountRow } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { AccountId, AgentId, ChannelBindingId, OrganizationId, PlatformId } from "@mosoo/id";
+import type { AccountId, AgentId, ChannelBindingId, PlatformId, AppId } from "@mosoo/id";
 import { and, eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { validationError } from "../../../platform/errors";
 import { currentTimestampMs, toIsoString } from "../../../time";
-import { ensureAgentEditor } from "../../agents/application/agent-access.service";
+import { ensureAppAgentOwner } from "../../agents/application/agent-access.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { deleteSecretsById } from "../../mcp/application/mcp-secret-store";
 import {
@@ -42,6 +41,7 @@ export interface WeChatChannelAccount {
   id: ChannelBindingId;
   lastErrorCode: string | null;
   ownerAccountId: AccountId;
+  appId: AppId;
   runtimeStateJson: string;
   status: WeChatChannelAccountRow["status"];
   updatedAt: string;
@@ -72,6 +72,7 @@ function toWeChatChannelAccount(row: WeChatChannelAccountRow): WeChatChannelAcco
     id: row.id,
     lastErrorCode: row.lastErrorCode,
     ownerAccountId: row.ownerAccountId,
+    appId: row.appId,
     runtimeStateJson: row.runtimeStateJson,
     status: row.status,
     updatedAt: toIsoString(row.updatedAt),
@@ -117,30 +118,11 @@ async function readWeChatContextTokenSecretIdsForAccount(
   return rows.map((row) => row.encryptedContextTokenSecretId);
 }
 
-async function readWeChatAccountOrganizationId(
-  database: D1Database,
-  input: { agentId: AgentId },
-): Promise<OrganizationId> {
-  const row =
-    (await getAppDatabase(database)
-      .select({ organizationId: agentsTable.organizationId })
-      .from(agentsTable)
-      .where(eq(agentsTable.id, input.agentId))
-      .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    throw validationError("WeChat channel account owner is unavailable.");
-  }
-
-  return row.organizationId as OrganizationId;
-}
-
 async function cleanupStoredWeChatCredentialSecrets(input: {
   agentId: AgentId;
   database: D1Database;
-  organizationId: OrganizationId;
   purpose: "channel_binding_replace_cleanup" | "channel_binding_write_rollback";
+  appId: AppId;
   secretIds: readonly PlatformId[];
 }): Promise<boolean> {
   let cleanupSucceeded = true;
@@ -150,8 +132,8 @@ async function cleanupStoredWeChatCredentialSecrets(input: {
       (await cleanupStoredAgentChannelBindingCredentialSecret({
         command: {
           agentId: input.agentId,
-          organizationId: input.organizationId,
           provider: "wechat",
+          appId: input.appId,
           purpose: input.purpose,
           secretId,
         },
@@ -172,15 +154,12 @@ export async function readWeChatChannelAccountWithCredentials(
     return null;
   }
 
-  const organizationId = await readWeChatAccountOrganizationId(bindings.DB, {
-    agentId: row.agentId,
-  });
   const credentials = parseWeChatChannelCredentials(
     await readAgentChannelBindingCredentialSecret(bindings, {
       bindingId: row.id,
       expectedOwner: {
         agentId: row.agentId,
-        organizationId,
+        appId: row.appId,
       },
       provider: "wechat",
       purpose: "channel_context",
@@ -199,11 +178,15 @@ export async function persistConfirmedWeChatQrPairing(
   viewer: AuthenticatedViewer,
   input: {
     agentId: AgentId;
+    appId: AppId;
     snapshot: WeChatQrPairingSnapshot;
   },
 ): Promise<WeChatChannelAccount> {
   const viewerId = viewer.id;
-  const access = await ensureAgentEditor(bindings.DB, viewer.id, input.agentId);
+  const access = await ensureAppAgentOwner(bindings.DB, viewer.id, {
+    agentId: input.agentId,
+    appId: input.appId,
+  });
 
   if (access.agent.status !== "published") {
     throw validationError("Publish the Agent before connecting WeChat.", "AGENT_NOT_PUBLISHED");
@@ -215,7 +198,12 @@ export async function persistConfirmedWeChatQrPairing(
     (await database
       .select()
       .from(wechatChannelAccountsTable)
-      .where(eq(wechatChannelAccountsTable.agentId, input.agentId))
+      .where(
+        and(
+          eq(wechatChannelAccountsTable.agentId, input.agentId),
+          eq(wechatChannelAccountsTable.appId, input.appId),
+        ),
+      )
       .limit(1)
       .get()) ?? null;
   const existingBinding =
@@ -225,6 +213,7 @@ export async function persistConfirmedWeChatQrPairing(
       .where(
         and(
           eq(agentChannelBindingsTable.agentId, input.agentId),
+          eq(agentChannelBindingsTable.appId, input.appId),
           eq(agentChannelBindingsTable.provider, "wechat"),
         ),
       )
@@ -235,6 +224,7 @@ export async function persistConfirmedWeChatQrPairing(
       .select({
         agentId: wechatChannelAccountsTable.agentId,
         id: wechatChannelAccountsTable.id,
+        appId: wechatChannelAccountsTable.appId,
       })
       .from(wechatChannelAccountsTable)
       .where(
@@ -246,7 +236,10 @@ export async function persistConfirmedWeChatQrPairing(
       .limit(1)
       .get()) ?? null;
 
-  if (existingForRuntime && existingForRuntime.agentId !== input.agentId) {
+  if (
+    existingForRuntime &&
+    (existingForRuntime.agentId !== input.agentId || existingForRuntime.appId !== input.appId)
+  ) {
     throw validationError(
       "This WeChat account is already connected to an Agent.",
       "WECHAT_ACCOUNT_BOUND",
@@ -264,8 +257,8 @@ export async function persistConfirmedWeChatQrPairing(
   const encryptedCredsSecretId = await storeAgentChannelBindingCredentialSecret(bindings, {
     agentId: input.agentId,
     credentialsJson: serializeWeChatChannelCredentials(credentials),
-    organizationId: access.agent.organizationId,
     provider: "wechat",
+    appId: input.appId,
     purpose:
       existingForAgent || existingBinding ? "channel_binding_update" : "channel_binding_create",
   });
@@ -303,6 +296,7 @@ export async function persistConfirmedWeChatQrPairing(
               externalBotId: credentials.ilinkBotId,
               externalTenantId: credentials.ilinkUserId,
               lastErrorCode: null,
+              appId: input.appId,
               status: "active",
               updatedAt: nowMs,
             })
@@ -317,6 +311,7 @@ export async function persistConfirmedWeChatQrPairing(
             id: accountId,
             lastErrorCode: null,
             provider: "wechat",
+            appId: input.appId,
             status: "active",
             updatedAt: nowMs,
           });
@@ -331,6 +326,7 @@ export async function persistConfirmedWeChatQrPairing(
             externalBotId: credentials.ilinkBotId,
             lastErrorCode: null,
             ownerAccountId: viewerId,
+            appId: input.appId,
             status: "idle",
             statusChangedAt: nowMs,
             updatedAt: nowMs,
@@ -365,6 +361,7 @@ export async function persistConfirmedWeChatQrPairing(
           lastInboundAt: null,
           lastPollAt: null,
           ownerAccountId: viewerId,
+          appId: input.appId,
           runtimeStateJson: "{}",
           status: "idle",
           statusChangedAt: nowMs,
@@ -377,8 +374,8 @@ export async function persistConfirmedWeChatQrPairing(
     await cleanupStoredWeChatCredentialSecrets({
       agentId: input.agentId,
       database: bindings.DB,
-      organizationId: access.agent.organizationId,
       purpose: "channel_binding_write_rollback",
+      appId: input.appId,
       secretIds: [encryptedCredsSecretId],
     });
     throw error;
@@ -387,8 +384,8 @@ export async function persistConfirmedWeChatQrPairing(
   await cleanupStoredWeChatCredentialSecrets({
     agentId: input.agentId,
     database: bindings.DB,
-    organizationId: access.agent.organizationId,
     purpose: "channel_binding_replace_cleanup",
+    appId: input.appId,
     secretIds: staleCredentialSecretIds,
   });
   await deleteSecretsById(bindings.DB, staleContextTokenSecretIds);

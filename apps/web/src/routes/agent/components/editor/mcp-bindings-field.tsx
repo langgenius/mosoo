@@ -19,7 +19,6 @@ import { Switch } from "@/shared/ui/switch";
 import { isTruthy } from "../../../../shared/lib/truthiness";
 import { IconAvatar } from "../../../integrations/mcp/icon-avatar";
 import type { McpServer } from "../../agent.types";
-type McpSource = "personal" | "organization_shared";
 
 function toDraftMcpServer(server: PoolServer): McpServer {
   const draftServer: McpServer = {
@@ -45,41 +44,22 @@ function toDraftMcpServer(server: PoolServer): McpServer {
   return draftServer;
 }
 
-function findPoolServer(
-  poolServers: PoolServer[],
-  serverId: string,
-): { server: PoolServer; source: McpSource } | null {
-  const server = poolServers.find((candidate) => candidate.id === serverId);
-
-  if (!server) {
-    return null;
-  }
-
-  return {
-    server,
-    source: server.source === "organization_shared" ? "organization_shared" : "personal",
-  };
-}
-
 function McpAddDropdown({
   addedIds,
   onPick,
   open,
   onOpenChange,
-  personalPool,
-  organizationPool,
+  servers,
 }: {
   addedIds: Set<string>;
   onPick: (server: PoolServer) => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
-  personalPool: PoolServer[];
-  organizationPool: PoolServer[];
+  servers: PoolServer[];
 }) {
-  const availablePersonal = personalPool.filter((server) => !addedIds.has(server.id));
-  const availableOrganization = organizationPool.filter((server) => !addedIds.has(server.id));
-  const nothingLeft = availablePersonal.length === 0 && availableOrganization.length === 0;
-  const noServersAtAll = personalPool.length === 0 && organizationPool.length === 0;
+  const availableServers = servers.filter((server) => !addedIds.has(server.id));
+  const nothingLeft = availableServers.length === 0;
+  const noServersAtAll = servers.length === 0;
 
   return (
     <DropdownMenu onOpenChange={onOpenChange} open={open}>
@@ -103,28 +83,12 @@ function McpAddDropdown({
           </div>
         ) : (
           <>
-            {availablePersonal.length > 0 ? (
-              <>
-                <DropdownMenuLabel className="text-muted-foreground text-[10px] tracking-wider uppercase">
-                  Personal
-                </DropdownMenuLabel>
-                {availablePersonal.map((server) => (
-                  <McpPickerItem key={server.id} server={server} onPick={() => onPick(server)} />
-                ))}
-              </>
-            ) : null}
-
-            {availableOrganization.length > 0 ? (
-              <>
-                {availablePersonal.length > 0 ? <DropdownMenuSeparator /> : null}
-                <DropdownMenuLabel className="text-muted-foreground text-[10px] tracking-wider uppercase">
-                  Shared with me
-                </DropdownMenuLabel>
-                {availableOrganization.map((server) => (
-                  <McpPickerItem key={server.id} server={server} onPick={() => onPick(server)} />
-                ))}
-              </>
-            ) : null}
+            <DropdownMenuLabel className="text-muted-foreground text-[10px] tracking-wider uppercase">
+              App MCP
+            </DropdownMenuLabel>
+            {availableServers.map((server) => (
+              <McpPickerItem key={server.id} server={server} onPick={() => onPick(server)} />
+            ))}
           </>
         )}
 
@@ -160,21 +124,19 @@ function McpPickerItem({ server, onPick }: { server: PoolServer; onPick(): void 
 
 export function AgentMcpBindingsField({
   readOnly = false,
-  organizationId,
+  appId,
   selectedServers,
   setServers,
 }: {
   readOnly?: boolean;
-  organizationId: string | null;
+  appId: string | null;
   selectedServers: McpServer[];
   setServers: (servers: McpServer[]) => void;
 }) {
   const [addOpen, setAddOpen] = useState(false);
-  const registryQuery = useMcpRegistryQuery(organizationId);
+  const registryQuery = useMcpRegistryQuery(appId);
 
-  const personalPool = registryQuery.data?.personal ?? [];
-  const organizationPool = registryQuery.data?.organizationShared ?? [];
-  const combinedPool = [...personalPool, ...organizationPool];
+  const poolServers = registryQuery.data?.servers ?? [];
   const addedIds = useMemo(
     () => new Set(selectedServers.map((server) => server.id)),
     [selectedServers],
@@ -193,10 +155,10 @@ export function AgentMcpBindingsField({
     setServers(selectedServers.filter((server) => server.id !== serverId));
   }
 
-  if (!isTruthy(organizationId)) {
+  if (!isTruthy(appId)) {
     return (
       <div className="border-border text-muted-foreground rounded-lg border p-3 text-[12px]">
-        Select a organization before managing MCP bindings.
+        Select an App before managing MCP bindings.
       </div>
     );
   }
@@ -214,12 +176,8 @@ export function AgentMcpBindingsField({
   return (
     <div className="space-y-1">
       {selectedServers.map((server) => {
-        const pool = findPoolServer(combinedPool, server.id);
-        const source = server.source ?? pool?.source ?? "personal";
-        const sourceLabel =
-          source === "organization_shared"
-            ? `Organization · ${pool?.server.ownerName ?? "Admin"}`
-            : "Personal";
+        const pool = poolServers.find((candidate) => candidate.id === server.id);
+        const sourceLabel = `App · ${pool?.ownerName ?? "Owner"}`;
 
         return (
           <div
@@ -267,8 +225,7 @@ export function AgentMcpBindingsField({
           onOpenChange={setAddOpen}
           onPick={addServer}
           open={addOpen}
-          personalPool={personalPool}
-          organizationPool={organizationPool}
+          servers={poolServers}
         />
       ) : null}
     </div>

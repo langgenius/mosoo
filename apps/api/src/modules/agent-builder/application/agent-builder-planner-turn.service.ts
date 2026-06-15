@@ -304,7 +304,6 @@ export async function appendAgentBuilderPlannerTurnResult(
           errorMessage: null,
           id: plannerRunId,
           model: plannerExecution.modelId,
-          organizationId: thread.organizationId,
           outputJson,
           provider: plannerExecution.provider,
           requestDigest,

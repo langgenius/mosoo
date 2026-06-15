@@ -6,20 +6,26 @@
 //
 // The script fetches the manifest, derives a section + canonical page URL for each
 // entry, and rewrites the region between the GENERATED markers in help-docs.ts.
-// Run the project formatter afterwards (`bun run fmt`) so the output matches style.
+// Run the app formatter afterwards (`bun run fmt`) so the output matches style.
 
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const MANIFEST_URL = "https://docs.mosoo.ai/llms.txt";
 const TARGET_PATH = fileURLToPath(
-  new URL("../../apps/web/src/shared/config/help-docs.ts", import.meta.url),
+  new URL("../apps/web/src/shared/config/help-docs.ts", import.meta.url),
 );
 const BEGIN_MARKER = "// <generated:help-docs>";
 const END_MARKER = "// </generated:help-docs>";
 
 const SECTION_ORDER = ["Getting started", "CLI", "API reference"] as const;
 type Section = (typeof SECTION_ORDER)[number];
+
+const TITLE_OVERRIDES_BY_PATHNAME: Record<string, string> = {
+  "api-reference/create-a-thread-for-a-published-agent":
+    "Create a Thread for an Agent API Endpoint",
+  "api-reference/list-threads-for-a-published-agent": "List Threads for an Agent API Endpoint",
+};
 
 // Lower number sorts first within "Getting started"; everything else keeps
 // manifest order.
@@ -73,8 +79,8 @@ function parseManifest(text: string): HelpDocEntry[] {
       continue;
     }
 
-    const title = match[1].trim();
     const { pathname, url } = toPageUrl(rawUrl);
+    const title = TITLE_OVERRIDES_BY_PATHNAME[pathname] ?? match[1].trim();
     entries.push({ manifestIndex: entries.length, section: classifySection(pathname), title, url });
   }
 

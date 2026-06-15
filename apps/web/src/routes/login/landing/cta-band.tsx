@@ -30,7 +30,7 @@ export function CtaBand({ onContinue }: { onContinue: () => void }): ReactElemen
       ref={panelRef}
       className="bg-ink-900 relative overflow-hidden px-4 py-16 md:px-6 md:py-20"
     >
-      {sceneVisible ? <UnicornBackground projectId={CTA_SCENE_ID} /> : null}
+      {sceneVisible ? <UnicornBackground sceneId={CTA_SCENE_ID} /> : null}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-[1]"

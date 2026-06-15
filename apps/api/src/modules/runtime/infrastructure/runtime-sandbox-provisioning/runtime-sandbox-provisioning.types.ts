@@ -4,7 +4,7 @@ import type { DriverBootPayload } from "agent-driver/boot";
 import type { DriverBootPayloadPreparedHandler } from "../../application/execution-plane/driver-boot-payload-prepared";
 import type { RuntimeTimingSnapshot } from "../../application/session-runs/session-runtime-timing";
 import type {
-  DriverOrganizationAccessSnapshotOutput,
+  DriverAppAccessSnapshotOutput,
   DriverProfileConfig,
   DriverResolvedMcpServer,
   DriverResolvedSkill,
@@ -43,5 +43,5 @@ export interface ProvisionDriverInput {
   sandboxSessionId: SessionId;
   sessionRunId?: SessionRunId | null;
   traceId?: string | null;
-  organizationAccessSnapshot: DriverOrganizationAccessSnapshotOutput;
+  appAccessSnapshot: DriverAppAccessSnapshotOutput;
 }

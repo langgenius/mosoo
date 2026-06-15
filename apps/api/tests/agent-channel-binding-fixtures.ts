@@ -4,8 +4,9 @@ import { agentDeploymentVersionsTable, agentsTable } from "@mosoo/db";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { readFetchUrl } from "./helpers/fetch-request-url";
-import type { createPublicHttpContractDatabase } from "./helpers/published-agent-http-test-fixture";
-import { nowMsForTest } from "./helpers/published-agent-http-test-fixture";
+import type { createPublicHttpContractDatabase } from "./helpers/public-api-http-test-fixture";
+import { PUBLIC_API_TEST_IDS } from "./helpers/public-api-http-test-fixture";
+import { nowMsForTest } from "./helpers/public-api-http-test-fixture";
 
 export const OWNER_VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",
@@ -15,12 +16,12 @@ export const OWNER_VIEWER: AuthenticatedViewer = {
   name: "Owner",
 };
 
-export const COLLABORATOR_VIEWER: AuthenticatedViewer = {
-  email: "collaborator@example.com",
+export const EXTERNAL_VIEWER: AuthenticatedViewer = {
+  email: "external@example.com",
   emailVerified: true,
   id: "01J00000000000000000000003",
   imageUrl: null,
-  name: "Collaborator",
+  name: "External Viewer",
 };
 
 export const SLACK_AUTH_TEST_OK_RESPONSE = {
@@ -291,14 +292,13 @@ export async function withWeChatQrMock<T>(input: {
   }
 }
 
-export async function insertSecondPublishedAgent(
+export async function insertSecondLiveAgent(
   database: Awaited<ReturnType<typeof createPublicHttpContractDatabase>>,
 ): Promise<void> {
   const nowMs = nowMsForTest();
   const configJson = JSON.stringify({
     packageMcpServers: [],
     packageResolution: null,
-    packageSharingEnabled: false,
     packageSkills: [],
   });
   const appDatabase = database.app();
@@ -314,15 +314,15 @@ export async function insertSecondPublishedAgent(
       kind: "pet",
       liveDeploymentVersionId: "01J00000000000000000000069",
       model: "gpt-5.4",
-      name: "Second Published Agent",
-      organizationId: "01J00000000000000000000006",
+      name: "Second Live Agent",
       ownerId: "01J00000000000000000000001",
       prompt: "Help again.",
       provider: "openai",
+      appId: PUBLIC_API_TEST_IDS.app,
       runtimeId: "openai-runtime",
       status: "published",
       updatedAt: nowMs,
-      visibility: "organization",
+      visibility: "private",
     })
     .run();
 

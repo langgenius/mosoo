@@ -5,7 +5,7 @@ import type { FormEvent } from "react";
 
 import { createDiscordAgentChannelBinding } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
-import { toAgentId } from "@/routes/typed-id";
+import { toAgentId, toAppId } from "@/routes/typed-id";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -15,7 +15,7 @@ import type { ChannelInlineSetupAgent } from "./settings-dialog-channel-agent";
 const DISCORD_RELAY_SECRET_LABEL = "Relay Secret";
 const DISCORD_DEVELOPER_PORTAL_URL = "https://discord.com/developers/applications";
 const DiscordSetupCaveat =
-  "Save validates the bot token with Discord. The Gateway connection starts after the binding exists; send a real DM or guild mention after saving to verify delivery in your workspace.";
+  "Save validates the bot token with Discord. The Gateway connection starts after the binding exists; send a real DM or guild mention after saving to verify delivery in your Discord server.";
 const DiscordIntentsPrerequisite =
   "Before connecting, open your app in the Discord Developer Portal → Bot → Privileged Gateway Intents and enable Message Content Intent. Without it Discord closes the Gateway with discord_gateway_disallowed_intents and the bot cannot read message text.";
 
@@ -34,7 +34,9 @@ export function DiscordChannelInlineSetup({
   const mutation = useMutation({
     mutationFn: createDiscordAgentChannelBinding,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: agentKeys.channelBindings(agent.id) });
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.channelBindings(agent.appId, agent.id),
+      });
       onSuccess?.();
     },
   });
@@ -57,6 +59,7 @@ export function DiscordChannelInlineSetup({
       agentId: toAgentId(agent.id),
       applicationId: applicationId.trim(),
       botToken: botToken.trim(),
+      appId: toAppId(agent.appId),
       relaySecret: relaySecret.trim(),
     });
   }

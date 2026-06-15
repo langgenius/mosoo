@@ -17,7 +17,8 @@ import { OWNER_VIEWER } from "./channel-final-delivery-fetch-fixtures";
 import {
   createTestExecutionContext,
   nowMsForTest,
-} from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
 
 interface CompletedFinalDeliveryJob {
   bindingId: string;
@@ -32,8 +33,9 @@ export async function createCompletedTelegramFinalDeliveryJob(input: {
   externalEventId: string;
 }): Promise<CompletedFinalDeliveryJob> {
   const binding = await createTelegramAgentChannelBinding(input.bindings, OWNER_VIEWER, {
-    agentId: "01J00000000000000000000009",
+    agentId: PUBLIC_API_TEST_IDS.agent,
     botToken: "telegram-token",
+    appId: PUBLIC_API_TEST_IDS.app,
     webhookSecret: "telegram-webhook-secret",
   });
   const context = await resolveAgentChannelBindingContextById(input.bindings, {
@@ -117,9 +119,10 @@ export async function createCompletedDiscordFinalDeliveryJob(input: {
   externalEventId: string;
 }): Promise<CompletedFinalDeliveryJob> {
   const binding = await createDiscordAgentChannelBinding(input.bindings, OWNER_VIEWER, {
-    agentId: "01J00000000000000000000009",
+    agentId: PUBLIC_API_TEST_IDS.agent,
     applicationId: "discord-app-1",
     botToken: "discord-token",
+    appId: PUBLIC_API_TEST_IDS.app,
     relaySecret: "discord-relay-secret",
   });
   const context = await resolveAgentChannelBindingContextById(input.bindings, {
@@ -206,12 +209,13 @@ export async function createCompletedLarkFinalDeliveryJob(input: {
   externalEventId: string;
 }): Promise<CompletedFinalDeliveryJob> {
   const binding = await createLarkAgentChannelBinding(input.bindings, OWNER_VIEWER, {
-    agentId: "01J00000000000000000000009",
-    appId: "cli_a",
+    agentId: PUBLIC_API_TEST_IDS.agent,
+    larkAppId: "cli_a",
     appSecret: "secret",
     connectionMode: "webhook",
     domain: "feishu",
     encryptKey: "encrypt-key",
+    appId: PUBLIC_API_TEST_IDS.app,
     verificationToken: "verification-token",
   });
   const context = await resolveAgentChannelBindingContextById(input.bindings, {

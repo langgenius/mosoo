@@ -31,7 +31,7 @@ export async function streamFileContent(
   const file = await ensureFileAccess({
     database: bindings.DB,
     fileId,
-    requiredRole: "read",
+    requiredIntent: "view",
     viewer,
   });
 
@@ -65,7 +65,7 @@ export async function deleteFileById(
   const file = await ensureFileAccess({
     database: bindings.DB,
     fileId,
-    requiredRole: "edit",
+    requiredIntent: "write",
     viewer,
   });
 

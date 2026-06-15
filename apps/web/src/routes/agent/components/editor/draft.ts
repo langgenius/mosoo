@@ -394,7 +394,6 @@ function readMcpServers(value: unknown, fallback: McpServer[]): McpServer[] {
 
     const credentialMode = server["credentialMode"];
     const enabled = server["enabled"];
-    const source = server["source"];
 
     return [
       {
@@ -404,7 +403,7 @@ function readMcpServers(value: unknown, fallback: McpServer[]): McpServer[] {
         enabled: typeof enabled === "boolean" ? enabled : true,
         id,
         name,
-        ...(source === "personal" || source === "organization_shared" ? { source } : {}),
+        source: "app",
         type: "web" as const,
         url,
       },

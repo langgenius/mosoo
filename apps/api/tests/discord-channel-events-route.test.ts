@@ -18,8 +18,9 @@ import {
   createPublicHttpTestBindings,
   createRecordedQueueMessage,
   createTestExecutionContext,
-} from "./helpers/published-agent-http-test-fixture";
-import type { ApiCommandQueueStub } from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
+import type { ApiCommandQueueStub } from "./helpers/public-api-http-test-fixture";
 
 const OWNER_VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",
@@ -144,9 +145,10 @@ describe("Discord channel events route", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createDiscordAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         applicationId: "app-1",
         botToken: "discord-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         relaySecret: "discord-relay-secret",
       });
       const body = JSON.stringify({
@@ -188,15 +190,16 @@ describe("Discord channel events route", () => {
     });
   });
 
-  test("accepts signed Discord DM MESSAGE_CREATE dispatches for a published Agent binding", async () => {
+  test("accepts signed Discord DM MESSAGE_CREATE dispatches for a Agent API Endpoint binding", async () => {
     await withDiscordFetchMock(async () => {
       const app = createDiscordRouteTestApp();
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createDiscordAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         applicationId: "app-1",
         botToken: "discord-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         relaySecret: "discord-relay-secret",
       });
       const body = JSON.stringify({
@@ -245,9 +248,10 @@ describe("Discord channel events route", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createDiscordAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         applicationId: "app-1",
         botToken: "discord-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         relaySecret: "discord-relay-secret",
       });
 
@@ -327,9 +331,10 @@ describe("Discord channel events route", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createDiscordAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         applicationId: "app-1",
         botToken: "discord-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         relaySecret: "discord-relay-secret",
       });
       const body = JSON.stringify({
@@ -402,9 +407,10 @@ describe("Discord channel events route", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createDiscordAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         applicationId: "app-1",
         botToken: "discord-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         relaySecret: "discord-relay-secret",
       });
       const body = JSON.stringify({

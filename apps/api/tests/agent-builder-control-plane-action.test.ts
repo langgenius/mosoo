@@ -8,6 +8,8 @@ import {
 } from "./helpers/agent-builder-api-fixture";
 import type { AgentBuilderApiFixture } from "./helpers/agent-builder-api-fixture";
 
+type ControlPlaneActionInput = Parameters<typeof executeAgentBuilderControlPlaneAction>[2];
+
 const COMPLETE_DRAFT_YAML = [
   "version: 1",
   "kind: cattle",
@@ -31,6 +33,16 @@ const COMPLETE_DRAFT_YAML = [
 ].join("\n");
 const TOMBSTONE_MCP_SERVER_ID = "01J000000000000000000000M2";
 const TOMBSTONE_SKILL_ID = "01J000000000000000000000F2";
+
+async function executeFixtureControlPlaneAction(
+  fixture: AgentBuilderApiFixture,
+  input: Omit<ControlPlaneActionInput, "appId">,
+) {
+  return executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+    ...input,
+    appId: fixture.ids.appId,
+  });
+}
 
 async function insertAnthropicVendorCredential(fixture: AgentBuilderApiFixture): Promise<void> {
   await insertAgentBuilderVendorCredential(fixture, {
@@ -63,7 +75,7 @@ async function insertPreviewSession(
       message_seq_cursor,
       metadata_json,
       model,
-      organization_id,
+      app_id,
       provider,
       renamed,
       runtime_id,
@@ -85,7 +97,7 @@ async function insertPreviewSession(
       1,
       "{}",
       "claude-sonnet-4-5",
-      fixture.ids.organizationId,
+      fixture.ids.appId,
       "anthropic",
       0,
       "claude-agent-sdk",
@@ -123,7 +135,7 @@ describe("Agent Builder control-plane action execution", () => {
 
   test("creates an Environment directly when the action carries a payload", async () => {
     const fixture = await createAgentBuilderApiFixture();
-    const result = await executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+    const result = await executeFixtureControlPlaneAction(fixture, {
       agentId: fixture.ids.agentId,
       createEnvironmentPayload: {
         description: "Build sandbox for the Slack bot.",
@@ -140,22 +152,22 @@ describe("Agent Builder control-plane action execution", () => {
     expect(result.createdEnvironment?.name).toBe("Slack Bot Environment");
 
     const row = await fixture.bindings.DB.prepare(
-      "SELECT description, name, owner_account_id, organization_id FROM environment WHERE id = ?",
+      "SELECT app_id, description, name, owner_account_id FROM environment WHERE id = ?",
     )
       .bind(result.createdEnvironment?.id ?? "")
       .first();
 
     expect(row).toMatchObject({
+      app_id: fixture.ids.appId,
       description: "Build sandbox for the Slack bot.",
       name: "Slack Bot Environment",
-      organization_id: fixture.ids.organizationId,
       owner_account_id: fixture.viewer.id,
     });
   });
 
   test("creates an MCP server record directly and routes credential connection to secure UI", async () => {
     const fixture = await createAgentBuilderApiFixture();
-    const result = await executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+    const result = await executeFixtureControlPlaneAction(fixture, {
       agentId: fixture.ids.agentId,
       createRemoteMcpServerPayload: {
         authType: "bearer",
@@ -180,7 +192,7 @@ describe("Agent Builder control-plane action execution", () => {
     });
 
     const row = await fixture.bindings.DB.prepare(
-      "SELECT auth_type, name, source, url FROM mcp_server WHERE id = ?",
+      "SELECT auth_type, name, app_id, source, url FROM mcp_server WHERE id = ?",
     )
       .bind(result.createdMcpServer?.id ?? "")
       .first();
@@ -188,7 +200,8 @@ describe("Agent Builder control-plane action execution", () => {
     expect(row).toMatchObject({
       auth_type: "bearer",
       name: "Linear MCP",
-      source: "personal",
+      app_id: fixture.ids.appId,
+      source: "app",
       url: "https://mcp.linear.app/mcp",
     });
 
@@ -203,7 +216,7 @@ describe("Agent Builder control-plane action execution", () => {
 
   test("returns noop when the MCP server payload is rejected", async () => {
     const fixture = await createAgentBuilderApiFixture();
-    const result = await executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+    const result = await executeFixtureControlPlaneAction(fixture, {
       agentId: fixture.ids.agentId,
       createRemoteMcpServerPayload: {
         authType: "bearer",
@@ -222,7 +235,7 @@ describe("Agent Builder control-plane action execution", () => {
     const fixture = await createAgentBuilderApiFixture();
 
     await expect(
-      executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+      executeFixtureControlPlaneAction(fixture, {
         agentId: fixture.ids.agentId,
         draftYaml: COMPLETE_DRAFT_YAML,
         toolId: "apply_agent_config",
@@ -254,7 +267,7 @@ describe("Agent Builder control-plane action execution", () => {
     const fixture = await createAgentBuilderApiFixture();
     await insertAnthropicVendorCredential(fixture);
 
-    const result = await executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+    const result = await executeFixtureControlPlaneAction(fixture, {
       agentId: fixture.ids.agentId,
       draftYaml: COMPLETE_DRAFT_YAML,
       toolId: "apply_agent_config",
@@ -299,7 +312,7 @@ describe("Agent Builder control-plane action execution", () => {
         "      state: tombstone",
       ].join("\n"),
     );
-    const result = await executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+    const result = await executeFixtureControlPlaneAction(fixture, {
       agentId: fixture.ids.agentId,
       draftYaml,
       toolId: "apply_agent_config",
@@ -326,7 +339,7 @@ describe("Agent Builder control-plane action execution", () => {
         "      state: tombstone",
       ].join("\n"),
     );
-    const result = await executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+    const result = await executeFixtureControlPlaneAction(fixture, {
       agentId: fixture.ids.agentId,
       draftYaml,
       toolId: "apply_agent_config",
@@ -345,7 +358,7 @@ describe("Agent Builder control-plane action execution", () => {
     const fixture = await createAgentBuilderApiFixture();
 
     await expect(
-      executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+      executeFixtureControlPlaneAction(fixture, {
         agentId: fixture.ids.agentId,
         draftYaml: "  ",
         toolId: "apply_agent_config",
@@ -357,7 +370,7 @@ describe("Agent Builder control-plane action execution", () => {
     const fixture = await createAgentBuilderApiFixture();
 
     await expect(
-      executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+      executeFixtureControlPlaneAction(fixture, {
         agentId: fixture.ids.agentId,
         draftYaml: "[]",
         toolId: "apply_agent_config",
@@ -386,7 +399,7 @@ describe("Agent Builder control-plane action execution", () => {
     ].join("\n");
 
     await expect(
-      executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+      executeFixtureControlPlaneAction(fixture, {
         agentId: fixture.ids.agentId,
         draftYaml: malformedAssetDraftYaml,
         toolId: "apply_agent_config",
@@ -412,7 +425,7 @@ describe("Agent Builder control-plane action execution", () => {
     ].join("\n");
 
     await expect(
-      executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+      executeFixtureControlPlaneAction(fixture, {
         agentId: fixture.ids.agentId,
         draftYaml: malformedMcpAssetDraftYaml,
         toolId: "apply_agent_config",
@@ -439,7 +452,7 @@ describe("Agent Builder control-plane action execution", () => {
     ].join("\n");
 
     await expect(
-      executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+      executeFixtureControlPlaneAction(fixture, {
         agentId: fixture.ids.agentId,
         draftYaml: malformedAssetsDraftYaml,
         toolId: "apply_agent_config",
@@ -466,7 +479,7 @@ describe("Agent Builder control-plane action execution", () => {
     ].join("\n");
 
     await expect(
-      executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+      executeFixtureControlPlaneAction(fixture, {
         agentId: fixture.ids.agentId,
         draftYaml: malformedFieldDraftYaml,
         toolId: "apply_agent_config",
@@ -497,7 +510,7 @@ describe("Agent Builder control-plane action execution", () => {
     ].join("\n");
 
     await expect(
-      executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+      executeFixtureControlPlaneAction(fixture, {
         agentId: fixture.ids.agentId,
         draftYaml: malformedSpaceStateDraftYaml,
         toolId: "apply_agent_config",
@@ -528,7 +541,7 @@ describe("Agent Builder control-plane action execution", () => {
     ].join("\n");
 
     await expect(
-      executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+      executeFixtureControlPlaneAction(fixture, {
         agentId: fixture.ids.agentId,
         draftYaml: malformedSkillStateDraftYaml,
         toolId: "apply_agent_config",
@@ -552,7 +565,7 @@ describe("Agent Builder control-plane action execution", () => {
     ].join("\n");
 
     await expect(
-      executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+      executeFixtureControlPlaneAction(fixture, {
         agentId: fixture.ids.agentId,
         draftYaml: incompleteDraftYaml,
         toolId: "create_agent",
@@ -563,10 +576,10 @@ describe("Agent Builder control-plane action execution", () => {
   test("blocks stale Create Agent actions after the Agent leaves draft state", async () => {
     const fixture = await createAgentBuilderApiFixture();
     await fixture.bindings.DB.prepare("UPDATE agent SET name = ?, status = ? WHERE id = ?")
-      .bind("Published Agent", "published", fixture.ids.agentId)
+      .bind("Public API Agent", "published", fixture.ids.agentId)
       .run();
 
-    const result = await executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+    const result = await executeFixtureControlPlaneAction(fixture, {
       agentId: fixture.ids.agentId,
       draftYaml: COMPLETE_DRAFT_YAML,
       toolId: "create_agent",
@@ -581,14 +594,14 @@ describe("Agent Builder control-plane action execution", () => {
       toolId: "create_agent",
     });
     expect(row).toEqual({
-      name: "Published Agent",
+      name: "Public API Agent",
       status: "published",
     });
   });
 
   test("marks Preview opened without creating a preview Session", async () => {
     const fixture = await createAgentBuilderApiFixture();
-    const result = await executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+    const result = await executeFixtureControlPlaneAction(fixture, {
       agentId: fixture.ids.agentId,
       toolId: "open_preview",
     });
@@ -648,7 +661,7 @@ describe("Agent Builder control-plane action execution", () => {
       updatedAt: 50,
     });
 
-    const result = await executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+    const result = await executeFixtureControlPlaneAction(fixture, {
       agentId: fixture.ids.agentId,
       toolId: "reset_preview_session",
     });
@@ -670,7 +683,7 @@ describe("Agent Builder control-plane action execution", () => {
 
   test("routes missing Environment creation payloads to secure UI", async () => {
     const fixture = await createAgentBuilderApiFixture();
-    const result = await executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+    const result = await executeFixtureControlPlaneAction(fixture, {
       agentId: fixture.ids.agentId,
       toolId: "create_environment",
     });
@@ -685,7 +698,7 @@ describe("Agent Builder control-plane action execution", () => {
 
   test("routes missing remote MCP server creation payloads to secure UI", async () => {
     const fixture = await createAgentBuilderApiFixture();
-    const result = await executeAgentBuilderControlPlaneAction(fixture.bindings, fixture.viewer, {
+    const result = await executeFixtureControlPlaneAction(fixture, {
       agentId: fixture.ids.agentId,
       toolId: "create_remote_mcp_server",
     });

@@ -1,0 +1,72 @@
+import { PUBLIC_API_OPENAPI_SCHEMAS } from "@mosoo/contracts/public-api";
+
+function jsonResponse(description: string, schema: Record<string, unknown>) {
+  return {
+    content: {
+      "application/json": {
+        schema,
+      },
+    },
+    description,
+  };
+}
+
+export function createPublicApiOpenApiComponents() {
+  return {
+    responses: {
+      Conflict: jsonResponse(
+        "The Agent/session state rejects this action, or an Idempotency-Key is already processing or was reused for a different request.",
+        {
+          $ref: "#/components/schemas/ErrorResponse",
+        },
+      ),
+      Forbidden: jsonResponse("The caller cannot consume this Agent.", {
+        $ref: "#/components/schemas/ErrorResponse",
+      }),
+      InternalError: jsonResponse("The request failed unexpectedly.", {
+        $ref: "#/components/schemas/ErrorResponse",
+      }),
+      InvalidRequest: jsonResponse("The request shape or query value is invalid.", {
+        $ref: "#/components/schemas/ErrorResponse",
+      }),
+      NotFound: jsonResponse("The resource was not found for this caller.", {
+        $ref: "#/components/schemas/ErrorResponse",
+      }),
+      RateLimited: {
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/ErrorResponse" },
+          },
+        },
+        description:
+          "The caller token exceeded the public API request budget for the current window.",
+        headers: {
+          "Retry-After": {
+            description: "Seconds to wait before retrying the request.",
+            schema: { minimum: 1, type: "integer" },
+          },
+        },
+      },
+      Unauthenticated: jsonResponse("A valid Access Token is required.", {
+        $ref: "#/components/schemas/ErrorResponse",
+      }),
+    },
+    schemas: PUBLIC_API_OPENAPI_SCHEMAS,
+    securitySchemes: {
+      publicApiBearer: {
+        bearerFormat: "Mosoo Access Token",
+        description:
+          "Use Authorization: Bearer mst_... . Access Tokens identify an account and do not carry scopes.",
+        scheme: "bearer",
+        type: "http",
+      },
+      accessToken: {
+        bearerFormat: "Mosoo Access Token",
+        description:
+          "Use Authorization: Bearer mst_... . Access Tokens identify an account and do not carry scopes.",
+        scheme: "bearer",
+        type: "http",
+      },
+    },
+  };
+}

@@ -1,4 +1,4 @@
-import type { SessionId } from "@mosoo/contracts/id";
+import type { AppId, SessionId } from "@mosoo/contracts/id";
 
 import { graphql } from "@/gql";
 import type { AgentSessionDiagnosticsQuery, ThreadAgentSessionRetrieveQuery } from "@/gql/graphql";
@@ -9,8 +9,8 @@ export interface ThreadAgentSessionRetrieveResult {
 }
 
 const THREAD_AGENT_SESSION_RETRIEVE_QUERY = graphql(/* GraphQL */ `
-  query ThreadAgentSessionRetrieve($sessionId: ULID!) {
-    threadAgentSessionRetrieve(sessionId: $sessionId) {
+  query ThreadAgentSessionRetrieve($appId: ULID!, $sessionId: ULID!) {
+    threadAgentSessionRetrieve(appId: $appId, sessionId: $sessionId) {
       capabilities {
         action
         reason
@@ -50,8 +50,8 @@ const THREAD_AGENT_SESSION_RETRIEVE_QUERY = graphql(/* GraphQL */ `
           updatedAt
         }
         model
-        organizationId
         provider
+        appId
         runtimeId
         status
         title
@@ -62,8 +62,8 @@ const THREAD_AGENT_SESSION_RETRIEVE_QUERY = graphql(/* GraphQL */ `
 `);
 
 const AGENT_SESSION_DIAGNOSTICS_QUERY = graphql(/* GraphQL */ `
-  query AgentSessionDiagnostics($sessionId: ULID!) {
-    agentSessionDiagnostics(sessionId: $sessionId) {
+  query AgentSessionDiagnostics($appId: ULID!, $sessionId: ULID!) {
+    agentSessionDiagnostics(appId: $appId, sessionId: $sessionId) {
       execution {
         binding {
           deploymentVersionId
@@ -119,9 +119,11 @@ const AGENT_SESSION_DIAGNOSTICS_QUERY = graphql(/* GraphQL */ `
 `);
 
 export async function retrieveThreadAgentSession(input: {
+  appId: AppId;
   sessionId: SessionId;
 }): Promise<ThreadAgentSessionRetrieveResult> {
   const payload = await requestGraphQL(THREAD_AGENT_SESSION_RETRIEVE_QUERY, {
+    appId: input.appId,
     sessionId: input.sessionId,
   });
 
@@ -131,9 +133,11 @@ export async function retrieveThreadAgentSession(input: {
 }
 
 export async function getAgentSessionDiagnostics(input: {
+  appId: AppId;
   sessionId: SessionId;
 }): Promise<AgentSessionDiagnosticsQuery> {
   return requestGraphQL(AGENT_SESSION_DIAGNOSTICS_QUERY, {
+    appId: input.appId,
     sessionId: input.sessionId,
   });
 }

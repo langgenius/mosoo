@@ -56,7 +56,6 @@ export function prepareAgentEnvironmentConfigWrite(input: {
     packageMcpServers: stored.packageMcpServers,
     packageSkills: stored.packageSkills,
     packageResolution: stored.packageResolution,
-    packageSharingEnabled: stored.packageSharingEnabled,
     providerOptions: input.providerOptions ?? stored.providerOptions,
   });
 

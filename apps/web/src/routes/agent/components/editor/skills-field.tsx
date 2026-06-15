@@ -19,7 +19,7 @@ import { MarkdownPreviewDialog } from "./markdown-preview-dialog";
 import { useAgentSkillsFieldModel } from "./use-skills-field-model";
 
 interface AgentSkillsFieldProps {
-  organizationId: string | null;
+  appId: string | null;
   readOnly?: boolean;
   selectedSkills: SkillInfo[];
   setSkills(skills: SkillInfo[]): void;
@@ -37,10 +37,10 @@ export function AgentSkillsField({
   readOnly = false,
   selectedSkills,
   setSkills,
-  organizationId,
+  appId,
 }: AgentSkillsFieldProps): ReactElement {
   const model = useAgentSkillsFieldModel({
-    organizationId,
+    appId,
     selectedSkills,
     setSkills,
   });
@@ -180,11 +180,7 @@ function renderSkillsDropdownContent({
 
   return (
     <>
-      <SkillPickerGroup label="Personal" onAdd={onAdd} skills={model.availablePersonalSkills} />
-      {model.availablePersonalSkills.length > 0 && model.availableSharedSkills.length > 0 ? (
-        <DropdownMenuSeparator />
-      ) : null}
-      <SkillPickerGroup label="Shared with me" onAdd={onAdd} skills={model.availableSharedSkills} />
+      <SkillPickerGroup label="App skills" onAdd={onAdd} skills={model.availablePersonalSkills} />
     </>
   );
 }

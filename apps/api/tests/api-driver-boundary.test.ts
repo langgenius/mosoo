@@ -20,7 +20,7 @@ import {
   readPermissionRequestViews,
   removePermissionRequest,
 } from "../src/modules/runtime/infrastructure/driver-instance/event-projection";
-import { projectRuntimeDriverEvents } from "../src/modules/runtime/infrastructure/driver-instance/events";
+import { appRuntimeDriverEvents } from "../src/modules/runtime/infrastructure/driver-instance/events";
 import { readNativeResumeRef } from "../src/modules/runtime/infrastructure/driver-instance/native-resume-ref-event";
 import { parseDriverEventBatchInput } from "../src/modules/runtime/infrastructure/driver-instance/rpc-wire";
 import {
@@ -260,11 +260,11 @@ describe("API to driver boundary", () => {
         runtimeId: "openai-runtime",
         value: "thread-1",
       },
-      organizationAccessSnapshot: {
+      appAccessSnapshot: {
         entries: [
           {
+            canWrite: true,
             mountPath: "/workspace/docs",
-            role: "edit",
             spaceId: API_DRIVER_BOUNDARY_IDS.space,
             type: "space",
           },
@@ -282,10 +282,10 @@ describe("API to driver boundary", () => {
     expect(execution.environment.variables).toEqual({
       EXISTING_ENV: "kept",
     });
-    expect(execution.session.context.organizationAccessSnapshot.entries).toEqual([
+    expect(execution.session.context.appAccessSnapshot.entries).toEqual([
       {
+        canWrite: true,
         mountPath: "/workspace/docs",
-        role: "edit",
         spaceId: API_DRIVER_BOUNDARY_IDS.space,
         type: "space",
       },
@@ -332,7 +332,7 @@ describe("API to driver boundary", () => {
   test("emits a boot payload that the driver protocol parser accepts", async () => {
     const execution = await buildExecutionSpec(bindings, {
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
-      organizationAccessSnapshot: {
+      appAccessSnapshot: {
         entries: [],
       },
       profile: createDriverProfile(),
@@ -431,7 +431,7 @@ describe("API to driver boundary", () => {
     expect(envelope.occurredAt).toBe(10);
   });
 
-  test("projects admitted driver wire events into API runtime and viewer events", async () => {
+  test("apps admitted driver wire events into API runtime and viewer events", async () => {
     const link = createRuntimeSessionLink();
     const permissionRequested = createDriverEvent({
       kind: "permission.requested",
@@ -459,7 +459,7 @@ describe("API to driver boundary", () => {
       ],
     });
 
-    const projection = await projectRuntimeDriverEvents(new SqliteD1Database(), {
+    const projection = await appRuntimeDriverEvents(new SqliteD1Database(), {
       currentLiveState: createBaseLiveState({
         callerId: link.callerId,
         creatorId: link.creatorId,

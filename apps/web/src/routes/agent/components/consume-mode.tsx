@@ -13,12 +13,10 @@ export function ConsumeMode({
   agent,
   showConfigButton,
   onOpenConfig,
-  organizationId,
 }: {
   agent: Agent;
   showConfigButton?: boolean;
   onOpenConfig?: () => void;
-  organizationId: string | null;
 }): ReactElement {
   const runtime = getRuntimeInfo(agent.runtime);
   const navigate = useNavigate();
@@ -68,7 +66,7 @@ export function ConsumeMode({
           agentName={agent.name}
           readiness={agent.readiness}
           tone="consume"
-          organizationId={organizationId}
+          appId={agent.appId}
         />
       </div>
     </div>

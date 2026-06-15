@@ -73,7 +73,7 @@ Platform-side goals:
 | Sandbox state          | The vendor-native local state, login state, cache, native session state, and rebuildable caches inside a Sandbox. Pet state persists with the stable Sandbox by default; Cattle state is destroyed with the Session Sandbox by default.                                                                                                                                                  |
 | Sandbox workspace      | The `/workspace` skeleton the Runtime provisions inside the Sandbox before any session run or Owner debug terminal opens. It contains three subdirectories: `/workspace/cache` (rebuildable cache for Environment packages and setup artifacts), `/workspace/memory` (persistent agent state survived across runs), and `/workspace/se` (per-session execution scratch space).                  |
 | NativeRuntimeRef       | The vendor's own recovery pointer, such as an OpenAI runtime thread or a Claude session. It enters internal runtime state only and is never exposed as a public id.                                                                                                                                                                                                                      |
-| Diagnostics            | The diagnostic view for Owner/Admin, showing the runtime transport, driver type, rendered config summary, native events, drift signals, and errors.                                                                                                                                                                                                                                      |
+| Diagnostics            | The diagnostic view for the App owner, showing the runtime transport, driver type, rendered config summary, native events, drift signals, and errors.                                                                                                                                                                                                                                     |
 | Readiness              | The runnability check before Preview / Publish. When a required item is missing, it blocks the run and provides a fix entry.                                                                                                                                                                                                                                                             |
 | Runtime catalog        | The registry of M1 confirmed runtimes (`OpenAI runtime` / `claude-agent-sdk`) plus planned runtimes (`opencode` / `openclaw` / `gemini` / `hermes` / `pi` / `cursor-agent`). Each entry self-reports its visibility, transport, provider/default provider/default model, whether it accepts a custom provider, driver backend, and capabilities / unsupported gaps / envVarRestartKinds. |
 
@@ -120,7 +120,7 @@ Decisions:
 - The Driver exposes only a unified AG-UI event stream upward.
 - Mosoo custom events do not introduce a separate protocol; they are AG-UI `CUSTOM` events.
 - The Runtime may handle permissions, attribution, persistence, and filtering, but it does not leak vendor-native events directly to the frontend.
-- Ordinary users do not see `native.event` by default; Owner/Admin can see a summary or debug log in Diagnostics.
+- Non-owners do not see `native.event` by default; the App owner can see a summary or debug log in Diagnostics.
 
 ### 4.3 Product Manifest and Runtime State
 
@@ -152,7 +152,7 @@ Decisions:
 | Wait for confirmation | Driver requests to run a command or access a resource            | Approval card                        | Medium        | Unsure of the risk                                      | Show the action, target, and risk; allow / deny                                                        |
 | Auto recovery         | Sandbox / Driver briefly interrupted                             | Working pill + reconnecting subtitle | Low to medium | Afraid the task was lost                                | Keep the previous pill frame and show reconnecting, without requiring the user to understand hibernate |
 | Failure block         | The run is unrecoverable or configuration is missing             | Error banner / Diagnostics           | Low           | Unsure whether it is a config error or a broken runtime | Distinguish Fix config / New session / Diagnostics                                                     |
-| Diagnose              | Owner/Admin opens Debug                                          | Diagnostics                          | Medium        | Native state is a black box                             | Show transport, rendered config, native drift, and debug events                                        |
+| Diagnose              | App owner opens Debug                                            | Diagnostics                          | Medium        | Native state is a black box                             | Show transport, rendered config, native drift, and debug events                                        |
 
 ### 5.1 Preview happy path
 

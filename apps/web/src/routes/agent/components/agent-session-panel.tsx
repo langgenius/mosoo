@@ -15,7 +15,7 @@ import {
   useSessionFilesStore,
 } from "@/features/session-files/session-files-store";
 import { uploadSessionResource } from "@/features/session-files/session-resource-upload";
-import { toSessionId } from "@/routes/typed-id";
+import { toAppId, toSessionId } from "@/routes/typed-id";
 import { Button } from "@/shared/ui/button";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
@@ -35,7 +35,7 @@ export function AgentSessionPanel({
   configurationChangedAt,
   configurationRevisionKey,
   tone,
-  organizationId,
+  appId,
   readiness,
 }: {
   agentId: string;
@@ -44,13 +44,13 @@ export function AgentSessionPanel({
   configurationRevisionKey?: string | null;
   readiness: AgentReadiness | null;
   tone: "preview" | "consume";
-  organizationId: string | null;
+  appId: string | null;
 }) {
   const model = useAgentSessionPanelModel({
     agentId,
     configurationChangedAt: configurationChangedAt ?? null,
     configurationRevisionKey: configurationRevisionKey ?? null,
-    organizationId,
+    appId,
     readiness,
     requireFreshConfiguration: tone === "preview",
     sessionType: tone === "preview" ? "preview" : "ui",
@@ -131,11 +131,13 @@ export function AgentSessionPanel({
 
         try {
           markSessionFileUploadProgress(sessionId, pendingId, 35);
-          const uploadedResource = await uploadSessionResource(sessionId, file);
+          const uploadedResource = await uploadSessionResource(appId, sessionId, file);
           markSessionFileUploadProgress(sessionId, pendingId, 95);
           completeSessionFileUpload(sessionId, pendingId);
           resourceDraft.appendMention(sessionId, uploadedResource);
-          await queryClient.invalidateQueries({ queryKey: sessionResourcesQueryKey(sessionId) });
+          await queryClient.invalidateQueries({
+            queryKey: sessionResourcesQueryKey(appId === null ? null : toAppId(appId), sessionId),
+          });
         } catch {
           failSessionFileUpload(sessionId, pendingId);
         }

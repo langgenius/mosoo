@@ -4,7 +4,7 @@ import type { SandboxSessionId } from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 
 import type {
-  DriverOrganizationAccessSnapshotOutput,
+  DriverAppAccessSnapshotOutput,
   DriverProfileConfig,
 } from "../src/modules/runtime/domain/driver-snapshot";
 import type {
@@ -33,7 +33,7 @@ const SESSION_ID = PLATFORM_ID_FIXTURES.session;
 const SESSION_RUN_ID = PLATFORM_ID_FIXTURES.sessionRun;
 const SANDBOX_SESSION_ID = SESSION_ID as unknown as SandboxSessionId;
 
-const ORGANIZATION_ACCESS_SNAPSHOT: DriverOrganizationAccessSnapshotOutput = {
+const APP_ACCESS_SNAPSHOT: DriverAppAccessSnapshotOutput = {
   entries: [],
 };
 
@@ -169,7 +169,7 @@ describe("driver session readiness", () => {
     await expect(
       ensureDriverSessionReady(bindings, "https://api.test/runtime", {
         cloudflareSession: {} as ExecutionSessionHandle,
-        organizationAccessSnapshot: ORGANIZATION_ACCESS_SNAPSHOT,
+        appAccessSnapshot: APP_ACCESS_SNAPSHOT,
         profile: PROFILE,
         resolvedMcpServers: [],
         resolvedSkillCatalog: [],

@@ -2,12 +2,13 @@ import { useRef, useState } from "react";
 
 import { uploadSpaceFiles } from "../../domains/file/api/space-file-client";
 import { isTruthy } from "../../shared/lib/truthiness";
-import { toSpaceId } from "../typed-id";
+import { toAppId, toSpaceId } from "../typed-id";
 import { createUploadRow, getErrorMessage, readCurrentEtag } from "./use-space-browser-upload";
 import type { PendingUploadConflict, UploadRow } from "./use-space-browser-upload";
 interface UseSpaceUploadControllerInput {
   activeSpace: string | null;
   currentPath: string;
+  appId: string | null;
   refreshFiles: () => Promise<void>;
   setFileActionError: (message: string | null) => void;
 }
@@ -15,6 +16,7 @@ interface UseSpaceUploadControllerInput {
 export function useSpaceUploadController({
   activeSpace,
   currentPath,
+  appId,
   refreshFiles,
   setFileActionError,
 }: UseSpaceUploadControllerInput) {
@@ -39,7 +41,7 @@ export function useSpaceUploadController({
       rows?: UploadRow[];
     } = {},
   ) {
-    if (!isTruthy(activeSpace) || inputFiles.length === 0) {
+    if (!isTruthy(appId) || !isTruthy(activeSpace) || inputFiles.length === 0) {
       return;
     }
 
@@ -51,29 +53,36 @@ export function useSpaceUploadController({
     setFileActionError(null);
 
     try {
-      const result = await uploadSpaceFiles(toSpaceId(activeSpace), inputFiles, parentPath, {
-        conflictMode: options.conflictMode,
-        onFileProgress(progress) {
-          const rowId = rows[progress.index]?.id;
+      const result = await uploadSpaceFiles(
+        toAppId(appId),
+        toSpaceId(activeSpace),
+        inputFiles,
+        parentPath,
+        {
+          conflictMode: options.conflictMode,
+          replaceIfMatchEtag: options.replaceIfMatchEtag,
+          onFileProgress(progress) {
+            const rowId = rows[progress.index]?.id;
 
-          if (!isTruthy(rowId)) {
-            return;
-          }
+            if (!isTruthy(rowId)) {
+              return;
+            }
 
-          setUploadRows((current) =>
-            current.map((row) =>
-              row.id === rowId
-                ? {
-                    ...row,
-                    error: progress.error,
-                    path: progress.path,
-                    status: progress.status,
-                  }
-                : row,
-            ),
-          );
+            setUploadRows((current) =>
+              current.map((row) =>
+                row.id === rowId
+                  ? {
+                      ...row,
+                      error: progress.error,
+                      path: progress.path,
+                      status: progress.status,
+                    }
+                  : row,
+              ),
+            );
+          },
         },
-      });
+      );
 
       if (result.successCount > 0) {
         await refreshFiles();

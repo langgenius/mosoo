@@ -24,7 +24,7 @@ export interface FinalizeReadyFileRecordInput {
 }
 
 function getReadyFileExpiresAt(context: FileUploadContext): number | null {
-  return context.file.purpose === "agent_package" || context.file.purpose === "organization_draft"
+  return context.file.purpose === "agent_package" || context.file.purpose === "app_draft"
     ? context.file.expires_at
     : null;
 }
@@ -49,10 +49,7 @@ export async function finalizeReadyFileRecord(
   await getAppDatabase(bindings.DB)
     .update(fileRecordsTable)
     .set({
-      committed:
-        context.file.scope_kind === "session" ||
-        context.file.scope_kind === "organization_avatar" ||
-        context.file.committed === 1,
+      committed: context.file.scope_kind === "session" || context.file.committed === 1,
       etag: finalHead.etag,
       expiresAt: getReadyFileExpiresAt(context),
       mimeType: finalHead.contentType,

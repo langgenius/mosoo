@@ -2,7 +2,7 @@ import type { PrimitiveRecord } from "@mosoo/contracts";
 import { agentChannelBindingsTable, sessionsTable } from "@mosoo/db";
 import type { AgentChannelBindingProvider } from "@mosoo/db";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
-import type { AgentId, ChannelBindingId, OrganizationId, PlatformId } from "@mosoo/id";
+import type { AgentId, ChannelBindingId, PlatformId, AppId } from "@mosoo/id";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -13,8 +13,7 @@ import {
   validationError,
 } from "../../../platform/errors";
 import { currentTimestampMs, toIsoString } from "../../../time";
-import { ensureAgentReadable } from "../../agents/application/agent-access.service";
-import type { ensureAgentEditor } from "../../agents/application/agent-access.service";
+import { ensureAppAgentOwner } from "../../agents/application/agent-access.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import type { AgentChannelBinding } from "./agent-channel-binding.types";
 import {
@@ -28,7 +27,7 @@ interface AgentChannelBindingActivity {
   sessionCount7d: number;
 }
 
-type AgentEditorAccess = Awaited<ReturnType<typeof ensureAgentEditor>>;
+type AppAgentOwnerAccess = Awaited<ReturnType<typeof ensureAppAgentOwner>>;
 
 const AGENT_CHANNEL_BINDING_PROVIDER_LABELS = {
   discord: "Discord",
@@ -60,15 +59,15 @@ function createChannelAppAlreadyConnectedError(): Error {
 async function cleanupStoredChannelBindingSecret(input: {
   agentId: AgentId;
   database: D1Database;
-  organizationId: OrganizationId;
   provider: AgentChannelBindingProvider;
+  appId: AppId;
   secretId: PlatformId;
 }): Promise<void> {
   await cleanupStoredAgentChannelBindingCredentialSecret({
     command: {
       agentId: input.agentId,
-      organizationId: input.organizationId,
       provider: input.provider,
+      appId: input.appId,
       purpose: "channel_binding_create_rollback",
       secretId: input.secretId,
     },
@@ -147,6 +146,7 @@ export async function ensureProviderBindingAvailable(
     createAppBindingConflictError?: (() => Error) | undefined;
     externalBotId?: string;
     externalTenantId?: string;
+    appId: AppId;
     provider: AgentChannelBindingProvider;
   },
 ): Promise<void> {
@@ -157,6 +157,7 @@ export async function ensureProviderBindingAvailable(
     .where(
       and(
         eq(agentChannelBindingsTable.agentId, input.agentId),
+        eq(agentChannelBindingsTable.appId, input.appId),
         eq(agentChannelBindingsTable.provider, input.provider),
       ),
     )
@@ -206,6 +207,7 @@ function toAgentChannelBinding(
     externalTenantId: row.externalTenantId,
     id: row.id,
     lastErrorCode: row.lastErrorCode,
+    appId: row.appId,
     provider: row.provider,
     status: row.status,
     updatedAt: toIsoString(row.updatedAt),
@@ -259,18 +261,26 @@ async function loadAgentChannelBindingActivities(
 export async function listAgentChannelBindings(
   database: D1Database,
   viewer: AuthenticatedViewer,
-  agentId: AgentId,
+  input: {
+    agentId: AgentId;
+    appId: AppId;
+  },
 ): Promise<AgentChannelBinding[]> {
-  await ensureAgentReadable(database, viewer.id, agentId);
+  await ensureAppAgentOwner(database, viewer.id, input);
   const rows = await getAppDatabase(database)
     .select()
     .from(agentChannelBindingsTable)
-    .where(eq(agentChannelBindingsTable.agentId, agentId))
+    .where(
+      and(
+        eq(agentChannelBindingsTable.agentId, input.agentId),
+        eq(agentChannelBindingsTable.appId, input.appId),
+      ),
+    )
     .orderBy(asc(agentChannelBindingsTable.id))
     .all();
 
   const activityByBindingId = await loadAgentChannelBindingActivities(database, {
-    agentId,
+    agentId: input.agentId,
     bindingIds: rows.map((row) => row.id),
   });
 
@@ -278,7 +288,7 @@ export async function listAgentChannelBindings(
 }
 
 export async function createProviderAgentChannelBinding(input: {
-  access: AgentEditorAccess;
+  access: AppAgentOwnerAccess;
   bindings: ApiBindings;
   credentialsJson: string;
   displayMetadata: PrimitiveRecord;
@@ -289,13 +299,11 @@ export async function createProviderAgentChannelBinding(input: {
   viewer: AuthenticatedViewer;
 }): Promise<AgentChannelBinding> {
   const agentId = parsePlatformId<AgentId>(input.access.agent.id, "agent ID");
-  const organizationId = parsePlatformId<OrganizationId>(
-    input.access.agent.organizationId,
-    "organization ID",
-  );
+  const appId = parsePlatformId<AppId>(input.access.agent.appId, "app ID");
 
   await ensureProviderBindingAvailable(input.bindings.DB, {
     agentId,
+    appId,
     externalBotId: input.externalBotId,
     externalTenantId: input.externalTenantId,
     createAppBindingConflictError: input.createAppBindingConflictError,
@@ -307,8 +315,8 @@ export async function createProviderAgentChannelBinding(input: {
   const encryptedCredsSecretId = await storeAgentChannelBindingCredentialSecret(input.bindings, {
     agentId,
     credentialsJson: input.credentialsJson,
-    organizationId,
     provider: input.provider,
+    appId,
     purpose: "channel_binding_create",
   });
 
@@ -325,6 +333,7 @@ export async function createProviderAgentChannelBinding(input: {
         id,
         lastErrorCode: null,
         provider: input.provider,
+        appId,
         status: "active",
         updatedAt: timestampMs,
       })
@@ -333,8 +342,8 @@ export async function createProviderAgentChannelBinding(input: {
     await cleanupStoredChannelBindingSecret({
       agentId,
       database: input.bindings.DB,
-      organizationId,
       provider: input.provider,
+      appId,
       secretId: encryptedCredsSecretId,
     });
     if (isAgentProviderConflict(error)) {

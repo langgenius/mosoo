@@ -32,6 +32,7 @@ const credentialColumns = {
   lastRefreshedAt: mcpCredentialsTable.lastRefreshedAt,
   oauthClientId: mcpCredentialsTable.oauthClientId,
   oauthClientSecretSecretId: mcpCredentialsTable.oauthClientSecretSecretId,
+  appId: mcpCredentialsTable.appId,
   refreshSecretId: mcpCredentialsTable.refreshSecretId,
   scope: mcpCredentialsTable.scope,
   scopeValuesJson: mcpCredentialsTable.scopeValuesJson,
@@ -46,7 +47,7 @@ const credentialColumns = {
 const credentialSecretServerColumns = {
   credentialScope: mcpServersTable.credentialScope,
   id: mcpServersTable.id,
-  organizationId: mcpServersTable.organizationId,
+  appId: mcpServersTable.appId,
 };
 
 function scopedCredentialKey(input: { agentId: AgentId | null; serverId: McpServerId }): string {
@@ -66,7 +67,7 @@ function credentialMatchesExplicitAgentBinding(
   );
 }
 
-export async function getSharedCredentialRow(
+export async function getAppCredentialRow(
   database: D1Database,
   serverId: McpServerId,
 ): Promise<CredentialRow | null> {
@@ -74,33 +75,7 @@ export async function getSharedCredentialRow(
     (await getAppDatabase(database)
       .select(credentialColumns)
       .from(mcpCredentialsTable)
-      .where(
-        and(
-          eq(mcpCredentialsTable.serverId, serverId),
-          eq(mcpCredentialsTable.scope, "organization_shared"),
-        ),
-      )
-      .limit(1)
-      .get()) ?? null
-  );
-}
-
-export async function getUserCredentialRow(
-  database: D1Database,
-  serverId: McpServerId,
-  userId: AccountId,
-): Promise<CredentialRow | null> {
-  return (
-    (await getAppDatabase(database)
-      .select(credentialColumns)
-      .from(mcpCredentialsTable)
-      .where(
-        and(
-          eq(mcpCredentialsTable.serverId, serverId),
-          eq(mcpCredentialsTable.scope, "user"),
-          eq(mcpCredentialsTable.accountId, userId),
-        ),
-      )
+      .where(and(eq(mcpCredentialsTable.serverId, serverId), eq(mcpCredentialsTable.scope, "app")))
       .limit(1)
       .get()) ?? null
   );
@@ -144,14 +119,14 @@ export async function listCredentialRowsByServerId(
     .all();
 }
 
-export async function hasSharedCredential(
+export async function hasAppCredential(
   database: D1Database,
   serverId: McpServerId,
 ): Promise<boolean> {
-  return (await listServerIdsWithSharedCredentials(database, [serverId])).has(serverId);
+  return (await listServerIdsWithAppCredentials(database, [serverId])).has(serverId);
 }
 
-export async function listServerIdsWithSharedCredentials(
+export async function listServerIdsWithAppCredentials(
   database: D1Database,
   serverIds: McpServerId[],
 ): Promise<Set<McpServerId>> {
@@ -167,7 +142,7 @@ export async function listServerIdsWithSharedCredentials(
     .where(
       and(
         inArray(mcpCredentialsTable.serverId, uniqueServerIds),
-        eq(mcpCredentialsTable.scope, "organization_shared"),
+        eq(mcpCredentialsTable.scope, "app"),
         eq(mcpCredentialsTable.status, "active"),
       ),
     )
@@ -179,29 +154,15 @@ export async function listServerIdsWithSharedCredentials(
 export async function resolveRegistryCredential(
   database: D1Database,
   server: ServerRow,
-  viewerId: AccountId,
 ): Promise<CredentialRow | null> {
-  if (server.credentialScope === "organization_shared") {
-    return getSharedCredentialRow(database, server.id);
-  }
-
-  if (server.source === "personal" && server.ownerId !== viewerId) {
-    return null;
-  }
-
-  return getUserCredentialRow(database, server.id, viewerId);
+  return getAppCredentialRow(database, server.id);
 }
 
 export async function listCredentialsForAgentBindings(
   database: D1Database,
   bindings: AgentBindingRow[],
-  runtimeCredentialUserId: AccountId,
 ): Promise<Map<AgentMcpBindingId, CredentialRow | null>> {
-  const credentials = await resolveCredentialsForMcpBindings(
-    database,
-    bindings,
-    runtimeCredentialUserId,
-  );
+  const credentials = await resolveCredentialsForMcpBindings(database, bindings);
 
   return new Map(bindings.map((binding, index) => [binding.id, credentials[index] ?? null]));
 }
@@ -209,7 +170,6 @@ export async function listCredentialsForAgentBindings(
 export async function resolveCredentialsForMcpBindings(
   database: D1Database,
   bindings: readonly McpCredentialResolutionBinding[],
-  runtimeCredentialUserId: AccountId,
 ): Promise<(CredentialRow | null)[]> {
   const resolvedCredentials = bindings.map(() => null as CredentialRow | null);
 
@@ -224,24 +184,12 @@ export async function resolveCredentialsForMcpBindings(
   const agentScopedBindings = bindings.filter(
     (binding) => binding.credentialMode === "agent_bound" && !isTruthy(binding.agentCredentialId),
   );
-  const sharedServerIds = [
+  const appCredentialServerIds = [
     ...new Set(
       bindings
         .filter(
           (binding) =>
-            binding.credentialMode === "runtime_resolved" &&
-            binding.credentialScope === "organization_shared",
-        )
-        .map((binding) => binding.serverId),
-    ),
-  ];
-  const userServerIds = [
-    ...new Set(
-      bindings
-        .filter(
-          (binding) =>
-            binding.credentialMode === "runtime_resolved" &&
-            binding.credentialScope !== "organization_shared",
+            binding.credentialMode === "runtime_resolved" && binding.credentialScope === "app",
         )
         .map((binding) => binding.serverId),
     ),
@@ -266,22 +214,10 @@ export async function resolveCredentialsForMcpBindings(
     }
   }
 
-  if (sharedServerIds.length > 0) {
+  if (appCredentialServerIds.length > 0) {
     const condition = and(
-      eq(mcpCredentialsTable.scope, "organization_shared"),
-      inArray(mcpCredentialsTable.serverId, sharedServerIds),
-    );
-
-    if (condition) {
-      conditions.push(condition);
-    }
-  }
-
-  if (userServerIds.length > 0) {
-    const condition = and(
-      eq(mcpCredentialsTable.scope, "user"),
-      eq(mcpCredentialsTable.accountId, runtimeCredentialUserId),
-      inArray(mcpCredentialsTable.serverId, userServerIds),
+      eq(mcpCredentialsTable.scope, "app"),
+      inArray(mcpCredentialsTable.serverId, appCredentialServerIds),
     );
 
     if (condition) {
@@ -306,14 +242,9 @@ export async function resolveCredentialsForMcpBindings(
       .filter((credential) => credential.scope === "agent")
       .map((credential) => [scopedCredentialKey(credential), credential]),
   );
-  const sharedCredentialsByServerId = new Map(
+  const appCredentialsByServerId = new Map(
     credentials
-      .filter((credential) => credential.scope === "organization_shared")
-      .map((credential) => [credential.serverId, credential]),
-  );
-  const userCredentialsByServerId = new Map(
-    credentials
-      .filter((credential) => credential.scope === "user")
+      .filter((credential) => credential.scope === "app")
       .map((credential) => [credential.serverId, credential]),
   );
 
@@ -331,10 +262,7 @@ export async function resolveCredentialsForMcpBindings(
       return;
     }
 
-    resolvedCredentials[index] =
-      binding.credentialScope === "organization_shared"
-        ? (sharedCredentialsByServerId.get(binding.serverId) ?? null)
-        : (userCredentialsByServerId.get(binding.serverId) ?? null);
+    resolvedCredentials[index] = appCredentialsByServerId.get(binding.serverId) ?? null;
   });
 
   return resolvedCredentials;
@@ -354,7 +282,7 @@ export async function writeCredential(
     refreshToken?: string | null;
     scope: McpCredentialRecordScope;
     scopeValues: string[];
-    server: Pick<ServerRow, "credentialScope" | "id" | "organizationId">;
+    server: Pick<ServerRow, "credentialScope" | "id" | "appId">;
     subjectLabel?: string | null;
     tokenExpiresAt?: number | null;
     userId?: AccountId | null;
@@ -418,6 +346,7 @@ export async function writeCredential(
     lastRefreshedAt: input.authType === "oauth" ? updatedAt : null,
     oauthClientId: input.oauthClientId ?? existing?.oauthClientId ?? null,
     oauthClientSecretSecretId,
+    appId: input.server.appId,
     refreshSecretId,
     scope: input.scope,
     scopeValuesJson: JSON.stringify(input.scopeValues),

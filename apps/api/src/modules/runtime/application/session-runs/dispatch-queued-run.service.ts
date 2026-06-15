@@ -1,11 +1,10 @@
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import { parsePlatformId } from "@mosoo/id";
-import type { FileId, OrganizationId, SessionId, SessionRunId } from "@mosoo/id";
+import type { FileId, AppId, SessionId, SessionRunId } from "@mosoo/id";
 
 import { logError, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
-import { claimOrganizationDraftFilesToSession } from "../../../files/application/draft-file-claim.service";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import { hydrateCachedRunContextFromSession } from "../session-definition/hydrate-run-context.service";
@@ -81,12 +80,11 @@ async function failQueuedSessionRunBeforeDispatch(
 interface DispatchQueuedSessionRunInput {
   accessViewer?: AuthenticatedViewer;
   attachmentIds: FileId[];
-  draftAttachmentOrganizationId: OrganizationId | null | undefined;
   prompt: string;
   queuedAtMs: number;
   session: {
     id: SessionId;
-    organization_id: OrganizationId;
+    app_id: AppId;
   };
   sessionRunId: SessionRunId;
   traceId: string;
@@ -116,24 +114,10 @@ export async function dispatchQueuedSessionRun(
       const hydrated = await hydrationTiming.measure("hydrateRunContext", () =>
         hydrateCachedRunContextFromSession(bindings, viewer, {
           id: input.session.id,
-          organizationId: input.session.organization_id,
+          appId: input.session.app_id,
           ...(input.accessViewer ? { accessViewer: input.accessViewer } : {}),
         }),
       );
-
-      if (
-        typeof input.draftAttachmentOrganizationId === "string" &&
-        input.attachmentIds.length > 0
-      ) {
-        const organizationId = input.draftAttachmentOrganizationId;
-        await hydrationTiming.measure("claimDraftFiles", () =>
-          claimOrganizationDraftFilesToSession(bindings, viewer, {
-            attachmentIds: input.attachmentIds,
-            organizationId,
-            sessionId: input.session.id,
-          }),
-        );
-      }
 
       const sessionResources = await hydrationTiming.measure("listSessionResources", () =>
         listSessionResourcePathEntries(bindings.DB, input.session.id),
@@ -191,7 +175,7 @@ export async function dispatchQueuedSessionRun(
       attachmentIds: resolved.sessionResources.map((resource, index) =>
         parsePlatformId(resource.id, `session resource id ${index}`),
       ),
-      organizationAccessSnapshot: resolved.hydrated.value.organizationAccessSnapshot,
+      appAccessSnapshot: resolved.hydrated.value.appAccessSnapshot,
       profile: {
         ...resolved.hydrated.value.profile,
         runtimeId,

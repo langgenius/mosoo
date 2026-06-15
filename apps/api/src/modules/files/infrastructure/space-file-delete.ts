@@ -16,7 +16,7 @@ import {
   markFileRecordsDeleting,
 } from "./file-record-store";
 import { abortMultipartUpload, deleteObject } from "./r2-s3-client";
-import { ensureSpaceAccess } from "./space-access";
+import { ensureSpaceAccessBySpaceId } from "./space-access";
 import { ensureSpaceFileWriteUnlocked } from "./space-file-lock";
 import {
   commitPendingSpaceFileVersionSafely,
@@ -36,7 +36,7 @@ export async function deleteSpaceEntry(
   input: { key: string; spaceId: SpaceId },
 ): Promise<void> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureSpaceAccess(bindings.DB, viewerId, input.spaceId, "edit");
+  await ensureSpaceAccessBySpaceId(bindings.DB, viewerId, input.spaceId, "write");
   const normalizedKey = normalizeSpaceDirectoryPath(input.key);
   const escapedKey = escapeLikePattern(normalizedKey);
 

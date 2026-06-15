@@ -3,6 +3,7 @@ import type { AgentKind, AgentReadiness } from "@mosoo/contracts/agent";
 import type {
   AccountId,
   AgentId,
+  AppId,
   SandboxId,
   SandboxSessionId,
   SessionId,
@@ -10,14 +11,10 @@ import type {
 } from "@mosoo/id";
 import { getSessionOrganizationPath, getSessionRuntimeStatePath } from "agent-driver/paths";
 
-import {
-  isSpaceRoleRankSufficient,
-  listSpaceAccessRows,
-  rankToSpaceRole,
-} from "../../spaces/domain/space-access.policy";
+import { listSpaceAccessRows } from "../../spaces/domain/space-access.policy";
 import type {
   DriverConfigRevision,
-  DriverOrganizationAccessSnapshotOutput,
+  DriverAppAccessSnapshotOutput,
   DriverProfileConfig,
 } from "../domain/driver-snapshot";
 import { getSupportedRuntimeId } from "../domain/runtime-config";
@@ -27,9 +24,15 @@ import type { FrozenSandboxSpaceBinding } from "../domain/sandbox-layout";
 export async function resolveAgentSpaceBindings(
   database: D1Database,
   permissionPrincipalUserId: AccountId,
+  appId: AppId,
   boundSpaceIds: SpaceId[],
 ): Promise<FrozenSandboxSpaceBinding[]> {
-  const access = await listSpaceAccessRows(database, permissionPrincipalUserId, boundSpaceIds);
+  const access = await listSpaceAccessRows(
+    database,
+    permissionPrincipalUserId,
+    appId,
+    boundSpaceIds,
+  );
 
   return boundSpaceIds.map((spaceId) => {
     const row = access.accessibleRowsById.get(spaceId);
@@ -38,12 +41,12 @@ export async function resolveAgentSpaceBindings(
       throw new Error("Space not found.");
     }
 
-    if (!row || !isSpaceRoleRankSufficient(row.role_rank, "read")) {
+    if (!row) {
       throw new Error("Space not found.");
     }
 
     return {
-      role: rankToSpaceRole(row.role_rank),
+      canWrite: true,
       spaceId,
       spaceName: row.name,
       type: "space",
@@ -72,7 +75,7 @@ export function createAgentRuntimeProfile(input: {
   spaceBindings: FrozenSandboxSpaceBinding[];
 }): {
   profile: DriverProfileConfig;
-  organizationAccessSnapshot: DriverOrganizationAccessSnapshotOutput;
+  appAccessSnapshot: DriverAppAccessSnapshotOutput;
 } {
   const frozenBindings = freezeSandboxSpaceBindings({
     bindings: input.spaceBindings,
@@ -87,7 +90,7 @@ export function createAgentRuntimeProfile(input: {
   const sandboxSubject = resolveAgentRuntimeSandboxSubject(input);
 
   return {
-    organizationAccessSnapshot: frozenBindings.organizationAccessSnapshot,
+    appAccessSnapshot: frozenBindings.appAccessSnapshot,
     profile: {
       agentId: input.agentId,
       configRevision: input.configRevision,

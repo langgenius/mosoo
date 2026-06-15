@@ -4,7 +4,6 @@ import type {
   AgentBuilderPlannerRunId,
   AgentBuilderThreadId,
   AgentId,
-  OrganizationId,
 } from "@mosoo/id";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
@@ -34,7 +33,6 @@ export const agentBuilderThreadsTable = sqliteTable(
     id: platformIdColumn<AgentBuilderThreadId>("id").primaryKey(),
     lastTurnAt: integer("last_turn_at"),
     messageSeqCursor: integer("message_seq_cursor").notNull().default(0),
-    organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
     previewOpenedAt: integer("preview_opened_at"),
     status: text("status").$type<AgentBuilderThreadStatus>().notNull().default("active"),
     title: text("title"),
@@ -42,11 +40,7 @@ export const agentBuilderThreadsTable = sqliteTable(
   },
   (table) => [
     uniqueIndex("agent_builder_thread_agent_idx").on(table.agentId),
-    index("agent_builder_thread_creator_updated_idx").on(
-      table.organizationId,
-      table.creatorAccountId,
-      table.updatedAt,
-    ),
+    index("agent_builder_thread_creator_updated_idx").on(table.creatorAccountId, table.updatedAt),
   ],
 );
 
@@ -85,7 +79,6 @@ export const agentBuilderPlannerRunsTable = sqliteTable(
     errorMessage: text("error_message"),
     id: platformIdColumn<AgentBuilderPlannerRunId>("id").primaryKey(),
     model: text("model").notNull(),
-    organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
     outputJson: text("output_json"),
     provider: text("provider").notNull(),
     requestDigest: text("request_digest").notNull(),

@@ -53,6 +53,7 @@ async function listLarkBindingIdPage(
     .where(
       and(
         eq(agentChannelBindingsTable.provider, "lark"),
+        eq(agentChannelBindingsTable.appId, agentsTable.appId),
         eq(agentChannelBindingsTable.status, "active"),
         eq(agentsTable.status, "published"),
         ...(input.afterBindingId ? [gt(agentChannelBindingsTable.id, input.afterBindingId)] : []),

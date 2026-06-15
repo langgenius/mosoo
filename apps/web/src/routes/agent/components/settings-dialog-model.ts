@@ -1,13 +1,6 @@
-import type { AgentCollaboratorRole } from "@mosoo/contracts/agent";
 import type { AgentChannelBindingProvider } from "@mosoo/contracts/channel";
 
-export type AgentPublishMode = "private" | "organization";
 export type ChannelId = AgentChannelBindingProvider;
-
-export const ROLE_OPTIONS: { value: AgentCollaboratorRole; label: string }[] = [
-  { label: "Admin", value: "admin" },
-  { label: "Can use", value: "user" },
-];
 
 export const DISTRIBUTION_CHANNELS: {
   enabled: boolean;

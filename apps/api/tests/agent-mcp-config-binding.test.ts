@@ -28,14 +28,6 @@ function createMcpBindingDatabase(): D1Database {
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE organization_member (
-      organization_id text NOT NULL,
-      account_id text NOT NULL,
-      role text NOT NULL,
-      disabled_at integer,
-      PRIMARY KEY (organization_id, account_id)
-    );
-
     CREATE TABLE agent (
       config_json text NOT NULL,
       created_at integer NOT NULL,
@@ -46,8 +38,8 @@ function createMcpBindingDatabase(): D1Database {
       live_deployment_version_id text,
       model text NOT NULL,
       name text NOT NULL,
-      organization_id text NOT NULL,
       owner_account_id text NOT NULL,
+      app_id text NOT NULL,
       prompt text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
@@ -68,8 +60,8 @@ function createMcpBindingDatabase(): D1Database {
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       oauth_metadata_json text,
-      organization_id text NOT NULL,
       owner_account_id text NOT NULL,
+      app_id text NOT NULL,
       source text NOT NULL,
       updated_at integer NOT NULL,
       url text NOT NULL
@@ -97,6 +89,7 @@ function createMcpBindingDatabase(): D1Database {
       last_refreshed_at integer,
       oauth_client_id text,
       oauth_client_secret_secret_id text,
+      app_id text NOT NULL,
       refresh_secret_id text,
       scope text NOT NULL,
       scope_values_json text,
@@ -105,17 +98,6 @@ function createMcpBindingDatabase(): D1Database {
       status text NOT NULL,
       subject_label text,
       updated_at integer NOT NULL
-    );
-
-    CREATE TABLE resource_acl (
-      assigned_by_account_id text,
-      created_at integer NOT NULL,
-      resource_id text NOT NULL,
-      resource_type text NOT NULL,
-      role text NOT NULL,
-      target_id text NOT NULL,
-      target_kind text NOT NULL,
-      PRIMARY KEY (resource_type, resource_id, target_kind, target_id)
     );
 
     INSERT INTO account (
@@ -128,9 +110,6 @@ function createMcpBindingDatabase(): D1Database {
     )
     VALUES (1, 'owner@mosoo.ai', 1, '01J00000000000000000000001', 'Owner', 1);
 
-    INSERT INTO organization_member (organization_id, account_id, role, disabled_at)
-    VALUES ('01J00000000000000000000006', '01J00000000000000000000001', 'owner', NULL);
-
     INSERT INTO agent (
       config_json,
       created_at,
@@ -138,8 +117,8 @@ function createMcpBindingDatabase(): D1Database {
       kind,
       model,
       name,
-      organization_id,
       owner_account_id,
+      app_id,
       prompt,
       provider,
       runtime_id,
@@ -154,8 +133,8 @@ function createMcpBindingDatabase(): D1Database {
       'pet',
       'gpt-5.4',
       'Agent',
-      '01J00000000000000000000006',
       '01J00000000000000000000001',
+      '01J00000000000000000000007',
       'Help',
       'openai',
       'openai-runtime',
@@ -172,8 +151,8 @@ function createMcpBindingDatabase(): D1Database {
       enabled,
       id,
       name,
-      organization_id,
       owner_account_id,
+      app_id,
       source,
       updated_at,
       url
@@ -182,42 +161,42 @@ function createMcpBindingDatabase(): D1Database {
       (
         'oauth',
         1,
-        'user',
+        'app',
         'OAuth not connected yet',
         1,
         '${NEEDS_AUTH_MCP_SERVER_ID}',
         'Needs Auth MCP',
-        '01J00000000000000000000006',
         '01J00000000000000000000001',
-        'organization_shared',
+        '01J00000000000000000000007',
+        'app',
         1,
         'https://mcp.example.com'
       ),
       (
         'oauth',
         1,
-        'user',
+        'app',
         'OAuth not connected yet',
         1,
         '${FILES_MCP_SERVER_ID}',
         'Files MCP',
-        '01J00000000000000000000006',
         '01J00000000000000000000001',
-        'organization_shared',
+        '01J00000000000000000000007',
+        'app',
         1,
         'https://files.example.com'
       ),
       (
         'oauth',
         1,
-        'user',
+        'app',
         'OAuth not connected yet',
         1,
         '${ISSUES_MCP_SERVER_ID}',
         'Issues MCP',
-        '01J00000000000000000000006',
         '01J00000000000000000000001',
-        'organization_shared',
+        '01J00000000000000000000007',
+        'app',
         1,
         'https://issues.example.com'
       );
@@ -244,8 +223,8 @@ const agent: AgentRow = {
   liveDeploymentVersionId: null,
   model: "gpt-5.4",
   name: "Agent",
-  organizationId: "01J00000000000000000000006",
   ownerId: "01J00000000000000000000001",
+  appId: "01J00000000000000000000007",
   prompt: "Help",
   provider: "openai",
   runtimeId: "openai-runtime",

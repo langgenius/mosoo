@@ -7,7 +7,7 @@ import type {
 import { useCallback, useMemo } from "react";
 import type { MutableRefObject } from "react";
 
-import { toFileIds, toNullableSessionRunId, toSessionId } from "../../../routes/typed-id";
+import { toFileIds, toNullableSessionRunId, toAppId, toSessionId } from "../../../routes/typed-id";
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { sendAgentSessionEvents } from "../../session/api/agent-session";
 import type { SendViewerEventOptions, SessionStreamEventSender } from "./session-stream-socket";
@@ -32,6 +32,7 @@ export function isSessionStreamStreaming(
 interface UseSessionStreamActionsInput {
   activeSessionIdRef: MutableRefObject<string | null>;
   liveState: SessionLiveState | null;
+  appId: string | null;
   sendViewerEvent: SessionStreamEventSender;
 }
 
@@ -92,10 +93,11 @@ export function useSessionStreamActions(input: UseSessionStreamActionsInput): {
             type: "user_message",
           },
         ],
+        appId: toAppId(input.appId ?? ""),
         sessionId: toSessionId(message.sessionId),
       });
     },
-    [],
+    [input.appId],
   );
   const sendPermissionDecision = useCallback(
     async (decision: {
@@ -111,10 +113,11 @@ export function useSessionStreamActions(input: UseSessionStreamActionsInput): {
             type: "permission_decision",
           },
         ],
+        appId: toAppId(input.appId ?? ""),
         sessionId: toSessionId(decision.sessionId),
       });
     },
-    [],
+    [input.appId],
   );
   const sendUserInterrupt = useCallback(
     async (interrupt: { runId?: string | null; sessionId: string }): Promise<void> => {
@@ -125,10 +128,11 @@ export function useSessionStreamActions(input: UseSessionStreamActionsInput): {
             type: "user_interrupt",
           },
         ],
+        appId: toAppId(input.appId ?? ""),
         sessionId: toSessionId(interrupt.sessionId),
       });
     },
-    [],
+    [input.appId],
   );
 
   const messages = useMemo(() => input.liveState?.messages ?? [], [input.liveState]);

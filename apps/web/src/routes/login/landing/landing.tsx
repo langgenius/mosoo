@@ -4,7 +4,6 @@ import { CostSection } from "./cost-section";
 import { CtaBand } from "./cta-band";
 import { DeploySection } from "./deploy-section";
 import { FaqSection } from "./faq-section";
-import { GovernanceSection } from "./governance-section";
 import { Hero } from "./hero";
 import { InvokeSection } from "./invoke-section";
 import { RuntimeShowcase } from "./runtime-showcase";
@@ -18,7 +17,6 @@ export function LoginLanding({ onContinue }: { onContinue: () => void }): ReactE
       <div className="border-border-strong divide-border-strong mx-auto w-full max-w-[1280px] divide-y border-x">
         <Hero onContinue={onContinue} />
         <DeploySection />
-        <GovernanceSection />
         <RuntimeShowcase />
         <SandboxSection />
         <InvokeSection />

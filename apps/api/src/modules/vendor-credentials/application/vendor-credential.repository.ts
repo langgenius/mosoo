@@ -1,17 +1,9 @@
 import { vendorCredentialsTable } from "@mosoo/db";
-import type { AccountId, OrganizationId, VendorCredentialId } from "@mosoo/id";
-import { and, asc, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
+import type { AppId, VendorCredentialId } from "@mosoo/id";
+import { and, asc, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { isTruthy } from "../../../shared/truthiness";
-import { currentTimestampMs } from "../../../time";
 import type { VendorCredentialRow } from "./vendor-credential.types";
-export interface PreferredPersonalCredentialRequest {
-  actorAccountId: AccountId;
-  database: D1Database;
-  organizationId: OrganizationId;
-  vendorId: string;
-}
 
 function selectVendorCredentialRows(database: D1Database) {
   return getAppDatabase(database)
@@ -19,61 +11,39 @@ function selectVendorCredentialRows(database: D1Database) {
       apiBase: vendorCredentialsTable.apiBase,
       apiKeySecretId: vendorCredentialsTable.apiKeySecretId,
       id: vendorCredentialsTable.id,
-      isDefault: sql<number>`${vendorCredentialsTable.isDefault}`,
-      isPreferred: sql<number>`${vendorCredentialsTable.isPreferred}`,
-      modelsJson: sql<string | null>`${vendorCredentialsTable.models}`,
+      modelsJson: vendorCredentialsTable.models,
       name: vendorCredentialsTable.name,
-      organizationId: vendorCredentialsTable.organizationId,
-      ownerUserId: vendorCredentialsTable.ownerAccountId,
+      appId: vendorCredentialsTable.appId,
       vendorId: vendorCredentialsTable.vendorId,
     })
     .from(vendorCredentialsTable);
 }
 
-export async function listReachableCustomCredentialRows(
+export async function listAppCustomCredentialRows(
   database: D1Database,
-  actorAccountId: AccountId,
-  organizationId: OrganizationId,
+  appId: AppId,
 ): Promise<VendorCredentialRow[]> {
   return selectVendorCredentialRows(database)
     .where(
       and(
-        eq(vendorCredentialsTable.organizationId, organizationId),
+        eq(vendorCredentialsTable.appId, appId),
         eq(vendorCredentialsTable.vendorId, "openai-compatible"),
-        or(
-          isNull(vendorCredentialsTable.ownerAccountId),
-          eq(vendorCredentialsTable.ownerAccountId, actorAccountId),
-        ),
       ),
     )
-    .orderBy(
-      sql`${vendorCredentialsTable.ownerAccountId} IS NOT NULL`,
-      asc(vendorCredentialsTable.name),
-    )
+    .orderBy(asc(vendorCredentialsTable.name), asc(vendorCredentialsTable.id))
     .all();
 }
 
-export async function listVisibleVendorCredentialRows(
+export async function listAppVendorCredentialRows(
   database: D1Database,
-  actorAccountId: AccountId,
-  organizationId: OrganizationId,
+  appId: AppId,
 ): Promise<VendorCredentialRow[]> {
   return selectVendorCredentialRows(database)
-    .where(
-      and(
-        eq(vendorCredentialsTable.organizationId, organizationId),
-        or(
-          isNull(vendorCredentialsTable.ownerAccountId),
-          eq(vendorCredentialsTable.ownerAccountId, actorAccountId),
-        ),
-      ),
-    )
+    .where(eq(vendorCredentialsTable.appId, appId))
     .orderBy(
       asc(vendorCredentialsTable.vendorId),
-      sql`${vendorCredentialsTable.ownerAccountId} IS NOT NULL`,
-      desc(vendorCredentialsTable.isDefault),
-      desc(vendorCredentialsTable.isPreferred),
       asc(vendorCredentialsTable.name),
+      asc(vendorCredentialsTable.id),
     )
     .all();
 }
@@ -90,122 +60,30 @@ export async function getCredentialRow(
   );
 }
 
-export async function hasDefaultCompanyCredential(
+export async function getAppCredentialRow(
   database: D1Database,
-  organizationId: OrganizationId,
-  vendorId: string,
-): Promise<boolean> {
-  const row =
-    (await getAppDatabase(database)
-      .select({ id: vendorCredentialsTable.id })
-      .from(vendorCredentialsTable)
-      .where(
-        and(
-          eq(vendorCredentialsTable.organizationId, organizationId),
-          eq(vendorCredentialsTable.vendorId, vendorId),
-          isNull(vendorCredentialsTable.ownerAccountId),
-          eq(vendorCredentialsTable.isDefault, true),
-        ),
-      )
-      .limit(1)
-      .get()) ?? null;
-
-  return Boolean(row);
-}
-
-export async function setCompanyCredentialAsDefault(
-  database: D1Database,
-  credential: VendorCredentialRow,
-): Promise<void> {
-  const timestampMs = currentTimestampMs();
-  const db = getAppDatabase(database);
-
-  await db
-    .update(vendorCredentialsTable)
-    .set({ isDefault: false, updatedAt: timestampMs })
-    .where(
-      and(
-        eq(vendorCredentialsTable.organizationId, credential.organizationId),
-        eq(vendorCredentialsTable.vendorId, credential.vendorId),
-        isNull(vendorCredentialsTable.ownerAccountId),
-        ne(vendorCredentialsTable.id, credential.id),
-      ),
-    )
-    .run();
-  await db
-    .update(vendorCredentialsTable)
-    .set({ isDefault: true, updatedAt: timestampMs })
-    .where(eq(vendorCredentialsTable.id, credential.id))
-    .run();
-}
-
-export async function setPersonalCredentialAsPreferred(
-  database: D1Database,
-  credential: VendorCredentialRow,
-): Promise<void> {
-  if (!isTruthy(credential.ownerUserId)) {
-    throw new Error("Company credentials cannot be preferred personal keys.");
-  }
-
-  const timestampMs = currentTimestampMs();
-  const db = getAppDatabase(database);
-
-  await db
-    .update(vendorCredentialsTable)
-    .set({ isPreferred: false, updatedAt: timestampMs })
-    .where(
-      and(
-        eq(vendorCredentialsTable.organizationId, credential.organizationId),
-        eq(vendorCredentialsTable.vendorId, credential.vendorId),
-        eq(vendorCredentialsTable.ownerAccountId, credential.ownerUserId),
-        ne(vendorCredentialsTable.id, credential.id),
-      ),
-    )
-    .run();
-  await db
-    .update(vendorCredentialsTable)
-    .set({ isPreferred: true, updatedAt: timestampMs })
-    .where(eq(vendorCredentialsTable.id, credential.id))
-    .run();
-}
-
-export async function getPreferredPersonalCredentialRow({
-  actorAccountId,
-  database,
-  organizationId,
-  vendorId,
-}: PreferredPersonalCredentialRequest): Promise<VendorCredentialRow | null> {
+  appId: AppId,
+  id: VendorCredentialId,
+): Promise<VendorCredentialRow | null> {
   return (
     (await selectVendorCredentialRows(database)
-      .where(
-        and(
-          eq(vendorCredentialsTable.organizationId, organizationId),
-          eq(vendorCredentialsTable.vendorId, vendorId),
-          eq(vendorCredentialsTable.ownerAccountId, actorAccountId),
-          eq(vendorCredentialsTable.isPreferred, true),
-        ),
-      )
-      .orderBy(desc(vendorCredentialsTable.updatedAt))
+      .where(and(eq(vendorCredentialsTable.id, id), eq(vendorCredentialsTable.appId, appId)))
       .limit(1)
       .get()) ?? null
   );
 }
 
-export async function getCompanyCredentialRow(
+export async function getAppVendorCredentialRow(
   database: D1Database,
-  organizationId: OrganizationId,
+  appId: AppId,
   vendorId: string,
 ): Promise<VendorCredentialRow | null> {
   return (
     (await selectVendorCredentialRows(database)
       .where(
-        and(
-          eq(vendorCredentialsTable.organizationId, organizationId),
-          eq(vendorCredentialsTable.vendorId, vendorId),
-          isNull(vendorCredentialsTable.ownerAccountId),
-        ),
+        and(eq(vendorCredentialsTable.appId, appId), eq(vendorCredentialsTable.vendorId, vendorId)),
       )
-      .orderBy(desc(vendorCredentialsTable.isDefault), asc(vendorCredentialsTable.createdAt))
+      .orderBy(asc(vendorCredentialsTable.name), asc(vendorCredentialsTable.id))
       .limit(1)
       .get()) ?? null
   );

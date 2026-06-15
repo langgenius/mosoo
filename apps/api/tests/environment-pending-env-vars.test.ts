@@ -13,7 +13,7 @@ import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
 describe("Environment pending env vars", () => {
   test("allows creating an Environment env var placeholder without a secret value", async () => {

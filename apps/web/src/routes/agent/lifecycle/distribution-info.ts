@@ -1,4 +1,4 @@
-import { PUBLIC_API_PREFIX, PUBLISHED_AGENT_API_PREFIX } from "@mosoo/contracts/public-api";
+import { PUBLIC_API_PREFIX, PUBLIC_API_VERSION_PREFIX } from "@mosoo/contracts/public-api";
 
 import { MOSOO_API_REFERENCE_URL } from "@/shared/config/external-links";
 
@@ -20,8 +20,8 @@ export interface AgentDistribution {
 
 const ACCESS_TOKEN_SETTINGS_PATH = "/settings/access-tokens";
 const MOSOO_PUBLIC_WEB_ORIGIN = "https://mosoo.ai";
-const PUBLISHED_AGENT_API_BASE_PATH = `${PUBLIC_API_PREFIX}${PUBLISHED_AGENT_API_PREFIX}`;
-const PUBLISHED_AGENT_OPENAPI_PATH = `${PUBLISHED_AGENT_API_BASE_PATH}/openapi.json`;
+const AGENT_API_ENDPOINT_BASE_PATH = `${PUBLIC_API_PREFIX}${PUBLIC_API_VERSION_PREFIX}`;
+const AGENT_API_ENDPOINT_OPENAPI_PATH = `${AGENT_API_ENDPOINT_BASE_PATH}/openapi.json`;
 
 function shortSlug(id: string): string {
   return (
@@ -60,17 +60,17 @@ export function buildAgentDistribution(agent: Agent): AgentDistribution {
   const webUrl = `${origin}/a/${slug}`;
   const threadsPath = `/threads?compose=1&agent=${encodeURIComponent(agent.id)}&lock=1`;
   const threadsUrl = `${origin}${threadsPath}`;
-  const apiPath = `POST ${PUBLISHED_AGENT_API_BASE_PATH}/agents/${agent.id}/threads`;
-  const apiUrl = `${origin}${PUBLISHED_AGENT_API_BASE_PATH}/agents/${agent.id}/threads`;
+  const apiPath = `POST ${AGENT_API_ENDPOINT_BASE_PATH}/agents/${agent.id}/threads`;
+  const apiUrl = `${origin}${AGENT_API_ENDPOINT_BASE_PATH}/agents/${agent.id}/threads`;
 
   return {
-    apiBasePath: PUBLISHED_AGENT_API_BASE_PATH,
-    apiBaseUrl: `${origin}${PUBLISHED_AGENT_API_BASE_PATH}`,
+    apiBasePath: AGENT_API_ENDPOINT_BASE_PATH,
+    apiBaseUrl: `${origin}${AGENT_API_ENDPOINT_BASE_PATH}`,
     apiDocsUrl: MOSOO_API_REFERENCE_URL,
     apiPath,
     apiUrl,
-    openApiPath: PUBLISHED_AGENT_OPENAPI_PATH,
-    openApiUrl: `${origin}${PUBLISHED_AGENT_OPENAPI_PATH}`,
+    openApiPath: AGENT_API_ENDPOINT_OPENAPI_PATH,
+    openApiUrl: `${origin}${AGENT_API_ENDPOINT_OPENAPI_PATH}`,
     threadsPath,
     threadsUrl,
     tokenSettingsPath: ACCESS_TOKEN_SETTINGS_PATH,

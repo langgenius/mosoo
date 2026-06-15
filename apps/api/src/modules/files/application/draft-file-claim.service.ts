@@ -1,4 +1,4 @@
 export {
-  claimOrganizationDraftFilesToSession,
-  ensureOrganizationDraftFilesClaimable,
+  claimAppDraftFilesToSession,
+  ensureAppDraftFilesClaimable,
 } from "../infrastructure/draft-file-service";

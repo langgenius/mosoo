@@ -1,20 +1,18 @@
-import { Permission, can } from "@mosoo/contracts/permission";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Box, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { useAppSession } from "@/app/session-provider";
 import {
-  createEnvironmentFork,
   deleteEnvironment,
-  setOrganizationDefaultEnvironment,
+  setAppDefaultEnvironment,
 } from "@/domains/environment/api/environment-client";
 import { CreateEnvironmentDialog } from "@/domains/environment/components/create-environment-dialog";
 import {
   environmentKeys,
-  useOrganizationEnvironmentsQuery,
+  useAppEnvironmentsQuery,
 } from "@/domains/environment/query/environment-queries";
-import { toEnvironmentId, toOrganizationId } from "@/routes/typed-id";
+import { toEnvironmentId, toAppId } from "@/routes/typed-id";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 import {
@@ -24,82 +22,59 @@ import {
   ListPageToolbarSpacer,
 } from "@/shared/ui/list-page";
 import { PageHeader } from "@/shared/ui/page-header";
-import { ScopeTabs } from "@/shared/ui/scope-tabs";
-import type { Scope } from "@/shared/ui/scope-tabs";
 
 import { isTruthy } from "../../shared/lib/truthiness";
 import { EnvironmentListTable } from "./environment-list-table";
-import {
-  filterEnvironments,
-  getEnvironmentsForScope,
-  groupEnvironmentsByScope,
-} from "./environments-list-model";
+import { filterEnvironments } from "./environments-list-model";
 
 export function EnvironmentsListPage() {
-  const { activeOrganization, activeOrganizationId } = useAppSession();
-  const organizationId = activeOrganizationId;
-  const environmentsQuery = useOrganizationEnvironmentsQuery(organizationId);
+  const { activeAppId } = useAppSession();
+  const appId = activeAppId;
+  const environmentsQuery = useAppEnvironmentsQuery(appId);
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [scope, setScope] = useState<Scope>("mine");
   const [search, setSearch] = useState("");
 
   const defaultMutation = useMutation({
-    mutationFn: setOrganizationDefaultEnvironment,
+    mutationFn: setAppDefaultEnvironment,
     onSuccess: async () => {
-      if (!isTruthy(organizationId)) {
+      if (!isTruthy(appId)) {
         return;
       }
 
       await queryClient.invalidateQueries({
-        queryKey: environmentKeys.list(toOrganizationId(organizationId)),
-      });
-    },
-  });
-  const forkMutation = useMutation({
-    mutationFn: createEnvironmentFork,
-    onSuccess: async () => {
-      if (!isTruthy(organizationId)) {
-        return;
-      }
-
-      await queryClient.invalidateQueries({
-        queryKey: environmentKeys.list(toOrganizationId(organizationId)),
+        queryKey: environmentKeys.list(appId),
       });
     },
   });
   const deleteMutation = useMutation({
     mutationFn: deleteEnvironment,
     onSuccess: async () => {
-      if (!isTruthy(organizationId)) {
+      if (!isTruthy(appId)) {
         return;
       }
 
       await queryClient.invalidateQueries({
-        queryKey: environmentKeys.list(toOrganizationId(organizationId)),
+        queryKey: environmentKeys.list(appId),
       });
     },
   });
-  const isAdmin = can(activeOrganization?.viewerRole, Permission.ProvidersCompanyManage);
   const environments = useMemo(() => environmentsQuery.data ?? [], [environmentsQuery.data]);
-  const environmentScopes = useMemo(() => groupEnvironmentsByScope(environments), [environments]);
-
-  const scopeEnvironments = getEnvironmentsForScope(environmentScopes, scope);
   const filteredEnvironments = useMemo(
-    () => filterEnvironments(scopeEnvironments, search),
-    [scopeEnvironments, search],
+    () => filterEnvironments(environments, search),
+    [environments, search],
   );
 
   async function handleSetDefault(environmentId: string) {
-    if (!isTruthy(organizationId)) {
+    if (!isTruthy(appId)) {
       return;
     }
     setError(null);
     try {
       await defaultMutation.mutateAsync({
         environmentId: toEnvironmentId(environmentId),
-        organizationId: toOrganizationId(organizationId),
+        appId: toAppId(appId),
       });
     } catch (caughtError) {
       setError(
@@ -108,19 +83,16 @@ export function EnvironmentsListPage() {
     }
   }
 
-  async function handleFork(environmentId: string) {
-    setError(null);
-    try {
-      await forkMutation.mutateAsync({ environmentId: toEnvironmentId(environmentId) });
-    } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Failed to fork environment.");
-    }
-  }
-
   async function handleDelete(environmentId: string) {
+    if (!isTruthy(appId)) {
+      return;
+    }
     setError(null);
     try {
-      await deleteMutation.mutateAsync({ environmentId: toEnvironmentId(environmentId) });
+      await deleteMutation.mutateAsync({
+        environmentId: toEnvironmentId(environmentId),
+        appId: toAppId(appId),
+      });
     } catch (caughtError) {
       setError(
         caughtError instanceof Error ? caughtError.message : "Failed to delete environment.",
@@ -128,7 +100,7 @@ export function EnvironmentsListPage() {
     }
   }
 
-  if (!isTruthy(organizationId)) {
+  if (!isTruthy(appId)) {
     return null;
   }
 
@@ -147,19 +119,6 @@ export function EnvironmentsListPage() {
       </PageHeader>
 
       <ListPageToolbar>
-        <ScopeTabs
-          value={scope}
-          onChange={setScope}
-          tabs={[
-            { count: environmentScopes.personalEnvironments.length, label: "Mine", value: "mine" },
-            {
-              count: environmentScopes.sharedEnvironments.length,
-              label: "Shared with me",
-              value: "shared",
-            },
-          ]}
-        />
-
         <ListPageToolbarSpacer />
 
         <ListPageSearch value={search} onChange={setSearch} placeholder="Search environments…" />
@@ -183,35 +142,25 @@ export function EnvironmentsListPage() {
         ) : filteredEnvironments.length === 0 ? (
           <EmptyState
             icon={Box}
-            title={scope === "mine" ? "No environments yet" : "No environments shared with you yet"}
-            description={
-              scope === "mine"
-                ? "Create an environment to define the runtime your Agents run inside."
-                : "Environments shared with you will show up here."
-            }
+            title="No environments yet"
+            description="Create an environment to define the runtime your Agents run inside."
             action={
-              scope === "mine" ? (
-                <Button
-                  onClick={() => {
-                    setCreateOpen(true);
-                  }}
-                  size="sm"
-                >
-                  <Plus className="size-3.5" />
-                  Create environment
-                </Button>
-              ) : undefined
+              <Button
+                onClick={() => {
+                  setCreateOpen(true);
+                }}
+                size="sm"
+              >
+                <Plus className="size-3.5" />
+                Create environment
+              </Button>
             }
           />
         ) : (
           <EnvironmentListTable
             environments={filteredEnvironments}
-            isAdmin={isAdmin}
             onDelete={(environmentId) => {
               void handleDelete(environmentId);
-            }}
-            onFork={(environmentId) => {
-              void handleFork(environmentId);
             }}
             onSetDefault={(environmentId) => {
               void handleSetDefault(environmentId);
@@ -222,17 +171,17 @@ export function EnvironmentsListPage() {
 
       <CreateEnvironmentDialog
         onCreated={() => {
-          if (!isTruthy(organizationId)) {
+          if (!isTruthy(appId)) {
             return;
           }
 
           void queryClient.invalidateQueries({
-            queryKey: environmentKeys.list(toOrganizationId(organizationId)),
+            queryKey: environmentKeys.list(appId),
           });
         }}
         onOpenChange={setCreateOpen}
         open={createOpen}
-        organizationId={organizationId}
+        appId={appId}
       />
     </div>
   );

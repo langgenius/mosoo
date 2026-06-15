@@ -19,7 +19,7 @@ import { isTruthy } from "../../../../shared/truthiness";
 import {
   applyAgUiEventToSessionLiveState,
   loadSessionViewerState,
-  projectRuntimeEventToSessionDeliveryEvents,
+  appRuntimeEventToSessionDeliveryEvents,
 } from "../../../sessions/application/session-live-state.service";
 import type {
   SessionDeliveryEvent,
@@ -27,6 +27,7 @@ import type {
 } from "../../../sessions/application/session-live-state.service";
 import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
 import { upsertNativeResumeRef } from "../native-resume-ref.repository";
+import { indexRuntimeSpaceFileMutation } from "./app-access";
 import {
   assertRuntimeEventMatchesDriverEnvelope,
   assertRuntimeEventMatchesDriverLink,
@@ -41,15 +42,14 @@ import {
 } from "./event-projection";
 import type {
   ProjectedRuntimeEventRecord,
-  ProjectRuntimeDriverEventsResult,
+  AppRuntimeDriverEventsResult,
   RuntimeDriverRunTransition,
   RuntimeSessionLink,
 } from "./event-types";
 import { readNativeResumeRef } from "./native-resume-ref-event";
-import { indexRuntimeSpaceFileMutation } from "./organization-access";
 import { getRuntimeSessionLink } from "./session-link.repository";
 export type {
-  ProjectRuntimeDriverEventsResult,
+  AppRuntimeDriverEventsResult,
   RuntimeDriverRunTransition,
   RuntimeSessionLink,
 } from "./event-types";
@@ -60,7 +60,7 @@ export {
   recordDriverInstanceFailure,
 } from "./terminal-driver-events";
 
-export async function projectRuntimeDriverEvents(
+export async function appRuntimeDriverEvents(
   database: D1Database,
   input: {
     assertCurrentConnection?: () => void;
@@ -69,7 +69,7 @@ export async function projectRuntimeDriverEvents(
     driverInstanceId: DriverInstanceId;
     link?: RuntimeSessionLink | null;
   },
-): Promise<ProjectRuntimeDriverEventsResult> {
+): Promise<AppRuntimeDriverEventsResult> {
   const link = input.link ?? (await getRuntimeSessionLink(database, input.driverInstanceId));
 
   if (!isTruthy(link.sessionId)) {
@@ -93,9 +93,9 @@ export async function projectRuntimeDriverEvents(
   let nextLiveState = currentLiveState;
   let liveStateChanged = false;
   let sessionTitle: string | null = null;
-  let usage: ProjectRuntimeDriverEventsResult["usage"] = null;
+  let usage: AppRuntimeDriverEventsResult["usage"] = null;
   const runtimeEvents: ProjectedRuntimeEventRecord[] = [];
-  const sessionDeliveryEvents: ProjectRuntimeDriverEventsResult["sessionDeliveryEvents"] = [];
+  const sessionDeliveryEvents: AppRuntimeDriverEventsResult["sessionDeliveryEvents"] = [];
   const transitions: RuntimeDriverRunTransition[] = [];
 
   function appendCanonicalEvent(source: DriverEventEnvelope, event: RuntimeEventEnvelope): void {
@@ -261,12 +261,12 @@ export async function projectRuntimeDriverEvents(
       continue;
     }
 
-    const liveEvents = projectRuntimeEventToSessionDeliveryEvents(event);
+    const liveEvents = appRuntimeEventToSessionDeliveryEvents(event);
 
     const setSessionTitle = (title: string | null): void => {
       sessionTitle = title;
     };
-    const setUsage = (nextUsage: ProjectRuntimeDriverEventsResult["usage"]): void => {
+    const setUsage = (nextUsage: AppRuntimeDriverEventsResult["usage"]): void => {
       usage = nextUsage;
     };
 
@@ -295,7 +295,7 @@ function appendRuntimeDriverCanonicalSideEffects(
   event: RuntimeEventEnvelope,
   output: {
     setSessionTitle: (title: string | null) => void;
-    setUsage: (usage: ProjectRuntimeDriverEventsResult["usage"]) => void;
+    setUsage: (usage: AppRuntimeDriverEventsResult["usage"]) => void;
     transitions: RuntimeDriverRunTransition[];
   },
 ): void {

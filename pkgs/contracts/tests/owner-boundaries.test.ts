@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync, readFileSync } from "node:fs";
 
+import * as Contracts from "@mosoo/contracts";
 import {
   agentKindSupportsOwnerTerminal,
   agentKindSupportsResetState,
@@ -45,7 +47,6 @@ import {
   isCustomRuntimeModelProvider,
   parseRuntimeModelIdentity,
 } from "@mosoo/contracts/models";
-import { canRemoveOrganizationMember } from "@mosoo/contracts/permission";
 import { parseRuntimeCommand } from "@mosoo/contracts/runtime-command";
 import {
   AGENT_SESSION_ARCHIVED_READ_ONLY_REASON,
@@ -56,7 +57,28 @@ import {
 const FILE_ID = "01J00000000000000000000001" as FileId;
 const SESSION_ID = "01J00000000000000000000002" as SessionId;
 const SPACE_ID = "01J00000000000000000000003" as SpaceId;
+
+function readFixture(path: string): string {
+  return readFileSync(new URL(path, import.meta.url), "utf8");
+}
+
 describe("contracts owner boundaries", () => {
+  test("does not expose the old permission package surface", () => {
+    const packageJson = readFixture("../package.json");
+    const indexSource = readFixture("../src/index.ts");
+
+    expect(packageJson).not.toContain('"./permission"');
+    expect(indexSource).not.toContain("permission.contract");
+    expect(indexSource).not.toContain("./permission/");
+    expect(packageJson).not.toContain("providers.company.create");
+    expect(packageJson).not.toContain("agents.acl.");
+    expect(existsSync(new URL("../src/permission/permission.contract.ts", import.meta.url))).toBe(
+      false,
+    );
+    expect("Permission" in Contracts).toBe(false);
+    expect("can" in Contracts).toBe(false);
+  });
+
   test("agent kind runtime policy owns Pet and Cattle semantics", () => {
     expect(getAgentKindRuntimeSubjectScope("pet")).toBe("agent");
     expect(getAgentKindRuntimeSubjectScope("cattle")).toBe("session");
@@ -526,11 +548,5 @@ describe("contracts owner boundaries", () => {
       state: "buried",
       terminal: true,
     });
-  });
-
-  test("permission vocabulary keeps member and organization owner powers separated", () => {
-    expect(canRemoveOrganizationMember({ actorRole: "owner", targetRole: "admin" })).toBe(true);
-    expect(canRemoveOrganizationMember({ actorRole: "admin", targetRole: "owner" })).toBe(false);
-    expect(canRemoveOrganizationMember({ actorRole: "admin", targetRole: "member" })).toBe(true);
   });
 });

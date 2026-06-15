@@ -88,7 +88,6 @@ async function insertPlannerRun(input: {
   readonly createdAt: number;
   readonly database: D1Database;
   readonly id: AgentBuilderPlannerRunId;
-  readonly organizationId: string;
   readonly outputJson: string | null;
   readonly status?: string;
   readonly threadId: string;
@@ -105,7 +104,6 @@ async function insertPlannerRun(input: {
         error_message,
         id,
         model,
-        organization_id,
         output_json,
         provider,
         request_digest,
@@ -114,7 +112,7 @@ async function insertPlannerRun(input: {
         trace_id,
         tool_trace_json,
         trigger_message_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       input.agentId,
@@ -125,7 +123,6 @@ async function insertPlannerRun(input: {
       null,
       input.id,
       "heuristic",
-      input.organizationId,
       input.outputJson,
       "agent-builder-lightweight",
       `digest-${input.id}`,
@@ -239,7 +236,6 @@ describe("Agent Builder planner ledger snapshot", () => {
       createdAt: 10,
       database: fixture.bindings.DB,
       id: oldRunId,
-      organizationId: fixture.ids.organizationId,
       outputJson: plannerOutputJson({
         mode: "action",
         nodes: [pendingActionNode("old_create_agent")],
@@ -253,7 +249,6 @@ describe("Agent Builder planner ledger snapshot", () => {
       createdAt: 20,
       database: fixture.bindings.DB,
       id: latestRunId,
-      organizationId: fixture.ids.organizationId,
       outputJson: plannerOutputJson({
         mode: "action",
         nodes: [
@@ -293,7 +288,6 @@ describe("Agent Builder planner ledger snapshot", () => {
       createdAt: 20,
       database: fixture.bindings.DB,
       id: blockedRunId,
-      organizationId: fixture.ids.organizationId,
       outputJson: plannerOutputJson({
         mode: "blocked",
         nodes: [pendingActionNode("blocked_create_agent")],
@@ -357,7 +351,6 @@ describe("Agent Builder planner ledger snapshot", () => {
       createdAt: 10,
       database: fixture.bindings.DB,
       id: oldRunId,
-      organizationId: fixture.ids.organizationId,
       outputJson: plannerOutputJson({
         mode: "action",
         nodes: [pendingActionNode("old_create_agent")],
@@ -371,7 +364,6 @@ describe("Agent Builder planner ledger snapshot", () => {
       createdAt: 20,
       database: fixture.bindings.DB,
       id: middleRunId,
-      organizationId: fixture.ids.organizationId,
       outputJson: plannerOutputJson({
         mode: "question",
         nodes: [
@@ -398,7 +390,6 @@ describe("Agent Builder planner ledger snapshot", () => {
       createdAt: 30,
       database: fixture.bindings.DB,
       id: latestRunId,
-      organizationId: fixture.ids.organizationId,
       outputJson: plannerOutputJson({
         mode: "action",
         nodes: [
@@ -472,7 +463,6 @@ describe("Agent Builder planner ledger snapshot", () => {
       createdAt: sameTimestamp,
       database: fixture.bindings.DB,
       id: plannerRunId,
-      organizationId: fixture.ids.organizationId,
       outputJson: plannerOutputJson({
         mode: "question",
         nodes: [questionNode("ask_environment", "pending")],
@@ -503,7 +493,6 @@ describe("Agent Builder planner ledger snapshot", () => {
       createdAt: 10,
       database: fixture.bindings.DB,
       id: oldRunId,
-      organizationId: fixture.ids.organizationId,
       outputJson: plannerOutputJson({
         mode: "action",
         nodes: [pendingActionNode("old_create_agent")],
@@ -517,7 +506,6 @@ describe("Agent Builder planner ledger snapshot", () => {
       createdAt: 20,
       database: fixture.bindings.DB,
       id: latestRunId,
-      organizationId: fixture.ids.organizationId,
       outputJson: JSON.stringify({ invalid: true }),
       threadId: thread.id,
     });

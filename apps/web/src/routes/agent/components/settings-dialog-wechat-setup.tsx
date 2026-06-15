@@ -1,4 +1,4 @@
-import type { AgentId } from "@mosoo/contracts/id";
+import type { AgentId, AppId } from "@mosoo/contracts/id";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, RefreshCw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -13,7 +13,7 @@ import type {
   PollWeChatAgentChannelPairingInput,
   WeChatAgentChannelPairingFieldsFragment,
 } from "@/gql/graphql";
-import { toAgentId } from "@/routes/typed-id";
+import { toAgentId, toAppId } from "@/routes/typed-id";
 import { Button } from "@/shared/ui/button";
 
 import type { ChannelInlineSetupAgent } from "./settings-dialog-channel-agent";
@@ -92,11 +92,13 @@ function mergePairing(
 function useWeChatPairingPolling({
   agentId,
   poll,
+  appId,
   qrToken,
   shouldPoll,
 }: {
   agentId: AgentId;
   poll: (input: PollWeChatAgentChannelPairingInput) => void;
+  appId: AppId;
   qrToken: string | null;
   shouldPoll: boolean;
 }) {
@@ -106,13 +108,13 @@ function useWeChatPairingPolling({
     }
 
     const timeoutId = globalThis.setTimeout(() => {
-      poll({ agentId, qrToken });
+      poll({ agentId, appId, qrToken });
     }, WECHAT_POLL_INTERVAL_MS);
 
     return () => {
       globalThis.clearTimeout(timeoutId);
     };
-  }, [agentId, poll, qrToken, shouldPoll]);
+  }, [agentId, poll, appId, qrToken, shouldPoll]);
 }
 
 export function WeChatChannelInlineSetup({
@@ -125,12 +127,15 @@ export function WeChatChannelInlineSetup({
   const queryClient = useQueryClient();
   const [pairing, setPairing] = useState<WeChatAgentChannelPairingFieldsFragment | null>(null);
   const typedAgentId = toAgentId(agent.id);
+  const typedAppId = toAppId(agent.appId);
 
   const startMutation = useMutation({
     mutationFn: startWeChatAgentChannelPairing,
     onSuccess: async (result) => {
       setPairing(result);
-      await queryClient.invalidateQueries({ queryKey: agentKeys.channelBindings(agent.id) });
+      await queryClient.invalidateQueries({
+        queryKey: agentKeys.channelBindings(agent.appId, agent.id),
+      });
     },
   });
   const pollMutation = useMutation({
@@ -139,7 +144,9 @@ export function WeChatChannelInlineSetup({
       setPairing((current) => mergePairing(current, result));
 
       if (result.status === "confirmed" && result.binding) {
-        await queryClient.invalidateQueries({ queryKey: agentKeys.channelBindings(agent.id) });
+        await queryClient.invalidateQueries({
+          queryKey: agentKeys.channelBindings(agent.appId, agent.id),
+        });
         onSuccess?.();
       }
     },
@@ -158,12 +165,13 @@ export function WeChatChannelInlineSetup({
   useWeChatPairingPolling({
     agentId: typedAgentId,
     poll: pollPairing,
+    appId: typedAppId,
     qrToken,
     shouldPoll,
   });
 
   function handleStartPairing() {
-    startMutation.mutate({ agentId: typedAgentId });
+    startMutation.mutate({ agentId: typedAgentId, appId: typedAppId });
   }
 
   function handlePollNow() {
@@ -173,6 +181,7 @@ export function WeChatChannelInlineSetup({
 
     pollMutation.mutate({
       agentId: typedAgentId,
+      appId: typedAppId,
       qrToken,
     });
   }

@@ -11,9 +11,9 @@ import {
   parseAgentBuilderPlannerRunId,
   parseAgentBuilderThreadId,
   parseAgentId,
+  parseAppId,
   parseEnvironmentId,
   parseMcpServerId,
-  parseOrganizationId,
   parseSkillId,
   parseSpaceId,
 } from "../src/modules/agent-builder/application/agent-builder-ids";
@@ -25,13 +25,13 @@ function platformId(index: number): string {
 export const NORMALIZER_IDS = {
   account: parseAccountId(platformId(101)),
   agent: parseAgentId(platformId(102)),
+  app: parseAppId(platformId(107)),
   environmentLinear: parseEnvironmentId(platformId(103)),
   environmentSystemDefault: parseEnvironmentId(platformId(104)),
   mcpNeedsAuth: parseMcpServerId(platformId(105)),
   mcpKeep: parseMcpServerId(platformId(113)),
   mcpRemove: parseMcpServerId(platformId(114)),
   message: parseAgentBuilderMessageId(platformId(106)),
-  organization: parseOrganizationId(platformId(107)),
   plannerRun: parseAgentBuilderPlannerRunId(platformId(108)),
   spaceAvailable: parseSpaceId(platformId(109)),
   spaceKeep: parseSpaceId(platformId(110)),
@@ -66,9 +66,9 @@ export function plannerContext(): AgentBuilderPlannerContext {
   return {
     agent: {
       agentId: NORMALIZER_IDS.agent,
+      appId: NORMALIZER_IDS.app,
       baseConfigApplied: true,
       kind: "pet",
-      organizationId: NORMALIZER_IDS.organization,
       status: "draft",
     },
     assets: {

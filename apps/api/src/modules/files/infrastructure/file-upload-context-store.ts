@@ -6,7 +6,7 @@ import type {
   FileUploadStatus,
 } from "@mosoo/contracts/file";
 import { fileRecordsTable, fileUploadsTable, sessionsTable } from "@mosoo/db";
-import type { AccountId, FileId, OrganizationId, PlatformId, SessionId, UploadId } from "@mosoo/id";
+import type { AccountId, FileId, PlatformId, SessionId, UploadId } from "@mosoo/id";
 import { and, eq, or, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -60,7 +60,6 @@ interface FileUploadContextRow {
 
 interface FileUploadAccessContextRow extends FileUploadContextRow {
   session_id: SessionId | null;
-  session_organization_id: OrganizationId | null;
   session_provider: string | null;
   session_title: string | null;
 }
@@ -178,7 +177,6 @@ function toJoinedSessionFileAccess(row: FileUploadAccessContextRow): SessionFile
 
   return {
     id: row.session_id,
-    organization_id: requireJoinedSessionValue(row.session_organization_id, "organization_id"),
     provider: requireJoinedSessionValue(row.session_provider, "provider"),
     title: row.session_title,
   };
@@ -194,7 +192,6 @@ export async function getFileUploadAccessContextByFileId(
       .select({
         ...fileUploadContextColumns,
         session_id: sessionsTable.id,
-        session_organization_id: sessionsTable.organizationId,
         session_provider: sessionsTable.provider,
         session_title: sessionsTable.title,
       })

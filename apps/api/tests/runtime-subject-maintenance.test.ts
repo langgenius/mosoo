@@ -5,8 +5,8 @@ import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
-  insertMemberSession,
-} from "./helpers/published-agent-http-test-fixture";
+  insertNonOwnerSession,
+} from "./helpers/public-api-http-test-fixture";
 
 async function insertRunningSessionRun(database: D1Database): Promise<void> {
   await database
@@ -53,7 +53,7 @@ async function insertRunningSessionRun(database: D1Database): Promise<void> {
 describe("runtime subject maintenance", () => {
   test("expires stale rescheduling sessions", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertRunningSessionRun(database);
 
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
@@ -72,7 +72,7 @@ describe("runtime subject maintenance", () => {
 
   test("does not expire runtime operation owned rescheduling sessions", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertRunningSessionRun(database);
     await database
       .prepare("UPDATE session SET status_operation_id = ? WHERE id = ?")

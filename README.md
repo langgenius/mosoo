@@ -1,8 +1,8 @@
 # Mosoo
 
-Mosoo is an open-source Agent Cloud project in alpha, built on a Cloudflare-native architecture. The current priority is OPC / personal developers: a user should be able to bring a `PRD.md`, invoke `@mosoo`, and get an Agent App that organizes Agents, app-local resources, Threads, Agent exposure, operations, and an exportable `Skill.md`.
+Mosoo is an open-source Agent Cloud product in alpha, built on a Cloudflare-native architecture. The current priority is OPC / personal developers: a user should be able to bring a `PRD.md`, invoke `@mosoo`, and get an Agent App that organizes Agents, app-local resources, Threads, Agent exposure, operations, and an exportable `Skill.md`.
 
-During the current construction phase, assume one human owns one Organization. The Organization is the account / billing / tenant shell; the business, resource, operations, and export boundary is **Project** in code, database, API, and architecture docs, and **App** in console copy. Team membership, project roles, org-wide shared resources, and enterprise governance remain future extensions after the single-owner Project/App loop is real.
+During the current construction phase, assume one human owns one Organization. The Organization is the account / billing / tenant shell; the business, resource, operations, and export boundary is **App** in code, database, API, architecture docs, and console copy. Role matrices, cross-account resource catalogs, and governance extensions stay outside the single-owner App loop.
 
 In the long term, we want Mosoo to grow from an open-source community edition into Agent infrastructure that supports individuals, OPCs, small teams, and enterprise governance. Personal developers can experiment and fork freely, teams can build shared Agent and Knowledge assets, and enterprises can add permission, cost, version, and runtime-state management on top of the same boundary model.
 
@@ -11,8 +11,8 @@ For implementation language and V1 boundaries, read [SPEC.md](./docs/SPEC.md) be
 ## Current Product Lock
 
 - The primary loop is `PRD.md + @mosoo` -> create or select an App -> provision Agents and app-local resources -> expose an Agent through API or channel when needed -> export the App as `Skill.md`.
-- Project is the canonical engineering noun. App is the user-facing console noun. Avoid introducing parallel boundary nouns such as Workspace, Team, Application, Service App, or Product.
-- Agents, Threads / Sessions, Spaces, Environments, Skills, MCP servers, Provider keys, Channels, Agent exposure state, export, and app-scoped cost belong to the Project/App boundary first.
+- App is the canonical engineering and user-facing noun. Avoid introducing parallel boundary nouns such as Workspace, Team, Application, Service App, Agent Service, or Product.
+- Agents, Threads / Sessions, Spaces, Environments, Skills, MCP servers, Provider keys, Channels, Agent exposure state, export, and app-scoped cost belong to the App boundary first.
 - App is not a Web shell, GitHub repository, App runtime, App-level API endpoint, or generic Service container in V1. Do not add a unified `services` table or polymorphic `service.kind`.
 - Agents own runtime, API endpoint exposure, and channel delivery.
 - The console should create a default App during onboarding. If an Organization has one App, route directly into that App; the App list only becomes prominent when there is a second App.
@@ -37,7 +37,7 @@ Mosoo was originally named Dify-Lite. The initial goal was to build a lighter ve
 
 The value proposition at this stage is not to clone a complete large platform. It is to make the Agent Cloud skeleton thin, fast, and open-source first, so personal developers can own infrastructure that is runnable, understandable, and easy to fork.
 
-Mosoo still has three long-term planes, but the current alpha should express them through the Project/App delivery loop first:
+Mosoo still has three long-term planes, but the current alpha should express them through the App delivery loop first:
 
 - **Consumption plane**: let users access exposed Agents through Threads, Agent APIs, and channels.
 - **Production plane**: let personal developers configure, operate, and export Agent Apps faster.
@@ -54,22 +54,22 @@ The current roadmap centers on these goals:
 - **OPC / personal developers first**: polish the full loop for creating, exposing, running, debugging, and exporting one Agent App as an individual developer.
 - **Cloudflare-native runtime**: continue converging the architecture around Workers, Durable Objects, D1, R2, and related platform capabilities.
 - **Complete open-source community path**: prioritize the core capabilities required for a self-hostable, modifiable, extensible community edition.
-- **Project/App resource boundary**: move Agent, Thread / Session, Space, Environment, Skill, MCP, Provider Credential, Channel, Agent exposure state, export, and app-scoped Cost under one boundary without adding a generic Service entity.
+- **App resource boundary**: move Agent, Thread / Session, Space, Environment, Skill, MCP, Provider Credential, Channel, Agent exposure state, export, and app-scoped Cost under one boundary without adding a generic Service entity.
 - **Enterprise capability expansion**: after personal and OPC scenarios work end to end, add team collaboration, permissions, cost governance, version control, and runtime governance.
 
 For the current status snapshot — what is **Planned**, **In Development**, and **Done** — see [roadmap.md](./roadmap.md).
 
 ## Vision
 
-In the long term, Mosoo aims to grow from an open-source Agent Cloud project into a management-oriented platform rather than a pure tool. This vision is aimed at internal enterprise AI governance and Agent infrastructure management, letting application / Agent developers, administrators, and users participate in the same AI infrastructure from different perspectives.
+In the long term, Mosoo aims to grow from an open-source Agent Cloud product into a management-oriented platform rather than a pure tool. This vision is aimed at internal enterprise AI governance and Agent infrastructure management, letting application / Agent developers, administrators, and users participate in the same AI infrastructure from different perspectives.
 
 For producers, the future goal is to complete application configuration and launch within 15 minutes, delivering different kinds of Agent Runtime to employees, such as Claude Code and Hermes. Mosoo should also connect to channels / platforms such as GitHub, Slack, and Lark, or integrate into internal enterprise systems and application development workflows through APIs and Skills.
 
 For administrators, Mosoo aims to provide an easy-to-use WebUI for understanding which Agents are running inside the company, who can access them, who is using them, how cost is calculated, how versions are controlled, and how internal Agent infrastructure becomes managed infrastructure.
 
-## Project Status
+## Product Status
 
-Mosoo is still in alpha exploration. Product boundaries, data models, deployment methods, and management experience are all evolving quickly. During the Project/App separation, treat the current lock above and [Project / App Boundary](./docs/prd/project-app-boundary.md) as newer than older Agent-first, Workspace, member-management, or team-governance language. This repository currently prioritizes fast validation and architectural convergence for the open-source version, with no promise of stable APIs or backward compatibility.
+Mosoo is still in alpha exploration. Product boundaries, data models, deployment methods, and management experience are all evolving quickly. During the App boundary cut, treat the current lock above and [App Boundary](./docs/prd/app-boundary.md) as newer than older Agent-first, Workspace, member-management, or team-governance language. This repository currently prioritizes fast validation and architectural convergence for the open-source version, with no promise of stable APIs or backward compatibility.
 
 - PRDs and product design: [docs/prd/README.md](./docs/prd/README.md).
 - Current product spec: [SPEC.md](./docs/SPEC.md).

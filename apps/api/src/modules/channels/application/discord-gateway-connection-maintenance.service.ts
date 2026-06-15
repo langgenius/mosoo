@@ -27,6 +27,7 @@ async function listPublishedDiscordBindingIdPage(
 ): Promise<ChannelBindingId[]> {
   const predicates = [
     eq(agentChannelBindingsTable.provider, "discord"),
+    eq(agentChannelBindingsTable.appId, agentsTable.appId),
     eq(agentChannelBindingsTable.status, "active"),
     eq(agentsTable.status, "published"),
   ];

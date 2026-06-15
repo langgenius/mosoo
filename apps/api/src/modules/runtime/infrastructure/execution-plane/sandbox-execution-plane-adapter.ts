@@ -210,7 +210,7 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
 
       const executionSession = await timing.measure("ensureSandboxConversationSession", () =>
         ensureSandboxConversationSession(bindings, {
-          currentOrganizationAccessSnapshot: input.organizationAccessSnapshot,
+          currentAppAccessSnapshot: input.appAccessSnapshot,
           kind: input.profile.kind,
           mountSessionResources: input.attachmentIds.length > 0,
           origin: input.profile.session.origin,
@@ -240,7 +240,7 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
           ...(input.onBootPayloadPrepared
             ? { onBootPayloadPrepared: input.onBootPayloadPrepared }
             : {}),
-          organizationAccessSnapshot: executionSession.organizationAccessSnapshot,
+          appAccessSnapshot: executionSession.appAccessSnapshot,
           profile: driverProfile,
           resolvedMcpServers: input.resolvedMcpServers,
           resolvedSkillCatalog: input.resolvedSkillCatalog,
@@ -258,7 +258,7 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
 
       return {
         driverInstanceId: driver.driverInstanceId,
-        organizationAccessSnapshot: executionSession.organizationAccessSnapshot,
+        appAccessSnapshot: executionSession.appAccessSnapshot,
         timing: timing.snapshot({ path: driver.timing.path }),
         release: () => {
           releaseRunResources(handles);

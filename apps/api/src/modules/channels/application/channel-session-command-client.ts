@@ -128,6 +128,7 @@ export function createChannelSessionClient(input: {
               executionContext: input.executionContext,
               input: {
                 agentId: input.binding.agentId,
+                appId: input.binding.appId,
                 type: "api_channel",
               },
               options: {
@@ -176,6 +177,7 @@ export function createChannelSessionClient(input: {
                 type: "user_message",
               },
             ],
+            appId: input.binding.appId,
             sessionId,
           },
           options: {
@@ -215,6 +217,7 @@ export function createChannelSessionClient(input: {
         agentId: input.binding.agentId,
         bindingId: input.binding.bindingId,
         errorCode,
+        appId: input.binding.appId,
       });
     },
     retrieveSessionReply(sessionId, runId) {

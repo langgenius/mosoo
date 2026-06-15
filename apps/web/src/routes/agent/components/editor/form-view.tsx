@@ -27,7 +27,6 @@ export interface AgentFormViewProps {
   focusSection?: AgentFormSectionId | null;
   highlightedSections?: ReadonlySet<AgentFormSectionId> | null;
   model: AgentEditorModel;
-  organizationId: string | null;
   readOnly?: boolean;
   showChannels?: boolean;
 }
@@ -37,7 +36,6 @@ interface AgentFormViewBodyProps {
   focusSection: AgentFormSectionId | null;
   highlightedSections: ReadonlySet<AgentFormSectionId> | null;
   model: AgentEditorModel;
-  organizationId: string | null;
   readOnly: boolean;
   showChannels: boolean;
 }
@@ -48,9 +46,8 @@ export function AgentFormView({
   focusSection = null,
   highlightedSections = null,
   model,
-  organizationId,
   readOnly = false,
-  showChannels = true,
+  showChannels = false,
 }: AgentFormViewProps): ReactElement {
   return (
     <AgentFormBody
@@ -58,7 +55,6 @@ export function AgentFormView({
       focusSection={focusSection}
       highlightedSections={highlightedSections}
       model={model}
-      organizationId={organizationId}
       readOnly={readOnly}
       showChannels={showChannels}
     />
@@ -103,7 +99,6 @@ function AgentFormBody({
   focusSection,
   highlightedSections,
   model,
-  organizationId,
   readOnly,
   showChannels,
 }: AgentFormViewBodyProps): ReactElement {
@@ -135,7 +130,7 @@ function AgentFormBody({
           setSectionRef("integrations", node);
         }}
       >
-        <IntegrationsSection model={model} organizationId={organizationId} readOnly={readOnly} />
+        <IntegrationsSection model={model} appId={agent.appId} readOnly={readOnly} />
       </div>
 
       <div
@@ -150,7 +145,6 @@ function AgentFormBody({
         <EnvironmentSection
           agent={agent}
           model={model}
-          organizationId={organizationId}
           readOnly={readOnly}
           showChannels={showChannels}
         />

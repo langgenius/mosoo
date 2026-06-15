@@ -2,12 +2,11 @@ import type {
   CreateEnvironmentInput,
   EnvironmentDetail,
   EnvironmentSummary,
-  SetOrganizationDefaultEnvironmentInput,
+  SetAppDefaultEnvironmentInput,
   SetEnvironmentVariableValueInput,
   UpdateEnvironmentInput,
 } from "@mosoo/contracts/environment";
-import { Permission } from "@mosoo/contracts/permission";
-import { environmentsTable, organizationsTable } from "@mosoo/db";
+import { environmentsTable, appsTable } from "@mosoo/db";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
 import type { AccountId, EnvironmentId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
@@ -16,8 +15,8 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureOrganizationPermission } from "../../organizations/domain/organization-access.policy";
 import {
   ensureEnvironmentAccess,
   ensureEnvironmentEditor,
@@ -29,7 +28,6 @@ import {
   toConfig,
   toEnvironmentSummary,
 } from "./environment-config-mapping";
-import { ensureOrganizationEnvironmentDefaults } from "./environment-defaults";
 import { getEnvironmentDetail } from "./environment-queries";
 import type { EnvironmentMutableConfig } from "./environment-types";
 import { createEnvironmentFromConfig, createRevision } from "./environment-write.service";
@@ -40,14 +38,7 @@ export async function createEnvironment(
   input: CreateEnvironmentInput,
 ): Promise<EnvironmentSummary> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-
-  await ensureOrganizationPermission(
-    bindings.DB,
-    viewerId,
-    input.organizationId,
-    Permission.EnvironmentsCreate,
-  );
-  await ensureOrganizationEnvironmentDefaults(bindings, input.organizationId);
+  const app = await ensureAppOwnership(bindings.DB, viewerId, input.appId);
 
   const metadata = normalizeEnvironmentMetadata(input);
   const environmentId = createPlatformId<EnvironmentId>();
@@ -67,8 +58,8 @@ export async function createEnvironment(
     description: metadata.description,
     environmentId,
     name: metadata.name,
-    organizationId: input.organizationId,
     ownerId: viewerId,
+    appId: app.id,
     timestampMs,
   });
 
@@ -78,7 +69,7 @@ export async function createEnvironment(
     throw new Error("Environment could not be loaded after creation.");
   }
 
-  return toEnvironmentSummary(created, viewerId, false);
+  return toEnvironmentSummary(created);
 }
 
 export async function updateEnvironment(
@@ -87,7 +78,10 @@ export async function updateEnvironment(
   input: UpdateEnvironmentInput,
 ): Promise<EnvironmentDetail> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  const access = await ensureEnvironmentEditor(bindings.DB, viewerId, input.environmentId);
+  const access = await ensureEnvironmentEditor(bindings.DB, viewerId, {
+    environmentId: input.environmentId,
+    appId: input.appId,
+  });
   const beforeConfig = toConfig(access.row);
   const metadata = normalizeEnvironmentMetadata(input);
   const normalized = normalizeConfigForCreate(input);
@@ -105,7 +99,7 @@ export async function updateEnvironment(
     actorId: viewerId,
     config,
     environmentId: access.row.id,
-    organizationId: access.row.organizationId,
+    appId: access.row.appId,
     timestampMs,
   });
 
@@ -120,7 +114,10 @@ export async function updateEnvironment(
     .where(eq(environmentsTable.id, access.row.id))
     .run();
 
-  return getEnvironmentDetail(bindings, viewer, access.row.id);
+  return getEnvironmentDetail(bindings, viewer, {
+    environmentId: access.row.id,
+    appId: access.row.appId,
+  });
 }
 
 export async function setEnvironmentVariableValue(
@@ -129,7 +126,10 @@ export async function setEnvironmentVariableValue(
   input: SetEnvironmentVariableValueInput,
 ): Promise<EnvironmentDetail> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  const access = await ensureEnvironmentEditor(bindings.DB, viewerId, input.environmentId);
+  const access = await ensureEnvironmentEditor(bindings.DB, viewerId, {
+    environmentId: input.environmentId,
+    appId: input.appId,
+  });
   const beforeConfig = toConfig(access.row);
   const key = input.key.trim();
   const value = input.value;
@@ -162,7 +162,7 @@ export async function setEnvironmentVariableValue(
       envVars,
     },
     environmentId: access.row.id,
-    organizationId: access.row.organizationId,
+    appId: access.row.appId,
     timestampMs,
   });
 
@@ -175,42 +175,36 @@ export async function setEnvironmentVariableValue(
     .where(eq(environmentsTable.id, access.row.id))
     .run();
 
-  return getEnvironmentDetail(bindings, viewer, access.row.id);
+  return getEnvironmentDetail(bindings, viewer, {
+    environmentId: access.row.id,
+    appId: access.row.appId,
+  });
 }
 
-export async function setOrganizationDefaultEnvironment(
+export async function setAppDefaultEnvironment(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
-  input: SetOrganizationDefaultEnvironmentInput,
+  input: SetAppDefaultEnvironmentInput,
 ): Promise<EnvironmentSummary> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
+  await ensureAppOwnership(bindings.DB, viewerId, input.appId);
 
-  await ensureOrganizationPermission(
-    bindings.DB,
-    viewerId,
-    input.organizationId,
-    Permission.EnvironmentsSetOrgDefault,
-  );
+  const access = await ensureEnvironmentAccess(bindings.DB, viewerId, {
+    environmentId: input.environmentId,
+    appId: input.appId,
+  });
 
-  await ensureOrganizationEnvironmentDefaults(bindings, input.organizationId);
-
-  const access = await ensureEnvironmentAccess(bindings.DB, viewerId, input.environmentId);
-
-  if (access.row.organizationId !== input.organizationId) {
-    throw forbiddenError("Environment belongs to another organization.");
-  }
-
-  if (access.row.ownerId !== null && !access.hasOrganizationShare) {
-    throw new Error("Only organization-shared environments can be set as default.");
+  if (access.row.appId !== input.appId) {
+    throw forbiddenError("Environment belongs to another App.");
   }
 
   await getAppDatabase(bindings.DB)
-    .update(organizationsTable)
+    .update(appsTable)
     .set({
       defaultEnvironmentId: access.row.id,
       updatedAt: currentTimestampMs(),
     })
-    .where(eq(organizationsTable.id, input.organizationId))
+    .where(eq(appsTable.id, input.appId))
     .run();
 
   const row = await getEnvironmentRecordRow(bindings.DB, access.row.id);
@@ -219,5 +213,5 @@ export async function setOrganizationDefaultEnvironment(
     throw new Error("Environment not found.");
   }
 
-  return toEnvironmentSummary(row, viewerId, true);
+  return toEnvironmentSummary(row);
 }

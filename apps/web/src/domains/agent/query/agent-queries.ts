@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { UseQueryResult } from "@tanstack/react-query";
 
 import type { AgentChannelBindingFieldsFragment } from "@/gql/graphql";
-import { toAgentId, toOrganizationId } from "@/routes/typed-id";
+import { toAgentId, toAppId } from "@/routes/typed-id";
 
 import {
   getAgent,
@@ -14,15 +14,17 @@ import {
 
 export const agentKeys = {
   all: ["agent"] as const,
-  detail: (agentId: string) => [...agentKeys.details(), agentId] as const,
+  detail: (appId: string, agentId: string) => [...agentKeys.details(), appId, agentId] as const,
   details: () => [...agentKeys.all, "detail"] as const,
-  channelBindings: (agentId: string) => [...agentKeys.channelBindingLists(), agentId] as const,
+  channelBindings: (appId: string, agentId: string) =>
+    [...agentKeys.channelBindingLists(), appId, agentId] as const,
   channelBindingLists: () => [...agentKeys.all, "channel-bindings"] as const,
-  editorState: (agentId: string) => [...agentKeys.editorStates(), agentId] as const,
+  editorState: (appId: string, agentId: string) =>
+    [...agentKeys.editorStates(), appId, agentId] as const,
   editorStates: () => [...agentKeys.all, "editor-state"] as const,
-  list: (organizationId: string) => [...agentKeys.lists(), organizationId] as const,
+  list: (appId: string) => [...agentKeys.lists(), appId] as const,
   lists: () => [...agentKeys.all, "list"] as const,
-  manifest: (agentId: string) => [...agentKeys.manifests(), agentId] as const,
+  manifest: (appId: string, agentId: string) => [...agentKeys.manifests(), appId, agentId] as const,
   manifests: () => [...agentKeys.all, "manifest"] as const,
 };
 
@@ -31,69 +33,90 @@ export type AgentDetailQueryResult = UseQueryResult<AgentDetail>;
 export type AgentChannelBindingsQueryResult = UseQueryResult<AgentChannelBindingFieldsFragment[]>;
 export type AgentEditorStateQueryResult = UseQueryResult<AgentEditorState>;
 
-export function useVisibleAgentsQuery(organizationId: string | null): VisibleAgentsQueryResult {
+export function useVisibleAgentsQuery(appId: string | null): VisibleAgentsQueryResult {
   return useQuery({
-    enabled: organizationId !== null,
+    enabled: appId !== null,
     queryFn: async () => {
-      if (organizationId === null) {
-        throw new Error("Organization id is required to list visible agents.");
+      if (appId === null) {
+        throw new Error("App id is required to list visible agents.");
       }
 
-      return listVisibleAgents(toOrganizationId(organizationId));
+      return listVisibleAgents(toAppId(appId));
     },
-    queryKey:
-      organizationId === null ? [...agentKeys.lists(), "missing"] : agentKeys.list(organizationId),
+    queryKey: appId === null ? [...agentKeys.lists(), "missing"] : agentKeys.list(appId),
   });
 }
 
-export function useAgentDetailQuery(agentId: string | null): AgentDetailQueryResult {
+export function useAgentDetailQuery(
+  appId: string | null,
+  agentId: string | null,
+): AgentDetailQueryResult {
   return useQuery({
-    enabled: agentId !== null,
+    enabled: appId !== null && agentId !== null,
     queryFn: async () => {
+      if (appId === null) {
+        throw new Error("App id is required to load agent details.");
+      }
+
       if (agentId === null) {
         throw new Error("Agent id is required to load agent details.");
       }
 
-      return getAgent(toAgentId(agentId));
+      return getAgent(toAppId(appId), toAgentId(agentId));
     },
-    queryKey: agentId === null ? [...agentKeys.details(), "missing"] : agentKeys.detail(agentId),
+    queryKey:
+      appId === null || agentId === null
+        ? [...agentKeys.details(), "missing"]
+        : agentKeys.detail(appId, agentId),
   });
 }
 
 export function useAgentEditorStateQuery(
+  appId: string | null,
   agentId: string | null,
   enabled = true,
 ): AgentEditorStateQueryResult {
   return useQuery({
-    enabled: enabled && agentId !== null,
+    enabled: enabled && appId !== null && agentId !== null,
     queryFn: async () => {
+      if (appId === null) {
+        throw new Error("App id is required to load editor state.");
+      }
+
       if (agentId === null) {
         throw new Error("Agent id is required to load editor state.");
       }
 
-      return getAgentEditorState(toAgentId(agentId));
+      return getAgentEditorState(toAppId(appId), toAgentId(agentId));
     },
     queryKey:
-      agentId === null ? [...agentKeys.editorStates(), "missing"] : agentKeys.editorState(agentId),
+      appId === null || agentId === null
+        ? [...agentKeys.editorStates(), "missing"]
+        : agentKeys.editorState(appId, agentId),
   });
 }
 
 export function useAgentChannelBindingsQuery(
+  appId: string | null,
   agentId: string | null,
   enabled = true,
 ): AgentChannelBindingsQueryResult {
   return useQuery({
-    enabled: enabled && agentId !== null,
+    enabled: enabled && appId !== null && agentId !== null,
     queryFn: async () => {
+      if (appId === null) {
+        throw new Error("App id is required to load channel bindings.");
+      }
+
       if (agentId === null) {
         throw new Error("Agent id is required to load channel bindings.");
       }
 
-      return listAgentChannelBindings(toAgentId(agentId));
+      return listAgentChannelBindings(toAppId(appId), toAgentId(agentId));
     },
     queryKey:
-      agentId === null
+      appId === null || agentId === null
         ? [...agentKeys.channelBindingLists(), "missing"]
-        : agentKeys.channelBindings(agentId),
+        : agentKeys.channelBindings(appId, agentId),
   });
 }

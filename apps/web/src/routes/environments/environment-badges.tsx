@@ -9,7 +9,7 @@ export function EnvironmentBadges({
     isBuiltIn: boolean;
     isDefault: boolean;
     networkPolicy: "full" | "limited";
-    role: "owner" | "user";
+    role: "owner";
   };
 }) {
   return (
@@ -24,9 +24,6 @@ export function EnvironmentBadges({
       <Badge variant={environment.networkPolicy === "limited" ? "soil" : "default"}>
         {environment.networkPolicy === "limited" ? "Limited" : "Full"}
       </Badge>
-      {environment.role === "user" && !environment.isBuiltIn ? (
-        <Badge variant="outline">Shared</Badge>
-      ) : null}
     </div>
   );
 }

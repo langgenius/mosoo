@@ -1,14 +1,8 @@
 import { parsePlatformId } from "@mosoo/id";
 
-import type { AccountId, FileId, OrganizationId, SessionId, SpaceId } from "../id/id.contract";
+import type { AccountId, FileId, AppId, SessionId, SpaceId } from "../id/id.contract";
 
-export const FILE_SCOPE_KINDS = [
-  "agent_package",
-  "organization_avatar",
-  "organization_draft",
-  "session",
-  "space",
-] as const;
+export const FILE_SCOPE_KINDS = ["agent_package", "app_draft", "session", "space"] as const;
 export type FileScopeKind = (typeof FILE_SCOPE_KINDS)[number];
 
 export const FILE_STATUSES = ["deleting", "failed", "pending", "ready"] as const;
@@ -30,13 +24,12 @@ export type FileUploadStrategy = (typeof FILE_UPLOAD_STRATEGIES)[number];
 export const FILE_PURPOSES = [
   "agent_asset",
   "agent_package",
-  "organization_avatar",
-  "organization_draft",
+  "app_draft",
   "session_attachment",
   "space_file",
 ] as const;
 export type FilePurpose = (typeof FILE_PURPOSES)[number];
-export const FILE_OWNER_KINDS = ["account", "organization", "session", "space"] as const;
+export const FILE_OWNER_KINDS = ["account", "app", "session", "space"] as const;
 export type FileOwnerKind = (typeof FILE_OWNER_KINDS)[number];
 export const SPACE_FILE_EXTENSION_REQUIRED_MESSAGE = "File name must include an extension.";
 export const SINGLE_PUT_THRESHOLD_BYTES = 64 * 1024 * 1024;
@@ -44,7 +37,18 @@ export const DEFAULT_MULTIPART_PART_SIZE_BYTES = 16 * 1024 * 1024;
 export const MIN_MULTIPART_PART_SIZE_BYTES = 5 * 1024 * 1024;
 
 function trimSlashes(value: string): string {
-  return value.replace(/^\/+/, "").replace(/\/+$/, "");
+  let start = 0;
+  let end = value.length;
+
+  while (start < end && value.charCodeAt(start) === 0x2f) {
+    start += 1;
+  }
+
+  while (end > start && value.charCodeAt(end - 1) === 0x2f) {
+    end -= 1;
+  }
+
+  return value.slice(start, end);
 }
 
 function assertRelativePathOriginal(path: string): void {
@@ -228,8 +232,8 @@ export function choosePartSize(size: number): number {
   return Math.max(basePartSize, MIN_MULTIPART_PART_SIZE_BYTES);
 }
 
-export type FileScopeId = OrganizationId | SessionId | SpaceId;
-export type FileOwnerId = AccountId | OrganizationId | SessionId | SpaceId;
+export type FileScopeId = AppId | SessionId | SpaceId;
+export type FileOwnerId = AccountId | AppId | SessionId | SpaceId;
 
 export function createScope(scopeKind: FileScopeKind, scopeId: FileScopeId): FileScope {
   return {
@@ -323,16 +327,12 @@ export function createFileObjectKey(file: FileObjectKeyInput): string {
 
   const fileName = requireProjectionFileName(file.name);
 
-  if (file.scope.kind === "organization_draft") {
-    return `draft/${file.scope.id}/attachment/${file.id}/${fileName}`;
+  if (file.scope.kind === "app_draft") {
+    return `app-draft/${file.scope.id}/attachment/${file.id}/${fileName}`;
   }
 
   if (file.scope.kind === "agent_package") {
     return `agent-package/${file.scope.id}/attachment/${file.id}/${fileName}`;
-  }
-
-  if (file.scope.kind === "organization_avatar") {
-    return `organization-avatar/${file.scope.id}/${file.id}/${fileName}`;
   }
 
   return `session/${file.scope.id}/attachment/${file.id}/${fileName}`;
@@ -418,28 +418,24 @@ export interface CreateSpaceFileUploadTarget {
   id: SpaceId;
   kind: "space";
   path: string;
+  appId: AppId;
 }
 
 export interface CreateSessionFileUploadTarget {
   id: SessionId;
   kind: "session";
   name: string;
+  appId: AppId;
 }
 
-export interface CreateOrganizationDraftFileUploadTarget {
-  id: OrganizationId;
-  kind: "organization_draft";
-  name: string;
-}
-
-export interface CreateOrganizationAvatarFileUploadTarget {
-  id: OrganizationId;
-  kind: "organization_avatar";
+export interface CreateAppDraftFileUploadTarget {
+  id: AppId;
+  kind: "app_draft";
   name: string;
 }
 
 export interface CreateAgentPackageFileUploadTarget {
-  id: OrganizationId;
+  id: AppId;
   kind: "agent_package";
   name: string;
 }
@@ -448,8 +444,7 @@ export type CreateFileUploadTarget =
   | CreateSessionFileUploadTarget
   | CreateSpaceFileUploadTarget
   | CreateAgentPackageFileUploadTarget
-  | CreateOrganizationDraftFileUploadTarget
-  | CreateOrganizationAvatarFileUploadTarget;
+  | CreateAppDraftFileUploadTarget;
 
 export interface CreateFileUploadRequest {
   file: {

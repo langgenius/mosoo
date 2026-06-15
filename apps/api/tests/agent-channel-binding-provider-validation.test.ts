@@ -27,7 +27,8 @@ import {
 import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
-} from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
 
 describe("agent channel provider validation", () => {
   test("starts and polls Lark / Feishu app registration for scan-to-create prefill", async () => {
@@ -37,8 +38,9 @@ describe("agent channel provider validation", () => {
         const bindings = createPublicHttpTestBindings(database) as ApiBindings;
 
         const started = await startLarkAgentChannelRegistration(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
           domain: "feishu",
+          appId: PUBLIC_API_TEST_IDS.app,
         });
 
         expect(started).toMatchObject({
@@ -55,9 +57,10 @@ describe("agent channel provider validation", () => {
         });
 
         const polled = await pollLarkAgentChannelRegistration(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
           deviceCode: started.deviceCode ?? "",
           domain: "feishu",
+          appId: PUBLIC_API_TEST_IDS.app,
         });
 
         expect(polled).toMatchObject({
@@ -80,8 +83,9 @@ describe("agent channel provider validation", () => {
 
         try {
           await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-            agentId: "01J00000000000000000000009",
+            agentId: PUBLIC_API_TEST_IDS.agent,
             botToken: "xoxb-invalid-token",
+            appId: PUBLIC_API_TEST_IDS.app,
             signingSecret: "signing-secret",
           });
         } catch (error) {
@@ -122,8 +126,9 @@ describe("agent channel provider validation", () => {
 
           try {
             await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-              agentId: "01J00000000000000000000009",
+              agentId: PUBLIC_API_TEST_IDS.agent,
               botToken: scenario.botToken,
+              appId: PUBLIC_API_TEST_IDS.app,
               signingSecret: scenario.signingSecret,
             });
           } catch (error) {
@@ -154,8 +159,9 @@ describe("agent channel provider validation", () => {
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
 
       await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "xoxb-secret-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         signingSecret: "signing-secret",
       });
 
@@ -163,8 +169,9 @@ describe("agent channel provider validation", () => {
 
       try {
         await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
           botToken: "xoxb-secret-token",
+          appId: PUBLIC_API_TEST_IDS.app,
           signingSecret: "signing-secret",
         });
       } catch (error) {
@@ -199,6 +206,7 @@ describe("agent channel provider validation", () => {
           externalTenantId: "T123",
           id: "existing-binding",
           lastErrorCode: null,
+          appId: PUBLIC_API_TEST_IDS.app,
           provider: "slack",
           status: "active",
           updatedAt: nowMs,
@@ -209,8 +217,9 @@ describe("agent channel provider validation", () => {
 
       try {
         await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
           botToken: "xoxb-secret-token",
+          appId: PUBLIC_API_TEST_IDS.app,
           signingSecret: "signing-secret",
         });
       } catch (error) {
@@ -232,19 +241,24 @@ describe("agent channel provider validation", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       const binding = await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "xoxb-secret-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         signingSecret: "signing-secret",
       });
 
       await recordAgentChannelBindingError(database, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         bindingId: binding.id,
         errorCode: "invalid_auth",
+        appId: PUBLIC_API_TEST_IDS.app,
       });
 
       await expect(
-        listAgentChannelBindings(database, OWNER_VIEWER, "01J00000000000000000000009"),
+        listAgentChannelBindings(database, OWNER_VIEWER, {
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
+        }),
       ).resolves.toEqual([
         expect.objectContaining({
           id: binding.id,
@@ -264,12 +278,13 @@ describe("agent channel provider validation", () => {
 
         try {
           await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
-            agentId: "01J00000000000000000000009",
-            appId: "cli-invalid",
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            larkAppId: "cli-invalid",
             appSecret: "invalid-secret",
             connectionMode: "webhook",
             domain: "feishu",
             encryptKey: "lark-encrypt-key",
+            appId: PUBLIC_API_TEST_IDS.app,
             verificationToken: "lark-verification-token",
           });
         } catch (error) {
@@ -298,12 +313,13 @@ describe("agent channel provider validation", () => {
 
     try {
       await createLarkAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
-        appId: "cli_a",
+        agentId: PUBLIC_API_TEST_IDS.agent,
+        larkAppId: "cli_a",
         appSecret: "app-secret",
         connectionMode: "websocket",
         domain: "feishu",
         encryptKey: null,
+        appId: PUBLIC_API_TEST_IDS.app,
         verificationToken: null,
       });
     } catch (error) {
@@ -328,8 +344,9 @@ describe("agent channel provider validation", () => {
 
         try {
           await createTelegramAgentChannelBinding(bindings, OWNER_VIEWER, {
-            agentId: "01J00000000000000000000009",
+            agentId: PUBLIC_API_TEST_IDS.agent,
             botToken: "telegram-token",
+            appId: PUBLIC_API_TEST_IDS.app,
             webhookSecret: "telegram-webhook-secret",
           });
         } catch (error) {
@@ -360,9 +377,10 @@ describe("agent channel provider validation", () => {
 
         try {
           await createDiscordAgentChannelBinding(bindings, OWNER_VIEWER, {
-            agentId: "01J00000000000000000000009",
+            agentId: PUBLIC_API_TEST_IDS.agent,
             applicationId: "discord-app-1",
             botToken: "discord-user-token",
+            appId: PUBLIC_API_TEST_IDS.app,
             relaySecret: "relay-secret",
           });
         } catch (error) {

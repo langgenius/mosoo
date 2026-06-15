@@ -1,5 +1,5 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AgentId, OrganizationId, SessionId, SessionRunId } from "@mosoo/id";
+import type { AccountId, AgentId, OrganizationId, AppId, SessionId, SessionRunId } from "@mosoo/id";
 
 import { getAppDatabase, parameterizedSql } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
@@ -15,17 +15,13 @@ import type {
   AggregateRow,
   CostAgentRowView,
   CostDailyPointView,
-  CostExternalChannelAttributionView,
   CostModelRowView,
   CostRecentSessionView,
   CostTotalsView,
-  CostUserAttributionMode,
-  CostUserRowView,
   CostWindow,
   DailyRow,
   ModelAggregateRow,
   RecentUsageRow,
-  UserAggregateRow,
 } from "./cost-query.types";
 
 async function getCostRow<T>(
@@ -65,11 +61,9 @@ function readSessionRunId(value: unknown, label: string): SessionRunId | null {
 }
 
 interface ScopedCostQuery {
-  actorUserId?: AccountId;
   agentId?: AgentId;
-  externalChannel?: boolean;
   organizationId: OrganizationId;
-  ownerUserId?: AccountId;
+  appId?: AppId;
   runPurposes?: readonly string[];
 }
 
@@ -81,7 +75,7 @@ export async function queryTotals(
   database: D1Database,
   input: WindowedCostQuery,
 ): Promise<CostTotalsView> {
-  const source = buildUsageSourceCte(input.window, input.organizationId);
+  const source = buildUsageSourceCte(input.window, input);
   const where = buildWhere(input);
   const row = await getCostRow<AggregateRow>(
     database,
@@ -102,7 +96,7 @@ export async function queryDaily(
   database: D1Database,
   input: WindowedCostQuery,
 ): Promise<CostDailyPointView[]> {
-  const source = buildUsageSourceCte(input.window, input.organizationId);
+  const source = buildUsageSourceCte(input.window, input);
   const where = buildWhere(input);
   const results = await listCostRows<DailyRow>(
     database,
@@ -130,7 +124,7 @@ export async function queryAgents(
   database: D1Database,
   input: WindowedCostQuery,
 ): Promise<CostAgentRowView[]> {
-  const source = buildUsageSourceCte(input.window, input.organizationId);
+  const source = buildUsageSourceCte(input.window, input);
   const where = buildWhere(input);
   const results = await listCostRows<AgentAggregateRow>(
     database,
@@ -183,129 +177,11 @@ export async function queryAgents(
   });
 }
 
-export async function queryExternalChannelAttribution(
-  database: D1Database,
-  input: WindowedCostQuery,
-): Promise<CostExternalChannelAttributionView> {
-  const source = buildUsageSourceCte(input.window, input.organizationId);
-  const where = buildWhere({ ...input, externalChannel: true });
-  const row = await getCostRow<AggregateRow>(
-    database,
-    `
-        ${source.sql}
-        SELECT
-          ${aggregateSelect()}
-        FROM usage_source
-        WHERE ${where.sql}
-      `,
-    [...source.bindings, ...where.bindings],
-  );
-
-  return {
-    ...toTotalsView(row),
-    previousCostUsd: null,
-  };
-}
-
-export async function queryUsers(
-  database: D1Database,
-  input: {
-    agentId?: AgentId;
-    mode: CostUserAttributionMode;
-    organizationId: OrganizationId;
-    runPurposes?: readonly string[];
-    window: CostWindow;
-  },
-): Promise<CostUserRowView[]> {
-  const source = buildUsageSourceCte(input.window, input.organizationId);
-  const whereInput: {
-    agentId?: AgentId;
-    externalChannel?: boolean;
-    runPurposes?: readonly string[];
-  } = {};
-
-  if (isTruthy(input.agentId)) {
-    whereInput.agentId = input.agentId;
-  }
-
-  if (input.runPurposes) {
-    whereInput.runPurposes = input.runPurposes;
-  }
-
-  if (input.mode === "used_by") {
-    whereInput.externalChannel = false;
-  }
-
-  const where = buildWhere(whereInput);
-  const userColumn = input.mode === "owned_by" ? "agent_owner_user_id" : "actor_user_id";
-  const results = await listCostRows<UserAggregateRow>(
-    database,
-    `
-        ${source.sql}
-        , filtered_usage AS (
-          SELECT *
-          FROM usage_source
-          WHERE ${where.sql}
-        ),
-        user_totals AS (
-          SELECT
-            filtered_usage.${userColumn} AS user_id,
-            account.name AS user_name,
-            account.email AS user_email,
-            COUNT(DISTINCT filtered_usage.agent_id) AS agent_count,
-            ${aggregateSelect()}
-          FROM filtered_usage
-          LEFT JOIN account ON account.id = filtered_usage.${userColumn}
-          GROUP BY filtered_usage.${userColumn}
-        ),
-        agent_totals AS (
-          SELECT
-            filtered_usage.${userColumn} AS user_id,
-            filtered_usage.agent_id,
-            COALESCE(agent.name, filtered_usage.agent_id) AS agent_name,
-            ROW_NUMBER() OVER (
-              PARTITION BY filtered_usage.${userColumn}
-              ORDER BY SUM(filtered_usage.total_cost_usd) DESC, filtered_usage.agent_id ASC
-            ) AS agent_rank
-          FROM filtered_usage
-          LEFT JOIN agent ON agent.id = filtered_usage.agent_id
-          GROUP BY filtered_usage.${userColumn}, filtered_usage.agent_id
-        )
-        SELECT
-          user_totals.*,
-          agent_totals.agent_id AS top_agent_id,
-          agent_totals.agent_name AS top_agent_name
-        FROM user_totals
-        LEFT JOIN agent_totals
-          ON agent_totals.user_id = user_totals.user_id
-          AND agent_totals.agent_rank = 1
-        ORDER BY total_cost_usd DESC
-      `,
-    [...source.bindings, ...where.bindings],
-  );
-
-  return results.map((row) => {
-    const userId = readAccountId(row.user_id, "cost user ID");
-    const topAgentId =
-      row.top_agent_id === null ? null : readAgentId(row.top_agent_id, "top cost agent ID");
-
-    return mergeTotalsView(toTotalsView(row), {
-      agentCount: row.agent_count,
-      previousCostUsd: null,
-      topAgentId,
-      topAgentName: row.top_agent_name,
-      userEmail: row.user_email,
-      userId,
-      userName: row.user_name ?? row.user_email ?? userId,
-    });
-  });
-}
-
 export async function queryModels(
   database: D1Database,
   input: WindowedCostQuery,
 ): Promise<CostModelRowView[]> {
-  const source = buildUsageSourceCte(input.window, input.organizationId);
+  const source = buildUsageSourceCte(input.window, input);
   const where = buildWhere(input);
   const results = await listCostRows<ModelAggregateRow>(
     database,
@@ -348,22 +224,14 @@ export async function queryRecentSessions(
   const filters = ["usage_event.organization_id = ?"];
   const bindings: string[] = [input.organizationId];
 
+  if (isTruthy(input.appId)) {
+    filters.push("usage_event.app_id = ?");
+    bindings.push(input.appId);
+  }
+
   if (isTruthy(input.agentId)) {
     filters.push("usage_event.agent_id = ?");
     bindings.push(input.agentId);
-  }
-
-  if (isTruthy(input.actorUserId)) {
-    filters.push("usage_event.actor_user_id = ?");
-    bindings.push(input.actorUserId);
-    filters.push(
-      "COALESCE(json_extract(session.metadata_json, '$.triggered_by.provider'), '') = ''",
-    );
-  }
-
-  if (isTruthy(input.ownerUserId)) {
-    filters.push("usage_event.agent_owner_user_id = ?");
-    bindings.push(input.ownerUserId);
   }
 
   if (input.runPurposes && input.runPurposes.length > 0) {
@@ -405,7 +273,6 @@ export async function queryRecentSessions(
     return {
       actorEmail: row.actor_email,
       actorName: row.actor_name ?? row.actor_email ?? actorUserId,
-      actorUserId,
       cacheCreationTokens: row.cache_creation_tokens,
       cacheReadTokens: row.cache_read_tokens,
       createdAt: new Date(row.created_at).toISOString(),

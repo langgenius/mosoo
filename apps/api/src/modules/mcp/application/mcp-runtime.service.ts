@@ -5,7 +5,7 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs, toIsoString } from "../../../time";
 import { getAgentRow } from "../../agents/application/agent-repository";
-import { ensureOrganizationMembership } from "../../organizations/domain/organization-access.policy";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { DriverResolvedMcpServer } from "../../runtime/domain/driver-snapshot";
 import { readMcpCredentialSecret } from "./mcp-credential-secret-resolution";
 import {
@@ -53,6 +53,7 @@ function toRuntimeResolvedMcpServer(input: {
     authType: input.server.authType,
     credentialScope: input.server.credentialScope,
     name: input.server.name,
+    appId: input.server.appId,
     serverId: input.server.id,
     subjectLabel: input.credential?.subjectLabel ?? null,
   } as const;
@@ -108,7 +109,7 @@ export async function resolveRuntimeMcpServersForSnapshot(
     })
     .toSorted((left, right) => left.sortOrder - right.sortOrder);
   const agent = await getAgentRow(bindings.DB, agentId);
-  await ensureOrganizationMembership(bindings.DB, callerUserId, agent.organizationId);
+  await ensureAppOwnership(bindings.DB, callerUserId, agent.appId);
 
   if (executionOwnerUserId !== agent.ownerId) {
     throw new Error("Runtime MCP credentials must resolve for the agent owner.");
@@ -135,12 +136,12 @@ export async function resolveRuntimeMcpServersForSnapshot(
       throw new Error("MCP server not found.");
     }
 
-    if (
-      server.source === "personal" &&
-      snapshot.credentialMode === "runtime_resolved" &&
-      server.ownerId !== executionOwnerUserId
-    ) {
-      throw new Error("Personal MCP bindings can only resolve runtime credentials for the owner.");
+    if (server.appId !== agent.appId) {
+      throw new Error("MCP server is not available in this app.");
+    }
+
+    if (server.ownerId !== executionOwnerUserId) {
+      throw new Error("Runtime MCP credentials must resolve for the App owner.");
     }
 
     credentialBindings.push({
@@ -154,11 +155,7 @@ export async function resolveRuntimeMcpServersForSnapshot(
     enabledByIndex.push(snapshot.enabled);
   }
 
-  const credentials = await resolveCredentialsForMcpBindings(
-    bindings.DB,
-    credentialBindings,
-    executionOwnerUserId,
-  );
+  const credentials = await resolveCredentialsForMcpBindings(bindings.DB, credentialBindings);
 
   return resolvedServers.map((server, index) => {
     const credential = credentials[index] ?? null;
@@ -197,11 +194,16 @@ export async function refreshRuntimeCredential(
     throw new Error("This MCP server does not use OAuth authentication.");
   }
 
+  if (credential.appId !== server.appId) {
+    await expireCredential(bindings.DB, credential.id);
+    throw new Error("MCP credential is not available in this app.");
+  }
+
   const metadata = await getOrDiscoverOAuthMetadata(bindings.DB, server);
   const refreshSecret = await readMcpCredentialSecret(bindings, {
     credential,
-    organizationId: server.organizationId,
     purpose: "runtime_refresh_token",
+    appId: server.appId,
     server,
   });
 
@@ -213,8 +215,8 @@ export async function refreshRuntimeCredential(
   const clientSecret = isTruthy(credential.oauthClientSecretSecretId)
     ? await readMcpCredentialSecret(bindings, {
         credential,
-        organizationId: server.organizationId,
         purpose: "runtime_oauth_client_secret",
+        appId: server.appId,
         server,
       })
     : null;

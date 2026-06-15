@@ -1,5 +1,5 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AgentId } from "@mosoo/id";
+import type { AgentId, AppId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { channelGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
@@ -18,6 +18,7 @@ import {
 
 interface AgentChannelBindingListArgs {
   agentId: string;
+  appId: string;
 }
 
 interface CreateSlackAgentChannelBindingArgs {
@@ -107,7 +108,11 @@ export const channelGraphQLModule = {
   authenticatedQueryResolvers: {
     agentChannelBindingList: async (_parent, args: AgentChannelBindingListArgs, context) => {
       const agentId = parsePlatformId<AgentId>(args.agentId, "agent ID");
-      return listAgentChannelBindings(context.bindings.DB, context.viewer, agentId);
+      const appId = parsePlatformId<AppId>(args.appId, "app ID");
+      return listAgentChannelBindings(context.bindings.DB, context.viewer, {
+        agentId,
+        appId,
+      });
     },
   },
 } satisfies GraphQLModule;

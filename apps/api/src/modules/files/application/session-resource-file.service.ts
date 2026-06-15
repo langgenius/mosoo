@@ -118,6 +118,7 @@ export async function createSessionResourceUpload(
       id: input.sessionId,
       kind: "session",
       name: input.file.name,
+      appId: input.appId,
     },
   });
 }
@@ -189,7 +190,7 @@ export async function deleteSessionResource(
   const file = await ensureFileAccess({
     database: bindings.DB,
     fileId: input.resourceId,
-    requiredRole: "edit",
+    requiredIntent: "write",
     viewer,
   });
 

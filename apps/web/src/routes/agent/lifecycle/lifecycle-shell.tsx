@@ -5,7 +5,6 @@ import { useState } from "react";
 import type { ReactElement } from "react";
 import { createPortal } from "react-dom";
 
-import { useAppSession } from "@/app/session-provider";
 import { CreateEnvironmentDialog } from "@/domains/environment/components/create-environment-dialog";
 import type { McpConnectTargetServer } from "@/routes/integrations/mcp/oauth-connect-dialog";
 import { Button } from "@/shared/ui/button";
@@ -34,7 +33,6 @@ export interface LifecycleShellProps {
   headerCenterTarget: HTMLDivElement | null;
   mode: LifecycleMode;
   onSwitchMode: (mode: AgentMode | "logs") => void;
-  organizationId: string | null;
 }
 
 interface ConfigureStageProps {
@@ -64,7 +62,6 @@ export function LifecycleShell({
   headerCenterTarget,
   mode,
   onSwitchMode,
-  organizationId,
 }: LifecycleShellProps): ReactElement {
   return (
     <div className="bg-bg-1 flex h-full min-h-0 flex-col">
@@ -81,7 +78,6 @@ export function LifecycleShell({
           <PreviewMode
             agent={agent}
             onSwitchMode={onSwitchMode}
-            organizationId={organizationId}
             headerActionTarget={headerActionTarget}
           />
         )}
@@ -97,8 +93,6 @@ function ConfigureStage({
   headerActionTarget,
   headerCenterTarget,
 }: ConfigureStageProps): ReactElement {
-  const { activeOrganization } = useAppSession();
-  const organizationId = activeOrganization?.id ?? null;
   const model = useAgentEditorModel({ agent });
   const [createEnvironmentOpen, setCreateEnvironmentOpen] = useState(false);
   const [createRemoteMcpOpen, setCreateRemoteMcpOpen] = useState(false);
@@ -123,18 +117,12 @@ function ConfigureStage({
     onConnectMcpCredential: (server) => {
       setConnectMcpServer(server);
     },
-    onCreateEnvironment:
-      organizationId === null
-        ? undefined
-        : () => {
-            setCreateEnvironmentOpen(true);
-          },
-    onCreateRemoteMcpServer:
-      organizationId === null
-        ? undefined
-        : () => {
-            setCreateRemoteMcpOpen(true);
-          },
+    onCreateEnvironment: () => {
+      setCreateEnvironmentOpen(true);
+    },
+    onCreateRemoteMcpServer: () => {
+      setCreateRemoteMcpOpen(true);
+    },
     onEnvironmentCreated: (environment) => {
       bindCreatedEnvironment(environment);
     },
@@ -145,6 +133,7 @@ function ConfigureStage({
       onSwitchMode("preview");
     },
     previewDisabled: testDisabled,
+    appId: agent.appId,
     saving: model.saving,
   });
 
@@ -200,26 +189,22 @@ function ConfigureStage({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {organizationId !== null ? (
-        <>
-          <CreateEnvironmentDialog
-            onCreated={bindCreatedEnvironment}
-            onOpenChange={setCreateEnvironmentOpen}
-            open={createEnvironmentOpen}
-            organizationId={organizationId}
-          />
-          <AgentBuilderRemoteMcpSecureDialog
-            connectServer={connectMcpServer}
-            onConnectServerClose={() => {
-              setConnectMcpServer(null);
-            }}
-            onCreated={bindCreatedMcpServer}
-            onOpenChange={setCreateRemoteMcpOpen}
-            open={createRemoteMcpOpen}
-            organizationId={organizationId}
-          />
-        </>
-      ) : null}
+      <CreateEnvironmentDialog
+        onCreated={bindCreatedEnvironment}
+        onOpenChange={setCreateEnvironmentOpen}
+        open={createEnvironmentOpen}
+        appId={agent.appId}
+      />
+      <AgentBuilderRemoteMcpSecureDialog
+        connectServer={connectMcpServer}
+        onConnectServerClose={() => {
+          setConnectMcpServer(null);
+        }}
+        onCreated={bindCreatedMcpServer}
+        onOpenChange={setCreateRemoteMcpOpen}
+        open={createRemoteMcpOpen}
+        appId={agent.appId}
+      />
       {headerCenterTarget !== null
         ? createPortal(<DraftStageIndicator stages={draftStages} />, headerCenterTarget)
         : null}
@@ -308,7 +293,6 @@ function ConfigureStage({
             focusSection={model.focusSection}
             highlightedSections={model.highlightedSections}
             model={model}
-            organizationId={organizationId}
           />
         </div>
       </div>

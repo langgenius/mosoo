@@ -9,7 +9,6 @@ import type {
 import type { AuthMethod, AuthSecurityLevel } from "@mosoo/contracts/auth";
 import { accountsTable } from "@mosoo/db";
 import type { AccountId, OrganizationId } from "@mosoo/id";
-import { SYSTEM_AGENT_RUNTIME_ID } from "@mosoo/runtime-catalog";
 import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -17,12 +16,10 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { ensureModelAvailableForSelection } from "../../vendor-credentials/application/available-models";
 import { normalizeAccountImageUrl } from "../domain/user-avatar";
 import { normalizeAccountName } from "../domain/user-name";
 import {
-  listViewerOrganizationMemberships,
-  resolveActiveOrganization,
+  listViewerOrganizations,
   resolveViewerOrganizationContextFromState,
 } from "./account-organization-context.service";
 
@@ -157,18 +154,18 @@ export async function getViewer(
       account: null,
       activeOrganization: null,
       auth: getViewerAuth(bindings, null),
-      memberships: [],
+      organizations: [],
     };
   }
 
-  const [accountState, memberships] = await Promise.all([
+  const [accountState, organizations] = await Promise.all([
     getViewerAccountState(database, viewer.id),
-    listViewerOrganizationMemberships(database, viewer.id),
+    listViewerOrganizations(database, viewer.id),
   ]);
   const organizationContext = await resolveViewerOrganizationContextFromState(
     database,
     accountState,
-    memberships,
+    organizations,
   );
 
   return {
@@ -178,7 +175,7 @@ export async function getViewer(
     ),
     activeOrganization: organizationContext.activeOrganization,
     auth: getViewerAuth(bindings, viewer),
-    memberships: organizationContext.memberships,
+    organizations: organizationContext.organizations,
   };
 }
 
@@ -220,43 +217,9 @@ export async function updateProfile(
 }
 
 export async function setSystemAgentModel(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  input: SetSystemAgentModelInput,
+  _database: D1Database,
+  _viewer: AuthenticatedViewer,
+  _input: SetSystemAgentModelInput,
 ): Promise<AccountProfile> {
-  const activeOrganization = await resolveActiveOrganization(database, viewer.id);
-
-  if (!activeOrganization) {
-    throw new Error("Active organization is required.");
-  }
-
-  const systemAgentModel: SystemAgentModelSetting = {
-    modelId: input.modelId.trim(),
-    vendor: input.vendor.trim(),
-  };
-
-  await ensureModelAvailableForSelection(database, {
-    accountId: viewer.id,
-    modelId: systemAgentModel.modelId,
-    organizationId: activeOrganization.id,
-    runtimeId: SYSTEM_AGENT_RUNTIME_ID,
-    vendorId: systemAgentModel.vendor,
-  });
-
-  const updated =
-    (await getAppDatabase(database)
-      .update(accountsTable)
-      .set({
-        systemAgentModel,
-        updatedAt: currentTimestampMs(),
-      })
-      .where(eq(accountsTable.id, viewer.id))
-      .returning({ id: accountsTable.id })
-      .get()) ?? null;
-
-  if (updated === null) {
-    throw new Error("Account not found.");
-  }
-
-  return createAccountProfile(viewer, systemAgentModel);
+  throw new Error("System Agent model selection requires an App App.");
 }

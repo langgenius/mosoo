@@ -1,29 +1,21 @@
-import type {
-  AgentCollaboratorRole,
-  AgentOwnerSummary,
-  AgentToolSummary,
-} from "@mosoo/contracts/agent";
-import type { OrganizationMemberRole } from "@mosoo/contracts/organization";
+import type { AgentOwnerSummary, AgentToolSummary, AgentVisibility } from "@mosoo/contracts/agent";
 import {
   accountsTable,
   agentMcpBindingsTable,
   agentSkillsTable,
   agentsTable,
+  appsTable,
   mcpServersTable,
-  organizationMembersTable,
-  resourceAclTable,
 } from "@mosoo/db";
 import type {
   AccountId,
   AgentDeploymentVersionId,
   AgentId,
   EnvironmentId,
-  OrganizationId,
+  AppId,
   SkillId,
 } from "@mosoo/id";
-import type { SQL } from "drizzle-orm";
-import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/sqlite-core";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { notFoundError } from "../../../platform/errors";
@@ -33,36 +25,11 @@ import {
   readAgentId,
   readEnvironmentId,
   readMcpServerId,
-  readOrganizationId,
+  readAppId,
 } from "./agent-platform-ids";
 import { normalizeAgentSkillIds } from "./agent-skill-resolution.service";
 import { normalizeAgentStoredConfigJson } from "./agent-stored-config.service";
-import type { AgentRow, CollaboratorRow } from "./agent-types";
-
-export interface AgentAccessRecord {
-  agent: AgentRow;
-  hasPersonalMcpBindings: boolean;
-  owner: AgentOwnerSummary;
-  ownerMembershipActive: boolean;
-  viewerAclRoleRank: number;
-  viewerMembershipDisabledAt: number | null;
-  viewerMembershipRole: OrganizationMemberRole | null;
-}
-
-export interface AgentViewerAccessFacts {
-  viewerAclRoleRank: number;
-  viewerMembershipDisabledAt: number | null;
-  viewerMembershipRole: OrganizationMemberRole | null;
-}
-
-export interface VisibleAgentAccessRow {
-  agent: AgentRow;
-  hasPersonalMcpBindings: boolean;
-  viewerAclRoleRank: number;
-}
-
-const agentOwnerMembersTable = alias(organizationMembersTable, "agent_owner_member");
-const agentViewerMembersTable = alias(organizationMembersTable, "agent_viewer_member");
+import type { AgentRow } from "./agent-types";
 
 export const agentRowColumns = {
   configJson: agentsTable.configJson,
@@ -74,8 +41,8 @@ export const agentRowColumns = {
   liveDeploymentVersionId: agentsTable.liveDeploymentVersionId,
   model: agentsTable.model,
   name: agentsTable.name,
-  organizationId: agentsTable.organizationId,
   ownerId: agentsTable.ownerId,
+  appId: agentsTable.appId,
   prompt: agentsTable.prompt,
   provider: agentsTable.provider,
   runtimeId: agentsTable.runtimeId,
@@ -94,15 +61,23 @@ type RawAgentRow = {
   liveDeploymentVersionId: AgentDeploymentVersionId | null;
   model: string;
   name: string;
-  organizationId: OrganizationId;
   ownerId: AccountId;
+  appId: AppId;
   prompt: string;
   provider: string;
   runtimeId: string;
   status: AgentRow["status"];
   updatedAt: number;
-  visibility: AgentRow["visibility"];
+  visibility: string;
 };
+
+function readAgentVisibility(value: string): AgentVisibility {
+  if (value === "private") {
+    return value;
+  }
+
+  throw new Error("Agent visibility must be private for App-scoped Agents.");
+}
 
 function toAgentRow(row: RawAgentRow): AgentRow {
   return {
@@ -120,66 +95,10 @@ function toAgentRow(row: RawAgentRow): AgentRow {
             row.liveDeploymentVersionId,
             "Agent live deployment version ID",
           ),
-    organizationId: readOrganizationId(row.organizationId, "Agent organization ID"),
     ownerId: readAccountId(row.ownerId, "Agent owner ID"),
+    appId: readAppId(row.appId, "Agent app ID"),
+    visibility: readAgentVisibility(row.visibility),
   };
-}
-
-function toCollaboratorRole(role: string): AgentCollaboratorRole {
-  if (role === "admin" || role === "user") {
-    return role;
-  }
-
-  throw new Error(`Unsupported agent collaborator role: ${role}.`);
-}
-
-function viewerAgentAclRoleRankSql(input: {
-  organizationId: SQL<string>;
-  resourceId: SQL<string>;
-  viewerId: AccountId;
-}): SQL<number> {
-  return sql<number>`COALESCE(
-    (
-      SELECT MAX(
-        CASE ${resourceAclTable.role}
-          WHEN 'admin' THEN 2
-          WHEN 'user' THEN 1
-          ELSE 0
-        END
-      )
-      FROM ${resourceAclTable}
-      WHERE ${resourceAclTable.resourceType} = 'agent'
-        AND ${resourceAclTable.resourceId} = ${input.resourceId}
-        AND (
-          (
-            ${resourceAclTable.targetKind} = 'user'
-            AND ${resourceAclTable.targetId} = ${input.viewerId}
-          )
-          OR (
-            ${resourceAclTable.targetKind} = 'organization'
-            AND ${resourceAclTable.targetId} = ${input.organizationId}
-          )
-        )
-    ),
-    0
-  )`;
-}
-
-function agentPersonalMcpBindingsExistSql(agentId: SQL<string>): SQL<number> {
-  // drizzle's raw sql`` interpolation renders bare column names without table
-  // prefix inside a subquery, which collides when both joined tables have an
-  // `id` column (SQLite: "ambiguous column name: id"). Explicitly qualify
-  // every column with its table identifier to disambiguate.
-  return sql<number>`
-    EXISTS (
-      SELECT 1
-      FROM ${agentMcpBindingsTable}
-      INNER JOIN ${mcpServersTable}
-        ON ${mcpServersTable}."id" = ${agentMcpBindingsTable}."server_id"
-      WHERE ${agentMcpBindingsTable}."agent_id" = ${agentId}
-        AND ${mcpServersTable}."source" = 'personal'
-    )
-  `;
 }
 
 export async function getAgentRow(database: D1Database, agentId: string): Promise<AgentRow> {
@@ -187,6 +106,7 @@ export async function getAgentRow(database: D1Database, agentId: string): Promis
   const row = await getAppDatabase(database)
     .select(agentRowColumns)
     .from(agentsTable)
+    .innerJoin(appsTable, eq(appsTable.id, agentsTable.appId))
     .where(eq(agentsTable.id, normalizedAgentId))
     .limit(1)
     .get();
@@ -198,230 +118,41 @@ export async function getAgentRow(database: D1Database, agentId: string): Promis
   return toAgentRow(row);
 }
 
-export async function getAgentAccessRecord(
-  database: D1Database,
-  viewerId: AccountId,
-  agentId: string,
-): Promise<AgentAccessRecord> {
-  const normalizedAgentId = readAgentId(agentId);
-  const row =
-    (await getAppDatabase(database)
-      .select({
-        ...agentRowColumns,
-        hasPersonalMcpBindings: agentPersonalMcpBindingsExistSql(
-          sql<string>`${agentsTable.id}`,
-        ).mapWith(Number),
-        ownerImageUrl: accountsTable.image,
-        ownerName: accountsTable.name,
-        ownerMembershipActive: sql<number>`CASE
-          WHEN ${agentOwnerMembersTable.accountId} IS NOT NULL
-            AND ${agentOwnerMembersTable.disabledAt} IS NULL
-          THEN 1
-          ELSE 0
-        END`.mapWith(Number),
-        viewerAclRoleRank: viewerAgentAclRoleRankSql({
-          organizationId: sql<string>`${agentsTable.organizationId}`,
-          resourceId: sql<string>`${agentsTable.id}`,
-          viewerId,
-        }).mapWith(Number),
-        viewerMembershipDisabledAt: agentViewerMembersTable.disabledAt,
-        viewerMembershipRole: agentViewerMembersTable.role,
-      })
-      .from(agentsTable)
-      .leftJoin(
-        agentViewerMembersTable,
-        and(
-          eq(agentViewerMembersTable.organizationId, agentsTable.organizationId),
-          eq(agentViewerMembersTable.accountId, viewerId),
-        ),
-      )
-      .leftJoin(
-        agentOwnerMembersTable,
-        and(
-          eq(agentOwnerMembersTable.organizationId, agentsTable.organizationId),
-          eq(agentOwnerMembersTable.accountId, agentsTable.ownerId),
-        ),
-      )
-      .leftJoin(accountsTable, eq(accountsTable.id, agentsTable.ownerId))
-      .where(eq(agentsTable.id, normalizedAgentId))
-      .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    throw notFoundError("Agent not found.");
-  }
-
-  const {
-    hasPersonalMcpBindings: hasPersonalMcpBindingsValue,
-    ownerImageUrl,
-    ownerMembershipActive: ownerMembershipActiveValue,
-    ownerName,
-    viewerAclRoleRank,
-    viewerMembershipDisabledAt,
-    viewerMembershipRole,
-    ...agent
-  } = row;
-
-  return {
-    agent: toAgentRow(agent),
-    hasPersonalMcpBindings: hasPersonalMcpBindingsValue > 0,
-    owner: {
-      id: readAccountId(agent.ownerId, "Agent owner ID"),
-      imageUrl: ownerImageUrl,
-      name: ownerName,
-    },
-    ownerMembershipActive: ownerMembershipActiveValue > 0,
-    viewerAclRoleRank,
-    viewerMembershipDisabledAt,
-    viewerMembershipRole,
-  };
-}
-
-export async function getAgentViewerAccessFacts(
-  database: D1Database,
-  viewerId: AccountId,
-  agent: Pick<AgentRow, "id" | "organizationId">,
-): Promise<AgentViewerAccessFacts> {
-  const row =
-    (await getAppDatabase(database)
-      .select({
-        viewerAclRoleRank: viewerAgentAclRoleRankSql({
-          organizationId: sql<string>`${agent.organizationId}`,
-          resourceId: sql<string>`${agent.id}`,
-          viewerId,
-        }).mapWith(Number),
-        viewerMembershipDisabledAt: organizationMembersTable.disabledAt,
-        viewerMembershipRole: organizationMembersTable.role,
-      })
-      .from(organizationMembersTable)
-      .where(
-        and(
-          eq(organizationMembersTable.organizationId, agent.organizationId),
-          eq(organizationMembersTable.accountId, viewerId),
-        ),
-      )
-      .limit(1)
-      .get()) ?? null;
-
-  return (
-    row ?? {
-      viewerAclRoleRank: 0,
-      viewerMembershipDisabledAt: null,
-      viewerMembershipRole: null,
-    }
-  );
-}
-
-export async function listVisibleAgentAccessRowsForOrganization(
+export async function getAppAgentRow(
   database: D1Database,
   input: {
-    includeAllAgents: boolean;
-    organizationId: OrganizationId;
+    agentId: AgentId;
+    appId: AppId;
+  },
+): Promise<AgentRow | null> {
+  const row =
+    (await getAppDatabase(database)
+      .select(agentRowColumns)
+      .from(agentsTable)
+      .innerJoin(appsTable, eq(appsTable.id, agentsTable.appId))
+      .where(and(eq(agentsTable.id, input.agentId), eq(agentsTable.appId, input.appId)))
+      .limit(1)
+      .get()) ?? null;
+
+  return row === null ? null : toAgentRow(row);
+}
+
+export async function listAppOwnerAgentRows(
+  database: D1Database,
+  input: {
+    appId: AppId;
     viewerId: AccountId;
   },
-): Promise<VisibleAgentAccessRow[]> {
-  const viewerAclRoleRankExpression = viewerAgentAclRoleRankSql({
-    organizationId: sql<string>`${agentsTable.organizationId}`,
-    resourceId: sql<string>`${agentsTable.id}`,
-    viewerId: input.viewerId,
-  });
-  const filters = [eq(agentsTable.organizationId, input.organizationId)];
-
-  if (!input.includeAllAgents) {
-    filters.push(
-      or(eq(agentsTable.ownerId, input.viewerId), sql`${viewerAclRoleRankExpression} > 0`)!,
-    );
-  }
-
+): Promise<AgentRow[]> {
   const rows = await getAppDatabase(database)
-    .select({
-      ...agentRowColumns,
-      hasPersonalMcpBindings: agentPersonalMcpBindingsExistSql(
-        sql<string>`${agentsTable.id}`,
-      ).mapWith(Number),
-      viewerAclRoleRank: viewerAclRoleRankExpression.mapWith(Number),
-    })
+    .select(agentRowColumns)
     .from(agentsTable)
-    .where(and(...filters))
+    .innerJoin(appsTable, eq(appsTable.id, agentsTable.appId))
+    .where(and(eq(agentsTable.appId, input.appId), eq(agentsTable.ownerId, input.viewerId)))
     .orderBy(desc(agentsTable.updatedAt))
     .all();
 
-  return rows.map(
-    ({ hasPersonalMcpBindings: personalMcpBindingCount, viewerAclRoleRank, ...agent }) => ({
-      agent: toAgentRow(agent),
-      hasPersonalMcpBindings: personalMcpBindingCount > 0,
-      viewerAclRoleRank,
-    }),
-  );
-}
-
-export async function listAgentCollaboratorRows(
-  database: D1Database,
-  agentId: AgentId,
-): Promise<CollaboratorRow[]> {
-  return (await listAgentCollaboratorRowsByAgentIds(database, [agentId])).get(agentId) ?? [];
-}
-
-async function listAgentCollaboratorRowsByAgentIds(
-  database: D1Database,
-  agentIds: readonly AgentId[],
-): Promise<Map<AgentId, CollaboratorRow[]>> {
-  const uniqueAgentIds = [...new Set(agentIds)];
-  const collaboratorsByAgentId = new Map<AgentId, CollaboratorRow[]>(
-    uniqueAgentIds.map((agentId) => [agentId, []]),
-  );
-
-  if (uniqueAgentIds.length === 0) {
-    return collaboratorsByAgentId;
-  }
-
-  const rows = await getAppDatabase(database)
-    .select({
-      agentId: resourceAclTable.resourceId,
-      createdAt: resourceAclTable.createdAt,
-      principal: sql<string>`
-        CASE ${resourceAclTable.targetKind}
-          WHEN 'organization' THEN '*'
-          ELSE ${resourceAclTable.targetId}
-        END
-      `.as("principal"),
-      role: resourceAclTable.role,
-    })
-    .from(resourceAclTable)
-    .where(
-      and(
-        eq(resourceAclTable.resourceType, "agent"),
-        inArray(resourceAclTable.resourceId, uniqueAgentIds),
-      ),
-    )
-    .all();
-
-  for (const row of rows) {
-    const agentId = readAgentId(row.agentId);
-
-    collaboratorsByAgentId.get(agentId)?.push({
-      createdAt: row.createdAt,
-      principal: row.principal,
-      role: toCollaboratorRole(row.role),
-    });
-  }
-
-  return collaboratorsByAgentId;
-}
-
-export async function hasPersonalMcpBindings(
-  database: D1Database,
-  agentId: AgentId,
-): Promise<boolean> {
-  const row = await getAppDatabase(database)
-    .select({ agentId: agentMcpBindingsTable.agentId })
-    .from(agentMcpBindingsTable)
-    .innerJoin(mcpServersTable, eq(mcpServersTable.id, agentMcpBindingsTable.serverId))
-    .where(and(eq(agentMcpBindingsTable.agentId, agentId), eq(mcpServersTable.source, "personal")))
-    .limit(1)
-    .get();
-
-  return Boolean(row);
+  return rows.map(toAgentRow);
 }
 
 export async function replaceAgentSkills(

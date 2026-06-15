@@ -20,11 +20,13 @@ export function registerRootRoute(app: Hono<ApiGatewayEnvironment>) {
       );
     }
 
+    const appId = c.req.query("appId");
     const sessionId = c.req.param("sessionId");
 
     try {
       return await connectAuthenticatedSessionViewerWebSocket(c.env, {
         executionContext: c.executionCtx,
+        appId: appId ?? "",
         request: c.req.raw,
         sessionId,
         viewer,

@@ -174,8 +174,7 @@ export function LoginAuthCard({
           )}
 
           <p className="text-fg-3 pt-2 text-center text-[13px]">
-            If this is your first time, we&apos;ll create your organization account after
-            verification.
+            If this is your first time, we&apos;ll create your default App after verification.
           </p>
         </div>
       </div>

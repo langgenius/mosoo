@@ -6,8 +6,8 @@ import type {
   CredentialId,
   McpOAuthFlowId,
   McpServerId,
-  OrganizationId,
   PlatformId,
+  AppId,
 } from "@mosoo/id";
 
 type IdInput = PlatformId | string;
@@ -40,8 +40,8 @@ export function readMcpServerId(value: IdInput, label = "serverId"): McpServerId
   return readPlatformSemanticId(value, label) as McpServerId;
 }
 
-export function readOrganizationId(value: IdInput, label = "organizationId"): OrganizationId {
-  return readPlatformSemanticId(value, label) as OrganizationId;
+export function readAppId(value: IdInput, label = "appId"): AppId {
+  return readPlatformSemanticId(value, label) as AppId;
 }
 
 export function createAgentMcpBindingId(): AgentMcpBindingId {

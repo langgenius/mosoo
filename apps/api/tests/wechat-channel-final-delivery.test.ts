@@ -18,7 +18,8 @@ import {
   createRecordedQueueMessage,
   createTestExecutionContext,
   nowMsForTest,
-} from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
 import {
   OWNER_VIEWER,
   createConfirmedWeChatQrSnapshot,
@@ -38,7 +39,8 @@ describe("WeChat channel final delivery", () => {
     try {
       const bindings = await createWeChatTestBindings();
       const account = await persistConfirmedWeChatQrPairing(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
+        appId: PUBLIC_API_TEST_IDS.app,
         snapshot: createConfirmedWeChatQrSnapshot(),
       });
       const store = createWeChatPollingOwnerDatabaseStore(bindings);
@@ -167,7 +169,8 @@ describe("WeChat channel final delivery", () => {
     try {
       const bindings = await createWeChatTestBindings();
       const account = await persistConfirmedWeChatQrPairing(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
+        appId: PUBLIC_API_TEST_IDS.app,
         snapshot: createConfirmedWeChatQrSnapshot(),
       });
       await bindings.DB.prepare(

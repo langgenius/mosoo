@@ -1,6 +1,6 @@
 import { vaultSecretsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, AgentId, CredentialId, McpServerId, OrganizationId } from "@mosoo/id";
+import type { AccountId, AgentId, CredentialId, McpServerId, AppId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -22,7 +22,7 @@ export type McpCredentialSecretReadDenialReason =
   | "credential_server_mismatch"
   | "secret_kind_mismatch"
   | "secret_not_found"
-  | "server_organization_mismatch";
+  | "server_app_mismatch";
 
 export type McpCredentialSecretStorageKind =
   | "access_token"
@@ -39,7 +39,7 @@ export type McpCredentialSecretDeletePurpose =
   | "credential_replace"
   | "credential_revoke";
 
-type McpCredentialSecretOwnerServer = Pick<ServerRow, "credentialScope" | "id" | "organizationId">;
+type McpCredentialSecretOwnerServer = Pick<ServerRow, "credentialScope" | "id" | "appId">;
 
 interface McpCredentialSecretOwner {
   agentId: AgentId | null;
@@ -81,8 +81,8 @@ export type McpCredentialSecretDeleteOutcome =
 
 export interface ReadMcpCredentialSecretCommand {
   credential: CredentialRow;
-  organizationId: OrganizationId;
   purpose: McpCredentialSecretReadPurpose;
+  appId: AppId;
   server: ServerRow;
 }
 
@@ -118,12 +118,8 @@ function credentialScopeHasOwner(input: {
   scope: CredentialRow["scope"];
   userId: AccountId | null;
 }): boolean {
-  if (input.scope === "organization_shared") {
+  if (input.scope === "app") {
     return input.agentId === null && input.userId === null;
-  }
-
-  if (input.scope === "user") {
-    return input.agentId === null && isTruthy(input.userId);
   }
 
   return input.userId === null && isTruthy(input.agentId);
@@ -144,11 +140,11 @@ function getMcpCredentialOwnerDenial(
 }
 
 function getMcpCredentialOwnerKey(owner: McpCredentialSecretOwner): string {
-  if (owner.scope === "organization_shared") {
-    return "organization";
+  if (owner.scope === "app") {
+    return "app";
   }
 
-  return owner.scope === "agent" ? (owner.agentId ?? "") : (owner.userId ?? "");
+  return owner.agentId ?? "";
 }
 
 function toMcpCredentialSecretStorageKind(input: {
@@ -163,7 +159,7 @@ function toMcpCredentialSecretStorageKind(input: {
 
   return [
     "mcp_credential",
-    input.owner.server.organizationId,
+    input.owner.server.appId,
     input.owner.server.id,
     input.owner.scope,
     getMcpCredentialOwnerKey(input.owner),
@@ -186,8 +182,8 @@ async function readVaultSecretKind(database: D1Database, secretId: string): Prom
 function getMcpCredentialSecretReadDenial(
   command: ReadMcpCredentialSecretCommand,
 ): McpCredentialSecretReadDenialReason | null {
-  if (command.server.organizationId !== command.organizationId) {
-    return "server_organization_mismatch";
+  if (command.server.appId !== command.appId) {
+    return "server_app_mismatch";
   }
 
   if (command.credential.serverId !== command.server.id) {

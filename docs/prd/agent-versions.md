@@ -62,14 +62,14 @@ Once done, an owner should be able to:
 
 ## 3. Concept definitions
 
-| Term                                  | Meaning                                                                                                                                                                                              |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Version (DeploymentVersion)**       | The configuration snapshot left behind by one publish. New sessions use this version from then on; existing sessions keep their respective original versions.                                        |
-| **Live Version**                      | The version currently used for new sessions. There is only ever one at a time.                                                                                                                       |
-| **Snapshot view (frozen view)**       | The read-only page you reach by clicking a version row — it reuses the layout of the Edit page, but all inputs are disabled.                                                                         |
-| **Restore (rollback / time machine)** | Select an old version → the system creates a new live version that copies the configuration from that time + resets the agent's own accumulated memory back to its initial state at that time.       |
-| **The "time machine" principle**      | From the user's point of view, the agent is 100% back to the way it was (configuration + memory); records that belong to the observer's point of view (cost / logs) keep their real history.         |
-| **Session pinning**                   | A session is bound to the live version that was current when it was created; this binding **never changes**. Restore does not switch sessions that are already running.                              |
+| Term                                  | Meaning                                                                                                                                                                                        |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Version (DeploymentVersion)**       | The configuration snapshot left behind by one publish. New sessions use this version from then on; existing sessions keep their respective original versions.                                  |
+| **Live Version**                      | The version currently used for new sessions. There is only ever one at a time.                                                                                                                 |
+| **Snapshot view (frozen view)**       | The read-only page you reach by clicking a version row — it reuses the layout of the Edit page, but all inputs are disabled.                                                                   |
+| **Restore (rollback / time machine)** | Select an old version → the system creates a new live version that copies the configuration from that time + resets the agent's own accumulated memory back to its initial state at that time. |
+| **The "time machine" principle**      | From the user's point of view, the agent is 100% back to the way it was (configuration + memory); records that belong to the observer's point of view (cost / logs) keep their real history.   |
+| **Session pinning**                   | A session is bound to the live version that was current when it was created; this binding **never changes**. Restore does not switch sessions that are already running.                        |
 
 ---
 
@@ -156,11 +156,10 @@ flowchart LR
 
 This product has several kinds of "logs / history / versions." Do not mix them up:
 
-| What you want to know                                             | Where to look                                                                  |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| What a given session did (messages / tools / permissions / files) | **Logs tab** → select session                                                  |
-| What recently happened on this agent's machine                    | **Debug → System Log** (a separate PRD, [for-humans](./agent-runtime-logs.md); surface removed) |
-| An agent's historical versions + rolling back to an old version   | **Versions tab** (**this PRD, currently deferred**)                            |
+| What you want to know                                             | Where to look                                       |
+| ----------------------------------------------------------------- | --------------------------------------------------- |
+| What a given session did (messages / tools / permissions / files) | **Logs tab** → select session                       |
+| An agent's historical versions + rolling back to an old version   | **Versions tab** (**this PRD, currently deferred**) |
 
 ---
 

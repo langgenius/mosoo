@@ -136,7 +136,7 @@ describe("agent runtime event projection", () => {
     }
   });
 
-  test("projects completed and failed tool output as process-ready content", () => {
+  test("apps completed and failed tool output as process-ready content", () => {
     const completed = createSessionRuntimeEventProjection(
       createRuntimeEvent({
         actor: "driver",

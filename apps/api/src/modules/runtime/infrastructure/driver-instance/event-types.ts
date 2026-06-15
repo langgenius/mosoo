@@ -2,15 +2,7 @@ import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
 import type { AgentKind } from "@mosoo/contracts/agent";
 import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
 import type { SessionRunStatus } from "@mosoo/contracts/session-run";
-import type {
-  AccountId,
-  AgentId,
-  OrganizationId,
-  PlatformId,
-  SandboxId,
-  SessionId,
-  SessionRunId,
-} from "@mosoo/id";
+import type { AccountId, AgentId, PlatformId, SandboxId, SessionId, SessionRunId } from "@mosoo/id";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 
 import type {
@@ -32,7 +24,6 @@ export interface RuntimeSessionLink {
   sessionRunStatus: SessionRunStatus | null;
   traceId: string | null;
   sandboxSubjectKind: SandboxSubjectKind | null;
-  organizationId: OrganizationId | null;
 }
 
 export function runtimeSessionLinkNeedsRefresh(link: RuntimeSessionLink | null): boolean {
@@ -61,7 +52,7 @@ export interface RuntimeDriverRunTransition {
   status: "cancelled" | "completed" | "failed" | "running";
 }
 
-export interface ProjectRuntimeDriverEventsResult {
+export interface AppRuntimeDriverEventsResult {
   link: RuntimeSessionLink;
   liveStateChanged: boolean;
   nextLiveState: SessionLiveState | null;

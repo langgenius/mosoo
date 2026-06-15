@@ -13,6 +13,7 @@ import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
   createFileConflictError,
+  createFileForbiddenError,
   createFileMoveFailedError,
   createFilePreconditionFailedError,
 } from "./file-errors";
@@ -26,7 +27,7 @@ import {
   toFileRecord,
 } from "./file-record-store";
 import { copyObject, deleteObject, headObject, normalizeR2Etag } from "./r2-s3-client";
-import { ensureSpaceAccess } from "./space-access";
+import { ensureSpaceAccessBySpaceId } from "./space-access";
 import { ensureSpaceParentDirectories } from "./space-directory-store";
 import { ensureSpaceFileWriteUnlocked } from "./space-file-lock";
 import {
@@ -52,7 +53,12 @@ export async function updateSpaceFile(
 
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
   const sourceSpaceId: SpaceId = parsePlatformId(file.scope_id, "file space ID");
-  await ensureSpaceAccess(bindings.DB, viewerId, sourceSpaceId, "edit");
+  const sourceSpace = await ensureSpaceAccessBySpaceId(
+    bindings.DB,
+    viewerId,
+    sourceSpaceId,
+    "write",
+  );
 
   if (file.status !== "ready") {
     throw createFileConflictError("Only a ready file can be moved.");
@@ -74,7 +80,16 @@ export async function updateSpaceFile(
       : parsePlatformId(input.targetSpaceId, "target space ID");
 
   if (targetSpaceId !== sourceSpaceId) {
-    await ensureSpaceAccess(bindings.DB, viewerId, targetSpaceId, "edit");
+    const targetSpace = await ensureSpaceAccessBySpaceId(
+      bindings.DB,
+      viewerId,
+      targetSpaceId,
+      "write",
+    );
+
+    if (targetSpace.app_id !== sourceSpace.app_id) {
+      throw createFileForbiddenError("Cannot move space files across Apps.");
+    }
   }
 
   await ensureSpaceFileWriteUnlocked(bindings, viewer, sourceSpaceId, file.path);

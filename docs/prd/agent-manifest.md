@@ -4,7 +4,7 @@
 >
 > **Contract status (2026-06-12, advanced provider options)**: the Manifest contract adds `runtime.providerOptions: JsonObject` — a free-form JSON escape hatch that is serialized into the exported agent.yaml and into the package `manifest.json`. It is surfaced in the Agent editor's Basics section as a collapsed `Advanced settings (JSON, applied to runtime config) — Validated by the runtime, not by Mosoo` disclosure. Treat the "vendor-private knobs (reasoning_effort / thinking level / …) live only in the Sandbox / Terminal" wording in §4 Principle 2 and the `❌ → Runtime / Advanced` row in §6 as the **default** rule for fields we model in the form — they no longer forbid using `providerOptions` as a pass-through; Mosoo still does not validate the JSON, it just hands it to the runtime.
 >
-> **Current Project/App boundary note**: Agent Manifest is still the App-local Agent runtime/config contract. It should not absorb Project/App metadata, Provider key ownership, deployment health, App Overview state, or app-scoped cost. Project/App owns those boundaries and references Agent Manifests as resources. See [Project / App Boundary](./project-app-boundary.md).
+> **Current App boundary note**: Agent Manifest is still the App-local Agent runtime/config contract. It should not absorb App metadata, Provider key ownership, deployment health, App Overview state, or app-scoped cost. App owns those boundaries and references Agent Manifests as resources. See [App Boundary](./app-boundary.md).
 
 ---
 
@@ -14,12 +14,12 @@ The Agent Manifest is the **declarative product configuration** of a Mosoo Agent
 
 - It uses **a small set of stable fields** to spell out who an Agent is, which runtime it runs on, which model it uses, which system prompt it follows, and which Skills / MCP / Spaces / Environment it has installed.
 - Upstream: the Agent owner edits it through a UI form, or lets **Agent Builder** generate it.
-- Downstream: any tool — Agent Builder, the CLI, CI, a future IDE plugin — can read the same Manifest and package it into a **`.agent` file** to distribute, fork, and import across teams, organizations, and the community.
+- Downstream: any tool — Agent Builder, the CLI, CI, a future IDE plugin — can read the same Manifest and package it into a **`.agent` file** to distribute, fork, and import across Apps, instances, and the community.
 
 It is **not** a "super `agent.yaml`" that unifies the vendor configuration files of OpenAI runtime, Claude Agent SDK, OpenCode, Cursor, and so on. Those vendors have their own full-featured configuration formats, and we do not try to swallow them.
 
 > Analogy:
-> The Manifest is to an Agent what `package.json` is to a frontend project — it pins down "which framework this project uses, which packages it depends on, and where the entry point is." But it does **not** write every webpack plugin option for you, and it does **not** manage the internal config of each dependency inside `node_modules`.
+> The Manifest is to an Agent what `package.json` is to a frontend app — it pins down "which framework this app uses, which packages it depends on, and where the entry point is." But it does **not** write every webpack plugin option for you, and it does **not** manage the internal config of each dependency inside `node_modules`.
 
 ---
 
@@ -30,7 +30,7 @@ It is **not** a "super `agent.yaml`" that unifies the vendor configuration files
 The core points it solves are:
 
 1. **Consumable by downstream tools** — whether it is our own Agent Builder, other automation tools, or future third-party platforms, all of them can read the same Manifest to understand "who this Agent is and what it needs."
-2. **Making `.agent` files easy to distribute** — a `.zip` that contains `manifest.json` plus asset files (skills / environment definition / etc.) can be attached to a GitHub, Notion, or Slack file and handed to a colleague, and can also be imported into any Mosoo workspace or organization.
+2. **Making `.agent` files easy to distribute** — a `.zip` that contains `manifest.json` plus asset files (skills / environment definition / etc.) can be attached to a GitHub, Notion, or Slack file and handed to another developer, and can also be imported into any Mosoo App.
 3. **Declarative** — the user expresses "what I want," and the platform renders it into something a concrete runtime can run. The user does **not** write startup commands, does not maintain a vendor `.toml`, and does not toggle dozens of advanced switches in a UI form.
 
 ---
@@ -70,7 +70,7 @@ The real problem is not "how do we merge every vendor's fields into one," but ra
 
 - Define a long-lived Agent with a small set of stable fields: `kind`, runtime, model, system prompt, Skills, MCP, Environment, Spaces.
 - Let Agent Builder take over the complex editing work: say in natural language "give me an agent that can read Linear tickets," and Builder translates it into a Manifest patch.
-- Export the Agent as a **`.agent` package** to send to colleagues, upload to the community, or fork across organizations.
+- Export the Agent as a **`.agent` package** to send to another developer, upload to the community, or fork into another App.
 - Import someone else's `.agent` package: the Manifest lands, assets are reused, and **credentials / tokens are not carried along with it**.
 
 ### What the UI makes clear
@@ -185,21 +185,21 @@ The Manifest is a minimal common set → it is impossible to move all of the Ope
 
 ### Owner creates an Agent (through the UI or Agent Builder)
 
-| Stage                     | Action                                                     | Experience                                                                           |
-| ------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| 1. Getting started        | Fill in name, description                                  | The form shows only stable product semantics                                         |
-| 2. Choose runtime / model | Pick from dropdowns                                        | See the list of runtimes + models available to the current organization / individual |
-| 3. Write the prompt       | Fill in the system prompt                                  | The platform stores the prompt as part of the Manifest                               |
-| 4. Attach capabilities    | Skills / MCP / Environment / Spaces, each in its own group | Clear section boundaries, no nesting into each other                                 |
-| 5. Check readiness        | The UI validates automatically                             | Any unavailable item is grayed out with its reason + a fix-it path                   |
-| 6. Save / Publish         | One click                                                  | Enters the Manifest state machine: draft / preview / live                            |
+| Stage                     | Action                                                     | Experience                                                         |
+| ------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------ |
+| 1. Getting started        | Fill in name, description                                  | The form shows only stable product semantics                       |
+| 2. Choose runtime / model | Pick from dropdowns                                        | See the list of runtimes + models available to the current App     |
+| 3. Write the prompt       | Fill in the system prompt                                  | The platform stores the prompt as part of the Manifest             |
+| 4. Attach capabilities    | Skills / MCP / Environment / Spaces, each in its own group | Clear section boundaries, no nesting into each other               |
+| 5. Check readiness        | The UI validates automatically                             | Any unavailable item is grayed out with its reason + a fix-it path |
+| 6. Save / Publish         | One click                                                  | Enters the Manifest state machine: draft / preview / live          |
 
 ### Owner distributes the Agent
 
 ```mermaid
 flowchart LR
   A["UI: Export Agent"] --> B["Generate the .agent zip<br/>(manifest.json + skills + ...)"]
-  B --> C["Send to a colleague / upload to the community / submit a PR"]
+  B --> C["Send to another developer / upload to the community / submit a PR"]
   C --> D["The recipient Imports it"]
   D --> E["Manifest lands<br/>Assets are reused<br/>The recipient supplies credentials in their own environment"]
 ```

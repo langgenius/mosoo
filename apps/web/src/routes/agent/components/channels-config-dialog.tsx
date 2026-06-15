@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { deleteAgentChannelBinding } from "@/domains/agent/api/agent-client";
 import { agentKeys, useAgentChannelBindingsQuery } from "@/domains/agent/query/agent-queries";
-import { toChannelBindingId } from "@/routes/typed-id";
+import { toChannelBindingId, toAppId } from "@/routes/typed-id";
 import { Dialog, DialogContent } from "@/shared/ui/dialog";
 
 import type { Agent } from "../agent.types";
@@ -32,14 +32,16 @@ export function ChannelsConfigDialog({
   const queryClient = useQueryClient();
   const [selectedChannelId, setSelectedChannelId] = useState<ChannelId>(initialChannelId);
 
-  const channelBindingsQuery = useAgentChannelBindingsQuery(agent.id);
+  const channelBindingsQuery = useAgentChannelBindingsQuery(agent.appId, agent.id);
   const deleteChannelBindingMutation = useMutation({
     mutationFn: deleteAgentChannelBinding,
     onSuccess: async () =>
-      queryClient.invalidateQueries({ queryKey: agentKeys.channelBindings(agent.id) }),
+      queryClient.invalidateQueries({
+        queryKey: agentKeys.channelBindings(agent.appId, agent.id),
+      }),
   });
 
-  const canManageChannels = agent.role === "owner" || agent.role === "admin";
+  const canManageChannels = agent.role === "owner";
   const isPublished = agent.status === "published";
   const pendingRemoveBindingId = deleteChannelBindingMutation.isPending
     ? deleteChannelBindingMutation.variables.bindingId
@@ -55,7 +57,10 @@ export function ChannelsConfigDialog({
           channelBindingsLoading={channelBindingsQuery.isLoading}
           isPublished={isPublished}
           onRemoveChannelBinding={async (bindingId) =>
-            deleteChannelBindingMutation.mutateAsync({ bindingId: toChannelBindingId(bindingId) })
+            deleteChannelBindingMutation.mutateAsync({
+              bindingId: toChannelBindingId(bindingId),
+              appId: toAppId(agent.appId),
+            })
           }
           onSelectChannel={(channelId) => {
             setSelectedChannelId(channelId);

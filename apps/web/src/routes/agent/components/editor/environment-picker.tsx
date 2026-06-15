@@ -5,7 +5,7 @@ import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
 
 import { CreateEnvironmentDialog } from "@/domains/environment/components/create-environment-dialog";
-import { useOrganizationEnvironmentsQuery } from "@/domains/environment/query/environment-queries";
+import { useAppEnvironmentsQuery } from "@/domains/environment/query/environment-queries";
 import { cn } from "@/shared/lib/class-names";
 import { Label } from "@/shared/ui/label";
 
@@ -53,18 +53,17 @@ function EnvironmentOption({
 
 export function EnvironmentPicker({
   model,
-  organizationId,
+  appId,
   readOnly = false,
 }: {
   model: AgentEditorModel;
-  organizationId: string | null;
+  appId: string | null;
   readOnly?: boolean;
 }): ReactElement {
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const activeOrganizationId =
-    organizationId !== null && organizationId !== "" ? organizationId : null;
-  const environmentsQuery = useOrganizationEnvironmentsQuery(activeOrganizationId);
+  const activeAppId = appId !== null && appId !== "" ? appId : null;
+  const environmentsQuery = useAppEnvironmentsQuery(activeAppId);
   const environments = environmentsQuery.data ?? [];
   const explicitEnvironmentId =
     model.draft.environmentId !== null && model.draft.environmentId !== ""
@@ -86,7 +85,7 @@ export function EnvironmentPicker({
             readOnly ? "cursor-default opacity-80" : "cursor-pointer hover:border-brand/30",
             open ? "border-brand/30 ring-2 ring-brand-ring" : null,
           )}
-          disabled={readOnly || activeOrganizationId === null}
+          disabled={readOnly || activeAppId === null}
           onClick={() => {
             setOpen((current) => !current);
           }}
@@ -101,7 +100,7 @@ export function EnvironmentPicker({
                 <span className="text-foreground truncate text-[13px] font-semibold">
                   {selectedEnvironmentMissing
                     ? "Loading selected environment..."
-                    : (selectedEnvironment?.name ?? "Organization default")}
+                    : (selectedEnvironment?.name ?? "App default")}
                 </span>
                 {selectedEnvironment?.isDefault === true ? (
                   <Star className="text-brand size-3" />
@@ -145,7 +144,7 @@ export function EnvironmentPicker({
               <div className="border-border-subtle mt-1 grid gap-1 border-t pt-1">
                 <button
                   className="text-brand hover:bg-brand-light/60 flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={activeOrganizationId === null}
+                  disabled={activeAppId === null}
                   onClick={() => {
                     setOpen(false);
                     setCreateOpen(true);
@@ -173,14 +172,14 @@ export function EnvironmentPicker({
         ) : null}
       </div>
 
-      {activeOrganizationId !== null ? (
+      {activeAppId !== null ? (
         <CreateEnvironmentDialog
           onCreated={(environment) => {
             model.setEnvironmentId(environment.id);
           }}
           onOpenChange={setCreateOpen}
           open={createOpen}
-          organizationId={activeOrganizationId}
+          appId={activeAppId}
         />
       ) : null}
     </div>

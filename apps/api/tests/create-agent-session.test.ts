@@ -6,7 +6,8 @@ import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
-} from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
 
 const OWNER_VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",
@@ -51,7 +52,8 @@ describe("createAgentSession", () => {
       createAgentSession({
         bindings: createPublicHttpTestBindings(database) as ApiBindings,
         input: {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
           type: "preview",
         },
         viewer: OWNER_VIEWER,
@@ -59,14 +61,14 @@ describe("createAgentSession", () => {
     );
 
     expect(session).toMatchObject({
-      agentId: "01J00000000000000000000009",
-      deploymentVersionId: "01J0000000000000000000000A",
+      agentId: PUBLIC_API_TEST_IDS.agent,
+      deploymentVersionId: PUBLIC_API_TEST_IDS.deployment,
       deploymentVersionNumber: 1,
       kind: "pet",
       lastRun: null,
       model: "gpt-5.4",
-      organizationId: "01J00000000000000000000006",
       provider: "openai",
+      appId: PUBLIC_API_TEST_IDS.app,
       runtimeId: "openai-runtime",
       status: "IDLE",
       title: null,
@@ -76,12 +78,12 @@ describe("createAgentSession", () => {
     expect(session.createdAt).toBe(session.updatedAt);
   });
 
-  test("fails published session creation when the live version is missing", async () => {
+  test("fails Public Thread session creation when the live version is missing", async () => {
     const database = await createPublicHttpContractDatabase();
     database.execute("PRAGMA ignore_check_constraints = ON");
     await database
       .prepare("UPDATE agent SET live_deployment_version_id = NULL WHERE id = ?")
-      .bind("01J00000000000000000000009")
+      .bind(PUBLIC_API_TEST_IDS.agent)
       .run();
     database.execute("PRAGMA ignore_check_constraints = OFF");
 
@@ -89,7 +91,8 @@ describe("createAgentSession", () => {
       createAgentSession({
         bindings: createPublicHttpTestBindings(database) as ApiBindings,
         input: {
-          agentId: "01J00000000000000000000009",
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          appId: PUBLIC_API_TEST_IDS.app,
           type: "preview",
         },
         viewer: OWNER_VIEWER,
@@ -119,7 +122,8 @@ describe("createAgentSession", () => {
           createAgentSession({
             bindings: createPublicHttpTestBindings(database) as ApiBindings,
             input: {
-              agentId: "01J00000000000000000000009",
+              agentId: PUBLIC_API_TEST_IDS.agent,
+              appId: PUBLIC_API_TEST_IDS.app,
               type,
               waitForRuntimeReady: true,
             },
@@ -147,7 +151,8 @@ describe("createAgentSession", () => {
         createAgentSession({
           bindings: createPublicHttpTestBindings(database) as ApiBindings,
           input: {
-            agentId: "01J00000000000000000000009",
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            appId: PUBLIC_API_TEST_IDS.app,
             type: "preview",
           },
           viewer: OWNER_VIEWER,

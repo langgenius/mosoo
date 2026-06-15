@@ -16,7 +16,6 @@ const VIEWER: AuthenticatedViewer = {
 const AGENT_CONFIG_JSON = JSON.stringify({
   packageMcpServers: [],
   packageResolution: null,
-  packageSharingEnabled: true,
   packageSkills: [],
 });
 
@@ -30,8 +29,8 @@ const AGENT_ROW: AgentRow = {
   liveDeploymentVersionId: "01J0000000000000000000006A",
   model: "gpt-5.4",
   name: "Agent",
-  organizationId: "01J00000000000000000000006",
   ownerId: "01J00000000000000000000001",
+  appId: "01J0000000000000000000000P",
   prompt: "Private prompt",
   provider: "openai",
   runtimeId: "openai-runtime",
@@ -69,6 +68,11 @@ function createAgentDetailModelDatabase(
       name text
     );
 
+    CREATE TABLE agent (
+      id text PRIMARY KEY NOT NULL,
+      app_id text NOT NULL
+    );
+
     CREATE TABLE agent_deployment_version (
       agent_id text NOT NULL,
       config_json text NOT NULL,
@@ -97,15 +101,8 @@ function createAgentDetailModelDatabase(
     CREATE TABLE skill (
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
-      organization_id text NOT NULL,
-      owner_account_id text NOT NULL
-    );
-
-    CREATE TABLE resource_acl (
-      resource_type text NOT NULL,
-      resource_id text NOT NULL,
-      target_kind text NOT NULL,
-      target_id text NOT NULL
+      owner_account_id text NOT NULL,
+      app_id text NOT NULL
     );
 
     CREATE TABLE agent_mcp_binding (
@@ -119,11 +116,15 @@ function createAgentDetailModelDatabase(
     CREATE TABLE mcp_server (
       id text PRIMARY KEY NOT NULL,
       icon_url text,
-      name text NOT NULL
+      name text NOT NULL,
+      app_id text NOT NULL
     );
 
     INSERT INTO account (id, image_url, name)
     VALUES ('01J00000000000000000000001', NULL, 'Owner');
+
+    INSERT INTO agent (id, app_id)
+    VALUES ('01J00000000000000000000009', '01J0000000000000000000000P');
 
     INSERT INTO agent_deployment_version (
       agent_id,
@@ -176,10 +177,9 @@ describe("agent detail model", () => {
     expect(detail.versions.map((version) => version.id)).toEqual(["01J0000000000000000000006A"]);
     expect(detail.prompt).toBe("Private prompt");
     expect(detail.model).toBe("gpt-5.4");
-    expect(detail.packageSharingEnabled).toBe(true);
   });
 
-  test("projects runtime model fields from admitted identity values", async () => {
+  test("apps runtime model fields from admitted identity values", async () => {
     const database = createAgentDetailModelDatabase({
       deploymentModel: " gpt-5.4 ",
       deploymentProvider: " openai ",
@@ -228,7 +228,7 @@ describe("agent detail model", () => {
   test("redacts deployment details for non-editor viewers", async () => {
     const database = createAgentDetailModelDatabase();
 
-    const detail = await toAgentDetailModel(database, VIEWER, AGENT_ROW, OWNER_SUMMARY, "user");
+    const detail = await toAgentDetailModel(database, VIEWER, AGENT_ROW, OWNER_SUMMARY, "none");
 
     expect(detail.liveVersion).toBeNull();
     expect(detail.versions).toEqual([]);

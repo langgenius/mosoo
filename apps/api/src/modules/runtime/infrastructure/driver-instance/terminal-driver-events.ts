@@ -10,7 +10,7 @@ import { appendSessionRuntimeEvents } from "../../../sessions/application/sessio
 import {
   applyRuntimeEventToSessionLiveState,
   loadSessionViewerState,
-  projectRuntimeEventToSessionDeliveryEvents,
+  appRuntimeEventToSessionDeliveryEvents,
 } from "../../../sessions/application/session-live-state.service";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
 import { recordRuntimeRunLeaseReleasedOutcome } from "../runtime-subject-lifecycle/runtime-run-lease-store";
@@ -216,10 +216,10 @@ async function synthesizeDriverRunFinished(
     sessionId: input.link.sessionId,
     sourceEventId: eventId,
   });
-  const [runFinishedEvent] = projectRuntimeEventToSessionDeliveryEvents(runCompletedEvent);
+  const [runFinishedEvent] = appRuntimeEventToSessionDeliveryEvents(runCompletedEvent);
 
   if (runFinishedEvent === undefined) {
-    throw new Error("Run completion event did not project to session delivery.");
+    throw new Error("Run completion event did not app to session delivery.");
   }
 
   const currentLiveState = await loadSessionViewerState(database, {

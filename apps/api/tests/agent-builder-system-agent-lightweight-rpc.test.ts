@@ -29,6 +29,8 @@ import {
 import type { AgentBuilderApiFixture } from "./helpers/agent-builder-api-fixture";
 import { readFetchUrl } from "./helpers/fetch-request-url";
 
+type ControlPlaneActionInput = Parameters<typeof executeAgentBuilderControlPlaneAction>[2];
+
 const DRAFT_YAML = [
   "version: 1",
   "kind: pet",
@@ -200,6 +202,17 @@ function readJsonObjectBody(body: BodyInit | null | undefined): Record<string, u
   return parsed;
 }
 
+async function executeFixtureControlPlaneAction(
+  fixture: AgentBuilderApiFixture,
+  viewer: AgentBuilderApiFixture["viewer"],
+  input: Omit<ControlPlaneActionInput, "appId">,
+) {
+  return executeAgentBuilderControlPlaneAction(fixture.bindings, viewer, {
+    ...input,
+    appId: fixture.ids.appId,
+  });
+}
+
 async function insertPreviewSession(
   fixture: AgentBuilderApiFixture,
   input: {
@@ -226,7 +239,7 @@ async function insertPreviewSession(
       message_seq_cursor,
       metadata_json,
       model,
-      organization_id,
+      app_id,
       provider,
       renamed,
       runtime_id,
@@ -248,7 +261,7 @@ async function insertPreviewSession(
       input.messageSeqCursor,
       "{}",
       "claude-sonnet-4-5",
-      fixture.ids.organizationId,
+      fixture.ids.appId,
       "anthropic",
       0,
       "cloudflare-agents-sdk",
@@ -282,7 +295,7 @@ describe("Agent Builder System Agent lightweight RPC", () => {
     });
   });
 
-  test("keeps published Agents in refactor mode instead of Quickstart steps", async () => {
+  test("keeps Agent API Endpoints in refactor mode instead of Quickstart steps", async () => {
     const planner = createDefaultAgentBuilderLightweightPlanner();
     const context = plannerContext();
     const output = await planner.plan({
@@ -1446,7 +1459,7 @@ describe("Agent Builder System Agent lightweight RPC", () => {
     expect(repeatedCreateActionOutput?.mode).toBe("action");
     expect(repeatedCreateActionOutput?.nodes[0]?.nodeKey).toBe("show_next_action:create_agent");
 
-    await executeAgentBuilderControlPlaneAction(fixture.bindings, viewer, {
+    await executeFixtureControlPlaneAction(fixture, viewer, {
       agentId: fixture.ids.agentId,
       draftYaml: DRAFT_YAML,
       toolId: "create_agent",
@@ -1492,7 +1505,7 @@ describe("Agent Builder System Agent lightweight RPC", () => {
       runtime,
       threadId: thread.id,
     });
-    await executeAgentBuilderControlPlaneAction(fixture.bindings, viewer, {
+    await executeFixtureControlPlaneAction(fixture, viewer, {
       agentId: fixture.ids.agentId,
       draftYaml: DRAFT_YAML,
       toolId: "create_agent",
@@ -1571,7 +1584,7 @@ describe("Agent Builder System Agent lightweight RPC", () => {
     const thread = await ensureAgentBuilderThread(fixture.bindings.DB, viewer, fixture.ids.agentId);
     const runtime = createDeterministicAgentBuilderRuntime(fixture, viewer);
 
-    await executeAgentBuilderControlPlaneAction(fixture.bindings, viewer, {
+    await executeFixtureControlPlaneAction(fixture, viewer, {
       agentId: fixture.ids.agentId,
       draftYaml: DRAFT_YAML,
       toolId: "create_agent",
@@ -1720,7 +1733,7 @@ describe("Agent Builder System Agent lightweight RPC", () => {
     const thread = await ensureAgentBuilderThread(fixture.bindings.DB, viewer, fixture.ids.agentId);
     const runtime = createDeterministicAgentBuilderRuntime(fixture, viewer);
 
-    await executeAgentBuilderControlPlaneAction(fixture.bindings, viewer, {
+    await executeFixtureControlPlaneAction(fixture, viewer, {
       agentId: fixture.ids.agentId,
       draftYaml: DRAFT_YAML,
       toolId: "create_agent",
@@ -1909,7 +1922,7 @@ describe("Agent Builder System Agent lightweight RPC", () => {
     const viewer = await login(fixture);
     const thread = await ensureAgentBuilderThread(fixture.bindings.DB, viewer, fixture.ids.agentId);
 
-    await executeAgentBuilderControlPlaneAction(fixture.bindings, viewer, {
+    await executeFixtureControlPlaneAction(fixture, viewer, {
       agentId: fixture.ids.agentId,
       toolId: "open_preview",
     });
@@ -2061,11 +2074,13 @@ describe("Agent Builder System Agent lightweight RPC", () => {
       agentId: fixture.ids.agentId,
       archived: false,
       participantOnly: true,
+      appId: fixture.ids.appId,
       type: "preview",
     });
     const editorVisibleSessions = await listAgentSessions(fixture.bindings.DB, viewer, {
       agentId: fixture.ids.agentId,
       archived: false,
+      appId: fixture.ids.appId,
       type: "preview",
     });
 

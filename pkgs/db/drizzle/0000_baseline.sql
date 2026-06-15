@@ -66,8 +66,8 @@ CREATE TABLE `agent` (
 	`live_deployment_version_id` text CHECK ("live_deployment_version_id" = upper("live_deployment_version_id") AND length("live_deployment_version_id") = 26 AND substr("live_deployment_version_id", 1, 1) GLOB '[0-7]' AND "live_deployment_version_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`model` text NOT NULL,
 	`name` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`prompt` text NOT NULL,
 	`provider` text NOT NULL,
 	`runtime_id` text NOT NULL,
@@ -77,9 +77,9 @@ CREATE TABLE `agent` (
 	CONSTRAINT "agent_published_live_deployment_version_check" CHECK("agent"."status" <> 'published' OR "agent"."live_deployment_version_id" IS NOT NULL)
 );
 --> statement-breakpoint
-CREATE INDEX `agent_organization_owner_account_idx` ON `agent` (`organization_id`,`owner_account_id`);--> statement-breakpoint
+CREATE INDEX `agent_app_owner_account_idx` ON `agent` (`app_id`,`owner_account_id`);--> statement-breakpoint
+CREATE INDEX `agent_app_status_idx` ON `agent` (`app_id`,`status`);--> statement-breakpoint
 CREATE INDEX `agent_environment_idx` ON `agent` (`environment_id`);--> statement-breakpoint
-CREATE INDEX `agent_organization_status_idx` ON `agent` (`organization_id`,`status`);--> statement-breakpoint
 CREATE TABLE `agent_builder_message` (
 	`cards_json` text,
 	`content_text` text NOT NULL,
@@ -105,7 +105,6 @@ CREATE TABLE `agent_builder_planner_run` (
 	`error_message` text,
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`model` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`output_json` text,
 	`provider` text NOT NULL,
 	`request_digest` text NOT NULL,
@@ -128,7 +127,6 @@ CREATE TABLE `agent_builder_thread` (
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`last_turn_at` integer,
 	`message_seq_cursor` integer DEFAULT 0 NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`preview_opened_at` integer,
 	`status` text DEFAULT 'active' NOT NULL,
 	`title` text,
@@ -137,7 +135,7 @@ CREATE TABLE `agent_builder_thread` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `agent_builder_thread_agent_idx` ON `agent_builder_thread` (`agent_id`);--> statement-breakpoint
-CREATE INDEX `agent_builder_thread_creator_updated_idx` ON `agent_builder_thread` (`organization_id`,`creator_account_id`,`updated_at`);--> statement-breakpoint
+CREATE INDEX `agent_builder_thread_creator_updated_idx` ON `agent_builder_thread` (`creator_account_id`,`updated_at`);--> statement-breakpoint
 CREATE TABLE `api_command` (
 	`attempt_count` integer DEFAULT 0 NOT NULL,
 	`claim_expires_at` integer,
@@ -223,15 +221,18 @@ CREATE TABLE `agent_channel_binding` (
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`last_error_code` text,
 	`provider` text NOT NULL,
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`status` text NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`agent_id`) REFERENCES `agent`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`encrypted_creds_secret_id`) REFERENCES `vault_secret`(`id`) ON UPDATE no action ON DELETE restrict
+	FOREIGN KEY (`encrypted_creds_secret_id`) REFERENCES `vault_secret`(`id`) ON UPDATE no action ON DELETE restrict,
+	FOREIGN KEY (`app_id`) REFERENCES `app`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `agent_channel_binding_agent_provider_idx` ON `agent_channel_binding` (`agent_id`,`provider`);--> statement-breakpoint
 CREATE UNIQUE INDEX `agent_channel_binding_provider_tenant_bot_idx` ON `agent_channel_binding` (`provider`,`external_tenant_id`,`external_bot_id`);--> statement-breakpoint
 CREATE INDEX `agent_channel_binding_agent_status_idx` ON `agent_channel_binding` (`agent_id`,`status`);--> statement-breakpoint
+CREATE INDEX `agent_channel_binding_app_status_idx` ON `agent_channel_binding` (`app_id`,`status`);--> statement-breakpoint
 CREATE TABLE `channel_runtime_state` (
 	`binding_id` text CHECK ("binding_id" = upper("binding_id") AND length("binding_id") = 26 AND substr("binding_id", 1, 1) GLOB '[0-7]' AND "binding_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
@@ -319,18 +320,21 @@ CREATE TABLE `wechat_channel_account` (
 	`last_inbound_at` integer,
 	`last_poll_at` integer,
 	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`runtime_state_json` text DEFAULT '{}' NOT NULL,
 	`status` text NOT NULL,
 	`status_changed_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`agent_id`) REFERENCES `agent`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`encrypted_creds_secret_id`) REFERENCES `vault_secret`(`id`) ON UPDATE no action ON DELETE restrict,
-	FOREIGN KEY (`owner_account_id`) REFERENCES `account`(`id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`owner_account_id`) REFERENCES `account`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`app_id`) REFERENCES `app`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `wechat_channel_account_agent_idx` ON `wechat_channel_account` (`agent_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `wechat_channel_account_external_idx` ON `wechat_channel_account` (`external_account_id`,`external_bot_id`);--> statement-breakpoint
 CREATE INDEX `wechat_channel_account_status_idx` ON `wechat_channel_account` (`status`,`updated_at`);--> statement-breakpoint
+CREATE INDEX `wechat_channel_account_app_status_idx` ON `wechat_channel_account` (`app_id`,`status`);--> statement-breakpoint
 CREATE TABLE `wechat_channel_pairing` (
 	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`consumed_at` integer,
@@ -338,14 +342,17 @@ CREATE TABLE `wechat_channel_pairing` (
 	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND substr("created_by_account_id", 1, 1) GLOB '[0-7]' AND "created_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`expires_at` integer NOT NULL,
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`qr_token_hash` text NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`agent_id`) REFERENCES `agent`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`created_by_account_id`) REFERENCES `account`(`id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`created_by_account_id`) REFERENCES `account`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`app_id`) REFERENCES `app`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `wechat_channel_pairing_qr_token_hash_idx` ON `wechat_channel_pairing` (`qr_token_hash`);--> statement-breakpoint
 CREATE INDEX `wechat_channel_pairing_agent_creator_idx` ON `wechat_channel_pairing` (`agent_id`,`created_by_account_id`,`consumed_at`);--> statement-breakpoint
+CREATE INDEX `wechat_channel_pairing_app_creator_idx` ON `wechat_channel_pairing` (`app_id`,`created_by_account_id`,`consumed_at`);--> statement-breakpoint
 CREATE INDEX `wechat_channel_pairing_expires_idx` ON `wechat_channel_pairing` (`expires_at`);--> statement-breakpoint
 CREATE TABLE `wechat_context_token` (
 	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
@@ -388,14 +395,14 @@ CREATE TABLE `environment_revision` (
 	`environment_id` text CHECK ("environment_id" = upper("environment_id") AND length("environment_id") = 26 AND substr("environment_id", 1, 1) GLOB '[0-7]' AND "environment_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`network_policy` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`packages_json` text NOT NULL,
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`setup_script` text NOT NULL,
 	CONSTRAINT "environment_revision_network_policy_check" CHECK("environment_revision"."network_policy" IN ('full', 'limited'))
 );
 --> statement-breakpoint
 CREATE INDEX `environment_revision_environment_created_at_idx` ON `environment_revision` (`environment_id`,`created_at`);--> statement-breakpoint
-CREATE INDEX `environment_revision_organization_created_at_idx` ON `environment_revision` (`organization_id`,`created_at`);--> statement-breakpoint
+CREATE INDEX `environment_revision_app_created_at_idx` ON `environment_revision` (`app_id`,`created_at`);--> statement-breakpoint
 CREATE TABLE `environment` (
 	`created_at` integer NOT NULL,
 	`current_revision_id` text CHECK ("current_revision_id" = upper("current_revision_id") AND length("current_revision_id") = 26 AND substr("current_revision_id", 1, 1) GLOB '[0-7]' AND "current_revision_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
@@ -405,15 +412,15 @@ CREATE TABLE `environment` (
 	`forked_from_owner_name` text,
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `environment_organization_updated_at_idx` ON `environment` (`organization_id`,`updated_at`);--> statement-breakpoint
+CREATE INDEX `environment_app_updated_at_idx` ON `environment` (`app_id`,`updated_at`);--> statement-breakpoint
 CREATE INDEX `environment_owner_updated_at_idx` ON `environment` (`owner_account_id`,`updated_at`);--> statement-breakpoint
-CREATE UNIQUE INDEX `environment_owner_name_idx` ON `environment` (`organization_id`,`owner_account_id`,`name`) WHERE "environment"."owner_account_id" IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX `environment_system_default_idx` ON `environment` (`organization_id`) WHERE "environment"."owner_account_id" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX `environment_owner_name_idx` ON `environment` (`app_id`,`owner_account_id`,`name`) WHERE "environment"."owner_account_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX `environment_system_default_idx` ON `environment` (`app_id`) WHERE "environment"."owner_account_id" IS NULL;--> statement-breakpoint
 CREATE TABLE `file_record` (
 	`committed` integer NOT NULL,
 	`created_at` integer NOT NULL,
@@ -497,6 +504,7 @@ CREATE TABLE `mcp_credential` (
 	`last_refreshed_at` integer,
 	`oauth_client_id` text,
 	`oauth_client_secret_secret_id` text,
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`refresh_secret_id` text,
 	`scope` text NOT NULL,
 	`scope_values_json` text,
@@ -506,12 +514,7 @@ CREATE TABLE `mcp_credential` (
 	`subject_label` text,
 	`updated_at` integer NOT NULL,
 	CONSTRAINT "mcp_credential_scope_shape_check" CHECK(
-        ("mcp_credential"."scope" = 'user' AND "mcp_credential"."account_id" IS NOT NULL AND "mcp_credential"."agent_id" IS NULL)
-        OR (
-          "mcp_credential"."scope" = 'organization_shared'
-          AND "mcp_credential"."account_id" IS NULL
-          AND "mcp_credential"."agent_id" IS NULL
-        )
+        ("mcp_credential"."scope" = 'app' AND "mcp_credential"."account_id" IS NULL AND "mcp_credential"."agent_id" IS NULL)
         OR ("mcp_credential"."scope" = 'agent' AND "mcp_credential"."account_id" IS NULL AND "mcp_credential"."agent_id" IS NOT NULL)
       ),
 	CONSTRAINT "mcp_credential_scope_values_json_check" CHECK(
@@ -529,8 +532,8 @@ CREATE TABLE `mcp_credential` (
 );
 --> statement-breakpoint
 CREATE INDEX `mcp_credential_server_scope_status_idx` ON `mcp_credential` (`server_id`,`scope`,`status`);--> statement-breakpoint
-CREATE UNIQUE INDEX `mcp_credential_user_scope_idx` ON `mcp_credential` (`server_id`,`account_id`,`scope`) WHERE "mcp_credential"."scope" = 'user' AND "mcp_credential"."account_id" IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX `mcp_credential_shared_scope_idx` ON `mcp_credential` (`server_id`,`scope`) WHERE "mcp_credential"."scope" = 'organization_shared';--> statement-breakpoint
+CREATE INDEX `mcp_credential_app_scope_status_idx` ON `mcp_credential` (`app_id`,`scope`,`status`);--> statement-breakpoint
+CREATE UNIQUE INDEX `mcp_credential_app_scope_idx` ON `mcp_credential` (`server_id`,`scope`) WHERE "mcp_credential"."scope" = 'app';--> statement-breakpoint
 CREATE UNIQUE INDEX `mcp_credential_agent_scope_idx` ON `mcp_credential` (`server_id`,`agent_id`,`scope`) WHERE "mcp_credential"."scope" = 'agent' AND "mcp_credential"."agent_id" IS NOT NULL;--> statement-breakpoint
 CREATE TABLE `mcp_oauth_flow` (
 	`authorization_endpoint` text NOT NULL,
@@ -544,7 +547,7 @@ CREATE TABLE `mcp_oauth_flow` (
 	`initiator_account_id` text CHECK ("initiator_account_id" = upper("initiator_account_id") AND length("initiator_account_id") = 26 AND substr("initiator_account_id", 1, 1) GLOB '[0-7]' AND "initiator_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`oauth_client_id` text NOT NULL,
 	`oauth_client_secret_secret_id` text,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`registration_endpoint` text,
 	`return_url` text,
 	`scope_values_json` text,
@@ -562,6 +565,7 @@ CREATE TABLE `mcp_oauth_flow` (
 CREATE INDEX `mcp_oauth_flow_status_cleanup_after_idx` ON `mcp_oauth_flow` (`status`,`cleanup_after`);--> statement-breakpoint
 CREATE INDEX `mcp_oauth_flow_expires_at_idx` ON `mcp_oauth_flow` (`expires_at`);--> statement-breakpoint
 CREATE INDEX `mcp_oauth_flow_server_account_idx` ON `mcp_oauth_flow` (`server_id`,`initiator_account_id`);--> statement-breakpoint
+CREATE INDEX `mcp_oauth_flow_app_server_account_idx` ON `mcp_oauth_flow` (`app_id`,`server_id`,`initiator_account_id`);--> statement-breakpoint
 CREATE TABLE `mcp_server` (
 	`auth_type` text NOT NULL,
 	`byo_client_id` text,
@@ -574,25 +578,17 @@ CREATE TABLE `mcp_server` (
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
 	`oauth_metadata_json` text,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`source` text NOT NULL,
 	`updated_at` integer NOT NULL,
 	`url` text NOT NULL,
-	CONSTRAINT "mcp_server_source_scope_check" CHECK(
-        ("mcp_server"."source" = 'personal' AND "mcp_server"."credential_scope" = 'user')
-        OR (
-          "mcp_server"."source" = 'organization_shared'
-          AND "mcp_server"."credential_scope" IN ('user', 'organization_shared')
-        )
-      ),
-	CONSTRAINT "mcp_server_organization_shared_auth_check" CHECK("mcp_server"."credential_scope" != 'organization_shared' OR "mcp_server"."auth_type" = 'bearer')
+	CONSTRAINT "mcp_server_source_scope_check" CHECK("mcp_server"."source" = 'app' AND "mcp_server"."credential_scope" = 'app')
 );
 --> statement-breakpoint
-CREATE INDEX `mcp_server_organization_source_enabled_idx` ON `mcp_server` (`organization_id`,`source`,`enabled`);--> statement-breakpoint
-CREATE INDEX `mcp_server_owner_organization_idx` ON `mcp_server` (`owner_account_id`,`organization_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `mcp_server_personal_url_idx` ON `mcp_server` (`organization_id`,`owner_account_id`,`url`) WHERE "mcp_server"."source" = 'personal';--> statement-breakpoint
-CREATE UNIQUE INDEX `mcp_server_shared_url_idx` ON `mcp_server` (`organization_id`,`url`) WHERE "mcp_server"."source" = 'organization_shared';--> statement-breakpoint
+CREATE INDEX `mcp_server_app_enabled_idx` ON `mcp_server` (`app_id`,`enabled`);--> statement-breakpoint
+CREATE INDEX `mcp_server_owner_app_idx` ON `mcp_server` (`owner_account_id`,`app_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `mcp_server_app_url_idx` ON `mcp_server` (`app_id`,`url`);--> statement-breakpoint
 CREATE TABLE `vault_secret` (
 	`algorithm` text DEFAULT 'AES-GCM' NOT NULL,
 	`ciphertext` text NOT NULL,
@@ -606,75 +602,30 @@ CREATE TABLE `vault_secret` (
 );
 --> statement-breakpoint
 CREATE INDEX `vault_secret_kind_created_at_idx` ON `vault_secret` (`kind`,`created_at`);--> statement-breakpoint
-CREATE TABLE `organization_access_request` (
-	`created_at` integer NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`referrer_account_id` text CHECK ("referrer_account_id" = upper("referrer_account_id") AND length("referrer_account_id") = 26 AND substr("referrer_account_id", 1, 1) GLOB '[0-7]' AND "referrer_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
-	`requested_by_account_id` text CHECK ("requested_by_account_id" = upper("requested_by_account_id") AND length("requested_by_account_id") = 26 AND substr("requested_by_account_id", 1, 1) GLOB '[0-7]' AND "requested_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`requester_email` text NOT NULL,
-	`reviewed_at` integer,
-	`reviewed_by` text CHECK ("reviewed_by" = upper("reviewed_by") AND length("reviewed_by") = 26 AND substr("reviewed_by", 1, 1) GLOB '[0-7]' AND "reviewed_by" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
-	`status` text NOT NULL,
-	`updated_at` integer NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `organization_access_request_organization_status_idx` ON `organization_access_request` (`organization_id`,`status`);--> statement-breakpoint
-CREATE INDEX `organization_access_request_requester_status_idx` ON `organization_access_request` (`requested_by_account_id`,`status`);--> statement-breakpoint
-CREATE UNIQUE INDEX `organization_access_request_pending_account_idx` ON `organization_access_request` (`organization_id`,`requested_by_account_id`) WHERE "organization_access_request"."status" = 'pending';--> statement-breakpoint
-CREATE TABLE `organization_domain` (
-	`created_at` integer NOT NULL,
-	`domain` text NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`status` text NOT NULL,
-	`updated_at` integer NOT NULL
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `organization_domain_domain_idx` ON `organization_domain` (`domain`);--> statement-breakpoint
-CREATE INDEX `organization_domain_organization_id_idx` ON `organization_domain` (`organization_id`);--> statement-breakpoint
-CREATE TABLE `organization_invitation` (
-	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
-	`created_at` integer NOT NULL,
-	`email` text NOT NULL,
-	`expires_at` integer,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
-	`invited_by` text CHECK ("invited_by" = upper("invited_by") AND length("invited_by") = 26 AND substr("invited_by", 1, 1) GLOB '[0-7]' AND "invited_by" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`status` text NOT NULL,
-	`updated_at` integer NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `organization_invitation_organization_status_idx` ON `organization_invitation` (`organization_id`,`status`);--> statement-breakpoint
-CREATE INDEX `organization_invitation_email_status_created_idx` ON `organization_invitation` (`email`,`status`,`created_at`);--> statement-breakpoint
-CREATE UNIQUE INDEX `organization_invitation_pending_email_idx` ON `organization_invitation` (`organization_id`,`email`) WHERE "organization_invitation"."status" = 'pending';--> statement-breakpoint
-CREATE TABLE `organization_member` (
-	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`created_at` integer NOT NULL,
-	`disabled_at` integer,
-	`disabled_by_account_id` text CHECK ("disabled_by_account_id" = upper("disabled_by_account_id") AND length("disabled_by_account_id") = 26 AND substr("disabled_by_account_id", 1, 1) GLOB '[0-7]' AND "disabled_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
-	`joined_at` integer NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`role` text NOT NULL,
-	PRIMARY KEY(`organization_id`, `account_id`)
-);
---> statement-breakpoint
 CREATE TABLE `organization` (
 	`avatar_url` text,
 	`created_at` integer NOT NULL,
 	`creator_account_id` text CHECK ("creator_account_id" = upper("creator_account_id") AND length("creator_account_id") = 26 AND substr("creator_account_id", 1, 1) GLOB '[0-7]' AND "creator_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
-	`default_environment_id` text CHECK ("default_environment_id" = upper("default_environment_id") AND length("default_environment_id") = 26 AND substr("default_environment_id", 1, 1) GLOB '[0-7]' AND "default_environment_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
-	`join_policy` text NOT NULL,
 	`name` text NOT NULL,
-	`primary_domain` text,
 	`slug` text NOT NULL,
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `organization_creator_account_idx` ON `organization` (`creator_account_id`) WHERE "organization"."creator_account_id" IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX `organization_primary_domain_idx` ON `organization` (`primary_domain`);--> statement-breakpoint
 CREATE UNIQUE INDEX `organization_slug_idx` ON `organization` (`slug`);--> statement-breakpoint
+CREATE TABLE `app` (
+	`created_at` integer NOT NULL,
+	`default_environment_id` text CHECK ("default_environment_id" = upper("default_environment_id") AND length("default_environment_id") = 26 AND substr("default_environment_id", 1, 1) GLOB '[0-7]' AND "default_environment_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
+	`name` text NOT NULL,
+	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`slug` text NOT NULL,
+	`updated_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `app_organization_slug_idx` ON `app` (`organization_id`,`slug`);--> statement-breakpoint
 CREATE TABLE `public_api_idempotency_key` (
 	`body_hash` text,
 	`created_at` integer NOT NULL,
@@ -700,21 +651,6 @@ CREATE TABLE `public_api_rate_limit_window` (
 );
 --> statement-breakpoint
 CREATE INDEX `public_api_rate_limit_window_updated_idx` ON `public_api_rate_limit_window` (`updated_at`);--> statement-breakpoint
-CREATE TABLE `resource_acl` (
-	`assigned_by_account_id` text CHECK ("assigned_by_account_id" = upper("assigned_by_account_id") AND length("assigned_by_account_id") = 26 AND substr("assigned_by_account_id", 1, 1) GLOB '[0-7]' AND "assigned_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
-	`created_at` integer NOT NULL,
-	`resource_id` text CHECK ("resource_id" = upper("resource_id") AND length("resource_id") = 26 AND substr("resource_id", 1, 1) GLOB '[0-7]' AND "resource_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`resource_type` text NOT NULL,
-	`role` text NOT NULL,
-	`target_id` text CHECK ("target_id" = upper("target_id") AND length("target_id") = 26 AND substr("target_id", 1, 1) GLOB '[0-7]' AND "target_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`target_kind` text NOT NULL,
-	PRIMARY KEY(`resource_type`, `resource_id`, `target_kind`, `target_id`),
-	CONSTRAINT "resource_acl_resource_type_check" CHECK("resource_acl"."resource_type" IN ('agent', 'environment', 'skill', 'space')),
-	CONSTRAINT "resource_acl_target_kind_check" CHECK("resource_acl"."target_kind" IN ('organization', 'user'))
-);
---> statement-breakpoint
-CREATE INDEX `resource_acl_target_idx` ON `resource_acl` (`target_kind`,`target_id`);--> statement-breakpoint
-CREATE INDEX `resource_acl_resource_idx` ON `resource_acl` (`resource_type`,`resource_id`);--> statement-breakpoint
 CREATE TABLE `driver_command` (
 	`acked_at` integer,
 	`completed_at` integer,
@@ -742,6 +678,7 @@ CREATE TABLE `driver_instance_mcp_grant` (
 	`created_at` integer NOT NULL,
 	`credential_id` text CHECK ("credential_id" = upper("credential_id") AND length("credential_id") = 26 AND substr("credential_id", 1, 1) GLOB '[0-7]' AND "credential_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`driver_instance_id` text CHECK ("driver_instance_id" = upper("driver_instance_id") AND length("driver_instance_id") = 26 AND substr("driver_instance_id", 1, 1) GLOB '[0-7]' AND "driver_instance_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`server_id` text CHECK ("server_id" = upper("server_id") AND length("server_id") = 26 AND substr("server_id", 1, 1) GLOB '[0-7]' AND "server_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`driver_instance_id`) REFERENCES `driver_instance`(`id`) ON UPDATE no action ON DELETE cascade
@@ -892,7 +829,7 @@ CREATE TABLE `session` (
 	`message_seq_cursor` integer DEFAULT 0 NOT NULL,
 	`metadata_json` text DEFAULT '{}' NOT NULL,
 	`model` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`provider` text NOT NULL,
 	`renamed` integer NOT NULL,
 	`runtime_id` text NOT NULL,
@@ -908,14 +845,12 @@ CREATE TABLE `session` (
 );
 --> statement-breakpoint
 CREATE INDEX `session_agent_updated_idx` ON `session` (`agent_id`,`updated_at`,`id`);--> statement-breakpoint
+CREATE INDEX `session_app_creator_archived_updated_idx` ON `session` (`app_id`,`creator_account_id`,`archived_at`,`updated_at`,`id`);--> statement-breakpoint
+CREATE INDEX `session_app_attributed_archived_updated_idx` ON `session` (`app_id`,`attributed_user_id`,`archived_at`,`updated_at`,`id`);--> statement-breakpoint
+CREATE INDEX `session_app_creator_type_archived_updated_idx` ON `session` (`app_id`,`creator_account_id`,`type`,`archived_at`,`updated_at`,`id`);--> statement-breakpoint
+CREATE INDEX `session_app_attributed_type_archived_updated_idx` ON `session` (`app_id`,`attributed_user_id`,`type`,`archived_at`,`updated_at`,`id`);--> statement-breakpoint
 CREATE INDEX `session_status_operation_updated_idx` ON `session` (`status`,`status_operation_id`,`updated_at`);--> statement-breakpoint
 CREATE INDEX `session_status_updated_idx` ON `session` (`status`,`updated_at`,`id`);--> statement-breakpoint
-CREATE INDEX `session_organization_creator_status_updated_idx` ON `session` (`organization_id`,`creator_account_id`,`status`,`updated_at`,`id`);--> statement-breakpoint
-CREATE INDEX `session_organization_attributed_status_updated_idx` ON `session` (`organization_id`,`attributed_user_id`,`status`,`updated_at`,`id`);--> statement-breakpoint
-CREATE INDEX `session_organization_creator_archived_updated_idx` ON `session` (`organization_id`,`creator_account_id`,`archived_at`,`updated_at`,`id`);--> statement-breakpoint
-CREATE INDEX `session_organization_attributed_archived_updated_idx` ON `session` (`organization_id`,`attributed_user_id`,`archived_at`,`updated_at`,`id`);--> statement-breakpoint
-CREATE INDEX `session_organization_creator_type_archived_updated_idx` ON `session` (`organization_id`,`creator_account_id`,`type`,`archived_at`,`updated_at`,`id`);--> statement-breakpoint
-CREATE INDEX `session_organization_attributed_type_archived_updated_idx` ON `session` (`organization_id`,`attributed_user_id`,`type`,`archived_at`,`updated_at`,`id`);--> statement-breakpoint
 CREATE TABLE `session_execution_snapshot` (
 	`created_at` integer NOT NULL,
 	`plan_json` text NOT NULL,
@@ -1058,27 +993,6 @@ CREATE TABLE `session_readiness_snapshot` (
 	FOREIGN KEY (`session_id`) REFERENCES `session`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE TABLE `session_thread_ui_state` (
-	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`pinned` integer DEFAULT false NOT NULL,
-	`read_at` integer,
-	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`updated_at` integer NOT NULL,
-	PRIMARY KEY(`account_id`, `session_id`),
-	FOREIGN KEY (`session_id`) REFERENCES `session`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `session_thread_ui_state_account_updated_idx` ON `session_thread_ui_state` (`account_id`,`updated_at`,`session_id`);--> statement-breakpoint
-CREATE INDEX `session_thread_ui_state_session_idx` ON `session_thread_ui_state` (`session_id`);--> statement-breakpoint
-CREATE TABLE `skill_preference` (
-	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`auto_enabled` integer NOT NULL,
-	`created_at` integer NOT NULL,
-	`skill_id` text CHECK ("skill_id" = upper("skill_id") AND length("skill_id") = 26 AND substr("skill_id", 1, 1) GLOB '[0-7]' AND "skill_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`updated_at` integer NOT NULL,
-	PRIMARY KEY(`skill_id`, `account_id`)
-);
---> statement-breakpoint
 CREATE TABLE `skill_snapshot_entry` (
 	`entry_kind` text NOT NULL,
 	`is_executable` integer NOT NULL,
@@ -1099,14 +1013,14 @@ CREATE TABLE `skill_snapshot` (
 	`description` text NOT NULL,
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`skill_markdown_path` text NOT NULL,
 	`uncompressed_size` integer NOT NULL,
 	`version` text
 );
 --> statement-breakpoint
-CREATE INDEX `skill_snapshot_organization_created_at_idx` ON `skill_snapshot` (`organization_id`,`created_at`);--> statement-breakpoint
-CREATE UNIQUE INDEX `skill_snapshot_blob_sha256_idx` ON `skill_snapshot` (`organization_id`,`blob_sha256`);--> statement-breakpoint
+CREATE INDEX `skill_snapshot_app_created_at_idx` ON `skill_snapshot` (`app_id`,`created_at`);--> statement-breakpoint
+CREATE UNIQUE INDEX `skill_snapshot_blob_sha256_idx` ON `skill_snapshot` (`app_id`,`blob_sha256`);--> statement-breakpoint
 CREATE TABLE `skill` (
 	`author` text NOT NULL,
 	`created_at` integer NOT NULL,
@@ -1117,14 +1031,14 @@ CREATE TABLE `skill` (
 	`forked_from_skill_name` text,
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`source_kind` text NOT NULL,
 	`updated_at` integer NOT NULL,
 	`version` text
 );
 --> statement-breakpoint
-CREATE INDEX `skill_organization_updated_at_idx` ON `skill` (`organization_id`,`updated_at`);--> statement-breakpoint
+CREATE INDEX `skill_app_updated_at_idx` ON `skill` (`app_id`,`updated_at`);--> statement-breakpoint
 CREATE INDEX `skill_owner_account_updated_at_idx` ON `skill` (`owner_account_id`,`updated_at`);--> statement-breakpoint
 CREATE TABLE `space_directory` (
 	`created_at` integer NOT NULL,
@@ -1143,14 +1057,13 @@ CREATE TABLE `space` (
 	`created_at` integer NOT NULL,
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`updated_at` integer NOT NULL,
-	`visibility` text NOT NULL
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `space_organization_name_idx` ON `space` (`organization_id`,lower("name"));--> statement-breakpoint
-CREATE INDEX `space_organization_owner_idx` ON `space` (`organization_id`,`owner_account_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `space_app_name_idx` ON `space` (`app_id`,lower("name"));--> statement-breakpoint
+CREATE INDEX `space_app_owner_idx` ON `space` (`app_id`,`owner_account_id`);--> statement-breakpoint
 CREATE TABLE `account` (
 	`created_at` integer NOT NULL,
 	`email` text NOT NULL,
@@ -1176,15 +1089,17 @@ CREATE TABLE `usage_daily_rollup` (
 	`input_tokens` integer NOT NULL,
 	`model` text NOT NULL,
 	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`output_tokens` integer NOT NULL,
 	`provider` text NOT NULL,
 	`request_count` integer NOT NULL,
 	`run_purpose` text NOT NULL,
 	`total_cost_usd_micros` integer NOT NULL,
 	`unpriced_request_count` integer NOT NULL,
-	PRIMARY KEY(`organization_id`, `agent_id`, `actor_user_id`, `agent_owner_user_id`, `date`, `agent_publication_state_at_run`, `run_purpose`, `provider`, `model`)
+	PRIMARY KEY(`organization_id`, `app_id`, `agent_id`, `actor_user_id`, `agent_owner_user_id`, `date`, `agent_publication_state_at_run`, `run_purpose`, `provider`, `model`)
 );
 --> statement-breakpoint
+CREATE INDEX `usage_daily_rollup_app_date_idx` ON `usage_daily_rollup` (`app_id`,`date`);--> statement-breakpoint
 CREATE INDEX `usage_daily_rollup_organization_date_idx` ON `usage_daily_rollup` (`organization_id`,`date`);--> statement-breakpoint
 CREATE INDEX `usage_daily_rollup_agent_date_idx` ON `usage_daily_rollup` (`agent_id`,`date`);--> statement-breakpoint
 CREATE INDEX `usage_daily_rollup_actor_date_idx` ON `usage_daily_rollup` (`actor_user_id`,`date`);--> statement-breakpoint
@@ -1202,6 +1117,7 @@ CREATE TABLE `usage_event` (
 	`input_tokens` integer NOT NULL,
 	`model` text NOT NULL,
 	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`output_tokens` integer NOT NULL,
 	`price_snapshot_json` text,
 	`pricing_status` text NOT NULL,
@@ -1216,6 +1132,7 @@ CREATE TABLE `usage_event` (
 	`usage_contract` text NOT NULL
 );
 --> statement-breakpoint
+CREATE INDEX `usage_event_app_created_idx` ON `usage_event` (`app_id`,`created_at`);--> statement-breakpoint
 CREATE INDEX `usage_event_organization_created_idx` ON `usage_event` (`organization_id`,`created_at`);--> statement-breakpoint
 CREATE INDEX `usage_event_agent_created_idx` ON `usage_event` (`agent_id`,`created_at`);--> statement-breakpoint
 CREATE INDEX `usage_event_actor_created_idx` ON `usage_event` (`actor_user_id`,`created_at`);--> statement-breakpoint
@@ -1227,19 +1144,12 @@ CREATE TABLE `vendor_credential` (
 	`api_key_secret_id` text CHECK ("api_key_secret_id" = upper("api_key_secret_id") AND length("api_key_secret_id") = 26 AND substr("api_key_secret_id", 1, 1) GLOB '[0-7]' AND "api_key_secret_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
-	`is_default` integer DEFAULT false NOT NULL,
-	`is_preferred` integer DEFAULT false NOT NULL,
 	`models` text,
 	`name` text NOT NULL,
-	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`updated_at` integer NOT NULL,
 	`vendor_id` text NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `vendor_credential_organization_vendor_idx` ON `vendor_credential` (`organization_id`,`vendor_id`);--> statement-breakpoint
-CREATE INDEX `vendor_credential_organization_vendor_owner_account_idx` ON `vendor_credential` (`organization_id`,`vendor_id`,`owner_account_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `vendor_credential_company_name_idx` ON `vendor_credential` (`organization_id`,`vendor_id`,`name`) WHERE "vendor_credential"."owner_account_id" IS NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX `vendor_credential_personal_name_idx` ON `vendor_credential` (`organization_id`,`vendor_id`,`owner_account_id`,`name`) WHERE "vendor_credential"."owner_account_id" IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX `vendor_credential_personal_preferred_idx` ON `vendor_credential` (`organization_id`,`vendor_id`,`owner_account_id`) WHERE "vendor_credential"."owner_account_id" IS NOT NULL AND "vendor_credential"."is_preferred" = 1;--> statement-breakpoint
-CREATE UNIQUE INDEX `vendor_credential_organization_vendor_default_idx` ON `vendor_credential` (`organization_id`,`vendor_id`) WHERE "vendor_credential"."owner_account_id" IS NULL AND "vendor_credential"."is_default" = 1;
+CREATE INDEX `vendor_credential_app_vendor_idx` ON `vendor_credential` (`app_id`,`vendor_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `vendor_credential_app_vendor_name_idx` ON `vendor_credential` (`app_id`,`vendor_id`,`name`);

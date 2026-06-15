@@ -2,46 +2,34 @@ export const vendorCredentialSchema = /* GraphQL */ `
   type VendorCredential {
     apiBase: String
     id: ULID!
-    isDefault: Boolean!
-    isPreferred: Boolean!
     maskedApiKey: String!
     models: [String!]
     name: String!
-    ownerUserId: ULID
-    scope: VendorCredentialScope!
+    appId: ULID!
     vendorId: String!
-    organizationId: ULID!
-  }
-
-  enum VendorCredentialScope {
-    company
-    personal
   }
 
   input CreateVendorCredentialInput {
     apiBase: String
     apiKey: String!
-    isDefault: Boolean
-    isPreferred: Boolean
     models: [String!]
     name: String!
-    scope: VendorCredentialScope
+    appId: ULID!
     vendorId: String!
-    organizationId: ULID!
   }
 
   input UpdateVendorCredentialInput {
     apiBase: String
     apiKey: String
     id: ULID!
-    isDefault: Boolean
-    isPreferred: Boolean
     models: [String!]
     name: String
+    appId: ULID!
   }
 
   input DeleteVendorCredentialInput {
     id: ULID!
+    appId: ULID!
   }
 
   type ResolvedModelEntry {
@@ -65,8 +53,7 @@ export const vendorCredentialSchema = /* GraphQL */ `
     apiBase: String
     apiKey: String!
     modelId: String
-    organizationId: ULID!
-    scope: VendorCredentialScope
+    appId: ULID!
     vendorId: String!
   }
 

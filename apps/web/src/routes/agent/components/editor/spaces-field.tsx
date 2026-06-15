@@ -24,19 +24,19 @@ export function AgentSpacesField({
   readOnly = false,
   selectedSpaces,
   setSpaces,
-  organizationId,
+  appId,
 }: {
   readOnly?: boolean;
   selectedSpaces: SpaceBinding[];
   setSpaces: (spaces: SpaceBinding[]) => void;
-  organizationId: string | null;
+  appId: string | null;
 }): ReactElement {
   const [open, setOpen] = useState(false);
   const listboxId = useId();
-  const spacesQuery = useSpacesQuery(organizationId);
+  const spacesQuery = useSpacesQuery(appId);
   const availableSpaces = spacesQuery.data ?? EMPTY_SPACES;
-  const hasOrganization = organizationId !== null && organizationId !== "";
-  const triggerDisabled = readOnly || !hasOrganization;
+  const hasApp = appId !== null && appId !== "";
+  const triggerDisabled = readOnly || !hasApp;
   const resolvedSelectedSpaces = useMemo(
     () =>
       selectedSpaces.map((space) => {
@@ -170,7 +170,7 @@ function SpacesMenuContent({
   if (availableSpaces.length === 0) {
     return (
       <div className="text-muted-foreground p-3 text-[12px]">
-        No spaces are available in this organization.
+        No spaces are available in this App.
       </div>
     );
   }

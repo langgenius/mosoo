@@ -1,20 +1,14 @@
 import type { AgentBuilderPreviewStageSnapshot } from "@mosoo/contracts/agent-builder";
 import { agentBuilderThreadsTable, sessionsTable } from "@mosoo/db";
-import type {
-  AccountId,
-  AgentBuilderThreadId,
-  AgentId,
-  OrganizationId,
-  SessionId,
-} from "@mosoo/id";
+import type { AccountId, AgentBuilderThreadId, AgentId, AppId, SessionId } from "@mosoo/id";
 import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { sessionParticipantCondition } from "../../sessions/domain/session-access.policy";
 
 export interface AgentBuilderPreviewSessionSelectionAgent {
+  readonly appId: AppId;
   readonly id: AgentId;
-  readonly organizationId: OrganizationId;
 }
 
 export interface AgentBuilderPreviewSessionSelection {
@@ -55,7 +49,7 @@ export async function listAgentBuilderPreviewSessions(
     .where(
       and(
         eq(sessionsTable.agentId, input.agent.id),
-        eq(sessionsTable.organizationId, input.agent.organizationId),
+        eq(sessionsTable.appId, input.agent.appId),
         eq(sessionsTable.type, "preview"),
         isNull(sessionsTable.archivedAt),
         sessionParticipantCondition(input.viewerId),

@@ -24,29 +24,19 @@ const VIEWER_QUERY = graphql(/* GraphQL */ `
         avatarUrl
         createdAt
         id
-        joinPolicy
         name
-        primaryDomain
         slug
-        viewerRole
       }
       auth {
         currentSecurityLevel
         methods
       }
-      memberships {
-        joinedAt
-        role
-        organization {
-          avatarUrl
-          createdAt
-          id
-          joinPolicy
-          name
-          primaryDomain
-          slug
-          viewerRole
-        }
+      organizations {
+        avatarUrl
+        createdAt
+        id
+        name
+        slug
       }
     }
   }
@@ -85,10 +75,7 @@ function toViewer(viewer: ViewerQuery["viewer"]): Viewer {
           },
     activeOrganization:
       viewer.activeOrganization === null ? null : toOrganizationSummary(viewer.activeOrganization),
-    memberships: viewer.memberships.map((membership) => ({
-      ...membership,
-      organization: toOrganizationSummary(membership.organization),
-    })),
+    organizations: viewer.organizations.map(toOrganizationSummary),
   };
 }
 

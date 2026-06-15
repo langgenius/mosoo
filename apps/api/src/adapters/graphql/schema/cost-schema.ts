@@ -70,24 +70,6 @@ export const costSchema = /* GraphQL */ `
     unpricedRequestCount: Int!
   }
 
-  type CostUserRow implements CostAggregate {
-    activeUsers: Int!
-    agentCount: Int!
-    cacheCreationTokens: Int!
-    cacheReadTokens: Int!
-    inputTokens: Int!
-    outputTokens: Int!
-    previousCostUsd: Float
-    requestCount: Int!
-    topAgentId: ULID
-    topAgentName: String
-    totalCostUsd: Float!
-    unpricedRequestCount: Int!
-    userEmail: String
-    userId: ULID!
-    userName: String!
-  }
-
   type CostModelRow implements CostAggregate {
     activeUsers: Int!
     cacheCreationTokens: Int!
@@ -109,7 +91,6 @@ export const costSchema = /* GraphQL */ `
   type CostRecentSession {
     actorEmail: String
     actorName: String!
-    actorUserId: ULID!
     cacheCreationTokens: Int!
     cacheReadTokens: Int!
     createdAt: String!
@@ -131,15 +112,22 @@ export const costSchema = /* GraphQL */ `
     totals: CostTotals!
   }
 
-  type OrganizationCostCard {
+  type OrganizationBillingCostCard {
+    daily: [CostDailyPoint!]!
+    models: [CostModelRow!]!
+    previousTotals: CostTotals!
+    totals: CostTotals!
+  }
+
+  type AppCostCard {
     agents: [CostAgentRow!]!
     daily: [CostDailyPoint!]!
     models: [CostModelRow!]!
-    ownerUsers: [CostUserRow!]!
     previousTotals: CostTotals!
+    appId: ULID!
+    appName: String!
     recentSessions: [CostRecentSession!]!
     totals: CostTotals!
-    users: [CostUserRow!]!
   }
 
   type AgentCostCard {
@@ -152,11 +140,5 @@ export const costSchema = /* GraphQL */ `
     ownerName: String!
     recentSessions: [CostRecentSession!]!
     totals: CostTotals!
-    users: [CostUserRow!]!
-  }
-
-  type MemberCostCard {
-    owned: CostAttributionCard!
-    used: CostAttributionCard!
   }
 `;

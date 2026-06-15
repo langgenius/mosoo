@@ -12,12 +12,12 @@ import type {
 import type { WeChatQrPairingSnapshot } from "../src/modules/channels/wechat/wechat-runtime";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { readFetchUrl } from "./helpers/fetch-request-url";
-import type { ChannelFinalDeliveryQueueStub } from "./helpers/published-agent-http-test-fixture";
+import type { ChannelFinalDeliveryQueueStub } from "./helpers/public-api-http-test-fixture";
 import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   nowMsForTest,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
 export const OWNER_VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",

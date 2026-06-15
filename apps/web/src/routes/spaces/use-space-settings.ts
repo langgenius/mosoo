@@ -1,10 +1,10 @@
-import type { SpaceView, SpaceVisibility } from "@mosoo/contracts/space";
+import type { SpaceView } from "@mosoo/contracts/space";
 import { getSpaceNameValidationError } from "@mosoo/contracts/space";
 import { useState } from "react";
 
 import { createSpace, deleteSpace } from "../../domains/space/api/details";
 import { isTruthy } from "../../shared/lib/truthiness";
-import { toOrganizationId, toSpaceId } from "../typed-id";
+import { toAppId, toSpaceId } from "../typed-id";
 function getCreateSpaceErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Failed to create space.";
 }
@@ -20,15 +20,14 @@ function getSpaceNameError(name: string): string | null {
 export function useSpaceSettings({
   refreshSpaces,
   selectSpace,
-  organizationId,
+  appId,
 }: {
   refreshSpaces: () => Promise<SpaceView[]>;
   selectSpace: (spaceId: string | null) => void;
-  organizationId: string | null;
+  appId: string | null;
 }) {
   const [showNewSpace, setShowNewSpace] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState("");
-  const [newSpaceVisibility, setNewSpaceVisibility] = useState<SpaceVisibility>("private");
   const [creatingSpace, setCreatingSpace] = useState(false);
   const [createSpaceError, setCreateSpaceError] = useState<string | null>(null);
   const [settingsSpaceId, setSettingsSpaceId] = useState<string | null>(null);
@@ -38,7 +37,7 @@ export function useSpaceSettings({
   const newSpaceNameError = getSpaceNameError(newSpaceName);
 
   async function handleCreateSpace() {
-    if (!isTruthy(organizationId) || !newSpaceName || Boolean(newSpaceNameError)) {
+    if (!isTruthy(appId) || !newSpaceName || Boolean(newSpaceNameError)) {
       return;
     }
 
@@ -46,11 +45,7 @@ export function useSpaceSettings({
     setCreateSpaceError(null);
 
     try {
-      const created = await createSpace(
-        toOrganizationId(organizationId),
-        newSpaceName,
-        newSpaceVisibility,
-      );
+      const created = await createSpace(toAppId(appId), newSpaceName);
       await refreshSpaces();
       selectSpace(created.id);
       handleShowNewSpace(false);
@@ -72,7 +67,6 @@ export function useSpaceSettings({
     if (!open) {
       setCreateSpaceError(null);
       setNewSpaceName("");
-      setNewSpaceVisibility("private");
     }
   }
 
@@ -88,7 +82,11 @@ export function useSpaceSettings({
     setDeletingSpace(true);
 
     try {
-      await deleteSpace(toSpaceId(settingsSpaceId));
+      if (!isTruthy(appId)) {
+        return;
+      }
+
+      await deleteSpace(toAppId(appId), toSpaceId(settingsSpaceId));
       await refreshSpaces();
       selectSpace(null);
       setSettingsSpaceId(null);
@@ -119,10 +117,8 @@ export function useSpaceSettings({
     handleShowNewSpace,
     newSpaceName,
     newSpaceNameError,
-    newSpaceVisibility,
     openSettings,
     setDeleteConfirmationName,
-    setNewSpaceVisibility,
     setSettingsSpaceId,
     settingsSpaceId,
     showDeleteConfirm,

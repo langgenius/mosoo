@@ -8,7 +8,7 @@ import type {
   AcquireSpaceFileLockRequest,
   ReleaseSpaceFileLockRequest,
 } from "@mosoo/contracts/space";
-import type { FileId, SpaceId } from "@mosoo/id";
+import type { FileId, AppId, SpaceId } from "@mosoo/id";
 import type { Hono } from "hono";
 
 import { getViewerFromRequest } from "../../../modules/auth/application/viewer-auth.service";
@@ -256,7 +256,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  app.post("/space/:spaceId/locks/acquire", async (c) => {
+  app.post("/apps/:appId/spaces/:spaceId/locks/acquire", async (c) => {
     try {
       const viewer = await getViewerFromRequest(c.env, c.req.raw);
 
@@ -269,6 +269,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
         await acquireSpaceFileLock(
           c.env,
           viewer,
+          toPlatformId<AppId>(c.req.param("appId"), "App ID"),
           toPlatformId<SpaceId>(c.req.param("spaceId"), "Space ID"),
           body,
         ),
@@ -278,7 +279,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
     }
   });
 
-  app.post("/space/:spaceId/locks/release", async (c) => {
+  app.post("/apps/:appId/spaces/:spaceId/locks/release", async (c) => {
     try {
       const viewer = await getViewerFromRequest(c.env, c.req.raw);
 
@@ -291,6 +292,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
         await releaseSpaceFileLock(
           c.env,
           viewer,
+          toPlatformId<AppId>(c.req.param("appId"), "App ID"),
           toPlatformId<SpaceId>(c.req.param("spaceId"), "Space ID"),
           body,
         ),

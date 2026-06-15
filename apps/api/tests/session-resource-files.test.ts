@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, OrganizationId, SessionId } from "@mosoo/id";
+import type { AccountId, FileId, OrganizationId, AppId, SessionId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import {
@@ -22,13 +22,17 @@ import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const OWNER_ID = parsePlatformId<AccountId>("01J00000000000000000000001", "owner ID");
-const MEMBER_ID = parsePlatformId<AccountId>("01J00000000000000000000004", "member ID");
+const OTHER_CREATOR_ID = parsePlatformId<AccountId>(
+  "01J00000000000000000000004",
+  "other creator ID",
+);
 const FILE_ID = parsePlatformId<FileId>("01J00000000000000000000002", "file ID");
 const SESSION_ID = parsePlatformId<SessionId>("01J00000000000000000000003", "session ID");
 const ORGANIZATION_ID = parsePlatformId<OrganizationId>(
   "01J00000000000000000000006",
   "organization ID",
 );
+const APP_ID = parsePlatformId<AppId>("01J0000000000000000000000Q", "app ID");
 
 const VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",
@@ -36,14 +40,6 @@ const VIEWER: AuthenticatedViewer = {
   id: OWNER_ID,
   imageUrl: null,
   name: "Owner",
-};
-
-const MEMBER_VIEWER: AuthenticatedViewer = {
-  email: "member@example.com",
-  emailVerified: true,
-  id: MEMBER_ID,
-  imageUrl: null,
-  name: "Member",
 };
 
 function createSessionResourceDatabase(input: { includeFile?: boolean } = {}): SqliteD1Database {
@@ -57,19 +53,22 @@ function createSessionResourceDatabase(input: { includeFile?: boolean } = {}): S
       attributed_user_id text,
       archived_at integer,
       metadata_json text DEFAULT '{}' NOT NULL,
-      organization_id text NOT NULL,
+      app_id text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
       status text NOT NULL,
       title text
     );
 
-    CREATE TABLE organization_member (
+    CREATE TABLE app (
+      id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
-      account_id text NOT NULL,
-      role text NOT NULL,
-      disabled_at integer,
-      PRIMARY KEY (organization_id, account_id)
+      owner_account_id text NOT NULL,
+      name text NOT NULL,
+      slug text NOT NULL,
+      default_environment_id text,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL
     );
 
     CREATE TABLE file_record (
@@ -121,7 +120,7 @@ function createSessionResourceDatabase(input: { includeFile?: boolean } = {}): S
       attributed_user_id,
       archived_at,
       metadata_json,
-      organization_id,
+      app_id,
       provider,
       runtime_id,
       status,
@@ -133,23 +132,31 @@ function createSessionResourceDatabase(input: { includeFile?: boolean } = {}): S
       NULL,
       NULL,
       '{}',
-      '${ORGANIZATION_ID}',
+      '${APP_ID}',
       'openai',
       'openai-runtime',
       'IDLE',
       'Session'
     );
 
-    INSERT INTO organization_member (
+    INSERT INTO app (
+      id,
       organization_id,
-      account_id,
-      role,
-      disabled_at
+      owner_account_id,
+      name,
+      slug,
+      default_environment_id,
+      created_at,
+      updated_at
     ) VALUES (
+      '${APP_ID}',
       '${ORGANIZATION_ID}',
       '${OWNER_ID}',
-      'owner',
-      NULL
+      'Default App',
+      'default',
+      NULL,
+      1,
+      1
     );
   `);
 
@@ -207,23 +214,12 @@ function createSessionResourceDatabase(input: { includeFile?: boolean } = {}): S
   return database;
 }
 
-function makeMemberParticipant(database: SqliteD1Database): void {
+function makeOwnerAttributedParticipant(database: SqliteD1Database): void {
   database.execute(`
     UPDATE session
-       SET attributed_user_id = '${MEMBER_ID}'
+       SET creator_account_id = '${OTHER_CREATOR_ID}',
+           attributed_user_id = '${OWNER_ID}'
      WHERE id = '${SESSION_ID}';
-
-    INSERT INTO organization_member (
-      organization_id,
-      account_id,
-      role,
-      disabled_at
-    ) VALUES (
-      '${ORGANIZATION_ID}',
-      '${MEMBER_ID}',
-      'member',
-      NULL
-    );
   `);
 }
 
@@ -258,6 +254,7 @@ describe("session resource files", () => {
         name: "notes.txt",
         size: 12,
       },
+      appId: APP_ID,
       sessionId: SESSION_ID,
     });
 
@@ -328,7 +325,10 @@ describe("session resource files", () => {
   test("lists resources through the session service without delete-side dependencies", async () => {
     const database = createSessionResourceDatabase();
 
-    const resources = await listSessionResources(database, VIEWER, SESSION_ID);
+    const resources = await listSessionResources(database, VIEWER, {
+      appId: APP_ID,
+      sessionId: SESSION_ID,
+    });
 
     expect(resources).toEqual([
       {
@@ -345,7 +345,10 @@ describe("session resource files", () => {
   test("lists empty accessible sessions", async () => {
     const database = createSessionResourceDatabase({ includeFile: false });
 
-    const resources = await listSessionResources(database, VIEWER, SESSION_ID);
+    const resources = await listSessionResources(database, VIEWER, {
+      appId: APP_ID,
+      sessionId: SESSION_ID,
+    });
 
     expect(resources).toEqual([]);
   });
@@ -386,22 +389,24 @@ describe("session resource files", () => {
 
   test("rejects participant resource mutations when the viewer is not the session creator", async () => {
     const database = createSessionResourceDatabase();
-    makeMemberParticipant(database);
+    makeOwnerAttributedParticipant(database);
     const bindings = { DB: database } as ApiBindings;
 
     await expect(
-      addSessionResource(bindings, MEMBER_VIEWER, {
+      addSessionResource(bindings, VIEWER, {
         file: {
           contentType: "text/plain",
           name: "notes.txt",
           size: 12,
         },
+        appId: APP_ID,
         sessionId: SESSION_ID,
       }),
     ).rejects.toThrow();
 
     await expect(
-      removeSessionResource(bindings, MEMBER_VIEWER, {
+      removeSessionResource(bindings, VIEWER, {
+        appId: APP_ID,
         resourceId: FILE_ID,
         sessionId: SESSION_ID,
       }),

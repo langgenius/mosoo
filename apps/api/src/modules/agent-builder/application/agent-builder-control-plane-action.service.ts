@@ -5,14 +5,14 @@ import type {
   AgentBuilderSecureUiAction,
 } from "@mosoo/contracts/agent-builder";
 import type { McpAuthType } from "@mosoo/contracts/mcp";
-import type { AgentId, EnvironmentId, McpServerId, SessionId } from "@mosoo/id";
+import type { AgentId, EnvironmentId, McpServerId, AppId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { ensureAgentEditor } from "../../agents/application/agent-access.service";
+import { ensureAppAgentOwner } from "../../agents/application/agent-access.service";
 import { updateAgentConfig } from "../../agents/application/agent-command.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { createEnvironment } from "../../environments/application/environment.service";
-import { createPersonalMcpServer } from "../../mcp/application/mcp-server.service";
+import { createAppMcpServer } from "../../mcp/application/mcp-server.service";
 import { deleteAgentSession } from "../../sessions/application/session-lifecycle-mutation.service";
 import { ensureModelAvailableForSelection } from "../../vendor-credentials/application/vendor-credential.service";
 import { toAgentBuilderUpdateAgentConfigInput } from "./agent-builder-lightweight-manifest-projections";
@@ -26,6 +26,7 @@ export interface ExecuteAgentBuilderControlPlaneActionInput {
   readonly createEnvironmentPayload?: AgentBuilderCreateEnvironmentActionPayload | null;
   readonly createRemoteMcpServerPayload?: AgentBuilderCreateRemoteMcpServerActionPayload | null;
   readonly draftYaml?: string;
+  readonly appId: AppId;
   readonly toolId: AgentBuilderExecutableActionToolId;
 }
 
@@ -64,13 +65,19 @@ async function applyAgentConfig(
   viewer: AuthenticatedViewer,
   input: ExecuteAgentBuilderControlPlaneActionInput,
 ): Promise<AgentBuilderControlPlaneActionResult> {
-  const configInput = toAgentBuilderUpdateAgentConfigInput(input.agentId, requireDraftYaml(input));
-  const editable = await ensureAgentEditor(bindings.DB, viewer.id, input.agentId);
+  const editable = await ensureAppAgentOwner(bindings.DB, viewer.id, {
+    agentId: input.agentId,
+    appId: input.appId,
+  });
+  const configInput = toAgentBuilderUpdateAgentConfigInput(
+    editable.agent.appId,
+    input.agentId,
+    requireDraftYaml(input),
+  );
 
   await ensureModelAvailableForSelection(bindings.DB, {
-    accountId: viewer.id,
     modelId: configInput.model,
-    organizationId: editable.agent.organizationId,
+    appId: editable.agent.appId,
     runtimeId: configInput.runtimeId,
     vendorId: configInput.provider,
   });
@@ -88,7 +95,10 @@ async function createAgentFromDraft(
   viewer: AuthenticatedViewer,
   input: ExecuteAgentBuilderControlPlaneActionInput,
 ): Promise<AgentBuilderControlPlaneActionResult> {
-  const editable = await ensureAgentEditor(bindings.DB, viewer.id, input.agentId);
+  const editable = await ensureAppAgentOwner(bindings.DB, viewer.id, {
+    agentId: input.agentId,
+    appId: input.appId,
+  });
 
   if (editable.agent.status !== "draft") {
     return {
@@ -106,11 +116,14 @@ async function resetPreviewSession(
   viewer: AuthenticatedViewer,
   input: ExecuteAgentBuilderControlPlaneActionInput,
 ): Promise<AgentBuilderControlPlaneActionResult> {
-  const editable = await ensureAgentEditor(bindings.DB, viewer.id, input.agentId);
+  const editable = await ensureAppAgentOwner(bindings.DB, viewer.id, {
+    agentId: input.agentId,
+    appId: input.appId,
+  });
   const previewSessions = await listAgentBuilderPreviewSessions(bindings.DB, {
     agent: {
+      appId: editable.agent.appId,
       id: editable.agent.id,
-      organizationId: editable.agent.organizationId,
     },
     viewerId: viewer.id,
   });
@@ -128,6 +141,7 @@ async function resetPreviewSession(
     await deleteAgentSession({
       authorization: "admitted",
       bindings,
+      appId: editable.agent.appId,
       sessionId: previewSession.id,
       viewer,
     });
@@ -160,7 +174,10 @@ async function executeCreateEnvironment(
   viewer: AuthenticatedViewer,
   input: ExecuteAgentBuilderControlPlaneActionInput,
 ): Promise<AgentBuilderControlPlaneActionResult> {
-  const editable = await ensureAgentEditor(bindings.DB, viewer.id, input.agentId);
+  const editable = await ensureAppAgentOwner(bindings.DB, viewer.id, {
+    agentId: input.agentId,
+    appId: input.appId,
+  });
   const payload = input.createEnvironmentPayload ?? null;
 
   if (payload === null) {
@@ -183,8 +200,8 @@ async function executeCreateEnvironment(
     envVars: [],
     name: payload.name,
     networkPolicy: "full",
-    organizationId: editable.agent.organizationId,
     packages: [],
+    appId: editable.agent.appId,
     setupScript: "",
   });
 
@@ -201,7 +218,10 @@ async function executeCreateRemoteMcpServer(
   viewer: AuthenticatedViewer,
   input: ExecuteAgentBuilderControlPlaneActionInput,
 ): Promise<AgentBuilderControlPlaneActionResult> {
-  const editable = await ensureAgentEditor(bindings.DB, viewer.id, input.agentId);
+  const editable = await ensureAppAgentOwner(bindings.DB, viewer.id, {
+    agentId: input.agentId,
+    appId: input.appId,
+  });
   const payload = input.createRemoteMcpServerPayload ?? null;
 
   if (payload === null) {
@@ -214,11 +234,11 @@ async function executeCreateRemoteMcpServer(
   }
 
   try {
-    const server = await createPersonalMcpServer(bindings, viewer, {
+    const server = await createAppMcpServer(bindings, viewer, {
       authType: payload.authType,
       description: payload.description ?? null,
       name: payload.name,
-      organizationId: editable.agent.organizationId,
+      appId: editable.agent.appId,
       url: payload.url,
     });
 

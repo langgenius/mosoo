@@ -1,16 +1,17 @@
 import type { OrganizationSummary } from "@mosoo/contracts/organization";
-import { organizationMembersTable, organizationsTable } from "@mosoo/db";
+import { organizationsTable, appsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { AccountId, OrganizationId } from "@mosoo/id";
+import type { AccountId, OrganizationId, AppId } from "@mosoo/id";
 
 import { runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { errorMessageChainIncludes } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
+import { DEFAULT_APP_NAME, DEFAULT_APP_SLUG } from "../../apps/application/app-defaults";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { createOrganizationEnvironmentDefaults } from "../../environments/application/environment.service";
+import { createAppEnvironmentDefaults } from "../../environments/application/environment.service";
 import { recordLastActiveOrganization } from "../../users/application/account-organization-context.service";
-import { toOrganizationSummaryWithViewerRole } from "../domain/organization-access.policy";
 import { deriveOrganizationSlugBase } from "../domain/organization-name";
+import { toOrganizationSummary } from "../domain/organization-ownership.policy";
 
 interface ProvisionOrganizationWithOwnerInput {
   makeActive: boolean;
@@ -18,8 +19,8 @@ interface ProvisionOrganizationWithOwnerInput {
 }
 
 interface ProvisionOrganizationWriteInput {
-  joinPolicy: "auto" | "invite_only";
   name: string;
+  defaultAppId: AppId;
   organizationId: OrganizationId;
   ownerId: AccountId;
   slug: string;
@@ -45,18 +46,18 @@ async function writeOrganizationWithOwner(
       createdAt: input.timestampMs,
       creatorAccountId: input.ownerId,
       id: input.organizationId,
-      joinPolicy: input.joinPolicy,
       name: input.name,
-      primaryDomain: null,
       slug: input.slug,
       updatedAt: input.timestampMs,
     }),
-    db.insert(organizationMembersTable).values({
-      accountId: input.ownerId,
+    db.insert(appsTable).values({
       createdAt: input.timestampMs,
-      joinedAt: input.timestampMs,
+      id: input.defaultAppId,
+      name: DEFAULT_APP_NAME,
       organizationId: input.organizationId,
-      role: "owner",
+      ownerAccountId: input.ownerId,
+      slug: DEFAULT_APP_SLUG,
+      updatedAt: input.timestampMs,
     }),
   ]);
 }
@@ -68,8 +69,8 @@ export async function provisionOrganizationWithOwner(
 ): Promise<OrganizationSummary> {
   const timestampMs = currentTimestampMs();
   const organizationId: OrganizationId = createPlatformId();
+  const defaultAppId: AppId = createPlatformId();
   const slugBase = deriveOrganizationSlugBase(input.name);
-  const joinPolicy = "auto";
   let slug: string | null = null;
 
   for (let attempt = 1; attempt <= MAX_ORGANIZATION_SLUG_ATTEMPTS; attempt += 1) {
@@ -77,8 +78,8 @@ export async function provisionOrganizationWithOwner(
 
     try {
       await writeOrganizationWithOwner(database, {
-        joinPolicy,
         name: input.name,
+        defaultAppId,
         organizationId,
         ownerId: owner.id,
         slug: candidate,
@@ -99,11 +100,11 @@ export async function provisionOrganizationWithOwner(
     throw new Error("Could not allocate organization slug.");
   }
 
-  await createOrganizationEnvironmentDefaults(
+  await createAppEnvironmentDefaults(
     { DB: database },
     {
       actorId: owner.id,
-      organizationId,
+      appId: defaultAppId,
       timestampMs,
     },
   );
@@ -112,16 +113,11 @@ export async function provisionOrganizationWithOwner(
     await recordLastActiveOrganization(database, owner.id, organizationId);
   }
 
-  return toOrganizationSummaryWithViewerRole(
-    {
-      avatar_url: null,
-      created_at: timestampMs,
-      id: organizationId,
-      join_policy: joinPolicy,
-      name: input.name,
-      primary_domain: null,
-      slug,
-    },
-    "owner",
-  );
+  return toOrganizationSummary({
+    avatar_url: null,
+    created_at: timestampMs,
+    id: organizationId,
+    name: input.name,
+    slug,
+  });
 }

@@ -14,8 +14,8 @@ import {
   createPublicHttpTestBindings,
   insertOwnerSession,
   PUBLIC_API_TEST_IDS,
-} from "./helpers/published-agent-http-test-fixture";
-import type { SqliteD1Database } from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
+import type { SqliteD1Database } from "./helpers/public-api-http-test-fixture";
 
 const FINALIZE_RUN_ID = "01J0000000000000000000000T" as SessionRunId;
 const FINALIZE_COMMAND_ID = "01J0000000000000000000000V" as DriverCommandId;

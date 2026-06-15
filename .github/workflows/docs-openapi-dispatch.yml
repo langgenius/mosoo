@@ -4,9 +4,9 @@ on:
   push:
     branches: [main]
     paths:
-      - apps/api/src/adapters/http/routes/published-agent-api-route.ts
-      - apps/api/src/adapters/http/routes/published-agent-openapi.ts
-      - apps/api/src/adapters/http/routes/published-agent-openapi-components.ts
+      - apps/api/src/adapters/http/routes/public-api-route.ts
+      - apps/api/src/adapters/http/routes/public-api-openapi.ts
+      - apps/api/src/adapters/http/routes/public-api-openapi-components.ts
       - pkgs/contracts/src/http/public-api-core.contract.ts
       - pkgs/contracts/src/http/public-api-openapi.contract.ts
   workflow_dispatch:

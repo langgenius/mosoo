@@ -5,8 +5,8 @@ import { collectAgentBuilderReadinessContext } from "../src/modules/agent-builde
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 
 const agent = {
+  appId: "01J00000000000000000000007",
   id: "01J000000000000000000000A1",
-  organizationId: "01J00000000000000000000006",
   ownerId: "01J00000000000000000000051",
 } as const;
 

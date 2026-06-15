@@ -15,7 +15,8 @@ import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   createTestExecutionContext,
-} from "./helpers/published-agent-http-test-fixture";
+  PUBLIC_API_TEST_IDS,
+} from "./helpers/public-api-http-test-fixture";
 
 const OWNER_VIEWER: AuthenticatedViewer = {
   email: "owner@example.com",
@@ -108,8 +109,9 @@ describe("Slack channel events route", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "xoxb-secret-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         signingSecret: "signing-secret",
       });
       const body = JSON.stringify({
@@ -213,8 +215,9 @@ describe("Slack channel events route", () => {
       const database = await createPublicHttpContractDatabase();
       const bindings = createPublicHttpTestBindings(database) as ApiBindings;
       await createSlackAgentChannelBinding(bindings, OWNER_VIEWER, {
-        agentId: "01J00000000000000000000009",
+        agentId: PUBLIC_API_TEST_IDS.agent,
         botToken: "xoxb-secret-token",
+        appId: PUBLIC_API_TEST_IDS.app,
         signingSecret: "signing-secret",
       });
       await database

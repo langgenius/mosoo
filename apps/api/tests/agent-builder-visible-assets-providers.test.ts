@@ -23,6 +23,8 @@ const viewer: AuthenticatedViewer = {
   name: "Agent Builder User",
 };
 
+const APP_ID = "01J00000000000000000000006";
+
 const VISIBLE_ASSET_IDS = {
   environmentBound: "01J00000000000000000000303",
   environmentOld: "01J00000000000000000000304",
@@ -95,18 +97,17 @@ describe("Agent Builder visible asset providers", () => {
         boundMcpServerIds: new Set([VISIBLE_ASSET_IDS.mcpBound]),
       },
       {
-        organizationShared: [],
-        personal: [
+        servers: [
           {
             authType: "oauth",
             authorizationState: "active",
-            credentialScope: "user",
+            credentialScope: "app",
             credentialStatus: "active",
             description: "Slack tools",
             enabled: true,
             id: VISIBLE_ASSET_IDS.mcpBound,
             name: "slack",
-            source: "personal",
+            source: "app",
             updatedAt: "2026-05-20T00:00:00.000Z",
             url: "https://mcp.example.com/slack",
           },
@@ -133,8 +134,6 @@ describe("Agent Builder visible asset providers", () => {
         {
           id: VISIBLE_ASSET_IDS.spaceBound,
           name: "support-kb",
-          role: "read",
-          visibility: "shared",
         },
       ],
     );
@@ -300,7 +299,7 @@ describe("Agent Builder visible asset providers", () => {
       collectSummaries: async () => emptySummaries(),
       draft: toAgentBuilderPlannerDraftContext(draftYaml),
       draftYaml: "draft",
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       previousAssets: null,
       viewer,
     };
@@ -319,7 +318,7 @@ describe("Agent Builder visible asset providers", () => {
         throw new Error("visible asset providers should not run for invalid Draft YAML");
       },
       draftYaml: "draft",
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       previousAssets: null,
       viewer,
     });
@@ -381,7 +380,7 @@ describe("Agent Builder visible asset providers", () => {
         };
       },
       draftYaml,
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       previousAssets: null,
       viewer,
     });
@@ -494,13 +493,11 @@ describe("Agent Builder visible asset providers", () => {
             hash: "space-new-hash",
             id: VISIBLE_ASSET_IDS.spaceBound,
             name: "Support KB",
-            role: "admin",
-            visibility: "private",
           },
         ],
       }),
       draftYaml,
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       previousAssets,
       viewer,
     });
@@ -533,8 +530,6 @@ describe("Agent Builder visible asset providers", () => {
         hash: "space-new-hash",
         id: VISIBLE_ASSET_IDS.spaceBound,
         name: "Support KB",
-        role: "admin",
-        visibility: "private",
       },
     ]);
   });
@@ -628,7 +623,7 @@ describe("Agent Builder visible asset providers", () => {
         ],
       }),
       draftYaml,
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       previousAssets: previous.assets,
       previousContext: previous.context,
       viewer,
@@ -665,7 +660,7 @@ describe("Agent Builder visible asset providers", () => {
         ],
       }),
       draftYaml,
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       previousAssets: previous.assets,
       previousContext: previous.context,
       viewer,

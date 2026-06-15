@@ -7,7 +7,7 @@ import type {
 import { spaceDirectoriesTable } from "@mosoo/db";
 import type { SpaceDirectoryId } from "@mosoo/db";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
-import type { AccountId, SpaceId } from "@mosoo/id";
+import type { AccountId, AppId, SpaceId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -28,18 +28,20 @@ import { ensureParentDirectories, ensureSpaceAccess } from "../domain/space-acce
 export async function getSpaceFiles(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
+  appId: AppId,
   spaceId: SpaceId,
   path?: string,
 ): Promise<SpaceFileListing> {
-  return listSpaceFiles(bindings, viewer, spaceId, path);
+  return listSpaceFiles(bindings, viewer, appId, spaceId, path);
 }
 
 export async function getSpaceRootFileSummaries(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
+  appId: AppId,
   spaceIds: readonly SpaceId[],
 ): Promise<Map<SpaceId, SpaceRootFileSummaryListing>> {
-  return listSpaceRootFileSummaries(bindings, viewer, spaceIds);
+  return listSpaceRootFileSummaries(bindings, viewer, appId, spaceIds);
 }
 
 export async function createSpaceDirectory(
@@ -48,7 +50,7 @@ export async function createSpaceDirectory(
   input: CreateSpaceDirectoryInput,
 ): Promise<DirectoryEntry> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-  await ensureSpaceAccess(database, viewerId, input.spaceId, "edit");
+  await ensureSpaceAccess(database, viewerId, input.appId, input.spaceId, "write");
 
   const path = joinPath(normalizeSpaceDirectoryPath(input.path), normalizeFileName(input.name));
   const parentPath = getParentPath(path);

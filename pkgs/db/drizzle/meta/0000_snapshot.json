@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "412f7261-f3ef-50c0-830f-feb0634914c0",
+  "id": "a2de6f2c-c111-54bf-874e-4c83740bf301",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_deployment_version": {
@@ -399,16 +399,16 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+        "owner_account_id": {
+          "name": "owner_account_id",
+          "type": "text CHECK (\"owner_account_id\" = upper(\"owner_account_id\") AND length(\"owner_account_id\") = 26 AND substr(\"owner_account_id\", 1, 1) GLOB '[0-7]' AND \"owner_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "owner_account_id": {
-          "name": "owner_account_id",
-          "type": "text CHECK (\"owner_account_id\" = upper(\"owner_account_id\") AND length(\"owner_account_id\") = 26 AND substr(\"owner_account_id\", 1, 1) GLOB '[0-7]' AND \"owner_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -459,19 +459,19 @@
         }
       },
       "indexes": {
-        "agent_organization_owner_account_idx": {
-          "name": "agent_organization_owner_account_idx",
-          "columns": ["organization_id", "owner_account_id"],
+        "agent_app_owner_account_idx": {
+          "name": "agent_app_owner_account_idx",
+          "columns": ["app_id", "owner_account_id"],
+          "isUnique": false
+        },
+        "agent_app_status_idx": {
+          "name": "agent_app_status_idx",
+          "columns": ["app_id", "status"],
           "isUnique": false
         },
         "agent_environment_idx": {
           "name": "agent_environment_idx",
           "columns": ["environment_id"],
-          "isUnique": false
-        },
-        "agent_organization_status_idx": {
-          "name": "agent_organization_status_idx",
-          "columns": ["organization_id", "status"],
           "isUnique": false
         }
       },
@@ -645,13 +645,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "output_json": {
           "name": "output_json",
           "type": "text",
@@ -796,13 +789,6 @@
           "autoincrement": false,
           "default": 0
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "preview_opened_at": {
           "name": "preview_opened_at",
           "type": "integer",
@@ -841,7 +827,7 @@
         },
         "agent_builder_thread_creator_updated_idx": {
           "name": "agent_builder_thread_creator_updated_idx",
-          "columns": ["organization_id", "creator_account_id", "updated_at"],
+          "columns": ["creator_account_id", "updated_at"],
           "isUnique": false
         }
       },
@@ -1379,6 +1365,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -1409,6 +1402,11 @@
           "name": "agent_channel_binding_agent_status_idx",
           "columns": ["agent_id", "status"],
           "isUnique": false
+        },
+        "agent_channel_binding_app_status_idx": {
+          "name": "agent_channel_binding_app_status_idx",
+          "columns": ["app_id", "status"],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -1428,6 +1426,15 @@
           "columnsFrom": ["encrypted_creds_secret_id"],
           "columnsTo": ["id"],
           "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "agent_channel_binding_app_id_app_id_fk": {
+          "name": "agent_channel_binding_app_id_app_id_fk",
+          "tableFrom": "agent_channel_binding",
+          "tableTo": "app",
+          "columnsFrom": ["app_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -1999,6 +2006,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "runtime_state_json": {
           "name": "runtime_state_json",
           "type": "text",
@@ -2044,6 +2058,11 @@
           "name": "wechat_channel_account_status_idx",
           "columns": ["status", "updated_at"],
           "isUnique": false
+        },
+        "wechat_channel_account_app_status_idx": {
+          "name": "wechat_channel_account_app_status_idx",
+          "columns": ["app_id", "status"],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -2070,6 +2089,15 @@
           "tableFrom": "wechat_channel_account",
           "tableTo": "account",
           "columnsFrom": ["owner_account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "wechat_channel_account_app_id_app_id_fk": {
+          "name": "wechat_channel_account_app_id_app_id_fk",
+          "tableFrom": "wechat_channel_account",
+          "tableTo": "app",
+          "columnsFrom": ["app_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -2124,6 +2152,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "qr_token_hash": {
           "name": "qr_token_hash",
           "type": "text",
@@ -2150,6 +2185,11 @@
           "columns": ["agent_id", "created_by_account_id", "consumed_at"],
           "isUnique": false
         },
+        "wechat_channel_pairing_app_creator_idx": {
+          "name": "wechat_channel_pairing_app_creator_idx",
+          "columns": ["app_id", "created_by_account_id", "consumed_at"],
+          "isUnique": false
+        },
         "wechat_channel_pairing_expires_idx": {
           "name": "wechat_channel_pairing_expires_idx",
           "columns": ["expires_at"],
@@ -2171,6 +2211,15 @@
           "tableFrom": "wechat_channel_pairing",
           "tableTo": "account",
           "columnsFrom": ["created_by_account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "wechat_channel_pairing_app_id_app_id_fk": {
+          "name": "wechat_channel_pairing_app_id_app_id_fk",
+          "tableFrom": "wechat_channel_pairing",
+          "tableTo": "app",
+          "columnsFrom": ["app_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -2438,16 +2487,16 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+        "packages_json": {
+          "name": "packages_json",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "packages_json": {
-          "name": "packages_json",
-          "type": "text",
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -2466,9 +2515,9 @@
           "columns": ["environment_id", "created_at"],
           "isUnique": false
         },
-        "environment_revision_organization_created_at_idx": {
-          "name": "environment_revision_organization_created_at_idx",
-          "columns": ["organization_id", "created_at"],
+        "environment_revision_app_created_at_idx": {
+          "name": "environment_revision_app_created_at_idx",
+          "columns": ["app_id", "created_at"],
           "isUnique": false
         }
       },
@@ -2541,18 +2590,18 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "owner_account_id": {
           "name": "owner_account_id",
           "type": "text CHECK (\"owner_account_id\" = upper(\"owner_account_id\") AND length(\"owner_account_id\") = 26 AND substr(\"owner_account_id\", 1, 1) GLOB '[0-7]' AND \"owner_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": false,
+          "autoincrement": false
+        },
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+          "primaryKey": false,
+          "notNull": true,
           "autoincrement": false
         },
         "updated_at": {
@@ -2564,9 +2613,9 @@
         }
       },
       "indexes": {
-        "environment_organization_updated_at_idx": {
-          "name": "environment_organization_updated_at_idx",
-          "columns": ["organization_id", "updated_at"],
+        "environment_app_updated_at_idx": {
+          "name": "environment_app_updated_at_idx",
+          "columns": ["app_id", "updated_at"],
           "isUnique": false
         },
         "environment_owner_updated_at_idx": {
@@ -2576,13 +2625,13 @@
         },
         "environment_owner_name_idx": {
           "name": "environment_owner_name_idx",
-          "columns": ["organization_id", "owner_account_id", "name"],
+          "columns": ["app_id", "owner_account_id", "name"],
           "isUnique": true,
           "where": "\"environment\".\"owner_account_id\" IS NOT NULL"
         },
         "environment_system_default_idx": {
           "name": "environment_system_default_idx",
-          "columns": ["organization_id"],
+          "columns": ["app_id"],
           "isUnique": true,
           "where": "\"environment\".\"owner_account_id\" IS NULL"
         }
@@ -3118,6 +3167,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "refresh_secret_id": {
           "name": "refresh_secret_id",
           "type": "text",
@@ -3181,17 +3237,16 @@
           "columns": ["server_id", "scope", "status"],
           "isUnique": false
         },
-        "mcp_credential_user_scope_idx": {
-          "name": "mcp_credential_user_scope_idx",
-          "columns": ["server_id", "account_id", "scope"],
-          "isUnique": true,
-          "where": "\"mcp_credential\".\"scope\" = 'user' AND \"mcp_credential\".\"account_id\" IS NOT NULL"
+        "mcp_credential_app_scope_status_idx": {
+          "name": "mcp_credential_app_scope_status_idx",
+          "columns": ["app_id", "scope", "status"],
+          "isUnique": false
         },
-        "mcp_credential_shared_scope_idx": {
-          "name": "mcp_credential_shared_scope_idx",
+        "mcp_credential_app_scope_idx": {
+          "name": "mcp_credential_app_scope_idx",
           "columns": ["server_id", "scope"],
           "isUnique": true,
-          "where": "\"mcp_credential\".\"scope\" = 'organization_shared'"
+          "where": "\"mcp_credential\".\"scope\" = 'app'"
         },
         "mcp_credential_agent_scope_idx": {
           "name": "mcp_credential_agent_scope_idx",
@@ -3206,7 +3261,7 @@
       "checkConstraints": {
         "mcp_credential_scope_shape_check": {
           "name": "mcp_credential_scope_shape_check",
-          "value": "\n        (\"mcp_credential\".\"scope\" = 'user' AND \"mcp_credential\".\"account_id\" IS NOT NULL AND \"mcp_credential\".\"agent_id\" IS NULL)\n        OR (\n          \"mcp_credential\".\"scope\" = 'organization_shared'\n          AND \"mcp_credential\".\"account_id\" IS NULL\n          AND \"mcp_credential\".\"agent_id\" IS NULL\n        )\n        OR (\"mcp_credential\".\"scope\" = 'agent' AND \"mcp_credential\".\"account_id\" IS NULL AND \"mcp_credential\".\"agent_id\" IS NOT NULL)\n      "
+          "value": "\n        (\"mcp_credential\".\"scope\" = 'app' AND \"mcp_credential\".\"account_id\" IS NULL AND \"mcp_credential\".\"agent_id\" IS NULL)\n        OR (\"mcp_credential\".\"scope\" = 'agent' AND \"mcp_credential\".\"account_id\" IS NULL AND \"mcp_credential\".\"agent_id\" IS NOT NULL)\n      "
         },
         "mcp_credential_scope_values_json_check": {
           "name": "mcp_credential_scope_values_json_check",
@@ -3298,9 +3353,9 @@
           "notNull": false,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -3376,6 +3431,11 @@
         "mcp_oauth_flow_server_account_idx": {
           "name": "mcp_oauth_flow_server_account_idx",
           "columns": ["server_id", "initiator_account_id"],
+          "isUnique": false
+        },
+        "mcp_oauth_flow_app_server_account_idx": {
+          "name": "mcp_oauth_flow_app_server_account_idx",
+          "columns": ["app_id", "server_id", "initiator_account_id"],
           "isUnique": false
         }
       },
@@ -3470,16 +3530,16 @@
           "notNull": false,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+        "owner_account_id": {
+          "name": "owner_account_id",
+          "type": "text CHECK (\"owner_account_id\" = upper(\"owner_account_id\") AND length(\"owner_account_id\") = 26 AND substr(\"owner_account_id\", 1, 1) GLOB '[0-7]' AND \"owner_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "owner_account_id": {
-          "name": "owner_account_id",
-          "type": "text CHECK (\"owner_account_id\" = upper(\"owner_account_id\") AND length(\"owner_account_id\") = 26 AND substr(\"owner_account_id\", 1, 1) GLOB '[0-7]' AND \"owner_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -3507,27 +3567,20 @@
         }
       },
       "indexes": {
-        "mcp_server_organization_source_enabled_idx": {
-          "name": "mcp_server_organization_source_enabled_idx",
-          "columns": ["organization_id", "source", "enabled"],
+        "mcp_server_app_enabled_idx": {
+          "name": "mcp_server_app_enabled_idx",
+          "columns": ["app_id", "enabled"],
           "isUnique": false
         },
-        "mcp_server_owner_organization_idx": {
-          "name": "mcp_server_owner_organization_idx",
-          "columns": ["owner_account_id", "organization_id"],
+        "mcp_server_owner_app_idx": {
+          "name": "mcp_server_owner_app_idx",
+          "columns": ["owner_account_id", "app_id"],
           "isUnique": false
         },
-        "mcp_server_personal_url_idx": {
-          "name": "mcp_server_personal_url_idx",
-          "columns": ["organization_id", "owner_account_id", "url"],
-          "isUnique": true,
-          "where": "\"mcp_server\".\"source\" = 'personal'"
-        },
-        "mcp_server_shared_url_idx": {
-          "name": "mcp_server_shared_url_idx",
-          "columns": ["organization_id", "url"],
-          "isUnique": true,
-          "where": "\"mcp_server\".\"source\" = 'organization_shared'"
+        "mcp_server_app_url_idx": {
+          "name": "mcp_server_app_url_idx",
+          "columns": ["app_id", "url"],
+          "isUnique": true
         }
       },
       "foreignKeys": {},
@@ -3536,11 +3589,7 @@
       "checkConstraints": {
         "mcp_server_source_scope_check": {
           "name": "mcp_server_source_scope_check",
-          "value": "\n        (\"mcp_server\".\"source\" = 'personal' AND \"mcp_server\".\"credential_scope\" = 'user')\n        OR (\n          \"mcp_server\".\"source\" = 'organization_shared'\n          AND \"mcp_server\".\"credential_scope\" IN ('user', 'organization_shared')\n        )\n      "
-        },
-        "mcp_server_organization_shared_auth_check": {
-          "name": "mcp_server_organization_shared_auth_check",
-          "value": "\"mcp_server\".\"credential_scope\" != 'organization_shared' OR \"mcp_server\".\"auth_type\" = 'bearer'"
+          "value": "\"mcp_server\".\"source\" = 'app' AND \"mcp_server\".\"credential_scope\" = 'app'"
         }
       }
     },
@@ -3624,320 +3673,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "organization_access_request": {
-      "name": "organization_access_request",
-      "columns": {
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "id": {
-          "name": "id",
-          "type": "text CHECK (\"id\" = upper(\"id\") AND length(\"id\") = 26 AND substr(\"id\", 1, 1) GLOB '[0-7]' AND \"id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "referrer_account_id": {
-          "name": "referrer_account_id",
-          "type": "text CHECK (\"referrer_account_id\" = upper(\"referrer_account_id\") AND length(\"referrer_account_id\") = 26 AND substr(\"referrer_account_id\", 1, 1) GLOB '[0-7]' AND \"referrer_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "requested_by_account_id": {
-          "name": "requested_by_account_id",
-          "type": "text CHECK (\"requested_by_account_id\" = upper(\"requested_by_account_id\") AND length(\"requested_by_account_id\") = 26 AND substr(\"requested_by_account_id\", 1, 1) GLOB '[0-7]' AND \"requested_by_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "requester_email": {
-          "name": "requester_email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "reviewed_at": {
-          "name": "reviewed_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "reviewed_by": {
-          "name": "reviewed_by",
-          "type": "text CHECK (\"reviewed_by\" = upper(\"reviewed_by\") AND length(\"reviewed_by\") = 26 AND substr(\"reviewed_by\", 1, 1) GLOB '[0-7]' AND \"reviewed_by\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "organization_access_request_organization_status_idx": {
-          "name": "organization_access_request_organization_status_idx",
-          "columns": ["organization_id", "status"],
-          "isUnique": false
-        },
-        "organization_access_request_requester_status_idx": {
-          "name": "organization_access_request_requester_status_idx",
-          "columns": ["requested_by_account_id", "status"],
-          "isUnique": false
-        },
-        "organization_access_request_pending_account_idx": {
-          "name": "organization_access_request_pending_account_idx",
-          "columns": ["organization_id", "requested_by_account_id"],
-          "isUnique": true,
-          "where": "\"organization_access_request\".\"status\" = 'pending'"
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "organization_domain": {
-      "name": "organization_domain",
-      "columns": {
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "domain": {
-          "name": "domain",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "id": {
-          "name": "id",
-          "type": "text CHECK (\"id\" = upper(\"id\") AND length(\"id\") = 26 AND substr(\"id\", 1, 1) GLOB '[0-7]' AND \"id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "organization_domain_domain_idx": {
-          "name": "organization_domain_domain_idx",
-          "columns": ["domain"],
-          "isUnique": true
-        },
-        "organization_domain_organization_id_idx": {
-          "name": "organization_domain_organization_id_idx",
-          "columns": ["organization_id"],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "organization_invitation": {
-      "name": "organization_invitation",
-      "columns": {
-        "account_id": {
-          "name": "account_id",
-          "type": "text CHECK (\"account_id\" = upper(\"account_id\") AND length(\"account_id\") = 26 AND substr(\"account_id\", 1, 1) GLOB '[0-7]' AND \"account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "email": {
-          "name": "email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "id": {
-          "name": "id",
-          "type": "text CHECK (\"id\" = upper(\"id\") AND length(\"id\") = 26 AND substr(\"id\", 1, 1) GLOB '[0-7]' AND \"id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "invited_by": {
-          "name": "invited_by",
-          "type": "text CHECK (\"invited_by\" = upper(\"invited_by\") AND length(\"invited_by\") = 26 AND substr(\"invited_by\", 1, 1) GLOB '[0-7]' AND \"invited_by\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "organization_invitation_organization_status_idx": {
-          "name": "organization_invitation_organization_status_idx",
-          "columns": ["organization_id", "status"],
-          "isUnique": false
-        },
-        "organization_invitation_email_status_created_idx": {
-          "name": "organization_invitation_email_status_created_idx",
-          "columns": ["email", "status", "created_at"],
-          "isUnique": false
-        },
-        "organization_invitation_pending_email_idx": {
-          "name": "organization_invitation_pending_email_idx",
-          "columns": ["organization_id", "email"],
-          "isUnique": true,
-          "where": "\"organization_invitation\".\"status\" = 'pending'"
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "organization_member": {
-      "name": "organization_member",
-      "columns": {
-        "account_id": {
-          "name": "account_id",
-          "type": "text CHECK (\"account_id\" = upper(\"account_id\") AND length(\"account_id\") = 26 AND substr(\"account_id\", 1, 1) GLOB '[0-7]' AND \"account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "disabled_at": {
-          "name": "disabled_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "disabled_by_account_id": {
-          "name": "disabled_by_account_id",
-          "type": "text CHECK (\"disabled_by_account_id\" = upper(\"disabled_by_account_id\") AND length(\"disabled_by_account_id\") = 26 AND substr(\"disabled_by_account_id\", 1, 1) GLOB '[0-7]' AND \"disabled_by_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "joined_at": {
-          "name": "joined_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "role": {
-          "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "organization_member_organization_id_account_id_pk": {
-          "columns": ["organization_id", "account_id"],
-          "name": "organization_member_organization_id_account_id_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "organization": {
       "name": "organization",
       "columns": {
@@ -3962,24 +3697,10 @@
           "notNull": false,
           "autoincrement": false
         },
-        "default_environment_id": {
-          "name": "default_environment_id",
-          "type": "text CHECK (\"default_environment_id\" = upper(\"default_environment_id\") AND length(\"default_environment_id\") = 26 AND substr(\"default_environment_id\", 1, 1) GLOB '[0-7]' AND \"default_environment_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "id": {
           "name": "id",
           "type": "text CHECK (\"id\" = upper(\"id\") AND length(\"id\") = 26 AND substr(\"id\", 1, 1) GLOB '[0-7]' AND \"id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "join_policy": {
-          "name": "join_policy",
-          "type": "text",
-          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -3988,13 +3709,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "primary_domain": {
-          "name": "primary_domain",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "slug": {
@@ -4019,14 +3733,81 @@
           "isUnique": true,
           "where": "\"organization\".\"creator_account_id\" IS NOT NULL"
         },
-        "organization_primary_domain_idx": {
-          "name": "organization_primary_domain_idx",
-          "columns": ["primary_domain"],
-          "isUnique": true
-        },
         "organization_slug_idx": {
           "name": "organization_slug_idx",
           "columns": ["slug"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "app": {
+      "name": "app",
+      "columns": {
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "default_environment_id": {
+          "name": "default_environment_id",
+          "type": "text CHECK (\"default_environment_id\" = upper(\"default_environment_id\") AND length(\"default_environment_id\") = 26 AND substr(\"default_environment_id\", 1, 1) GLOB '[0-7]' AND \"default_environment_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "id": {
+          "name": "id",
+          "type": "text CHECK (\"id\" = upper(\"id\") AND length(\"id\") = 26 AND substr(\"id\", 1, 1) GLOB '[0-7]' AND \"id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_account_id": {
+          "name": "owner_account_id",
+          "type": "text CHECK (\"owner_account_id\" = upper(\"owner_account_id\") AND length(\"owner_account_id\") = 26 AND substr(\"owner_account_id\", 1, 1) GLOB '[0-7]' AND \"owner_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "app_organization_slug_idx": {
+          "name": "app_organization_slug_idx",
+          "columns": ["organization_id", "slug"],
           "isUnique": true
         }
       },
@@ -4182,90 +3963,6 @@
       },
       "uniqueConstraints": {},
       "checkConstraints": {}
-    },
-    "resource_acl": {
-      "name": "resource_acl",
-      "columns": {
-        "assigned_by_account_id": {
-          "name": "assigned_by_account_id",
-          "type": "text CHECK (\"assigned_by_account_id\" = upper(\"assigned_by_account_id\") AND length(\"assigned_by_account_id\") = 26 AND substr(\"assigned_by_account_id\", 1, 1) GLOB '[0-7]' AND \"assigned_by_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "resource_id": {
-          "name": "resource_id",
-          "type": "text CHECK (\"resource_id\" = upper(\"resource_id\") AND length(\"resource_id\") = 26 AND substr(\"resource_id\", 1, 1) GLOB '[0-7]' AND \"resource_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "resource_type": {
-          "name": "resource_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "role": {
-          "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "target_id": {
-          "name": "target_id",
-          "type": "text CHECK (\"target_id\" = upper(\"target_id\") AND length(\"target_id\") = 26 AND substr(\"target_id\", 1, 1) GLOB '[0-7]' AND \"target_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "target_kind": {
-          "name": "target_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "resource_acl_target_idx": {
-          "name": "resource_acl_target_idx",
-          "columns": ["target_kind", "target_id"],
-          "isUnique": false
-        },
-        "resource_acl_resource_idx": {
-          "name": "resource_acl_resource_idx",
-          "columns": ["resource_type", "resource_id"],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "resource_acl_resource_type_resource_id_target_kind_target_id_pk": {
-          "columns": ["resource_type", "resource_id", "target_kind", "target_id"],
-          "name": "resource_acl_resource_type_resource_id_target_kind_target_id_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "resource_acl_resource_type_check": {
-          "name": "resource_acl_resource_type_check",
-          "value": "\"resource_acl\".\"resource_type\" IN ('agent', 'environment', 'skill', 'space')"
-        },
-        "resource_acl_target_kind_check": {
-          "name": "resource_acl_target_kind_check",
-          "value": "\"resource_acl\".\"target_kind\" IN ('organization', 'user')"
-        }
-      }
     },
     "driver_command": {
       "name": "driver_command",
@@ -4439,6 +4136,13 @@
         "driver_instance_id": {
           "name": "driver_instance_id",
           "type": "text CHECK (\"driver_instance_id\" = upper(\"driver_instance_id\") AND length(\"driver_instance_id\") = 26 AND substr(\"driver_instance_id\", 1, 1) GLOB '[0-7]' AND \"driver_instance_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -5410,9 +5114,9 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -5497,6 +5201,26 @@
           "columns": ["agent_id", "updated_at", "id"],
           "isUnique": false
         },
+        "session_app_creator_archived_updated_idx": {
+          "name": "session_app_creator_archived_updated_idx",
+          "columns": ["app_id", "creator_account_id", "archived_at", "updated_at", "id"],
+          "isUnique": false
+        },
+        "session_app_attributed_archived_updated_idx": {
+          "name": "session_app_attributed_archived_updated_idx",
+          "columns": ["app_id", "attributed_user_id", "archived_at", "updated_at", "id"],
+          "isUnique": false
+        },
+        "session_app_creator_type_archived_updated_idx": {
+          "name": "session_app_creator_type_archived_updated_idx",
+          "columns": ["app_id", "creator_account_id", "type", "archived_at", "updated_at", "id"],
+          "isUnique": false
+        },
+        "session_app_attributed_type_archived_updated_idx": {
+          "name": "session_app_attributed_type_archived_updated_idx",
+          "columns": ["app_id", "attributed_user_id", "type", "archived_at", "updated_at", "id"],
+          "isUnique": false
+        },
         "session_status_operation_updated_idx": {
           "name": "session_status_operation_updated_idx",
           "columns": ["status", "status_operation_id", "updated_at"],
@@ -5505,50 +5229,6 @@
         "session_status_updated_idx": {
           "name": "session_status_updated_idx",
           "columns": ["status", "updated_at", "id"],
-          "isUnique": false
-        },
-        "session_organization_creator_status_updated_idx": {
-          "name": "session_organization_creator_status_updated_idx",
-          "columns": ["organization_id", "creator_account_id", "status", "updated_at", "id"],
-          "isUnique": false
-        },
-        "session_organization_attributed_status_updated_idx": {
-          "name": "session_organization_attributed_status_updated_idx",
-          "columns": ["organization_id", "attributed_user_id", "status", "updated_at", "id"],
-          "isUnique": false
-        },
-        "session_organization_creator_archived_updated_idx": {
-          "name": "session_organization_creator_archived_updated_idx",
-          "columns": ["organization_id", "creator_account_id", "archived_at", "updated_at", "id"],
-          "isUnique": false
-        },
-        "session_organization_attributed_archived_updated_idx": {
-          "name": "session_organization_attributed_archived_updated_idx",
-          "columns": ["organization_id", "attributed_user_id", "archived_at", "updated_at", "id"],
-          "isUnique": false
-        },
-        "session_organization_creator_type_archived_updated_idx": {
-          "name": "session_organization_creator_type_archived_updated_idx",
-          "columns": [
-            "organization_id",
-            "creator_account_id",
-            "type",
-            "archived_at",
-            "updated_at",
-            "id"
-          ],
-          "isUnique": false
-        },
-        "session_organization_attributed_type_archived_updated_idx": {
-          "name": "session_organization_attributed_type_archived_updated_idx",
-          "columns": [
-            "organization_id",
-            "attributed_user_id",
-            "type",
-            "archived_at",
-            "updated_at",
-            "id"
-          ],
           "isUnique": false
         }
       },
@@ -6475,128 +6155,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "session_thread_ui_state": {
-      "name": "session_thread_ui_state",
-      "columns": {
-        "account_id": {
-          "name": "account_id",
-          "type": "text CHECK (\"account_id\" = upper(\"account_id\") AND length(\"account_id\") = 26 AND substr(\"account_id\", 1, 1) GLOB '[0-7]' AND \"account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "pinned": {
-          "name": "pinned",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "read_at": {
-          "name": "read_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "session_id": {
-          "name": "session_id",
-          "type": "text CHECK (\"session_id\" = upper(\"session_id\") AND length(\"session_id\") = 26 AND substr(\"session_id\", 1, 1) GLOB '[0-7]' AND \"session_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "session_thread_ui_state_account_updated_idx": {
-          "name": "session_thread_ui_state_account_updated_idx",
-          "columns": ["account_id", "updated_at", "session_id"],
-          "isUnique": false
-        },
-        "session_thread_ui_state_session_idx": {
-          "name": "session_thread_ui_state_session_idx",
-          "columns": ["session_id"],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "session_thread_ui_state_session_id_session_id_fk": {
-          "name": "session_thread_ui_state_session_id_session_id_fk",
-          "tableFrom": "session_thread_ui_state",
-          "tableTo": "session",
-          "columnsFrom": ["session_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "session_thread_ui_state_account_id_session_id_pk": {
-          "columns": ["account_id", "session_id"],
-          "name": "session_thread_ui_state_account_id_session_id_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "skill_preference": {
-      "name": "skill_preference",
-      "columns": {
-        "account_id": {
-          "name": "account_id",
-          "type": "text CHECK (\"account_id\" = upper(\"account_id\") AND length(\"account_id\") = 26 AND substr(\"account_id\", 1, 1) GLOB '[0-7]' AND \"account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "auto_enabled": {
-          "name": "auto_enabled",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "skill_id": {
-          "name": "skill_id",
-          "type": "text CHECK (\"skill_id\" = upper(\"skill_id\") AND length(\"skill_id\") = 26 AND substr(\"skill_id\", 1, 1) GLOB '[0-7]' AND \"skill_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "skill_preference_skill_id_account_id_pk": {
-          "columns": ["skill_id", "account_id"],
-          "name": "skill_preference_skill_id_account_id_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "skill_snapshot_entry": {
       "name": "skill_snapshot_entry",
       "columns": {
@@ -6720,9 +6278,9 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -6750,14 +6308,14 @@
         }
       },
       "indexes": {
-        "skill_snapshot_organization_created_at_idx": {
-          "name": "skill_snapshot_organization_created_at_idx",
-          "columns": ["organization_id", "created_at"],
+        "skill_snapshot_app_created_at_idx": {
+          "name": "skill_snapshot_app_created_at_idx",
+          "columns": ["app_id", "created_at"],
           "isUnique": false
         },
         "skill_snapshot_blob_sha256_idx": {
           "name": "skill_snapshot_blob_sha256_idx",
-          "columns": ["organization_id", "blob_sha256"],
+          "columns": ["app_id", "blob_sha256"],
           "isUnique": true
         }
       },
@@ -6832,16 +6390,16 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+        "owner_account_id": {
+          "name": "owner_account_id",
+          "type": "text CHECK (\"owner_account_id\" = upper(\"owner_account_id\") AND length(\"owner_account_id\") = 26 AND substr(\"owner_account_id\", 1, 1) GLOB '[0-7]' AND \"owner_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "owner_account_id": {
-          "name": "owner_account_id",
-          "type": "text CHECK (\"owner_account_id\" = upper(\"owner_account_id\") AND length(\"owner_account_id\") = 26 AND substr(\"owner_account_id\", 1, 1) GLOB '[0-7]' AND \"owner_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -6869,9 +6427,9 @@
         }
       },
       "indexes": {
-        "skill_organization_updated_at_idx": {
-          "name": "skill_organization_updated_at_idx",
-          "columns": ["organization_id", "updated_at"],
+        "skill_app_updated_at_idx": {
+          "name": "skill_app_updated_at_idx",
+          "columns": ["app_id", "updated_at"],
           "isUnique": false
         },
         "skill_owner_account_updated_at_idx": {
@@ -6986,16 +6544,16 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+        "owner_account_id": {
+          "name": "owner_account_id",
+          "type": "text CHECK (\"owner_account_id\" = upper(\"owner_account_id\") AND length(\"owner_account_id\") = 26 AND substr(\"owner_account_id\", 1, 1) GLOB '[0-7]' AND \"owner_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "owner_account_id": {
-          "name": "owner_account_id",
-          "type": "text CHECK (\"owner_account_id\" = upper(\"owner_account_id\") AND length(\"owner_account_id\") = 26 AND substr(\"owner_account_id\", 1, 1) GLOB '[0-7]' AND \"owner_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -7006,24 +6564,17 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "visibility": {
-          "name": "visibility",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
         }
       },
       "indexes": {
-        "space_organization_name_idx": {
-          "name": "space_organization_name_idx",
-          "columns": ["organization_id", "lower(\"name\")"],
+        "space_app_name_idx": {
+          "name": "space_app_name_idx",
+          "columns": ["app_id", "lower(\"name\")"],
           "isUnique": true
         },
-        "space_organization_owner_idx": {
-          "name": "space_organization_owner_idx",
-          "columns": ["organization_id", "owner_account_id"],
+        "space_app_owner_idx": {
+          "name": "space_app_owner_idx",
+          "columns": ["app_id", "owner_account_id"],
           "isUnique": false
         }
       },
@@ -7189,6 +6740,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "output_tokens": {
           "name": "output_tokens",
           "type": "integer",
@@ -7233,6 +6791,11 @@
         }
       },
       "indexes": {
+        "usage_daily_rollup_app_date_idx": {
+          "name": "usage_daily_rollup_app_date_idx",
+          "columns": ["app_id", "date"],
+          "isUnique": false
+        },
         "usage_daily_rollup_organization_date_idx": {
           "name": "usage_daily_rollup_organization_date_idx",
           "columns": ["organization_id", "date"],
@@ -7256,9 +6819,10 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "usage_daily_rollup_organization_id_agent_id_actor_user_id_agent_owner_user_id_date_agent_publication_state_at_run_run_purpose_provider_model_pk": {
+        "usage_daily_rollup_organization_id_app_id_agent_id_actor_user_id_agent_owner_user_id_date_agent_publication_state_at_run_run_purpose_provider_model_pk": {
           "columns": [
             "organization_id",
+            "app_id",
             "agent_id",
             "actor_user_id",
             "agent_owner_user_id",
@@ -7268,7 +6832,7 @@
             "provider",
             "model"
           ],
-          "name": "usage_daily_rollup_organization_id_agent_id_actor_user_id_agent_owner_user_id_date_agent_publication_state_at_run_run_purpose_provider_model_pk"
+          "name": "usage_daily_rollup_organization_id_app_id_agent_id_actor_user_id_agent_owner_user_id_date_agent_publication_state_at_run_run_purpose_provider_model_pk"
         }
       },
       "uniqueConstraints": {},
@@ -7361,6 +6925,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "output_tokens": {
           "name": "output_tokens",
           "type": "integer",
@@ -7447,6 +7018,11 @@
         }
       },
       "indexes": {
+        "usage_event_app_created_idx": {
+          "name": "usage_event_app_created_idx",
+          "columns": ["app_id", "created_at"],
+          "isUnique": false
+        },
         "usage_event_organization_created_idx": {
           "name": "usage_event_organization_created_idx",
           "columns": ["organization_id", "created_at"],
@@ -7514,22 +7090,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "is_default": {
-          "name": "is_default",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "is_preferred": {
-          "name": "is_preferred",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
         "models": {
           "name": "models",
           "type": "text",
@@ -7544,18 +7104,11 @@
           "notNull": true,
           "autoincrement": false
         },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text CHECK (\"organization_id\" = upper(\"organization_id\") AND length(\"organization_id\") = 26 AND substr(\"organization_id\", 1, 1) GLOB '[0-7]' AND \"organization_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+        "app_id": {
+          "name": "app_id",
+          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "owner_account_id": {
-          "name": "owner_account_id",
-          "type": "text CHECK (\"owner_account_id\" = upper(\"owner_account_id\") AND length(\"owner_account_id\") = 26 AND substr(\"owner_account_id\", 1, 1) GLOB '[0-7]' AND \"owner_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "updated_at": {
@@ -7574,39 +7127,15 @@
         }
       },
       "indexes": {
-        "vendor_credential_organization_vendor_idx": {
-          "name": "vendor_credential_organization_vendor_idx",
-          "columns": ["organization_id", "vendor_id"],
+        "vendor_credential_app_vendor_idx": {
+          "name": "vendor_credential_app_vendor_idx",
+          "columns": ["app_id", "vendor_id"],
           "isUnique": false
         },
-        "vendor_credential_organization_vendor_owner_account_idx": {
-          "name": "vendor_credential_organization_vendor_owner_account_idx",
-          "columns": ["organization_id", "vendor_id", "owner_account_id"],
-          "isUnique": false
-        },
-        "vendor_credential_company_name_idx": {
-          "name": "vendor_credential_company_name_idx",
-          "columns": ["organization_id", "vendor_id", "name"],
-          "isUnique": true,
-          "where": "\"vendor_credential\".\"owner_account_id\" IS NULL"
-        },
-        "vendor_credential_personal_name_idx": {
-          "name": "vendor_credential_personal_name_idx",
-          "columns": ["organization_id", "vendor_id", "owner_account_id", "name"],
-          "isUnique": true,
-          "where": "\"vendor_credential\".\"owner_account_id\" IS NOT NULL"
-        },
-        "vendor_credential_personal_preferred_idx": {
-          "name": "vendor_credential_personal_preferred_idx",
-          "columns": ["organization_id", "vendor_id", "owner_account_id"],
-          "isUnique": true,
-          "where": "\"vendor_credential\".\"owner_account_id\" IS NOT NULL AND \"vendor_credential\".\"is_preferred\" = 1"
-        },
-        "vendor_credential_organization_vendor_default_idx": {
-          "name": "vendor_credential_organization_vendor_default_idx",
-          "columns": ["organization_id", "vendor_id"],
-          "isUnique": true,
-          "where": "\"vendor_credential\".\"owner_account_id\" IS NULL AND \"vendor_credential\".\"is_default\" = 1"
+        "vendor_credential_app_vendor_name_idx": {
+          "name": "vendor_credential_app_vendor_name_idx",
+          "columns": ["app_id", "vendor_id", "name"],
+          "isUnique": true
         }
       },
       "foreignKeys": {},
@@ -7638,7 +7167,7 @@
           }
         }
       },
-      "space_organization_name_idx": {
+      "space_app_name_idx": {
         "columns": {
           "lower(\"name\")": {
             "isExpression": true

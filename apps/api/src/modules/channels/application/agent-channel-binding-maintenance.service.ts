@@ -17,7 +17,7 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { notFoundError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
-import { ensureAgentEditor } from "../../agents/application/agent-access.service";
+import { ensureAppAgentOwner } from "../../agents/application/agent-access.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { stopDiscordGatewayConnection } from "../discord/discord-gateway-connection-client";
 import { deleteWeChatChannelAccountRuntime } from "../wechat/wechat-runtime-store";
@@ -185,14 +185,20 @@ export async function deleteAgentChannelBinding(
   const row = await getAppDatabase(bindings.DB)
     .select({
       agentId: agentChannelBindingsTable.agentId,
+      agentAppId: agentsTable.appId,
       encryptedCredsSecretId: agentChannelBindingsTable.encryptedCredsSecretId,
       id: agentChannelBindingsTable.id,
-      organizationId: agentsTable.organizationId,
+      appId: agentChannelBindingsTable.appId,
       provider: agentChannelBindingsTable.provider,
     })
     .from(agentChannelBindingsTable)
     .innerJoin(agentsTable, eq(agentsTable.id, agentChannelBindingsTable.agentId))
-    .where(eq(agentChannelBindingsTable.id, input.bindingId))
+    .where(
+      and(
+        eq(agentChannelBindingsTable.id, input.bindingId),
+        eq(agentChannelBindingsTable.appId, input.appId),
+      ),
+    )
     .limit(1)
     .get();
 
@@ -200,7 +206,14 @@ export async function deleteAgentChannelBinding(
     throw notFoundError("Agent channel binding not found.");
   }
 
-  await ensureAgentEditor(bindings.DB, viewer.id, row.agentId);
+  if (row.agentAppId !== row.appId) {
+    throw notFoundError("Agent channel binding not found.");
+  }
+
+  await ensureAppAgentOwner(bindings.DB, viewer.id, {
+    agentId: row.agentId,
+    appId: input.appId,
+  });
 
   if (row.provider === "discord") {
     await markDiscordGatewayBindingDeleting(bindings.DB, row.id);
@@ -220,6 +233,7 @@ export async function deleteAgentChannelBinding(
     .where(
       and(
         eq(agentChannelBindingsTable.id, input.bindingId),
+        eq(agentChannelBindingsTable.appId, input.appId),
         eq(agentChannelBindingsTable.provider, row.provider),
       ),
     )
@@ -227,8 +241,8 @@ export async function deleteAgentChannelBinding(
   await cleanupStoredAgentChannelBindingCredentialSecret({
     command: {
       agentId: row.agentId,
-      organizationId: row.organizationId,
       provider: row.provider,
+      appId: row.appId,
       purpose: "channel_binding_delete",
       secretId: row.encryptedCredsSecretId,
     },

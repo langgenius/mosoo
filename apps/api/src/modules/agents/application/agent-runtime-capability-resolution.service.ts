@@ -4,17 +4,19 @@ import type {
   AgentResolutionTargetType,
 } from "@mosoo/contracts/agent-manifest";
 import { vendorCredentialsTable } from "@mosoo/db";
-import type { AccountId, OrganizationId } from "@mosoo/id";
+import type { AccountId, AppId } from "@mosoo/id";
 import {
   VENDOR_OPENAI,
   VENDOR_OPENAI_COMPATIBLE,
   getRuntimeCatalogEntry,
 } from "@mosoo/runtime-catalog";
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
+import { isApiError } from "../../../platform/errors";
 import { isTruthy } from "../../../shared/truthiness";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import { resolveAvailableModels } from "../../vendor-credentials/application/available-models";
 import type { ResolvedModelEntry } from "../../vendor-credentials/application/available-models";
 import {
@@ -34,7 +36,7 @@ interface RuntimeCapabilityIssueInput {
   bindings?: ApiBindings;
   codePrefix: "agent.fork" | "agent.import" | "agent.readiness";
   database: D1Database;
-  organizationId: OrganizationId;
+  appId: AppId;
   selection: RuntimeCapabilitySelection;
 }
 
@@ -44,46 +46,29 @@ const OPENAI_SHAPED_PROVIDER_IDS = new Set([
   VENDOR_OPENAI_COMPATIBLE.vendorId,
 ]);
 
-async function hasCompanyCredential(
-  database: D1Database,
-  organizationId: OrganizationId,
-  provider: string,
-): Promise<boolean> {
-  const row = await getAppDatabase(database)
-    .select({ id: vendorCredentialsTable.id })
-    .from(vendorCredentialsTable)
-    .where(
-      and(
-        eq(vendorCredentialsTable.organizationId, organizationId),
-        eq(vendorCredentialsTable.vendorId, provider),
-        isNull(vendorCredentialsTable.ownerAccountId),
-      ),
-    )
-    .orderBy(desc(vendorCredentialsTable.isDefault), asc(vendorCredentialsTable.createdAt))
-    .limit(1)
-    .get();
-
-  return Boolean(row);
-}
-
-async function hasPreferredPersonalCredential(
+async function hasAppCredential(
   database: D1Database,
   actorAccountId: AccountId,
-  organizationId: OrganizationId,
+  appId: AppId,
   provider: string,
 ): Promise<boolean> {
+  try {
+    await ensureAppOwnership(database, actorAccountId, appId);
+  } catch (error) {
+    if (isApiError(error)) {
+      return false;
+    }
+
+    throw error;
+  }
+
   const row = await getAppDatabase(database)
     .select({ id: vendorCredentialsTable.id })
     .from(vendorCredentialsTable)
     .where(
-      and(
-        eq(vendorCredentialsTable.organizationId, organizationId),
-        eq(vendorCredentialsTable.vendorId, provider),
-        eq(vendorCredentialsTable.ownerAccountId, actorAccountId),
-        eq(vendorCredentialsTable.isPreferred, true),
-      ),
+      and(eq(vendorCredentialsTable.appId, appId), eq(vendorCredentialsTable.vendorId, provider)),
     )
-    .orderBy(desc(vendorCredentialsTable.updatedAt))
+    .orderBy(asc(vendorCredentialsTable.name), asc(vendorCredentialsTable.id))
     .limit(1)
     .get();
 
@@ -115,17 +100,14 @@ async function collectCredentialIssues(
 ): Promise<AgentResolutionIssue[]> {
   const { provider } = input.selection;
   const required = true;
-  const [companyCredentialAvailable, personalCredentialAvailable] = await Promise.all([
-    hasCompanyCredential(input.database, input.organizationId, provider),
-    hasPreferredPersonalCredential(
-      input.database,
-      input.actorAccountId,
-      input.organizationId,
-      provider,
-    ),
-  ]);
+  const appCredentialAvailable = await hasAppCredential(
+    input.database,
+    input.actorAccountId,
+    input.appId,
+    provider,
+  );
 
-  if (companyCredentialAvailable || personalCredentialAvailable) {
+  if (appCredentialAvailable) {
     return [];
   }
 
@@ -133,7 +115,7 @@ async function collectCredentialIssues(
     createCapabilityIssue({
       actionLabel: "Configure key",
       code: `${input.codePrefix}.provider_credential.missing`,
-      message: `Provider ${provider} needs a company key or your personal key in this Organization.`,
+      message: `Provider ${provider} needs a key in this App.`,
       required,
       status: "needs_reconnect",
       targetLabel: provider,
@@ -160,10 +142,10 @@ async function collectProviderProbeIssues(
   }
 
   const credential = await resolveVendorApiKey({
-    actorAccountId: input.actorAccountId,
     bindings,
+    executionOwnerUserId: input.actorAccountId,
     options: { modelId: input.selection.model },
-    organizationId: input.organizationId,
+    appId: input.appId,
     vendorId: input.selection.provider,
   });
 
@@ -253,10 +235,9 @@ export async function collectRuntimeCapabilityIssues(
     modelEntry =
       (
         await resolveAvailableModels(input.database, {
-          accountId: input.actorAccountId,
           currentModelId: model,
           currentVendorId: provider,
-          organizationId: input.organizationId,
+          appId: input.appId,
           runtimeId,
         })
       ).find((entry) => entry.vendorId === provider && entry.modelId === model) ?? null;

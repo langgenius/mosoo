@@ -1,26 +1,21 @@
-import type { McpOAuthFlowId, McpServerId, OrganizationId } from "@mosoo/contracts/id";
+import type { McpOAuthFlowId, McpServerId, AppId } from "@mosoo/contracts/id";
 import type {
   ConnectMcpBearerInput,
-  CreateOrganizationMcpServerInput,
-  CreatePersonalMcpServerInput,
+  CreateAppMcpServerInput,
   McpOAuthFlowState,
   McpRegistry,
   McpServerWithCredential,
-  SetOrganizationSharedMcpBearerInput,
   StartMcpOAuthInput,
   StartMcpOAuthPayload,
 } from "@mosoo/contracts/mcp";
 
 import type {
-  ClearOrganizationSharedCredentialMutation,
   ConnectMcpBearerMutation,
-  CreateOrganizationMcpServerMutation,
-  CreatePersonalMcpServerMutation,
+  CreateAppMcpServerMutation,
   McpOAuthFlowStatusQuery,
   McpRegistryQuery,
-  RevokeMcpUserCredentialMutation,
+  RevokeMcpCredentialMutation,
   SetMcpServerEnabledMutation,
-  SetOrganizationSharedBearerMutation,
   StartMcpOAuthMutation,
 } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
@@ -29,31 +24,25 @@ import {
   toCredentialId,
   toMcpOAuthFlowId,
   toMcpServerId,
-  toOrganizationId,
+  toAppId,
 } from "@/routes/typed-id";
 
 import {
-  CLEAR_ORGANIZATION_SHARED_CREDENTIAL_MUTATION,
   CONNECT_MCP_BEARER_MUTATION,
-  CREATE_ORGANIZATION_MCP_SERVER_MUTATION,
-  CREATE_PERSONAL_MCP_SERVER_MUTATION,
+  CREATE_APP_MCP_SERVER_MUTATION,
   DELETE_MCP_SERVER_MUTATION,
   MCP_OAUTH_FLOW_STATUS_QUERY,
   MCP_REGISTRY_QUERY,
-  REVOKE_MCP_USER_CREDENTIAL_MUTATION,
+  REVOKE_MCP_CREDENTIAL_MUTATION,
   SET_MCP_SERVER_ENABLED_MUTATION,
-  SET_ORGANIZATION_SHARED_BEARER_MUTATION,
   START_MCP_OAUTH_MUTATION,
 } from "./mcp-graphql-documents";
 
-type GraphQLMcpServerWithCredential = McpRegistryQuery["mcpRegistry"]["personal"][number];
+type GraphQLMcpServerWithCredential = McpRegistryQuery["mcpRegistry"]["servers"][number];
 type GraphQLMcpServerMutationResult =
-  | CreatePersonalMcpServerMutation["createPersonalMcpServer"]
-  | CreateOrganizationMcpServerMutation["createOrganizationMcpServer"]
+  | CreateAppMcpServerMutation["createAppMcpServer"]
   | ConnectMcpBearerMutation["connectMcpBearer"]
-  | SetOrganizationSharedBearerMutation["setOrganizationSharedBearer"]
-  | ClearOrganizationSharedCredentialMutation["clearOrganizationSharedCredential"]
-  | RevokeMcpUserCredentialMutation["revokeMcpUserCredential"]
+  | RevokeMcpCredentialMutation["revokeMcpCredential"]
   | SetMcpServerEnabledMutation["setMcpServerEnabled"];
 
 function toMcpServerWithCredential(
@@ -69,8 +58,8 @@ function toMcpServerWithCredential(
             id: toCredentialId(server.credential.id),
           },
     id: toMcpServerId(server.id),
-    organizationId: toOrganizationId(server.organizationId),
     ownerId: toAccountId(server.ownerId),
+    appId: toAppId(server.appId),
   };
 }
 
@@ -78,9 +67,8 @@ function toMcpRegistry(registry: McpRegistryQuery["mcpRegistry"]): McpRegistry {
   return {
     ...registry,
     currentUserId: toAccountId(registry.currentUserId),
-    organizationId: toOrganizationId(registry.organizationId),
-    organizationShared: registry.organizationShared.map(toMcpServerWithCredential),
-    personal: registry.personal.map(toMcpServerWithCredential),
+    appId: toAppId(registry.appId),
+    servers: registry.servers.map(toMcpServerWithCredential),
   };
 }
 
@@ -103,26 +91,18 @@ function toMcpOAuthFlowState(
   };
 }
 
-export async function getMcpRegistry(organizationId: OrganizationId): Promise<McpRegistry> {
-  const payload = await requestGraphQL(MCP_REGISTRY_QUERY, { organizationId });
+export async function getMcpRegistry(appId: AppId): Promise<McpRegistry> {
+  const payload = await requestGraphQL(MCP_REGISTRY_QUERY, { appId });
 
   return toMcpRegistry(payload.mcpRegistry);
 }
 
-export async function createPersonalMcpServer(
-  input: CreatePersonalMcpServerInput,
+export async function createAppMcpServer(
+  input: CreateAppMcpServerInput,
 ): Promise<McpServerWithCredential> {
-  const payload = await requestGraphQL(CREATE_PERSONAL_MCP_SERVER_MUTATION, { input });
+  const payload = await requestGraphQL(CREATE_APP_MCP_SERVER_MUTATION, { input });
 
-  return toMcpServerWithCredential(payload.createPersonalMcpServer);
-}
-
-export async function createOrganizationMcpServer(
-  input: CreateOrganizationMcpServerInput,
-): Promise<McpServerWithCredential> {
-  const payload = await requestGraphQL(CREATE_ORGANIZATION_MCP_SERVER_MUTATION, { input });
-
-  return toMcpServerWithCredential(payload.createOrganizationMcpServer);
+  return toMcpServerWithCredential(payload.createAppMcpServer);
 }
 
 export async function connectMcpBearer(
@@ -133,41 +113,31 @@ export async function connectMcpBearer(
   return toMcpServerWithCredential(payload.connectMcpBearer);
 }
 
-export async function setOrganizationSharedBearer(
-  input: SetOrganizationSharedMcpBearerInput,
-): Promise<McpServerWithCredential> {
-  const payload = await requestGraphQL(SET_ORGANIZATION_SHARED_BEARER_MUTATION, { input });
-
-  return toMcpServerWithCredential(payload.setOrganizationSharedBearer);
-}
-
-export async function clearOrganizationSharedCredential(
+export async function revokeMcpCredential(
+  appId: AppId,
   serverId: McpServerId,
 ): Promise<McpServerWithCredential> {
-  const payload = await requestGraphQL(CLEAR_ORGANIZATION_SHARED_CREDENTIAL_MUTATION, { serverId });
+  const payload = await requestGraphQL(REVOKE_MCP_CREDENTIAL_MUTATION, { appId, serverId });
 
-  return toMcpServerWithCredential(payload.clearOrganizationSharedCredential);
-}
-
-export async function revokeMcpUserCredential(
-  serverId: McpServerId,
-): Promise<McpServerWithCredential> {
-  const payload = await requestGraphQL(REVOKE_MCP_USER_CREDENTIAL_MUTATION, { serverId });
-
-  return toMcpServerWithCredential(payload.revokeMcpUserCredential);
+  return toMcpServerWithCredential(payload.revokeMcpCredential);
 }
 
 export async function setMcpServerEnabled(
+  appId: AppId,
   serverId: McpServerId,
   enabled: boolean,
 ): Promise<McpServerWithCredential> {
-  const payload = await requestGraphQL(SET_MCP_SERVER_ENABLED_MUTATION, { enabled, serverId });
+  const payload = await requestGraphQL(SET_MCP_SERVER_ENABLED_MUTATION, {
+    enabled,
+    appId,
+    serverId,
+  });
 
   return toMcpServerWithCredential(payload.setMcpServerEnabled);
 }
 
-export async function deleteMcpServer(serverId: McpServerId): Promise<void> {
-  await requestGraphQL(DELETE_MCP_SERVER_MUTATION, { serverId });
+export async function deleteMcpServer(appId: AppId, serverId: McpServerId): Promise<void> {
+  await requestGraphQL(DELETE_MCP_SERVER_MUTATION, { appId, serverId });
 }
 
 export async function startMcpOAuth(input: StartMcpOAuthInput): Promise<StartMcpOAuthPayload> {

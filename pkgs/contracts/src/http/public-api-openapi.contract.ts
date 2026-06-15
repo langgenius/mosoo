@@ -3,14 +3,14 @@ import { PLATFORM_ID_INPUT_PATTERN } from "@mosoo/id";
 import { AGENT_KIND_VALUES } from "../agent/agent.contract.ts";
 import {
   PUBLIC_API_ERROR_CODES,
-  PUBLISHED_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
-  PUBLISHED_THREAD_EVENT_LOG_STATUSES,
-  PUBLISHED_THREAD_EVENT_LOG_TYPES,
-  PUBLISHED_THREAD_FILE_ID_MAX_LENGTH,
-  PUBLISHED_THREAD_INPUT_TEXT_MAX_LENGTH,
+  PUBLIC_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
+  PUBLIC_THREAD_EVENT_LOG_STATUSES,
+  PUBLIC_THREAD_EVENT_LOG_TYPES,
+  PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
+  PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
 } from "./public-api-core.contract";
 
-export type PublishedAgentOpenApiSchema = Record<string, unknown>;
+export type PublicApiOpenApiSchema = Record<string, unknown>;
 
 export interface PublicApiPlatformIdSchemaOptions {
   example?: string | undefined;
@@ -20,7 +20,7 @@ export interface PublicApiPlatformIdSchemaOptions {
 
 export function createPublicApiPlatformIdSchema(
   options: PublicApiPlatformIdSchemaOptions = {},
-): PublishedAgentOpenApiSchema {
+): PublicApiOpenApiSchema {
   return {
     example: options.example ?? "01ARZ3NDEKTSV4RRFFQ69G5FAV",
     format: "ulid",
@@ -33,7 +33,7 @@ export function createPublicApiPlatformIdSchema(
 
 const PLATFORM_ID_SCHEMA = createPublicApiPlatformIdSchema();
 
-export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
+export const PUBLIC_API_OPENAPI_SCHEMAS = {
   ThreadEventInput: {
     description:
       "A single event posted to a Thread. Exactly one variant applies: send a user message, answer a pending permission request, or interrupt a running Run.",
@@ -129,7 +129,7 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
     properties: {
       fileId: {
         ...createPublicApiPlatformIdSchema({
-          maxLength: PUBLISHED_THREAD_FILE_ID_MAX_LENGTH,
+          maxLength: PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
           minLength: 1,
         }),
         description:
@@ -217,7 +217,7 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
       status: {
         description:
           "Delivery status of the event: `available` when the event is fully populated, `error` when it failed, `unsupported` when this event type cannot be rendered on the public surface.",
-        enum: PUBLISHED_THREAD_EVENT_LOG_STATUSES,
+        enum: PUBLIC_THREAD_EVENT_LOG_STATUSES,
       },
       tokens: {
         description:
@@ -227,7 +227,7 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
       type: {
         description:
           "Event type, such as `run.started`, `run.completed`, `agent.message.delta`, or `tool.use.started`.",
-        enum: PUBLISHED_THREAD_EVENT_LOG_TYPES,
+        enum: PUBLIC_THREAD_EVENT_LOG_TYPES,
       },
     },
     required: ["content", "durationMs", "id", "occurredAt", "status", "tokens", "type"],
@@ -281,7 +281,7 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
       client_external_ref: {
         description:
           "Optional caller-owned reference (for example an external ticket key) stored on the Thread for correlation. Not unique and not validated by Mosoo.",
-        maxLength: PUBLISHED_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
+        maxLength: PUBLIC_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
         type: "string",
       },
       files: {
@@ -292,7 +292,7 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
           properties: {
             file_id: {
               ...createPublicApiPlatformIdSchema({
-                maxLength: PUBLISHED_THREAD_FILE_ID_MAX_LENGTH,
+                maxLength: PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
                 minLength: 1,
               }),
               description: "ID (bare ULID) of a ready draft file uploaded by the same caller.",
@@ -316,7 +316,7 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
               properties: {
                 text: {
                   description: "The text of this content part. Must not be empty.",
-                  maxLength: PUBLISHED_THREAD_INPUT_TEXT_MAX_LENGTH,
+                  maxLength: PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
                   minLength: 1,
                   type: "string",
                 },
@@ -492,11 +492,11 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
   },
   ThreadSummary: {
     additionalProperties: false,
-    description: "Summary of a Thread on a published Agent.",
+    description: "Summary of a Thread on a Agent API Endpoint.",
     properties: {
       agent_id: {
         ...PLATFORM_ID_SCHEMA,
-        description: "ID (bare ULID) of the published Agent this Thread belongs to.",
+        description: "ID (bare ULID) of the Agent API Endpoint this Thread belongs to.",
       },
       attributed_user: {
         description:
@@ -523,7 +523,7 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
       },
       kind: {
         description:
-          "Agent kind backing this Thread (for example a persistent or one-off published Agent).",
+          "Agent kind backing this Thread (for example a persistent or one-off Agent API Endpoint).",
         enum: AGENT_KIND_VALUES,
       },
       last_run_id: {
@@ -634,4 +634,4 @@ export const PUBLISHED_AGENT_OPENAPI_SCHEMAS = {
     required: ["code", "message"],
     type: "object",
   },
-} satisfies Record<string, PublishedAgentOpenApiSchema>;
+} satisfies Record<string, PublicApiOpenApiSchema>;

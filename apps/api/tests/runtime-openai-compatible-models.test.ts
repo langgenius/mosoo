@@ -1,9 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
+import { parsePlatformId } from "@mosoo/id";
+import type { AppId } from "@mosoo/id";
 import { VENDOR_OPENAI_COMPATIBLE } from "@mosoo/runtime-catalog";
 
 import { resolveAvailableModels } from "../src/modules/vendor-credentials/application/available-models";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
+
+const APP_ID = parsePlatformId<AppId>("01J00000000000000000000009", "app ID");
 
 function createAvailableModelsDatabase(): D1Database {
   const database = new SqliteD1Database();
@@ -13,22 +17,51 @@ function createAvailableModelsDatabase(): D1Database {
       id TEXT PRIMARY KEY
     );
 
+    CREATE TABLE app (
+      id TEXT PRIMARY KEY NOT NULL,
+      organization_id TEXT NOT NULL,
+      owner_account_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      default_environment_id TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE TABLE vendor_credential (
       api_base TEXT,
       api_key_secret_id TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       id TEXT PRIMARY KEY,
-      is_default INTEGER NOT NULL DEFAULT 0,
-      is_preferred INTEGER NOT NULL DEFAULT 0,
       models TEXT,
       name TEXT NOT NULL,
-      organization_id TEXT NOT NULL,
-      owner_account_id TEXT,
+      app_id TEXT NOT NULL,
       updated_at INTEGER NOT NULL,
       vendor_id TEXT NOT NULL
     );
 
     INSERT INTO organization (id) VALUES ('01J00000000000000000000006');
+
+    INSERT INTO app (
+      id,
+      organization_id,
+      owner_account_id,
+      name,
+      slug,
+      default_environment_id,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      '${APP_ID}',
+      '01J00000000000000000000006',
+      'account-1',
+      'Default App',
+      'default',
+      NULL,
+      1,
+      1
+    );
   `);
 
   return database;
@@ -37,10 +70,9 @@ function createAvailableModelsDatabase(): D1Database {
 describe("OpenAI-compatible runtime model support", () => {
   test("marks current custom models as wrong-runtime when the selected runtime rejects custom providers", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
-      accountId: "account-1",
       currentModelId: "qwen-coder",
       currentVendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       runtimeId: "claude-agent-sdk",
     });
     const currentCustomEntry = entries.find(
@@ -56,8 +88,7 @@ describe("OpenAI-compatible runtime model support", () => {
 
   test("keeps unsupported preset models visible with wrong-runtime reason", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
-      accountId: "account-1",
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       runtimeId: "openai-runtime",
     });
     const claudeEntry = entries.find(

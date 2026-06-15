@@ -21,20 +21,20 @@ import type {
 } from "../session/session.contract";
 
 export const PUBLIC_API_PREFIX = "/api";
-export const PUBLISHED_AGENT_API_PREFIX = "/v1";
+export const PUBLIC_API_VERSION_PREFIX = "/v1";
 export const PUBLIC_API_VERSION = "v1";
-export const PUBLISHED_THREAD_INPUT_TEXT_MAX_LENGTH = 32_000;
-export const PUBLISHED_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH = 255;
-export const PUBLISHED_THREAD_FILE_ID_MAX_LENGTH = 26;
-export const PUBLISHED_THREAD_ID_PATTERN = PLATFORM_ID_INPUT_PATTERN;
-export const PUBLISHED_THREAD_JSON_BODY_MAX_BYTES = PUBLISHED_THREAD_INPUT_TEXT_MAX_LENGTH + 8192;
-export const PUBLISHED_AGENT_THREADS_MAX_LIMIT = 100;
-export const PUBLISHED_THREAD_EVENTS_DEFAULT_LIMIT = 100;
-export const PUBLISHED_THREAD_EVENTS_MAX_LIMIT = 1000;
-export const PUBLISHED_THREAD_EVENT_LOG_TYPES = SESSION_PROCESS_EVENT_TYPES;
-export type PublishedThreadEventLogType = SessionProcessEventType;
-export const PUBLISHED_THREAD_EVENT_LOG_STATUSES = SESSION_PROCESS_EVENT_STATUSES;
-export type PublishedThreadEventLogStatus = SessionProcessEventStatus;
+export const PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH = 32_000;
+export const PUBLIC_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH = 255;
+export const PUBLIC_THREAD_FILE_ID_MAX_LENGTH = 26;
+export const PUBLIC_THREAD_ID_PATTERN = PLATFORM_ID_INPUT_PATTERN;
+export const PUBLIC_THREAD_JSON_BODY_MAX_BYTES = PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH + 8192;
+export const PUBLIC_THREAD_API_THREADS_MAX_LIMIT = 100;
+export const PUBLIC_THREAD_EVENTS_DEFAULT_LIMIT = 100;
+export const PUBLIC_THREAD_EVENTS_MAX_LIMIT = 1000;
+export const PUBLIC_THREAD_EVENT_LOG_TYPES = SESSION_PROCESS_EVENT_TYPES;
+export type PublicThreadEventLogType = SessionProcessEventType;
+export const PUBLIC_THREAD_EVENT_LOG_STATUSES = SESSION_PROCESS_EVENT_STATUSES;
+export type PublicThreadEventLogStatus = SessionProcessEventStatus;
 
 export const PUBLIC_API_ERROR_CODES = [
   "agent_not_published",
@@ -61,7 +61,7 @@ export interface PublicApiErrorResponse {
   error: PublicApiErrorPayload;
 }
 
-export type PublishedRunStatus =
+export type PublicThreadRunStatus =
   | "booting"
   | "cancelled"
   | "completed"
@@ -71,23 +71,23 @@ export type PublishedRunStatus =
   | "running"
   | "waiting_input";
 
-export type PublishedRunTrigger = "resume" | "retry" | "system" | "user_prompt";
+export type PublicThreadRunTrigger = "resume" | "retry" | "system" | "user_prompt";
 
-export interface PublishedRunSummary {
+export interface PublicThreadRunSummary {
   completedAt: string | null;
   createdAt: string;
   id: SessionRunId;
   startedAt: string | null;
-  status: PublishedRunStatus;
-  trigger: PublishedRunTrigger;
+  status: PublicThreadRunStatus;
+  trigger: PublicThreadRunTrigger;
   updatedAt: string;
 }
 
-export type PublishedThreadEventType = "permission_decision" | "user_interrupt" | "user_message";
+export type PublicThreadEventType = "permission_decision" | "user_interrupt" | "user_message";
 
-export type PublishedThreadPermissionDecision = "allow_once" | "reject_once";
+export type PublicThreadPermissionDecision = "allow_once" | "reject_once";
 
-export type PublishedThreadEventInput =
+export type PublicThreadEventInput =
   | {
       attachmentIds?: FileId[];
       clientRequestId?: string | null;
@@ -95,7 +95,7 @@ export type PublishedThreadEventInput =
       type: "user_message";
     }
   | {
-      decision: PublishedThreadPermissionDecision;
+      decision: PublicThreadPermissionDecision;
       requestId: string;
       type: "permission_decision";
     }
@@ -104,89 +104,89 @@ export type PublishedThreadEventInput =
       type: "user_interrupt";
     };
 
-export interface PublishedThreadEventResult {
+export interface PublicThreadEventResult {
   clientRequestId: string | null;
-  run: PublishedRunSummary | null;
-  type: PublishedThreadEventType;
+  run: PublicThreadRunSummary | null;
+  type: PublicThreadEventType;
 }
 
-export interface PublishedThreadCallerSummary {
+export interface PublicThreadCallerSummary {
   id: PlatformId;
   kind: "access_token";
 }
 
-export interface PublishedThreadAttributedUserSummary {
+export interface PublicThreadAttributedUserSummary {
   id: AccountId;
 }
 
-export type PublishedThreadStatus = "IDLE" | "RESCHEDULING" | "RUNNING" | "TERMINATED";
+export type PublicThreadStatus = "IDLE" | "RESCHEDULING" | "RUNNING" | "TERMINATED";
 
-export interface PublishedThreadSummary {
+export interface PublicThreadSummary {
   agent_id: AgentId;
-  attributed_user: PublishedThreadAttributedUserSummary | null;
+  attributed_user: PublicThreadAttributedUserSummary | null;
   client_external_ref: string | null;
   created_at: string;
-  created_by: PublishedThreadCallerSummary;
+  created_by: PublicThreadCallerSummary;
   id: PublicThreadId;
   kind: AgentKind;
   last_run_id: SessionRunId | null;
   source: "api";
-  status: PublishedThreadStatus;
+  status: PublicThreadStatus;
   title: string | null;
   updated_at: string;
 }
 
-export interface PublishedThreadLinks {
+export interface PublicThreadLinks {
   thread: string;
 }
 
-export interface PublishedAgentCreateThreadResponse {
-  links: PublishedThreadLinks;
-  run: PublishedRunSummary | null;
-  thread: PublishedThreadSummary;
+export interface PublicThreadApiCreateThreadResponse {
+  links: PublicThreadLinks;
+  run: PublicThreadRunSummary | null;
+  thread: PublicThreadSummary;
 }
 
-export interface PublishedAgentRetrieveThreadResponse {
-  links: PublishedThreadLinks;
-  run: PublishedRunSummary | null;
-  thread: PublishedThreadSummary;
+export interface PublicThreadApiRetrieveThreadResponse {
+  links: PublicThreadLinks;
+  run: PublicThreadRunSummary | null;
+  thread: PublicThreadSummary;
 }
 
-export interface PublishedAgentListThreadsResponse {
-  threads: PublishedThreadSummary[];
+export interface PublicThreadApiListThreadsResponse {
+  threads: PublicThreadSummary[];
 }
 
-export interface PublishedAgentSendEventsRequest {
-  events: PublishedThreadEventInput[];
+export interface PublicThreadApiSendEventsRequest {
+  events: PublicThreadEventInput[];
 }
 
-export interface PublishedAgentSendEventsResponse {
+export interface PublicThreadApiSendEventsResponse {
   acceptedAt: string;
-  events: PublishedThreadEventResult[];
-  thread: PublishedThreadSummary;
+  events: PublicThreadEventResult[];
+  thread: PublicThreadSummary;
   warnings: UserWarning[];
 }
 
-export interface PublishedThreadEventLogEntry {
+export interface PublicThreadEventLogEntry {
   content: string;
   durationMs: number | null;
   id: RuntimeEventId;
   occurredAt: string;
-  status: PublishedThreadEventLogStatus;
+  status: PublicThreadEventLogStatus;
   tokens: number | null;
-  type: PublishedThreadEventLogType;
+  type: PublicThreadEventLogType;
 }
 
-export interface PublishedAgentListThreadEventsResponse {
-  events: PublishedThreadEventLogEntry[];
+export interface PublicThreadApiListThreadEventsResponse {
+  events: PublicThreadEventLogEntry[];
   truncated: boolean;
 }
 
-export interface CreatePublishedThreadFileRequest {
+export interface CreatePublicThreadFileRequest {
   fileId: FileId;
 }
 
-export interface PublishedThreadFile {
+export interface PublicThreadFile {
   committed: boolean;
   createdAt: string;
   id: FileId;
@@ -196,10 +196,10 @@ export interface PublishedThreadFile {
   size: number;
 }
 
-export interface PublishedThreadFileResponse {
-  file: PublishedThreadFile;
+export interface PublicThreadFileResponse {
+  file: PublicThreadFile;
 }
 
-export interface PublishedThreadFileListResponse {
-  files: PublishedThreadFile[];
+export interface PublicThreadFileListResponse {
+  files: PublicThreadFile[];
 }

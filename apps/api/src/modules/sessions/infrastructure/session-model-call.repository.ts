@@ -1,5 +1,11 @@
 import type { SessionType } from "@mosoo/contracts/session";
-import { agentsTable, sessionModelCallsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
+import {
+  agentsTable,
+  appsTable,
+  sessionModelCallsTable,
+  sessionRunsTable,
+  sessionsTable,
+} from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type {
   AccountId,
@@ -7,11 +13,12 @@ import type {
   AgentId,
   DriverInstanceId,
   OrganizationId,
+  AppId,
   SessionId,
   SessionModelCallId,
   SessionRunId,
 } from "@mosoo/id";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
@@ -26,7 +33,8 @@ interface SessionModelCallRunRow {
   actor_user_id: AccountId;
   completed_at: number | null;
   model: string | null;
-  organization_id: OrganizationId;
+  app_organization_id: OrganizationId;
+  app_id: AppId;
   provider: string | null;
   runtime_id: string | null;
   session_id: SessionId;
@@ -95,7 +103,8 @@ async function getSessionModelCallRunRow(
         agent_status: sql<"draft" | "published">`${agentsTable.status}`,
         completed_at: sessionRunsTable.completedAt,
         model: sql`${sessionRunsTable.model}`.mapWith(sessionRunsTable.model).as("model"),
-        organization_id: sessionsTable.organizationId,
+        app_organization_id: appsTable.organizationId,
+        app_id: sessionsTable.appId,
         provider: sql`${sessionRunsTable.provider}`
           .mapWith(sessionRunsTable.provider)
           .as("provider"),
@@ -119,7 +128,14 @@ async function getSessionModelCallRunRow(
       })
       .from(sessionRunsTable)
       .innerJoin(sessionsTable, eq(sessionsTable.id, sessionRunsTable.sessionId))
-      .innerJoin(agentsTable, eq(agentsTable.id, sessionRunsTable.agentId))
+      .innerJoin(
+        agentsTable,
+        and(
+          eq(agentsTable.id, sessionRunsTable.agentId),
+          eq(agentsTable.appId, sessionsTable.appId),
+        ),
+      )
+      .innerJoin(appsTable, eq(appsTable.id, sessionsTable.appId))
       .where(eq(sessionRunsTable.id, sessionRunId))
       .limit(1)
       .get()) ?? null
@@ -216,7 +232,8 @@ export async function upsertSessionModelCallUsage(
       agentStatus: run.agent_status,
       createdAtMs: completedAt ?? timestampMs,
       model,
-      organizationId: run.organization_id,
+      organizationId: run.app_organization_id,
+      appId: run.app_id,
       provider,
       runtimeId: run.runtime_id ?? run.session_runtime_id,
       sessionId: run.session_id,

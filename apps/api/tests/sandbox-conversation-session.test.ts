@@ -238,7 +238,7 @@ function createBindings(database: D1Database): ApiBindings {
 
 function createInput(sandbox: SandboxHandle, kind: AgentKind = "pet") {
   return {
-    currentOrganizationAccessSnapshot: { entries: [] },
+    currentAppAccessSnapshot: { entries: [] },
     kind,
     mountSessionResources: false,
     origin: ORIGIN,

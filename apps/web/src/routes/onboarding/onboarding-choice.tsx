@@ -34,7 +34,7 @@ export function OnboardingChoiceScreen({
             Set up your space
           </h2>
           <p className="text-muted-foreground mt-2 text-center text-sm">
-            Create your organization to start using Mosoo.
+            Create your first App to start using Mosoo.
           </p>
 
           <div className="mt-8 space-y-3">
@@ -52,12 +52,12 @@ export function OnboardingChoiceScreen({
                 </div>
                 <div className="min-w-0">
                   <div className="text-foreground truncate text-sm font-semibold">
-                    Create {domainOrganizationName} organization
+                    Create {domainOrganizationName} App
                   </div>
                   <div className="text-muted-foreground mt-0.5 text-xs">
                     {isTruthy(domain)
-                      ? `For collaboration with people on @${domain}`
-                      : "For collaboration with your team"}
+                      ? `For Agent work connected to @${domain}`
+                      : "For building and running your Agents"}
                   </div>
                 </div>
               </div>

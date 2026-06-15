@@ -19,6 +19,7 @@ const VIEWER: AuthenticatedViewer = {
 };
 
 const ORGANIZATION_ID = "01J00000000000000000000006";
+const APP_ID = "01J0000000000000000000000Q";
 const PREVIEW_SESSION_ID = "01J0000000000000000000A900";
 const UI_SESSION_ID = "01J0000000000000000000A901";
 const ATTRIBUTED_SESSION_ID = "01J0000000000000000000A902";
@@ -32,29 +33,28 @@ function createSessionTypeDatabase(): SqliteD1Database {
   const database = new SqliteD1Database();
 
   database.execute(`
-    CREATE TABLE organization (
-      id text PRIMARY KEY NOT NULL,
-      join_policy text NOT NULL,
-      name text NOT NULL,
-      slug text NOT NULL,
+	    CREATE TABLE organization (
+	      id text PRIMARY KEY NOT NULL,
+	      name text NOT NULL,
+	      slug text NOT NULL,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE organization_member (
+    CREATE TABLE app (
+      id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
-      account_id text NOT NULL,
-      role text NOT NULL,
-      disabled_at integer,
-      disabled_by_account_id text,
+      owner_account_id text NOT NULL,
+      name text NOT NULL,
+      slug text NOT NULL,
+      default_environment_id text,
       created_at integer NOT NULL,
-      joined_at integer NOT NULL,
-      PRIMARY KEY (organization_id, account_id)
+      updated_at integer NOT NULL
     );
 
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
-      organization_id text NOT NULL,
+      app_id text NOT NULL,
       creator_account_id text NOT NULL,
       attributed_user_id text,
       agent_id text NOT NULL,
@@ -97,32 +97,34 @@ function createSessionTypeDatabase(): SqliteD1Database {
       updated_at integer
     );
 
-    INSERT INTO organization (
+	    INSERT INTO organization (
+	      id,
+	      name,
+	      slug,
+	      created_at,
+      updated_at
+	    ) VALUES (
+	      '${ORGANIZATION_ID}',
+	      'Test Org',
+	      'test-org',
+      1,
+      1
+    );
+
+    INSERT INTO app (
       id,
-      join_policy,
+      organization_id,
+      owner_account_id,
       name,
       slug,
       created_at,
       updated_at
     ) VALUES (
-      '${ORGANIZATION_ID}',
-      'invite_only',
-      'Test Org',
-      'test-org',
-      1,
-      1
-    );
-
-    INSERT INTO organization_member (
-      organization_id,
-      account_id,
-      role,
-      created_at,
-      joined_at
-    ) VALUES (
+      '${APP_ID}',
       '${ORGANIZATION_ID}',
       'account-1',
-      'member',
+      'Default App',
+      'default',
       1,
       1
     );
@@ -156,7 +158,7 @@ function insertSession(
   database.execute(`
     INSERT INTO session (
       id,
-      organization_id,
+      app_id,
       creator_account_id,
       agent_id,
       kind,
@@ -171,7 +173,7 @@ function insertSession(
       updated_at
     ) VALUES (
       '${input.id}',
-      '${ORGANIZATION_ID}',
+      '${APP_ID}',
       'account-1',
       '01J00000000000000000000009',
       'pet',
@@ -199,7 +201,7 @@ describe("session type queries", () => {
   test("lists only sessions with the requested type", async () => {
     const sessions = await listSessions(createSessionTypeDatabase(), VIEWER, {
       archived: false,
-      organizationId: ORGANIZATION_ID,
+      appId: APP_ID,
       type: "preview",
     });
 
@@ -211,7 +213,7 @@ describe("session type queries", () => {
   test("lists all visible session summaries", async () => {
     const sessions = await listSessions(createSessionTypeDatabase(), VIEWER, {
       archived: false,
-      organizationId: ORGANIZATION_ID,
+      appId: APP_ID,
       type: null,
     });
 
@@ -238,7 +240,7 @@ describe("session type queries", () => {
 
     const sessions = await listThreadAgentSessions(database, VIEWER, {
       archived: false,
-      organizationId: ORGANIZATION_ID,
+      appId: APP_ID,
       type: "ui",
     });
     const attributed = sessions.nodes.find((node) => node.session.id === ATTRIBUTED_SESSION_ID);
@@ -264,7 +266,7 @@ describe("session type queries", () => {
     });
   });
 
-  test("bounds organization session summaries on stable updated ordering", async () => {
+  test("bounds app session summaries on stable updated ordering", async () => {
     const database = createSessionTypeDatabase();
 
     for (let index = 0; index < SESSION_SUMMARY_LIST_LIMIT + 5; index += 1) {
@@ -280,7 +282,7 @@ describe("session type queries", () => {
 
     const sessions = await listSessions(database, VIEWER, {
       archived: false,
-      organizationId: ORGANIZATION_ID,
+      appId: APP_ID,
       type: null,
     });
 
@@ -294,7 +296,7 @@ describe("session type queries", () => {
     });
   });
 
-  test("pages organization session summaries from the returned cursor", async () => {
+  test("pages app session summaries from the returned cursor", async () => {
     const database = createSessionTypeDatabase();
 
     for (let index = 0; index < 5; index += 1) {
@@ -311,14 +313,14 @@ describe("session type queries", () => {
     const firstPage = await listSessions(database, VIEWER, {
       archived: false,
       limit: 2,
-      organizationId: ORGANIZATION_ID,
+      appId: APP_ID,
       type: null,
     });
     const secondPage = await listSessions(database, VIEWER, {
       archived: false,
       beforeCursor: firstPage.pageInfo.endCursor,
       limit: 2,
-      organizationId: ORGANIZATION_ID,
+      appId: APP_ID,
       type: null,
     });
 
@@ -346,7 +348,7 @@ describe("session type queries", () => {
     await expect(
       listSessions(createSessionTypeDatabase(), VIEWER, {
         limit: 0,
-        organizationId: ORGANIZATION_ID,
+        appId: APP_ID,
         type: null,
       }),
     ).rejects.toThrow("Session list limit must be a positive integer.");
@@ -354,7 +356,7 @@ describe("session type queries", () => {
     await expect(
       listSessions(createSessionTypeDatabase(), VIEWER, {
         beforeCursor: "10:not-a-ulid",
-        organizationId: ORGANIZATION_ID,
+        appId: APP_ID,
         type: null,
       }),
     ).rejects.toThrow("Session list cursor ID must be a valid ULID.");

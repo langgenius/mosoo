@@ -1,4 +1,4 @@
-import type { OrganizationId } from "@mosoo/contracts/id";
+import type { AppId } from "@mosoo/contracts/id";
 import type { SpaceView } from "@mosoo/contracts/space";
 
 import { graphql } from "@/gql";
@@ -7,27 +7,25 @@ import { requestGraphQL } from "@/platform/http/graphql-client";
 import { toSpaceView } from "./space-mappers";
 
 const SPACES_QUERY = graphql(/* GraphQL */ `
-  query Spaces($organizationId: ULID!) {
-    spaceList(organizationId: $organizationId) {
+  query Spaces($appId: ULID!) {
+    spaceList(appId: $appId) {
       createdAt
       id
-      isSharedWithViewer
       name
       ownerId
-      role
+      appId
       storagePrefix
       canDelete
-      canUpdateAcl
-      creatorMembershipStatus
-      viewerAssetRole
-      visibility
+      canManage
+      canRead
+      canWrite
     }
   }
 `);
 
-export async function spaces(organizationId: OrganizationId): Promise<SpaceView[]> {
+export async function spaces(appId: AppId): Promise<SpaceView[]> {
   const payload = await requestGraphQL(SPACES_QUERY, {
-    organizationId,
+    appId,
   });
 
   return payload.spaceList.map(toSpaceView);

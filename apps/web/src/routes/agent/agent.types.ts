@@ -10,7 +10,7 @@ import type { AgentPackageResolutionState } from "@mosoo/contracts/agent-manifes
 import type { McpAuthorizationState, McpCredentialStatus } from "@mosoo/contracts/mcp";
 
 export type AgentStatus = "draft" | "published";
-export type AgentRole = "owner" | "admin" | "user";
+export type AgentRole = "owner" | "none";
 export type AgentMode = "create" | "preview" | "dev" | "consume";
 export type { AgentKind };
 
@@ -48,12 +48,7 @@ export interface McpServer {
   authorizationState?: McpAuthorizationState;
   iconUrl?: string; // Connector icon
   type?: "web" | "custom";
-  /**
-   * Source pool this server was added from.
-   * personal = the owner's Integration pool.
-   * organization_shared = Admin-managed Organization pool.
-   */
-  source?: "personal" | "organization_shared";
+  source?: "app";
   /**
    * Credential resolution mode for this Agent × Server binding.
    * runtime_resolved = resolve at runtime from the active credential source.
@@ -93,6 +88,7 @@ export interface UserInfo {
 
 export interface Agent {
   id: string;
+  appId: string;
   kind: AgentKind;
   liveVersion: AgentDeploymentVersion | null;
   name: string;
@@ -107,9 +103,7 @@ export interface Agent {
   versions: AgentDeploymentVersion[];
   visibility: AgentVisibility;
   owner: UserInfo;
-  packageSharingEnabled: boolean;
   packageResolution: AgentPackageResolutionState | null;
   role: AgentRole;
   config: AgentConfig;
-  collaborators: { user: UserInfo; role: "admin" | "user" }[];
 }

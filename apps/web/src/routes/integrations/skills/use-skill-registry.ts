@@ -1,9 +1,4 @@
-import type {
-  SkillDetail,
-  SkillInspectResult,
-  SkillShareTarget,
-  SkillSummary,
-} from "@mosoo/contracts/skill";
+import type { SkillDetail, SkillInspectResult, SkillSummary } from "@mosoo/contracts/skill";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 
@@ -15,32 +10,28 @@ import {
   getSkillDetail as getSkillDetailRemote,
   inspectSkillUpload,
   publishSkillPackage,
-  shareSkillWithOrganization as shareSkillWithOrganizationRemote,
-  shareSkillWithUser as shareSkillWithUserRemote,
-  unshareSkillTarget as unshareSkillTargetRemote,
 } from "../../../domains/skill/api/skill-client";
-import { skillKeys, useOrganizationSkillsQuery } from "../../../domains/skill/query/skill-queries";
+import { skillKeys, useAppSkillsQuery } from "../../../domains/skill/query/skill-queries";
 import { isTruthy } from "../../../shared/lib/truthiness";
-import { toOrganizationId, toSkillId } from "../../typed-id";
+import { toAppId, toSkillId } from "../../typed-id";
 export function useSkillRegistry() {
   const queryClient = useQueryClient();
-  const { activeOrganization, organizationsLoading } = useAppSession();
-  const organizationId = activeOrganization?.id ?? null;
-  const skillsQuery = useOrganizationSkillsQuery(organizationId);
+  const { activeAppId, appsLoading } = useAppSession();
+  const appId = activeAppId;
+  const skillsQuery = useAppSkillsQuery(appId);
   const skills = useMemo(() => skillsQuery.data ?? [], [skillsQuery.data]);
 
   const refresh = useCallback(async () => {
-    if (!isTruthy(organizationId)) {
+    if (!isTruthy(appId)) {
       return;
     }
 
     await queryClient.invalidateQueries({
-      queryKey: skillKeys.list(toOrganizationId(organizationId)),
+      queryKey: skillKeys.list(toAppId(appId)),
     });
-  }, [queryClient, organizationId]);
+  }, [queryClient, appId]);
 
-  const personal = useMemo(() => skills.filter((skill) => skill.role === "owner"), [skills]);
-  const shared = useMemo(() => skills.filter((skill) => skill.role === "user"), [skills]);
+  const personal = skills;
 
   const getSkill = useCallback(
     (skillId: string): SkillSummary | undefined => skills.find((skill) => skill.id === skillId),
@@ -48,45 +39,57 @@ export function useSkillRegistry() {
   );
 
   const getSkillDetail = useCallback(
-    async (skillId: string): Promise<SkillDetail> => getSkillDetailRemote(toSkillId(skillId)),
-    [],
+    async (skillId: string): Promise<SkillDetail> => {
+      if (!isTruthy(appId)) {
+        throw new Error("App is required.");
+      }
+
+      return getSkillDetailRemote(toAppId(appId), toSkillId(skillId));
+    },
+    [appId],
   );
 
   const getSkillSource = useCallback(
-    async (skillId: string): Promise<string> => fetchSkillSource(toSkillId(skillId)),
-    [],
+    async (skillId: string): Promise<string> => {
+      if (!isTruthy(appId)) {
+        throw new Error("App is required.");
+      }
+
+      return fetchSkillSource(toAppId(appId), toSkillId(skillId));
+    },
+    [appId],
   );
 
   const publishFromFile = useCallback(
     async (file: File): Promise<SkillSummary | null> => {
-      if (!isTruthy(organizationId)) {
+      if (!isTruthy(appId)) {
         return null;
       }
 
       const created = await publishSkillPackage({
         file,
-        organizationId: toOrganizationId(organizationId),
+        appId: toAppId(appId),
       });
       await refresh();
       return created;
     },
-    [refresh, organizationId],
+    [refresh, appId],
   );
 
   const publishFromGithub = useCallback(
     async (githubUrl: string): Promise<SkillSummary | null> => {
-      if (!isTruthy(organizationId)) {
+      if (!isTruthy(appId)) {
         return null;
       }
 
       const created = await publishSkillPackage({
         githubUrl,
-        organizationId: toOrganizationId(organizationId),
+        appId: toAppId(appId),
       });
       await refresh();
       return created;
     },
-    [refresh, organizationId],
+    [refresh, appId],
   );
 
   const inspectFile = useCallback(
@@ -101,45 +104,31 @@ export function useSkillRegistry() {
 
   const createSkillFork = useCallback(
     async (skillId: string): Promise<SkillSummary> => {
-      const created = await createSkillForkRemote({ skillId: toSkillId(skillId) });
+      if (!isTruthy(appId)) {
+        throw new Error("App is required.");
+      }
+
+      const created = await createSkillForkRemote({
+        appId: toAppId(appId),
+        skillId: toSkillId(skillId),
+      });
       await refresh();
       return created;
     },
-    [refresh],
+    [refresh, appId],
   );
 
   const deleteOwnedSkill = useCallback(
     async (skillId: string) => {
-      await deleteOwnedSkillRemote(toSkillId(skillId));
+      if (!isTruthy(appId)) {
+        throw new Error("App is required.");
+      }
+
+      await deleteOwnedSkillRemote(toAppId(appId), toSkillId(skillId));
       await refresh();
     },
-    [refresh],
+    [refresh, appId],
   );
-
-  const shareSkillWithUser = useCallback(
-    async (skillId: string, email: string) =>
-      shareSkillWithUserRemote({
-        email,
-        skillId: toSkillId(skillId),
-      }),
-    [],
-  );
-
-  const shareSkillWithOrganization = useCallback(
-    async (skillId: string) =>
-      shareSkillWithOrganizationRemote({
-        skillId: toSkillId(skillId),
-      }),
-    [],
-  );
-
-  const unshareSkillTarget = useCallback(async (skillId: string, target: SkillShareTarget) => {
-    await unshareSkillTargetRemote({
-      skillId: toSkillId(skillId),
-      targetId: target.id,
-      targetKind: target.kind,
-    });
-  }, []);
 
   return {
     createSkillFork,
@@ -149,15 +138,11 @@ export function useSkillRegistry() {
     getSkillSource,
     inspectFile,
     inspectGithub,
-    loading: isTruthy(organizationId) ? skillsQuery.isLoading : organizationsLoading,
-    organizationId,
+    loading: isTruthy(appId) ? skillsQuery.isLoading : appsLoading,
     personal,
+    appId,
     publishFromFile,
     publishFromGithub,
     refresh,
-    shareSkillWithOrganization,
-    shareSkillWithUser,
-    shared,
-    unshareSkillTarget,
   };
 }

@@ -10,8 +10,8 @@ import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
-  insertMemberSession,
-} from "./helpers/published-agent-http-test-fixture";
+  insertNonOwnerSession,
+} from "./helpers/public-api-http-test-fixture";
 
 function createRuntimeTarget(
   input: Omit<RuntimeSessionTarget, "sessionStatusOperationId" | "sessionStatusSeq"> & {
@@ -71,7 +71,7 @@ async function insertRunningSessionRun(database: D1Database): Promise<void> {
 describe("runtime state operation phases", () => {
   test("complete cancels the run that was active before the session becomes ready", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertRunningSessionRun(database);
 
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
@@ -130,7 +130,7 @@ describe("runtime state operation phases", () => {
 
   test("complete writes the run cancellation snapshot when driver stop already cancelled the run", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertRunningSessionRun(database);
 
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
@@ -206,7 +206,7 @@ describe("runtime state operation phases", () => {
 
   test("failure recovery writes the run cancellation snapshot when stop already cancelled the run", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertRunningSessionRun(database);
 
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
@@ -256,9 +256,9 @@ describe("runtime state operation phases", () => {
     );
   });
 
-  test("complete does not project terminal runs from another outcome as cancelled", async () => {
+  test("complete does not app terminal runs from another outcome as cancelled", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertRunningSessionRun(database);
 
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
@@ -308,7 +308,7 @@ describe("runtime state operation phases", () => {
 
   test("start ignores stale targets that changed after scope resolution", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
 
     await database
       .prepare(

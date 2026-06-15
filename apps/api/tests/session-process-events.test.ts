@@ -11,10 +11,17 @@ import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer
 import { getThreadSessionProcessEvents } from "../src/modules/sessions/application/session-process-events.service";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
+const ORGANIZATION_ID = "01J00000000000000000000006";
+const APP_ID = "01J0000000000000000000000Q";
+const SESSION_ID = "01J0000000000000000000000B";
+const ATTRIBUTED_SESSION_ID = "01J0000000000000000000000C";
+const VIEWER_ID = "01J00000000000000000000001";
+const CREATOR_ID = "01J00000000000000000000002";
+
 const VIEWER: AuthenticatedViewer = {
   email: "viewer@example.com",
   emailVerified: true,
-  id: "viewer-1",
+  id: VIEWER_ID,
   imageUrl: null,
   name: "Viewer",
 };
@@ -25,7 +32,7 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
   database.execute(`
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
-      organization_id text NOT NULL,
+      app_id text NOT NULL,
       creator_account_id text NOT NULL,
       attributed_user_id text,
       agent_id text NOT NULL,
@@ -46,12 +53,15 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
       archived_at integer
     );
 
-    CREATE TABLE organization_member (
+    CREATE TABLE app (
+      id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
-      account_id text NOT NULL,
-      role text NOT NULL,
-      disabled_at integer,
-      PRIMARY KEY (organization_id, account_id)
+      owner_account_id text NOT NULL,
+      name text NOT NULL,
+      slug text NOT NULL,
+      default_environment_id text,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL
     );
 
     CREATE TABLE session_run (
@@ -87,7 +97,7 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
 
     INSERT INTO session (
       id,
-      organization_id,
+      app_id,
       creator_account_id,
       attributed_user_id,
       agent_id,
@@ -107,9 +117,9 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
       updated_at,
       archived_at
     ) VALUES (
-      'session-1',
-      '01J00000000000000000000006',
-      'viewer-1',
+      '${SESSION_ID}',
+      '${APP_ID}',
+      '${VIEWER_ID}',
       NULL,
       '01J00000000000000000000009',
       NULL,
@@ -128,10 +138,10 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
       2000,
       NULL
     ), (
-      'session-attributed',
-      '01J00000000000000000000006',
-      'creator-1',
-      'viewer-1',
+      '${ATTRIBUTED_SESSION_ID}',
+      '${APP_ID}',
+      '${CREATOR_ID}',
+      '${VIEWER_ID}',
       '01J00000000000000000000009',
       NULL,
       NULL,
@@ -150,16 +160,24 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
       NULL
     );
 
-    INSERT INTO organization_member (
+    INSERT INTO app (
+      id,
       organization_id,
-      account_id,
-      role,
-      disabled_at
+      owner_account_id,
+      name,
+      slug,
+      default_environment_id,
+      created_at,
+      updated_at
     ) VALUES (
-      '01J00000000000000000000006',
-      'viewer-1',
-      'member',
-      NULL
+      '${APP_ID}',
+      '${ORGANIZATION_ID}',
+      '${VIEWER_ID}',
+      'Default App',
+      'default',
+      NULL,
+      1,
+      1
     );
   `);
 
@@ -176,6 +194,7 @@ async function insertSessionProcessEvent(
     processStatus?: SessionProcessEventStatus;
     processType?: SessionProcessEventType;
     seq: number;
+    sessionId?: string;
     tokens?: number | null;
     visibility?: SessionRuntimeEventVisibility;
   },
@@ -207,7 +226,7 @@ async function insertSessionProcessEvent(
       input.processStatus ?? "available",
       input.processType ?? "run.started",
       input.seq,
-      "session-1",
+      input.sessionId ?? SESSION_ID,
       input.tokens ?? null,
       input.visibility ?? "all_consumers",
     )
@@ -217,9 +236,17 @@ async function insertSessionProcessEvent(
 describe("session process event projection", () => {
   test("rejects invalid process event limits", async () => {
     await expect(
-      getThreadSessionProcessEvents(createProcessEventQueryDatabase(), VIEWER, "session-1", {
-        limit: 0,
-      }),
+      getThreadSessionProcessEvents(
+        createProcessEventQueryDatabase(),
+        VIEWER,
+        {
+          appId: APP_ID,
+          sessionId: SESSION_ID,
+        },
+        {
+          limit: 0,
+        },
+      ),
     ).rejects.toThrow();
   });
 
@@ -232,9 +259,17 @@ describe("session process event projection", () => {
       seq: 1,
     });
 
-    const events = await getThreadSessionProcessEvents(database, VIEWER, "session-1", {
-      limit: 10,
-    });
+    const events = await getThreadSessionProcessEvents(
+      database,
+      VIEWER,
+      {
+        appId: APP_ID,
+        sessionId: SESSION_ID,
+      },
+      {
+        limit: 10,
+      },
+    );
 
     expect(events.map((event) => event.type)).toEqual(["run.started"]);
   });
@@ -256,9 +291,17 @@ describe("session process event projection", () => {
       seq: 2,
     });
 
-    const events = await getThreadSessionProcessEvents(innerDatabase, VIEWER, "session-1", {
-      limit: 10,
-    });
+    const events = await getThreadSessionProcessEvents(
+      innerDatabase,
+      VIEWER,
+      {
+        appId: APP_ID,
+        sessionId: SESSION_ID,
+      },
+      {
+        limit: 10,
+      },
+    );
 
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
@@ -283,9 +326,17 @@ describe("session process event projection", () => {
       seq: 2,
     });
 
-    const events = await getThreadSessionProcessEvents(innerDatabase, VIEWER, "session-1", {
-      limit: 1,
-    });
+    const events = await getThreadSessionProcessEvents(
+      innerDatabase,
+      VIEWER,
+      {
+        appId: APP_ID,
+        sessionId: SESSION_ID,
+      },
+      {
+        limit: 1,
+      },
+    );
 
     expect(events).toHaveLength(2);
     expect(events[0]).toMatchObject({
@@ -311,9 +362,17 @@ describe("session process event projection", () => {
       });
     }
 
-    const events = await getThreadSessionProcessEvents(innerDatabase, VIEWER, "session-1", {
-      limit: 2000,
-    });
+    const events = await getThreadSessionProcessEvents(
+      innerDatabase,
+      VIEWER,
+      {
+        appId: APP_ID,
+        sessionId: SESSION_ID,
+      },
+      {
+        limit: 2000,
+      },
+    );
 
     expect(events).toHaveLength(1001);
     expect(events[0]).toMatchObject({
@@ -333,7 +392,10 @@ describe("session process event projection", () => {
     const events = await getThreadSessionProcessEvents(
       createProcessEventQueryDatabase(),
       VIEWER,
-      "session-attributed",
+      {
+        appId: APP_ID,
+        sessionId: ATTRIBUTED_SESSION_ID,
+      },
       {
         limit: 10,
       },

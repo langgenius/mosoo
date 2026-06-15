@@ -5,9 +5,9 @@ import type {
   AgentBuilderPlannerRunId,
   AgentBuilderThreadId,
   AgentId,
+  AppId,
   EnvironmentId,
   McpServerId,
-  OrganizationId,
   PlatformId,
   SkillId,
   SpaceId,
@@ -46,6 +46,10 @@ export function parseAgentId(value: unknown, label = "agentId"): AgentId {
   return parsePlatformId<AgentId>(value, label);
 }
 
+export function parseAppId(value: unknown, label = "appId"): AppId {
+  return parsePlatformId<AppId>(value, label);
+}
+
 export function parseAgentBuilderMessageId(
   value: unknown,
   label = "agentBuilderMessageId",
@@ -73,10 +77,6 @@ export function parseEnvironmentId(value: unknown, label = "environmentId"): Env
 
 export function parseMcpServerId(value: unknown, label = "mcpServerId"): McpServerId {
   return parsePlatformId<McpServerId>(value, label);
-}
-
-export function parseOrganizationId(value: unknown, label = "organizationId"): OrganizationId {
-  return parsePlatformId<OrganizationId>(value, label);
 }
 
 export function parseSkillId(value: unknown, label = "skillId"): SkillId {

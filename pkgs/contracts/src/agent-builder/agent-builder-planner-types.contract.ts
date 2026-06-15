@@ -6,7 +6,7 @@ import type {
   AgentId,
   EnvironmentId,
   McpServerId,
-  OrganizationId,
+  AppId,
   SkillId,
   SkillSnapshotId,
   SpaceId,
@@ -515,8 +515,6 @@ export interface AgentBuilderVisibleSpaceSummary {
   hash: string;
   id: SpaceId;
   name: string;
-  role: string;
-  visibility: string;
 }
 
 export interface AgentBuilderSelectedSpaceFilesSummary {
@@ -606,7 +604,7 @@ export interface AgentBuilderPlannerAgentContext {
   agentId: AgentId;
   baseConfigApplied: boolean;
   kind: AgentKind;
-  organizationId: OrganizationId;
+  appId: AppId;
   status: AgentStatus;
 }
 

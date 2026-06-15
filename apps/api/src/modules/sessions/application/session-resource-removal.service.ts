@@ -17,6 +17,7 @@ export async function removeSessionResource(
     action: "remove_session_resource",
     ...(options.authorization ? { authorization: options.authorization } : {}),
     database: bindings.DB,
+    appId: input.appId,
     sessionId: input.sessionId,
     viewer,
   });

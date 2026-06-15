@@ -15,6 +15,8 @@ const VIEWER: AuthenticatedViewer = {
   name: "Viewer",
 };
 
+const APP_ID = "01J0000000000000000000000Q";
+
 function createAgentSessionRetrieveDatabase(): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
 
@@ -33,7 +35,7 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
       last_run_id text,
       metadata_json text DEFAULT '{}' NOT NULL,
       model text NOT NULL,
-      organization_id text NOT NULL,
+      app_id text NOT NULL,
       provider text NOT NULL,
       runtime_id text NOT NULL,
       status text NOT NULL,
@@ -42,12 +44,15 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE organization_member (
+    CREATE TABLE app (
+      id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
-      account_id text NOT NULL,
-      role text NOT NULL,
-      disabled_at integer,
-      PRIMARY KEY (organization_id, account_id)
+      owner_account_id text NOT NULL,
+      name text NOT NULL,
+      slug text NOT NULL,
+      default_environment_id text,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL
     );
 
     CREATE TABLE session_run (
@@ -76,7 +81,7 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
       kind,
       metadata_json,
       model,
-      organization_id,
+      app_id,
       provider,
       runtime_id,
       status,
@@ -92,7 +97,7 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
       'pet',
       '{}',
       'gpt-5.4',
-      '01J00000000000000000000006',
+      '${APP_ID}',
       'openai',
       'openai-runtime',
       'IDLE',
@@ -101,16 +106,22 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
       1
     );
 
-    INSERT INTO organization_member (
+    INSERT INTO app (
+      id,
       organization_id,
-      account_id,
-      role,
-      disabled_at
+      owner_account_id,
+      name,
+      slug,
+      created_at,
+      updated_at
     ) VALUES (
+      '${APP_ID}',
       '01J00000000000000000000006',
       'viewer-1',
-      'member',
-      NULL
+      'Default App',
+      'default',
+      1,
+      1
     );
   `);
 
@@ -121,7 +132,10 @@ describe("agent session retrieve", () => {
   test("computes creator capabilities from the retrieved session", async () => {
     const database = createAgentSessionRetrieveDatabase();
 
-    const result = await retrieveAgentSession(database, VIEWER, { sessionId: "session-1" });
+    const result = await retrieveAgentSession(database, VIEWER, {
+      appId: APP_ID,
+      sessionId: "session-1",
+    });
 
     expect(result.session.id).toBe("session-1");
     expect(
@@ -132,12 +146,15 @@ describe("agent session retrieve", () => {
   test("loads thread retrieve summaries for the creator", async () => {
     const database = createAgentSessionRetrieveDatabase();
 
-    const result = await retrieveThreadAgentSession(database, VIEWER, { sessionId: "session-1" });
+    const result = await retrieveThreadAgentSession(database, VIEWER, {
+      appId: APP_ID,
+      sessionId: "session-1",
+    });
 
     expect(result.session.id).toBe("session-1");
   });
 
-  test("projects terminal cleanup rows as not recoverable even with archive marker", async () => {
+  test("apps terminal cleanup rows as not recoverable even with archive marker", async () => {
     const database = createAgentSessionRetrieveDatabase();
 
     await database
@@ -145,7 +162,10 @@ describe("agent session retrieve", () => {
       .bind(2, "TERMINATED", "session-1")
       .run();
 
-    const result = await retrieveAgentSession(database, VIEWER, { sessionId: "session-1" });
+    const result = await retrieveAgentSession(database, VIEWER, {
+      appId: APP_ID,
+      sessionId: "session-1",
+    });
     const capabilities = new Map(
       result.capabilities.map((capability) => [capability.action, capability]),
     );
@@ -188,7 +208,10 @@ describe("agent session retrieve", () => {
       .run();
 
     await expect(
-      retrieveThreadAgentSession(database, VIEWER, { sessionId: "session-1" }),
+      retrieveThreadAgentSession(database, VIEWER, {
+        appId: APP_ID,
+        sessionId: "session-1",
+      }),
     ).rejects.toThrow();
   });
 });

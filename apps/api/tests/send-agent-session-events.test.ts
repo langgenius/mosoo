@@ -8,7 +8,7 @@ import {
   createPublicHttpTestBindings,
   createTestExecutionContext,
   insertOwnerSession,
-} from "./helpers/published-agent-http-test-fixture";
+} from "./helpers/public-api-http-test-fixture";
 
 describe("send agent session events", () => {
   test("returns user message response summaries", async () => {
@@ -27,6 +27,7 @@ describe("send agent session events", () => {
             type: "user_message",
           },
         ],
+        appId: PUBLIC_API_TEST_IDS.app,
         sessionId: "01J0000000000000000000000C",
       },
       requestUrl: "https://api.example.com/api/v1/sessions/01J0000000000000000000000C/events",
@@ -52,7 +53,7 @@ describe("send agent session events", () => {
     await insertOwnerSession(database);
     await database
       .prepare("UPDATE session SET attributed_user_id = ? WHERE id = ?")
-      .bind(PUBLIC_API_TEST_IDS.memberAccount, PUBLIC_API_TEST_IDS.ownerSession)
+      .bind(PUBLIC_API_TEST_IDS.nonOwnerAccount, PUBLIC_API_TEST_IDS.ownerSession)
       .run();
 
     await expect(
@@ -68,15 +69,16 @@ describe("send agent session events", () => {
               type: "user_message",
             },
           ],
+          appId: PUBLIC_API_TEST_IDS.app,
           sessionId: PUBLIC_API_TEST_IDS.ownerSession,
         },
         requestUrl: `https://api.example.com/api/v1/sessions/${PUBLIC_API_TEST_IDS.ownerSession}/events`,
         viewer: {
-          email: "member@example.com",
+          email: "non-owner@example.com",
           emailVerified: true,
-          id: PUBLIC_API_TEST_IDS.memberAccount,
+          id: PUBLIC_API_TEST_IDS.nonOwnerAccount,
           imageUrl: null,
-          name: "Org Member",
+          name: "Non Owner",
         },
       }),
     ).rejects.toThrow();

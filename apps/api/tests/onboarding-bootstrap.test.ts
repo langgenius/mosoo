@@ -28,47 +28,38 @@ function createOnboardingDatabase(): SqliteD1Database {
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE organization (
-      id text PRIMARY KEY NOT NULL,
-      name text NOT NULL,
-      slug text NOT NULL,
-      join_policy text NOT NULL,
-      primary_domain text,
-      avatar_url text,
-      creator_account_id text,
-      default_environment_id text,
+	    CREATE TABLE organization (
+	      id text PRIMARY KEY NOT NULL,
+	      name text NOT NULL,
+	      slug text NOT NULL,
+	      avatar_url text,
+	      creator_account_id text,
+	      default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
     );
 
     CREATE UNIQUE INDEX organization_slug_idx ON organization (slug);
 
-    CREATE TABLE organization_domain (
+    CREATE TABLE app (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
-      domain text NOT NULL,
-      status text NOT NULL,
+      owner_account_id text NOT NULL,
+      name text NOT NULL,
+      slug text NOT NULL,
+      default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE organization_member (
-      organization_id text NOT NULL,
-      account_id text NOT NULL,
-      role text NOT NULL,
-      disabled_at integer,
-      disabled_by_account_id text,
-      created_at integer NOT NULL,
-      joined_at integer NOT NULL,
-      PRIMARY KEY (organization_id, account_id)
-    );
+    CREATE UNIQUE INDEX app_organization_slug_idx ON app (organization_id, slug);
 
     CREATE TABLE environment (
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       description text NOT NULL,
-      organization_id text NOT NULL,
       owner_account_id text,
+      app_id text NOT NULL,
       current_revision_id text NOT NULL,
       forked_from_environment_id text,
       forked_from_environment_name text,
@@ -80,7 +71,7 @@ function createOnboardingDatabase(): SqliteD1Database {
     CREATE TABLE environment_revision (
       id text PRIMARY KEY NOT NULL,
       environment_id text NOT NULL,
-      organization_id text NOT NULL,
+      app_id text NOT NULL,
       network_policy text NOT NULL,
       allow_mcp_servers integer NOT NULL,
       allow_package_managers integer NOT NULL,
@@ -106,18 +97,16 @@ function createOnboardingDatabase(): SqliteD1Database {
     VALUES ('account-1', 'new@example.com', 1, NULL, NULL, 'New User', NULL, 1, 1);
 
     INSERT INTO organization (
-      id,
-      name,
-      slug,
-      join_policy,
-      primary_domain,
-      avatar_url,
-      creator_account_id,
-      default_environment_id,
+	      id,
+	      name,
+	      slug,
+	      avatar_url,
+	      creator_account_id,
+	      default_environment_id,
       created_at,
       updated_at
-    )
-    VALUES ('01J00000000000000000000006', 'Example Org', 'example-org', 'auto', 'example.com', NULL, '01J00000000000000000000001', NULL, 1, 1);
+	    )
+	    VALUES ('01J00000000000000000000006', 'Example Org', 'example-org', NULL, '01J00000000000000000000001', NULL, 1, 1);
   `);
 
   return database;
@@ -128,56 +117,67 @@ describe("onboarding bootstrap", () => {
     const database = createOnboardingDatabase();
 
     const status = await bootstrapOnboarding(database, VIEWER, {
-      action: "create",
       name: "Created Org",
     });
 
     expect(status.completed).toBe(true);
     expect(status.organization).toMatchObject({
-      joinPolicy: "auto",
       name: "Created Org",
-      primaryDomain: null,
       slug: "created-org",
-      viewerRole: "owner",
     });
+    expect(status.organization).not.toHaveProperty("viewerRole");
 
     const account = await database
       .prepare("SELECT last_active_organization_id FROM account WHERE id = 'account-1'")
       .first<{ last_active_organization_id: string | null }>();
 
     expect(account?.last_active_organization_id).toBe(status.organization?.id);
+
+    const app = await database
+      .prepare(
+        "SELECT name, organization_id, owner_account_id, slug FROM app WHERE organization_id = ?",
+      )
+      .bind(status.organization?.id)
+      .first<{
+        name: string;
+        organization_id: string;
+        owner_account_id: string;
+        slug: string;
+      }>();
+
+    expect(app).toEqual({
+      name: "Default App",
+      organization_id: status.organization?.id,
+      owner_account_id: VIEWER.id,
+      slug: "default",
+    });
   });
 
   test("creates the next slug candidate when the base slug exists", async () => {
     const database = createOnboardingDatabase();
     database.execute(`
       INSERT INTO organization (
-        id,
-        name,
-        slug,
-        join_policy,
-        primary_domain,
-        avatar_url,
-        creator_account_id,
-        default_environment_id,
+	        id,
+	        name,
+	        slug,
+	        avatar_url,
+	        creator_account_id,
+	        default_environment_id,
         created_at,
         updated_at
       )
       VALUES (
-        'org-slug-collision',
-        'Created Org',
-        'created-org',
-        'auto',
-        NULL,
-        NULL,
-        'owner-2',
-        NULL,
+	        'org-slug-collision',
+	        'Created Org',
+	        'created-org',
+	        NULL,
+	        'owner-2',
+	        NULL,
         1,
         1
       );
-    `);
+	`);
     const status = await bootstrapOnboarding(database, VIEWER, {
-      action: "create",
       name: "Created Org",
     });
 
@@ -185,55 +185,24 @@ describe("onboarding bootstrap", () => {
     expect(status.organization).toMatchObject({
       name: "Created Org",
       slug: "created-org-2",
-      viewerRole: "owner",
     });
+    expect(status.organization).not.toHaveProperty("viewerRole");
 
     const createdRows = await database
       .prepare("SELECT id FROM organization WHERE creator_account_id = 'account-1' ORDER BY slug")
       .all<{ id: string }>();
 
     expect(createdRows.results).toEqual([{ id: status.organization?.id }]);
-  });
 
-  test("joins a discovered organization", async () => {
-    const database = createOnboardingDatabase();
+    const appRows = await database
+      .prepare("SELECT organization_id, slug FROM app ORDER BY organization_id")
+      .all<{ organization_id: string; slug: string }>();
 
-    const status = await bootstrapOnboarding(database, VIEWER, {
-      action: "join",
-      organizationId: "01J00000000000000000000006",
-    });
-
-    expect(status.completed).toBe(true);
-    expect(status.organization?.id).toBe("01J00000000000000000000006");
-    expect(status.organization?.viewerRole).toBe("member");
-
-    const account = await database
-      .prepare("SELECT last_active_organization_id FROM account WHERE id = 'account-1'")
-      .first<{ last_active_organization_id: string | null }>();
-
-    expect(account?.last_active_organization_id).toBe("01J00000000000000000000006");
-  });
-
-  test("keeps completed onboarding when joining again", async () => {
-    const database = createOnboardingDatabase();
-    database.execute(`
-      INSERT INTO organization_member (
-        organization_id,
-        account_id,
-        role,
-        disabled_at,
-        disabled_by_account_id,
-        created_at,
-        joined_at
-      )
-      VALUES ('01J00000000000000000000006', 'account-1', 'member', NULL, NULL, 1, 1);
-    `);
-    const status = await bootstrapOnboarding(database, VIEWER, {
-      action: "join",
-      organizationId: "missing-org",
-    });
-
-    expect(status.completed).toBe(true);
-    expect(status.organization?.id).toBe("01J00000000000000000000006");
+    expect(appRows.results).toEqual([
+      {
+        organization_id: status.organization?.id ?? "",
+        slug: "default",
+      },
+    ]);
   });
 });

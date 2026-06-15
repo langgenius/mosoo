@@ -1,17 +1,11 @@
-import { Permission, can } from "@mosoo/contracts/permission";
-import {
-  accountsTable,
-  mcpServersTable,
-  organizationMembersTable,
-  organizationsTable,
-} from "@mosoo/db";
-import type { AccountId, McpServerId } from "@mosoo/id";
+import { accountsTable, mcpServersTable } from "@mosoo/db";
+import type { AccountId, McpServerId, AppId } from "@mosoo/id";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import type { ViewerOrganizationMembership } from "../../organizations/domain/organization-access.policy";
 import { readAccountId } from "./mcp-platform-ids";
 import type { ServerRow, ViewerRow } from "./mcp-types";
 
@@ -33,9 +27,9 @@ const serverColumns = {
   oauthMetadataJson: sql<string | null>`${mcpServersTable.oauthMetadataJson}`.as(
     "oauthMetadataJson",
   ),
-  organizationId: mcpServersTable.organizationId,
   ownerId: mcpServersTable.ownerId,
   ownerName: sql<string | null>`${accountsTable.name}`.as("ownerName"),
+  appId: mcpServersTable.appId,
   source: sql<ServerRow["source"]>`${mcpServersTable.source}`.as("source"),
   updatedAt: sql<number>`${mcpServersTable.updatedAt}`.as("updatedAt"),
   url: mcpServersTable.url,
@@ -120,31 +114,19 @@ export async function listServerRowsById(
 export async function ensureServerAccess(
   database: D1Database,
   viewer: AuthenticatedViewer,
+  appId: AppId,
   serverId: McpServerId,
 ): Promise<{
-  membership: ViewerOrganizationMembership;
   server: ServerRow;
 }> {
   const viewerId = readAccountId(viewer.id);
+  await ensureAppOwnership(database, viewerId, appId);
   const row =
     (await getAppDatabase(database)
-      .select({
-        ...serverColumns,
-        viewerMembershipDisabledAt: organizationMembersTable.disabledAt,
-        viewerMembershipJoinPolicy: organizationsTable.joinPolicy,
-        viewerMembershipRole: organizationMembersTable.role,
-      })
+      .select(serverColumns)
       .from(mcpServersTable)
-      .innerJoin(organizationsTable, eq(organizationsTable.id, mcpServersTable.organizationId))
       .leftJoin(accountsTable, eq(accountsTable.id, mcpServersTable.ownerId))
-      .leftJoin(
-        organizationMembersTable,
-        and(
-          eq(organizationMembersTable.organizationId, mcpServersTable.organizationId),
-          eq(organizationMembersTable.accountId, viewerId),
-        ),
-      )
-      .where(eq(mcpServersTable.id, serverId))
+      .where(and(eq(mcpServersTable.id, serverId), eq(mcpServersTable.appId, appId)))
       .limit(1)
       .get()) ?? null;
 
@@ -152,51 +134,22 @@ export async function ensureServerAccess(
     throw new Error("MCP server not found.");
   }
 
-  const {
-    viewerMembershipDisabledAt,
-    viewerMembershipJoinPolicy,
-    viewerMembershipRole,
-    ...serverRow
-  } = row;
+  const server = toServerRow(row);
 
-  if (viewerMembershipRole === null) {
-    throw new Error("Organization not found.");
-  }
-
-  if (viewerMembershipDisabledAt !== null) {
-    throw forbiddenError("Your organization membership is disabled.");
-  }
-
-  const server = toServerRow(serverRow);
-  const membership: ViewerOrganizationMembership = {
-    joinPolicy: viewerMembershipJoinPolicy,
-    organizationId: server.organizationId,
-    role: viewerMembershipRole,
-  };
-
-  if (server.source === "personal" && server.ownerId !== viewerId) {
+  if (server.ownerId !== viewerId) {
     throw forbiddenError("You do not have access to this MCP server.");
   }
 
-  return { membership, server };
+  return { server };
 }
 
 export async function ensureServerManageAccess(
   database: D1Database,
   viewer: AuthenticatedViewer,
+  appId: AppId,
   serverId: McpServerId,
 ): Promise<{
-  membership: ViewerOrganizationMembership;
   server: ServerRow;
 }> {
-  const { membership, server } = await ensureServerAccess(database, viewer, serverId);
-
-  if (
-    server.source === "organization_shared" &&
-    !can(membership.role, Permission.McpOrganizationManage)
-  ) {
-    throw forbiddenError();
-  }
-
-  return { membership, server };
+  return ensureServerAccess(database, viewer, appId, serverId);
 }

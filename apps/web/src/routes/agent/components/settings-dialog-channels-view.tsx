@@ -287,8 +287,8 @@ function ComingSoonPanel({ channelLabel }: { channelLabel: string }) {
       <Inbox className="text-muted-foreground mx-auto mb-3 size-8" />
       <div className="text-foreground text-sm font-medium">{channelLabel} support is coming</div>
       <p className="text-muted-foreground mx-auto mt-2 max-w-sm text-xs leading-relaxed">
-        We're working on letting agents talk to your team through {channelLabel}. Pick another
-        channel for now, or come back soon.
+        We're working on letting agents receive and answer messages through {channelLabel}. Pick
+        another channel for now, or come back soon.
       </p>
     </div>
   );
@@ -416,7 +416,7 @@ export function AgentSettingsChannelsView({
             </div>
           ) : !canManageChannels ? (
             <div className="border-border bg-muted/20 text-muted-foreground rounded-md border px-3 py-2 text-xs">
-              Only Owners and Admins can connect channels for this agent.
+              Only the Agent owner in this App can connect channels.
             </div>
           ) : selectedChannel.id === "slack" ? (
             <SlackChannelInlineSetup agent={agent} />

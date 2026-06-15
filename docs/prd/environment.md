@@ -1,203 +1,172 @@
-# Environment — for humans
+# Environment - for humans
 
-> This is the product-story version for non-engineer readers. The **full engineering contract** (change-impact matrix / revisions / lifecycle protocol / override-governance details) lives in the shipped Environment PRD.
+> This is the product-story version for non-engineer readers. The complete engineering contract for revisions, lifecycle, and execution snapshots lives in the shipped Environment PRD.
 >
-> **Current Project/App boundary note**: New Project/App work should make Environment Project-scoped, with a default Environment per App. Organization defaults, org-wide sharing, admin compliance override, and cross-project forks are future governance or migration concerns. Preserve EnvironmentRevision freeze semantics. See [Project / App Boundary](./project-app-boundary.md).
+> **Current App boundary note**: Environment is an App-local runtime template. It belongs to one App, Agents in that App can select it, and Session start freezes the selected revision into the execution snapshot. Tenant-wide defaults, tenant policy controls, and cross-App copies are future governance or migration concerns. Preserve EnvironmentRevision freeze semantics. See [App Boundary](./app-boundary.md).
 
 ---
 
 ## One-line positioning
 
-**An Environment is the operating manual for the "little machine" an Agent runs inside**—where its network can reach, what's pre-installed in the container, whether a setup script runs before launch, and which env vars to inject. It packages all of this into a **reusable template** that multiple Agents can share by reference.
+**An Environment is the operating manual for the runtime an Agent runs inside**: which packages are installed, whether setup code runs before launch, which network policy applies, which hosts are allowed, and which env vars are injected.
+
+An Environment is not an access model. It is an App-owned runtime template that one or more Agents in the same App can select by reference.
 
 Analogy:
 
-> Think of Vercel's Project Settings → Environment Variables + Build Settings + Runtime, but **extracted into a standalone asset** that can be attached to many Agents at once—and it doubles as the switch an Org Admin flips to lock down compliance network policy.
+> Think of Vercel App Settings for runtime variables, build setup, and network policy, but as an App-owned template that Agents in the same App can reuse.
 
-It sits alongside the other first-class assets—**Agent / Space / Skill / MCP Server / Environment**:
+It sits alongside the other App-owned resources:
 
-| Asset           | In one line                                                                |
-| --------------- | -------------------------------------------------------------------------- |
-| **Agent**       | A "unit of work" with a persona, capabilities, and configuration           |
-| **Space**       | A **file container** an Agent can mount (an organization-level data asset) |
-| **Skill**       | A stateless capability unit (a callable tool)                              |
-| **MCP Server**  | An external capability server (tool endpoint) an Agent can call            |
-| **Environment** | The **runtime container template** an Agent runs inside                    |
+| Asset           | In one line                                         |
+| --------------- | --------------------------------------------------- |
+| **Agent**       | App-local execution and delivery unit               |
+| **Space**       | App-owned file storage an Agent can mount           |
+| **Skill**       | App-local capability package                        |
+| **MCP Server**  | App-local tool connector definition                 |
+| **Environment** | App-local runtime template an Agent executes inside |
 
 ---
 
-## 1. The user problem
+## 1. Problem
 
-DifyLite v1 has no concept of an Environment. As a result, all three of the people below end up wrestling with the "runtime container":
+Alex is an App owner building a data-analysis Agent that needs `pandas`, `numpy`, and `scikit-learn`.
 
-### Scenario A · Agent author, Alex
+Without Environment, he has only bad choices:
 
-He publishes a data-analysis Agent that needs pandas / numpy / scikit-learn. Today he puts this in the system prompt:
+- Ask the Agent to install packages during each Session
+- Spend extra cold-start time in every run
+- Lose package/version clarity when a downstream run breaks
+- Hide runtime dependencies in prompt text instead of App configuration
 
-> "Please run `pip install pandas` first"
+With Environment, Alex creates one App-local runtime template, selects it on the Agent, and lets every new Session freeze the selected Environment revision at start.
 
-Every session cold-start costs an extra 12 seconds, tokens are wasted in tool-call logs, package versions aren't pinned—and when a downstream Agent breaks, he spends ages debugging.
-
-### Scenario B · Org Admin, Morgan
-
-Compliance requires that all outbound traffic be limited to `mcp.linear.app` and `api.githubcopilot.com`. She wants to "**flip one switch in one place and have it apply org-wide**"—rather than digging through settings Agent by Agent.
-
-### Scenario C · Design intern, Riley
-
-She uses an Agent a colleague published, and the UI asks her "which Environment?". She doesn't understand network policy or package managers—**what she wants is a sensible default that just works, with no thinking required**.
-
-> Without Environment: Alex can only hack it in the prompt; Morgan can only edit each Agent one at a time; and Riley should never have been asked this question at all.
+Riley is configuring a second Agent in the same App. She should not need to understand package managers or network policies. The Agent form should already resolve the App default Environment, while still letting her pick another Environment from the same App when needed.
 
 ---
 
 ## 2. Goals
 
-### What the Agent author (Alex) can do
+When this is done, an App owner should be able to:
 
-- Define a named "runtime template"—network policy + pre-installed packages + setup script + env vars, written once and shared by reference across multiple Agents
-- Pick an Environment from a dropdown on the Agent config page; or create one on the spot with **"+ Create new environment…"** without leaving the Agent form
-- See the compliance template the Org Admin configured (Limited network + allowlist), and—when needed—**Fork it directly** and add his own pandas, without bothering the Admin
-
-### What the Org Admin (Morgan) can do
-
-- Create a named Environment ("compliance-locked") configured with Limited network + Allowed Hosts
-- **Share it with the entire Organization** and mark it as the **Organization Default**—so new Agents adopt it automatically
-- Discover that a member's forked version reset the network back to Full → **edit that copy directly to change it back** through the Org Admin override permission
-- See from the Environment detail who last changed `api.notion.com` in Allowed Hosts
-
-### What a regular Member (Riley) can do
-
-- Use any Agent a colleague published **without needing to understand what an Environment is**—the platform already provides a System Default (Full network, no pre-installed packages) as a fallback, and the picker auto-fills the Org Default
-
-### What InfoSec (Zhang Min) can do
-
-- Quarterly review: which Environments are shared, forked, cascade-forked, or overridden by an Admin
+- Create a named Environment inside the active App with network policy, allowed hosts, packages, setup script, and env vars
+- Mark one Environment as the App default so new Agents in that App preselect it
+- Pick an Environment from the Agent config page
+- Create a new Environment from the Agent form without leaving the configuration flow
+- Copy an App-local Environment when they need an independent runtime template
+- See that each Session freezes the selected Environment revision at Session start
+- Delete or change an Environment only with explicit affected-Agent feedback; missing or cross-App references must surface as errors instead of silently resolving through tenant state
 
 ---
 
 ## 3. Concept definitions
 
-| Term                     | Plain-language definition                                                                                                                                                                                                                                                                                           |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Environment**          | A reusable runtime container template. **Contains only**: network policy + pre-installed packages + setup script + env vars + metadata (name / description). **Does not contain** Spaces / Skills / MCP server—those all belong to the Agent itself.                                                                |
-| **System Default**       | The platform's built-in, read-only Environment: Full network, no pre-installed packages, empty setup, no env vars. **Every Org has one**—a fallback so that any Agent can at least run.                                                                                                                             |
-| **Organization Default** | What the Admin designates in Org settings as "what a new Agent is pre-filled with." It can be the System Default, or one of the Org's own custom Environments. At most 1 per Org.                                                                                                                                   |
-| **Network · Full**       | The sandbox can reach any external domain (the development default)                                                                                                                                                                                                                                                 |
-| **Network · Limited**    | The sandbox can only reach the domains listed in Allowed Hosts, plus the implicit set permitted by two switches (Allow MCP / Allow Package Manager)                                                                                                                                                                 |
-| **Allowed Hosts**        | The outbound allowlist under the Limited policy—a comma-separated list of bare domains. For example, `api.githubcopilot.com, mcp.linear.app` (no https://, no port)                                                                                                                                                 |
-| **Packages**             | The list of dependencies pre-installed by pip / npm / apt at container startup; versions can be pinned                                                                                                                                                                                                              |
-| **Setup Script**         | A shell snippet that runs at container startup, before the Agent process is brought up. If it fails, the session fails to start                                                                                                                                                                                     |
-| **Env Vars**             | `KEY = plaintext value`. The front end uses a password input; once submitted, **the backend encrypts it at rest**, and the UI thereafter shows only a masked preview (e.g. `xoxb-…-abcd`). **There are no cross-resource references**—to use the same token in several places, you fill it in each place separately |
-| **Snapshot**             | At session start, the Environment's current configuration is copied wholesale into the sandbox. Editing the Environment afterward does not affect that session—it runs to completion on the snapshot it started with                                                                                                |
-| **Owner**                | The person who created the Environment. The **only** one who can Edit / Delete / manage sharing                                                                                                                                                                                                                     |
-| **User**                 | An Account that an Owner has shared an Environment with. **Can only Use or Fork**—cannot Edit, cannot Delete, and cannot remove themselves from the share list                                                                                                                                                      |
-| **Use**                  | A User selects this Environment as the current value in their own Agent—this is a **reference**, so when the Owner makes a change the next new session picks up the new version (protected by snapshots, so the current session is unaffected)                                                                      |
-| **Fork**                 | Copy an independent duplicate. **The forker becomes the new Owner and is fully severed from the source.** Later edits to the source do not affect this copy                                                                                                                                                         |
-| **Cascade Fork**         | When an Owner deletes a shared Environment, the system **automatically lands an independent Fork copy for each User**—avoiding a sudden broken reference for downstream Agents                                                                                                                                      |
+| Term                           | Plain-language definition                                                                                                                                                |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Environment**                | App-owned runtime template containing network policy, packages, setup script, env vars, and metadata. It does not contain Spaces, Skills, or MCP servers.                |
+| **App default Environment**    | The Environment preselected for new Agents in one App. It is scoped to that App and does not apply tenant-wide.                                                          |
+| **Network - Full**             | The sandbox can reach external domains without an explicit allowlist.                                                                                                    |
+| **Network - Limited**          | The sandbox can reach only Allowed Hosts plus any explicitly permitted platform dependencies.                                                                            |
+| **Allowed Hosts**              | Outbound allowlist under the Limited policy, written as bare domains such as `api.githubcopilot.com` or `mcp.linear.app`.                                                |
+| **Packages**                   | Dependencies installed before Agent execution, such as pip / npm / apt packages. Versions can be pinned.                                                                 |
+| **Setup Script**               | Shell snippet that runs before the Agent process starts. If it fails, the Session fails to start.                                                                        |
+| **Env Vars**                   | Plain key/value inputs submitted through masked UI and encrypted at rest by the backend. Reusing a token across resources requires entering it separately in each place. |
+| **Environment Revision**       | Immutable saved version of an Environment configuration.                                                                                                                 |
+| **Session execution snapshot** | Runtime copy of the selected Environment revision. Editing the Environment later does not affect an already-started Session.                                             |
+| **Copy**                       | Independent duplicate inside the same App. The copy does not sync with the source.                                                                                       |
 
 ---
 
-## 4. The relationship rule: Environment **does not nest** other assets
+## 4. Relationship rule: Environment does not nest other assets
 
-Environment is **orthogonal** to the other first-class assets—an Agent references Environment and Space and Skill simultaneously, and **the Environment itself does not nest Spaces / Skills / MCP**.
+Environment is orthogonal to the other App-owned resources. An Agent references Environment, Space, Skill, and MCP bindings separately. The Environment itself does not contain those resources.
 
 ```mermaid
 flowchart LR
+  App[App] --> DefaultEnvironment[App default Environment]
+  App --> Environment
+  App --> Agent
   Agent --> Environment
-  Agent --> Space
+  Agent --> Space[Space / Storage]
   Agent --> Skill
-  Agent --> MCP
-  Environment --> Network[Network Policy]
+  Agent --> MCP[MCP Server]
+  Environment --> Network[Network policy]
   Environment --> Packages
-  Environment --> SetupScript[Setup Script]
-  Environment --> EnvVars[Env Vars · values filled in directly]
-  Organization --> OrgDefault[Organization Default]
-  OrgDefault -.points to.-> Environment
+  Environment --> SetupScript[Setup script]
+  Environment --> EnvVars[Env vars]
+  Session[Session start] --> Snapshot[Freeze selected Environment revision]
 ```
 
-> **Why no nesting**: a Space is an organization-level data asset with its own ACL; MCP / Skill are the Agent's capability pool. Each has its own lifecycle, and cramming them all into the Environment would turn it into a "manages everything" grab-bag—change one thing and everything breaks.
+Why no nesting: Space is App-owned storage, MCP and Skill are Agent capability inputs, and Environment is runtime shape. Keeping those concepts separate prevents a runtime template from becoming a "manages everything" container.
 
 ---
 
-## 5. The collaboration model: reuse the Skill playbook (Owner / User · Cascade Fork on Delete)
+## 5. V1 ownership and revision semantics
 
-Environment and Skill look very much alike—both are "template assets." So we **directly reuse the two-tier RBAC already proven out on Skill**:
+Environment has one current ownership model:
 
-```mermaid
-stateDiagram-v2
-  [*] --> Personal: Member creates → automatically becomes Owner
-  Personal --> Personal: Owner edits
-  Personal --> Shared: Owner shares with a User or the whole Org
-  Shared --> Shared: Owner edits (User's next session picks up the new version automatically, protected by snapshots)
-  Shared --> Personal: Owner removes all Users
-  Shared --> [*]: Owner deletes → triggers Cascade Fork
-  Personal --> [*]: Owner deletes (no Users → physically deleted directly)
-  Shared --> Personal: User actively Forks (the forker's copy is independent; the source is unchanged)
-```
+| Capability                             | V1 behavior                                                                                          |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Create Environment                     | App owner only, inside the active App                                                                |
+| Read / edit / delete Environment       | App owner only                                                                                       |
+| Select Environment on an Agent         | App owner only, and only for Agents in the same App                                                  |
+| Set App default Environment            | App owner only, scoped to one App                                                                    |
+| Copy Environment                       | App owner only, producing a new independent Environment in the same App                              |
+| Start Session                          | Runtime freezes the selected Environment revision into the Session execution snapshot                |
+| Cross-App or legacy Environment id use | Fail closed; do not infer access from tenant state, package metadata, snapshots, or a tenant default |
 
-### A few product rules worth remembering
+Hard rules:
 
-- **Environments in your "Shared with me" list are not editable.** To change one, you must Fork a copy. Rationale: an Environment is a template asset, not a collaborative document; multi-person co-editing is pointless and only increases the surface for conflicts
-- **A User cannot opt out of the collaboration.** To leave fully, Fork; to wait, wait for the Owner to delete (at which point Cascade Fork covers you). This simplifies the mental model—"is it mine?" is strictly yes or no
-- **Forking severs the link completely.** There is no "submit to Owner for merge" PR flow; that's only considered for Phase 2+
-- **There is no ownership transfer.** To hand off, have the other party Fork and then the Owner delete (triggering Cascade Fork)
-
-### Cascade Fork: why we do it and how it works
-
-```mermaid
-flowchart TD
-  D[Owner clicks Delete] --> C{N Users in use?}
-  C -->|N = 0| HD[Delete physically right away]
-  C -->|N > 0| CONFIRM["Confirmation dialog: N Users are using this<br/>Deleting will automatically generate a Fork copy for each User"]
-  CONFIRM -->|Confirm| LOOP["For each User:<br/>1. Copy the current snapshot<br/>2. Land it in the User's Personal group<br/>3. Tag it 'Forked from {Owner name}'s deleted Environment'<br/>4. The User becomes the new Owner"]
-  LOOP --> HD2[The Owner's copy is physically deleted]
-```
-
-> **Why we do it**: to avoid the disaster of "the Owner silently deletes it, every downstream Agent's reference breaks, and a User wakes up with no env to start with." Each User inherits an independent copy—whoever uses it owns it.
-
-### The Org Admin override permission (this differs from Skill)
-
-The Org Admin **has a compliance-governance right over any Environment**—they can directly edit someone else's Environment (e.g. changing the network from Full back to Limited). The UI must make this explicit before saving and show the Owner that the Environment was changed by an Org Admin.
-
-Rationale: the **blast radius of network policy is too large**—a single member resetting the network to Full breaks compliance, so someone must be able to dial it back immediately.
-
-> Skill does not enable this override right—Environment's is a special carve-out opened specifically because of compliance pressure.
+- Environment belongs to one App.
+- Agent configuration is the only V1 consumption path for Environment.
+- App default Environment is scoped to one App.
+- Environment edits affect only future Sessions.
+- Missing or mismatched App proof must become an explicit UI/runtime error, not a compatibility path.
 
 ---
 
-## 6. User journeys
+## 6. Journeys
 
-### Admin creates a compliance template → sets it as the default
+### App owner creates a runtime template and sets it as App default
 
-| Stage          | Actor  | Experience                                                                              | Pain point → experience                                                                                            |
-| -------------- | ------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Discover       | Morgan | Hears the compliance requirement, opens the sidebar `Studio → Environments`             | The first item in the list is the System Default with a BUILT-IN badge—clear at a glance                           |
-| Create         | Morgan | A dialog lets her fill in Name + Limited + Allowed Hosts + one env var in one go → Save | No need to first create an empty shell and then jump to a detail page to configure it—fully configured in one step |
-| Share          | Morgan | On the detail page, top-right Share → "Add everyone in organization"                    | Once added, it instantly appears under "Shared with me" in every member's list                                     |
-| Set as default | Morgan | Settings → Organization → select this one as the Default                                | The description is explicit: "Affects new Agents only; existing ones are left untouched"                           |
+| Stage          | Experience                                                                                  | Result                                                                          |
+| -------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Discover       | Alex opens the active App's Environments surface                                            | The list shows App-local runtime templates only                                 |
+| Create         | He creates `data-analysis`, pins packages, sets network mode, adds Allowed Hosts, and saves | A new Environment revision is available in the same App                         |
+| Set as default | He marks `data-analysis` as the App default                                                 | New Agents in this App preselect it; existing Agents keep their current setting |
+| Run            | A Session starts from an Agent that selected `data-analysis`                                | Runtime freezes the selected revision into that Session's execution snapshot    |
 
-### Agent author forks and adds packages → without bothering the Admin
+### App owner configures a second Agent
 
-| Stage                          | Actor | Experience                                                                                                                                                                                                    |
-| ------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Open config page               | Alex  | The picker is already pre-filled with the Org Default "compliance-locked"                                                                                                                                     |
-| Needs pandas                   | Alex  | For him, this env is "Shared with me"—he can't Edit it                                                                                                                                                        |
-| Fork & customize               | Alex  | In the picker dropdown he clicks "+ Create new environment…" or "Fork & customize" on the tile → copies the source, renames it "data-sci-locked", and adds pip packages; he becomes the Owner of the new copy |
-| Continue configuring the Agent | Alex  | **He never left the Agent form**                                                                                                                                                                              |
+| Stage            | Experience                                           | Result                                                     |
+| ---------------- | ---------------------------------------------------- | ---------------------------------------------------------- |
+| Open Agent form  | Riley opens an Agent in the same App                 | The picker resolves the App default Environment            |
+| Needs variation  | She needs one extra package                          | She creates or copies an Environment inside the same App   |
+| Continue editing | She selects the copied Environment in the Agent form | The Agent now has an explicit App-local runtime dependency |
 
-### The person using the Agent notices nothing
+### Runtime rejects stale or cross-App references
 
-| Stage | Actor | Experience                                                            |
-| ----- | ----- | --------------------------------------------------------------------- |
-| Run   | Riley | Chats with the Agent in Chat—with no idea what an Environment even is |
-
-### Owner deletes a shared env → User discovers an extra copy two weeks later
-
-| Stage                 | Actor | Experience                                                                                                                                           |
-| --------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cascade Fork fallback | Alex  | One day, his List's Personal group has an extra entry, "compliance-locked-cascade", with an inline banner _Forked from Morgan's deleted Environment_ |
-| Reaction              | Alex  | "Ah, so Morgan deleted the original—good thing the system took over automatically, the session can still run." Whether to clean it up is his call    |
+| Stage       | Experience                                                              | Result                                                               |
+| ----------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Import      | A package references an Environment id that does not belong to this App | The import path asks for reconnection instead of trusting the id     |
+| Run         | A Session starts with an Agent / Environment App mismatch           | Runtime fails closed with an explicit Environment resolution error   |
+| Maintenance | An Environment is deleted while Agents still reference it               | The affected Agent config or runtime path shows a missing dependency |
 
 ---
 
-> Full engineering contract + 18 Non-Goals + change-impact matrix + protocol-layer lifecycle decisions + override-governance details are covered in the shipped Environment PRD.
+## Future governance, not V1
+
+The following topics can be revisited only after the V1 App boundary is stable:
+
+- Tenant-wide Environment defaults
+- Tenant policy controls for runtime network settings
+- Multi-account access to an Environment
+- Human role matrices for Environments
+- Cross-App copy and transfer flows
+- Audit and review surfaces
+
+Do not keep dormant routes, schema fields, or tests for these topics in the current V1 surface.
+
+---
+
+> Full engineering contract details for change-impact behavior, revision lifecycle, and execution snapshot protocol are covered in the shipped Environment PRD.

@@ -5,22 +5,19 @@ import type {
   AgentConfigChangePlan,
   AgentConfigChangeSnapshot,
 } from "@mosoo/contracts/agent-config-change-plan";
-import type { AccountId, AgentId, McpServerId, SkillId, SpaceId } from "@mosoo/id";
+import type { AccountId, AgentId, McpServerId, AppId, SkillId, SpaceId } from "@mosoo/id";
 import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 import { isSupportedDriverRuntime } from "agent-driver/runtime";
 import type { DriverRuntime } from "agent-driver/runtime";
 
-import {
-  isSpaceRoleRankSufficient,
-  listSpaceAccessRows,
-} from "../../spaces/domain/space-access.policy";
+import { listSpaceAccessRows } from "../../spaces/domain/space-access.policy";
 import { listEditableAgentSkillReferences } from "./agent-deployment-version.service";
 import type { AgentRow } from "./agent-types";
 
 class AgentRuntimeForkRequiredError extends Error {
   public constructor() {
     super(
-      "Runtime change is not allowed in place on a published Agent. Fork Agent to change runtime; sessions, logs, cost, and agent-state stay attached to the original Agent.",
+      "Runtime change is not allowed in place on a Agent API Endpoint. Fork Agent to change runtime; sessions, logs, cost, and agent-state stay attached to the original Agent.",
     );
     this.name = "AgentRuntimeForkRequiredError";
   }
@@ -66,10 +63,11 @@ export function evaluateAgentRuntimeSelection(input: {
 export async function ensureAgentOwnerCanReadBoundSpaces(
   database: D1Database,
   ownerId: AccountId,
+  appId: AppId,
   boundSpaceIds: readonly SpaceId[],
 ): Promise<void> {
   const uniqueSpaceIds = [...new Set(boundSpaceIds)];
-  const access = await listSpaceAccessRows(database, ownerId, uniqueSpaceIds);
+  const access = await listSpaceAccessRows(database, ownerId, appId, uniqueSpaceIds);
 
   for (const spaceId of uniqueSpaceIds) {
     const row = access.accessibleRowsById.get(spaceId);
@@ -78,8 +76,8 @@ export async function ensureAgentOwnerCanReadBoundSpaces(
       throw new Error(`Cannot bind Space ${spaceId}: Space not found.`);
     }
 
-    if (!row || !isSpaceRoleRankSufficient(row.role_rank, "read")) {
-      throw new Error(`Cannot bind Space ${spaceId}: Insufficient space permission.`);
+    if (!row) {
+      throw new Error(`Cannot bind Space ${spaceId}: App owner access required.`);
     }
   }
 }

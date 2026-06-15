@@ -8,7 +8,7 @@ import type {
   CredentialId,
   EnvironmentId,
   McpServerId,
-  OrganizationId,
+  AppId,
   SkillId,
   SpaceId,
 } from "@mosoo/id";
@@ -39,8 +39,8 @@ export const agentsTable = sqliteTable(
     ),
     model: text("model").notNull(),
     name: text("name").notNull(),
-    organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
     ownerId: platformIdColumn<AccountId>("owner_account_id").notNull(),
+    appId: platformIdColumn<AppId>("app_id").notNull(),
     prompt: text("prompt").notNull(),
     provider: text("provider").notNull(),
     runtimeId: text("runtime_id").notNull(),
@@ -53,9 +53,9 @@ export const agentsTable = sqliteTable(
       "agent_published_live_deployment_version_check",
       sql`${table.status} <> 'published' OR ${table.liveDeploymentVersionId} IS NOT NULL`,
     ),
-    index("agent_organization_owner_account_idx").on(table.organizationId, table.ownerId),
+    index("agent_app_owner_account_idx").on(table.appId, table.ownerId),
+    index("agent_app_status_idx").on(table.appId, table.status),
     index("agent_environment_idx").on(table.environmentId),
-    index("agent_organization_status_idx").on(table.organizationId, table.status),
   ],
 );
 

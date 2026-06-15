@@ -4,6 +4,7 @@ import type {
   AgentId,
   OrganizationId,
   PlatformId,
+  AppId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
@@ -35,6 +36,7 @@ export const usageEventsTable = sqliteTable(
     inputTokens: integer("input_tokens").notNull(),
     model: text("model").notNull(),
     organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
+    appId: platformIdColumn<AppId>("app_id").notNull(),
     outputTokens: integer("output_tokens").notNull(),
     priceSnapshotJson: text("price_snapshot_json"),
     pricingStatus: text("pricing_status").$type<"priced" | "unknown">().notNull(),
@@ -57,6 +59,7 @@ export const usageEventsTable = sqliteTable(
       .notNull(),
   },
   (table) => [
+    index("usage_event_app_created_idx").on(table.appId, table.createdAt),
     index("usage_event_organization_created_idx").on(table.organizationId, table.createdAt),
     index("usage_event_agent_created_idx").on(table.agentId, table.createdAt),
     index("usage_event_actor_created_idx").on(table.actorUserId, table.createdAt),
@@ -81,6 +84,7 @@ export const usageDailyRollupsTable = sqliteTable(
     inputTokens: integer("input_tokens").notNull(),
     model: text("model").notNull(),
     organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
+    appId: platformIdColumn<AppId>("app_id").notNull(),
     outputTokens: integer("output_tokens").notNull(),
     provider: text("provider").notNull(),
     requestCount: integer("request_count").notNull(),
@@ -94,6 +98,7 @@ export const usageDailyRollupsTable = sqliteTable(
     primaryKey({
       columns: [
         table.organizationId,
+        table.appId,
         table.agentId,
         table.actorUserId,
         table.agentOwnerUserId,
@@ -104,6 +109,7 @@ export const usageDailyRollupsTable = sqliteTable(
         table.model,
       ],
     }),
+    index("usage_daily_rollup_app_date_idx").on(table.appId, table.date),
     index("usage_daily_rollup_organization_date_idx").on(table.organizationId, table.date),
     index("usage_daily_rollup_agent_date_idx").on(table.agentId, table.date),
     index("usage_daily_rollup_actor_date_idx").on(table.actorUserId, table.date),

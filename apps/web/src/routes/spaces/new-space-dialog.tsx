@@ -1,7 +1,6 @@
 import { SPACE_NAME_MAX_LENGTH, SPACE_NAME_RULE_DESCRIPTION } from "@mosoo/contracts/space";
 import type { CSSProperties, ReactElement } from "react";
 
-import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 
@@ -15,9 +14,7 @@ interface NewSpaceDialogProps {
   onClose: () => void;
   onCreate: () => void;
   onOpenChange: (open: boolean) => void;
-  onSelectVisibility: (visibility: "shared" | "private") => void;
   open: boolean;
-  visibility: "shared" | "private";
 }
 
 export function NewSpaceDialog({
@@ -28,9 +25,7 @@ export function NewSpaceDialog({
   onClose,
   onCreate,
   onOpenChange,
-  onSelectVisibility,
   open,
-  visibility,
 }: NewSpaceDialogProps): ReactElement {
   const nameLength = name.length;
   const nameIsEmpty = name.trim().length === 0;
@@ -73,42 +68,6 @@ export function NewSpaceDialog({
               <span className="text-muted-foreground">
                 {nameLength}/{SPACE_NAME_MAX_LENGTH}
               </span>
-            </div>
-          </div>
-
-          <div>
-            <div className="text-foreground text-sm font-medium">Visibility</div>
-            <div className="mt-1.5 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  onSelectVisibility("shared");
-                }}
-                className={cn(
-                  "rounded-lg border px-3 py-2.5 text-left text-sm transition-colors",
-                  visibility === "shared"
-                    ? "border-primary bg-primary/[0.06] text-primary"
-                    : "border-border text-muted-foreground hover:border-foreground/20",
-                )}
-              >
-                <div className="font-medium">Shared</div>
-                <div className="mt-0.5 text-xs opacity-70">Everyone can read</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onSelectVisibility("private");
-                }}
-                className={cn(
-                  "rounded-lg border px-3 py-2.5 text-left text-sm transition-colors",
-                  visibility === "private"
-                    ? "border-primary bg-primary/[0.06] text-primary"
-                    : "border-border text-muted-foreground hover:border-foreground/20",
-                )}
-              >
-                <div className="font-medium">Private</div>
-                <div className="mt-0.5 text-xs opacity-70">Only you</div>
-              </button>
             </div>
           </div>
 

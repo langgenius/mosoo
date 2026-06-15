@@ -3,32 +3,12 @@ schema {
   mutation: Mutation
 }
 
-input AcceptOrganizationInvitationInput {
-  invitationId: ULID!
-}
-
 type Account {
   email: String!
   id: ULID!
   imageUrl: String
   name: String!
   systemAgentModel: SystemAgentModelSetting
-}
-
-input AddAgentCollaboratorInput {
-  agentId: ULID!
-  principal: String!
-  role: AgentCollaboratorRole!
-}
-
-input AddCollaboratorInput {
-  email: String!
-  role: SpaceRole!
-  spaceId: ULID!
-}
-
-input AddOrganizationCollaboratorInput {
-  spaceId: ULID!
 }
 
 input AddSessionResourceFileInput {
@@ -38,11 +18,13 @@ input AddSessionResourceFileInput {
 }
 
 input AddSessionResourceInput {
+  appId: ULID!
   file: AddSessionResourceFileInput!
   sessionId: ULID!
 }
 
 type Agent {
+  appId: ULID!
   createdAt: String!
   description: String
   id: ULID!
@@ -50,8 +32,6 @@ type Agent {
   liveVersion: AgentDeploymentVersion
   model: String!
   name: String!
-  organizationId: ULID!
-  packageSharingEnabled: Boolean!
   prompt: String!
   provider: String!
   runtimeId: String!
@@ -176,7 +156,6 @@ type AgentBuilderThread {
   creatorAccountId: ULID!
   id: ULID!
   lastTurnAt: String
-  organizationId: ULID!
   status: AgentBuilderThreadStatus!
   title: String
   updatedAt: String!
@@ -191,6 +170,7 @@ type AgentChannelBinding {
   activityLastTriggeredAt: String
   activitySessionCount7d: Int!
   agentId: ULID!
+  appId: ULID!
   createdAt: String!
   displayMetadata: PrimitiveRecord!
   externalBotId: String!
@@ -207,19 +187,6 @@ enum AgentChannelBindingStatus {
   error
 }
 
-type AgentCollaborator {
-  email: String
-  imageUrl: String
-  name: String
-  principal: String!
-  role: AgentCollaboratorRole!
-}
-
-enum AgentCollaboratorRole {
-  admin
-  user
-}
-
 type AgentCostCard {
   agentId: ULID!
   agentName: String!
@@ -230,7 +197,6 @@ type AgentCostCard {
   ownerName: String!
   recentSessions: [CostRecentSession!]!
   totals: CostTotals!
-  users: [CostUserRow!]!
 }
 
 type AgentDeploymentVersion {
@@ -249,6 +215,7 @@ type AgentDeploymentVersion {
 }
 
 type AgentDetail {
+  appId: ULID!
   createdAt: String!
   description: String
   id: ULID!
@@ -256,9 +223,7 @@ type AgentDetail {
   liveVersion: AgentDeploymentVersion
   model: String!
   name: String!
-  organizationId: ULID!
   owner: AgentOwnerSummary!
-  packageSharingEnabled: Boolean!
   prompt: String!
   provider: String!
   runtimeId: String!
@@ -273,7 +238,6 @@ type AgentDetail {
 
 type AgentEditorState {
   builder: AgentBuilderMetadata!
-  collaborators: [AgentCollaborator!]!
   environment: AgentEnvironmentConfig!
   id: ULID!
   mcpBindings: [AgentMcpBinding!]!
@@ -312,7 +276,7 @@ type AgentMcpBinding {
   credentialStatus: McpCredentialStatus!
   credentialSubject: String
   enabled: Boolean!
-  hasSharedCredential: Boolean!
+  hasCredential: Boolean!
   iconUrl: String
   id: ULID!
   name: String!
@@ -551,12 +515,12 @@ enum AgentStatus {
 }
 
 type AgentSummary {
+  appId: ULID!
   createdAt: String!
   description: String
   id: ULID!
   kind: AgentKind!
   name: String!
-  organizationId: ULID!
   owner: AgentOwnerSummary!
   runtimeId: String!
   status: AgentStatus!
@@ -574,15 +538,32 @@ type AgentToolSummary {
 }
 
 enum AgentViewerRole {
-  admin
   none
   owner
-  user
 }
 
 enum AgentVisibility {
-  organization
   private
+}
+
+type App {
+  createdAt: String!
+  defaultEnvironmentId: ULID
+  id: ULID!
+  name: String!
+  ownerAccountId: ULID!
+  slug: String!
+}
+
+type AppCostCard {
+  agents: [CostAgentRow!]!
+  appId: ULID!
+  appName: String!
+  daily: [CostDailyPoint!]!
+  models: [CostModelRow!]!
+  previousTotals: CostTotals!
+  recentSessions: [CostRecentSession!]!
+  totals: CostTotals!
 }
 
 type AppInfo {
@@ -603,13 +584,7 @@ enum AuthSecurityLevel {
 }
 
 input BootstrapOnboardingInput {
-  action: String!
   name: String
-  organizationId: ULID
-}
-
-input CancelOrganizationInvitationInput {
-  invitationId: ULID!
 }
 
 enum ChannelProvider {
@@ -620,17 +595,8 @@ enum ChannelProvider {
   wechat
 }
 
-type Collaborator {
-  assignedBy: ULID
-  createdAt: String!
-  email: String
-  imageUrl: String
-  name: String
-  principal: String!
-  role: SpaceRole!
-}
-
 input ConnectMcpBearerInput {
+  appId: ULID!
   serverId: ULID!
   subjectLabel: String
   token: String!
@@ -717,7 +683,6 @@ enum CostRange {
 type CostRecentSession {
   actorEmail: String
   actorName: String!
-  actorUserId: ULID!
   cacheCreationTokens: Int!
   cacheReadTokens: Int!
   createdAt: String!
@@ -750,35 +715,18 @@ type CostTotals implements CostAggregate {
   unpricedRequestCount: Int!
 }
 
-type CostUserRow implements CostAggregate {
-  activeUsers: Int!
-  agentCount: Int!
-  cacheCreationTokens: Int!
-  cacheReadTokens: Int!
-  inputTokens: Int!
-  outputTokens: Int!
-  previousCostUsd: Float
-  requestCount: Int!
-  topAgentId: ULID
-  topAgentName: String
-  totalCostUsd: Float!
-  unpricedRequestCount: Int!
-  userEmail: String
-  userId: ULID!
-  userName: String!
-}
-
 input CreateAgentForkInput {
   agentId: ULID!
+  appId: ULID!
   kind: AgentKind
 }
 
 input CreateAgentInput {
+  appId: ULID!
   description: String
   kind: AgentKind!
   model: String!
   name: String!
-  organizationId: ULID!
   prompt: String!
   provider: String!
   runtimeId: String!
@@ -787,18 +735,32 @@ input CreateAgentInput {
 
 input CreateAgentSessionInput {
   agentId: ULID!
+  appId: ULID!
   type: SessionType
   waitForRuntimeReady: Boolean
 }
 
+input CreateAppMcpServerInput {
+  appId: ULID!
+  authType: McpAuthType!
+  description: String
+  iconUrl: String
+  name: String!
+  oauthClientId: String
+  oauthClientSecret: String
+  url: String!
+}
+
 input CreateDiscordAgentChannelBindingInput {
   agentId: ULID!
+  appId: ULID!
   applicationId: String!
   botToken: String!
   relaySecret: String!
 }
 
 input CreateEnvironmentForkInput {
+  appId: ULID!
   environmentId: ULID!
 }
 
@@ -806,59 +768,34 @@ input CreateEnvironmentInput {
   allowMcpServers: Boolean!
   allowPackageManagers: Boolean!
   allowedHosts: [String!]!
+  appId: ULID!
   description: String
   envVars: [EnvironmentVariableInput!]!
   name: String!
   networkPolicy: EnvironmentNetworkPolicy!
-  organizationId: ULID!
   packages: [EnvironmentPackageSpecInput!]!
   setupScript: String!
 }
 
 input CreateLarkAgentChannelBindingInput {
   agentId: ULID!
-  appId: String!
+  appId: ULID!
   appSecret: String!
   connectionMode: LarkConnectionMode!
   domain: LarkDomain!
   encryptKey: String
+  larkAppId: String!
   verificationToken: String
 }
 
-input CreateOrganizationInput {
-  name: String
-}
-
-input CreateOrganizationMcpServerInput {
-  authType: McpAuthType!
-  credentialScope: McpCredentialScope!
-  description: String
-  iconUrl: String
-  name: String!
-  oauthClientId: String
-  oauthClientSecret: String
-  organizationId: ULID!
-  sharedBearerToken: String
-  url: String!
-}
-
-input CreatePersonalMcpServerInput {
-  authType: McpAuthType!
-  description: String
-  iconUrl: String
-  name: String!
-  oauthClientId: String
-  oauthClientSecret: String
-  organizationId: ULID!
-  url: String!
-}
-
 input CreateSkillForkInput {
+  appId: ULID!
   skillId: ULID!
 }
 
 input CreateSlackAgentChannelBindingInput {
   agentId: ULID!
+  appId: ULID!
   appLevelToken: String
   botToken: String!
   signingSecret: String!
@@ -866,19 +803,20 @@ input CreateSlackAgentChannelBindingInput {
 }
 
 input CreateSpaceDirectoryInput {
+  appId: ULID!
   name: String!
   path: String
   spaceId: ULID!
 }
 
 input CreateSpaceInput {
+  appId: ULID!
   name: String!
-  organizationId: ULID!
-  visibility: SpaceVisibility
 }
 
 input CreateTelegramAgentChannelBindingInput {
   agentId: ULID!
+  appId: ULID!
   botToken: String!
   webhookSecret: String!
 }
@@ -886,39 +824,35 @@ input CreateTelegramAgentChannelBindingInput {
 input CreateVendorCredentialInput {
   apiBase: String
   apiKey: String!
-  isDefault: Boolean
-  isPreferred: Boolean
+  appId: ULID!
   models: [String!]
   name: String!
-  organizationId: ULID!
-  scope: VendorCredentialScope
   vendorId: String!
 }
 
-enum CreatorMembershipStatus {
-  active
-  disabled
-  removed
-}
-
 input DeleteAgentChannelBindingInput {
+  appId: ULID!
   bindingId: ULID!
 }
 
 input DeleteAgentInput {
   agentId: ULID!
+  appId: ULID!
 }
 
 input DeleteEnvironmentInput {
+  appId: ULID!
   environmentId: ULID!
 }
 
 input DeleteSpaceEntryInput {
+  appId: ULID!
   key: String!
   spaceId: ULID!
 }
 
 input DeleteVendorCredentialInput {
+  appId: ULID!
   id: ULID!
 }
 
@@ -930,6 +864,7 @@ type EnvironmentDetail {
   allowMcpServers: Boolean!
   allowPackageManagers: Boolean!
   allowedHosts: [String!]!
+  appId: ULID!
   canDelete: Boolean!
   canEdit: Boolean!
   createdAt: String!
@@ -943,12 +878,10 @@ type EnvironmentDetail {
   isEditable: Boolean!
   name: String!
   networkPolicy: EnvironmentNetworkPolicy!
-  organizationId: ULID!
   owner: EnvironmentOwnerSummary!
   packages: [EnvironmentPackageSpec!]!
   role: EnvironmentRegistryRole!
   setupScript: String!
-  shareTargets: [EnvironmentShareTarget!]!
   updatedAt: String!
   usedByAgentCount: Int!
 }
@@ -991,26 +924,13 @@ input EnvironmentPackageSpecInput {
 
 enum EnvironmentRegistryRole {
   owner
-  user
-}
-
-type EnvironmentShareTarget {
-  createdAt: String!
-  email: String
-  id: ULID!
-  kind: EnvironmentShareTargetKind!
-  name: String
-}
-
-enum EnvironmentShareTargetKind {
-  organization
-  user
 }
 
 type EnvironmentSummary {
   allowMcpServers: Boolean!
   allowPackageManagers: Boolean!
   allowedHosts: [String!]!
+  appId: ULID!
   canDelete: Boolean!
   canEdit: Boolean!
   createdAt: String!
@@ -1024,7 +944,6 @@ type EnvironmentSummary {
   isEditable: Boolean!
   name: String!
   networkPolicy: EnvironmentNetworkPolicy!
-  organizationId: ULID!
   owner: EnvironmentOwnerSummary!
   packages: [EnvironmentPackageSpec!]!
   role: EnvironmentRegistryRole!
@@ -1051,6 +970,7 @@ enum EnvironmentVariableStatus {
 
 input ExecuteAgentBuilderControlPlaneActionInput {
   agentId: ULID!
+  appId: ULID!
   createEnvironmentPayload: AgentBuilderCreateEnvironmentPayloadInput
   createRemoteMcpServerPayload: AgentBuilderCreateRemoteMcpServerPayloadInput
   draftYaml: String
@@ -1075,7 +995,7 @@ type FileOwner {
 
 enum FileOwnerKind {
   account
-  organization
+  app
   session
   space
 }
@@ -1083,8 +1003,7 @@ enum FileOwnerKind {
 enum FilePurpose {
   agent_asset
   agent_package
-  organization_avatar
-  organization_draft
+  app_draft
   session_attachment
   space_file
 }
@@ -1096,8 +1015,7 @@ type FileScope {
 
 enum FileScopeKind {
   agent_package
-  organization_avatar
-  organization_draft
+  app_draft
   session
   space
 }
@@ -1118,13 +1036,8 @@ enum FileUploadStrategy {
 }
 
 input ImportAgentPackageInput {
+  appId: ULID!
   fileId: ULID!
-  organizationId: ULID!
-}
-
-input InviteOrganizationMemberInput {
-  email: String!
-  organizationId: ULID!
 }
 
 scalar JsonObject
@@ -1177,13 +1090,11 @@ enum McpAuthorizationState {
 
 enum McpCredentialRecordScope {
   agent
-  organization_shared
-  user
+  app
 }
 
 enum McpCredentialScope {
-  organization_shared
-  user
+  app
 }
 
 enum McpCredentialStatus {
@@ -1222,26 +1133,24 @@ enum McpOAuthFlowStatus {
 }
 
 type McpRegistry {
+  appId: ULID!
   currentUserEmail: String!
   currentUserId: ULID!
   currentUserName: String!
-  isAdmin: Boolean!
-  organizationId: ULID!
-  organizationShared: [McpServerWithCredential!]!
-  personal: [McpServerWithCredential!]!
+  servers: [McpServerWithCredential!]!
 }
 
 type McpServer {
+  appId: ULID!
   authType: McpAuthType!
   createdAt: String!
   credentialScope: McpCredentialScope!
   description: String
   enabled: Boolean!
-  hasSharedCredential: Boolean!
+  hasCredential: Boolean!
   iconUrl: String
   id: ULID!
   name: String!
-  organizationId: ULID!
   ownerId: ULID!
   ownerName: String!
   source: McpServerSource!
@@ -1250,11 +1159,11 @@ type McpServer {
 }
 
 enum McpServerSource {
-  organization_shared
-  personal
+  app
 }
 
 type McpServerWithCredential {
+  appId: ULID!
   authType: McpAuthType!
   authorizationState: McpAuthorizationState!
   createdAt: String!
@@ -1263,21 +1172,15 @@ type McpServerWithCredential {
   credentialStatus: McpCredentialStatus!
   description: String
   enabled: Boolean!
-  hasSharedCredential: Boolean!
+  hasCredential: Boolean!
   iconUrl: String
   id: ULID!
   name: String!
-  organizationId: ULID!
   ownerId: ULID!
   ownerName: String!
   source: McpServerSource!
   updatedAt: String!
   url: String!
-}
-
-type MemberCostCard {
-  owned: CostAttributionCard!
-  used: CostAttributionCard!
 }
 
 enum ModelCatalogSource {
@@ -1286,26 +1189,18 @@ enum ModelCatalogSource {
 }
 
 type Mutation {
-  acceptOrganizationInvitation(input: AcceptOrganizationInvitationInput!): Organization!
-  addAgentCollaborator(input: AddAgentCollaboratorInput!): OperationResult!
-  addCollaborator(input: AddCollaboratorInput!): Collaborator!
-  addOrganizationCollaborator(input: AddOrganizationCollaboratorInput!): Collaborator!
   addSessionResource(input: AddSessionResourceInput!): SessionResourceUpload!
-  archiveAgentSession(sessionId: ULID!): OperationResult!
+  archiveAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!
   autoTitleSession(input: RenameSessionInput!): Session!
-  cancelOrganizationInvitation(input: CancelOrganizationInvitationInput!): OrganizationInvitation!
-  clearOrganizationSharedCredential(serverId: ULID!): McpServerWithCredential!
   connectMcpBearer(input: ConnectMcpBearerInput!): McpServerWithCredential!
   createAgent(input: CreateAgentInput!): Agent!
   createAgentFork(input: CreateAgentForkInput!): AgentPackageImportResult!
   createAgentSession(input: CreateAgentSessionInput!): Session!
+  createAppMcpServer(input: CreateAppMcpServerInput!): McpServerWithCredential!
   createDiscordAgentChannelBinding(input: CreateDiscordAgentChannelBindingInput!): AgentChannelBinding!
   createEnvironment(input: CreateEnvironmentInput!): EnvironmentSummary!
   createEnvironmentFork(input: CreateEnvironmentForkInput!): EnvironmentSummary!
   createLarkAgentChannelBinding(input: CreateLarkAgentChannelBindingInput!): AgentChannelBinding!
-  createOrganization(input: CreateOrganizationInput!): Organization!
-  createOrganizationMcpServer(input: CreateOrganizationMcpServerInput!): McpServerWithCredential!
-  createPersonalMcpServer(input: CreatePersonalMcpServerInput!): McpServerWithCredential!
   createSkillFork(input: CreateSkillForkInput!): SkillSummary!
   createSlackAgentChannelBinding(input: CreateSlackAgentChannelBindingInput!): AgentChannelBinding!
   createSpace(input: CreateSpaceInput!): SpaceView!
@@ -1314,82 +1209,43 @@ type Mutation {
   createVendorCredential(input: CreateVendorCredentialInput!): VendorCredential!
   deleteAgent(input: DeleteAgentInput!): OperationResult!
   deleteAgentChannelBinding(input: DeleteAgentChannelBindingInput!): OperationResult!
-  deleteAgentSession(sessionId: ULID!): OperationResult!
+  deleteAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!
   deleteEnvironment(input: DeleteEnvironmentInput!): OperationResult!
-  deleteMcpServer(serverId: ULID!): OperationResult!
-  deleteOwnedSkill(skillId: ULID!): OperationResult!
-  deleteSpace(spaceId: ULID!): OperationResult!
+  deleteMcpServer(appId: ULID!, serverId: ULID!): OperationResult!
+  deleteOwnedSkill(appId: ULID!, skillId: ULID!): OperationResult!
+  deleteSpace(appId: ULID!, spaceId: ULID!): OperationResult!
   deleteSpaceEntry(input: DeleteSpaceEntryInput!): OperationResult!
   deleteVendorCredential(input: DeleteVendorCredentialInput!): OperationResult!
   ensureAgentBuilderThread(agentId: ULID!): AgentBuilderThread!
   executeAgentBuilderControlPlaneAction(input: ExecuteAgentBuilderControlPlaneActionInput!): AgentBuilderControlPlaneActionResult!
   importAgentPackage(input: ImportAgentPackageInput!): AgentPackageImportResult!
-  inviteOrganizationMember(input: InviteOrganizationMemberInput!): OrganizationInvitation!
   onboardingBootstrap(input: BootstrapOnboardingInput!): OnboardingStatus!
   pollLarkAgentChannelRegistration(input: PollLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!
   pollWeChatAgentChannelPairing(input: PollWeChatAgentChannelPairingInput!): WeChatAgentChannelPairing!
-  prewarmAgentSession(sessionId: ULID!): SessionRuntimePrewarmAck!
+  prewarmAgentSession(appId: ULID!, sessionId: ULID!): SessionRuntimePrewarmAck!
   publishAgent(input: PublishAgentInput!): Agent!
   recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
-  removeAgentCollaborator(input: RemoveAgentCollaboratorInput!): OperationResult!
-  removeCollaborator(input: RemoveCollaboratorInput!): OperationResult!
-  removeOrganizationMember(input: RemoveOrganizationMemberInput!): OperationResult!
   removeSessionResource(input: RemoveSessionResourceInput!): OperationResult!
   renameSession(input: RenameSessionInput!): Session!
-  requestOrganizationAccess(input: RequestOrganizationAccessInput!): OrganizationAccessRequest!
-  requestOrganizationInvitation(input: RequestOrganizationInvitationInput!): OrganizationAccessRequest!
   resetAgentState(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
   restartDriver(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
-  reviewOrganizationAccessRequest(input: ReviewOrganizationAccessRequestInput!): OrganizationAccessRequest!
-  revokeMcpUserCredential(serverId: ULID!): McpServerWithCredential!
-  sendAgentSessionEvents(events: [AgentSessionEventInput!]!, sessionId: ULID!): AgentSessionEventBatch!
-  setActiveOrganization(input: SetActiveOrganizationInput!): Organization!
+  revokeMcpCredential(appId: ULID!, serverId: ULID!): McpServerWithCredential!
+  sendAgentSessionEvents(appId: ULID!, events: [AgentSessionEventInput!]!, sessionId: ULID!): AgentSessionEventBatch!
+  setAppDefaultEnvironment(input: SetAppDefaultEnvironmentInput!): EnvironmentSummary!
   setEnvironmentVariableValue(input: SetEnvironmentVariableValueInput!): EnvironmentDetail!
-  setMcpServerEnabled(enabled: Boolean!, serverId: ULID!): McpServerWithCredential!
-  setOrganizationDefaultEnvironment(input: SetOrganizationDefaultEnvironmentInput!): EnvironmentSummary!
-  setOrganizationMemberStatus(input: SetOrganizationMemberStatusInput!): OrganizationMember!
-  setOrganizationSharedBearer(input: SetOrganizationSharedMcpBearerInput!): McpServerWithCredential!
-  setSkillAutoEnabled(input: SetSkillAutoEnabledInput!): SkillAutoPreference!
+  setMcpServerEnabled(appId: ULID!, enabled: Boolean!, serverId: ULID!): McpServerWithCredential!
   setSystemAgentModel(input: SetSystemAgentModelInput!): Account!
-  shareEnvironmentWithOrganization(input: ShareEnvironmentWithOrganizationInput!): EnvironmentShareTarget!
-  shareEnvironmentWithUser(input: ShareEnvironmentWithUserInput!): EnvironmentShareTarget!
-  shareSkillWithOrganization(input: ShareSkillWithOrganizationInput!): SkillShareTarget!
-  shareSkillWithUser(input: ShareSkillWithUserInput!): SkillShareTarget!
   startLarkAgentChannelRegistration(input: StartLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!
   startMcpOAuth(input: StartMcpOAuthInput!): StartMcpOAuthPayload!
   startWeChatAgentChannelPairing(input: StartWeChatAgentChannelPairingInput!): WeChatAgentChannelPairing!
   testVendorCredential(input: TestVendorCredentialInput!): TestVendorCredentialResult!
-  unarchiveAgentSession(sessionId: ULID!): OperationResult!
-  unpublishAgent(agentId: ULID!): Agent!
-  unshareEnvironmentTarget(input: UnshareEnvironmentTargetInput!): OperationResult!
-  unshareSkillTarget(input: UnshareSkillTargetInput!): OperationResult!
-  updateAgentCollaborator(input: UpdateAgentCollaboratorInput!): OperationResult!
+  unarchiveAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!
+  unpublishAgent(agentId: ULID!, appId: ULID!): Agent!
   updateAgentConfig(input: UpdateAgentConfigInput!): Agent!
-  updateAgentPackageSharing(input: UpdateAgentPackageSharingInput!): Agent!
-  updateCollaborator(input: UpdateCollaboratorInput!): Collaborator!
   updateEnvironment(input: UpdateEnvironmentInput!): EnvironmentDetail!
-  updateOrganizationJoinPolicy(input: UpdateOrganizationJoinPolicyInput!): Organization!
-  updateOrganizationMemberRole(input: UpdateOrganizationMemberRoleInput!): OrganizationMember!
-  updateOrganizationPrimaryDomain(input: UpdateOrganizationPrimaryDomainInput!): Organization!
-  updateOrganizationProfile(input: UpdateOrganizationProfileInput!): Organization!
   updateProfile(input: UpdateAccountProfileInput!): Account!
-  updateSessionThreadUiState(input: UpdateSessionThreadUiStateInput!): SessionThreadUiState!
   updateSpace(input: UpdateSpaceInput!): Space!
   updateVendorCredential(input: UpdateVendorCredentialInput!): VendorCredential!
-}
-
-type OnboardingDiscovery {
-  domain: String!
-  isPublicEmail: Boolean!
-  orgs: [OnboardingDiscoveryOrganization!]!
-}
-
-type OnboardingDiscoveryOrganization {
-  creator: String!
-  id: ULID!
-  joinPolicy: OrganizationJoinPolicy!
-  memberCount: Int!
-  name: String!
 }
 
 type OnboardingStatus {
@@ -1405,121 +1261,27 @@ type Organization {
   avatarUrl: String
   createdAt: String!
   id: ULID!
-  joinPolicy: OrganizationJoinPolicy!
   name: String!
-  primaryDomain: String
   slug: String!
-  viewerRole: OrganizationMemberRole
 }
 
-type OrganizationAccessRequest {
-  createdAt: String!
-  id: ULID!
-  organizationId: ULID!
-  organizationName: String!
-  referrerAccountId: ULID
-  referrerName: String
-  requestedByAccountId: ULID!
-  requesterEmail: String!
-  requesterName: String!
-  reviewedAt: String
-  reviewedBy: ULID
-  reviewedByName: String
-  status: OrganizationAccessRequestStatus!
-  updatedAt: String!
-}
-
-enum OrganizationAccessRequestDecision {
-  approve
-  reject
-}
-
-enum OrganizationAccessRequestStatus {
-  approved
-  cancelled
-  pending
-  rejected
-}
-
-type OrganizationCostCard {
-  agents: [CostAgentRow!]!
+type OrganizationBillingCostCard {
   daily: [CostDailyPoint!]!
   models: [CostModelRow!]!
-  ownerUsers: [CostUserRow!]!
   previousTotals: CostTotals!
-  recentSessions: [CostRecentSession!]!
   totals: CostTotals!
-  users: [CostUserRow!]!
-}
-
-type OrganizationInvitation {
-  accountId: ULID
-  createdAt: String!
-  email: String!
-  expiresAt: String
-  id: ULID!
-  invitedBy: ULID!
-  invitedByName: String
-  organizationId: ULID!
-  organizationName: String!
-  status: OrganizationInvitationStatus!
-  updatedAt: String!
-}
-
-enum OrganizationInvitationStatus {
-  accepted
-  cancelled
-  expired
-  pending
-  rejected
-}
-
-enum OrganizationJoinPolicy {
-  auto
-  invite_only
-}
-
-type OrganizationJoinTarget {
-  organization: Organization!
-  organizationId: ULID!
-  organizationName: String!
-  pendingInvitation: OrganizationInvitation
-  pendingRequest: OrganizationAccessRequest
-  viewerIsAuthenticated: Boolean!
-  viewerIsMember: Boolean!
-}
-
-type OrganizationMember {
-  accountId: ULID!
-  disabledAt: String
-  disabledByAccountId: ULID
-  email: String!
-  imageUrl: String
-  joinedAt: String!
-  name: String!
-  role: OrganizationMemberRole!
-  status: OrganizationMemberStatus!
-}
-
-enum OrganizationMemberRole {
-  admin
-  member
-  owner
-}
-
-enum OrganizationMemberStatus {
-  active
-  disabled
 }
 
 input PollLarkAgentChannelRegistrationInput {
   agentId: ULID!
+  appId: ULID!
   deviceCode: String!
   domain: LarkDomain!
 }
 
 input PollWeChatAgentChannelPairingInput {
   agentId: ULID!
+  appId: ULID!
   qrToken: String!
 }
 
@@ -1527,94 +1289,58 @@ scalar PrimitiveRecord
 
 input PublishAgentInput {
   agentId: ULID!
-  """
-  Omit on re-publish to inherit the agent's current visibility. Required only
-  on the very first publish.
-  """
-  visibility: AgentVisibility
+  appId: ULID!
 }
 
 type Query {
-  accessibleAgentList(organizationId: ULID!): [AgentSummary!]!
-  agent(agentId: ULID!): AgentDetail!
+  accessibleAgentList(appId: ULID!): [AgentSummary!]!
+  agent(agentId: ULID!, appId: ULID!): AgentDetail!
   agentBuilderMessages(agentId: ULID!, beforeSeq: Int, limit: Int): [AgentBuilderMessage!]!
-  agentChannelBindingList(agentId: ULID!): [AgentChannelBinding!]!
-  agentCollaboratorList(agentId: ULID!): [AgentCollaborator!]!
-  agentCostCard(agentId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AgentCostCard!
-  agentEditorState(agentId: ULID!): AgentEditorState!
-  agentManifest(agentId: ULID!): AgentManifestExport!
-  agentSessionDiagnostics(sessionId: ULID!): AgentSessionDiagnostics!
-  agentSessionList(agentId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!
-  agentSessionRetrieve(sessionId: ULID!): AgentSessionRetrieve!
+  agentChannelBindingList(agentId: ULID!, appId: ULID!): [AgentChannelBinding!]!
+  agentCostCard(agentId: ULID!, appId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AgentCostCard!
+  agentEditorState(agentId: ULID!, appId: ULID!): AgentEditorState!
+  agentManifest(agentId: ULID!, appId: ULID!): AgentManifestExport!
+  agentSessionDiagnostics(appId: ULID!, sessionId: ULID!): AgentSessionDiagnostics!
+  agentSessionList(agentId: ULID!, appId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!
+  agentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!
+  appCostCard(appId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AppCostCard!
+  appEnvironmentList(appId: ULID!): [EnvironmentSummary!]!
   appInfo: AppInfo!
-  availableAgentModels(currentModelId: String, currentVendorId: String, runtimeId: String!): [ResolvedModelEntry!]!
-  environment(environmentId: ULID!): EnvironmentDetail!
-  exportAgentPackage(agentId: ULID!): AgentPackageExport!
-  listSessionResources(sessionId: ULID!): [SessionResource!]!
+  appList(organizationId: ULID!): [App!]!
+  appSkillList(appId: ULID!): [SkillSummary!]!
+  availableAgentModels(appId: ULID!, currentModelId: String, currentVendorId: String, runtimeId: String!): [ResolvedModelEntry!]!
+  environment(appId: ULID!, environmentId: ULID!): EnvironmentDetail!
+  exportAgentPackage(agentId: ULID!, appId: ULID!): AgentPackageExport!
+  listSessionResources(appId: ULID!, sessionId: ULID!): [SessionResource!]!
   mcpOAuthFlowStatus(flowId: ULID!): McpOAuthFlowState!
-  mcpRegistry(organizationId: ULID!): McpRegistry!
-  memberCostCard(memberId: ULID!, organizationId: ULID!, range: CostRange!): MemberCostCard!
-  onboardingDiscovery: OnboardingDiscovery!
-  organizationAccessRequestList(organizationId: ULID!): [OrganizationAccessRequest!]!
-  organizationCostCard(organizationId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): OrganizationCostCard!
-  organizationEnvironmentList(organizationId: ULID!): [EnvironmentSummary!]!
-  organizationInvitationList(organizationId: ULID!): [OrganizationInvitation!]!
-  organizationJoinTarget(organizationId: ULID!): OrganizationJoinTarget!
-  organizationMemberList(organizationId: ULID!): [OrganizationMember!]!
-  organizationSkillList(organizationId: ULID!): [SkillSummary!]!
-  ownerCostCard(organizationId: ULID!, ownerUserId: ULID!, range: CostRange!): CostAttributionCard!
-  pendingOrganizationInvitationList: [OrganizationInvitation!]!
-  session(sessionId: ULID!): Session!
-  sessionList(archived: Boolean, beforeCursor: String, limit: Int, organizationId: ULID!, type: SessionType): SessionConnection!
-  sessionMessages(sessionId: ULID!): [SessionMessage!]!
-  sessionProcessEvents(limit: Int, sessionId: ULID!): [SessionProcessEvent!]!
-  sessionThreadUiStateList(organizationId: ULID!): [SessionThreadUiState!]!
-  skillDetail(skillId: ULID!): SkillDetail!
-  skillShareTargetList(skillId: ULID!): [SkillShareTarget!]!
-  space(spaceId: ULID!): Space!
-  spaceCollaboratorList(spaceId: ULID!): [Collaborator!]!
-  spaceFiles(path: String, spaceId: ULID!): SpaceFileListing!
-  spaceList(organizationId: ULID!): [SpaceView!]!
-  threadAgentSessionList(archived: Boolean, beforeCursor: String, limit: Int, organizationId: ULID!, type: SessionType): AgentSessionRetrieveConnection!
-  threadAgentSessionRetrieve(sessionId: ULID!): AgentSessionRetrieve!
-  threadSessionMessages(sessionId: ULID!): [SessionMessage!]!
-  threadSessionProcessEvents(limit: Int, sessionId: ULID!): [SessionProcessEvent!]!
-  vendorCredentialList(organizationId: ULID!): [VendorCredential!]!
+  mcpRegistry(appId: ULID!): McpRegistry!
+  organizationBillingCostCard(organizationId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): OrganizationBillingCostCard!
+  session(appId: ULID!, sessionId: ULID!): Session!
+  sessionList(appId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, type: SessionType): SessionConnection!
+  sessionMessages(appId: ULID!, sessionId: ULID!): [SessionMessage!]!
+  sessionProcessEvents(appId: ULID!, limit: Int, sessionId: ULID!): [SessionProcessEvent!]!
+  skillDetail(appId: ULID!, skillId: ULID!): SkillDetail!
+  space(appId: ULID!, spaceId: ULID!): Space!
+  spaceFiles(appId: ULID!, path: String, spaceId: ULID!): SpaceFileListing!
+  spaceList(appId: ULID!): [SpaceView!]!
+  threadAgentSessionList(appId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, type: SessionType): AgentSessionRetrieveConnection!
+  threadAgentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!
+  threadSessionMessages(appId: ULID!, sessionId: ULID!): [SessionMessage!]!
+  threadSessionProcessEvents(appId: ULID!, limit: Int, sessionId: ULID!): [SessionProcessEvent!]!
+  vendorCredentialList(appId: ULID!): [VendorCredential!]!
   viewer: Viewer!
 }
 
-input RemoveAgentCollaboratorInput {
-  agentId: ULID!
-  principal: String!
-}
-
-input RemoveCollaboratorInput {
-  principal: String!
-  spaceId: ULID!
-}
-
-input RemoveOrganizationMemberInput {
-  accountId: ULID!
-  organizationId: ULID!
-}
-
 input RemoveSessionResourceInput {
+  appId: ULID!
   resourceId: ULID!
   sessionId: ULID!
 }
 
 input RenameSessionInput {
+  appId: ULID!
   sessionId: ULID!
   title: String!
-}
-
-input RequestOrganizationAccessInput {
-  organizationId: ULID!
-}
-
-input RequestOrganizationInvitationInput {
-  email: String!
-  organizationId: ULID!
 }
 
 type ResolvedModelEntry {
@@ -1627,11 +1353,6 @@ type ResolvedModelEntry {
   statusLabel: String!
   vendorId: String!
   vendorLabel: String!
-}
-
-input ReviewOrganizationAccessRequestInput {
-  decision: OrganizationAccessRequestDecision!
-  requestId: ULID!
 }
 
 type RunError {
@@ -1661,6 +1382,7 @@ enum RuntimeStateOperation {
 input RuntimeStateOperationInput {
   affectedFields: [String!]
   agentId: ULID!
+  appId: ULID!
   applyActionKind: String
   targetVersion: RuntimeStateTargetVersionInput
 }
@@ -1679,6 +1401,7 @@ input RuntimeStateTargetVersionInput {
 
 type Session {
   agentId: ULID!
+  appId: ULID!
   archivedAt: String
   createdAt: String!
   deploymentVersionId: ULID
@@ -1688,7 +1411,6 @@ type Session {
   lastMessageAt: String
   lastRun: SessionRun
   model: String!
-  organizationId: ULID!
   provider: String!
   runtimeId: String!
   status: SessionStatus!
@@ -1887,49 +1609,22 @@ enum SessionStatus {
   TERMINATED
 }
 
-type SessionThreadUiState {
-  pinned: Boolean!
-  readAt: String
-  sessionId: ULID!
-  updatedAt: String!
-}
-
 enum SessionType {
   api_channel
   preview
   ui
 }
 
-input SetActiveOrganizationInput {
-  organizationId: ULID!
+input SetAppDefaultEnvironmentInput {
+  appId: ULID!
+  environmentId: ULID!
 }
 
 input SetEnvironmentVariableValueInput {
+  appId: ULID!
   environmentId: ULID!
   key: String!
   value: String!
-}
-
-input SetOrganizationDefaultEnvironmentInput {
-  environmentId: ULID!
-  organizationId: ULID!
-}
-
-input SetOrganizationMemberStatusInput {
-  accountId: ULID!
-  organizationId: ULID!
-  status: OrganizationMemberStatus!
-}
-
-input SetOrganizationSharedMcpBearerInput {
-  serverId: ULID!
-  subjectLabel: String
-  token: String!
-}
-
-input SetSkillAutoEnabledInput {
-  autoEnabled: Boolean!
-  skillId: ULID!
 }
 
 input SetSystemAgentModelInput {
@@ -1937,32 +1632,9 @@ input SetSystemAgentModelInput {
   vendor: String!
 }
 
-input ShareEnvironmentWithOrganizationInput {
-  environmentId: ULID!
-}
-
-input ShareEnvironmentWithUserInput {
-  email: String!
-  environmentId: ULID!
-}
-
-input ShareSkillWithOrganizationInput {
-  skillId: ULID!
-}
-
-input ShareSkillWithUserInput {
-  email: String!
-  skillId: ULID!
-}
-
-type SkillAutoPreference {
-  autoEnabled: Boolean!
-  skillId: ULID!
-}
-
 type SkillDetail {
+  appId: ULID!
   author: String!
-  autoEnabled: Boolean!
   createdAt: String!
   currentSnapshot: SkillSnapshotRecord!
   description: String!
@@ -1970,11 +1642,8 @@ type SkillDetail {
   forkOrigin: SkillForkOrigin
   id: ULID!
   name: String!
-  organizationId: ULID!
   ownerId: ULID!
   ownerName: String!
-  role: SkillRegistryRole!
-  shareTargets: [SkillShareTarget!]!
   snapshotId: ULID!
   sourceKind: SkillSourceKind!
   updatedAt: String!
@@ -1984,24 +1653,6 @@ type SkillForkOrigin {
   name: String!
   ownerName: String!
   skillId: ULID!
-}
-
-enum SkillRegistryRole {
-  owner
-  user
-}
-
-type SkillShareTarget {
-  createdAt: String!
-  email: String
-  id: ULID!
-  kind: SkillShareTargetKind!
-  name: String
-}
-
-enum SkillShareTargetKind {
-  organization
-  user
 }
 
 type SkillSnapshotEntry {
@@ -2040,34 +1691,30 @@ enum SkillSourceKind {
 }
 
 type SkillSummary {
+  appId: ULID!
   author: String!
-  autoEnabled: Boolean!
   createdAt: String!
   description: String!
   forkOrigin: SkillForkOrigin
   id: ULID!
   name: String!
-  organizationId: ULID!
   ownerId: ULID!
   ownerName: String!
-  role: SkillRegistryRole!
   snapshotId: ULID!
   sourceKind: SkillSourceKind!
   updatedAt: String!
 }
 
 type Space {
+  appId: ULID!
   canDelete: Boolean!
-  canUpdateAcl: Boolean!
+  canManage: Boolean!
+  canRead: Boolean!
+  canWrite: Boolean!
   createdAt: String!
-  creatorMembershipStatus: CreatorMembershipStatus!
   id: ULID!
-  isSharedWithViewer: Boolean!
   name: String!
-  organizationId: ULID!
   ownerId: ULID!
-  viewerAssetRole: SpaceRole!
-  visibility: SpaceVisibility!
 }
 
 type SpaceFileListing {
@@ -2092,38 +1739,27 @@ enum SpaceFileLockHolderType {
   user
 }
 
-enum SpaceRole {
-  admin
-  edit
-  read
-}
-
 type SpaceView {
+  appId: ULID!
   canDelete: Boolean!
-  canUpdateAcl: Boolean!
+  canManage: Boolean!
+  canRead: Boolean!
+  canWrite: Boolean!
   createdAt: String!
-  creatorMembershipStatus: CreatorMembershipStatus!
   id: ULID!
-  isSharedWithViewer: Boolean!
   name: String!
   ownerId: ULID!
-  role: SpaceRole!
   storagePrefix: String!
-  viewerAssetRole: SpaceRole!
-  visibility: SpaceVisibility!
-}
-
-enum SpaceVisibility {
-  private
-  shared
 }
 
 input StartLarkAgentChannelRegistrationInput {
   agentId: ULID!
+  appId: ULID!
   domain: LarkDomain!
 }
 
 input StartMcpOAuthInput {
+  appId: ULID!
   returnUrl: String
   serverId: ULID!
 }
@@ -2135,6 +1771,7 @@ type StartMcpOAuthPayload {
 
 input StartWeChatAgentChannelPairingInput {
   agentId: ULID!
+  appId: ULID!
 }
 
 type SystemAgentModelSetting {
@@ -2145,9 +1782,8 @@ type SystemAgentModelSetting {
 input TestVendorCredentialInput {
   apiBase: String
   apiKey: String!
+  appId: ULID!
   modelId: String
-  organizationId: ULID!
-  scope: VendorCredentialScope
   vendorId: String!
 }
 
@@ -2159,31 +1795,14 @@ type TestVendorCredentialResult {
 
 scalar ULID
 
-input UnshareEnvironmentTargetInput {
-  environmentId: ULID!
-  targetId: ULID!
-  targetKind: EnvironmentShareTargetKind!
-}
-
-input UnshareSkillTargetInput {
-  skillId: ULID!
-  targetId: ULID!
-  targetKind: SkillShareTargetKind!
-}
-
 input UpdateAccountProfileInput {
   imageUrl: String
   name: String!
 }
 
-input UpdateAgentCollaboratorInput {
-  agentId: ULID!
-  principal: String!
-  role: AgentCollaboratorRole!
-}
-
 input UpdateAgentConfigInput {
   agentId: ULID!
+  appId: ULID!
   builder: AgentBuilderMetadataInput!
   description: String
   environment: AgentEnvironmentConfigInput!
@@ -2198,21 +1817,11 @@ input UpdateAgentConfigInput {
   skillIds: [ULID!]!
 }
 
-input UpdateAgentPackageSharingInput {
-  agentId: ULID!
-  packageSharingEnabled: Boolean!
-}
-
-input UpdateCollaboratorInput {
-  role: SpaceRole!
-  spaceId: ULID!
-  userId: ULID!
-}
-
 input UpdateEnvironmentInput {
   allowMcpServers: Boolean!
   allowPackageManagers: Boolean!
   allowedHosts: [String!]!
+  appId: ULID!
   description: String
   envVars: [EnvironmentVariableInput!]!
   environmentId: ULID!
@@ -2222,46 +1831,17 @@ input UpdateEnvironmentInput {
   setupScript: String!
 }
 
-input UpdateOrganizationJoinPolicyInput {
-  joinPolicy: OrganizationJoinPolicy!
-  organizationId: ULID!
-}
-
-input UpdateOrganizationMemberRoleInput {
-  accountId: ULID!
-  organizationId: ULID!
-  role: OrganizationMemberRole!
-}
-
-input UpdateOrganizationPrimaryDomainInput {
-  domain: String
-  organizationId: ULID!
-}
-
-input UpdateOrganizationProfileInput {
-  avatarUrl: String
-  name: String
-  organizationId: ULID!
-}
-
-input UpdateSessionThreadUiStateInput {
-  pinned: Boolean
-  readAt: String
-  sessionId: ULID!
-}
-
 input UpdateSpaceInput {
+  appId: ULID!
   name: String
   spaceId: ULID!
-  visibility: SpaceVisibility
 }
 
 input UpdateVendorCredentialInput {
   apiBase: String
   apiKey: String
+  appId: ULID!
   id: ULID!
-  isDefault: Boolean
-  isPreferred: Boolean
   models: [String!]
   name: String
 }
@@ -2273,39 +1853,24 @@ type UserWarning {
 
 type VendorCredential {
   apiBase: String
+  appId: ULID!
   id: ULID!
-  isDefault: Boolean!
-  isPreferred: Boolean!
   maskedApiKey: String!
   models: [String!]
   name: String!
-  organizationId: ULID!
-  ownerUserId: ULID
-  scope: VendorCredentialScope!
   vendorId: String!
-}
-
-enum VendorCredentialScope {
-  company
-  personal
 }
 
 type Viewer {
   account: Account
   activeOrganization: Organization
   auth: ViewerAuth!
-  memberships: [ViewerOrganizationMembership!]!
+  organizations: [Organization!]!
 }
 
 type ViewerAuth {
   currentSecurityLevel: AuthSecurityLevel!
   methods: [AuthMethod!]!
-}
-
-type ViewerOrganizationMembership {
-  joinedAt: String!
-  organization: Organization!
-  role: OrganizationMemberRole!
 }
 
 type WeChatAgentChannelPairing {

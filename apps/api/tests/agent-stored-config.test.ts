@@ -13,13 +13,13 @@ describe("agent stored config", () => {
         JSON.stringify({
           packageMcpServers: [],
           packageResolution: null,
-          packageSharingEnabled: false,
           packageSkills: [],
         }),
       ),
     );
 
     expect(normalized.builder).toEqual({ componentDecisions: {} });
+    expect(normalized).not.toHaveProperty("packageSharingEnabled");
     expect(normalized.providerOptions).toEqual({});
   });
 
@@ -32,7 +32,6 @@ describe("agent stored config", () => {
       },
       packageMcpServers: [],
       packageResolution: null,
-      packageSharingEnabled: false,
       packageSkills: [],
       providerOptions: {
         model_providers: {
@@ -65,7 +64,6 @@ describe("agent stored config", () => {
       },
       packageMcpServers: [],
       packageResolution: null,
-      packageSharingEnabled: false,
       packageSkills: [],
       providerOptions: {},
     };

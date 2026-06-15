@@ -1,52 +1,105 @@
-# Public Thread API — for humans
+# Public Thread API - Legacy Public Task API Link
 
-> This is the product-story version for non-engineering readers. For the single source of truth on the product contract, see [`./published-agent-api-surface.md`](./published-agent-api-surface.md). The history of what was removed is no longer tracked in a separate draft.
+> **Purpose**: This file keeps the old `public-task-api.md` link readable. The current and canonical Public Thread API contract is [Public Thread API Surface](./public-thread-api-surface.md).
 >
-> The file is still named `public-task-api` only to keep old links readable. As of 2026-05-28, the standalone Public Task API has been retired, and the Published Agent API adopts **Thread-first** language directly.
+> **Current App boundary note**: The Public Thread API calls one Agent API Endpoint. The Agent owns endpoint exposure, runtime execution, and V1 Threads/Sessions. The App owns the product, API admission, resource, operations, and usage boundary around that Agent. Organization is not a public API authorization boundary in V1.
+>
+> **Related docs**: [SPEC](../SPEC.md), [App Boundary](./app-boundary.md), [Agent Session Contract](./agent-session-api.md), [Thread Files](./session-files.md), and [Public Thread API Surface](./public-thread-api-surface.md).
 
-## 1. In one sentence
+---
 
-The Public Thread API lets external systems invoke a Published Agent and receive a **Thread** they can continue, view, archive, and review.
+## 1. One-Line Positioning
 
-The old Public Task API tried to solve "don't make developers understand Session mechanics on day one." That direction was right, but the `Task` wrapper was too thin: it created a Session, surfaced Session / Run status, and then every real interaction fell back to the Session or the Web Thread. In the end users had to understand four nouns at once — Task, Session, Run, and Thread.
+Call one exposed Agent API Endpoint with an Access Token. Mosoo returns a Thread that can be read, continued, streamed, archived, unarchived, deleted, and given Thread files.
 
-The decision now is: the external API creates a Thread directly. A Thread is still implemented by an AgentSession underneath, but the public language no longer exposes the internal Session axis.
+The App receives the operational and usage rollup. The Agent remains the runtime and delivery subject. The Thread remains the public conversation object.
 
-## 2. What users want to do
+---
 
-- "Have this Agent do one thing."
-- "I want to be able to continue this work later."
-- "Calls I make with my token should show up in my Threads."
-- "My backend may retry — please don't run it twice."
-- "I want to carry a ticket / issue / event id from my customer's system, so I can look it up later."
+## 2. Why This File Still Exists
 
-None of these require a separate Task object. They require a trackable, continuable Thread.
+The old Public Task API has been retired. This path remains only because older PRD links pointed here.
 
-## 3. Core mental model
+The current contract is:
 
-| Noun                  | Plain-language explanation                                                                                                          |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Thread                | Where this work continues, gets viewed, and gets resumed. This is what API users create.                                            |
-| Run                   | A single execution of the Agent. A new Thread starts the first Run; later follow-up input triggers a new Run.                       |
-| AgentSession          | The internal implementation name. It still exists in engineering, but it should not be the first-screen language of the public API. |
-| Human Access Token    | An Access Token. It identifies the human caller and attributes the Thread to that caller.                                   |
-| `client_external_ref` | A correlation ID from the customer's system, e.g. a Linear issue or a support ticket.                                               |
+- Public create-work noun: **Thread**.
+- Public retrieve noun: **Thread**.
+- Runtime implementation noun: **AgentSession / Session**.
+- Public exposure noun: **Agent API Endpoint**.
+- Task object: **not current V1**.
 
-## 4. API shape
+Do not reintroduce `/tasks`, `TaskSummary`, task links, current-task objects, or Session-first public naming as compatibility surfaces.
 
-The first screen of the public docs covers five endpoints:
+---
 
-```text
-POST /api/v1/agents/{agentId}/threads
-GET  /api/v1/threads/{threadId}
-GET  /api/v1/threads/{threadId}/events
-GET  /api/v1/threads/{threadId}/events/stream
-POST /api/v1/threads/{threadId}/events
-```
+## 3. Concepts
 
-`input` is **optional** on create. When the caller passes input, the system starts the first Run immediately; when it is omitted, the Thread is created in `idle` with no Run yet, ready to be continued later.
+| Noun                   | Current meaning                                                                                                                  |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **App**      | The product/API/resource/usage boundary. App is user-facing; App is the engineering name.                                    |
+| **Agent**              | The App-local execution and delivery unit. It owns runtime execution, endpoint exposure, Channel delivery, and Threads/Sessions. |
+| **Agent API Endpoint** | The public HTTPS surface exposed by one Agent.                                                                                   |
+| **Public Thread API**  | The public API for creating, reading, continuing, streaming, archiving, deleting, and attaching files to Threads.                |
+| **Thread**             | Public conversation object created through Web, Public Thread API, or Channel delivery.                                          |
+| **AgentSession**       | Runtime record backing one Thread in V1.                                                                                         |
+| **Run**                | One execution attempt inside a Thread.                                                                                           |
+| **Thread file**        | Material attached to one Thread/backing Session.                                                                                 |
+| **Access Token**       | Caller credential. In V1 it must belong to the App owner of the target Agent API Endpoint.                               |
+| **Caller**             | The token-authenticated account issuing a public request.                                                                        |
+| **Execution owner**    | The Agent owner whose App-local resources, credentials, Environment, Skills, Storage, MCP, and runtime are used.                 |
 
-Create with an initial prompt:
+---
+
+## 4. Admission Model
+
+A Public Thread API request is admitted only when all of these are true:
+
+1. The caller authenticates with an Access Token.
+2. The target Agent is exposed as an active Agent API Endpoint.
+3. The caller owns the App that owns the target Agent.
+4. The Agent owner matches the App owner.
+5. The created or retrieved Thread is backed by a Session for that Agent.
+6. The backing Session inherits App from the Agent.
+
+Tenant people state, old access rows, channel metadata, runtime ids, and historical package ids do not grant public API access in V1.
+
+---
+
+## 5. Route Family
+
+The current route family is:
+
+| Capability                  | Route shape                                    | Product meaning                             |
+| --------------------------- | ---------------------------------------------- | ------------------------------------------- |
+| Machine-readable API schema | `GET /api/v1/openapi.json`                     | Describe the Public Thread API for tooling. |
+| Create Thread               | `POST /api/v1/agents/{agentId}/threads`        | Create a Thread for one Agent API Endpoint. |
+| List endpoint Threads       | `GET /api/v1/agents/{agentId}/threads`         | List Threads for that endpoint and caller.  |
+| Retrieve Thread             | `GET /api/v1/threads/{threadId}`               | Read one Thread by public Thread ID.        |
+| List Thread events          | `GET /api/v1/threads/{threadId}/events`        | Read public event projections.              |
+| Stream Thread events        | `GET /api/v1/threads/{threadId}/events/stream` | Stream public event projections.            |
+| Post Thread events          | `POST /api/v1/threads/{threadId}/events`       | Continue, interrupt, or answer permissions. |
+| Archive Thread              | `POST /api/v1/threads/{threadId}/archive`      | Archive a Thread for the caller.            |
+| Unarchive Thread            | `POST /api/v1/threads/{threadId}/unarchive`    | Restore an archived Thread.                 |
+| Delete Thread               | `DELETE /api/v1/threads/{threadId}`            | Delete the Thread through the public API.   |
+| List Thread files           | `GET /api/v1/threads/{threadId}/files`         | List files attached to the Thread.          |
+| Attach Thread file          | `POST /api/v1/threads/{threadId}/files`        | Claim a draft file into the Thread.         |
+| Delete Thread file          | `DELETE /api/v1/threads/{threadId}/files/{id}` | Remove a file from the Thread.              |
+
+Public IDs are bare Mosoo platform IDs in V1. Product examples should avoid legacy prefixed placeholder IDs.
+
+---
+
+## 6. Create Thread
+
+Creating a Thread accepts:
+
+- optional initial `input`;
+- optional `files` containing staged file IDs;
+- optional `client_external_ref` from the caller's system.
+
+When `input` is present, Mosoo queues the first Run. When `input` is omitted, Mosoo creates an idle Thread that can receive its first user event later.
+
+Example request:
 
 ```json
 {
@@ -54,93 +107,98 @@ Create with an initial prompt:
     "type": "user.message",
     "content": [{ "type": "text", "text": "Review this launch plan." }]
   },
-  "files": [{ "file_id": "file_tmp_..." }],
+  "files": [{ "file_id": "01J00000000000000000000F1" }],
   "client_external_ref": "linear-ENG-123"
 }
 ```
 
-Create an empty Thread to populate later (e.g. a draft scoped to a Linear issue):
-
-```json
-{
-  "client_external_ref": "linear-ENG-123"
-}
-```
-
-Either way, the response centers on the Thread; `run` is present when the create started a Run, and `null` for an empty Thread:
+Example response shape:
 
 ```json
 {
   "thread": {
-    "id": "thread_...",
+    "id": "01J00000000000000000000T1",
     "status": "RUNNING",
-    "agent_id": "agent_...",
-    "last_run_id": "run_...",
+    "agent_id": "01J00000000000000000000A1",
+    "last_run_id": "01J00000000000000000000R1",
     "client_external_ref": "linear-ENG-123"
   },
   "run": {
-    "id": "run_...",
+    "id": "01J00000000000000000000R1",
     "status": "queued"
   },
   "links": {
-    "thread": "/threads/thread_..."
+    "thread": "/threads/01J00000000000000000000T1"
   }
 }
 ```
 
-### Reading events back
+`run` is `null` when the Thread is created without initial input.
 
-For each Thread the public API exposes two read paths and a write path:
+---
 
-- `GET /api/v1/threads/{threadId}/events` returns the latest event log entries as JSON. A `limit` query parameter (default 100, max 1000) caps the number of entries.
-- `GET /api/v1/threads/{threadId}/events/stream` streams the same events as Server-Sent Events for long-running consumers.
-- `POST /api/v1/threads/{threadId}/events` posts a follow-up input event into the Thread, triggering the next Run (this is how a Thread created empty gets its first Run).
+## 7. Events And Lifecycle
 
-## 5. Attribution rules
+For each Thread:
 
-| Caller    | Thread ownership | Enters private Threads?           |
-| --------- | ---------------- | --------------------------------- |
-| Human Access Token | Access Token owner        | Yes — enters this user's Threads. |
+- `GET /events` returns stable public event projections.
+- `GET /events/stream` streams the same event projection as Server-Sent Events.
+- `POST /events` accepts user messages, permission decisions, and user interrupts.
+- Archive makes a Thread read-only to the caller until unarchived.
+- Unarchive restores the Thread to the resumable public path.
+- Delete removes the Thread through the public API.
 
-## 6. Relationship to Channels
+Public event responses hide runtime internals such as driver ids, trace ids, native resume pointers, raw vendor payloads, sandbox paths, and private diagnostics.
 
-Channels such as Slack / Lark / Discord / Telegram / WeChat do not go through the Public Thread API.
+---
 
-A Channel is an entry point into an external collaboration platform. It uses its own binding, signature verification, and external thread id to create or reuse an AgentSession inside Mosoo, and then writes the result back to the originating platform. It does not consume an Access Token, and it does not automatically project an external user into a Mosoo user's private Thread.
+## 8. Thread Files
 
-So this boundary still holds:
+Thread files are not one-message attachments and not App-wide Storage.
+
+The current public file flow is:
+
+1. A caller stages a draft file through the upload path.
+2. `POST /api/v1/threads/{threadId}/files` claims the staged file into the admitted Thread.
+3. `GET /api/v1/threads/{threadId}/files` lists public Thread file metadata.
+4. `DELETE /api/v1/threads/{threadId}/files/{id}` removes a file from that Thread.
+5. The Agent sees the current ready file set through the next user-turn Session manifest.
+
+Public responses do not expose runtime mount paths, object keys, trace ids, or native runtime file pointers.
+
+---
+
+## 9. Idempotency And Rate Limits
+
+Thread creation and event mutation paths support idempotency keyed by caller token, route, method, body hash, and idempotency key. Replayed completed requests return the stored response. Conflicting in-flight or body-mismatched requests fail closed.
+
+The public API also rate-limits requests per Access Token bucket and returns retry information when the bucket is exhausted.
+
+---
+
+## 10. Channel Boundary
+
+Channels such as Slack, Lark, Discord, Telegram, and WeChat do not call the Public Thread API.
+
+They are App-owned delivery resources with their own provider credentials, signature verification, external thread mapping, and reply write-back. A Channel binding can create or continue an AgentSession through its adapter path, but it does not become a public HTTPS API caller.
 
 ```text
 External developers / SaaS / CLI -> Public Thread API
-Slack / Lark / Discord / WeChat  -> Channel binding + internal session path
-Web users                        -> /threads
+Slack / Lark / Discord / WeChat  -> Channel binding + adapter path
+Web users                        -> App Threads
 ```
 
-## 7. Why we retired Task
+---
 
-`Task` sounds like an object that would have its own status, list, lifecycle, comments, collaboration, and notifications. But the v1.3 Task was just a status card; all the real continuation, confirmation, archiving, cancellation, and deletion fell back to the Session / Thread.
+## 11. Legacy Guardrails
 
-This made the product language more complex without giving users any new capability. The Thread is already where users go to continue work, so the public API should deliver a Thread directly.
+- Do not add `/tasks` as an alias, deprecated route, or shadow route.
+- Do not add a current Task object.
+- Do not add `TaskSummary`, Task links, or Task next-action wrappers.
+- Do not make Session the public create/retrieve noun.
+- Do not describe the target as anything other than an Agent API Endpoint.
+- Do not use tenant people records, old role matrices, sharing, or legacy access rows as public API admission.
 
-## 8. What deletion meant
+---
 
-The Thread-first migration has already landed. The `/tasks` route, the `public_api_task` table, the OpenAPI Task schemas, the `TaskSummary` wrapper, and the publishing-panel Task copy were removed during that migration — the published-agent router (`apps/api/src/adapters/http/routes/published-agent-api-route.ts`) now registers only `/threads` endpoints, and the boundary tests assert the legacy surface stays gone.
-
-The invariants we hold going forward:
-
-- New docs, new CLI, and new PRDs use only `threads`.
-- `/tasks` is not reintroduced as an alias, a deprecated surface, or a shadow route.
-- Thin wrappers like `TaskSummary`, Task links, and Task next action do not reappear in the OpenAPI.
-- Future Channel, System Agent, and CLI designs are not bound to the Task concept.
-
-## 9. Decision boundaries
-
-| Question                                 | Conclusion                          |
-| ---------------------------------------- | ----------------------------------- |
-| Public create-work noun                  | Thread                              |
-| Public retrieve noun                     | Thread                              |
-| Old Session API public naming            | Migrated to Thread API naming       |
-| Internal implementation name             | AgentSession may continue to exist  |
-| Keep Task as a product object?           | No                                  |
-| Does Channel call the Public Thread API? | No                                  |
-| Long-term CLI command                    | `threads`, not `tasks` / `sessions` |
+> This file explains the current Thread-first API from the old filename. Use [Public Thread API Surface](./public-thread-api-surface.md) for the canonical product contract.

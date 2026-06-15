@@ -24,7 +24,7 @@ describe("agent debug menu policy", () => {
       canShowAgentDebugMenuItem({
         agentKind: "pet",
         itemId: "terminal",
-        viewerRole: "admin",
+        viewerRole: "none",
       }),
     ).toBe(false);
   });

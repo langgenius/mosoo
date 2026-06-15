@@ -1,4 +1,4 @@
-import type { OrganizationId, SessionId } from "@mosoo/id";
+import type { AppId, SessionId } from "@mosoo/id";
 
 import { logError, logInfo } from "../../../../platform/cloudflare/logger";
 import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
@@ -24,7 +24,7 @@ interface AgentSessionRuntimePrewarmRequest {
   requestUrl: string;
   session: {
     id: SessionId;
-    organizationId: OrganizationId;
+    appId: AppId;
   };
   viewer: AuthenticatedViewer;
 }
@@ -61,7 +61,7 @@ export async function prewarmAgentSessionRuntime(
     const hydrated = await timing.measure("hydrateRunContext", () =>
       hydrateCachedRunContextFromSession(bindings, viewer, {
         id: session.id,
-        organizationId: session.organizationId,
+        appId: session.appId,
         ...(accessViewer ? { accessViewer } : {}),
       }),
     );
@@ -87,7 +87,7 @@ export async function prewarmAgentSessionRuntime(
 
     const executionSession = await timing.measure("ensureSandboxConversationSession", () =>
       ensureSandboxConversationSession(bindings, {
-        currentOrganizationAccessSnapshot: hydrated.value.organizationAccessSnapshot,
+        currentAppAccessSnapshot: hydrated.value.appAccessSnapshot,
         kind: hydrated.value.profile.kind,
         mountSessionResources: false,
         origin: hydrated.value.profile.session.origin,
@@ -122,7 +122,7 @@ export async function prewarmAgentSessionRuntime(
     const driverPrewarm = await timing.measure("prewarmDriverSession", () =>
       prewarmDriverSession(bindings, request.requestUrl, {
         cloudflareSession: executionSession.cloudflareSession,
-        organizationAccessSnapshot: executionSession.organizationAccessSnapshot,
+        appAccessSnapshot: executionSession.appAccessSnapshot,
         profile: driverProfile,
         resolvedMcpServers: hydrated.value.mcpServers,
         resolvedSkillCatalog: hydrated.value.skillCatalog,

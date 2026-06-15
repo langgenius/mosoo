@@ -19,6 +19,7 @@ export function isViewerSocketAttachment(value: unknown): value is ViewerSocketA
 
   return (
     typeof value["publicOrigin"] === "string" &&
+    typeof value["appId"] === "string" &&
     typeof value["sessionId"] === "string" &&
     isRecord(viewer) &&
     typeof viewer["email"] === "string" &&

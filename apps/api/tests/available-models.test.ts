@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
+import { parsePlatformId } from "@mosoo/id";
+import type { AppId } from "@mosoo/id";
+
 import { resolveAvailableModels } from "../src/modules/vendor-credentials/application/available-models";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
+
+const APP_ID = parsePlatformId<AppId>("01J00000000000000000000009", "app ID");
 
 function createAvailableModelsDatabase(): SqliteD1Database {
   const database = new SqliteD1Database();
@@ -11,56 +16,76 @@ function createAvailableModelsDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL
     );
 
-    CREATE TABLE vendor_credential (
+    CREATE TABLE app (
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
+      owner_account_id text NOT NULL,
+      name text NOT NULL,
+      slug text NOT NULL,
+      default_environment_id text,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL
+    );
+
+    CREATE TABLE vendor_credential (
+      id text PRIMARY KEY NOT NULL,
+      app_id text NOT NULL,
       vendor_id text NOT NULL,
-      owner_account_id text,
       name text NOT NULL,
       api_key_secret_id text NOT NULL,
       api_base text,
-      models text,
-      is_default integer DEFAULT 0 NOT NULL,
-      is_preferred integer DEFAULT 0 NOT NULL
+      models text
     );
 
     INSERT INTO organization (id) VALUES ('01J00000000000000000000006');
 
-    INSERT INTO vendor_credential (
+    INSERT INTO app (
       id,
       organization_id,
-      vendor_id,
       owner_account_id,
+      name,
+      slug,
+      default_environment_id,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      '${APP_ID}',
+      '01J00000000000000000000006',
+      'account-1',
+      'Default App',
+      'default',
+      NULL,
+      1,
+      1
+    );
+
+    INSERT INTO vendor_credential (
+      id,
+      app_id,
+      vendor_id,
       name,
       api_key_secret_id,
       api_base,
-      models,
-      is_default,
-      is_preferred
+      models
     )
     VALUES (
       'credential-1',
-      '01J00000000000000000000006',
+      '${APP_ID}',
       'openai',
-      NULL,
       'OpenAI default',
       'secret-1',
       NULL,
-      NULL,
-      1,
-      0
+      NULL
     ),
     (
       'credential-custom',
-      '01J00000000000000000000006',
+      '${APP_ID}',
       'openai-compatible',
-      'account-1',
       'Custom default',
       'secret-custom',
       'https://models.example.com/v1',
-      '["qwen-coder"]',
-      0,
-      1
+      '["qwen-coder"]'
     );
   `);
 
@@ -70,8 +95,7 @@ function createAvailableModelsDatabase(): SqliteD1Database {
 describe("available models", () => {
   test("resolves preset and custom availability", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
-      accountId: "account-1",
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       runtimeId: "openai-runtime",
     });
 
@@ -98,8 +122,7 @@ describe("available models", () => {
 
   test("makes OpenAI preset models available for the internal System Agent runtime", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
-      accountId: "account-1",
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       runtimeId: "system-agent",
     });
 
@@ -118,12 +141,11 @@ describe("available models", () => {
     });
   });
 
-  test("projects a missing current preset model as unavailable catalog state", async () => {
+  test("apps a missing current preset model as unavailable catalog state", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
-      accountId: "account-1",
       currentModelId: "legacy-gpt",
       currentVendorId: "openai",
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       runtimeId: "openai-runtime",
     });
 
@@ -140,12 +162,11 @@ describe("available models", () => {
     });
   });
 
-  test("projects missing current custom models through runtime availability", async () => {
+  test("apps missing current custom models through runtime availability", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
-      accountId: "account-1",
       currentModelId: "removed-custom-model",
       currentVendorId: "openai-compatible",
-      organizationId: "01J00000000000000000000006",
+      appId: APP_ID,
       runtimeId: "openai-runtime",
     });
 

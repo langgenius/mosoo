@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, OrganizationId, SpaceId, UploadId } from "@mosoo/id";
+import type { AccountId, FileId, AppId, SpaceId, UploadId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { deleteFileById } from "../src/modules/files/infrastructure/file-content-service";
@@ -20,10 +20,7 @@ const OTHER_ID = parsePlatformId<AccountId>("01J00000000000000000000002", "other
 const SPACE_ID = parsePlatformId<SpaceId>("01J00000000000000000000003", "space ID");
 const FILE_ID = parsePlatformId<FileId>("01J00000000000000000000004", "file ID");
 const PENDING_FILE_ID = parsePlatformId<FileId>("01J00000000000000000000005", "pending file ID");
-const ORGANIZATION_ID = parsePlatformId<OrganizationId>(
-  "01J00000000000000000000006",
-  "organization ID",
-);
+const APP_ID = parsePlatformId<AppId>("01J00000000000000000000006", "app ID");
 const OVERWRITE_UPLOAD_ID = parsePlatformId<UploadId>(
   "01J00000000000000000000007",
   "overwrite upload ID",
@@ -189,33 +186,24 @@ function createSpaceFileDatabase(): SqliteD1Database {
   const database = new SqliteD1Database({ foreignKeys: false });
 
   database.execute(`
-    CREATE TABLE space (
+    CREATE TABLE app (
       id text PRIMARY KEY NOT NULL,
-      name text NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
-      visibility text NOT NULL,
+      name text NOT NULL,
+      slug text NOT NULL,
+      default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE organization_member (
-      organization_id text NOT NULL,
-      account_id text NOT NULL,
-      role text NOT NULL,
-      disabled_at integer,
-      PRIMARY KEY (organization_id, account_id)
-    );
-
-    CREATE TABLE resource_acl (
-      resource_type text NOT NULL,
-      resource_id text NOT NULL,
-      target_kind text NOT NULL,
-      target_id text NOT NULL,
-      role text NOT NULL,
-      assigned_by_account_id text,
+    CREATE TABLE space (
+      id text PRIMARY KEY NOT NULL,
+      name text NOT NULL,
+      app_id text NOT NULL,
+      owner_account_id text NOT NULL,
       created_at integer NOT NULL,
-      PRIMARY KEY (resource_type, resource_id, target_kind, target_id)
+      updated_at integer NOT NULL
     );
 
     CREATE TABLE file_record (
@@ -265,44 +253,40 @@ function createSpaceFileDatabase(): SqliteD1Database {
       attributed_user_id text,
       creator_account_id text NOT NULL,
       id text PRIMARY KEY NOT NULL,
-      organization_id text NOT NULL,
       provider text NOT NULL,
       title text
+    );
+
+    INSERT INTO app (
+      id,
+      name,
+      organization_id,
+      owner_account_id,
+      slug,
+      default_environment_id,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      '${APP_ID}',
+      'Default App',
+      '01J0000000000000000000000A',
+      '${OWNER_ID}',
+      'default',
+      NULL,
+      1,
+      1
     );
 
     INSERT INTO space (
       id,
       name,
-      organization_id,
+      app_id,
       owner_account_id,
-      visibility,
       created_at,
       updated_at
     )
-    VALUES ('${SPACE_ID}', 'Docs', '${ORGANIZATION_ID}', '${OWNER_ID}', 'shared', 1, 1);
-
-    INSERT INTO organization_member (
-      organization_id,
-      account_id,
-      role,
-      disabled_at
-    )
-    VALUES
-      ('${ORGANIZATION_ID}', '${OWNER_ID}', 'owner', NULL),
-      ('${ORGANIZATION_ID}', '${OTHER_ID}', 'member', NULL);
-
-    INSERT INTO resource_acl (
-      resource_type,
-      resource_id,
-      target_kind,
-      target_id,
-      role,
-      assigned_by_account_id,
-      created_at
-    )
-    VALUES
-      ('space', '${SPACE_ID}', 'user', '${OWNER_ID}', 'admin', '${OWNER_ID}', 1),
-      ('space', '${SPACE_ID}', 'user', '${OTHER_ID}', 'edit', '${OWNER_ID}', 2);
+    VALUES ('${SPACE_ID}', 'Docs', '${APP_ID}', '${OWNER_ID}', 1, 1);
 
     INSERT INTO file_record (
       id,
@@ -453,37 +437,31 @@ function createBindings(
   } as ApiBindings;
 }
 
-async function acquireOtherLock(bucket: MemoryFileBucket, path: string): Promise<void> {
-  await expect(
-    acquireSpaceFileLock(createBindings(bucket), OTHER, SPACE_ID, {
-      path,
-      ttlSeconds: 30,
-    }),
-  ).resolves.toMatchObject({ ok: true });
+function putOtherLock(
+  bucket: MemoryFileBucket,
+  path: string,
+  expiresAt = Date.now() + 30_000,
+): void {
+  bucket.putJson(`_internal/space-file-locks/${SPACE_ID}/${path}`, {
+    expires_at: expiresAt,
+    holder: {
+      displayName: OTHER.name,
+      id: OTHER_ID,
+      type: "user",
+    },
+    lock_id: `other-lock-${path}`,
+    path,
+  });
 }
 
 async function putExpiredLock(bucket: MemoryFileBucket, path: string): Promise<void> {
-  await acquireOtherLock(bucket, path);
-
-  for (const object of bucket.objects.values()) {
-    const payload = JSON.parse(object.body) as { expires_at?: number; path?: string };
-
-    if (payload.path === path) {
-      bucket.putJson(object.key, {
-        ...payload,
-        expires_at: Date.now() - 1,
-      });
-      return;
-    }
-  }
-
-  throw new Error("Expected lock fixture was not stored.");
+  putOtherLock(bucket, path, Date.now() - 1);
 }
 
 describe("space file locks", () => {
   test("rejects locked file update, delete, and upload overwrite paths", async () => {
     const bucket = new MemoryFileBucket();
-    await acquireOtherLock(bucket, REPORT_PATH);
+    putOtherLock(bucket, REPORT_PATH);
 
     await expect(
       updateSpaceFile(createBindings(bucket), OWNER, FILE_ID, {
@@ -513,6 +491,7 @@ describe("space file locks", () => {
           id: SPACE_ID,
           kind: "space",
           path: REPORT_PATH,
+          appId: APP_ID,
         },
       }),
     ).rejects.toMatchObject({
@@ -524,7 +503,7 @@ describe("space file locks", () => {
   test("rejects locked upload completion before storage finalization", async () => {
     const bucket = new MemoryFileBucket();
     const database = createSpaceFileDatabase();
-    await acquireOtherLock(bucket, REPORT_PATH);
+    putOtherLock(bucket, REPORT_PATH);
     insertPendingOverwriteUpload(database);
 
     await expect(
@@ -556,6 +535,7 @@ describe("space file locks", () => {
         id: SPACE_ID,
         kind: "space",
         path: REPORT_PATH,
+        appId: APP_ID,
       },
     });
 
@@ -566,7 +546,7 @@ describe("space file locks", () => {
     const bucket = new MemoryFileBucket();
     bucket.putText(`space/${SPACE_ID}/notes.lock`, "user data");
 
-    const result = await acquireSpaceFileLock(createBindings(bucket), OWNER, SPACE_ID, {
+    const result = await acquireSpaceFileLock(createBindings(bucket), OWNER, APP_ID, SPACE_ID, {
       path: "notes.lock",
       ttlSeconds: 30,
     });
@@ -578,19 +558,19 @@ describe("space file locks", () => {
   test("cleans expired internal locks without depending on a user file suffix", async () => {
     const bucket = new MemoryFileBucket();
     await putExpiredLock(bucket, REPORT_PATH);
-    await acquireOtherLock(bucket, "active.txt");
+    putOtherLock(bucket, "active.txt");
     bucket.putText(`space/${SPACE_ID}/user-owned.lock`, "user data");
 
     await cleanupExpiredSpaceFileLocks(createBindings(bucket));
 
     await expect(
-      acquireSpaceFileLock(createBindings(bucket), OWNER, SPACE_ID, {
+      acquireSpaceFileLock(createBindings(bucket), OWNER, APP_ID, SPACE_ID, {
         path: REPORT_PATH,
         ttlSeconds: 30,
       }),
     ).resolves.toMatchObject({ ok: true });
     await expect(
-      acquireSpaceFileLock(createBindings(bucket), OWNER, SPACE_ID, {
+      acquireSpaceFileLock(createBindings(bucket), OWNER, APP_ID, SPACE_ID, {
         path: "active.txt",
         ttlSeconds: 30,
       }),
