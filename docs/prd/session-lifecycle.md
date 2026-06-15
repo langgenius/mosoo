@@ -140,13 +140,13 @@ We don't do a per-timezone daily reset; TTL is the only time axis a user can pre
 
 The session's product promise is not "always try to recover the Agent's latest configuration." Instead, it is: **a snapshot is frozen at creation time, and every continuation thereafter is built around that snapshot.**
 
-| Question a user might ask                                                                                                | Answer                                                                                                          |
-| ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| I opened this session half an hour ago, the author just changed the prompt — which version am I using now that I'm back? | Still the version you created with (v3); it won't switch silently                                               |
-| The environment my old session used has already been deleted by the author or can't be recovered — what happens?         | This session goes to TERMINATED, with a "New session" button                                                    |
-| What about Space files that were changed or permissions that were revoked?                                               | Every continuation re-validates against the current permissions; it won't use an old snapshot to bypass the ACL |
-| Can I have the platform upgrade me to the latest version?                                                                | No. To upgrade, create a new session; this is the "no silent config swap" promise                               |
-| I'm the owner of a Pet Agent and want to clear leftover login state in the sandbox — what do I do?                       | Reset agent-state; this clears only sandbox state and doesn't touch the transcript / Space / cost               |
+| Question a user might ask                                                                                                | Answer                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| I opened this session half an hour ago, the author just changed the prompt — which version am I using now that I'm back? | Still the version you created with (v3); it won't switch silently                                      |
+| The environment my old session used has already been deleted by the author or can't be recovered — what happens?         | This session goes to TERMINATED, with a "New session" button                                           |
+| What about Space files that were changed or App owner access that no longer proves out?                                  | Every continuation re-validates current App proof; it won't use an old snapshot to bypass owner access |
+| Can I have the platform upgrade me to the latest version?                                                                | No. To upgrade, create a new session; this is the "no silent config swap" promise                      |
+| I'm the owner of a Pet Agent and want to clear leftover login state in the sandbox — what do I do?                       | Reset agent-state; this clears only sandbox state and doesn't touch the transcript / Space / cost      |
 
 ---
 

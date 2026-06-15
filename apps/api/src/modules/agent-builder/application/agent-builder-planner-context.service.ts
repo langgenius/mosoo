@@ -48,7 +48,7 @@ const AGENT_BUILDER_BOUNDARY_POLICY = {
   forbiddenWrites: [
     "secret_plaintext",
     "provider_key",
-    "collaborator_permission",
+    "human_access_control",
     "publish_state",
     "terminal_command_to_draft",
     "other_agent_draft",

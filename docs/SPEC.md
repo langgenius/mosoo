@@ -195,7 +195,7 @@ Storage:
 - Can receive write summaries from runtime file activity.
 - Can be bound by one or more Agents.
 
-Storage collaborator views and org-wide storage catalogs are future governance concepts.
+Storage external-access views and org-wide storage catalogs are future governance concepts.
 
 ### Skill
 
@@ -353,20 +353,19 @@ V1 must not include:
 - App members.
 - App roles.
 - Organization member management.
-- RBAC matrices.
+- Role matrices.
 - Member invitations.
 - Access requests.
 - Enterprise domain discovery.
 - SAML, SCIM, or enterprise SSO.
 - Ownership transfer.
 - Asset takeover.
-- Org-wide shared resource catalogs.
-- Cross-account shared resource views.
 - Org-wide resource catalogs.
-- Agent collaborator management.
-- Storage collaborator management.
-- Skill sharing.
-- Org-shared MCP governance.
+- Cross-account resource views.
+- Agent external-access management.
+- Storage external-access management.
+- Skill external-access management.
+- Org-level MCP governance.
 - Company credential pools.
 - Per-member BYOK.
 - Cross-member cost reporting.
@@ -463,15 +462,15 @@ V1 must not include:
 4. App views show Agent detail, resource lists, Thread history, expose state, spend, request
    count, token/cache usage, model breakdown, recent runs, logs, health, and unpriced usage
    count.
-5. V1 does not show member drilldown.
+5. V1 does not show per-user drilldown.
 
 ## Access Rules
 
 - The Organization owner can access all Apps in that Organization.
 - The App owner is the Organization owner in V1.
-- New access checks should be App owner checks.
-- Existing Organization membership checks are migration compatibility only.
-- New code must not add admin/member branches for V1 behavior.
+- Access checks are App owner checks.
+- Legacy tenant/account rows must not be used to infer product-resource access.
+- Code must not add admin/member branches for V1 behavior.
 
 ## Console IA
 
@@ -529,8 +528,8 @@ Rules:
   runtime behavior.
 - When older docs mention cross-account collaboration, org-wide resource catalogs,
   member role matrices, invitations, or access requests, treat it as future governance.
-- Remove old governance tables as soon as App ownership and owner access replace their runtime
-  dependencies.
+- Old governance tables should be deleted once runtime dependencies no longer need them;
+  new App paths must fail closed instead of deriving access from historical records.
 
 ## Implementation Order
 
@@ -547,10 +546,10 @@ Rules:
 9. Add App usage, health, logs, and Organization billing rollup.
 10. Make App Overview the console root.
 11. Add App export to one `Skill.md`.
-12. Remove or hide public Members, RBAC, invitations, access requests, resource-sharing,
+12. Remove or hide public Members, role matrices, invitations, access requests, external-access,
     App-publish, preview-URL, and Web-shell surfaces from the V1 path.
 13. Remove internal services, contracts, tests, and database tables for old governance after
-    no runtime path depends on them.
+    no runtime path depends on them; do not keep adapters for compatibility.
 
 ## Acceptance Checklist
 
@@ -575,4 +574,4 @@ An implementation is aligned with this Spec when:
 - Export creates one `Skill.md` for the whole App.
 - Usage, health, and logs are visible at App scope.
 - Organization remains present only as tenant, billing rollup, and future governance shell.
-- No new V1 code introduces App members, RBAC, invitations, or access requests.
+- No new V1 code introduces App members, role matrices, invitations, or access requests.

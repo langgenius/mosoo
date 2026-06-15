@@ -332,7 +332,7 @@ describe("agent package file import", () => {
     {
       message: "Agent package file does not belong to the importing user.",
       name: "rejects cross-owner files",
-      updateSql: `UPDATE file_record SET created_by_account_id = '${PUBLIC_API_TEST_IDS.memberAccount}' WHERE id = ?`,
+      updateSql: `UPDATE file_record SET created_by_account_id = '${PUBLIC_API_TEST_IDS.nonOwnerAccount}' WHERE id = ?`,
     },
     {
       message: "Agent package file does not belong to the target App.",

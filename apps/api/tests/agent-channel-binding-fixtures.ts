@@ -16,12 +16,12 @@ export const OWNER_VIEWER: AuthenticatedViewer = {
   name: "Owner",
 };
 
-export const COLLABORATOR_VIEWER: AuthenticatedViewer = {
-  email: "collaborator@example.com",
+export const EXTERNAL_VIEWER: AuthenticatedViewer = {
+  email: "external@example.com",
   emailVerified: true,
   id: "01J00000000000000000000003",
   imageUrl: null,
-  name: "Collaborator",
+  name: "External Viewer",
 };
 
 export const SLACK_AUTH_TEST_OK_RESPONSE = {

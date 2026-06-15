@@ -13,7 +13,7 @@ Product contracts and the standards used to write them.
 
 ## PRDs
 
-Implementation contracts and shipped product behavior. Each PRD is the high-readability product specification for a capability. When older PRDs mention Organization-owned business assets, members, Admin reach-through, Workspace, Agent-first service identity, or a required single Agent type picker, apply the App Boundary drift rules first.
+Implementation contracts and shipped product behavior. Each PRD is the high-readability product specification for a capability. When older PRDs mention Organization-owned business assets, Workspace, or Agent-first service identity, apply the App Boundary drift rules first.
 
 ### Agents & packaging
 
@@ -31,9 +31,7 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 - [Session Lifecycle](./session-lifecycle.md)
 - [Session Files](./session-files.md)
 - [Session Log](./session-log.md)
-- [Agent Runtime Logs](./agent-runtime-logs.md) — **deprecated** (Debug → System Log surface removed; dropped from the roadmap)
 - [Agent Terminal](./agent-terminal.md)
-- [Agent File Browser](./agent-file-browser.md) — **deprecated** (File Browser surface removed; dropped from the roadmap)
 
 ### Surfaces & channels
 
@@ -46,12 +44,6 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 - [Space](./space-interaction.md)
 
 Surface boundary: public HTTPS exposure is an Agent API Endpoint inside one App. Thread is the public conversation object, Session is the runtime record, and Thread files are scoped to the admitted Thread/backing Session. Organization remains account and billing context, not a public API authorization boundary.
-
-### Deprecated / future access, identity & governance
-
-- [Identity & Access](./identity-access.md) — deprecated for the current App cut; keep only as future multi-member governance archive.
-- [RBAC](./rbac.md) — deprecated for the current App cut; do not use it to justify V1 permissions, UI, fixtures, or fallbacks.
-- [Credentials](./credentials.md) — current App work moves Provider credentials to App scope first, preserving Organization fallback only as migration context.
 
 ### Admin & cost
 

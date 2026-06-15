@@ -459,7 +459,7 @@ describe("API to web boundary", () => {
             `https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`,
             {
               body: JSON.stringify({
-                attributed_user_id: PUBLIC_API_TEST_IDS.memberAccount,
+                attributed_user_id: PUBLIC_API_TEST_IDS.nonOwnerAccount,
                 input: {
                   content: [{ text: "Do the work.", type: "text" }],
                   type: "user.message",
@@ -570,7 +570,7 @@ describe("API to web boundary", () => {
       readCreateThreadFileRequest({
         req: {
           raw: new Request(
-            `https://api.example.com/api/v1/threads/${PUBLIC_API_TEST_IDS.memberSession}/files`,
+            `https://api.example.com/api/v1/threads/${PUBLIC_API_TEST_IDS.nonOwnerSession}/files`,
             {
               body: JSON.stringify(requestExample),
               headers: { "Content-Type": "application/json" },
@@ -680,7 +680,7 @@ describe("API to web boundary", () => {
       readCreateThreadFileRequest({
         req: {
           raw: new Request(
-            `https://api.example.com/api/v1/threads/${PUBLIC_API_TEST_IDS.memberSession}/files`,
+            `https://api.example.com/api/v1/threads/${PUBLIC_API_TEST_IDS.nonOwnerSession}/files`,
             {
               body: JSON.stringify({
                 contentBase64: "SGVsbG8=",
@@ -751,7 +751,7 @@ describe("API to web boundary", () => {
 
     expect(publicBatch.thread).toMatchObject({
       agent_id: PUBLIC_API_TEST_IDS.agent,
-      id: PUBLIC_API_TEST_IDS.memberSession,
+      id: PUBLIC_API_TEST_IDS.nonOwnerSession,
       source: "api",
     });
     expectNoProperties(publicBatch.thread, [

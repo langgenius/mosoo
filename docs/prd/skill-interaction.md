@@ -75,8 +75,8 @@ We deliberately do **not** reuse Space's old three-tier admin / edit / read mode
 
 The current registry has one product group:
 
-| Group          | Who's in it                                                                                                       |
-| -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Group          | Who's in it                                                                                           |
+| -------------- | ----------------------------------------------------------------------------------------------------- |
 | **App Skills** | Skills whose `app_id` is the active App, including uploaded, generated, imported, and copied packages |
 
 Future multi-user governance may add additional views, but V1 should not expose them or keep dormant route/API entrypoints for them.
@@ -125,7 +125,7 @@ The effect: nothing invents ownership for another user or App, and no compatibil
 | Copy/fork                          | Yes        | No V1 path |
 | Mount on an Agent                  | Yes        | No V1 path |
 | Delete                             | Yes        | No V1 path |
-| Manage collaborators               | No V1 path | No V1 path |
+| Manage external access             | No V1 path | No V1 path |
 
 ---
 
@@ -155,7 +155,7 @@ What's mounted in an Agent's configuration is an **App-owned Skill id reference*
 
 - The Agent config stores explicit references to Skills in the same App
 - At Session start, runtime resolves and freezes the configured Skill bindings through the Agent's App
-- Legacy package runtime ids or cross-App references fail closed instead of deriving ownership from snapshots or Organization membership
+- Legacy package runtime ids or cross-App references fail closed instead of deriving ownership from snapshots or historical tenant rows
 - If a Skill is deleted or unavailable, the UI/runtime must surface a tombstone or explicit failure; no shared-owner fallback is allowed
 
 ### 8.1 User-level "toggle" vs Agent mounting (drift)

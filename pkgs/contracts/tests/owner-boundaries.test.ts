@@ -63,7 +63,7 @@ function readFixture(path: string): string {
 }
 
 describe("contracts owner boundaries", () => {
-  test("does not expose the old RBAC permission package surface", () => {
+  test("does not expose the old permission package surface", () => {
     const packageJson = readFixture("../package.json");
     const indexSource = readFixture("../src/index.ts");
 

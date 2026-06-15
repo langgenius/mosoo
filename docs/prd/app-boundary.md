@@ -78,7 +78,7 @@ Onboarding should create a default App. If an Organization has exactly one App, 
 1. Add the App data model, shared contracts, GraphQL surface, and default App creation during onboarding / Organization provisioning.
 2. Move Agent creation and Agent reads under App without introducing a generic Service entity. Threads / Sessions should inherit App from Agent rather than introducing an independent picker.
 3. Move concrete resources under App ownership directly; do not route them through a unified `services` table.
-4. Move Environment and Provider defaults to App scope.
+4. Move Environment and Provider defaults to App scope; resources without App ownership fail closed.
 5. Move MCP, Skills, Spaces, and Channels under App resource ownership. Preserve existing resource semantics, but change the owning boundary first.
 6. Add App Templates for common simple shapes such as Pet Agent plus Channel.
 7. Add App-scoped usage / cost while preserving Organization rollups for billing and future governance.

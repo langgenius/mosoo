@@ -126,7 +126,6 @@ This product has several ops tools. Don't mix them up:
 
 | What you want to do                                                         | Which one to use                                                         |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| See what events recently happened on this agent's machine (Pet only)        | **Debug → System Log** ([for-humans](./agent-runtime-logs.md), surface removed) |
 | See what messages / tool calls a given session ran (Pet + Cattle)           | **Logs tab** → pick a session                                            |
 | Open a root shell to debug / maintain the sandbox (**Pet only, daily ops**) | **Terminal tab** (this PRD)                                              |
 | See an agent's version history and roll back to an older version            | **Versions tab** ([for-humans](./agent-versions.md), currently deferred) |

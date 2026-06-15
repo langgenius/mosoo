@@ -6,7 +6,7 @@ import {
 } from "../src/modules/runtime/infrastructure/session-runs/session-run-store.repository";
 import {
   createPublicHttpContractDatabase,
-  insertMemberSession,
+  insertNonOwnerSession,
 } from "./helpers/public-api-http-test-fixture";
 
 async function insertQueuedSessionRun(
@@ -59,7 +59,7 @@ async function insertQueuedSessionRun(
 describe("session run reads", () => {
   test("checks active run existence", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertQueuedSessionRun(database);
 
     await expect(hasActiveSessionRun(database, "01J0000000000000000000000B")).resolves.toBe(true);
@@ -67,7 +67,7 @@ describe("session run reads", () => {
 
   test("loads the latest active run id", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertQueuedSessionRun(database, { createdAt: 1, id: "run-active-probe-old" });
     await insertQueuedSessionRun(database, { createdAt: 2, id: "run-active-probe-latest" });
 

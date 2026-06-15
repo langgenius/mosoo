@@ -4,7 +4,7 @@
 
 Mosoo provides a deliberately simple web experience for orchestrating App-local Agents and concrete resources backed by CLI tools and SDK-based runtimes.
 
-The current priority is OPCs, personal developers, and small self-hosted deployments. A user should be able to bring `PRD.md`, invoke `@mosoo`, and get a running Agent App in their own Cloudflare account with low operational overhead. In the current construction phase, assume one human owns one Organization: Organization is the account / billing / tenant shell, and App is the code, data, product, and console boundary. App owns concrete resources directly; it does not introduce a generic Service entity, `services` table, or polymorphic `service.kind`. Team collaboration, enterprise governance, cost management, and stronger compliance controls are extension paths for the same architecture, not default complexity for the current community edition.
+The current priority is OPCs, personal developers, and small self-hosted deployments. A user should be able to bring `PRD.md`, invoke `@mosoo`, and get a running Agent App in their own Cloudflare account with low operational overhead. In the current construction phase, assume one human owns one Organization: Organization is the account / billing / tenant shell, and App is the code, data, product, and console boundary. App owns concrete resources directly; it does not introduce a generic Service entity, `services` table, or polymorphic `service.kind`. Additional operational controls are extension paths for the same architecture, not default complexity for the current community edition.
 
 To support lightweight deployment, fast iteration, and future governance expansion, the architecture embraces Serverless and edge computing and follows these baseline principles:
 
@@ -21,7 +21,7 @@ The architecture is built on the Cloudflare platform and uses a Serverless shape
 
 - **Frontend and ingress: Cloudflare Workers**. The Web Worker serves Vite-built static assets. The API Worker handles stateless GraphQL / Web API requests and WebSocket handshakes, then hands upgraded session connections to the corresponding Session Durable Object. Cloudflare routing sends `mosoo.ai/api/*` to the API Worker and all other paths to the Web Worker.
 - **State and connection management: Cloudflare Durable Objects**. Durable Objects hold upgraded WebSocket connections, high-frequency Session state, and distributed coordination points that need single-instance concurrency.
-- **Primary database: Cloudflare D1**. D1 stores Organization / Account / Membership records, App records, core entity configuration, and metadata.
+- **Primary database: Cloudflare D1**. D1 stores Account records, Organization shell records, App records, core entity configuration, and metadata.
 - **Message queues: Cloudflare Queues**. Queues decouple the control plane from offline tasks. They provide consumer groups, ACK semantics, dead-letter queues, and at-least-once delivery for asynchronous work and cost log ingestion.
 - **Object storage: Cloudflare R2**. R2 stores long-lived Space files, session-level file objects, sandbox state backups, and configuration attachments. User-visible Space files are mounted into the Sandbox from R2 bucket prefixes. Sandbox private state backups use a separate backup bucket and must not be mixed with user-visible file prefixes.
 - **Execution sandbox: Cloudflare Sandbox / Containers**. Heterogeneous Agents run in container-image-backed isolated environments, with Sandbox APIs and Durable Object boundaries controlling runtime lifecycle.
@@ -43,7 +43,7 @@ graph TD
     subgraph API_Layer [API Layer]
         Ingress[HTTP / WS Ingress<br/>Workers]
 
-        Identity[Identity & Access Service<br/>Org / Account / Membership]
+        Identity[Account & Organization Shell Service]
         Auth[Auth Service]
         App[App Domain<br/>Resource Boundary]
         Session[Session Service / Event Bus<br/>Durable Objects]
@@ -126,10 +126,10 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
 2. **App Domain**
    App Domain owns the business, resource, operations, and export boundary for the current pivot. App is the canonical product and engineering noun. An App belongs to an Organization and is owned by the Organization owner during the single-owner phase. App has no runtime; Agents own Agent runtime, API endpoint exposure, channel delivery, and Threads / Sessions.
    - **Default App provisioning**: Onboarding / Organization provisioning creates a default App. If the Organization has exactly one App, the console routes directly into that App instead of forcing an App picker.
-   - **Agent and resource ownership**: Agents, Threads / Sessions, Spaces, Environments, Skills, MCP servers, Provider credentials, Channels, Agent exposure state, App export, app health, logs, and app-scoped cost are App-owned resources. Organization rollups remain for billing and future governance.
+   - **Agent and resource ownership**: Agents, Threads / Sessions, Spaces, Environments, Skills, MCP servers, Provider credentials, Channels, Agent exposure state, App export, app health, logs, and app-scoped cost are App-owned resources. Organization rollups remain for billing.
    - **No generic Service entity**: Do not add a unified `services` table, polymorphic `service.kind`, or generic Service CRUD for concrete App resources. If a future Web/API runtime, database service, worker process, or scheduled job is needed, model it with an explicit noun and lifecycle.
    - **App Templates**: Common one-Agent, one-Channel Apps should be created from App Templates that provision a resource graph, not from a required global App type or single Agent type picker.
-   - **Access boundary**: App access maps to the single Organization owner for this phase. App members, App roles, ownership transfer, and org-wide resource catalogs are future extensions, not prerequisites for the first cut.
+   - **Access boundary**: App access maps to the single Organization owner for this phase. No secondary principal model is part of the first cut.
 
 3. **Agent Plane**
    The Agent Plane unifies configuration management, lightweight system assistance, and runtime scheduling. The public data entity is the bare `Agent`. Historical terms such as `AgentService` and `PublishedAgent` have been collapsed into `Agent`, and the module name `Agent Plane` avoids a naming collision with the entity itself.
@@ -143,7 +143,7 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
 
 4. **File Service**
    The File Service combines Space logic with storage access. It is a shallow wrapper around Cloudflare R2:
-   - **Abstraction and permission control**: Space is moving to an App-owned file asset for current App work. Existing Organization-owned ACL language is migration context or future multi-member governance. During the single-owner phase, Space access is derived from App owner access; `admin`, `edit`, `read`, wildcard sharing, and Organization admin reach-through remain extension points.
+   - **Abstraction and permission control**: Space is an App-owned file asset for current App work. During the single-owner phase, Space access is derived from App owner access; old permission-table language must not be used to derive access.
    - **Direct read/write data plane**: During Sandbox execution, authorized App Space R2 prefixes are mounted directly into the Sandbox. Existing `organization/sp/{spaceId}` physical prefixes are legacy storage paths, not logical ownership. This creates the real data plane `Sandbox / Agent Process <-> R2`. The File Service does not proxy runtime Space file bytes. Browser-side large uploads and downloads may use presigned URLs to avoid API memory pressure.
    - **Space version safety net**: Cloudflare R2 currently does not expose usable bucket-level Object Versioning controls. Before destructive writes such as overwrite, delete, directory delete, or Space delete, the File Service performs copy-on-write. It copies the previous object into the non-mounted `space_versions/{spaceId}/...` prefix in `FILE_BUCKET`, then writes version metadata into `space_file_version` in D1. `space/{spaceId}/...` remains the only user- and Agent-visible Space timeline. The version ledger is for operational recovery and future recovery UI.
    - **Session file resources**: Session File / Session Resource is the explicit attachment layer for files uploaded by a user or added through the Public API. The File Service stores them as `file_record(scope_kind=session, session_kind=attachment)` plus an R2 object, then injects a readable path manifest into the next Agent input. Session Files are not an automatic snapshot of the entire Session working directory, and Sandbox temporary files are not promoted into long-lived assets by default.
@@ -152,20 +152,20 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
 5. **Environment Service**
    Environment is a first-class Agent runtime template asset. Like Agent, Space, Skill, and MCP, new App work scopes it by App boundaries first.
    - **Data model**: `environment` stores environment asset metadata, owner, fork source, App scope, and `current_revision_id`. `environment_revision` stores immutable configuration versions, including `network_policy`, `allowed_hosts_json`, `packages_json`, `setup_script`, `env_vars_json`, `allow_package_managers`, and `allow_mcp_servers`. App points to its default environment; Organization does not provide a current runtime default.
-   - **Defaults and sharing**: Each App has a system default environment. Users can create App-local Environments. Cross-app sharing and compliance overrides are future governance extensions. Forking creates a new Environment identity and a new revision without mutating the source Environment.
+   - **Defaults and reuse**: Each App has a system default environment. Users can create App-local Environments. Cross-App reuse is not part of the current control plane. Forking creates a new Environment identity and a new revision without mutating the source Environment.
    - **Runtime freeze**: An Agent references an `environment_id`. When a Session is created, Runtime resolves the current EnvironmentRevision and writes it into `session_execution_snapshot.plan_json`. The Session then always uses the environment id/name/revision/network/packages/setup/env vars snapshot captured there. Editing an Environment affects only future Sessions.
    - **Responsibility boundary**: Environment describes rebuildable runtime templates and startup constraints. It does not contain Space files, Skill package content, MCP server definitions, or Session history. Setup scripts, packages, and package manager caches are rebuildable and are not user-visible state.
    - **Execution constraints**: Runtime provisioning installs packages, runs the setup script, injects env vars, and applies network constraints from `network_policy` and `allowed_hosts` according to the frozen snapshot. Missing required environment configuration or setup failure must fail Session startup and enter Runtime diagnostics.
 
-6. **Identity & Access Service**
+6. **Account & Organization Shell Service**
    - The current construction model is `Account -> Organization owner -> App`. Workspace and Team are not architecture concepts. For this phase, one human owns one Organization and App access maps to that owner.
-   - Core identity entities remain `Account` and `Organization`; Organization is the account / billing / tenant shell for this cut. `Invitation`, `AccessRequest`, Organization roles beyond the single owner, and member lifecycle administration are future multi-member governance, not current App dependencies.
+   - Core identity entities remain `Account` and `Organization`; Organization is the account / billing / tenant shell for this cut. No invitation, request, role matrix, or lifecycle administration flow is part of the current App dependency graph.
    - Login selects the account's Organization shell, then routes to the default App when the Organization has exactly one App. The system no longer maintains `account.origin_organization_id` or an "Origin Org for life" concept.
 
 7. **Auth Service**
    - Authentication is built on Better Auth. Supported authentication methods are **Google OAuth** and **Email OTP**. Both support registration, recovery, and cross-device fallback. Passkey (WebAuthn) is a planned future option but is not enabled in the current build.
    - The same verified email across providers maps to the same Account.
-   - The current version does not support passwords, magic links, enterprise SAML / OIDC, SCIM, enterprise domain discovery, invitation acceptance, or access requests. Any post-auth resolver logic for those flows is future governance, not the V1 single-owner App path.
+   - The current version does not support passwords, magic links, federated identity, directory sync, domain-based routing, or invite/request flows. Post-auth resolver logic outside the single-owner App path is not part of V1.
 
 8. **Session Service**
    - The Session Service is backed by Durable Objects, which own upgraded WebSocket connections.
@@ -177,7 +177,7 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
    - Credential CRUD, active key switching, and Agent / MCP binding changes are control-plane changes. High-frequency `resolveCredential()` calls are runtime reads and remain outside mutation workflows.
 
 10. **Cost / Billing Service**
-    - Cost and billing data are recorded as a usage ledger. The current schema uses `usage_event` and `usage_daily_rollup`, with dimensions such as `organization_id`, `agent_id`, `actor_user_id`, `agent_owner_user_id`, `session_id`, `session_run_id`, provider, model, runtime id, run purpose, token buckets, pricing status, and usage contract. App separation adds `app_id` as the primary business-cost dimension while preserving Organization rollups for billing and future governance.
+    - Cost and billing data are recorded as a usage ledger. The current schema uses `usage_event` and `usage_daily_rollup`, with dimensions such as `organization_id`, `app_id`, `agent_id`, `actor_user_id`, `agent_owner_user_id`, `session_id`, `session_run_id`, provider, model, runtime id, run purpose, token buckets, pricing status, and usage contract. App is the primary business-cost dimension; Organization remains the billing rollup.
     - Runtime model-call events are normalized before they enter the cost service. The cost service consumes already-normalized usage and does not infer provider-specific token semantics itself.
     - Cost records usage in its own ledger and does not reuse Runtime Log, traces, or structured application logs as billing data.
 
@@ -349,8 +349,6 @@ sequenceDiagram
 
 ### Product Documents
 
-- `Identity & Access Foundation PRD`: [`identity-access.md`](./prd/identity-access.md)
-- `RBAC PRD`: [`rbac.md`](./prd/rbac.md)
 - `Credentials PRD`: [`credentials.md`](./prd/credentials.md)
 - `Space Interaction PRD`: [`space-interaction.md`](./prd/space-interaction.md)
 - `Session Lifecycle PRD`: [`session-lifecycle.md`](./prd/session-lifecycle.md)
