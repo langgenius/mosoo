@@ -1,0 +1,33 @@
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+
+function readSource(path: string): string {
+  return readFileSync(new URL(path, import.meta.url), "utf8");
+}
+
+describe("Two-layer console boundary", () => {
+  test("Org-layer routes render in the Org shell, not the App sidebar", () => {
+    const routeRegistry = readSource("../src/app/route-registry.tsx");
+
+    expect(routeRegistry).toContain('orgProtectedRoute(<AppsList />), path: "/apps"');
+    expect(routeRegistry).toContain('orgProtectedRoute(<OrgSettings />), path: "/org/settings"');
+  });
+
+  test("the shell picks the Org vs App layout by route", () => {
+    const guards = readSource("../src/app/route-guards.tsx");
+    const shell = readSource("../src/app/app-shell.tsx");
+
+    expect(guards).toContain('shell?: "app" | "org"');
+    expect(guards).toContain("OrgLayout");
+    expect(shell).toContain("export function OrgLayout");
+    expect(shell).toContain("OrgNavigation");
+  });
+
+  test("New app creation is wired to the createApp mutation", () => {
+    const appsList = readSource("../src/routes/apps/apps-list.route.tsx");
+
+    expect(appsList).toContain("createApp");
+    expect(appsList).toContain("New app");
+    expect(appsList).not.toContain("coming soon");
+  });
+});

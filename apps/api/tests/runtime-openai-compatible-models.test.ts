@@ -33,6 +33,7 @@ function createAvailableModelsDatabase(): D1Database {
       api_key_secret_id TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       id TEXT PRIMARY KEY,
+      is_default INTEGER DEFAULT false NOT NULL,
       models TEXT,
       name TEXT NOT NULL,
       app_id TEXT NOT NULL,

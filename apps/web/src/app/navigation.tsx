@@ -8,7 +8,6 @@ import {
   KeyRound,
   LayoutDashboard,
   Puzzle,
-  Radio,
 } from "lucide-react";
 import type { MouseEvent } from "react";
 import { useState } from "react";
@@ -40,7 +39,6 @@ const NAV_SECTIONS: AppNavSection[] = [
       { icon: LayoutDashboard, label: "Overview", path: "/" },
       { icon: Inbox, label: "Threads", path: "/threads" },
       { icon: Bot, label: "Agents", path: "/agent" },
-      { icon: Radio, label: "Channels", path: "/channels" },
       { icon: Folder, label: "Spaces", path: "/space" },
       { icon: Box, label: "Environments", path: "/environment" },
     ],

@@ -15,12 +15,7 @@ import {
 import { toEnvironmentId, toAppId } from "@/routes/typed-id";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
-import {
-  ListPageContent,
-  ListPageSearch,
-  ListPageToolbar,
-  ListPageToolbarSpacer,
-} from "@/shared/ui/list-page";
+import { ListPageContent, ListPageSearch, ListPageToolbar } from "@/shared/ui/list-page";
 import { PageHeader } from "@/shared/ui/page-header";
 
 import { isTruthy } from "../../shared/lib/truthiness";
@@ -119,8 +114,6 @@ export function EnvironmentsListPage() {
       </PageHeader>
 
       <ListPageToolbar>
-        <ListPageToolbarSpacer />
-
         <ListPageSearch value={search} onChange={setSearch} placeholder="Search environments…" />
       </ListPageToolbar>
 

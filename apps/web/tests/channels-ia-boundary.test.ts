@@ -1,24 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 function readSource(path: string): string {
   return readFileSync(new URL(path, import.meta.url), "utf8");
 }
 
 describe("Channels IA boundary", () => {
-  test("makes Channels an App entry that selects an App-local Agent", () => {
-    const source = readSource("../src/routes/channels/channels.route.tsx");
-
-    expect(source).toContain("useAppSession");
-    expect(source).toContain("useVisibleAgentsQuery(activeAppId)");
-    expect(source).toContain("ChannelsConfigDialog");
-    expect(source).toContain("App Channels");
-    expect(source).toContain("App-local Agent");
-    expect(source).toContain("Configure channels");
-    expect(source).toContain('to="/agent?create=1"');
-    expect(source).not.toContain("Organization");
-    expect(source).not.toContain("Members");
-    expect(source).not.toContain("Admin");
+  test("drops the standalone Channels IA tab while keeping Agent channel bindings", () => {
+    expect(existsSync(new URL("../src/routes/channels/channels.route.tsx", import.meta.url))).toBe(
+      false,
+    );
+    expect(
+      existsSync(
+        new URL("../src/routes/agent/components/channels-config-dialog.tsx", import.meta.url),
+      ),
+    ).toBe(true);
   });
 
   test("keeps setup execution on Agent channel bindings with explicit App proof", () => {

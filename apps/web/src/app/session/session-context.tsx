@@ -1,7 +1,7 @@
 import type { AccountProfile } from "@mosoo/contracts/account";
 import type { AppSummary } from "@mosoo/contracts/app";
 import type { OrganizationSummary } from "@mosoo/contracts/organization";
-import { createContext, useCallback, useMemo, use } from "react";
+import { createContext, useCallback, useMemo, useState, use } from "react";
 import type { ReactNode } from "react";
 
 import { useOrganizationAppsQuery } from "@/domains/app/query/app-queries";
@@ -10,6 +10,24 @@ import { useViewerQuery } from "@/domains/user/query/user-queries";
 import { resolveActiveApp } from "./active-app";
 
 export type OnboardingState = "complete" | "loading" | "pending";
+
+const SELECTED_APP_STORAGE_KEY = "mosoo:selected-app";
+
+function readSelectedAppId(): string | null {
+  try {
+    return globalThis.localStorage?.getItem(SELECTED_APP_STORAGE_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSelectedAppId(appId: string): void {
+  try {
+    globalThis.localStorage?.setItem(SELECTED_APP_STORAGE_KEY, appId);
+  } catch {
+    // ignore storage failures (private mode, quota, etc.)
+  }
+}
 
 interface SessionUser {
   email: string;
@@ -30,6 +48,7 @@ interface AppSessionContextValue {
   appsLoading: boolean;
   refreshOnboardingState(): Promise<boolean>;
   refreshOrganizations(): Promise<OrganizationSummary[]>;
+  setActiveApp(appId: string): void;
   user: SessionUser | null;
   userLoading: boolean;
 }
@@ -74,7 +93,12 @@ export function AppSessionProvider({ children }: { children: ReactNode }) {
   const activeOrganization = viewer?.activeOrganization ?? null;
   const appsQuery = useOrganizationAppsQuery(activeOrganization?.id ?? null);
   const apps = activeOrganization === null ? [] : (appsQuery.data ?? []);
-  const activeApp = resolveActiveApp(apps);
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(readSelectedAppId);
+  const activeApp = resolveActiveApp(apps, selectedAppId);
+  const setActiveApp = useCallback((appId: string) => {
+    setSelectedAppId(appId);
+    writeSelectedAppId(appId);
+  }, []);
   const onboardingState = resolveOnboardingState({
     hasOrganizations: organizations.length > 0,
     loading: viewerQuery.isLoading,
@@ -105,6 +129,7 @@ export function AppSessionProvider({ children }: { children: ReactNode }) {
       appsLoading: appsQuery.isLoading,
       refreshOnboardingState,
       refreshOrganizations: refreshViewer,
+      setActiveApp,
       user,
       userLoading: viewerQuery.isLoading,
     }),
@@ -115,6 +140,7 @@ export function AppSessionProvider({ children }: { children: ReactNode }) {
       organizations,
       refreshOnboardingState,
       refreshViewer,
+      setActiveApp,
       user,
       apps,
       appsQuery.isLoading,

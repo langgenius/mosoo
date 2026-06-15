@@ -249,6 +249,11 @@ export type CreateAgentSessionInput = {
   waitForRuntimeReady?: boolean | null | undefined;
 };
 
+export type CreateAppInput = {
+  name: string;
+  organizationId: PlatformId;
+};
+
 export type CreateAppMcpServerInput = {
   appId: PlatformId;
   authType: McpAuthType;
@@ -612,6 +617,11 @@ export type SetAppDefaultEnvironmentInput = {
   environmentId: PlatformId;
 };
 
+export type SetDefaultVendorCredentialInput = {
+  appId: PlatformId;
+  id: PlatformId;
+};
+
 export type SetSystemAgentModelInput = {
   modelId: string;
   vendor: string;
@@ -931,6 +941,13 @@ export type AppListQueryVariables = Exact<{
 
 
 export type AppListQuery = { appList: Array<{ createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId, slug: string }> };
+
+export type CreateAppMutationVariables = Exact<{
+  input: CreateAppInput;
+}>;
+
+
+export type CreateAppMutation = { createApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId, slug: string } };
 
 type CostTotalsFields_CostAgentRow_Fragment = { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number };
 
@@ -1367,21 +1384,21 @@ export type VendorCredentialListQueryVariables = Exact<{
 }>;
 
 
-export type VendorCredentialListQuery = { vendorCredentialList: Array<{ apiBase: string | null, id: PlatformId, maskedApiKey: string, models: Array<string> | null, name: string, appId: PlatformId, vendorId: string }> };
+export type VendorCredentialListQuery = { vendorCredentialList: Array<{ apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, appId: PlatformId, vendorId: string }> };
 
 export type CreateVendorCredentialMutationVariables = Exact<{
   input: CreateVendorCredentialInput;
 }>;
 
 
-export type CreateVendorCredentialMutation = { createVendorCredential: { apiBase: string | null, id: PlatformId, maskedApiKey: string, models: Array<string> | null, name: string, appId: PlatformId, vendorId: string } };
+export type CreateVendorCredentialMutation = { createVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, appId: PlatformId, vendorId: string } };
 
 export type UpdateVendorCredentialMutationVariables = Exact<{
   input: UpdateVendorCredentialInput;
 }>;
 
 
-export type UpdateVendorCredentialMutation = { updateVendorCredential: { apiBase: string | null, id: PlatformId, maskedApiKey: string, models: Array<string> | null, name: string, appId: PlatformId, vendorId: string } };
+export type UpdateVendorCredentialMutation = { updateVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, appId: PlatformId, vendorId: string } };
 
 export type DeleteVendorCredentialMutationVariables = Exact<{
   input: DeleteVendorCredentialInput;
@@ -1389,6 +1406,13 @@ export type DeleteVendorCredentialMutationVariables = Exact<{
 
 
 export type DeleteVendorCredentialMutation = { deleteVendorCredential: { ok: boolean } };
+
+export type SetDefaultVendorCredentialMutationVariables = Exact<{
+  input: SetDefaultVendorCredentialInput;
+}>;
+
+
+export type SetDefaultVendorCredentialMutation = { setDefaultVendorCredential: { apiBase: string | null, id: PlatformId, isDefault: boolean, maskedApiKey: string, models: Array<string> | null, name: string, appId: PlatformId, vendorId: string } };
 
 export type AvailableAgentModelsQueryVariables = Exact<{
   appId: PlatformId;
@@ -2755,6 +2779,18 @@ export const AppListDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AppListQuery, AppListQueryVariables>;
+export const CreateAppDocument = new TypedDocumentString(`
+    mutation CreateApp($input: CreateAppInput!) {
+  createApp(input: $input) {
+    createdAt
+    defaultEnvironmentId
+    id
+    name
+    ownerAccountId
+    slug
+  }
+}
+    `) as unknown as TypedDocumentString<CreateAppMutation, CreateAppMutationVariables>;
 export const AppCostCardDocument = new TypedDocumentString(`
     query AppCostCard($appId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
   appCostCard(appId: $appId, range: $range, runPurposes: $runPurposes) {
@@ -4270,6 +4306,7 @@ export const VendorCredentialListDocument = new TypedDocumentString(`
   vendorCredentialList(appId: $appId) {
     apiBase
     id
+    isDefault
     maskedApiKey
     models
     name
@@ -4283,6 +4320,7 @@ export const CreateVendorCredentialDocument = new TypedDocumentString(`
   createVendorCredential(input: $input) {
     apiBase
     id
+    isDefault
     maskedApiKey
     models
     name
@@ -4296,6 +4334,7 @@ export const UpdateVendorCredentialDocument = new TypedDocumentString(`
   updateVendorCredential(input: $input) {
     apiBase
     id
+    isDefault
     maskedApiKey
     models
     name
@@ -4311,6 +4350,20 @@ export const DeleteVendorCredentialDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<DeleteVendorCredentialMutation, DeleteVendorCredentialMutationVariables>;
+export const SetDefaultVendorCredentialDocument = new TypedDocumentString(`
+    mutation SetDefaultVendorCredential($input: SetDefaultVendorCredentialInput!) {
+  setDefaultVendorCredential(input: $input) {
+    apiBase
+    id
+    isDefault
+    maskedApiKey
+    models
+    name
+    appId
+    vendorId
+  }
+}
+    `) as unknown as TypedDocumentString<SetDefaultVendorCredentialMutation, SetDefaultVendorCredentialMutationVariables>;
 export const AvailableAgentModelsDocument = new TypedDocumentString(`
     query AvailableAgentModels($appId: ULID!, $runtimeId: String!, $currentModelId: String, $currentVendorId: String) {
   availableAgentModels(

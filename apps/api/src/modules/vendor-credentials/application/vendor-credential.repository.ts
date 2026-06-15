@@ -1,6 +1,6 @@
 import { vendorCredentialsTable } from "@mosoo/db";
 import type { AppId, VendorCredentialId } from "@mosoo/id";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import type { VendorCredentialRow } from "./vendor-credential.types";
@@ -11,6 +11,7 @@ function selectVendorCredentialRows(database: D1Database) {
       apiBase: vendorCredentialsTable.apiBase,
       apiKeySecretId: vendorCredentialsTable.apiKeySecretId,
       id: vendorCredentialsTable.id,
+      isDefault: vendorCredentialsTable.isDefault,
       modelsJson: vendorCredentialsTable.models,
       name: vendorCredentialsTable.name,
       appId: vendorCredentialsTable.appId,
@@ -83,7 +84,11 @@ export async function getAppVendorCredentialRow(
       .where(
         and(eq(vendorCredentialsTable.appId, appId), eq(vendorCredentialsTable.vendorId, vendorId)),
       )
-      .orderBy(asc(vendorCredentialsTable.name), asc(vendorCredentialsTable.id))
+      .orderBy(
+        desc(vendorCredentialsTable.isDefault),
+        asc(vendorCredentialsTable.name),
+        asc(vendorCredentialsTable.id),
+      )
       .limit(1)
       .get()) ?? null
   );

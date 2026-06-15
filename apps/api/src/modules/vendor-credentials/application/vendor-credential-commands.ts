@@ -1,6 +1,7 @@
 import type {
   CreateVendorCredentialInput,
   DeleteVendorCredentialInput,
+  SetDefaultVendorCredentialInput,
   UpdateVendorCredentialInput,
   VendorCredential,
 } from "@mosoo/contracts/vendor-credential";
@@ -12,7 +13,7 @@ import { getVendor } from "@mosoo/runtime-catalog";
 import { and, eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { getAppDatabase } from "../../../platform/db/drizzle";
+import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
@@ -24,7 +25,11 @@ import {
   normalizeCredentialName,
 } from "./vendor-credential-validation";
 import { parseCredentialModels, toVendorCredentialWithSecret } from "./vendor-credential.mapper";
-import { getCredentialRow, getAppCredentialRow } from "./vendor-credential.repository";
+import {
+  getCredentialRow,
+  getAppCredentialRow,
+  getAppVendorCredentialRow,
+} from "./vendor-credential.repository";
 import {
   deleteVendorCredentialSecret,
   readVendorCredentialSecret,
@@ -87,6 +92,10 @@ export async function createVendorCredential(
     throw new Error("API key is required.");
   }
 
+  // The first credential added for a vendor becomes its default, so the runtime
+  // always has exactly one credential to resolve until the user picks another.
+  const isFirstForVendor =
+    (await getAppVendorCredentialRow(bindings.DB, input.appId, input.vendorId)) === null;
   const id = createPlatformId<VendorCredentialId>();
   const timestampMs = currentTimestampMs();
   const secretId = await storeVendorCredentialSecret(bindings, {
@@ -105,6 +114,7 @@ export async function createVendorCredential(
         apiKeySecretId: secretId,
         createdAt: timestampMs,
         id,
+        isDefault: isFirstForVendor,
         models,
         name,
         appId: input.appId,
@@ -207,6 +217,48 @@ export async function updateVendorCredential(
   return toVisibleVendorCredential(bindings, updated);
 }
 
+export async function setDefaultVendorCredential(
+  bindings: ApiBindings,
+  viewer: AuthenticatedViewer,
+  input: SetDefaultVendorCredentialInput,
+): Promise<VendorCredential> {
+  await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
+  const row = await getAppCredentialRow(bindings.DB, input.appId, input.id);
+
+  if (!row) {
+    throw new Error("Vendor credential not found.");
+  }
+
+  // Clear the current default for this vendor and promote the chosen credential
+  // in one batch so there is always exactly one default per vendor.
+  const timestampMs = currentTimestampMs();
+  await runAppDatabaseBatch(bindings.DB, (database) => [
+    database
+      .update(vendorCredentialsTable)
+      .set({ isDefault: false, updatedAt: timestampMs })
+      .where(
+        and(
+          eq(vendorCredentialsTable.appId, input.appId),
+          eq(vendorCredentialsTable.vendorId, row.vendorId),
+        ),
+      ),
+    database
+      .update(vendorCredentialsTable)
+      .set({ isDefault: true, updatedAt: timestampMs })
+      .where(
+        and(eq(vendorCredentialsTable.id, input.id), eq(vendorCredentialsTable.appId, input.appId)),
+      ),
+  ]);
+
+  const updated = await getAppCredentialRow(bindings.DB, input.appId, input.id);
+
+  if (!updated) {
+    throw new Error("Vendor credential could not be loaded.");
+  }
+
+  return toVisibleVendorCredential(bindings, updated);
+}
+
 export async function deleteVendorCredential(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
@@ -232,4 +284,23 @@ export async function deleteVendorCredential(
       secretId: row.apiKeySecretId,
     }),
   );
+
+  // Deleting the default leaves the vendor with no default; promote the next
+  // remaining credential so resolution stays deterministic.
+  if (row.isDefault) {
+    const nextDefault = await getAppVendorCredentialRow(bindings.DB, input.appId, row.vendorId);
+
+    if (nextDefault) {
+      await getAppDatabase(bindings.DB)
+        .update(vendorCredentialsTable)
+        .set({ isDefault: true, updatedAt: currentTimestampMs() })
+        .where(
+          and(
+            eq(vendorCredentialsTable.id, nextDefault.id),
+            eq(vendorCredentialsTable.appId, input.appId),
+          ),
+        )
+        .run();
+    }
+  }
 }
