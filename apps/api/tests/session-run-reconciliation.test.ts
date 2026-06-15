@@ -3,13 +3,13 @@ import { describe, expect, test } from "bun:test";
 import { reconcileStaleActiveSessionRun } from "../src/modules/runtime/application/session-runs/stale-run-reconciliation.service";
 import {
   createPublicHttpContractDatabase,
-  insertMemberSession,
+  insertNonOwnerSession,
 } from "./helpers/public-api-http-test-fixture";
 
 describe("session run reconciliation", () => {
   test("fails stale active runs", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
 
     await database
       .prepare(

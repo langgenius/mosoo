@@ -308,7 +308,7 @@ describe("session run cancel", () => {
     expect(driverRequests).toHaveLength(1);
   });
 
-  test("resolves permission requests for the App owner without Organization membership", async () => {
+  test("resolves permission requests for the App owner through App ownership", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
     await insertRunningSessionRun(database, {

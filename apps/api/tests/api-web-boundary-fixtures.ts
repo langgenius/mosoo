@@ -12,7 +12,7 @@ export function createSessionSummary(): SessionSummary {
     createdAt: "2026-05-19T00:00:00.000Z",
     deploymentVersionId: PUBLIC_API_TEST_IDS.deployment,
     deploymentVersionNumber: 4,
-    id: PUBLIC_API_TEST_IDS.memberSession,
+    id: PUBLIC_API_TEST_IDS.nonOwnerSession,
     kind: "cattle",
     lastMessageAt: "2026-05-19T00:01:00.000Z",
     lastRun: createRunSummary(),
@@ -70,14 +70,14 @@ export function createChunkedJsonRequest(url: string, value: unknown, chunkSize:
 export function createThreadSummary(): PublicThreadSummary {
   return {
     agent_id: PUBLIC_API_TEST_IDS.agent,
-    attributed_user: { id: PUBLIC_API_TEST_IDS.memberAccount },
+    attributed_user: { id: PUBLIC_API_TEST_IDS.nonOwnerAccount },
     client_external_ref: "linear-ENG-123",
     created_at: "2026-05-19T00:00:00.000Z",
     created_by: {
       id: "pat-1",
       kind: "access_token",
     },
-    id: PUBLIC_API_TEST_IDS.memberSession,
+    id: PUBLIC_API_TEST_IDS.nonOwnerSession,
     kind: "cattle",
     last_run_id: PUBLIC_API_TEST_IDS.run,
     source: "api",

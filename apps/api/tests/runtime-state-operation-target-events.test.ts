@@ -15,7 +15,7 @@ import {
   PUBLIC_API_TEST_IDS,
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
-  insertMemberSession,
+  insertNonOwnerSession,
   insertOwnerSession,
 } from "./helpers/public-api-http-test-fixture";
 
@@ -26,9 +26,9 @@ async function insertRunningSessionRun(
     runId: string;
     sessionId: string;
   } = {
-    accountId: PUBLIC_API_TEST_IDS.memberAccount,
+    accountId: PUBLIC_API_TEST_IDS.nonOwnerAccount,
     runId: PUBLIC_API_TEST_IDS.run,
-    sessionId: PUBLIC_API_TEST_IDS.memberSession,
+    sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession,
   },
 ): Promise<void> {
   await database
@@ -76,10 +76,10 @@ function createRuntimeDiagnosticTargets(): RuntimeSessionTarget[] {
   return [
     createRuntimeTarget({
       agentId: PUBLIC_API_TEST_IDS.agent,
-      creatorAccountId: PUBLIC_API_TEST_IDS.memberAccount,
+      creatorAccountId: PUBLIC_API_TEST_IDS.nonOwnerAccount,
       lastRunId: null,
       sandboxId: PUBLIC_API_TEST_IDS.sandbox,
-      sessionId: PUBLIC_API_TEST_IDS.memberSession,
+      sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession,
       sessionStatus: "IDLE",
     }),
     createRuntimeTarget({
@@ -92,7 +92,7 @@ function createRuntimeDiagnosticTargets(): RuntimeSessionTarget[] {
     }),
     createRuntimeTarget({
       agentId: null,
-      creatorAccountId: PUBLIC_API_TEST_IDS.memberAccount,
+      creatorAccountId: PUBLIC_API_TEST_IDS.nonOwnerAccount,
       lastRunId: null,
       sandboxId: PUBLIC_API_TEST_IDS.sandbox,
       sessionId: "session-without-agent",
@@ -202,29 +202,29 @@ describe("runtime state operation target events", () => {
           id: PUBLIC_API_TEST_IDS.deployment,
           versionNumber: 1,
         },
-        sessionId: PUBLIC_API_TEST_IDS.memberSession,
+        sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession,
       }),
     ).toEqual({
       agentId: PUBLIC_API_TEST_IDS.agent,
       deploymentVersionId: PUBLIC_API_TEST_IDS.deployment,
       deploymentVersionNumber: 1,
-      sessionId: PUBLIC_API_TEST_IDS.memberSession,
+      sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession,
     });
   });
 
   test("interrupt snapshots cancel running runs with an operation error", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertRunningSessionRun(database);
 
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
     const targets: RuntimeSessionTarget[] = [
       createRuntimeTarget({
         agentId: PUBLIC_API_TEST_IDS.agent,
-        creatorAccountId: PUBLIC_API_TEST_IDS.memberAccount,
+        creatorAccountId: PUBLIC_API_TEST_IDS.nonOwnerAccount,
         lastRunId: PUBLIC_API_TEST_IDS.run,
         sandboxId: PUBLIC_API_TEST_IDS.sandbox,
-        sessionId: PUBLIC_API_TEST_IDS.memberSession,
+        sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession,
         sessionStatus: "RUNNING",
       }),
     ];
@@ -246,7 +246,7 @@ describe("runtime state operation target events", () => {
 
   test("interrupt snapshots persist events for each target session", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertOwnerSession(database);
     await insertRunningSessionRun(database);
     await insertRunningSessionRun(database, {
@@ -259,10 +259,10 @@ describe("runtime state operation target events", () => {
     const targets: RuntimeSessionTarget[] = [
       createRuntimeTarget({
         agentId: PUBLIC_API_TEST_IDS.agent,
-        creatorAccountId: PUBLIC_API_TEST_IDS.memberAccount,
+        creatorAccountId: PUBLIC_API_TEST_IDS.nonOwnerAccount,
         lastRunId: PUBLIC_API_TEST_IDS.run,
         sandboxId: PUBLIC_API_TEST_IDS.sandbox,
-        sessionId: PUBLIC_API_TEST_IDS.memberSession,
+        sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession,
         sessionStatus: "RUNNING",
       }),
       createRuntimeTarget({
@@ -305,14 +305,14 @@ describe("runtime state operation target events", () => {
     expect(
       events.results.map((event) => ({ seq: event.seq, sessionId: event.session_id })),
     ).toEqual([
-      { seq: 1, sessionId: PUBLIC_API_TEST_IDS.memberSession },
+      { seq: 1, sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession },
       { seq: 1, sessionId: PUBLIC_API_TEST_IDS.ownerSession },
     ]);
   });
 
   test("terminated subject events are written for target sessions", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertOwnerSession(database);
 
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
@@ -337,7 +337,7 @@ describe("runtime state operation target events", () => {
         session_id: string;
       }>();
     expect(rows.results.map((row) => ({ seq: row.seq, sessionId: row.session_id }))).toEqual([
-      { seq: 1, sessionId: PUBLIC_API_TEST_IDS.memberSession },
+      { seq: 1, sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession },
       { seq: 1, sessionId: PUBLIC_API_TEST_IDS.ownerSession },
     ]);
     expect(rows.results.every((row) => row.event_type === "runtime.sandbox.updated")).toBe(true);
@@ -345,11 +345,11 @@ describe("runtime state operation target events", () => {
 
   test("driver restart attempted events are written for target sessions", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertOwnerSession(database);
     await insertLiveDriverInstance(database, {
-      driverInstanceId: PUBLIC_API_TEST_IDS.driverMember,
-      sessionId: PUBLIC_API_TEST_IDS.memberSession,
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverNonOwner,
+      sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession,
     });
     await insertLiveDriverInstance(database, {
       driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
@@ -377,7 +377,7 @@ describe("runtime state operation target events", () => {
         session_id: string;
       }>();
     expect(rows.results.map((row) => ({ seq: row.seq, sessionId: row.session_id }))).toEqual([
-      { seq: 1, sessionId: PUBLIC_API_TEST_IDS.memberSession },
+      { seq: 1, sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession },
       { seq: 1, sessionId: PUBLIC_API_TEST_IDS.ownerSession },
     ]);
     expect(rows.results.every((row) => row.event_type === "runtime.driver.updated")).toBe(true);
@@ -385,7 +385,7 @@ describe("runtime state operation target events", () => {
 
   test("runtime operation broadcasts events across target sessions", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertOwnerSession(database);
 
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
@@ -416,7 +416,7 @@ describe("runtime state operation target events", () => {
         session_id: string;
       }>();
     expect(rows.results.map((row) => ({ seq: row.seq, sessionId: row.session_id }))).toEqual([
-      { seq: 1, sessionId: PUBLIC_API_TEST_IDS.memberSession },
+      { seq: 1, sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession },
       { seq: 1, sessionId: PUBLIC_API_TEST_IDS.ownerSession },
     ]);
     expect(rows.results.every((row) => row.event_type === "agent.task.updated")).toBe(true);
@@ -424,7 +424,7 @@ describe("runtime state operation target events", () => {
 
   test("timed out snapshots cancel running runs and persist target events", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertOwnerSession(database);
     await insertRunningSessionRun(database);
 
@@ -432,10 +432,10 @@ describe("runtime state operation target events", () => {
     const targets: RuntimeSessionTarget[] = [
       createRuntimeTarget({
         agentId: PUBLIC_API_TEST_IDS.agent,
-        creatorAccountId: PUBLIC_API_TEST_IDS.memberAccount,
+        creatorAccountId: PUBLIC_API_TEST_IDS.nonOwnerAccount,
         lastRunId: PUBLIC_API_TEST_IDS.run,
         sandboxId: PUBLIC_API_TEST_IDS.sandbox,
-        sessionId: PUBLIC_API_TEST_IDS.memberSession,
+        sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession,
         sessionStatus: "RUNNING",
       }),
       createRuntimeTarget({
@@ -470,7 +470,7 @@ describe("runtime state operation target events", () => {
     expect(
       events.results.map((event) => ({ seq: event.seq, sessionId: event.session_id })),
     ).toEqual([
-      { seq: 1, sessionId: PUBLIC_API_TEST_IDS.memberSession },
+      { seq: 1, sessionId: PUBLIC_API_TEST_IDS.nonOwnerSession },
       { seq: 1, sessionId: PUBLIC_API_TEST_IDS.ownerSession },
     ]);
   });

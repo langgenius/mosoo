@@ -18,7 +18,7 @@ import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
   insertOwnerSession,
-  insertMemberSession,
+  insertNonOwnerSession,
 } from "./helpers/public-api-http-test-fixture";
 
 const OWNER_VIEWER: AuthenticatedViewer = {
@@ -130,7 +130,7 @@ async function ensureRuntimeLifecycleTables(database: D1Database): Promise<void>
 
 async function insertSandboxSession(
   database: D1Database,
-  sessionId: string = PUBLIC_API_TEST_IDS.memberSession,
+  sessionId: string = PUBLIC_API_TEST_IDS.nonOwnerSession,
 ): Promise<void> {
   await ensureRuntimeLifecycleTables(database);
   await database
@@ -190,7 +190,7 @@ async function insertSessionRun(
     status?: string;
   },
 ): Promise<void> {
-  const sessionId = input.sessionId ?? PUBLIC_API_TEST_IDS.memberSession;
+  const sessionId = input.sessionId ?? PUBLIC_API_TEST_IDS.nonOwnerSession;
 
   await database
     .prepare(
@@ -216,7 +216,7 @@ async function insertSessionRun(
       input.runId,
       sessionId,
       PUBLIC_API_TEST_IDS.agent,
-      input.createdByAccountId ?? PUBLIC_API_TEST_IDS.memberAccount,
+      input.createdByAccountId ?? PUBLIC_API_TEST_IDS.nonOwnerAccount,
       "user_prompt",
       input.status ?? "running",
       "openai",
@@ -292,7 +292,7 @@ async function insertDriverInstance(
 describe("session lifecycle mutations", () => {
   test("delete cascade removes live and terminal driver instances associated with the session", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertSandboxSession(database);
     await insertSessionRun(database, { runId: PUBLIC_API_TEST_IDS.run });
     await insertSessionRun(database, {
@@ -300,15 +300,15 @@ describe("session lifecycle mutations", () => {
       status: "completed",
     });
     await insertDriverInstance(database, {
-      driverId: PUBLIC_API_TEST_IDS.driverMember,
-      sandboxSessionId: PUBLIC_API_TEST_IDS.memberSession,
+      driverId: PUBLIC_API_TEST_IDS.driverNonOwner,
+      sandboxSessionId: PUBLIC_API_TEST_IDS.nonOwnerSession,
       sessionRunId: PUBLIC_API_TEST_IDS.run,
       status: "ready",
       tokenByte: 1,
     });
     await insertDriverInstance(database, {
       driverId: PUBLIC_API_TEST_IDS.driverOwner,
-      sandboxSessionId: PUBLIC_API_TEST_IDS.memberSession,
+      sandboxSessionId: PUBLIC_API_TEST_IDS.nonOwnerSession,
       sessionRunId: null,
       status: "stopped",
       tokenByte: 2,
@@ -325,7 +325,7 @@ describe("session lifecycle mutations", () => {
       withDriverConnection(createPublicHttpTestBindings(database) as ApiBindings, driverRequests),
     );
 
-    const outcomes = await deleteSessionCascade(bindings, PUBLIC_API_TEST_IDS.memberSession);
+    const outcomes = await deleteSessionCascade(bindings, PUBLIC_API_TEST_IDS.nonOwnerSession);
 
     const remainingDrivers = await database
       .prepare(
@@ -336,11 +336,11 @@ describe("session lifecycle mutations", () => {
           ORDER BY id
         `,
       )
-      .bind(PUBLIC_API_TEST_IDS.driverMember, PUBLIC_API_TEST_IDS.driverOwner, FAILED_DRIVER_ID)
+      .bind(PUBLIC_API_TEST_IDS.driverNonOwner, PUBLIC_API_TEST_IDS.driverOwner, FAILED_DRIVER_ID)
       .all<{ id: string }>();
     const session = await database
       .prepare("SELECT id FROM session WHERE id = ?")
-      .bind(PUBLIC_API_TEST_IDS.memberSession)
+      .bind(PUBLIC_API_TEST_IDS.nonOwnerSession)
       .first();
 
     expect(remainingDrivers.results).toEqual([]);
@@ -351,15 +351,15 @@ describe("session lifecycle mutations", () => {
 
   test("delete cascade completes when the session has no runtime state", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     const bindings = withSessionLifecycleBinding(
       createPublicHttpTestBindings(database) as ApiBindings,
     );
 
-    const outcomes = await deleteSessionCascade(bindings, PUBLIC_API_TEST_IDS.memberSession);
+    const outcomes = await deleteSessionCascade(bindings, PUBLIC_API_TEST_IDS.nonOwnerSession);
     const session = await database
       .prepare("SELECT id FROM session WHERE id = ?")
-      .bind(PUBLIC_API_TEST_IDS.memberSession)
+      .bind(PUBLIC_API_TEST_IDS.nonOwnerSession)
       .first();
 
     expect(session).toBeNull();
@@ -368,7 +368,7 @@ describe("session lifecycle mutations", () => {
 
   test("delete cleanup keeps a durable anchor and repair resumes after interruption", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     const operationId = PUBLIC_API_TEST_IDS.operation as RuntimeOperationId;
     const failingBindings = withSessionLifecycleBinding(
       createPublicHttpTestBindings(database) as ApiBindings,
@@ -377,7 +377,7 @@ describe("session lifecycle mutations", () => {
     );
 
     await expect(
-      deleteSessionCascade(failingBindings, PUBLIC_API_TEST_IDS.memberSession, {
+      deleteSessionCascade(failingBindings, PUBLIC_API_TEST_IDS.nonOwnerSession, {
         operationId,
       }),
     ).rejects.toThrow();
@@ -390,7 +390,7 @@ describe("session lifecycle mutations", () => {
           WHERE id = ?
         `,
       )
-      .bind(PUBLIC_API_TEST_IDS.memberSession)
+      .bind(PUBLIC_API_TEST_IDS.nonOwnerSession)
       .first<{
         archived_at: number | null;
         status: string;
@@ -412,7 +412,7 @@ describe("session lifecycle mutations", () => {
     );
     const session = await database
       .prepare("SELECT id FROM session WHERE id = ?")
-      .bind(PUBLIC_API_TEST_IDS.memberSession)
+      .bind(PUBLIC_API_TEST_IDS.nonOwnerSession)
       .first();
 
     expect(repairedCount).toBe(1);
@@ -528,7 +528,7 @@ describe("session lifecycle mutations", () => {
     await database
       .prepare("UPDATE session SET creator_account_id = ?, attributed_user_id = ? WHERE id = ?")
       .bind(
-        PUBLIC_API_TEST_IDS.memberAccount,
+        PUBLIC_API_TEST_IDS.nonOwnerAccount,
         PUBLIC_API_TEST_IDS.ownerAccount,
         PUBLIC_API_TEST_IDS.ownerSession,
       )

@@ -45,7 +45,7 @@ async function withProviderProbeMock<T>(operation: () => Promise<T>): Promise<T>
 }
 
 describe("agent deployment version atomicity", () => {
-  test("publish writes status, ACL, deployment version, and live pointer together", async () => {
+  test("publish writes status, deployment version, and live pointer together", async () => {
     const database = await createPublicHttpContractDatabase();
     const nowMs = nowMsForTest();
 

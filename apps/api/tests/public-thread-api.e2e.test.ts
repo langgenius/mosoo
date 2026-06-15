@@ -451,25 +451,25 @@ describe("Public Thread API e2e", () => {
       );
       expect(ownerEventsResponse.status).toBe(200);
 
-      const memberCreateResponse = await requestPublicApi(
+      const nonOwnerCreateResponse = await requestPublicApi(
         app,
         database,
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           body: JSON.stringify({
             input: {
-              content: [{ text: "Org membership must not grant API access.", type: "text" }],
+              content: [{ text: "Non-owner callers must not get API access.", type: "text" }],
               type: "user.message",
             },
           }),
           headers: {
-            Authorization: bearer(TOKENS.member),
+            Authorization: bearer(TOKENS.nonOwner),
             "Content-Type": "application/json",
           },
           method: "POST",
         }),
       );
-      expect(memberCreateResponse.status).toBe(403);
-      expect(expectRecord(await readJson(memberCreateResponse))["error"]).toMatchObject({
+      expect(nonOwnerCreateResponse.status).toBe(403);
+      expect(expectRecord(await readJson(nonOwnerCreateResponse))["error"]).toMatchObject({
         code: "forbidden",
         message: "Caller is not the App owner for this Agent.",
       });
@@ -480,12 +480,12 @@ describe("Public Thread API e2e", () => {
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           body: JSON.stringify({
             input: {
-              content: [{ text: "Stale ACL must not grant API access.", type: "text" }],
+              content: [{ text: "Legacy grants must not get API access.", type: "text" }],
               type: "user.message",
             },
           }),
           headers: {
-            Authorization: bearer(TOKENS.collaborator),
+            Authorization: bearer(TOKENS.legacyGrant),
             "Content-Type": "application/json",
           },
           method: "POST",
@@ -995,7 +995,7 @@ describe("Public Thread API e2e", () => {
     });
     await database
       .prepare("UPDATE file_record SET created_by_account_id = ? WHERE id = ?")
-      .bind(PUBLIC_API_TEST_IDS.memberAccount, wrongCreatorFileId)
+      .bind(PUBLIC_API_TEST_IDS.nonOwnerAccount, wrongCreatorFileId)
       .run();
     await expectThreadFileClaimRejected({
       fileId: wrongCreatorFileId,
@@ -1120,16 +1120,16 @@ describe("Public Thread API e2e", () => {
       updatedAt: 2_001,
     });
 
-    const memberDeleteResponse = await requestPublicApi(
+    const nonOwnerDeleteResponse = await requestPublicApi(
       app,
       ownerThreadDatabase,
       new Request(`https://api.example.com/api/v1/threads/${ownerThreadId}`, {
-        headers: { Authorization: bearer(TOKENS.member) },
+        headers: { Authorization: bearer(TOKENS.nonOwner) },
         method: "DELETE",
       }),
     );
-    expect(memberDeleteResponse.status).toBe(404);
-    expect(expectRecord(await readJson(memberDeleteResponse))["error"]).toMatchObject({
+    expect(nonOwnerDeleteResponse.status).toBe(404);
+    expect(expectRecord(await readJson(nonOwnerDeleteResponse))["error"]).toMatchObject({
       code: "not_found",
       message: "Thread not found.",
     });
@@ -1142,28 +1142,28 @@ describe("Public Thread API e2e", () => {
 
     await ownerThreadDatabase
       .prepare("UPDATE session SET attributed_user_id = ? WHERE id = ?")
-      .bind(PUBLIC_API_TEST_IDS.memberAccount, ownerThreadId)
+      .bind(PUBLIC_API_TEST_IDS.nonOwnerAccount, ownerThreadId)
       .run();
-    const attributedMemberDeleteResponse = await requestPublicApi(
+    const attributedNonOwnerDeleteResponse = await requestPublicApi(
       app,
       ownerThreadDatabase,
       new Request(`https://api.example.com/api/v1/threads/${ownerThreadId}`, {
-        headers: { Authorization: bearer(TOKENS.member) },
+        headers: { Authorization: bearer(TOKENS.nonOwner) },
         method: "DELETE",
       }),
     );
-    expect(attributedMemberDeleteResponse.status).toBe(403);
-    expect(expectRecord(await readJson(attributedMemberDeleteResponse))["error"]).toMatchObject({
+    expect(attributedNonOwnerDeleteResponse.status).toBe(403);
+    expect(expectRecord(await readJson(attributedNonOwnerDeleteResponse))["error"]).toMatchObject({
       code: "forbidden",
       message: "Caller is not the App owner for this Agent.",
     });
 
-    const attributedMemberThreadStillExists = await ownerThreadDatabase
+    const attributedNonOwnerThreadStillExists = await ownerThreadDatabase
       .prepare("SELECT attributed_user_id, id FROM session WHERE id = ?")
       .bind(ownerThreadId)
       .first<{ attributed_user_id: string; id: string }>();
-    expect(attributedMemberThreadStillExists).toEqual({
-      attributed_user_id: PUBLIC_API_TEST_IDS.memberAccount,
+    expect(attributedNonOwnerThreadStillExists).toEqual({
+      attributed_user_id: PUBLIC_API_TEST_IDS.nonOwnerAccount,
       id: ownerThreadId,
     });
 
@@ -1264,7 +1264,7 @@ describe("Public Thread API e2e", () => {
       {
         message: "File ID must be a valid ULID.",
         request: new Request(
-          `https://api.example.com/api/v1/threads/${PUBLIC_API_TEST_IDS.memberSession}/files/${invalidId}`,
+          `https://api.example.com/api/v1/threads/${PUBLIC_API_TEST_IDS.nonOwnerSession}/files/${invalidId}`,
           {
             headers: { Authorization: bearer(TOKENS.owner) },
             method: "DELETE",

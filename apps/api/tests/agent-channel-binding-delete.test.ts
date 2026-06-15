@@ -12,7 +12,7 @@ import {
 } from "../src/modules/channels/application/agent-channel-binding.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
-  COLLABORATOR_VIEWER,
+  EXTERNAL_VIEWER,
   OWNER_VIEWER,
   createChannelConnectionNamespaceForDeleteTest,
   withDiscordCurrentUserMock,
@@ -116,13 +116,13 @@ describe("agent channel binding deletion", () => {
       });
 
       await expect(
-        listAgentChannelBindings(database, COLLABORATOR_VIEWER, {
+        listAgentChannelBindings(database, EXTERNAL_VIEWER, {
           agentId: PUBLIC_API_TEST_IDS.agent,
           appId: PUBLIC_API_TEST_IDS.app,
         }),
       ).rejects.toThrow();
       await expect(
-        deleteAgentChannelBinding(bindings, COLLABORATOR_VIEWER, {
+        deleteAgentChannelBinding(bindings, EXTERNAL_VIEWER, {
           bindingId: binding.id,
           appId: PUBLIC_API_TEST_IDS.app,
         }),

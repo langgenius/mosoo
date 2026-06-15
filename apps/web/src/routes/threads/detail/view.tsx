@@ -513,7 +513,7 @@ export function ThreadsMissingDetail({ onBack }: { onBack: () => void }): ReactE
       <EmptyState
         icon={Inbox}
         title="Thread no longer exists"
-        description="It may have been deleted or moved out of this workspace."
+        description="It may have been deleted or removed from this App."
       >
         <Button onClick={onBack} size="sm" variant="outline">
           Back to threads

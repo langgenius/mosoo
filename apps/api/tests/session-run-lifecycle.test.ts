@@ -7,7 +7,7 @@ import {
 } from "../src/modules/runtime/infrastructure/session-runs/session-run-store.repository";
 import {
   createPublicHttpContractDatabase,
-  insertMemberSession,
+  insertNonOwnerSession,
 } from "./helpers/public-api-http-test-fixture";
 
 async function insertSessionRun(
@@ -67,7 +67,7 @@ async function insertSessionRun(
 describe("session run lifecycle", () => {
   test("does not let a stale terminal event revive or overwrite a completed run", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertSessionRun(database, {
       runId: "run-terminal",
       status: "running",
@@ -111,7 +111,7 @@ describe("session run lifecycle", () => {
 
   test("leaves duplicate transitions idempotent", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertSessionRun(database, {
       runId: "run-duplicate",
       status: "running",
@@ -132,7 +132,7 @@ describe("session run lifecycle", () => {
 
   test("rejects new runs after the owning session is terminated", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await database
       .prepare("UPDATE session SET status = ? WHERE id = ?")
       .bind("TERMINATED", "01J0000000000000000000000B")
@@ -154,7 +154,7 @@ describe("session run lifecycle", () => {
 
   test("rejects new runs while a runtime operation owns the session", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await database
       .prepare(
         `
@@ -182,7 +182,7 @@ describe("session run lifecycle", () => {
 
   test("session run projections expose the session as idle after completion", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     const run = await createSessionRunRecordIfSessionIdle(database, {
       agentId: "01J00000000000000000000009",
       createdBy: "01J00000000000000000000002",
@@ -225,7 +225,7 @@ describe("session run lifecycle", () => {
 
   test("does not revive terminated sessions from stale run projections", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertMemberSession(database);
+    await insertNonOwnerSession(database);
     await insertSessionRun(database, {
       runId: "run-stale-session",
       status: "running",

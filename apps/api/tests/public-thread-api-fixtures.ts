@@ -26,12 +26,12 @@ export const OWNER_VIEWER: AuthenticatedViewer = {
   name: "Owner",
 };
 
-export const MEMBER_VIEWER: AuthenticatedViewer = {
-  email: "member@example.com",
+export const NON_OWNER_VIEWER: AuthenticatedViewer = {
+  email: "non-owner@example.com",
   emailVerified: true,
-  id: PUBLIC_API_TEST_IDS.memberAccount,
+  id: PUBLIC_API_TEST_IDS.nonOwnerAccount,
   imageUrl: null,
-  name: "Org Member",
+  name: "Non Owner",
 };
 
 export function bearer(token: string): string {

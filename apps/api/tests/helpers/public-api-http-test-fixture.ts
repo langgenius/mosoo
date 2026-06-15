@@ -51,23 +51,23 @@ const INITIAL_AGENT_CONFIG_JSON = JSON.stringify({
 
 export const PUBLIC_API_TEST_IDS = {
   agent: "01J00000000000000000000009",
-  collaboratorAccount: "01J00000000000000000000003",
+  legacyGrantAccount: "01J00000000000000000000003",
   deployment: "01J0000000000000000000000A",
   disabledAccount: "01J00000000000000000000004",
   environment: "01J00000000000000000000007",
   environmentRevision: "01J00000000000000000000008",
   file: "01J0000000000000000000000J",
   fileAlt: "01J0000000000000000000000K",
-  memberAccount: "01J00000000000000000000002",
-  memberSession: "01J0000000000000000000000B",
+  nonOwnerAccount: "01J00000000000000000000002",
+  nonOwnerSession: "01J0000000000000000000000B",
   operation: "01J0000000000000000000000R",
   organization: "01J00000000000000000000006",
   outsiderAccount: "01J00000000000000000000005",
   ownerAccount: "01J00000000000000000000001",
   ownerSession: "01J0000000000000000000000C",
-  patCollaborator: "01J00000000000000000000063",
+  patLegacyGrant: "01J00000000000000000000063",
   patDisabled: "01J00000000000000000000064",
-  patMember: "01J00000000000000000000062",
+  patNonOwner: "01J00000000000000000000062",
   patOutsider: "01J00000000000000000000065",
   patOwner: "01J00000000000000000000061",
   patRevoked: "01J00000000000000000000066",
@@ -75,7 +75,7 @@ export const PUBLIC_API_TEST_IDS = {
   run: "01J0000000000000000000000N",
   runAlt: "01J0000000000000000000000P",
   sandbox: "01J0000000000000000000000D",
-  driverMember: "01J0000000000000000000000E",
+  driverNonOwner: "01J0000000000000000000000E",
   driverOwner: "01J0000000000000000000000F",
 } as const;
 
@@ -91,9 +91,9 @@ export function createTestExecutionContext(): ExecutionContext {
 }
 
 export const TOKENS = {
-  collaborator: "mst_collaborator_public_http_token_01",
+  legacyGrant: "mst_legacy_grant_public_http_token_01",
   disabled: "mst_disabled_public_http_token_01",
-  member: "mst_member_public_http_token_01",
+  nonOwner: "mst_non_owner_public_http_token_01",
   outsider: "mst_outsider_public_http_token_01",
   owner: "mst_owner_public_http_token_01",
   revoked: "mst_revoked_public_http_token_01",
@@ -305,8 +305,8 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
     .values(
       [
         [PUBLIC_API_TEST_IDS.ownerAccount, "owner@example.com", "Owner"],
-        [PUBLIC_API_TEST_IDS.memberAccount, "member@example.com", "Org Member"],
-        [PUBLIC_API_TEST_IDS.collaboratorAccount, "collaborator@example.com", "Collaborator"],
+        [PUBLIC_API_TEST_IDS.nonOwnerAccount, "non-owner@example.com", "Non Owner"],
+        [PUBLIC_API_TEST_IDS.legacyGrantAccount, "legacy-grant@example.com", "Legacy Grant"],
         [PUBLIC_API_TEST_IDS.disabledAccount, "disabled@example.com", "Disabled"],
         [PUBLIC_API_TEST_IDS.outsiderAccount, "outsider@example.com", "Outsider"],
       ].map(([id, email, name]) => ({
@@ -362,7 +362,6 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
       environmentId: PUBLIC_API_TEST_IDS.environment,
       id: PUBLIC_API_TEST_IDS.environmentRevision,
       networkPolicy: "full",
-      organizationId: PUBLIC_API_TEST_IDS.organization,
       packagesJson: "[]",
       appId: PUBLIC_API_TEST_IDS.app,
       setupScript: "",
@@ -380,7 +379,6 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
       forkedFromOwnerName: null,
       id: PUBLIC_API_TEST_IDS.environment,
       name: "Default",
-      organizationId: PUBLIC_API_TEST_IDS.organization,
       ownerAccountId: null,
       appId: PUBLIC_API_TEST_IDS.app,
       updatedAt: nowMs,
@@ -407,7 +405,6 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
       id: PUBLIC_API_VENDOR_CREDENTIAL_ID,
       models: null,
       name: "App OpenAI",
-      organizationId: PUBLIC_API_TEST_IDS.organization,
       appId: PUBLIC_API_TEST_IDS.app,
       updatedAt: nowMs,
       vendorId: "openai",
@@ -466,16 +463,16 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
     tokenValue: TOKENS.owner,
   });
   await insertPat({
-    accountId: PUBLIC_API_TEST_IDS.memberAccount,
+    accountId: PUBLIC_API_TEST_IDS.nonOwnerAccount,
     database,
-    id: PUBLIC_API_TEST_IDS.patMember,
-    tokenValue: TOKENS.member,
+    id: PUBLIC_API_TEST_IDS.patNonOwner,
+    tokenValue: TOKENS.nonOwner,
   });
   await insertPat({
-    accountId: PUBLIC_API_TEST_IDS.collaboratorAccount,
+    accountId: PUBLIC_API_TEST_IDS.legacyGrantAccount,
     database,
-    id: PUBLIC_API_TEST_IDS.patCollaborator,
-    tokenValue: TOKENS.collaborator,
+    id: PUBLIC_API_TEST_IDS.patLegacyGrant,
+    tokenValue: TOKENS.legacyGrant,
   });
   await insertPat({
     accountId: PUBLIC_API_TEST_IDS.disabledAccount,
@@ -490,7 +487,7 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
     tokenValue: TOKENS.outsider,
   });
   await insertPat({
-    accountId: PUBLIC_API_TEST_IDS.memberAccount,
+    accountId: PUBLIC_API_TEST_IDS.nonOwnerAccount,
     database,
     id: PUBLIC_API_TEST_IDS.patRevoked,
     revokedAt: nowMs,
@@ -500,11 +497,11 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
   return database;
 }
 
-export async function insertMemberSession(database: SqliteD1Database): Promise<void> {
+export async function insertNonOwnerSession(database: SqliteD1Database): Promise<void> {
   await insertSession(database, {
-    creatorAccountId: PUBLIC_API_TEST_IDS.memberAccount,
-    id: PUBLIC_API_TEST_IDS.memberSession,
-    title: "Member route session",
+    creatorAccountId: PUBLIC_API_TEST_IDS.nonOwnerAccount,
+    id: PUBLIC_API_TEST_IDS.nonOwnerSession,
+    title: "Non-owner route session",
   });
 }
 
