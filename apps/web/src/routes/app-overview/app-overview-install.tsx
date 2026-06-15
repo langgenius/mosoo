@@ -79,7 +79,9 @@ export function AppOverviewInstallGuide(): ReactElement {
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [skillCopied, setSkillCopied] = useState(false);
-  const [showOtherAgents, setShowOtherAgents] = useState(false);
+  // Default to expanded so the @mosoo skill + Copy/Download actions are visible
+  // without an extra click for users on Codex / Cursor / Cline.
+  const [showOtherAgents, setShowOtherAgents] = useState(true);
 
   const createTokenMutation = useMutation({
     mutationFn: async () => createPersonalAccessToken("mosoo CLI"),
@@ -126,7 +128,7 @@ export function AppOverviewInstallGuide(): ReactElement {
   const minting = createTokenMutation.isPending;
 
   return (
-    <section className="border-border bg-card rounded-lg border px-6 py-10">
+    <section className="py-6">
       <div className="mx-auto flex max-w-xl flex-col items-center text-center">
         <h2 className="text-foreground text-2xl font-semibold tracking-tight">
           Hand Mosoo to your agent
