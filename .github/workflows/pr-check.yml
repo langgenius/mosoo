@@ -1,7 +1,7 @@
 name: PR Check
 
 on:
-  pull_request:
+  pull_request_target:
     types:
       - opened
       - synchronize
@@ -21,12 +21,13 @@ jobs:
     name: Repository check
     if: >-
       github.event.pull_request.draft == false ||
-      github.base_ref == 'main' ||
-      startsWith(github.base_ref, 'release/')
+      github.event.pull_request.base.ref == 'main' ||
+      startsWith(github.event.pull_request.base.ref, 'release/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
           submodules: true
           persist-credentials: false
