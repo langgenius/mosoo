@@ -34,7 +34,12 @@ async function createCostQueryDatabase(): Promise<SqliteD1Database> {
 
     CREATE TABLE session (
       id text PRIMARY KEY NOT NULL,
+      agent_id text,
+      app_id text,
+      created_at integer,
       metadata_json text NOT NULL,
+      model text,
+      provider text,
       type text NOT NULL
     );
 

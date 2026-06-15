@@ -82,7 +82,7 @@ export function buildUsageSourceCte(
   bindings: (number | string)[];
   sql: string;
 } {
-  const detailAppFilter = isTruthy(scope.appId) ? "AND app_id = ?" : "";
+  const detailAppFilter = isTruthy(scope.appId) ? "AND usage_event.app_id = ?" : "";
   const rollupAppFilter = isTruthy(scope.appId) ? "AND app_id = ?" : "";
 
   return {
@@ -98,35 +98,35 @@ export function buildUsageSourceCte(
     sql: `
       WITH usage_source AS (
         SELECT
-          organization_id,
-          app_id,
-          agent_id,
-          actor_user_id,
-          agent_owner_user_id,
+          usage_event.organization_id,
+          usage_event.app_id,
+          usage_event.agent_id,
+          usage_event.actor_user_id,
+          usage_event.agent_owner_user_id,
           CASE
             WHEN session.type = 'api_channel'
               AND json_extract(session.metadata_json, '$.triggered_by.provider') IS NOT NULL
               THEN 1
             ELSE 0
           END AS is_external_channel,
-          date(created_at / 1000, 'unixepoch') AS date,
-          agent_publication_state_at_run,
-          run_purpose,
-          provider,
-          model,
+          date(usage_event.created_at / 1000, 'unixepoch') AS date,
+          usage_event.agent_publication_state_at_run,
+          usage_event.run_purpose,
+          usage_event.provider,
+          usage_event.model,
           1 AS request_count,
-          input_tokens,
-          output_tokens,
-          cache_read_tokens,
-          cache_creation_tokens,
-          total_cost_usd_micros / 1000000.0 AS total_cost_usd,
-          CASE WHEN pricing_status = 'unknown' THEN 1 ELSE 0 END
+          usage_event.input_tokens,
+          usage_event.output_tokens,
+          usage_event.cache_read_tokens,
+          usage_event.cache_creation_tokens,
+          usage_event.total_cost_usd_micros / 1000000.0 AS total_cost_usd,
+          CASE WHEN usage_event.pricing_status = 'unknown' THEN 1 ELSE 0 END
             AS unpriced_request_count
         FROM usage_event
         LEFT JOIN session ON session.id = usage_event.session_id
-        WHERE organization_id = ?
+        WHERE usage_event.organization_id = ?
           ${detailAppFilter}
-          AND created_at >= ?
+          AND usage_event.created_at >= ?
         UNION ALL
         SELECT
           organization_id,
