@@ -261,6 +261,17 @@ chore/dev-docs-layout
 
 Use `!` only for intentional breaking changes. Every Issue and PR must be self-assigned. PRs should keep a clear scope, describe verification results, and explicitly state whether they include generated files, GraphQL codegen, or DB baseline updates.
 
+### Pull Requests
+
+- Open PRs **only to `main`** (or `release/*`). No PR chains between feature branches.
+- Private-stage PRs should use branches in the upstream repository so required `pull_request` checks can run.
+- Fork PRs are usable only when private fork workflows are enabled, or when a maintainer handles verification and bypass explicitly.
+- Metadata gates support fork PRs through `pull_request_target`; upstream branch PRs still use `pull_request`.
+- Repository code checks stay on `pull_request`.
+- Branch names use `type/scope-subject` above.
+- Run `just check` before marking ready for review. CI runs the same gate for non-draft `pull_request` PRs.
+- Big pivots: update the boundary docs first, then prefer **one umbrella PR** with `just check` and boundary tests as the review contract.
+
 ### Enforced Commit Policy
 
 Commit quality is enforced by automation, not contributor memory:

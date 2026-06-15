@@ -1,0 +1,52 @@
+name: PR Ship Policy
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - converted_to_draft
+      - edited
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ship-policy:
+    name: Ship policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce ship-only pull requests
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+
+          case "$BASE_REF" in
+            main)
+              echo "Ship lane: base is main."
+              ;;
+            release/*)
+              echo "Ship lane: release branch base is allowed."
+              ;;
+            *)
+              echo "::error::Pull requests must target main (or release/*). Got base: ${BASE_REF}. Integration stacks must not use GitHub PRs between side branches."
+              exit 1
+              ;;
+          esac
+
+          # Belt-and-suspenders: ruleset blocks new tool-prefixed branches on push.
+          # This still catches old branches, forks, and PRs opened before the ruleset.
+          if echo "$HEAD_REF" | grep -Eiq '^(codex|cursor|claude|agent|copilot|aider|devin|windsurf|codegen|opencode|grok)(/|$)'; then
+            echo "::error::Head branch '${HEAD_REF}' uses a blocked tool/agent prefix. Use type/scope-subject under feat|fix|docs|... instead."
+            exit 1
+          fi
+
+          echo "Ship policy passed for head=${HEAD_REF} base=${BASE_REF}."
