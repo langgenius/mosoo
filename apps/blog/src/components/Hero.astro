@@ -18,7 +18,7 @@ const dateLabel = featured.data.date.toLocaleDateString("en-US", {
 
 <a
   href={href}
-  class="group block overflow-hidden rounded-[var(--r-2xl)] border border-[color:var(--border)] bg-[color:var(--surface)] shadow-[var(--shadow-sm)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-lg)]"
+  class="group block"
 >
   <div class="grid grid-cols-1 md:grid-cols-[0.95fr_1.05fr]">
     <div class="md:order-2">
@@ -30,7 +30,7 @@ const dateLabel = featured.data.date.toLocaleDateString("en-US", {
         label={featured.data.category}
       />
     </div>
-    <div class="flex flex-col gap-4 p-6 md:order-1 md:p-8 lg:p-9">
+    <div class="flex flex-col gap-4 pt-5 md:order-1 md:pt-0 md:pr-10 lg:pr-12">
       <div class="font-mono text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[color:var(--fg-muted)]">
         Featured · {dateLabel}
       </div>
