@@ -31,15 +31,12 @@ function createOnboardingDatabase(): SqliteD1Database {
 	    CREATE TABLE organization (
 	      id text PRIMARY KEY NOT NULL,
 	      name text NOT NULL,
-	      slug text NOT NULL,
 	      avatar_url text,
 	      creator_account_id text,
 	      default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
     );
-
-    CREATE UNIQUE INDEX organization_slug_idx ON organization (slug);
 
     CREATE TABLE app (
       id text PRIMARY KEY NOT NULL,
@@ -96,14 +93,13 @@ function createOnboardingDatabase(): SqliteD1Database {
     INSERT INTO organization (
 	      id,
 	      name,
-	      slug,
 	      avatar_url,
 	      creator_account_id,
 	      default_environment_id,
       created_at,
       updated_at
 	    )
-	    VALUES ('01J00000000000000000000006', 'Example Org', 'example-org', NULL, '01J00000000000000000000001', NULL, 1, 1);
+	    VALUES ('01J00000000000000000000006', 'Example Org', NULL, '01J00000000000000000000001', NULL, 1, 1);
   `);
 
   return database;
@@ -120,7 +116,6 @@ describe("onboarding bootstrap", () => {
     expect(status.completed).toBe(true);
     expect(status.organization).toMatchObject({
       name: "Created Org",
-      slug: "created-org",
     });
     expect(status.organization).not.toHaveProperty("viewerRole");
 
@@ -144,57 +139,5 @@ describe("onboarding bootstrap", () => {
       organization_id: status.organization?.id,
       owner_account_id: VIEWER.id,
     });
-  });
-
-  test("creates the next slug candidate when the base slug exists", async () => {
-    const database = createOnboardingDatabase();
-    database.execute(`
-      INSERT INTO organization (
-	        id,
-	        name,
-	        slug,
-	        avatar_url,
-	        creator_account_id,
-	        default_environment_id,
-        created_at,
-        updated_at
-      )
-      VALUES (
-	        'org-slug-collision',
-	        'Created Org',
-	        'created-org',
-	        NULL,
-	        'owner-2',
-	        NULL,
-        1,
-        1
-      );
-	`);
-    const status = await bootstrapOnboarding(database, VIEWER, {
-      name: "Created Org",
-    });
-
-    expect(status.completed).toBe(true);
-    expect(status.organization).toMatchObject({
-      name: "Created Org",
-      slug: "created-org-2",
-    });
-    expect(status.organization).not.toHaveProperty("viewerRole");
-
-    const createdRows = await database
-      .prepare("SELECT id FROM organization WHERE creator_account_id = 'account-1' ORDER BY slug")
-      .all<{ id: string }>();
-
-    expect(createdRows.results).toEqual([{ id: status.organization?.id }]);
-
-    const appRows = await database
-      .prepare("SELECT organization_id FROM app ORDER BY organization_id")
-      .all<{ organization_id: string }>();
-
-    expect(appRows.results).toEqual([
-      {
-        organization_id: status.organization?.id ?? "",
-      },
-    ]);
   });
 });

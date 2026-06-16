@@ -15,7 +15,6 @@ function createAppDatabase(): SqliteD1Database {
 	    CREATE TABLE organization (
 	      id text PRIMARY KEY NOT NULL,
 	      name text NOT NULL,
-	      slug text NOT NULL,
 	      avatar_url text,
 	      creator_account_id text,
 	      created_at integer NOT NULL,
@@ -53,12 +52,11 @@ describe("App provisioning boundary", () => {
       INSERT INTO organization (
 	        id,
 	        name,
-	        slug,
 	        creator_account_id,
 	        created_at,
 	        updated_at
 	      )
-	      VALUES ('org-1', 'Org One', 'org-one', 'account-1', 1, 1);
+	      VALUES ('org-1', 'Org One', 'account-1', 1, 1);
 
       INSERT INTO app (
         id,
@@ -93,12 +91,11 @@ describe("App provisioning boundary", () => {
       INSERT INTO organization (
 	        id,
 	        name,
-	        slug,
 	        creator_account_id,
 	        created_at,
 	        updated_at
 	      )
-	      VALUES ('org-1', 'Org One', 'org-one', 'account-1', 1, 1);
+	      VALUES ('org-1', 'Org One', 'account-1', 1, 1);
 
       INSERT INTO app (
         id,
@@ -123,12 +120,11 @@ describe("App provisioning boundary", () => {
       INSERT INTO organization (
 	        id,
 	        name,
-	        slug,
 	        creator_account_id,
 	        created_at,
 	        updated_at
 	      )
-	      VALUES ('org-1', 'Org One', 'org-one', NULL, 1, 1);
+	      VALUES ('org-1', 'Org One', NULL, 1, 1);
     `);
 
     await expect(listOrganizationApps(database, makeViewer("account-1"), "org-1")).rejects.toThrow(
@@ -142,12 +138,11 @@ describe("App provisioning boundary", () => {
       INSERT INTO organization (
 	        id,
 	        name,
-	        slug,
 	        creator_account_id,
 	        created_at,
 	        updated_at
 	      )
-	      VALUES ('org-1', 'Org One', 'org-one', 'account-1', 1, 1);
+	      VALUES ('org-1', 'Org One', 'account-1', 1, 1);
     `);
 
     await expect(

@@ -32,7 +32,6 @@ function createViewerContextDatabase(): SqliteD1Database {
 	    CREATE TABLE organization (
 	      id text PRIMARY KEY NOT NULL,
 	      name text NOT NULL,
-	      slug text NOT NULL,
 	      avatar_url text,
 	      creator_account_id text,
 	      created_at integer NOT NULL,
@@ -55,16 +54,15 @@ function createViewerContextDatabase(): SqliteD1Database {
     INSERT INTO organization (
 	      id,
 	      name,
-	      slug,
 	      avatar_url,
 	      creator_account_id,
 	      created_at,
       updated_at
 	    )
 	    VALUES
-	      ('01J00000000000000000000006', 'First Org', 'first-org', NULL, 'account-1', 1, 1),
-	      ('org-2', 'Second Org', 'second-org', NULL, 'account-1', 2, 2),
-	      ('org-other-owner', 'Other Owner Org', 'other-owner-org', NULL, 'other-owner', 3, 3);
+	      ('01J00000000000000000000006', 'First Org', NULL, 'account-1', 1, 1),
+	      ('org-2', 'Second Org', NULL, 'account-1', 2, 2),
+	      ('org-other-owner', 'Other Owner Org', NULL, 'other-owner', 3, 3);
 
   `);
 

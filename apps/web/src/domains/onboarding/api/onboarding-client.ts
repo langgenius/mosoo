@@ -14,7 +14,6 @@ const ONBOARDING_BOOTSTRAP_MUTATION = graphql(/* GraphQL */ `
         createdAt
         id
         name
-        slug
       }
     }
   }

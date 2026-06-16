@@ -1268,7 +1268,6 @@ type Organization {
   createdAt: String!
   id: ULID!
   name: String!
-  slug: String!
 }
 
 type OrganizationBillingCostCard {

@@ -36,7 +36,6 @@ function createSessionTypeDatabase(): SqliteD1Database {
 	    CREATE TABLE organization (
 	      id text PRIMARY KEY NOT NULL,
 	      name text NOT NULL,
-	      slug text NOT NULL,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
     );
@@ -99,13 +98,11 @@ function createSessionTypeDatabase(): SqliteD1Database {
 	    INSERT INTO organization (
 	      id,
 	      name,
-	      slug,
 	      created_at,
       updated_at
 	    ) VALUES (
 	      '${ORGANIZATION_ID}',
 	      'Test Org',
-	      'test-org',
       1,
       1
     );

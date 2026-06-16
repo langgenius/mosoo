@@ -4,6 +4,5 @@ export const organizationSchema = /* GraphQL */ `
     createdAt: String!
     id: ULID!
     name: String!
-    slug: String!
   }
 `;
