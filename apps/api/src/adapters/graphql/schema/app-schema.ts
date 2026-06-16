@@ -5,7 +5,6 @@ export const appSchema = /* GraphQL */ `
     id: ULID!
     name: String!
     ownerAccountId: ULID!
-    slug: String!
   }
 
   input CreateAppInput {

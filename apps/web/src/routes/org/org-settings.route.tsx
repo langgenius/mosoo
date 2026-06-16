@@ -30,7 +30,6 @@ export function OrgSettingsPage() {
           ) : (
             <div className="space-y-6">
               <ReadonlyField label="Name" value={activeOrganization.name} />
-              <ReadonlyField label="Slug" value={activeOrganization.slug} />
             </div>
           )}
         </div>

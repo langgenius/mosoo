@@ -25,7 +25,6 @@ const VIEWER_QUERY = graphql(/* GraphQL */ `
         createdAt
         id
         name
-        slug
       }
       auth {
         currentSecurityLevel
@@ -36,7 +35,6 @@ const VIEWER_QUERY = graphql(/* GraphQL */ `
         createdAt
         id
         name
-        slug
       }
     }
   }

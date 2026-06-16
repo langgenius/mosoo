@@ -75,7 +75,6 @@ const organization = {
   kind: "personal",
   name: "Harness E2E",
   primaryDomain: null,
-  slug: "harness-e2e",
   viewerRole: "owner",
 };
 const agentDetail = {

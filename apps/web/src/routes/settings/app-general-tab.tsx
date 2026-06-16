@@ -40,7 +40,6 @@ export function AppGeneralTab() {
                 </p>
                 <CommandBlock command={activeApp.id} prompt={null} />
               </div>
-              <ReadonlyField label="Slug" value={activeApp.slug} />
             </div>
           )}
         </div>

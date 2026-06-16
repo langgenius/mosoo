@@ -60,7 +60,6 @@ function createSessionViewerSocketPrewarmDatabase(input: {
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       name text NOT NULL,
-      slug text NOT NULL,
       default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
@@ -91,7 +90,6 @@ function createSessionViewerSocketPrewarmDatabase(input: {
       organization_id,
       owner_account_id,
       name,
-      slug,
       default_environment_id,
       created_at,
       updated_at
@@ -100,7 +98,6 @@ function createSessionViewerSocketPrewarmDatabase(input: {
       '${ORGANIZATION_ID}',
       '${VIEWER_ID}',
       'Default App',
-      'default',
       NULL,
       1,
       1

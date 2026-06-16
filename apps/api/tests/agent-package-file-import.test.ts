@@ -421,7 +421,6 @@ describe("agent package file import", () => {
         name,
         organization_id,
         owner_account_id,
-        slug,
         updated_at
       )
       VALUES (
@@ -431,7 +430,6 @@ describe("agent package file import", () => {
         'Other App',
         '${ORGANIZATION_ID}',
         '${OWNER_VIEWER.id}',
-        'other-app',
         1
       );
 

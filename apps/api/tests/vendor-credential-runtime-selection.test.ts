@@ -51,7 +51,6 @@ function createCredentialRuntimeDatabase(): SqliteD1Database {
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       name text NOT NULL,
-      slug text NOT NULL,
       default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
@@ -93,12 +92,11 @@ function createCredentialRuntimeDatabase(): SqliteD1Database {
           organization_id,
           owner_account_id,
           name,
-          slug,
           default_environment_id,
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, 'Default App', 'default', NULL, 1, 1)
+        VALUES (?, ?, ?, 'Default App', NULL, 1, 1)
       `,
     )
     .bind(APP_ID, ORGANIZATION_ID, APP_OWNER_ID)

@@ -22,7 +22,6 @@ function createOnboardingStatusDatabase(): SqliteD1Database {
 	      creator_account_id text,
 	      id text PRIMARY KEY NOT NULL,
 	      name text NOT NULL,
-	      slug text NOT NULL,
 	      updated_at integer NOT NULL
 	    );
 
@@ -32,13 +31,12 @@ function createOnboardingStatusDatabase(): SqliteD1Database {
 	      creator_account_id,
 	      id,
 	      name,
-	      slug,
 	      updated_at
 	    )
 	    VALUES
-	      (NULL, 1, 'viewer-1', 'org-old', 'Old Org', 'old-org', 1),
-	      (NULL, 2, 'viewer-1', 'org-current', 'Current Org', 'current-org', 2),
-	      (NULL, 3, 'other-owner', 'org-other-owner', 'Other Owner Org', 'other-owner-org', 3);
+	      (NULL, 1, 'viewer-1', 'org-old', 'Old Org', 1),
+	      (NULL, 2, 'viewer-1', 'org-current', 'Current Org', 2),
+	      (NULL, 3, 'other-owner', 'org-other-owner', 'Other Owner Org', 3);
   `);
 
   return database;

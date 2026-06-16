@@ -552,7 +552,6 @@ type App {
   id: ULID!
   name: String!
   ownerAccountId: ULID!
-  slug: String!
 }
 
 type AppCostCard {
@@ -1269,7 +1268,6 @@ type Organization {
   createdAt: String!
   id: ULID!
   name: String!
-  slug: String!
 }
 
 type OrganizationBillingCostCard {

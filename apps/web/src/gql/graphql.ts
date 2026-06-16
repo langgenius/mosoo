@@ -940,14 +940,14 @@ export type AppListQueryVariables = Exact<{
 }>;
 
 
-export type AppListQuery = { appList: Array<{ createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId, slug: string }> };
+export type AppListQuery = { appList: Array<{ createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId }> };
 
 export type CreateAppMutationVariables = Exact<{
   input: CreateAppInput;
 }>;
 
 
-export type CreateAppMutation = { createApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId, slug: string } };
+export type CreateAppMutation = { createApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId } };
 
 type CostTotalsFields_CostAgentRow_Fragment = { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number };
 
@@ -1131,7 +1131,7 @@ export type OnboardingBootstrapMutationVariables = Exact<{
 }>;
 
 
-export type OnboardingBootstrapMutation = { onboardingBootstrap: { completed: boolean, organization: { avatarUrl: string | null, createdAt: string, id: PlatformId, name: string, slug: string } | null } };
+export type OnboardingBootstrapMutation = { onboardingBootstrap: { completed: boolean, organization: { avatarUrl: string | null, createdAt: string, id: PlatformId, name: string } | null } };
 
 export type ThreadAgentSessionRetrieveQueryVariables = Exact<{
   appId: PlatformId;
@@ -1363,7 +1363,7 @@ export type SpacesQuery = { spaceList: Array<{ createdAt: string, id: PlatformId
 export type ViewerQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ViewerQuery = { viewer: { account: { email: string, id: PlatformId, imageUrl: string | null, name: string, systemAgentModel: { modelId: string, vendor: string } | null } | null, activeOrganization: { avatarUrl: string | null, createdAt: string, id: PlatformId, name: string, slug: string } | null, auth: { currentSecurityLevel: AuthSecurityLevel, methods: Array<AuthMethod> }, organizations: Array<{ avatarUrl: string | null, createdAt: string, id: PlatformId, name: string, slug: string }> } };
+export type ViewerQuery = { viewer: { account: { email: string, id: PlatformId, imageUrl: string | null, name: string, systemAgentModel: { modelId: string, vendor: string } | null } | null, activeOrganization: { avatarUrl: string | null, createdAt: string, id: PlatformId, name: string } | null, auth: { currentSecurityLevel: AuthSecurityLevel, methods: Array<AuthMethod> }, organizations: Array<{ avatarUrl: string | null, createdAt: string, id: PlatformId, name: string }> } };
 
 export type UpdateProfileMutationVariables = Exact<{
   input: UpdateAccountProfileInput;
@@ -2775,7 +2775,6 @@ export const AppListDocument = new TypedDocumentString(`
     id
     name
     ownerAccountId
-    slug
   }
 }
     `) as unknown as TypedDocumentString<AppListQuery, AppListQueryVariables>;
@@ -2787,7 +2786,6 @@ export const CreateAppDocument = new TypedDocumentString(`
     id
     name
     ownerAccountId
-    slug
   }
 }
     `) as unknown as TypedDocumentString<CreateAppMutation, CreateAppMutationVariables>;
@@ -3626,7 +3624,6 @@ export const OnboardingBootstrapDocument = new TypedDocumentString(`
       createdAt
       id
       name
-      slug
     }
   }
 }
@@ -4266,7 +4263,6 @@ export const ViewerDocument = new TypedDocumentString(`
       createdAt
       id
       name
-      slug
     }
     auth {
       currentSecurityLevel
@@ -4277,7 +4273,6 @@ export const ViewerDocument = new TypedDocumentString(`
       createdAt
       id
       name
-      slug
     }
   }
 }

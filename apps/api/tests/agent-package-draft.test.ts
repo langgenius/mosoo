@@ -29,7 +29,6 @@ function createAgentPackageDraftDatabase(): SqliteD1Database {
       name text NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
-      slug text NOT NULL,
       updated_at integer NOT NULL
     );
 
@@ -76,10 +75,9 @@ function createAgentPackageDraftDatabase(): SqliteD1Database {
       name,
       organization_id,
       owner_account_id,
-      slug,
       updated_at
     )
-    VALUES (1, NULL, '${DRAFT_IDS.app}', 'Draft App', '${DRAFT_IDS.organization}', '${DRAFT_IDS.owner}', 'draft', 1);
+    VALUES (1, NULL, '${DRAFT_IDS.app}', 'Draft App', '${DRAFT_IDS.organization}', '${DRAFT_IDS.owner}', 1);
   `);
 
   return database;
@@ -101,7 +99,6 @@ function createPackageResolutionDatabase(): SqliteD1Database {
       name text NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
-      slug text NOT NULL,
       updated_at integer NOT NULL
     );
 
@@ -136,10 +133,9 @@ function createPackageResolutionDatabase(): SqliteD1Database {
       name,
       organization_id,
       owner_account_id,
-      slug,
       updated_at
     )
-    VALUES ('${DRAFT_IDS.app}', 1, NULL, 'Draft App', '${DRAFT_IDS.organization}', '${DRAFT_IDS.owner}', 'draft', 1);
+    VALUES ('${DRAFT_IDS.app}', 1, NULL, 'Draft App', '${DRAFT_IDS.organization}', '${DRAFT_IDS.owner}', 1);
   `);
 
   return database;
