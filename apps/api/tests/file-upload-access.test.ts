@@ -103,7 +103,6 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
       name text NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
-      slug text NOT NULL,
       updated_at integer NOT NULL
     );
 
@@ -114,7 +113,6 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
       name,
       organization_id,
       owner_account_id,
-      slug,
       updated_at
     )
     VALUES (
@@ -124,7 +122,6 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
       'Main App',
       '${ORGANIZATION_ID}',
       '${VIEWER_ID}',
-      'main-app',
       1
     );
 
@@ -252,11 +249,10 @@ async function insertRawFileRouteSessionFixture(
         name,
         organization_id,
         owner_account_id,
-        slug,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?)`,
     )
-    .bind(1, input.otherAppId, "Other App", input.organizationId, input.viewerId, "other-app", 1)
+    .bind(1, input.otherAppId, "Other App", input.organizationId, input.viewerId, 1)
     .run();
 
   await database

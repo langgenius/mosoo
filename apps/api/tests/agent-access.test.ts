@@ -28,7 +28,6 @@ function createAgentAccessDatabase(): SqliteD1Database {
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       name text NOT NULL,
-      slug text NOT NULL,
       default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
@@ -64,7 +63,6 @@ function createAgentAccessDatabase(): SqliteD1Database {
       organization_id,
       owner_account_id,
       name,
-      slug,
       created_at,
       updated_at
     )
@@ -74,7 +72,6 @@ function createAgentAccessDatabase(): SqliteD1Database {
         '${AGENT_ACCESS_IDS.organization}',
         '${AGENT_ACCESS_IDS.ownerAccount}',
         'Default App',
-        'default',
         1,
         1
       ),
@@ -83,7 +80,6 @@ function createAgentAccessDatabase(): SqliteD1Database {
         '${AGENT_ACCESS_IDS.organization}',
         '${AGENT_ACCESS_IDS.ownerAccount}',
         'Other App',
-        'other',
         1,
         1
       );

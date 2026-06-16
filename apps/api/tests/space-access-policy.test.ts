@@ -26,7 +26,6 @@ function createSpaceAccessDatabase(): SqliteD1Database {
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       name text NOT NULL,
-      slug text NOT NULL,
       default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
@@ -46,19 +45,17 @@ function createSpaceAccessDatabase(): SqliteD1Database {
       organization_id,
       owner_account_id,
       name,
-      slug,
       default_environment_id,
       created_at,
       updated_at
     )
     VALUES
-      ('${APP_ID}', '01J00000000000000000000008', '${OWNER_ID}', 'Main App', 'main', NULL, 1, 1),
+      ('${APP_ID}', '01J00000000000000000000008', '${OWNER_ID}', 'Main App', NULL, 1, 1),
       (
         '${OTHER_APP_ID}',
         '01J00000000000000000000008',
         '${OTHER_OWNER_ID}',
         'Other App',
-        'other',
         NULL,
         1,
         1

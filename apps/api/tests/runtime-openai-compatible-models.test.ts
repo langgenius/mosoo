@@ -22,7 +22,6 @@ function createAvailableModelsDatabase(): D1Database {
       organization_id TEXT NOT NULL,
       owner_account_id TEXT NOT NULL,
       name TEXT NOT NULL,
-      slug TEXT NOT NULL,
       default_environment_id TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
@@ -48,7 +47,6 @@ function createAvailableModelsDatabase(): D1Database {
       organization_id,
       owner_account_id,
       name,
-      slug,
       default_environment_id,
       created_at,
       updated_at
@@ -58,7 +56,6 @@ function createAvailableModelsDatabase(): D1Database {
       '01J00000000000000000000006',
       'account-1',
       'Default App',
-      'default',
       NULL,
       1,
       1

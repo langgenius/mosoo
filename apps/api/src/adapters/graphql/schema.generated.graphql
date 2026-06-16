@@ -552,7 +552,6 @@ type App {
   id: ULID!
   name: String!
   ownerAccountId: ULID!
-  slug: String!
 }
 
 type AppCostCard {

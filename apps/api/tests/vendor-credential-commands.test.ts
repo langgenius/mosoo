@@ -30,9 +30,8 @@ async function insertOtherApp(
         name,
         organization_id,
         owner_account_id,
-        slug,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       1,
@@ -40,7 +39,6 @@ async function insertOtherApp(
       "Other App",
       fixture.ids.organizationId,
       input.ownerAccountId ?? fixture.viewer.id,
-      "other-app",
       1,
     )
     .run();

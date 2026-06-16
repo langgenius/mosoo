@@ -50,8 +50,8 @@ type Documents = {
     "\n  mutation RestartDriver($input: RuntimeStateOperationInput!) {\n    restartDriver(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": typeof types.RestartDriverDocument,
     "\n  mutation RecreateSandbox($input: RuntimeStateOperationInput!) {\n    recreateSandbox(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": typeof types.RecreateSandboxDocument,
     "\n  mutation ResetAgentState($input: RuntimeStateOperationInput!) {\n    resetAgentState(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": typeof types.ResetAgentStateDocument,
-    "\n  query AppList($organizationId: ULID!) {\n    appList(organizationId: $organizationId) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n      slug\n    }\n  }\n": typeof types.AppListDocument,
-    "\n  mutation CreateApp($input: CreateAppInput!) {\n    createApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n      slug\n    }\n  }\n": typeof types.CreateAppDocument,
+    "\n  query AppList($organizationId: ULID!) {\n    appList(organizationId: $organizationId) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": typeof types.AppListDocument,
+    "\n  mutation CreateApp($input: CreateAppInput!) {\n    createApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": typeof types.CreateAppDocument,
     "\n  fragment CostTotalsFields on CostAggregate {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostTotalsFieldsFragmentDoc,
     "\n  fragment CostDailyFields on CostDailyPoint {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    date\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostDailyFieldsFragmentDoc,
     "\n  fragment CostAgentFields on CostAgentRow {\n    activeUsers\n    agentId\n    agentName\n    cacheCreationTokens\n    cacheReadTokens\n    debugCostUsd\n    evalCostUsd\n    inputTokens\n    outputTokens\n    ownerEmail\n    ownerId\n    ownerName\n    previousCostUsd\n    previewCostUsd\n    productionCostUsd\n    requestCount\n    scheduledCostUsd\n    totalCostUsd\n    unpricedRequestCount\n  }\n": typeof types.CostAgentFieldsFragmentDoc,
@@ -161,8 +161,8 @@ const documents: Documents = {
     "\n  mutation RestartDriver($input: RuntimeStateOperationInput!) {\n    restartDriver(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": types.RestartDriverDocument,
     "\n  mutation RecreateSandbox($input: RuntimeStateOperationInput!) {\n    recreateSandbox(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": types.RecreateSandboxDocument,
     "\n  mutation ResetAgentState($input: RuntimeStateOperationInput!) {\n    resetAgentState(input: $input) {\n      affectedSessionCount\n      agentId\n      ok\n      operation\n    }\n  }\n": types.ResetAgentStateDocument,
-    "\n  query AppList($organizationId: ULID!) {\n    appList(organizationId: $organizationId) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n      slug\n    }\n  }\n": types.AppListDocument,
-    "\n  mutation CreateApp($input: CreateAppInput!) {\n    createApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n      slug\n    }\n  }\n": types.CreateAppDocument,
+    "\n  query AppList($organizationId: ULID!) {\n    appList(organizationId: $organizationId) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": types.AppListDocument,
+    "\n  mutation CreateApp($input: CreateAppInput!) {\n    createApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": types.CreateAppDocument,
     "\n  fragment CostTotalsFields on CostAggregate {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostTotalsFieldsFragmentDoc,
     "\n  fragment CostDailyFields on CostDailyPoint {\n    activeUsers\n    cacheCreationTokens\n    cacheReadTokens\n    date\n    inputTokens\n    outputTokens\n    requestCount\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostDailyFieldsFragmentDoc,
     "\n  fragment CostAgentFields on CostAgentRow {\n    activeUsers\n    agentId\n    agentName\n    cacheCreationTokens\n    cacheReadTokens\n    debugCostUsd\n    evalCostUsd\n    inputTokens\n    outputTokens\n    ownerEmail\n    ownerId\n    ownerName\n    previousCostUsd\n    previewCostUsd\n    productionCostUsd\n    requestCount\n    scheduledCostUsd\n    totalCostUsd\n    unpricedRequestCount\n  }\n": types.CostAgentFieldsFragmentDoc,
@@ -380,11 +380,11 @@ export function graphql(source: "\n  mutation ResetAgentState($input: RuntimeSta
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query AppList($organizationId: ULID!) {\n    appList(organizationId: $organizationId) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n      slug\n    }\n  }\n"): typeof import('./graphql').AppListDocument;
+export function graphql(source: "\n  query AppList($organizationId: ULID!) {\n    appList(organizationId: $organizationId) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n"): typeof import('./graphql').AppListDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  mutation CreateApp($input: CreateAppInput!) {\n    createApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n      slug\n    }\n  }\n"): typeof import('./graphql').CreateAppDocument;
+export function graphql(source: "\n  mutation CreateApp($input: CreateAppInput!) {\n    createApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n"): typeof import('./graphql').CreateAppDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

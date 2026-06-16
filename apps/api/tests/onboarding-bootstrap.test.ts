@@ -46,13 +46,10 @@ function createOnboardingDatabase(): SqliteD1Database {
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       name text NOT NULL,
-      slug text NOT NULL,
       default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
     );
-
-    CREATE UNIQUE INDEX app_organization_slug_idx ON app (organization_id, slug);
 
     CREATE TABLE environment (
       id text PRIMARY KEY NOT NULL,
@@ -134,22 +131,18 @@ describe("onboarding bootstrap", () => {
     expect(account?.last_active_organization_id).toBe(status.organization?.id);
 
     const app = await database
-      .prepare(
-        "SELECT name, organization_id, owner_account_id, slug FROM app WHERE organization_id = ?",
-      )
+      .prepare("SELECT name, organization_id, owner_account_id FROM app WHERE organization_id = ?")
       .bind(status.organization?.id)
       .first<{
         name: string;
         organization_id: string;
         owner_account_id: string;
-        slug: string;
       }>();
 
     expect(app).toEqual({
       name: "Default App",
       organization_id: status.organization?.id,
       owner_account_id: VIEWER.id,
-      slug: "default",
     });
   });
 
@@ -195,13 +188,12 @@ describe("onboarding bootstrap", () => {
     expect(createdRows.results).toEqual([{ id: status.organization?.id }]);
 
     const appRows = await database
-      .prepare("SELECT organization_id, slug FROM app ORDER BY organization_id")
-      .all<{ organization_id: string; slug: string }>();
+      .prepare("SELECT organization_id FROM app ORDER BY organization_id")
+      .all<{ organization_id: string }>();
 
     expect(appRows.results).toEqual([
       {
         organization_id: status.organization?.id ?? "",
-        slug: "default",
       },
     ]);
   });

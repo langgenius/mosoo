@@ -191,7 +191,6 @@ function createSpaceFileDatabase(): SqliteD1Database {
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       name text NOT NULL,
-      slug text NOT NULL,
       default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
@@ -262,7 +261,6 @@ function createSpaceFileDatabase(): SqliteD1Database {
       name,
       organization_id,
       owner_account_id,
-      slug,
       default_environment_id,
       created_at,
       updated_at
@@ -272,7 +270,6 @@ function createSpaceFileDatabase(): SqliteD1Database {
       'Default App',
       '01J0000000000000000000000A',
       '${OWNER_ID}',
-      'default',
       NULL,
       1,
       1

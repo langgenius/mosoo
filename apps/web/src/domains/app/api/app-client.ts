@@ -13,7 +13,6 @@ const APP_LIST_QUERY = graphql(/* GraphQL */ `
       id
       name
       ownerAccountId
-      slug
     }
   }
 `);
@@ -26,7 +25,6 @@ const CREATE_APP_MUTATION = graphql(/* GraphQL */ `
       id
       name
       ownerAccountId
-      slug
     }
   }
 `);
@@ -37,7 +35,6 @@ interface AppFields {
   id: string;
   name: string;
   ownerAccountId: string;
-  slug: string;
 }
 
 function toAppSummary(app: AppFields): AppSummary {

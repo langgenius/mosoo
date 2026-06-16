@@ -49,7 +49,6 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       name text NOT NULL,
-      slug text NOT NULL,
       default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
@@ -111,7 +110,6 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
       organization_id,
       owner_account_id,
       name,
-      slug,
       created_at,
       updated_at
     ) VALUES (
@@ -119,7 +117,6 @@ function createAgentSessionRetrieveDatabase(): SqliteD1Database {
       '01J00000000000000000000006',
       'viewer-1',
       'Default App',
-      'default',
       1,
       1
     );

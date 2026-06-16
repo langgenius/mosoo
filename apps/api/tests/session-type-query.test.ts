@@ -46,7 +46,6 @@ function createSessionTypeDatabase(): SqliteD1Database {
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       name text NOT NULL,
-      slug text NOT NULL,
       default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
@@ -116,7 +115,6 @@ function createSessionTypeDatabase(): SqliteD1Database {
       organization_id,
       owner_account_id,
       name,
-      slug,
       created_at,
       updated_at
     ) VALUES (
@@ -124,7 +122,6 @@ function createSessionTypeDatabase(): SqliteD1Database {
       '${ORGANIZATION_ID}',
       'account-1',
       'Default App',
-      'default',
       1,
       1
     );

@@ -14,7 +14,6 @@ function appSummary(id: string, name: string): AppSummary {
     name,
     organizationId: toOrganizationId("01J000000000000000000000A0"),
     ownerAccountId: toAccountId("01J000000000000000000000A1"),
-    slug: name.toLowerCase(),
   };
 }
 

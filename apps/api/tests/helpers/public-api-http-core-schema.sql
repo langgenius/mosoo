@@ -36,7 +36,6 @@ CREATE TABLE app (
   organization_id text NOT NULL,
   owner_account_id text NOT NULL,
   name text NOT NULL,
-  slug text NOT NULL,
   default_environment_id text,
   created_at integer NOT NULL,
   updated_at integer NOT NULL

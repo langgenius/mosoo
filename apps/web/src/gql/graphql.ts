@@ -940,14 +940,14 @@ export type AppListQueryVariables = Exact<{
 }>;
 
 
-export type AppListQuery = { appList: Array<{ createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId, slug: string }> };
+export type AppListQuery = { appList: Array<{ createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId }> };
 
 export type CreateAppMutationVariables = Exact<{
   input: CreateAppInput;
 }>;
 
 
-export type CreateAppMutation = { createApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId, slug: string } };
+export type CreateAppMutation = { createApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId } };
 
 type CostTotalsFields_CostAgentRow_Fragment = { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number };
 
@@ -2775,7 +2775,6 @@ export const AppListDocument = new TypedDocumentString(`
     id
     name
     ownerAccountId
-    slug
   }
 }
     `) as unknown as TypedDocumentString<AppListQuery, AppListQueryVariables>;
@@ -2787,7 +2786,6 @@ export const CreateAppDocument = new TypedDocumentString(`
     id
     name
     ownerAccountId
-    slug
   }
 }
     `) as unknown as TypedDocumentString<CreateAppMutation, CreateAppMutationVariables>;

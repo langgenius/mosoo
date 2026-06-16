@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 
-import { deriveAppSlugBase } from "../src/modules/apps/application/app-defaults";
 import { createApp } from "../src/modules/apps/application/app-provisioning.service";
 import {
   ensureAppOwnership,
@@ -28,13 +27,10 @@ function createAppDatabase(): SqliteD1Database {
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       name text NOT NULL,
-      slug text NOT NULL,
       default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
     );
-
-    CREATE UNIQUE INDEX app_organization_slug_idx ON app (organization_id, slug);
   `);
 
   return database;
@@ -69,14 +65,13 @@ describe("App provisioning boundary", () => {
         organization_id,
         owner_account_id,
         name,
-        slug,
         default_environment_id,
         created_at,
         updated_at
       )
       VALUES
-        ('app-1', 'org-1', 'account-1', 'Default App', 'default', 'env-1', 1, 1),
-        ('app-2', 'org-1', 'account-2', 'Foreign App', 'foreign', NULL, 2, 2);
+        ('app-1', 'org-1', 'account-1', 'Default App', 'env-1', 1, 1),
+        ('app-2', 'org-1', 'account-2', 'Foreign App', NULL, 2, 2);
     `);
 
     const apps = await listOrganizationApps(database, makeViewer("account-1"), "org-1");
@@ -88,7 +83,6 @@ describe("App provisioning boundary", () => {
         id: "app-1",
         name: "Default App",
         ownerAccountId: "account-1",
-        slug: "default",
       },
     ]);
   });
@@ -111,12 +105,11 @@ describe("App provisioning boundary", () => {
         organization_id,
         owner_account_id,
         name,
-        slug,
         default_environment_id,
         created_at,
         updated_at
       )
-      VALUES ('app-1', 'org-1', 'account-1', 'Default App', 'default', NULL, 1, 1);
+      VALUES ('app-1', 'org-1', 'account-1', 'Default App', NULL, 1, 1);
     `);
 
     await expect(ensureAppOwnership(database, "account-2", "app-1")).rejects.toThrow(
@@ -163,16 +156,5 @@ describe("App provisioning boundary", () => {
 
     const apps = await listOrganizationApps(database, makeViewer("account-1"), "org-1");
     expect(apps).toEqual([]);
-  });
-});
-
-describe("App slug derivation", () => {
-  test("slugifies the App name", () => {
-    expect(deriveAppSlugBase("My New App!")).toBe("my-new-app");
-    expect(deriveAppSlugBase("  Support Bot  ")).toBe("support-bot");
-  });
-
-  test("falls back to a stable slug when the name has no slug characters", () => {
-    expect(deriveAppSlugBase("***")).toBe("app");
   });
 });

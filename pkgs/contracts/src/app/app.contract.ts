@@ -6,5 +6,4 @@ export interface AppSummary {
   id: AppId;
   name: string;
   ownerAccountId: AccountId;
-  slug: string;
 }

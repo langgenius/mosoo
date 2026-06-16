@@ -6,7 +6,7 @@ import type { AccountId, OrganizationId, AppId } from "@mosoo/id";
 import { runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { errorMessageChainIncludes } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
-import { DEFAULT_APP_NAME, DEFAULT_APP_SLUG } from "../../apps/application/app-defaults";
+import { DEFAULT_APP_NAME } from "../../apps/application/app-defaults";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { createAppEnvironmentDefaults } from "../../environments/application/environment.service";
 import { recordLastActiveOrganization } from "../../users/application/account-organization-context.service";
@@ -56,7 +56,6 @@ async function writeOrganizationWithOwner(
       name: DEFAULT_APP_NAME,
       organizationId: input.organizationId,
       ownerAccountId: input.ownerId,
-      slug: DEFAULT_APP_SLUG,
       updatedAt: input.timestampMs,
     }),
   ]);

@@ -621,11 +621,9 @@ CREATE TABLE `app` (
 	`name` text NOT NULL,
 	`organization_id` text CHECK ("organization_id" = upper("organization_id") AND length("organization_id") = 26 AND substr("organization_id", 1, 1) GLOB '[0-7]' AND "organization_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`slug` text NOT NULL,
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `app_organization_slug_idx` ON `app` (`organization_id`,`slug`);--> statement-breakpoint
 CREATE TABLE `public_api_idempotency_key` (
 	`body_hash` text,
 	`created_at` integer NOT NULL,

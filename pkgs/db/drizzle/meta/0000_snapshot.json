@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "4bf1f53f-6210-5120-8e2f-fb66484b70dd",
+  "id": "5062abe0-316f-5baf-86a3-a7ae9d0d01cb",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_deployment_version": {
@@ -3789,13 +3789,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "slug": {
-          "name": "slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "updated_at": {
           "name": "updated_at",
           "type": "integer",
@@ -3804,13 +3797,7 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "app_organization_slug_idx": {
-          "name": "app_organization_slug_idx",
-          "columns": ["organization_id", "slug"],
-          "isUnique": true
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

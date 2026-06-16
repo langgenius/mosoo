@@ -24,7 +24,6 @@ function createMcpRegistryDatabase(input: { includeServers?: boolean } = {}): Sq
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
-      slug text NOT NULL,
       name text NOT NULL,
       default_environment_id text,
       created_at integer NOT NULL,
@@ -85,12 +84,11 @@ function createMcpRegistryDatabase(input: { includeServers?: boolean } = {}): Sq
       id,
       organization_id,
       owner_account_id,
-      slug,
       name,
       created_at,
       updated_at
     )
-    VALUES ('${APP_ID}', '01J00000000000000000000006', '${VIEWER_ID}', 'app', 'App', 1, 1);
+    VALUES ('${APP_ID}', '01J00000000000000000000006', '${VIEWER_ID}', 'App', 1, 1);
 
     INSERT INTO account (id, email, image_url, name)
     VALUES
