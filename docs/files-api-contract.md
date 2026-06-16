@@ -3,7 +3,7 @@
 Status: proposed (design contract for the Files API consolidation, YEF-674)
 Scope: `apps/api/src/modules/files`, `apps/api/src/modules/spaces`, `pkgs/contracts/src/file`, `pkgs/contracts/src/space`, and every module that today reaches into file storage internals (`runtime`, `sessions`, `public-api`, `api-command`, `agents`, `agent-builder`).
 
-This document defines the **one abstraction** all file storage flows through (`FileStore`), the **product model** that sits on top of it (Files, Mounts, the two write doors, and the scope axis), the layering rules that keep it the single entry point, and the attachment in/out contract (aligned with the Claude Managed Agents `file_id` / `resources[]` model). It is the interface contract acceptance artifact for YEF-674; the staged migration plan and the one-month MVP cut are at the end.
+This document defines the **one abstraction** all file storage flows through (`FileStore`), the **product model** that sits on top of it (Files, Mounts, and the two write doors), the layering rules that keep it the single entry point, and the attachment in/out contract (aligned with the Claude Managed Agents `file_id` / `resources[]` model). It is the interface contract acceptance artifact for YEF-674; the staged migration plan and the one-month MVP cut are at the end.
 
 ---
 
@@ -39,16 +39,15 @@ Mount = {
   source:        Files-subtree | uploaded-file | session-area,
   mount_path:    string,                    // absolute path in the sandbox
   runtime_access: "ro" | "rw",              // can the AGENT write here during a run?
-  scope:         "shared" | "session" | "user",  // shared = App Files, runtime READ-ONLY (curated via the developer door); session/user = isolated writable areas
 }
 
-`scope=shared` is **always** `runtime_access=ro`: App Files is curated only through the developer door, never written by an agent at runtime. `rw` exists only for `session` and `user` scopes.
+`source` already carries the isolation that a separate `scope` enum would: a **Files-subtree** is the App's one persistent tree (mounted `ro` at runtime — curated only through the developer door); a **session-area** is this session's own writable scratch; an **uploaded-file** is an attachment claimed into this session. App Files is never written by an agent at runtime. A per-end-user tenant dimension is **not** in the MVP shape — it is added back only when end-user identity exists (§7 step 8), at which point it is the first thing `source` cannot express.
 ```
 
 Everything reduces to a Mount:
-- **Knowledge base** = `Mount(Files subtree, ro, shared)` — the KB bot.
-- **Agent memory / scratch** = `Mount(subtree, rw, session)` (or `user`).
-- **Session attachment** = `Mount(uploaded file, ro, session)` — the degenerate case.
+- **Knowledge base** = `Mount(Files subtree, ro)` — the KB bot.
+- **Agent scratch** = `Mount(session-area, rw)` — this session's working area.
+- **Session attachment** = `Mount(uploaded file, ro)` — the degenerate case.
 
 ### 2.3 The two write doors (never conflate them)
 `runtime_access` governs **only** the agent at runtime. Curation is a **different door**:
@@ -56,9 +55,9 @@ Everything reduces to a Mount:
 | Door | Who | Channel | Governs |
 |---|---|---|---|
 | **Developer door** | App owner | management API / console (out of band) | curating Files (KB, templates, config). Always open to the owner, independent of `runtime_access`. |
-| **Agent-runtime door** | the agent in a session (possibly driven by untrusted end-user input) | sandbox writes during a run | bounded by the Mount's `runtime_access` + `scope`. |
+| **Agent-runtime door** | the agent in a session (possibly driven by untrusted end-user input) | sandbox writes during a run | bounded by the Mount's `source` + `runtime_access`. |
 
-A public KB/résumé bot mounts its KB as `(ro, shared)`: the developer writes it through the developer door; **every end-user session is read-only** through the runtime door. Prompt-injected end-user input can at most write its own `(rw, session|user)` area, never the shared KB. This is exactly Claude's "shared read-only store + per-user read-write store" guidance, expressed as two Mount fields instead of two resource types.
+A public KB/résumé bot mounts its KB as a `Files-subtree` with `ro`: the developer writes it through the developer door; **every end-user session is read-only** through the runtime door. Prompt-injected end-user input can at most write its own `session-area`, never the App Files tree. This mirrors Claude's "shared read-only store + per-session writable scratch" split, expressed through `source` + `runtime_access` rather than a separate scope enum.
 
 ### 2.4 What curated persistent Files is *for* — across the developer's product lifecycle
 
@@ -108,16 +107,16 @@ export interface FileStore {
   deleteScope(scope: FileScope): Promise<void>;
 
   // ── Mounts (declarative; replaces ensureSessionResourcesMounted + ad-hoc space mounts) ──
-  resolveMounts(viewer: Viewer, sessionId: SessionId): Promise<Mount[]>;   // {source, mount_path, runtime_access, scope}
+  resolveMounts(viewer: Viewer, sessionId: SessionId): Promise<Mount[]>;   // {source, mount_path, runtime_access}
 
   // ── Attachment in/out (replaces draft-file-service + session-resource-file + public-thread-file-api glue) ──
   claimToSession(viewer: Viewer, sessionId: SessionId, fileIds: FileId[]): Promise<FileRecord[]>;
   ensureClaimable(viewer: Viewer, sessionId: SessionId, fileIds: FileId[]): Promise<void>;
-  recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileRecord>;  // input carries the originating Mount's scope
+  recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileRecord>;  // always recorded session-scoped (owner=session)
 }
 ```
 
-All request/response DTOs (`CreateFileUploadRequest`, `FileRecord`, `FileUploadSummary`, `UpdateFileRequest`, `CreateFileDownloadResponse`, …) are **reused unchanged** from `pkgs/contracts/src/file/file.contract.ts`. `Mount` adds `{ source, mount_path, runtime_access, scope }` to the contract.
+All request/response DTOs (`CreateFileUploadRequest`, `FileRecord`, `FileUploadSummary`, `UpdateFileRequest`, `CreateFileDownloadResponse`, …) are **reused unchanged** from `pkgs/contracts/src/file/file.contract.ts`. `Mount` adds `{ source, mount_path, runtime_access }` to the contract.
 
 ### Capabilities, not scope branches
 
@@ -235,7 +234,7 @@ A public résumé-editing bot. End user uploads `resume.pdf` and asks the agent 
 **Expected developer "Files" view: no change.** Both the input résumé and the output live under *that Thread*; neither enters the App's curated Files. End users are isolated from each other. App Files is unaffected by end-user runs **by construction** — there is no runtime write path into it; persisting an output to Files is only ever an explicit developer-door copy. Acceptance test asserts: after the run, `FileStore.list` over App Files scope is unchanged; the artifact is listed only under the session.
 
 ### Mapping to Claude file references (forward-looking)
-When mosoo dispatches to a Claude managed agent, `FileStore` is the single place that translates a mosoo `FileId` → an Anthropic `file_id` (upload-on-demand + cache the mapping). Mount → Claude session resource is a near-identity map: `(ro, shared)` Files subtree → `read_only` memory_store / file resource; `(rw, session|user)` → `read_write` memory_store; uploaded attachment → `{type:"file", file_id, mount_path}`. Centralizing in/out here makes this a single thin adapter rather than per-call glue.
+When mosoo dispatches to a Claude managed agent, `FileStore` is the single place that translates a mosoo `FileId` → an Anthropic `file_id` (upload-on-demand + cache the mapping). Mount → Claude session resource is a near-identity map: a `ro` Files-subtree → `read_only` memory_store / file resource; a `rw` session-area → `read_write` memory_store; an uploaded attachment → `{type:"file", file_id, mount_path}`. Centralizing in/out here makes this a single thin adapter rather than per-call glue.
 
 ---
 
@@ -269,15 +268,15 @@ Each step is one consistent state — compiles, `just check` + `just test` green
 1. **Introduce the port (additive, no behavior change).** Add `file-store.ts`, `file-scope-registry.ts`, `ports/*`. Implement `FileStore` as a thin composition delegating to existing infrastructure. ✅ verifiable in isolation.
 2. **Route the HTTP/GraphQL adapters through `FileStore`.** `file-route.ts`, space GraphQL, `public-thread-file-api` import `FileStore` instead of infrastructure. Delete the `file-http.service` barrel.
 3. **Migrate the attachment in-path.** Collapse the three claim entry points into `claimToSession`/`ensureClaimable`; guard the R2 rollback; validate `attachmentIds` in `api-command`. Materialize inbound as `Mount(upload, ro, session)`.
-4. **Migrate the attachment out-path + the scope fix.** Single `recordRuntimeOutput`, always `scope=session` (fixes §1's leak — no runtime write path into App Files at all); collapse the three runtime indexing callers; fix `sessionKind` semantics. Add the `Mount` shape (`{source, mount_path, runtime_access, scope}`) to the session resource list. Ship the résumé-thread acceptance test.
+4. **Migrate the attachment out-path + the scope fix.** Single `recordRuntimeOutput`, always `scope=session` (fixes §1's leak — no runtime write path into App Files at all); collapse the three runtime indexing callers; fix `sessionKind` semantics. Add the `Mount` shape (`{source, mount_path, runtime_access}`) to the session resource list. Ship the résumé-thread acceptance test.
 
 **Deferred debt (not required for MVP) — steps 5–8.**
 
 5. **Collapse delete paths** behind `delete`/`deleteScope`; move versioning/locking invocation into `FileStore` via the registry.
 6. **Collapse upload + storage adapters** into `ObjectStore`/`FileRecordStore`; make `files/infrastructure/**` private.
 7. **Add the lint import-boundary rule** (§4.1–4.2) and invert the `files → spaces` dependency.
-8. **(Optional, separate)** Reconcile `spaceDirectoriesTable` with the path hierarchy; add the `user` scope value (needs end-user identity); add the Claude `file_id` translation adapter.
+8. **(Optional, separate)** Reconcile `spaceDirectoriesTable` with the path hierarchy; add a per-end-user tenant dimension to Mounts (needs end-user identity); add the Claude `file_id` translation adapter.
 
-**Product naming:** Space → **Files** (singular App tree) at the product/UI layer; the internal `space` scope kind can stay. `Memory` is **not** a new resource — read-write agent memory is `Mount(Files subtree, rw, session|user)`. `user` scope is reserved as a third enum value (step 8), so adding cross-session per-end-user memory later is additive, not a rebuild.
+**Product naming:** Space → **Files** (singular App tree) at the product/UI layer; the internal `space` scope kind can stay. `Memory` is **not** a new resource — runtime-writable agent state is a `Mount(session-area, rw)` (this session's scratch). Persistent cross-session per-end-user memory is deferred until end-user identity exists (step 8), which re-introduces a per-user tenant dimension then — additive, not a rebuild.
 
 Verification per step: `just check`, `just test`, the existing file tests (`apps/api/tests/file-upload-*.test.ts`, `session-resource-files.test.ts`, `space-file-lock.test.ts`, `agent-package-file-import.test.ts`), and `just graphql-codegen` when GraphQL touched. In/out validated end-to-end by `file-upload-recovery.test.ts` + `session-resource-files.test.ts` + the new résumé-thread acceptance test (asserts App Files unchanged after an end-user run).
