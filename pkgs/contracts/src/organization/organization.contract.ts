@@ -5,5 +5,4 @@ export interface OrganizationSummary {
   createdAt: string;
   id: OrganizationId;
   name: string;
-  slug: string;
 }

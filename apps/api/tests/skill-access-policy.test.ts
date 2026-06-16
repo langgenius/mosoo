@@ -34,7 +34,6 @@ function createSkillAccessDatabase(): SqliteD1Database {
       name text NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
-      slug text NOT NULL,
       updated_at integer NOT NULL
     );
 
@@ -67,12 +66,11 @@ function createSkillAccessDatabase(): SqliteD1Database {
       name,
       organization_id,
       owner_account_id,
-      slug,
       updated_at
     )
     VALUES
-      ('${IDS.app}', 1, NULL, 'Main App', '${IDS.organization}', '${IDS.owner}', 'main', 1),
-      ('${IDS.otherApp}', 1, NULL, 'Other App', '${IDS.organization}', '${IDS.owner}', 'other', 1);
+      ('${IDS.app}', 1, NULL, 'Main App', '${IDS.organization}', '${IDS.owner}', 1),
+      ('${IDS.otherApp}', 1, NULL, 'Other App', '${IDS.organization}', '${IDS.owner}', 1);
 
     INSERT INTO skill (
       id,

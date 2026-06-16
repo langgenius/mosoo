@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import { getViewer, updateProfile } from "../src/modules/users/application/viewer-context.service";
+import {
+  getViewer,
+  setSystemAgentModel,
+  updateProfile,
+} from "../src/modules/users/application/viewer-context.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -32,7 +36,6 @@ function createViewerContextDatabase(): SqliteD1Database {
 	    CREATE TABLE organization (
 	      id text PRIMARY KEY NOT NULL,
 	      name text NOT NULL,
-	      slug text NOT NULL,
 	      avatar_url text,
 	      creator_account_id text,
 	      created_at integer NOT NULL,
@@ -55,16 +58,15 @@ function createViewerContextDatabase(): SqliteD1Database {
     INSERT INTO organization (
 	      id,
 	      name,
-	      slug,
 	      avatar_url,
 	      creator_account_id,
 	      created_at,
       updated_at
 	    )
 	    VALUES
-	      ('01J00000000000000000000006', 'First Org', 'first-org', NULL, 'account-1', 1, 1),
-	      ('org-2', 'Second Org', 'second-org', NULL, 'account-1', 2, 2),
-	      ('org-other-owner', 'Other Owner Org', 'other-owner-org', NULL, 'other-owner', 3, 3);
+	      ('01J00000000000000000000006', 'First Org', NULL, 'account-1', 1, 1),
+	      ('org-2', 'Second Org', NULL, 'account-1', 2, 2),
+	      ('org-other-owner', 'Other Owner Org', NULL, 'other-owner', 3, 3);
 
   `);
 
@@ -182,6 +184,37 @@ describe("viewer organization context", () => {
       modelId: "model-1",
       vendor: "openai",
     });
+  });
+
+  test("updates the System Agent model setting", async () => {
+    const database = createViewerContextDatabase();
+
+    const account = await setSystemAgentModel(database, VIEWER, {
+      modelId: " gpt-5.5 ",
+      vendor: " openai ",
+    });
+
+    expect(account.systemAgentModel).toEqual({
+      modelId: "gpt-5.5",
+      vendor: "openai",
+    });
+
+    const viewer = await getViewer(database, {} as ApiBindings, VIEWER);
+    expect(viewer.account?.systemAgentModel).toEqual({
+      modelId: "gpt-5.5",
+      vendor: "openai",
+    });
+  });
+
+  test("rejects an empty System Agent model setting", async () => {
+    const database = createViewerContextDatabase();
+
+    await expect(
+      setSystemAgentModel(database, VIEWER, {
+        modelId: " ",
+        vendor: "openai",
+      }),
+    ).rejects.toThrow("System Agent model and provider are required.");
   });
 
   test("reads the account name and image from the database, not the session", async () => {

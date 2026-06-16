@@ -552,7 +552,6 @@ type App {
   id: ULID!
   name: String!
   ownerAccountId: ULID!
-  slug: String!
 }
 
 type AppCostCard {
@@ -1232,6 +1231,7 @@ type Mutation {
   publishAgent(input: PublishAgentInput!): Agent!
   recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
   removeSessionResource(input: RemoveSessionResourceInput!): OperationResult!
+  renameApp(input: RenameAppInput!): App!
   renameSession(input: RenameSessionInput!): Session!
   resetAgentState(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
   restartDriver(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
@@ -1269,7 +1269,6 @@ type Organization {
   createdAt: String!
   id: ULID!
   name: String!
-  slug: String!
 }
 
 type OrganizationBillingCostCard {
@@ -1342,6 +1341,11 @@ input RemoveSessionResourceInput {
   appId: ULID!
   resourceId: ULID!
   sessionId: ULID!
+}
+
+input RenameAppInput {
+  appId: ULID!
+  name: String!
 }
 
 input RenameSessionInput {

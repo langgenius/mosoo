@@ -7,12 +7,3 @@ export function normalizeOrganizationName(name: string): string {
 
   return normalized;
 }
-
-export function deriveOrganizationSlugBase(name: string): string {
-  const slug = normalizeOrganizationName(name)
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/gu, "-")
-    .replaceAll(/^-+|-+$/gu, "");
-
-  return slug || "organization";
-}

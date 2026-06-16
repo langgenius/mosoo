@@ -12,7 +12,6 @@ export interface OrganizationSummaryRow {
   created_at: number;
   id: OrganizationId;
   name: string;
-  slug: string;
 }
 
 export interface OrganizationOwnership {
@@ -26,7 +25,6 @@ export function toOrganizationSummary(row: OrganizationSummaryRow): Organization
     createdAt: toIsoString(row.created_at),
     id: row.id,
     name: row.name,
-    slug: row.slug,
   };
 }
 
@@ -36,7 +34,6 @@ export function organizationSummaryColumns() {
     created_at: organizationsTable.createdAt,
     id: organizationsTable.id,
     name: organizationsTable.name,
-    slug: organizationsTable.slug,
   };
 }
 

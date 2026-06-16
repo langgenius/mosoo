@@ -73,7 +73,6 @@ export async function listViewerOrganizations(
       created_at: organizationsTable.createdAt,
       id: organizationsTable.id,
       name: organizationsTable.name,
-      slug: organizationsTable.slug,
     })
     .from(organizationsTable)
     .where(eq(organizationsTable.creatorAccountId, accountId))

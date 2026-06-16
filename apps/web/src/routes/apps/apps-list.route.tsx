@@ -43,10 +43,6 @@ function AppCard({
         ) : null}
         <ChevronRight className="text-fg-3 group-hover:text-fg-1 size-4 shrink-0 transition-colors" />
       </div>
-      <div className="text-fg-2 flex items-center gap-1.5 text-xs">
-        <span className="size-1.5 rounded-full bg-green-500" />
-        Active
-      </div>
       <div className="text-muted-foreground text-xs">{agentLabel}</div>
     </button>
   );

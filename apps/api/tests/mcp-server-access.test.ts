@@ -26,7 +26,6 @@ function createMcpServerAccessDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
-      slug text NOT NULL,
       name text NOT NULL,
       default_environment_id text,
       created_at integer NOT NULL,
@@ -64,14 +63,13 @@ function createMcpServerAccessDatabase(): SqliteD1Database {
       id,
       organization_id,
       owner_account_id,
-      slug,
       name,
       created_at,
       updated_at
     )
     VALUES
-      ('${APP_ID}', '01J00000000000000000000006', '${OWNER_ID}', 'app', 'App', 1, 1),
-      ('${OTHER_APP_ID}', '01J00000000000000000000006', '${MEMBER_ID}', 'other-app', 'Other App', 1, 1);
+      ('${APP_ID}', '01J00000000000000000000006', '${OWNER_ID}', 'App', 1, 1),
+      ('${OTHER_APP_ID}', '01J00000000000000000000006', '${MEMBER_ID}', 'Other App', 1, 1);
 
     INSERT INTO account (id, name)
     VALUES ('${OWNER_ID}', 'Owner'), ('${MEMBER_ID}', 'Member');

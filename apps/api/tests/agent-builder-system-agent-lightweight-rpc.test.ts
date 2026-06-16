@@ -977,6 +977,7 @@ describe("Agent Builder System Agent lightweight RPC", () => {
       expect(fetchUrls).toEqual(["https://api.openai.com/v1/chat/completions"]);
       expect(fetchHeaders[0]?.get("authorization")).toBe("Bearer sk-unit-agent-builder");
       expect(fetchBodies[0]?.["model"]).toBe("gpt-5.4");
+      expect(fetchBodies[0]).not.toHaveProperty("temperature");
       expect(fetchBodies[0]?.["response_format"]).toMatchObject({
         json_schema: {
           name: "agent_builder_planner_output",

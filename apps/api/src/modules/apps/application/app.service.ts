@@ -1,4 +1,4 @@
-import type { AppSummary } from "@mosoo/contracts/app";
+import type { AppSummary, RenameAppInput } from "@mosoo/contracts/app";
 import type { AppRow } from "@mosoo/db";
 import { appsTable } from "@mosoo/db";
 import type { AccountId, OrganizationId, AppId } from "@mosoo/id";
@@ -6,9 +6,10 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError, notFoundError } from "../../../platform/errors";
-import { toIsoString } from "../../../time";
+import { currentTimestampMs, toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureOrganizationOwnership } from "../../organizations/domain/organization-ownership.policy";
+import { normalizeAppName } from "../domain/app-name";
 
 export function toAppSummary(row: AppRow): AppSummary {
   return {
@@ -17,7 +18,6 @@ export function toAppSummary(row: AppRow): AppSummary {
     id: row.id,
     name: row.name,
     ownerAccountId: row.ownerAccountId,
-    slug: row.slug,
   };
 }
 
@@ -49,6 +49,24 @@ export async function ensureAppOwnership(
   }
 
   return app;
+}
+
+export async function renameApp(
+  database: D1Database,
+  viewer: AuthenticatedViewer,
+  input: RenameAppInput,
+): Promise<AppSummary> {
+  await ensureAppOwnership(database, viewer.id, input.appId);
+
+  const name = normalizeAppName(input.name);
+
+  await getAppDatabase(database)
+    .update(appsTable)
+    .set({ name, updatedAt: currentTimestampMs() })
+    .where(eq(appsTable.id, input.appId))
+    .run();
+
+  return toAppSummary(await getAppRow(database, input.appId));
 }
 
 export async function listOrganizationApps(

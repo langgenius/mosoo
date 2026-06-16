@@ -62,7 +62,6 @@ function createPersonalTokenDatabase(): SqliteD1Database {
 	      created_at integer NOT NULL,
 	      creator_account_id text,
 	      name text NOT NULL,
-	      slug text NOT NULL,
 	      updated_at integer NOT NULL
 	    );
 
@@ -85,10 +84,9 @@ function createPersonalTokenDatabase(): SqliteD1Database {
 	      created_at,
 	      creator_account_id,
 	      name,
-	      slug,
 	      updated_at
 	    )
-	    VALUES ('01J00000000000000000000006', NULL, 1, '01J00000000000000000000001', 'Acme', 'acme', 1);
+	    VALUES ('01J00000000000000000000006', NULL, 1, '01J00000000000000000000001', 'Acme', 1);
 
     INSERT INTO personal_access_token (
       id,

@@ -160,7 +160,6 @@ describe("agent channel binding deletion", () => {
           name: "Other App",
           organizationId: PUBLIC_API_TEST_IDS.organization,
           ownerAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
-          slug: "other-app",
           updatedAt: nowMs,
         })
         .run();

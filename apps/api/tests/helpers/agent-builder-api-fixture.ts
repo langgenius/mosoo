@@ -315,7 +315,6 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
 	      creator_account_id text,
 	      id text PRIMARY KEY NOT NULL,
 	      name text NOT NULL,
-	      slug text NOT NULL,
 	      updated_at integer NOT NULL
 	    );
 
@@ -326,7 +325,6 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       name text NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
-      slug text NOT NULL,
       updated_at integer NOT NULL
     );
 
@@ -770,16 +768,14 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
 	        creator_account_id,
 	        id,
 	        name,
-	        slug,
 	        updated_at
-	      ) VALUES (?, ?, ?, ?, ?, ?)`,
+	      ) VALUES (?, ?, ?, ?, ?)`,
     )
     .bind(
       1,
       AGENT_BUILDER_TEST_VIEWER.id,
       AGENT_BUILDER_TEST_IDS.organizationId,
       "Mosoo Agent Builder Test",
-      "mosoo-agent-builder-test",
       1,
     )
     .run();
@@ -792,9 +788,8 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
         name,
         organization_id,
         owner_account_id,
-        slug,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       1,
@@ -802,7 +797,6 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
       "Default App",
       AGENT_BUILDER_TEST_IDS.organizationId,
       AGENT_BUILDER_TEST_VIEWER.id,
-      "default",
       1,
     )
     .run();

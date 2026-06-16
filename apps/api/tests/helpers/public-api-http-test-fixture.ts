@@ -331,7 +331,6 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
       creatorAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
       id: PUBLIC_API_TEST_IDS.organization,
       name: "Mosoo Test Org",
-      slug: "mosoo-test-org",
       updatedAt: nowMs,
     })
     .run();
@@ -345,7 +344,6 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
       name: "Default App",
       organizationId: PUBLIC_API_TEST_IDS.organization,
       ownerAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
-      slug: "default",
       updatedAt: nowMs,
     })
     .run();
