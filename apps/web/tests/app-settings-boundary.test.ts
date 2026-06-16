@@ -48,7 +48,7 @@ describe("App settings boundary", () => {
     expect(settingsNav).toContain('label: "General"');
     expect(settingsNav).toContain('path: "/settings/app"');
     // App General is App-owned identity, not Organization-owned settings.
-    expect(routeRegistry).toContain('{ element: <SettingsAppGeneral />, path: "app" }');
+    expect(routeRegistry).toContain('{ element: <SettingsApp />, path: "app" }');
     expect(routeRegistry).not.toContain("OrganizationGeneralTab");
   });
 

@@ -1,7 +1,8 @@
-import type { AppSummary } from "@mosoo/contracts/app";
+import type { AppSummary, RenameAppInput } from "@mosoo/contracts/app";
 import type { OrganizationId } from "@mosoo/contracts/id";
 
 import { graphql } from "@/gql";
+import type { AppListQuery, CreateAppMutation, RenameAppMutation } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
 import { toAccountId, toEnvironmentId, toAppId } from "@/routes/typed-id";
 
@@ -29,15 +30,24 @@ const CREATE_APP_MUTATION = graphql(/* GraphQL */ `
   }
 `);
 
-interface AppFields {
-  createdAt: string;
-  defaultEnvironmentId: string | null;
-  id: string;
-  name: string;
-  ownerAccountId: string;
-}
+const RENAME_APP_MUTATION = graphql(/* GraphQL */ `
+  mutation RenameApp($input: RenameAppInput!) {
+    renameApp(input: $input) {
+      createdAt
+      defaultEnvironmentId
+      id
+      name
+      ownerAccountId
+    }
+  }
+`);
 
-function toAppSummary(app: AppFields): AppSummary {
+function toAppSummary(
+  app:
+    | AppListQuery["appList"][number]
+    | CreateAppMutation["createApp"]
+    | RenameAppMutation["renameApp"],
+): AppSummary {
   return {
     ...app,
     defaultEnvironmentId:
@@ -60,4 +70,10 @@ export async function createApp(input: {
   const payload = await requestGraphQL(CREATE_APP_MUTATION, { input });
 
   return toAppSummary(payload.createApp);
+}
+
+export async function renameApp(input: RenameAppInput): Promise<AppSummary> {
+  const payload = await requestGraphQL(RENAME_APP_MUTATION, { input });
+
+  return toAppSummary(payload.renameApp);
 }

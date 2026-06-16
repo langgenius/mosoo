@@ -7,3 +7,8 @@ export interface AppSummary {
   name: string;
   ownerAccountId: AccountId;
 }
+
+export interface RenameAppInput {
+  appId: AppId;
+  name: string;
+}

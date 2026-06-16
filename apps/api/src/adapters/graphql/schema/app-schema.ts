@@ -11,4 +11,9 @@ export const appSchema = /* GraphQL */ `
     name: String!
     organizationId: ULID!
   }
+
+  input RenameAppInput {
+    appId: ULID!
+    name: String!
+  }
 `;

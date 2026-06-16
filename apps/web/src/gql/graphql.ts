@@ -522,6 +522,11 @@ export type RemoveSessionResourceInput = {
   sessionId: PlatformId;
 };
 
+export type RenameAppInput = {
+  appId: PlatformId;
+  name: string;
+};
+
 export type RenameSessionInput = {
   appId: PlatformId;
   sessionId: PlatformId;
@@ -948,6 +953,13 @@ export type CreateAppMutationVariables = Exact<{
 
 
 export type CreateAppMutation = { createApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId } };
+
+export type RenameAppMutationVariables = Exact<{
+  input: RenameAppInput;
+}>;
+
+
+export type RenameAppMutation = { renameApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId } };
 
 type CostTotalsFields_CostAgentRow_Fragment = { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number };
 
@@ -2789,6 +2801,17 @@ export const CreateAppDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<CreateAppMutation, CreateAppMutationVariables>;
+export const RenameAppDocument = new TypedDocumentString(`
+    mutation RenameApp($input: RenameAppInput!) {
+  renameApp(input: $input) {
+    createdAt
+    defaultEnvironmentId
+    id
+    name
+    ownerAccountId
+  }
+}
+    `) as unknown as TypedDocumentString<RenameAppMutation, RenameAppMutationVariables>;
 export const AppCostCardDocument = new TypedDocumentString(`
     query AppCostCard($appId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
   appCostCard(appId: $appId, range: $range, runPurposes: $runPurposes) {
