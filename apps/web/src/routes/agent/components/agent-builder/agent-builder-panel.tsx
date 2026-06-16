@@ -1,13 +1,14 @@
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import type { AgentBuilderDraftPatchSectionId } from "@mosoo/contracts/agent-builder";
 import { SendHorizontal } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import type { FormEvent } from "react";
 import type { ReactElement } from "react";
 
 import type { AgentBuilderMessage } from "@/domains/agent-builder/api/agent-builder-client";
 import { takeAgentBuilderInitialMessage } from "@/domains/agent-builder/initial-message";
 import { useAgentBuilderSystemAgentSession } from "@/domains/agent-builder/query/use-agent-builder-system-agent-session";
+import { useMountEffect } from "@/shared/hooks/use-mount-effect";
 import { Button } from "@/shared/ui/button";
 
 import type { Agent } from "../../agent.types";
@@ -24,6 +25,7 @@ import type {
   AgentBuilderActionHandler,
   AgentBuilderActionDisabled,
 } from "./agent-builder-message-card";
+import { AgentBuilderModelPicker } from "./agent-builder-model-picker";
 import { getLatestActionableStructuredReplyMessageId } from "./agent-builder-structured-reply-state";
 import { canSubmitAgentBuilderTurn } from "./agent-builder-submit-gate";
 
@@ -36,6 +38,24 @@ function combineBuilderActionDisabled(input: {
   }
 
   return input.actionDisabled;
+}
+
+function AgentBuilderInitialMessageSubmitter({
+  agentId,
+  onSubmit,
+}: {
+  readonly agentId: string;
+  readonly onSubmit: (inputText: string) => void;
+}): ReactElement | null {
+  useMountEffect(() => {
+    const initialMessage = takeAgentBuilderInitialMessage(agentId)?.trim() ?? "";
+
+    if (initialMessage.length > 0) {
+      onSubmit(initialMessage.slice(0, 4000));
+    }
+  });
+
+  return null;
 }
 
 export function AgentBuilderPanel({
@@ -65,6 +85,7 @@ export function AgentBuilderPanel({
 }): ReactElement {
   const [inputText, setInputText] = useState("");
   const [clientPatchError, setClientPatchError] = useState<string | null>(null);
+  const [modelSelectionError, setModelSelectionError] = useState<string | null>(null);
   const [autoApplyPending, setAutoApplyPending] = useState(false);
   const applyAutoPatch = useCallback(
     async (turnMessages: AgentBuilderMessage[]): Promise<void> => {
@@ -119,20 +140,6 @@ export function AgentBuilderPanel({
     },
     [canSubmitBuilderTurn, submitSystemAgentTurn],
   );
-  // The creation flow can stash the user's first Builder message (template or
-  // free text). Send it once the submit gate opens; take() clears the stash,
-  // so the effect stays idempotent under StrictMode.
-  useEffect(() => {
-    if (!canSubmitBuilderTurn) {
-      return;
-    }
-
-    const initialMessage = takeAgentBuilderInitialMessage(agent.id)?.trim() ?? "";
-
-    if (initialMessage.length > 0) {
-      submitBuilderTurn(initialMessage.slice(0, 4000));
-    }
-  }, [agent.id, canSubmitBuilderTurn, submitBuilderTurn]);
   const assistantRuntime = useAgentBuilderAssistantRuntime({
     isBusy: systemAgentSession.isBusy || autoApplyPending,
     isSendDisabled: !canSubmitBuilderTurn,
@@ -164,6 +171,13 @@ export function AgentBuilderPanel({
 
   return (
     <AssistantRuntimeProvider runtime={assistantRuntime}>
+      {canSubmitBuilderTurn ? (
+        <AgentBuilderInitialMessageSubmitter
+          agentId={agent.id}
+          key={agent.id}
+          onSubmit={submitBuilderTurn}
+        />
+      ) : null}
       <div className="bg-bg-1 flex h-full min-h-0 flex-col overflow-hidden">
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {systemAgentSession.historyError !== null ? (
@@ -209,6 +223,11 @@ export function AgentBuilderPanel({
               {clientPatchError}
             </div>
           ) : null}
+          {modelSelectionError ? (
+            <div className="border-destructive/30 bg-destructive/5 text-destructive mb-2 rounded-lg border px-3 py-2 text-[12px]">
+              {modelSelectionError}
+            </div>
+          ) : null}
           {actionError ? (
             <div className="border-destructive/30 bg-destructive/5 text-destructive mb-2 rounded-lg border px-3 py-2 text-[12px]">
               {actionError}
@@ -226,6 +245,7 @@ export function AgentBuilderPanel({
               placeholder="Message Agent Builder"
               value={inputText}
             />
+            <AgentBuilderModelPicker appId={agent.appId} onError={setModelSelectionError} />
             <Button disabled={!canSubmit} size="icon-sm" type="submit">
               <SendHorizontal />
             </Button>
