@@ -1,7 +1,7 @@
 import type { Viewer } from "@mosoo/contracts/account";
 import { SYSTEM_AGENT_RUNTIME_ID } from "@mosoo/runtime-catalog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Zap } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { setSystemAgentModel } from "@/domains/user/api/user-client";
@@ -133,7 +133,6 @@ export function AgentBuilderModelPicker({
           type="button"
           variant="ghost"
         >
-          <Zap className="size-3.5" />
           <span className="truncate text-[12px] font-medium">{triggerLabel}</span>
           <ChevronDown className="size-3.5" />
         </Button>
