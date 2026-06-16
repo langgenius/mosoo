@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronDown, Settings, TerminalSquare } from "lucide-react";
+import { ArrowLeft, Settings, TerminalSquare } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -8,12 +8,6 @@ import { useAgentDetailQuery, useAgentEditorStateQuery } from "@/domains/agent/q
 import { useAuth } from "@/domains/auth/use-auth";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/shared/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
 
 import { isTruthy } from "../../shared/lib/truthiness";
@@ -40,8 +34,6 @@ const MODE_TABS: { id: DetailMode; label: string; ownerOnly?: boolean }[] = [
   { id: "logs", label: "Logs", ownerOnly: true },
   { id: "cost", label: "Cost", ownerOnly: true },
 ];
-
-const DEBUG_MODES = new Set<DetailMode>(["terminal"]);
 
 interface DebugModeItem {
   icon: LucideIcon;
@@ -151,40 +143,27 @@ function AgentDetailHeader({
                   </button>,
                 ],
           )}
-          {debugItems.length > 0 ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    "flex items-center gap-1 rounded-lg px-3.5 py-1.5 text-[13px] font-medium outline-none transition-all",
-                    DEBUG_MODES.has(mode)
-                      ? "bg-ink-100 text-fg-1"
-                      : "text-muted-foreground hover:bg-accent",
-                  )}
-                >
-                  Debug
-                  <ChevronDown aria-hidden="true" size={14} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {debugItems.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <DropdownMenuItem
-                      key={item.id}
-                      onSelect={() => {
-                        onSelectMode(item.id);
-                      }}
-                    >
-                      <Icon aria-hidden="true" size={14} />
-                      <span className="flex-1">{item.label}</span>
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
+          {debugItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  onSelectMode(item.id);
+                }}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-all",
+                  mode === item.id
+                    ? "bg-ink-100 text-fg-1"
+                    : "text-muted-foreground hover:bg-accent",
+                )}
+              >
+                <Icon aria-hidden="true" size={14} />
+                {item.label}
+              </button>
+            );
+          })}
         </div>
       )}
 
