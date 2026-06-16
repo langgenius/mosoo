@@ -16,7 +16,7 @@
     "deploy": "vp run -w deploy:api && vp run -w deploy:web",
     "deploy:api": "vp run --filter @mosoo/api deploy",
     "deploy:web": "vp run --filter @mosoo/web deploy",
-    "dev": "vp run --filter @mosoo/api --filter @mosoo/web --parallel dev",
+    "dev": "vp run --filter @mosoo/api --filter @mosoo/web --filter @mosoo/blog --parallel dev",
     "driver:repo:export": "vp exec bun scripts/export-driver-standalone-repo.ts",
     "driver:submodule:smoke": "vp exec bun scripts/check-driver-submodule-cutover.ts",
     "e2e:deterministic": "./e2e/run-deterministic.sh",
