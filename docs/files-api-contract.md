@@ -39,8 +39,10 @@ Mount = {
   source:        Files-subtree | uploaded-file | session-area,
   mount_path:    string,                    // absolute path in the sandbox
   runtime_access: "ro" | "rw",              // can the AGENT write here during a run?
-  scope:         "shared" | "session" | "user",  // is the writable target one shared tree, or isolated per session / per end-user?
+  scope:         "shared" | "session" | "user",  // shared = App Files, runtime READ-ONLY (curated via the developer door); session/user = isolated writable areas
 }
+
+`scope=shared` is **always** `runtime_access=ro`: App Files is curated only through the developer door, never written by an agent at runtime. `rw` exists only for `session` and `user` scopes.
 ```
 
 Everything reduces to a Mount:
@@ -67,7 +69,7 @@ Curated Files is the **developer's durable control surface over what the agent K
 3. **Operate — correct without a redeploy.** Wrong answer in production? Edit the file through the developer door; the next session is fixed. No code deploy, no re-embedding, no model change. The out-of-band developer write door **is** the product's iteration loop.
 4. **Trust / audit — versioned knowledge.** Each curation is a version (we already have `spaceFileVersionsTable`). You can see what the agent knew at any point, roll back a bad edit, and prove provenance — load-bearing for support, finance, and compliance bots.
 5. **Scale across an App's agents.** SPEC allows Storage to be bound by one or more Agents. A "writer" agent and a "reviewer" agent both mount the same brand-guidelines subtree. Curated Files is the **shared substrate of the App**, not a per-agent silo.
-6. **Optional durable landing zone (opt-in only).** When the developer *genuinely wants* to accumulate end-user outputs — a recruiting app retaining every submitted résumé, a research agent building a shared corpus — they explicitly add a `Mount(Files subtree, rw, shared)` output target. Rare, deliberate, never the default. (Contrast: §1's bug makes this the *accidental* default today.)
+6. **No runtime path persists end-user outputs into Files.** Run outputs are always session-scoped (§5). There is deliberately **no** `(rw, shared)` runtime mount that lets an end-user run write into curated Files — that was §1's accidental-default leak, and removing the mode removes the leak at the root. If a developer ever wants to keep a specific output, that is an explicit developer-door copy, not a runtime behavior.
 7. **Export / portability.** SPEC exports an App to one `Skill.md`. Curated Files is the portable knowledge/asset bundle that travels with the App — a large part of what makes an App forkable and reusable.
 
 The through-line: **session files are the user's data; curated Files is the developer's product.** Keeping them on opposite sides of the `scope` axis is what makes the résumé bot safe *and* makes this control surface coherent. Delete curated Files and you delete the developer's ability to ground, standardize, correct, audit, and ship an agent product without redeploying it.
@@ -214,23 +216,23 @@ Replaces the three independent claim entry points (`public-thread-file-api`, `pu
 ### Outbound (run → reply) — default `scope=session`, NOT space
 ```
 sandbox file mutation event
-   → FileStore.recordRuntimeOutput({ sessionId, mountScope, path, size, mimeType })   // ONE indexing path
-        • DEFAULT mountScope = "session": FileRecordStore upsert with scope=session, owner=session,
-          purpose=session_artifact, sessionKind="artifact"   ← stays under the Thread, NOT in developer Files
-        • mountScope = "shared" ONLY when the developer configured a Mount(Files subtree, rw, shared):
-          upsert scope=space, purpose=space_file            ← opt-in persistence into curated Files
+   → FileStore.recordRuntimeOutput({ sessionId, path, size, mimeType })   // ONE indexing path
+        • ALWAYS scope=session: FileRecordStore upsert with scope=session, owner=session,
+          purpose=session_artifact, sessionKind="artifact"   ← stays under the Thread, never in developer Files
+        • there is NO runtime path that writes an end-user output into App Files. Persisting an
+          output to curated Files is a separate, explicit developer-door action (a copy), never a mount mode.
    → file_id exposed in the reply; client downloads via FileStore.createDownload → GET content
 ```
-This is the fix for §1's load-bearing bug. Run outputs default to the session and are invisible in the developer's Files; they land in curated Files **only** through an explicit developer-configured `(rw, shared)` output Mount. Also collapses the three event entry points that today each call `indexRuntimeSpaceFileMutation`/`syncSandboxSpaceFileMutation` (`app-access.ts`, `sandbox-file-watch.service`, `driver-instance/events.ts`) into one method, eliminating double-indexing races. `sessionKind` semantics are fixed: `"attachment"` = user-supplied inbound, `"artifact"` = run-produced outbound.
+This is the fix for §1's load-bearing bug. Run outputs are **always** session-scoped and invisible in the developer's Files; there is no runtime write path into App Files at all — the `(rw, shared)` landing-zone mode is removed by design. Also collapses the three event entry points that today each call `indexRuntimeSpaceFileMutation`/`syncSandboxSpaceFileMutation` (`app-access.ts`, `sandbox-file-watch.service`, `driver-instance/events.ts`) into one method, eliminating double-indexing races. `sessionKind` semantics are fixed: `"attachment"` = user-supplied inbound, `"artifact"` = run-produced outbound.
 
 ### Acceptance case — the résumé thread (end-to-end)
 A public résumé-editing bot. End user uploads `resume.pdf` and asks the agent to improve it.
 
 1. Upload → `Mount(uploaded resume, ro, session)`; record `owner=session, purpose=session_attachment`.
-2. Agent reads the read-only copy, writes the improved résumé to a new path → `recordRuntimeOutput({mountScope:"session", …})` → `owner=session, purpose=session_artifact, sessionKind="artifact"`.
+2. Agent reads the read-only copy, writes the improved résumé to a new path → `recordRuntimeOutput({…})` (always session-scoped) → `owner=session, purpose=session_artifact, sessionKind="artifact"`.
 3. Reply exposes the artifact `file_id`; the end user downloads it.
 
-**Expected developer "Files" view: no change.** Both the input résumé and the output live under *that Thread*; neither enters the App's curated Files. End users are isolated from each other. Files changes *only* if the developer added a `Mount(Files subtree, rw, shared)` landing zone (e.g. a recruiting app retaining submissions). Acceptance test asserts: after the run, `FileStore.list` over App Files scope is unchanged; the artifact is listed only under the session.
+**Expected developer "Files" view: no change.** Both the input résumé and the output live under *that Thread*; neither enters the App's curated Files. End users are isolated from each other. App Files is unaffected by end-user runs **by construction** — there is no runtime write path into it; persisting an output to Files is only ever an explicit developer-door copy. Acceptance test asserts: after the run, `FileStore.list` over App Files scope is unchanged; the artifact is listed only under the session.
 
 ### Mapping to Claude file references (forward-looking)
 When mosoo dispatches to a Claude managed agent, `FileStore` is the single place that translates a mosoo `FileId` → an Anthropic `file_id` (upload-on-demand + cache the mapping). Mount → Claude session resource is a near-identity map: `(ro, shared)` Files subtree → `read_only` memory_store / file resource; `(rw, session|user)` → `read_write` memory_store; uploaded attachment → `{type:"file", file_id, mount_path}`. Centralizing in/out here makes this a single thin adapter rather than per-call glue.
@@ -267,7 +269,7 @@ Each step is one consistent state — compiles, `just check` + `just test` green
 1. **Introduce the port (additive, no behavior change).** Add `file-store.ts`, `file-scope-registry.ts`, `ports/*`. Implement `FileStore` as a thin composition delegating to existing infrastructure. ✅ verifiable in isolation.
 2. **Route the HTTP/GraphQL adapters through `FileStore`.** `file-route.ts`, space GraphQL, `public-thread-file-api` import `FileStore` instead of infrastructure. Delete the `file-http.service` barrel.
 3. **Migrate the attachment in-path.** Collapse the three claim entry points into `claimToSession`/`ensureClaimable`; guard the R2 rollback; validate `attachmentIds` in `api-command`. Materialize inbound as `Mount(upload, ro, session)`.
-4. **Migrate the attachment out-path + the scope fix.** Single `recordRuntimeOutput` with `mountScope` defaulting to `session` (fixes §1's leak); collapse the three runtime indexing callers; fix `sessionKind` semantics. Add the `Mount` shape (`{source, mount_path, runtime_access, scope}`) to the session resource list. Ship the résumé-thread acceptance test.
+4. **Migrate the attachment out-path + the scope fix.** Single `recordRuntimeOutput`, always `scope=session` (fixes §1's leak — no runtime write path into App Files at all); collapse the three runtime indexing callers; fix `sessionKind` semantics. Add the `Mount` shape (`{source, mount_path, runtime_access, scope}`) to the session resource list. Ship the résumé-thread acceptance test.
 
 **Deferred debt (not required for MVP) — steps 5–8.**
 
