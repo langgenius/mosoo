@@ -9,6 +9,7 @@ import { costGraphQLModule } from "../../modules/cost/graphql/cost-graphql";
 import { environmentGraphQLModule } from "../../modules/environments/graphql/environment-graphql";
 import { mcpGraphQLModule } from "../../modules/mcp/graphql/mcp-graphql";
 import { onboardingGraphQLModule } from "../../modules/onboarding/graphql/onboarding-graphql";
+import { organizationGraphQLModule } from "../../modules/organizations/graphql/organization-graphql";
 import { sessionGraphQLModule } from "../../modules/sessions/graphql/session-graphql";
 import { skillGraphQLModule } from "../../modules/skills/graphql/skill-graphql";
 import { spaceGraphQLModule } from "../../modules/spaces/graphql/space-graphql";
@@ -16,7 +17,6 @@ import { userGraphQLModule } from "../../modules/users/graphql/user-graphql";
 import { vendorCredentialGraphQLModule } from "../../modules/vendor-credentials/graphql/vendor-credential-graphql";
 import type { GraphQLContext } from "./graphql-context";
 import { composeGraphQLModules } from "./graphql-module";
-import { organizationGraphQLSpec } from "./graphql-module-specs";
 import { commonGraphQLModule } from "./modules/common-graphql";
 import { jsonObjectScalar } from "./scalars/json-object-scalar";
 import { primitiveRecordScalar } from "./scalars/primitive-record-scalar";
@@ -31,7 +31,7 @@ const composedGraphQLModules = composeGraphQLModules([
   environmentGraphQLModule,
   mcpGraphQLModule,
   onboardingGraphQLModule,
-  organizationGraphQLSpec,
+  organizationGraphQLModule,
   appGraphQLModule,
   sessionGraphQLModule,
   skillGraphQLModule,

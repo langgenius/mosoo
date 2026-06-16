@@ -2,14 +2,22 @@ import type { OrganizationId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { appGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
-import { listOrganizationApps } from "../application/app.service";
+import { listOrganizationApps, renameApp } from "../application/app.service";
 
 interface OrganizationIdArgs {
   organizationId: OrganizationId;
 }
 
+interface RenameAppArgs {
+  input: Parameters<typeof renameApp>[2];
+}
+
 export const appGraphQLModule = {
   ...appGraphQLSpec,
+  authenticatedMutationResolvers: {
+    renameApp: async (_parent, args: RenameAppArgs, context) =>
+      renameApp(context.bindings.DB, context.viewer, args.input),
+  },
   authenticatedQueryResolvers: {
     appList: async (_parent, args: OrganizationIdArgs, context) =>
       listOrganizationApps(context.bindings.DB, context.viewer, args.organizationId),

@@ -6,4 +6,9 @@ export const organizationSchema = /* GraphQL */ `
     name: String!
     slug: String!
   }
+
+  input RenameOrganizationInput {
+    organizationId: ULID!
+    name: String!
+  }
 `;

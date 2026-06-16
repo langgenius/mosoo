@@ -517,6 +517,16 @@ export type RemoveSessionResourceInput = {
   sessionId: PlatformId;
 };
 
+export type RenameAppInput = {
+  appId: PlatformId;
+  name: string;
+};
+
+export type RenameOrganizationInput = {
+  name: string;
+  organizationId: PlatformId;
+};
+
 export type RenameSessionInput = {
   appId: PlatformId;
   sessionId: PlatformId;
@@ -932,6 +942,13 @@ export type AppListQueryVariables = Exact<{
 
 export type AppListQuery = { appList: Array<{ createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId, slug: string }> };
 
+export type RenameAppMutationVariables = Exact<{
+  input: RenameAppInput;
+}>;
+
+
+export type RenameAppMutation = { renameApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId, slug: string } };
+
 type CostTotalsFields_CostAgentRow_Fragment = { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number };
 
 type CostTotalsFields_CostDailyPoint_Fragment = { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number };
@@ -1115,6 +1132,13 @@ export type OnboardingBootstrapMutationVariables = Exact<{
 
 
 export type OnboardingBootstrapMutation = { onboardingBootstrap: { completed: boolean, organization: { avatarUrl: string | null, createdAt: string, id: PlatformId, name: string, slug: string } | null } };
+
+export type RenameOrganizationMutationVariables = Exact<{
+  input: RenameOrganizationInput;
+}>;
+
+
+export type RenameOrganizationMutation = { renameOrganization: { avatarUrl: string | null, createdAt: string, id: PlatformId, name: string, slug: string } };
 
 export type ThreadAgentSessionRetrieveQueryVariables = Exact<{
   appId: PlatformId;
@@ -2755,6 +2779,18 @@ export const AppListDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AppListQuery, AppListQueryVariables>;
+export const RenameAppDocument = new TypedDocumentString(`
+    mutation RenameApp($input: RenameAppInput!) {
+  renameApp(input: $input) {
+    createdAt
+    defaultEnvironmentId
+    id
+    name
+    ownerAccountId
+    slug
+  }
+}
+    `) as unknown as TypedDocumentString<RenameAppMutation, RenameAppMutationVariables>;
 export const AppCostCardDocument = new TypedDocumentString(`
     query AppCostCard($appId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
   appCostCard(appId: $appId, range: $range, runPurposes: $runPurposes) {
@@ -3595,6 +3631,17 @@ export const OnboardingBootstrapDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<OnboardingBootstrapMutation, OnboardingBootstrapMutationVariables>;
+export const RenameOrganizationDocument = new TypedDocumentString(`
+    mutation RenameOrganization($input: RenameOrganizationInput!) {
+  renameOrganization(input: $input) {
+    avatarUrl
+    createdAt
+    id
+    name
+    slug
+  }
+}
+    `) as unknown as TypedDocumentString<RenameOrganizationMutation, RenameOrganizationMutationVariables>;
 export const ThreadAgentSessionRetrieveDocument = new TypedDocumentString(`
     query ThreadAgentSessionRetrieve($appId: ULID!, $sessionId: ULID!) {
   threadAgentSessionRetrieve(appId: $appId, sessionId: $sessionId) {

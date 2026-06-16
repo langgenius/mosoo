@@ -8,3 +8,8 @@ export interface AppSummary {
   ownerAccountId: AccountId;
   slug: string;
 }
+
+export interface RenameAppInput {
+  appId: AppId;
+  name: string;
+}

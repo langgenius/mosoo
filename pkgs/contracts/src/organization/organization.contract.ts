@@ -7,3 +7,8 @@ export interface OrganizationSummary {
   name: string;
   slug: string;
 }
+
+export interface RenameOrganizationInput {
+  organizationId: OrganizationId;
+  name: string;
+}

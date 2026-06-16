@@ -7,4 +7,9 @@ export const appSchema = /* GraphQL */ `
     ownerAccountId: ULID!
     slug: String!
   }
+
+  input RenameAppInput {
+    appId: ULID!
+    name: String!
+  }
 `;

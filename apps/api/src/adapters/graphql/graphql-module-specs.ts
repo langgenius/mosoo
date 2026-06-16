@@ -118,6 +118,7 @@ export const onboardingGraphQLSpec = {
 } satisfies GraphQLModuleSpec;
 
 export const appGraphQLSpec = {
+  mutationFields: ["renameApp(input: RenameAppInput!): App!"],
   queryFields: ["appList(organizationId: ULID!): [App!]!"],
   typeDefs: appSchema,
 } satisfies GraphQLModuleSpec;
@@ -204,7 +205,7 @@ export const vendorCredentialGraphQLSpec = {
 } satisfies GraphQLModuleSpec;
 
 export const organizationGraphQLSpec = {
-  mutationFields: [],
+  mutationFields: ["renameOrganization(input: RenameOrganizationInput!): Organization!"],
   queryFields: [],
   typeDefs: organizationSchema,
 } satisfies GraphQLModuleSpec;

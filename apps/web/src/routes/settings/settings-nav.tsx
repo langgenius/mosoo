@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { BarChart3, KeyRound, User } from "lucide-react";
+import { BarChart3, Box, KeyRound, User } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { cn } from "@/shared/lib/class-names";
@@ -23,6 +23,10 @@ const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = [
       { icon: BarChart3, label: "App usage", path: "/cost" },
     ],
     label: "Account",
+  },
+  {
+    items: [{ icon: Box, label: "Workspace", path: "/settings/workspace" }],
+    label: "Workspace",
   },
 ];
 

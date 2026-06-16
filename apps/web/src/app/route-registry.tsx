@@ -69,6 +69,10 @@ const SettingsAccessTokens = lazyNamed(
   "AccessTokensTab",
 );
 const SettingsUsage = lazyNamed(async () => import("../routes/settings/usage-tab"), "UsageTab");
+const SettingsWorkspace = lazyNamed(
+  async () => import("../routes/settings/workspace-tab"),
+  "WorkspaceTab",
+);
 const AgentList = lazyNamed(
   async () => import("../routes/agent/agent-list.route"),
   "AgentListPage",
@@ -131,6 +135,7 @@ const appRoutes = [
       { element: <Navigate to="/settings/profile" replace />, index: true },
       { element: <SettingsProfile />, path: "profile" },
       { element: <SettingsAccessTokens />, path: "access-tokens" },
+      { element: <SettingsWorkspace />, path: "workspace" },
       { element: <SettingsUsage />, path: "usage" },
       { element: <Navigate to="/environment" replace />, path: "environments" },
       { element: <Navigate to="/cost" replace />, path: "cost" },
