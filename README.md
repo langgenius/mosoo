@@ -87,5 +87,6 @@ just dev
 
 - Web: `http://localhost:5173`
 - API: `http://localhost:8787`
+- Blog: `http://localhost:4321/blog`
 - Regular email login uses OTP.
 - In local development, email addresses ending with `@mosoo.ai` skip OTP and log in directly.

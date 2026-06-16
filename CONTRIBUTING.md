@@ -88,12 +88,13 @@ Start the regular local stack:
 just dev
 ```
 
-This command runs local D1 migration first, then starts the driver build, API Worker, and web app.
+This command runs local D1 migration first, then starts the driver build, API Worker, web app, and blog.
 
 Default local URLs:
 
 - Web: `http://localhost:5173`
 - API: `http://localhost:8787`
+- Blog: `http://localhost:4321/blog` (Astro dev server; mounted at the `/blog` base path with `trailingSlash: "never"`, so the URL must be `/blog` with no trailing slash — `/` and `/blog/` both 404)
 
 Local login:
 
