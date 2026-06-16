@@ -118,7 +118,10 @@ export const onboardingGraphQLSpec = {
 } satisfies GraphQLModuleSpec;
 
 export const appGraphQLSpec = {
-  mutationFields: ["createApp(input: CreateAppInput!): App!"],
+  mutationFields: [
+    "createApp(input: CreateAppInput!): App!",
+    "renameApp(input: RenameAppInput!): App!",
+  ],
   queryFields: ["appList(organizationId: ULID!): [App!]!"],
   typeDefs: appSchema,
 } satisfies GraphQLModuleSpec;
