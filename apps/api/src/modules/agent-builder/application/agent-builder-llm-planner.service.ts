@@ -432,7 +432,6 @@ async function callOpenAiShapePlanner(input: {
         ],
         model: input.model,
         response_format: createAgentBuilderPlannerResponseFormat(),
-        temperature: 0,
       }),
       headers: {
         Accept: "application/json",

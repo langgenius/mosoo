@@ -67,6 +67,17 @@ function createAccountProfile(
   };
 }
 
+function normalizeSystemAgentModel(input: SetSystemAgentModelInput): SystemAgentModelSetting {
+  const modelId = input.modelId.trim();
+  const vendor = input.vendor.trim();
+
+  if (!isTruthy(modelId) || !isTruthy(vendor)) {
+    throw new Error("System Agent model and provider are required.");
+  }
+
+  return { modelId, vendor };
+}
+
 export async function getSystemAgentModel(
   database: D1Database,
   accountId: AccountId,
@@ -217,9 +228,32 @@ export async function updateProfile(
 }
 
 export async function setSystemAgentModel(
-  _database: D1Database,
-  _viewer: AuthenticatedViewer,
-  _input: SetSystemAgentModelInput,
+  database: D1Database,
+  viewer: AuthenticatedViewer,
+  input: SetSystemAgentModelInput,
 ): Promise<AccountProfile> {
-  throw new Error("System Agent model selection requires an App App.");
+  const systemAgentModel = normalizeSystemAgentModel(input);
+  const updated =
+    (await getAppDatabase(database)
+      .update(accountsTable)
+      .set({
+        systemAgentModel,
+        updatedAt: currentTimestampMs(),
+      })
+      .where(eq(accountsTable.id, viewer.id))
+      .returning({
+        imageUrl: accountsTable.image,
+        name: accountsTable.name,
+        systemAgentModel: accountsTable.systemAgentModel,
+      })
+      .get()) ?? null;
+
+  if (updated === null) {
+    throw new Error("Account not found.");
+  }
+
+  return createAccountProfile(
+    { ...viewer, imageUrl: updated.imageUrl, name: updated.name },
+    parseSystemAgentModel(updated.systemAgentModel),
+  );
 }
