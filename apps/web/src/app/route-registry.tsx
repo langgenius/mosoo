@@ -21,6 +21,10 @@ function protectedRoute(element: ReactElement): ReactElement {
   return <ProtectedRoute>{element}</ProtectedRoute>;
 }
 
+function orgProtectedRoute(element: ReactElement): ReactElement {
+  return <ProtectedRoute shell="org">{element}</ProtectedRoute>;
+}
+
 function NavigateToEnvironmentAlias(): ReactElement {
   const { environmentId } = useParams();
 
@@ -55,7 +59,6 @@ const Providers = lazyNamed(
   async () => import("../routes/providers/providers.route"),
   "ProvidersPage",
 );
-const Cost = lazyNamed(async () => import("../routes/cost/cost.route"), "CostPage");
 const SettingsLayout = lazyNamed(
   async () => import("../routes/settings/settings.route"),
   "SettingsLayout",
@@ -69,6 +72,10 @@ const SettingsAccessTokens = lazyNamed(
   "AccessTokensTab",
 );
 const SettingsUsage = lazyNamed(async () => import("../routes/settings/usage-tab"), "UsageTab");
+const SettingsAppGeneral = lazyNamed(
+  async () => import("../routes/settings/app-general-tab"),
+  "AppGeneralTab",
+);
 const AgentList = lazyNamed(
   async () => import("../routes/agent/agent-list.route"),
   "AgentListPage",
@@ -77,11 +84,15 @@ const AgentDetail = lazyNamed(
   async () => import("../routes/agent/agent-detail.route"),
   "AgentDetailPage",
 );
-const Channels = lazyNamed(async () => import("../routes/channels/channels.route"), "ChannelsPage");
 const Threads = lazyNamed(async () => import("../routes/threads/route"), "ThreadsPage");
 const AppOverview = lazyNamed(
   async () => import("../routes/app-overview/app-overview.route"),
   "AppOverviewPage",
+);
+const AppsList = lazyNamed(async () => import("../routes/apps/apps-list.route"), "AppsListPage");
+const OrgSettings = lazyNamed(
+  async () => import("../routes/org/org-settings.route"),
+  "OrgSettingsPage",
 );
 
 const appRoutes = [
@@ -103,6 +114,8 @@ const appRoutes = [
   },
   { element: <McpOAuthComplete />, path: "/integrations/mcp/oauth-complete" },
   { element: protectedRoute(<AppOverview />), path: "/" },
+  { element: orgProtectedRoute(<AppsList />), path: "/apps" },
+  { element: orgProtectedRoute(<OrgSettings />), path: "/org/settings" },
   { element: protectedRoute(<Space />), path: "/space" },
   { element: protectedRoute(<Navigate to="/space" replace />), path: "/spaces" },
   { element: protectedRoute(<Environments />), path: "/environment" },
@@ -123,7 +136,6 @@ const appRoutes = [
   { element: protectedRoute(<McpTabRoute />), path: "/integrations/mcp" },
   { element: protectedRoute(<AgentList />), path: "/agent" },
   { element: protectedRoute(<AgentDetail />), path: "/agent/:agentId" },
-  { element: protectedRoute(<Channels />), path: "/channels" },
   { element: protectedRoute(<Threads />), path: "/threads" },
   { element: protectedRoute(<Threads />), path: "/threads/:threadId" },
   {
@@ -131,17 +143,18 @@ const appRoutes = [
       { element: <Navigate to="/settings/profile" replace />, index: true },
       { element: <SettingsProfile />, path: "profile" },
       { element: <SettingsAccessTokens />, path: "access-tokens" },
+      { element: <SettingsAppGeneral />, path: "app" },
       { element: <SettingsUsage />, path: "usage" },
       { element: <Navigate to="/environment" replace />, path: "environments" },
-      { element: <Navigate to="/cost" replace />, path: "cost" },
+      { element: <Navigate to="/settings/usage" replace />, path: "cost" },
     ],
     element: protectedRoute(<SettingsLayout />),
     path: "/settings",
   },
   { element: protectedRoute(<Navigate to="/settings/profile" replace />), path: "/profile" },
-  { element: protectedRoute(<Navigate to="/cost" replace />), path: "/usage" },
+  { element: protectedRoute(<Navigate to="/settings/usage" replace />), path: "/usage" },
   { element: protectedRoute(<Providers />), path: "/providers" },
-  { element: protectedRoute(<Cost />), path: "/cost" },
+  { element: protectedRoute(<Navigate to="/settings/usage" replace />), path: "/cost" },
 ] satisfies RouteObject[];
 
 export function AppRoutes(): ReactNode {

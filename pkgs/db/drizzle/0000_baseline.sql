@@ -1144,6 +1144,7 @@ CREATE TABLE `vendor_credential` (
 	`api_key_secret_id` text CHECK ("api_key_secret_id" = upper("api_key_secret_id") AND length("api_key_secret_id") = 26 AND substr("api_key_secret_id", 1, 1) GLOB '[0-7]' AND "api_key_secret_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
+	`is_default` integer DEFAULT false NOT NULL,
 	`models` text,
 	`name` text NOT NULL,
 	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,

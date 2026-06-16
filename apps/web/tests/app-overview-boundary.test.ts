@@ -6,36 +6,53 @@ function readSource(path: string): string {
 }
 
 describe("App overview boundary", () => {
-  test("keeps the console root centered on the active App", () => {
+  test("keeps the console root as the App install page without dashboard fetches", () => {
     const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
-    const modelSource = readSource("../src/routes/app-overview/app-overview-model.ts");
-    const combinedSource = `${routeSource}\n${modelSource}`;
 
-    expect(routeSource).toContain("Quickstart");
-    expect(routeSource).toContain("quickstart steps complete");
-    expect(routeSource).toContain("No threads have run in this App yet.");
-    expect(routeSource).toContain("Last 30 days in this App");
-    expect(routeSource).toContain('to="/channels"');
-    expect(routeSource).toContain("Channels");
+    expect(routeSource).toContain("AppOverviewInstallGuide");
     expect(routeSource).toContain("Provider keys");
     expect(routeSource).toContain("New agent");
-    expect(modelSource).toContain('label: "Add provider key"');
-    expect(modelSource).toContain('label: "Create agent"');
-    expect(modelSource).toContain('label: "Run a thread"');
-    expect(modelSource).toContain('label: "Publish an agent"');
-    expect(modelSource).toContain("Store a model key for this App.");
-    expect(modelSource).toContain("Expose an App-local Agent through its Agent API endpoint.");
 
-    expect(combinedSource).not.toContain("app-scoped");
-    expect(combinedSource).not.toContain("Expose the App through its runtime endpoint");
-    expect(combinedSource).not.toContain('label: "Publish runtime"');
-    expect(combinedSource).not.toContain("App setup");
-    expect(combinedSource).not.toContain("Loading app");
-    expect(combinedSource).not.toContain("No app available");
-    expect(combinedSource).not.toContain("Organization");
-    expect(combinedSource).not.toContain("Members");
-    expect(combinedSource).not.toContain("Invite");
-    expect(combinedSource).not.toContain('to="/members"');
-    expect(combinedSource).not.toContain('to="/join');
+    // The overview dashboard and its per-resource queries were removed; the root
+    // no longer aggregates loads (which surfaced "data failed to load").
+    expect(routeSource).not.toContain("Quickstart");
+    expect(routeSource).not.toContain("App overview data failed to load");
+    expect(routeSource).not.toContain("useVisibleAgentsQuery");
+    expect(routeSource).not.toContain("fetchAppCost");
+    expect(routeSource).not.toContain("listVendorCredentials");
+    expect(routeSource).not.toContain('to="/channels"');
+
+    expect(routeSource).not.toContain("Organization");
+    expect(routeSource).not.toContain("Members");
+    expect(routeSource).not.toContain("Invite");
+    expect(routeSource).not.toContain('to="/members"');
+    expect(routeSource).not.toContain('to="/join');
+  });
+
+  test("hands the App to a coding agent with one CLI command on the console root", () => {
+    const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
+    const installSource = readSource("../src/routes/app-overview/app-overview-install.tsx");
+
+    expect(routeSource).toContain("AppOverviewInstallGuide");
+    expect(installSource).toContain("Hand Mosoo to your agent");
+    expect(installSource).toContain("npx mosoo login");
+    expect(installSource).toContain("@mosoo skill");
+    expect(installSource).toContain("Codex");
+    // The CLI token is minted on demand and only copied — never rendered.
+    expect(installSource).toContain("createPersonalAccessToken");
+    expect(installSource).toContain("MASKED_TOKEN");
+
+    expect(installSource).not.toContain("Organization");
+    expect(installSource).not.toContain("Members");
+    expect(installSource).not.toContain("Invite");
+  });
+
+  test("keeps the App console root free of Chinese copy", () => {
+    const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
+    const installSource = readSource("../src/routes/app-overview/app-overview-install.tsx");
+
+    const cjk = /[一-鿿]/u;
+    expect(cjk.test(routeSource)).toBe(false);
+    expect(cjk.test(installSource)).toBe(false);
   });
 });

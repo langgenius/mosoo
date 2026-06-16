@@ -740,6 +740,11 @@ input CreateAgentSessionInput {
   waitForRuntimeReady: Boolean
 }
 
+input CreateAppInput {
+  name: String!
+  organizationId: ULID!
+}
+
 input CreateAppMcpServerInput {
   appId: ULID!
   authType: McpAuthType!
@@ -1196,6 +1201,7 @@ type Mutation {
   createAgent(input: CreateAgentInput!): Agent!
   createAgentFork(input: CreateAgentForkInput!): AgentPackageImportResult!
   createAgentSession(input: CreateAgentSessionInput!): Session!
+  createApp(input: CreateAppInput!): App!
   createAppMcpServer(input: CreateAppMcpServerInput!): McpServerWithCredential!
   createDiscordAgentChannelBinding(input: CreateDiscordAgentChannelBindingInput!): AgentChannelBinding!
   createEnvironment(input: CreateEnvironmentInput!): EnvironmentSummary!
@@ -1232,6 +1238,7 @@ type Mutation {
   revokeMcpCredential(appId: ULID!, serverId: ULID!): McpServerWithCredential!
   sendAgentSessionEvents(appId: ULID!, events: [AgentSessionEventInput!]!, sessionId: ULID!): AgentSessionEventBatch!
   setAppDefaultEnvironment(input: SetAppDefaultEnvironmentInput!): EnvironmentSummary!
+  setDefaultVendorCredential(input: SetDefaultVendorCredentialInput!): VendorCredential!
   setEnvironmentVariableValue(input: SetEnvironmentVariableValueInput!): EnvironmentDetail!
   setMcpServerEnabled(appId: ULID!, enabled: Boolean!, serverId: ULID!): McpServerWithCredential!
   setSystemAgentModel(input: SetSystemAgentModelInput!): Account!
@@ -1620,6 +1627,11 @@ input SetAppDefaultEnvironmentInput {
   environmentId: ULID!
 }
 
+input SetDefaultVendorCredentialInput {
+  appId: ULID!
+  id: ULID!
+}
+
 input SetEnvironmentVariableValueInput {
   appId: ULID!
   environmentId: ULID!
@@ -1855,6 +1867,7 @@ type VendorCredential {
   apiBase: String
   appId: ULID!
   id: ULID!
+  isDefault: Boolean!
   maskedApiKey: String!
   models: [String!]
   name: String!

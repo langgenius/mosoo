@@ -1,4 +1,4 @@
-import { PUBLIC_VENDORS } from "@mosoo/runtime-catalog";
+import { PUBLIC_VENDORS, getVendor } from "@mosoo/runtime-catalog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { ReactElement } from "react";
@@ -9,6 +9,7 @@ import {
   createVendorCredential,
   deleteVendorCredential,
   listVendorCredentials,
+  setDefaultVendorCredential,
   testVendorCredential,
   updateVendorCredential,
 } from "@/domains/vendor-credential/api/vendor-credential-client";
@@ -21,6 +22,7 @@ import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 
 import { ProviderTestStatus } from "./provider-test-status";
+import { RuntimeAvailabilitySection } from "./runtime-availability-section";
 
 const CUSTOM_PROVIDER_VENDOR_ID = "openai-compatible";
 
@@ -44,9 +46,25 @@ const EMPTY_FORM: CredentialForm = {
   vendorId: "",
 };
 
+interface ProviderFormControls {
+  form: CredentialForm;
+  onCancel: () => void;
+  onChange: (form: CredentialForm) => void;
+  onSave: () => void;
+  onTest: () => void;
+  saving: boolean;
+  testState: TestState;
+}
+
 const providerCredentialKeys = {
   list: (appId: string) => ["vendor-credentials", appId] as const,
 };
+
+// Preset providers (Anthropic, OpenAI) carry a default endpoint; pre-fill it so
+// the user does not have to look it up. OpenAI-compatible has no default.
+function defaultApiBaseForVendor(vendorId: string): string {
+  return getVendor(vendorId)?.defaultApiBase ?? "";
+}
 
 function displayApiBase(credential: VendorCredential): string {
   return credential.apiBase ?? "Provider endpoint";
@@ -153,6 +171,14 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
     },
   });
 
+  const setDefaultMutation = useMutation({
+    mutationFn: async (credential: VendorCredential) =>
+      setDefaultVendorCredential({ id: credential.id, appId: typedAppId }),
+    onSuccess: async () => {
+      await invalidateCredentials();
+    },
+  });
+
   async function handleSave(): Promise<void> {
     setError(null);
     try {
@@ -193,7 +219,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
   }
 
   function startCreate(vendorId: string): void {
-    setForm({ ...EMPTY_FORM, vendorId });
+    setForm({ ...EMPTY_FORM, apiBase: defaultApiBaseForVendor(vendorId), vendorId });
     setError(null);
     setTestState("idle");
   }
@@ -210,6 +236,31 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
     setError(null);
     setTestState("idle");
   }
+
+  // Shared add/edit form controls, rendered inline inside whichever vendor card
+  // is being edited (form.vendorId), so the form expands in place rather than as
+  // a separate card at the top of the list.
+  const formControls: ProviderFormControls = {
+    form,
+    onCancel: () => {
+      setForm(EMPTY_FORM);
+      setError(null);
+      setTestState("idle");
+    },
+    onChange: (nextForm) => {
+      setForm(nextForm);
+      setError(null);
+      setTestState("idle");
+    },
+    onSave: () => {
+      void handleSave();
+    },
+    onTest: () => {
+      void handleTest();
+    },
+    saving: saveMutation.isPending,
+    testState,
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -238,29 +289,14 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
             </div>
           )}
 
-          {form.vendorId.length > 0 ? (
-            <ProviderCredentialForm
-              form={form}
-              saving={saveMutation.isPending}
-              testState={testState}
-              onCancel={() => {
-                setForm(EMPTY_FORM);
-                setError(null);
-                setTestState("idle");
-              }}
-              onChange={(nextForm) => {
-                setForm(nextForm);
-                setError(null);
-                setTestState("idle");
-              }}
-              onSave={() => void handleSave()}
-              onTest={() => void handleTest()}
-            />
-          ) : null}
+          {credentialsQuery.isLoading ? null : (
+            <RuntimeAvailabilitySection credentials={credentials} />
+          )}
 
           {PUBLIC_VENDORS.map((vendor) => (
             <ProviderCredentialSection
               credentials={groupedCredentials.get(vendor.vendorId) ?? []}
+              formControls={formControls}
               key={vendor.vendorId}
               onCreate={() => startCreate(vendor.vendorId)}
               onDelete={(credential) => {
@@ -269,12 +305,18 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
                 });
               }}
               onEdit={startEdit}
+              onSetDefault={(credential) => {
+                void setDefaultMutation.mutateAsync(credential).catch((caughtError) => {
+                  setError(getErrorMessage(caughtError, "Failed to set default provider key."));
+                });
+              }}
               vendorId={vendor.vendorId}
             />
           ))}
 
           <ProviderCredentialSection
             credentials={groupedCredentials.get(CUSTOM_PROVIDER_VENDOR_ID) ?? []}
+            formControls={formControls}
             onCreate={() => startCreate(CUSTOM_PROVIDER_VENDOR_ID)}
             onDelete={(credential) => {
               void deleteMutation.mutateAsync(credential).catch((caughtError) => {
@@ -282,6 +324,11 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
               });
             }}
             onEdit={startEdit}
+            onSetDefault={(credential) => {
+              void setDefaultMutation.mutateAsync(credential).catch((caughtError) => {
+                setError(getErrorMessage(caughtError, "Failed to set default provider key."));
+              });
+            }}
             vendorId={CUSTOM_PROVIDER_VENDOR_ID}
           />
         </div>
@@ -315,18 +362,16 @@ function ProviderCredentialForm({
   const modelsInputId = `${formId}-models`;
 
   return (
-    <section className="border-border bg-card space-y-3 rounded-lg border p-4">
+    <div className="border-border-soft mt-1 space-y-3 border-t pt-3">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-fg-1 text-[15px] font-semibold">
-            {form.id === null ? "Add" : "Edit"} {vendorLabel(form.vendorId)} key
-          </h2>
+        <div className="text-fg-1 text-[13px] font-semibold">
+          {form.id === null ? "Add" : "Edit"} {vendorLabel(form.vendorId)} key
         </div>
         <Button onClick={onCancel} size="sm" variant="ghost">
           Cancel
         </Button>
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className={endpointEnabled ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}>
         <label className="space-y-1" htmlFor={nameInputId}>
           <div className="text-muted-foreground text-xs font-medium">Name</div>
           <Input
@@ -336,28 +381,28 @@ function ProviderCredentialForm({
             onChange={(event) => onChange({ ...form, name: event.target.value })}
           />
         </label>
-        <label className="space-y-1" htmlFor={apiKeyInputId}>
-          <div className="text-muted-foreground text-xs font-medium">API key</div>
-          <Input
-            id={apiKeyInputId}
-            placeholder={form.id === null ? "sk-..." : "Leave blank to keep current key"}
-            type="password"
-            value={form.apiKey}
-            onChange={(event) => onChange({ ...form, apiKey: event.target.value })}
-          />
-        </label>
+        {endpointEnabled ? (
+          <label className="space-y-1" htmlFor={apiBaseInputId}>
+            <div className="text-muted-foreground text-xs font-medium">Base URL</div>
+            <Input
+              id={apiBaseInputId}
+              placeholder={defaultApiBaseForVendor(form.vendorId) || "https://api.example.com/v1"}
+              value={form.apiBase}
+              onChange={(event) => onChange({ ...form, apiBase: event.target.value })}
+            />
+          </label>
+        ) : null}
       </div>
-      {endpointEnabled ? (
-        <label className="block space-y-1" htmlFor={apiBaseInputId}>
-          <div className="text-muted-foreground text-xs font-medium">Base URL</div>
-          <Input
-            id={apiBaseInputId}
-            placeholder="https://api.example.com/v1"
-            value={form.apiBase}
-            onChange={(event) => onChange({ ...form, apiBase: event.target.value })}
-          />
-        </label>
-      ) : null}
+      <label className="block space-y-1" htmlFor={apiKeyInputId}>
+        <div className="text-muted-foreground text-xs font-medium">API key</div>
+        <Input
+          id={apiKeyInputId}
+          placeholder={form.id === null ? "sk-..." : "Leave blank to keep current key"}
+          type="password"
+          value={form.apiKey}
+          onChange={(event) => onChange({ ...form, apiKey: event.target.value })}
+        />
+      </label>
       {form.vendorId === CUSTOM_PROVIDER_VENDOR_ID ? (
         <label className="block space-y-1" htmlFor={modelsInputId}>
           <div className="text-muted-foreground text-xs font-medium">Models</div>
@@ -380,23 +425,29 @@ function ProviderCredentialForm({
           {saving ? "Saving..." : "Save"}
         </Button>
       </div>
-    </section>
+    </div>
   );
 }
 
 function ProviderCredentialSection({
   credentials,
+  formControls,
   onCreate,
   onDelete,
   onEdit,
+  onSetDefault,
   vendorId,
 }: {
   credentials: readonly VendorCredential[];
+  formControls: ProviderFormControls;
   onCreate: () => void;
   onDelete: (credential: VendorCredential) => void;
   onEdit: (credential: VendorCredential) => void;
+  onSetDefault: (credential: VendorCredential) => void;
   vendorId: string;
 }): ReactElement {
+  const isFormOpen = formControls.form.vendorId === vendorId;
+
   return (
     <section className="border-border bg-card space-y-3 rounded-lg border p-4">
       <div className="flex items-center justify-between gap-3">
@@ -404,16 +455,14 @@ function ProviderCredentialSection({
           <h2 className="text-fg-1 text-[15px] font-semibold">{vendorLabel(vendorId)}</h2>
           <p className="text-muted-foreground text-[12px]">App-level provider keys</p>
         </div>
-        <Button onClick={onCreate} size="sm" variant="outline">
-          <Plus className="size-3.5" />
-          Add key
-        </Button>
+        {isFormOpen ? null : (
+          <Button onClick={onCreate} size="sm" variant="outline">
+            <Plus className="size-3.5" />
+            Add key
+          </Button>
+        )}
       </div>
-      {credentials.length === 0 ? (
-        <div className="text-muted-foreground/70 rounded-md border border-dashed px-3 py-3 text-[13px]">
-          No key configured in this App.
-        </div>
-      ) : (
+      {credentials.length > 0 ? (
         <div className="space-y-2">
           {credentials.map((credential) => (
             <div
@@ -421,7 +470,16 @@ function ProviderCredentialSection({
               key={credential.id}
             >
               <div className="min-w-0">
-                <div className="text-fg-1 truncate text-[13px] font-medium">{credential.name}</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-fg-1 truncate text-[13px] font-medium">
+                    {credential.name}
+                  </span>
+                  {credential.isDefault ? (
+                    <span className="bg-success-bg text-success-fg shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+                      Default
+                    </span>
+                  ) : null}
+                </div>
                 <div className="text-muted-foreground truncate font-mono text-[12px]">
                   {credential.maskedApiKey}
                   <span className="text-muted-foreground/60 ml-2">
@@ -430,6 +488,16 @@ function ProviderCredentialSection({
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
+                {credential.isDefault ? null : (
+                  <Button
+                    className="text-muted-foreground h-7 px-2 text-[12px]"
+                    onClick={() => onSetDefault(credential)}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    Set default
+                  </Button>
+                )}
                 <Button onClick={() => onEdit(credential)} size="icon" variant="ghost">
                   <Pencil className="size-4" />
                 </Button>
@@ -445,7 +513,12 @@ function ProviderCredentialSection({
             </div>
           ))}
         </div>
+      ) : isFormOpen ? null : (
+        <div className="text-muted-foreground/70 rounded-md border border-dashed px-3 py-3 text-[13px]">
+          No key configured in this App.
+        </div>
       )}
+      {isFormOpen ? <ProviderCredentialForm {...formControls} /> : null}
     </section>
   );
 }

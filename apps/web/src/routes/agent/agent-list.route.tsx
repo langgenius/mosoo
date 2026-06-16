@@ -102,8 +102,6 @@ export function AgentListPage() {
       </PageHeader>
 
       <ListPageToolbar>
-        <ListPageToolbarSpacer />
-
         <ListPageSearch
           value={search}
           onChange={(nextSearch) => {
@@ -111,6 +109,8 @@ export function AgentListPage() {
           }}
           placeholder="Search agents…"
         />
+
+        <ListPageToolbarSpacer />
 
         <Button
           variant="outline"

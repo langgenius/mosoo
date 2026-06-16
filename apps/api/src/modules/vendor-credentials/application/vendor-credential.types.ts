@@ -4,6 +4,7 @@ export interface VendorCredentialRow {
   apiBase: string | null;
   apiKeySecretId: PlatformId;
   id: VendorCredentialId;
+  isDefault: boolean;
   modelsJson: string[] | null;
   name: string;
   appId: AppId;

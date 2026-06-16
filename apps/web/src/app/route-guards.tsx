@@ -2,7 +2,7 @@ import type { ReactElement, ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
 import { UploadRecoveryDialog } from "../features/files/upload-recovery/upload-recovery-dialog";
-import { Layout } from "./app-shell";
+import { Layout, OrgLayout } from "./app-shell";
 import { useAppSession } from "./session-provider";
 
 interface RouteChildrenProps {
@@ -51,7 +51,10 @@ export function OnboardingRoute({ children }: RouteChildrenProps): ReactNode {
   return children;
 }
 
-export function ProtectedRoute({ children }: RouteChildrenProps): ReactNode {
+export function ProtectedRoute({
+  children,
+  shell = "app",
+}: RouteChildrenProps & { shell?: "app" | "org" }): ReactNode {
   const location = useLocation();
   const { onboardingState, user, userLoading } = useAppSession();
   const redirectTarget = `${location.pathname}${location.search}${location.hash}`;
@@ -71,10 +74,12 @@ export function ProtectedRoute({ children }: RouteChildrenProps): ReactNode {
     return <AppLoading />;
   }
 
+  const Shell = shell === "org" ? OrgLayout : Layout;
+
   return (
-    <Layout>
+    <Shell>
       <UploadRecoveryDialog />
       {children}
-    </Layout>
+    </Shell>
   );
 }

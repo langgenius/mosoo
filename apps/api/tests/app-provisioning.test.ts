@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { deriveAppSlugBase } from "../src/modules/apps/application/app-defaults";
+import { createApp } from "../src/modules/apps/application/app-provisioning.service";
 import {
   ensureAppOwnership,
   listOrganizationApps,
@@ -139,5 +141,38 @@ describe("App provisioning boundary", () => {
     await expect(listOrganizationApps(database, makeViewer("account-1"), "org-1")).rejects.toThrow(
       "Organization owner could not be resolved.",
     );
+  });
+
+  test("createApp fails closed when the viewer does not own the Organization", async () => {
+    const database = createAppDatabase();
+    database.execute(`
+      INSERT INTO organization (
+	        id,
+	        name,
+	        slug,
+	        creator_account_id,
+	        created_at,
+	        updated_at
+	      )
+	      VALUES ('org-1', 'Org One', 'org-one', 'account-1', 1, 1);
+    `);
+
+    await expect(
+      createApp(database, makeViewer("account-2"), { name: "New App", organizationId: "org-1" }),
+    ).rejects.toThrow();
+
+    const apps = await listOrganizationApps(database, makeViewer("account-1"), "org-1");
+    expect(apps).toEqual([]);
+  });
+});
+
+describe("App slug derivation", () => {
+  test("slugifies the App name", () => {
+    expect(deriveAppSlugBase("My New App!")).toBe("my-new-app");
+    expect(deriveAppSlugBase("  Support Bot  ")).toBe("support-bot");
+  });
+
+  test("falls back to a stable slug when the name has no slug characters", () => {
+    expect(deriveAppSlugBase("***")).toBe("app");
   });
 });

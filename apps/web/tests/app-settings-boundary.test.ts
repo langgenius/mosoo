@@ -19,19 +19,37 @@ describe("App settings boundary", () => {
     expect(settingsNav).not.toContain("viewerRole");
   });
 
-  test("keeps Settings to account controls and App usage only", () => {
+  test("keeps Settings to account controls and App usage rendered in-shell", () => {
     const routeRegistry = readSource("../src/app/route-registry.tsx");
     const settingsNav = readSource("../src/routes/settings/settings-nav.tsx");
 
     expect(settingsNav).toContain('label: "Profile"');
     expect(settingsNav).toContain('label: "API tokens"');
     expect(settingsNav).toContain('label: "App usage"');
-    expect(settingsNav).toContain('path: "/cost"');
+    // App usage is a nested Settings tab (like Profile / API tokens), not a jump
+    // to a standalone /cost page.
+    expect(settingsNav).toContain('path: "/settings/usage"');
+    expect(settingsNav).not.toContain('path: "/cost"');
     expect(routeRegistry).toContain('{ element: <SettingsUsage />, path: "usage" }');
-    expect(routeRegistry).toContain('{ element: <Navigate to="/cost" replace />, path: "cost" }');
     expect(routeRegistry).toContain(
-      '{ element: protectedRoute(<Navigate to="/cost" replace />), path: "/usage" }',
+      '{ element: <Navigate to="/settings/usage" replace />, path: "cost" }',
     );
+    expect(routeRegistry).toContain(
+      '{ element: protectedRoute(<Navigate to="/settings/usage" replace />), path: "/usage" }',
+    );
+  });
+
+  test("splits Settings into Account and App sections", () => {
+    const settingsNav = readSource("../src/routes/settings/settings-nav.tsx");
+    const routeRegistry = readSource("../src/app/route-registry.tsx");
+
+    expect(settingsNav).toContain('label: "Account"');
+    expect(settingsNav).toContain('label: "App"');
+    expect(settingsNav).toContain('label: "General"');
+    expect(settingsNav).toContain('path: "/settings/app"');
+    // App General is App-owned identity, not Organization-owned settings.
+    expect(routeRegistry).toContain('{ element: <SettingsAppGeneral />, path: "app" }');
+    expect(routeRegistry).not.toContain("OrganizationGeneralTab");
   });
 
   test("uses Agent API Endpoint wording for API tokens and API reference help", () => {

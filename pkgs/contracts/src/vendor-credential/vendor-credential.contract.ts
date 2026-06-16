@@ -3,6 +3,7 @@ import type { AppId, VendorCredentialId } from "../id/id.contract";
 export interface VendorCredential {
   apiBase: string | null;
   id: VendorCredentialId;
+  isDefault: boolean;
   maskedApiKey: string;
   models: string[] | null;
   name: string;
@@ -49,6 +50,11 @@ export interface TestVendorCredentialResult {
 }
 
 export interface DeleteVendorCredentialInput {
+  id: VendorCredentialId;
+  appId: AppId;
+}
+
+export interface SetDefaultVendorCredentialInput {
   id: VendorCredentialId;
   appId: AppId;
 }

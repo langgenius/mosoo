@@ -11,6 +11,7 @@ const VENDOR_CREDENTIAL_LIST_QUERY = graphql(/* GraphQL */ `
     vendorCredentialList(appId: $appId) {
       apiBase
       id
+      isDefault
       maskedApiKey
       models
       name
@@ -25,6 +26,7 @@ const CREATE_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
     createVendorCredential(input: $input) {
       apiBase
       id
+      isDefault
       maskedApiKey
       models
       name
@@ -39,6 +41,7 @@ const UPDATE_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
     updateVendorCredential(input: $input) {
       apiBase
       id
+      isDefault
       maskedApiKey
       models
       name
@@ -52,6 +55,21 @@ const DELETE_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
   mutation DeleteVendorCredential($input: DeleteVendorCredentialInput!) {
     deleteVendorCredential(input: $input) {
       ok
+    }
+  }
+`);
+
+const SET_DEFAULT_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
+  mutation SetDefaultVendorCredential($input: SetDefaultVendorCredentialInput!) {
+    setDefaultVendorCredential(input: $input) {
+      apiBase
+      id
+      isDefault
+      maskedApiKey
+      models
+      name
+      appId
+      vendorId
     }
   }
 `);
@@ -95,6 +113,7 @@ const TEST_VENDOR_CREDENTIAL_MUTATION = graphql(/* GraphQL */ `
 export interface VendorCredential {
   apiBase: string | null;
   id: VendorCredentialId;
+  isDefault: boolean;
   maskedApiKey: string;
   models: string[] | null;
   name: string;
@@ -149,6 +168,14 @@ export async function deleteVendorCredential(input: {
   appId: AppId;
 }): Promise<void> {
   await requestGraphQL(DELETE_VENDOR_CREDENTIAL_MUTATION, { input });
+}
+
+export async function setDefaultVendorCredential(input: {
+  id: VendorCredentialId;
+  appId: AppId;
+}): Promise<VendorCredential> {
+  const payload = await requestGraphQL(SET_DEFAULT_VENDOR_CREDENTIAL_MUTATION, { input });
+  return toVendorCredential(payload.setDefaultVendorCredential);
 }
 
 export type ModelCatalogSource = "preset" | "custom";
