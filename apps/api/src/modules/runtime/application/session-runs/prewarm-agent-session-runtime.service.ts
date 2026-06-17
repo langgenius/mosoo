@@ -77,6 +77,7 @@ export async function prewarmAgentSessionRuntime(
         executionOwnerUserId: hydrated.value.profile.session.origin.executionOwnerUserId,
         kind: hydrated.value.profile.kind,
         runtimeSubjectId: sandboxId,
+        purpose: "prewarm",
         spaceAliases: hydrated.value.profile.session.spaceAliases,
         subjectId: hydrated.value.profile.sandbox.subjectId,
         subjectKind: hydrated.value.profile.sandbox.subjectKind,

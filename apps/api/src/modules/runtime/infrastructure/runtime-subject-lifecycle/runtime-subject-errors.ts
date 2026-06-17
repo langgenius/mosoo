@@ -2,6 +2,7 @@ import type { RuntimeSubjectErrorCode } from "@mosoo/contracts/sandbox";
 
 const RECOVERABLE_RUNTIME_SUBJECT_ERROR_CODES: ReadonlySet<RuntimeSubjectErrorCode> = new Set([
   "runtime.conversation_mount_failed",
+  "runtime.subject_activation_failed",
 ]);
 
 export class RuntimeSubjectBackupNotReadyError extends Error {

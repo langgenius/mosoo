@@ -302,6 +302,41 @@ export async function claimRuntimeSubjectActivation(
   return Boolean(claimed?.id);
 }
 
+export async function preemptRuntimeSubjectActivationClaim(
+  database: D1Database,
+  input: {
+    readonly claimExpiresAt: number;
+    readonly claimOwner: string;
+    readonly expectedClaimExpiresAt: number;
+    readonly expectedClaimOwner: string;
+    readonly expectedStatus: RuntimeSubjectStatus;
+    readonly now: number;
+    readonly runtimeSubjectId: SandboxId;
+  },
+): Promise<boolean> {
+  const preempted =
+    (await getAppDatabase(database)
+      .update(sandboxesTable)
+      .set({
+        claimExpiresAt: input.claimExpiresAt,
+        claimOwner: input.claimOwner,
+        updatedAt: input.now,
+      })
+      .where(
+        and(
+          eq(sandboxesTable.id, input.runtimeSubjectId),
+          eq(sandboxesTable.status, input.expectedStatus),
+          inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
+          eq(sandboxesTable.claimOwner, input.expectedClaimOwner),
+          eq(sandboxesTable.claimExpiresAt, input.expectedClaimExpiresAt),
+        ),
+      )
+      .returning({ id: sandboxesTable.id })
+      .get()) ?? null;
+
+  return Boolean(preempted?.id);
+}
+
 export async function markRuntimeSubjectRestoring(
   database: D1Database,
   input: {

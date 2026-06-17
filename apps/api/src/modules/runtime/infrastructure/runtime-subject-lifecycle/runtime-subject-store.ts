@@ -28,6 +28,7 @@ export {
   markRuntimeSubjectFailed,
   markRuntimeSubjectOperationStarted,
   markRuntimeSubjectOperationRepairNeeded,
+  preemptRuntimeSubjectActivationClaim,
   markRuntimeSubjectRestoreApplied,
   markRuntimeSubjectRestoring,
 } from "./runtime-subject-record-store";
