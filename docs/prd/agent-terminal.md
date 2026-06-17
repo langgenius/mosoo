@@ -50,14 +50,14 @@ A Cattle owner who wants to inspect task execution → goes to the **Logs tab** 
 
 **Keeping a Terminal entry point (even with a tooltip) would give Cattle owners the false expectation that "I can go into the sandbox and tinker."** Opening it would hit a generic error — a worse experience than "never seeing the entry point at all."
 
-> ⚠️ This conflicts with the [`./agent-type.md`](./agent-type.md) decision that the Debug nav is identical across Pet and Cattle (see the user-journey Run row "Both have consistent nav (Dev / Preview / Logs / Cost / Debug ▾)" and the After diagram node "Cattle: Reset agent-state ✗ / Debug ✓ same as Pet"). That decision prioritized nav consistency to avoid drift; the Terminal is now specialized as a "honest UX fit > nav consistency" exception. The agent-type PRD needs a drift note that references this PRD.
+> ⚠️ Earlier [`./agent-type.md`](./agent-type.md) planned a consistent **Debug ▾ dropdown** across Pet and Cattle (the user-journey Run row "Dev / Preview / Logs / Cost / Debug ▾" and the After diagram node "Cattle: Debug ✓ same as Pet"). As of #49 the Debug dropdown was removed and **Terminal is now a flat tab in the editor toolbar**; as designed in this PRD it is shown for Pet but hidden for Cattle, so the nav is no longer identical across kinds. agent-type.md has been updated to reflect this Terminal exception.
 
 ---
 
 ## A day in the life of Terminal usage (Pet owner)
 
 ```
-09:15  Bob opens Pet agent X → Debug → Terminal
+09:15  Bob opens Pet agent X → Terminal tab
        Sees that tail -f /workspace/logs/agent.log is still running
        The cursor is still where it was last evening (CF replay restores it automatically)
 
@@ -86,7 +86,7 @@ A Cattle owner who wants to inspect task execution → goes to the **Logs tab** 
 
 A Pet owner **runs through this journey 3-10 times a day**, scaled by the number of Pet agents per team × the number of Pet owners.
 
-> Cattle agent owners don't see a Terminal entry in the Debug menu; to inspect session behavior they go to the Logs tab.
+> Cattle agent owners don't see the Terminal tab in the editor toolbar; to inspect session behavior they go to the Logs tab.
 
 ---
 
@@ -116,7 +116,7 @@ A sandbox that hasn't been used in a week will hibernate; after you click Termin
 
 ### (+1) Cattle does not show a Terminal entry
 
-A Cattle agent's Debug menu does not render the Terminal item. Cattle owners never see this entry point, which avoids creating a false expectation.
+A Cattle agent does not render the Terminal tab in the editor toolbar. Cattle owners never see this entry point, which avoids creating a false expectation.
 
 ---
 

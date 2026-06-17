@@ -43,7 +43,7 @@ When this is done, the Builder should be able to:
 - **U2**: see the kind selector at the top of Configure at a glance, alongside a one-line scenario description and a comparison table — and choose correctly without relying on external docs.
 - **U3**: switch the kind freely before the first Publish; after Publish the kind is locked and switching requires a Fork.
 - **U4**: see the Locked state and the Fork path after Agent Exposure, feeling exactly consistent with the runtime/status lock behavior.
-- **U5**: see kind-aware content in the Iterate phase (Logs / Cost / Settings / Debug), while 90% of the Studio shape is shared.
+- **U5**: see kind-aware content in the Iterate phase (Logs / Cost / Settings / Terminal), while 90% of the Studio shape is shared.
 - **U6**: have API consumers consume both kinds through the same session product semantics; the only difference shows up in sandbox lifecycle and state continuity.
 
 ---
@@ -74,7 +74,7 @@ When this is done, the Builder should be able to:
 | Configure                               | Fill in Identity / Model / System Prompt / Skills / MCP                                                               | Standard Studio shape (shared by Pet/Cattle)                                                                | Smooth       |
 | Test                                    | Click "Test in Chat" → enter Preview                                                                                  | Multi-turn conversation; **kind can still be switched freely during Draft**, with no side effects           | Anticipation |
 | Publish                                 | Click "Publish" → configure Agent Exposure                                                                            | Single-step dialog: Pet/Cattle copy explains exposure and the kind lock                                     | Decisive     |
-| Run                                     | View sessions / Logs / Cost / Debug                                                                                   | Both have consistent nav (Dev / Preview / Logs / Cost / Debug ▾)                                            | In control   |
+| Run                                     | View sessions / Logs / Cost / Terminal                                                                                | Shared nav (Dev / Preview / Logs / Cost); the Terminal tab is shown for Pet but hidden for Cattle — see [`./agent-terminal.md`](./agent-terminal.md) | In control   |
 | Discover a wrong choice                 | Click the locked kind card                                                                                            | Fork confirmation: clearly lists ✓ what carries over / ✗ what is lost / ⓘ what stays in place               | Alert        |
 | Change your mind (before first Publish) | Switch the kind directly                                                                                              | No confirmation, free switch, including after Test in Chat                                                  | Smooth       |
 
@@ -97,8 +97,8 @@ flowchart LR
     A2 --> A3{Pet or Cattle?}
     A3 -->|Pet| A4[Sandbox = agent:agentId<br/>+ Backup/Restore continuity]
     A3 -->|Cattle| A5[Sandbox = session:sessionId<br/>no Agent-level stable state]
-    A4 --> A6[Pet: Reset agent-state ✓<br/>Debug ✓]
-    A5 --> A7[Cattle: Reset agent-state ✗<br/>Debug ✓ same as Pet]
+    A4 --> A6[Pet: Reset agent-state ✓<br/>Terminal ✓]
+    A5 --> A7[Cattle: Reset agent-state ✗<br/>Terminal hidden, see agent-terminal.md]
     A6 --> A8[Pet Publish: Agent Exposure settings<br/>kind locked]
     A7 --> A9[Cattle Publish: Agent Exposure settings<br/>kind locked]
   end
