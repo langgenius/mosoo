@@ -54,6 +54,7 @@ import {
   markRuntimeSubjectActive,
   markRuntimeSubjectRestoreApplied,
   markRuntimeSubjectRestoring,
+  preemptRuntimeSubjectActivationClaim,
   recordRuntimeConversationSessionActive,
   recordRuntimeConversationSessionClosed,
   recordRuntimeConversationSessionError,
@@ -64,6 +65,11 @@ import type { ReadyRuntimeSubjectBackupRecord } from "./runtime-subject-store";
 const RUNTIME_SUBJECT_ACTIVATION_CLAIM_TTL_MS = 10 * 60_000;
 const RUNTIME_SUBJECT_ACTIVATION_CLAIM_WAIT_MAX_MS = 8_000;
 const RUNTIME_SUBJECT_ACTIVATION_CLAIM_POLL_INTERVAL_MS = 250;
+const INTERACTIVE_ACTIVATION_CLAIM_OWNER_PREFIX = "interactive-activation-";
+const PREWARM_ACTIVATION_CLAIM_OWNER_PREFIX = "prewarm-activation-";
+const MAINTENANCE_CLAIM_OWNER_PREFIXES = ["scheduled-", "immediate-"] as const;
+
+export type RuntimeSubjectActivationPurpose = "interactive" | "prewarm";
 
 export interface ActivateRuntimeSubjectInput {
   readonly executionOwnerUserId: AccountId;
@@ -71,6 +77,7 @@ export interface ActivateRuntimeSubjectInput {
   readonly onSpaceMountFailed?: (alias: SpaceAliasBinding, error: unknown) => Promise<void>;
   readonly onSpaceMountSucceeded?: (alias: SpaceAliasBinding) => Promise<void>;
   readonly diagnosticContext?: RuntimeDiagnosticContext;
+  readonly purpose?: RuntimeSubjectActivationPurpose;
   readonly runtimeSubjectId: SandboxId;
   readonly spaceAliases: SpaceAliasBinding[];
   readonly subjectId: PlatformId;
@@ -96,6 +103,33 @@ function hasActiveRuntimeSubjectClaim(
 ): boolean {
   return (
     record.claimOwner !== null && record.claimExpiresAt !== null && record.claimExpiresAt > now
+  );
+}
+
+function createRuntimeSubjectActivationClaimOwner(
+  purpose: RuntimeSubjectActivationPurpose,
+): string {
+  const prefix =
+    purpose === "prewarm"
+      ? PREWARM_ACTIVATION_CLAIM_OWNER_PREFIX
+      : INTERACTIVE_ACTIVATION_CLAIM_OWNER_PREFIX;
+
+  return `${prefix}${crypto.randomUUID()}`;
+}
+
+function isPrewarmActivationClaim(record: RuntimeSubjectActivationRecord): boolean {
+  return record.claimOwner?.startsWith(PREWARM_ACTIVATION_CLAIM_OWNER_PREFIX) ?? false;
+}
+
+function isClaimableRuntimeSubjectStatus(record: RuntimeSubjectActivationRecord): boolean {
+  return record.status === "active" || record.status === "cold" || record.status === "error";
+}
+
+function isUnstartedMaintenanceClaim(record: RuntimeSubjectActivationRecord): boolean {
+  return (
+    record.status === "active" &&
+    record.claimOwner !== null &&
+    MAINTENANCE_CLAIM_OWNER_PREFIXES.some((prefix) => record.claimOwner?.startsWith(prefix))
   );
 }
 
@@ -140,9 +174,10 @@ export class RuntimeSubjectLifecycleService {
   }
 
   async activate(input: ActivateRuntimeSubjectInput): Promise<ActiveRuntimeSubject> {
-    const claimOwner = `activation-${crypto.randomUUID()}`;
+    const purpose = input.purpose ?? "interactive";
+    const claimOwner = createRuntimeSubjectActivationClaimOwner(purpose);
     const record = await measureOptional(input.timing, "runtimeSubject.admitLifecycle", () =>
-      this.#admitActivation(input, claimOwner),
+      this.#admitActivation(input, claimOwner, purpose),
     );
     const subject = await this.getHandle(input.runtimeSubjectId);
     const isCold = record === null || record.status === "cold";
@@ -311,6 +346,7 @@ export class RuntimeSubjectLifecycleService {
   async #admitActivation(
     input: ActivateRuntimeSubjectInput,
     claimOwner: string,
+    purpose: RuntimeSubjectActivationPurpose,
   ): Promise<RuntimeSubjectActivationRecord | null> {
     const now = currentTimestampMs();
     const claimExpiresAt = now + RUNTIME_SUBJECT_ACTIVATION_CLAIM_TTL_MS;
@@ -345,6 +381,7 @@ export class RuntimeSubjectLifecycleService {
         claimExpiresAt,
         claimOwner,
         now,
+        purpose,
         record: createdByAnotherActivation,
       });
     }
@@ -354,6 +391,7 @@ export class RuntimeSubjectLifecycleService {
       claimExpiresAt,
       claimOwner,
       now,
+      purpose,
       record,
     });
   }
@@ -363,6 +401,7 @@ export class RuntimeSubjectLifecycleService {
     readonly claimExpiresAt: number;
     readonly claimOwner: string;
     readonly now: number;
+    readonly purpose: RuntimeSubjectActivationPurpose;
     readonly record: RuntimeSubjectActivationRecord;
   }): Promise<RuntimeSubjectActivationRecord> {
     let record = input.record;
@@ -373,6 +412,23 @@ export class RuntimeSubjectLifecycleService {
 
     if (record.status === "backing_up" || record.status === "destroying") {
       throw new Error("Runtime subject is busy with lifecycle maintenance.");
+    }
+
+    if (this.#canPreemptRuntimeSubjectClaim(input, record, "prewarm_only")) {
+      const preempted = await this.#preemptRuntimeSubjectClaim(input, record);
+
+      if (preempted) {
+        return record;
+      }
+
+      const refreshed = await getRuntimeSubjectActivationRecord(
+        this.#bindings.DB,
+        input.activation.runtimeSubjectId,
+      );
+      if (!refreshed) {
+        throw new Error("Runtime subject activation could not refresh the lifecycle record.");
+      }
+      record = refreshed;
     }
 
     // A concurrent activation can hold the claim through `cold` / `restoring` for tens of
@@ -408,6 +464,14 @@ export class RuntimeSubjectLifecycleService {
     }
 
     if (hasActiveRuntimeSubjectClaim(record, currentTimestampMs())) {
+      const preempted = this.#canPreemptRuntimeSubjectClaim(input, record, "all_low_priority")
+        ? await this.#preemptRuntimeSubjectClaim(input, record)
+        : false;
+
+      if (preempted) {
+        return record;
+      }
+
       throw new Error("Runtime subject is claimed by lifecycle maintenance.");
     }
 
@@ -431,6 +495,55 @@ export class RuntimeSubjectLifecycleService {
     }
 
     return record;
+  }
+
+  #canPreemptRuntimeSubjectClaim(
+    input: {
+      readonly purpose: RuntimeSubjectActivationPurpose;
+    },
+    record: RuntimeSubjectActivationRecord,
+    mode: "all_low_priority" | "prewarm_only",
+  ): boolean {
+    if (
+      input.purpose !== "interactive" ||
+      record.claimOwner === null ||
+      record.claimExpiresAt === null
+    ) {
+      return false;
+    }
+
+    if (!isClaimableRuntimeSubjectStatus(record)) {
+      return false;
+    }
+
+    if (isPrewarmActivationClaim(record)) {
+      return true;
+    }
+
+    return mode === "all_low_priority" && isUnstartedMaintenanceClaim(record);
+  }
+
+  async #preemptRuntimeSubjectClaim(
+    input: {
+      readonly activation: ActivateRuntimeSubjectInput;
+      readonly claimExpiresAt: number;
+      readonly claimOwner: string;
+    },
+    record: RuntimeSubjectActivationRecord,
+  ): Promise<boolean> {
+    if (record.claimOwner === null || record.claimExpiresAt === null) {
+      return false;
+    }
+
+    return preemptRuntimeSubjectActivationClaim(this.#bindings.DB, {
+      claimExpiresAt: input.claimExpiresAt,
+      claimOwner: input.claimOwner,
+      expectedClaimExpiresAt: record.claimExpiresAt,
+      expectedClaimOwner: record.claimOwner,
+      expectedStatus: record.status,
+      now: currentTimestampMs(),
+      runtimeSubjectId: input.activation.runtimeSubjectId,
+    });
   }
 
   async #restoreLastBackup(input: {

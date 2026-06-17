@@ -1,12 +1,17 @@
 import { describe, expect, test } from "bun:test";
 
 import { decideRuntimeSubjectTransition } from "../src/modules/runtime/domain/runtime-subject-lifecycle.machine";
+import { createRuntimeSubjectLifecycleService } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
 import {
   advanceRuntimeSubjectOperationStatus,
   markRuntimeSubjectCold,
   markRuntimeSubjectOperationStarted,
 } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
+import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
+import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
+
+const RUNTIME_SUBJECT_ID = "01J0000000000000000000000D";
 
 function createRuntimeSubjectLifecycleDatabase(): SqliteD1Database {
   const database = new SqliteD1Database();
@@ -31,6 +36,18 @@ function createRuntimeSubjectLifecycleDatabase(): SqliteD1Database {
       status_source text DEFAULT 'system' NOT NULL,
       updated_at integer NOT NULL
     );
+
+    CREATE TABLE sandbox_backup (
+      created_at integer NOT NULL,
+      dir text NOT NULL,
+      error_message text,
+      id text PRIMARY KEY NOT NULL,
+      keep integer NOT NULL,
+      sandbox_id text NOT NULL,
+      status text NOT NULL,
+      ttl_seconds integer NOT NULL,
+      updated_at integer NOT NULL
+    );
   `);
 
   return database;
@@ -39,6 +56,8 @@ function createRuntimeSubjectLifecycleDatabase(): SqliteD1Database {
 async function insertRuntimeSubject(
   database: D1Database,
   input: {
+    readonly lastError?: string | null;
+    readonly lastErrorCode?: string | null;
     readonly status: string;
     readonly statusSeq?: number;
   },
@@ -68,12 +87,12 @@ async function insertRuntimeSubject(
     .bind(
       null,
       null,
-      "01J0000000000000000000000D",
+      RUNTIME_SUBJECT_ID,
       1,
       "cattle",
       null,
-      null,
-      null,
+      input.lastError ?? null,
+      input.lastErrorCode ?? null,
       null,
       input.status,
       `runtime_subject.${input.status === "backing_up" ? "back_up" : input.status}`,
@@ -95,7 +114,7 @@ async function readRuntimeSubject(database: D1Database): Promise<{
       `
         SELECT status, status_event, status_seq, status_source
         FROM sandbox
-        WHERE id = '01J0000000000000000000000D'
+        WHERE id = '${RUNTIME_SUBJECT_ID}'
       `,
     )
     .first<{
@@ -110,6 +129,39 @@ async function readRuntimeSubject(database: D1Database): Promise<{
   }
 
   return row;
+}
+
+function createSandboxHandle(): SandboxHandle {
+  const unavailable = async () => {
+    throw new Error("Unexpected sandbox test method call.");
+  };
+
+  return {
+    createBackup: unavailable,
+    createSession: unavailable,
+    deleteSession: unavailable,
+    destroy: unavailable,
+    exec: unavailable,
+    getSession: unavailable,
+    mkdir: async () => {},
+    mountBucket: unavailable,
+    readFile: unavailable,
+    restoreBackup: unavailable,
+    setKeepAlive: async () => {},
+    startProcess: unavailable,
+    terminal: unavailable,
+    watch: unavailable,
+    writeFile: unavailable,
+    wsConnect: unavailable,
+  } as SandboxHandle;
+}
+
+function createBindings(database: D1Database): ApiBindings {
+  return {
+    DB: database,
+    SANDBOX_FILE_BUCKET_LOCAL: "true",
+    runtimeSubjectHandleFactory: () => createSandboxHandle(),
+  } as unknown as ApiBindings;
 }
 
 describe("runtime subject lifecycle machine", () => {
@@ -181,6 +233,101 @@ describe("runtime subject lifecycle machine", () => {
       status_event: "runtime_subject.active",
       status_seq: 7,
       status_source: "test",
+    });
+  });
+
+  test("lets interactive activation preempt best-effort prewarm activation claims", async () => {
+    const database = createRuntimeSubjectLifecycleDatabase();
+    await insertRuntimeSubject(database, { status: "cold" });
+    await database
+      .prepare(
+        `
+          UPDATE sandbox
+          SET claim_owner = ?, claim_expires_at = ?
+          WHERE id = ?
+        `,
+      )
+      .bind("prewarm-activation-stalled", Date.now() + 60_000, RUNTIME_SUBJECT_ID)
+      .run();
+
+    const activation = await createRuntimeSubjectLifecycleService(
+      createBindings(database),
+    ).activate({
+      executionOwnerUserId: "01J00000000000000000000002",
+      kind: "cattle",
+      runtimeSubjectId: RUNTIME_SUBJECT_ID,
+      spaceAliases: [],
+      subjectId: "01J00000000000000000000009",
+      subjectKind: "session",
+    });
+
+    expect(activation.subject).toBeTruthy();
+    const row = await database
+      .prepare(
+        `
+          SELECT claim_expires_at, claim_owner, status
+          FROM sandbox
+          WHERE id = ?
+        `,
+      )
+      .bind(RUNTIME_SUBJECT_ID)
+      .first<{
+        claim_expires_at: number | null;
+        claim_owner: string | null;
+        status: string;
+      }>();
+
+    expect(row).toEqual({
+      claim_expires_at: null,
+      claim_owner: null,
+      status: "active",
+    });
+  });
+
+  test("lets interactive activation retry after activation failures", async () => {
+    const database = createRuntimeSubjectLifecycleDatabase();
+    await insertRuntimeSubject(database, {
+      lastError: "Runtime subject filesystem prepare timed out after 15000ms.",
+      lastErrorCode: "runtime.subject_activation_failed",
+      status: "error",
+      statusSeq: 7,
+    });
+
+    const activation = await createRuntimeSubjectLifecycleService(
+      createBindings(database),
+    ).activate({
+      executionOwnerUserId: "01J00000000000000000000002",
+      kind: "cattle",
+      runtimeSubjectId: RUNTIME_SUBJECT_ID,
+      spaceAliases: [],
+      subjectId: "01J00000000000000000000009",
+      subjectKind: "session",
+    });
+
+    expect(activation.subject).toBeTruthy();
+    const row = await database
+      .prepare(
+        `
+          SELECT claim_expires_at, claim_owner, last_error, last_error_code, status
+          FROM sandbox
+          WHERE id = ?
+        `,
+      )
+      .bind(RUNTIME_SUBJECT_ID)
+      .first<{
+        claim_expires_at: number | null;
+        claim_owner: string | null;
+        last_error: string | null;
+        last_error_code: string | null;
+        status: string;
+      }>();
+
+    expect(row).toEqual({
+      claim_expires_at: null,
+      claim_owner: null,
+      last_error: null,
+      last_error_code: null,
+      status: "active",
     });
   });
 });
