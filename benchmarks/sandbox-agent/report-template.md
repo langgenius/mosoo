@@ -12,6 +12,7 @@
 | Agent profile            | Default/simple Agent, no Skills/MCP/Spaces |
 | Runtime                  |                                            |
 | Cloudflare account check |                                            |
+| Suite(s)                 |                                            |
 | Total cases              |                                            |
 | Success rate             |                                            |
 | p50 first assistant text |                                            |
@@ -38,6 +39,15 @@
 | `long_context`         |          |         |                   |                   |              |              |       |
 | `event_stream`         |          |         |                   |                   |              |              |       |
 | `thread_lifecycle`     |          |         |                   |                   |              |              |       |
+| `benchmark_mmlu_cs`    |          |         |                   |                   |              |              |       |
+| `benchmark_gpqa_science` |        |         |                   |                   |              |              |       |
+| `benchmark_gsm8k_reasoning` |    |         |                   |                   |              |              |       |
+| `benchmark_humaneval_code` |      |         |                   |                   |              |              |       |
+| `benchmark_mbpp_python` |         |         |                   |                   |              |              |       |
+| `benchmark_swe_patch`  |          |         |                   |                   |              |              |       |
+| `benchmark_bfcl_tool_call` |      |         |                   |                   |              |              |       |
+| `benchmark_ifeval_constraints` | |         |                   |                   |              |              |       |
+| `benchmark_json_extraction` |    |         |                   |                   |              |              |       |
 
 ## Failures
 
@@ -51,6 +61,7 @@
 - Warm continuation signal:
 - Streaming signal:
 - Lifecycle/API control signal:
+- Benchmark-lite score:
 - Main bottleneck hypothesis:
 
 ## Follow-ups
