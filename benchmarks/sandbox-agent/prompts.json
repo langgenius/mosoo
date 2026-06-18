@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "defaultScenarios": [
+    "smoke_first_turn",
+    "same_thread_followup",
+    "structured_output",
+    "long_context",
+    "event_stream",
+    "thread_lifecycle"
+  ],
+  "scenarios": [
+    {
+      "id": "smoke_first_turn",
+      "category": "runtime",
+      "mode": "create_thread",
+      "title": "First turn baseline",
+      "expectedToken": "BENCH_SMOKE_OK",
+      "prompt": "Reply with exactly {{expectedToken}}. Do not use tools. Do not add any other text.",
+      "description": "Measures a cold or warm first run from thread creation to the first assistant token and terminal run status."
+    },
+    {
+      "id": "same_thread_followup",
+      "category": "runtime",
+      "mode": "followup",
+      "title": "Same-thread follow-up",
+      "setupToken": "BENCH_FOLLOWUP_SETUP_OK",
+      "setupPrompt": "Reply with exactly {{setupToken}}. Do not use tools. Do not add any other text.",
+      "expectedToken": "BENCH_FOLLOWUP_OK",
+      "prompt": "This is a same-thread follow-up. Reply with exactly {{expectedToken}}. Do not use tools. Do not add any other text.",
+      "description": "Measures continuation in an existing thread after one completed run."
+    },
+    {
+      "id": "structured_output",
+      "category": "output",
+      "mode": "create_thread",
+      "title": "Structured response",
+      "expectedToken": "BENCH_JSON_OK",
+      "prompt": "Return one compact JSON object with exactly these keys: status, token, note. Set token to {{expectedToken}}. Do not wrap the JSON in Markdown.",
+      "description": "Checks whether a simple default agent can produce constrained structured output without tool use."
+    },
+    {
+      "id": "long_context",
+      "category": "input",
+      "mode": "create_thread",
+      "title": "Long prompt handling",
+      "expectedToken": "BENCH_LONG_CONTEXT_OK",
+      "prompt": "Read the repeated context below, ignore its noise, and reply with exactly {{expectedToken}}. Do not use tools.\\n\\n{{longContext}}",
+      "description": "Exercises larger prompt input while keeping the expected output deterministic."
+    },
+    {
+      "id": "event_stream",
+      "category": "streaming",
+      "mode": "stream",
+      "title": "SSE event stream",
+      "expectedToken": "BENCH_STREAM_OK",
+      "prompt": "Reply with exactly {{expectedToken}}. Do not use tools. Do not add any other text.",
+      "description": "Measures Thread event stream delivery from create-thread acceptance to token arrival."
+    },
+    {
+      "id": "thread_lifecycle",
+      "category": "public-api",
+      "mode": "lifecycle",
+      "title": "Thread lifecycle",
+      "expectedToken": "BENCH_LIFECYCLE_OK",
+      "prompt": "Reply with exactly {{expectedToken}}. Do not use tools. Do not add any other text.",
+      "description": "Covers retrieve, list, archive, unarchive, and delete around a completed simple run."
+    },
+    {
+      "id": "interrupt_run",
+      "category": "resilience",
+      "mode": "interrupt",
+      "title": "User interrupt",
+      "expectedToken": "BENCH_INTERRUPT_STARTED",
+      "prompt": "Begin a deliberately verbose answer. First print {{expectedToken}}, then continue with a long numbered list from 1 to 200. Do not use tools.",
+      "description": "Optional resilience case that sends user_interrupt shortly after run acceptance. Enable explicitly with --scenario interrupt_run."
+    }
+  ]
+}
