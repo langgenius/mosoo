@@ -39,6 +39,18 @@ Run the default benchmark set:
 just bench-sandbox-agent --repeat 3 --concurrency 1
 ```
 
+Run the public-benchmark-inspired suite:
+
+```bash
+just bench-sandbox-agent --suite benchmark_lite --repeat 1 --concurrency 1
+```
+
+Run the default runtime/API checks plus the benchmark-inspired suite:
+
+```bash
+just bench-sandbox-agent --suite full --repeat 1 --concurrency 1
+```
+
 Artifacts are written under `outputs/sandbox-agent-bench/<run-id>/` by default:
 
 - `results.json`: full machine-readable result set.
@@ -69,6 +81,12 @@ just bench-sandbox-agent-preflight
 # Run defaults once.
 just bench-sandbox-agent
 
+# Run benchmark-inspired cases only.
+just bench-sandbox-agent --suite benchmark_lite
+
+# Run defaults plus benchmark-inspired cases.
+just bench-sandbox-agent --suite full
+
 # Repeat each default scenario 5 times with two concurrent cases.
 just bench-sandbox-agent --repeat 5 --concurrency 2
 
@@ -96,6 +114,17 @@ Use these fields first:
 - `tokenCompletedMs`: time until the expected token is observed.
 - `completedMs`: time until a terminal run status is observed after the token.
 - `terminalRunStatus`: terminal run status if observed.
+
+Suites:
+
+- `default`: six runtime/API scenarios that keep the Agent simple and measure dispatch, sandbox startup, streaming, follow-up, structured output, long input, and Thread lifecycle behavior.
+- `benchmark_lite`: nine public benchmark-inspired prompts covering MMLU-style knowledge, GPQA-style science reasoning, GSM8K-style arithmetic, HumanEval/MBPP-style coding, SWE-bench-style patch reasoning, BFCL-style function-call planning, IFEval-style instruction constraints, and structured extraction.
+- `full`: `default` plus `benchmark_lite`.
+
+The `benchmark_lite` suite is intentionally not a formal reproduction of those public
+leaderboards. It uses compact original prompts and deterministic token scoring so this
+harness can keep measuring sandbox execution success and latency. Treat the score as a
+Mosoo sandbox regression signal, not as a comparable public model score.
 
 Layer attribution:
 
