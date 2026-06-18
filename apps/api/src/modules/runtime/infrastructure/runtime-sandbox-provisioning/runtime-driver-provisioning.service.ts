@@ -246,7 +246,6 @@ async function provisionDriver(
       buildExecutionSpec(env, {
         driverInstanceId,
         nativeResumeRef,
-        appAccessSnapshot: input.appAccessSnapshot,
         profile: input.profile,
         requestUrl: containerRequestUrl,
         resolvedMcpServers: input.resolvedMcpServers,

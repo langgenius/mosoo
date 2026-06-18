@@ -15,7 +15,6 @@ import {
   getRuntimeSubjectInactiveDeadline,
   runtimeCheckpointRulesInclude,
 } from "../../domain/runtime-kind-policy";
-import { buildAppAccessSnapshotFromAliases } from "../../domain/sandbox-layout";
 import type { RuntimeConversationSessionRecord } from "../runtime-subject-lifecycle/runtime-subject-store";
 import {
   ensureRuntimeConversationSessionRecord,
@@ -26,11 +25,7 @@ import {
   recordRuntimeConversationSessionError,
 } from "../runtime-subject-lifecycle/runtime-subject-store";
 import { ensureSessionResourcesMounted } from "../session-resources/session-resource-mount.service";
-import { ensureSandboxAliasMounts } from "./sandbox-alias-mount.service";
-import {
-  parseSandboxConversationOrigin,
-  parseSandboxConversationSpaceAliases,
-} from "./sandbox-conversation-session-codec";
+import { parseSandboxConversationOrigin } from "./sandbox-conversation-session-codec";
 import {
   deleteSandboxConversationSessionBestEffort,
   openSandboxConversationSession,
@@ -134,9 +129,6 @@ export async function ensureSandboxConversationSession(
   const frozenOrigin = existingSession
     ? parseSandboxConversationOrigin(existingSession.originJson)
     : input.origin;
-  const frozenAliases = existingSession
-    ? parseSandboxConversationSpaceAliases(existingSession.spaceAliasesJson)
-    : input.spaceAliases;
   const sessionRecord = await measureOptional(input.timing, "conversation.ensureRecord", () =>
     ensureRuntimeConversationSessionRecord(bindings.DB, {
       cwd,
@@ -144,14 +136,9 @@ export async function ensureSandboxConversationSession(
       originJson: JSON.stringify(frozenOrigin),
       runtimeSubjectId: input.sandboxId,
       sessionId: input.sessionId,
-      spaceAliasesJson: JSON.stringify(frozenAliases),
     }),
   );
   const sandboxSessionId = continuation.sandboxSessionId ?? sessionRecord.sandboxSessionId;
-  const appAccessSnapshot = buildAppAccessSnapshotFromAliases({
-    currentSnapshot: input.currentAppAccessSnapshot,
-    spaceAliases: frozenAliases,
-  });
 
   if (continuation.shouldRestoreCwd && existingSession) {
     await measureOptional(input.timing, "conversation.restoreCwd", () =>
@@ -166,10 +153,8 @@ export async function ensureSandboxConversationSession(
   if (continuation.shouldCreateCloudflareSession) {
     await measureOptional(input.timing, "conversation.prepareDirectories", () =>
       prepareSandboxConversationDirectories({
-        createSpaceRoot: frozenAliases.length > 0,
         cwd,
         sandbox: input.sandbox,
-        sessionId: input.sessionId,
       }),
     );
   }
@@ -207,14 +192,6 @@ export async function ensureSandboxConversationSession(
   const cloudflareSession = openedCloudflareSession.session;
 
   try {
-    await measureOptional(input.timing, "conversation.ensureAliasMounts", () =>
-      ensureSandboxAliasMounts({
-        aliases: frozenAliases,
-        cloudflareSession,
-        sessionId: input.sessionId,
-      }),
-    );
-
     await measureOptional(input.timing, "conversation.activateRecord", () =>
       recordRuntimeConversationSessionActive(bindings.DB, {
         sandboxSessionId,
@@ -223,14 +200,11 @@ export async function ensureSandboxConversationSession(
         originJson: JSON.stringify(frozenOrigin),
         runtimeSubjectId: input.sandboxId,
         sessionId: input.sessionId,
-        spaceAliasesJson: JSON.stringify(frozenAliases),
       }),
     );
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : "Sandbox alias mount failed during session creation.";
+      error instanceof Error ? error.message : "Sandbox conversation session activation failed.";
 
     await recordRuntimeConversationSessionError(bindings.DB, {
       sandboxSessionId,
@@ -241,7 +215,6 @@ export async function ensureSandboxConversationSession(
       originJson: JSON.stringify(frozenOrigin),
       runtimeSubjectId: input.sandboxId,
       sessionId: input.sessionId,
-      spaceAliasesJson: JSON.stringify(frozenAliases),
     });
 
     disposeRpcResource(cloudflareSession);
@@ -252,9 +225,7 @@ export async function ensureSandboxConversationSession(
     cloudflareSession,
     sandboxSessionId,
     cwd,
-    appAccessSnapshot,
     origin: frozenOrigin,
-    spaceAliases: frozenAliases,
   };
 }
 

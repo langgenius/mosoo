@@ -43,7 +43,6 @@ export const IMPORT_AGENT_PACKAGE_MUTATION = graphql(/* GraphQL */ `
         summary {
           boundMcpServerCount
           boundSkillCount
-          boundSpaceCount
           copiedAssetCount
           createdMcpServerCount
           reusedMcpServerCount
@@ -73,7 +72,6 @@ export const CREATE_AGENT_FORK_MUTATION = graphql(/* GraphQL */ `
         summary {
           boundMcpServerCount
           boundSkillCount
-          boundSpaceCount
           copiedAssetCount
           createdMcpServerCount
           reusedMcpServerCount

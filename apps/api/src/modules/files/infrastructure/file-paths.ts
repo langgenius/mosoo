@@ -3,12 +3,13 @@ import {
   createFileObjectKey as createContractFileObjectKey,
   createFileRecordObjectKey,
   createScope as createContractScope,
-  ensureSpaceFilePathHasExtension as ensureContractSpaceFilePathHasExtension,
+  createSessionArtifactPath as createContractSessionArtifactPath,
+  ensureLibraryFilePathHasExtension as ensureContractLibraryFilePathHasExtension,
   normalizeFileName as normalizeContractFileName,
-  normalizeSpaceDirectoryPath as normalizeContractSpaceDirectoryPath,
-  normalizeSpaceFilePath as normalizeContractSpaceFilePath,
+  normalizeLibraryDirectoryPath as normalizeContractLibraryDirectoryPath,
+  normalizeLibraryFilePath as normalizeContractLibraryFilePath,
 } from "@mosoo/contracts/file";
-import type { FileRecord, FileScopeKind } from "@mosoo/contracts/file";
+import type { FileRecord, FileScopeKind, FileSessionKind } from "@mosoo/contracts/file";
 import type { FileScopeId } from "@mosoo/contracts/file";
 import type { AccountId, FileId, PlatformId } from "@mosoo/id";
 
@@ -27,8 +28,9 @@ interface ObjectKeyRecord {
   id: FileId;
   name: string;
   path: string;
-  scope_id: PlatformId;
+  scope_id: PlatformId | null;
   scope_kind: FileScopeKind;
+  session_kind?: FileSessionKind | null;
 }
 
 function translatePathAdmission<T>(read: () => T): T {
@@ -44,20 +46,24 @@ export function createAttachmentPath(fileId: FileId, fileName: string): string {
   return translatePathAdmission(() => createContractAttachmentPath(fileId, fileName));
 }
 
+export function createSessionArtifactPath(fileId: FileId, fileName: string): string {
+  return translatePathAdmission(() => createContractSessionArtifactPath(fileId, fileName));
+}
+
 export function normalizeFileName(name: string): string {
   return translatePathAdmission(() => normalizeContractFileName(name));
 }
 
-export function normalizeSpaceDirectoryPath(path?: string): string {
-  return translatePathAdmission(() => normalizeContractSpaceDirectoryPath(path));
+export function normalizeLibraryDirectoryPath(path?: string | null): string {
+  return translatePathAdmission(() => normalizeContractLibraryDirectoryPath(path));
 }
 
-export function normalizeSpaceFilePath(path: string): string {
-  return translatePathAdmission(() => normalizeContractSpaceFilePath(path));
+export function normalizeLibraryFilePath(path: string): string {
+  return translatePathAdmission(() => normalizeContractLibraryFilePath(path));
 }
 
-export function ensureSpaceFilePathHasExtension(path: string): string {
-  return translatePathAdmission(() => ensureContractSpaceFilePathHasExtension(path));
+export function ensureLibraryFilePathHasExtension(path: string): string {
+  return translatePathAdmission(() => ensureContractLibraryFilePathHasExtension(path));
 }
 
 export function createStagingObjectKey(
@@ -65,7 +71,7 @@ export function createStagingObjectKey(
   scopeId: FileScopeId,
   fileId: FileId,
 ): string {
-  return `staging/${scopeKind}/${scopeId}/${fileId}`;
+  return `staging/${scopeKind}/${scopeId ?? "unscoped"}/${fileId}`;
 }
 
 export function createFinalObjectKey(file: ObjectKeyRecord | FileRecord): string {
@@ -76,6 +82,7 @@ export function createFinalObjectKey(file: ObjectKeyRecord | FileRecord): string
         name: file.name,
         path: file.path,
         scope: createContractScope(file.scope_kind, file.scope_id as FileScopeId),
+        sessionKind: file.session_kind ?? null,
       });
     }
 

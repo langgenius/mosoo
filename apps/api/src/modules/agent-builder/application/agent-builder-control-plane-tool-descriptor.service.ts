@@ -37,7 +37,7 @@ const DESCRIPTOR_BY_TOOL_ID = {
     description: "Hard-delete the active Builder preview Session without changing Manifest config.",
   }),
   search_builder_assets: descriptor("search_builder_assets", "read", {
-    description: "Search visible existing Skills, MCP servers, Spaces, and Environments.",
+    description: "Search visible existing Skills, MCP servers, and Environments.",
   }),
   show_next_action: descriptor("show_next_action", "action", {
     description: "Render a frontend button for allowed Builder workflow and control-plane actions.",

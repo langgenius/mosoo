@@ -31,7 +31,7 @@ export function OnboardingChoiceScreen({
           </div>
 
           <h2 className="text-fg-1 text-center text-[24px] font-semibold tracking-normal">
-            Set up your space
+            Set up your workspace
           </h2>
           <p className="text-muted-foreground mt-2 text-center text-sm">
             Create your first App to start using Mosoo.

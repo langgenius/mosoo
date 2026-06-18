@@ -1,6 +1,5 @@
 import { discardPromiseResult } from "@mosoo/effects";
-import type { SandboxBackupId, SandboxSessionId, SessionId } from "@mosoo/id";
-import { getSessionSpaceRootPath } from "agent-driver/paths";
+import type { SandboxBackupId, SandboxSessionId } from "@mosoo/id";
 
 import { withDisposedRpcResult } from "../../../../platform/cloudflare/rpc-disposal";
 import { withRuntimeProvisionTimeout } from "../runtime-provision-timeout";
@@ -59,20 +58,10 @@ export async function restoreSandboxConversationDirectoryBackup(
 }
 
 export async function prepareSandboxConversationDirectories(input: {
-  readonly createSpaceRoot: boolean;
   readonly cwd: string;
   readonly sandbox: SandboxHandle;
-  readonly sessionId: SessionId;
 }): Promise<void> {
-  if (!input.createSpaceRoot) {
-    await input.sandbox.mkdir(input.cwd, { recursive: true });
-    return;
-  }
-
-  await Promise.all([
-    input.sandbox.mkdir(input.cwd, { recursive: true }),
-    input.sandbox.mkdir(getSessionSpaceRootPath(input.sessionId), { recursive: true }),
-  ]);
+  await input.sandbox.mkdir(input.cwd, { recursive: true });
 }
 
 export async function deleteSandboxConversationSessionBestEffort(input: {

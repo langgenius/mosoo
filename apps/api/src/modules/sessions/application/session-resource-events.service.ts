@@ -15,7 +15,7 @@ function toSessionResourceViewFile(file: FileRecord): SessionViewFile {
     committed: true,
     createdAt: file.createdAt,
     id: file.id,
-    kind: "attachment",
+    kind: file.sessionKind ?? "attachment",
     mimeType: file.mimeType,
     name: file.name,
     size: file.size,

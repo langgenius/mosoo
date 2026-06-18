@@ -231,7 +231,6 @@ CREATE TABLE sandbox_session (
   origin_json text NOT NULL,
   sandbox_id text NOT NULL,
   session_id text PRIMARY KEY NOT NULL,
-  space_aliases_json text NOT NULL,
   status text NOT NULL,
   updated_at integer NOT NULL
 );
@@ -293,7 +292,7 @@ CREATE TABLE driver_instance (
 CREATE TABLE file_record (
   id text PRIMARY KEY NOT NULL,
   scope_kind text NOT NULL,
-  scope_id text NOT NULL,
+  scope_id text,
   session_kind text,
   status text NOT NULL,
   name text NOT NULL,

@@ -13,6 +13,7 @@ export type {
   EnvironmentId,
   EnvironmentRevisionId,
   FileId,
+  FileVersionId,
   McpOAuthFlowId,
   McpServerId,
   OrganizationId,
@@ -32,8 +33,6 @@ export type {
   SessionRunId,
   SkillId,
   SkillSnapshotId,
-  SpaceFileVersionId,
-  SpaceId,
   UploadId,
   VendorCredentialId,
 } from "@mosoo/id";

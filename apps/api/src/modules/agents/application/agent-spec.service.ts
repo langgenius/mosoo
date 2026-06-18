@@ -9,11 +9,9 @@ import type {
 import {
   accountsTable,
   agentSkillsTable,
-  agentSpaceBindingsTable,
   environmentRevisionsTable,
   environmentsTable,
   skillsTable,
-  spacesTable,
 } from "@mosoo/db";
 import type {
   CredentialId,
@@ -23,7 +21,6 @@ import type {
   AppId,
   SkillId,
   SkillSnapshotId,
-  SpaceId,
 } from "@mosoo/id";
 import { asc, eq, inArray, sql } from "drizzle-orm";
 
@@ -41,7 +38,6 @@ import {
   readNullableCredentialId,
   readNullableSkillSnapshotId,
   readSkillId,
-  readSpaceId,
 } from "./agent-platform-ids";
 import { parseAgentStoredConfig, serializeAgentStoredConfig } from "./agent-stored-config.service";
 import type { AgentRow } from "./agent-types";
@@ -76,13 +72,6 @@ export interface AgentSpecMcpBinding {
   url: string;
 }
 
-export interface AgentSpecSpaceBinding {
-  alias: string;
-  expectedName: string | null;
-  sortOrder: number;
-  spaceId: SpaceId;
-}
-
 export interface AgentSpec {
   agentId: AgentId;
   configJson: string;
@@ -102,7 +91,6 @@ export interface AgentSpec {
   providerOptions: JsonObject;
   runtimeId: string;
   skills: AgentSpecSkill[];
-  spaces: AgentSpecSpaceBinding[];
 }
 
 export interface AgentSpecMcpBindingSnapshot {
@@ -110,11 +98,6 @@ export interface AgentSpecMcpBindingSnapshot {
   credentialMode: AgentSpecMcpBinding["credentialMode"];
   enabled: boolean;
   serverId: McpServerId;
-  sortOrder: number;
-}
-
-export interface AgentSpecSpaceBindingSnapshot {
-  spaceId: SpaceId;
   sortOrder: number;
 }
 
@@ -285,66 +268,6 @@ export async function listAgentSpecMcpBindings(
   }));
 }
 
-async function listAgentSpecSpaces(
-  database: D1Database,
-  agentId: AgentId,
-): Promise<AgentSpecSpaceBinding[]> {
-  const results = await getAppDatabase(database)
-    .select({
-      name: spacesTable.name,
-      sortOrder: agentSpaceBindingsTable.sortOrder,
-      spaceId: agentSpaceBindingsTable.spaceId,
-    })
-    .from(agentSpaceBindingsTable)
-    .leftJoin(spacesTable, eq(spacesTable.id, agentSpaceBindingsTable.spaceId))
-    .where(eq(agentSpaceBindingsTable.agentId, agentId))
-    .orderBy(asc(agentSpaceBindingsTable.sortOrder), asc(agentSpaceBindingsTable.createdAt))
-    .all();
-
-  return results.map((row, index) => ({
-    alias: row.name ?? row.spaceId,
-    expectedName: row.name,
-    sortOrder: row.sortOrder ?? index,
-    spaceId: readSpaceId(row.spaceId),
-  }));
-}
-
-export async function listAgentSpecSpacesByIds(
-  database: D1Database,
-  spaceIds: readonly SpaceId[],
-): Promise<AgentSpecSpaceBinding[]> {
-  const uniqueSpaceIds = [...new Set(spaceIds)];
-
-  if (uniqueSpaceIds.length === 0) {
-    return [];
-  }
-
-  const results = await getAppDatabase(database)
-    .select({
-      name: spacesTable.name,
-      spaceId: spacesTable.id,
-    })
-    .from(spacesTable)
-    .where(inArray(spacesTable.id, uniqueSpaceIds))
-    .all();
-  const rowsBySpaceId = new Map(results.map((row) => [readSpaceId(row.spaceId), row]));
-
-  return uniqueSpaceIds.map((spaceId, index) => {
-    const row = rowsBySpaceId.get(spaceId);
-
-    if (!row) {
-      throw new Error(`Cannot bind Space ${spaceId}: Space not found.`);
-    }
-
-    return {
-      alias: row.name,
-      expectedName: row.name,
-      sortOrder: index,
-      spaceId,
-    };
-  });
-}
-
 function normalizeStoredConfigJson(input: { configJson: string }): string {
   const stored = parseAgentStoredConfig(input.configJson);
 
@@ -360,10 +283,9 @@ function normalizeStoredConfigJson(input: { configJson: string }): string {
 export async function buildAgentSpec(database: D1Database, agent: AgentRow): Promise<AgentSpec> {
   const storedConfig = parseAgentStoredConfig(agent.configJson);
   const environment = await loadAgentEnvironmentConfig(database, agent.id, agent.environmentId);
-  const [skills, registryMcpBindings, spaces, environmentManifest] = await Promise.all([
+  const [skills, registryMcpBindings, environmentManifest] = await Promise.all([
     listAgentSpecSkills(database, agent.id),
     listAgentSpecMcpBindings(database, agent.id),
-    listAgentSpecSpaces(database, agent.id),
     getAgentEnvironmentManifest(database, environment.environmentId),
   ]);
 
@@ -373,7 +295,6 @@ export async function buildAgentSpec(database: D1Database, agent: AgentRow): Pro
     environmentManifest,
     mcpBindings: registryMcpBindings,
     skills,
-    spaces,
     storedConfig,
   });
 }
@@ -384,7 +305,6 @@ function buildAgentSpecFromProfile(input: {
   environmentManifest: AgentSpec["environmentManifest"];
   mcpBindings: AgentSpecMcpBinding[];
   skills: AgentSpecSkill[];
-  spaces: AgentSpecSpaceBinding[];
   storedConfig: ReturnType<typeof parseAgentStoredConfig>;
 }): AgentSpec {
   const packageMcpBindings = input.storedConfig.packageMcpServers.map((server, index) => ({
@@ -434,7 +354,6 @@ function buildAgentSpecFromProfile(input: {
     providerOptions: input.storedConfig.providerOptions,
     runtimeId: input.agent.runtimeId,
     skills: allSkills,
-    spaces: input.spaces,
   };
 }
 
@@ -445,7 +364,6 @@ export async function buildAgentSpecForPreparedProfile(
     environment: AgentEnvironmentConfig;
     mcpBindings: AgentSpecMcpBinding[];
     skills: AgentSpecSkill[];
-    spaces: AgentSpecSpaceBinding[];
   },
 ): Promise<AgentSpec> {
   const environmentManifest = await getAgentEnvironmentManifest(
@@ -501,13 +419,6 @@ export function toAgentManifest(spec: AgentSpec): AgentManifest {
       skillName: skill.skillName,
       state: skill.state,
     })),
-    spaces: spec.spaces.map((space) => ({
-      alias: space.alias,
-      expectedName: space.expectedName,
-      mode: "read",
-      required: true,
-      spaceId: space.spaceId,
-    })),
   };
 }
 
@@ -560,13 +471,4 @@ export function toAgentSpecMcpBindingSnapshots(
       },
     ];
   });
-}
-
-export function toAgentSpecSpaceBindingSnapshots(
-  spec: Pick<AgentSpec, "spaces">,
-): AgentSpecSpaceBindingSnapshot[] {
-  return spec.spaces.map((space) => ({
-    sortOrder: space.sortOrder,
-    spaceId: space.spaceId,
-  }));
 }

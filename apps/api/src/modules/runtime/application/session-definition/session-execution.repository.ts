@@ -15,7 +15,6 @@ import type {
   SessionId,
   SkillId,
   SkillSnapshotId,
-  SpaceId,
 } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
@@ -214,19 +213,6 @@ function parseToolReference(value: unknown, index: number): SessionExecutionPlan
   };
 }
 
-function parseSpaceReference(
-  value: unknown,
-  index: number,
-): SessionExecutionPlan["spaces"][number] {
-  const field = `sessionExecutionPlan.spaces.${index}`;
-  const record = readRecord(value, field);
-
-  return {
-    sortOrder: readNumber(record["sortOrder"], `${field}.sortOrder`),
-    spaceId: readPlatformId(record["spaceId"], `${field}.spaceId`) as SpaceId,
-  };
-}
-
 function parseSessionExecutionPlanJson(planJson: string): SessionExecutionPlan {
   const parsed: unknown = JSON.parse(planJson);
   const record = readRecord(parsed, "sessionExecutionPlan");
@@ -235,7 +221,6 @@ function parseSessionExecutionPlanJson(planJson: string): SessionExecutionPlan {
     binding: parseBinding(record["binding"]),
     environment: parseEnvironment(record["environment"]),
     skills: readArray(record["skills"], "sessionExecutionPlan.skills").map(parseSkillReference),
-    spaces: readArray(record["spaces"], "sessionExecutionPlan.spaces").map(parseSpaceReference),
     tools: readArray(record["tools"], "sessionExecutionPlan.tools").map(parseToolReference),
   };
 }

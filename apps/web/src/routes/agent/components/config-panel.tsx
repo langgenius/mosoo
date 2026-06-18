@@ -173,17 +173,14 @@ function ConfigPanelContent({
             </div>
             {model.changePlan.action === "recreate-preserving-state" ? (
               <div className="text-muted-foreground mt-4 space-y-2 text-[12px] leading-relaxed">
-                <p>
-                  Spaces, network policy, and setup script can only change at container creation
-                  time.
-                </p>
+                <p>Network policy and setup script can only change at container creation time.</p>
                 <p>
                   In-flight sessions will see Agent is updating until the runtime is ready. Existing
                   sessions keep their frozen config.
                 </p>
                 <p>
-                  Preserved: agent-state is backed up before rebuild and restored after. Space files
-                  are unchanged.
+                  Preserved: agent-state is backed up before rebuild and restored after. Files are
+                  managed outside this runtime reset.
                 </p>
               </div>
             ) : null}

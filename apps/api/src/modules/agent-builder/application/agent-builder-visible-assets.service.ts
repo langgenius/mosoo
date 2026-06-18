@@ -38,7 +38,6 @@ function toDraftBindings(
     parseError: draft.parseError,
     parseStatus: draft.parseStatus,
     skillIds: draft.skillIds,
-    spaceIds: draft.spaceIds,
   };
 }
 
@@ -68,7 +67,6 @@ export function createAgentBuilderVisibleAssetProviderInput(
     bindings: input.bindings,
     boundMcpServerIds: new Set(draftBindings.mcpServerIds),
     boundSkillIds: new Set(draftBindings.skillIds),
-    boundSpaceIds: new Set(draftBindings.spaceIds),
     draft: draftBindings,
     appId: input.appId,
     viewer: input.viewer,

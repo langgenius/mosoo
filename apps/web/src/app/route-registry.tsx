@@ -41,11 +41,11 @@ const Onboarding = lazyNamed(
   async () => import("../routes/onboarding/onboarding.route"),
   "Onboarding",
 );
-const Space = lazyNamed(async () => import("../routes/spaces/spaces.route"), "SpacePage");
 const Environments = lazyNamed(
   async () => import("../routes/environments/environments.route"),
   "EnvironmentsPage",
 );
+const Files = lazyNamed(async () => import("../routes/files/files.route"), "FilesPage");
 const SkillsTabRoute = lazyNamed(
   async () => import("../routes/integrations/skills/skills-tab"),
   "SkillsTab",
@@ -113,8 +113,7 @@ const appRoutes = [
   { element: protectedRoute(<AppOverview />), path: "/" },
   { element: orgProtectedRoute(<AppsList />), path: "/apps" },
   { element: orgProtectedRoute(<OrgSettings />), path: "/org/settings" },
-  { element: protectedRoute(<Space />), path: "/space" },
-  { element: protectedRoute(<Navigate to="/space" replace />), path: "/spaces" },
+  { element: protectedRoute(<Files />), path: "/files" },
   { element: protectedRoute(<Environments />), path: "/environment" },
   { element: protectedRoute(<Environments />), path: "/environment/:environmentId" },
   { element: protectedRoute(<Navigate to="/environment" replace />), path: "/environments" },

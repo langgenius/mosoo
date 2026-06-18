@@ -4,7 +4,6 @@ export function buildSnapshotAgentEnvironment(
   input: AgentEnvironmentConfig,
 ): AgentEnvironmentConfig {
   return {
-    boundSpaceIds: [...input.boundSpaceIds],
     environmentId: input.environmentId,
   };
 }

@@ -4,7 +4,7 @@ import { createEmptyResolutionSummary } from "@mosoo/agent-package";
 import type { AgentManifest } from "@mosoo/contracts/agent-manifest";
 import { AGENT_MANIFEST_VERSION } from "@mosoo/contracts/agent-manifest";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, OrganizationId, AppId, SkillId, SpaceId } from "@mosoo/id";
+import type { AccountId, OrganizationId, AppId, SkillId } from "@mosoo/id";
 
 import { createDraftAgent } from "../src/modules/agents/application/agent-package-draft.service";
 import { resolvePackageSkills } from "../src/modules/agents/application/agent-package-resolution.service";
@@ -15,7 +15,6 @@ const DRAFT_IDS = {
   owner: parsePlatformId<AccountId>("01J00000000000000000000001"),
   app: parsePlatformId<AppId>("01J00000000000000000000002"),
   skill: parsePlatformId<SkillId>("01J00000000000000000000003"),
-  space: parsePlatformId<SpaceId>("01J00000000000000000000004"),
 } as const;
 
 function createAgentPackageDraftDatabase(): SqliteD1Database {
@@ -58,14 +57,6 @@ function createAgentPackageDraftDatabase(): SqliteD1Database {
       skill_id text NOT NULL,
       sort_order integer NOT NULL,
       PRIMARY KEY (agent_id, skill_id)
-    );
-
-    CREATE TABLE agent_space_binding (
-      agent_id text NOT NULL,
-      created_at integer NOT NULL,
-      sort_order integer NOT NULL,
-      space_id text NOT NULL,
-      PRIMARY KEY (agent_id, space_id)
     );
 
     INSERT INTO app (
@@ -161,7 +152,6 @@ describe("agent package draft", () => {
       appId: DRAFT_IDS.app,
       runtimeId: "openai-runtime",
       skillIds: [DRAFT_IDS.skill, DRAFT_IDS.skill],
-      spaceIds: [DRAFT_IDS.space],
     });
 
     expect(agent).toMatchObject({
@@ -217,7 +207,6 @@ describe("agent package draft", () => {
         appId: DRAFT_IDS.app,
         runtimeId: "openai-runtime",
         skillIds: ["package:docs" as SkillId],
-        spaceIds: [],
       }),
     ).rejects.toThrow("Agent skill ID must be a valid ULID.");
 
@@ -263,7 +252,6 @@ describe("agent package draft", () => {
           state: "active",
         },
       ],
-      spaces: [],
     };
 
     const resolution = await resolvePackageSkills({

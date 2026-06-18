@@ -66,7 +66,7 @@ export class DriverInstanceRpcHandshakeController {
     input: DriverHelloInput,
     context: DriverInstanceRpcOperationContext,
   ): Promise<DriverHelloOutput> {
-    const { env, fileWatch, state, withRuntimeLogContext } = this.#dependencies;
+    const { env, state, withRuntimeLogContext } = this.#dependencies;
 
     if (state.hello) {
       throw new Error("Driver hello has already been received.");
@@ -93,8 +93,6 @@ export class DriverInstanceRpcHandshakeController {
     if (state.traceId === null && link.traceId !== null) {
       await state.setTraceId(link.traceId);
     }
-
-    fileWatch.ensureStarted(link);
 
     withRuntimeLogContext(() => {
       logInfo("runtime.driver.hello.received", {

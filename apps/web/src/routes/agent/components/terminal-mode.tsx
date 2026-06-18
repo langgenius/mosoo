@@ -289,7 +289,7 @@ export function TerminalMode({ agent }: { agent: Agent }): ReactElement {
         <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-200" />
         <span className="min-w-0">
           Live sandbox shell. Commands run as root and can change sandbox state, including
-          /workspace, session directories, Space mounts, runtime state, and cache.
+          /workspace, session directories, Files mounts, runtime state, and cache.
         </span>
       </div>
 

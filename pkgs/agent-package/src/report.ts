@@ -56,7 +56,6 @@ export function createEmptyResolutionSummary(): AgentPackageResolutionSummary {
   return {
     boundMcpServerCount: 0,
     boundSkillCount: 0,
-    boundSpaceCount: 0,
     copiedAssetCount: 0,
     createdMcpServerCount: 0,
     reusedMcpServerCount: 0,
@@ -72,7 +71,6 @@ export function createResolutionReport(
     summary: {
       boundMcpServerCount: summary.boundMcpServerCount,
       boundSkillCount: summary.boundSkillCount,
-      boundSpaceCount: summary.boundSpaceCount,
       copiedAssetCount: summary.copiedAssetCount,
       createdMcpServerCount: summary.createdMcpServerCount,
       reusedMcpServerCount: summary.reusedMcpServerCount,

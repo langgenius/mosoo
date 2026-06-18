@@ -22,7 +22,6 @@ import type {
   SessionMessageId,
   SessionRunId,
   SkillId,
-  SpaceId,
   VendorCredentialId,
 } from "./index";
 
@@ -52,7 +51,6 @@ export const PLATFORM_ID_FIXTURES = {
   sessionMessage: fixture("01J0000000000000000000000M") as SessionMessageId,
   sessionRun: fixture("01J0000000000000000000000N") as SessionRunId,
   skill: fixture("01J0000000000000000000000P") as SkillId,
-  space: fixture("01J0000000000000000000000Q") as SpaceId,
   vendorCredential: fixture("01J0000000000000000000000R") as VendorCredentialId,
 } as const;
 

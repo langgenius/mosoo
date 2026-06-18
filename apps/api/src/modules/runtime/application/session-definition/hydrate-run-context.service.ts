@@ -38,7 +38,7 @@ import {
   ensureRuntimeSubjectId,
   getRuntimeConversationSession,
 } from "../../infrastructure/runtime-subject-lifecycle/runtime-subject-store";
-import { createAgentRuntimeProfile, resolveAgentSpaceBindings } from "../agent-runtime-profile";
+import { createAgentRuntimeProfile } from "../agent-runtime-profile";
 import {
   appendRuntimeDiagnosticEvent,
   toRuntimeDiagnosticBaseValue,
@@ -202,32 +202,20 @@ async function hydrateRunContextFromSession(
   const toolReferences = executionPlan.tools.toSorted(
     (left, right) => left.sortOrder - right.sortOrder,
   );
-  const spaceReferences = executionPlan.spaces.toSorted(
-    (left, right) => left.sortOrder - right.sortOrder,
-  );
   const snapshotEnvironment = buildSnapshotAgentEnvironment({
-    boundSpaceIds: spaceReferences.map((reference) => reference.spaceId),
     environmentId: environmentSnapshot.environmentId,
   });
-  const [agentReadiness, agentMounts] = await Promise.all([
-    computeAgentReadiness(bindings.DB, agent.ownerId, {
-      agentId: agent.id,
-      bindings,
-      environment: snapshotEnvironment,
-      mcpServerIds: toolReferences.map((reference) => reference.serverId),
-      model: binding.model,
-      packageResolution: storedConfig.packageResolution,
-      appId: agent.appId,
-      provider: binding.provider,
-      runtimeId,
-    }),
-    resolveAgentSpaceBindings(
-      bindings.DB,
-      agent.ownerId,
-      agent.appId,
-      snapshotEnvironment.boundSpaceIds,
-    ),
-  ]);
+  const agentReadiness = await computeAgentReadiness(bindings.DB, agent.ownerId, {
+    agentId: agent.id,
+    bindings,
+    environment: snapshotEnvironment,
+    mcpServerIds: toolReferences.map((reference) => reference.serverId),
+    model: binding.model,
+    packageResolution: storedConfig.packageResolution,
+    appId: agent.appId,
+    provider: binding.provider,
+    runtimeId,
+  });
 
   if (!agentReadiness.ready) {
     throw validationError(
@@ -304,7 +292,7 @@ async function hydrateRunContextFromSession(
     snapshotEnvVars,
     vendorEnvVars,
   });
-  let runtimeProfileResult: ReturnType<typeof createAgentRuntimeProfile>;
+  let profile: DriverProfileConfig;
   const runtimeProfileIds = await resolveRuntimeProfileIds(bindings, {
     agentId: agent.id,
     kind: binding.kind,
@@ -312,7 +300,7 @@ async function hydrateRunContextFromSession(
   });
 
   try {
-    runtimeProfileResult = createAgentRuntimeProfile({
+    profile = createAgentRuntimeProfile({
       agentId: agent.id,
       sandboxSessionId: runtimeProfileIds.sandboxSessionId,
       callerUserId: viewer.id,
@@ -337,7 +325,6 @@ async function hydrateRunContextFromSession(
       sandboxId: runtimeProfileIds.sandboxId,
       sessionId: session.id,
       setupScript: environmentSnapshot.setupScript,
-      spaceBindings: agentMounts,
     });
   } catch (error) {
     await appendRuntimeDiagnosticEvent(bindings, {
@@ -354,8 +341,6 @@ async function hydrateRunContextFromSession(
     });
     throw error;
   }
-  const { profile } = runtimeProfileResult;
-
   const mcpServers = await resolveRuntimeMcpServersForSnapshot(bindings, {
     agentId: agent.id,
     bindings: toolReferences.map((reference) => ({
@@ -371,7 +356,6 @@ async function hydrateRunContextFromSession(
 
   return {
     mcpServers,
-    appAccessSnapshot: runtimeProfileResult.appAccessSnapshot,
     profile,
     skillCatalog,
     skills,
@@ -422,13 +406,10 @@ async function refreshCachedRunContextVolatileFields(
   }
 
   const environmentSnapshot = executionPlan.environment;
-  const spaceReferences = executionPlan.spaces.toSorted(
-    (left, right) => left.sortOrder - right.sortOrder,
-  );
   const toolReferences = executionPlan.tools.toSorted(
     (left, right) => left.sortOrder - right.sortOrder,
   );
-  const [credential, snapshotEnvVars, agentMounts, mcpServers] = await Promise.all([
+  const [credential, snapshotEnvVars, mcpServers] = await Promise.all([
     resolveVendorApiKey({
       bindings,
       executionOwnerUserId: agent.ownerId,
@@ -440,12 +421,6 @@ async function refreshCachedRunContextVolatileFields(
       environmentId: environmentSnapshot.environmentId,
       envVars: parseStoredEnvVarsJson(environmentSnapshot.envVarsJson),
     }),
-    resolveAgentSpaceBindings(
-      bindings.DB,
-      agent.ownerId,
-      session.appId,
-      spaceReferences.map((reference) => reference.spaceId),
-    ),
     toolReferences.length > 0
       ? resolveRuntimeMcpServersForSnapshot(bindings, {
           agentId: agent.id,
@@ -480,7 +455,7 @@ async function refreshCachedRunContextVolatileFields(
     kind: binding.kind,
     sessionId: session.id,
   });
-  const runtimeProfileResult = createAgentRuntimeProfile({
+  const profile = createAgentRuntimeProfile({
     agentId: agent.id,
     sandboxSessionId: runtimeProfileIds.sandboxSessionId,
     callerUserId: viewer.id,
@@ -505,14 +480,12 @@ async function refreshCachedRunContextVolatileFields(
     sandboxId: runtimeProfileIds.sandboxId,
     sessionId: session.id,
     setupScript: environmentSnapshot.setupScript,
-    spaceBindings: agentMounts,
   });
 
   return {
     ...cached,
     mcpServers,
-    appAccessSnapshot: runtimeProfileResult.appAccessSnapshot,
-    profile: runtimeProfileResult.profile,
+    profile,
   };
 }
 

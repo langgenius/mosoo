@@ -25,14 +25,6 @@ export const InputStartCommand = type({
   commandId: NonEmptyString,
   input: RuntimeCommandInput,
   kind: '"input.start"',
-  "appAccessSnapshot?": type({
-    entries: type({
-      canWrite: "boolean",
-      mountPath: NonEmptyString,
-      spaceId: NonEmptyString,
-      type: '"space"',
-    }).array(),
-  }),
   requestId: NonEmptyString,
   runId: NonEmptyString,
 });
@@ -63,25 +55,10 @@ export const PermissionResolveCommand = type({
 });
 export type PermissionResolveCommand = typeof PermissionResolveCommand.infer;
 
-export const AccessRefreshCommand = type({
-  commandId: NonEmptyString,
-  kind: '"access.refresh"',
-  appAccessSnapshot: type({
-    entries: type({
-      canWrite: "boolean",
-      mountPath: NonEmptyString,
-      spaceId: NonEmptyString,
-      type: '"space"',
-    }).array(),
-  }),
-});
-export type AccessRefreshCommand = typeof AccessRefreshCommand.infer;
-
 export const RuntimeCommand = TurnCancelCommand.or(InputStartCommand)
   .or(McpExecuteCommand)
   .or(SessionStopCommand)
-  .or(PermissionResolveCommand)
-  .or(AccessRefreshCommand);
+  .or(PermissionResolveCommand);
 export type RuntimeCommand = typeof RuntimeCommand.infer;
 
 export const InputStartCommandResult = type({
@@ -97,13 +74,7 @@ export const McpExecuteCommandResult = type({
 });
 export type McpExecuteCommandResult = typeof McpExecuteCommandResult.infer;
 
-export const AccessRefreshCommandResult = type({
-  entryCount: "number >= 0",
-});
-export type AccessRefreshCommandResult = typeof AccessRefreshCommandResult.infer;
-
 export const RuntimeCommandResult = type("null")
-  .or(AccessRefreshCommandResult)
   .or(InputStartCommandResult)
   .or(McpExecuteCommandResult);
 export type RuntimeCommandResult = typeof RuntimeCommandResult.infer;
@@ -156,14 +127,6 @@ export const RuntimeCommandRecord = type({
       kind: '"permission.resolve"',
       payload: PermissionResolveCommand,
       result: "null",
-    }),
-  )
-  .or(
-    type({
-      ...runtimeCommandRecordBase,
-      kind: '"access.refresh"',
-      payload: AccessRefreshCommand,
-      result: type("null").or(AccessRefreshCommandResult),
     }),
   );
 export type RuntimeCommandRecord = typeof RuntimeCommandRecord.infer;

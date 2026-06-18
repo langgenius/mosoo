@@ -212,16 +212,9 @@ export const sessionSchema = /* GraphQL */ `
     sortOrder: Int!
   }
 
-  type SessionExecutionSpaceReference {
-    sessionId: ULID!
-    sortOrder: Int!
-    spaceId: ULID!
-  }
-
   type AgentSessionExecutionDiagnostics {
     binding: SessionExecutionBinding!
     skills: [SessionExecutionSkillReference!]!
-    spaces: [SessionExecutionSpaceReference!]!
     tools: [SessionExecutionToolReference!]!
   }
 
@@ -303,7 +296,7 @@ export const sessionSchema = /* GraphQL */ `
   }
 
   type FileScope {
-    id: ULID!
+    id: ULID
     kind: FileScopeKind!
   }
 
@@ -315,6 +308,7 @@ export const sessionSchema = /* GraphQL */ `
   type SessionResource {
     createdAt: String!
     id: ULID!
+    kind: FileSessionKind!
     mimeType: String
     name: String!
     path: String!

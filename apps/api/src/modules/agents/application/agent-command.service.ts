@@ -4,7 +4,6 @@ import {
   agentMcpBindingsTable,
   agentsTable,
   agentSkillsTable,
-  agentSpaceBindingsTable,
 } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type { AgentId } from "@mosoo/id";
@@ -39,15 +38,10 @@ import {
   ensureAgentSkillSelectionAccess,
   normalizeAgentSkillIds,
 } from "./agent-skill-resolution.service";
-import {
-  buildAgentSpecForPreparedProfile,
-  listAgentSpecSkillsByIds,
-  listAgentSpecSpacesByIds,
-} from "./agent-spec.service";
+import { buildAgentSpecForPreparedProfile, listAgentSpecSkillsByIds } from "./agent-spec.service";
 import { parseAgentStoredConfig, serializeAgentStoredConfig } from "./agent-stored-config.service";
 import {
   evaluateAgentRuntimeSelection,
-  ensureAgentOwnerCanReadBoundSpaces,
   enforcePublishedRuntimeStability,
   createAgentConfigChangeSnapshot,
   listAgentSkillIds,
@@ -179,13 +173,6 @@ export async function updateAgentConfig(
 
   enforcePublishedRuntimeStability(editable.agent, runtimeId);
   await ensureAgentSkillSelectionAccess(database, viewer, editable.agent.appId, skillIds);
-  await ensureAgentOwnerCanReadBoundSpaces(
-    database,
-    editable.agent.ownerId,
-    editable.agent.appId,
-    input.environment.boundSpaceIds,
-  );
-
   if (
     environmentId !== null &&
     environmentId !== "" &&
@@ -218,16 +205,12 @@ export async function updateAgentConfig(
     runtimeId,
     updatedAt: timestampMs,
   };
-  const [specSkills, specSpaces] = await Promise.all([
-    listAgentSpecSkillsByIds(database, skillIds),
-    listAgentSpecSpacesByIds(database, preparedEnvironment.environment.boundSpaceIds),
-  ]);
+  const [specSkills] = await Promise.all([listAgentSpecSkillsByIds(database, skillIds)]);
   const spec = await buildAgentSpecForPreparedProfile(database, {
     agent: nextAgent,
     environment: preparedEnvironment.environment,
     mcpBindings: preparedMcpBindings.specBindings,
     skills: specSkills,
-    spaces: specSpaces,
   });
 
   const deploymentSummary = summarizeVersionedAgentConfigChange(changePlan);
@@ -273,12 +256,6 @@ export async function updateAgentConfig(
     db.delete(agentMcpBindingsTable).where(eq(agentMcpBindingsTable.agentId, editable.agent.id)),
     ...(preparedMcpBindings.rows.length > 0
       ? [db.insert(agentMcpBindingsTable).values(preparedMcpBindings.rows)]
-      : []),
-    db
-      .delete(agentSpaceBindingsTable)
-      .where(eq(agentSpaceBindingsTable.agentId, editable.agent.id)),
-    ...(preparedEnvironment.spaceRows.length > 0
-      ? [db.insert(agentSpaceBindingsTable).values(preparedEnvironment.spaceRows)]
       : []),
   ]);
 

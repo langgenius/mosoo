@@ -10,7 +10,6 @@ import {
 } from "../../application/runtime-diagnostic-events";
 import { resolvePendingRuntimeCommands } from "./commands";
 import { runtimeSessionLinkNeedsRefresh } from "./event-types";
-import type { DriverInstanceFileWatchSupervisor } from "./file-watch-supervisor";
 import { finalizeDriverInstance } from "./lifecycle";
 import type { RuntimeSessionViewCache } from "./runtime-session-view-cache";
 import type { DriverInstanceRuntimeState } from "./runtime-state";
@@ -21,7 +20,6 @@ import { repairFinalizedTerminalDriverRunState } from "./terminal-run-release";
 interface DriverInstanceTerminalStateCoordinatorOptions {
   clearStorage: () => Promise<void>;
   env: ApiBindings;
-  fileWatch: DriverInstanceFileWatchSupervisor;
   state: DriverInstanceRuntimeState;
   viewCache: RuntimeSessionViewCache;
   viewerEventDelivery: SessionViewerEventDeliveryBuffer;
@@ -31,7 +29,6 @@ interface DriverInstanceTerminalStateCoordinatorOptions {
 export class DriverInstanceTerminalStateCoordinator {
   readonly #clearStorage: () => Promise<void>;
   readonly #env: ApiBindings;
-  readonly #fileWatch: DriverInstanceFileWatchSupervisor;
   readonly #state: DriverInstanceRuntimeState;
   readonly #viewCache: RuntimeSessionViewCache;
   readonly #viewerEventDelivery: SessionViewerEventDeliveryBuffer;
@@ -40,7 +37,6 @@ export class DriverInstanceTerminalStateCoordinator {
   constructor(options: DriverInstanceTerminalStateCoordinatorOptions) {
     this.#clearStorage = options.clearStorage;
     this.#env = options.env;
-    this.#fileWatch = options.fileWatch;
     this.#state = options.state;
     this.#viewCache = options.viewCache;
     this.#viewerEventDelivery = options.viewerEventDelivery;
@@ -53,7 +49,6 @@ export class DriverInstanceTerminalStateCoordinator {
     }
 
     this.#state.terminalized = true;
-    this.#fileWatch.stop();
     await this.#viewerEventDelivery.flushSafely();
 
     const driverInstanceId = this.#state.requireDriverInstanceId();
@@ -133,7 +128,6 @@ export class DriverInstanceTerminalStateCoordinator {
   }
 
   async destroy(reason: string): Promise<void> {
-    this.#fileWatch.stop();
     await this.#viewerEventDelivery.flushSafely();
     this.#viewerEventDelivery.resetAfterFlush();
     this.#viewCache.reset();

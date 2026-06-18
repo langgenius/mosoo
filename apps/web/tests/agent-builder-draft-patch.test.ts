@@ -41,7 +41,6 @@ function draft(): AgentEditorDraft {
         name: "Existing Skill",
       },
     ],
-    spaces: [{ id: "space_existing", name: "Existing Space" }],
   };
 }
 
@@ -172,7 +171,7 @@ describe("Agent Builder draft patch application", () => {
     expect(result.draft.name).toBe("Builder Edit");
   });
 
-  test("binds existing visible Skill and Space references", () => {
+  test("binds existing visible Skill references", () => {
     const current = draft();
     const result = applyAgentEditorBuilderPatch(current, {
       items: [
@@ -193,29 +192,12 @@ describe("Agent Builder draft patch application", () => {
           sectionId: "integrations",
           value: ["skill_existing", "skill_new"],
         },
-        {
-          autoApply: true,
-          baseDraftRevision: createDraftYamlHash(current),
-          baseValue: ["space_existing"],
-          fieldPath: "spaceIds",
-          resolvedReferences: [
-            {
-              bindingState: "not_bound",
-              id: "space_new",
-              name: "New Space",
-              targetType: "space",
-            },
-          ],
-          sectionId: "environment",
-          value: ["space_existing", "space_new"],
-        },
       ],
     });
 
     expect(result.blockedItems).toEqual([]);
-    expect(result.appliedSections).toEqual(["integrations", "environment"]);
+    expect(result.appliedSections).toEqual(["integrations"]);
     expect(result.draft.skills.map((skill) => skill.id)).toEqual(["skill_existing", "skill_new"]);
-    expect(result.draft.spaces.map((space) => space.id)).toEqual(["space_existing", "space_new"]);
   });
 
   test("binds existing visible MCP references even when auth is not ready", () => {
@@ -411,7 +393,6 @@ describe("Agent Builder draft patch application", () => {
       environmentId: "01J0000000000000000000E001",
       mcpServers: [],
       skills: [],
-      spaces: [],
     };
     const result = applyAgentEditorBuilderPatch(current, {
       items: [

@@ -53,7 +53,6 @@ export const agentSchema = /* GraphQL */ `
     provider
     runtime
     skill
-    space
   }
 
   enum AgentPackageResolutionSource {
@@ -119,7 +118,6 @@ export const agentSchema = /* GraphQL */ `
   }
 
   type AgentEnvironmentConfig {
-    boundSpaceIds: [ULID!]!
     environmentId: ULID
   }
 
@@ -158,7 +156,6 @@ export const agentSchema = /* GraphQL */ `
   type AgentPackageResolutionSummary {
     boundMcpServerCount: Int!
     boundSkillCount: Int!
-    boundSpaceCount: Int!
     copiedAssetCount: Int!
     createdMcpServerCount: Int!
     reusedMcpServerCount: Int!
@@ -325,7 +322,6 @@ export const agentSchema = /* GraphQL */ `
   }
 
   input AgentEnvironmentConfigInput {
-    boundSpaceIds: [ULID!]!
     environmentId: ULID
   }
 

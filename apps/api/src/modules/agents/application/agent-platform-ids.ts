@@ -11,7 +11,6 @@ import type {
   AppId,
   SkillId,
   SkillSnapshotId,
-  SpaceId,
 } from "@mosoo/id";
 
 export function readAccountId(value: unknown, label = "Account ID"): AccountId {
@@ -55,10 +54,6 @@ export function readSkillId(value: unknown, label = "Skill ID"): SkillId {
 
 export function readSkillSnapshotId(value: unknown, label = "Skill snapshot ID"): SkillSnapshotId {
   return parsePlatformId<SkillSnapshotId>(value, label);
-}
-
-export function readSpaceId(value: unknown, label = "Space ID"): SpaceId {
-  return parsePlatformId<SpaceId>(value, label);
 }
 
 export function readNullableCredentialId(

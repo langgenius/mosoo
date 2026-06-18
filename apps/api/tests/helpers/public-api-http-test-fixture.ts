@@ -448,7 +448,6 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
       provider: "openai",
       runtimeId: "openai-runtime",
       skillsJson: "[]",
-      spaceBindingsJson: "[]",
       summary: "Live test version",
       versionNumber: 1,
     })

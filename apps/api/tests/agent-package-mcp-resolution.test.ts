@@ -53,7 +53,6 @@ function createManifest(serverId: McpServerId): AgentManifest {
       providerOptions: {},
     },
     skills: [],
-    spaces: [],
   };
 }
 

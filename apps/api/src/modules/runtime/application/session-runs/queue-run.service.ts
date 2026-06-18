@@ -14,6 +14,7 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { toIsoString } from "../../../../time";
 import { enqueueSessionRunDispatchCommand } from "../../../api-command/application/api-command-enqueue";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
+import { fileStore } from "../../../files/application/file-store";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { insertSessionMessageRecord } from "../../../sessions/application/session-message-write.service";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
@@ -79,6 +80,13 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
   if (runtimeId === null) {
     throw new Error(`Unsupported runtime: ${input.session.runtime_id}.`);
   }
+
+  await fileStore.ensureSessionAttachments(
+    bindings,
+    input.accessViewer ?? viewer,
+    input.session.id,
+    input.attachmentIds,
+  );
 
   const createRunResult = await createSessionRunRecordIfSessionIdle(bindings.DB, {
     agentId: input.session.agent_id,

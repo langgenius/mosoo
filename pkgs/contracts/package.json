@@ -28,7 +28,6 @@
     "./session": "./src/session/session.contract.ts",
     "./session-run": "./src/session/session-run.contract.ts",
     "./skill": "./src/skill/skill.contract.ts",
-    "./space": "./src/space/space.contract.ts",
     "./validation": "./src/validation/primitives.contract.ts",
     "./vendor-credential": "./src/vendor-credential/vendor-credential.contract.ts",
     "./organization": "./src/organization/organization.contract.ts"

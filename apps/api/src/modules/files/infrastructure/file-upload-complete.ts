@@ -1,6 +1,6 @@
 import type { CompleteFileUploadRequest, CompleteFileUploadResponse } from "@mosoo/contracts/file";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, SpaceId } from "@mosoo/id";
+import type { AccountId, FileId } from "@mosoo/id";
 
 import {
   createApiWideEvent,
@@ -15,6 +15,7 @@ import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.ser
 import { FileControlError, createFileConflictError } from "./file-errors";
 import { createFinalObjectKey } from "./file-paths";
 import { ensureUploadAccess, expireUploadIfNeeded, getReadyFileByPath } from "./file-record-store";
+import { getFileScopeDescriptor } from "./file-scope-descriptor";
 import {
   buildFinalizeCopyOptions,
   completeStagingUpload,
@@ -22,15 +23,14 @@ import {
   readVerifiedStagingObject,
 } from "./file-upload-completion-steps";
 import { finalizeReadyFileRecord } from "./file-upload-finalize";
+import {
+  commitPendingFileVersionSafely,
+  createPendingFileVersion,
+  findPendingFileVersion,
+} from "./file-version-store";
+import type { PendingFileVersion } from "./file-version-store";
 import { copyObject, deleteObject, headObject, normalizeR2Etag } from "./r2-s3-client";
 import type { HeadObjectResult } from "./r2-s3-client";
-import { ensureSpaceFileWriteUnlocked } from "./space-file-lock";
-import {
-  commitPendingSpaceFileVersionSafely,
-  createPendingSpaceFileVersion,
-  findPendingSpaceFileVersion,
-} from "./space-file-version-store";
-import type { PendingSpaceFileVersion } from "./space-file-version-store";
 
 function isMatchingRecoveredFinalObject(
   finalHead: HeadObjectResult | null,
@@ -97,15 +97,6 @@ export async function completeFileUpload(
       throw createFileConflictError("A file already exists at this path.");
     }
 
-    if (upload.scope_kind === "space") {
-      await ensureSpaceFileWriteUnlocked(
-        bindings,
-        viewer,
-        parsePlatformId<SpaceId>(upload.scope_id, "file upload space ID"),
-        file.path,
-      );
-    }
-
     await completeStagingUpload({ bindings, context, request: input });
 
     const stagingHead = await readVerifiedStagingObject({ bindings, context });
@@ -117,18 +108,21 @@ export async function completeFileUpload(
       sourceEtag: stagingHead.etag,
     });
 
-    let overwrittenVersion: PendingSpaceFileVersion | null = null;
+    let overwrittenVersion: PendingFileVersion | null = null;
 
-    if (readyConflict && readyConflict.id !== file.id && upload.scope_kind === "space") {
+    if (
+      readyConflict &&
+      readyConflict.id !== file.id &&
+      getFileScopeDescriptor(upload.scope_kind).capabilities.versioning
+    ) {
       overwrittenVersion =
-        (await findPendingSpaceFileVersion(bindings.DB, {
+        (await findPendingFileVersion(bindings.DB, {
           fileId: readyConflict.id,
           path: file.path,
           reason: "overwrite",
           sourceObjectKey: readyConflict.object_key,
           version: readyConflict.version,
-        })) ??
-        (await createPendingSpaceFileVersion(bindings, readyConflict, viewerId, "overwrite"));
+        })) ?? (await createPendingFileVersion(bindings, readyConflict, viewerId, "overwrite"));
     }
 
     let finalHead: HeadObjectResult | null =
@@ -162,7 +156,7 @@ export async function completeFileUpload(
       finalHead,
       finalObjectKey,
     });
-    await commitPendingSpaceFileVersionSafely(bindings, overwrittenVersion, {
+    await commitPendingFileVersionSafely(bindings, overwrittenVersion, {
       fileId: readyConflict?.id,
       objectKey: readyConflict?.object_key,
       path: file.path,

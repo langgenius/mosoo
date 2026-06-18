@@ -44,7 +44,7 @@ function SandboxTerminal(): ReactElement {
           <span className="text-emerald-300">✓</span> runtime online · claude-opus-4.8 · streaming +
           tools
         </p>
-        <p className="text-white/45">▸ mounting Spaces · support-kb, runbooks (ro)</p>
+        <p className="text-white/45">▸ mounting session files · support-kb, runbooks (ro)</p>
         <p className="text-white/80">
           <span className="text-emerald-300">✓</span> 12 MCP tools · BYOK credentials resolved
         </p>

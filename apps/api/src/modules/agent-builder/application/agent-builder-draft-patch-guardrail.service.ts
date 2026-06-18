@@ -105,9 +105,6 @@ function applyDraftPatchToMutableYamlShape(
     case "skillIds":
       assets["skills"] = normalizeStringArray(draftPatch.value);
       return;
-    case "spaceIds":
-      assets["spaces"] = normalizeStringArray(draftPatch.value);
-      return;
   }
 }
 

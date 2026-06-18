@@ -37,7 +37,6 @@ export interface RuntimeSubjectActivationRecord {
   readonly lastErrorCode: RuntimeSubjectErrorCode | null;
   readonly lastBackup: RuntimeSubjectBackupRecord | null;
   readonly lastReadyBackup: ReadyRuntimeSubjectBackupRecord | null;
-  readonly mountedSpaceIds: ReadonlySet<string>;
   readonly status: RuntimeSubjectStatus;
 }
 
@@ -58,7 +57,6 @@ export interface RuntimeConversationSessionRecord {
   readonly latestReadyBackup: ReadyRuntimeSubjectBackupRecord | null;
   readonly originJson: string;
   readonly sandboxId: SandboxId;
-  readonly spaceAliasesJson: string;
   readonly status: SandboxSessionStatus;
 }
 

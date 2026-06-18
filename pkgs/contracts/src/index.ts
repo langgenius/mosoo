@@ -20,7 +20,6 @@ export * from "./runtime/sandbox.contract";
 export type * from "./session/session.contract";
 export * from "./session/session-run.contract";
 export type * from "./skill/skill.contract";
-export * from "./space/space.contract";
 export * from "./validation/primitives.contract";
 export type * from "./vendor-credential/vendor-credential.contract";
 export type * from "./organization/organization.contract";

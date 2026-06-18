@@ -12,7 +12,7 @@
 
 The Agent Manifest is the **declarative product configuration** of a Mosoo Agent:
 
-- It uses **a small set of stable fields** to spell out who an Agent is, which runtime it runs on, which model it uses, which system prompt it follows, and which Skills / MCP / Spaces / Environment it has installed.
+- It uses **a small set of stable fields** to spell out who an Agent is, which runtime it runs on, which model it uses, which system prompt it follows, and which Skills / MCP / Files / Environment it has installed.
 - Upstream: the Agent owner edits it through a UI form, or lets **Agent Builder** generate it.
 - Downstream: any tool — Agent Builder, the CLI, CI, a future IDE plugin — can read the same Manifest and package it into a **`.agent` file** to distribute, fork, and import across Apps, instances, and the community.
 
@@ -68,7 +68,7 @@ The real problem is not "how do we merge every vendor's fields into one," but ra
 
 ### What Agent authors can do
 
-- Define a long-lived Agent with a small set of stable fields: `kind`, runtime, model, system prompt, Skills, MCP, Environment, Spaces.
+- Define a long-lived Agent with a small set of stable fields: `kind`, runtime, model, system prompt, Skills, MCP, Environment, Files.
 - Let Agent Builder take over the complex editing work: say in natural language "give me an agent that can read Linear tickets," and Builder translates it into a Manifest patch.
 - Export the Agent as a **`.agent` package** to send to another developer, upload to the community, or fork into another App.
 - Import someone else's `.agent` package: the Manifest lands, assets are reused, and **credentials / tokens are not carried along with it**.
@@ -76,7 +76,7 @@ The real problem is not "how do we merge every vendor's fields into one," but ra
 ### What the UI makes clear
 
 - Whether this Agent **renders successfully right now** — whether the config is in effect and whether it is still running the way you last saved it.
-- When any one of model / runtime / credential / MCP / Space is unavailable, the UI **shows a clear grayed-out state** with a fix-it entry point, instead of silently swapping in a substitute for you.
+- When any one of model / runtime / credential / MCP / Files is unavailable, the UI **shows a clear grayed-out state** with a fix-it entry point, instead of silently swapping in a substitute for you.
 - When the actual state inside the Sandbox disagrees with the Manifest, there is a **clear drift indicator** — and the UI will not reverse-write over it.
 
 ### What advanced users can do
@@ -116,7 +116,7 @@ flowchart LR
 
 ## 4. The minimal common set + the "full-power VPS" mental model
 
-What we are building is the **overall unification of heterogeneous vendors** — so at the product layer the Manifest only ever appears as a **"minimal common set"**: runtime / model / system prompt / Skills / MCP / Environment / Spaces.
+What we are building is the **overall unification of heterogeneous vendors** — so at the product layer the Manifest only ever appears as a **"minimal common set"**: runtime / model / system prompt / Skills / MCP / Environment / Files.
 
 For configuration that is **not on the user's side** (vendor-private parameters, native CLI settings, login caches, reasoning_effort, performance tuning, and so on), our principles are:
 
@@ -155,10 +155,10 @@ The Manifest is a minimal common set → it is impossible to move all of the Ope
 | **Sandbox**                      | The execution environment in which the Agent actually runs. Pet uses an "Agent Sandbox"; Cattle uses a "Session Sandbox." All of the vendor's full capabilities are preserved here.                                                                         |
 | **Rendered Native Config**       | The vendor config file / startup parameters the Agent Driver renders from the Manifest. **A materialized result, not the truth.**                                                                                                                           |
 | **Drift**                        | The intent expressed by the Manifest vs. the actual state running inside the Sandbox disagree. Possible sources: you changed it in the Terminal / the vendor runtime changed it on its own / the platform failed to sync.                                   |
-| **Advanced Sandbox Mode**        | The Terminal / advanced entry point that operates the Sandbox directly. It can change native state, but **cannot break through** the Space / Credential / Network boundaries.                                                                               |
+| **Advanced Sandbox Mode**        | The Terminal / advanced entry point that operates the Sandbox directly. It can change native state, but **cannot break through** the Files / Credential / Network boundaries.                                                                               |
 | **Import / Adopt**               | Explicitly absorb certain observed config from the Sandbox back into the Manifest. **By default this never happens automatically.**                                                                                                                         |
 | **Fork Agent**                   | Take a clean copy: the Manifest + asset bindings are copied over, while runtime state / login state / session history / cost are left behind.                                                                                                               |
-| **Readiness (grayed-out state)** | When any one of runtime / model / credential / MCP / Environment / Space is unavailable, the Manifest is **kept**, but the frontend shows a clear grayed-out state + a fix-it path; it does **not** auto-swap the runtime and does not auto-swap the model. |
+| **Readiness (grayed-out state)** | When any one of runtime / model / credential / MCP / Environment / Files is unavailable, the Manifest is **kept**, but the frontend shows a clear grayed-out state + a fix-it path; it does **not** auto-swap the runtime and does not auto-swap the model. |
 | **Unavailable Model**            | A model that was selected before but is no longer in the dynamic model list. The Manifest still keeps it, the UI marks it Unavailable, and the user switches it manually.                                                                                   |
 
 ---
@@ -174,7 +174,7 @@ The Manifest is a minimal common set → it is impossible to move all of the Ope
 | Skills                                                     | Built-in capability bindings                      |                                                    ✅ |
 | MCP Servers                                                | External tool / connector bindings                |                                                    ✅ |
 | Environment                                                | Reference to a runtime container template         |                                                    ✅ |
-| Space Bindings                                             | The data spaces visible to the Agent              |                                                    ✅ |
+| File references                                            | Uploaded or packaged file references, if this Agent uses them |                                           ✅ |
 | Vendor native config (`config.toml` / `settings.json` / …) | Vendor-private                                    |                               ❌ → Sandbox / Terminal |
 | Login state / CLI cache / vendor session state             | Runtime-internal state                            | ❌ → Pet Sandbox state / Cattle Session Sandbox state |
 | Performance / auto-switching / reasoning effort            | Vendor-private preferences                        |                               ❌ → Runtime / Advanced |
@@ -190,7 +190,7 @@ The Manifest is a minimal common set → it is impossible to move all of the Ope
 | 1. Getting started        | Fill in name, description                                  | The form shows only stable product semantics                       |
 | 2. Choose runtime / model | Pick from dropdowns                                        | See the list of runtimes + models available to the current App     |
 | 3. Write the prompt       | Fill in the system prompt                                  | The platform stores the prompt as part of the Manifest             |
-| 4. Attach capabilities    | Skills / MCP / Environment / Spaces, each in its own group | Clear section boundaries, no nesting into each other               |
+| 4. Attach capabilities    | Skills / MCP / Environment / Files, each in its own group | Clear section boundaries, no nesting into each other               |
 | 5. Check readiness        | The UI validates automatically                             | Any unavailable item is grayed out with its reason + a fix-it path |
 | 6. Save / Publish         | One click                                                  | Enters the Manifest state machine: draft / preview / live          |
 
@@ -220,7 +220,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  S1["The user creates a session from the Agent"] --> S2["The platform prepares Environment / Space / Credential"]
+  S1["The user creates a session from the Agent"] --> S2["The platform prepares Environment / Files / Credential"]
   S2 --> S3["The Agent Driver renders the Manifest into the current runtime's native config"]
   S3 --> S4{"Render succeeded?"}
   S4 -->|Yes| S5["The Sandbox enters a runnable state<br/>The session starts running"]

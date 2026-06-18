@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a872b780-600b-546f-80fb-48baad1aca13",
+  "id": "b2d5b8d2-d2f2-5860-817d-7e596730df21",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_deployment_version": {
@@ -93,13 +93,6 @@
         },
         "skills_json": {
           "name": "skills_json",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "space_bindings_json": {
-          "name": "space_bindings_json",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -278,55 +271,6 @@
         "agent_skill_agent_id_skill_id_pk": {
           "columns": ["agent_id", "skill_id"],
           "name": "agent_skill_agent_id_skill_id_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "agent_space_binding": {
-      "name": "agent_space_binding",
-      "columns": {
-        "agent_id": {
-          "name": "agent_id",
-          "type": "text CHECK (\"agent_id\" = upper(\"agent_id\") AND length(\"agent_id\") = 26 AND substr(\"agent_id\", 1, 1) GLOB '[0-7]' AND \"agent_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "sort_order": {
-          "name": "sort_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "space_id": {
-          "name": "space_id",
-          "type": "text CHECK (\"space_id\" = upper(\"space_id\") AND length(\"space_id\") = 26 AND substr(\"space_id\", 1, 1) GLOB '[0-7]' AND \"space_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "agent_space_binding_agent_sort_idx": {
-          "name": "agent_space_binding_agent_sort_idx",
-          "columns": ["agent_id", "sort_order"],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "agent_space_binding_agent_id_space_id_pk": {
-          "columns": ["agent_id", "space_id"],
-          "name": "agent_space_binding_agent_id_space_id_pk"
         }
       },
       "uniqueConstraints": {},
@@ -2746,7 +2690,7 @@
           "name": "scope_id",
           "type": "text CHECK (\"scope_id\" = upper(\"scope_id\") AND length(\"scope_id\") = 26 AND substr(\"scope_id\", 1, 1) GLOB '[0-7]' AND \"scope_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "scope_kind": {
@@ -2798,22 +2742,40 @@
           "columns": ["object_key"],
           "isUnique": true
         },
-        "file_record_scope_parent_path_name_status_idx": {
-          "name": "file_record_scope_parent_path_name_status_idx",
+        "file_record_unscoped_parent_path_name_status_idx": {
+          "name": "file_record_unscoped_parent_path_name_status_idx",
+          "columns": ["scope_kind", "parent_path", "name", "status"],
+          "isUnique": true,
+          "where": "\"file_record\".\"scope_id\" IS NULL"
+        },
+        "file_record_scoped_parent_path_name_status_idx": {
+          "name": "file_record_scoped_parent_path_name_status_idx",
           "columns": ["scope_kind", "scope_id", "parent_path", "name", "status"],
           "isUnique": true
         },
-        "file_record_pending_path_idx": {
-          "name": "file_record_pending_path_idx",
-          "columns": ["scope_kind", "scope_id", "path"],
+        "file_record_unscoped_pending_path_idx": {
+          "name": "file_record_unscoped_pending_path_idx",
+          "columns": ["scope_kind", "path"],
           "isUnique": true,
-          "where": "\"file_record\".\"status\" = 'pending'"
+          "where": "\"file_record\".\"status\" = 'pending' AND \"file_record\".\"scope_id\" IS NULL"
         },
-        "file_record_ready_path_idx": {
-          "name": "file_record_ready_path_idx",
+        "file_record_scoped_pending_path_idx": {
+          "name": "file_record_scoped_pending_path_idx",
           "columns": ["scope_kind", "scope_id", "path"],
           "isUnique": true,
-          "where": "\"file_record\".\"status\" = 'ready'"
+          "where": "\"file_record\".\"status\" = 'pending' AND \"file_record\".\"scope_id\" IS NOT NULL"
+        },
+        "file_record_unscoped_ready_path_idx": {
+          "name": "file_record_unscoped_ready_path_idx",
+          "columns": ["scope_kind", "path"],
+          "isUnique": true,
+          "where": "\"file_record\".\"status\" = 'ready' AND \"file_record\".\"scope_id\" IS NULL"
+        },
+        "file_record_scoped_ready_path_idx": {
+          "name": "file_record_scoped_ready_path_idx",
+          "columns": ["scope_kind", "scope_id", "path"],
+          "isUnique": true,
+          "where": "\"file_record\".\"status\" = 'ready' AND \"file_record\".\"scope_id\" IS NOT NULL"
         },
         "file_record_governance_idx": {
           "name": "file_record_governance_idx",
@@ -2915,7 +2877,7 @@
           "name": "scope_id",
           "type": "text CHECK (\"scope_id\" = upper(\"scope_id\") AND length(\"scope_id\") = 26 AND substr(\"scope_id\", 1, 1) GLOB '[0-7]' AND \"scope_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "scope_kind": {
@@ -2964,8 +2926,8 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "space_file_version": {
-      "name": "space_file_version",
+    "file_version": {
+      "name": "file_version",
       "columns": {
         "committed": {
           "name": "committed",
@@ -3037,6 +2999,20 @@
           "notNull": true,
           "autoincrement": false
         },
+        "scope_id": {
+          "name": "scope_id",
+          "type": "text CHECK (\"scope_id\" = upper(\"scope_id\") AND length(\"scope_id\") = 26 AND substr(\"scope_id\", 1, 1) GLOB '[0-7]' AND \"scope_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "scope_kind": {
+          "name": "scope_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "size": {
           "name": "size",
           "type": "integer",
@@ -3058,13 +3034,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "space_id": {
-          "name": "space_id",
-          "type": "text CHECK (\"space_id\" = upper(\"space_id\") AND length(\"space_id\") = 26 AND substr(\"space_id\", 1, 1) GLOB '[0-7]' AND \"space_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "version": {
           "name": "version",
           "type": "integer",
@@ -3074,26 +3043,26 @@
         }
       },
       "indexes": {
-        "space_file_version_object_key_idx": {
-          "name": "space_file_version_object_key_idx",
+        "file_version_object_key_idx": {
+          "name": "file_version_object_key_idx",
           "columns": ["object_key"],
           "isUnique": true
         },
-        "space_file_version_space_path_created_idx": {
-          "name": "space_file_version_space_path_created_idx",
-          "columns": ["space_id", "path", "created_at"],
+        "file_version_scope_path_created_idx": {
+          "name": "file_version_scope_path_created_idx",
+          "columns": ["scope_kind", "scope_id", "path", "created_at"],
           "isUnique": false
         },
-        "space_file_version_file_created_idx": {
-          "name": "space_file_version_file_created_idx",
+        "file_version_file_created_idx": {
+          "name": "file_version_file_created_idx",
           "columns": ["file_id", "created_at"],
           "isUnique": false
         },
-        "space_file_version_pending_idx": {
-          "name": "space_file_version_pending_idx",
+        "file_version_pending_idx": {
+          "name": "file_version_pending_idx",
           "columns": ["committed", "created_at"],
           "isUnique": false,
-          "where": "\"space_file_version\".\"committed\" = 0"
+          "where": "\"file_version\".\"committed\" = 0"
         }
       },
       "foreignKeys": {},
@@ -4645,13 +4614,6 @@
           "name": "session_id",
           "type": "text CHECK (\"session_id\" = upper(\"session_id\") AND length(\"session_id\") = 26 AND substr(\"session_id\", 1, 1) GLOB '[0-7]' AND \"session_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "space_aliases_json": {
-          "name": "space_aliases_json",
-          "type": "text",
-          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -6418,146 +6380,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "space_directory": {
-      "name": "space_directory",
-      "columns": {
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_by_account_id": {
-          "name": "created_by_account_id",
-          "type": "text CHECK (\"created_by_account_id\" = upper(\"created_by_account_id\") AND length(\"created_by_account_id\") = 26 AND substr(\"created_by_account_id\", 1, 1) GLOB '[0-7]' AND \"created_by_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "id": {
-          "name": "id",
-          "type": "text CHECK (\"id\" = upper(\"id\") AND length(\"id\") = 26 AND substr(\"id\", 1, 1) GLOB '[0-7]' AND \"id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "parent_path": {
-          "name": "parent_path",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "path": {
-          "name": "path",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "space_id": {
-          "name": "space_id",
-          "type": "text CHECK (\"space_id\" = upper(\"space_id\") AND length(\"space_id\") = 26 AND substr(\"space_id\", 1, 1) GLOB '[0-7]' AND \"space_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "space_directory_path_idx": {
-          "name": "space_directory_path_idx",
-          "columns": ["space_id", "path"],
-          "isUnique": true
-        },
-        "space_directory_listing_idx": {
-          "name": "space_directory_listing_idx",
-          "columns": ["space_id", "parent_path", "lower(\"name\")"],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "space": {
-      "name": "space",
-      "columns": {
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "id": {
-          "name": "id",
-          "type": "text CHECK (\"id\" = upper(\"id\") AND length(\"id\") = 26 AND substr(\"id\", 1, 1) GLOB '[0-7]' AND \"id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "owner_account_id": {
-          "name": "owner_account_id",
-          "type": "text CHECK (\"owner_account_id\" = upper(\"owner_account_id\") AND length(\"owner_account_id\") = 26 AND substr(\"owner_account_id\", 1, 1) GLOB '[0-7]' AND \"owner_account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "app_id": {
-          "name": "app_id",
-          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "space_app_name_idx": {
-          "name": "space_app_name_idx",
-          "columns": ["app_id", "lower(\"name\")"],
-          "isUnique": true
-        },
-        "space_app_owner_idx": {
-          "name": "space_app_owner_idx",
-          "columns": ["app_id", "owner_account_id"],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "account": {
       "name": "account",
       "columns": {
@@ -7137,20 +6959,6 @@
   "internal": {
     "indexes": {
       "file_record_listing_idx": {
-        "columns": {
-          "lower(\"name\")": {
-            "isExpression": true
-          }
-        }
-      },
-      "space_directory_listing_idx": {
-        "columns": {
-          "lower(\"name\")": {
-            "isExpression": true
-          }
-        }
-      },
-      "space_app_name_idx": {
         "columns": {
           "lower(\"name\")": {
             "isExpression": true

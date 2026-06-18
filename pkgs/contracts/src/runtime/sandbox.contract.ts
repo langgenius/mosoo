@@ -9,9 +9,7 @@ import type {
   SandboxSessionId,
   SessionId,
   SessionRunId,
-  SpaceId,
 } from "../id/id.contract";
-import { NonEmptyString } from "../validation/primitives.contract";
 
 export const SandboxSubjectKind = type('"user" | "agent" | "session"');
 export type SandboxSubjectKind = typeof SandboxSubjectKind.infer;
@@ -28,7 +26,7 @@ export const SandboxBackupStatus = type('"creating" | "ready" | "restoring" | "f
 export type SandboxBackupStatus = typeof SandboxBackupStatus.infer;
 
 export const RuntimeSubjectErrorCode = type(
-  '"runtime.conversation_mount_failed" | "runtime.space_mount_conflict" | "runtime.subject_activation_failed" | "runtime.subject_backup_not_ready" | "runtime.subject_checkpoint_failed" | "runtime.subject_operation_failed" | "runtime.subject_restore_failed"',
+  '"runtime.conversation_mount_failed" | "runtime.subject_activation_failed" | "runtime.subject_backup_not_ready" | "runtime.subject_checkpoint_failed" | "runtime.subject_operation_failed" | "runtime.subject_restore_failed"',
 );
 export type RuntimeSubjectErrorCode = typeof RuntimeSubjectErrorCode.infer;
 
@@ -36,19 +34,6 @@ export const DriverInstanceStatus = type(
   '"provisioning" | "connecting" | "ready" | "stopping" | "stopped" | "failed"',
 );
 export type DriverInstanceStatus = typeof DriverInstanceStatus.infer;
-
-export const SpaceAliasBinding = type({
-  aliasPath: NonEmptyString,
-  globalMountPath: NonEmptyString,
-  spaceId: NonEmptyString,
-  spaceName: NonEmptyString,
-});
-export interface SpaceAliasBinding {
-  aliasPath: string;
-  globalMountPath: string;
-  spaceId: SpaceId;
-  spaceName: string;
-}
 
 export interface SandboxSummary {
   id: SandboxId;
@@ -68,7 +53,6 @@ export interface SandboxSessionSummary {
   id: SessionId;
   originJson: string;
   sandboxId: SandboxId;
-  spaceAliases: SpaceAliasBinding[];
   status: SandboxSessionStatus;
 }
 

@@ -29,7 +29,7 @@ interface FileErrorPayload {
 
 export interface FileUploadCompletionEventDetail {
   fileId: string;
-  scopeId: string;
+  scopeId: string | null;
   scopeKind: FileScopeKind;
 }
 
@@ -48,7 +48,7 @@ export interface FileUploadBatchResult {
 export interface FileUploadRecoveryCandidate {
   fileId: string;
   fileName: string;
-  scopeId: string;
+  scopeId: string | null;
   scopeKind: FileScopeKind;
 }
 
@@ -59,7 +59,7 @@ export interface FileUploadRecoveryScanResult {
 export interface FileUploadResumeResult {
   error: FileApiError | null;
   fileId: string;
-  scopeId: string;
+  scopeId: string | null;
   scopeKind: FileScopeKind;
   status: "completed" | "removed_terminal" | "retryable_error";
 }

@@ -5,13 +5,11 @@ import type { FileId, AppId, SessionId, SessionRunId } from "@mosoo/id";
 import { logError, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
+import { fileStore } from "../../../files/application/file-store";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import { hydrateCachedRunContextFromSession } from "../session-definition/hydrate-run-context.service";
-import {
-  appendSessionResourceContextToPrompt,
-  listSessionResourcePathEntries,
-} from "../session-resources/session-resource-prompt.service";
+import { appendSessionResourceContextToPrompt } from "../session-resources/session-resource-prompt.service";
 import { dispatchSessionRun } from "./dispatch-run.service";
 import { getSessionRunState, updateSessionRunStatusIfActive } from "./session-run-state.repository";
 import { createFailedSessionRunRuntimeEvent } from "./session-run-view-events.service";
@@ -111,16 +109,20 @@ export async function dispatchQueuedSessionRun(
   });
   const resolved = await (async () => {
     try {
+      const sessionResources = await hydrationTiming.measure("listSessionResources", () =>
+        fileStore.listSessionResourcePathEntries(
+          bindings.DB,
+          input.session.id,
+          input.attachmentIds,
+        ),
+      );
+
       const hydrated = await hydrationTiming.measure("hydrateRunContext", () =>
         hydrateCachedRunContextFromSession(bindings, viewer, {
           id: input.session.id,
           appId: input.session.app_id,
           ...(input.accessViewer ? { accessViewer: input.accessViewer } : {}),
         }),
-      );
-
-      const sessionResources = await hydrationTiming.measure("listSessionResources", () =>
-        listSessionResourcePathEntries(bindings.DB, input.session.id),
       );
 
       return {
@@ -175,7 +177,6 @@ export async function dispatchQueuedSessionRun(
       attachmentIds: resolved.sessionResources.map((resource, index) =>
         parsePlatformId(resource.id, `session resource id ${index}`),
       ),
-      appAccessSnapshot: resolved.hydrated.value.appAccessSnapshot,
       profile: {
         ...resolved.hydrated.value.profile,
         runtimeId,

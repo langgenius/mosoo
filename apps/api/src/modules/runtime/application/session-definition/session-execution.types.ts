@@ -2,7 +2,6 @@ import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
 import type {
   SessionExecutionBinding,
   SessionExecutionSkillReference,
-  SessionExecutionSpaceReference,
   SessionExecutionToolReference,
 } from "@mosoo/contracts/session";
 import type { UserWarning } from "@mosoo/contracts/session-run";
@@ -10,7 +9,6 @@ import type { ResolvedRunSkill } from "@mosoo/contracts/skill";
 import type { EnvironmentId, EnvironmentRevisionId } from "@mosoo/id";
 
 import type {
-  DriverAppAccessSnapshotOutput,
   DriverProfileConfig,
   DriverResolvedMcpServer,
   DriverSkillCatalogEntry,
@@ -31,7 +29,6 @@ export interface SessionExecutionPlan {
     setupScript: string;
   };
   skills: Omit<SessionExecutionSkillReference, "sessionId">[];
-  spaces: Omit<SessionExecutionSpaceReference, "sessionId">[];
   tools: Omit<SessionExecutionToolReference, "sessionId">[];
 }
 
@@ -40,6 +37,5 @@ export interface HydratedSessionRunContext {
   profile: DriverProfileConfig;
   skillCatalog: DriverSkillCatalogEntry[];
   skills: Omit<ResolvedRunSkill, "downloadUrl">[];
-  appAccessSnapshot: DriverAppAccessSnapshotOutput;
   warnings: UserWarning[];
 }

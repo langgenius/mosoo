@@ -78,7 +78,6 @@ export async function prewarmAgentSessionRuntime(
         kind: hydrated.value.profile.kind,
         runtimeSubjectId: sandboxId,
         purpose: "prewarm",
-        spaceAliases: hydrated.value.profile.session.spaceAliases,
         subjectId: hydrated.value.profile.sandbox.subjectId,
         subjectKind: hydrated.value.profile.sandbox.subjectKind,
         timing,
@@ -88,14 +87,12 @@ export async function prewarmAgentSessionRuntime(
 
     const executionSession = await timing.measure("ensureSandboxConversationSession", () =>
       ensureSandboxConversationSession(bindings, {
-        currentAppAccessSnapshot: hydrated.value.appAccessSnapshot,
         kind: hydrated.value.profile.kind,
         mountSessionResources: false,
         origin: hydrated.value.profile.session.origin,
         sandbox,
         sandboxId,
         sessionId: session.id,
-        spaceAliases: hydrated.value.profile.session.spaceAliases,
         timing,
       }),
     );
@@ -117,13 +114,11 @@ export async function prewarmAgentSessionRuntime(
         homePath: hydrated.value.profile.session.homePath,
         origin: executionSession.origin,
         sessionOrganizationPath: executionSession.cwd,
-        spaceAliases: executionSession.spaceAliases,
       },
     };
     const driverPrewarm = await timing.measure("prewarmDriverSession", () =>
       prewarmDriverSession(bindings, request.requestUrl, {
         cloudflareSession: executionSession.cloudflareSession,
-        appAccessSnapshot: executionSession.appAccessSnapshot,
         profile: driverProfile,
         resolvedMcpServers: hydrated.value.mcpServers,
         resolvedSkillCatalog: hydrated.value.skillCatalog,

@@ -1,4 +1,4 @@
-import { RuntimeSpaceMountConflictError } from "./runtime-subject-lifecycle/runtime-subject-errors";
+import { RuntimeBucketMountConflictError } from "./runtime-subject-lifecycle/runtime-subject-errors";
 
 function getErrorMessage(error: unknown): string | null {
   if (!(error instanceof Error)) {
@@ -27,12 +27,12 @@ function parseMountedBucketReference(errorMessage: string): {
   return { bucket, prefix };
 }
 
-export function toRuntimeSpaceMountConflictError(
+export function toRuntimeBucketMountConflictError(
   error: unknown,
   input: {
     readonly mountPath: string;
   },
-): RuntimeSpaceMountConflictError | null {
+): RuntimeBucketMountConflictError | null {
   const message = getErrorMessage(error);
 
   if (message === null) {
@@ -50,7 +50,7 @@ export function toRuntimeSpaceMountConflictError(
 
   const bucketReference = parseMountedBucketReference(message);
 
-  return new RuntimeSpaceMountConflictError({
+  return new RuntimeBucketMountConflictError({
     bucket: bucketReference?.bucket ?? null,
     cause: error,
     mountPath: input.mountPath,

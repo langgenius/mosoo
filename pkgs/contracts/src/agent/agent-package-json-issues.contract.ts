@@ -29,7 +29,6 @@ const PACKAGE_MANIFEST_TOP_LEVEL_FIELDS = new Set([
   "runtime",
   "skills",
   "sourceAgentId",
-  "spaceBindings",
   "version",
 ]);
 
@@ -86,7 +85,6 @@ const PACKAGE_MANIFEST_FORBIDDEN_SECRET_FIELDS = new Set([
 ]);
 
 const MCP_SIDECAR_REF_PREFIX = ".mcp.json#";
-const PACKAGE_SPACE_BINDING_FIELDS = new Set(["alias", "expectedName"]);
 const PACKAGE_ENVIRONMENT_CATALOG_FIELDS = new Set(["ref"]);
 
 export function createPackageIssue(
@@ -177,7 +175,6 @@ export function collectPackageIssues(input: Record<string, unknown>): AgentResol
 
   issues.push(...collectMcpCatalogIssues(input["mcpServers"]));
   issues.push(...collectEnvironmentCatalogIssues(input["environment"]));
-  issues.push(...collectSpaceBindingCatalogIssues(input["spaceBindings"]));
 
   if (kind === null) {
     issues.push(
@@ -221,34 +218,6 @@ export function hasBlockingPackageIssue(issues: AgentResolutionIssue[]): boolean
       issue.code === "manifest.model.missing" ||
       issue.code === "manifest.prompt.missing",
   );
-}
-
-function collectSpaceBindingCatalogIssues(value: unknown): AgentResolutionIssue[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  const issues: AgentResolutionIssue[] = [];
-
-  for (const entry of value) {
-    if (!isRecord(entry)) {
-      continue;
-    }
-
-    for (const field of Object.keys(entry)) {
-      if (!PACKAGE_SPACE_BINDING_FIELDS.has(field)) {
-        issues.push(
-          createPackageIssue(
-            "package.space.field.unsupported",
-            `Space binding field ${field} is not supported in Agent packages.`,
-            "unsupported",
-          ),
-        );
-      }
-    }
-  }
-
-  return issues;
 }
 
 function collectEnvironmentCatalogIssues(value: unknown): AgentResolutionIssue[] {

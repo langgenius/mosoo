@@ -41,8 +41,8 @@ async function getCloudflareRuntimeSubjectKeepAliveHandle(
 }
 
 export async function prepareRuntimeSubjectFilesystem(subject: SandboxHandle): Promise<void> {
-  // Guard these container RPCs with the provision timeout (like restoreRuntimeSubjectBackup
-  // and the space-mount path below). On local Apple Silicon container reactivation the SDK's
+  // Guard these container RPCs with the provision timeout. On local Apple Silicon container
+  // reactivation the SDK's
   // port-readiness wait can stall ~120s; without a timeout the run wedges in `booting`
   // indefinitely until the next message reconciles it as `runtime.inactive`. Failing fast
   // surfaces a retryable `runtime.provision_failed` instead.

@@ -62,18 +62,6 @@ const OPTIONAL_COMPONENT_SPECS = [
     prompt: "Select MCP servers to bind to this Agent.",
     targetType: "mcp",
   },
-  {
-    askText: "可以。你可以选择当前可见的 Spaces，让这个 Agent 绑定对应知识空间。",
-    fieldPath: "spaceIds",
-    intentPatterns: [/\bspaces?\b/iu, /\bkb\b/iu, /知识库/iu, /空间/iu],
-    listKey: "spaces",
-    nodeKey: "ask_spaces",
-    optionPrefix: "space:",
-    patchNodeKey: "patch_spaces",
-    patchSummary: "Bind selected Spaces to the Agent Manifest.",
-    prompt: "Select Spaces to bind to this Agent.",
-    targetType: "space",
-  },
 ] as const satisfies readonly OptionalComponentSpec[];
 
 function createComponentOptionKey(spec: OptionalComponentSpec, id: string): string {

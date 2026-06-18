@@ -78,9 +78,6 @@ const AGENT_SESSION_DIAGNOSTICS_QUERY = graphql(/* GraphQL */ `
           skillId
           skillName
         }
-        spaces {
-          spaceId
-        }
         tools {
           credentialMode
           serverId

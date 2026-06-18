@@ -27,8 +27,6 @@ import type {
   MosooSessionStoppedValue,
   MosooSessionSyncRequestValue,
   MosooSessionUsageUpdatedValue,
-  MosooSpaceLockEventValue,
-  MosooSpaceWriteStaleEventValue,
 } from "./custom-event-values";
 
 export type * from "./custom-event-values";
@@ -149,9 +147,6 @@ export interface MosooCustomEventValueByName {
   [CUSTOM_EVENT_REGISTRY.sessionStopped.name]: MosooSessionStoppedValue;
   [CUSTOM_EVENT_REGISTRY.sessionSyncRequest.name]: MosooSessionSyncRequestValue;
   [CUSTOM_EVENT_REGISTRY.sessionUsageUpdated.name]: MosooSessionUsageUpdatedValue;
-  [CUSTOM_EVENT_REGISTRY.spaceLockAcquired.name]: MosooSpaceLockEventValue;
-  [CUSTOM_EVENT_REGISTRY.spaceLockReleased.name]: MosooSpaceLockEventValue;
-  [CUSTOM_EVENT_REGISTRY.spaceWriteStale.name]: MosooSpaceWriteStaleEventValue;
 }
 
 type MosooCustomEventByName<TName extends keyof MosooCustomEventValueByName> = AgUiCustomEvent<

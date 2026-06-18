@@ -30,7 +30,6 @@ export async function getRuntimeConversationSession(
         latestReadyBackupId: readyConversationBackupTable.id,
         originJson: sandboxSessionsTable.originJson,
         sandboxId: sandboxSessionsTable.sandboxId,
-        spaceAliasesJson: sandboxSessionsTable.spaceAliasesJson,
         status: sandboxSessionsTable.status,
       })
       .from(sandboxSessionsTable)
@@ -60,7 +59,6 @@ export async function getRuntimeConversationSession(
     }),
     originJson: row.originJson,
     sandboxId: row.sandboxId,
-    spaceAliasesJson: row.spaceAliasesJson,
     status: row.status,
   };
 }
@@ -102,7 +100,6 @@ export async function ensureRuntimeConversationSessionRecord(
     readonly originJson: string;
     readonly runtimeSubjectId: SandboxId;
     readonly sessionId: SessionId;
-    readonly spaceAliasesJson: string;
   },
 ): Promise<RuntimeConversationSessionRecord> {
   const existing = await getRuntimeConversationSession(database, input.sessionId);
@@ -124,7 +121,6 @@ export async function ensureRuntimeConversationSessionRecord(
       originJson: input.originJson,
       sandboxId: input.runtimeSubjectId,
       sessionId: input.sessionId,
-      spaceAliasesJson: input.spaceAliasesJson,
       status: "closed",
       updatedAt: input.now,
     })
@@ -155,7 +151,6 @@ export async function recordRuntimeConversationSessionError(
     readonly originJson: string;
     readonly runtimeSubjectId: SandboxId;
     readonly sessionId: SessionId;
-    readonly spaceAliasesJson: string;
   },
 ): Promise<void> {
   await runAppDatabaseBatch(database, (appDb) => [
@@ -168,7 +163,6 @@ export async function recordRuntimeConversationSessionError(
         originJson: input.originJson,
         sandboxId: input.runtimeSubjectId,
         sessionId: input.sessionId,
-        spaceAliasesJson: input.spaceAliasesJson,
         status: "error",
         updatedAt: input.now,
       })
@@ -210,7 +204,6 @@ export async function recordRuntimeConversationSessionActive(
     readonly originJson: string;
     readonly runtimeSubjectId: SandboxId;
     readonly sessionId: SessionId;
-    readonly spaceAliasesJson: string;
   },
 ): Promise<void> {
   await runAppDatabaseBatch(database, (appDb) => [
@@ -223,7 +216,6 @@ export async function recordRuntimeConversationSessionActive(
         originJson: input.originJson,
         sandboxId: input.runtimeSubjectId,
         sessionId: input.sessionId,
-        spaceAliasesJson: input.spaceAliasesJson,
         status: "active",
         updatedAt: input.now,
       })

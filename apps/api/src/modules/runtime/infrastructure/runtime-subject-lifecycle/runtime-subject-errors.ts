@@ -62,7 +62,7 @@ export class RuntimeSubjectRestoreFailedError extends Error {
   }
 }
 
-export class RuntimeSpaceMountConflictError extends Error {
+export class RuntimeBucketMountConflictError extends Error {
   readonly bucket: string | null;
   readonly mountPath: string;
   readonly prefix: string | null;
@@ -75,11 +75,11 @@ export class RuntimeSpaceMountConflictError extends Error {
   }) {
     const message =
       input.bucket && input.prefix
-        ? `Runtime space mount path ${input.mountPath} is already in use by ${input.bucket}:${input.prefix}.`
-        : `Runtime space mount path ${input.mountPath} is already in use.`;
+        ? `Runtime bucket mount path ${input.mountPath} is already in use by ${input.bucket}:${input.prefix}.`
+        : `Runtime bucket mount path ${input.mountPath} is already in use.`;
 
     super(message, { cause: input.cause });
-    this.name = "RuntimeSpaceMountConflictError";
+    this.name = "RuntimeBucketMountConflictError";
     this.bucket = input.bucket;
     this.mountPath = input.mountPath;
     this.prefix = input.prefix;
@@ -103,10 +103,6 @@ export function getRuntimeSubjectErrorCode(error: unknown): RuntimeSubjectErrorC
 
   if (error instanceof RuntimeSubjectRestoreFailedError) {
     return "runtime.subject_restore_failed";
-  }
-
-  if (error instanceof RuntimeSpaceMountConflictError) {
-    return "runtime.space_mount_conflict";
   }
 
   return "runtime.subject_activation_failed";

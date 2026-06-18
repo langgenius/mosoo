@@ -12,7 +12,7 @@ const environmentId = "01J00000000000000000000005";
 const deploymentVersionId = "01J00000000000000000000006";
 const sessionRunId = "01J00000000000000000000007";
 const shellServerId = "01J00000000000000000000008";
-const docsSpaceId = "01J00000000000000000000009";
+const appId = "01J00000000000000000000009";
 const viewerEmail = "harness-e2e@mosoo.ai";
 const now = "2026-05-18T08:00:00.000Z";
 const liveVersion = {
@@ -57,6 +57,7 @@ const sessionSummary = {
   model: liveVersion.model,
   organizationId,
   provider: liveVersion.provider,
+  appId,
   runtimeId: liveVersion.runtimeId,
   status: "IDLE",
   title: "Harness contract acceptance replay",
@@ -69,6 +70,7 @@ const owner = {
   name: "E2E Owner",
 };
 const organization = {
+  avatarUrl: null,
   createdAt: now,
   id: organizationId,
   joinPolicy: "domain_request",
@@ -78,6 +80,7 @@ const organization = {
   viewerRole: "owner",
 };
 const agentDetail = {
+  appId,
   createdAt: now,
   description: "Fixture-backed agent for deterministic session log coverage.",
   id: agentId,
@@ -114,7 +117,6 @@ const editorState = {
   },
   collaborators: [],
   environment: {
-    boundSpaceIds: [docsSpaceId],
     environmentId,
   },
   id: agentId,
@@ -364,7 +366,22 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
             currentSecurityLevel: "low",
             methods: ["email_otp"],
           },
+          organizations: [organization],
         },
+      });
+      return;
+    }
+    case "AppList": {
+      await fulfillJson(route, {
+        appList: [
+          {
+            createdAt: now,
+            defaultEnvironmentId: environmentId,
+            id: appId,
+            name: "Harness E2E App",
+            ownerAccountId,
+          },
+        ],
       });
       return;
     }
@@ -402,7 +419,6 @@ async function fulfillGraphQLFixture(route: Route): Promise<void> {
               sessionId,
             },
             skills: [],
-            spaces: [{ spaceId: docsSpaceId }],
             tools: [{ credentialMode: "runtime_resolved", serverId: shellServerId }],
           },
           generatedAt: now,

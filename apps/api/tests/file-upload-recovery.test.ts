@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, AppId, SpaceFileVersionId, SpaceId, UploadId } from "@mosoo/id";
+import type { AccountId, FileVersionId, FileId, AppId, UploadId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import type { FileUploadContext } from "../src/modules/files/infrastructure/file-record-store";
@@ -12,13 +12,12 @@ import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const OWNER_ID = parsePlatformId<AccountId>("01J00000000000000000000001", "owner ID");
-const SPACE_ID = parsePlatformId<SpaceId>("01J00000000000000000000002", "space ID");
 const STALE_FILE_ID = parsePlatformId<FileId>("01J00000000000000000000003", "stale file ID");
 const STALE_UPLOAD_ID = parsePlatformId<UploadId>("01J00000000000000000000004", "stale upload ID");
 const APP_ID = parsePlatformId<AppId>("01J00000000000000000000006", "app ID");
 const READY_FILE_ID = parsePlatformId<FileId>("01J00000000000000000000007", "ready file ID");
 const READY_UPLOAD_ID = parsePlatformId<UploadId>("01J00000000000000000000008", "ready upload ID");
-const PENDING_VERSION_ID = parsePlatformId<SpaceFileVersionId>(
+const PENDING_VERSION_ID = parsePlatformId<FileVersionId>(
   "01J00000000000000000000009",
   "pending version ID",
 );
@@ -181,15 +180,6 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE space (
-      id text PRIMARY KEY NOT NULL,
-      name text NOT NULL,
-      app_id text NOT NULL,
-      owner_account_id text NOT NULL,
-      created_at integer NOT NULL,
-      updated_at integer NOT NULL
-    );
-
     CREATE TABLE session (
       attributed_user_id text,
       creator_account_id text NOT NULL,
@@ -201,7 +191,7 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
     CREATE TABLE file_record (
       id text PRIMARY KEY NOT NULL,
       scope_kind text NOT NULL,
-      scope_id text NOT NULL,
+      scope_id text,
       session_kind text,
       status text NOT NULL,
       committed integer NOT NULL,
@@ -234,14 +224,14 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
       multipart_upload_id text,
       overwrite integer NOT NULL,
       part_size integer,
-      scope_id text NOT NULL,
+      scope_id text,
       scope_kind text NOT NULL,
       status text NOT NULL,
       strategy text NOT NULL,
       updated_at integer NOT NULL
     );
 
-    CREATE TABLE space_file_version (
+    CREATE TABLE file_version (
       committed integer NOT NULL,
       committed_at integer,
       created_at integer NOT NULL,
@@ -252,10 +242,11 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
       object_key text NOT NULL,
       path text NOT NULL,
       reason text NOT NULL,
+      scope_id text,
+      scope_kind text NOT NULL,
       size integer NOT NULL,
       source_etag text NOT NULL,
       source_object_key text NOT NULL,
-      space_id text NOT NULL,
       version integer NOT NULL
     );
 
@@ -277,16 +268,6 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
       1,
       1
     );
-
-    INSERT INTO space (
-      id,
-      name,
-      app_id,
-      owner_account_id,
-      created_at,
-      updated_at
-    )
-    VALUES ('${SPACE_ID}', 'Docs', '${APP_ID}', '${OWNER_ID}', 1, 1);
 
     INSERT INTO file_record (
       id,
@@ -313,8 +294,8 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
     )
     VALUES (
       '${STALE_FILE_ID}',
-      'space',
-      '${SPACE_ID}',
+      'library',
+      NULL,
       NULL,
       'pending',
       0,
@@ -324,12 +305,12 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
       1,
       'text/csv',
       'report.csv',
-      'staging/space/${SPACE_ID}/${STALE_FILE_ID}',
-      '${SPACE_ID}',
-      'space',
+      'staging/library/unscoped/${STALE_FILE_ID}',
+      '${OWNER_ID}',
+      'account',
       '',
       'report.csv',
-      'space_file',
+      'library_file',
       42,
       1,
       1
@@ -365,8 +346,8 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
       'multipart-stale',
       0,
       16777216,
-      '${SPACE_ID}',
-      'space',
+      NULL,
+      'library',
       'completing',
       'multipart',
       1
@@ -386,7 +367,7 @@ function createBindings(database: D1Database, bucket: MemoryFileBucket): ApiBind
 describe("file upload recovery", () => {
   test("lets completing multipart retries continue when the staged object already exists", async () => {
     const bucket = new MemoryFileBucket();
-    const objectKey = `staging/space/${SPACE_ID}/${STALE_FILE_ID}`;
+    const objectKey = `staging/library/unscoped/${STALE_FILE_ID}`;
     bucket.putHead(objectKey, {
       contentLength: 42,
       contentType: "text/csv",
@@ -404,13 +385,13 @@ describe("file upload recovery", () => {
         mime_type: "text/csv",
         name: "report.csv",
         object_key: objectKey,
-        owner_id: SPACE_ID,
-        owner_kind: "space",
+        owner_id: OWNER_ID,
+        owner_kind: "account",
         parent_path: "",
         path: "report.csv",
-        purpose: "space_file",
-        scope_id: SPACE_ID,
-        scope_kind: "space",
+        purpose: "library_file",
+        scope_id: null,
+        scope_kind: "library",
         session_kind: null,
         size: 42,
         status: "pending",
@@ -429,8 +410,8 @@ describe("file upload recovery", () => {
         multipart_upload_id: "multipart-stale",
         overwrite: 0,
         part_size: 16777216,
-        scope_id: SPACE_ID,
-        scope_kind: "space",
+        scope_id: null,
+        scope_kind: "library",
         status: "completing",
         strategy: "multipart",
         updated_at: 1,
@@ -457,12 +438,10 @@ describe("file upload recovery", () => {
         name: "report.csv",
         size: 42,
       },
-      purpose: "space_file",
+      purpose: "library_file",
       target: {
-        id: SPACE_ID,
-        kind: "space",
+        kind: "library",
         path: "report.csv",
-        appId: APP_ID,
       },
     });
 
@@ -526,7 +505,7 @@ describe("file upload recovery", () => {
         owner_id: string;
         owner_kind: string;
         purpose: string;
-        scope_id: string;
+        scope_id: string | null;
         scope_kind: string;
         status: string;
       }>();
@@ -555,8 +534,8 @@ describe("file upload recovery", () => {
   test("recovers when final object copy succeeded before the file row was finalized", async () => {
     const database = createUploadRecoveryDatabase();
     const bucket = new MemoryFileBucket();
-    const stagingObjectKey = `staging/space/${SPACE_ID}/${STALE_FILE_ID}`;
-    const finalObjectKey = `space/${SPACE_ID}/report.csv`;
+    const stagingObjectKey = `staging/library/unscoped/${STALE_FILE_ID}`;
+    const finalObjectKey = `library/${STALE_FILE_ID}/report.csv`;
 
     await database
       .prepare("UPDATE file_upload SET expires_at = ? WHERE id = ?")
@@ -615,9 +594,9 @@ describe("file upload recovery", () => {
   test("recovers an overwrite retry after the version row and final object were written", async () => {
     const database = createUploadRecoveryDatabase();
     const bucket = new MemoryFileBucket();
-    const stagingObjectKey = `staging/space/${SPACE_ID}/${STALE_FILE_ID}`;
-    const finalObjectKey = `space/${SPACE_ID}/report.csv`;
-    const versionObjectKey = `space_versions/${SPACE_ID}/${PENDING_VERSION_ID}/report.csv`;
+    const stagingObjectKey = `staging/library/unscoped/${STALE_FILE_ID}`;
+    const finalObjectKey = `library/${STALE_FILE_ID}/report.csv`;
+    const versionObjectKey = `file_versions/library/unscoped/${PENDING_VERSION_ID}/report.csv`;
     const oldBody = "old report bytes";
     const newBody = "new report bytes after retry";
 
@@ -647,10 +626,10 @@ describe("file upload recovery", () => {
           updated_at,
           version
         )
-        VALUES (?, 'space', ?, NULL, 'ready', 1, 2, ?, 'old-etag', NULL, 'text/csv', 'report.csv', ?, ?, 'space', '', 'report.csv', 'space_file', ?, 2, 7)
+        VALUES (?, 'library', NULL, NULL, 'ready', 1, 2, ?, 'old-etag', NULL, 'text/csv', 'report.csv', ?, ?, 'account', '', 'report.csv', 'library_file', ?, 2, 7)
       `,
       )
-      .bind(READY_FILE_ID, SPACE_ID, OWNER_ID, finalObjectKey, SPACE_ID, oldBody.length)
+      .bind(READY_FILE_ID, OWNER_ID, finalObjectKey, OWNER_ID, oldBody.length)
       .run();
 
     await database
@@ -674,16 +653,16 @@ describe("file upload recovery", () => {
           strategy,
           updated_at
         )
-        VALUES ('text/csv', 2, ?, ?, ?, ?, ?, NULL, NULL, 0, NULL, ?, 'space', 'completed', 'single', 2)
+        VALUES ('text/csv', 2, ?, ?, ?, ?, ?, NULL, NULL, 0, NULL, NULL, 'library', 'completed', 'single', 2)
       `,
       )
-      .bind(OWNER_ID, oldBody.length, Date.now() + 60_000, READY_FILE_ID, READY_UPLOAD_ID, SPACE_ID)
+      .bind(OWNER_ID, oldBody.length, Date.now() + 60_000, READY_FILE_ID, READY_UPLOAD_ID)
       .run();
 
     await database
       .prepare(
         `
-        INSERT INTO space_file_version (
+        INSERT INTO file_version (
           committed,
           committed_at,
           created_at,
@@ -694,13 +673,14 @@ describe("file upload recovery", () => {
           object_key,
           path,
           reason,
+          scope_id,
+          scope_kind,
           size,
           source_etag,
           source_object_key,
-          space_id,
           version
         )
-        VALUES (0, NULL, 3, ?, ?, ?, 'text/csv', ?, 'report.csv', 'overwrite', ?, 'old-etag', ?, ?, 7)
+        VALUES (0, NULL, 3, ?, ?, ?, 'text/csv', ?, 'report.csv', 'overwrite', NULL, 'library', ?, 'old-etag', ?, 7)
       `,
       )
       .bind(
@@ -710,7 +690,6 @@ describe("file upload recovery", () => {
         versionObjectKey,
         oldBody.length,
         finalObjectKey,
-        SPACE_ID,
       )
       .run();
 
@@ -766,7 +745,7 @@ describe("file upload recovery", () => {
       .bind(READY_FILE_ID)
       .first<{ id: string }>();
     const pendingVersion = await database
-      .prepare("SELECT committed, committed_at FROM space_file_version WHERE id = ?")
+      .prepare("SELECT committed, committed_at FROM file_version WHERE id = ?")
       .bind(PENDING_VERSION_ID)
       .first<{ committed: number; committed_at: number | null }>();
     const finalizedFile = await database

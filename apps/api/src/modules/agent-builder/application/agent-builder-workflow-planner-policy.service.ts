@@ -50,7 +50,7 @@ export function planAgentBuilderRefactorTurn(
   return createAgentBuilderActionPlannerOutput({
     actionKey: APPLY_AGENT_CONFIG_ACTION_KEY,
     assistantText:
-      "我会把当前 Agent 当成已存在的 Manifest 来协助 refactor：可以继续修改名称、描述、模型、系统提示词，或调整 Environment、Skill、MCP、Space 绑定；不会重新带你走 Quickstart 初始化步骤。如果右侧配置已经是你想保存的版本，可以点击 Apply changes 写回 Agent 配置。",
+      "我会把当前 Agent 当成已存在的 Manifest 来协助 refactor：可以继续修改名称、描述、模型、系统提示词，或调整 Environment、Skill、MCP 绑定；不会重新带你走 Quickstart 初始化步骤。如果右侧配置已经是你想保存的版本，可以点击 Apply changes 写回 Agent 配置。",
     context,
     intentSummary: "Continue lightweight Agent Manifest refactor.",
     label: "Apply changes",

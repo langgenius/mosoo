@@ -7,7 +7,6 @@ import { toAgentConfigChangeSnapshot } from "../src/routes/agent/components/edit
 
 const ENVIRONMENT_ID = "01J000000000000000000000B1";
 const MCP_SERVER_ID = "01J000000000000000000000B2";
-const SPACE_ID = "01J000000000000000000000B3";
 
 function draft(overrides: Partial<AgentEditorDraft> = {}): AgentEditorDraft {
   return {
@@ -23,7 +22,6 @@ function draft(overrides: Partial<AgentEditorDraft> = {}): AgentEditorDraft {
     providerOptions: {},
     runtime: "openai-runtime",
     skills: [],
-    spaces: [],
     ...overrides,
   };
 }
@@ -42,14 +40,13 @@ describe("agent config change plan", () => {
     expect(plan.agentStatePreserved).toBe(true);
   });
 
-  test("uses recreate-preserving-state as the max rank for environment and space changes", () => {
+  test("uses recreate-preserving-state as the max rank for environment changes", () => {
     const plan = classifyAgentConfigChanges({
       agentStatus: "published",
       current: toAgentConfigChangeSnapshot(
         draft({
           prompt: "Help more",
           environmentId: ENVIRONMENT_ID,
-          spaces: [{ id: SPACE_ID, name: "Workspace" }],
         }),
       ),
       saved: toAgentConfigChangeSnapshot(draft()),

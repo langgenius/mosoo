@@ -55,14 +55,13 @@ export class DriverInstanceRpcEventIngestionController {
 
     return this.#withDriverEventGate(async () => {
       context.assertActiveConnection();
-      const { env, fileWatch, viewCache, viewerEventDelivery } = this.#dependencies;
+      const { env, viewCache, viewerEventDelivery } = this.#dependencies;
       const cachedLink = state.runtimeSessionLink;
       const shouldRefreshLink =
         input.events.some((envelope) => envelope.event.kind === "run.started") ||
         runtimeSessionLinkNeedsRefresh(cachedLink);
       const link = await this.#getRuntimeSessionLink({ refresh: shouldRefreshLink });
       context.assertActiveConnection();
-      fileWatch.ensureStarted(link);
       const replayedReceipts = state.readProcessedDriverEventReceipts(input.events);
       const candidateEvents = state.filterUnprocessedDriverEvents(input.events);
       const durableReceipts = await this.#readPersistedEventReceipts(link, candidateEvents);
@@ -80,7 +79,7 @@ export class DriverInstanceRpcEventIngestionController {
         return { accepted: replayedAccepted };
       }
 
-      const projection = await appRuntimeDriverEvents(env.DB, {
+      const projection = await appRuntimeDriverEvents(env, {
         assertCurrentConnection: () => context.assertActiveConnection(),
         currentLiveState: viewCache.currentState,
         driverInstanceId,

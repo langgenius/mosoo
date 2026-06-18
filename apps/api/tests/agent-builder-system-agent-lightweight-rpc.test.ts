@@ -47,7 +47,6 @@ const DRAFT_YAML = [
   "assets:",
   "  skills: []",
   "  mcpServers: []",
-  "  spaces: []",
 ].join("\n");
 
 const DRAFT_YAML_WITH_SKIPPED_ENVIRONMENT = [
@@ -90,7 +89,7 @@ function withPendingComponentQuestion(
   input: {
     readonly mode: "multi_select" | "single_select";
     readonly nodeKey: string;
-    readonly targetType: "mcp" | "skill" | "space";
+    readonly targetType: "mcp" | "skill";
   },
 ): AgentBuilderPlannerContext {
   return {
@@ -144,15 +143,6 @@ function plannerContextWithOptionalComponentAssets(): AgentBuilderPlannerContext
             id: skillId,
             kind: "skill",
             name: "PDF",
-          },
-        ],
-        spaces: [
-          {
-            bindingState: "not_bound",
-            hash: "support_space_hash",
-            id: NORMALIZER_IDS.spaceAvailable,
-            kind: "space",
-            name: "Support KB",
           },
         ],
       },
@@ -394,44 +384,6 @@ describe("Agent Builder System Agent lightweight RPC", () => {
       },
       kind: "draft_patch",
       nodeKey: "patch_skills",
-      operation: "bind",
-      status: "pending",
-      targetType: "draft",
-    });
-  });
-
-  test("applies selected optional Spaces as a Manifest patch", async () => {
-    const planner = createDefaultAgentBuilderLightweightPlanner();
-    const context = plannerContextWithOptionalComponentAssets();
-    const output = await planner.plan({
-      context: {
-        ...withPendingComponentQuestion(context, {
-          mode: "multi_select",
-          nodeKey: "ask_spaces",
-          targetType: "space",
-        }),
-        turn: {
-          ...context.turn,
-          inputText: JSON.stringify({
-            customText: null,
-            mode: "multi_select",
-            nodeKey: "ask_spaces",
-            selectedOptionKeys: [`space:${NORMALIZER_IDS.spaceAvailable}`],
-            skipped: false,
-            type: "agent_builder_structured_input",
-          }),
-        },
-      },
-    });
-
-    expect(output.mode).toBe("draft_patch");
-    expect(output.nodes[0]).toMatchObject({
-      draftPatch: {
-        fieldPath: "spaceIds",
-        value: [NORMALIZER_IDS.spaceAvailable],
-      },
-      kind: "draft_patch",
-      nodeKey: "patch_spaces",
       operation: "bind",
       status: "pending",
       targetType: "draft",

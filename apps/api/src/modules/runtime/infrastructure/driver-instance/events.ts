@@ -3,7 +3,9 @@ import {
   createServerCustomEvent,
   parseNullableSessionUsageSummary,
 } from "@mosoo/ag-ui-session";
+import { parsePlatformId } from "@mosoo/id";
 import type { DriverInstanceId } from "@mosoo/id";
+import type { AccountId, SessionId } from "@mosoo/id";
 import {
   parseRuntimeEventEnvelope,
   readRuntimeEventFileChanges,
@@ -14,8 +16,11 @@ import {
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 import type { DriverEventEnvelope } from "agent-driver/events";
 
-import { logInfo } from "../../../../platform/cloudflare/logger";
+import { createErrorLogContext, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
+import { withDisposedRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
+import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../../shared/truthiness";
+import { fileStore } from "../../../files/application/file-store";
 import {
   applyAgUiEventToSessionLiveState,
   loadSessionViewerState,
@@ -27,7 +32,9 @@ import type {
 } from "../../../sessions/application/session-live-state.service";
 import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
 import { upsertNativeResumeRef } from "../native-resume-ref.repository";
-import { indexRuntimeSpaceFileMutation } from "./app-access";
+import { getRuntimeSubjectKeepAliveHandle } from "../runtime-subject-lifecycle/runtime-subject-lifecycle.service";
+import { getRuntimeConversationSession } from "../runtime-subject-lifecycle/runtime-subject-store";
+import { readSandboxFileBytes } from "../sandbox-file-bytes";
 import {
   assertRuntimeEventMatchesDriverEnvelope,
   assertRuntimeEventMatchesDriverLink,
@@ -60,8 +67,102 @@ export {
   recordDriverInstanceFailure,
 } from "./terminal-driver-events";
 
+function resolveRuntimeOutputCreator(link: RuntimeSessionLink): AccountId | null {
+  const actorId = link.executionOwnerId ?? link.callerId ?? link.creatorId;
+
+  if (!isTruthy(actorId)) {
+    return null;
+  }
+
+  return parsePlatformId<AccountId>(actorId, "runtime output creator account ID");
+}
+
+function resolveSandboxReadPath(cwd: string, path: string): string {
+  const normalizedPath = path.trim();
+
+  if (normalizedPath.startsWith("/")) {
+    return normalizedPath;
+  }
+
+  return `${cwd.replace(/\/+$/, "")}/${normalizedPath.replace(/^\/+/, "")}`;
+}
+
+function readRuntimeFileChangeContentType(
+  metadata: Record<string, unknown> | undefined,
+): string | null {
+  const contentType = metadata?.["contentType"] ?? metadata?.["mimeType"];
+  return typeof contentType === "string" && contentType.trim().length > 0 ? contentType : null;
+}
+
+async function recordRuntimeFileChanges(input: {
+  bindings: ApiBindings;
+  event: RuntimeEventEnvelope;
+  link: RuntimeSessionLink;
+}): Promise<void> {
+  const sessionId = input.link.sessionId;
+  const sandboxId = input.link.sandboxId;
+  const createdBy = resolveRuntimeOutputCreator(input.link);
+  const changes = readRuntimeEventFileChanges(input.event).filter(
+    (change) => change.change === "upsert",
+  );
+
+  if (changes.length === 0) {
+    return;
+  }
+
+  if (sessionId === null || sandboxId === null || createdBy === null) {
+    logWarn("runtime.file_artifact.record_skipped", {
+      driverInstanceId: input.event.driverInstanceId ?? null,
+      hasCreatedBy: createdBy !== null,
+      sandboxId,
+      sessionId,
+    });
+    return;
+  }
+
+  const conversation = await getRuntimeConversationSession(input.bindings.DB, sessionId);
+
+  if (conversation === null) {
+    logWarn("runtime.file_artifact.record_skipped.missing_session", {
+      sandboxId,
+      sessionId,
+    });
+    return;
+  }
+
+  await withDisposedRpcResource(
+    await getRuntimeSubjectKeepAliveHandle(input.bindings, sandboxId),
+    async (sandbox) => {
+      const sandboxSession = await sandbox.getSession(conversation.sandboxSessionId);
+
+      for (const change of changes) {
+        try {
+          const readPath = resolveSandboxReadPath(conversation.cwd, change.path);
+          const bytes = await readSandboxFileBytes(sandboxSession, readPath);
+
+          await fileStore.recordRuntimeOutput({
+            bindings: input.bindings,
+            body: bytes,
+            contentType: readRuntimeFileChangeContentType(change.metadata),
+            createdBy,
+            path: change.path,
+            sessionId: parsePlatformId<SessionId>(sessionId, "runtime output session ID"),
+          });
+        } catch (error) {
+          logWarn("runtime.file_artifact.record_failed", {
+            ...createErrorLogContext(error),
+            path: change.path,
+            sandboxId,
+            sessionId,
+          });
+        }
+      }
+    },
+  );
+}
+
 export async function appRuntimeDriverEvents(
-  database: D1Database,
+  bindings: ApiBindings,
   input: {
     assertCurrentConnection?: () => void;
     currentLiveState?: SessionLiveState | null;
@@ -70,6 +171,7 @@ export async function appRuntimeDriverEvents(
     link?: RuntimeSessionLink | null;
   },
 ): Promise<AppRuntimeDriverEventsResult> {
+  const database = bindings.DB;
   const link = input.link ?? (await getRuntimeSessionLink(database, input.driverInstanceId));
 
   if (!isTruthy(link.sessionId)) {
@@ -185,35 +287,11 @@ export async function appRuntimeDriverEvents(
     }
 
     if (event.kind === "file.change.updated" || event.kind === "file.changed") {
-      const fileChanges = readRuntimeEventFileChanges(event);
-
-      for (const fileChange of fileChanges) {
-        input.assertCurrentConnection?.();
-        const artifactChange = await indexRuntimeSpaceFileMutation(
-          database,
-          {
-            executionOwnerUserId: link.executionOwnerId,
-            sessionId: link.sessionId,
-          },
-          fileChange,
-        );
-        input.assertCurrentConnection?.();
-        if (!artifactChange) {
-          continue;
-        }
-
-        const filesUpdatedEvent = createServerCustomEvent(
-          MOSOO_CUSTOM_EVENT.sessionFilesUpdated.name,
-          {
-            change: artifactChange,
-          },
-        );
-
-        nextLiveState = applyAgUiEventToSessionLiveState(nextLiveState, filesUpdatedEvent);
-        appendSessionDeliveryEvent(envelope, filesUpdatedEvent);
-        liveStateChanged = true;
-      }
-
+      await recordRuntimeFileChanges({
+        bindings,
+        event,
+        link,
+      });
       continue;
     }
 

@@ -12,7 +12,6 @@ CREATE TABLE `agent_deployment_version` (
 	`provider` text NOT NULL,
 	`runtime_id` text NOT NULL,
 	`skills_json` text NOT NULL,
-	`space_bindings_json` text NOT NULL,
 	`summary` text NOT NULL,
 	`version_number` integer NOT NULL
 );
@@ -47,15 +46,6 @@ CREATE TABLE `agent_skill` (
 );
 --> statement-breakpoint
 CREATE INDEX `agent_skill_agent_sort_idx` ON `agent_skill` (`agent_id`,`sort_order`);--> statement-breakpoint
-CREATE TABLE `agent_space_binding` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`created_at` integer NOT NULL,
-	`sort_order` integer NOT NULL,
-	`space_id` text CHECK ("space_id" = upper("space_id") AND length("space_id") = 26 AND substr("space_id", 1, 1) GLOB '[0-7]' AND "space_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	PRIMARY KEY(`agent_id`, `space_id`)
-);
---> statement-breakpoint
-CREATE INDEX `agent_space_binding_agent_sort_idx` ON `agent_space_binding` (`agent_id`,`sort_order`);--> statement-breakpoint
 CREATE TABLE `agent` (
 	`config_json` text NOT NULL,
 	`created_at` integer NOT NULL,
@@ -436,7 +426,7 @@ CREATE TABLE `file_record` (
 	`parent_path` text NOT NULL,
 	`path` text NOT NULL,
 	`purpose` text NOT NULL,
-	`scope_id` text CHECK ("scope_id" = upper("scope_id") AND length("scope_id") = 26 AND substr("scope_id", 1, 1) GLOB '[0-7]' AND "scope_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`scope_id` text CHECK ("scope_id" = upper("scope_id") AND length("scope_id") = 26 AND substr("scope_id", 1, 1) GLOB '[0-7]' AND "scope_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`scope_kind` text NOT NULL,
 	`session_kind` text,
 	`size` integer NOT NULL,
@@ -446,9 +436,12 @@ CREATE TABLE `file_record` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `file_record_object_key_idx` ON `file_record` (`object_key`);--> statement-breakpoint
-CREATE UNIQUE INDEX `file_record_scope_parent_path_name_status_idx` ON `file_record` (`scope_kind`,`scope_id`,`parent_path`,`name`,`status`);--> statement-breakpoint
-CREATE UNIQUE INDEX `file_record_pending_path_idx` ON `file_record` (`scope_kind`,`scope_id`,`path`) WHERE "file_record"."status" = 'pending';--> statement-breakpoint
-CREATE UNIQUE INDEX `file_record_ready_path_idx` ON `file_record` (`scope_kind`,`scope_id`,`path`) WHERE "file_record"."status" = 'ready';--> statement-breakpoint
+CREATE UNIQUE INDEX `file_record_unscoped_parent_path_name_status_idx` ON `file_record` (`scope_kind`,`parent_path`,`name`,`status`) WHERE "file_record"."scope_id" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX `file_record_scoped_parent_path_name_status_idx` ON `file_record` (`scope_kind`,`scope_id`,`parent_path`,`name`,`status`);--> statement-breakpoint
+CREATE UNIQUE INDEX `file_record_unscoped_pending_path_idx` ON `file_record` (`scope_kind`,`path`) WHERE "file_record"."status" = 'pending' AND "file_record"."scope_id" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX `file_record_scoped_pending_path_idx` ON `file_record` (`scope_kind`,`scope_id`,`path`) WHERE "file_record"."status" = 'pending' AND "file_record"."scope_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX `file_record_unscoped_ready_path_idx` ON `file_record` (`scope_kind`,`path`) WHERE "file_record"."status" = 'ready' AND "file_record"."scope_id" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX `file_record_scoped_ready_path_idx` ON `file_record` (`scope_kind`,`scope_id`,`path`) WHERE "file_record"."status" = 'ready' AND "file_record"."scope_id" IS NOT NULL;--> statement-breakpoint
 CREATE INDEX `file_record_governance_idx` ON `file_record` (`purpose`,`owner_kind`,`owner_id`,`status`,`expires_at`);--> statement-breakpoint
 CREATE INDEX `file_record_listing_idx` ON `file_record` (`scope_kind`,`scope_id`,`parent_path`,`status`,lower("name"));--> statement-breakpoint
 CREATE TABLE `file_upload` (
@@ -463,7 +456,7 @@ CREATE TABLE `file_upload` (
 	`multipart_upload_id` text,
 	`overwrite` integer NOT NULL,
 	`part_size` integer,
-	`scope_id` text CHECK ("scope_id" = upper("scope_id") AND length("scope_id") = 26 AND substr("scope_id", 1, 1) GLOB '[0-7]' AND "scope_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
+	`scope_id` text CHECK ("scope_id" = upper("scope_id") AND length("scope_id") = 26 AND substr("scope_id", 1, 1) GLOB '[0-7]' AND "scope_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`scope_kind` text NOT NULL,
 	`status` text NOT NULL,
 	`strategy` text NOT NULL,
@@ -472,7 +465,7 @@ CREATE TABLE `file_upload` (
 --> statement-breakpoint
 CREATE UNIQUE INDEX `file_upload_file_id_idx` ON `file_upload` (`file_id`);--> statement-breakpoint
 CREATE INDEX `file_upload_status_expires_idx` ON `file_upload` (`status`,`expires_at`);--> statement-breakpoint
-CREATE TABLE `space_file_version` (
+CREATE TABLE `file_version` (
 	`committed` integer NOT NULL,
 	`committed_at` integer,
 	`created_at` integer NOT NULL,
@@ -483,17 +476,18 @@ CREATE TABLE `space_file_version` (
 	`object_key` text NOT NULL,
 	`path` text NOT NULL,
 	`reason` text NOT NULL,
+	`scope_id` text CHECK ("scope_id" = upper("scope_id") AND length("scope_id") = 26 AND substr("scope_id", 1, 1) GLOB '[0-7]' AND "scope_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`scope_kind` text NOT NULL,
 	`size` integer NOT NULL,
 	`source_etag` text NOT NULL,
 	`source_object_key` text NOT NULL,
-	`space_id` text CHECK ("space_id" = upper("space_id") AND length("space_id") = 26 AND substr("space_id", 1, 1) GLOB '[0-7]' AND "space_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`version` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `space_file_version_object_key_idx` ON `space_file_version` (`object_key`);--> statement-breakpoint
-CREATE INDEX `space_file_version_space_path_created_idx` ON `space_file_version` (`space_id`,`path`,`created_at`);--> statement-breakpoint
-CREATE INDEX `space_file_version_file_created_idx` ON `space_file_version` (`file_id`,`created_at`);--> statement-breakpoint
-CREATE INDEX `space_file_version_pending_idx` ON `space_file_version` (`committed`,`created_at`) WHERE "space_file_version"."committed" = 0;--> statement-breakpoint
+CREATE UNIQUE INDEX `file_version_object_key_idx` ON `file_version` (`object_key`);--> statement-breakpoint
+CREATE INDEX `file_version_scope_path_created_idx` ON `file_version` (`scope_kind`,`scope_id`,`path`,`created_at`);--> statement-breakpoint
+CREATE INDEX `file_version_file_created_idx` ON `file_version` (`file_id`,`created_at`);--> statement-breakpoint
+CREATE INDEX `file_version_pending_idx` ON `file_version` (`committed`,`created_at`) WHERE "file_version"."committed" = 0;--> statement-breakpoint
 CREATE TABLE `mcp_credential` (
 	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
 	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
@@ -757,7 +751,6 @@ CREATE TABLE `sandbox_session` (
 	`origin_json` text NOT NULL,
 	`sandbox_id` text CHECK ("sandbox_id" = upper("sandbox_id") AND length("sandbox_id") = 26 AND substr("sandbox_id", 1, 1) GLOB '[0-7]' AND "sandbox_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`session_id` text CHECK ("session_id" = upper("session_id") AND length("session_id") = 26 AND substr("session_id", 1, 1) GLOB '[0-7]' AND "session_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
-	`space_aliases_json` text NOT NULL,
 	`status` text NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`session_id`) REFERENCES `session`(`id`) ON UPDATE no action ON DELETE cascade
@@ -1036,30 +1029,6 @@ CREATE TABLE `skill` (
 --> statement-breakpoint
 CREATE INDEX `skill_app_updated_at_idx` ON `skill` (`app_id`,`updated_at`);--> statement-breakpoint
 CREATE INDEX `skill_owner_account_updated_at_idx` ON `skill` (`owner_account_id`,`updated_at`);--> statement-breakpoint
-CREATE TABLE `space_directory` (
-	`created_at` integer NOT NULL,
-	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND substr("created_by_account_id", 1, 1) GLOB '[0-7]' AND "created_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
-	`name` text NOT NULL,
-	`parent_path` text NOT NULL,
-	`path` text NOT NULL,
-	`space_id` text CHECK ("space_id" = upper("space_id") AND length("space_id") = 26 AND substr("space_id", 1, 1) GLOB '[0-7]' AND "space_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`updated_at` integer NOT NULL
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `space_directory_path_idx` ON `space_directory` (`space_id`,`path`);--> statement-breakpoint
-CREATE INDEX `space_directory_listing_idx` ON `space_directory` (`space_id`,`parent_path`,lower("name"));--> statement-breakpoint
-CREATE TABLE `space` (
-	`created_at` integer NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
-	`name` text NOT NULL,
-	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`updated_at` integer NOT NULL
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `space_app_name_idx` ON `space` (`app_id`,lower("name"));--> statement-breakpoint
-CREATE INDEX `space_app_owner_idx` ON `space` (`app_id`,`owner_account_id`);--> statement-breakpoint
 CREATE TABLE `account` (
 	`created_at` integer NOT NULL,
 	`email` text NOT NULL,

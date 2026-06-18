@@ -19,7 +19,6 @@ const COMPLETE_BASE_DRAFT = [
   "assets:",
   "  skills: []",
   "  mcpServers: []",
-  "  spaces: []",
 ].join("\n");
 
 const DRAFT_WITH_SKIPPED_ENVIRONMENT = [
@@ -62,11 +61,7 @@ describe("Agent Builder workflow stage", () => {
     expect(state.steps.createAgent.status).toBe("completed");
     expect(state.steps.configureComponents.status).toBe("active");
     expect(state.steps.configureComponents.blockingMissingItems).toEqual(["environment"]);
-    expect(state.steps.configureComponents.optionalItems).toEqual([
-      "skills",
-      "mcp_servers",
-      "spaces",
-    ]);
+    expect(state.steps.configureComponents.optionalItems).toEqual(["skills", "mcp_servers"]);
     expect(state.nextAction.kind).toBe("configure_environment");
   });
 

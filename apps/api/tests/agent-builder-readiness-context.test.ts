@@ -26,7 +26,6 @@ const completeDraftYaml = [
   "assets:",
   "  skills: []",
   "  mcpServers: []",
-  "  spaces: []",
 ].join("\n");
 
 describe("Agent Builder readiness context", () => {

@@ -63,20 +63,6 @@ export function mapReadyRuntimeSubjectBackup(input: {
   };
 }
 
-export function parseMountedSpaceIds(raw: string | null | undefined): ReadonlySet<string> {
-  if (raw === null || raw === undefined || raw.length === 0) {
-    return new Set<string>();
-  }
-
-  const parsed: unknown = JSON.parse(raw);
-
-  if (!Array.isArray(parsed) || !parsed.every((value) => typeof value === "string")) {
-    throw new Error("Runtime subject global mounts must be a JSON string array.");
-  }
-
-  return new Set(parsed);
-}
-
 export function activeConversationSessionQuery(appDb: AppDatabase, runtimeSubjectId: SandboxId) {
   return appDb
     .select({ id: activeConversationSessionsTable.sessionId })

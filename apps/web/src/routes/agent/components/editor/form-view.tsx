@@ -11,7 +11,7 @@ import type { AgentEditorModel } from "./use-model";
 // Three-section form layout (locked on 2026-05-05):
 //   1. Basics       — name, description, runtime, model, system prompt
 //   2. Integrations — skills, MCP servers
-//   3. Environment  — environment, spaces
+//   3. Environment  — environment
 // Runtime-native JSON settings live under Basics next to model selection; keep
 // future runtime-specific typed fields section-scoped when they arrive.
 // One renderer for every surface (Draft Configure, Live Preview, Dev): a single

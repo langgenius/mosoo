@@ -46,10 +46,6 @@ export function createPortableAgentPackageManifest(
           ? skill.skillId
           : createAgentPackageSkillPath(skill.skillName),
     })),
-    spaces: sourceManifest.spaces.map((space) => ({
-      ...space,
-      spaceId: null,
-    })),
   };
 }
 

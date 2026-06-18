@@ -7,11 +7,11 @@ import { appGraphQLModule } from "../../modules/apps/graphql/app-graphql";
 import { channelGraphQLModule } from "../../modules/channels/graphql/channel-graphql";
 import { costGraphQLModule } from "../../modules/cost/graphql/cost-graphql";
 import { environmentGraphQLModule } from "../../modules/environments/graphql/environment-graphql";
+import { fileGraphQLModule } from "../../modules/files/graphql/file-graphql";
 import { mcpGraphQLModule } from "../../modules/mcp/graphql/mcp-graphql";
 import { onboardingGraphQLModule } from "../../modules/onboarding/graphql/onboarding-graphql";
 import { sessionGraphQLModule } from "../../modules/sessions/graphql/session-graphql";
 import { skillGraphQLModule } from "../../modules/skills/graphql/skill-graphql";
-import { spaceGraphQLModule } from "../../modules/spaces/graphql/space-graphql";
 import { userGraphQLModule } from "../../modules/users/graphql/user-graphql";
 import { vendorCredentialGraphQLModule } from "../../modules/vendor-credentials/graphql/vendor-credential-graphql";
 import type { GraphQLContext } from "./graphql-context";
@@ -29,13 +29,13 @@ const composedGraphQLModules = composeGraphQLModules([
   channelGraphQLModule,
   costGraphQLModule,
   environmentGraphQLModule,
+  fileGraphQLModule,
   mcpGraphQLModule,
   onboardingGraphQLModule,
   organizationGraphQLSpec,
   appGraphQLModule,
   sessionGraphQLModule,
   skillGraphQLModule,
-  spaceGraphQLModule,
   userGraphQLModule,
   vendorCredentialGraphQLModule,
 ]);

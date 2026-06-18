@@ -9,7 +9,6 @@ import type {
   AppId,
   SkillId,
   SkillSnapshotId,
-  SpaceId,
 } from "../id/id.contract";
 import type {
   AgentBuilderAskUserMode,
@@ -31,13 +30,7 @@ export type AgentBuilderPlanNodeKind = Exclude<AgentBuilderPlannerResponseMode, 
 
 export type AgentBuilderPlanNodeStatus = "applied" | "blocked" | "failed" | "pending";
 
-export type AgentBuilderPlanNodeTargetType =
-  | "draft"
-  | "environment"
-  | "mcp"
-  | "skill"
-  | "space"
-  | "workflow";
+export type AgentBuilderPlanNodeTargetType = "draft" | "environment" | "mcp" | "skill" | "workflow";
 
 export type AgentBuilderPlanNodeOperation =
   | "ask"
@@ -84,8 +77,7 @@ export type AgentBuilderDraftPatchFieldPath =
   | "prompt"
   | "provider"
   | "runtimeId"
-  | "skillIds"
-  | "spaceIds";
+  | "skillIds";
 
 export type AgentBuilderDraftPatchSectionId = "basics" | "environment" | "integrations";
 
@@ -96,12 +88,8 @@ export type AgentBuilderDraftPatchOperation = Extract<
   "bind" | "remove" | "update"
 >;
 
-export type AgentBuilderDraftPatchReferenceTargetType =
-  | "environment"
-  | "mcp_server"
-  | "skill"
-  | "space";
-export type AgentBuilderDraftPatchReferenceId = EnvironmentId | McpServerId | SkillId | SpaceId;
+export type AgentBuilderDraftPatchReferenceTargetType = "environment" | "mcp_server" | "skill";
+export type AgentBuilderDraftPatchReferenceId = EnvironmentId | McpServerId | SkillId;
 
 export type AgentBuilderVisibleAssetBindingState = "bound" | "not_bound" | "not_represented";
 
@@ -188,7 +176,6 @@ export const AGENT_BUILDER_DRAFT_PATCH_FIELD_PATH_VALUES = [
   "environmentId",
   "skillIds",
   "mcpServerIds",
-  "spaceIds",
 ] as const satisfies readonly AgentBuilderDraftPatchFieldPath[];
 
 export const AGENT_BUILDER_DRAFT_PATCH_SECTION_ID_VALUES = [
@@ -201,21 +188,16 @@ export const AGENT_BUILDER_DRAFT_PATCH_REFERENCE_TARGET_TYPE_VALUES = [
   "environment",
   "mcp_server",
   "skill",
-  "space",
 ] as const satisfies readonly AgentBuilderDraftPatchReferenceTargetType[];
 
 export type AgentBuilderDraftPatchAssetFieldPath = Extract<
   AgentBuilderDraftPatchFieldPath,
-  "environmentId" | "mcpServerIds" | "skillIds" | "spaceIds"
+  "environmentId" | "mcpServerIds" | "skillIds"
 >;
 
-export type AgentBuilderVisibleAssetIndexListKey =
-  | "environments"
-  | "mcpServers"
-  | "skills"
-  | "spaces";
+export type AgentBuilderVisibleAssetIndexListKey = "environments" | "mcpServers" | "skills";
 
-export type AgentBuilderBindableAssetField = "environment" | "mcpServer" | "skill" | "space";
+export type AgentBuilderBindableAssetField = "environment" | "mcpServer" | "skill";
 
 export interface AgentBuilderDraftPatchAssetFieldSpec {
   assetField: AgentBuilderBindableAssetField;
@@ -223,17 +205,13 @@ export interface AgentBuilderDraftPatchAssetFieldSpec {
   listKey: AgentBuilderVisibleAssetIndexListKey;
   sectionId: AgentBuilderDraftPatchSectionId;
   targetType: AgentBuilderDraftPatchReferenceTargetType;
-  visibleAssetKind: Extract<
-    AgentBuilderVisibleAssetKind,
-    "environment" | "mcp_server" | "skill" | "space"
-  >;
+  visibleAssetKind: Extract<AgentBuilderVisibleAssetKind, "environment" | "mcp_server" | "skill">;
 }
 
 export const AGENT_BUILDER_DRAFT_PATCH_ASSET_FIELD_PATH_VALUES = [
   "environmentId",
   "mcpServerIds",
   "skillIds",
-  "spaceIds",
 ] as const satisfies readonly AgentBuilderDraftPatchAssetFieldPath[];
 
 export const AGENT_BUILDER_DRAFT_PATCH_ASSET_FIELD_SPECS = {
@@ -261,14 +239,6 @@ export const AGENT_BUILDER_DRAFT_PATCH_ASSET_FIELD_SPECS = {
     targetType: "skill",
     visibleAssetKind: "skill",
   },
-  spaceIds: {
-    assetField: "space",
-    fieldPath: "spaceIds",
-    listKey: "spaces",
-    sectionId: "environment",
-    targetType: "space",
-    visibleAssetKind: "space",
-  },
 } as const satisfies Record<
   AgentBuilderDraftPatchAssetFieldPath,
   AgentBuilderDraftPatchAssetFieldSpec
@@ -278,7 +248,6 @@ export const AGENT_BUILDER_BINDABLE_ASSET_FIELD_SPECS = {
   environment: AGENT_BUILDER_DRAFT_PATCH_ASSET_FIELD_SPECS.environmentId,
   mcpServer: AGENT_BUILDER_DRAFT_PATCH_ASSET_FIELD_SPECS.mcpServerIds,
   skill: AGENT_BUILDER_DRAFT_PATCH_ASSET_FIELD_SPECS.skillIds,
-  space: AGENT_BUILDER_DRAFT_PATCH_ASSET_FIELD_SPECS.spaceIds,
 } as const satisfies Record<AgentBuilderBindableAssetField, AgentBuilderDraftPatchAssetFieldSpec>;
 
 export const AGENT_BUILDER_DRAFT_PATCH_FIELD_PATH_ALIASES: Readonly<
@@ -288,8 +257,6 @@ export const AGENT_BUILDER_DRAFT_PATCH_FIELD_PATH_ALIASES: Readonly<
   "assets.mcpServers": "mcpServerIds",
   "assets.skillIds": "skillIds",
   "assets.skills": "skillIds",
-  "assets.spaceIds": "spaceIds",
-  "assets.spaces": "spaceIds",
   "builder.componentDecisions.environment": "componentDecisions.environment",
   "environment.environmentId": "environmentId",
   "identity.description": "description",
@@ -408,11 +375,7 @@ export function getAgentBuilderDraftPatchSectionId(
     return "integrations";
   }
 
-  if (
-    fieldPath === "componentDecisions.environment" ||
-    fieldPath === "environmentId" ||
-    fieldPath === "spaceIds"
-  ) {
+  if (fieldPath === "componentDecisions.environment" || fieldPath === "environmentId") {
     return "environment";
   }
 
@@ -436,12 +399,7 @@ export interface AgentBuilderPlannerDraftContext {
   yaml: string;
 }
 
-export type AgentBuilderVisibleAssetKind =
-  | "environment"
-  | "mcp_server"
-  | "selected_space_files"
-  | "skill"
-  | "space";
+export type AgentBuilderVisibleAssetKind = "environment" | "mcp_server" | "skill";
 
 export interface AgentBuilderVisibleAssetIndexEntry {
   bindingState: AgentBuilderVisibleAssetBindingState;
@@ -510,30 +468,6 @@ export interface AgentBuilderVisibleEnvironmentSummary {
   updatedAt: string;
 }
 
-export interface AgentBuilderVisibleSpaceSummary {
-  bindingState: AgentBuilderVisibleAssetBindingState;
-  hash: string;
-  id: SpaceId;
-  name: string;
-}
-
-export interface AgentBuilderSelectedSpaceFilesSummary {
-  bindingState: "bound";
-  directories: string[];
-  directoryCount: number;
-  files: {
-    key: string;
-    mimeType: string | null;
-    size: number;
-  }[];
-  fileCount: number;
-  hash: string;
-  id: SpaceId;
-  listingState: "available" | "unavailable";
-  name: string;
-  unavailableReason: string | null;
-}
-
 export interface AgentBuilderPlannerDraftBindingsContext {
   componentDecisions: AgentBuilderComponentDecisions;
   environmentId: EnvironmentId | null;
@@ -541,7 +475,6 @@ export interface AgentBuilderPlannerDraftBindingsContext {
   parseError: string | null;
   parseStatus: "failed" | "parsed";
   skillIds: SkillId[];
-  spaceIds: SpaceId[];
 }
 
 export type AgentBuilderPreviousVisibleAssetsContextStatus = "available" | "invalid" | "missing";
@@ -555,16 +488,12 @@ export interface AgentBuilderVisibleAssetsContext {
   changesSinceLastTurn: {
     environments: AgentBuilderVisibleAssetChangeSet<AgentBuilderVisibleEnvironmentSummary>;
     mcpServers: AgentBuilderVisibleAssetChangeSet<AgentBuilderVisibleMcpServerSummary>;
-    selectedSpaceFiles: AgentBuilderVisibleAssetChangeSet<AgentBuilderSelectedSpaceFilesSummary>;
     skills: AgentBuilderVisibleAssetChangeSet<AgentBuilderVisibleSkillSummary>;
-    spaces: AgentBuilderVisibleAssetChangeSet<AgentBuilderVisibleSpaceSummary>;
   };
   currentIndex: {
     environments: AgentBuilderVisibleAssetIndexEntry[];
     mcpServers: AgentBuilderVisibleAssetIndexEntry[];
-    selectedSpaceFiles: AgentBuilderVisibleAssetIndexEntry[];
     skills: AgentBuilderVisibleAssetIndexEntry[];
-    spaces: AgentBuilderVisibleAssetIndexEntry[];
   };
   draftBindings: AgentBuilderPlannerDraftBindingsContext;
   observedAt: string;

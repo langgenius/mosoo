@@ -17,7 +17,7 @@ import { buildAgentManifest } from "./agent-manifest.service";
 import { toAgentModel } from "./agent-models";
 import { bindDraftAgentMcpServers, createDraftAgent } from "./agent-package-draft.service";
 import { resolveForkMcpServers } from "./agent-package-mcp-resolution.service";
-import { resolvePackageSkills, resolvePackageSpaces } from "./agent-package-resolution.service";
+import { resolvePackageSkills } from "./agent-package-resolution.service";
 import { collectRuntimeCapabilityIssues } from "./agent-runtime-capability-resolution.service";
 import { parseAgentStoredConfig } from "./agent-stored-config.service";
 export async function createAgentFork(
@@ -49,17 +49,9 @@ export async function createAgentFork(
     })),
   );
 
-  const [skillResolution, spaceIds, mcpResolution] = await Promise.all([
+  const [skillResolution, mcpResolution] = await Promise.all([
     resolvePackageSkills({
       allowSourceSkillIds: true,
-      database: bindings.DB,
-      issues,
-      manifest,
-      appId: sourceAgent.appId,
-      summary,
-      viewerId: viewer.id,
-    }),
-    resolvePackageSpaces({
       database: bindings.DB,
       issues,
       manifest,
@@ -92,7 +84,6 @@ export async function createAgentFork(
     appId: sourceAgent.appId,
     runtimeId: sourceAgent.runtimeId,
     skillIds: skillResolution.skillIds,
-    spaceIds,
   });
 
   await bindDraftAgentMcpServers(bindings.DB, agent.id, mcpResolution.serverIds);

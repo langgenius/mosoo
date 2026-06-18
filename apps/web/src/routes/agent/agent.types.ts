@@ -63,11 +63,6 @@ export interface McpServer {
   credentialSubject?: string;
 }
 
-export interface SpaceBinding {
-  id: string;
-  name: string;
-}
-
 export interface AgentConfig {
   builder: AgentConfigBuilderMetadata;
   environmentId: string | null;
@@ -76,7 +71,6 @@ export interface AgentConfig {
   prompt: string;
   providerOptions: JsonObject;
   skills: SkillInfo[];
-  spaces: SpaceBinding[];
 }
 
 export interface UserInfo {

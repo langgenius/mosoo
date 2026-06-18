@@ -13,13 +13,14 @@ import { toSessionResourceMaterializedPath } from "@mosoo/contracts/file";
 import type { SessionFile } from "@mosoo/contracts/session";
 import { fileRecordsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, PlatformId, AppId, SessionId, SpaceId, UploadId } from "@mosoo/id";
+import type { AccountId, FileId, PlatformId, AppId, SessionId, UploadId } from "@mosoo/id";
 import { sql } from "drizzle-orm";
 
 import { toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import type { SpaceAccessIntent } from "../../spaces/domain/space-access.policy";
 import { createScope } from "./file-paths";
+
+export type FileAccessIntent = "view" | "write";
 
 export interface FileRecordRow {
   committed: number;
@@ -36,7 +37,7 @@ export interface FileRecordRow {
   parent_path: string;
   path: string;
   purpose: FilePurpose;
-  scope_id: PlatformId;
+  scope_id: PlatformId | null;
   scope_kind: FileScopeKind;
   session_kind: "artifact" | "attachment" | null;
   size: number;
@@ -81,7 +82,7 @@ export interface FileUploadRow {
   multipart_upload_id: string | null;
   overwrite: number;
   part_size: number | null;
-  scope_id: PlatformId;
+  scope_id: PlatformId | null;
   scope_kind: FileScopeKind;
   status: FileUploadStatus;
   strategy: "multipart" | "single_put";
@@ -102,31 +103,35 @@ export interface FileUploadContext {
 export interface FilePathLookupRequest {
   database: D1Database;
   path: string;
-  scopeId: PlatformId;
+  scopeId: PlatformId | null;
   scopeKind: FileScopeKind;
 }
 
 export interface UploadAccessRequest {
   database: D1Database;
   fileId: FileId;
-  requiredIntent: SpaceAccessIntent;
+  requiredIntent: FileAccessIntent;
   viewer: AuthenticatedViewer;
 }
 
 export interface FileAccessRequest {
   database: D1Database;
   fileId: FileId;
-  requiredIntent: SpaceAccessIntent;
+  requiredIntent: FileAccessIntent;
   viewer: AuthenticatedViewer;
 }
 
-function toFileScopeId(scopeKind: FileScopeKind, scopeId: PlatformId): FileScopeId {
-  if (scopeKind === "agent_package" || scopeKind === "app_draft") {
-    return parsePlatformId<AppId>(scopeId, "file app ID");
+function toFileScopeId(scopeKind: FileScopeKind, scopeId: PlatformId | null): FileScopeId {
+  if (scopeKind === "library") {
+    return scopeId === null ? null : parsePlatformId<SessionId>(scopeId, "library session ID");
   }
 
-  if (scopeKind === "space") {
-    return parsePlatformId<SpaceId>(scopeId, "file space ID");
+  if (scopeId === null) {
+    throw new Error(`${scopeKind} file scope ID is required.`);
+  }
+
+  if (scopeKind === "agent_package" || scopeKind === "app_draft") {
+    return parsePlatformId<AppId>(scopeId, "file app ID");
   }
 
   if (scopeKind === "session") {
@@ -151,7 +156,9 @@ function toFileOwnerId(ownerKind: FileOwnerKind, ownerId: PlatformId): FileOwner
     return parsePlatformId<SessionId>(ownerId, "file owner session ID");
   }
 
-  return parsePlatformId<SpaceId>(ownerId, "file owner space ID");
+  const unsupported: never = ownerKind;
+  void unsupported;
+  throw new Error("Unsupported file owner kind.");
 }
 
 export function toFileRecord(row: FileRecordRow): FileRecord {
@@ -170,6 +177,7 @@ export function toFileRecord(row: FileRecordRow): FileRecord {
     path: row.scope_kind === "session" ? toSessionResourceMaterializedPath(row.path) : row.path,
     purpose: row.purpose,
     scope: createScope(row.scope_kind, toFileScopeId(row.scope_kind, row.scope_id)),
+    sessionKind: row.session_kind,
     size: row.size,
     status: row.status,
     updatedAt: toIsoString(row.updated_at),

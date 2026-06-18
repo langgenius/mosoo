@@ -8,7 +8,6 @@ import type { DriverBootPayloadPreparedHandler } from "../application/execution-
 import { createRuntimeTimingRecorder } from "../application/session-runs/session-runtime-timing";
 import type { RuntimeTimingSnapshot } from "../application/session-runs/session-runtime-timing";
 import type {
-  DriverAppAccessSnapshotOutput,
   DriverProfileConfig,
   DriverResolvedMcpServer,
   DriverResolvedSkill,
@@ -140,7 +139,6 @@ export async function ensureDriverSessionReady(
     sessionRunId: SessionRunId;
     traceId: string;
     onBootPayloadPrepared?: DriverBootPayloadPreparedHandler;
-    appAccessSnapshot: DriverAppAccessSnapshotOutput;
   },
 ): Promise<{
   driverInstanceId: DriverInstanceId;
@@ -291,7 +289,6 @@ export async function ensureDriverSessionReady(
       cloudflareSession: input.cloudflareSession,
       driverRecordConflictStrategy: "insert-only" as const,
       driverInstanceId,
-      appAccessSnapshot: input.appAccessSnapshot,
       profile: input.profile,
       requestUrl,
       resolvedMcpServers: input.resolvedMcpServers,
@@ -416,7 +413,6 @@ export async function prewarmDriverSession(
     sandbox: SandboxHandle;
     sandboxSessionId: SessionId;
     sessionId: SessionId;
-    appAccessSnapshot: DriverAppAccessSnapshotOutput;
   },
 ): Promise<{
   driverInstanceId: DriverInstanceId;
@@ -490,7 +486,6 @@ export async function prewarmDriverSession(
       cloudflareSession: input.cloudflareSession,
       driverRecordConflictStrategy: "insert-only" as const,
       driverInstanceId,
-      appAccessSnapshot: input.appAccessSnapshot,
       profile: input.profile,
       requestUrl,
       resolvedMcpServers: input.resolvedMcpServers,
@@ -592,7 +587,6 @@ export async function dispatchDriverTurn(
     attachmentIds: FileId[];
     driverInstanceId: DriverInstanceId;
     prompt: string;
-    appAccessSnapshot: DriverAppAccessSnapshotOutput;
     sessionRunId: SessionRunId;
   },
 ): Promise<void> {
@@ -603,7 +597,6 @@ export async function dispatchDriverTurn(
       text: input.prompt,
     },
     kind: "input.start",
-    appAccessSnapshot: input.appAccessSnapshot,
     requestId: createPlatformId(),
     runId: input.sessionRunId,
   });

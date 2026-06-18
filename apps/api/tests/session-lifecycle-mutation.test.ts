@@ -105,7 +105,6 @@ async function ensureRuntimeLifecycleTables(database: D1Database): Promise<void>
           origin_json text NOT NULL,
           sandbox_id text NOT NULL,
           session_id text PRIMARY KEY NOT NULL,
-          space_aliases_json text NOT NULL,
           status text NOT NULL,
           updated_at integer NOT NULL
         )
@@ -160,11 +159,10 @@ async function insertSandboxSession(
           origin_json,
           sandbox_id,
           session_id,
-          space_aliases_json,
           status,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
     )
     .bind(
@@ -174,7 +172,6 @@ async function insertSandboxSession(
       "{}",
       PUBLIC_API_TEST_IDS.sandbox,
       sessionId,
-      "[]",
       "closed",
       1,
     )

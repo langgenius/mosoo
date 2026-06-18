@@ -15,7 +15,6 @@ import type {
   AgentManifest,
   AgentManifestMcpServerBinding,
   AgentManifestSkillReference,
-  AgentManifestSpaceBinding,
   AgentPackage,
 } from "./agent-manifest.contract";
 
@@ -83,7 +82,6 @@ export function buildPackageManifest(input: Record<string, unknown>): AgentManif
       ),
     },
     skills: readParsedArray(input, "skills", readPackageSkill),
-    spaces: readParsedArray(input, "spaceBindings", readPackageSpaceBinding),
   };
 }
 
@@ -186,24 +184,5 @@ function readPackageMcpServer(value: unknown): AgentManifestMcpServerBinding | n
     serverId: null,
     source,
     url,
-  };
-}
-
-function readPackageSpaceBinding(value: unknown): AgentManifestSpaceBinding | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-
-  const alias = readString(value, "alias");
-  if (!hasRequiredText(alias)) {
-    return null;
-  }
-
-  return {
-    alias,
-    expectedName: readNullableString(value, "expectedName"),
-    mode: "read",
-    required: true,
-    spaceId: null,
   };
 }

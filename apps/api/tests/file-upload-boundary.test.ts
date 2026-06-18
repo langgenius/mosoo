@@ -1,14 +1,17 @@
 import { describe, expect, test } from "bun:test";
+import { readdirSync, readFileSync } from "node:fs";
+import { basename, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, AppId, SessionId, SpaceId } from "@mosoo/id";
+import type { AccountId, FileId, AppId, SessionId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import {
   createDownloadDisposition,
   createFinalObjectKey,
-  normalizeSpaceDirectoryPath,
-  normalizeSpaceFilePath,
+  normalizeLibraryDirectoryPath,
+  normalizeLibraryFilePath,
 } from "../src/modules/files/infrastructure/file-paths";
 import { createFileUpload } from "../src/modules/files/infrastructure/file-upload-create";
 import {
@@ -20,8 +23,12 @@ import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 const VIEWER_ID = parsePlatformId<AccountId>("01J00000000000000000000001", "viewer ID");
 const SESSION_ID = parsePlatformId<SessionId>("01J00000000000000000000002", "session ID");
 const FILE_ID = parsePlatformId<FileId>("01J00000000000000000000003", "file ID");
-const SPACE_ID = parsePlatformId<SpaceId>("01J00000000000000000000004", "space ID");
 const APP_ID = parsePlatformId<AppId>("01J00000000000000000000005", "app ID");
+const API_SRC_ROOT = fileURLToPath(new URL("../src/", import.meta.url));
+const FILES_MODULE_PREFIX = "modules/files/";
+const FILES_INFRASTRUCTURE_IMPORT_PATTERN = /from\s+["'][^"']*files\/infrastructure\//;
+const FILES_APPLICATION_ROOT = join(API_SRC_ROOT, "modules/files/application");
+const ALLOWED_FILES_APPLICATION_SURFACES = new Set(["file-control-errors.ts", "file-store.ts"]);
 
 const VIEWER: AuthenticatedViewer = {
   email: "viewer@example.com",
@@ -31,7 +38,43 @@ const VIEWER: AuthenticatedViewer = {
   name: "Viewer",
 };
 
+function listTypeScriptFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      return listTypeScriptFiles(path);
+    }
+
+    if (!entry.isFile() || !path.endsWith(".ts")) {
+      return [];
+    }
+
+    return [path];
+  });
+}
+
 describe("file upload boundary", () => {
+  test("keeps Files infrastructure private to the Files module in production code", () => {
+    const offenders = listTypeScriptFiles(API_SRC_ROOT)
+      .filter(
+        (path) =>
+          !relative(API_SRC_ROOT, path).replaceAll("\\", "/").startsWith(FILES_MODULE_PREFIX),
+      )
+      .filter((path) => FILES_INFRASTRUCTURE_IMPORT_PATTERN.test(readFileSync(path, "utf8")))
+      .map((path) => relative(API_SRC_ROOT, path).replaceAll("\\", "/"));
+
+    expect(offenders).toEqual([]);
+  });
+
+  test("keeps the Files application surface narrow", () => {
+    const unexpectedApplicationFiles = listTypeScriptFiles(FILES_APPLICATION_ROOT)
+      .map((path) => basename(path))
+      .filter((name) => !ALLOWED_FILES_APPLICATION_SURFACES.has(name));
+
+    expect(unexpectedApplicationFiles).toEqual([]);
+  });
+
   test("rejects invalid byte sizes before storage or database work", async () => {
     await expect(
       createFileUpload({} as ApiBindings, VIEWER, {
@@ -105,7 +148,7 @@ describe("file upload boundary", () => {
     expect(formatR2EtagHeader("*")).toBe("*");
   });
 
-  test("rejects noncanonical space path segments before storage work", () => {
+  test("rejects noncanonical library path segments before storage work", () => {
     for (const path of [
       ".",
       "..",
@@ -116,16 +159,16 @@ describe("file upload boundary", () => {
       "docs/%2f/notes.txt",
       "docs/%5c/notes.txt",
     ]) {
-      expect(() => normalizeSpaceFilePath(path)).toThrow();
+      expect(() => normalizeLibraryFilePath(path)).toThrow();
     }
 
     for (const path of ["/docs/notes.txt", String.raw`\docs\notes.txt`, "docs/notes.txt/"]) {
-      expect(() => normalizeSpaceFilePath(path)).toThrow();
+      expect(() => normalizeLibraryFilePath(path)).toThrow();
     }
 
-    expect(() => normalizeSpaceFilePath(String.raw`docs\notes.txt`)).toThrow();
-    expect(() => normalizeSpaceDirectoryPath("/docs")).toThrow();
-    expect(() => normalizeSpaceDirectoryPath("docs/%2e%2e")).toThrow();
+    expect(() => normalizeLibraryFilePath(String.raw`docs\notes.txt`)).toThrow();
+    expect(() => normalizeLibraryDirectoryPath("/docs")).toThrow();
+    expect(() => normalizeLibraryDirectoryPath("docs/%2e%2e")).toThrow();
   });
 
   test("rejects unsafe file names before download header projection", () => {
@@ -143,8 +186,8 @@ describe("file upload boundary", () => {
         id: FILE_ID,
         name: "notes.txt",
         path: "docs/notes.txt ",
-        scope_id: SPACE_ID,
-        scope_kind: "space",
+        scope_id: null,
+        scope_kind: "library",
       }),
     ).toThrow(
       expect.objectContaining({

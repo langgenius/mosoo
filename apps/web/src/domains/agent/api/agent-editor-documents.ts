@@ -11,7 +11,6 @@ export const GET_AGENT_EDITOR_STATE_QUERY = graphql(/* GraphQL */ `
         }
       }
       environment {
-        boundSpaceIds
         environmentId
       }
       packageResolution {
@@ -31,7 +30,6 @@ export const GET_AGENT_EDITOR_STATE_QUERY = graphql(/* GraphQL */ `
           summary {
             boundMcpServerCount
             boundSkillCount
-            boundSpaceCount
             copiedAssetCount
             createdMcpServerCount
             reusedMcpServerCount

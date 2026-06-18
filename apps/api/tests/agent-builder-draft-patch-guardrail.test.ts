@@ -29,7 +29,6 @@ const draftYaml = [
   "assets:",
   "  skills: []",
   "  mcpServers: []",
-  "  spaces: []",
 ].join("\n");
 
 const GUARDRAIL_IDS = {

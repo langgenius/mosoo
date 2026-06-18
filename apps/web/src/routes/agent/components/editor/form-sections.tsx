@@ -16,7 +16,6 @@ import { ModelPickerField } from "./model-picker-field";
 import { RequiredMark } from "./required-mark";
 import { SectionHeader } from "./section-header";
 import { AgentSkillsField } from "./skills-field";
-import { AgentSpacesField } from "./spaces-field";
 import type { AgentEditorModel } from "./use-model";
 
 function ReadinessBanner({ agent }: { agent: Agent }) {
@@ -298,16 +297,6 @@ export function EnvironmentSection({
       <div>
         <SectionHeader>Environment</SectionHeader>
         <EnvironmentPicker model={model} appId={agent.appId} readOnly={readOnly} />
-      </div>
-
-      <div>
-        <SectionHeader>Spaces</SectionHeader>
-        <AgentSpacesField
-          appId={agent.appId}
-          readOnly={readOnly}
-          selectedSpaces={model.draft.spaces}
-          setSpaces={model.setSpaces}
-        />
       </div>
 
       {showChannels ? (

@@ -87,7 +87,6 @@ function createAgentDetailModelDatabase(
       provider text NOT NULL,
       runtime_id text NOT NULL,
       skills_json text NOT NULL,
-      space_bindings_json text NOT NULL,
       summary text NOT NULL,
       version_number integer NOT NULL
     );
@@ -140,7 +139,6 @@ function createAgentDetailModelDatabase(
       provider,
       runtime_id,
       skills_json,
-      space_bindings_json,
       summary,
       version_number
     )
@@ -157,7 +155,6 @@ function createAgentDetailModelDatabase(
       'Private prompt',
       ${sqlString(deploymentProvider)},
       ${sqlString(deploymentRuntimeId)},
-      '[]',
       '[]',
       'Initial publish',
       1

@@ -17,7 +17,6 @@ import type {
   SessionId,
   SkillId,
   SkillSnapshotId,
-  SpaceId,
   VendorCredentialId,
 } from "@mosoo/contracts/id";
 import { parsePlatformId } from "@mosoo/id";
@@ -100,10 +99,6 @@ export function toSkillId(id: string): SkillId {
 
 export function toSkillSnapshotId(id: string): SkillSnapshotId {
   return parsePlatformId(id, "Skill snapshot ID") as SkillSnapshotId;
-}
-
-export function toSpaceId(id: string): SpaceId {
-  return parsePlatformId(id, "Space ID") as SpaceId;
 }
 
 export function toVendorCredentialId(id: string): VendorCredentialId {

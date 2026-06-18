@@ -247,12 +247,10 @@ type AgentEditorState {
 }
 
 type AgentEnvironmentConfig {
-  boundSpaceIds: [ULID!]!
   environmentId: ULID
 }
 
 input AgentEnvironmentConfigInput {
-  boundSpaceIds: [ULID!]!
   environmentId: ULID
 }
 
@@ -330,7 +328,6 @@ type AgentPackageResolutionState {
 type AgentPackageResolutionSummary {
   boundMcpServerCount: Int!
   boundSkillCount: Int!
-  boundSpaceCount: Int!
   copiedAssetCount: Int!
   createdMcpServerCount: Int!
   reusedMcpServerCount: Int!
@@ -389,7 +386,6 @@ enum AgentResolutionTargetType {
   provider
   runtime
   skill
-  space
 }
 
 type AgentSessionActionCapability {
@@ -459,7 +455,6 @@ enum AgentSessionEventType {
 type AgentSessionExecutionDiagnostics {
   binding: SessionExecutionBinding!
   skills: [SessionExecutionSkillReference!]!
-  spaces: [SessionExecutionSpaceReference!]!
   tools: [SessionExecutionToolReference!]!
 }
 
@@ -806,18 +801,6 @@ input CreateSlackAgentChannelBindingInput {
   threadRepliesRequireMention: Boolean
 }
 
-input CreateSpaceDirectoryInput {
-  appId: ULID!
-  name: String!
-  path: String
-  spaceId: ULID!
-}
-
-input CreateSpaceInput {
-  appId: ULID!
-  name: String!
-}
-
 input CreateTelegramAgentChannelBindingInput {
   agentId: ULID!
   appId: ULID!
@@ -849,19 +832,9 @@ input DeleteEnvironmentInput {
   environmentId: ULID!
 }
 
-input DeleteSpaceEntryInput {
-  appId: ULID!
-  key: String!
-  spaceId: ULID!
-}
-
 input DeleteVendorCredentialInput {
   appId: ULID!
   id: ULID!
-}
-
-type DirectoryEntry {
-  key: String!
 }
 
 type EnvironmentDetail {
@@ -981,15 +954,14 @@ input ExecuteAgentBuilderControlPlaneActionInput {
   toolId: AgentBuilderExecutableActionToolId!
 }
 
-type FileEntry {
-  etag: String
-  id: ULID!
-  key: String!
-  lock: SpaceFileLock
-  mimeType: String
-  size: Int!
-  uploadedAt: String!
-  version: Int!
+input FileListInput {
+  scopeId: ULID
+  scopeKind: FileScopeKind
+  sessionKind: FileSessionKind
+}
+
+type FileListing {
+  files: [FileRecord!]!
 }
 
 type FileOwner {
@@ -1001,27 +973,51 @@ enum FileOwnerKind {
   account
   app
   session
-  space
 }
 
 enum FilePurpose {
   agent_asset
   agent_package
   app_draft
+  library_file
+  session_artifact
   session_attachment
-  space_file
+}
+
+type FileRecord {
+  createdAt: String!
+  createdBy: ULID!
+  etag: String
+  expiresAt: String
+  id: ULID!
+  mimeType: String
+  name: String!
+  owner: FileOwner!
+  path: String!
+  purpose: FilePurpose!
+  scope: FileScope!
+  sessionKind: FileSessionKind
+  size: Int!
+  status: String!
+  updatedAt: String!
+  version: Int!
 }
 
 type FileScope {
-  id: ULID!
+  id: ULID
   kind: FileScopeKind!
 }
 
 enum FileScopeKind {
   agent_package
   app_draft
+  library
   session
-  space
+}
+
+enum FileSessionKind {
+  artifact
+  attachment
 }
 
 enum FileUploadStatus {
@@ -1208,8 +1204,6 @@ type Mutation {
   createLarkAgentChannelBinding(input: CreateLarkAgentChannelBindingInput!): AgentChannelBinding!
   createSkillFork(input: CreateSkillForkInput!): SkillSummary!
   createSlackAgentChannelBinding(input: CreateSlackAgentChannelBindingInput!): AgentChannelBinding!
-  createSpace(input: CreateSpaceInput!): SpaceView!
-  createSpaceDirectory(input: CreateSpaceDirectoryInput!): DirectoryEntry!
   createTelegramAgentChannelBinding(input: CreateTelegramAgentChannelBindingInput!): AgentChannelBinding!
   createVendorCredential(input: CreateVendorCredentialInput!): VendorCredential!
   deleteAgent(input: DeleteAgentInput!): OperationResult!
@@ -1218,8 +1212,6 @@ type Mutation {
   deleteEnvironment(input: DeleteEnvironmentInput!): OperationResult!
   deleteMcpServer(appId: ULID!, serverId: ULID!): OperationResult!
   deleteOwnedSkill(appId: ULID!, skillId: ULID!): OperationResult!
-  deleteSpace(appId: ULID!, spaceId: ULID!): OperationResult!
-  deleteSpaceEntry(input: DeleteSpaceEntryInput!): OperationResult!
   deleteVendorCredential(input: DeleteVendorCredentialInput!): OperationResult!
   ensureAgentBuilderThread(agentId: ULID!): AgentBuilderThread!
   executeAgentBuilderControlPlaneAction(input: ExecuteAgentBuilderControlPlaneActionInput!): AgentBuilderControlPlaneActionResult!
@@ -1251,7 +1243,6 @@ type Mutation {
   updateAgentConfig(input: UpdateAgentConfigInput!): Agent!
   updateEnvironment(input: UpdateEnvironmentInput!): EnvironmentDetail!
   updateProfile(input: UpdateAccountProfileInput!): Account!
-  updateSpace(input: UpdateSpaceInput!): Space!
   updateVendorCredential(input: UpdateVendorCredentialInput!): VendorCredential!
 }
 
@@ -1317,6 +1308,7 @@ type Query {
   availableAgentModels(appId: ULID!, currentModelId: String, currentVendorId: String, runtimeId: String!): [ResolvedModelEntry!]!
   environment(appId: ULID!, environmentId: ULID!): EnvironmentDetail!
   exportAgentPackage(agentId: ULID!, appId: ULID!): AgentPackageExport!
+  fileList(input: FileListInput): FileListing!
   listSessionResources(appId: ULID!, sessionId: ULID!): [SessionResource!]!
   mcpOAuthFlowStatus(flowId: ULID!): McpOAuthFlowState!
   mcpRegistry(appId: ULID!): McpRegistry!
@@ -1326,9 +1318,6 @@ type Query {
   sessionMessages(appId: ULID!, sessionId: ULID!): [SessionMessage!]!
   sessionProcessEvents(appId: ULID!, limit: Int, sessionId: ULID!): [SessionProcessEvent!]!
   skillDetail(appId: ULID!, skillId: ULID!): SkillDetail!
-  space(appId: ULID!, spaceId: ULID!): Space!
-  spaceFiles(appId: ULID!, path: String, spaceId: ULID!): SpaceFileListing!
-  spaceList(appId: ULID!): [SpaceView!]!
   threadAgentSessionList(appId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, type: SessionType): AgentSessionRetrieveConnection!
   threadAgentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!
   threadSessionMessages(appId: ULID!, sessionId: ULID!): [SessionMessage!]!
@@ -1456,12 +1445,6 @@ type SessionExecutionSkillReference {
   sortOrder: Int!
 }
 
-type SessionExecutionSpaceReference {
-  sessionId: ULID!
-  sortOrder: Int!
-  spaceId: ULID!
-}
-
 type SessionExecutionToolReference {
   agentCredentialId: ULID
   credentialMode: String!
@@ -1565,6 +1548,7 @@ enum SessionProcessEventType {
 type SessionResource {
   createdAt: String!
   id: ULID!
+  kind: FileSessionKind!
   mimeType: String
   name: String!
   path: String!
@@ -1721,53 +1705,6 @@ type SkillSummary {
   updatedAt: String!
 }
 
-type Space {
-  appId: ULID!
-  canDelete: Boolean!
-  canManage: Boolean!
-  canRead: Boolean!
-  canWrite: Boolean!
-  createdAt: String!
-  id: ULID!
-  name: String!
-  ownerId: ULID!
-}
-
-type SpaceFileListing {
-  directories: [DirectoryEntry!]!
-  files: [FileEntry!]!
-}
-
-type SpaceFileLock {
-  expiresAt: Float!
-  holder: SpaceFileLockHolder!
-  path: String!
-}
-
-type SpaceFileLockHolder {
-  displayName: String
-  id: ULID!
-  type: SpaceFileLockHolderType!
-}
-
-enum SpaceFileLockHolderType {
-  agent
-  user
-}
-
-type SpaceView {
-  appId: ULID!
-  canDelete: Boolean!
-  canManage: Boolean!
-  canRead: Boolean!
-  canWrite: Boolean!
-  createdAt: String!
-  id: ULID!
-  name: String!
-  ownerId: ULID!
-  storagePrefix: String!
-}
-
 input StartLarkAgentChannelRegistrationInput {
   agentId: ULID!
   appId: ULID!
@@ -1845,12 +1782,6 @@ input UpdateEnvironmentInput {
   networkPolicy: EnvironmentNetworkPolicy!
   packages: [EnvironmentPackageSpecInput!]!
   setupScript: String!
-}
-
-input UpdateSpaceInput {
-  appId: ULID!
-  name: String
-  spaceId: ULID!
 }
 
 input UpdateVendorCredentialInput {

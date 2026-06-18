@@ -13,7 +13,6 @@ export * from "./schema/public-api.schema";
 export * from "./schema/runtime.schema";
 export * from "./schema/session.schema";
 export * from "./schema/skill.schema";
-export * from "./schema/space.schema";
 export * from "./schema/user.schema";
 export * from "./schema/usage.schema";
 export * from "./schema/vendor-credential.schema";

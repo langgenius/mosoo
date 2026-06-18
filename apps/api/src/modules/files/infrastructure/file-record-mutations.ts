@@ -1,12 +1,24 @@
 import type { FileScopeKind, FileStatus, FileUploadStatus } from "@mosoo/contracts/file";
 import { fileRecordsTable, fileUploadsTable } from "@mosoo/db";
 import type { FileId, PlatformId, UploadId } from "@mosoo/id";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import { createUploadExpiredError } from "./file-errors";
 import type { FilePathLookupRequest, FileUploadContext } from "./file-record-model";
+
+function recordScopeIdWhere(scopeId: PlatformId | null) {
+  return scopeId === null
+    ? isNull(fileRecordsTable.scopeId)
+    : eq(fileRecordsTable.scopeId, scopeId);
+}
+
+function uploadScopeIdWhere(scopeId: PlatformId | null) {
+  return scopeId === null
+    ? isNull(fileUploadsTable.scopeId)
+    : eq(fileUploadsTable.scopeId, scopeId);
+}
 
 export async function deleteFileControlRows(
   database: D1Database,
@@ -38,25 +50,15 @@ export async function deleteFileControlRows(
 
 export async function deleteFileControlRowsForScope(
   database: D1Database,
-  input: { scopeId: PlatformId; scopeKind: FileScopeKind },
+  input: { scopeId: PlatformId | null; scopeKind: FileScopeKind },
 ): Promise<void> {
   await getAppDatabase(database)
     .delete(fileUploadsTable)
-    .where(
-      and(
-        eq(fileUploadsTable.scopeKind, input.scopeKind),
-        eq(fileUploadsTable.scopeId, input.scopeId),
-      ),
-    )
+    .where(and(eq(fileUploadsTable.scopeKind, input.scopeKind), uploadScopeIdWhere(input.scopeId)))
     .run();
   await getAppDatabase(database)
     .delete(fileRecordsTable)
-    .where(
-      and(
-        eq(fileRecordsTable.scopeKind, input.scopeKind),
-        eq(fileRecordsTable.scopeId, input.scopeId),
-      ),
-    )
+    .where(and(eq(fileRecordsTable.scopeKind, input.scopeKind), recordScopeIdWhere(input.scopeId)))
     .run();
 }
 
@@ -162,7 +164,7 @@ export async function expirePathLocks({
     .where(
       and(
         eq(fileUploadsTable.scopeKind, scopeKind),
-        eq(fileUploadsTable.scopeId, scopeId),
+        uploadScopeIdWhere(scopeId),
         eq(fileRecordsTable.path, path),
         inArray(fileUploadsTable.status, ["pending", "uploading", "completing"]),
         sql`${fileUploadsTable.expiresAt} <= ${now}`,

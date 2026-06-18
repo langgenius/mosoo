@@ -21,7 +21,6 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { toIsoString } from "../../../time";
 import { parseStoredEnvVarsJson } from "../../environments/application/environment-config";
 import { getSupportedRuntimeId } from "../../runtime/domain/runtime-config";
-import { listSpaceAccessRows } from "../../spaces/domain/space-access.policy";
 import { collectRuntimeCapabilityIssues } from "./agent-runtime-capability-resolution.service";
 
 function createIssue(
@@ -38,47 +37,6 @@ function createIssue(
 
 function isSqliteEnabled(value: boolean | number | string): boolean {
   return value === true || value === 1 || value === "1";
-}
-
-async function collectBoundSpaceIssues(
-  database: D1Database,
-  permissionPrincipalUserId: AccountId,
-  appId: AppId,
-  environment: AgentEnvironmentConfig,
-): Promise<AgentReadinessIssue[]> {
-  const issues: AgentReadinessIssue[] = [];
-  const boundSpaceIds = [...new Set(environment.boundSpaceIds)];
-  const access = await listSpaceAccessRows(
-    database,
-    permissionPrincipalUserId,
-    appId,
-    boundSpaceIds,
-  );
-
-  for (const spaceId of boundSpaceIds) {
-    const row = access.accessibleRowsById.get(spaceId);
-
-    if (!access.existingSpaceIds.has(spaceId)) {
-      issues.push(
-        createIssue(
-          "agent.bound_space.missing",
-          `Bound Space ${spaceId} is not available: Space not found.`,
-        ),
-      );
-      continue;
-    }
-
-    if (!row) {
-      issues.push(
-        createIssue(
-          "agent.bound_space.forbidden",
-          `Bound Space ${spaceId} is not available: App owner access required.`,
-        ),
-      );
-    }
-  }
-
-  return issues;
 }
 
 async function collectMcpIssues(
@@ -278,7 +236,6 @@ async function collectPackageResolutionIssues(
   const boundMcpServerNames = needsMcpNames
     ? await listBoundMcpServerNames(database, input.agentId)
     : new Set<string>();
-  let availableSpaceRepairCount = input.environment.boundSpaceIds.length;
   const issues: AgentReadinessIssue[] = [];
 
   for (const issue of packageIssues) {
@@ -305,11 +262,6 @@ async function collectPackageResolutionIssues(
       input.environment.environmentId !== null &&
       input.environment.environmentId !== ""
     ) {
-      continue;
-    }
-
-    if (issue.targetType === "space" && availableSpaceRepairCount > 0) {
-      availableSpaceRepairCount -= 1;
       continue;
     }
 
@@ -431,14 +383,6 @@ export async function computeAgentReadiness(
   );
   issues.push(
     ...(await collectPendingEnvironmentSecretIssues(database, input.environment.environmentId)),
-  );
-  issues.push(
-    ...(await collectBoundSpaceIssues(
-      database,
-      permissionPrincipalUserId,
-      input.appId,
-      input.environment,
-    )),
   );
   issues.push(...(await collectMcpIssues(database, input.agentId, input.mcpServerIds)));
   const dedupedIssues = dedupeReadinessIssues(issues);

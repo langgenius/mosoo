@@ -5,12 +5,11 @@ import type {
   AgentConfigChangePlan,
   AgentConfigChangeSnapshot,
 } from "@mosoo/contracts/agent-config-change-plan";
-import type { AccountId, AgentId, McpServerId, AppId, SkillId, SpaceId } from "@mosoo/id";
+import type { AgentId, McpServerId, SkillId } from "@mosoo/id";
 import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 import { isSupportedDriverRuntime } from "agent-driver/runtime";
 import type { DriverRuntime } from "agent-driver/runtime";
 
-import { listSpaceAccessRows } from "../../spaces/domain/space-access.policy";
 import { listEditableAgentSkillReferences } from "./agent-deployment-version.service";
 import type { AgentRow } from "./agent-types";
 
@@ -60,28 +59,6 @@ export function evaluateAgentRuntimeSelection(input: {
   };
 }
 
-export async function ensureAgentOwnerCanReadBoundSpaces(
-  database: D1Database,
-  ownerId: AccountId,
-  appId: AppId,
-  boundSpaceIds: readonly SpaceId[],
-): Promise<void> {
-  const uniqueSpaceIds = [...new Set(boundSpaceIds)];
-  const access = await listSpaceAccessRows(database, ownerId, appId, uniqueSpaceIds);
-
-  for (const spaceId of uniqueSpaceIds) {
-    const row = access.accessibleRowsById.get(spaceId);
-
-    if (!access.existingSpaceIds.has(spaceId)) {
-      throw new Error(`Cannot bind Space ${spaceId}: Space not found.`);
-    }
-
-    if (!row) {
-      throw new Error(`Cannot bind Space ${spaceId}: App owner access required.`);
-    }
-  }
-}
-
 export async function listAgentSkillIds(
   database: D1Database,
   agentId: AgentId,
@@ -111,7 +88,6 @@ export function createAgentConfigChangeSnapshot(input: {
     providerOptions: input.agent.providerOptions,
     runtimeId: input.agent.runtimeId,
     skills: input.skillIds.map((id) => ({ id, state: "active" as const })),
-    spaceIds: input.environment.boundSpaceIds,
   };
 }
 

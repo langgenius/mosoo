@@ -5,7 +5,7 @@ import type {
   AgentBuilderComponentDecision,
   AgentBuilderComponentDecisions,
 } from "@mosoo/contracts/agent-builder";
-import type { EnvironmentId, McpServerId, PlatformId, SkillId, SpaceId } from "@mosoo/id";
+import type { EnvironmentId, McpServerId, PlatformId, SkillId } from "@mosoo/id";
 import { parsePlatformId } from "@mosoo/id";
 import { parseDocument } from "yaml";
 
@@ -25,13 +25,6 @@ export interface AgentBuilderLightweightManifest {
   readonly provider: string | null;
   readonly runtimeId: string | null;
   readonly skillIds: SkillId[];
-  readonly spaceBindings: AgentBuilderLightweightSpaceBinding[];
-  readonly spaceIds: SpaceId[];
-}
-
-export interface AgentBuilderLightweightSpaceBinding {
-  readonly id: SpaceId;
-  readonly name: string;
 }
 
 type AgentBuilderLightweightAssetState = "active" | "tombstone";
@@ -251,65 +244,6 @@ function readIdListWithActiveIds(
   };
 }
 
-function compareSpaceBindings(
-  left: AgentBuilderLightweightSpaceBinding,
-  right: AgentBuilderLightweightSpaceBinding,
-): number {
-  const byName = left.name.localeCompare(right.name);
-
-  return byName === 0 ? left.id.localeCompare(right.id) : byName;
-}
-
-function readSpaceBindings(value: unknown): AgentBuilderLightweightSpaceBinding[] {
-  if (value === undefined || value === null) {
-    return [];
-  }
-
-  if (!Array.isArray(value)) {
-    throw new Error("assets.spaces must be an array.");
-  }
-
-  const byId = new Map<SpaceId, AgentBuilderLightweightSpaceBinding>();
-
-  for (const [index, entry] of value.entries()) {
-    if (typeof entry === "string") {
-      const id = parsePlatformId<SpaceId>(entry, "assets.spaces[].id");
-
-      if (!byId.has(id)) {
-        byId.set(id, {
-          id,
-          name: id,
-        });
-      }
-      continue;
-    }
-
-    if (!isRecord(entry)) {
-      throw new Error(`assets.spaces[${index}] must be a string ID or object with id.`);
-    }
-
-    const rawId = readString(entry["id"]);
-
-    if (rawId === null) {
-      throw new Error(`assets.spaces[${index}] must be a string ID or object with id.`);
-    }
-
-    const id = parsePlatformId<SpaceId>(rawId, "assets.spaces[].id");
-    const state = readOptionalAssetStateField(entry, `assets.spaces[${index}]`);
-
-    if (state === "tombstone") {
-      continue;
-    }
-
-    byId.set(id, {
-      id,
-      name: readOptionalStringField(entry, "name", `assets.spaces[${index}].name`) ?? rawId,
-    });
-  }
-
-  return [...byId.values()].toSorted(compareSpaceBindings);
-}
-
 function parseIdList<TId extends PlatformId>(values: readonly string[], label: string): TId[] {
   return values.map((value, index) => parsePlatformId<TId>(value, `${label}.${index}`));
 }
@@ -341,8 +275,6 @@ function emptyManifest(): AgentBuilderLightweightManifest {
     provider: null,
     runtimeId: null,
     skillIds: [],
-    spaceBindings: [],
-    spaceIds: [],
   };
 }
 
@@ -381,7 +313,6 @@ export function parseAgentBuilderLightweightManifestYaml(
     const decisions = readComponentDecisions(componentDecisions);
     const mcpServerIdList = readIdListWithActiveIds(assets["mcpServers"], "assets.mcpServers");
     const skillIdList = readIdListWithActiveIds(assets["skills"], "assets.skills");
-    const spaceBindings = readSpaceBindings(assets["spaces"]);
 
     return {
       manifest: {
@@ -408,8 +339,6 @@ export function parseAgentBuilderLightweightManifestYaml(
         runtimeId: readOptionalStringField(runtime, "id", "runtime.id"),
         activeSkillIds: parseIdList<SkillId>(skillIdList.activeIds, "assets.skills"),
         skillIds: parseIdList<SkillId>(skillIdList.ids, "assets.skills"),
-        spaceBindings,
-        spaceIds: spaceBindings.map((space) => space.id),
       },
       status: "parsed",
     };

@@ -59,7 +59,7 @@ async function insertRuntimeSubject(
     .bind(
       null,
       "claim-owner",
-      JSON.stringify(["space-1"]),
+      JSON.stringify([]),
       input.runtimeSubjectId,
       "pet",
       input.lastBackupId ?? null,
@@ -118,7 +118,6 @@ describe("runtime subject activation record", () => {
       dir: "/memory",
       id: "backup-ready",
     });
-    expect([...(record?.mountedSpaceIds ?? [])]).toEqual(["space-1"]);
   });
 
   test("selects no restore backup for a fresh runtime subject", async () => {

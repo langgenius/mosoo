@@ -17,17 +17,9 @@ import {
   toMcpServerId,
   toAppId,
   toSkillId,
-  toSpaceId,
 } from "@/routes/typed-id";
 
-import type {
-  Agent,
-  AgentKind,
-  McpServer,
-  RuntimeId,
-  SkillInfo,
-  SpaceBinding,
-} from "../../agent.types";
+import type { Agent, AgentKind, McpServer, RuntimeId, SkillInfo } from "../../agent.types";
 import {
   createDraftYaml,
   createDraftYamlHash,
@@ -35,7 +27,6 @@ import {
   createInitialDraft,
   createSnapshotHash,
   normalizeMcpServers,
-  normalizeSpaces,
   toAgentConfigChangeSnapshot,
 } from "./draft";
 import type { AgentEditorDraft } from "./draft";
@@ -84,7 +75,6 @@ export interface AgentEditorModel {
   setProviderOptions(providerOptions: JsonObject): void;
   setRuntime(runtime: RuntimeId): void;
   setSkills(skills: SkillInfo[]): void;
-  setSpaces(spaces: SpaceBinding[]): void;
   applyPatch(patch: Record<string, unknown>): void;
   applyBuilderPatch(patch: AgentEditorBuilderPatch): AgentEditorBuilderPatchApplyResult;
   applyAndSaveBuilderPatch(
@@ -253,7 +243,6 @@ export function useAgentEditorModel({
         },
         description: draftToSave.description.trim() || null,
         environment: {
-          boundSpaceIds: normalizeSpaces(draftToSave.spaces).map((space) => toSpaceId(space.id)),
           environmentId:
             draftToSave.environmentId === null ? null : toEnvironmentId(draftToSave.environmentId),
         },
@@ -455,12 +444,6 @@ export function useAgentEditorModel({
       updateDraft((current) => ({
         ...current,
         skills,
-      }));
-    },
-    setSpaces(spaces) {
-      updateDraft((current) => ({
-        ...current,
-        spaces: normalizeSpaces(spaces),
       }));
     },
   };

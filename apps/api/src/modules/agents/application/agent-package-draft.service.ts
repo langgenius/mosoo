@@ -4,12 +4,7 @@ import type {
   AgentManifestMcpServerBinding,
   AgentPackageResolutionState,
 } from "@mosoo/contracts/agent-manifest";
-import {
-  agentMcpBindingsTable,
-  agentSkillsTable,
-  agentSpaceBindingsTable,
-  agentsTable,
-} from "@mosoo/db";
+import { agentMcpBindingsTable, agentSkillsTable, agentsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type {
   AccountId,
@@ -19,7 +14,6 @@ import type {
   McpServerId,
   AppId,
   SkillId,
-  SpaceId,
 } from "@mosoo/id";
 
 import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
@@ -47,7 +41,6 @@ export interface CreateDraftAgentInput {
   appId: AppId;
   runtimeId: string;
   skillIds: SkillId[];
-  spaceIds: SpaceId[];
 }
 
 export interface CreateDraftAgentBatchInput extends CreateDraftAgentInput {
@@ -70,7 +63,6 @@ export async function createDraftAgentBatch(
   const agentId = createPlatformId<AgentId>();
   const timestampMs = currentTimestampMs();
   const uniqueSkillIds = normalizeAgentSkillIds(input.skillIds);
-  const uniqueSpaceIds = [...new Set(input.spaceIds)];
   const uniqueMcpServerIds = [...new Set(input.mcpServerIds ?? [])];
 
   await runAppDatabaseBatch(database, (db) => {
@@ -108,19 +100,6 @@ export async function createDraftAgentBatch(
             createdAt: timestampMs,
             skillId,
             sortOrder: index,
-          })),
-        ),
-      );
-    }
-
-    if (uniqueSpaceIds.length > 0) {
-      queries.push(
-        db.insert(agentSpaceBindingsTable).values(
-          uniqueSpaceIds.map((spaceId, index) => ({
-            agentId,
-            createdAt: timestampMs,
-            sortOrder: index,
-            spaceId,
           })),
         ),
       );

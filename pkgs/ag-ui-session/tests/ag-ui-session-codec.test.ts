@@ -91,19 +91,19 @@ describe("AG-UI session codec boundary", () => {
 
   test("rejects nullable numeric fields when the custom contract requires numbers", () => {
     const event = {
-      name: "space.lock.acquired",
+      name: "mosoo.session.runtime.timing",
       type: "CUSTOM",
       value: {
-        lock: {
-          displayName: null,
-          expiresAt: null,
-          holder: {
-            displayName: null,
-            id: "viewer-1",
-            type: "user",
-          },
-          path: "/notes.md",
-        },
+        completedAtMs: 2,
+        path: "warm",
+        phases: [{ durationMs: null, name: "prepare" }],
+        runId: "run-1",
+        sessionId: "session-1",
+        source: "api",
+        stage: "prepare_run",
+        startedAtMs: 1,
+        totalMs: null,
+        traceId: null,
       },
     };
 
