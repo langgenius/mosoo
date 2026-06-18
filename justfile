@@ -144,6 +144,14 @@ e2e-preview-smoke-headed:
 e2e-preview-latency:
     bun run e2e:preview-latency
 
+# Check credentials and local/Cloudflare visibility for the sandbox Agent benchmark.
+bench-sandbox-agent-preflight *args:
+    vp exec bun benchmarks/sandbox-agent/sandbox-agent-bench.ts preflight {{ args }}
+
+# Run the sandbox Agent benchmark.
+bench-sandbox-agent *args:
+    vp exec bun benchmarks/sandbox-agent/sandbox-agent-bench.ts run {{ args }}
+
 # Verify runtime signal contracts.
 e2e-signal-contract:
     bun run e2e:signal-contract
