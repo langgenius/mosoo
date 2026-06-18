@@ -21,7 +21,7 @@
     "driver:submodule:smoke": "vp exec bun scripts/check-driver-submodule-cutover.ts",
     "e2e:deterministic": "./e2e/run-deterministic.sh",
     "e2e:harness-contract": "vp exec bun test e2e/runtime-signal-collector.test.ts e2e/preview-env.test.ts e2e/preview-live-harness.test.ts",
-    "e2e:agent-builder-live-planner": "vp exec bun test --timeout 30000 apps/api/tests/agent-builder-system-agent-live.e2e.test.ts",
+    "e2e:agent-builder-live-planner": "./e2e/run-agent-builder-live-planner.sh",
     "e2e:agent-builder-smoke": "./e2e/run-agent-builder-smoke.sh",
     "e2e:preview-latency": "./e2e/run-preview-latency.sh",
     "e2e:preview-smoke": "./e2e/run-preview-smoke.sh",
