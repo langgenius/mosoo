@@ -151,6 +151,10 @@
     },
     "e2e": {
       "name": "@mosoo/e2e",
+      "dependencies": {
+        "@mosoo/contracts": "workspace:*",
+        "@mosoo/runtime-catalog": "workspace:*",
+      },
       "devDependencies": {
         "@playwright/test": "^1.60.0",
         "@types/bun": "^1.3.14",

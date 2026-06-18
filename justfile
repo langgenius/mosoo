@@ -116,33 +116,9 @@ react-doctor-report:
 help-docs-index:
     bun run help-docs-index
 
-# Verify the deterministic local acceptance path.
-e2e-deterministic:
-    bun run e2e:deterministic
-
-# Verify local E2E harness contracts.
-e2e-harness-contract:
-    bun run e2e:harness-contract
-
-# Run the live Agent Builder planner check.
-e2e-agent-builder-live-planner:
-    bun run e2e:agent-builder-live-planner
-
-# Run the Agent Builder smoke check.
-e2e-agent-builder-smoke:
-    bun run e2e:agent-builder-smoke
-
-# Run the Preview live smoke check.
-e2e-preview-smoke:
-    bun run e2e:preview-smoke
-
-# Run the Preview live smoke check in headed mode.
-e2e-preview-smoke-headed:
-    ./e2e/run-preview-smoke.sh --headed
-
-# Run the Preview latency check.
-e2e-preview-latency:
-    bun run e2e:preview-latency
+# Run E2E cases. Use `just e2e --help`.
+e2e *args:
+    bun run e2e -- {{args}}
 
 # Check credentials and local/Cloudflare visibility for the sandbox Agent benchmark.
 bench-sandbox-agent-preflight *args:
@@ -151,10 +127,6 @@ bench-sandbox-agent-preflight *args:
 # Run the sandbox Agent benchmark.
 bench-sandbox-agent *args:
     vp exec bun benchmarks/sandbox-agent/sandbox-agent-bench.ts run {{ args }}
-
-# Verify runtime signal contracts.
-e2e-signal-contract:
-    bun run e2e:signal-contract
 
 # Export the standalone Agent Driver repository.
 driver-repo-export:

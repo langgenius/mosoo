@@ -2,16 +2,16 @@ import { describe, test } from "bun:test";
 
 import { parseAgentBuilderPlannerOutput } from "@mosoo/contracts/agent-builder";
 
-import { submitAgentBuilderSystemAgentMessage } from "../src/modules/agent-builder/application/agent-builder-system-agent-rpc.service";
-import { createAgentBuilderSystemAgentSubmitRuntime } from "../src/modules/agent-builder/application/agent-builder-system-agent-runtime.service";
+import { submitAgentBuilderSystemAgentMessage } from "../../../apps/api/src/modules/agent-builder/application/agent-builder-system-agent-rpc.service";
+import { createAgentBuilderSystemAgentSubmitRuntime } from "../../../apps/api/src/modules/agent-builder/application/agent-builder-system-agent-runtime.service";
 import {
   ensureAgentBuilderThread,
   listAgentBuilderMessages,
-} from "../src/modules/agent-builder/application/agent-builder-thread.service";
+} from "../../../apps/api/src/modules/agent-builder/application/agent-builder-thread.service";
 import {
   createAgentBuilderApiFixture,
   insertAgentBuilderVendorCredential,
-} from "./helpers/agent-builder-api-fixture";
+} from "../../../apps/api/tests/helpers/agent-builder-api-fixture";
 
 const openAiApiKey = process.env["MOSOO_E2E_OPENAI_API_KEY"]?.trim() ?? "";
 const openAiModel = process.env["MOSOO_E2E_OPENAI_MODEL"]?.trim() ?? "";

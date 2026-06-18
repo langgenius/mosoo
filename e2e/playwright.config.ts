@@ -4,7 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const webPort = process.env["WEB_DEV_PORT"]?.trim() || "5173";
-const baseURL = process.env["MOSOO_E2E_BASE_URL"]?.trim() || `http://localhost:${webPort}`;
+const baseURL = process.env["MOSOO_E2E_BASE_URL"]?.trim() || `http://127.0.0.1:${webPort}`;
 const defaultWebServerCommand = `${repoRoot}/node_modules/.bin/vp run dev`;
 const webServerCommand =
   process.env["MOSOO_E2E_WEB_SERVER_COMMAND"]?.trim() || defaultWebServerCommand;

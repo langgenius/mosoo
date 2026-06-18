@@ -1,17 +1,17 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
+import { loginWithMosooAiBackdoor } from "../../lib/dev-auth";
+import { requirePreviewRuntimeCredential } from "../../lib/env-preflight";
+import { createRuntimeSignalCollector } from "../../lib/runtime-progress";
 import {
   configureProviderCompanyKey,
   createPreviewRuntimeAgent,
   createPreviewRunId,
   getPreviewSmokeEmail,
-  loginWithMosooAiBackdoor,
   maybeClick,
-  requirePreviewRuntimeCredential,
   verifyPreviewReadinessBlocker,
-} from "./preview-live-harness";
-import { createRuntimeSignalCollector } from "./runtime-signal-collector";
+} from "../../lib/setup-agent";
 
 const runId = createPreviewRunId();
 const smokeEmail = getPreviewSmokeEmail(runId);

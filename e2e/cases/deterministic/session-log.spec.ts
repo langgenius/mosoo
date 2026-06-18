@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import type { Page, Route } from "@playwright/test";
 
-import { formatHarnessError } from "./harness-error";
-import { createRuntimeSignalCollector } from "./runtime-signal-collector";
+import { formatHarnessError } from "../../lib/env-preflight";
+import { createRuntimeSignalCollector } from "../../lib/runtime-progress";
 
 const agentId = "01J00000000000000000000001";
 const organizationId = "01J00000000000000000000002";

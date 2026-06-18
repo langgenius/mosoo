@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Page, Route } from "@playwright/test";
 
-import { formatHarnessError } from "./harness-error";
+import { formatHarnessError } from "../../lib/env-preflight";
 
 const appId = "01J00000000000000000000100";
 const organizationId = "01J00000000000000000000101";
