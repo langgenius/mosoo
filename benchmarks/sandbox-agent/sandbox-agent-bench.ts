@@ -1380,8 +1380,18 @@ function commandStatus(command: string, args: string[]): PreflightCheck {
   };
 }
 
+function isLocalBaseUrl(baseUrl: string): boolean {
+  try {
+    const hostname = new URL(baseUrl).hostname.toLowerCase();
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return false;
+  }
+}
+
 async function runPreflight(config: CliOptions): Promise<PreflightCheck[]> {
   const checks: PreflightCheck[] = [];
+  const requiresLocalDocker = isLocalBaseUrl(config.baseUrl);
 
   checks.push({
     detail: config.baseUrl,
@@ -1400,6 +1410,24 @@ async function runPreflight(config: CliOptions): Promise<PreflightCheck[]> {
     name: "Mosoo PAT",
     required: true,
     status: config.pat.length > 0 ? "ok" : "fail",
+  });
+
+  const docker = commandStatus("docker", [
+    "info",
+    "--format",
+    "Docker daemon running: {{.ServerVersion}}",
+  ]);
+  checks.push({
+    ...docker,
+    detail:
+      docker.status === "ok"
+        ? docker.detail
+        : requiresLocalDocker
+          ? `${docker.detail} Start Docker Desktop before running local sandbox benchmarks.`
+          : docker.detail,
+    name: "Docker daemon",
+    required: requiresLocalDocker,
+    status: docker.status === "ok" ? "ok" : requiresLocalDocker ? "fail" : "warn",
   });
 
   try {

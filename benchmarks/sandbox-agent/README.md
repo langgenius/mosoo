@@ -54,6 +54,7 @@ The script starts with an interactive preflight when required values are missing
 | Mosoo base URL   | yes                            | Points the harness at the local API Worker.                                                | `MOSOO_BENCH_BASE_URL` or prompt.               |
 | Agent ID         | yes                            | Selects the published simple Agent under test.                                             | `MOSOO_BENCH_AGENT_ID` or prompt.               |
 | Mosoo PAT        | yes                            | Calls the Public Thread API.                                                               | `MOSOO_BENCH_PAT` or hidden prompt.             |
+| Docker daemon    | local API only                 | Local `wrangler dev --local` uses Docker-backed Sandbox/Container execution.               | Start Docker Desktop before running.            |
 | Cloudflare login | optional by default            | Lets the operator confirm Worker/Sandbox account visibility.                               | `wrangler login`, then `wrangler whoami`.       |
 | Provider API key | not used by the default runner | The simple Agent must already have a working runtime credential configured in local Mosoo. | Configure it in Mosoo Providers before running. |
 
@@ -111,6 +112,16 @@ If preflight reports `PAT and Agent access` with `HTTP 404`, first check:
 - The Agent has been published; draft Agents are not visible through the Public Thread API.
 - The PAT was created by the same local Mosoo account that owns the Agent's App.
 - You are pointing at the local API origin for this checkout, usually `http://127.0.0.1:8787`.
+
+If all benchmark cases fail with `runtime.provision_failed` or fail before producing
+any assistant text, check Docker first. In local development, the Mosoo Worker is
+served by `wrangler dev --local`, and the Sandbox/Container path depends on Docker
+Desktop being fully running.
+
+If thread creation returns `409 readiness_blocked` with `Provider error: timeout`,
+the Agent is reachable but its configured provider/model is not ready. Reconnect or
+replace the App's default provider credential, or publish the simple Agent with a
+model that the provider can probe within the readiness timeout.
 
 ## Safety
 
