@@ -117,14 +117,14 @@ caller-side call was removed.
 | `src/routes/agent/components/terminal-mode.tsx`                   | 6      |
 | `src/routes/agent/components/settings-dialog-lark-setup.tsx`      | 5      |
 | `src/routes/cost/cost-model.ts`                                   | 5      |
-| `src/routes/spaces/header.tsx`                                    | 5      |
+| deleted hub route header                                          | 5      |
 | `src/domains/environment/components/environment-form.tsx`         | 4      |
 | `src/routes/agent/components/settings-dialog.tsx`                 | 4      |
 | `src/routes/agent/components/file-browser-mode.tsx`               | 4      |
 | `src/features/resource-sharing/access-primitives.tsx`             | 4      |
 | `src/routes/agent/components/settings-dialog-channels-view.tsx`   | 4      |
 | `src/features/session-chat/session-composer.tsx`                  | 4      |
-| `src/features/spaces/share-space/dialog.tsx`                      | 4      |
+| deleted share dialog                                              | 4      |
 | `src/routes/agent/components/agent-builder/starter-pack-card.tsx` | 4      |
 
 ## Log
@@ -137,7 +137,7 @@ caller-side call was removed.
   - `effect-needs-cleanup` (1) fixed on `completion-notifications.ts`.
   - `exhaustive-deps` (12) cleared.
   - `jsx-no-constructed-context-values` (1) fixed.
-  - 4 small-file fixes via `key` remount pattern + delete reset effects (share-space dialog, channels-config, delete-skill-dialog, share-skill-dialog).
+  - 4 small-file fixes via `key` remount pattern + delete reset effects (share dialog, channels-config, delete-skill-dialog, share-skill-dialog).
   - `no-event-handler` resolved in `mcp-tab.tsx` via inline derived scope.
   - `no-cascading-set-state` resolved in `organization-join.route.tsx` via combined state object.
   - 4 medium-file remount/derived-state refactors (drawer-core, organization-general-tab, threads/compose/new-dialog, terminal-mode) using `key` prop + dropped mirror effects.

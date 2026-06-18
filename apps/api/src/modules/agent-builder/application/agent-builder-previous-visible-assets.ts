@@ -11,7 +11,6 @@ import {
   parseMcpServerIdList,
   parseNullableEnvironmentId,
   parseSkillIdList,
-  parseSpaceIdList,
 } from "./agent-builder-ids";
 import { emptyVisibleAssetChanges } from "./agent-builder-visible-asset-index";
 import type {
@@ -40,7 +39,6 @@ function emptyDraftBindings(): AgentBuilderPlannerDraftBindingsContext {
     parseError: null,
     parseStatus: "parsed",
     skillIds: [],
-    spaceIds: [],
   };
 }
 
@@ -122,7 +120,6 @@ function readDraftBindings(value: unknown): AgentBuilderPlannerDraftBindingsCont
     parseError: readNullableString(value["parseError"]),
     parseStatus,
     skillIds: parseSkillIdList(readStringList(value["skillIds"]), "skillIds"),
-    spaceIds: parseSpaceIdList(readStringList(value["spaceIds"]), "spaceIds"),
   };
 }
 
@@ -194,24 +191,15 @@ function readVisibleAssetCurrentIndex(value: Record<string, unknown>): {
 } {
   const environments = readIndexEntries(value["environments"], "environment");
   const mcpServers = readIndexEntries(value["mcpServers"], "mcp_server");
-  const selectedSpaceFiles = readIndexEntries(value["selectedSpaceFiles"], "selected_space_files");
   const skills = readIndexEntries(value["skills"], "skill");
-  const spaces = readIndexEntries(value["spaces"], "space");
 
   return {
     index: {
       environments: environments.entries,
       mcpServers: mcpServers.entries,
-      selectedSpaceFiles: selectedSpaceFiles.entries,
       skills: skills.entries,
-      spaces: spaces.entries,
     },
-    valid:
-      environments.valid &&
-      mcpServers.valid &&
-      selectedSpaceFiles.valid &&
-      skills.valid &&
-      spaces.valid,
+    valid: environments.valid && mcpServers.valid && skills.valid,
   };
 }
 

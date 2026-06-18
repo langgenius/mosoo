@@ -129,7 +129,6 @@ describe("agent deployment version atomicity", () => {
       agentId: PUBLIC_API_TEST_IDS.agent,
       description: null,
       environment: {
-        boundSpaceIds: [],
         environmentId: PUBLIC_API_TEST_IDS.environment,
       },
       kind: "pet",

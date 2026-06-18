@@ -166,31 +166,7 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
           },
           executionOwnerUserId: input.profile.session.origin.executionOwnerUserId,
           kind: input.profile.kind,
-          onSpaceMountFailed: async (alias, error) => {
-            await appendRuntimeDiagnosticEvent(bindings, {
-              eventName: RUNTIME_DIAGNOSTIC_EVENT.configMountFailed.name,
-              sessionId: input.sessionId,
-              value: {
-                ...runtimeBase,
-                mountPath: alias.globalMountPath,
-                reason: toRuntimeDiagnosticReason(error, "Runtime space mount failed."),
-                spaceId: alias.spaceId,
-              },
-            });
-          },
-          onSpaceMountSucceeded: async (alias) => {
-            await appendRuntimeDiagnosticEvent(bindings, {
-              eventName: RUNTIME_DIAGNOSTIC_EVENT.configMountSucceeded.name,
-              sessionId: input.sessionId,
-              value: {
-                ...runtimeBase,
-                mountPath: alias.globalMountPath,
-                spaceId: alias.spaceId,
-              },
-            });
-          },
           runtimeSubjectId: sandboxId,
-          spaceAliases: input.profile.session.spaceAliases,
           subjectId: input.profile.sandbox.subjectId,
           subjectKind: input.profile.sandbox.subjectKind,
           timing,
@@ -210,14 +186,12 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
 
       const executionSession = await timing.measure("ensureSandboxConversationSession", () =>
         ensureSandboxConversationSession(bindings, {
-          currentAppAccessSnapshot: input.appAccessSnapshot,
           kind: input.profile.kind,
           mountSessionResources: input.attachmentIds.length > 0,
           origin: input.profile.session.origin,
           sandbox,
           sandboxId,
           sessionId: input.sessionId,
-          spaceAliases: input.profile.session.spaceAliases,
           timing,
         }),
       );
@@ -231,7 +205,6 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
           homePath: input.profile.session.homePath,
           origin: executionSession.origin,
           sessionOrganizationPath: executionSession.cwd,
-          spaceAliases: executionSession.spaceAliases,
         },
       };
       const driver = await timing.measure("ensureDriverSessionReady", () =>
@@ -240,7 +213,6 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
           ...(input.onBootPayloadPrepared
             ? { onBootPayloadPrepared: input.onBootPayloadPrepared }
             : {}),
-          appAccessSnapshot: executionSession.appAccessSnapshot,
           profile: driverProfile,
           resolvedMcpServers: input.resolvedMcpServers,
           resolvedSkillCatalog: input.resolvedSkillCatalog,
@@ -258,7 +230,6 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
 
       return {
         driverInstanceId: driver.driverInstanceId,
-        appAccessSnapshot: executionSession.appAccessSnapshot,
         timing: timing.snapshot({ path: driver.timing.path }),
         release: () => {
           releaseRunResources(handles);

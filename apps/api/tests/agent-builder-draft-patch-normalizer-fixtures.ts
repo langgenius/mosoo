@@ -15,7 +15,6 @@ import {
   parseEnvironmentId,
   parseMcpServerId,
   parseSkillId,
-  parseSpaceId,
 } from "../src/modules/agent-builder/application/agent-builder-ids";
 
 function platformId(index: number): string {
@@ -33,9 +32,6 @@ export const NORMALIZER_IDS = {
   mcpRemove: parseMcpServerId(platformId(114)),
   message: parseAgentBuilderMessageId(platformId(106)),
   plannerRun: parseAgentBuilderPlannerRunId(platformId(108)),
-  spaceAvailable: parseSpaceId(platformId(109)),
-  spaceKeep: parseSpaceId(platformId(110)),
-  spaceRemove: parseSpaceId(platformId(111)),
   thread: parseAgentBuilderThreadId(platformId(112)),
 } as const;
 
@@ -75,9 +71,7 @@ export function plannerContext(): AgentBuilderPlannerContext {
       changesSinceLastTurn: {
         environments: { added: [], removed: [], updated: [] },
         mcpServers: { added: [], removed: [], updated: [] },
-        selectedSpaceFiles: { added: [], removed: [], updated: [] },
         skills: { added: [], removed: [], updated: [] },
-        spaces: { added: [], removed: [], updated: [] },
       },
       currentIndex: {
         environments: [],
@@ -90,9 +84,7 @@ export function plannerContext(): AgentBuilderPlannerContext {
             name: "Needs Auth MCP",
           },
         ],
-        selectedSpaceFiles: [],
         skills: [],
-        spaces: [],
       },
       draftBindings: {
         environmentId: null,
@@ -100,7 +92,6 @@ export function plannerContext(): AgentBuilderPlannerContext {
         parseError: null,
         parseStatus: "parsed",
         skillIds: [],
-        spaceIds: [],
       },
       observedAt: "2026-05-18T00:00:00.000Z",
       snapshotHash: "asset_hash",
@@ -129,7 +120,6 @@ export function plannerContext(): AgentBuilderPlannerContext {
         "assets:",
         "  skills: []",
         "  mcpServers: []",
-        "  spaces: []",
       ].join("\n"),
     },
     historicalOpenNodes: [],
@@ -234,7 +224,6 @@ export function plannerContextWithBoundEnvironment(): AgentBuilderPlannerContext
         "assets:",
         "  skills: []",
         "  mcpServers: []",
-        "  spaces: []",
       ].join("\n"),
     },
   };
@@ -263,7 +252,6 @@ export function plannerContextWithMissingModelSelection(): AgentBuilderPlannerCo
         "assets:",
         "  skills: []",
         "  mcpServers: []",
-        "  spaces: []",
       ].join("\n"),
     },
   };
@@ -292,72 +280,6 @@ export function plannerContextWithUnsupportedRuntime(): AgentBuilderPlannerConte
         "assets:",
         "  skills: []",
         "  mcpServers: []",
-        "  spaces: []",
-      ].join("\n"),
-    },
-  };
-}
-
-export function plannerContextWithBoundSpaces(): AgentBuilderPlannerContext {
-  const context = plannerContext();
-  const keepSpace = {
-    bindingState: "bound" as const,
-    hash: "space_keep_hash",
-    id: NORMALIZER_IDS.spaceKeep,
-    kind: "space" as const,
-    name: "Keep Space",
-  };
-  const removeSpace = {
-    bindingState: "bound" as const,
-    hash: "space_remove_hash",
-    id: NORMALIZER_IDS.spaceRemove,
-    kind: "space" as const,
-    name: "Remove Space",
-  };
-  const availableSpace = {
-    bindingState: "not_bound" as const,
-    hash: "space_available_hash",
-    id: NORMALIZER_IDS.spaceAvailable,
-    kind: "space" as const,
-    name: "Available Space",
-  };
-
-  return {
-    ...context,
-    assets: {
-      ...context.assets,
-      currentIndex: {
-        ...context.assets.currentIndex,
-        spaces: [keepSpace, removeSpace, availableSpace],
-      },
-      draftBindings: {
-        ...context.assets.draftBindings,
-        spaceIds: [NORMALIZER_IDS.spaceKeep, NORMALIZER_IDS.spaceRemove],
-      },
-    },
-    draft: {
-      ...context.draft,
-      yaml: [
-        "version: 1",
-        "kind: pet",
-        "identity:",
-        "  name: Old Agent",
-        "  description: Old description.",
-        "runtime:",
-        "  id: claude-agent-sdk",
-        "  provider: anthropic",
-        "  model: claude-sonnet-4-5",
-        "prompt: Old prompt.",
-        "environment:",
-        "  environmentId: null",
-        "assets:",
-        "  skills: []",
-        "  mcpServers: []",
-        "  spaces:",
-        `    - id: ${NORMALIZER_IDS.spaceKeep}`,
-        "      name: Keep Space",
-        `    - id: ${NORMALIZER_IDS.spaceRemove}`,
-        "      name: Remove Space",
       ].join("\n"),
     },
   };
@@ -411,7 +333,6 @@ export function plannerContextWithVisibleSkills(
         "  skills:",
         ...existingSkillIds.flatMap((id) => [`    - id: ${id}`, `      name: Skill ${id}`]),
         "  mcpServers: []",
-        "  spaces: []",
       ].join("\n"),
     },
   };
@@ -464,7 +385,6 @@ export function plannerContextWithVisibleMcpServers(
         "  skills: []",
         "  mcpServers:",
         ...existingMcpServerIds.flatMap((id) => [`    - id: ${id}`, `      name: MCP ${id}`]),
-        "  spaces: []",
       ].join("\n"),
     },
   };
@@ -497,12 +417,7 @@ export function plannerContextWithVisibleSkillIndex(input: {
     },
     draft: {
       ...context.draft,
-      yaml: defaultDraftYaml([
-        "  skills:",
-        ...input.draftSkillLines,
-        "  mcpServers: []",
-        "  spaces: []",
-      ]),
+      yaml: defaultDraftYaml(["  skills:", ...input.draftSkillLines, "  mcpServers: []"]),
     },
   };
 }

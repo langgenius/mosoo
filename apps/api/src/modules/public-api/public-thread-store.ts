@@ -12,7 +12,7 @@ import { eq } from "drizzle-orm";
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../platform/db/drizzle";
 import { currentTimestampMs, toIsoString } from "../../time";
-import { deleteFilesForScope } from "../files/application/file-scope-cleanup.service";
+import { fileStore } from "../files/application/file-store";
 import {
   buildSessionSummaryFromJoinedRow,
   sessionSummaryWithLastRunColumns,
@@ -42,9 +42,9 @@ export async function cleanupFailedThreadCreation(input: {
   sessionId: SessionId;
 }): Promise<void> {
   if (input.fileIds.length > 0) {
-    await deleteFilesForScope(input.bindings, {
-      scopeId: input.sessionId,
-      scopeKind: "session",
+    await fileStore.deleteScope(input.bindings, {
+      id: input.sessionId,
+      kind: "session",
     });
   }
 

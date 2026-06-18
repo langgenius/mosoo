@@ -44,11 +44,5 @@ export function listAdditionalDirectories(
     organizationPath,
   ]);
 
-  for (const alias of profile.session.spaceAliases) {
-    directories.add(alias.globalMountPath);
-    directories.add(getParentDirectory(alias.aliasPath));
-    directories.add(getParentDirectory(alias.globalMountPath));
-  }
-
   return [...directories];
 }

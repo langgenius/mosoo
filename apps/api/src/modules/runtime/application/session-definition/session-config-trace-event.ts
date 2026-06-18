@@ -37,12 +37,6 @@ export function buildSessionConfigTraceValue(
       provider: bootPayload.execution.provider,
       runtimeId: bootPayload.runtime,
       runtimeTransport: bootPayload.runtimeTransport,
-      spaceAliases: session.context.spaceAliases.map((alias) => ({
-        aliasPath: alias.aliasPath,
-        globalMountPath: alias.globalMountPath,
-        spaceId: alias.spaceId,
-        spaceName: alias.spaceName,
-      })),
     },
     environmentId: configRevision.environmentId,
     environmentRevisionId: configRevision.environmentRevisionId,

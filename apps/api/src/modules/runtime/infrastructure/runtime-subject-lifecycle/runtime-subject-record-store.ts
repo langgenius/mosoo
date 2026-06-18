@@ -21,7 +21,6 @@ import {
   lastBackupTable,
   mapRuntimeSubjectBackup,
   mapReadyRuntimeSubjectBackup,
-  parseMountedSpaceIds,
   readyLastBackupTable,
 } from "./runtime-subject-store-queries";
 import type {
@@ -167,7 +166,6 @@ export async function getRuntimeSubjectActivationRecord(
       .select({
         claimExpiresAt: sandboxesTable.claimExpiresAt,
         claimOwner: sandboxesTable.claimOwner,
-        globalMountsJson: sandboxesTable.globalMountsJson,
         id: sandboxesTable.id,
         kind: sandboxesTable.kind,
         lastError: sandboxesTable.lastError,
@@ -219,7 +217,6 @@ export async function getRuntimeSubjectActivationRecord(
       dir: row.lastReadyBackupDir,
       id: row.lastReadyBackupId,
     }),
-    mountedSpaceIds: parseMountedSpaceIds(row.globalMountsJson),
     status: row.status,
   };
 }
@@ -397,7 +394,6 @@ export async function markRuntimeSubjectActive(
   input: {
     readonly claimOwner: string;
     readonly kind: AgentKind;
-    readonly mountedSpaceIds: ReadonlySet<string>;
     readonly runtimeSubjectId: SandboxId;
   },
 ): Promise<boolean> {
@@ -408,7 +404,7 @@ export async function markRuntimeSubjectActive(
     .set({
       claimExpiresAt: null,
       claimOwner: null,
-      globalMountsJson: JSON.stringify([...input.mountedSpaceIds]),
+      globalMountsJson: "[]",
       inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(getRuntimeKindPolicy(input.kind), now),
       lastError: null,
       lastErrorCode: null,

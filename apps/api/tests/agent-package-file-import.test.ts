@@ -216,7 +216,6 @@ function createPackageFixture(): AgentPackage {
         providerOptions: {},
       },
       skills: [],
-      spaces: [],
     },
     packageVersion: AGENT_PACKAGE_VERSION,
     sourceAgentId: null,

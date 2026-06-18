@@ -12,7 +12,6 @@ import {
   readParsedArray,
   readRecordField,
   readSkillReference,
-  readSpaceBinding,
   readString,
   readStringRecord,
 } from "./agent-manifest-parser-internals.contract";
@@ -246,6 +245,5 @@ function buildAgentManifest(
       ),
     },
     skills: readParsedArray(input, "skills", readSkillReference),
-    spaces: readParsedArray(input, "spaces", readSpaceBinding),
   };
 }

@@ -14,7 +14,6 @@ import type {
   SessionRunId,
   SkillId,
   SkillSnapshotId,
-  SpaceId,
 } from "../id/id.contract";
 import type { AgentMcpCredentialMode } from "../mcp/mcp.contract";
 import type { SessionRunSummary, UserWarning } from "./session-run.contract";
@@ -83,12 +82,6 @@ export interface SessionExecutionToolReference {
   serverId: McpServerId;
   sessionId: SessionId;
   sortOrder: number;
-}
-
-export interface SessionExecutionSpaceReference {
-  sessionId: SessionId;
-  sortOrder: number;
-  spaceId: SpaceId;
 }
 
 /**
@@ -239,6 +232,7 @@ export interface SessionFile {
 export interface SessionResource {
   createdAt: string;
   id: FileId;
+  kind: "artifact" | "attachment";
   mimeType: string | null;
   name: string;
   path: string;
@@ -388,7 +382,6 @@ export function getAgentSessionUserLifecycleProjection(
 export interface AgentSessionExecutionDiagnostics {
   binding: SessionExecutionBinding;
   skills: SessionExecutionSkillReference[];
-  spaces: SessionExecutionSpaceReference[];
   tools: SessionExecutionToolReference[];
 }
 

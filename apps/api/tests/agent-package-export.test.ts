@@ -10,7 +10,6 @@ const SOURCE_IDS = {
   environment: "01J00000000000000000000002",
   mcpServer: "01J00000000000000000000003",
   skill: "01J00000000000000000000004",
-  space: "01J00000000000000000000005",
 } as const;
 
 function createSourceManifest(): AgentManifest {
@@ -60,15 +59,6 @@ function createSourceManifest(): AgentManifest {
         state: "active",
       },
     ],
-    spaces: [
-      {
-        alias: "docs",
-        expectedName: "Product Docs",
-        mode: "read",
-        required: true,
-        spaceId: SOURCE_IDS.space,
-      },
-    ],
   };
 }
 
@@ -83,7 +73,6 @@ describe("agent package export", () => {
     });
     expect(manifest.mcpServers[0]?.serverId).toBeNull();
     expect(manifest.skills[0]?.skillId).toBe("skills/billing-helper/");
-    expect(manifest.spaces[0]?.spaceId).toBeNull();
 
     const manifestYaml = serializeAgentManifestToYaml(manifest);
 

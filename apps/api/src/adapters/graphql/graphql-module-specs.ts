@@ -6,11 +6,11 @@ import { channelSchema } from "./schema/channel-schema.ts";
 import { commonSchema } from "./schema/common-schema.ts";
 import { costSchema } from "./schema/cost-schema.ts";
 import { environmentSchema } from "./schema/environment-schema.ts";
+import { fileSchema } from "./schema/file-schema.ts";
 import { mcpSchema } from "./schema/mcp-schema.ts";
 import { organizationSchema } from "./schema/organization-schema.ts";
 import { sessionSchema } from "./schema/session-schema.ts";
 import { skillSchema } from "./schema/skill-schema.ts";
-import { spaceSchema } from "./schema/space-schema.ts";
 import { userSchema } from "./schema/user-schema.ts";
 import { vendorCredentialSchema } from "./schema/vendor-credential-schema.ts";
 
@@ -96,6 +96,11 @@ export const environmentGraphQLSpec = {
   typeDefs: environmentSchema,
 } satisfies GraphQLModuleSpec;
 
+export const fileGraphQLSpec = {
+  queryFields: ["fileList(input: FileListInput): FileListing!"],
+  typeDefs: fileSchema,
+} satisfies GraphQLModuleSpec;
+
 export const mcpGraphQLSpec = {
   mutationFields: [
     "connectMcpBearer(input: ConnectMcpBearerInput!): McpServerWithCredential!",
@@ -168,22 +173,6 @@ export const skillGraphQLSpec = {
   typeDefs: skillSchema,
 } satisfies GraphQLModuleSpec;
 
-export const spaceGraphQLSpec = {
-  mutationFields: [
-    "createSpace(input: CreateSpaceInput!): SpaceView!",
-    "createSpaceDirectory(input: CreateSpaceDirectoryInput!): DirectoryEntry!",
-    "deleteSpace(appId: ULID!, spaceId: ULID!): OperationResult!",
-    "deleteSpaceEntry(input: DeleteSpaceEntryInput!): OperationResult!",
-    "updateSpace(input: UpdateSpaceInput!): Space!",
-  ],
-  queryFields: [
-    "space(appId: ULID!, spaceId: ULID!): Space!",
-    "spaceFiles(path: String, appId: ULID!, spaceId: ULID!): SpaceFileListing!",
-    "spaceList(appId: ULID!): [SpaceView!]!",
-  ],
-  typeDefs: spaceSchema,
-} satisfies GraphQLModuleSpec;
-
 export const userGraphQLSpec = {
   mutationFields: [
     "setSystemAgentModel(input: SetSystemAgentModelInput!): Account!",
@@ -221,12 +210,12 @@ export const graphqlModuleSpecs = [
   channelGraphQLSpec,
   costGraphQLSpec,
   environmentGraphQLSpec,
+  fileGraphQLSpec,
   mcpGraphQLSpec,
   onboardingGraphQLSpec,
   appGraphQLSpec,
   sessionGraphQLSpec,
   skillGraphQLSpec,
-  spaceGraphQLSpec,
   userGraphQLSpec,
   vendorCredentialGraphQLSpec,
   organizationGraphQLSpec,

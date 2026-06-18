@@ -17,12 +17,10 @@ import type {
   McpServer,
   RuntimeId,
   SkillInfo,
-  SpaceBinding,
   ToolInfo,
   UserInfo,
 } from "./agent.types";
 const DEFAULT_ENVIRONMENT_CONFIG: AgentEnvironmentConfig = {
-  boundSpaceIds: [],
   environmentId: null,
 };
 
@@ -102,10 +100,6 @@ function toMcpServer(binding: AgentEditorState["mcpBindings"][number]): McpServe
   return server;
 }
 
-function toSpaceBinding(spaceId: string): SpaceBinding {
-  return { id: spaceId, name: spaceId };
-}
-
 function toOwner(
   profile:
     | Pick<AgentSummary, "id" | "owner" | "viewerRole">
@@ -143,7 +137,6 @@ function createEmptyAgentConfig(): Agent["config"] {
     prompt: "",
     providerOptions: {},
     skills: [],
-    spaces: [],
   };
 }
 
@@ -190,7 +183,6 @@ export function mapAgentDetailToView(
       prompt: profile.prompt,
       providerOptions: editorDetail?.providerOptions ?? {},
       skills: profile.skills.map((skill) => toSkillInfo(skill)),
-      spaces: environmentConfig.boundSpaceIds.map((spaceId) => toSpaceBinding(spaceId)),
     },
     createdAt: profile.createdAt,
     description: profile.description ?? "",

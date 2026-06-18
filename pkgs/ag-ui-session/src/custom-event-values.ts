@@ -1,5 +1,3 @@
-import type { SpaceFileLockView, SpaceWriteStaleEvent } from "@mosoo/contracts/space";
-
 import type {
   SessionCommandOption,
   SessionConfigOption,
@@ -98,13 +96,6 @@ export interface MosooSessionConfigTraceMcpServer {
   serverId: string;
 }
 
-export interface MosooSessionConfigTraceSpaceAlias {
-  aliasPath: string;
-  globalMountPath: string;
-  spaceId: string;
-  spaceName: string;
-}
-
 export interface MosooSessionConfigTraceBootPayload {
   credentialRefs: "redacted"[];
   cwd: string;
@@ -114,7 +105,6 @@ export interface MosooSessionConfigTraceBootPayload {
   provider: string;
   runtimeId: string;
   runtimeTransport: string;
-  spaceAliases: MosooSessionConfigTraceSpaceAlias[];
 }
 
 export interface MosooSessionConfigTraceValue {
@@ -167,9 +157,3 @@ export interface MosooSessionInfoUpdatedValue {
   title?: string | null;
   updatedAt?: string | null;
 }
-
-export interface MosooSpaceLockEventValue {
-  lock: SpaceFileLockView;
-}
-
-export type MosooSpaceWriteStaleEventValue = SpaceWriteStaleEvent;

@@ -8,7 +8,7 @@ import type {
   UnavailableMcpAuthorizationState,
   UnavailableMcpCredentialStatus,
 } from "@mosoo/contracts/mcp";
-import type { SandboxSubjectKind, SpaceAliasBinding } from "@mosoo/contracts/sandbox";
+import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
 import type { SkillMaterializationStatus, SkillResolutionMode } from "@mosoo/contracts/skill";
 import type {
   AccountId,
@@ -26,22 +26,10 @@ import type {
   SessionRunId,
   SkillId,
   SkillSnapshotId,
-  SpaceId,
 } from "@mosoo/id";
 import type { DriverNativeRuntimeRef, DriverRuntime } from "agent-driver/runtime";
 
 export type { DriverRuntime };
-
-export interface DriverAppAccessSnapshotEntry {
-  readonly canWrite: boolean;
-  readonly mountPath: string;
-  readonly spaceId: SpaceId;
-  readonly type: "space";
-}
-
-export interface DriverAppAccessSnapshotOutput {
-  readonly entries: DriverAppAccessSnapshotEntry[];
-}
 
 export interface DriverOrigin {
   readonly callerUserId: AccountId;
@@ -62,7 +50,6 @@ export interface DriverSessionContext {
   readonly homePath: string;
   readonly origin: DriverOrigin;
   readonly sessionOrganizationPath: string;
-  readonly spaceAliases: SpaceAliasBinding[];
 }
 
 export interface DriverConfigRevision {
@@ -164,14 +151,12 @@ export interface DriverExecutionEnvironment {
 export interface DriverExecutionSessionContext {
   readonly sandboxSessionId: SandboxSessionId;
   readonly homePath: string;
-  readonly appAccessSnapshot: DriverAppAccessSnapshotOutput;
   readonly origin: DriverOrigin;
   readonly sandboxId: SandboxId;
   readonly sandboxKind: AgentKind;
   readonly sandboxSubjectId: PlatformId;
   readonly sandboxSubjectKind: SandboxSubjectKind;
   readonly sessionOrganizationPath: string;
-  readonly spaceAliases: SpaceAliasBinding[];
 }
 
 export interface DriverExecutionSessionSpec {

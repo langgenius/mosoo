@@ -10,11 +10,10 @@ import type {
   McpServerId,
   PlatformId,
   SkillId,
-  SpaceId,
 } from "@mosoo/id";
 
-export type AgentBuilderBindableAssetId = EnvironmentId | McpServerId | SkillId | SpaceId;
-export type AgentBuilderBindableAssetType = "environment" | "mcp" | "skill" | "space";
+export type AgentBuilderBindableAssetId = EnvironmentId | McpServerId | SkillId;
+export type AgentBuilderBindableAssetType = "environment" | "mcp" | "skill";
 
 type ParsePlatformIdValue<TId extends PlatformId> = (value: unknown, label: string) => TId;
 
@@ -83,10 +82,6 @@ export function parseSkillId(value: unknown, label = "skillId"): SkillId {
   return parsePlatformId<SkillId>(value, label);
 }
 
-export function parseSpaceId(value: unknown, label = "spaceId"): SpaceId {
-  return parsePlatformId<SpaceId>(value, label);
-}
-
 export function parseNullableEnvironmentId(
   value: unknown,
   label = "environmentId",
@@ -103,10 +98,6 @@ export function parseMcpServerIdList(
 
 export function parseSkillIdList(values: readonly unknown[], label = "skillIds"): SkillId[] {
   return parseIdList(values, label, parseSkillId);
-}
-
-export function parseSpaceIdList(values: readonly unknown[], label = "spaceIds"): SpaceId[] {
-  return parseIdList(values, label, parseSpaceId);
 }
 
 export function parseAgentBuilderBindableAssetId(input: {
@@ -126,5 +117,5 @@ export function parseAgentBuilderBindableAssetId(input: {
     return parseSkillId(input.value, input.label ?? "skillId");
   }
 
-  return parseSpaceId(input.value, input.label ?? "spaceId");
+  throw new Error(`Unsupported Agent Builder asset type: ${input.assetType}`);
 }

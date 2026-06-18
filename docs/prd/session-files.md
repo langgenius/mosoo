@@ -73,7 +73,7 @@ The expected behavior is simple:
 | **Artifact**              | Runtime-produced file. It can appear in Thread file projections, but is not uploaded by a caller as an input file.  |
 | **Runtime manifest**      | The list of currently attached Session files injected into the next user turn with read-only paths for the runtime. |
 | **Channel provider file** | File-like content received from Slack, Lark, Telegram, Discord, WeChat, or another provider. It must be normalized. |
-| **App Storage / Space**   | Persistent App-local file storage. It is separate from Thread files and has its own App-owned access model.         |
+| **Files Library**         | General uploaded file pool. It is separate from Thread files unless a file is explicitly scoped to a Session.        |
 | **App ownership** | The boundary inherited from Agent -> Thread -> Session. File access is checked against that boundary.               |
 
 ---

@@ -22,6 +22,7 @@ export type DriverInstanceId = SemanticPlatformId<"DriverInstanceId">;
 export type EnvironmentId = SemanticPlatformId<"EnvironmentId">;
 export type EnvironmentRevisionId = SemanticPlatformId<"EnvironmentRevisionId">;
 export type FileId = SemanticPlatformId<"FileId">;
+export type FileVersionId = SemanticPlatformId<"FileVersionId">;
 export type McpOAuthFlowId = SemanticPlatformId<"McpOAuthFlowId">;
 export type McpServerId = SemanticPlatformId<"McpServerId">;
 export type OrganizationId = SemanticPlatformId<"OrganizationId">;
@@ -39,8 +40,6 @@ export type SessionModelCallId = SemanticPlatformId<"SessionModelCallId">;
 export type SessionRunId = SemanticPlatformId<"SessionRunId">;
 export type SkillId = SemanticPlatformId<"SkillId">;
 export type SkillSnapshotId = SemanticPlatformId<"SkillSnapshotId">;
-export type SpaceFileVersionId = SemanticPlatformId<"SpaceFileVersionId">;
-export type SpaceId = SemanticPlatformId<"SpaceId">;
 export type UploadId = SemanticPlatformId<"UploadId">;
 export type VendorCredentialId = SemanticPlatformId<"VendorCredentialId">;
 

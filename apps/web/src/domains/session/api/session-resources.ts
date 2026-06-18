@@ -5,7 +5,7 @@ import type { SessionResource } from "@mosoo/contracts/session";
 import { graphql } from "@/gql";
 import type { AddSessionResourceMutation, ListSessionResourcesQuery } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import { toAccountId, toFileId, toAppId, toSessionId, toSpaceId } from "@/routes/typed-id";
+import { toAccountId, toFileId, toAppId, toSessionId } from "@/routes/typed-id";
 
 const ADD_SESSION_RESOURCE_MUTATION = graphql(/* GraphQL */ `
   mutation AddSessionResource($input: AddSessionResourceInput!) {
@@ -36,6 +36,7 @@ const LIST_SESSION_RESOURCES_QUERY = graphql(/* GraphQL */ `
     listSessionResources(appId: $appId, sessionId: $sessionId) {
       createdAt
       id
+      kind
       mimeType
       name
       path
@@ -59,17 +60,25 @@ export function sessionResourcesQueryKey(
   return ["session-resources", appId, sessionId];
 }
 
+function requireFileScopeId(id: string | null, kind: string): string {
+  if (id === null) {
+    throw new Error(`File scope ${kind} must include an id.`);
+  }
+
+  return id;
+}
+
 function toFileUploadScope(
   scope: AddSessionResourceMutation["addSessionResource"]["scope"],
 ): FileUploadSummary["scope"] {
   switch (scope.kind) {
     case "agent_package":
     case "app_draft":
-      return { id: toAppId(scope.id), kind: scope.kind };
+      return { id: toAppId(requireFileScopeId(scope.id, scope.kind)), kind: scope.kind };
+    case "library":
+      return { id: null, kind: scope.kind };
     case "session":
-      return { id: toSessionId(scope.id), kind: scope.kind };
-    case "space":
-      return { id: toSpaceId(scope.id), kind: scope.kind };
+      return { id: toSessionId(requireFileScopeId(scope.id, scope.kind)), kind: scope.kind };
   }
 }
 
@@ -83,8 +92,6 @@ function toFileUploadOwner(
       return { id: toAppId(owner.id), kind: owner.kind };
     case "session":
       return { id: toSessionId(owner.id), kind: owner.kind };
-    case "space":
-      return { id: toSpaceId(owner.id), kind: owner.kind };
   }
 }
 
@@ -112,6 +119,7 @@ function toSessionResource(
   return {
     createdAt: resource.createdAt,
     id: toFileId(resource.id),
+    kind: resource.kind,
     mimeType: resource.mimeType,
     name: resource.name,
     path: resource.path,

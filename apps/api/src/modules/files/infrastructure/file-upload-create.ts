@@ -1,22 +1,17 @@
-import { getParentPath } from "@mosoo/contracts/file";
 import type {
   CreateFileUploadRequest,
   CreateFileUploadResponse,
-  FileOwnerKind,
-  FileScopeId,
-  FileScopeKind,
   FilePurpose,
   FileUploadStrategy,
 } from "@mosoo/contracts/file";
 import { fileRecordsTable, fileUploadsTable } from "@mosoo/db";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, AppId, SpaceId, UploadId } from "@mosoo/id";
+import type { AccountId, FileId, UploadId } from "@mosoo/id";
 
 import { logInfo } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
-import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
   FileControlError,
@@ -28,11 +23,8 @@ import {
 import {
   choosePartSize,
   chooseUploadStrategy,
-  createAttachmentPath,
   createStagingObjectKey,
   normalizeContentType,
-  normalizeFileName,
-  normalizeSpaceFilePath,
 } from "./file-paths";
 import {
   ensureUploadAccess,
@@ -43,123 +35,18 @@ import {
   toUploadSummary,
 } from "./file-record-store";
 import type { FileRecordRow } from "./file-record-store";
+import { getFileScopeDescriptor, resolveFileUploadTargetContext } from "./file-scope-descriptor";
 import { createMultipartUpload, normalizeR2Etag } from "./r2-s3-client";
-import { ensureAppSessionFileAccess } from "./session-file-ownership";
-import { ensureSpaceAccess } from "./space-access";
-import { ensureSpaceParentDirectories } from "./space-directory-store";
-import { ensureSpaceFileWriteUnlocked } from "./space-file-lock";
 
 const UPLOAD_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
-
-interface FileUploadTargetContext {
-  logicalPath: string;
-  name: string;
-  ownerId: FileScopeId;
-  ownerKind: FileOwnerKind;
-  parentPath: string;
-  scopeId: FileScopeId;
-  scopeKind: FileScopeKind;
-  sessionKind: "artifact" | "attachment" | null;
-}
 
 interface FileUploadOverwriteState {
   ifMatchEtag: string | null;
   overwrite: boolean;
 }
 
-async function resolveFileUploadTargetContext(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  target: CreateFileUploadRequest["target"],
-  fileId: FileId,
-): Promise<FileUploadTargetContext> {
-  if (target.kind === "space") {
-    const logicalPath = normalizeSpaceFilePath(target.path);
-    const parentPath = getParentPath(logicalPath);
-    const scopeId = target.id;
-
-    const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-    const appId: AppId = parsePlatformId(target.appId, "upload space app ID");
-    await ensureSpaceAccess(bindings.DB, viewerId, appId, scopeId, "write");
-    await ensureSpaceParentDirectories(bindings.DB, viewerId, scopeId, parentPath);
-
-    return {
-      logicalPath,
-      name: logicalPath.split("/").pop() ?? logicalPath,
-      ownerId: scopeId,
-      ownerKind: "space",
-      parentPath,
-      scopeId,
-      scopeKind: "space",
-      sessionKind: null,
-    };
-  }
-
-  const name = normalizeFileName(target.name);
-  const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-
-  if (target.kind === "session") {
-    const scopeId = target.id;
-    const appId: AppId = parsePlatformId(target.appId, "upload session app ID");
-    await ensureAppSessionFileAccess(bindings.DB, viewerId, {
-      appId,
-      sessionId: scopeId,
-    });
-    const logicalPath = createAttachmentPath(fileId, name);
-
-    return {
-      logicalPath,
-      name,
-      ownerId: scopeId,
-      ownerKind: "session",
-      parentPath: getParentPath(logicalPath),
-      scopeId,
-      scopeKind: target.kind,
-      sessionKind: "attachment",
-    };
-  }
-
-  if (target.kind === "agent_package") {
-    const logicalPath = createAttachmentPath(fileId, name);
-    const scopeId: AppId = parsePlatformId(target.id, "upload agent package app ID");
-    await ensureAppOwnership(bindings.DB, viewerId, scopeId);
-
-    return {
-      logicalPath,
-      name,
-      ownerId: scopeId,
-      ownerKind: "app",
-      parentPath: getParentPath(logicalPath),
-      scopeId,
-      scopeKind: target.kind,
-      sessionKind: null,
-    };
-  }
-
-  const logicalPath = createAttachmentPath(fileId, name);
-  const scopeId: AppId = parsePlatformId(target.id, "upload app draft app ID");
-  await ensureAppOwnership(bindings.DB, viewerId, scopeId);
-
-  return {
-    logicalPath,
-    name,
-    ownerId: scopeId,
-    ownerKind: "app",
-    parentPath: getParentPath(logicalPath),
-    scopeId,
-    scopeKind: target.kind,
-    sessionKind: "attachment",
-  };
-}
-
 function resolveFileUploadPurpose(input: CreateFileUploadRequest): FilePurpose {
-  const expectedPurposeByTargetKind = {
-    agent_package: "agent_package",
-    app_draft: "app_draft",
-    session: "session_attachment",
-    space: "space_file",
-  } satisfies Record<CreateFileUploadRequest["target"]["kind"], FilePurpose>;
-  const expectedPurpose = expectedPurposeByTargetKind[input.target.kind];
+  const expectedPurpose = getFileScopeDescriptor(input.target.kind).uploadPurpose;
 
   if (input.purpose !== expectedPurpose) {
     throw createFileInvalidRequestError(
@@ -243,15 +130,22 @@ export async function createFileUpload(
   const purpose = resolveFileUploadPurpose(input);
 
   const { logicalPath, name, ownerId, ownerKind, parentPath, scopeId, scopeKind, sessionKind } =
-    await resolveFileUploadTargetContext(bindings, viewer, input.target, fileId);
+    await resolveFileUploadTargetContext({
+      bindings,
+      fileId,
+      target: input.target,
+      viewer,
+    });
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
 
-  await expirePathLocks({
-    database: bindings.DB,
-    path: logicalPath,
-    scopeId,
-    scopeKind,
-  });
+  if (getFileScopeDescriptor(scopeKind).capabilities.pathLocks) {
+    await expirePathLocks({
+      database: bindings.DB,
+      path: logicalPath,
+      scopeId,
+      scopeKind,
+    });
+  }
 
   if (
     await getPendingFileByPath({
@@ -272,15 +166,6 @@ export async function createFileUpload(
   });
 
   const { ifMatchEtag, overwrite } = resolveFileUploadOverwriteState(input, existingReady);
-
-  if (scopeKind === "space" && existingReady !== null && overwrite) {
-    await ensureSpaceFileWriteUnlocked(
-      bindings,
-      viewer,
-      parsePlatformId<SpaceId>(scopeId, "file upload space ID"),
-      logicalPath,
-    );
-  }
 
   const stagingObjectKey = createStagingObjectKey(scopeKind, scopeId, fileId);
   const multipartUploadId = await createMultipartUploadId(bindings, {

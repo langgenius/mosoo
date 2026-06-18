@@ -26,7 +26,6 @@ const COMPLETE_DRAFT_YAML = [
   "assets:",
   "  skills: []",
   "  mcpServers: []",
-  "  spaces: []",
   "builder:",
   "  componentDecisions:",
   "    environment: skipped",
@@ -486,37 +485,6 @@ describe("Agent Builder control-plane action execution", () => {
       }),
     ).rejects.toThrow(
       "Cannot apply Agent Builder Manifest: builder.componentDecisions.environment must be one of: bound, created, skipped.",
-    );
-  });
-
-  test("rejects malformed Space binding states before executing apply", async () => {
-    const fixture = await createAgentBuilderApiFixture();
-    const malformedSpaceStateDraftYaml = [
-      "version: 1",
-      "kind: cattle",
-      "identity:",
-      "  name: Slack Support Bot",
-      "  description: Triage customer support messages in Slack.",
-      "runtime:",
-      "  id: claude-agent-sdk",
-      "  provider: anthropic",
-      "  model: claude-sonnet-4-5",
-      "prompt: Triage Slack support messages and write concise replies.",
-      "assets:",
-      "  spaces:",
-      "    - id: 01J000000000000000000000E2",
-      "      name: Support KB",
-      "      state: banana",
-    ].join("\n");
-
-    await expect(
-      executeFixtureControlPlaneAction(fixture, {
-        agentId: fixture.ids.agentId,
-        draftYaml: malformedSpaceStateDraftYaml,
-        toolId: "apply_agent_config",
-      }),
-    ).rejects.toThrow(
-      "Cannot apply Agent Builder Manifest: assets.spaces[0].state must be one of: active, tombstone.",
     );
   });
 

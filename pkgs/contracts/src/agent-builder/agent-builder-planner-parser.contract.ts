@@ -59,7 +59,6 @@ const AGENT_BUILDER_PLAN_NODE_TARGET_TYPES = new Set<AgentBuilderPlanNodeTargetT
   "environment",
   "mcp",
   "skill",
-  "space",
   "workflow",
 ]);
 

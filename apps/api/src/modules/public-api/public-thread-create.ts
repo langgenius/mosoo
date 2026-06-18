@@ -1,13 +1,10 @@
 import type { PublicThreadApiCreateThreadResponse } from "@mosoo/contracts/public-api";
-import type { FileId, AppId, SessionId } from "@mosoo/id";
+import type { FileId, SessionId } from "@mosoo/id";
 
 import { createErrorLogContext, logError } from "../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
-import {
-  claimAppDraftFilesToSession,
-  ensureAppDraftFilesClaimable,
-} from "../files/application/draft-file-claim.service";
+import { fileStore } from "../files/application/file-store";
 import { createAgentSession, queueSessionRun } from "../runtime/application/session-run.service";
 import { admitPublicThreadCreator } from "./public-thread-admission";
 import type { ThreadCreationAdmission } from "./public-thread-admission";
@@ -26,7 +23,6 @@ import type { CreatePublicThreadRequest } from "./public-thread.types";
 async function claimThreadFiles(input: {
   bindings: ApiBindings;
   fileIds: FileId[];
-  appId: AppId;
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
 }): Promise<void> {
@@ -34,26 +30,25 @@ async function claimThreadFiles(input: {
     return;
   }
 
-  await claimAppDraftFilesToSession(input.bindings, input.viewer, {
-    attachmentIds: input.fileIds,
-    appId: input.appId,
-    sessionId: input.sessionId,
-  });
+  await fileStore.claimToSession(input.bindings, input.viewer, input.sessionId, input.fileIds);
 }
 
 async function ensureThreadFilesClaimable(input: {
   admission: ThreadCreationAdmission;
   bindings: ApiBindings;
   fileIds: FileId[];
+  sessionId: SessionId;
 }): Promise<void> {
   if (input.fileIds.length === 0) {
     return;
   }
 
-  await ensureAppDraftFilesClaimable(input.bindings, input.admission.fileViewer, {
-    attachmentIds: input.fileIds,
-    appId: input.admission.appId,
-  });
+  await fileStore.ensureClaimable(
+    input.bindings,
+    input.admission.fileViewer,
+    input.sessionId,
+    input.fileIds,
+  );
 }
 
 export async function createPublicThread(
@@ -61,11 +56,6 @@ export async function createPublicThread(
 ): Promise<PublicThreadApiCreateThreadResponse> {
   const admission = await admitPublicThreadCreator(request.bindings.DB, request.caller, {
     agentId: request.agentId,
-  });
-  await ensureThreadFilesClaimable({
-    admission,
-    bindings: request.bindings,
-    fileIds: request.input.fileIds,
   });
   let createdSessionId: SessionId | null = null;
   const metadata = createPublicApiThreadMetadata({
@@ -92,10 +82,16 @@ export async function createPublicThread(
     const sessionId = session.id;
     createdSessionId = sessionId;
 
+    await ensureThreadFilesClaimable({
+      admission,
+      bindings: request.bindings,
+      fileIds: request.input.fileIds,
+      sessionId,
+    });
+
     await claimThreadFiles({
       bindings: request.bindings,
       fileIds: request.input.fileIds,
-      appId: admission.appId,
       sessionId,
       viewer: admission.fileViewer,
     });

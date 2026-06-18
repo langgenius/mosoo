@@ -131,7 +131,6 @@ const DRAFT_PATCH_FIELD_LABELS: Record<AgentBuilderDraftPatchChange["fieldPath"]
   provider: "Provider",
   runtimeId: "Runtime",
   skillIds: "Skills",
-  spaceIds: "Spaces",
 };
 
 function getDraftPatchFieldLabel(fieldPath: AgentBuilderDraftPatchChange["fieldPath"]): string {

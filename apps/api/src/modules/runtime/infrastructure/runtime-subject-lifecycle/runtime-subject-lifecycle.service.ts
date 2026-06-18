@@ -1,5 +1,5 @@
 import type { AgentKind } from "@mosoo/contracts/agent";
-import type { SandboxSubjectKind, SpaceAliasBinding } from "@mosoo/contracts/sandbox";
+import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
 import type { RuntimeSubjectErrorCode } from "@mosoo/contracts/sandbox";
 import type {
   AccountId,
@@ -33,7 +33,6 @@ import {
   recordRuntimeRunLeaseReleased,
 } from "./runtime-run-lease-store";
 import type { RuntimeRunLeaseTransitionOutcome } from "./runtime-run-lease-store";
-import { materializeRuntimeSpaces } from "./runtime-space-materializer";
 import {
   getRuntimeSubjectErrorCode,
   isRecoverableRuntimeSubjectErrorCode,
@@ -74,12 +73,9 @@ export type RuntimeSubjectActivationPurpose = "interactive" | "prewarm";
 export interface ActivateRuntimeSubjectInput {
   readonly executionOwnerUserId: AccountId;
   readonly kind: AgentKind;
-  readonly onSpaceMountFailed?: (alias: SpaceAliasBinding, error: unknown) => Promise<void>;
-  readonly onSpaceMountSucceeded?: (alias: SpaceAliasBinding) => Promise<void>;
   readonly diagnosticContext?: RuntimeDiagnosticContext;
   readonly purpose?: RuntimeSubjectActivationPurpose;
   readonly runtimeSubjectId: SandboxId;
-  readonly spaceAliases: SpaceAliasBinding[];
   readonly subjectId: PlatformId;
   readonly subjectKind: SandboxSubjectKind;
   readonly timing?: RuntimeTimingRecorder;
@@ -181,7 +177,6 @@ export class RuntimeSubjectLifecycleService {
     );
     const subject = await this.getHandle(input.runtimeSubjectId);
     const isCold = record === null || record.status === "cold";
-    const mountedSpaceIds = new Set(record?.mountedSpaceIds);
 
     await measureOptional(input.timing, "runtimeSubject.prepareFilesystem", () =>
       prepareRuntimeSubjectFilesystem(subject),
@@ -211,25 +206,10 @@ export class RuntimeSubjectLifecycleService {
         );
       }
 
-      await materializeRuntimeSpaces({
-        bindings: this.#bindings,
-        executionOwnerUserId: input.executionOwnerUserId,
-        isCold,
-        mountedSpaceIds,
-        ...(input.onSpaceMountFailed ? { onSpaceMountFailed: input.onSpaceMountFailed } : {}),
-        ...(input.onSpaceMountSucceeded
-          ? { onSpaceMountSucceeded: input.onSpaceMountSucceeded }
-          : {}),
-        spaceAliases: input.spaceAliases,
-        subject,
-        ...(input.timing ? { timing: input.timing } : {}),
-      });
-
       const activated = await measureOptional(input.timing, "runtimeSubject.markActive", () =>
         markRuntimeSubjectActive(this.#bindings.DB, {
           claimOwner,
           kind: input.kind,
-          mountedSpaceIds,
           runtimeSubjectId: input.runtimeSubjectId,
         }),
       );
@@ -268,7 +248,6 @@ export class RuntimeSubjectLifecycleService {
     readonly originJson: string;
     readonly runtimeSubjectId: SandboxId;
     readonly sessionId: SessionId;
-    readonly spaceAliasesJson: string;
   }): Promise<void> {
     await recordRuntimeConversationSessionActive(this.#bindings.DB, input);
   }
@@ -282,7 +261,6 @@ export class RuntimeSubjectLifecycleService {
     readonly originJson: string;
     readonly runtimeSubjectId: SandboxId;
     readonly sessionId: SessionId;
-    readonly spaceAliasesJson: string;
   }): Promise<void> {
     await recordRuntimeConversationSessionError(this.#bindings.DB, input);
   }

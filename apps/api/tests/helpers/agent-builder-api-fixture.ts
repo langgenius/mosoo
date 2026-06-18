@@ -413,26 +413,6 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       version text
     );
 
-    CREATE TABLE space (
-      created_at integer NOT NULL,
-      id text PRIMARY KEY NOT NULL,
-      name text NOT NULL,
-      owner_account_id text NOT NULL,
-      app_id text NOT NULL,
-      updated_at integer NOT NULL
-    );
-
-    CREATE TABLE space_directory (
-      created_at integer NOT NULL,
-      created_by_account_id text NOT NULL,
-      id text PRIMARY KEY NOT NULL,
-      name text NOT NULL,
-      parent_path text NOT NULL,
-      path text NOT NULL,
-      space_id text NOT NULL,
-      updated_at integer NOT NULL
-    );
-
     CREATE TABLE file_record (
       committed integer NOT NULL,
       created_at integer NOT NULL,
@@ -448,7 +428,7 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       parent_path text NOT NULL,
       path text NOT NULL,
       purpose text NOT NULL,
-      scope_id text NOT NULL,
+      scope_id text,
       scope_kind text NOT NULL,
       session_kind text,
       size integer NOT NULL,
@@ -469,7 +449,7 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       multipart_upload_id text,
       overwrite integer NOT NULL,
       part_size integer,
-      scope_id text NOT NULL,
+      scope_id text,
       scope_kind text NOT NULL,
       status text NOT NULL,
       strategy text NOT NULL,
@@ -490,7 +470,6 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       provider text NOT NULL,
       runtime_id text NOT NULL,
       skills_json text NOT NULL,
-      space_bindings_json text NOT NULL,
       summary text NOT NULL,
       version_number integer NOT NULL
     );
@@ -501,14 +480,6 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       skill_id text NOT NULL,
       sort_order integer NOT NULL,
       PRIMARY KEY (agent_id, skill_id)
-    );
-
-    CREATE TABLE agent_space_binding (
-      agent_id text NOT NULL,
-      created_at integer NOT NULL,
-      sort_order integer NOT NULL,
-      space_id text NOT NULL,
-      PRIMARY KEY (agent_id, space_id)
     );
 
     CREATE TABLE session (
@@ -574,7 +545,6 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       origin_json text NOT NULL,
       sandbox_id text NOT NULL,
       session_id text PRIMARY KEY NOT NULL,
-      space_aliases_json text NOT NULL,
       status text NOT NULL,
       updated_at integer NOT NULL
     );

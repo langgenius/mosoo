@@ -97,18 +97,6 @@ export const MOSOO_CUSTOM_EVENT = {
     direction: "server",
     name: "mosoo.session.usage.updated",
   },
-  spaceLockAcquired: {
-    direction: "server",
-    name: "space.lock.acquired",
-  },
-  spaceLockReleased: {
-    direction: "server",
-    name: "space.lock.released",
-  },
-  spaceWriteStale: {
-    direction: "server",
-    name: "space.write.stale",
-  },
 } as const satisfies Record<
   string,
   MosooCustomEventRegistration<string, MosooCustomEventDirection>

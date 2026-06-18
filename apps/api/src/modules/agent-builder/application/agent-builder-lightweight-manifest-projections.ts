@@ -29,8 +29,6 @@ function emptyPlannerDraftContext(
     provider: null,
     runtimeId: null,
     skillIds: [],
-    spaceIds: [],
-    spaces: [],
   };
 }
 
@@ -77,7 +75,6 @@ export function toAgentBuilderUpdateAgentConfigInput(
     builder: manifest.builder,
     description: manifest.description,
     environment: {
-      boundSpaceIds: manifest.spaceIds,
       environmentId: manifest.environmentId,
     },
     kind: manifest.kind,
@@ -157,7 +154,5 @@ export function toAgentBuilderPlannerDraftContext(
     provider: manifest.provider,
     runtimeId: manifest.runtimeId,
     skillIds: manifest.skillIds,
-    spaceIds: manifest.spaceIds,
-    spaces: manifest.spaceBindings,
   };
 }

@@ -24,7 +24,6 @@ import {
   readNullableEnvironmentId,
   readNullableSkillSnapshotId,
   readSkillId,
-  readSpaceId,
 } from "./agent-platform-ids";
 import { getAgentRow } from "./agent-repository";
 import { toAgentRuntimeModelProjection } from "./agent-runtime-model-identity";
@@ -34,14 +33,9 @@ import {
   listAgentSpecSkills,
   toAgentSpecMcpBindingSnapshots,
   toAgentSpecSkillReferences,
-  toAgentSpecSpaceBindingSnapshots,
   toAgentSpecToolReferences,
 } from "./agent-spec.service";
-import type {
-  AgentSpec,
-  AgentSpecMcpBindingSnapshot,
-  AgentSpecSpaceBindingSnapshot,
-} from "./agent-spec.service";
+import type { AgentSpec, AgentSpecMcpBindingSnapshot } from "./agent-spec.service";
 import { normalizeAgentStoredConfigJson } from "./agent-stored-config.service";
 import type { AgentRow } from "./agent-types";
 
@@ -59,7 +53,6 @@ interface AgentDeploymentVersionRow {
   provider: string;
   runtimeId: string;
   skillsJson: string;
-  spaceBindingsJson: string;
   summary: string;
   versionNumber: number;
 }
@@ -78,13 +71,11 @@ const deploymentVersionColumns = {
   provider: agentDeploymentVersionsTable.provider,
   runtimeId: agentDeploymentVersionsTable.runtimeId,
   skillsJson: agentDeploymentVersionsTable.skillsJson,
-  spaceBindingsJson: agentDeploymentVersionsTable.spaceBindingsJson,
   summary: agentDeploymentVersionsTable.summary,
   versionNumber: agentDeploymentVersionsTable.versionNumber,
 };
 
 export type AgentVersionMcpBindingSnapshot = AgentSpecMcpBindingSnapshot;
-export type AgentVersionSpaceBindingSnapshot = AgentSpecSpaceBindingSnapshot;
 
 const AgentVersionMcpBindingSnapshotJson = type({
   agentCredentialId: NonEmptyString.or("null"),
@@ -102,16 +93,10 @@ const AgentVersionSkillReferenceJson = type({
   sortOrder: "number",
 });
 
-const AgentVersionSpaceBindingSnapshotJson = type({
-  spaceId: NonEmptyString,
-  sortOrder: "number",
-});
-
 // Hoisted .array() schemas: arktype lazy-compiles via `new Function`, which
 // workerd permits only during module init, not per-request.
 const AgentVersionMcpBindingSnapshotJsonArray = AgentVersionMcpBindingSnapshotJson.array();
 const AgentVersionSkillReferenceJsonArray = AgentVersionSkillReferenceJson.array();
-const AgentVersionSpaceBindingSnapshotJsonArray = AgentVersionSpaceBindingSnapshotJson.array();
 
 export interface AgentDeploymentVersionRecord {
   agentId: AgentId;
@@ -127,7 +112,6 @@ export interface AgentDeploymentVersionRecord {
   provider: string;
   runtimeId: string;
   skills: Omit<SessionExecutionSkillReference, "sessionId">[];
-  spaceBindings: AgentVersionSpaceBindingSnapshot[];
   summary: string;
   versionNumber: number;
 }
@@ -161,14 +145,6 @@ function toRecord(row: AgentDeploymentVersionRow): AgentDeploymentVersionRecord 
     sortOrder: skill.sortOrder,
   }));
 
-  const spaceBindings: AgentVersionSpaceBindingSnapshot[] = parseSchemaValue(
-    AgentVersionSpaceBindingSnapshotJsonArray,
-    JSON.parse(row.spaceBindingsJson),
-  ).map((binding) => ({
-    sortOrder: binding.sortOrder,
-    spaceId: readSpaceId(binding.spaceId),
-  }));
-
   return {
     agentId: readAgentId(row.agentId, "Agent ID"),
     configJson: normalizeAgentStoredConfigJson(row.configJson),
@@ -183,7 +159,6 @@ function toRecord(row: AgentDeploymentVersionRow): AgentDeploymentVersionRecord 
     provider: runtimeModel.provider,
     runtimeId: runtimeModel.runtimeId,
     skills,
-    spaceBindings,
     summary: row.summary,
     versionNumber: row.versionNumber,
   };
@@ -270,7 +245,6 @@ export async function prepareAgentDeploymentVersionCandidate(
   const versionNumber = await getNextVersionNumber(database, agent.id);
   const skills = toAgentSpecSkillReferences(spec);
   const mcpBindings = toAgentSpecMcpBindingSnapshots(spec);
-  const spaceBindings = toAgentSpecSpaceBindingSnapshots(spec);
   const values: typeof agentDeploymentVersionsTable.$inferInsert = {
     agentId: agent.id,
     configJson: spec.configJson,
@@ -285,7 +259,6 @@ export async function prepareAgentDeploymentVersionCandidate(
     provider: spec.provider,
     runtimeId: spec.runtimeId,
     skillsJson: JSON.stringify(skills),
-    spaceBindingsJson: JSON.stringify(spaceBindings),
     summary: input.summary,
     versionNumber,
   };
@@ -305,7 +278,6 @@ export async function prepareAgentDeploymentVersionCandidate(
       provider: spec.provider,
       runtimeId: spec.runtimeId,
       skills,
-      spaceBindings,
       summary: input.summary,
       versionNumber,
     },
@@ -436,9 +408,6 @@ export function toVersionAgentEnvironmentConfig(
   version: AgentDeploymentVersionRecord,
 ): AgentEnvironmentConfig {
   return {
-    boundSpaceIds: [...version.spaceBindings]
-      .toSorted((left, right) => left.sortOrder - right.sortOrder)
-      .map((binding) => binding.spaceId),
     environmentId: version.environmentId,
   };
 }

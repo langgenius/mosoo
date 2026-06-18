@@ -3,10 +3,7 @@ import { describe, expect, mock, test } from "bun:test";
 import type { SandboxSessionId } from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 
-import type {
-  DriverAppAccessSnapshotOutput,
-  DriverProfileConfig,
-} from "../src/modules/runtime/domain/driver-snapshot";
+import type { DriverProfileConfig } from "../src/modules/runtime/domain/driver-snapshot";
 import type {
   ExecutionSessionHandle,
   SandboxHandle,
@@ -32,10 +29,6 @@ const SANDBOX_ID = PLATFORM_ID_FIXTURES.sandbox;
 const SESSION_ID = PLATFORM_ID_FIXTURES.session;
 const SESSION_RUN_ID = PLATFORM_ID_FIXTURES.sessionRun;
 const SANDBOX_SESSION_ID = SESSION_ID as unknown as SandboxSessionId;
-
-const APP_ACCESS_SNAPSHOT: DriverAppAccessSnapshotOutput = {
-  entries: [],
-};
 
 const PROFILE: DriverProfileConfig = {
   agentId: AGENT_ID,
@@ -77,7 +70,6 @@ const PROFILE: DriverProfileConfig = {
       type: "agent",
     },
     sessionOrganizationPath: `/workspace/sessions/${SESSION_ID}`,
-    spaceAliases: [],
   },
   setupScript: "",
   sourceKind: "agent",
@@ -169,7 +161,6 @@ describe("driver session readiness", () => {
     await expect(
       ensureDriverSessionReady(bindings, "https://api.test/runtime", {
         cloudflareSession: {} as ExecutionSessionHandle,
-        appAccessSnapshot: APP_ACCESS_SNAPSHOT,
         profile: PROFILE,
         resolvedMcpServers: [],
         resolvedSkillCatalog: [],

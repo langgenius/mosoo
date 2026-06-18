@@ -5,8 +5,6 @@ import type {
 } from "@mosoo/contracts/agent-builder";
 import type { EnvironmentId } from "@mosoo/id";
 
-import type { AgentBuilderLightweightSpaceBinding } from "./agent-builder-lightweight-manifest";
-
 export interface AgentBuilderLightweightPlannerDraftContext extends AgentBuilderPlannerDraftBindingsContext {
   readonly description: string | null;
   readonly kind: AgentKind | null;
@@ -16,7 +14,6 @@ export interface AgentBuilderLightweightPlannerDraftContext extends AgentBuilder
   readonly prompt: string | null;
   readonly provider: string | null;
   readonly runtimeId: string | null;
-  readonly spaces: AgentBuilderLightweightSpaceBinding[];
 }
 
 export interface AgentBuilderWorkflowDraftSnapshot {

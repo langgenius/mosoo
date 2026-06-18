@@ -22,7 +22,6 @@ interface RequiredCreateAgentField {
 const OPTIONAL_COMPONENT_ITEMS = [
   "skills",
   "mcp_servers",
-  "spaces",
 ] as const satisfies readonly AgentBuilderComponentChecklistItem[];
 
 function hasText(value: string | null): boolean {

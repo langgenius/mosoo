@@ -24,8 +24,7 @@ export function listAgentDraftStages(draft: AgentEditorDraft): AgentDraftStage[]
   const assemblyComplete =
     draft.componentDecisions.environment !== undefined ||
     draft.skills.length > 0 ||
-    draft.mcpServers.length > 0 ||
-    draft.spaces.length > 0;
+    draft.mcpServers.length > 0;
 
   return [
     { complete: identityComplete, id: "identity", label: "Identity" },

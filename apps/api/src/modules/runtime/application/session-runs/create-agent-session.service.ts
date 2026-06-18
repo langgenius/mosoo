@@ -200,10 +200,6 @@ async function buildSessionExecutionPlan(input: {
       setupScript: environmentSnapshot.setupScript,
     },
     skills,
-    spaces: input.source.environment.boundSpaceIds.map((spaceId, index) => ({
-      sortOrder: index,
-      spaceId,
-    })),
     tools,
   };
 }

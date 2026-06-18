@@ -10,7 +10,6 @@ import type {
   McpServerId,
   AppId,
   SkillId,
-  SpaceId,
 } from "@mosoo/id";
 import { sql } from "drizzle-orm";
 import {
@@ -75,7 +74,6 @@ export const agentDeploymentVersionsTable = sqliteTable(
     provider: text("provider").notNull(),
     runtimeId: text("runtime_id").notNull(),
     skillsJson: text("skills_json").notNull(),
-    spaceBindingsJson: text("space_bindings_json").notNull(),
     summary: text("summary").notNull(),
     versionNumber: integer("version_number").notNull(),
   },
@@ -131,24 +129,7 @@ export const agentSkillsTable = sqliteTable(
   ],
 );
 
-export const agentSpaceBindingsTable = sqliteTable(
-  "agent_space_binding",
-  {
-    agentId: platformIdColumn<AgentId>("agent_id").notNull(),
-    createdAt: integer("created_at").notNull(),
-    sortOrder: integer("sort_order").notNull(),
-    spaceId: platformIdColumn<SpaceId>("space_id").notNull(),
-  },
-  (table) => [
-    primaryKey({
-      columns: [table.agentId, table.spaceId],
-    }),
-    index("agent_space_binding_agent_sort_idx").on(table.agentId, table.sortOrder),
-  ],
-);
-
 export type AgentDeploymentVersionRow = typeof agentDeploymentVersionsTable.$inferSelect;
 export type AgentMcpBindingRow = typeof agentMcpBindingsTable.$inferSelect;
 export type AgentRow = typeof agentsTable.$inferSelect;
 export type AgentSkillRow = typeof agentSkillsTable.$inferSelect;
-export type AgentSpaceBindingRow = typeof agentSpaceBindingsTable.$inferSelect;

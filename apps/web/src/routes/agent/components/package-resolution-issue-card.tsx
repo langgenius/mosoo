@@ -33,9 +33,6 @@ function getIssueActionLabel(issue: AgentResolutionIssue): string {
   if (issue.targetType === "environment") {
     return "Choose environment";
   }
-  if (issue.targetType === "space") {
-    return "Rebind space";
-  }
   if (issue.targetType === "channel") {
     return "Reconnect channel";
   }

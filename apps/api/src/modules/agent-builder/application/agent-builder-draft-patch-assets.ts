@@ -11,12 +11,7 @@ import type {
 import { getAgentBuilderDraftPatchAssetFieldSpec } from "@mosoo/contracts/agent-builder";
 
 import { normalizeDraftPatchIdList } from "./agent-builder-draft-patch-id-list";
-import {
-  parseEnvironmentId,
-  parseMcpServerId,
-  parseSkillId,
-  parseSpaceId,
-} from "./agent-builder-ids";
+import { parseEnvironmentId, parseMcpServerId, parseSkillId } from "./agent-builder-ids";
 
 export type VisibleAssetReferenceMapResolver = (
   fieldPath: AgentBuilderDraftPatchFieldPath,
@@ -85,7 +80,7 @@ function parseReferenceId(
     return parseSkillId(value, label);
   }
 
-  return parseSpaceId(value, label);
+  throw new Error(`Unsupported draft patch reference target type: ${spec.targetType}`);
 }
 
 function createDraftPatchReference(

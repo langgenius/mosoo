@@ -252,11 +252,10 @@ describe("session run cancel", () => {
             origin_json,
             sandbox_id,
             session_id,
-            space_aliases_json,
             status,
             updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `,
       )
       .bind(
@@ -266,7 +265,6 @@ describe("session run cancel", () => {
         "{}",
         SANDBOX_ID,
         OWNER_SESSION_ID,
-        "[]",
         "active",
         1,
       )

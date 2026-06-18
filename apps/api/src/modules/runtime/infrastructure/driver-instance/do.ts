@@ -24,7 +24,6 @@ import {
 import { toDriverInstanceRequestErrorStatus } from "./connections";
 import { json, toErrorMessage } from "./driver-instance-support";
 import { runtimeSessionLinkNeedsRefresh } from "./event-types";
-import { DriverInstanceFileWatchSupervisor } from "./file-watch-supervisor";
 import { handleDriverInstanceRequest } from "./http";
 import type { DriverInstanceHttpHandler, DriverInstanceSandboxSocketRequest } from "./http";
 import { getDriverInstanceStatus, markDriverInstanceConnected } from "./lifecycle";
@@ -53,7 +52,6 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
     mismatchMessage: "Driver instance id does not match the active Durable Object.",
     requiredMessage: "Driver instance id is required.",
   });
-  readonly #fileWatch: DriverInstanceFileWatchSupervisor;
   readonly #rpcController: DriverInstanceRpcController;
   #rpcHandler: RPCHandler<DriverInstanceRpcContext> | null = null;
   #rpcHandlerPromise: Promise<RPCHandler<DriverInstanceRpcContext>> | null = null;
@@ -83,44 +81,12 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
       getDriverInstanceId: () => this.#state.driverInstanceId,
       withRuntimeLogContext: (fn) => this.#withRuntimeLogContext(fn),
     });
-    this.#fileWatch = new DriverInstanceFileWatchSupervisor({
-      env,
-      getDriverInstanceId: () => this.#state.requireDriverInstanceId(),
-      onFailure: async (error, link) => {
-        this.#withRuntimeLogContext(() => {
-          logError("runtime.file_watch.failed", {
-            ...createErrorLogContext(error),
-            driverInstanceId: this.#state.driverInstanceId,
-            sessionId: link.sessionId,
-            sessionRunId: link.sessionRunId,
-          });
-        });
-
-        if (!isTruthy(link.agentId) || !isTruthy(link.sessionId)) {
-          return;
-        }
-
-        await appendRuntimeDiagnosticEvent(this.env, {
-          eventName: RUNTIME_DIAGNOSTIC_EVENT.transportResyncRequired.name,
-          sessionId: link.sessionId,
-          value: {
-            ...toRuntimeDiagnosticBaseValue({
-              agentId: link.agentId,
-              sessionId: link.sessionId,
-              traceId: link.traceId,
-            }),
-            reason: toRuntimeDiagnosticReason(error, "Runtime file watch failed; resync required."),
-          },
-        });
-      },
-    });
     this.#terminalState = new DriverInstanceTerminalStateCoordinator({
       clearStorage: async () => {
         await ctx.storage.deleteAlarm();
         await ctx.storage.deleteAll();
       },
       env,
-      fileWatch: this.#fileWatch,
       state: this.#state,
       viewCache: this.#viewCache,
       viewerEventDelivery: this.#viewerEventDelivery,
@@ -128,7 +94,6 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
     });
     this.#rpcController = new DriverInstanceRpcController({
       env,
-      fileWatch: this.#fileWatch,
       finalizeTerminalState: async () => this.#terminalState.finalize(),
       sockets: this.#sockets,
       state: this.#state,

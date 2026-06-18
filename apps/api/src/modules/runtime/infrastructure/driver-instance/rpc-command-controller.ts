@@ -1,4 +1,6 @@
+import { RuntimeCommandResult } from "@mosoo/contracts/runtime-command";
 import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
+import { parseSchemaValue } from "@mosoo/contracts/validation";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverCommandId } from "@mosoo/id";
 import type {
@@ -25,6 +27,12 @@ import { currentTimestampPlus } from "./driver-instance-support";
 import type { DriverInstanceRpcOperationContext } from "./rpc";
 import type { DriverInstanceRpcControllerDependencies } from "./rpc-controller-dependencies";
 import { releaseLinkedTerminalDriverInstanceSessionRun } from "./terminal-run-release";
+
+function toStoredRuntimeCommandResult(
+  result: DriverCommandUpdateInput["result"],
+): RuntimeCommandResult {
+  return parseSchemaValue(RuntimeCommandResult, result);
+}
 
 export class DriverInstanceRpcCommandController {
   readonly #dependencies: DriverInstanceRpcControllerDependencies;
@@ -70,7 +78,7 @@ export class DriverInstanceRpcCommandController {
       driverInstanceId,
       ...(input.error === undefined ? {} : { error: input.error }),
       status: input.status,
-      ...(input.result === undefined ? {} : { result: input.result }),
+      ...(input.result === undefined ? {} : { result: toStoredRuntimeCommandResult(input.result) }),
     });
     context.assertActiveConnection();
 

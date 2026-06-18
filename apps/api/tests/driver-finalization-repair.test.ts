@@ -91,11 +91,10 @@ async function insertFinalizedDriverLeaseFixture(database: SqliteD1Database): Pr
           origin_json,
           sandbox_id,
           session_id,
-          space_aliases_json,
           status,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
     )
     .bind(
@@ -110,7 +109,6 @@ async function insertFinalizedDriverLeaseFixture(database: SqliteD1Database): Pr
       }),
       PUBLIC_API_TEST_IDS.sandbox,
       PUBLIC_API_TEST_IDS.ownerSession,
-      "[]",
       "active",
       1,
     )

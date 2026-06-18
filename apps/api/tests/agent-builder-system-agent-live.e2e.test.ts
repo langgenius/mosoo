@@ -42,7 +42,6 @@ const DRAFT_YAML = [
   "assets:",
   "  skills: []",
   "  mcpServers: []",
-  "  spaces: []",
 ].join("\n");
 
 async function loginAndReadViewer(input: Awaited<ReturnType<typeof createAgentBuilderApiFixture>>) {

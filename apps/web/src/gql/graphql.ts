@@ -81,7 +81,6 @@ export type AgentChannelBindingStatus =
   | 'error';
 
 export type AgentEnvironmentConfigInput = {
-  boundSpaceIds: Array<PlatformId>;
   environmentId?: PlatformId | null | undefined;
 };
 
@@ -123,8 +122,7 @@ export type AgentResolutionTargetType =
   | 'model'
   | 'provider'
   | 'runtime'
-  | 'skill'
-  | 'space';
+  | 'skill';
 
 export type AgentSessionActionCapabilityName =
   | 'add_session_resource'
@@ -316,18 +314,6 @@ export type CreateSlackAgentChannelBindingInput = {
   threadRepliesRequireMention?: boolean | null | undefined;
 };
 
-export type CreateSpaceDirectoryInput = {
-  appId: PlatformId;
-  name: string;
-  path?: string | null | undefined;
-  spaceId: PlatformId;
-};
-
-export type CreateSpaceInput = {
-  appId: PlatformId;
-  name: string;
-};
-
 export type CreateTelegramAgentChannelBindingInput = {
   agentId: PlatformId;
   appId: PlatformId;
@@ -357,12 +343,6 @@ export type DeleteAgentInput = {
 export type DeleteEnvironmentInput = {
   appId: PlatformId;
   environmentId: PlatformId;
-};
-
-export type DeleteSpaceEntryInput = {
-  appId: PlatformId;
-  key: string;
-  spaceId: PlatformId;
 };
 
 export type DeleteVendorCredentialInput = {
@@ -408,24 +388,34 @@ export type ExecuteAgentBuilderControlPlaneActionInput = {
   toolId: AgentBuilderExecutableActionToolId;
 };
 
+export type FileListInput = {
+  scopeId?: PlatformId | null | undefined;
+  scopeKind?: FileScopeKind | null | undefined;
+  sessionKind?: FileSessionKind | null | undefined;
+};
+
 export type FileOwnerKind =
   | 'account'
   | 'app'
-  | 'session'
-  | 'space';
+  | 'session';
 
 export type FilePurpose =
   | 'agent_asset'
   | 'agent_package'
   | 'app_draft'
-  | 'session_attachment'
-  | 'space_file';
+  | 'library_file'
+  | 'session_artifact'
+  | 'session_attachment';
 
 export type FileScopeKind =
   | 'agent_package'
   | 'app_draft'
-  | 'session'
-  | 'space';
+  | 'library'
+  | 'session';
+
+export type FileSessionKind =
+  | 'artifact'
+  | 'attachment';
 
 export type FileUploadStatus =
   | 'aborted'
@@ -638,10 +628,6 @@ export type SkillSnapshotEntryKind =
 
 export type SkillSourceKind =
   | 'official'
-  | 'user';
-
-export type SpaceFileLockHolderType =
-  | 'agent'
   | 'user';
 
 export type StartLarkAgentChannelRegistrationInput = {
@@ -865,7 +851,7 @@ export type AgentEditorStateQueryVariables = Exact<{
 }>;
 
 
-export type AgentEditorStateQuery = { agentEditorState: { id: PlatformId, providerOptions: JsonObject, builder: { componentDecisions: { agentType: AgentBuilderAgentTypeDecision | null, environment: AgentBuilderComponentDecision | null } }, environment: { boundSpaceIds: Array<PlatformId>, environmentId: PlatformId | null }, packageResolution: { recordedAt: string, source: AgentPackageResolutionSource, report: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, boundSpaceCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } | null, mcpBindings: Array<{ authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialMode: AgentMcpCredentialMode, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, credentialSubject: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, serverId: PlatformId, source: McpServerSource, updatedAt: string, url: string }>, readiness: { checkedAt: string, ready: boolean, issues: Array<{ code: string, message: string, severity: AgentReadinessSeverity }> } } };
+export type AgentEditorStateQuery = { agentEditorState: { id: PlatformId, providerOptions: JsonObject, builder: { componentDecisions: { agentType: AgentBuilderAgentTypeDecision | null, environment: AgentBuilderComponentDecision | null } }, environment: { environmentId: PlatformId | null }, packageResolution: { recordedAt: string, source: AgentPackageResolutionSource, report: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } | null, mcpBindings: Array<{ authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialMode: AgentMcpCredentialMode, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, credentialSubject: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, serverId: PlatformId, source: McpServerSource, updatedAt: string, url: string }>, readiness: { checkedAt: string, ready: boolean, issues: Array<{ code: string, message: string, severity: AgentReadinessSeverity }> } } };
 
 export type UpdateAgentConfigMutationVariables = Exact<{
   input: UpdateAgentConfigInput;
@@ -895,14 +881,14 @@ export type ImportAgentPackageMutationVariables = Exact<{
 }>;
 
 
-export type ImportAgentPackageMutation = { importAgentPackage: { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, boundSpaceCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
+export type ImportAgentPackageMutation = { importAgentPackage: { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
 
 export type CreateAgentForkMutationVariables = Exact<{
   input: CreateAgentForkInput;
 }>;
 
 
-export type CreateAgentForkMutation = { createAgentFork: { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, boundSpaceCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
+export type CreateAgentForkMutation = { createAgentFork: { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }> }, resolution: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } };
 
 export type PublishAgentMutationVariables = Exact<{
   input: PublishAgentInput;
@@ -1074,6 +1060,13 @@ export type SetAppDefaultEnvironmentMutationVariables = Exact<{
 
 export type SetAppDefaultEnvironmentMutation = { setAppDefaultEnvironment: { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, appId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> } };
 
+export type FileListQueryVariables = Exact<{
+  input?: FileListInput | null | undefined;
+}>;
+
+
+export type FileListQuery = { fileList: { files: Array<{ createdAt: string, createdBy: PlatformId, etag: string | null, expiresAt: string | null, id: PlatformId, mimeType: string | null, name: string, path: string, purpose: FilePurpose, sessionKind: FileSessionKind | null, size: number, status: string, updatedAt: string, version: number, owner: { id: PlatformId, kind: FileOwnerKind }, scope: { id: PlatformId | null, kind: FileScopeKind } }> } };
+
 export type McpCredentialFieldsFragment = { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string };
 
 export type McpServerFieldsFragment = { authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null };
@@ -1159,7 +1152,7 @@ export type AgentSessionDiagnosticsQueryVariables = Exact<{
 }>;
 
 
-export type AgentSessionDiagnosticsQuery = { agentSessionDiagnostics: { generatedAt: string, pendingPermissionCount: number, execution: { binding: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, kind: AgentKind, model: string, provider: string, runtimeId: string, sessionId: PlatformId }, skills: Array<{ skillId: PlatformId, skillName: string }>, spaces: Array<{ spaceId: PlatformId }>, tools: Array<{ credentialMode: string, serverId: PlatformId }> } | null, nativeRuntimeRef: { kind: string | null, runtimeId: string | null, status: string, valuePreview: string | null }, session: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, model: string, provider: string, runtimeId: string, status: SessionStatus, title: string | null, lastRun: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, status: RunStatus, traceId: string } | null } } };
+export type AgentSessionDiagnosticsQuery = { agentSessionDiagnostics: { generatedAt: string, pendingPermissionCount: number, execution: { binding: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, kind: AgentKind, model: string, provider: string, runtimeId: string, sessionId: PlatformId }, skills: Array<{ skillId: PlatformId, skillName: string }>, tools: Array<{ credentialMode: string, serverId: PlatformId }> } | null, nativeRuntimeRef: { kind: string | null, runtimeId: string | null, status: string, valuePreview: string | null }, session: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, model: string, provider: string, runtimeId: string, status: SessionStatus, title: string | null, lastRun: { deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, status: RunStatus, traceId: string } | null } } };
 
 export type CreateAgentSessionMutationVariables = Exact<{
   input: CreateAgentSessionInput;
@@ -1267,7 +1260,7 @@ export type AddSessionResourceMutationVariables = Exact<{
 }>;
 
 
-export type AddSessionResourceMutation = { addSessionResource: { contentType: string, expectedSize: number, expiresAt: string, fileId: PlatformId, partSize: number | null, path: string, purpose: FilePurpose, status: FileUploadStatus, strategy: FileUploadStrategy, owner: { id: PlatformId, kind: FileOwnerKind }, scope: { id: PlatformId, kind: FileScopeKind } } };
+export type AddSessionResourceMutation = { addSessionResource: { contentType: string, expectedSize: number, expiresAt: string, fileId: PlatformId, partSize: number | null, path: string, purpose: FilePurpose, status: FileUploadStatus, strategy: FileUploadStrategy, owner: { id: PlatformId, kind: FileOwnerKind }, scope: { id: PlatformId | null, kind: FileScopeKind } } };
 
 export type ListSessionResourcesQueryVariables = Exact<{
   appId: PlatformId;
@@ -1275,7 +1268,7 @@ export type ListSessionResourcesQueryVariables = Exact<{
 }>;
 
 
-export type ListSessionResourcesQuery = { listSessionResources: Array<{ createdAt: string, id: PlatformId, mimeType: string | null, name: string, path: string, size: number }> };
+export type ListSessionResourcesQuery = { listSessionResources: Array<{ createdAt: string, id: PlatformId, kind: FileSessionKind, mimeType: string | null, name: string, path: string, size: number }> };
 
 export type RemoveSessionResourceMutationVariables = Exact<{
   input: RemoveSessionResourceInput;
@@ -1326,51 +1319,6 @@ export type DeleteOwnedSkillMutationVariables = Exact<{
 
 
 export type DeleteOwnedSkillMutation = { deleteOwnedSkill: { ok: boolean } };
-
-export type CreateSpaceMutationVariables = Exact<{
-  input: CreateSpaceInput;
-}>;
-
-
-export type CreateSpaceMutation = { createSpace: { createdAt: string, id: PlatformId, name: string, ownerId: PlatformId, appId: PlatformId, storagePrefix: string, canDelete: boolean, canManage: boolean, canRead: boolean, canWrite: boolean } };
-
-export type DeleteSpaceMutationVariables = Exact<{
-  appId: PlatformId;
-  spaceId: PlatformId;
-}>;
-
-
-export type DeleteSpaceMutation = { deleteSpace: { ok: boolean } };
-
-export type SpaceFilesQueryVariables = Exact<{
-  appId: PlatformId;
-  spaceId: PlatformId;
-  path?: string | null | undefined;
-}>;
-
-
-export type SpaceFilesQuery = { spaceFiles: { directories: Array<{ key: string }>, files: Array<{ etag: string | null, id: PlatformId, key: string, mimeType: string | null, size: number, uploadedAt: string, version: number, lock: { expiresAt: number, path: string, holder: { displayName: string | null, id: PlatformId, type: SpaceFileLockHolderType } } | null }> } };
-
-export type CreateSpaceDirectoryMutationVariables = Exact<{
-  input: CreateSpaceDirectoryInput;
-}>;
-
-
-export type CreateSpaceDirectoryMutation = { createSpaceDirectory: { key: string } };
-
-export type DeleteSpaceEntryMutationVariables = Exact<{
-  input: DeleteSpaceEntryInput;
-}>;
-
-
-export type DeleteSpaceEntryMutation = { deleteSpaceEntry: { ok: boolean } };
-
-export type SpacesQueryVariables = Exact<{
-  appId: PlatformId;
-}>;
-
-
-export type SpacesQuery = { spaceList: Array<{ createdAt: string, id: PlatformId, name: string, ownerId: PlatformId, appId: PlatformId, storagePrefix: string, canDelete: boolean, canManage: boolean, canRead: boolean, canWrite: boolean }> };
 
 export type ViewerQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -2406,7 +2354,6 @@ export const AgentEditorStateDocument = new TypedDocumentString(`
       }
     }
     environment {
-      boundSpaceIds
       environmentId
     }
     packageResolution {
@@ -2426,7 +2373,6 @@ export const AgentEditorStateDocument = new TypedDocumentString(`
         summary {
           boundMcpServerCount
           boundSkillCount
-          boundSpaceCount
           copiedAssetCount
           createdMcpServerCount
           reusedMcpServerCount
@@ -2549,7 +2495,6 @@ export const ImportAgentPackageDocument = new TypedDocumentString(`
       summary {
         boundMcpServerCount
         boundSkillCount
-        boundSpaceCount
         copiedAssetCount
         createdMcpServerCount
         reusedMcpServerCount
@@ -2615,7 +2560,6 @@ export const CreateAgentForkDocument = new TypedDocumentString(`
       summary {
         boundMcpServerCount
         boundSkillCount
-        boundSpaceCount
         copiedAssetCount
         createdMcpServerCount
         reusedMcpServerCount
@@ -3410,6 +3354,36 @@ fragment EnvironmentSummaryFields on EnvironmentSummary {
   usedByAgentCount
   appId
 }`) as unknown as TypedDocumentString<SetAppDefaultEnvironmentMutation, SetAppDefaultEnvironmentMutationVariables>;
+export const FileListDocument = new TypedDocumentString(`
+    query FileList($input: FileListInput) {
+  fileList(input: $input) {
+    files {
+      createdAt
+      createdBy
+      etag
+      expiresAt
+      id
+      mimeType
+      name
+      owner {
+        id
+        kind
+      }
+      path
+      purpose
+      scope {
+        id
+        kind
+      }
+      sessionKind
+      size
+      status
+      updatedAt
+      version
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<FileListQuery, FileListQueryVariables>;
 export const McpRegistryDocument = new TypedDocumentString(`
     query McpRegistry($appId: ULID!) {
   mcpRegistry(appId: $appId) {
@@ -3719,9 +3693,6 @@ export const AgentSessionDiagnosticsDocument = new TypedDocumentString(`
       skills {
         skillId
         skillName
-      }
-      spaces {
-        spaceId
       }
       tools {
         credentialMode
@@ -4059,6 +4030,7 @@ export const ListSessionResourcesDocument = new TypedDocumentString(`
   listSessionResources(appId: $appId, sessionId: $sessionId) {
     createdAt
     id
+    kind
     mimeType
     name
     path
@@ -4188,86 +4160,6 @@ export const DeleteOwnedSkillDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<DeleteOwnedSkillMutation, DeleteOwnedSkillMutationVariables>;
-export const CreateSpaceDocument = new TypedDocumentString(`
-    mutation CreateSpace($input: CreateSpaceInput!) {
-  createSpace(input: $input) {
-    createdAt
-    id
-    name
-    ownerId
-    appId
-    storagePrefix
-    canDelete
-    canManage
-    canRead
-    canWrite
-  }
-}
-    `) as unknown as TypedDocumentString<CreateSpaceMutation, CreateSpaceMutationVariables>;
-export const DeleteSpaceDocument = new TypedDocumentString(`
-    mutation DeleteSpace($appId: ULID!, $spaceId: ULID!) {
-  deleteSpace(appId: $appId, spaceId: $spaceId) {
-    ok
-  }
-}
-    `) as unknown as TypedDocumentString<DeleteSpaceMutation, DeleteSpaceMutationVariables>;
-export const SpaceFilesDocument = new TypedDocumentString(`
-    query SpaceFiles($appId: ULID!, $spaceId: ULID!, $path: String) {
-  spaceFiles(appId: $appId, spaceId: $spaceId, path: $path) {
-    directories {
-      key
-    }
-    files {
-      etag
-      id
-      key
-      lock {
-        expiresAt
-        holder {
-          displayName
-          id
-          type
-        }
-        path
-      }
-      mimeType
-      size
-      uploadedAt
-      version
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<SpaceFilesQuery, SpaceFilesQueryVariables>;
-export const CreateSpaceDirectoryDocument = new TypedDocumentString(`
-    mutation CreateSpaceDirectory($input: CreateSpaceDirectoryInput!) {
-  createSpaceDirectory(input: $input) {
-    key
-  }
-}
-    `) as unknown as TypedDocumentString<CreateSpaceDirectoryMutation, CreateSpaceDirectoryMutationVariables>;
-export const DeleteSpaceEntryDocument = new TypedDocumentString(`
-    mutation DeleteSpaceEntry($input: DeleteSpaceEntryInput!) {
-  deleteSpaceEntry(input: $input) {
-    ok
-  }
-}
-    `) as unknown as TypedDocumentString<DeleteSpaceEntryMutation, DeleteSpaceEntryMutationVariables>;
-export const SpacesDocument = new TypedDocumentString(`
-    query Spaces($appId: ULID!) {
-  spaceList(appId: $appId) {
-    createdAt
-    id
-    name
-    ownerId
-    appId
-    storagePrefix
-    canDelete
-    canManage
-    canRead
-    canWrite
-  }
-}
-    `) as unknown as TypedDocumentString<SpacesQuery, SpacesQueryVariables>;
 export const ViewerDocument = new TypedDocumentString(`
     query Viewer {
   viewer {

@@ -61,7 +61,6 @@ import {
   toMcpServerId,
   toAppId,
   toSkillId,
-  toSpaceId,
 } from "@/routes/typed-id";
 
 import {
@@ -172,7 +171,6 @@ function toAgentEnvironmentConfig(
   environment: GraphQLAgentEditorState["environment"],
 ): AgentEnvironmentConfig {
   return {
-    boundSpaceIds: environment.boundSpaceIds.map(toSpaceId),
     environmentId:
       environment.environmentId === null ? null : toEnvironmentId(environment.environmentId),
   };

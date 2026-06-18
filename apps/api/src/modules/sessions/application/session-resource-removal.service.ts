@@ -2,7 +2,7 @@ import type { RemoveSessionResourceInput } from "@mosoo/contracts/session";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { deleteSessionResource } from "../../files/application/session-resource-file.service";
+import { fileStore } from "../../files/application/file-store";
 import type { SessionActionAuthorization } from "../domain/session-access.policy";
 import { ensureSessionResourceCapability } from "./session-resource-capability.service";
 import { publishSessionResourceDelete } from "./session-resource-events.service";
@@ -22,7 +22,7 @@ export async function removeSessionResource(
     viewer,
   });
 
-  const resource = await deleteSessionResource(bindings, viewer, input);
+  const resource = await fileStore.deleteSessionResource(bindings, viewer, input);
 
   await publishSessionResourceDelete({
     bindings,

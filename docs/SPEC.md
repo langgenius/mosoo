@@ -183,19 +183,19 @@ An Environment:
 Organization default environments and admin compliance overrides are migration or future
 governance concepts.
 
-### Storage / Space
+### Files
 
-Storage is persistent App-local file storage. Existing code may still use the name Space.
+Files is a file library plus session-scoped file surface. Existing Space naming is pre-launch legacy and should be removed rather than preserved as a compatibility layer.
 
-Storage:
+Files:
 
-- Belongs to one App.
-- Stores user-visible files and directories.
-- Can be mounted into Agent execution.
-- Can receive write summaries from runtime file activity.
-- Can be bound by one or more Agents.
+- Belongs to the current tenant/account/App access boundary.
+- Stores uploaded files and file metadata.
+- Supports unscoped library files and session-scoped attachments/artifacts.
+- Must not receive runtime artifacts into the unscoped library by default.
+- Is not the product model for generated application source trees, deployable projects, or App asset publishing.
 
-Storage external-access views and org-wide storage catalogs are future governance concepts.
+Generated application source trees, templates, previews, and deployment outputs need their own Project / repository / template model when Mosoo moves toward a VibeSDK-like product.
 
 ### Skill
 
@@ -299,7 +299,7 @@ Account
         |   |   +-- Session Runs
         |   +-- Agent API Endpoint exposure
         |   +-- Channel delivery bindings
-        +-- Storage / Spaces
+        +-- Files
         +-- Environments
         +-- Skills
         +-- MCP Servers
@@ -483,7 +483,7 @@ Apps
     +-- Agents
     +-- Resources
     |   +-- Channels / Gateways
-    |   +-- Storage / Spaces
+    |   +-- Files
     |   +-- Environments
     |   +-- Skills
     |   +-- MCP
@@ -540,7 +540,7 @@ Rules:
 4. Keep Thread as Agent Session in V1; add App inheritance through Agent and
    App-level aggregation.
 5. Move Environment defaults and Provider credentials under App.
-6. Move MCP servers, Skills, Storage/Spaces, and Channels under App resource ownership.
+6. Move MCP servers, Skills, Files, and Channels under App resource ownership.
 7. Keep Agent API endpoint exposure and Channel delivery on Agent.
 8. Add App Templates for common simple shapes such as Pet Agent plus Channel.
 9. Add App usage, health, logs, and Organization billing rollup.

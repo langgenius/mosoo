@@ -5,13 +5,11 @@ import {
   readPreviousVisibleAssetsFromPlannerContextJson,
   readVisibleAssetsFromPlannerContextJson,
 } from "../src/modules/agent-builder/application/agent-builder-previous-visible-assets";
-import { createAgentBuilderSelectedSpaceFileSummaries } from "../src/modules/agent-builder/application/agent-builder-selected-space-file-summaries";
 import { collectAgentBuilderVisibleAssets } from "../src/modules/agent-builder/application/agent-builder-visible-assets.service";
 import type { AgentBuilderVisibleAssetSummaryCollections } from "../src/modules/agent-builder/application/agent-builder-visible-assets.types";
 import { createAgentBuilderVisibleEnvironmentSummaries } from "../src/modules/agent-builder/application/agent-builder-visible-environment-summaries";
 import { createAgentBuilderVisibleMcpServerSummaries } from "../src/modules/agent-builder/application/agent-builder-visible-mcp-server-summaries";
 import { createAgentBuilderVisibleSkillSummaries } from "../src/modules/agent-builder/application/agent-builder-visible-skill-summaries";
-import { createAgentBuilderVisibleSpaceSummaries } from "../src/modules/agent-builder/application/agent-builder-visible-space-summaries";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 
@@ -33,9 +31,6 @@ const VISIBLE_ASSET_IDS = {
   skillBound: "01J00000000000000000000307",
   skillOld: "01J00000000000000000000308",
   skillSnapshot: "01J00000000000000000000309",
-  spaceBound: "01J00000000000000000000310",
-  spaceOld: "01J00000000000000000000311",
-  spaceUnavailable: "01J00000000000000000000312",
 } as const;
 
 const draftYaml = [
@@ -55,18 +50,13 @@ const draftYaml = [
   `    - ${VISIBLE_ASSET_IDS.skillBound}`,
   "  mcpServers:",
   `    - ${VISIBLE_ASSET_IDS.mcpBound}`,
-  "  spaces:",
-  `    - id: ${VISIBLE_ASSET_IDS.spaceBound}`,
-  "      name: Support KB",
 ].join("\n");
 
 function emptySummaries(): AgentBuilderVisibleAssetSummaryCollections {
   return {
     environments: [],
     mcpServers: [],
-    selectedSpaceFiles: [],
     skills: [],
-    spaces: [],
   };
 }
 
@@ -128,16 +118,6 @@ describe("Agent Builder visible asset providers", () => {
         },
       ],
     );
-    const spaces = createAgentBuilderVisibleSpaceSummaries(
-      { boundSpaceIds: new Set([VISIBLE_ASSET_IDS.spaceBound]) },
-      [
-        {
-          id: VISIBLE_ASSET_IDS.spaceBound,
-          name: "support-kb",
-        },
-      ],
-    );
-
     expect(environments[0]).toEqual(
       expect.objectContaining({
         bindingState: "bound",
@@ -156,139 +136,6 @@ describe("Agent Builder visible asset providers", () => {
       expect.objectContaining({
         bindingState: "bound",
         name: "docs-review",
-      }),
-    );
-    expect(spaces[0]).toEqual(
-      expect.objectContaining({
-        bindingState: "bound",
-        name: "support-kb",
-      }),
-    );
-  });
-
-  test("summarizes selected Space files through one batched Space file summary boundary", async () => {
-    const listedBatches: string[][] = [];
-    const summaries = await createAgentBuilderSelectedSpaceFileSummaries({
-      draftSpaces: [
-        { id: VISIBLE_ASSET_IDS.spaceBound, name: "Support KB" },
-        { id: VISIBLE_ASSET_IDS.spaceOld, name: "Legacy KB" },
-        { id: VISIBLE_ASSET_IDS.spaceUnavailable, name: "Private Notes" },
-      ],
-      listSpaceFiles: async (spaceIds) => {
-        listedBatches.push([...spaceIds]);
-
-        return new Map([
-          [
-            VISIBLE_ASSET_IDS.spaceBound,
-            {
-              directories: [{ key: "docs/" }],
-              files: [
-                {
-                  key: "readme.md",
-                  mimeType: "text/markdown",
-                  size: 42,
-                },
-              ],
-            },
-          ],
-          [
-            VISIBLE_ASSET_IDS.spaceOld,
-            {
-              directories: [{ key: "archive/" }],
-              files: [],
-            },
-          ],
-        ]);
-      },
-      visibleSpaces: [{ id: VISIBLE_ASSET_IDS.spaceBound }, { id: VISIBLE_ASSET_IDS.spaceOld }],
-    });
-
-    expect(listedBatches).toEqual([[VISIBLE_ASSET_IDS.spaceBound, VISIBLE_ASSET_IDS.spaceOld]]);
-    expect(summaries.find((summary) => summary.id === VISIBLE_ASSET_IDS.spaceBound)).toEqual(
-      expect.objectContaining({
-        directories: ["docs/"],
-        directoryCount: 1,
-        fileCount: 1,
-        files: [
-          {
-            key: "readme.md",
-            mimeType: "text/markdown",
-            size: 42,
-          },
-        ],
-        id: VISIBLE_ASSET_IDS.spaceBound,
-        listingState: "available",
-        name: "Support KB",
-        unavailableReason: null,
-      }),
-    );
-    expect(summaries.find((summary) => summary.id === VISIBLE_ASSET_IDS.spaceOld)).toEqual(
-      expect.objectContaining({
-        directories: ["archive/"],
-        directoryCount: 1,
-        fileCount: 0,
-        files: [],
-        listingState: "available",
-        name: "Legacy KB",
-        unavailableReason: null,
-      }),
-    );
-    expect(summaries.find((summary) => summary.id === VISIBLE_ASSET_IDS.spaceUnavailable)).toEqual(
-      expect.objectContaining({
-        directories: [],
-        directoryCount: 0,
-        fileCount: 0,
-        files: [],
-        id: VISIBLE_ASSET_IDS.spaceUnavailable,
-        listingState: "unavailable",
-        name: "Private Notes",
-        unavailableReason: "Selected Space is not visible to the current viewer.",
-      }),
-    );
-  });
-
-  test("degrades a missing selected Space file listing entry to an unavailable summary", async () => {
-    const summaries = await createAgentBuilderSelectedSpaceFileSummaries({
-      draftSpaces: [
-        { id: VISIBLE_ASSET_IDS.spaceBound, name: "Support KB" },
-        { id: VISIBLE_ASSET_IDS.spaceOld, name: "Legacy KB" },
-      ],
-      listSpaceFiles: async () => {
-        return new Map([
-          [
-            VISIBLE_ASSET_IDS.spaceBound,
-            {
-              directories: [],
-              files: [
-                {
-                  key: "readme.md",
-                  mimeType: "text/markdown",
-                  size: 42,
-                },
-              ],
-            },
-          ],
-        ]);
-      },
-      visibleSpaces: [{ id: VISIBLE_ASSET_IDS.spaceBound }, { id: VISIBLE_ASSET_IDS.spaceOld }],
-    });
-
-    expect(summaries.find((summary) => summary.id === VISIBLE_ASSET_IDS.spaceBound)).toEqual(
-      expect.objectContaining({
-        fileCount: 1,
-        listingState: "available",
-      }),
-    );
-    expect(summaries.find((summary) => summary.id === VISIBLE_ASSET_IDS.spaceOld)).toEqual(
-      expect.objectContaining({
-        directories: [],
-        directoryCount: 0,
-        fileCount: 0,
-        files: [],
-        id: VISIBLE_ASSET_IDS.spaceOld,
-        listingState: "unavailable",
-        name: "Legacy KB",
-        unavailableReason: "Selected Space files could not be listed.",
       }),
     );
   });
@@ -329,9 +176,7 @@ describe("Agent Builder visible asset providers", () => {
     expect(assets.changesSinceLastTurn).toEqual({
       environments: { added: [], removed: [], updated: [] },
       mcpServers: { added: [], removed: [], updated: [] },
-      selectedSpaceFiles: { added: [], removed: [], updated: [] },
       skills: { added: [], removed: [], updated: [] },
-      spaces: { added: [], removed: [], updated: [] },
     });
   });
 
@@ -341,7 +186,6 @@ describe("Agent Builder visible asset providers", () => {
       collectSummaries: async (input) => {
         expect([...input.boundSkillIds]).toEqual([VISIBLE_ASSET_IDS.skillBound]);
         expect([...input.boundMcpServerIds]).toEqual([VISIBLE_ASSET_IDS.mcpBound]);
-        expect([...input.boundSpaceIds]).toEqual([VISIBLE_ASSET_IDS.spaceBound]);
         expect(input.draft.environmentId).toBe(VISIBLE_ASSET_IDS.environmentBound);
 
         return {
@@ -390,7 +234,6 @@ describe("Agent Builder visible asset providers", () => {
       mcpServerIds: [VISIBLE_ASSET_IDS.mcpBound],
       parseStatus: "parsed",
       skillIds: [VISIBLE_ASSET_IDS.skillBound],
-      spaceIds: [VISIBLE_ASSET_IDS.spaceBound],
     });
     expect(assets.currentIndex.environments).toEqual([
       {
@@ -423,14 +266,12 @@ describe("Agent Builder visible asset providers", () => {
         environment: "skipped",
         mcpServers: "skipped",
         skills: "skipped",
-        spaces: "skipped",
       },
       environmentId: VISIBLE_ASSET_IDS.environmentOld,
       mcpServerIds: [VISIBLE_ASSET_IDS.mcpOld],
       parseError: null,
       parseStatus: "parsed" as const,
       skillIds: [VISIBLE_ASSET_IDS.skillOld],
-      spaceIds: [VISIBLE_ASSET_IDS.spaceOld],
     };
     const expectedPreviousDraftBindings = {
       ...previousDraftBindings,
@@ -487,14 +328,6 @@ describe("Agent Builder visible asset providers", () => {
             updatedAt: "2026-05-20T00:00:00.000Z",
           },
         ],
-        spaces: [
-          {
-            bindingState: "bound",
-            hash: "space-new-hash",
-            id: VISIBLE_ASSET_IDS.spaceBound,
-            name: "Support KB",
-          },
-        ],
       }),
       draftYaml,
       appId: APP_ID,
@@ -522,14 +355,6 @@ describe("Agent Builder visible asset providers", () => {
         snapshotId: VISIBLE_ASSET_IDS.skillSnapshot,
         sourceKind: "manual",
         updatedAt: "2026-05-20T00:00:00.000Z",
-      },
-    ]);
-    expect(assets.changesSinceLastTurn.spaces.added).toEqual([
-      {
-        bindingState: "bound",
-        hash: "space-new-hash",
-        id: VISIBLE_ASSET_IDS.spaceBound,
-        name: "Support KB",
       },
     ]);
   });
@@ -633,9 +458,7 @@ describe("Agent Builder visible asset providers", () => {
     expect(assets.changesSinceLastTurn).toEqual({
       environments: { added: [], removed: [], updated: [] },
       mcpServers: { added: [], removed: [], updated: [] },
-      selectedSpaceFiles: { added: [], removed: [], updated: [] },
       skills: { added: [], removed: [], updated: [] },
-      spaces: { added: [], removed: [], updated: [] },
     });
   });
 
@@ -670,9 +493,7 @@ describe("Agent Builder visible asset providers", () => {
     expect(assets.changesSinceLastTurn).toEqual({
       environments: { added: [], removed: [], updated: [] },
       mcpServers: { added: [], removed: [], updated: [] },
-      selectedSpaceFiles: { added: [], removed: [], updated: [] },
       skills: { added: [], removed: [], updated: [] },
-      spaces: { added: [], removed: [], updated: [] },
     });
   });
 });

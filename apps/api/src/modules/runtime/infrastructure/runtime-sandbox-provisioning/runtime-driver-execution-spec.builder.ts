@@ -11,7 +11,6 @@ import type { DriverNativeRuntimeRef } from "agent-driver/runtime";
 import type {
   DriverBootMcpServer,
   DriverExecutionSpec,
-  DriverAppAccessSnapshotOutput,
   DriverProfileConfig,
   DriverResolvedMcpServer,
   DriverResolvedSkill,
@@ -157,7 +156,6 @@ export async function buildExecutionSpec(
     resolvedSkillCatalog: DriverSkillCatalogEntry[];
     resolvedSkills: Omit<DriverResolvedSkill, "downloadUrl">[];
     sessionRunId?: SessionRunId | null;
-    appAccessSnapshot: DriverAppAccessSnapshotOutput;
   },
 ): Promise<DriverExecutionSpec> {
   const organizationPath = getOrganizationPath(input.profile);
@@ -192,14 +190,12 @@ export async function buildExecutionSpec(
       context: {
         sandboxSessionId: input.profile.session.sandboxSessionId,
         homePath: input.profile.session.homePath,
-        appAccessSnapshot: input.appAccessSnapshot,
         origin: input.profile.session.origin,
         sandboxId: input.profile.sandbox.id,
         sandboxKind: input.profile.kind,
         sandboxSubjectId: input.profile.sandbox.subjectId,
         sandboxSubjectKind: input.profile.sandbox.subjectKind,
         sessionOrganizationPath: organizationPath,
-        spaceAliases: input.profile.session.spaceAliases,
       },
       cwd: organizationPath,
       mcpServers,

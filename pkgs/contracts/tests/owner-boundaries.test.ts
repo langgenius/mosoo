@@ -34,14 +34,14 @@ import {
   createFileObjectKey,
   createScope,
   createSessionFilePath,
-  ensureSpaceFilePathHasExtension,
+  ensureLibraryFilePathHasExtension,
   joinPath,
   normalizeFileName,
-  normalizeSpaceDirectoryPath,
-  normalizeSpaceFilePath,
+  normalizeLibraryDirectoryPath,
+  normalizeLibraryFilePath,
   toSessionResourceMaterializedPath,
 } from "@mosoo/contracts/file";
-import type { FileId, SessionId, SpaceId } from "@mosoo/contracts/id";
+import type { FileId, SessionId } from "@mosoo/contracts/id";
 import {
   createRuntimeModelIdentity,
   isCustomRuntimeModelProvider,
@@ -56,7 +56,6 @@ import {
 
 const FILE_ID = "01J00000000000000000000001" as FileId;
 const SESSION_ID = "01J00000000000000000000002" as SessionId;
-const SPACE_ID = "01J00000000000000000000003" as SpaceId;
 
 function readFixture(path: string): string {
   return readFileSync(new URL(path, import.meta.url), "utf8");
@@ -118,7 +117,7 @@ describe("contracts owner boundaries", () => {
       id: "cross_session_memory",
       label: "Cross-session memory",
       values: {
-        cattle: "Only explicit Space/Backup content",
+        cattle: "Only explicit session files",
         pet: "Stable sandbox continuity",
       },
     });
@@ -212,7 +211,6 @@ describe("contracts owner boundaries", () => {
     expect(resolveAgentBuilderDraftPatchFieldPath("runtime.provider")).toBe("provider");
     expect(resolveAgentBuilderDraftPatchFieldPath("runtime.vendor")).toBeNull();
     expect(getAgentBuilderDraftPatchSectionId("skillIds")).toBe("integrations");
-    expect(getAgentBuilderDraftPatchSectionId("spaceIds")).toBe("environment");
     expect(getAgentBuilderDraftPatchSectionId("prompt")).toBe("basics");
     expect(isAgentBuilderDraftPatchOperation("blocked")).toBe(false);
     expect(isAgentBuilderDraftPatchOperation("remove")).toBe(true);
@@ -222,30 +220,30 @@ describe("contracts owner boundaries", () => {
 
   test("agent builder planner parser preserves visible asset binding state", () => {
     const output = {
-      assistantText: "Bind the Space.",
-      intentSummary: "Bind support Space.",
+      assistantText: "Bind the skill.",
+      intentSummary: "Bind support skill.",
       mode: "draft_patch",
       nodes: [
         {
           actions: [],
           draftPatch: {
-            fieldPath: "spaceIds",
+            fieldPath: "skillIds",
             resolvedReferences: [
               {
                 bindingState: "not_bound",
                 id: "01J00000000000000000000003",
-                name: "Support Space",
-                targetType: "space",
+                name: "Support Skill",
+                targetType: "skill",
               },
             ],
             value: ["01J00000000000000000000003"],
           },
           kind: "draft_patch",
-          nodeKey: "bind_space",
+          nodeKey: "bind_skill",
           operation: "bind",
           requiresConfirmation: false,
           status: "pending",
-          summary: "Bind support Space.",
+          summary: "Bind support skill.",
           targetType: "draft",
         },
       ],
@@ -268,8 +266,8 @@ describe("contracts owner boundaries", () => {
               resolvedReferences: [
                 {
                   id: "01J00000000000000000000003",
-                  name: "Support Space",
-                  targetType: "space",
+                  name: "Support Skill",
+                  targetType: "skill",
                 },
               ],
             },
@@ -402,20 +400,20 @@ describe("contracts owner boundaries", () => {
     ).toThrow();
   });
 
-  test("space directory path normalization tolerates absent roots", () => {
+  test("library directory path normalization tolerates absent roots", () => {
     // A root-level listing arrives as an explicit `null` from the GraphQL
     // nullable `path` argument; it must normalize to the empty root, not throw
     // `Cannot read properties of null (reading 'trim')`.
-    expect(normalizeSpaceDirectoryPath(null)).toBe("");
-    expect(normalizeSpaceDirectoryPath(undefined)).toBe("");
-    expect(normalizeSpaceDirectoryPath("")).toBe("");
-    expect(normalizeSpaceDirectoryPath("docs/notes ")).toBe("docs/notes");
-    expect(() => normalizeSpaceDirectoryPath("/docs")).toThrow();
+    expect(normalizeLibraryDirectoryPath(null)).toBe("");
+    expect(normalizeLibraryDirectoryPath(undefined)).toBe("");
+    expect(normalizeLibraryDirectoryPath("")).toBe("");
+    expect(normalizeLibraryDirectoryPath("docs/notes ")).toBe("docs/notes");
+    expect(() => normalizeLibraryDirectoryPath("/docs")).toThrow();
   });
 
   test("file contract owns user path admission before object key projection", () => {
-    expect(normalizeSpaceFilePath("docs/notes.txt ")).toBe("docs/notes.txt");
-    expect(ensureSpaceFilePathHasExtension("docs/notes.txt")).toBe("docs/notes.txt");
+    expect(normalizeLibraryFilePath("docs/notes.txt ")).toBe("docs/notes.txt");
+    expect(ensureLibraryFilePathHasExtension("docs/notes.txt")).toBe("docs/notes.txt");
     expect(joinPath("docs", "notes.txt")).toBe("docs/notes.txt");
     expect(createAttachmentPath(FILE_ID, " notes.txt ")).toBe(`attachment/${FILE_ID}/notes.txt`);
     expect(createSessionFilePath(FILE_ID, " notes.txt ")).toBe(
@@ -429,7 +427,7 @@ describe("contracts owner boundaries", () => {
       "docs/notes.txt/",
       String.raw`docs\notes.txt`,
     ]) {
-      expect(() => normalizeSpaceFilePath(path)).toThrow();
+      expect(() => normalizeLibraryFilePath(path)).toThrow();
     }
 
     expect(() => normalizeFileName("notes\r\nx-file: bad.txt")).toThrow();
@@ -439,7 +437,7 @@ describe("contracts owner boundaries", () => {
     expect(() => createDownloadDisposition('"', "attachment")).toThrow();
 
     expect(() => joinPath("docs", "nested/notes.txt")).toThrow();
-    expect(() => ensureSpaceFilePathHasExtension("docs/README")).toThrow();
+    expect(() => ensureLibraryFilePathHasExtension("docs/README")).toThrow();
   });
 
   test("file contract rejects noncanonical object key projection records", () => {
@@ -448,9 +446,9 @@ describe("contracts owner boundaries", () => {
         id: FILE_ID,
         name: "notes.txt",
         path: "docs/notes.txt",
-        scope: createScope("space", SPACE_ID),
+        scope: createScope("library", null),
       }),
-    ).toBe(`space/${SPACE_ID}/docs/notes.txt`);
+    ).toBe(`library/${FILE_ID}/docs/notes.txt`);
 
     expect(
       createFileObjectKey({
@@ -466,7 +464,7 @@ describe("contracts owner boundaries", () => {
         id: FILE_ID,
         name: "notes.txt",
         path: "docs/notes.txt ",
-        scope: createScope("space", SPACE_ID),
+        scope: createScope("library", null),
       }),
     ).toThrow();
 

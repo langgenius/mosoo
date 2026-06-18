@@ -12,7 +12,6 @@ import type {
 import { getFileRecordById } from "./file-record-queries";
 import { getFileUploadAccessContextByFileId } from "./file-upload-context-store";
 import { ensureSessionFileAccess } from "./session-file-ownership";
-import { ensureSpaceAccessBySpaceId } from "./space-access";
 
 async function ensureAgentPackageFileAccess(
   database: D1Database,
@@ -30,10 +29,29 @@ async function ensureAgentPackageFileAccess(
   }
 }
 
+function requireScopeId(scopeId: string | null, label: string): string {
+  if (scopeId === null) {
+    throw createFileNotFoundError(`${label} not found.`);
+  }
+
+  return scopeId;
+}
+
+function ensureLibraryFileOwner(
+  viewerId: AccountId,
+  file: FileRecordRow,
+  resourceKind: "file" | "upload",
+): void {
+  if (file.owner_kind !== "account" || file.owner_id !== viewerId) {
+    throw createFileNotFoundError(
+      resourceKind === "file" ? "File not found." : "Upload not found.",
+    );
+  }
+}
+
 export async function ensureUploadAccess({
   database,
   fileId,
-  requiredIntent,
   viewer,
 }: UploadAccessRequest): Promise<FileUploadContext> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
@@ -43,13 +61,8 @@ export async function ensureUploadAccess({
     throw createFileNotFoundError("Upload not found.");
   }
 
-  if (context.upload.scope_kind === "space") {
-    await ensureSpaceAccessBySpaceId(
-      database,
-      viewerId,
-      parsePlatformId(context.upload.scope_id, "upload space ID"),
-      requiredIntent,
-    );
+  if (context.upload.scope_kind === "library") {
+    ensureLibraryFileOwner(viewerId, context.file, "upload");
   } else if (context.upload.scope_kind === "session") {
     if (!context.sessionAccess) {
       throw createFileNotFoundError("Session not found.");
@@ -61,7 +74,7 @@ export async function ensureUploadAccess({
     await ensureAgentPackageFileAccess(
       database,
       viewerId,
-      parsePlatformId<AppId>(context.upload.scope_id, "upload app ID"),
+      parsePlatformId<AppId>(requireScopeId(context.upload.scope_id, "Upload"), "upload app ID"),
       context.upload.created_by_account_id,
       "upload",
     );
@@ -75,7 +88,6 @@ export async function ensureUploadAccess({
 export async function ensureFileAccess({
   database,
   fileId,
-  requiredIntent,
   viewer,
 }: FileAccessRequest): Promise<FileRecordRow> {
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
@@ -85,24 +97,19 @@ export async function ensureFileAccess({
     throw createFileNotFoundError("File not found.");
   }
 
-  if (file.scope_kind === "space") {
-    await ensureSpaceAccessBySpaceId(
-      database,
-      viewerId,
-      parsePlatformId(file.scope_id, "file space ID"),
-      requiredIntent,
-    );
+  if (file.scope_kind === "library") {
+    ensureLibraryFileOwner(viewerId, file, "file");
   } else if (file.scope_kind === "session") {
     await ensureSessionFileAccess(
       database,
       viewerId,
-      parsePlatformId(file.scope_id, "file session ID"),
+      parsePlatformId(requireScopeId(file.scope_id, "File"), "file session ID"),
     );
   } else if (file.scope_kind === "agent_package" || file.scope_kind === "app_draft") {
     await ensureAgentPackageFileAccess(
       database,
       viewerId,
-      parsePlatformId<AppId>(file.scope_id, "file app ID"),
+      parsePlatformId<AppId>(requireScopeId(file.scope_id, "File"), "file app ID"),
       file.created_by_account_id,
       "file",
     );

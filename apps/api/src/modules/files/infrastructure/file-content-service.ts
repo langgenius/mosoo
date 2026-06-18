@@ -1,26 +1,11 @@
-import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, SpaceId } from "@mosoo/id";
+import type { FileId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import {
-  createFileConflictError,
-  createFileDeleteFailedError,
-  createFileNotFoundError,
-  isRetryableFileControlError,
-} from "./file-errors";
+import { createFileConflictError, createFileNotFoundError } from "./file-errors";
 import { createDownloadDisposition } from "./file-paths";
-import {
-  deleteFileControlRows,
-  ensureFileAccess,
-  markFileRecordsDeleting,
-} from "./file-record-store";
-import { deleteObject, getObjectBody } from "./r2-s3-client";
-import { ensureSpaceFileWriteUnlocked } from "./space-file-lock";
-import {
-  commitPendingSpaceFileVersionSafely,
-  createPendingSpaceFileVersion,
-} from "./space-file-version-store";
+import { ensureFileAccess } from "./file-record-store";
+import { getObjectBody } from "./r2-s3-client";
 
 export async function streamFileContent(
   bindings: ApiBindings,
@@ -54,60 +39,4 @@ export async function streamFileContent(
   return new Response(object.body, {
     headers,
   });
-}
-
-export async function deleteFileById(
-  bindings: ApiBindings,
-  viewer: AuthenticatedViewer,
-  fileId: FileId,
-  options: { ifMatchEtag?: string | null | undefined } = {},
-): Promise<void> {
-  const file = await ensureFileAccess({
-    database: bindings.DB,
-    fileId,
-    requiredIntent: "write",
-    viewer,
-  });
-
-  if (file.status !== "ready" && file.status !== "deleting") {
-    throw createFileConflictError("Only a ready file can be deleted.");
-  }
-
-  if (file.scope_kind === "space") {
-    await ensureSpaceFileWriteUnlocked(
-      bindings,
-      viewer,
-      parsePlatformId<SpaceId>(file.scope_id, "file space ID"),
-      file.path,
-    );
-  }
-
-  try {
-    const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
-    const pendingVersion =
-      file.status === "ready"
-        ? await createPendingSpaceFileVersion(bindings, file, viewerId, "delete")
-        : null;
-
-    await commitPendingSpaceFileVersionSafely(bindings, pendingVersion, {
-      fileId,
-      objectKey: file.object_key,
-      path: file.path,
-      reason: "delete",
-      scopeId: file.scope_id,
-    });
-    await markFileRecordsDeleting(bindings.DB, { fileIds: [fileId] });
-    await deleteObject(bindings, file.object_key, {
-      ifMatch:
-        file.status === "ready" ? (options.ifMatchEtag ?? file.etag ?? undefined) : undefined,
-    });
-  } catch (error) {
-    if (isRetryableFileControlError(error)) {
-      throw createFileDeleteFailedError(error.message);
-    }
-
-    throw error;
-  }
-
-  await deleteFileControlRows(bindings.DB, { fileIds: [fileId] });
 }

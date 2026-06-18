@@ -51,7 +51,7 @@ interface FileUploadContextRow {
   upload_multipart_upload_id: string | null;
   upload_overwrite: number;
   upload_part_size: number | null;
-  upload_scope_id: PlatformId;
+  upload_scope_id: PlatformId | null;
   upload_scope_kind: FileScopeKind;
   upload_status: FileUploadStatus;
   upload_strategy: "multipart" | "single_put";
@@ -139,7 +139,7 @@ function toJoinedFileUploadRecord(row: FileUploadContextRow): FileRecordRow {
     parent_path: requireJoinedFileValue(row.file_parent_path, "parent_path"),
     path: requireJoinedFileValue(row.file_path, "path"),
     purpose: requireJoinedFileValue(row.file_purpose, "purpose"),
-    scope_id: requireJoinedFileValue(row.file_scope_id, "scope_id"),
+    scope_id: row.file_scope_id,
     scope_kind: requireJoinedFileValue(row.file_scope_kind, "scope_kind"),
     session_kind: row.file_session_kind,
     size: requireJoinedFileValue(row.file_size, "size"),

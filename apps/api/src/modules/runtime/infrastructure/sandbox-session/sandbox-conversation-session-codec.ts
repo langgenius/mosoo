@@ -1,12 +1,7 @@
-import { SpaceAliasBinding } from "@mosoo/contracts/sandbox";
-import type { SpaceAliasBinding as SpaceAliasBindingValue } from "@mosoo/contracts/sandbox";
-import { parseSchemaValue } from "@mosoo/contracts/validation";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, SpaceId } from "@mosoo/id";
+import type { AccountId } from "@mosoo/id";
 
 import type { DriverOrigin as DriverOriginValue } from "../../domain/driver-snapshot";
-
-const SpaceAliasBindingList = SpaceAliasBinding.array();
 
 function readSandboxConversationOriginRecord(raw: string): Record<string, unknown> {
   const parsed: unknown = JSON.parse(raw);
@@ -49,12 +44,4 @@ export function parseSandboxConversationOrigin(raw: string): DriverOriginValue {
     ),
     type: readSandboxOriginType(origin["type"]),
   };
-}
-
-export function parseSandboxConversationSpaceAliases(raw: string): SpaceAliasBindingValue[] {
-  return parseSchemaValue(SpaceAliasBindingList, JSON.parse(raw)).map((alias) =>
-    Object.assign(alias, {
-      spaceId: parsePlatformId<SpaceId>(alias.spaceId, "sandbox space alias space id"),
-    }),
-  );
 }

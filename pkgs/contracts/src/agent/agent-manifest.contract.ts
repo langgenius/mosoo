@@ -24,8 +24,7 @@ export type AgentResolutionTargetType =
   | "mcp_server"
   | "provider"
   | "runtime"
-  | "skill"
-  | "space";
+  | "skill";
 
 export interface AgentResolutionIssue {
   actionLabel: string | null;
@@ -78,14 +77,6 @@ export interface AgentManifestEnvironmentReference {
   setupScript: string;
 }
 
-export interface AgentManifestSpaceBinding {
-  alias: string;
-  expectedName: string | null;
-  mode: "read";
-  required: boolean;
-  spaceId: string | null;
-}
-
 export interface AgentManifestAdvanced {
   unparsedFields: Record<string, unknown>;
 }
@@ -110,7 +101,6 @@ export interface AgentManifest {
     providerOptions: JsonObject;
   };
   skills: AgentManifestSkillReference[];
-  spaces: AgentManifestSpaceBinding[];
 }
 
 export interface AgentPackageAsset {
@@ -145,7 +135,6 @@ export interface AgentPackage {
 export interface AgentPackageResolutionSummary {
   boundMcpServerCount: number;
   boundSkillCount: number;
-  boundSpaceCount: number;
   copiedAssetCount: number;
   createdMcpServerCount: number;
   reusedMcpServerCount: number;

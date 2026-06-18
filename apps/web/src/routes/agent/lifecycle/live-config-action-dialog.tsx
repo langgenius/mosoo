@@ -43,7 +43,7 @@ const META: Record<LifecycleActionKind, ActionMeta> = {
     title: "Apply changes · patch native config + restart",
   },
   "recreate-preserving-state": {
-    body: "Spaces, network policy, or setup script changed. The container will be rebuilt from a clean image, then your Agent home is restored from the latest backup. Expect ~10–30s of downtime; in-flight sessions reconnect.",
+    body: "Network policy or setup script changed. The container will be rebuilt from a clean image, then your Agent home is restored from the latest backup. Expect ~10-30s of downtime; in-flight sessions reconnect.",
     danger: "medium",
     preservesState: true,
     primary: "Recreate now",

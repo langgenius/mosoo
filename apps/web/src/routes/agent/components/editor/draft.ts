@@ -7,16 +7,9 @@ import type {
 import type { AgentConfigChangeSnapshot } from "@mosoo/contracts/agent-config-change-plan";
 import { parseDocument, stringify } from "yaml";
 
-import { toEnvironmentId, toMcpServerId, toSkillId, toSpaceId } from "@/routes/typed-id";
+import { toEnvironmentId, toMcpServerId, toSkillId } from "@/routes/typed-id";
 
-import type {
-  Agent,
-  AgentKind,
-  McpServer,
-  RuntimeId,
-  SkillInfo,
-  SpaceBinding,
-} from "../../agent.types";
+import type { Agent, AgentKind, McpServer, RuntimeId, SkillInfo } from "../../agent.types";
 import { getRuntimeInfo } from "../../runtime-catalog";
 
 export interface AgentEditorDraft {
@@ -32,7 +25,6 @@ export interface AgentEditorDraft {
   providerOptions: JsonObject;
   runtime: RuntimeId;
   skills: SkillInfo[];
-  spaces: SpaceBinding[];
 }
 
 export function createInitialDraft(agent: Agent): AgentEditorDraft {
@@ -49,7 +41,6 @@ export function createInitialDraft(agent: Agent): AgentEditorDraft {
     providerOptions: agent.config.providerOptions,
     runtime: agent.runtime,
     skills: [...agent.config.skills],
-    spaces: [...agent.config.spaces],
   };
 }
 
@@ -86,18 +77,7 @@ export function toAgentConfigChangeSnapshot(draft: AgentEditorDraft): AgentConfi
       id: toSkillId(skill.id),
       state: skill.state ?? "active",
     })),
-    spaceIds: draft.spaces.map((space) => toSpaceId(space.id)),
   };
-}
-
-export function normalizeSpaces(spaces: SpaceBinding[]): SpaceBinding[] {
-  const uniqueSpaces = new Map<string, SpaceBinding>();
-
-  for (const space of spaces) {
-    uniqueSpaces.set(space.id, space);
-  }
-
-  return [...uniqueSpaces.values()];
 }
 
 export function normalizeMcpServers(servers: McpServer[]): McpServer[] {
@@ -125,10 +105,6 @@ interface AgentDraftYamlShape {
       name: string;
       source?: McpServer["source"];
       url: string;
-    }[];
-    spaces: {
-      id: string;
-      name: string;
     }[];
   };
   builder?: {
@@ -162,10 +138,6 @@ function toDraftYamlShape(draft: AgentEditorDraft): AgentDraftYamlShape {
         state: skill.state ?? "active",
       })),
       mcpServers: normalizeMcpServers(draft.mcpServers).map(toDraftYamlMcpServer),
-      spaces: normalizeSpaces(draft.spaces).map((space) => ({
-        id: space.id,
-        name: space.name,
-      })),
     },
     ...(hasComponentDecisions(draft.componentDecisions)
       ? { builder: { componentDecisions: draft.componentDecisions } }
@@ -244,7 +216,6 @@ export function parseDraftYaml(yaml: string, fallback: AgentEditorDraft): AgentE
     providerOptions: readJsonObject(runtime["providerOptions"], fallback.providerOptions),
     runtime: readString(runtime["id"], fallback.runtime),
     skills: readSkills(assets["skills"], fallback.skills),
-    spaces: readSpaces(assets["spaces"], fallback.spaces),
   };
 }
 
@@ -360,20 +331,6 @@ function readSkills(value: unknown, fallback: SkillInfo[]): SkillInfo[] {
         ...(state === "tombstone" ? { state } : {}),
       },
     ];
-  });
-}
-
-function readSpaces(value: unknown, fallback: SpaceBinding[]): SpaceBinding[] {
-  if (!Array.isArray(value)) {
-    return fallback;
-  }
-
-  return value.flatMap((entry) => {
-    const space = asRecord(entry);
-    const id = space["id"];
-    const name = space["name"];
-
-    return typeof id === "string" && typeof name === "string" ? [{ id, name }] : [];
   });
 }
 

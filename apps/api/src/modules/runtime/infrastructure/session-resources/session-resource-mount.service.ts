@@ -6,8 +6,8 @@ import {
   isRuntimeSandboxLocalBucketEnabled,
   resolveRuntimeSandboxBucketMountTarget,
 } from "../runtime-sandbox-bucket-mount";
-import { toRuntimeSpaceMountConflictError } from "../runtime-sandbox-mount-errors";
-import { RuntimeSpaceMountConflictError } from "../runtime-subject-lifecycle/runtime-subject-errors";
+import { toRuntimeBucketMountConflictError } from "../runtime-sandbox-mount-errors";
+import { RuntimeBucketMountConflictError } from "../runtime-subject-lifecycle/runtime-subject-errors";
 import type { SandboxHandle } from "../sandbox-handles";
 
 function quoteShellArg(value: string): string {
@@ -70,12 +70,12 @@ export async function ensureSessionResourcesMounted(input: {
     );
   } catch (cause) {
     const error =
-      toRuntimeSpaceMountConflictError(cause, {
+      toRuntimeBucketMountConflictError(cause, {
         mountPath,
       }) ?? cause;
 
     if (
-      error instanceof RuntimeSpaceMountConflictError &&
+      error instanceof RuntimeBucketMountConflictError &&
       (localBucket ||
         (await sandboxBucketMountIsReady({
           localBucket,
@@ -88,7 +88,7 @@ export async function ensureSessionResourcesMounted(input: {
 
     if (
       !localBucket &&
-      error instanceof RuntimeSpaceMountConflictError &&
+      error instanceof RuntimeBucketMountConflictError &&
       error.bucket === bucket &&
       error.prefix === prefix
     ) {

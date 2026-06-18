@@ -3,11 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { PUBLIC_THREAD_API_THREADS_MAX_LIMIT } from "@mosoo/contracts/public-api";
 import { sessionsTable } from "@mosoo/db";
 
-import {
-  completeFileUpload,
-  createFileUpload,
-  uploadFileContent,
-} from "../src/modules/files/application/file-http.service";
+import { fileStore } from "../src/modules/files/application/file-store";
 import {
   PUBLIC_API_RATE_LIMIT_REQUESTS_PER_MINUTE,
   enforcePublicApiRateLimit,
@@ -47,7 +43,7 @@ async function createReadyAppDraftFile(input: {
     fileBucket: input.bucket as unknown as R2Bucket,
   }) as ApiBindings;
   const fileBytes = new TextEncoder().encode(input.body);
-  const upload = await createFileUpload(bindings, OWNER_VIEWER, {
+  const upload = await fileStore.createUpload(bindings, OWNER_VIEWER, {
     file: {
       contentType: "text/plain",
       name: input.name,
@@ -65,8 +61,8 @@ async function createReadyAppDraftFile(input: {
     method: "POST",
   }).body;
 
-  await uploadFileContent(bindings, OWNER_VIEWER, upload.fileId, uploadBody);
-  await completeFileUpload({
+  await fileStore.putContent(bindings, OWNER_VIEWER, upload.fileId, uploadBody);
+  await fileStore.completeUpload({
     bindings,
     fileId: upload.fileId,
     input: {},
@@ -86,7 +82,7 @@ async function createPendingAppDraftFile(input: {
     fileBucket: input.bucket as unknown as R2Bucket,
   }) as ApiBindings;
   const fileBytes = new TextEncoder().encode(input.body);
-  const upload = await createFileUpload(bindings, OWNER_VIEWER, {
+  const upload = await fileStore.createUpload(bindings, OWNER_VIEWER, {
     file: {
       contentType: "text/plain",
       name: input.name,
@@ -897,6 +893,68 @@ describe("Public Thread API e2e", () => {
       expectString(readyFileRow.path);
       expect(bucket.objects.has(readyFileRow.object_key)).toBe(true);
 
+      const artifactObjectKey = `session/${threadId}/artifact/${PUBLIC_API_TEST_IDS.fileAlt}/summary.md`;
+
+      await database
+        .prepare(
+          `
+            INSERT INTO file_record (
+              id,
+              scope_kind,
+              scope_id,
+              session_kind,
+              status,
+              name,
+              path,
+              parent_path,
+              object_key,
+              owner_id,
+              owner_kind,
+              purpose,
+              expires_at,
+              mime_type,
+              size,
+              etag,
+              committed,
+              version,
+              created_by_account_id,
+              created_at,
+              updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+        )
+        .bind(
+          PUBLIC_API_TEST_IDS.fileAlt,
+          "session",
+          threadId,
+          "artifact",
+          "ready",
+          "summary.md",
+          `artifact/${PUBLIC_API_TEST_IDS.fileAlt}/summary.md`,
+          `artifact/${PUBLIC_API_TEST_IDS.fileAlt}`,
+          artifactObjectKey,
+          threadId,
+          "session",
+          "session_artifact",
+          null,
+          "text/markdown",
+          23,
+          null,
+          1,
+          1,
+          PUBLIC_API_TEST_IDS.ownerAccount,
+          2,
+          2,
+        )
+        .run();
+      await bucket.put(artifactObjectKey, "runtime summary", {
+        httpMetadata: {
+          contentType: "text/markdown",
+        },
+      });
+      expect(bucket.objects.has(artifactObjectKey)).toBe(true);
+
       const listedFilesResponse = await requestThreadApi(
         new Request(`https://api.example.com/api/v1/threads/${threadId}/files`, {
           headers: { Authorization: bearer(TOKENS.owner) },
@@ -904,11 +962,24 @@ describe("Public Thread API e2e", () => {
       );
       expect(listedFilesResponse.status).toBe(200);
       const listedFiles = expectArray(expectRecord(await readJson(listedFilesResponse))["files"]);
-      expect(listedFiles).toHaveLength(1);
-      expect(expectRecord(listedFiles[0])).toMatchObject({
+      expect(listedFiles).toHaveLength(2);
+      const listedFilesById = new Map(
+        listedFiles.map((listedFile) => {
+          const listedFileRecord = expectRecord(listedFile);
+          return [expectString(listedFileRecord["id"]), listedFileRecord];
+        }),
+      );
+      expect(listedFilesById.get(fileId)).toMatchObject({
         id: fileId,
+        kind: "attachment",
         name: "launch-note.txt",
         size: 13,
+      });
+      expect(listedFilesById.get(PUBLIC_API_TEST_IDS.fileAlt)).toMatchObject({
+        id: PUBLIC_API_TEST_IDS.fileAlt,
+        kind: "artifact",
+        name: "summary.md",
+        size: 23,
       });
 
       const deleteFileResponse = await requestThreadApi(
@@ -920,6 +991,19 @@ describe("Public Thread API e2e", () => {
       expect(deleteFileResponse.status).toBe(200);
       expect(await readJson(deleteFileResponse)).toEqual({ ok: true });
       expect(bucket.objects.has(readyFileRow.object_key)).toBe(false);
+
+      const deleteArtifactResponse = await requestThreadApi(
+        new Request(
+          `https://api.example.com/api/v1/threads/${threadId}/files/${PUBLIC_API_TEST_IDS.fileAlt}`,
+          {
+            headers: { Authorization: bearer(TOKENS.owner) },
+            method: "DELETE",
+          },
+        ),
+      );
+      expect(deleteArtifactResponse.status).toBe(200);
+      expect(await readJson(deleteArtifactResponse)).toEqual({ ok: true });
+      expect(bucket.objects.has(artifactObjectKey)).toBe(false);
 
       const archiveResponse = await requestThreadApi(
         new Request(`https://api.example.com/api/v1/threads/${threadId}/archive`, {

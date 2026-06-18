@@ -18,7 +18,6 @@ import type { AgentBuilderLightweightPlannerDraftContext } from "./agent-builder
 const REMOVABLE_BINDING_FIELD_PATHS = new Set<AgentBuilderDraftPatchFieldPath>([
   "mcpServerIds",
   "skillIds",
-  "spaceIds",
 ]);
 
 export function isAgentBuilderManifestBindingRemove(input: {
@@ -55,8 +54,6 @@ export function readAgentBuilderManifestPatchBaseValue(
       return draft.runtimeId ?? "";
     case "skillIds":
       return draft.skillIds;
-    case "spaceIds":
-      return draft.spaceIds;
   }
 }
 
@@ -148,8 +145,6 @@ function getBindingFieldLabel(fieldPath: AgentBuilderDraftPatchFieldPath): strin
       return "MCP servers";
     case "skillIds":
       return "Skills";
-    case "spaceIds":
-      return "Spaces";
     default:
       return "bindings";
   }

@@ -8,7 +8,6 @@ import type {
   McpServerId,
   AppId,
   SkillId,
-  SpaceId,
 } from "../id/id.contract";
 import type { AgentMcpBinding } from "../mcp/mcp.contract";
 import type { JsonObject } from "../validation/primitives.contract";
@@ -139,7 +138,7 @@ export const AGENT_KIND_RUNTIME_COMPARISON_ROWS = [
     id: "cross_session_memory",
     label: "Cross-session memory",
     values: {
-      cattle: "Only explicit Space/Backup content",
+      cattle: "Only explicit session files",
       pet: "Stable sandbox continuity",
     },
   },
@@ -222,7 +221,6 @@ export interface AgentSkillReference {
 }
 
 export interface AgentEnvironmentConfig {
-  boundSpaceIds: SpaceId[];
   environmentId: EnvironmentId | null;
 }
 

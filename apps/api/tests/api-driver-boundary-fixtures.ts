@@ -38,7 +38,6 @@ export const API_DRIVER_BOUNDARY_IDS = {
   skill: PLATFORM_ID_FIXTURES.skill,
   skillSnapshot: parsePlatformId<SkillSnapshotId>("01J0000000000000000000000Y"),
   tombstoneSkill: parsePlatformId<SkillId>("01J0000000000000000000000Z"),
-  space: PLATFORM_ID_FIXTURES.space,
 } as const;
 
 export function createDriverProfile(): DriverProfileConfig {
@@ -84,14 +83,6 @@ export function createDriverProfile(): DriverProfileConfig {
         type: "agent",
       },
       sessionOrganizationPath: "/organization",
-      spaceAliases: [
-        {
-          aliasPath: "/workspace/docs",
-          globalMountPath: "/organization/spaces/docs",
-          spaceId: API_DRIVER_BOUNDARY_IDS.space,
-          spaceName: "Docs",
-        },
-      ],
     },
     setupScript: "",
     sourceKind: "agent",

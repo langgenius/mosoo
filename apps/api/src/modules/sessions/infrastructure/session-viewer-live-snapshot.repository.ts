@@ -18,20 +18,18 @@ import {
   parseSchemaValue,
 } from "@mosoo/contracts/validation";
 import {
-  fileRecordsTable,
   sessionPermissionRequestsTable,
   sessionReadinessSnapshotsTable,
   sessionRunsTable,
   sessionsTable,
 } from "@mosoo/db";
 import type { AgentDeploymentVersionId, PlatformId, SessionId, SessionRunId } from "@mosoo/id";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { toIsoString } from "../../../time";
-import type { FileRecordRow } from "../../files/infrastructure/file-record-store";
-import { fileRecordRowColumns, toSessionFile } from "../../files/infrastructure/file-record-store";
+import { fileStore } from "../../files/application/file-store";
 import { createInitialSessionLiveState } from "./session-live-state.reducer";
 import { loadStoredSessionMessages } from "./session-message-snapshot.repository";
 
@@ -61,7 +59,6 @@ interface SessionViewerStateJoinedRow extends SessionViewerStateSessionRow {
 }
 
 interface SessionViewerStateSnapshotRow {
-  file: FileRecordRow | null;
   session: SessionViewerStateJoinedRow;
 }
 
@@ -105,7 +102,6 @@ async function listSessionViewerStateSnapshotRows(
 ): Promise<SessionViewerStateSnapshotRow[]> {
   const rows = await getAppDatabase(database)
     .select({
-      file: fileRecordRowColumns,
       session: {
         id: sessionsTable.id,
         run_completed_at: sessionRunsTable.completedAt,
@@ -130,16 +126,8 @@ async function listSessionViewerStateSnapshotRows(
     })
     .from(sessionsTable)
     .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
-    .leftJoin(
-      fileRecordsTable,
-      and(
-        eq(fileRecordsTable.scopeKind, "session"),
-        eq(fileRecordsTable.scopeId, sessionsTable.id),
-        eq(fileRecordsTable.status, "ready"),
-      ),
-    )
     .where(eq(sessionsTable.id, sessionId))
-    .orderBy(desc(fileRecordsTable.createdAt))
+    .limit(1)
     .all();
 
   if (rows.length === 0) {
@@ -293,23 +281,6 @@ function toJoinedSessionRunSummary(row: SessionViewerStateJoinedRow): SessionRun
   });
 }
 
-function toJoinedSessionFile(row: SessionViewerStateSnapshotRow): SessionViewFile | null {
-  const file = row.file;
-
-  if (file === null) {
-    return null;
-  }
-
-  return toSessionFile(file);
-}
-
-function collectJoinedSessionFiles(rows: SessionViewerStateSnapshotRow[]): SessionViewFile[] {
-  return rows.flatMap((row) => {
-    const file = toJoinedSessionFile(row);
-    return file === null ? [] : [file];
-  });
-}
-
 function toIdleRunView(): SessionRunView {
   return {
     completedAt: null,
@@ -394,15 +365,16 @@ export async function loadSessionViewerState(
   const messagesPromise = loadStoredSessionMessages(database, input.sessionId);
   const permissionRequestsPromise = listActivePermissionRequests(database, input.sessionId);
   const readinessPromise = getLatestReadinessSnapshot(database, input.sessionId);
-  const snapshotRows = await snapshotRowsPromise;
-  const session = getFirstSnapshotRow(snapshotRows).session;
-  const latestRun = toJoinedSessionRunSummary(session);
-  const sessionFiles = collectJoinedSessionFiles(snapshotRows);
-  const [messages, permissionRequests, readiness] = await Promise.all([
+  const sessionFilesPromise = fileStore.listReadySessionFiles(database, input.sessionId);
+  const [snapshotRows, messages, permissionRequests, readiness, sessionFiles] = await Promise.all([
+    snapshotRowsPromise,
     messagesPromise,
     permissionRequestsPromise,
     readinessPromise,
+    sessionFilesPromise,
   ]);
+  const session = getFirstSnapshotRow(snapshotRows).session;
+  const latestRun = toJoinedSessionRunSummary(session);
   const baseState = createInitialSessionLiveState({
     sessionId: input.sessionId,
     title: session.title,

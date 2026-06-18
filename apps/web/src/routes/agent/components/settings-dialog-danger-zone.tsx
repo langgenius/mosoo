@@ -250,7 +250,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                   <div className="text-foreground font-medium">What will be preserved</div>
                   <ul className="mt-1 list-disc space-y-1 pl-4">
                     <li>Agent profile, prompts, Skills, and MCP refs</li>
-                    <li>Space files</li>
+                    <li>Session files</li>
                     <li>Past sessions and transcripts</li>
                     <li>Cost history</li>
                   </ul>

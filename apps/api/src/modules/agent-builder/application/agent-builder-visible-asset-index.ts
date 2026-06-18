@@ -15,9 +15,7 @@ import type {
 const VISIBLE_ASSET_KIND_BY_COLLECTION = {
   environments: "environment",
   mcpServers: "mcp_server",
-  selectedSpaceFiles: "selected_space_files",
   skills: "skill",
-  spaces: "space",
 } satisfies VisibleAssetKindByCollection;
 
 function toIndexEntry(
@@ -81,9 +79,7 @@ export function emptyVisibleAssetIndex(): VisibleAssetCurrentIndex {
   return {
     environments: [],
     mcpServers: [],
-    selectedSpaceFiles: [],
     skills: [],
-    spaces: [],
   };
 }
 
@@ -97,14 +93,8 @@ export function createVisibleAssetCurrentIndex(
     mcpServers: summaries.mcpServers.map((asset) =>
       toIndexEntry(VISIBLE_ASSET_KIND_BY_COLLECTION.mcpServers, asset),
     ),
-    selectedSpaceFiles: summaries.selectedSpaceFiles.map((asset) =>
-      toIndexEntry(VISIBLE_ASSET_KIND_BY_COLLECTION.selectedSpaceFiles, asset),
-    ),
     skills: summaries.skills.map((asset) =>
       toIndexEntry(VISIBLE_ASSET_KIND_BY_COLLECTION.skills, asset),
-    ),
-    spaces: summaries.spaces.map((asset) =>
-      toIndexEntry(VISIBLE_ASSET_KIND_BY_COLLECTION.spaces, asset),
     ),
   };
 }
@@ -113,9 +103,7 @@ export function emptyVisibleAssetChanges(): VisibleAssetChangesSinceLastTurn {
   return {
     environments: { added: [], removed: [], updated: [] },
     mcpServers: { added: [], removed: [], updated: [] },
-    selectedSpaceFiles: { added: [], removed: [], updated: [] },
     skills: { added: [], removed: [], updated: [] },
-    spaces: { added: [], removed: [], updated: [] },
   };
 }
 
@@ -126,8 +114,6 @@ export function createVisibleAssetChanges(
   return {
     environments: diffAssets(summaries.environments, previousIndex.environments),
     mcpServers: diffAssets(summaries.mcpServers, previousIndex.mcpServers),
-    selectedSpaceFiles: diffAssets(summaries.selectedSpaceFiles, previousIndex.selectedSpaceFiles),
     skills: diffAssets(summaries.skills, previousIndex.skills),
-    spaces: diffAssets(summaries.spaces, previousIndex.spaces),
   };
 }

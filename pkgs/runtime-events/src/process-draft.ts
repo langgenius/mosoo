@@ -165,8 +165,7 @@ export function createProcessDraftFromRuntimeEvent(event: RuntimeEventEnvelope):
       };
     }
     case "file.changed":
-    case "file.change.updated":
-    case "space.write.stale": {
+    case "file.change.updated": {
       return {
         content: readRuntimeEventFileChangePath(payload) ?? "Workspace file changed.",
         type: "file.changed",

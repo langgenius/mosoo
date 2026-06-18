@@ -16,7 +16,7 @@ export interface StoredFileUploadSession {
   partSize: number | null;
   path: string;
   parts: StoredUploadedPart[];
-  scopeId: string;
+  scopeId: string | null;
   scopeKind: FileScopeKind;
   strategy: "multipart" | "single_put";
 }

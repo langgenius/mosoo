@@ -1,5 +1,4 @@
 import type {
-  AgentBuilderSelectedSpaceFilesSummary,
   AgentBuilderVisibleAssetBindingState,
   AgentBuilderVisibleAssetChangeSet,
   AgentBuilderVisibleAssetIndexEntry,
@@ -8,17 +7,12 @@ import type {
   AgentBuilderVisibleEnvironmentSummary,
   AgentBuilderVisibleMcpServerSummary,
   AgentBuilderVisibleSkillSummary,
-  AgentBuilderVisibleSpaceSummary,
 } from "@mosoo/contracts/agent-builder";
-import type { McpServerId, AppId, SkillId, SpaceId } from "@mosoo/id";
+import type { McpServerId, AppId, SkillId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import type { AgentBuilderLightweightPlannerDraftContext } from "./agent-builder-lightweight-draft-types";
-import type { AgentBuilderLightweightSpaceBinding } from "./agent-builder-lightweight-manifest";
-
-export type DraftSpaceBinding = AgentBuilderLightweightSpaceBinding;
-
 export interface HashableAssetSummary {
   bindingState: AgentBuilderVisibleAssetBindingState;
   hash: string;
@@ -34,7 +28,6 @@ export interface AgentBuilderVisibleAssetProviderInput {
   bindings: ApiBindings;
   boundMcpServerIds: ReadonlySet<McpServerId>;
   boundSkillIds: ReadonlySet<SkillId>;
-  boundSpaceIds: ReadonlySet<SpaceId>;
   draft: AgentBuilderLightweightPlannerDraftContext;
   appId: AppId;
   viewer: AuthenticatedViewer;
@@ -43,9 +36,7 @@ export interface AgentBuilderVisibleAssetProviderInput {
 export interface AgentBuilderVisibleAssetSummaryCollections {
   environments: AgentBuilderVisibleEnvironmentSummary[];
   mcpServers: AgentBuilderVisibleMcpServerSummary[];
-  selectedSpaceFiles: AgentBuilderSelectedSpaceFilesSummary[];
   skills: AgentBuilderVisibleSkillSummary[];
-  spaces: AgentBuilderVisibleSpaceSummary[];
 }
 
 export type AgentBuilderVisibleAssetSummariesCollector = (

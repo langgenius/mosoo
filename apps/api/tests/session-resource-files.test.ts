@@ -4,21 +4,21 @@ import { parsePlatformId } from "@mosoo/id";
 import type { AccountId, FileId, OrganizationId, AppId, SessionId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import {
-  createSessionResourceUpload,
-  listSessionResourcesForSession,
-} from "../src/modules/files/application/session-resource-file.service";
-import { deleteFileById } from "../src/modules/files/infrastructure/file-content-service";
-import {
-  appendSessionResourceContextToPrompt,
-  listSessionResourcePathEntries,
-} from "../src/modules/runtime/application/session-resources/session-resource-prompt.service";
+import { fileStore } from "../src/modules/files/application/file-store";
+import { appendSessionResourceContextToPrompt } from "../src/modules/runtime/application/session-resources/session-resource-prompt.service";
 import { removeSessionResource } from "../src/modules/sessions/application/session-resource-removal.service";
 import {
   addSessionResource,
   listSessionResources,
 } from "../src/modules/sessions/application/session-resource.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
+import {
+  PUBLIC_API_TEST_IDS,
+  PublicApiMemoryFileBucket,
+  createPublicHttpContractDatabase,
+  createPublicHttpTestBindings,
+  insertOwnerSession,
+} from "./helpers/public-api-http-test-fixture";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const OWNER_ID = parsePlatformId<AccountId>("01J00000000000000000000001", "owner ID");
@@ -27,6 +27,16 @@ const OTHER_CREATOR_ID = parsePlatformId<AccountId>(
   "other creator ID",
 );
 const FILE_ID = parsePlatformId<FileId>("01J00000000000000000000002", "file ID");
+const ARTIFACT_FILE_ID = parsePlatformId<FileId>("01J00000000000000000000007", "artifact file ID");
+const LIBRARY_FILE_ID = parsePlatformId<FileId>("01J00000000000000000000008", "library file ID");
+const OTHER_SESSION_ID = parsePlatformId<SessionId>(
+  "01J00000000000000000000009",
+  "other session ID",
+);
+const OTHER_SESSION_FILE_ID = parsePlatformId<FileId>(
+  "01J0000000000000000000000A",
+  "other session file ID",
+);
 const SESSION_ID = parsePlatformId<SessionId>("01J00000000000000000000003", "session ID");
 const ORGANIZATION_ID = parsePlatformId<OrganizationId>(
   "01J00000000000000000000006",
@@ -73,7 +83,7 @@ function createSessionResourceDatabase(input: { includeFile?: boolean } = {}): S
     CREATE TABLE file_record (
       id text PRIMARY KEY NOT NULL,
       scope_kind text NOT NULL,
-      scope_id text NOT NULL,
+      scope_id text,
       session_kind text,
       status text NOT NULL,
       committed integer NOT NULL,
@@ -220,6 +230,184 @@ function makeOwnerAttributedParticipant(database: SqliteD1Database): void {
   `);
 }
 
+function insertSessionArtifact(database: SqliteD1Database): void {
+  database.execute(`
+    INSERT INTO file_record (
+      id,
+      scope_kind,
+      scope_id,
+      session_kind,
+      status,
+      committed,
+      created_at,
+      created_by_account_id,
+      etag,
+      expires_at,
+      mime_type,
+      name,
+      object_key,
+      owner_id,
+      owner_kind,
+      parent_path,
+      path,
+      purpose,
+      size,
+      updated_at,
+      version
+    )
+    VALUES (
+      '${ARTIFACT_FILE_ID}',
+      'session',
+      '${SESSION_ID}',
+      'artifact',
+      'ready',
+      1,
+      2,
+      '${OWNER_ID}',
+      NULL,
+      NULL,
+      'text/markdown',
+      'summary.md',
+      'objects/${ARTIFACT_FILE_ID}',
+      '${SESSION_ID}',
+      'session',
+      'artifact/${ARTIFACT_FILE_ID}',
+      'artifact/${ARTIFACT_FILE_ID}/summary.md',
+      'session_artifact',
+      23,
+      2,
+      1
+    );
+  `);
+}
+
+function insertLibraryFile(database: SqliteD1Database): void {
+  database.execute(`
+    INSERT INTO file_record (
+      id,
+      scope_kind,
+      scope_id,
+      session_kind,
+      status,
+      committed,
+      created_at,
+      created_by_account_id,
+      etag,
+      expires_at,
+      mime_type,
+      name,
+      object_key,
+      owner_id,
+      owner_kind,
+      parent_path,
+      path,
+      purpose,
+      size,
+      updated_at,
+      version
+    )
+    VALUES (
+      '${LIBRARY_FILE_ID}',
+      'library',
+      NULL,
+      NULL,
+      'ready',
+      1,
+      3,
+      '${OWNER_ID}',
+      NULL,
+      NULL,
+      'text/csv',
+      'seed.csv',
+      'objects/${LIBRARY_FILE_ID}',
+      '${OWNER_ID}',
+      'account',
+      '',
+      'seed.csv',
+      'library_file',
+      34,
+      3,
+      1
+    );
+  `);
+}
+
+function insertInaccessibleSessionFile(database: SqliteD1Database): void {
+  database.execute(`
+    INSERT INTO session (
+      id,
+      creator_account_id,
+      attributed_user_id,
+      archived_at,
+      metadata_json,
+      app_id,
+      provider,
+      runtime_id,
+      status,
+      title
+    )
+    VALUES (
+      '${OTHER_SESSION_ID}',
+      '${OTHER_CREATOR_ID}',
+      NULL,
+      NULL,
+      '{}',
+      '${APP_ID}',
+      'openai',
+      'openai-runtime',
+      'IDLE',
+      'Other Session'
+    );
+
+    INSERT INTO file_record (
+      id,
+      scope_kind,
+      scope_id,
+      session_kind,
+      status,
+      committed,
+      created_at,
+      created_by_account_id,
+      etag,
+      expires_at,
+      mime_type,
+      name,
+      object_key,
+      owner_id,
+      owner_kind,
+      parent_path,
+      path,
+      purpose,
+      size,
+      updated_at,
+      version
+    )
+    VALUES (
+      '${OTHER_SESSION_FILE_ID}',
+      'session',
+      '${OTHER_SESSION_ID}',
+      'attachment',
+      'ready',
+      1,
+      4,
+      '${OTHER_CREATOR_ID}',
+      NULL,
+      NULL,
+      'text/plain',
+      'private.txt',
+      'objects/${OTHER_SESSION_FILE_ID}',
+      '${OTHER_SESSION_ID}',
+      'session',
+      'attachment/${OTHER_SESSION_FILE_ID}',
+      'attachment/${OTHER_SESSION_FILE_ID}/private.txt',
+      'session_attachment',
+      45,
+      4,
+      1
+    );
+  `);
+}
+
 class RecordingDeleteBucket {
   readonly deletedKeys: string[] = [];
 
@@ -245,15 +433,19 @@ describe("session resource files", () => {
   test("creates upload mentions with the mounted session-file path grammar", async () => {
     const database = createSessionResourceDatabase({ includeFile: false });
 
-    const upload = await createSessionResourceUpload({ DB: database } as ApiBindings, VIEWER, {
-      file: {
-        contentType: "text/plain",
-        name: "notes.txt",
-        size: 12,
+    const upload = await fileStore.createSessionResourceUpload(
+      { DB: database } as ApiBindings,
+      VIEWER,
+      {
+        file: {
+          contentType: "text/plain",
+          name: "notes.txt",
+          size: 12,
+        },
+        appId: APP_ID,
+        sessionId: SESSION_ID,
       },
-      appId: APP_ID,
-      sessionId: SESSION_ID,
-    });
+    );
 
     expect(upload.path).toBe(`session-files/${upload.fileId}/notes.txt`);
 
@@ -271,12 +463,13 @@ describe("session resource files", () => {
   test("lists file records after session admission", async () => {
     const database = createSessionResourceDatabase();
 
-    const resources = await listSessionResourcesForSession(database, SESSION_ID);
+    const resources = await fileStore.listSessionResources(database, SESSION_ID);
 
     expect(resources).toEqual([
       {
         createdAt: "1970-01-01T00:00:00.001Z",
         id: FILE_ID,
+        kind: "attachment",
         mimeType: "text/plain",
         name: "notes.txt",
         path: `session-files/${FILE_ID}/notes.txt`,
@@ -288,7 +481,7 @@ describe("session resource files", () => {
   test("lists prompt path entries with stable resource ids", async () => {
     const database = createSessionResourceDatabase();
 
-    const resources = await listSessionResourcePathEntries(database, SESSION_ID);
+    const resources = await fileStore.listSessionResourcePathEntries(database, SESSION_ID);
 
     expect(resources).toEqual([
       {
@@ -331,6 +524,7 @@ describe("session resource files", () => {
       {
         createdAt: "1970-01-01T00:00:00.001Z",
         id: FILE_ID,
+        kind: "attachment",
         mimeType: "text/plain",
         name: "notes.txt",
         path: `session-files/${FILE_ID}/notes.txt`,
@@ -350,12 +544,129 @@ describe("session resource files", () => {
     expect(resources).toEqual([]);
   });
 
+  test("lists all visible files and filters by session scope", async () => {
+    const database = createSessionResourceDatabase();
+    insertSessionArtifact(database);
+    insertLibraryFile(database);
+    insertInaccessibleSessionFile(database);
+    const bindings = { DB: database } as ApiBindings;
+
+    const allFiles = await fileStore.list(bindings, VIEWER, {});
+    const allFileIds = allFiles.files.map((file) => file.id).sort();
+
+    expect(allFileIds).toEqual([ARTIFACT_FILE_ID, FILE_ID, LIBRARY_FILE_ID].sort());
+
+    const sessionFiles = await fileStore.list(bindings, VIEWER, {
+      scopeId: SESSION_ID,
+      scopeKind: "session",
+    });
+
+    expect(sessionFiles.files.map((file) => file.id).sort()).toEqual(
+      [ARTIFACT_FILE_ID, FILE_ID].sort(),
+    );
+
+    const artifacts = await fileStore.list(bindings, VIEWER, { sessionKind: "artifact" });
+
+    expect(artifacts.files.map((file) => file.id)).toEqual([ARTIFACT_FILE_ID]);
+  });
+
+  test("records runtime outputs as session-scoped artifacts", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertOwnerSession(database);
+    const bucket = new PublicApiMemoryFileBucket();
+    const ownerViewer: AuthenticatedViewer = {
+      email: "owner@example.com",
+      emailVerified: true,
+      id: PUBLIC_API_TEST_IDS.ownerAccount,
+      imageUrl: null,
+      name: "Owner",
+    };
+    const file = await fileStore.recordRuntimeOutput({
+      bindings: createPublicHttpTestBindings(database, {
+        fileBucket: bucket as unknown as R2Bucket,
+      }) as ApiBindings,
+      body: new TextEncoder().encode("runtime summary"),
+      contentType: "text/markdown",
+      createdBy: PUBLIC_API_TEST_IDS.ownerAccount,
+      path: "summary.md",
+      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+    });
+
+    expect(file.owner).toEqual({
+      id: PUBLIC_API_TEST_IDS.ownerSession,
+      kind: "session",
+    });
+    expect(file.purpose).toBe("session_artifact");
+    expect(file.scope).toEqual({
+      id: PUBLIC_API_TEST_IDS.ownerSession,
+      kind: "session",
+    });
+    expect(file.sessionKind).toBe("artifact");
+
+    const resources = await listSessionResources(database, ownerViewer, {
+      appId: PUBLIC_API_TEST_IDS.app,
+      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+    });
+
+    expect(resources).toEqual([
+      expect.objectContaining({
+        id: file.id,
+        kind: "artifact",
+        name: "summary.md",
+        path: `session-artifacts/${file.id}/summary.md`,
+      }),
+    ]);
+  });
+
+  test("lists session artifacts but does not treat them as removable attachments", async () => {
+    const database = createSessionResourceDatabase();
+    insertSessionArtifact(database);
+    const bucket = new RecordingDeleteBucket();
+    const bindings = createFileBindings(database, bucket);
+
+    const resources = await listSessionResources(database, VIEWER, {
+      appId: APP_ID,
+      sessionId: SESSION_ID,
+    });
+
+    expect(resources).toEqual([
+      {
+        createdAt: "1970-01-01T00:00:00.002Z",
+        id: ARTIFACT_FILE_ID,
+        kind: "artifact",
+        mimeType: "text/markdown",
+        name: "summary.md",
+        path: `session-artifacts/${ARTIFACT_FILE_ID}/summary.md`,
+        size: 23,
+      },
+      {
+        createdAt: "1970-01-01T00:00:00.001Z",
+        id: FILE_ID,
+        kind: "attachment",
+        mimeType: "text/plain",
+        name: "notes.txt",
+        path: `session-files/${FILE_ID}/notes.txt`,
+        size: 12,
+      },
+    ]);
+
+    await expect(
+      removeSessionResource(bindings, VIEWER, {
+        appId: APP_ID,
+        resourceId: ARTIFACT_FILE_ID,
+        sessionId: SESSION_ID,
+      }),
+    ).rejects.toThrow("Session resource not found.");
+
+    expect(bucket.deletedKeys).toEqual([]);
+  });
+
   test("marks session resources deleting before R2 delete failure can leave a ready row", async () => {
     const database = createSessionResourceDatabase();
     const bucket = new RecordingDeleteBucket(true);
 
     await expect(
-      deleteFileById(createFileBindings(database, bucket), VIEWER, FILE_ID),
+      fileStore.delete(createFileBindings(database, bucket), VIEWER, FILE_ID),
     ).rejects.toThrow();
 
     const row = await database
@@ -373,7 +684,7 @@ describe("session resource files", () => {
 
     database.execute(`UPDATE file_record SET status = 'deleting' WHERE id = '${FILE_ID}'`);
 
-    await deleteFileById(createFileBindings(database, bucket), VIEWER, FILE_ID);
+    await fileStore.delete(createFileBindings(database, bucket), VIEWER, FILE_ID);
 
     const row = await database
       .prepare("SELECT id FROM file_record WHERE id = ?")

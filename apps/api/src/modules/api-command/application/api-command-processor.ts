@@ -23,7 +23,6 @@ import { processSlackWorkTrigger } from "../../channels/slack/slack-first-party-
 import { parseTelegramCredentials } from "../../channels/telegram/telegram-credentials";
 import { processTelegramWorkTrigger } from "../../channels/telegram/telegram-first-party-adapter";
 import { runUsageDailyRollup } from "../../cost/application/cost-rollup.service";
-import { cleanupExpiredSpaceFileLocks } from "../../files/application/file-lock-maintenance.service";
 import { runSandboxMaintenance } from "../../runtime/application/runtime-maintenance.service";
 import { dispatchQueuedSessionRun } from "../../runtime/application/session-runs/dispatch-queued-run.service";
 import {
@@ -76,7 +75,6 @@ async function processScheduledMaintenanceCommand(
   const scheduledAt = new Date(payload.scheduledTime);
   const tasks: Promise<unknown>[] = [
     runSandboxMaintenance(bindings),
-    cleanupExpiredSpaceFileLocks(bindings),
     runDiscordGatewayConnectionMaintenance(bindings, scheduledAt),
     cleanupOrphanChannelBindingCredentialSecrets(bindings, scheduledAt),
     runLarkLongConnectionMaintenance(bindings, scheduledAt),

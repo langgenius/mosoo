@@ -30,6 +30,7 @@ import {
 import { AGENT_DRIVER_PROCESS_COMMAND } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-artifact";
 import { buildExecutionSpec } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-execution-spec.builder";
 import type { RuntimeExecutionSpecBindings } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-execution-spec.builder";
+import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   API_DRIVER_BOUNDARY_IDS,
   createDriverEvent,
@@ -109,13 +110,11 @@ describe("API to driver boundary", () => {
 
   test("uses agent-driver sandbox path contracts", () => {
     const runtimeProfile = readText("../src/modules/runtime/application/agent-runtime-profile.ts");
-    const sandboxLayout = readText("../src/modules/runtime/domain/sandbox-layout.ts");
     const subjectPlatform = readText(
       "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-platform.ts",
     );
 
     expect(runtimeProfile).toContain('from "agent-driver/paths"');
-    expect(sandboxLayout).toContain('from "agent-driver/paths"');
     expect(subjectPlatform).toContain('from "agent-driver/paths"');
   });
 
@@ -260,16 +259,6 @@ describe("API to driver boundary", () => {
         runtimeId: "openai-runtime",
         value: "thread-1",
       },
-      appAccessSnapshot: {
-        entries: [
-          {
-            canWrite: true,
-            mountPath: "/workspace/docs",
-            spaceId: API_DRIVER_BOUNDARY_IDS.space,
-            type: "space",
-          },
-        ],
-      },
       profile: createDriverProfile(),
       requestUrl: "http://localhost:8787/api/driver/connect",
       resolvedMcpServers: createResolvedMcpServers(),
@@ -282,14 +271,6 @@ describe("API to driver boundary", () => {
     expect(execution.environment.variables).toEqual({
       EXISTING_ENV: "kept",
     });
-    expect(execution.session.context.appAccessSnapshot.entries).toEqual([
-      {
-        canWrite: true,
-        mountPath: "/workspace/docs",
-        spaceId: API_DRIVER_BOUNDARY_IDS.space,
-        type: "space",
-      },
-    ]);
 
     const activeMcpServer = execution.session.mcpServers.find(
       (server) => server.serverId === API_DRIVER_BOUNDARY_IDS.mcpServerLinear,
@@ -332,9 +313,6 @@ describe("API to driver boundary", () => {
   test("emits a boot payload that the driver protocol parser accepts", async () => {
     const execution = await buildExecutionSpec(bindings, {
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
-      appAccessSnapshot: {
-        entries: [],
-      },
       profile: createDriverProfile(),
       requestUrl: "https://api.example.com/api/driver/connect",
       resolvedMcpServers: [],
@@ -459,7 +437,7 @@ describe("API to driver boundary", () => {
       ],
     });
 
-    const projection = await appRuntimeDriverEvents(new SqliteD1Database(), {
+    const projection = await appRuntimeDriverEvents({ DB: new SqliteD1Database() } as ApiBindings, {
       currentLiveState: createBaseLiveState({
         callerId: link.callerId,
         creatorId: link.creatorId,

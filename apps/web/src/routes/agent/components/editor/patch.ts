@@ -5,7 +5,7 @@ import type {
 } from "@mosoo/contracts/agent-builder";
 import { getAgentBuilderDraftPatchAssetFieldSpec } from "@mosoo/contracts/agent-builder";
 
-import type { McpServer, SkillInfo, SpaceBinding } from "../../agent.types";
+import type { McpServer, SkillInfo } from "../../agent.types";
 import type { AgentEditorDraft } from "./draft";
 import type { AgentFormSectionId } from "./section-ids";
 
@@ -183,17 +183,6 @@ function applyBuilderPatchItem(
         ? applied({ ...current, skills: selection.items })
         : blocked(current, formatMissingReferences("Skill", selection.missingIds));
     }
-    case "spaceIds": {
-      if (!Array.isArray(item.value)) {
-        return blocked(current, "Expected an array of space ids.");
-      }
-
-      const selection = createSpaceSelection(current.spaces, item.value, item);
-
-      return selection.missingIds.length === 0
-        ? applied({ ...current, spaces: selection.items })
-        : blocked(current, formatMissingReferences("Space", selection.missingIds));
-    }
   }
 }
 
@@ -282,38 +271,6 @@ function createSkillSelection(
         name: reference.name,
       },
     ];
-  });
-
-  return {
-    items,
-    missingIds,
-  };
-}
-
-function createSpaceSelection(
-  currentSpaces: SpaceBinding[],
-  targetIds: string[],
-  item: AgentBuilderDraftPatchChange,
-): AssetSelectionResult<SpaceBinding> {
-  const currentById = new Map(currentSpaces.map((space) => [space.id, space]));
-  const references = createReferenceMap(item, "spaceIds");
-  const missingIds: string[] = [];
-
-  const items = targetIds.flatMap((id): SpaceBinding[] => {
-    const current = currentById.get(id);
-
-    if (current !== undefined) {
-      return [current];
-    }
-
-    const reference = references.get(id);
-
-    if (reference === undefined) {
-      missingIds.push(id);
-      return [];
-    }
-
-    return [{ id: reference.id, name: reference.name }];
   });
 
   return {

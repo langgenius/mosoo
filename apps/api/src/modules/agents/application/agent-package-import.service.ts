@@ -25,7 +25,6 @@ import {
   collectRuntimeResolutionIssues,
   resolvePackageEnvironment,
   resolvePackageSkills,
-  resolvePackageSpaces,
 } from "./agent-package-resolution.service";
 import { readFileId, readAppId } from "./agent-platform-ids";
 export async function importAgentPackage(
@@ -53,7 +52,7 @@ export async function importAgentPackage(
   issues.push(...collectPackageDeclarationIssues(parsed.package));
   issues.push(...(await collectRuntimeResolutionIssues(bindings.DB, viewer.id, app.id, manifest)));
 
-  const [skillResolution, spaceIds, environmentId, mcpServerIds] = await Promise.all([
+  const [skillResolution, environmentId, mcpServerIds] = await Promise.all([
     resolvePackageSkills({
       bindings,
       database: bindings.DB,
@@ -63,15 +62,6 @@ export async function importAgentPackage(
       appId: app.id,
       summary,
       viewer,
-      viewerId: viewer.id,
-    }),
-    resolvePackageSpaces({
-      allowTargetNameMatch: false,
-      database: bindings.DB,
-      issues,
-      manifest,
-      appId: app.id,
-      summary,
       viewerId: viewer.id,
     }),
     resolvePackageEnvironment({
@@ -106,7 +96,6 @@ export async function importAgentPackage(
     appId: app.id,
     runtimeId: manifest.runtime.id,
     skillIds: skillResolution.skillIds,
-    spaceIds,
   });
 
   await deleteImportedAgentPackageFile({

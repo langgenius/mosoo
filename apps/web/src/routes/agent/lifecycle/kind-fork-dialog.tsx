@@ -23,7 +23,6 @@ const CARRIED_OVER = [
   "MCP server bindings",
   "Environment variables",
   "Setup script",
-  "Space bindings",
 ];
 
 const DROPPED_PET_TO_CATTLE = ["Assistant Agent stable Sandbox state"];

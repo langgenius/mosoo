@@ -164,9 +164,8 @@ export function ImportAgentPackageDialog({
                 <CheckCircle2 className="text-success-fg size-4" />
                 Draft created
               </div>
-              <div className="text-muted-foreground mt-2 grid gap-2 text-xs sm:grid-cols-3">
+              <div className="text-muted-foreground mt-2 grid gap-2 text-xs sm:grid-cols-2">
                 <span>Skills {importResult.resolution.summary.boundSkillCount}</span>
-                <span>Spaces {importResult.resolution.summary.boundSpaceCount}</span>
                 <span>MCP {importResult.resolution.summary.boundMcpServerCount}</span>
               </div>
               {issues.length > 0 ? (

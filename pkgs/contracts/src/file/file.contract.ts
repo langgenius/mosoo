@@ -1,8 +1,8 @@
 import { parsePlatformId } from "@mosoo/id";
 
-import type { AccountId, FileId, AppId, SessionId, SpaceId } from "../id/id.contract";
+import type { AccountId, FileId, AppId, SessionId } from "../id/id.contract";
 
-export const FILE_SCOPE_KINDS = ["agent_package", "app_draft", "session", "space"] as const;
+export const FILE_SCOPE_KINDS = ["agent_package", "app_draft", "library", "session"] as const;
 export type FileScopeKind = (typeof FILE_SCOPE_KINDS)[number];
 
 export const FILE_STATUSES = ["deleting", "failed", "pending", "ready"] as const;
@@ -25,13 +25,16 @@ export const FILE_PURPOSES = [
   "agent_asset",
   "agent_package",
   "app_draft",
+  "library_file",
   "session_attachment",
-  "space_file",
+  "session_artifact",
 ] as const;
 export type FilePurpose = (typeof FILE_PURPOSES)[number];
-export const FILE_OWNER_KINDS = ["account", "app", "session", "space"] as const;
+export const FILE_OWNER_KINDS = ["account", "app", "session"] as const;
 export type FileOwnerKind = (typeof FILE_OWNER_KINDS)[number];
-export const SPACE_FILE_EXTENSION_REQUIRED_MESSAGE = "File name must include an extension.";
+export const FILE_SESSION_KINDS = ["artifact", "attachment"] as const;
+export type FileSessionKind = (typeof FILE_SESSION_KINDS)[number];
+export const LIBRARY_FILE_EXTENSION_REQUIRED_MESSAGE = "File name must include an extension.";
 export const SINGLE_PUT_THRESHOLD_BYTES = 64 * 1024 * 1024;
 export const DEFAULT_MULTIPART_PART_SIZE_BYTES = 16 * 1024 * 1024;
 export const MIN_MULTIPART_PART_SIZE_BYTES = 5 * 1024 * 1024;
@@ -137,7 +140,7 @@ export function normalizeOptionalPath(path?: string | null): string {
 
 export function joinPath(parentPath: string, name: string): string {
   const normalizedName = normalizeFileName(name);
-  const normalizedParentPath = normalizeSpaceDirectoryPath(parentPath);
+  const normalizedParentPath = normalizeLibraryDirectoryPath(parentPath);
 
   return normalizedParentPath ? `${normalizedParentPath}/${normalizedName}` : normalizedName;
 }
@@ -154,23 +157,23 @@ export function getParentPath(path: string): string {
   return lastSlashIndex === -1 ? "" : normalizedPath.slice(0, lastSlashIndex);
 }
 
-export function getSpaceFileNameExtensionError(name: string): string | null {
+export function getLibraryFileNameExtensionError(name: string): string | null {
   const normalizedName = name.trim();
 
   if (!normalizedName) {
-    return SPACE_FILE_EXTENSION_REQUIRED_MESSAGE;
+    return LIBRARY_FILE_EXTENSION_REQUIRED_MESSAGE;
   }
 
   const lastDotIndex = normalizedName.lastIndexOf(".");
 
   if (lastDotIndex === -1 || lastDotIndex === normalizedName.length - 1) {
-    return SPACE_FILE_EXTENSION_REQUIRED_MESSAGE;
+    return LIBRARY_FILE_EXTENSION_REQUIRED_MESSAGE;
   }
 
   return null;
 }
 
-function normalizeSpacePath(
+function normalizeLibraryPath(
   path: string | null | undefined,
   input: { allowEmpty: boolean },
 ): string {
@@ -194,18 +197,18 @@ function normalizeSpacePath(
     .join("/");
 }
 
-export function normalizeSpaceDirectoryPath(path?: string | null): string {
-  return normalizeSpacePath(path, { allowEmpty: true });
+export function normalizeLibraryDirectoryPath(path?: string | null): string {
+  return normalizeLibraryPath(path, { allowEmpty: true });
 }
 
-export function normalizeSpaceFilePath(path: string): string {
-  return normalizeSpacePath(path, { allowEmpty: false });
+export function normalizeLibraryFilePath(path: string): string {
+  return normalizeLibraryPath(path, { allowEmpty: false });
 }
 
-export function ensureSpaceFilePathHasExtension(path: string): string {
-  const normalized = normalizeSpaceFilePath(path);
+export function ensureLibraryFilePathHasExtension(path: string): string {
+  const normalized = normalizeLibraryFilePath(path);
   const fileName = normalized.split("/").pop() ?? normalized;
-  const extensionError = getSpaceFileNameExtensionError(fileName);
+  const extensionError = getLibraryFileNameExtensionError(fileName);
 
   if (extensionError !== null) {
     throw new Error(extensionError);
@@ -232,8 +235,8 @@ export function choosePartSize(size: number): number {
   return Math.max(basePartSize, MIN_MULTIPART_PART_SIZE_BYTES);
 }
 
-export type FileScopeId = AppId | SessionId | SpaceId;
-export type FileOwnerId = AccountId | AppId | SessionId | SpaceId;
+export type FileScopeId = AppId | SessionId | null;
+export type FileOwnerId = AccountId | AppId | SessionId;
 
 export function createScope(scopeKind: FileScopeKind, scopeId: FileScopeId): FileScope {
   return {
@@ -244,9 +247,15 @@ export function createScope(scopeKind: FileScopeKind, scopeId: FileScopeId): Fil
 
 export const SESSION_RESOURCE_RECORD_DIR = "attachment";
 export const SESSION_RESOURCE_MOUNT_DIR = "session-files";
+export const SESSION_ARTIFACT_RECORD_DIR = "artifact";
+export const SESSION_ARTIFACT_MATERIALIZED_DIR = "session-artifacts";
 
 export function createAttachmentPath(fileId: FileId, fileName: string): string {
   return `${SESSION_RESOURCE_RECORD_DIR}/${fileId}/${normalizeFileName(fileName)}`;
+}
+
+export function createSessionArtifactPath(fileId: FileId, fileName: string): string {
+  return `${SESSION_ARTIFACT_RECORD_DIR}/${fileId}/${normalizeFileName(fileName)}`;
 }
 
 export function createSessionFilePath(fileId: FileId, fileName: string): string {
@@ -256,17 +265,21 @@ export function createSessionFilePath(fileId: FileId, fileName: string): string 
 function readSessionResourcePathParts(fileRecordPath: string): {
   fileId: FileId;
   fileName: string;
+  kind: FileSessionKind;
 } {
   const segments = fileRecordPath.split("/");
   const [root, fileId, fileName] = segments;
+  const kind =
+    root === SESSION_ARTIFACT_RECORD_DIR || root === SESSION_ARTIFACT_MATERIALIZED_DIR
+      ? "artifact"
+      : root === SESSION_RESOURCE_RECORD_DIR || root === SESSION_RESOURCE_MOUNT_DIR
+        ? "attachment"
+        : null;
 
-  if (
-    segments.length !== 3 ||
-    (root !== SESSION_RESOURCE_RECORD_DIR && root !== SESSION_RESOURCE_MOUNT_DIR) ||
-    fileId === undefined ||
-    fileName === undefined
-  ) {
-    throw new Error("Session resource path must be attachment/<fileId>/<fileName>.");
+  if (segments.length !== 3 || kind === null || fileId === undefined || fileName === undefined) {
+    throw new Error(
+      "Session file path must be attachment/<fileId>/<fileName> or artifact/<fileId>/<fileName>.",
+    );
   }
 
   const normalizedFileId = parsePlatformId<FileId>(fileId, "Session resource file ID");
@@ -284,13 +297,15 @@ function readSessionResourcePathParts(fileRecordPath: string): {
   return {
     fileId: normalizedFileId,
     fileName: normalizedFileName,
+    kind,
   };
 }
 
 export function toSessionResourceMaterializedPath(fileRecordPath: string): string {
-  const { fileId, fileName } = readSessionResourcePathParts(fileRecordPath);
+  const { fileId, fileName, kind } = readSessionResourcePathParts(fileRecordPath);
+  const root = kind === "artifact" ? SESSION_ARTIFACT_MATERIALIZED_DIR : SESSION_RESOURCE_MOUNT_DIR;
 
-  return `${SESSION_RESOURCE_MOUNT_DIR}/${fileId}/${fileName}`;
+  return `${root}/${fileId}/${fileName}`;
 }
 
 export interface FileObjectKeyInput {
@@ -298,6 +313,7 @@ export interface FileObjectKeyInput {
   name: string;
   path: string;
   scope: FileScope;
+  sessionKind?: FileSessionKind | null;
 }
 
 function requireNormalizedProjectionValue(
@@ -316,13 +332,17 @@ function requireProjectionFileName(name: string): string {
   return requireNormalizedProjectionValue(name, normalizeFileName(name), "File name");
 }
 
-function requireProjectionSpaceFilePath(path: string): string {
-  return requireNormalizedProjectionValue(path, normalizeSpaceFilePath(path), "Space file path");
+function requireProjectionLibraryFilePath(path: string): string {
+  return requireNormalizedProjectionValue(
+    path,
+    normalizeLibraryFilePath(path),
+    "Library file path",
+  );
 }
 
 export function createFileObjectKey(file: FileObjectKeyInput): string {
-  if (file.scope.kind === "space") {
-    return `space/${file.scope.id}/${requireProjectionSpaceFilePath(file.path)}`;
+  if (file.scope.kind === "library") {
+    return `library/${file.id}/${requireProjectionLibraryFilePath(file.path)}`;
   }
 
   const fileName = requireProjectionFileName(file.name);
@@ -335,7 +355,9 @@ export function createFileObjectKey(file: FileObjectKeyInput): string {
     return `agent-package/${file.scope.id}/attachment/${file.id}/${fileName}`;
   }
 
-  return `session/${file.scope.id}/attachment/${file.id}/${fileName}`;
+  const sessionRoot =
+    file.sessionKind === "artifact" ? SESSION_ARTIFACT_RECORD_DIR : SESSION_RESOURCE_RECORD_DIR;
+  return `session/${file.scope.id}/${sessionRoot}/${file.id}/${fileName}`;
 }
 
 export function createFileRecordObjectKey(file: FileRecord): string {
@@ -408,17 +430,27 @@ export interface FileRecord {
   path: string;
   purpose: FilePurpose;
   scope: FileScope;
+  sessionKind: FileSessionKind | null;
   size: number;
   status: FileStatus;
   updatedAt: string;
   version: number;
 }
 
-export interface CreateSpaceFileUploadTarget {
-  id: SpaceId;
-  kind: "space";
+export interface FileListQuery {
+  scopeId?: FileScopeId;
+  scopeKind?: FileScopeKind;
+  sessionKind?: FileSessionKind | null;
+  status?: FileStatus;
+}
+
+export interface FileListing {
+  files: FileRecord[];
+}
+
+export interface CreateLibraryFileUploadTarget {
+  kind: "library";
   path: string;
-  appId: AppId;
 }
 
 export interface CreateSessionFileUploadTarget {
@@ -442,7 +474,7 @@ export interface CreateAgentPackageFileUploadTarget {
 
 export type CreateFileUploadTarget =
   | CreateSessionFileUploadTarget
-  | CreateSpaceFileUploadTarget
+  | CreateLibraryFileUploadTarget
   | CreateAgentPackageFileUploadTarget
   | CreateAppDraftFileUploadTarget;
 
@@ -502,5 +534,4 @@ export interface UpdateFileRequest {
   ifMatchVersion: number;
   overwrite?: boolean;
   path: string;
-  targetSpaceId?: SpaceId;
 }

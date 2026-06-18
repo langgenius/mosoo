@@ -141,7 +141,6 @@ export function SessionDiagnosticsPanel({
             </div>
             <CountRow count={execution?.skills.length ?? null} label="Skills" />
             <CountRow count={execution?.tools.length ?? null} label="MCP" />
-            <CountRow count={execution?.spaces.length ?? null} label="Spaces" />
           </section>
 
           <section>

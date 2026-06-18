@@ -5,7 +5,6 @@ import type {
   AgentSessionRecoverability,
   AgentSessionRetrieveResult,
   SessionExecutionSkillReference,
-  SessionExecutionSpaceReference,
   SessionExecutionToolReference,
   SessionSummary,
 } from "@mosoo/contracts/session";
@@ -47,17 +46,6 @@ function toDiagnosticSkillReference(
     skillName: skill.skillName,
     snapshotId: skill.snapshotId,
     sortOrder: skill.sortOrder,
-  };
-}
-
-function toDiagnosticSpaceReference(
-  sessionId: SessionId,
-  space: Omit<SessionExecutionSpaceReference, "sessionId">,
-): SessionExecutionSpaceReference {
-  return {
-    sessionId,
-    sortOrder: space.sortOrder,
-    spaceId: space.spaceId,
   };
 }
 
@@ -162,9 +150,6 @@ async function loadSessionExecutionDiagnostics(
     skills: plan.skills
       .toSorted((left, right) => left.sortOrder - right.sortOrder)
       .map((skill) => toDiagnosticSkillReference(sessionId, skill)),
-    spaces: plan.spaces
-      .toSorted((left, right) => left.sortOrder - right.sortOrder)
-      .map((space) => toDiagnosticSpaceReference(sessionId, space)),
     tools: plan.tools
       .toSorted((left, right) => left.sortOrder - right.sortOrder)
       .map((tool) => toDiagnosticToolReference(sessionId, tool)),

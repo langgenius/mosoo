@@ -1,6 +1,9 @@
 import { PUBLIC_API_VERSION_PREFIX } from "@mosoo/contracts/public-api";
+import type { PublicThreadId } from "@mosoo/id";
 import { Hono } from "hono";
+import type { Context } from "hono";
 
+import type { PersonalAccessTokenCaller } from "../../../modules/auth/application/personal-access-token.service";
 import { hashPublicApiIdempotencyBody } from "../../../modules/public-api/public-api-idempotency.service";
 import { listAgentApiEndpointThreads } from "../../../modules/public-api/public-thread-session-query.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
@@ -24,6 +27,9 @@ import {
 } from "./public-thread-api-request";
 import type { ParsedCreateThreadRequest } from "./public-thread-api-request";
 
+type PublicApiRouteContext = Context<ApiGatewayEnvironment>;
+type PublicThreadFileService = Awaited<ReturnType<typeof loadPublicThreadFileService>>;
+
 async function loadPublicThreadCommandService() {
   return import("../../../modules/public-api/public-thread-api-command.service");
 }
@@ -34,6 +40,27 @@ async function loadPublicThreadService() {
 
 async function loadPublicThreadFileService() {
   return import("../../../modules/public-api/public-thread-file-api.service");
+}
+
+async function runPublicThreadFileRoute<T>(
+  c: PublicApiRouteContext,
+  operation: (input: {
+    caller: PersonalAccessTokenCaller;
+    service: PublicThreadFileService;
+    threadId: PublicThreadId;
+  }) => Promise<T>,
+  status = 200,
+): Promise<Response> {
+  return runPublicApiAuthenticatedJson(
+    c,
+    async (caller) =>
+      operation({
+        caller,
+        service: await loadPublicThreadFileService(),
+        threadId: parseThreadIdParam(c.req.param("threadId") ?? ""),
+      }),
+    status,
+  );
 }
 
 async function hashCreateThreadIdempotencyBody(
@@ -210,38 +237,28 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
   });
 
   v1.get("/threads/:threadId/files", async (c) =>
-    runPublicApiAuthenticatedJson(c, async (caller) => {
-      const { listPublicThreadFiles } = await loadPublicThreadFileService();
-      return listPublicThreadFiles(
-        c.env.DB,
-        caller.viewer,
-        parseThreadIdParam(c.req.param("threadId")),
-      );
-    }),
+    runPublicThreadFileRoute(c, async ({ caller, service, threadId }) =>
+      service.listPublicThreadFiles(c.env, caller.viewer, threadId),
+    ),
   );
 
   v1.post("/threads/:threadId/files", async (c) =>
-    runPublicApiAuthenticatedJson(
+    runPublicThreadFileRoute(
       c,
-      async (caller) => {
-        const { createPublicThreadFile } = await loadPublicThreadFileService();
-        const body = await readCreateThreadFileRequest(c);
-        return createPublicThreadFile(
+      async ({ caller, service, threadId }) =>
+        service.createPublicThreadFile(
           c.env,
           caller.viewer,
-          parseThreadIdParam(c.req.param("threadId")),
-          body,
-        );
-      },
+          threadId,
+          await readCreateThreadFileRequest(c),
+        ),
       201,
     ),
   );
 
   v1.delete("/threads/:threadId/files/:fileId", async (c) =>
-    runPublicApiAuthenticatedJson(c, async (caller) => {
-      const { deletePublicThreadFile } = await loadPublicThreadFileService();
-      const threadId = parseThreadIdParam(c.req.param("threadId"));
-      await deletePublicThreadFile(c.env, caller.viewer, {
+    runPublicThreadFileRoute(c, async ({ caller, service, threadId }) => {
+      await service.deletePublicThreadFile(c.env, caller.viewer, {
         fileId: parseFileIdParam(c.req.param("fileId")),
         threadId,
       });

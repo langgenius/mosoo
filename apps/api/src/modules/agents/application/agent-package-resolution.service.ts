@@ -6,8 +6,8 @@ import type {
   AgentPackageResolutionSummary,
   AgentResolutionIssue,
 } from "@mosoo/contracts/agent-manifest";
-import { environmentsTable, spacesTable } from "@mosoo/db";
-import type { AccountId, EnvironmentId, AppId, SkillId, SpaceId } from "@mosoo/id";
+import { environmentsTable } from "@mosoo/db";
+import type { AccountId, EnvironmentId, AppId, SkillId } from "@mosoo/id";
 import { and, eq, sql } from "drizzle-orm";
 import { zipSync } from "fflate";
 
@@ -17,13 +17,7 @@ import { isTruthy } from "../../../shared/truthiness";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { listAppSkillRows } from "../../skills/application/skill-access.service";
 import { createSkillFromUpload } from "../../skills/application/skill-package-write.service";
-import { listSpaceAccessRows } from "../../spaces/domain/space-access.policy";
-import {
-  readEnvironmentId,
-  readSkillId,
-  readSkillSnapshotId,
-  readSpaceId,
-} from "./agent-platform-ids";
+import { readEnvironmentId, readSkillId, readSkillSnapshotId } from "./agent-platform-ids";
 import { collectRuntimeCapabilityIssues } from "./agent-runtime-capability-resolution.service";
 import { getAgentEnvironmentName } from "./agent-spec.service";
 import type { AgentStoredPackageSkill } from "./agent-stored-config.service";
@@ -234,86 +228,6 @@ async function createPackageOwnedSkillIfPresent(
     skillName: created.name,
     sortOrder,
   };
-}
-
-async function listTargetSpacesByName(
-  database: D1Database,
-  appId: AppId,
-): Promise<Map<string, { id: SpaceId }>> {
-  const rows = await getAppDatabase(database)
-    .select({ id: spacesTable.id, name: spacesTable.name })
-    .from(spacesTable)
-    .where(eq(spacesTable.appId, appId))
-    .all();
-
-  return new Map(rows.map((row) => [row.name.toLowerCase(), { id: row.id }]));
-}
-
-export async function resolvePackageSpaces(input: {
-  allowTargetNameMatch?: boolean;
-  database: D1Database;
-  issues: AgentResolutionIssue[];
-  manifest: AgentManifest;
-  appId: AppId;
-  summary: AgentPackageResolutionSummary;
-  viewerId: AccountId;
-}): Promise<SpaceId[]> {
-  const spaceIds: SpaceId[] = [];
-  const manifestSpaces = input.manifest.spaces;
-  const requestedSpaceIds = manifestSpaces
-    .map((space) => space.spaceId)
-    .filter((spaceId): spaceId is string => isTruthy(spaceId))
-    .map((spaceId) => readSpaceId(spaceId));
-  const requestedSpaceAccess = await listSpaceAccessRows(
-    input.database,
-    input.viewerId,
-    input.appId,
-    requestedSpaceIds,
-  );
-  const shouldMatchByName =
-    input.allowTargetNameMatch !== false &&
-    manifestSpaces.some((space) => isTruthy(space.expectedName));
-  const targetSpacesByName = shouldMatchByName
-    ? await listTargetSpacesByName(input.database, input.appId)
-    : new Map<string, { id: SpaceId }>();
-
-  for (const space of manifestSpaces) {
-    const required = space.required;
-    let targetSpaceId = isTruthy(space.spaceId) ? readSpaceId(space.spaceId) : null;
-
-    if (isTruthy(targetSpaceId)) {
-      const access = requestedSpaceAccess.accessibleRowsById.get(targetSpaceId);
-
-      if (!access || access.app_id !== input.appId) {
-        targetSpaceId = null;
-      }
-    }
-
-    if (!isTruthy(targetSpaceId) && input.allowTargetNameMatch !== false) {
-      targetSpaceId = isTruthy(space.expectedName)
-        ? (targetSpacesByName.get(space.expectedName.toLowerCase())?.id ?? null)
-        : null;
-    }
-
-    if (!isTruthy(targetSpaceId)) {
-      input.issues.push(
-        createResolutionIssue({
-          actionLabel: "Rebind Space",
-          code: "agent.import.space.missing",
-          message: `Space binding ${space.alias} needs a target Space in this App.`,
-          required,
-          targetLabel: space.expectedName ?? space.alias,
-          targetType: "space",
-        }),
-      );
-      continue;
-    }
-
-    spaceIds.push(targetSpaceId);
-    input.summary.boundSpaceCount += 1;
-  }
-
-  return spaceIds;
 }
 
 async function findEnvironmentByName(

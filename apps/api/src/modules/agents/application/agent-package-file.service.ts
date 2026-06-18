@@ -1,8 +1,7 @@
 import { MAX_AGENT_PACKAGE_ARCHIVE_BYTES } from "@mosoo/agent-package";
-import { getParentPath } from "@mosoo/contracts/file";
 import { fileRecordsTable } from "@mosoo/db";
-import { createPlatformId } from "@mosoo/id";
 import type { AccountId, FileId, AppId } from "@mosoo/id";
+import { eq } from "drizzle-orm";
 
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -10,30 +9,29 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import {
-  deleteObject,
-  getObjectBody,
-  putObject,
-} from "../../files/application/file-object-storage.service";
-import {
-  createAttachmentPath,
-  createFinalObjectKey,
-  normalizeFileName,
-} from "../../files/application/file-path.service";
-import { getFileRecordById } from "../../files/application/file-record-read.service";
-import type { FileRecordRow } from "../../files/application/file-record-read.service";
-import { deleteFileById } from "../../files/infrastructure/file-content-service";
+import { fileStore, normalizeFileName } from "../../files/application/file-store";
 
-const AGENT_PACKAGE_FILE_TTL_MS = 24 * 60 * 60 * 1000;
 export const AGENT_PACKAGE_CONTENT_TYPE = "application/zip";
-
-type FileRecordInsert = typeof fileRecordsTable.$inferInsert;
 
 export interface CreatedAgentPackageFile {
   contentType: typeof AGENT_PACKAGE_CONTENT_TYPE;
   fileId: FileId;
   fileName: string;
   size: number;
+}
+
+interface AgentPackageFileAdmissionRecord {
+  createdBy: AccountId;
+  expiresAtMs: number | null;
+  id: FileId;
+  name: string;
+  ownerId: string;
+  ownerKind: string;
+  purpose: string;
+  scopeId: string | null;
+  scopeKind: string;
+  size: number;
+  status: string;
 }
 
 function isSupportedAgentPackageFileName(fileName: string): boolean {
@@ -56,76 +54,28 @@ function assertAgentPackageFileName(fileName: string): string {
   return normalizedFileName;
 }
 
-function createPackageRecordShape(input: {
-  createdBy: AccountId;
-  fileId: FileId;
-  fileName: string;
-  appId: AppId;
-}) {
-  const path = createAttachmentPath(input.fileId, input.fileName);
-
-  return {
-    created_by_account_id: input.createdBy,
-    id: input.fileId,
-    name: input.fileName,
-    path,
-    scope_id: input.appId,
-    scope_kind: "agent_package" as const,
-  };
-}
-
-function toRecordValues(input: {
-  contentType: string;
-  createdBy: AccountId;
-  etag: string;
-  expiresAt: number | null;
-  fileId: FileId;
-  fileName: string;
-  objectKey: string;
-  purpose: "agent_asset" | "agent_package";
-  appId: AppId;
-  size: number;
-  timestampMs: number;
-}): FileRecordInsert {
-  const path = createAttachmentPath(input.fileId, input.fileName);
-
-  return {
-    committed: false,
-    createdAt: input.timestampMs,
-    createdByAccountId: input.createdBy,
-    etag: input.etag,
-    expiresAt: input.expiresAt,
-    id: input.fileId,
-    mimeType: input.contentType,
-    name: input.fileName,
-    objectKey: input.objectKey,
-    ownerId: input.appId,
-    ownerKind: "app",
-    parentPath: getParentPath(path),
-    path,
-    purpose: input.purpose,
-    scopeId: input.appId,
-    scopeKind: "agent_package",
-    sessionKind: null,
-    size: input.size,
-    status: "ready",
-    updatedAt: input.timestampMs,
-    version: 1,
-  };
-}
-
-async function deleteObjectForCompensation(input: {
-  bindings: ApiBindings;
-  context: Record<string, string>;
-  objectKey: string;
-}): Promise<void> {
-  await deleteObject(input.bindings, input.objectKey).catch((error: unknown) => {
-    logError("agent-package.file-cleanup.failed", {
-      ...createErrorLogContext(error),
-      ...input.context,
-      objectKey: input.objectKey,
-    });
+function createArchiveBody(bytes: Uint8Array): ReadableStream<Uint8Array> {
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
   });
+}
+
+async function abortPackageUploadForCompensation(input: {
+  bindings: ApiBindings;
+  fileId: FileId;
+  viewer: AuthenticatedViewer;
+}): Promise<void> {
+  await fileStore
+    .abortUpload(input.bindings, input.viewer, input.fileId)
+    .catch((error: unknown) => {
+      logError("agent-package.file-cleanup.failed", {
+        ...createErrorLogContext(error),
+        fileId: input.fileId,
+      });
+    });
 }
 
 export async function createAgentPackageFile(input: {
@@ -138,63 +88,79 @@ export async function createAgentPackageFile(input: {
   await ensureAppOwnership(input.bindings.DB, input.viewer.id, input.appId);
   assertAgentPackageFileSize(input.archiveBytes.byteLength);
 
-  const fileId = createPlatformId<FileId>();
   const fileName = assertAgentPackageFileName(input.fileName);
-  const timestampMs = currentTimestampMs();
-  const recordShape = createPackageRecordShape({
-    createdBy: input.viewer.id,
-    fileId,
-    fileName,
-    appId: input.appId,
-  });
-  const objectKey = createFinalObjectKey(recordShape);
-  const head = await putObject({
-    bindings: input.bindings,
-    body: input.archiveBytes,
-    contentType: AGENT_PACKAGE_CONTENT_TYPE,
-    objectKey,
-    options: {
-      ifNoneMatch: "*",
+  const upload = await fileStore.createUpload(input.bindings, input.viewer, {
+    file: {
+      contentType: AGENT_PACKAGE_CONTENT_TYPE,
+      name: fileName,
+      size: input.archiveBytes.byteLength,
     },
-  });
-  const values = toRecordValues({
-    contentType: AGENT_PACKAGE_CONTENT_TYPE,
-    createdBy: input.viewer.id,
-    etag: head.etag,
-    expiresAt: timestampMs + AGENT_PACKAGE_FILE_TTL_MS,
-    fileId,
-    fileName,
-    objectKey,
     purpose: "agent_package",
-    appId: input.appId,
-    size: head.contentLength,
-    timestampMs,
+    target: {
+      id: input.appId,
+      kind: "agent_package",
+      name: fileName,
+    },
   });
 
   try {
-    await getAppDatabase(input.bindings.DB).insert(fileRecordsTable).values(values).run();
-  } catch (error) {
-    await deleteObjectForCompensation({
+    await fileStore.putContent(
+      input.bindings,
+      input.viewer,
+      upload.fileId,
+      createArchiveBody(input.archiveBytes),
+    );
+    const completed = await fileStore.completeUpload({
       bindings: input.bindings,
-      context: {
-        fileId,
-        appId: input.appId,
-      },
-      objectKey,
+      fileId: upload.fileId,
+      input: {},
+      viewer: input.viewer,
+    });
+
+    return {
+      contentType: AGENT_PACKAGE_CONTENT_TYPE,
+      fileId: completed.file.id,
+      fileName: completed.file.name,
+      size: completed.file.size,
+    };
+  } catch (error) {
+    await abortPackageUploadForCompensation({
+      bindings: input.bindings,
+      fileId: upload.fileId,
+      viewer: input.viewer,
     });
     throw error;
   }
+}
 
-  return {
-    contentType: AGENT_PACKAGE_CONTENT_TYPE,
-    fileId,
-    fileName,
-    size: head.contentLength,
-  };
+async function getAgentPackageFileAdmissionRecord(
+  database: D1Database,
+  fileId: FileId,
+): Promise<AgentPackageFileAdmissionRecord | null> {
+  return (
+    (await getAppDatabase(database)
+      .select({
+        createdBy: fileRecordsTable.createdByAccountId,
+        expiresAtMs: fileRecordsTable.expiresAt,
+        id: fileRecordsTable.id,
+        name: fileRecordsTable.name,
+        ownerId: fileRecordsTable.ownerId,
+        ownerKind: fileRecordsTable.ownerKind,
+        purpose: fileRecordsTable.purpose,
+        scopeId: fileRecordsTable.scopeId,
+        scopeKind: fileRecordsTable.scopeKind,
+        size: fileRecordsTable.size,
+        status: fileRecordsTable.status,
+      })
+      .from(fileRecordsTable)
+      .where(eq(fileRecordsTable.id, fileId))
+      .limit(1)
+      .get()) ?? null
+  );
 }
 
 function assertPackageFileAdmitted(input: {
-  file: FileRecordRow;
+  file: AgentPackageFileAdmissionRecord;
   nowMs: number;
   appId: AppId;
   viewerId: AccountId;
@@ -205,15 +171,15 @@ function assertPackageFileAdmitted(input: {
     throw new Error("Agent package file purpose must be agent_package.");
   }
 
-  if (file.scope_kind !== "agent_package") {
+  if (file.scopeKind !== "agent_package") {
     throw new Error("Agent package file must use the agent_package scope.");
   }
 
-  if (file.scope_id !== input.appId || file.owner_kind !== "app" || file.owner_id !== input.appId) {
+  if (file.scopeId !== input.appId || file.ownerKind !== "app" || file.ownerId !== input.appId) {
     throw new Error("Agent package file does not belong to the target App.");
   }
 
-  if (file.created_by_account_id !== input.viewerId) {
+  if (file.createdBy !== input.viewerId) {
     throw new Error("Agent package file does not belong to the importing user.");
   }
 
@@ -221,7 +187,7 @@ function assertPackageFileAdmitted(input: {
     throw new Error("Agent package file is not ready.");
   }
 
-  if (file.expires_at === null || file.expires_at <= input.nowMs) {
+  if (file.expiresAtMs === null || file.expiresAtMs <= input.nowMs) {
     throw new Error("Agent package file is expired.");
   }
 
@@ -237,10 +203,10 @@ export async function readAgentPackageArchiveFile(input: {
   fileId: FileId;
   appId: AppId;
   viewer: AuthenticatedViewer;
-}): Promise<{ archiveBytes: Uint8Array; file: FileRecordRow }> {
+}): Promise<{ archiveBytes: Uint8Array; file: AgentPackageFileAdmissionRecord }> {
   await ensureAppOwnership(input.bindings.DB, input.viewer.id, input.appId);
 
-  const file = await getFileRecordById(input.bindings.DB, input.fileId);
+  const file = await getAgentPackageFileAdmissionRecord(input.bindings.DB, input.fileId);
 
   if (file === null) {
     throw new Error("Agent package file was not found.");
@@ -253,14 +219,10 @@ export async function readAgentPackageArchiveFile(input: {
     viewerId: input.viewer.id,
   });
 
-  const object = await getObjectBody(input.bindings, file.object_key);
-
-  if (object === null) {
-    throw new Error("Agent package file content was not found.");
-  }
+  const response = await fileStore.streamContent(input.bindings, input.viewer, input.fileId);
 
   return {
-    archiveBytes: new Uint8Array(await object.arrayBuffer()),
+    archiveBytes: new Uint8Array(await response.arrayBuffer()),
     file,
   };
 }
@@ -270,7 +232,7 @@ export async function deleteImportedAgentPackageFile(input: {
   fileId: FileId;
   viewer: AuthenticatedViewer;
 }): Promise<void> {
-  await deleteFileById(input.bindings, input.viewer, input.fileId).catch((error: unknown) => {
+  await fileStore.delete(input.bindings, input.viewer, input.fileId).catch((error: unknown) => {
     logError("agent-package.import-package-delete.failed", {
       ...createErrorLogContext(error),
       fileId: input.fileId,

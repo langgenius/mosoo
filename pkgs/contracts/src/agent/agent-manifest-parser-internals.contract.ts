@@ -1,7 +1,6 @@
 import type {
   AgentManifestMcpServerBinding,
   AgentManifestSkillReference,
-  AgentManifestSpaceBinding,
   AgentResolutionIssue,
   AgentResolutionSeverity,
   AgentResolutionStatus,
@@ -19,7 +18,6 @@ const MANIFEST_TOP_LEVEL_KEYS = new Set<string>([
   "prompts",
   "runtime",
   "skills",
-  "spaces",
 ]);
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -245,30 +243,5 @@ export function readMcpServerBinding(value: unknown): AgentManifestMcpServerBind
     serverId: readNullableString(value, "serverId"),
     source,
     url,
-  };
-}
-
-export function readSpaceBinding(value: unknown): AgentManifestSpaceBinding | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-
-  const alias = readString(value, "alias");
-  const mode = readString(value, "mode");
-
-  if (!hasRequiredText(alias)) {
-    return null;
-  }
-
-  if (mode !== "read") {
-    throw new Error("Agent Manifest space mode is invalid.");
-  }
-
-  return {
-    alias,
-    expectedName: readNullableString(value, "expectedName"),
-    mode,
-    required: readBooleanOrDefault(value, "required", true),
-    spaceId: readNullableString(value, "spaceId"),
   };
 }

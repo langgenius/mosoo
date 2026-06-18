@@ -1,10 +1,5 @@
 import type { Agent, DeleteAgentInput, PublishAgentInput } from "@mosoo/contracts/agent";
-import {
-  agentDeploymentVersionsTable,
-  agentSkillsTable,
-  agentSpaceBindingsTable,
-  agentsTable,
-} from "@mosoo/db";
+import { agentDeploymentVersionsTable, agentSkillsTable, agentsTable } from "@mosoo/db";
 import type { AgentId, AppId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
@@ -38,7 +33,6 @@ export async function deleteAgent(
 
   await runAppDatabaseBatch(database, (db) => [
     db.delete(agentSkillsTable).where(eq(agentSkillsTable.agentId, agent.id)),
-    db.delete(agentSpaceBindingsTable).where(eq(agentSpaceBindingsTable.agentId, agent.id)),
     db.delete(agentsTable).where(eq(agentsTable.id, agent.id)),
   ]);
 }

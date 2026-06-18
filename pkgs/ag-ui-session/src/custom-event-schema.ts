@@ -49,13 +49,6 @@ const MosooSessionConfigTraceMcpServerSchema = type({
   serverId: "string",
 });
 
-const MosooSessionConfigTraceSpaceAliasSchema = type({
-  aliasPath: "string",
-  globalMountPath: "string",
-  spaceId: "string",
-  spaceName: "string",
-});
-
 const MosooSessionConfigTraceBootPayloadSchema = type({
   credentialRefs: type('"redacted"').array(),
   cwd: "string",
@@ -65,7 +58,6 @@ const MosooSessionConfigTraceBootPayloadSchema = type({
   provider: "string",
   runtimeId: "string",
   runtimeTransport: "string",
-  spaceAliases: MosooSessionConfigTraceSpaceAliasSchema.array(),
 });
 
 const MosooSessionConfigTraceValueSchema = type({
@@ -108,23 +100,6 @@ const MosooSessionRuntimeTimelineValueSchema = type({
   stage: '"context_hydration" | "driver_backend" | "driver_turn" | "prepare_run" | "prewarm"',
   startedAtMs: "number",
   traceId: NullableString,
-});
-
-const SpaceWriteActorSchema = type({
-  id: "string",
-  type: '"agent" | "user"',
-});
-
-const SpaceFileLockHolderSchema = type({
-  displayName: NullableString,
-  id: "string",
-  type: '"agent" | "user"',
-});
-
-const SpaceFileLockViewSchema = type({
-  expiresAt: "number",
-  holder: SpaceFileLockHolderSchema,
-  path: "string",
 });
 
 export const MosooServerCustomEventSchema = type.or(
@@ -256,33 +231,6 @@ export const MosooServerCustomEventSchema = type.or(
     value: {
       "title?": OptionalNullableString,
       "updatedAt?": OptionalNullableString,
-    },
-  }),
-  type({
-    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.spaceLockAcquired.name),
-    type: '"CUSTOM"',
-    value: {
-      lock: SpaceFileLockViewSchema,
-    },
-  }),
-  type({
-    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.spaceLockReleased.name),
-    type: '"CUSTOM"',
-    value: {
-      lock: SpaceFileLockViewSchema,
-    },
-  }),
-  type({
-    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.spaceWriteStale.name),
-    type: '"CUSTOM"',
-    value: {
-      "actor?": type("undefined").or(SpaceWriteActorSchema),
-      "current_etag?": "string | undefined",
-      path: "string",
-      reason: '"deleted" | "modified"',
-      "session_id?": "string | undefined",
-      "turn_id?": "string | undefined",
-      type: eventNameLiteral(MOSOO_CUSTOM_EVENT.spaceWriteStale.name),
     },
   }),
 );

@@ -28,7 +28,7 @@ export {
   getFileRecordById,
   getPendingFileByPath,
   getReadyFileByPath,
+  listFileRecords,
   listFileRecordsById,
   listFilesForScopeCleanup,
-  listSpaceFilesForDirectoryCleanup,
 } from "./file-record-queries";

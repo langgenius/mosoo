@@ -16,7 +16,6 @@ import {
   normalizerSkillId,
   plannerContext,
   plannerContextWithBoundEnvironment,
-  plannerContextWithBoundSpaces,
   plannerContextWithMissingModelSelection,
   plannerContextWithUnsupportedRuntime,
   plannerContextWithVisibleMcpServers,
@@ -327,45 +326,6 @@ describe("Agent Builder draft patch normalizer", () => {
       sectionId: "environment",
       value: NORMALIZER_IDS.environmentSystemDefault,
     });
-  });
-
-  test("normalizes Space unmount into remaining Manifest bindings", async () => {
-    const nodes = await normalizeAgentBuilderDraftPatchNodes({
-      actorAccountId: NORMALIZER_IDS.account,
-      bindings: { DB: {} as D1Database } as ApiBindings,
-      context: plannerContextWithBoundSpaces(),
-      mode: "draft_patch",
-      nodes: [draftPatchNode("remove_space", "spaceIds", [NORMALIZER_IDS.spaceRemove], "remove")],
-    });
-
-    expect(nodes[0]?.status).toBe("applied");
-    expect(nodes[0]?.operation).toBe("update");
-    expect(nodes[0]?.draftPatch).toMatchObject({
-      baseValue: [NORMALIZER_IDS.spaceKeep, NORMALIZER_IDS.spaceRemove],
-      fieldPath: "spaceIds",
-      sectionId: "environment",
-      value: [NORMALIZER_IDS.spaceKeep],
-    });
-  });
-
-  test("blocks Space unmount when the requested Space is not currently bound", async () => {
-    const nodes = await normalizeAgentBuilderDraftPatchNodes({
-      actorAccountId: NORMALIZER_IDS.account,
-      bindings: { DB: {} as D1Database } as ApiBindings,
-      context: plannerContextWithBoundSpaces(),
-      mode: "draft_patch",
-      nodes: [
-        draftPatchNode(
-          "remove_unbound_space",
-          "spaceIds",
-          [NORMALIZER_IDS.spaceAvailable],
-          "remove",
-        ),
-      ],
-    });
-
-    expect(nodes[0]?.status).toBe("blocked");
-    expect(nodes[0]?.summary).toContain("currently bound Spaces");
   });
 
   test("normalizes Skill unmount into remaining Manifest bindings", async () => {

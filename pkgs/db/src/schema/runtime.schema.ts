@@ -90,7 +90,6 @@ export const sandboxSessionsTable = sqliteTable(
     sessionId: platformIdColumn<SessionId>("session_id")
       .primaryKey()
       .references(() => sessionsTable.id, { onDelete: "cascade" }),
-    spaceAliasesJson: text("space_aliases_json").notNull(),
     status: text("status").$type<SandboxSessionStatus>().notNull(),
     updatedAt: integer("updated_at").notNull(),
   },

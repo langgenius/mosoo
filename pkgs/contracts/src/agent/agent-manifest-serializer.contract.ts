@@ -140,19 +140,6 @@ export function serializeAgentManifestToYaml(
   lines.push("  envVars:");
   appendStringRecordYaml(lines, manifest.environment.envVars, "    ");
 
-  lines.push("spaces:");
-  if (manifest.spaces.length === 0) {
-    lines.push("  []");
-  } else {
-    for (const space of manifest.spaces) {
-      lines.push(`  - alias: ${yamlString(space.alias)}`);
-      lines.push(`    mode: ${yamlString(space.mode)}`);
-      lines.push(`    expectedName: ${yamlString(space.expectedName)}`);
-      lines.push(`    required: ${space.required ? "true" : "false"}`);
-      lines.push(`    spaceId: ${yamlString(space.spaceId)}`);
-    }
-  }
-
   if (manifest.advanced && Object.keys(manifest.advanced.unparsedFields).length > 0) {
     lines.push("advanced:");
     lines.push("  unparsedFields: {}");
@@ -237,9 +224,5 @@ export function toAgentPackageManifestJson(agentPackage: AgentPackage): Record<s
     environment: {
       ref: "environment/definition.json",
     },
-    spaceBindings: manifest.spaces.map((space) => ({
-      alias: space.alias,
-      expectedName: space.expectedName,
-    })),
   };
 }

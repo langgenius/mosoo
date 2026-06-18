@@ -47,10 +47,7 @@ export function updateSessionMetadataState(
     }
 
     case CUSTOM_EVENT_REGISTRY.sessionConfigTrace.name:
-    case CUSTOM_EVENT_REGISTRY.sessionSyncRequest.name:
-    case CUSTOM_EVENT_REGISTRY.spaceLockAcquired.name:
-    case CUSTOM_EVENT_REGISTRY.spaceLockReleased.name:
-    case CUSTOM_EVENT_REGISTRY.spaceWriteStale.name: {
+    case CUSTOM_EVENT_REGISTRY.sessionSyncRequest.name: {
       return state;
     }
     default: {

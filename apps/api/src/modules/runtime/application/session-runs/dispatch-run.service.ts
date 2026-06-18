@@ -112,7 +112,6 @@ export async function dispatchSessionRun(
     sessionId: SessionId;
     sessionRunId: SessionRunId;
     traceId: string;
-    appAccessSnapshot: HydratedSessionRunContext["appAccessSnapshot"];
   },
 ): Promise<void> {
   const sandboxId = input.profile.sandbox.id;
@@ -176,7 +175,6 @@ export async function dispatchSessionRun(
           traceId: input.traceId,
         });
       },
-      appAccessSnapshot: input.appAccessSnapshot,
       profile: input.profile,
       resolvedMcpServers: input.resolvedMcpServers,
       resolvedSkillCatalog: input.resolvedSkillCatalog,
@@ -215,7 +213,6 @@ export async function dispatchSessionRun(
       executionPlane.dispatchTurn(bindings, {
         attachmentIds: input.attachmentIds,
         driverInstanceId: preparedDriverInstanceId,
-        appAccessSnapshot: preparedRunLease.appAccessSnapshot,
         prompt: input.prompt,
         sessionRunId: input.sessionRunId,
       }),

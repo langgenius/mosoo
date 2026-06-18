@@ -14,7 +14,7 @@ import { createErrorLogContext, logWarn } from "../../../platform/cloudflare/log
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
-import { deleteFilesForScope } from "../../files/application/file-scope-cleanup.service";
+import { fileStore } from "../../files/application/file-store";
 import { listLiveRuntimeDriverInstanceIdsForSession } from "../../runtime/application/runtime-driver-instance-query.service";
 import {
   closeSandboxConversationSession,
@@ -260,9 +260,9 @@ export async function deleteSessionCascade(
         return;
       }
       case "delete_session_files": {
-        await deleteFilesForScope(bindings, {
-          scopeId: sessionId,
-          scopeKind: "session",
+        await fileStore.deleteScope(bindings, {
+          id: sessionId,
+          kind: "session",
         });
         return;
       }

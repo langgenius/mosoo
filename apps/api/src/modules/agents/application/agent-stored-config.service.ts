@@ -55,7 +55,6 @@ const AGENT_RESOLUTION_TARGET_TYPES: AgentResolutionTargetType[] = [
   "provider",
   "runtime",
   "skill",
-  "space",
 ];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -337,10 +336,6 @@ function readPackageResolutionState(value: unknown): AgentPackageResolutionState
         boundSkillCount: readNumber(
           summary["boundSkillCount"],
           "packageResolution boundSkillCount",
-        ),
-        boundSpaceCount: readNumber(
-          summary["boundSpaceCount"],
-          "packageResolution boundSpaceCount",
         ),
         copiedAssetCount: readNumber(
           summary["copiedAssetCount"],

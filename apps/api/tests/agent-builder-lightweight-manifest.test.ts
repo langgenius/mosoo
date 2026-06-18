@@ -3,9 +3,6 @@ import { describe, expect, test } from "bun:test";
 import { parseAgentBuilderLightweightManifestYaml } from "../src/modules/agent-builder/application/agent-builder-lightweight-manifest";
 import { toAgentBuilderPlannerDraftContext } from "../src/modules/agent-builder/application/agent-builder-lightweight-manifest-projections";
 
-const SPACE_FROM_PATCH_ID = "01J000000000000000000000E1";
-const SPACE_FROM_OBJECT_ID = "01J000000000000000000000E2";
-const SPACE_DELETED_ID = "01J000000000000000000000E3";
 const MCP_ACTIVE_ID = "01J000000000000000000000M1";
 const MCP_DELETED_ID = "01J000000000000000000000M2";
 const SKILL_ACTIVE_ID = "01J000000000000000000000F1";
@@ -21,30 +18,6 @@ describe("Agent Builder lightweight Manifest reader", () => {
       parseError: expect.any(String),
       parseStatus: "failed",
     });
-  });
-
-  test("reads Space bindings from persisted string arrays and object bindings", () => {
-    const draft = toAgentBuilderPlannerDraftContext(
-      [
-        "version: 1",
-        "kind: pet",
-        "assets:",
-        "  spaces:",
-        `    - ${SPACE_FROM_PATCH_ID}`,
-        `    - id: ${SPACE_FROM_OBJECT_ID}`,
-        "      name: Object Space",
-        `    - ${SPACE_FROM_OBJECT_ID}`,
-        `    - id: ${SPACE_DELETED_ID}`,
-        "      name: Deleted Space",
-        "      state: tombstone",
-      ].join("\n"),
-    );
-
-    expect(draft.spaceIds).toEqual([SPACE_FROM_PATCH_ID, SPACE_FROM_OBJECT_ID]);
-    expect(draft.spaces).toEqual([
-      { id: SPACE_FROM_PATCH_ID, name: SPACE_FROM_PATCH_ID },
-      { id: SPACE_FROM_OBJECT_ID, name: "Object Space" },
-    ]);
   });
 
   test("preserves tombstone Skill references in planner binding IDs", () => {
@@ -98,7 +71,6 @@ describe("Agent Builder lightweight Manifest reader", () => {
         "    environment: skipped",
         "    mcpServers: skipped",
         "    skills: skipped",
-        "    spaces: skipped",
       ].join("\n"),
     );
 
@@ -183,17 +155,6 @@ describe("Agent Builder lightweight Manifest reader", () => {
       ),
       parseStatus: "failed",
     });
-
-    expect(
-      toAgentBuilderPlannerDraftContext(
-        ["version: 1", "kind: pet", "assets:", "  spaces:", "    - name: Knowledge Base"].join(
-          "\n",
-        ),
-      ),
-    ).toMatchObject({
-      parseError: expect.stringContaining("assets.spaces[0]"),
-      parseStatus: "failed",
-    });
   });
 
   test("rejects malformed explicit Manifest sections before treating them as empty", () => {
@@ -259,39 +220,6 @@ describe("Agent Builder lightweight Manifest reader", () => {
   });
 
   test("rejects malformed explicit asset object fields before treating them as defaults", () => {
-    expect(
-      toAgentBuilderPlannerDraftContext(
-        [
-          "version: 1",
-          "kind: pet",
-          "assets:",
-          "  spaces:",
-          `    - id: ${SPACE_FROM_OBJECT_ID}`,
-          "      name: Object Space",
-          "      state: banana",
-        ].join("\n"),
-      ),
-    ).toMatchObject({
-      parseError: expect.stringContaining("assets.spaces[0].state must be one of"),
-      parseStatus: "failed",
-    });
-
-    expect(
-      toAgentBuilderPlannerDraftContext(
-        [
-          "version: 1",
-          "kind: pet",
-          "assets:",
-          "  spaces:",
-          `    - id: ${SPACE_FROM_OBJECT_ID}`,
-          "      name: []",
-        ].join("\n"),
-      ),
-    ).toMatchObject({
-      parseError: expect.stringContaining("assets.spaces[0].name must be a string or null"),
-      parseStatus: "failed",
-    });
-
     expect(
       toAgentBuilderPlannerDraftContext(
         [

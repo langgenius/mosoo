@@ -16,7 +16,6 @@ function createConversationSessionDatabase(): SqliteD1Database {
       origin_json text NOT NULL,
       sandbox_id text NOT NULL,
       session_id text PRIMARY KEY NOT NULL,
-      space_aliases_json text NOT NULL,
       status text NOT NULL
     );
 
@@ -42,10 +41,9 @@ async function insertConversationSession(database: D1Database): Promise<void> {
           origin_json,
           sandbox_id,
           session_id,
-          space_aliases_json,
           status
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?)
       `,
     )
     .bind(
@@ -54,7 +52,6 @@ async function insertConversationSession(database: D1Database): Promise<void> {
       JSON.stringify({ type: "runtime" }),
       "01J0000000000000000000000D",
       "session-1",
-      "[]",
       "closed",
     )
     .run();

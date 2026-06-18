@@ -5,29 +5,34 @@ import type {
   PublicThreadFileListResponse,
   PublicThreadFileResponse,
 } from "@mosoo/contracts/public-api";
-import type { SessionResource } from "@mosoo/contracts/session";
 import { parsePlatformId } from "@mosoo/id";
-import type { FileId, PublicThreadId } from "@mosoo/id";
+import type { FileId, PublicThreadId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
-import { claimAppDraftFilesToSession } from "../files/application/draft-file-claim.service";
-import { createFileNotFoundError } from "../files/infrastructure/file-errors";
-import { getFileRecordById, toFileRecord } from "../files/infrastructure/file-record-store";
-import { listSessionResources } from "../sessions/application/session-resource.service";
+import { FileControlError } from "../files/application/file-control-errors";
+import { fileStore } from "../files/application/file-store";
+import { publishSessionResourceDelete } from "../sessions/application/session-resource-events.service";
 import { toBackingSessionId } from "./public-thread-ids";
 import { admitPublicSessionCaller } from "./public-thread-session-query.service";
 
-function toPublicThreadFileFromResource(resource: SessionResource): PublicThreadFile {
-  return {
-    committed: true,
-    createdAt: resource.createdAt,
-    id: parsePlatformId(resource.id, "File ID") as FileId,
-    kind: "attachment",
-    mimeType: resource.mimeType,
-    name: resource.name,
-    size: resource.size,
-  };
+async function admitPublicThreadFileAccess(
+  bindings: ApiBindings,
+  caller: AuthenticatedViewer,
+  threadId: PublicThreadId,
+): Promise<SessionId> {
+  await admitPublicSessionCaller(bindings.DB, caller, threadId);
+  return toBackingSessionId(threadId);
+}
+
+function assertPublicThreadFile(file: FileRecord, sessionId: SessionId): void {
+  if (
+    file.scope.kind !== "session" ||
+    file.scope.id !== sessionId ||
+    (file.sessionKind !== "attachment" && file.sessionKind !== "artifact")
+  ) {
+    throw new FileControlError(404, "file_not_found", `Thread file ${file.id} was not found.`);
+  }
 }
 
 function toPublicThreadFileFromRecord(file: FileRecord): PublicThreadFile {
@@ -35,31 +40,26 @@ function toPublicThreadFileFromRecord(file: FileRecord): PublicThreadFile {
     committed: true,
     createdAt: file.createdAt,
     id: parsePlatformId(file.id, "File ID") as FileId,
-    kind: "attachment",
+    kind: file.sessionKind ?? "attachment",
     mimeType: file.mimeType,
     name: file.name,
     size: file.size,
   };
 }
 
-async function loadSessionResourceRemovalService() {
-  return import("../sessions/application/session-resource-removal.service");
-}
-
 export async function listPublicThreadFiles(
-  database: D1Database,
+  bindings: ApiBindings,
   caller: AuthenticatedViewer,
   threadId: PublicThreadId,
 ): Promise<PublicThreadFileListResponse> {
-  const sessionId = toBackingSessionId(threadId);
-  const admission = await admitPublicSessionCaller(database, caller, threadId);
+  const sessionId = await admitPublicThreadFileAccess(bindings, caller, threadId);
   return {
     files: (
-      await listSessionResources(database, caller, {
-        appId: admission.session.app_id,
-        sessionId,
+      await fileStore.list(bindings, caller, {
+        scopeId: sessionId,
+        scopeKind: "session",
       })
-    ).map(toPublicThreadFileFromResource),
+    ).files.map(toPublicThreadFileFromRecord),
   };
 }
 
@@ -69,24 +69,23 @@ export async function createPublicThreadFile(
   threadId: PublicThreadId,
   input: CreatePublicThreadFileRequest,
 ): Promise<PublicThreadFileResponse> {
-  const sessionId = toBackingSessionId(threadId);
-  const admission = await admitPublicSessionCaller(bindings.DB, caller, threadId);
-  await claimAppDraftFilesToSession(bindings, caller, {
-    attachmentIds: [input.fileId],
-    appId: admission.session.app_id,
-    sessionId,
-  });
-  const claimedFile = await getFileRecordById(bindings.DB, input.fileId);
+  const sessionId = await admitPublicThreadFileAccess(bindings, caller, threadId);
+  const claimedFiles = await fileStore.claimToSession(bindings, caller, sessionId, [input.fileId]);
+  const claimedFile = claimedFiles[0];
 
   return {
     file: toPublicThreadFileFromRecord(
-      claimedFile === null ? toFileRecordMissing(input.fileId) : toFileRecord(claimedFile),
+      claimedFile === undefined ? toFileRecordMissing(input.fileId) : claimedFile,
     ),
   };
 }
 
 function toFileRecordMissing(fileId: FileId): never {
-  throw createFileNotFoundError(`Thread file ${fileId} was not found after claim.`);
+  throw new FileControlError(
+    404,
+    "file_not_found",
+    `Thread file ${fileId} was not found after claim.`,
+  );
 }
 
 export async function deletePublicThreadFile(
@@ -97,19 +96,15 @@ export async function deletePublicThreadFile(
     threadId: PublicThreadId;
   },
 ): Promise<void> {
-  const sessionId = toBackingSessionId(input.threadId);
-  const admission = await admitPublicSessionCaller(bindings.DB, caller, input.threadId);
-  const { removeSessionResource } = await loadSessionResourceRemovalService();
-  await removeSessionResource(
+  const sessionId = await admitPublicThreadFileAccess(bindings, caller, input.threadId);
+  const file = await fileStore.getRecord(bindings, caller, input.fileId);
+
+  assertPublicThreadFile(file, sessionId);
+
+  await fileStore.delete(bindings, caller, input.fileId);
+  await publishSessionResourceDelete({
     bindings,
-    caller,
-    {
-      appId: admission.session.app_id,
-      resourceId: input.fileId,
-      sessionId,
-    },
-    {
-      authorization: "admitted",
-    },
-  );
+    resourceId: input.fileId,
+    sessionId,
+  });
 }

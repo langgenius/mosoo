@@ -4,6 +4,7 @@ import type {
   CreateFileUploadRequest,
   CreateFileUploadResponse,
   FileErrorResponse,
+  FileListing,
 } from "@mosoo/contracts/file";
 import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api";
 import { parsePlatformId } from "@mosoo/id";
@@ -25,6 +26,7 @@ const OTHER_VIEWER_ID = parsePlatformId<AccountId>("01J00000000000000000000002",
 const FILE_ID = parsePlatformId<FileId>("01J00000000000000000000003", "file ID");
 const UPLOAD_ID = parsePlatformId<UploadId>("01J00000000000000000000004", "upload ID");
 const SESSION_ID = parsePlatformId<SessionId>("01J00000000000000000000005", "session ID");
+const LIBRARY_FILE_ID = parsePlatformId<FileId>("01J00000000000000000000009", "library file ID");
 const ORGANIZATION_ID = parsePlatformId<OrganizationId>(
   "01J00000000000000000000006",
   "organization ID",
@@ -321,6 +323,77 @@ async function countSessionFileRecords(
   return row?.count ?? 0;
 }
 
+async function insertReadyRawFileRecord(
+  database: SqliteD1Database,
+  input: {
+    createdBy: string;
+    fileId: FileId;
+    name: string;
+    ownerId: string;
+    ownerKind: "account" | "session";
+    path: string;
+    purpose: "library_file" | "session_attachment";
+    scopeId: string | null;
+    scopeKind: "library" | "session";
+    sessionKind: "attachment" | null;
+  },
+): Promise<void> {
+  const parentPath = input.path.includes("/")
+    ? input.path.slice(0, input.path.lastIndexOf("/"))
+    : "";
+
+  await database
+    .prepare(
+      `INSERT INTO file_record (
+        committed,
+        created_at,
+        created_by_account_id,
+        etag,
+        expires_at,
+        id,
+        mime_type,
+        name,
+        object_key,
+        owner_id,
+        owner_kind,
+        parent_path,
+        path,
+        purpose,
+        scope_id,
+        scope_kind,
+        session_kind,
+        size,
+        status,
+        updated_at,
+        version
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      1,
+      1,
+      input.createdBy,
+      "etag-ready",
+      null,
+      input.fileId,
+      "text/plain",
+      input.name,
+      `objects/${input.fileId}`,
+      input.ownerId,
+      input.ownerKind,
+      parentPath,
+      input.path,
+      input.purpose,
+      input.scopeId,
+      input.scopeKind,
+      input.sessionKind,
+      12,
+      "ready",
+      1,
+      1,
+    )
+    .run();
+}
+
 async function postRawSessionFileUpload(input: {
   bindings: ApiBindings;
   headers: Headers;
@@ -557,5 +630,69 @@ describe("file upload access", () => {
       kind: "session",
     });
     expect(await countSessionFileRecords(fixture.database, SESSION_ID)).toBe(1);
+  });
+
+  test("raw HTTP file list defaults to all visible files and filters by session scope", async () => {
+    const fixture = await createAgentBuilderApiFixture();
+    await fixture.client.loginAsMosooAiTestAccount();
+    await insertRawFileRouteSessionFixture(fixture.database, {
+      agentId: fixture.ids.agentId,
+      organizationId: fixture.ids.organizationId,
+      otherAppId: OTHER_APP_ID,
+      appId: fixture.ids.appId,
+      sessionId: SESSION_ID,
+      viewerId: fixture.viewer.id,
+    });
+
+    await insertReadyRawFileRecord(fixture.database, {
+      createdBy: fixture.viewer.id,
+      fileId: LIBRARY_FILE_ID,
+      name: "seed.csv",
+      ownerId: fixture.viewer.id,
+      ownerKind: "account",
+      path: "seed.csv",
+      purpose: "library_file",
+      scopeId: null,
+      scopeKind: "library",
+      sessionKind: null,
+    });
+    await insertReadyRawFileRecord(fixture.database, {
+      createdBy: fixture.viewer.id,
+      fileId: FILE_ID,
+      name: "notes.txt",
+      ownerId: SESSION_ID,
+      ownerKind: "session",
+      path: `attachment/${FILE_ID}/notes.txt`,
+      purpose: "session_attachment",
+      scopeId: SESSION_ID,
+      scopeKind: "session",
+      sessionKind: "attachment",
+    });
+
+    const allResponse = await createHttpApp().request(
+      `${PUBLIC_API_PREFIX}/files`,
+      {
+        headers: fixture.client.sessionHeaders(),
+        method: "GET",
+      },
+      fixture.bindings,
+    );
+    const allBody = (await allResponse.json()) as FileListing;
+
+    expect(allResponse.status).toBe(200);
+    expect(allBody.files.map((file) => file.id).sort()).toEqual([FILE_ID, LIBRARY_FILE_ID].sort());
+
+    const sessionResponse = await createHttpApp().request(
+      `${PUBLIC_API_PREFIX}/files?scopeId=${SESSION_ID}`,
+      {
+        headers: fixture.client.sessionHeaders(),
+        method: "GET",
+      },
+      fixture.bindings,
+    );
+    const sessionBody = (await sessionResponse.json()) as FileListing;
+
+    expect(sessionResponse.status).toBe(200);
+    expect(sessionBody.files.map((file) => file.id)).toEqual([FILE_ID]);
   });
 });

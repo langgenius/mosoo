@@ -43,7 +43,6 @@ function draft(): AgentEditorDraft {
         name: "Release Review",
       },
     ],
-    spaces: [{ id: "01J000000000000000000000E5", name: "Release Space" }],
   };
 }
 
@@ -89,7 +88,6 @@ describe("agent draft YAML codec", () => {
         "    environment: skipped",
         "    mcpServers: skipped",
         "    skills: skipped",
-        "    spaces: skipped",
       ].join("\n"),
       current,
     );

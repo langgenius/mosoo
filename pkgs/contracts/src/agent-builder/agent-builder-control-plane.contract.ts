@@ -138,11 +138,7 @@ export interface AgentBuilderCreateAgentStageState {
   readonly status: AgentBuilderWorkflowStageStatus;
 }
 
-export type AgentBuilderComponentChecklistItem =
-  | "environment"
-  | "mcp_servers"
-  | "skills"
-  | "spaces";
+export type AgentBuilderComponentChecklistItem = "environment" | "mcp_servers" | "skills";
 
 export interface AgentBuilderConfigureComponentsStageState {
   readonly blockingMissingItems: readonly AgentBuilderComponentChecklistItem[];

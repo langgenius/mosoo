@@ -4,7 +4,7 @@ import { createRuntimeEvent } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 import type { DriverFailureInput } from "agent-driver/orpc";
 
-import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/logger";
+import { logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import {
@@ -23,7 +23,6 @@ import {
   closeTerminalRuntimeConversationIfNeeded,
   recycleReleasedTerminalRuntimeLeaseIfNeeded,
 } from "./terminal-runtime-lease";
-import { syncLocalSandboxSpaceFilesAfterTurn } from "./terminal-space-sync";
 
 function assertTerminalDriverSessionRunTransition(outcome: SessionRunTransitionOutcome): void {
   switch (outcome.kind) {
@@ -92,7 +91,6 @@ export async function recordDriverInstanceCompletion(
     });
   }
 
-  await syncLocalSandboxSpaceFilesAfterTurnSafely(bindings, link);
   const released = await releaseLinkedRunLease(bindings, {
     driverInstanceId: input.driverInstanceId,
     link,
@@ -163,29 +161,12 @@ export async function recordDriverInstanceFailure(
     }
   }
 
-  await syncLocalSandboxSpaceFilesAfterTurnSafely(bindings, link);
   const released = await releaseLinkedRunLease(bindings, {
     driverInstanceId: input.driverInstanceId,
     link,
     sessionRunId: link.sessionRunId,
   });
   await recycleReleasedTerminalRuntimeLeaseIfNeeded(bindings, { link, released });
-}
-
-async function syncLocalSandboxSpaceFilesAfterTurnSafely(
-  bindings: ApiBindings,
-  link: RuntimeSessionLink,
-): Promise<void> {
-  try {
-    await syncLocalSandboxSpaceFilesAfterTurn(bindings, link);
-  } catch (error) {
-    logWarn("runtime.terminal.space_sync.failed", {
-      ...createErrorLogContext(error),
-      sandboxId: link.sandboxId,
-      sessionId: link.sessionId,
-      sessionRunId: link.sessionRunId,
-    });
-  }
 }
 
 async function synthesizeDriverRunFinished(

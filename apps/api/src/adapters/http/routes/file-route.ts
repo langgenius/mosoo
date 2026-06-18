@@ -1,3 +1,4 @@
+import { FILE_SCOPE_KINDS, FILE_SESSION_KINDS } from "@mosoo/contracts/file";
 import type {
   CompleteFileUploadRequest,
   CreateFileUploadRequest,
@@ -5,30 +6,22 @@ import type {
   UpdateFileRequest,
 } from "@mosoo/contracts/file";
 import type {
-  AcquireSpaceFileLockRequest,
-  ReleaseSpaceFileLockRequest,
-} from "@mosoo/contracts/space";
-import type { FileId, AppId, SpaceId } from "@mosoo/id";
+  FileListQuery,
+  FileScopeId,
+  FileScopeKind,
+  FileSessionKind,
+} from "@mosoo/contracts/file";
+import type { FileId } from "@mosoo/id";
 import type { Hono } from "hono";
 
 import { getViewerFromRequest } from "../../../modules/auth/application/viewer-auth.service";
 import {
   FileControlError,
-  abortFileUpload,
-  acquireSpaceFileLock,
-  completeFileUpload,
   createFileErrorResponse,
-  createFileUpload,
   createUnexpectedFileError,
-  deleteFileById,
-  getFileUpload,
+  fileStore,
   normalizeR2Etag,
-  releaseSpaceFileLock,
-  streamFileContent,
-  updateSpaceFile,
-  uploadFileContent,
-  uploadFilePart,
-} from "../../../modules/files/application/file-http.service";
+} from "../../../modules/files/application/file-store";
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { isApiError } from "../../../platform/errors";
@@ -76,7 +69,70 @@ function toErrorResponse(error: unknown): Response {
   });
 }
 
+function readFileScopeKind(value: string | undefined): FileScopeKind | undefined {
+  if (value === undefined || value.trim().length === 0) {
+    return undefined;
+  }
+
+  if ((FILE_SCOPE_KINDS as readonly string[]).includes(value)) {
+    return value as FileScopeKind;
+  }
+
+  throw new FileControlError(400, "file_invalid_request", "Invalid file scope kind.");
+}
+
+function readFileSessionKind(value: string | undefined): FileSessionKind | null | undefined {
+  if (value === undefined || value.trim().length === 0) {
+    return undefined;
+  }
+
+  if (value === "all") {
+    return null;
+  }
+
+  if ((FILE_SESSION_KINDS as readonly string[]).includes(value)) {
+    return value as FileSessionKind;
+  }
+
+  throw new FileControlError(400, "file_invalid_request", "Invalid file session kind.");
+}
+
+function readFileListQuery(
+  scopeIdValue: string | undefined,
+  c: { req: { query: (name: string) => string | undefined } },
+): FileListQuery {
+  const scopeId =
+    scopeIdValue === undefined || scopeIdValue.trim().length === 0
+      ? undefined
+      : (toPlatformId(scopeIdValue, "File scope ID") as Exclude<FileScopeId, null>);
+  const sessionKind = readFileSessionKind(c.req.query("sessionKind"));
+  const requestedScopeKind = readFileScopeKind(c.req.query("scopeKind"));
+  const scopeKind = requestedScopeKind ?? (scopeId === undefined ? undefined : "session");
+
+  return {
+    ...(scopeId === undefined ? {} : { scopeId }),
+    ...(sessionKind === undefined ? {} : { sessionKind }),
+    ...(scopeKind === undefined ? {} : { scopeKind }),
+  };
+}
+
 export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
+  app.get("/files", async (c) => {
+    try {
+      const viewer = await getViewerFromRequest(c.env, c.req.raw);
+
+      if (!viewer) {
+        return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
+      }
+
+      return c.json(
+        await fileStore.list(c.env, viewer, readFileListQuery(c.req.query("scopeId"), c)),
+      );
+    } catch (error) {
+      return toErrorResponse(error);
+    }
+  });
+
   app.post("/files", async (c) => {
     try {
       const viewer = await getViewerFromRequest(c.env, c.req.raw);
@@ -86,7 +142,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
       }
 
       const body = await c.req.json<CreateFileUploadRequest>();
-      return c.json(await createFileUpload(c.env, viewer, body));
+      return c.json(await fileStore.createUpload(c.env, viewer, body));
     } catch (error) {
       return toErrorResponse(error);
     }
@@ -101,7 +157,11 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
       }
 
       return c.json(
-        await getFileUpload(c.env, viewer, toPlatformId<FileId>(c.req.param("fileId"), "File ID")),
+        await fileStore.getUpload(
+          c.env,
+          viewer,
+          toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
+        ),
       );
     } catch (error) {
       return toErrorResponse(error);
@@ -116,7 +176,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
         return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
       }
 
-      await uploadFileContent(
+      await fileStore.putContent(
         c.env,
         viewer,
         toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
@@ -137,7 +197,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
       }
 
       return c.json(
-        await uploadFilePart(
+        await fileStore.putPart(
           c.env,
           viewer,
           toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
@@ -160,7 +220,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
 
       const body = await c.req.json<CompleteFileUploadRequest>();
       return c.json(
-        await completeFileUpload({
+        await fileStore.completeUpload({
           bindings: c.env,
           fileId: toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
           input: body,
@@ -180,7 +240,11 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
         return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
       }
 
-      await abortFileUpload(c.env, viewer, toPlatformId<FileId>(c.req.param("fileId"), "File ID"));
+      await fileStore.abortUpload(
+        c.env,
+        viewer,
+        toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
+      );
       return c.json({ ok: true });
     } catch (error) {
       return toErrorResponse(error);
@@ -201,7 +265,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
           ? requestedDisposition
           : "attachment";
 
-      return await streamFileContent(
+      return await fileStore.streamContent(
         c.env,
         viewer,
         toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
@@ -222,7 +286,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
 
       const body = await c.req.json<UpdateFileRequest>();
       return c.json(
-        await updateSpaceFile(
+        await fileStore.update(
           c.env,
           viewer,
           toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
@@ -247,56 +311,15 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
         );
       }
 
-      await deleteFileById(c.env, viewer, toPlatformId<FileId>(c.req.param("fileId"), "File ID"), {
-        ifMatchEtag: normalizeR2Etag(c.req.header("If-Match")),
-      });
+      await fileStore.delete(
+        c.env,
+        viewer,
+        toPlatformId<FileId>(c.req.param("fileId"), "File ID"),
+        {
+          ifMatchEtag: normalizeR2Etag(c.req.header("If-Match")),
+        },
+      );
       return c.json({ ok: true });
-    } catch (error) {
-      return toErrorResponse(error);
-    }
-  });
-
-  app.post("/apps/:appId/spaces/:spaceId/locks/acquire", async (c) => {
-    try {
-      const viewer = await getViewerFromRequest(c.env, c.req.raw);
-
-      if (!viewer) {
-        return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
-      }
-
-      const body = await c.req.json<AcquireSpaceFileLockRequest>();
-      return c.json(
-        await acquireSpaceFileLock(
-          c.env,
-          viewer,
-          toPlatformId<AppId>(c.req.param("appId"), "App ID"),
-          toPlatformId<SpaceId>(c.req.param("spaceId"), "Space ID"),
-          body,
-        ),
-      );
-    } catch (error) {
-      return toErrorResponse(error);
-    }
-  });
-
-  app.post("/apps/:appId/spaces/:spaceId/locks/release", async (c) => {
-    try {
-      const viewer = await getViewerFromRequest(c.env, c.req.raw);
-
-      if (!viewer) {
-        return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
-      }
-
-      const body = await c.req.json<ReleaseSpaceFileLockRequest>();
-      return c.json(
-        await releaseSpaceFileLock(
-          c.env,
-          viewer,
-          toPlatformId<AppId>(c.req.param("appId"), "App ID"),
-          toPlatformId<SpaceId>(c.req.param("spaceId"), "Space ID"),
-          body,
-        ),
-      );
     } catch (error) {
       return toErrorResponse(error);
     }

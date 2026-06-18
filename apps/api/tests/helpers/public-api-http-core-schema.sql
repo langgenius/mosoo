@@ -74,26 +74,8 @@ CREATE TABLE agent_deployment_version (
   environment_id text,
   skills_json text NOT NULL,
   mcp_bindings_json text NOT NULL,
-  space_bindings_json text NOT NULL,
   created_by_account_id text NOT NULL,
   created_at integer NOT NULL
-);
-
-CREATE TABLE space (
-  id text PRIMARY KEY NOT NULL,
-  owner_account_id text NOT NULL,
-  name text NOT NULL,
-  app_id text NOT NULL,
-  created_at integer NOT NULL,
-  updated_at integer NOT NULL
-);
-
-CREATE TABLE agent_space_binding (
-  agent_id text NOT NULL,
-  space_id text NOT NULL,
-  sort_order integer NOT NULL,
-  created_at integer NOT NULL,
-  PRIMARY KEY (agent_id, space_id)
 );
 
 CREATE TABLE skill (

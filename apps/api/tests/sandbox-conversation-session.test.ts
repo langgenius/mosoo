@@ -69,7 +69,6 @@ function createConversationSessionDatabase(): SqliteD1Database {
       origin_json text NOT NULL,
       sandbox_id text NOT NULL,
       session_id text PRIMARY KEY NOT NULL,
-      space_aliases_json text NOT NULL,
       status text NOT NULL,
       updated_at integer NOT NULL
     );
@@ -107,11 +106,10 @@ async function insertConversationSession(
           origin_json,
           sandbox_id,
           session_id,
-          space_aliases_json,
           status,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `,
     )
     .bind(
@@ -121,7 +119,6 @@ async function insertConversationSession(
       JSON.stringify(ORIGIN),
       "01J0000000000000000000000D",
       "session-1",
-      "[]",
       input.status,
       1,
     )
@@ -238,14 +235,12 @@ function createBindings(database: D1Database): ApiBindings {
 
 function createInput(sandbox: SandboxHandle, kind: AgentKind = "pet") {
   return {
-    currentAppAccessSnapshot: { entries: [] },
     kind,
     mountSessionResources: false,
     origin: ORIGIN,
     sandbox,
     sandboxId: "01J0000000000000000000000D",
     sessionId: "session-1",
-    spaceAliases: [],
   };
 }
 
