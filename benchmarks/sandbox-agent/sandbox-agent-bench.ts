@@ -540,13 +540,16 @@ async function resolveConfig(
 function joinApiPath(baseUrl: string, path: string): string {
   const url = new URL(baseUrl);
   const basePath = url.pathname.replace(/\/$/u, "");
+  const queryStart = path.indexOf("?");
+  const pathName = queryStart === -1 ? path : path.slice(0, queryStart);
+  const search = queryStart === -1 ? "" : path.slice(queryStart);
   const nextPath =
-    basePath.endsWith("/api") && path.startsWith("/api/")
-      ? `${basePath}${path.slice("/api".length)}`
-      : `${basePath}${path}`;
+    basePath.endsWith("/api") && pathName.startsWith("/api/")
+      ? `${basePath}${pathName.slice("/api".length)}`
+      : `${basePath}${pathName}`;
 
   url.pathname = nextPath.replace(/\/{2,}/gu, "/");
-  url.search = "";
+  url.search = search;
   return url.toString();
 }
 
