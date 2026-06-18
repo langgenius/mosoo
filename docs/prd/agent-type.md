@@ -89,7 +89,7 @@ flowchart LR
     B2 --> B3[Configure has no kind selector]
     B3 --> B4[Publish has a single visibility path]
     B4 --> B5[Settings always has Reset agent-state]
-    B5 --> B6[Iterate nav always has Debug]
+    B5 --> B6[Iterate nav always has Terminal]
   end
 
   subgraph After["After · Pet/Cattle dual shape"]
