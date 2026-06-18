@@ -168,7 +168,8 @@ export function createAgentPackageFileName(agentName: string): string {
     .trim()
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, "-")
-    .replaceAll(/^-+|-+$/g, "");
+    .replace(/^-/, "")
+    .replace(/-$/, "");
 
   return `${normalized || "agent"}.agent`;
 }
@@ -178,7 +179,8 @@ export function createAgentPackageSkillPath(skillName: string): string {
     .trim()
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, "-")
-    .replaceAll(/^-+|-+$/g, "");
+    .replace(/^-/, "")
+    .replace(/-$/, "");
 
   return `skills/${normalized || "skill"}/`;
 }
