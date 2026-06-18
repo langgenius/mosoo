@@ -2,6 +2,7 @@ node_modules
 .tmp
 .wrangler
 .dev.vars
+.env
 .envrc
 .local/
 dist

@@ -7,6 +7,7 @@ VP_BIN="$ROOT_DIR/node_modules/.bin/vp"
 PLAYWRIGHT_BIN="$E2E_DIR/node_modules/.bin/playwright"
 
 source "$E2E_DIR/preview-env.sh"
+load_repo_env
 require_preview_smoke_env
 
 if [[ ! -x "$PLAYWRIGHT_BIN" ]]; then
