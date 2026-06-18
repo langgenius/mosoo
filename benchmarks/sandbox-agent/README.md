@@ -100,6 +100,15 @@ Layer attribution:
 - Missing token with terminal `failed` points to runtime/provider failure; inspect the trace in `results.json`.
 - Local health failures mean fix local Mosoo before interpreting sandbox performance.
 
+## Troubleshooting
+
+If preflight reports `PAT and Agent access` with `HTTP 404`, first check:
+
+- The Agent ID is the actual Agent ID from the local Mosoo service you are benchmarking.
+- The Agent has been published; draft Agents are not visible through the Public Thread API.
+- The PAT was created by the same local Mosoo account that owns the Agent's App.
+- You are pointing at the local API origin for this checkout, usually `http://127.0.0.1:8787`.
+
 ## Safety
 
 - The default scenarios create benchmark Threads and one lifecycle case deletes its own Thread.
