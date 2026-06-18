@@ -21,8 +21,11 @@ Prepare credentials:
 ```bash
 export MOSOO_BENCH_BASE_URL=http://127.0.0.1:8787
 export MOSOO_BENCH_AGENT_ID=01J...
-export MOSOO_BENCH_PAT=mosoo_pat_...
+export MOSOO_BENCH_PAT=mst_...
 ```
+
+Or put those values in a local root `.env`; this file is ignored by git and is loaded
+automatically when present.
 
 Run preflight:
 
