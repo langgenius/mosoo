@@ -22,6 +22,7 @@ interface CliOptions {
   pollMs: number;
   repeat: number;
   scenarios: string[];
+  suites: string[];
   timeoutMs: number;
 }
 
@@ -40,6 +41,7 @@ interface ScenarioDefinition {
 interface PromptCatalog {
   defaultScenarios: string[];
   scenarios: ScenarioDefinition[];
+  suites?: Record<string, string[]>;
   version: number;
 }
 
@@ -131,7 +133,7 @@ const REPO_ROOT = resolvePath(CURRENT_DIR, "../..");
 const PROMPTS_PATH = join(CURRENT_DIR, "prompts.json");
 const DEFAULT_BASE_URL = "http://127.0.0.1:8787";
 const DEFAULT_OUTPUT_ROOT = join(REPO_ROOT, "outputs", "sandbox-agent-bench");
-const DEFAULT_TIMEOUT_MS = 240_000;
+const DEFAULT_TIMEOUT_MS = 360_000;
 const DEFAULT_POLL_MS = 500;
 const TERMINAL_GRACE_MS = 30_000;
 
@@ -164,6 +166,7 @@ Options:
   --pat <token>             Mosoo Personal Access Token. Prefer env or hidden prompt.
   --env-file <path>         Optional env file to load before reading env vars.
   --scenario <id>           Scenario to run. Repeat flag for multiple. Defaults to prompts.json defaults.
+  --suite <name>            Scenario suite to run. Repeat flag for multiple. Ignored when --scenario is set.
   --repeat <n>              Attempts per scenario. Default: 1.
   --concurrency <n>         Concurrent case count. Default: 1.
   --output-dir <path>       Artifact directory. Default: outputs/sandbox-agent-bench/<run-id>.
@@ -181,6 +184,7 @@ Environment:
   MOSOO_BENCH_OUTPUT_DIR
   MOSOO_BENCH_REPEAT
   MOSOO_BENCH_CONCURRENCY
+  MOSOO_BENCH_SUITE          Comma-separated suite names.
 `);
 }
 
@@ -225,6 +229,7 @@ function parseArgs(argv: string[]): { command: Command; options: Partial<CliOpti
   const rest = first === command ? args : argv;
   const options: Partial<CliOptions> = {};
   const scenarios: string[] = [];
+  const suites: string[] = [];
 
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index] ?? "";
@@ -252,6 +257,13 @@ function parseArgs(argv: string[]): { command: Command; options: Partial<CliOpti
     if (arg === "--scenario" || arg.startsWith("--scenario=")) {
       const read = takeValue(rest, index, "--scenario");
       scenarios.push(read.value);
+      index = read.nextIndex;
+      continue;
+    }
+
+    if (arg === "--suite" || arg.startsWith("--suite=")) {
+      const read = takeValue(rest, index, "--suite");
+      suites.push(read.value);
       index = read.nextIndex;
       continue;
     }
@@ -326,7 +338,56 @@ function parseArgs(argv: string[]): { command: Command; options: Partial<CliOpti
     options.scenarios = scenarios;
   }
 
+  if (suites.length > 0) {
+    options.suites = suites;
+  }
+
   return { command, options };
+}
+
+function parseCommaList(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+
+function dedupePreservingOrder(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const value of values) {
+    if (seen.has(value)) {
+      continue;
+    }
+
+    seen.add(value);
+    result.push(value);
+  }
+
+  return result;
+}
+
+function expandSuites(catalog: PromptCatalog, suiteNames: string[]): string[] {
+  if (suiteNames.length === 0) {
+    return catalog.defaultScenarios;
+  }
+
+  const scenarios = suiteNames.flatMap((suiteName) => {
+    if (suiteName === "default") {
+      return catalog.defaultScenarios;
+    }
+
+    const suite = catalog.suites?.[suiteName];
+    if (!suite) {
+      const knownSuites = ["default", ...Object.keys(catalog.suites ?? {})].join(", ");
+      throw new Error(`Unknown suite: ${suiteName}. Known suites: ${knownSuites}`);
+    }
+
+    return suite;
+  });
+
+  return dedupePreservingOrder(scenarios);
 }
 
 function parseEnvLine(line: string): { key: string; value: string } | null {
@@ -496,7 +557,10 @@ async function resolveConfig(
       parsePositiveInteger(process.env["MOSOO_BENCH_POLL_MS"] ?? `${DEFAULT_POLL_MS}`, "pollMs"),
     repeat:
       cliOptions.repeat ?? parsePositiveInteger(process.env["MOSOO_BENCH_REPEAT"] ?? "1", "repeat"),
-    scenarios: cliOptions.scenarios ?? catalog.defaultScenarios,
+    scenarios:
+      cliOptions.scenarios ??
+      expandSuites(catalog, cliOptions.suites ?? parseCommaList(process.env["MOSOO_BENCH_SUITE"])),
+    suites: cliOptions.suites ?? parseCommaList(process.env["MOSOO_BENCH_SUITE"]),
     timeoutMs:
       cliOptions.timeoutMs ??
       parsePositiveInteger(
@@ -930,6 +994,7 @@ async function runCreateThreadScenario(
   attempt: number,
 ): Promise<CaseResult> {
   const startedAt = performance.now();
+  let createThreadMs: number | null = null;
   let threadId: string | null = null;
 
   try {
@@ -938,6 +1003,7 @@ async function runCreateThreadScenario(
       longContext: createLongContext(),
     });
     const created = await createThread(config, scenario, attempt, prompt);
+    createThreadMs = created.elapsedMs;
     threadId = created.threadId;
     const poll = await pollThreadForToken(config, {
       expectedToken: scenario.expectedToken,
@@ -949,7 +1015,7 @@ async function runCreateThreadScenario(
       attempt,
       category: scenario.category,
       completedMs: poll.completedMs,
-      createThreadMs: created.elapsedMs,
+      createThreadMs,
       error: null,
       firstAssistantTextMs: poll.firstAssistantTextMs,
       mode: scenario.mode,
@@ -964,7 +1030,7 @@ async function runCreateThreadScenario(
     };
   } catch (error) {
     return createEmptyFailure(scenario, attempt, error, {
-      createThreadMs: null,
+      createThreadMs,
       threadId,
     });
   }
