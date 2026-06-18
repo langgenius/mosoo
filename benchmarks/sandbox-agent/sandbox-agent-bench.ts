@@ -433,6 +433,17 @@ function maskSecret(value: string): string {
   return `${value.slice(0, 4)}...${value.slice(-4)}`;
 }
 
+function formatHttpFailure(response: HttpJsonResult): string {
+  if (isRecord(response.payload) && isRecord(response.payload["error"])) {
+    const code = readString(response.payload["error"]["code"]);
+    const message = readString(response.payload["error"]["message"]);
+
+    return `HTTP ${response.status}${code ? ` ${code}` : ""}${message ? `: ${message}` : ""}`;
+  }
+
+  return `HTTP ${response.status} ${JSON.stringify(response.payload)}`;
+}
+
 function printHeader(title: string): void {
   console.log("");
   console.log("=".repeat(72));
@@ -1424,7 +1435,7 @@ async function runPreflight(config: CliOptions): Promise<PreflightCheck[]> {
         path: `/api/v1/agents/${encodeURIComponent(config.agentId)}/threads?archived=false`,
       });
       checks.push({
-        detail: auth.ok ? "PAT can list Agent threads" : `HTTP ${auth.status}`,
+        detail: auth.ok ? "PAT can list Agent threads" : formatHttpFailure(auth),
         name: "PAT and Agent access",
         required: true,
         status: auth.ok ? "ok" : "fail",
