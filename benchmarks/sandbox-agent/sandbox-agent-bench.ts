@@ -463,7 +463,11 @@ async function resolveConfig(
   cliOptions: Partial<CliOptions>,
   catalog: PromptCatalog,
 ): Promise<CliOptions> {
-  const envFile = cliOptions.envFile ?? process.env["MOSOO_BENCH_ENV_FILE"] ?? "";
+  const defaultEnvFile = ".env";
+  const envFile =
+    cliOptions.envFile ??
+    process.env["MOSOO_BENCH_ENV_FILE"] ??
+    (existsSync(defaultEnvFile) ? defaultEnvFile : "");
   await loadEnvFile(envFile);
 
   const interactive =
