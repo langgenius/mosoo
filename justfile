@@ -156,6 +156,10 @@ driver-repo-export:
 driver-submodule-smoke:
     bun run driver:submodule:smoke
 
+# Update the Agent Driver submodule to upstream HEAD.
+driver-update:
+    git submodule update --init --remote --checkout apps/driver
+
 # Deploy API and Web production targets.
 deploy: check
     bun run deploy
