@@ -1,3 +1,19 @@
+# Space — superseded by Files
+
+> **Status: SUPERSEDED (2026-06-18).** Space was removed in `feat(files)!: replace spaces with scoped files` (#64). There is no longer an App-owned Space resource, no `spaces[]` manifest binding, and no runtime space mount/watch/sync. The manifest no longer carries any Space or file binding at all.
+>
+> The replacement is **scoped Files**: a general **Files Library** plus **session-scoped attachments/artifacts**. Files are scoped at upload/session time rather than mounted through the Agent manifest. For current behavior see:
+>
+> - [Files API — Library And Session Artifacts Contract](./files-api-contract.md) — the shipped engineering contract.
+> - [Session Files](./session-files.md) — thread/session file behavior.
+>
+> Everything below is retained for historical context only and does **not** reflect current code. Do not treat it as a specification.
+
+---
+
+<details>
+<summary>Historical Space PRD (superseded — retained for context)</summary>
+
 # Space - for humans
 
 > This is the product-story version written for non-engineering readers. The full engineering contract lives in the shipped Space PRD.
@@ -127,3 +143,5 @@ Do not keep dormant routes, schema fields, or tests for these topics in the curr
 ---
 
 > The full engineering contract (covering Conditional Write / Lease Lock / the Phase 1-2 implementation staging / the complete Edge Cases table) is maintained in the shipped Space PRD.
+
+</details>

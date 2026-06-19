@@ -48,7 +48,7 @@ Success criterion ≈ at every point in time, the user can say "which state I'm 
 | **Deployment Version**         | A specific version of the Agent's configuration (prompt / model / skills / environment are all frozen into it)                                            |
 | **Session Execution Snapshot** | The configuration frozen at the moment a session is created; from then on, this session always runs against that snapshot                                 |
 | **Continuation**               | The process by which the platform automatically restores the conversation when you come back from dozing / asleep / a closed browser tab                  |
-| **Reset agent-state**          | Pet Agent only. Clears local state in the sandbox (logins, caches, etc.) without deleting the transcript or any Space files                               |
+| **Reset agent-state**          | Pet Agent only. Clears local state in the sandbox (logins, caches, etc.) without deleting the transcript or any Files                               |
 
 ---
 
@@ -58,7 +58,7 @@ Success criterion ≈ at every point in time, the user can say "which state I'm 
 | ---------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Across multiple sessions     | Share one stable environment                                                                       | Each runs on its own, fully isolated                                                          |
 | After being away for a while | Backs up local state, Restores next time                                                           | Destroys the environment outright                                                             |
-| Continuing the next day      | Local files and login state are still there                                                        | The platform preserves the conversation history and Space files; the environment is brand new |
+| Continuing the next day      | Local files and login state are still there                                                        | The platform preserves the conversation history and Files; the environment is brand new |
 | Reset agent-state            | Has this action (clears local state)                                                               | Not shown (there's no cross-session state to begin with)                                      |
 | Best suited for              | Agents that live long-term alongside the same working environment (IDE, long-lived account logins) | One-off tasks, concurrent execution, and isolated batch calls                                 |
 
@@ -78,7 +78,7 @@ She never sees terms like "dozing" or "released"; she only sees a brief loading 
 
 > Linear assigns the agent for the first time and it finishes the PR in 8 minutes → the next day the conversation continues in the comments → the platform matches the same session and continues automatically.
 
-If the agent is a Cattle agent, the old environment has already been destroyed; the new environment only inherits the conversation history the platform saved plus anything explicitly persisted (Space / Backup), and temporary caches are not restored. This is documented in the agent's product description so callers know what to expect.
+If the agent is a Cattle agent, the old environment has already been destroyed; the new environment only inherits the conversation history the platform saved plus anything explicitly persisted (Files / Backup), and temporary caches are not restored. This is documented in the agent's product description so callers know what to expect.
 
 ### Journey 3: continuing a Lark group chat 6 days later
 
@@ -86,7 +86,7 @@ If the agent is a Cattle agent, the old environment has already been destroyed; 
 
 > Coworker B also @-joins → it matches the same session → the agent sees A's conversation plus B's new message, labeled "from: @B". This is the coworker's real perspective in the group: shared context, knowing who's asking.
 
-Long-term memory as a fallback: the agent can proactively write Space files during the conversation; even if the transcript is compacted, the agent can read its own Space files to pick up the thread.
+Long-term memory as a fallback: the agent can proactively write Files during the conversation; even if the transcript is compacted, the agent can read its own Files to pick up the thread.
 
 ### Journey 4: Alex — re-publish
 
@@ -144,9 +144,9 @@ The session's product promise is not "always try to recover the Agent's latest c
 | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | I opened this session half an hour ago, the author just changed the prompt — which version am I using now that I'm back? | Still the version you created with (v3); it won't switch silently                                      |
 | The environment my old session used has already been deleted by the author or can't be recovered — what happens?         | This session goes to TERMINATED, with a "New session" button                                           |
-| What about Space files that were changed or App owner access that no longer proves out?                                  | Every continuation re-validates current App proof; it won't use an old snapshot to bypass owner access |
+| What about Files that were changed or App owner access that no longer proves out?                                  | Every continuation re-validates current App proof; it won't use an old snapshot to bypass owner access |
 | Can I have the platform upgrade me to the latest version?                                                                | No. To upgrade, create a new session; this is the "no silent config swap" promise                      |
-| I'm the owner of a Pet Agent and want to clear leftover login state in the sandbox — what do I do?                       | Reset agent-state; this clears only sandbox state and doesn't touch the transcript / Space / cost      |
+| I'm the owner of a Pet Agent and want to clear leftover login state in the sandbox — what do I do?                       | Reset agent-state; this clears only sandbox state and doesn't touch the transcript / Files / cost      |
 
 ---
 

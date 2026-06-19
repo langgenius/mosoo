@@ -26,7 +26,7 @@ Where legacy words such as Workspace, Organization, team, or sharing appear in o
 
 A Skill is a **stateless capability unit** (a prompt plus optional scripts / reference material) that an Agent invokes on demand.
 
-The registry entrypoint is the active App's Skills surface. Skills are App-owned resources alongside Agents, Spaces, MCP servers, Environments, Providers, and Channels.
+The registry entrypoint is the active App's Skills surface. Skills are App-owned resources alongside Agents, Files, MCP servers, Environments, Providers, and Channels.
 
 By analogy:
 
@@ -67,7 +67,7 @@ When this is done, an Agent owner should be able to:
 | **App owner**     | Create, read, download, re-upload, copy/fork, delete, and mount Skills on Agents inside the same App               |
 | **Everyone else** | Not a V1 access class for Skills; there is no received-Skill registry and no cross-account Skill permission matrix |
 
-We deliberately do **not** reuse Space's old three-tier admin / edit / read model. V1 Skill access is App-owner access only. Additional human roles belong to future governance.
+We deliberately do **not** reuse the old (now-removed) Space three-tier admin / edit / read model. V1 Skill access is App-owner access only. Additional human roles belong to future governance.
 
 ---
 
@@ -205,4 +205,4 @@ flowchart TD
 
 - **Complete engineering contract**: the full Skill PRD
 - **How a Skill is mounted in an Agent's configuration**: [`./agent-manifest.md`](./agent-manifest.md)
-- **Adjacent assets**: [Space](./space-interaction.md) · [MCP](./mcp-interaction.md) · [Environment](./environment.md)
+- **Adjacent assets**: [Files](./files-api-contract.md) · [MCP](./mcp-interaction.md) · [Environment](./environment.md)

@@ -43,7 +43,7 @@ A Cattle agent is a "task-oriented / one-shot worker" (see [`./agent-type.md`](.
 | ------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
 | Sandbox lifecycle   | Long-lived, follows the agent | Born and dies with the session                                               |
 | Ops mindset         | "My VPS / my coworker"        | "One instance per task"                                                      |
-| Cross-session state | Yes (agent state preserved)   | No (only the Space plus the platform-saved conversation)                     |
+| Cross-session state | Yes (agent state preserved)   | No (only Files plus the platform-saved conversation)                         |
 | Terminal value      | High (daily maintenance tool) | Low (every sandbox is different, so there's nothing to "maintain long-term") |
 
 A Cattle owner who wants to inspect task execution → goes to the **Logs tab** and picks a specific session (each session has its own log). A Cattle owner who wants to change something → edits the agent manifest / config and republishes.

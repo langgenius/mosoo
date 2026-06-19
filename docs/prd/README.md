@@ -41,7 +41,8 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 - [Public Thread API legacy link](./public-task-api.md) — old filename kept readable; use the surface PRD above as the canonical contract.
 - [MCP (Connector)](./mcp-interaction.md)
 - [Skill](./skill-interaction.md)
-- [Space](./space-interaction.md)
+- [Files API Contract](./files-api-contract.md) — Files Library plus session-scoped attachments/artifacts.
+- [Space](./space-interaction.md) — **superseded** by scoped Files (#64); retained for history only.
 - [Credentials](./credentials.md) — Provider and MCP secrets owned by the active App; runtime resolves them from that same App boundary.
 
 Surface boundary: public HTTPS exposure is an Agent API Endpoint inside one App. Thread is the public conversation object, Session is the runtime record, and Thread files are scoped to the admitted Thread/backing Session. Organization remains account and billing context, not a public API authorization boundary.

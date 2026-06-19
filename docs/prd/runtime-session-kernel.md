@@ -12,10 +12,10 @@ The first usable end-to-end loop for the Mosoo Runtime Session Kernel: a hand-co
 
 ## 1. The user's problem
 
-Mosoo already has configuration surfaces for Agent Manifest, Environment, Credentials, Spaces, Skills, MCP, and more, along with early frontend versions of Dev / Preview / Sessions / Debug. But the biggest gap today is not "one more missing form field" — it's that the user cannot confirm:
+Mosoo already has configuration surfaces for Agent Manifest, Environment, Credentials, Files, Skills, MCP, and more, along with early frontend versions of Dev / Preview / Sessions / Debug. But the biggest gap today is not "one more missing form field" — it's that the user cannot confirm:
 
 - Whether this hand-configured Agent can actually start at all.
-- When startup fails, whether the cause is missing Product Manifest configuration, an unavailable Credential, a non-executable Environment, a Space without permission, or a Driver / native runtime incident.
+- When startup fails, whether the cause is missing Product Manifest configuration, an unavailable Credential, a non-executable Environment, or a Driver / native runtime incident.
 - Whether the OpenAI runtime, Claude Agent SDK, and the upcoming `opencode` / `openclaw` / `gemini` / `hermes` / `pi` / `cursor-agent` runtimes all share the same product session mental model, or whether each runtime exposes its own thread / session / log rules.
 - Which of Dev Chat mock, Preview session, Driver native event, and AG-UI stream is the primary acceptance path.
 - Where an Agent's "full native capabilities" should live: polluting the main YAML / Manifest, or kept in kind-specific Sandbox state and Diagnostics.
@@ -23,7 +23,7 @@ Mosoo already has configuration surfaces for Agent Manifest, Environment, Creden
 The job the user actually needs to get done:
 
 1. Create a long-lived Agent.
-2. Tell it, using a small set of understandable fields, which runtime / model / prompt / Skills / MCP / Environment / Spaces to use.
+2. Tell it, using a small set of understandable fields, which runtime / model / prompt / Skills / MCP / Environment to use.
 3. Have it preserve the corresponding login state, native configuration, cache, CLI settings, and vendor capabilities by kind — in either the Pet Agent Sandbox or the Cattle Session Sandbox.
 4. Be able to copy, publish, recover, and review this Agent.
 5. When something goes wrong, know whether the product configuration is wrong or the machine / native runtime had an incident.
@@ -39,7 +39,7 @@ So the core of the Runtime Session Kernel is not "unify every vendor schema," bu
 After this round, an Agent Owner / Builder should be able to:
 
 - Start a hand-configured Agent from the Preview panel in Agent Detail and see a real running stream, not a mock conversation.
-- See readiness blockers before startup: missing Provider Credential, unavailable Environment, insufficient Space permission, unavailable MCP binding, and so on.
+- See readiness blockers before startup: missing Provider Credential, unavailable Environment, unavailable MCP binding, and so on.
 - See 5 user-visible pills in Preview: Setup required, Ready, Working, Needs approval, Stopped. Thinking / tool activity / reconnecting are shown only as inline activity or a subtitle.
 - Render text, tools, permission confirmations, file changes, run status, and diagnostic signals on the frontend through the same AG-UI event stream when the Driver / native runtime emits events.
 - Know the next step when recovering or failing: wait for automatic recovery, start a new session, fix configuration, or open Diagnostics.
@@ -58,14 +58,14 @@ Platform-side goals:
 
 | Term                   | Product definition                                                                                                                                                                                                                                                                                                                                                                       |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Runtime Session Kernel | The minimal kernel that takes an Agent from configuration to real execution: it resolves Manifest / Environment / Credential / Space, creates a Session, drives the Driver, and emits the AG-UI stream.                                                                                                                                                                                  |
+| Runtime Session Kernel | The minimal kernel that takes an Agent from configuration to real execution: it resolves Manifest / Environment / Credential, creates a Session, drives the Driver, and emits the AG-UI stream.                                                                                                                                                                                  |
 | Agent Session          | The business conversation a user opens with a given Agent within a given EnvironmentRevision. The Mosoo Session is the source of truth.                                                                                                                                                                                                                                                  |
 | Run                    | One execution of a user message / job within a Session. What the user sees is a single "working" turn.                                                                                                                                                                                                                                                                                   |
 | AG-UI Upward Protocol  | The envelope through which the Driver uniformly exposes events to the Runtime / Session DO / Frontend. Both standard events and Mosoo custom events live inside AG-UI.                                                                                                                                                                                                                   |
 | Mosoo Custom Event     | A Mosoo event embedded inside AG-UI `CUSTOM`, for example permission resolve, run ack, files updated, or diagnostics signal.                                                                                                                                                                                                                                                             |
 | Execution Actor        | The Agent's execution identity. Locked this round to the Agent Owner, used for Provider Credential resolve, Sandbox state ownership, and runtime identity.                                                                                                                                                                                                                               |
 | Caller                 | The person or surface that triggered this session/event, for example a Builder, API caller, or Channel adapter. The Caller affects entry context but does not by default determine the Provider Credential.                                                                                                                                                                              |
-| Product Manifest       | The user-understandable desired state of an Agent: runtime, model, prompt, Skills, MCP, Environment, Spaces.                                                                                                                                                                                                                                                                             |
+| Product Manifest       | The user-understandable desired state of an Agent: runtime, model, prompt, Skills, MCP, Environment.                                                                                                                                                                                                                                                                             |
 | Rendered Native Config | The local configuration or startup parameters the Agent Driver backend generates for the vendor runtime from the Product Manifest. Diagnosable, but not the source of truth.                                                                                                                                                                                                             |
 | Agent kind             | `pet \| cattle`. Pet uses a stable Agent Sandbox; Cattle uses a dedicated Session Sandbox.                                                                                                                                                                                                                                                                                               |
 | Pet Sandbox            | A stable Agent Sandbox with subject = `agent:{agentId}`. Multiple Sessions share the same Sandbox, default to the same initial working directory, and maintain continuity through Backup/Restore.                                                                                                                                                                                        |
@@ -87,10 +87,8 @@ Platform-side goals:
 flowchart LR
   Builder["Agent Owner / Builder"] --> Manifest["Product Manifest<br/>runtime / model / prompt / Skills / MCP"]
   Builder --> Env["Environment<br/>current revision"]
-  Builder --> Spaces["Space bindings"]
   Manifest --> Session["Create Agent Session"]
   Env --> Session
-  Spaces --> Session
   Cred["Credential resolve<br/>Execution Actor = Agent Owner"] --> Session
   Session --> Runtime["Runtime Scheduler"]
   Runtime --> Driver["Agent Driver"]
@@ -146,7 +144,7 @@ Decisions:
 
 | Phase                 | User Actions                                                     | Touchpoints                          | Emotion       | Pain point                                              | Opportunity                                                                                            |
 | --------------------- | ---------------------------------------------------------------- | ------------------------------------ | ------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Configure Agent       | Builder fills in runtime / model / prompt / Environment / Spaces | Agent Manifest form                  | Medium        | Unsure whether the configuration is enough to start     | Readiness gives a clear result before Preview                                                          |
+| Configure Agent       | Builder fills in runtime / model / prompt / Environment | Agent Manifest form                  | Medium        | Unsure whether the configuration is enough to start     | Readiness gives a clear result before Preview                                                          |
 | Start Preview         | Builder clicks Preview / Start session                           | Preview panel                        | High          | Worried it is still a mock                              | A real Session + AG-UI stream                                                                          |
 | Observe the run       | Builder watches the Working pill + inline thinking / tool events | Chat stream / tool cards             | High          | Unsure whether the agent is stuck                       | Status language like the OpenAI runtime / Claude Code                                                  |
 | Wait for confirmation | Driver requests to run a command or access a resource            | Approval card                        | Medium        | Unsure of the risk                                      | Show the action, target, and risk; allow / deny                                                        |

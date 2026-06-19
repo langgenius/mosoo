@@ -36,7 +36,7 @@ The answer is:
 
 The two documents use one hard rule:
 
-> Runtime operations may briefly move active Sessions into an updating/rescheduling state, but they must not switch an existing Session to a newer DeploymentVersion, Environment revision, Skill set, MCP set, Storage binding, model, provider, or runtime.
+> Runtime operations may briefly move active Sessions into an updating/rescheduling state, but they must not switch an existing Session to a newer DeploymentVersion, Environment revision, Skill set, MCP set, Files, model, provider, or runtime.
 
 When product copy talks to a caller, say **Thread**. When implementation or runtime copy talks about the frozen execution record, say **Session** or **AgentSession**.
 
@@ -85,7 +85,7 @@ The dangerous failure modes are:
 | **Thread**                    | User-facing conversation record. It is backed by one AgentSession in V1.                                                               |
 | **AgentSession / Session**    | Runtime record behind a Thread. It freezes the Agent execution snapshot when created.                                                  |
 | **DeploymentVersion**         | Immutable runnable Agent config snapshot for future Sessions.                                                                          |
-| **agent-state**               | Pet runtime-local state: login tokens, cache, long-term local memory, and native session state. It is not Storage/Space.               |
+| **agent-state**               | Pet runtime-local state: login tokens, cache, long-term local memory, and native session state. It is not Files.               |
 | **direct-update**             | Metadata-only save with no DeploymentVersion and no runtime operation.                                                                 |
 | **restart-process**           | Runtime operation that restarts the Agent process and preserves agent-state.                                                           |
 | **patch-and-restart**         | Runtime operation that writes native runtime config, then restarts while preserving agent-state.                                       |
@@ -102,7 +102,7 @@ The dangerous failure modes are:
 | Rename Agent or edit description               | `direct-update`                                | None                                  | None                               | Unchanged   |
 | Edit prompt                                    | `restart-process` when live runtime must apply | New live version for future Sessions  | Restart Agent process              | Preserved   |
 | Edit model, provider, Skills, MCP, or options  | `patch-and-restart`                            | New live version for future Sessions  | Patch native config and restart    | Preserved   |
-| Edit Environment or Storage/Space bindings     | `recreate-preserving-state`                    | New live version for future Sessions  | Recreate sandbox and restore state | Preserved   |
+| Edit Environment or Files bindings     | `recreate-preserving-state`                    | New live version for future Sessions  | Recreate sandbox and restore state | Preserved   |
 | Clear Pet runtime-local state                  | `reset-agent-state`                            | None                                  | Reset Pet runtime subject          | Cleared     |
 | Change runtime driver or Agent type after lock | Fork Agent                                     | New Agent identity, not in-place save | No operation on the source Agent   | Source kept |
 
@@ -154,7 +154,7 @@ Use this when the sandbox image, Environment, network shape, setup output, or mo
 - Backs up Pet agent-state before rebuild when the runtime kind supports it.
 - Restores Pet agent-state after rebuild.
 - Explains expected downtime.
-- Does not include Storage/Space files in agent-state deletion scope.
+- Does not include Files in agent-state deletion scope.
 
 ---
 
@@ -165,7 +165,7 @@ Reset agent-state is separate from Apply Changes.
 - It appears only where the Agent kind supports stable agent-state.
 - It requires strong confirmation.
 - It clears login tokens, cache, long-term runtime-local memory, and native session state.
-- It does not delete Agent profile, prompt, Skills, MCP references, Provider credentials, Storage/Space files, Threads, Session history, logs, or App Usage.
+- It does not delete Agent profile, prompt, Skills, MCP references, Provider credentials, Files, Threads, Session history, logs, or App Usage.
 - It cannot be used as a softer name for restart or recreate.
 
 Cattle Agents have no Agent-level stable state to reset. Their Session sandboxes are lifecycle-managed by Session rules.

@@ -31,7 +31,7 @@ App
         │   ├── Environment
         │   ├── Skills
         │   ├── MCP servers
-        │   └── Spaces
+        │   └── Files
         ├── Preview / Logs / Cost
         └── Publish / API access / Channels
 ```
@@ -91,7 +91,7 @@ The latest product decisions are:
   such as Assistant Agent or Task Agent.
 - If behavior is exposed in an Agent form, the label should be `How it runs` and
   describe that Agent's behavior as users experience it.
-- The progress model is `Agent → Space → Environment → Test`.
+- The progress model is `Agent → Files → Environment → Test`.
 - `Test` is the final creation node and represents Thread reachability for the
   App's configured Agent or Agents.
 - Publish starts the App's configured Agent or Agents in the online Cloudflare
@@ -145,7 +145,7 @@ Pressing Enter creates a draft and opens the App creation page.
 The same screen should also offer a small set of Agent App templates, such as
 Support assistant, Sales follow-up, Report generator, Image gallery, Data
 monitor, and Workflow automation. Templates are not just copy shortcuts: each
-template may set a default Agent behavior, tools, Spaces, prompt pattern, and
+template may set a default Agent behavior, tools, Files, prompt pattern, and
 environment expectation behind the scenes.
 
 ## App Creation Page
@@ -166,7 +166,7 @@ App Builder should help with:
 - Prompt content for each Agent.
 - Model and provider suggestions.
 - Environment selection or creation guidance.
-- Skill, MCP server, and Space binding suggestions.
+- Skill, MCP server, and Files suggestions.
 - Thread test feedback that should change configuration.
 
 The first-level creation page should include:
@@ -181,7 +181,7 @@ The first-level creation page should include:
   - One tab per Agent draft.
   - Tab title equals the editable Agent name in that Agent form.
   - Each tab contains Agent name, Agent description, `How it runs`,
-    model/provider, system prompt, Skills, MCP servers, Spaces, and Environment
+    model/provider, system prompt, Skills, MCP servers, Files, and Environment
     fields.
   - Switching tabs changes only the visible Agent form. It must not overwrite,
     duplicate, or reset other Agents' values.
@@ -252,7 +252,7 @@ configuration.
 The App creation page should use progress that matches the real creation path:
 
 ```text
-Agent → Space → Environment → Test
+Agent → Files → Environment → Test
 ```
 
 Progress definitions:
@@ -260,8 +260,8 @@ Progress definitions:
 - Agent: the App's Agent drafts have enough identity, model, prompt, and
   behavior configuration to run as App business engines. For a multiple-Agent
   App, each Agent tab should make its own readiness visible.
-- Space: the App has the required workspace, knowledge, or business context
-  bindings.
+- Files: the App has the required knowledge or business-context files available
+  to its Agents.
 - Environment: the runtime environment is selected or prepared, and required
   runtime resources are reachable.
 - Test: Test in Chat has verified that the App can be reached through a Thread
@@ -301,7 +301,7 @@ Current code has two Agent YAML-adjacent shapes:
   lives in `pkgs/contracts/src/agent/agent-manifest.contract.ts` and is
   serialized by `serializeAgentManifestToYaml`. Its stable sections are
   `manifestVersion`, `kind`, `metadata`, `runtime`, `prompts`, `skills`,
-  `mcpServers`, `environment`, `spaces`, and `advanced`.
+  `mcpServers`, `environment`, and `advanced`.
 - The current Agent editor draft YAML lives in
   `apps/web/src/routes/agent/components/editor/draft.ts`. It is a form-editing
   shape with `version: 1`, `identity`, `kind`, `runtime`, `prompt`,
@@ -341,7 +341,6 @@ agents:
       expectedName: "Default"
       setupScript: ""
       envVars: {}
-    spaces: []
     advanced:
       unparsedFields: {}
     extensions: {}
@@ -367,7 +366,6 @@ agents:
       expectedName: "Default"
       setupScript: ""
       envVars: {}
-    spaces: []
     advanced:
       unparsedFields: {}
     extensions: {}
@@ -400,7 +398,7 @@ YAML rules:
   `ongoing` or `one_off`. Implementation may map this to the existing internal
   Agent `kind`, but the App YAML must not expose a core/primary Agent or Agent
   hierarchy.
-- `runtime`, `prompts`, `skills`, `mcpServers`, `environment`, and `spaces`
+- `runtime`, `prompts`, `skills`, `mcpServers`, and `environment`
   intentionally mirror the current single-Agent manifest sections so
   implementation can reuse existing parser, serializer, readiness, import, and
   repair concepts.
@@ -658,7 +656,7 @@ design implementation, not this Markdown PRD.
 When screenshots are needed for review, capture only these states:
 
 1. App creation page with Builder chat, Agent tabs, full form, and progress
-   `Agent → Space → Environment → Test`.
+   `Agent → Files → Environment → Test`.
 2. Publish preparing popover after clicking Publish.
 3. App published modal with editable `instruction.md`, Copy, Download, and
    secondary API Reference link.
@@ -686,7 +684,7 @@ variant unless a design review specifically asks for visual evidence.
 11. Keep YAML extension data inside namespaced `extensions` objects.
 12. Do not require users to choose visible internal Agent categories during the
     primary creation flow.
-13. Use `Agent → Space → Environment → Test` as the creation progress model.
+13. Use `Agent → Files → Environment → Test` as the creation progress model.
 14. Preserve Builder conversation context for later summarization.
 15. Let Thread test feedback continue through App Builder and form edits.
 16. Start the App's configured Agent or Agents in the online Cloudflare runtime
@@ -751,7 +749,7 @@ variant unless a design review specifically asks for visual evidence.
   create the App.
 - App Builder can convert user requests into visible configuration changes.
 - Manual form edits remain possible at every point.
-- Progress is shown as `Agent → Space → Environment → Test`.
+- Progress is shown as `Agent → Files → Environment → Test`.
 - Test in Chat can validate Thread reachability for the selected Agent or
   configured App test target, even if the first implementation uses a mock
   Thread destination.
