@@ -23,7 +23,7 @@ The current phase deliberately assumes one human owns one Organization. Organiza
   API contracts, architecture, tests, migrations, and console copy.
 - **Agent** is the App-local runtime and delivery unit backed by the existing Agent identity.
   Do not introduce a second Agent Service table, App boundary, or deployment topology.
-- **Resources** are concrete App-owned nouns such as Channels, Spaces, Environments, Skills,
+- **Resources** are concrete App-owned nouns such as Channels, Files, Environments, Skills,
   MCP servers, Provider credentials, and future explicit runtime or database resources.
 - **Service** is not a V1 domain entity. Do not add a unified `services` table,
   polymorphic `service.kind`, or generic Service CRUD for App resources.
@@ -47,7 +47,7 @@ The following resources should belong to App before they belong to a broad Organ
 
 - Agents and their API or channel exposure.
 - Threads / Sessions, where Thread is the product name for an Agent Session in V1.
-- Spaces and Space mount intent.
+- Files, both the Files Library and session-scoped attachments/artifacts.
 - Environments and Environment revisions.
 - Skills and app-local Skill bindings.
 - MCP servers, MCP bindings, and MCP credentials.
@@ -68,7 +68,7 @@ The console has two layers:
 
 - **Organization layer**: Apps, Usage / Billing rollups, and thin Organization settings.
 - **App layer**: Overview, Agents, Resources, Threads, Usage, Logs, Export, and App settings.
-  The Resources view groups Channels / Gateways, Spaces, Environments, Skills, MCP servers,
+  The Resources view groups Channels / Gateways, Files, Environments, Skills, MCP servers,
   and Providers.
 
 Onboarding should create a default App. If an Organization has exactly one App, login should route directly to that App. The Apps list exists for creating or switching between multiple Apps and should not block the one-App OPC path.
@@ -79,7 +79,7 @@ Onboarding should create a default App. If an Organization has exactly one App, 
 2. Move Agent creation and Agent reads under App without introducing a generic Service entity. Threads / Sessions should inherit App from Agent rather than introducing an independent picker.
 3. Move concrete resources under App ownership directly; do not route them through a unified `services` table.
 4. Move Environment and Provider defaults to App scope; resources without App ownership fail closed.
-5. Move MCP, Skills, Spaces, and Channels under App resource ownership. Preserve existing resource semantics, but change the owning boundary first.
+5. Move MCP, Skills, Files, and Channels under App resource ownership. Preserve existing resource semantics, but change the owning boundary first.
 6. Add App Templates for common simple shapes such as Pet Agent plus Channel.
 7. Add App-scoped usage / cost while preserving Organization rollups for billing and future governance.
 8. Keep API endpoint exposure on Agent. Do not add Publish App, App runtime, or App-level API endpoint.

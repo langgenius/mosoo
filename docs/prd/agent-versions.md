@@ -92,7 +92,7 @@ flowchart LR
   end
 
   subgraph External["⚠️ External dependencies (out of scope)"]
-    Space["File contents in the Space<br/>owner handles rollback in the Space themselves"]
+    Files["File contents in Files<br/>owner handles rollback of those files themselves"]
   end
 
   System --> Restored
@@ -104,7 +104,7 @@ flowchart LR
 
 - **Everything from the user's point of view is rolled back** (configuration + agent memory).
 - **Everything from the observer's point of view is preserved** (cost / logs = "things that actually happened").
-- **External dependencies are untouched** (the Space has its own file versioning system).
+- **External dependencies are untouched** (Files has its own file versioning system).
 - **Running existing sessions are not switched** (this is a feature, not a bug — a customer's experience must not be interrupted midway).
 
 ---

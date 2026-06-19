@@ -118,7 +118,7 @@ Writing a PRD is essentially **locking flexibility to the right granularity**. L
 
 ### 3.1 Concept Lock
 
-Pin down the definitions of the core nouns. For example: Account / Org / Member / Role / Permission / Invitation / Disabled user / Provider / Credential / Agent / Space / Run / Session.
+Pin down the definitions of the core nouns. For example: Account / Org / Member / Role / Permission / Invitation / Disabled user / Provider / Credential / Agent / Files / Run / Session.
 
 - Use one consistent spelling for the same noun throughout (don't mix "user / Member / member")
 - A noun has exactly one definition; once defined, don't swap in synonyms
@@ -280,7 +280,7 @@ This section records only the architectural impact triggered by the product requ
 
 | Question                                         | This PRD's Conclusion                                                                                                                                                                                                                                   |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Which boundary did this add / change?            | For example Web/API, GraphQL, Public API, Runtime/Driver, Space/File, Credential/Vault, Cost, Organization/Access, etc.                                                                                                                                 |
+| Which boundary did this add / change?            | For example Web/API, GraphQL, Public API, Runtime/Driver, Files, Credential/Vault, Cost, Organization/Access, etc.                                                                                                                                 |
 | Which contract is the truth source?              | For example `docs/architecture.md`, some `pkgs/contracts/*`, the GraphQL spec, the runtime protocol, the DB schema, an OpenAPI doc, or an existing PRD.                                                                                                 |
 | Which generated artifacts must run?              | For example `just graphql-codegen`, `just db-regen`, OpenAPI example validation, etc.; write "none" if there are no generated artifacts.                                                                                                                |
 | E2E proof required?                              | For example `none`, `deterministic-e2e`, `live-smoke`, `manual-only`, `deferred-with-trigger`; state clearly why this posture is sufficient.                                                                                                            |

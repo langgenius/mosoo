@@ -21,7 +21,7 @@ It sits alongside the other App-owned resources:
 | Asset           | In one line                                         |
 | --------------- | --------------------------------------------------- |
 | **Agent**       | App-local execution and delivery unit               |
-| **Space**       | App-owned file storage an Agent can mount           |
+| **Files**       | Uploaded files an Agent can read, scoped per upload/session |
 | **Skill**       | App-local capability package                        |
 | **MCP Server**  | App-local tool connector definition                 |
 | **Environment** | App-local runtime template an Agent executes inside |
@@ -63,7 +63,7 @@ When this is done, an App owner should be able to:
 
 | Term                           | Plain-language definition                                                                                                                                                |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Environment**                | App-owned runtime template containing network policy, packages, setup script, env vars, and metadata. It does not contain Spaces, Skills, or MCP servers.                |
+| **Environment**                | App-owned runtime template containing network policy, packages, setup script, env vars, and metadata. It does not contain Files, Skills, or MCP servers.                 |
 | **App default Environment**    | The Environment preselected for new Agents in one App. It is scoped to that App and does not apply tenant-wide.                                                          |
 | **Network - Full**             | The sandbox can reach external domains without an explicit allowlist.                                                                                                    |
 | **Network - Limited**          | The sandbox can reach only Allowed Hosts plus any explicitly permitted platform dependencies.                                                                            |
@@ -79,7 +79,7 @@ When this is done, an App owner should be able to:
 
 ## 4. Relationship rule: Environment does not nest other assets
 
-Environment is orthogonal to the other App-owned resources. An Agent references Environment, Space, Skill, and MCP bindings separately. The Environment itself does not contain those resources.
+Environment is orthogonal to the other App-owned resources. An Agent references Environment, Skill, and MCP bindings separately, and reads Files. The Environment itself does not contain those resources.
 
 ```mermaid
 flowchart LR
@@ -87,7 +87,7 @@ flowchart LR
   App --> Environment
   App --> Agent
   Agent --> Environment
-  Agent --> Space[Space / Storage]
+  Agent --> Files[Files]
   Agent --> Skill
   Agent --> MCP[MCP Server]
   Environment --> Network[Network policy]
@@ -97,7 +97,7 @@ flowchart LR
   Session[Session start] --> Snapshot[Freeze selected Environment revision]
 ```
 
-Why no nesting: Space is App-owned storage, MCP and Skill are Agent capability inputs, and Environment is runtime shape. Keeping those concepts separate prevents a runtime template from becoming a "manages everything" container.
+Why no nesting: Files are uploaded data inputs, MCP and Skill are Agent capability inputs, and Environment is runtime shape. Keeping those concepts separate prevents a runtime template from becoming a "manages everything" container.
 
 ---
 
