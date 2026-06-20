@@ -30,8 +30,7 @@ App
         │   ├── Prompt
         │   ├── Environment
         │   ├── Skills
-        │   ├── MCP servers
-        │   └── Files
+        │   └── MCP servers
         ├── Preview / Logs / Cost
         └── Publish / API access / Channels
 ```
@@ -181,7 +180,7 @@ The first-level creation page should include:
   - One tab per Agent draft.
   - Tab title equals the editable Agent name in that Agent form.
   - Each tab contains Agent name, Agent description, `How it runs`,
-    model/provider, system prompt, Skills, MCP servers, Files, and Environment
+    model/provider, system prompt, Skills, MCP servers, and Environment
     fields.
   - Switching tabs changes only the visible Agent form. It must not overwrite,
     duplicate, or reset other Agents' values.
