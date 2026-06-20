@@ -1,6 +1,17 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import type { ReactElement } from "react";
-import { UnicornScene } from "unicornstudio-react";
+
+// `unicornstudio-react` bundles the full ~1.3 MB WebGL engine. The landing page
+// is the first thing every unauthenticated visitor loads, and this background is
+// purely decorative (aria-hidden, non-interactive, behind the content). Loading
+// it lazily keeps the engine out of the login route's critical path: the form and
+// copy paint immediately and the aurora streams in once its chunk arrives. The
+// runtime SDK is fetched separately from the CDN below, so deferring the wrapper
+// costs nothing visually.
+const UnicornScene = lazy(async () => {
+  const mod = await import("unicornstudio-react");
+  return { default: mod.UnicornScene };
+});
 
 // Shared Unicorn Studio WebGL background. A single SDK version is used across the
 // whole landing so the global runtime loads once and every scene renders on the
@@ -26,13 +37,15 @@ export function UnicornBackground({ sceneId }: { sceneId: string }): ReactElemen
       aria-hidden="true"
       className="pointer-events-none absolute inset-0 z-0 [&>div]:!h-full [&>div]:!w-full"
     >
-      <UnicornScene
-        projectId={sceneId}
-        sdkUrl={UNICORN_SDK_URL}
-        width="100%"
-        height="100%"
-        onError={() => setFailed(true)}
-      />
+      <Suspense fallback={null}>
+        <UnicornScene
+          projectId={sceneId}
+          sdkUrl={UNICORN_SDK_URL}
+          width="100%"
+          height="100%"
+          onError={() => setFailed(true)}
+        />
+      </Suspense>
     </div>
   );
 }
