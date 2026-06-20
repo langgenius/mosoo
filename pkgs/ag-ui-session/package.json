@@ -11,7 +11,7 @@
     "test": "vp exec bun test tests"
   },
   "dependencies": {
-    "@ag-ui/core": "^0.0.54",
+    "@ag-ui/core": "^0.0.57",
     "@mosoo/contracts": "workspace:*",
     "arktype": "^2.2.0"
   },
