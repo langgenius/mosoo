@@ -1,6 +1,6 @@
 import { ArrowLeft, Settings, TerminalSquare } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { useAppSession } from "@/app/session-provider";
@@ -21,10 +21,18 @@ import { LogsTab } from "./components/logs-tab";
 import { PreviewMode } from "./components/preview-mode";
 import { RuntimeIcon } from "./components/runtime-icon";
 import { SettingsSheet } from "./components/settings-dialog";
-import { TerminalMode } from "./components/terminal-mode";
 import { VersionsTab } from "./components/versions-tab";
 import { LifecycleShell } from "./lifecycle/lifecycle-shell";
 import { getRuntimeInfo } from "./runtime-catalog";
+
+// The terminal pulls in the full xterm engine (~250 kB) and its stylesheet, yet
+// it only renders in the debug-only "terminal" mode that most agent visits never
+// open. Loading it lazily keeps xterm out of the agent-detail route's initial
+// chunk so the default modes paint without paying for the terminal.
+const TerminalMode = lazy(async () => {
+  const mod = await import("./components/terminal-mode");
+  return { default: mod.TerminalMode };
+});
 
 type DetailMode = AgentMode | "cost" | "logs" | "terminal";
 
@@ -399,7 +407,11 @@ export function AgentDetailPage() {
         )}
         {mode === "logs" && <LogsTab agentId={agent.id} appId={agent.appId} />}
         {mode === "cost" && <AgentCostTab agentId={agent.id} appId={agent.appId} />}
-        {mode === "terminal" && <TerminalMode key={agent.id} agent={agent} />}
+        {mode === "terminal" && (
+          <Suspense fallback={null}>
+            <TerminalMode key={agent.id} agent={agent} />
+          </Suspense>
+        )}
       </div>
 
       <SettingsSheet
