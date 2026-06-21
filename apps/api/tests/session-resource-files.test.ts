@@ -552,17 +552,17 @@ describe("session resource files", () => {
     const bindings = { DB: database } as ApiBindings;
 
     const allFiles = await fileStore.list(bindings, VIEWER, { appId: APP_ID });
-    const allFileIds = allFiles.files.map((file) => file.id).sort();
+    const allFileIds = allFiles.files.map((file) => file.id).toSorted();
 
-    expect(allFileIds).toEqual([ARTIFACT_FILE_ID, FILE_ID, LIBRARY_FILE_ID].sort());
+    expect(allFileIds).toEqual([ARTIFACT_FILE_ID, FILE_ID, LIBRARY_FILE_ID].toSorted());
 
     const sessionFiles = await fileStore.list(bindings, VIEWER, {
       appId: APP_ID,
       sessionId: SESSION_ID,
     });
 
-    expect(sessionFiles.files.map((file) => file.id).sort()).toEqual(
-      [ARTIFACT_FILE_ID, FILE_ID].sort(),
+    expect(sessionFiles.files.map((file) => file.id).toSorted()).toEqual(
+      [ARTIFACT_FILE_ID, FILE_ID].toSorted(),
     );
 
     const artifacts = await fileStore.list(bindings, VIEWER, {

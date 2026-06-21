@@ -1,9 +1,9 @@
-import {
-  FILE_STATUSES,
-  type FileEntryListing,
-  type FileListQuery as FileListRequest,
-  type FileEntry,
-  type FileStatus,
+import { FILE_STATUSES } from "@mosoo/contracts/file";
+import type {
+  FileEntry,
+  FileEntryListing,
+  FileListQuery as FileListRequest,
+  FileStatus,
 } from "@mosoo/contracts/file";
 
 import { graphql } from "@/gql";

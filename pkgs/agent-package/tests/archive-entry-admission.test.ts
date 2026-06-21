@@ -105,7 +105,9 @@ describe("agent package archive entry admission", () => {
   test("rejects manifest declarations that target reserved package files", () => {
     const archive = createStoredZipArchive([
       {
-        body: textToArchiveBytes(createPackageManifestJson({ avatar: "manifest.json" })),
+        body: textToArchiveBytes(
+          createPackageManifestJson({ skills: [{ name: "Reserved", path: "manifest.json" }] }),
+        ),
         path: "manifest.json",
       },
       {
@@ -240,7 +242,6 @@ function createPackageManifestJson(
     provider: "anthropic",
     runtime: "claude-agent-sdk",
     skills: input.skills ?? [],
-    spaceBindings: [],
     version: "1.0.0",
   });
 }

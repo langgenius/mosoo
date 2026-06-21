@@ -117,5 +117,5 @@ export function parseAgentBuilderBindableAssetId(input: {
     return parseSkillId(input.value, input.label ?? "skillId");
   }
 
-  throw new Error(`Unsupported Agent Builder asset type: ${input.assetType}`);
+  throw new Error(`Unsupported Agent Builder asset type: ${String(input.assetType)}`);
 }

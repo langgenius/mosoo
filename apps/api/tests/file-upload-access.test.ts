@@ -689,7 +689,9 @@ describe("file upload access", () => {
     const allBody = (await allResponse.json()) as FileEntryListing;
 
     expect(allResponse.status).toBe(200);
-    expect(allBody.files.map((file) => file.id).sort()).toEqual([FILE_ID, LIBRARY_FILE_ID].sort());
+    expect(allBody.files.map((file) => file.id).toSorted()).toEqual(
+      [FILE_ID, LIBRARY_FILE_ID].toSorted(),
+    );
 
     const sessionResponse = await createHttpApp().request(
       `${PUBLIC_API_PREFIX}/files?appId=${fixture.ids.appId}&sessionId=${SESSION_ID}`,

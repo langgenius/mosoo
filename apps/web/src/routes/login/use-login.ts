@@ -115,7 +115,7 @@ export function useLoginFlow(): LoginFlow {
   async function handleGoogleLogin(): Promise<void> {
     setError(null);
 
-    const result = await authClient.signIn.social({
+    const result = await authClient["signIn"].social({
       callbackURL: redirectPath,
       errorCallbackURL: loginErrorCallbackUrl,
       provider: "google",
@@ -144,7 +144,7 @@ export function useLoginFlow(): LoginFlow {
         return;
       }
 
-      const result = await authClient.emailOtp.sendVerificationOtp({
+      const result = await authClient["emailOtp"].sendVerificationOtp({
         email: normalizedEmail,
         type: "sign-in",
       });
@@ -176,7 +176,7 @@ export function useLoginFlow(): LoginFlow {
 
     try {
       const normalizedEmail = email.trim();
-      const result = await authClient.signIn.emailOtp({
+      const result = await authClient["signIn"].emailOtp({
         email: normalizedEmail,
         name: deriveNameFromEmail(normalizedEmail),
         otp,

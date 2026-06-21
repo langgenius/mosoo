@@ -31,9 +31,17 @@ function isAuthUser(value: unknown): value is AuthUser {
   );
 }
 
+function getSessionUser(data: unknown): unknown {
+  if (data === null || typeof data !== "object" || !("user" in data)) {
+    return undefined;
+  }
+
+  return data.user;
+}
+
 export function useAuth(): AuthState {
   const session = authClient.useSession();
-  const sessionUser = session.data?.user;
+  const sessionUser = getSessionUser(session.data);
 
   return {
     loading: session.isPending,
