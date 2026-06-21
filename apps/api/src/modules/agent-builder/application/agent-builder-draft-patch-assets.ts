@@ -80,7 +80,7 @@ function parseReferenceId(
     return parseSkillId(value, label);
   }
 
-  throw new Error(`Unsupported draft patch reference target type: ${spec.targetType}`);
+  throw new Error(`Unsupported draft patch reference target type: ${String(spec.targetType)}`);
 }
 
 function createDraftPatchReference(

@@ -125,7 +125,7 @@ export function AccountMenu({
             className="cursor-pointer rounded-md"
             onSelect={() => {
               void (async () => {
-                await authClient.signOut();
+                await authClient["signOut"]();
                 globalThis.location.href = "/login";
               })();
             }}

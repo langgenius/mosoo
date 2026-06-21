@@ -1,7 +1,6 @@
 import type { Sandbox as CloudflareSandbox } from "@cloudflare/sandbox";
 
 export const SANDBOX_RPC_FORWARD_METHODS = [
-  "callDesktop",
   "callTunnels",
   "checkChanges",
   "cleanupCompletedProcesses",
@@ -20,7 +19,6 @@ export const SANDBOX_RPC_FORWARD_METHODS = [
   "exists",
   "exposePort",
   "getContainerPlacementId",
-  "getDesktopStreamUrl",
   "getExposedPorts",
   "getProcess",
   "getProcessLogs",

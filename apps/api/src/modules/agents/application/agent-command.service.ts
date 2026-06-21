@@ -205,7 +205,7 @@ export async function updateAgentConfig(
     runtimeId,
     updatedAt: timestampMs,
   };
-  const [specSkills] = await Promise.all([listAgentSpecSkillsByIds(database, skillIds)]);
+  const specSkills = await listAgentSpecSkillsByIds(database, skillIds);
   const spec = await buildAgentSpecForPreparedProfile(database, {
     agent: nextAgent,
     environment: preparedEnvironment.environment,

@@ -43,10 +43,9 @@ function SegmentedButtonGroup<T extends string>({
   value: T;
 }): ReactElement {
   return (
-    <div
+    <fieldset
       aria-label={label}
-      className="bg-card border-border-strong inline-flex h-8 overflow-hidden rounded-md border"
-      role="group"
+      className="bg-card border-border-strong m-0 inline-flex h-8 min-w-0 overflow-hidden rounded-md border p-0"
     >
       {options.map((option) => (
         <button
@@ -66,7 +65,7 @@ function SegmentedButtonGroup<T extends string>({
           {option.label}
         </button>
       ))}
-    </div>
+    </fieldset>
   );
 }
 
