@@ -1,4 +1,4 @@
-import type { FileListQuery, FileRecord, FileSessionKind } from "@mosoo/contracts/file";
+import type { FileEntry, FileListQuery, FileSessionKind } from "@mosoo/contracts/file";
 import { useQuery } from "@tanstack/react-query";
 import { Download, FileStack, RefreshCw } from "lucide-react";
 import type { ReactElement } from "react";
@@ -70,11 +70,18 @@ function SegmentedButtonGroup<T extends string>({
   );
 }
 
-function createFilesQueryInput(sessionId: string, sessionKind: SessionKindFilter): FileListQuery {
+function createFilesQueryInput(
+  appId: string,
+  sessionId: string,
+  sessionKind: SessionKindFilter,
+): FileListQuery {
   const input: FileListQuery =
     sessionKind === "all"
-      ? {}
+      ? {
+          appId: toAppId(appId),
+        }
       : {
+          appId: toAppId(appId),
           sessionKind,
         };
 
@@ -84,8 +91,7 @@ function createFilesQueryInput(sessionId: string, sessionKind: SessionKindFilter
 
   return {
     ...input,
-    scopeId: toSessionId(sessionId),
-    scopeKind: "session",
+    sessionId: toSessionId(sessionId),
   };
 }
 
@@ -116,27 +122,23 @@ function formatDateTime(value: string): string {
   }).format(new Date(value));
 }
 
-function formatFileKind(file: FileRecord): string {
-  if (file.scope.kind === "library") {
-    return "Library";
-  }
-
+function formatFileCategory(file: FileEntry): string {
   if (file.sessionKind === "artifact") {
     return "Artifact";
+  }
+
+  if (file.sessionKind === null) {
+    return "File";
   }
 
   return "Attachment";
 }
 
-function fileKindVariant(file: FileRecord): "default" | "primary" | "soil" {
-  if (file.scope.kind === "library") {
-    return "primary";
-  }
-
+function fileCategoryVariant(file: FileEntry): "default" | "soil" {
   return file.sessionKind === "artifact" ? "soil" : "default";
 }
 
-function matchesSearch(file: FileRecord, search: string): boolean {
+function matchesSearch(file: FileEntry, search: string): boolean {
   const normalized = search.trim().toLowerCase();
 
   if (!normalized) {
@@ -148,15 +150,14 @@ function matchesSearch(file: FileRecord, search: string): boolean {
   );
 }
 
-function FileTable({ files }: { files: FileRecord[] }): ReactElement {
+function FileTable({ files }: { files: FileEntry[] }): ReactElement {
   return (
     <div className="bg-card border-border-strong overflow-hidden rounded-md border">
       <Table>
         <TableHeader>
           <TableRow className="bg-paper-100 hover:bg-paper-100">
             <TableHead>Name</TableHead>
-            <TableHead className="hidden md:table-cell">Kind</TableHead>
-            <TableHead className="hidden lg:table-cell">Scope</TableHead>
+            <TableHead className="hidden md:table-cell">Category</TableHead>
             <TableHead className="hidden text-right md:table-cell">Size</TableHead>
             <TableHead className="hidden lg:table-cell">Updated</TableHead>
             <TableHead className="w-10 text-right"> </TableHead>
@@ -179,10 +180,7 @@ function FileTable({ files }: { files: FileRecord[] }): ReactElement {
                   </div>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                  <Badge variant={fileKindVariant(file)}>{formatFileKind(file)}</Badge>
-                </TableCell>
-                <TableCell className="text-fg-3 hidden max-w-[240px] truncate text-[12px] lg:table-cell">
-                  {file.scope.id ?? "Library"}
+                  <Badge variant={fileCategoryVariant(file)}>{formatFileCategory(file)}</Badge>
                 </TableCell>
                 <TableCell className="text-fg-2 hidden text-right text-[12px] tabular-nums md:table-cell">
                   {formatBytes(file.size)}
@@ -224,8 +222,15 @@ export function FilesPage(): ReactElement {
     queryKey: [...fileKeys.all, "session-options", activeAppId],
   });
   const filesQuery = useQuery({
-    queryFn: async () => listFiles(createFilesQueryInput(normalizedSessionId, sessionKind)),
-    queryKey: [...fileKeys.lists(), normalizedSessionId, sessionKind],
+    enabled: activeAppId !== null,
+    queryFn: async () => {
+      if (activeAppId === null) {
+        throw new Error("App id is required to list files.");
+      }
+
+      return listFiles(createFilesQueryInput(activeAppId, normalizedSessionId, sessionKind));
+    },
+    queryKey: [...fileKeys.lists(), activeAppId, normalizedSessionId, sessionKind],
   });
   const files = filesQuery.data?.files ?? [];
   const filteredFiles = useMemo(
@@ -235,10 +240,7 @@ export function FilesPage(): ReactElement {
 
   return (
     <div className="bg-background flex h-full flex-1 flex-col overflow-hidden">
-      <PageHeader
-        title="Files"
-        description="Files Library, session attachments, and runtime artifacts."
-      >
+      <PageHeader title="Files" description="App files, Thread attachments, and runtime artifacts.">
         <Button
           disabled={filesQuery.isFetching}
           onClick={() => {
@@ -254,7 +256,7 @@ export function FilesPage(): ReactElement {
 
       <ListPageToolbar className="flex-wrap">
         <select
-          aria-label="File scope"
+          aria-label="Thread filter"
           className="bg-card border-border-strong text-fg-2 focus:border-ring h-8 min-w-[220px] rounded-md border px-2 text-[12.5px] transition-colors outline-none"
           disabled={sessionOptionsQuery.isLoading || sessionOptionsQuery.error !== null}
           onChange={(event) => {
@@ -274,16 +276,16 @@ export function FilesPage(): ReactElement {
           ))}
         </select>
         <Input
-          aria-label="Session ID"
+          aria-label="Thread ID"
           className="h-8 w-[280px] text-[12.5px]"
           onChange={(event) => {
             setSessionId(event.target.value);
           }}
-          placeholder="Filter by session ID"
+          placeholder="Filter by Thread ID"
           value={sessionId}
         />
         <SegmentedButtonGroup<SessionKindFilter>
-          label="Session file kind"
+          label="Thread file category"
           onChange={setSessionKind}
           options={SESSION_KIND_OPTIONS}
           value={sessionKind}
@@ -308,7 +310,7 @@ export function FilesPage(): ReactElement {
           <EmptyState
             icon={FileStack}
             title={search.trim() ? "No matching files" : "No files"}
-            description="Uploaded library files and session files will appear here."
+            description="App files, Thread attachments, and runtime artifacts will appear here."
           />
         ) : (
           <FileTable files={filteredFiles} />

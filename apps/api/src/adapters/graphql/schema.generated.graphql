@@ -955,8 +955,10 @@ input ExecuteAgentBuilderControlPlaneActionInput {
 }
 
 input FileListInput {
+  appId: ULID!
   scopeId: ULID
   scopeKind: FileScopeKind
+  sessionId: ULID
   sessionKind: FileSessionKind
 }
 
@@ -1308,7 +1310,7 @@ type Query {
   availableAgentModels(appId: ULID!, currentModelId: String, currentVendorId: String, runtimeId: String!): [ResolvedModelEntry!]!
   environment(appId: ULID!, environmentId: ULID!): EnvironmentDetail!
   exportAgentPackage(agentId: ULID!, appId: ULID!): AgentPackageExport!
-  fileList(input: FileListInput): FileListing!
+  fileList(input: FileListInput!): FileListing!
   listSessionResources(appId: ULID!, sessionId: ULID!): [SessionResource!]!
   mcpOAuthFlowStatus(flowId: ULID!): McpOAuthFlowState!
   mcpRegistry(appId: ULID!): McpRegistry!

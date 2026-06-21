@@ -8,8 +8,10 @@ export const fileSchema = /* GraphQL */ `
   }
 
   input FileListInput {
+    appId: ULID!
     scopeId: ULID
     scopeKind: FileScopeKind
+    sessionId: ULID
     sessionKind: FileSessionKind
   }
 

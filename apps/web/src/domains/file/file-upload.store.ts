@@ -1,4 +1,3 @@
-import type { FileScopeKind } from "@mosoo/contracts/file";
 import { createPromiseDeferred } from "@mosoo/effects";
 
 export interface StoredUploadedPart {
@@ -16,8 +15,6 @@ export interface StoredFileUploadSession {
   partSize: number | null;
   path: string;
   parts: StoredUploadedPart[];
-  scopeId: string | null;
-  scopeKind: FileScopeKind;
   strategy: "multipart" | "single_put";
 }
 

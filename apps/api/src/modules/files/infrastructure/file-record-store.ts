@@ -11,6 +11,8 @@ export {
 } from "./file-record-mutations";
 export {
   fileRecordRowColumns,
+  toFileEntry,
+  toFileEntryFromRow,
   toFileRecord,
   toSessionFile,
   toUploadSummary,

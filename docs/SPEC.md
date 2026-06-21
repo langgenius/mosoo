@@ -189,10 +189,10 @@ Files is a file library plus session-scoped file surface. Existing Space naming 
 
 Files:
 
-- Belongs to the current tenant/account/App access boundary.
+- Belongs to the current App access boundary.
 - Stores uploaded files and file metadata.
-- Supports unscoped library files and session-scoped attachments/artifacts.
-- Must not receive runtime artifacts into the unscoped library by default.
+- Supports App-scoped library files and session-scoped attachments/artifacts.
+- Must not receive runtime artifacts into the App library by default.
 - Is not the product model for generated application source trees, deployable projects, or App asset publishing.
 
 Generated application source trees, templates, previews, and deployment outputs need their own Project / repository / template model when Mosoo moves toward a VibeSDK-like product.

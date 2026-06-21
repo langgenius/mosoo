@@ -187,8 +187,15 @@ describe("API to web boundary", () => {
     expect(deleteInput.getFields().organizationId).toBeUndefined();
   });
 
-  test("keeps file draft GraphQL enums App-scoped", () => {
+  test("keeps file GraphQL scope details compatible", () => {
     const schema = createGraphQLSchema();
+    const fileRecord = schema.getType("FileRecord");
+    const fileListInput = schema.getType("FileListInput");
+
+    if (!isObjectType(fileRecord) || !isInputObjectType(fileListInput)) {
+      throw new Error("Expected file GraphQL types.");
+    }
+
     const scopeKind = schema.getType("FileScopeKind");
     const purpose = schema.getType("FilePurpose");
 
@@ -203,6 +210,15 @@ describe("API to web boundary", () => {
     expect(scopeValues).not.toContain("organization_draft");
     expect(purposeValues).toContain("app_draft");
     expect(purposeValues).not.toContain("organization_draft");
+    expect(isObjectType(schema.getType("FileOwner"))).toBe(true);
+    expect(String(fileListInput.getFields().appId?.type)).toBe("ULID!");
+    expect(String(fileListInput.getFields().sessionId?.type)).toBe("ULID");
+    expect(String(fileListInput.getFields().sessionKind?.type)).toBe("FileSessionKind");
+    expect(String(fileListInput.getFields().scopeId?.type)).toBe("ULID");
+    expect(String(fileListInput.getFields().scopeKind?.type)).toBe("FileScopeKind");
+    expect(String(fileRecord.getFields().scope?.type)).toBe("FileScope!");
+    expect(String(fileRecord.getFields().owner?.type)).toBe("FileOwner!");
+    expect(String(fileRecord.getFields().purpose?.type)).toBe("FilePurpose!");
   });
 
   test("keeps V1 GraphQL free of Organization collaboration surfaces", () => {

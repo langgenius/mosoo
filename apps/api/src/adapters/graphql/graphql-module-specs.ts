@@ -97,7 +97,7 @@ export const environmentGraphQLSpec = {
 } satisfies GraphQLModuleSpec;
 
 export const fileGraphQLSpec = {
-  queryFields: ["fileList(input: FileListInput): FileListing!"],
+  queryFields: ["fileList(input: FileListInput!): FileListing!"],
   typeDefs: fileSchema,
 } satisfies GraphQLModuleSpec;
 

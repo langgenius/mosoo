@@ -1,22 +1,18 @@
 import {
   FILE_STATUSES,
+  type FileEntryListing,
   type FileListQuery as FileListRequest,
-  type FileListing,
-  type FileOwner,
-  type FileOwnerId,
-  type FileRecord,
-  type FileScope,
-  type FileScopeId,
+  type FileEntry,
   type FileStatus,
 } from "@mosoo/contracts/file";
 
 import { graphql } from "@/gql";
 import type { FileListQuery as FileListGraphQLQuery } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import { toAccountId, toAppId, toFileId, toSessionId } from "@/routes/typed-id";
+import { toAccountId, toFileId } from "@/routes/typed-id";
 
 const FILE_LIST_QUERY = graphql(/* GraphQL */ `
-  query FileList($input: FileListInput) {
+  query FileList($input: FileListInput!) {
     fileList(input: $input) {
       files {
         createdAt
@@ -26,16 +22,7 @@ const FILE_LIST_QUERY = graphql(/* GraphQL */ `
         id
         mimeType
         name
-        owner {
-          id
-          kind
-        }
         path
-        purpose
-        scope {
-          id
-          kind
-        }
         sessionKind
         size
         status
@@ -62,45 +49,7 @@ function toFileStatus(status: string): FileStatus {
   throw new Error(`Unknown file status: ${status}`);
 }
 
-function toScopeId(scope: FileRecordNode["scope"]): FileScopeId {
-  if (scope.id === null) {
-    return null;
-  }
-
-  if (scope.kind === "session") {
-    return toSessionId(scope.id);
-  }
-
-  return toAppId(scope.id);
-}
-
-function toOwnerId(owner: FileRecordNode["owner"]): FileOwnerId {
-  if (owner.kind === "account") {
-    return toAccountId(owner.id);
-  }
-
-  if (owner.kind === "session") {
-    return toSessionId(owner.id);
-  }
-
-  return toAppId(owner.id);
-}
-
-function toFileScope(scope: FileRecordNode["scope"]): FileScope {
-  return {
-    id: toScopeId(scope),
-    kind: scope.kind,
-  };
-}
-
-function toFileOwner(owner: FileRecordNode["owner"]): FileOwner {
-  return {
-    id: toOwnerId(owner),
-    kind: owner.kind,
-  };
-}
-
-function toFileRecord(file: FileRecordNode): FileRecord {
+function toFileEntry(file: FileRecordNode): FileEntry {
   return {
     createdAt: file.createdAt,
     createdBy: toAccountId(file.createdBy),
@@ -109,10 +58,7 @@ function toFileRecord(file: FileRecordNode): FileRecord {
     id: toFileId(file.id),
     mimeType: file.mimeType,
     name: file.name,
-    owner: toFileOwner(file.owner),
     path: file.path,
-    purpose: file.purpose,
-    scope: toFileScope(file.scope),
     sessionKind: file.sessionKind,
     size: file.size,
     status: toFileStatus(file.status),
@@ -121,10 +67,10 @@ function toFileRecord(file: FileRecordNode): FileRecord {
   };
 }
 
-export async function listFiles(input: FileListRequest): Promise<FileListing> {
+export async function listFiles(input: FileListRequest): Promise<FileEntryListing> {
   const payload = await requestGraphQL(FILE_LIST_QUERY, { input });
 
   return {
-    files: payload.fileList.files.map(toFileRecord),
+    files: payload.fileList.files.map(toFileEntry),
   };
 }

@@ -1,9 +1,4 @@
-import type {
-  FileApiErrorDetails,
-  FileErrorCode,
-  FileErrorResponse,
-  FileScopeKind,
-} from "@mosoo/contracts/file";
+import type { FileApiErrorDetails, FileErrorCode, FileErrorResponse } from "@mosoo/contracts/file";
 
 const TERMINAL_FILE_ERROR_CODES = new Set<FileErrorCode>([
   "file_conflict",
@@ -29,8 +24,6 @@ interface FileErrorPayload {
 
 export interface FileUploadCompletionEventDetail {
   fileId: string;
-  scopeId: string | null;
-  scopeKind: FileScopeKind;
 }
 
 export interface FileUploadBatchResult {
@@ -48,8 +41,6 @@ export interface FileUploadBatchResult {
 export interface FileUploadRecoveryCandidate {
   fileId: string;
   fileName: string;
-  scopeId: string | null;
-  scopeKind: FileScopeKind;
 }
 
 export interface FileUploadRecoveryScanResult {
@@ -59,8 +50,6 @@ export interface FileUploadRecoveryScanResult {
 export interface FileUploadResumeResult {
   error: FileApiError | null;
   fileId: string;
-  scopeId: string | null;
-  scopeKind: FileScopeKind;
   status: "completed" | "removed_terminal" | "retryable_error";
 }
 

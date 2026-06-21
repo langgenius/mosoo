@@ -389,23 +389,12 @@ export type ExecuteAgentBuilderControlPlaneActionInput = {
 };
 
 export type FileListInput = {
+  appId: PlatformId;
   scopeId?: PlatformId | null | undefined;
   scopeKind?: FileScopeKind | null | undefined;
+  sessionId?: PlatformId | null | undefined;
   sessionKind?: FileSessionKind | null | undefined;
 };
-
-export type FileOwnerKind =
-  | 'account'
-  | 'app'
-  | 'session';
-
-export type FilePurpose =
-  | 'agent_asset'
-  | 'agent_package'
-  | 'app_draft'
-  | 'library_file'
-  | 'session_artifact'
-  | 'session_attachment';
 
 export type FileScopeKind =
   | 'agent_package'
@@ -1061,11 +1050,11 @@ export type SetAppDefaultEnvironmentMutationVariables = Exact<{
 export type SetAppDefaultEnvironmentMutation = { setAppDefaultEnvironment: { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, appId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> } };
 
 export type FileListQueryVariables = Exact<{
-  input?: FileListInput | null | undefined;
+  input: FileListInput;
 }>;
 
 
-export type FileListQuery = { fileList: { files: Array<{ createdAt: string, createdBy: PlatformId, etag: string | null, expiresAt: string | null, id: PlatformId, mimeType: string | null, name: string, path: string, purpose: FilePurpose, sessionKind: FileSessionKind | null, size: number, status: string, updatedAt: string, version: number, owner: { id: PlatformId, kind: FileOwnerKind }, scope: { id: PlatformId | null, kind: FileScopeKind } }> } };
+export type FileListQuery = { fileList: { files: Array<{ createdAt: string, createdBy: PlatformId, etag: string | null, expiresAt: string | null, id: PlatformId, mimeType: string | null, name: string, path: string, sessionKind: FileSessionKind | null, size: number, status: string, updatedAt: string, version: number }> } };
 
 export type McpCredentialFieldsFragment = { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string };
 
@@ -1260,7 +1249,7 @@ export type AddSessionResourceMutationVariables = Exact<{
 }>;
 
 
-export type AddSessionResourceMutation = { addSessionResource: { contentType: string, expectedSize: number, expiresAt: string, fileId: PlatformId, partSize: number | null, path: string, purpose: FilePurpose, status: FileUploadStatus, strategy: FileUploadStrategy, owner: { id: PlatformId, kind: FileOwnerKind }, scope: { id: PlatformId | null, kind: FileScopeKind } } };
+export type AddSessionResourceMutation = { addSessionResource: { contentType: string, expectedSize: number, expiresAt: string, fileId: PlatformId, partSize: number | null, path: string, status: FileUploadStatus, strategy: FileUploadStrategy } };
 
 export type ListSessionResourcesQueryVariables = Exact<{
   appId: PlatformId;
@@ -3355,7 +3344,7 @@ fragment EnvironmentSummaryFields on EnvironmentSummary {
   appId
 }`) as unknown as TypedDocumentString<SetAppDefaultEnvironmentMutation, SetAppDefaultEnvironmentMutationVariables>;
 export const FileListDocument = new TypedDocumentString(`
-    query FileList($input: FileListInput) {
+    query FileList($input: FileListInput!) {
   fileList(input: $input) {
     files {
       createdAt
@@ -3365,16 +3354,7 @@ export const FileListDocument = new TypedDocumentString(`
       id
       mimeType
       name
-      owner {
-        id
-        kind
-      }
       path
-      purpose
-      scope {
-        id
-        kind
-      }
       sessionKind
       size
       status
@@ -4009,17 +3989,8 @@ export const AddSessionResourceDocument = new TypedDocumentString(`
     expectedSize
     expiresAt
     fileId
-    owner {
-      id
-      kind
-    }
     partSize
     path
-    purpose
-    scope {
-      id
-      kind
-    }
     status
     strategy
   }

@@ -1,4 +1,5 @@
 import type {
+  FileEntry,
   FileRecord,
   FileOwnerId,
   FileOwnerKind,
@@ -122,15 +123,11 @@ export interface FileAccessRequest {
 }
 
 function toFileScopeId(scopeKind: FileScopeKind, scopeId: PlatformId | null): FileScopeId {
-  if (scopeKind === "library") {
-    return scopeId === null ? null : parsePlatformId<SessionId>(scopeId, "library session ID");
-  }
-
   if (scopeId === null) {
     throw new Error(`${scopeKind} file scope ID is required.`);
   }
 
-  if (scopeKind === "agent_package" || scopeKind === "app_draft") {
+  if (scopeKind === "agent_package" || scopeKind === "app_draft" || scopeKind === "library") {
     return parsePlatformId<AppId>(scopeId, "file app ID");
   }
 
@@ -185,21 +182,37 @@ export function toFileRecord(row: FileRecordRow): FileRecord {
   };
 }
 
+export function toFileEntry(file: FileRecord): FileEntry {
+  return {
+    createdAt: file.createdAt,
+    createdBy: file.createdBy,
+    etag: file.etag,
+    expiresAt: file.expiresAt,
+    id: file.id,
+    mimeType: file.mimeType,
+    name: file.name,
+    path: file.path,
+    sessionKind: file.sessionKind,
+    size: file.size,
+    status: file.status,
+    updatedAt: file.updatedAt,
+    version: file.version,
+  };
+}
+
+export function toFileEntryFromRow(row: FileRecordRow): FileEntry {
+  return toFileEntry(toFileRecord(row));
+}
+
 export function toUploadSummary(upload: FileUploadRow, file: FileRecordRow): FileUploadSummary {
   return {
     contentType: upload.content_type,
     expectedSize: upload.expected_size,
     expiresAt: toIsoString(upload.expires_at),
     fileId: file.id,
-    owner: {
-      id: toFileOwnerId(file.owner_kind, file.owner_id),
-      kind: file.owner_kind,
-    },
     partSize: upload.part_size,
     path:
       upload.scope_kind === "session" ? toSessionResourceMaterializedPath(file.path) : file.path,
-    purpose: file.purpose,
-    scope: createScope(upload.scope_kind, toFileScopeId(upload.scope_kind, upload.scope_id)),
     status: upload.status,
     strategy: upload.strategy,
   };

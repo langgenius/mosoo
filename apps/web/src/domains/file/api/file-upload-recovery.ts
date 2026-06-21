@@ -41,8 +41,6 @@ export async function inspectRecoverableFileUploads(): Promise<FileUploadRecover
         return {
           fileId: stored.fileId,
           fileName: stored.fileName,
-          scopeId: stored.scopeId,
-          scopeKind: stored.scopeKind,
         };
       } catch (error) {
         if (isTerminalFileApiError(error)) {
@@ -53,8 +51,6 @@ export async function inspectRecoverableFileUploads(): Promise<FileUploadRecover
         return {
           fileId: stored.fileId,
           fileName: stored.fileName,
-          scopeId: stored.scopeId,
-          scopeKind: stored.scopeKind,
         };
       }
     }),
@@ -93,8 +89,6 @@ export async function resumeStoredFileUpload(fileId: FileId): Promise<FileUpload
       return {
         error,
         fileId: stored.fileId,
-        scopeId: stored.scopeId,
-        scopeKind: stored.scopeKind,
         status: "removed_terminal",
       };
     }
@@ -102,8 +96,6 @@ export async function resumeStoredFileUpload(fileId: FileId): Promise<FileUpload
     return {
       error: error instanceof FileApiError ? error : createFileApiError({ status: 503 }),
       fileId: stored.fileId,
-      scopeId: stored.scopeId,
-      scopeKind: stored.scopeKind,
       status: "retryable_error",
     };
   }
@@ -118,8 +110,6 @@ export async function resumeStoredFileUpload(fileId: FileId): Promise<FileUpload
     return {
       error: null,
       fileId: stored.fileId,
-      scopeId: stored.scopeId,
-      scopeKind: stored.scopeKind,
       status: session.status === "completed" ? "completed" : "removed_terminal",
     };
   }
@@ -129,8 +119,6 @@ export async function resumeStoredFileUpload(fileId: FileId): Promise<FileUpload
     return {
       error: null,
       fileId: stored.fileId,
-      scopeId: stored.scopeId,
-      scopeKind: stored.scopeKind,
       status: "completed",
     };
   } catch (error) {
@@ -144,8 +132,6 @@ export async function resumeStoredFileUpload(fileId: FileId): Promise<FileUpload
       return {
         error: normalized,
         fileId: stored.fileId,
-        scopeId: stored.scopeId,
-        scopeKind: stored.scopeKind,
         status: "removed_terminal",
       };
     }
@@ -153,8 +139,6 @@ export async function resumeStoredFileUpload(fileId: FileId): Promise<FileUpload
     return {
       error: normalized,
       fileId: stored.fileId,
-      scopeId: stored.scopeId,
-      scopeKind: stored.scopeKind,
       status: "retryable_error",
     };
   }

@@ -5,7 +5,7 @@ import type { SessionResource } from "@mosoo/contracts/session";
 import { graphql } from "@/gql";
 import type { AddSessionResourceMutation, ListSessionResourcesQuery } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import { toAccountId, toFileId, toAppId, toSessionId } from "@/routes/typed-id";
+import { toFileId } from "@/routes/typed-id";
 
 const ADD_SESSION_RESOURCE_MUTATION = graphql(/* GraphQL */ `
   mutation AddSessionResource($input: AddSessionResourceInput!) {
@@ -14,17 +14,8 @@ const ADD_SESSION_RESOURCE_MUTATION = graphql(/* GraphQL */ `
       expectedSize
       expiresAt
       fileId
-      owner {
-        id
-        kind
-      }
       partSize
       path
-      purpose
-      scope {
-        id
-        kind
-      }
       status
       strategy
     }
@@ -60,41 +51,6 @@ export function sessionResourcesQueryKey(
   return ["session-resources", appId, sessionId];
 }
 
-function requireFileScopeId(id: string | null, kind: string): string {
-  if (id === null) {
-    throw new Error(`File scope ${kind} must include an id.`);
-  }
-
-  return id;
-}
-
-function toFileUploadScope(
-  scope: AddSessionResourceMutation["addSessionResource"]["scope"],
-): FileUploadSummary["scope"] {
-  switch (scope.kind) {
-    case "agent_package":
-    case "app_draft":
-      return { id: toAppId(requireFileScopeId(scope.id, scope.kind)), kind: scope.kind };
-    case "library":
-      return { id: null, kind: scope.kind };
-    case "session":
-      return { id: toSessionId(requireFileScopeId(scope.id, scope.kind)), kind: scope.kind };
-  }
-}
-
-function toFileUploadOwner(
-  owner: AddSessionResourceMutation["addSessionResource"]["owner"],
-): FileUploadSummary["owner"] {
-  switch (owner.kind) {
-    case "account":
-      return { id: toAccountId(owner.id), kind: owner.kind };
-    case "app":
-      return { id: toAppId(owner.id), kind: owner.kind };
-    case "session":
-      return { id: toSessionId(owner.id), kind: owner.kind };
-  }
-}
-
 function toFileUploadSummary(
   upload: AddSessionResourceMutation["addSessionResource"],
 ): FileUploadSummary {
@@ -103,11 +59,8 @@ function toFileUploadSummary(
     expectedSize: upload.expectedSize,
     expiresAt: upload.expiresAt,
     fileId: toFileId(upload.fileId),
-    owner: toFileUploadOwner(upload.owner),
     partSize: upload.partSize,
     path: upload.path,
-    purpose: upload.purpose,
-    scope: toFileUploadScope(upload.scope),
     status: upload.status,
     strategy: upload.strategy,
   };

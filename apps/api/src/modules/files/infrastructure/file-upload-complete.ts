@@ -1,4 +1,4 @@
-import type { CompleteFileUploadRequest, CompleteFileUploadResponse } from "@mosoo/contracts/file";
+import type { CompleteFileUploadRequest, FileRecord } from "@mosoo/contracts/file";
 import { parsePlatformId } from "@mosoo/id";
 import type { AccountId, FileId } from "@mosoo/id";
 
@@ -52,9 +52,13 @@ export interface CompleteFileUploadOperation {
   viewer: AuthenticatedViewer;
 }
 
+export interface CompleteFileUploadResult {
+  file: FileRecord;
+}
+
 export async function completeFileUpload(
   operation: CompleteFileUploadOperation,
-): Promise<CompleteFileUploadResponse> {
+): Promise<CompleteFileUploadResult> {
   const { bindings, fileId, input, viewer } = operation;
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
   const context = await ensureUploadAccess({

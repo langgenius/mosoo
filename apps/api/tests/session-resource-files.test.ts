@@ -307,10 +307,10 @@ function insertLibraryFile(database: SqliteD1Database): void {
       version
     )
     VALUES (
-      '${LIBRARY_FILE_ID}',
-      'library',
-      NULL,
-      NULL,
+	      '${LIBRARY_FILE_ID}',
+	      'library',
+	      '${APP_ID}',
+	      NULL,
       'ready',
       1,
       3,
@@ -318,10 +318,10 @@ function insertLibraryFile(database: SqliteD1Database): void {
       NULL,
       NULL,
       'text/csv',
-      'seed.csv',
-      'objects/${LIBRARY_FILE_ID}',
-      '${OWNER_ID}',
-      'account',
+	      'seed.csv',
+	      'objects/${LIBRARY_FILE_ID}',
+	      '${APP_ID}',
+	      'app',
       '',
       'seed.csv',
       'library_file',
@@ -544,28 +544,31 @@ describe("session resource files", () => {
     expect(resources).toEqual([]);
   });
 
-  test("lists all visible files and filters by session scope", async () => {
+  test("lists visible Thread files and filters by session", async () => {
     const database = createSessionResourceDatabase();
     insertSessionArtifact(database);
     insertLibraryFile(database);
     insertInaccessibleSessionFile(database);
     const bindings = { DB: database } as ApiBindings;
 
-    const allFiles = await fileStore.list(bindings, VIEWER, {});
+    const allFiles = await fileStore.list(bindings, VIEWER, { appId: APP_ID });
     const allFileIds = allFiles.files.map((file) => file.id).sort();
 
     expect(allFileIds).toEqual([ARTIFACT_FILE_ID, FILE_ID, LIBRARY_FILE_ID].sort());
 
     const sessionFiles = await fileStore.list(bindings, VIEWER, {
-      scopeId: SESSION_ID,
-      scopeKind: "session",
+      appId: APP_ID,
+      sessionId: SESSION_ID,
     });
 
     expect(sessionFiles.files.map((file) => file.id).sort()).toEqual(
       [ARTIFACT_FILE_ID, FILE_ID].sort(),
     );
 
-    const artifacts = await fileStore.list(bindings, VIEWER, { sessionKind: "artifact" });
+    const artifacts = await fileStore.list(bindings, VIEWER, {
+      appId: APP_ID,
+      sessionKind: "artifact",
+    });
 
     expect(artifacts.files.map((file) => file.id)).toEqual([ARTIFACT_FILE_ID]);
   });

@@ -5,6 +5,7 @@ import type {
   CreateFileDownloadResponse,
   CreateFileUploadRequest,
   CreateFileUploadResponse,
+  FileEntry,
   FileListing,
   FileListQuery,
   FileRecord,
@@ -21,12 +22,13 @@ import type {
 import { fileRecordsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId, parsePlatformId } from "@mosoo/id";
 import type { AccountId, AppId, FileId, SessionId } from "@mosoo/id";
-import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
+import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { publishSessionResourceUpsert as publishSessionResourceUpsertEvent } from "../../sessions/application/session-resource-events.service";
 import {
@@ -54,6 +56,7 @@ import {
   fileRecordRowColumns,
   listFileRecords,
   listFileRecordsById,
+  toFileEntry,
   toFileRecord,
   toSessionFile,
 } from "../infrastructure/file-record-store";
@@ -67,10 +70,7 @@ import {
 } from "../infrastructure/file-upload-transfer";
 import { putObject } from "../infrastructure/r2-s3-client";
 import { normalizeR2Etag } from "../infrastructure/r2-s3-client";
-import {
-  ensureAppSessionFileAccess,
-  ensureSessionFileAccess,
-} from "../infrastructure/session-file-ownership";
+import { ensureAppSessionFileAccess } from "../infrastructure/session-file-ownership";
 
 export type ContentBody = ReadableStream<Uint8Array> | null;
 
@@ -193,7 +193,7 @@ export interface FileStore {
     viewer: AuthenticatedViewer,
     fileId: FileId,
     request: UpdateFileRequest,
-  ): Promise<FileRecord>;
+  ): Promise<FileEntry>;
 }
 
 async function publishSessionResourceUpsert(
@@ -357,7 +357,9 @@ async function completeUpload(
     await publishSessionResourceUpsert(command.bindings, result.file);
   }
 
-  return result;
+  return {
+    file: toFileEntry(result.file),
+  };
 }
 
 async function getRecord(
@@ -400,66 +402,34 @@ async function list(
   query: FileListQuery,
 ): Promise<FileListing> {
   const viewerId = parsePlatformId<AccountId>(viewer.id, "viewer ID");
-  const scopeKind =
-    query.scopeKind ?? (query.scopeId === undefined || query.scopeId === null ? null : "session");
-  const scopeId = query.scopeId ?? null;
+  const appId = parsePlatformId<AppId>(query.appId, "file list app ID");
+  const sessionId =
+    query.sessionId === undefined
+      ? undefined
+      : parsePlatformId<SessionId>(query.sessionId, "file list session ID");
 
-  if (scopeKind === null) {
-    const rows = await listVisibleFileRecords(bindings.DB, viewerId, query);
-    return { files: rows.map(toFileRecord) };
-  }
+  await ensureAppOwnership(bindings.DB, viewerId, appId);
 
-  if (scopeKind === "library") {
-    if (scopeId !== null) {
-      throw createFileInvalidRequestError("Library file listing must not include scopeId.");
-    }
-
-    const rows = await listFileRecords(bindings.DB, {
-      ...query,
-      scopeId: null,
-      scopeKind,
-      ownerId: viewerId,
+  if (sessionId !== undefined) {
+    await ensureAppSessionFileAccess(bindings.DB, viewerId, {
+      appId,
+      sessionId,
     });
-
-    return { files: rows.map(toFileRecord) };
   }
 
-  if (scopeKind === "session") {
-    if (scopeId === null) {
-      const rows = await listVisibleFileRecords(bindings.DB, viewerId, {
-        ...query,
-        scopeKind,
-      });
-      return { files: rows.map(toFileRecord) };
-    }
-
-    const sessionId = parsePlatformId<SessionId>(scopeId, "session file scope ID");
-    await ensureSessionFileAccess(bindings.DB, viewerId, sessionId);
-    const rows = await listFileRecords(bindings.DB, {
-      ...query,
-      scopeId: sessionId,
-      scopeKind,
-    });
-
-    return { files: rows.map(toFileRecord) };
-  }
-
-  throw createFileInvalidRequestError("Only library and session file listing are supported.");
+  const rows = await listVisibleFileRecords(bindings.DB, viewerId, appId, query, sessionId);
+  return { files: rows.map(toFileRecord) };
 }
 
-function visibleLibraryFilesCondition(viewerId: AccountId): SQL {
-  return and(
-    eq(fileRecordsTable.scopeKind, "library"),
-    isNull(fileRecordsTable.scopeId),
-    eq(fileRecordsTable.ownerKind, "account"),
-    eq(fileRecordsTable.ownerId, viewerId),
-  )!;
-}
-
-function visibleSessionFilesCondition(viewerId: AccountId, sessionId?: SessionId): SQL {
+function visibleSessionFilesCondition(
+  viewerId: AccountId,
+  appId: AppId,
+  sessionId?: SessionId,
+): SQL {
   const conditions: SQL[] = [
     eq(fileRecordsTable.scopeKind, "session"),
     eq(fileRecordsTable.scopeId, sessionsTable.id),
+    eq(sessionsTable.appId, appId),
     or(eq(sessionsTable.creatorAccountId, viewerId), eq(sessionsTable.attributedUserId, viewerId))!,
   ];
 
@@ -470,11 +440,30 @@ function visibleSessionFilesCondition(viewerId: AccountId, sessionId?: SessionId
   return and(...conditions)!;
 }
 
+function visibleLibraryFilesCondition(appId: AppId): SQL {
+  return and(
+    eq(fileRecordsTable.scopeKind, "library"),
+    eq(fileRecordsTable.scopeId, appId),
+    eq(fileRecordsTable.ownerKind, "app"),
+    eq(fileRecordsTable.ownerId, appId),
+  )!;
+}
+
 async function listVisibleFileRecords(
   database: D1Database,
   viewerId: AccountId,
+  appId: AppId,
   query: FileListQuery,
+  sessionId?: SessionId,
 ) {
+  if (
+    query.scopeKind !== undefined &&
+    query.scopeKind !== "library" &&
+    query.scopeKind !== "session"
+  ) {
+    throw createFileInvalidRequestError("Only library and session file listing are supported.");
+  }
+
   const conditions: SQL[] = [eq(fileRecordsTable.status, query.status ?? "ready")];
 
   if (query.sessionKind !== undefined && query.sessionKind !== null) {
@@ -482,12 +471,12 @@ async function listVisibleFileRecords(
   }
 
   if (query.scopeKind === "library") {
-    conditions.push(visibleLibraryFilesCondition(viewerId));
-  } else if (query.scopeKind === "session") {
-    conditions.push(visibleSessionFilesCondition(viewerId));
+    conditions.push(visibleLibraryFilesCondition(appId));
+  } else if (query.scopeKind === "session" || sessionId !== undefined) {
+    conditions.push(visibleSessionFilesCondition(viewerId, appId, sessionId));
   } else {
     conditions.push(
-      or(visibleLibraryFilesCondition(viewerId), visibleSessionFilesCondition(viewerId))!,
+      or(visibleLibraryFilesCondition(appId), visibleSessionFilesCondition(viewerId, appId))!,
     );
   }
 
@@ -593,8 +582,8 @@ async function update(
   viewer: AuthenticatedViewer,
   fileId: FileId,
   request: UpdateFileRequest,
-): Promise<FileRecord> {
-  return updateFile(bindings, viewer, fileId, request);
+): Promise<FileEntry> {
+  return toFileEntry(await updateFile(bindings, viewer, fileId, request));
 }
 
 async function deleteFile(
