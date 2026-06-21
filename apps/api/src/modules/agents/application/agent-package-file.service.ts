@@ -1,14 +1,11 @@
 import { MAX_AGENT_PACKAGE_ARCHIVE_BYTES } from "@mosoo/agent-package";
-import { fileRecordsTable } from "@mosoo/db";
-import type { AccountId, FileId, AppId } from "@mosoo/id";
-import { eq } from "drizzle-orm";
+import type { FileId, AppId } from "@mosoo/id";
 
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { getAppDatabase } from "../../../platform/db/drizzle";
-import { currentTimestampMs } from "../../../time";
 import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import type { AdmittedAgentPackageFile } from "../../files/application/file-store";
 import { fileStore, normalizeFileName } from "../../files/application/file-store";
 
 export const AGENT_PACKAGE_CONTENT_TYPE = "application/zip";
@@ -18,20 +15,6 @@ export interface CreatedAgentPackageFile {
   fileId: FileId;
   fileName: string;
   size: number;
-}
-
-interface AgentPackageFileAdmissionRecord {
-  createdBy: AccountId;
-  expiresAtMs: number | null;
-  id: FileId;
-  name: string;
-  ownerId: string;
-  ownerKind: string;
-  purpose: string;
-  scopeId: string | null;
-  scopeKind: string;
-  size: number;
-  status: string;
 }
 
 function isSupportedAgentPackageFileName(fileName: string): boolean {
@@ -133,64 +116,7 @@ export async function createAgentPackageFile(input: {
   }
 }
 
-async function getAgentPackageFileAdmissionRecord(
-  database: D1Database,
-  fileId: FileId,
-): Promise<AgentPackageFileAdmissionRecord | null> {
-  return (
-    (await getAppDatabase(database)
-      .select({
-        createdBy: fileRecordsTable.createdByAccountId,
-        expiresAtMs: fileRecordsTable.expiresAt,
-        id: fileRecordsTable.id,
-        name: fileRecordsTable.name,
-        ownerId: fileRecordsTable.ownerId,
-        ownerKind: fileRecordsTable.ownerKind,
-        purpose: fileRecordsTable.purpose,
-        scopeId: fileRecordsTable.scopeId,
-        scopeKind: fileRecordsTable.scopeKind,
-        size: fileRecordsTable.size,
-        status: fileRecordsTable.status,
-      })
-      .from(fileRecordsTable)
-      .where(eq(fileRecordsTable.id, fileId))
-      .limit(1)
-      .get()) ?? null
-  );
-}
-
-function assertPackageFileAdmitted(input: {
-  file: AgentPackageFileAdmissionRecord;
-  nowMs: number;
-  appId: AppId;
-  viewerId: AccountId;
-}): void {
-  const { file } = input;
-
-  if (file.purpose !== "agent_package") {
-    throw new Error("Agent package file purpose must be agent_package.");
-  }
-
-  if (file.scopeKind !== "agent_package") {
-    throw new Error("Agent package file must use the agent_package scope.");
-  }
-
-  if (file.scopeId !== input.appId || file.ownerKind !== "app" || file.ownerId !== input.appId) {
-    throw new Error("Agent package file does not belong to the target App.");
-  }
-
-  if (file.createdBy !== input.viewerId) {
-    throw new Error("Agent package file does not belong to the importing user.");
-  }
-
-  if (file.status !== "ready") {
-    throw new Error("Agent package file is not ready.");
-  }
-
-  if (file.expiresAtMs === null || file.expiresAtMs <= input.nowMs) {
-    throw new Error("Agent package file is expired.");
-  }
-
+function assertPackageFileArchiveShape(file: AdmittedAgentPackageFile): void {
   if (!isSupportedAgentPackageFileName(file.name)) {
     throw new Error("Agent package file must use .agent.");
   }
@@ -203,21 +129,12 @@ export async function readAgentPackageArchiveFile(input: {
   fileId: FileId;
   appId: AppId;
   viewer: AuthenticatedViewer;
-}): Promise<{ archiveBytes: Uint8Array; file: AgentPackageFileAdmissionRecord }> {
-  await ensureAppOwnership(input.bindings.DB, input.viewer.id, input.appId);
-
-  const file = await getAgentPackageFileAdmissionRecord(input.bindings.DB, input.fileId);
-
-  if (file === null) {
-    throw new Error("Agent package file was not found.");
-  }
-
-  assertPackageFileAdmitted({
-    file,
-    nowMs: currentTimestampMs(),
+}): Promise<{ archiveBytes: Uint8Array; file: AdmittedAgentPackageFile }> {
+  const file = await fileStore.admitAgentPackageFile(input.bindings, input.viewer, {
     appId: input.appId,
-    viewerId: input.viewer.id,
+    fileId: input.fileId,
   });
+  assertPackageFileArchiveShape(file);
 
   const response = await fileStore.streamContent(input.bindings, input.viewer, input.fileId);
 
