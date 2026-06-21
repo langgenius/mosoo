@@ -5,33 +5,38 @@ import type {
   FileSessionKind,
 } from "@mosoo/contracts/file";
 import { parsePlatformId } from "@mosoo/id";
+import type { AppId, SessionId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { fileGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
 import { fileStore } from "../application/file-store";
 
 interface FileListArgs {
-  input?: {
+  input: {
+    appId: string;
     scopeId?: string | null;
     scopeKind?: FileScopeKind | null;
+    sessionId?: string | null;
     sessionKind?: FileSessionKind | null;
-  } | null;
+  };
 }
 
 function toFileListQuery(input: FileListArgs["input"]): FileListQuery {
-  if (input === undefined || input === null) {
-    return {};
-  }
-
   return {
+    appId: parsePlatformId<AppId>(input.appId, "file list app ID"),
     ...(input.scopeId === undefined || input.scopeId === null
       ? {}
       : {
-          scopeId: parsePlatformId(input.scopeId, "File scope ID") as Exclude<FileScopeId, null>,
+          scopeId: parsePlatformId(input.scopeId, "file scope ID") as Exclude<FileScopeId, null>,
         }),
     ...(input.scopeKind === undefined || input.scopeKind === null
       ? {}
       : { scopeKind: input.scopeKind }),
+    ...(input.sessionId === undefined || input.sessionId === null
+      ? {}
+      : {
+          sessionId: parsePlatformId<SessionId>(input.sessionId, "file list session ID"),
+        }),
     ...(input.sessionKind === undefined ? {} : { sessionKind: input.sessionKind }),
   };
 }

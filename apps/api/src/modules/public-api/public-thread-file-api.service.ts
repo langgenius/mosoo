@@ -1,4 +1,4 @@
-import type { FileRecord } from "@mosoo/contracts/file";
+import type { FileEntry, FileRecord } from "@mosoo/contracts/file";
 import type { PublicThreadFile } from "@mosoo/contracts/public-api";
 import type {
   CreatePublicThreadFileRequest,
@@ -6,7 +6,7 @@ import type {
   PublicThreadFileResponse,
 } from "@mosoo/contracts/public-api";
 import { parsePlatformId } from "@mosoo/id";
-import type { FileId, PublicThreadId, SessionId } from "@mosoo/id";
+import type { AppId, FileId, PublicThreadId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
@@ -20,9 +20,12 @@ async function admitPublicThreadFileAccess(
   bindings: ApiBindings,
   caller: AuthenticatedViewer,
   threadId: PublicThreadId,
-): Promise<SessionId> {
-  await admitPublicSessionCaller(bindings.DB, caller, threadId);
-  return toBackingSessionId(threadId);
+): Promise<{ appId: AppId; sessionId: SessionId }> {
+  const admission = await admitPublicSessionCaller(bindings.DB, caller, threadId);
+  return {
+    appId: admission.session.app_id,
+    sessionId: toBackingSessionId(threadId),
+  };
 }
 
 function assertPublicThreadFile(file: FileRecord, sessionId: SessionId): void {
@@ -35,7 +38,7 @@ function assertPublicThreadFile(file: FileRecord, sessionId: SessionId): void {
   }
 }
 
-function toPublicThreadFileFromRecord(file: FileRecord): PublicThreadFile {
+function toPublicThreadFile(file: FileEntry | FileRecord): PublicThreadFile {
   return {
     committed: true,
     createdAt: file.createdAt,
@@ -52,14 +55,14 @@ export async function listPublicThreadFiles(
   caller: AuthenticatedViewer,
   threadId: PublicThreadId,
 ): Promise<PublicThreadFileListResponse> {
-  const sessionId = await admitPublicThreadFileAccess(bindings, caller, threadId);
+  const { appId, sessionId } = await admitPublicThreadFileAccess(bindings, caller, threadId);
   return {
     files: (
       await fileStore.list(bindings, caller, {
-        scopeId: sessionId,
-        scopeKind: "session",
+        appId,
+        sessionId,
       })
-    ).files.map(toPublicThreadFileFromRecord),
+    ).files.map(toPublicThreadFile),
   };
 }
 
@@ -69,12 +72,12 @@ export async function createPublicThreadFile(
   threadId: PublicThreadId,
   input: CreatePublicThreadFileRequest,
 ): Promise<PublicThreadFileResponse> {
-  const sessionId = await admitPublicThreadFileAccess(bindings, caller, threadId);
+  const { sessionId } = await admitPublicThreadFileAccess(bindings, caller, threadId);
   const claimedFiles = await fileStore.claimToSession(bindings, caller, sessionId, [input.fileId]);
   const claimedFile = claimedFiles[0];
 
   return {
-    file: toPublicThreadFileFromRecord(
+    file: toPublicThreadFile(
       claimedFile === undefined ? toFileRecordMissing(input.fileId) : claimedFile,
     ),
   };
@@ -96,7 +99,7 @@ export async function deletePublicThreadFile(
     threadId: PublicThreadId;
   },
 ): Promise<void> {
-  const sessionId = await admitPublicThreadFileAccess(bindings, caller, input.threadId);
+  const { sessionId } = await admitPublicThreadFileAccess(bindings, caller, input.threadId);
   const file = await fileStore.getRecord(bindings, caller, input.fileId);
 
   assertPublicThreadFile(file, sessionId);

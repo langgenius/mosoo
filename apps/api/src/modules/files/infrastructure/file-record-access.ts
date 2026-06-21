@@ -37,16 +37,24 @@ function requireScopeId(scopeId: string | null, label: string): string {
   return scopeId;
 }
 
-function ensureLibraryFileOwner(
+async function ensureLibraryFileAccess(
+  database: D1Database,
   viewerId: AccountId,
   file: FileRecordRow,
   resourceKind: "file" | "upload",
-): void {
-  if (file.owner_kind !== "account" || file.owner_id !== viewerId) {
+): Promise<void> {
+  const appId = parsePlatformId<AppId>(
+    requireScopeId(file.scope_id, "Library file"),
+    "file app ID",
+  );
+
+  if (file.owner_kind !== "app" || file.owner_id !== appId) {
     throw createFileNotFoundError(
       resourceKind === "file" ? "File not found." : "Upload not found.",
     );
   }
+
+  await ensureAppOwnership(database, viewerId, appId);
 }
 
 export async function ensureUploadAccess({
@@ -62,7 +70,7 @@ export async function ensureUploadAccess({
   }
 
   if (context.upload.scope_kind === "library") {
-    ensureLibraryFileOwner(viewerId, context.file, "upload");
+    await ensureLibraryFileAccess(database, viewerId, context.file, "upload");
   } else if (context.upload.scope_kind === "session") {
     if (!context.sessionAccess) {
       throw createFileNotFoundError("Session not found.");
@@ -98,7 +106,7 @@ export async function ensureFileAccess({
   }
 
   if (file.scope_kind === "library") {
-    ensureLibraryFileOwner(viewerId, file, "file");
+    await ensureLibraryFileAccess(database, viewerId, file, "file");
   } else if (file.scope_kind === "session") {
     await ensureSessionFileAccess(
       database,

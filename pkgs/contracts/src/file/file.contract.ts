@@ -437,9 +437,27 @@ export interface FileRecord {
   version: number;
 }
 
+export interface FileEntry {
+  createdAt: string;
+  createdBy: AccountId;
+  etag: string | null;
+  expiresAt: string | null;
+  id: FileId;
+  mimeType: string | null;
+  name: string;
+  path: string;
+  sessionKind: FileSessionKind | null;
+  size: number;
+  status: FileStatus;
+  updatedAt: string;
+  version: number;
+}
+
 export interface FileListQuery {
+  appId: AppId;
   scopeId?: FileScopeId;
   scopeKind?: FileScopeKind;
+  sessionId?: SessionId;
   sessionKind?: FileSessionKind | null;
   status?: FileStatus;
 }
@@ -448,7 +466,12 @@ export interface FileListing {
   files: FileRecord[];
 }
 
+export interface FileEntryListing {
+  files: FileEntry[];
+}
+
 export interface CreateLibraryFileUploadTarget {
+  id: AppId;
   kind: "library";
   path: string;
 }
@@ -495,11 +518,8 @@ export interface FileUploadSummary {
   expectedSize: number;
   expiresAt: string;
   fileId: FileId;
-  owner: FileOwner;
   partSize: number | null;
   path: string;
-  purpose: FilePurpose;
-  scope: FileScope;
   status: FileUploadStatus;
   strategy: FileUploadStrategy;
 }
@@ -516,7 +536,7 @@ export interface CompleteFileUploadRequest {
 }
 
 export interface CompleteFileUploadResponse {
-  file: FileRecord;
+  file: FileEntry;
 }
 
 export interface UploadFilePartResponse {

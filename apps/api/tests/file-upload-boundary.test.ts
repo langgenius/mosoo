@@ -186,7 +186,7 @@ describe("file upload boundary", () => {
         id: FILE_ID,
         name: "notes.txt",
         path: "docs/notes.txt ",
-        scope_id: null,
+        scope_id: APP_ID,
         scope_kind: "library",
       }),
     ).toThrow(

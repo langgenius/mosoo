@@ -1,17 +1,15 @@
-import { FILE_SCOPE_KINDS, FILE_SESSION_KINDS } from "@mosoo/contracts/file";
+import { FILE_SESSION_KINDS } from "@mosoo/contracts/file";
 import type {
   CompleteFileUploadRequest,
   CreateFileUploadRequest,
+  FileEntry,
   FileErrorResponse,
+  FileEntryListing,
+  FileRecord,
   UpdateFileRequest,
 } from "@mosoo/contracts/file";
-import type {
-  FileListQuery,
-  FileScopeId,
-  FileScopeKind,
-  FileSessionKind,
-} from "@mosoo/contracts/file";
-import type { FileId } from "@mosoo/id";
+import type { FileListQuery, FileSessionKind } from "@mosoo/contracts/file";
+import type { AppId, FileId, SessionId } from "@mosoo/id";
 import type { Hono } from "hono";
 
 import { getViewerFromRequest } from "../../../modules/auth/application/viewer-auth.service";
@@ -69,18 +67,6 @@ function toErrorResponse(error: unknown): Response {
   });
 }
 
-function readFileScopeKind(value: string | undefined): FileScopeKind | undefined {
-  if (value === undefined || value.trim().length === 0) {
-    return undefined;
-  }
-
-  if ((FILE_SCOPE_KINDS as readonly string[]).includes(value)) {
-    return value as FileScopeKind;
-  }
-
-  throw new FileControlError(400, "file_invalid_request", "Invalid file scope kind.");
-}
-
 function readFileSessionKind(value: string | undefined): FileSessionKind | null | undefined {
   if (value === undefined || value.trim().length === 0) {
     return undefined;
@@ -98,21 +84,53 @@ function readFileSessionKind(value: string | undefined): FileSessionKind | null 
 }
 
 function readFileListQuery(
-  scopeIdValue: string | undefined,
+  appIdValue: string | undefined,
+  sessionIdValue: string | undefined,
   c: { req: { query: (name: string) => string | undefined } },
 ): FileListQuery {
-  const scopeId =
-    scopeIdValue === undefined || scopeIdValue.trim().length === 0
+  if (appIdValue === undefined || appIdValue.trim().length === 0) {
+    throw new FileControlError(400, "file_invalid_request", "App ID is required to list files.");
+  }
+
+  const appId = toPlatformId<AppId>(appIdValue, "App ID");
+  const sessionId =
+    sessionIdValue === undefined || sessionIdValue.trim().length === 0
       ? undefined
-      : (toPlatformId(scopeIdValue, "File scope ID") as Exclude<FileScopeId, null>);
+      : toPlatformId<SessionId>(sessionIdValue, "Session ID");
   const sessionKind = readFileSessionKind(c.req.query("sessionKind"));
-  const requestedScopeKind = readFileScopeKind(c.req.query("scopeKind"));
-  const scopeKind = requestedScopeKind ?? (scopeId === undefined ? undefined : "session");
 
   return {
-    ...(scopeId === undefined ? {} : { scopeId }),
+    appId,
+    ...(sessionId === undefined ? {} : { sessionId }),
     ...(sessionKind === undefined ? {} : { sessionKind }),
-    ...(scopeKind === undefined ? {} : { scopeKind }),
+  };
+}
+
+function assertUserFileUploadTarget(request: CreateFileUploadRequest): void {
+  if (request.target.kind === "library") {
+    throw new FileControlError(
+      400,
+      "file_invalid_request",
+      "App file library uploads are not supported in this version.",
+    );
+  }
+}
+
+function toFileEntry(file: FileRecord): FileEntry {
+  return {
+    createdAt: file.createdAt,
+    createdBy: file.createdBy,
+    etag: file.etag,
+    expiresAt: file.expiresAt,
+    id: file.id,
+    mimeType: file.mimeType,
+    name: file.name,
+    path: file.path,
+    sessionKind: file.sessionKind,
+    size: file.size,
+    status: file.status,
+    updatedAt: file.updatedAt,
+    version: file.version,
   };
 }
 
@@ -125,9 +143,15 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
         return Response.json(createFileErrorResponse(unauthorizedFileError()), { status: 401 });
       }
 
-      return c.json(
-        await fileStore.list(c.env, viewer, readFileListQuery(c.req.query("scopeId"), c)),
+      const listing = await fileStore.list(
+        c.env,
+        viewer,
+        readFileListQuery(c.req.query("appId"), c.req.query("sessionId"), c),
       );
+      const response: FileEntryListing = {
+        files: listing.files.map(toFileEntry),
+      };
+      return c.json(response);
     } catch (error) {
       return toErrorResponse(error);
     }
@@ -142,6 +166,7 @@ export function registerFileRoute(app: Hono<ApiGatewayEnvironment>) {
       }
 
       const body = await c.req.json<CreateFileUploadRequest>();
+      assertUserFileUploadTarget(body);
       return c.json(await fileStore.createUpload(c.env, viewer, body));
     } catch (error) {
       return toErrorResponse(error);

@@ -4,7 +4,7 @@ import type {
   CreateFileUploadRequest,
   CreateFileUploadResponse,
   FileErrorResponse,
-  FileListing,
+  FileEntryListing,
 } from "@mosoo/contracts/file";
 import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api";
 import { parsePlatformId } from "@mosoo/id";
@@ -27,6 +27,10 @@ const FILE_ID = parsePlatformId<FileId>("01J00000000000000000000003", "file ID")
 const UPLOAD_ID = parsePlatformId<UploadId>("01J00000000000000000000004", "upload ID");
 const SESSION_ID = parsePlatformId<SessionId>("01J00000000000000000000005", "session ID");
 const LIBRARY_FILE_ID = parsePlatformId<FileId>("01J00000000000000000000009", "library file ID");
+const LEGACY_LIBRARY_FILE_ID = parsePlatformId<FileId>(
+  "01J0000000000000000000000B",
+  "legacy library file ID",
+);
 const ORGANIZATION_ID = parsePlatformId<OrganizationId>(
   "01J00000000000000000000006",
   "organization ID",
@@ -330,7 +334,7 @@ async function insertReadyRawFileRecord(
     fileId: FileId;
     name: string;
     ownerId: string;
-    ownerKind: "account" | "session";
+    ownerKind: "account" | "app" | "session";
     path: string;
     purpose: "library_file" | "session_attachment";
     scopeId: string | null;
@@ -464,15 +468,6 @@ describe("file upload access", () => {
       },
     });
 
-    expect(upload.scope).toEqual({
-      id: APP_ID,
-      kind: "agent_package",
-    });
-    expect(upload.owner).toEqual({
-      id: APP_ID,
-      kind: "app",
-    });
-
     await expect(
       ensureUploadAccess({
         database,
@@ -501,15 +496,6 @@ describe("file upload access", () => {
       },
     });
 
-    expect(upload.scope).toEqual({
-      id: APP_ID,
-      kind: "app_draft",
-    });
-    expect(upload.owner).toEqual({
-      id: APP_ID,
-      kind: "app",
-    });
-    expect(upload.purpose).toBe("app_draft");
     expect(upload.path).toBe(`attachment/${upload.fileId}/launch-note.txt`);
 
     const row = await database
@@ -621,18 +607,12 @@ describe("file upload access", () => {
     const acceptedBody = (await acceptedResponse.json()) as CreateFileUploadResponse;
 
     expect(acceptedResponse.status).toBe(200);
-    expect(acceptedBody.scope).toEqual({
-      id: SESSION_ID,
-      kind: "session",
-    });
-    expect(acceptedBody.owner).toEqual({
-      id: SESSION_ID,
-      kind: "session",
-    });
+    expect(acceptedBody.fileId).toBeString();
+    expect(acceptedBody.path).toContain(acceptedBody.fileId);
     expect(await countSessionFileRecords(fixture.database, SESSION_ID)).toBe(1);
   });
 
-  test("raw HTTP file list defaults to all visible files and filters by session scope", async () => {
+  test("raw HTTP file list defaults to visible Thread files and filters by session", async () => {
     const fixture = await createAgentBuilderApiFixture();
     await fixture.client.loginAsMosooAiTestAccount();
     await insertRawFileRouteSessionFixture(fixture.database, {
@@ -648,9 +628,21 @@ describe("file upload access", () => {
       createdBy: fixture.viewer.id,
       fileId: LIBRARY_FILE_ID,
       name: "seed.csv",
+      ownerId: fixture.ids.appId,
+      ownerKind: "app",
+      path: "seed.csv",
+      purpose: "library_file",
+      scopeId: fixture.ids.appId,
+      scopeKind: "library",
+      sessionKind: null,
+    });
+    await insertReadyRawFileRecord(fixture.database, {
+      createdBy: fixture.viewer.id,
+      fileId: LEGACY_LIBRARY_FILE_ID,
+      name: "legacy.csv",
       ownerId: fixture.viewer.id,
       ownerKind: "account",
-      path: "seed.csv",
+      path: "legacy.csv",
       purpose: "library_file",
       scopeId: null,
       scopeKind: "library",
@@ -669,7 +661,7 @@ describe("file upload access", () => {
       sessionKind: "attachment",
     });
 
-    const allResponse = await createHttpApp().request(
+    const missingAppResponse = await createHttpApp().request(
       `${PUBLIC_API_PREFIX}/files`,
       {
         headers: fixture.client.sessionHeaders(),
@@ -677,20 +669,37 @@ describe("file upload access", () => {
       },
       fixture.bindings,
     );
-    const allBody = (await allResponse.json()) as FileListing;
+    const missingAppBody = (await missingAppResponse.json()) as FileErrorResponse;
 
-    expect(allResponse.status).toBe(200);
-    expect(allBody.files.map((file) => file.id).sort()).toEqual([FILE_ID, LIBRARY_FILE_ID].sort());
+    expect(missingAppResponse.status).toBe(400);
+    expect(missingAppBody.error).toMatchObject({
+      code: "file_invalid_request",
+      message: "App ID is required to list files.",
+      status: 400,
+    });
 
-    const sessionResponse = await createHttpApp().request(
-      `${PUBLIC_API_PREFIX}/files?scopeId=${SESSION_ID}`,
+    const allResponse = await createHttpApp().request(
+      `${PUBLIC_API_PREFIX}/files?appId=${fixture.ids.appId}`,
       {
         headers: fixture.client.sessionHeaders(),
         method: "GET",
       },
       fixture.bindings,
     );
-    const sessionBody = (await sessionResponse.json()) as FileListing;
+    const allBody = (await allResponse.json()) as FileEntryListing;
+
+    expect(allResponse.status).toBe(200);
+    expect(allBody.files.map((file) => file.id).sort()).toEqual([FILE_ID, LIBRARY_FILE_ID].sort());
+
+    const sessionResponse = await createHttpApp().request(
+      `${PUBLIC_API_PREFIX}/files?appId=${fixture.ids.appId}&sessionId=${SESSION_ID}`,
+      {
+        headers: fixture.client.sessionHeaders(),
+        method: "GET",
+      },
+      fixture.bindings,
+    );
+    const sessionBody = (await sessionResponse.json()) as FileEntryListing;
 
     expect(sessionResponse.status).toBe(200);
     expect(sessionBody.files.map((file) => file.id)).toEqual([FILE_ID]);

@@ -2,7 +2,7 @@ import type {
   CompleteFileUploadRequest,
   CompleteFileUploadResponse,
   CreateFileUploadRequest,
-  FileRecord,
+  FileEntry,
   FileUploadSummary,
   UploadFilePartResponse,
 } from "@mosoo/contracts/file";
@@ -135,7 +135,7 @@ async function uploadMultipartParts(session: FileUploadSummary, file: Blob): Pro
   );
 }
 
-async function completeUpload(session: FileUploadSummary): Promise<FileRecord> {
+async function completeUpload(session: FileUploadSummary): Promise<FileEntry> {
   const stored = await getFileUploadSession(session.fileId);
   const bodyJson: CompleteFileUploadRequest =
     session.strategy === "multipart"
@@ -171,8 +171,6 @@ async function persistUploadSession(
     partSize: session.partSize,
     parts: [],
     path: session.path,
-    scopeId: session.scope.id,
-    scopeKind: session.scope.kind,
     strategy: session.strategy,
   };
 
@@ -180,14 +178,11 @@ async function persistUploadSession(
   return record;
 }
 
-function persistAndRunUploadSession(session: FileUploadSummary, file: File): Promise<FileRecord> {
+function persistAndRunUploadSession(session: FileUploadSummary, file: File): Promise<FileEntry> {
   return persistUploadSession(session, file).then(() => runUploadSession(session, file));
 }
 
-export async function runUploadSession(
-  session: FileUploadSummary,
-  file: Blob,
-): Promise<FileRecord> {
+export async function runUploadSession(session: FileUploadSummary, file: Blob): Promise<FileEntry> {
   if (session.strategy === "single_put" && session.status !== "completing") {
     await uploadSinglePut(session, file);
   } else if (session.strategy === "multipart" && session.status !== "completing") {
@@ -198,8 +193,6 @@ export async function runUploadSession(
   await removeFileUploadSession(session.fileId);
   dispatchUploadCompleted({
     fileId: finalizedFile.id,
-    scopeId: session.scope.id,
-    scopeKind: session.scope.kind,
   });
   return finalizedFile;
 }

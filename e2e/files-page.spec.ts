@@ -22,8 +22,7 @@ interface GraphQLRequestBody {
 }
 
 interface FileListInput {
-  scopeId?: string | null;
-  scopeKind?: string | null;
+  sessionId?: string | null;
   sessionKind?: string | null;
 }
 
@@ -49,7 +48,7 @@ function parseGraphQLRequestBody(postData: string | null): GraphQLRequestBody {
       formatHarnessError({
         fix: "Send `{ query, variables }` from the Web GraphQL client or add a parser case for the new envelope.",
         what: "The Files page E2E received a GraphQL request envelope it cannot parse.",
-        why: "The fixture is the executable contract for the Files page scope filter.",
+        why: "The fixture is the executable contract for the Files page Thread filter.",
       }),
     );
   }
@@ -80,11 +79,8 @@ function readFileListInput(body: GraphQLRequestBody): FileListInput {
   }
 
   return {
-    ...(typeof input["scopeId"] === "string" || input["scopeId"] === null
-      ? { scopeId: input["scopeId"] }
-      : {}),
-    ...(typeof input["scopeKind"] === "string" || input["scopeKind"] === null
-      ? { scopeKind: input["scopeKind"] }
+    ...(typeof input["sessionId"] === "string" || input["sessionId"] === null
+      ? { sessionId: input["sessionId"] }
       : {}),
     ...(typeof input["sessionKind"] === "string" || input["sessionKind"] === null
       ? { sessionKind: input["sessionKind"] }
@@ -167,10 +163,7 @@ function createSessionSummary() {
 function createFileRecord(input: {
   id: string;
   name: string;
-  owner: { id: string; kind: "account" | "session" };
   path: string;
-  purpose: "library_file" | "session_artifact" | "session_attachment";
-  scope: { id: string | null; kind: "library" | "session" };
   sessionKind: "artifact" | "attachment" | null;
 }) {
   return {
@@ -181,10 +174,7 @@ function createFileRecord(input: {
     id: input.id,
     mimeType: "text/plain",
     name: input.name,
-    owner: input.owner,
     path: input.path,
-    purpose: input.purpose,
-    scope: input.scope,
     sessionKind: input.sessionKind,
     size: 42,
     status: "ready",
@@ -198,25 +188,19 @@ function listFilesForInput(input: FileListInput) {
     createFileRecord({
       id: attachmentFileId,
       name: "user-brief.txt",
-      owner: { id: sessionId, kind: "session" },
       path: "attachments/user-brief.txt",
-      purpose: "session_attachment",
-      scope: { id: sessionId, kind: "session" },
       sessionKind: "attachment",
     }),
     createFileRecord({
       id: artifactFileId,
       name: "runtime-report.md",
-      owner: { id: sessionId, kind: "session" },
       path: "artifacts/runtime-report.md",
-      purpose: "session_artifact",
-      scope: { id: sessionId, kind: "session" },
       sessionKind: "artifact",
     }),
   ];
 
-  if (input.scopeKind === "session") {
-    if (input.scopeId !== sessionId) {
+  if (input.sessionId !== undefined && input.sessionId !== null) {
+    if (input.sessionId !== sessionId) {
       return [];
     }
 
@@ -233,10 +217,7 @@ function listFilesForInput(input: FileListInput) {
     createFileRecord({
       id: libraryFileId,
       name: "library-seed.csv",
-      owner: { id: accountId, kind: "account" },
       path: "library-seed.csv",
-      purpose: "library_file",
-      scope: { id: null, kind: "library" },
       sessionKind: null,
     }),
     ...sessionFiles,
@@ -330,15 +311,13 @@ async function installFilesPageFixtures(
         what: `The Files page E2E received an unexpected GraphQL request${
           operationName === null ? "" : ` (${operationName})`
         }.`,
-        why: "The Files page scope acceptance test must make every Web/API projection explicit.",
+        why: "The Files page acceptance test must make every Web/API projection explicit.",
       }),
     );
   });
 }
 
-test("Files page lists all files and filters by session scope or session kind", async ({
-  page,
-}) => {
+test("Files page lists Thread files and filters by Thread or session kind", async ({ page }) => {
   const seenFileListInputs: FileListInput[] = [];
 
   await installFilesPageFixtures(page, seenFileListInputs);
@@ -350,14 +329,13 @@ test("Files page lists all files and filters by session scope or session kind", 
   await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toBeVisible();
   expect(seenFileListInputs).toContainEqual({});
 
-  await page.getByLabel("File scope").selectOption(sessionId);
+  await page.getByLabel("Thread filter").selectOption(sessionId);
 
+  await expect(page.getByRole("row", { name: /library-seed\.csv/u })).toHaveCount(0);
   await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toBeVisible();
   await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toBeVisible();
-  await expect(page.getByRole("row", { name: /library-seed\.csv/u })).toHaveCount(0);
   expect(seenFileListInputs).toContainEqual({
-    scopeId: sessionId,
-    scopeKind: "session",
+    sessionId,
   });
 
   await page.getByRole("button", { name: "Artifacts" }).click();
@@ -365,8 +343,7 @@ test("Files page lists all files and filters by session scope or session kind", 
   await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toBeVisible();
   await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toHaveCount(0);
   expect(seenFileListInputs).toContainEqual({
-    scopeId: sessionId,
-    scopeKind: "session",
+    sessionId,
     sessionKind: "artifact",
   });
 
@@ -375,8 +352,7 @@ test("Files page lists all files and filters by session scope or session kind", 
   await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toBeVisible();
   await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toHaveCount(0);
   expect(seenFileListInputs).toContainEqual({
-    scopeId: sessionId,
-    scopeKind: "session",
+    sessionId,
     sessionKind: "attachment",
   });
 });

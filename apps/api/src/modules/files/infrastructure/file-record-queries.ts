@@ -1,4 +1,4 @@
-import type { FileListQuery, FileScopeKind } from "@mosoo/contracts/file";
+import type { FileScopeKind, FileSessionKind, FileStatus } from "@mosoo/contracts/file";
 import { fileRecordsTable, fileUploadsTable } from "@mosoo/db";
 import type { FileId, PlatformId } from "@mosoo/id";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -8,8 +8,12 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import type { FileCleanupRow, FilePathLookupRequest, FileRecordRow } from "./file-record-model";
 import { fileRecordRowColumns } from "./file-record-model";
 
-export interface FileRecordListQuery extends FileListQuery {
+export interface FileRecordListQuery {
   ownerId?: PlatformId;
+  scopeId?: PlatformId | null;
+  scopeKind?: FileScopeKind;
+  sessionKind?: FileSessionKind | null;
+  status?: FileStatus;
 }
 
 function scopeIdWhere(column: typeof fileRecordsTable.scopeId, scopeId: PlatformId | null) {

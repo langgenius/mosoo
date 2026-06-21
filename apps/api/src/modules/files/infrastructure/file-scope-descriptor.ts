@@ -112,18 +112,21 @@ const libraryDescriptor = defineFileScopeDescriptor({
   },
   kind: "library",
   uploadPurpose: "library_file",
-  async resolveUploadTargetContext({ target, viewer }) {
+  async resolveUploadTargetContext({ bindings, target, viewer }) {
     const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
+    const scopeId: AppId = parsePlatformId(target.id, "upload library app ID");
+    await ensureAppOwnership(bindings.DB, viewerId, scopeId);
+
     const logicalPath = normalizeLibraryFilePath(target.path);
     const fileName = logicalPath.split("/").pop() ?? logicalPath;
 
     return {
       logicalPath,
       name: fileName,
-      ownerId: viewerId,
-      ownerKind: "account",
+      ownerId: scopeId,
+      ownerKind: "app",
       parentPath: getParentPath(logicalPath),
-      scopeId: null,
+      scopeId,
       scopeKind: "library",
       sessionKind: null,
     };

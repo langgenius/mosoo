@@ -293,21 +293,21 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
       version
     )
     VALUES (
-      '${STALE_FILE_ID}',
-      'library',
-      NULL,
-      NULL,
-      'pending',
+	      '${STALE_FILE_ID}',
+	      'library',
+	      '${APP_ID}',
+	      NULL,
+	      'pending',
       0,
       1,
       '${OWNER_ID}',
       NULL,
       1,
       'text/csv',
-      'report.csv',
-      'staging/library/unscoped/${STALE_FILE_ID}',
-      '${OWNER_ID}',
-      'account',
+	      'report.csv',
+	      'staging/library/${APP_ID}/${STALE_FILE_ID}',
+	      '${APP_ID}',
+	      'app',
       '',
       'report.csv',
       'library_file',
@@ -345,9 +345,9 @@ function createUploadRecoveryDatabase(): SqliteD1Database {
       NULL,
       'multipart-stale',
       0,
-      16777216,
-      NULL,
-      'library',
+	      16777216,
+	      '${APP_ID}',
+	      'library',
       'completing',
       'multipart',
       1
@@ -367,7 +367,7 @@ function createBindings(database: D1Database, bucket: MemoryFileBucket): ApiBind
 describe("file upload recovery", () => {
   test("lets completing multipart retries continue when the staged object already exists", async () => {
     const bucket = new MemoryFileBucket();
-    const objectKey = `staging/library/unscoped/${STALE_FILE_ID}`;
+    const objectKey = `staging/library/${APP_ID}/${STALE_FILE_ID}`;
     bucket.putHead(objectKey, {
       contentLength: 42,
       contentType: "text/csv",
@@ -385,12 +385,12 @@ describe("file upload recovery", () => {
         mime_type: "text/csv",
         name: "report.csv",
         object_key: objectKey,
-        owner_id: OWNER_ID,
-        owner_kind: "account",
+        owner_id: APP_ID,
+        owner_kind: "app",
         parent_path: "",
         path: "report.csv",
         purpose: "library_file",
-        scope_id: null,
+        scope_id: APP_ID,
         scope_kind: "library",
         session_kind: null,
         size: 42,
@@ -410,7 +410,7 @@ describe("file upload recovery", () => {
         multipart_upload_id: "multipart-stale",
         overwrite: 0,
         part_size: 16777216,
-        scope_id: null,
+        scope_id: APP_ID,
         scope_kind: "library",
         status: "completing",
         strategy: "multipart",
@@ -440,6 +440,7 @@ describe("file upload recovery", () => {
       },
       purpose: "library_file",
       target: {
+        id: APP_ID,
         kind: "library",
         path: "report.csv",
       },
@@ -534,7 +535,7 @@ describe("file upload recovery", () => {
   test("recovers when final object copy succeeded before the file row was finalized", async () => {
     const database = createUploadRecoveryDatabase();
     const bucket = new MemoryFileBucket();
-    const stagingObjectKey = `staging/library/unscoped/${STALE_FILE_ID}`;
+    const stagingObjectKey = `staging/library/${APP_ID}/${STALE_FILE_ID}`;
     const finalObjectKey = `library/${STALE_FILE_ID}/report.csv`;
 
     await database
@@ -594,9 +595,9 @@ describe("file upload recovery", () => {
   test("recovers an overwrite retry after the version row and final object were written", async () => {
     const database = createUploadRecoveryDatabase();
     const bucket = new MemoryFileBucket();
-    const stagingObjectKey = `staging/library/unscoped/${STALE_FILE_ID}`;
+    const stagingObjectKey = `staging/library/${APP_ID}/${STALE_FILE_ID}`;
     const finalObjectKey = `library/${STALE_FILE_ID}/report.csv`;
-    const versionObjectKey = `file_versions/library/unscoped/${PENDING_VERSION_ID}/report.csv`;
+    const versionObjectKey = `file_versions/library/${APP_ID}/${PENDING_VERSION_ID}/report.csv`;
     const oldBody = "old report bytes";
     const newBody = "new report bytes after retry";
 
@@ -626,10 +627,10 @@ describe("file upload recovery", () => {
           updated_at,
           version
         )
-        VALUES (?, 'library', NULL, NULL, 'ready', 1, 2, ?, 'old-etag', NULL, 'text/csv', 'report.csv', ?, ?, 'account', '', 'report.csv', 'library_file', ?, 2, 7)
+        VALUES (?, 'library', ?, NULL, 'ready', 1, 2, ?, 'old-etag', NULL, 'text/csv', 'report.csv', ?, ?, 'app', '', 'report.csv', 'library_file', ?, 2, 7)
       `,
       )
-      .bind(READY_FILE_ID, OWNER_ID, finalObjectKey, OWNER_ID, oldBody.length)
+      .bind(READY_FILE_ID, APP_ID, OWNER_ID, finalObjectKey, APP_ID, oldBody.length)
       .run();
 
     await database
@@ -653,10 +654,10 @@ describe("file upload recovery", () => {
           strategy,
           updated_at
         )
-        VALUES ('text/csv', 2, ?, ?, ?, ?, ?, NULL, NULL, 0, NULL, NULL, 'library', 'completed', 'single', 2)
+        VALUES ('text/csv', 2, ?, ?, ?, ?, ?, NULL, NULL, 0, NULL, ?, 'library', 'completed', 'single', 2)
       `,
       )
-      .bind(OWNER_ID, oldBody.length, Date.now() + 60_000, READY_FILE_ID, READY_UPLOAD_ID)
+      .bind(OWNER_ID, oldBody.length, Date.now() + 60_000, READY_FILE_ID, READY_UPLOAD_ID, APP_ID)
       .run();
 
     await database
@@ -680,7 +681,7 @@ describe("file upload recovery", () => {
           source_object_key,
           version
         )
-        VALUES (0, NULL, 3, ?, ?, ?, 'text/csv', ?, 'report.csv', 'overwrite', NULL, 'library', ?, 'old-etag', ?, 7)
+        VALUES (0, NULL, 3, ?, ?, ?, 'text/csv', ?, 'report.csv', 'overwrite', ?, 'library', ?, 'old-etag', ?, 7)
       `,
       )
       .bind(
@@ -688,6 +689,7 @@ describe("file upload recovery", () => {
         READY_FILE_ID,
         PENDING_VERSION_ID,
         versionObjectKey,
+        APP_ID,
         oldBody.length,
         finalObjectKey,
       )
