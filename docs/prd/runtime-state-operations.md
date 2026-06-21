@@ -36,7 +36,7 @@ The answer is:
 
 The two documents use one hard rule:
 
-> Runtime operations may briefly move active Sessions into an updating/rescheduling state, but they must not switch an existing Session to a newer DeploymentVersion, Environment revision, Skill set, MCP set, Files, model, provider, or runtime.
+> Runtime operations may briefly move active Sessions into an updating/rescheduling state, but they must not switch an existing Session to a newer DeploymentVersion, Environment revision, Skill set, MCP set, model, provider, or runtime.
 
 When product copy talks to a caller, say **Thread**. When implementation or runtime copy talks about the frozen execution record, say **Session** or **AgentSession**.
 
@@ -102,7 +102,7 @@ The dangerous failure modes are:
 | Rename Agent or edit description               | `direct-update`                                | None                                  | None                               | Unchanged   |
 | Edit prompt                                    | `restart-process` when live runtime must apply | New live version for future Sessions  | Restart Agent process              | Preserved   |
 | Edit model, provider, Skills, MCP, or options  | `patch-and-restart`                            | New live version for future Sessions  | Patch native config and restart    | Preserved   |
-| Edit Environment or Files bindings     | `recreate-preserving-state`                    | New live version for future Sessions  | Recreate sandbox and restore state | Preserved   |
+| Edit Environment binding                       | `recreate-preserving-state`                    | New live version for future Sessions  | Recreate sandbox and restore state | Preserved   |
 | Clear Pet runtime-local state                  | `reset-agent-state`                            | None                                  | Reset Pet runtime subject          | Cleared     |
 | Change runtime driver or Agent type after lock | Fork Agent                                     | New Agent identity, not in-place save | No operation on the source Agent   | Source kept |
 
