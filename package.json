@@ -43,13 +43,13 @@
     "test": "vp exec bun test config/commit-policy.test.ts scripts/validate-commit-message.test.ts && vp run --filter @mosoo/api --filter agent-driver --filter @mosoo/web --filter @mosoo/ag-ui-session --filter @mosoo/agent-package --filter @mosoo/contracts --filter @mosoo/db --filter @mosoo/id --filter @mosoo/runtime-catalog --filter @mosoo/runtime-events --filter @mosoo/session-policy --filter @mosoo/skill-package test && vp run -w graphql:codegen:check"
   },
   "devDependencies": {
-    "@graphql-codegen/cli": "^7.1.1",
+    "@graphql-codegen/cli": "^7.1.3",
     "@graphql-codegen/client-preset": "^6.0.1",
     "@graphql-codegen/schema-ast": "^6.0.1",
     "@j178/prek": "^0.4.3",
     "graphql": "^16.14.0",
     "knip": "^6.15.0",
-    "react-doctor": "0.2.16",
+    "react-doctor": "0.5.8",
     "tsx": "^4.22.4",
     "vite-plus": "^0.1.23"
   },
