@@ -57,8 +57,6 @@ The current roadmap centers on these goals:
 - **App resource boundary**: move Agent, Thread / Session, Space, Environment, Skill, MCP, Provider Credential, Channel, Agent exposure state, export, and app-scoped Cost under one boundary without adding a generic Service entity.
 - **Enterprise capability expansion**: after personal and OPC scenarios work end to end, add team collaboration, permissions, cost governance, version control, and runtime governance.
 
-For the current status snapshot — what is **Planned**, **In Development**, and **Done** — see [roadmap.md](./roadmap.md).
-
 ## Vision
 
 In the long term, Mosoo aims to grow from an open-source Agent Cloud product into a management-oriented platform rather than a pure tool. This vision is aimed at internal enterprise AI governance and Agent infrastructure management, letting application / Agent developers, administrators, and users participate in the same AI infrastructure from different perspectives.
