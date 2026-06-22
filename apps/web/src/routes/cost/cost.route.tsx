@@ -8,7 +8,7 @@ import { toAppId } from "@/routes/typed-id";
 
 import { useAppSession } from "../../app/session-provider";
 import { CostAgentsPanel } from "./cost-agents-panel";
-import { rangeToInput } from "./cost-model";
+import { rangeToInput, runPurposeToQuery } from "./cost-model";
 import type { AgentCostSort, CostRange, CostTab } from "./cost-model";
 import { CostModelsPanel } from "./cost-models-panel";
 import { CostOverviewPanel } from "./cost-overview-panel";
@@ -21,7 +21,7 @@ export function CostPage() {
   const [activeTab, setActiveTab] = useState<CostTab>("overview");
   const [agentSort, setAgentSort] = useState<AgentCostSort>("cost_desc");
   const [runPurpose, setRunPurpose] = useState<CostRunPurpose | "all">("all");
-  const runPurposes = runPurpose === "all" ? [] : [runPurpose];
+  const runPurposes = runPurposeToQuery(runPurpose);
   const costQuery = useQuery({
     enabled: activeApp !== null,
     queryFn: async () => fetchAppCost(toAppId(activeApp!.id), rangeToInput(range), runPurposes),
