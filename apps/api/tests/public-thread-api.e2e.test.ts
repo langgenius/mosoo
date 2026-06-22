@@ -1057,6 +1057,124 @@ describe("Public Thread API e2e", () => {
     });
   });
 
+  test("creates a Thread file upload through the public files API contract", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+
+    await withProviderProbeMock(async () => {
+      const createThreadResponse = await requestPublicApi(
+        app,
+        database,
+        new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
+          body: JSON.stringify({
+            client_external_ref: "thread-upload-contract",
+          }),
+          headers: {
+            Authorization: bearer(TOKENS.owner),
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        }),
+      );
+      expect(createThreadResponse.status).toBe(201);
+      const threadId = expectString(
+        expectRecord(expectRecord(await readJson(createThreadResponse))["thread"])["id"],
+      );
+
+      const fileBody = "Launch note.\n";
+      const fileSize = new TextEncoder().encode(fileBody).byteLength;
+      const createUploadResponse = await requestPublicApi(
+        app,
+        database,
+        new Request(`https://api.example.com/api/v1/threads/${threadId}/files/uploads`, {
+          body: JSON.stringify({
+            file: {
+              contentType: "text/plain",
+              name: "launch-note.txt",
+              size: fileSize,
+            },
+          }),
+          headers: {
+            Authorization: bearer(TOKENS.owner),
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        }),
+      );
+      expect(createUploadResponse.status).toBe(201);
+
+      const upload = expectRecord(await readJson(createUploadResponse));
+      const fileId = expectString(upload["fileId"]);
+      expect(upload).toMatchObject({
+        contentType: "text/plain",
+        expectedSize: fileSize,
+        partSize: null,
+        path: `session-files/${fileId}/launch-note.txt`,
+        status: "pending",
+        strategy: "single_put",
+      });
+      expectNoProperties(upload, ["purpose", "scopeId", "scopeKind", "target", "upload"]);
+
+      const pendingFileRow = await database
+        .prepare(
+          `SELECT mime_type, owner_id, owner_kind, path, purpose, scope_id, scope_kind, session_kind, size, status
+             FROM file_record
+            WHERE id = ?`,
+        )
+        .bind(fileId)
+        .first<{
+          mime_type: string | null;
+          owner_id: string;
+          owner_kind: string;
+          path: string;
+          purpose: string;
+          scope_id: string;
+          scope_kind: string;
+          session_kind: string;
+          size: number;
+          status: string;
+        }>();
+      expect(pendingFileRow).toEqual({
+        mime_type: "text/plain",
+        owner_id: threadId,
+        owner_kind: "session",
+        path: `attachment/${fileId}/launch-note.txt`,
+        purpose: "session_attachment",
+        scope_id: threadId,
+        scope_kind: "session",
+        session_kind: "attachment",
+        size: fileSize,
+        status: "pending",
+      });
+
+      const uploadRow = await database
+        .prepare(
+          `SELECT expected_size, file_id, part_size, scope_id, scope_kind, status, strategy
+             FROM file_upload
+            WHERE file_id = ?`,
+        )
+        .bind(fileId)
+        .first<{
+          expected_size: number;
+          file_id: string;
+          part_size: number | null;
+          scope_id: string;
+          scope_kind: string;
+          status: string;
+          strategy: string;
+        }>();
+      expect(uploadRow).toEqual({
+        expected_size: fileSize,
+        file_id: fileId,
+        part_size: null,
+        scope_id: threadId,
+        scope_kind: "session",
+        status: "pending",
+        strategy: "single_put",
+      });
+    });
+  });
+
   test("rejects public Thread file claims that are not claimable owner drafts", async () => {
     const database = await createPublicHttpContractDatabase();
     const app = createPublicThreadApiTestApp();

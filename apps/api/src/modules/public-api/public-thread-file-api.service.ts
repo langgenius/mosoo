@@ -1,6 +1,7 @@
-import type { FileEntry, FileRecord } from "@mosoo/contracts/file";
+import type { CreateFileUploadResponse, FileEntry, FileRecord } from "@mosoo/contracts/file";
 import type { PublicThreadFile } from "@mosoo/contracts/public-api";
 import type {
+  CreatePublicThreadFileUploadRequest,
   CreatePublicThreadFileRequest,
   PublicThreadFileListResponse,
   PublicThreadFileResponse,
@@ -42,7 +43,7 @@ function toPublicThreadFile(file: FileEntry | FileRecord): PublicThreadFile {
   return {
     committed: true,
     createdAt: file.createdAt,
-    id: parsePlatformId(file.id, "File ID") as FileId,
+    id: parsePlatformId<FileId>(file.id, "File ID"),
     kind: file.sessionKind ?? "attachment",
     mimeType: file.mimeType,
     name: file.name,
@@ -64,6 +65,20 @@ export async function listPublicThreadFiles(
       })
     ).files.map(toPublicThreadFile),
   };
+}
+
+export async function createPublicThreadFileUpload(
+  bindings: ApiBindings,
+  caller: AuthenticatedViewer,
+  threadId: PublicThreadId,
+  input: CreatePublicThreadFileUploadRequest,
+): Promise<CreateFileUploadResponse> {
+  const { appId, sessionId } = await admitPublicThreadFileAccess(bindings, caller, threadId);
+  return fileStore.createSessionResourceUpload(bindings, caller, {
+    appId,
+    file: input.file,
+    sessionId,
+  });
 }
 
 export async function createPublicThreadFile(

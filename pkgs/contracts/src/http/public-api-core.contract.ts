@@ -10,6 +10,8 @@ import type {
 } from "@mosoo/id";
 
 import type { AgentKind } from "../agent/agent.contract";
+import { SINGLE_PUT_THRESHOLD_BYTES } from "../file/file.contract";
+import type { CreateFileUploadRequest } from "../file/file.contract";
 import type { UserWarning } from "../session/session-run.contract";
 import {
   SESSION_PROCESS_EVENT_STATUSES,
@@ -26,6 +28,7 @@ export const PUBLIC_API_VERSION = "v1";
 export const PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH = 32_000;
 export const PUBLIC_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH = 255;
 export const PUBLIC_THREAD_FILE_ID_MAX_LENGTH = 26;
+export const PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES = SINGLE_PUT_THRESHOLD_BYTES;
 export const PUBLIC_THREAD_ID_PATTERN = PLATFORM_ID_INPUT_PATTERN;
 export const PUBLIC_THREAD_JSON_BODY_MAX_BYTES = PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH + 8192;
 export const PUBLIC_THREAD_API_THREADS_MAX_LIMIT = 100;
@@ -184,6 +187,10 @@ export interface PublicThreadApiListThreadEventsResponse {
 
 export interface CreatePublicThreadFileRequest {
   fileId: FileId;
+}
+
+export interface CreatePublicThreadFileUploadRequest {
+  file: CreateFileUploadRequest["file"];
 }
 
 export interface PublicThreadFile {

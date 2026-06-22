@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { PUBLIC_API_ERROR_CODES } from "@mosoo/contracts/public-api";
+import {
+  PUBLIC_API_ERROR_CODES,
+  PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES,
+} from "@mosoo/contracts/public-api";
 import type { AgentSessionEventBatch } from "@mosoo/contracts/session";
 import { PLATFORM_ID_INPUT_PATTERN } from "@mosoo/id";
 import { isEnumType, isInputObjectType, isObjectType } from "graphql";
@@ -11,12 +14,14 @@ import {
   parseOptionalBoolean,
   readCreateThreadRequest,
   readCreateThreadFileRequest,
+  readCreateThreadFileUploadRequest,
   readSendEventsRequest,
 } from "../src/adapters/http/routes/public-thread-api-request";
 import { PublicApiError } from "../src/modules/public-api/public-api-errors";
 import { toPublicThreadEventBatch } from "../src/modules/public-api/public-thread-api-presenter";
 import {
   createChunkedJsonRequest,
+  createFileUploadSummary,
   createRunSummary,
   createSessionFile,
   createSessionSummary,
@@ -284,6 +289,7 @@ describe("API to web boundary", () => {
       "/threads/{threadId}/events",
       "/threads/{threadId}/events/stream",
       "/threads/{threadId}/files",
+      "/threads/{threadId}/files/uploads",
       "/threads/{threadId}/files/{fileId}",
       "/threads/{threadId}/unarchive",
     ]);
@@ -419,6 +425,19 @@ describe("API to web boundary", () => {
     const fileProperties = openApiSchemaProperties("ThreadFile");
     expectProperties(fileProperties, ["committed", "createdAt", "id", "kind", "name", "size"]);
     expectNoProperties(fileProperties, ["objectKey", "path", "scopeId", "scopeKind"]);
+
+    const uploadProperties = openApiSchemaProperties("FileUploadSummary");
+    expectProperties(uploadProperties, [
+      "contentType",
+      "expectedSize",
+      "expiresAt",
+      "fileId",
+      "partSize",
+      "path",
+      "status",
+      "strategy",
+    ]);
+    expectNoProperties(uploadProperties, ["purpose", "scopeId", "scopeKind", "target"]);
   });
 
   test("parses the Public Thread API create-work body shape", async () => {
@@ -580,6 +599,11 @@ describe("API to web boundary", () => {
 
   test("keeps Public Thread file OpenAPI examples aligned with public readers and responses", async () => {
     const requestExample = openApiJsonRequestExample("/threads/{threadId}/files", "post");
+    const uploadRequestExample = openApiJsonRequestExample(
+      "/threads/{threadId}/files/uploads",
+      "post",
+    );
+    const uploadSummary = createFileUploadSummary();
     const sessionFile = createSessionFile();
 
     await expect(
@@ -599,12 +623,36 @@ describe("API to web boundary", () => {
       fileId: PUBLIC_API_TEST_IDS.file,
     });
 
+    await expect(
+      readCreateThreadFileUploadRequest({
+        req: {
+          raw: new Request(
+            `https://api.example.com/api/v1/threads/${PUBLIC_API_TEST_IDS.nonOwnerSession}/files/uploads`,
+            {
+              body: JSON.stringify(uploadRequestExample),
+              headers: { "Content-Type": "application/json" },
+              method: "POST",
+            },
+          ),
+        },
+      }),
+    ).resolves.toEqual({
+      file: {
+        contentType: "text/plain",
+        name: "brief.txt",
+        size: 19,
+      },
+    });
+
     expect(openApiJsonResponseExample("/threads/{threadId}/files", "get", "200")).toEqual({
       files: [sessionFile],
     });
     expect(openApiJsonResponseExample("/threads/{threadId}/files", "post", "201")).toEqual({
       file: sessionFile,
     });
+    expect(openApiJsonResponseExample("/threads/{threadId}/files/uploads", "post", "201")).toEqual(
+      uploadSummary,
+    );
   });
 
   test("accepts the three public thread event input shapes", async () => {
@@ -703,6 +751,57 @@ describe("API to web boundary", () => {
                 contentType: "text/plain",
                 mountPath: "/workspace/brief.txt",
                 name: "brief.txt",
+              }),
+              headers: { "Content-Type": "application/json" },
+              method: "POST",
+            },
+          ),
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      status: 400,
+    });
+
+    await expect(
+      readCreateThreadFileUploadRequest({
+        req: {
+          raw: new Request(
+            `https://api.example.com/api/v1/threads/${PUBLIC_API_TEST_IDS.nonOwnerSession}/files/uploads`,
+            {
+              body: JSON.stringify({
+                file: {
+                  contentType: "text/plain",
+                  name: "too-large.txt",
+                  size: PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES + 1,
+                },
+              }),
+              headers: { "Content-Type": "application/json" },
+              method: "POST",
+            },
+          ),
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: "invalid_request",
+      status: 400,
+    });
+
+    await expect(
+      readCreateThreadFileUploadRequest({
+        req: {
+          raw: new Request(
+            `https://api.example.com/api/v1/threads/${PUBLIC_API_TEST_IDS.nonOwnerSession}/files/uploads`,
+            {
+              body: JSON.stringify({
+                file: {
+                  contentType: "text/plain",
+                  name: "brief.txt",
+                  size: 19,
+                },
+                target: {
+                  kind: "session",
+                },
               }),
               headers: { "Content-Type": "application/json" },
               method: "POST",
