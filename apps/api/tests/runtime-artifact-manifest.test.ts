@@ -44,10 +44,10 @@ function createSandboxHandle(files: ReadonlyMap<string, string>): SandboxHandle 
   const unavailable = async () => {
     throw new Error("Unexpected sandbox test method call.");
   };
-  const successfulCommand = async () => ({
+  const successfulCommand: SandboxHandle["exec"] = async (command) => ({
     exitCode: 0,
     stderr: "",
-    stdout: "",
+    stdout: [...files.keys()].some((path) => command.includes(path)) ? "1" : "",
     success: true,
   });
   const readFile: SandboxHandle["readFile"] = async (path) => {
@@ -88,6 +88,71 @@ function createSandboxHandle(files: ReadonlyMap<string, string>): SandboxHandle 
     writeFile: unavailable,
     wsConnect: unavailable,
   };
+}
+
+async function insertActiveSandboxSession(database: D1Database): Promise<void> {
+  await database
+    .prepare(
+      `
+        INSERT INTO sandbox_session (
+          cloudflare_session_id,
+          created_at,
+          cwd,
+          origin_json,
+          sandbox_id,
+          session_id,
+          status,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+    )
+    .bind(
+      API_DRIVER_BOUNDARY_IDS.sandboxSession,
+      nowMsForTest(),
+      "/workspace/session",
+      "{}",
+      PUBLIC_API_TEST_IDS.sandbox,
+      PUBLIC_API_TEST_IDS.ownerSession,
+      "active",
+      nowMsForTest(),
+    )
+    .run();
+}
+
+function createArtifactManifestRuntimeLink(): RuntimeSessionLink {
+  return {
+    agentId: PUBLIC_API_TEST_IDS.agent,
+    callerId: PUBLIC_API_TEST_IDS.ownerAccount,
+    creatorId: PUBLIC_API_TEST_IDS.ownerAccount,
+    executionOwnerId: PUBLIC_API_TEST_IDS.ownerAccount,
+    sandboxId: PUBLIC_API_TEST_IDS.sandbox,
+    sandboxKind: "cattle",
+    sandboxSubjectKind: "session",
+    sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+    sessionRunId: PUBLIC_API_TEST_IDS.run,
+    sessionRunStatus: "running",
+    traceId: "trace-artifact-manifest",
+  };
+}
+
+function createCompletedRunEvent() {
+  return createRuntimeEvent({
+    driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
+    id: API_DRIVER_BOUNDARY_IDS.runtimeEvent,
+    kind: "run.completed",
+    occurredAt: "2026-06-22T00:00:00.000Z",
+    payload: {
+      run: {
+        completedAt: "2026-06-22T00:00:00.000Z",
+        error: null,
+        startedAt: null,
+        status: "completed",
+      },
+    },
+    runId: PUBLIC_API_TEST_IDS.run,
+    sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+  });
 }
 
 describe("runtime artifact manifest", () => {
@@ -158,34 +223,7 @@ describe("runtime artifact manifest", () => {
   test("records declared sandbox outputs as session artifacts on run completion", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
-
-    await database
-      .prepare(
-        `
-          INSERT INTO sandbox_session (
-            cloudflare_session_id,
-            created_at,
-            cwd,
-            origin_json,
-            sandbox_id,
-            session_id,
-            status,
-            updated_at
-          )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-      )
-      .bind(
-        API_DRIVER_BOUNDARY_IDS.sandboxSession,
-        nowMsForTest(),
-        "/workspace/session",
-        "{}",
-        PUBLIC_API_TEST_IDS.sandbox,
-        PUBLIC_API_TEST_IDS.ownerSession,
-        "active",
-        nowMsForTest(),
-      )
-      .run();
+    await insertActiveSandboxSession(database);
 
     const bucket = new PublicApiMemoryFileBucket();
     const sandbox = createSandboxHandle(
@@ -210,35 +248,8 @@ describe("runtime artifact manifest", () => {
       }),
       runtimeSubjectHandleFactory: () => sandbox,
     } as ApiBindings;
-    const link: RuntimeSessionLink = {
-      agentId: PUBLIC_API_TEST_IDS.agent,
-      callerId: PUBLIC_API_TEST_IDS.ownerAccount,
-      creatorId: PUBLIC_API_TEST_IDS.ownerAccount,
-      executionOwnerId: PUBLIC_API_TEST_IDS.ownerAccount,
-      sandboxId: PUBLIC_API_TEST_IDS.sandbox,
-      sandboxKind: "cattle",
-      sandboxSubjectKind: "session",
-      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-      sessionRunId: PUBLIC_API_TEST_IDS.run,
-      sessionRunStatus: "running",
-      traceId: "trace-artifact-manifest",
-    };
-    const event = createRuntimeEvent({
-      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
-      id: API_DRIVER_BOUNDARY_IDS.runtimeEvent,
-      kind: "run.completed",
-      occurredAt: "2026-06-22T00:00:00.000Z",
-      payload: {
-        run: {
-          completedAt: "2026-06-22T00:00:00.000Z",
-          error: null,
-          startedAt: null,
-          status: "completed",
-        },
-      },
-      runId: PUBLIC_API_TEST_IDS.run,
-      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
-    });
+    const link = createArtifactManifestRuntimeLink();
+    const event = createCompletedRunEvent();
 
     await appRuntimeDriverEvents(bindings, {
       currentLiveState: createBaseLiveState({
@@ -295,5 +306,47 @@ describe("runtime artifact manifest", () => {
         contentType: "text/plain",
       }),
     ]);
+  });
+
+  test("skips optional sandbox artifact manifest when it does not exist", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertOwnerSession(database);
+    await insertActiveSandboxSession(database);
+
+    const bucket = new PublicApiMemoryFileBucket();
+    const sandbox = createSandboxHandle(new Map());
+    const bindings = {
+      ...createPublicHttpTestBindings(database, {
+        fileBucket: bucket as unknown as R2Bucket,
+      }),
+      runtimeSubjectHandleFactory: () => sandbox,
+    } as ApiBindings;
+    const link = createArtifactManifestRuntimeLink();
+    const event = createCompletedRunEvent();
+
+    await appRuntimeDriverEvents(bindings, {
+      currentLiveState: createBaseLiveState({
+        callerId: link.callerId,
+        creatorId: link.creatorId,
+        driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
+        sessionId: link.sessionId,
+      }),
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
+      events: [
+        {
+          event,
+          eventId: "source-run-completed-without-artifacts",
+          occurredAt: 1,
+        },
+      ],
+      link,
+    });
+
+    const row = await database
+      .prepare("SELECT count(*) AS count FROM file_record")
+      .first<{ count: number }>();
+
+    expect(row?.count).toBe(0);
+    expect([...bucket.objects.values()]).toEqual([]);
   });
 });

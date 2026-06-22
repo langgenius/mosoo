@@ -37,6 +37,7 @@ import { upsertNativeResumeRef } from "../native-resume-ref.repository";
 import { getRuntimeSubjectKeepAliveHandle } from "../runtime-subject-lifecycle/runtime-subject-lifecycle.service";
 import { getRuntimeConversationSession } from "../runtime-subject-lifecycle/runtime-subject-store";
 import { readSandboxFileBytes } from "../sandbox-file-bytes";
+import type { ExecutionSessionHandle } from "../sandbox-handles";
 import {
   assertRuntimeEventMatchesDriverEnvelope,
   assertRuntimeEventMatchesDriverLink,
@@ -74,6 +75,20 @@ export {
   recordDriverInstanceCompletion,
   recordDriverInstanceFailure,
 } from "./terminal-driver-events";
+
+function quoteShellArg(value: string): string {
+  return `'${value.replaceAll("'", `'"'"'`)}'`;
+}
+
+async function sandboxRegularFileExists(
+  handle: ExecutionSessionHandle,
+  path: string,
+): Promise<boolean> {
+  const command = `if [ -f ${quoteShellArg(path)} ]; then printf 1; fi`;
+  const result = await handle.exec(`sh -lc ${quoteShellArg(command)}`);
+
+  return result.success && result.exitCode === 0 && result.stdout.trim() === "1";
+}
 
 function resolveRuntimeOutputCreator(link: RuntimeSessionLink): AccountId | null {
   const actorId = link.executionOwnerId ?? link.callerId ?? link.creatorId;
@@ -263,6 +278,10 @@ async function recordRuntimeArtifactManifest(input: {
           RUNTIME_ARTIFACT_MANIFEST_PATH,
         );
         let manifestBytes: Uint8Array;
+
+        if (!(await sandboxRegularFileExists(sandboxSession, manifestPath))) {
+          return;
+        }
 
         try {
           manifestBytes = await readSandboxFileBytes(sandboxSession, manifestPath);
