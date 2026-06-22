@@ -1,0 +1,65 @@
+name: Feishu Notify
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - closed
+  issue_comment:
+    types:
+      - created
+  pull_request_review:
+    types:
+      - submitted
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  notify:
+    name: Notify Feishu
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send event to Feishu bot
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${FEISHU_WEBHOOK_URL}" ]; then
+            echo "FEISHU_WEBHOOK_URL is not configured; skipping Feishu notification."
+            exit 0
+          fi
+
+          title="GitHub: ${EVENT} / ${ACTION}"
+          url="${GITHUB_SERVER_URL}/${REPO}"
+          text="**${title}**\\n${ACTOR} on \`${REPO}\`\\n[Open](${url})"
+
+          curl --fail --silent --show-error --request POST \
+            --url "${FEISHU_WEBHOOK_URL}" \
+            --header "Content-Type: application/json" \
+            --data @- <<EOF
+          {
+            "msg_type": "interactive",
+            "card": {
+              "header": {
+                "title": { "tag": "plain_text", "content": "${title}" },
+                "template": "blue"
+              },
+              "elements": [
+                { "tag": "div", "text": { "tag": "lark_md", "content": "${text}" } }
+              ]
+            }
+          }
+          EOF
