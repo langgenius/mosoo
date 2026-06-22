@@ -1060,11 +1060,12 @@ describe("Public Thread API e2e", () => {
   test("creates a Thread file upload through the public files API contract", async () => {
     const database = await createPublicHttpContractDatabase();
     const app = createPublicThreadApiTestApp();
+    const bucket = new PublicApiMemoryFileBucket();
+    const requestThreadApi = (request: Request) =>
+      requestPublicApi(app, database, request, { fileBucket: bucket as unknown as R2Bucket });
 
     await withProviderProbeMock(async () => {
-      const createThreadResponse = await requestPublicApi(
-        app,
-        database,
+      const createThreadResponse = await requestThreadApi(
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           body: JSON.stringify({
             client_external_ref: "thread-upload-contract",
@@ -1083,9 +1084,7 @@ describe("Public Thread API e2e", () => {
 
       const fileBody = "Launch note.\n";
       const fileSize = new TextEncoder().encode(fileBody).byteLength;
-      const createUploadResponse = await requestPublicApi(
-        app,
-        database,
+      const createUploadResponse = await requestThreadApi(
         new Request(`https://api.example.com/api/v1/threads/${threadId}/files/uploads`, {
           body: JSON.stringify({
             file: {
@@ -1117,13 +1116,14 @@ describe("Public Thread API e2e", () => {
 
       const pendingFileRow = await database
         .prepare(
-          `SELECT mime_type, owner_id, owner_kind, path, purpose, scope_id, scope_kind, session_kind, size, status
+          `SELECT mime_type, object_key, owner_id, owner_kind, path, purpose, scope_id, scope_kind, session_kind, size, status
              FROM file_record
             WHERE id = ?`,
         )
         .bind(fileId)
         .first<{
           mime_type: string | null;
+          object_key: string;
           owner_id: string;
           owner_kind: string;
           path: string;
@@ -1136,6 +1136,7 @@ describe("Public Thread API e2e", () => {
         }>();
       expect(pendingFileRow).toEqual({
         mime_type: "text/plain",
+        object_key: `staging/session/${threadId}/${fileId}`,
         owner_id: threadId,
         owner_kind: "session",
         path: `attachment/${fileId}/launch-note.txt`,
@@ -1171,6 +1172,158 @@ describe("Public Thread API e2e", () => {
         scope_kind: "session",
         status: "pending",
         strategy: "single_put",
+      });
+
+      const uploadContentResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/files/${fileId}/content`, {
+          body: fileBody,
+          headers: {
+            Authorization: bearer(TOKENS.owner),
+            "Content-Type": "text/plain",
+          },
+          method: "PUT",
+        }),
+      );
+      expect(uploadContentResponse.status).toBe(200);
+      expect(await readJson(uploadContentResponse)).toEqual({ ok: true });
+
+      if (!pendingFileRow) {
+        throw new Error("Expected pending public Thread file row.");
+      }
+      const stagingObject = await bucket.get(pendingFileRow.object_key);
+      expect(await stagingObject?.text()).toBe(fileBody);
+
+      const uploadedRow = await database
+        .prepare("SELECT status FROM file_upload WHERE file_id = ?")
+        .bind(fileId)
+        .first<{ status: string }>();
+      expect(uploadedRow).toEqual({ status: "uploading" });
+
+      const nonOwnerUploadResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/files/${fileId}/content`, {
+          body: "non-owner overwrite\n",
+          headers: {
+            Authorization: bearer(TOKENS.nonOwner),
+            "Content-Type": "text/plain",
+          },
+          method: "PUT",
+        }),
+      );
+      expect(nonOwnerUploadResponse.status).toBe(404);
+      expect(expectRecord(await readJson(nonOwnerUploadResponse))["error"]).toMatchObject({
+        code: "not_found",
+      });
+
+      const nonOwnerCompleteResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/files/${fileId}/complete`, {
+          body: JSON.stringify({}),
+          headers: {
+            Authorization: bearer(TOKENS.nonOwner),
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        }),
+      );
+      expect(nonOwnerCompleteResponse.status).toBe(404);
+      expect(expectRecord(await readJson(nonOwnerCompleteResponse))["error"]).toMatchObject({
+        code: "not_found",
+      });
+
+      const completeUploadResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/files/${fileId}/complete`, {
+          body: JSON.stringify({}),
+          headers: {
+            Authorization: bearer(TOKENS.owner),
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        }),
+      );
+      expect(completeUploadResponse.status).toBe(200);
+      const completedFile = expectRecord(
+        expectRecord(await readJson(completeUploadResponse))["file"],
+      );
+      expect(completedFile).toMatchObject({
+        createdBy: PUBLIC_API_TEST_IDS.ownerAccount,
+        expiresAt: null,
+        id: fileId,
+        mimeType: "text/plain",
+        name: "launch-note.txt",
+        path: `session-files/${fileId}/launch-note.txt`,
+        sessionKind: "attachment",
+        size: fileSize,
+        status: "ready",
+        version: 1,
+      });
+      expectString(completedFile["createdAt"]);
+      expectString(completedFile["etag"]);
+      expectString(completedFile["updatedAt"]);
+
+      const finalObjectKey = `session/${threadId}/attachment/${fileId}/launch-note.txt`;
+      const finalObject = await bucket.get(finalObjectKey);
+      expect(await finalObject?.text()).toBe(fileBody);
+      expect(await bucket.get(pendingFileRow.object_key)).toBeNull();
+
+      const completedFileRow = await database
+        .prepare(
+          `SELECT committed, expires_at, object_key, status
+             FROM file_record
+            WHERE id = ?`,
+        )
+        .bind(fileId)
+        .first<{
+          committed: number;
+          expires_at: number | null;
+          object_key: string;
+          status: string;
+        }>();
+      expect(completedFileRow).toEqual({
+        committed: 1,
+        expires_at: null,
+        object_key: finalObjectKey,
+        status: "ready",
+      });
+
+      const completedUploadRow = await database
+        .prepare("SELECT status FROM file_upload WHERE file_id = ?")
+        .bind(fileId)
+        .first<{ status: string }>();
+      expect(completedUploadRow).toEqual({ status: "completed" });
+
+      const appDraftFileId = await createPendingAppDraftFile({
+        body: "App draft upload.\n",
+        bucket,
+        database,
+        name: "app-draft.txt",
+      });
+      const appDraftUploadResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/files/${appDraftFileId}/content`, {
+          body: "blocked app draft content\n",
+          headers: {
+            Authorization: bearer(TOKENS.owner),
+            "Content-Type": "text/plain",
+          },
+          method: "PUT",
+        }),
+      );
+      expect(appDraftUploadResponse.status).toBe(404);
+      expect(expectRecord(await readJson(appDraftUploadResponse))["error"]).toMatchObject({
+        code: "not_found",
+      });
+
+      const appDraftCompleteResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/files/${appDraftFileId}/complete`, {
+          body: JSON.stringify({}),
+          headers: {
+            Authorization: bearer(TOKENS.owner),
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        }),
+      );
+      expect(appDraftCompleteResponse.status).toBe(404);
+      expect(expectRecord(await readJson(appDraftCompleteResponse))["error"]).toMatchObject({
+        code: "not_found",
       });
     });
   });

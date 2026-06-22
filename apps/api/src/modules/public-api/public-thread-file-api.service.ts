@@ -1,4 +1,10 @@
-import type { CreateFileUploadResponse, FileEntry, FileRecord } from "@mosoo/contracts/file";
+import type {
+  CompleteFileUploadRequest,
+  CompleteFileUploadResponse,
+  CreateFileUploadResponse,
+  FileEntry,
+  FileRecord,
+} from "@mosoo/contracts/file";
 import type { PublicThreadFile } from "@mosoo/contracts/public-api";
 import type {
   CreatePublicThreadFileUploadRequest,
@@ -13,8 +19,9 @@ import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
 import { FileControlError } from "../files/application/file-control-errors";
 import { fileStore } from "../files/application/file-store";
+import type { ContentBody } from "../files/application/file-store";
 import { publishSessionResourceDelete } from "../sessions/application/session-resource-events.service";
-import { toBackingSessionId } from "./public-thread-ids";
+import { toBackingSessionId, toPublicThreadId } from "./public-thread-ids";
 import { admitPublicSessionCaller } from "./public-thread-session-query.service";
 
 async function admitPublicThreadFileAccess(
@@ -37,6 +44,18 @@ function assertPublicThreadFile(file: FileRecord, sessionId: SessionId): void {
   ) {
     throw new FileControlError(404, "file_not_found", `Thread file ${file.id} was not found.`);
   }
+}
+
+function requirePublicThreadAttachment(file: FileRecord): PublicThreadId {
+  if (
+    file.scope.kind !== "session" ||
+    file.scope.id === null ||
+    file.sessionKind !== "attachment"
+  ) {
+    throw new FileControlError(404, "file_not_found", `Thread file ${file.id} was not found.`);
+  }
+
+  return toPublicThreadId(parsePlatformId<SessionId>(file.scope.id, "File session ID"));
 }
 
 function toPublicThreadFile(file: FileEntry | FileRecord): PublicThreadFile {
@@ -78,6 +97,41 @@ export async function createPublicThreadFileUpload(
     appId,
     file: input.file,
     sessionId,
+  });
+}
+
+export async function putPublicThreadFileContent(
+  bindings: ApiBindings,
+  caller: AuthenticatedViewer,
+  input: {
+    body: ContentBody;
+    fileId: FileId;
+  },
+): Promise<void> {
+  const file = await fileStore.getRecord(bindings, caller, input.fileId);
+  const threadId = requirePublicThreadAttachment(file);
+
+  await admitPublicSessionCaller(bindings.DB, caller, threadId);
+  await fileStore.putContent(bindings, caller, input.fileId, input.body);
+}
+
+export async function completePublicThreadFileUpload(
+  bindings: ApiBindings,
+  caller: AuthenticatedViewer,
+  input: {
+    fileId: FileId;
+    request: CompleteFileUploadRequest;
+  },
+): Promise<CompleteFileUploadResponse> {
+  const file = await fileStore.getRecord(bindings, caller, input.fileId);
+  const threadId = requirePublicThreadAttachment(file);
+
+  await admitPublicSessionCaller(bindings.DB, caller, threadId);
+  return fileStore.completeUpload({
+    bindings,
+    fileId: input.fileId,
+    input: input.request,
+    viewer: caller,
   });
 }
 

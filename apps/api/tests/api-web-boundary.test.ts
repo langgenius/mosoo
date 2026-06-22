@@ -21,6 +21,7 @@ import { PublicApiError } from "../src/modules/public-api/public-api-errors";
 import { toPublicThreadEventBatch } from "../src/modules/public-api/public-thread-api-presenter";
 import {
   createChunkedJsonRequest,
+  createCompleteFileUploadResponse,
   createFileUploadSummary,
   createRunSummary,
   createSessionFile,
@@ -283,6 +284,8 @@ describe("API to web boundary", () => {
     expect(document.openapi).toBe("3.1.0");
     expect(document.servers).toEqual([{ url: "https://api.example.com/api/v1" }]);
     expectProperties(document.paths, [
+      "/files/{fileId}/complete",
+      "/files/{fileId}/content",
       "/agents/{agentId}/threads",
       "/threads/{threadId}",
       "/threads/{threadId}/archive",
@@ -293,6 +296,60 @@ describe("API to web boundary", () => {
       "/threads/{threadId}/files/{fileId}",
       "/threads/{threadId}/unarchive",
     ]);
+
+    const uploadContentOperation = document.paths["/files/{fileId}/content"]?.put;
+    expect(uploadContentOperation?.parameters?.map((parameter) => parameter.name)).toContain(
+      "fileId",
+    );
+    expect(uploadContentOperation?.requestBody).toMatchObject({
+      content: {
+        "application/octet-stream": {
+          schema: {
+            format: "binary",
+            type: "string",
+          },
+        },
+      },
+      required: true,
+    });
+    expect(uploadContentOperation?.responses["200"]).toMatchObject({
+      content: {
+        "application/json": {
+          schema: {
+            properties: {
+              ok: { const: true },
+            },
+            required: ["ok"],
+            type: "object",
+          },
+        },
+      },
+    });
+
+    const completeUploadOperation = document.paths["/files/{fileId}/complete"]?.post;
+    expect(completeUploadOperation?.parameters?.map((parameter) => parameter.name)).toContain(
+      "fileId",
+    );
+    expect(completeUploadOperation?.requestBody).toMatchObject({
+      content: {
+        "application/json": {
+          example: {},
+          schema: {
+            $ref: "#/components/schemas/CompleteFileUploadRequest",
+          },
+        },
+      },
+      required: true,
+    });
+    expect(completeUploadOperation?.responses["200"]).toMatchObject({
+      content: {
+        "application/json": {
+          schema: {
+            $ref: "#/components/schemas/CompleteFileUploadResponse",
+          },
+        },
+      },
+    });
 
     const createThreadSchema = document.components.schemas.CreateThreadRequest;
     expect(createThreadSchema.required).not.toContain("input");
@@ -332,9 +389,21 @@ describe("API to web boundary", () => {
     const fileIdParameter = document.paths[
       "/threads/{threadId}/files/{fileId}"
     ]?.delete?.parameters?.find((parameter) => parameter.name === "fileId");
+    const uploadContentFileIdParameter = document.paths[
+      "/files/{fileId}/content"
+    ]?.put?.parameters?.find((parameter) => parameter.name === "fileId");
+    const completeUploadFileIdParameter = document.paths[
+      "/files/{fileId}/complete"
+    ]?.post?.parameters?.find((parameter) => parameter.name === "fileId");
 
     expect(document.info.description).toContain("v1 resource identifiers are bare ULIDs");
-    for (const parameter of [agentIdParameter, threadIdParameter, fileIdParameter]) {
+    for (const parameter of [
+      agentIdParameter,
+      threadIdParameter,
+      fileIdParameter,
+      completeUploadFileIdParameter,
+      uploadContentFileIdParameter,
+    ]) {
       expect(parameter?.description).toContain("v1 IDs are bare ULIDs");
       expect(parameter?.schema).toMatchObject({
         format: "ulid",
@@ -438,6 +507,31 @@ describe("API to web boundary", () => {
       "strategy",
     ]);
     expectNoProperties(uploadProperties, ["purpose", "scopeId", "scopeKind", "target"]);
+
+    const fileEntryProperties = openApiSchemaProperties("FileEntry");
+    expectProperties(fileEntryProperties, [
+      "createdAt",
+      "createdBy",
+      "etag",
+      "expiresAt",
+      "id",
+      "mimeType",
+      "name",
+      "path",
+      "sessionKind",
+      "size",
+      "status",
+      "updatedAt",
+      "version",
+    ]);
+    expectNoProperties(fileEntryProperties, [
+      "objectKey",
+      "owner",
+      "purpose",
+      "scope",
+      "scopeId",
+      "scopeKind",
+    ]);
   });
 
   test("parses the Public Thread API create-work body shape", async () => {
@@ -652,6 +746,9 @@ describe("API to web boundary", () => {
     });
     expect(openApiJsonResponseExample("/threads/{threadId}/files/uploads", "post", "201")).toEqual(
       uploadSummary,
+    );
+    expect(openApiJsonResponseExample("/files/{fileId}/complete", "post", "200")).toEqual(
+      createCompleteFileUploadResponse(),
     );
   });
 

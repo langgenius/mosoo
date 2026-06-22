@@ -11,7 +11,7 @@ import {
 
 import { createPublicApiOpenApiComponents } from "./public-api-openapi-components";
 
-type HttpMethod = "delete" | "get" | "post";
+type HttpMethod = "delete" | "get" | "post" | "put";
 
 interface OpenApiParameter {
   description?: string;
@@ -49,6 +49,7 @@ interface PublicApiOpenApiDocument {
 const EXAMPLE_AGENT_ID = "01J00000000000000000000001";
 const EXAMPLE_THREAD_ID = "01J00000000000000000000009";
 const EXAMPLE_FILE_ID = "01J0000000000000000000000J";
+const EXAMPLE_ACCOUNT_ID = "01J00000000000000000000002";
 const ACCESS_TOKEN_SECURITY: Array<Record<string, []>> = [{ accessToken: [] }];
 
 const EXAMPLE_SESSION_FILE = {
@@ -70,6 +71,22 @@ const EXAMPLE_FILE_UPLOAD_SUMMARY = {
   path: `session-files/${EXAMPLE_FILE_ID}/brief.txt`,
   status: "pending",
   strategy: "single_put",
+};
+
+const EXAMPLE_FILE_ENTRY = {
+  createdAt: "2026-05-19T00:02:00.000Z",
+  createdBy: EXAMPLE_ACCOUNT_ID,
+  etag: "etag-1",
+  expiresAt: null,
+  id: EXAMPLE_FILE_ID,
+  mimeType: "text/plain",
+  name: "brief.txt",
+  path: `session-files/${EXAMPLE_FILE_ID}/brief.txt`,
+  sessionKind: "attachment",
+  size: 19,
+  status: "ready",
+  updatedAt: "2026-05-19T00:03:00.000Z",
+  version: 1,
 };
 
 function platformIdPathParameter(input: {
@@ -182,6 +199,21 @@ function jsonRequestBodyExamples(
   };
 }
 
+function binaryRequestBody(description: string) {
+  return {
+    content: {
+      "application/octet-stream": {
+        schema: {
+          format: "binary",
+          type: "string",
+        },
+      },
+    },
+    description,
+    required: true,
+  };
+}
+
 function jsonResponse(description: string, schema: Record<string, unknown>, example?: unknown) {
   return {
     content: {
@@ -250,6 +282,39 @@ function operation(
 
 export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApiDocument {
   const paths = {
+    "/files/{fileId}/complete": {
+      post: operation({
+        description:
+          "Completes a pending single PUT Thread file upload. The file must have been created through POST /threads/{threadId}/files/uploads, uploaded through PUT /files/{fileId}/content, and belong to a public Thread visible to the Access Token caller.",
+        parameters: [fileIdParameter],
+        requestBody: jsonRequestBody(
+          { $ref: "#/components/schemas/CompleteFileUploadRequest" },
+          {},
+        ),
+        security: ACCESS_TOKEN_SECURITY,
+        success: {
+          "200": jsonResponse(
+            "Completed files API upload.",
+            { $ref: "#/components/schemas/CompleteFileUploadResponse" },
+            { file: EXAMPLE_FILE_ENTRY },
+          ),
+        },
+        summary: "Complete Thread file upload",
+      }),
+    },
+    "/files/{fileId}/content": {
+      put: operation({
+        description:
+          "Uploads raw bytes for a pending single PUT Thread file upload. The file must have been created through POST /threads/{threadId}/files/uploads and belong to a public Thread visible to the Access Token caller.",
+        parameters: [fileIdParameter],
+        requestBody: binaryRequestBody("Raw file bytes for the upload session."),
+        security: ACCESS_TOKEN_SECURITY,
+        success: {
+          "200": okResponse("Uploaded."),
+        },
+        summary: "Upload Thread file content",
+      }),
+    },
     "/agents/{agentId}/threads": {
       get: operation({
         description: "Returns Threads created by the authenticated Access Token caller.",
