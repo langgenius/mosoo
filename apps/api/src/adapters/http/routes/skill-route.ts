@@ -1,7 +1,7 @@
 import type { AppId, SkillId } from "@mosoo/id";
 import type { Hono } from "hono";
 
-import { getViewerFromRequest } from "../../../modules/auth/application/viewer-auth.service";
+import { getAuthenticatedViewerFromRequest } from "../../../modules/auth/application/viewer-auth.service";
 import { inspectSkillInput } from "../../../modules/skills/application/skill-package-source.service";
 import {
   createSkillFromUpload,
@@ -52,7 +52,7 @@ function errorResponse(error: unknown): Response {
 export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
   app.post("/skill/inspect", async (c) => {
     try {
-      const viewer = await getViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
         return unauthorized();
       }
@@ -80,7 +80,7 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
 
   app.post("/skill/package", async (c) => {
     try {
-      const viewer = await getViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
         return unauthorized();
       }
@@ -144,7 +144,7 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
 
   app.get("/skill/:skillId/source", async (c) => {
     try {
-      const viewer = await getViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
         return unauthorized();
       }
@@ -169,7 +169,7 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
 
   app.get("/skill/:skillId/package", async (c) => {
     try {
-      const viewer = await getViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
         return unauthorized();
       }

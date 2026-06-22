@@ -8,7 +8,10 @@ import {
   listPersonalAccessTokens,
   revokePersonalAccessToken,
 } from "../../../modules/auth/application/personal-access-token.service";
-import { getViewerFromRequest } from "../../../modules/auth/application/viewer-auth.service";
+import {
+  getAuthenticatedViewerFromRequest,
+  getViewerFromRequest,
+} from "../../../modules/auth/application/viewer-auth.service";
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import {
@@ -69,7 +72,7 @@ async function readCreatePersonalAccessTokenRequest(
 export function registerAccessTokenRoute(app: Hono<ApiGatewayEnvironment>) {
   app.get("/access-tokens", async (c) => {
     try {
-      const viewer = await getViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
         return unauthorized();
       }
@@ -100,7 +103,7 @@ export function registerAccessTokenRoute(app: Hono<ApiGatewayEnvironment>) {
 
   app.delete("/access-tokens/:tokenId", async (c) => {
     try {
-      const viewer = await getViewerFromRequest(c.env, c.req.raw);
+      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
       if (!viewer) {
         return unauthorized();
       }
