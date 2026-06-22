@@ -48,8 +48,21 @@ export const RUN_PURPOSE_FILTERS: { label: string; value: CostRunPurpose | "all"
   { label: "All", value: "all" },
   { label: "Production", value: "production" },
   { label: "Debug", value: "debug" },
-  { label: "Preview", value: "preview" },
 ];
+
+// The UI only distinguishes production vs. debug usage. "Debug" covers every
+// non-production development run, so it expands to both the `debug` and
+// `preview` backend purposes (the latter being editor runs on a published
+// agent). The backend keeps the two purposes separate for granularity.
+export function runPurposeToQuery(value: CostRunPurpose | "all"): CostRunPurpose[] {
+  if (value === "all") {
+    return [];
+  }
+  if (value === "debug") {
+    return ["debug", "preview"];
+  }
+  return [value];
+}
 
 const CURRENCY_FORMATTER_PRECISE = new Intl.NumberFormat("en-US", {
   currency: "USD",
@@ -173,8 +186,7 @@ export function sortCostAgents(agents: CostAgentRow[], sort: AgentCostSort): Cos
 export function runMixSegments(agent: CostAgentRow): RunMixSegment[] {
   return [
     { className: "bg-green-600", label: "Production", value: agent.productionCostUsd },
-    { className: "bg-amber", label: "Debug", value: agent.debugCostUsd },
-    { className: "bg-sky", label: "Preview", value: agent.previewCostUsd },
+    { className: "bg-amber", label: "Debug", value: agent.debugCostUsd + agent.previewCostUsd },
   ].filter((segment) => segment.value > 0);
 }
 
