@@ -5,24 +5,27 @@ import { dirname } from "node:path";
 import { expect, test } from "@playwright/test";
 import type { TestInfo } from "@playwright/test";
 
-import { createLatencyProbe, sendMeasuredTurn } from "./preview-latency-probe";
-import type { TurnLatency } from "./preview-latency-probe";
+import { loginWithMosooAiBackdoor } from "../../lib/dev-auth";
+import { requirePreviewRuntimeCredential } from "../../lib/env-preflight";
 import {
   createPersonalAccessTokenForPublicApi,
   publishAgentForPublicApi,
   runPublicApiCreateThreadLatency,
-} from "./preview-latency-public-api";
-import type { PublicApiCreateThreadLatency } from "./preview-latency-public-api";
+} from "../../lib/public-api-client";
+import type { PublicApiCreateThreadLatency } from "../../lib/public-api-client";
+import {
+  createLatencyProbe,
+  createRuntimeSignalCollector,
+  sendMeasuredTurn,
+} from "../../lib/runtime-progress";
+import type { TurnLatency } from "../../lib/runtime-progress";
 import {
   configureProviderCompanyKey,
   createPreviewRuntimeAgent,
   createPreviewRunId,
   getPreviewSmokeEmail,
-  loginWithMosooAiBackdoor,
-  requirePreviewRuntimeCredential,
   verifyPreviewReadinessBlocker,
-} from "./preview-live-harness";
-import { createRuntimeSignalCollector } from "./runtime-signal-collector";
+} from "../../lib/setup-agent";
 
 const runId = createPreviewRunId();
 const smokeEmail = getPreviewSmokeEmail(runId);

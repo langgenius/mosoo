@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
 
+import { loginWithMosooAiBackdoor } from "../../lib/dev-auth";
 import {
   createPreviewRunId,
   createPreviewRuntimeAgent,
   getPreviewSmokeEmail,
-  loginWithMosooAiBackdoor,
-} from "./preview-live-harness";
+} from "../../lib/setup-agent";
 
 const runId = createPreviewRunId();
 const smokeEmail = getPreviewSmokeEmail(runId);

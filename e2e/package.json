@@ -5,6 +5,10 @@
   "scripts": {
     "tc": "vp exec tsc --noEmit"
   },
+  "dependencies": {
+    "@mosoo/contracts": "workspace:*",
+    "@mosoo/runtime-catalog": "workspace:*"
+  },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@types/bun": "^1.3.14",

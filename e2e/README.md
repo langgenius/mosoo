@@ -1,82 +1,66 @@
 # Local E2E Harness
 
-This directory contains isolated local smoke harnesses. Most commands are invoked
-explicitly so live-provider checks do not run during normal test loops unless
-their required environment is present.
+`just e2e` is the single local E2E entrypoint. The case catalog lives in
+`e2e/cases.ts`, and the dispatcher lives in `e2e/cli.ts`.
 
 Run from the repo root:
 
 ```bash
-just e2e-deterministic
-just e2e-harness-contract
-just e2e-preview-smoke
-just e2e-preview-smoke-headed
-just e2e-preview-latency
-just e2e-agent-builder-live-planner
+just e2e --help
+just e2e api
+just e2e contract
+just e2e public-api
+just e2e contract harness
+just e2e deterministic session-log
+just e2e ui files-page
+just e2e ui preview
+just e2e public-api runtime
+just e2e public-api latency
+just e2e api agent-builder-planner
 ```
 
-`run-deterministic.sh` is the L1 no-credential acceptance harness. It runs the
-real Web route with explicit GraphQL projection fixtures, so it is safe for local
-PR evidence and does not require provider keys or Worker runtime bindings. It
-starts only `@mosoo/web` by default; set `MOSOO_E2E_WEB_SERVER_COMMAND` to
-override the server command.
+The harness is grouped by layer. `just e2e <layer>` runs every case in that layer;
+`just e2e <layer> <case>` runs one case.
 
-Both deterministic and Preview smoke specs attach a `runtime-signal-coverage`
-artifact. The artifact is collected by `runtime-signal-collector.ts` and covers
-application lifecycle, feature path execution, GraphQL/API data flow, browser
-resource samples, and browser error / exception context. `run-deterministic.sh`
-also runs the focused collector, Preview live env preflight, and credential
-resolver contract tests before the Playwright spec.
+- `cases/contract`: local harness and signal contracts.
+- `cases/deterministic`: no-provider acceptance paths with fixture-backed data.
+- `cases/ui`: browser journeys.
+- `cases/public-api`: Public API-triggered live runtime checks.
+- `cases/api`: API-level live provider checks.
+- `lib`: shared E2E clients, auth helpers, setup helpers, env preflight, and runtime progress.
 
-Required environment for Preview live harnesses:
+- `contract`: local harness and signal contracts.
+- `deterministic`: no-provider acceptance paths with fixture-backed data.
+- `ui`: browser journeys.
+- `public-api`: Public API-triggered live runtime checks.
+- `api`: API-level live provider checks.
+
+`deterministic session-log` runs the real Web route with explicit GraphQL
+projection fixtures, so it is safe for local PR evidence and does not require
+provider keys or Worker runtime bindings. It starts only `@mosoo/web` by default;
+set `MOSOO_E2E_WEB_SERVER_COMMAND` to override the server command.
+
+Live provider cases require one of:
 
 ```bash
-# OpenAI Runtime by default
-export MOSOO_E2E_OPENAI_API_KEY=...
-
-# or Claude Agent SDK
-export MOSOO_E2E_PROVIDER=anthropic
-export MOSOO_E2E_ANTHROPIC_API_KEY=...
+MOSOO_E2E_PROVIDER_API_KEY=...
+MOSOO_E2E_OPENAI_API_KEY=...
+MOSOO_E2E_ANTHROPIC_API_KEY=...
 ```
 
-The Preview live runners check these credentials before launching Playwright, so
-missing-key failures return immediately without starting the local web server.
-`run-preview-smoke.sh` covers the selected public runtime provider; ACP fallback
-is an internal transport covered by driver fixture and API integration gates.
+Use `MOSOO_E2E_PROVIDER=openai|anthropic` to choose the runtime provider.
+Optional environment can live in `.env`, `MOSOO_ENV_FILE`, or
+`MOSOO_E2E_ENV_FILE`.
 
-Agent Builder live planner smoke is an API-level provider check for the
-lightweight System Agent planner. It is skipped unless both variables are set:
+Common optional values:
 
 ```bash
-export MOSOO_E2E_OPENAI_API_KEY=...
-export MOSOO_E2E_OPENAI_MODEL=...
-just e2e-agent-builder-live-planner
+MOSOO_E2E_EMAIL=preview-smoke@mosoo.ai
+MOSOO_E2E_BASE_URL=http://127.0.0.1:5173
+WEB_DEV_PORT=5173
+MOSOO_E2E_LATENCY_LABEL=current
+MOSOO_E2E_LATENCY_OUTPUT=.tmp/e2e/preview-latency-current.json
 ```
 
-Set `MOSOO_E2E_REQUIRE_LIVE_PLANNER=1` when the run must fail instead of skip if
-the required variables are missing.
-
-`run-preview-latency.sh` can target either supported live provider:
-
-```bash
-export MOSOO_E2E_PROVIDER=openai
-export MOSOO_E2E_PROVIDER_API_KEY=...
-# or:
-export MOSOO_E2E_PROVIDER=anthropic
-export MOSOO_E2E_PROVIDER_API_KEY=...
-```
-
-Optional environment:
-
-```bash
-export MOSOO_E2E_EMAIL=preview-smoke@mosoo.ai
-export MOSOO_E2E_BASE_URL=http://localhost:5173
-export WEB_DEV_PORT=5173
-export MOSOO_E2E_LATENCY_LABEL=current
-export MOSOO_E2E_LATENCY_OUTPUT=.tmp/e2e/preview-latency-current.json
-```
-
-`run-preview-latency.sh` reuses the Preview live smoke setup, then records the
-elapsed time from send click to the first assistant text frame and terminal run
-status for a first dispatch and a same-thread follow-up dispatch. It writes a
-JSON artifact when `MOSOO_E2E_LATENCY_OUTPUT` is set.
+Runtime signal artifacts are collected by `lib/runtime-progress.ts` and exported through
+`reporter.ts`.

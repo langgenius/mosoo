@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
-import { TURN_TIMEOUT_MS } from "./preview-latency-probe";
-import type { LatencyTraceEvent } from "./preview-latency-probe";
+import { TURN_TIMEOUT_MS } from "./runtime-progress";
+import type { LatencyTraceEvent } from "./runtime-progress";
 
 export interface PublicApiCreateThreadLatency {
   createThreadAcceptedMs: number;
