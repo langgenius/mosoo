@@ -1,7 +1,7 @@
 import type { RunError } from "@mosoo/contracts/session-run";
 import { driverInstancesTable, sessionRunsTable } from "@mosoo/db";
 import type { SessionId, SessionRunId } from "@mosoo/id";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { getAppDatabase } from "../../../../platform/db/drizzle";
@@ -15,8 +15,14 @@ export interface ActiveRunDriverRow {
   driver_status: string | null;
   driver_updated_at: number | null;
   run_id: SessionRunId;
+  session_id: SessionId;
   run_trace_id: string | null;
   run_updated_at: number;
+}
+
+export interface StaleActiveRunReconciliationResult {
+  readonly reconciledRunIds: readonly SessionRunId[];
+  readonly reconciledSessionIds: readonly SessionId[];
 }
 
 function latestRuntimeObservationMs(row: ActiveRunDriverRow): number {
@@ -54,21 +60,43 @@ function shouldFailActiveRunAsStale(row: ActiveRunDriverRow, nowMs: number): boo
 
 const runDriverInstancesTable = alias(driverInstancesTable, "run_driver");
 
+const ACTIVE_SESSION_RUN_STATUSES = ["queued", "booting", "running", "waiting_input"] as const;
+
+function activeRunDriverColumns() {
+  return {
+    driver_error_message: runDriverInstancesTable.errorMessage,
+    driver_last_heartbeat_at: runDriverInstancesTable.lastHeartbeatAt,
+    driver_status: runDriverInstancesTable.status,
+    driver_updated_at: runDriverInstancesTable.updatedAt,
+    run_id: sessionRunsTable.id,
+    run_trace_id: sessionRunsTable.traceId,
+    run_updated_at: sessionRunsTable.updatedAt,
+    session_id: sessionRunsTable.sessionId,
+  };
+}
+
+function latestRuntimeObservationSql() {
+  return sql<number>`MAX(
+    ${sessionRunsTable.updatedAt},
+    COALESCE(${runDriverInstancesTable.updatedAt}, 0),
+    COALESCE(${runDriverInstancesTable.lastHeartbeatAt}, 0)
+  )`;
+}
+
+function staleActiveRunPredicate(nowMs: number) {
+  return or(
+    inArray(runDriverInstancesTable.status, ["failed", "stopped"]),
+    lte(latestRuntimeObservationSql(), nowMs - RUNTIME_SOCKET_TIMEOUT_MS),
+  );
+}
+
 async function findStaleActiveRun(
   database: D1Database,
   sessionId: SessionId,
 ): Promise<ActiveRunDriverRow | null> {
   const row =
     (await getAppDatabase(database)
-      .select({
-        driver_error_message: runDriverInstancesTable.errorMessage,
-        driver_last_heartbeat_at: runDriverInstancesTable.lastHeartbeatAt,
-        driver_status: runDriverInstancesTable.status,
-        driver_updated_at: runDriverInstancesTable.updatedAt,
-        run_id: sessionRunsTable.id,
-        run_trace_id: sessionRunsTable.traceId,
-        run_updated_at: sessionRunsTable.updatedAt,
-      })
+      .select(activeRunDriverColumns())
       .from(sessionRunsTable)
       .leftJoin(
         runDriverInstancesTable,
@@ -77,7 +105,7 @@ async function findStaleActiveRun(
       .where(
         and(
           eq(sessionRunsTable.sessionId, sessionId),
-          inArray(sessionRunsTable.status, ["queued", "booting", "running", "waiting_input"]),
+          inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
         ),
       )
       .orderBy(
@@ -94,16 +122,32 @@ async function findStaleActiveRun(
   return shouldFailActiveRunAsStale(row, currentTimestampMs()) ? row : null;
 }
 
-export async function reconcileStaleActiveSessionRun(
+async function findStaleActiveRuns(
   database: D1Database,
-  sessionId: SessionId,
-): Promise<boolean> {
-  const staleRun = await findStaleActiveRun(database, sessionId);
+  input: {
+    readonly limit: number;
+    readonly nowMs: number;
+  },
+): Promise<ActiveRunDriverRow[]> {
+  return getAppDatabase(database)
+    .select(activeRunDriverColumns())
+    .from(sessionRunsTable)
+    .leftJoin(
+      runDriverInstancesTable,
+      eq(runDriverInstancesTable.id, sessionRunsTable.driverInstanceId),
+    )
+    .where(
+      and(
+        inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
+        staleActiveRunPredicate(input.nowMs),
+      ),
+    )
+    .orderBy(asc(sessionRunsTable.updatedAt), asc(sessionRunsTable.id))
+    .limit(input.limit)
+    .all();
+}
 
-  if (!staleRun) {
-    return false;
-  }
-
+async function failStaleActiveRun(database: D1Database, staleRun: ActiveRunDriverRow) {
   const error = staleRunError(staleRun);
   const outcome = await setSessionRunStatus(database, {
     error,
@@ -127,4 +171,43 @@ export async function reconcileStaleActiveSessionRun(
       return false;
     }
   }
+}
+
+export async function reconcileStaleActiveSessionRun(
+  database: D1Database,
+  sessionId: SessionId,
+): Promise<boolean> {
+  const staleRun = await findStaleActiveRun(database, sessionId);
+
+  if (!staleRun) {
+    return false;
+  }
+
+  return failStaleActiveRun(database, staleRun);
+}
+
+export async function reconcileStaleActiveSessionRuns(
+  database: D1Database,
+  input: {
+    readonly limit: number;
+  },
+): Promise<StaleActiveRunReconciliationResult> {
+  const staleRuns = await findStaleActiveRuns(database, {
+    limit: input.limit,
+    nowMs: currentTimestampMs(),
+  });
+  const reconciledRunIds: SessionRunId[] = [];
+  const reconciledSessionIds = new Set<SessionId>();
+
+  for (const staleRun of staleRuns) {
+    if (await failStaleActiveRun(database, staleRun)) {
+      reconciledRunIds.push(staleRun.run_id);
+      reconciledSessionIds.add(staleRun.session_id);
+    }
+  }
+
+  return {
+    reconciledRunIds,
+    reconciledSessionIds: [...reconciledSessionIds],
+  };
 }
