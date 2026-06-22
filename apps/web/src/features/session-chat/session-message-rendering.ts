@@ -1,10 +1,18 @@
-import type { SessionViewMessage, SessionViewSegment } from "@mosoo/ag-ui-session";
+import type {
+  SessionPermissionRequestView,
+  SessionViewMessage,
+  SessionViewSegment,
+} from "@mosoo/ag-ui-session";
 
 import type { ToolCall } from "./tool-call-card";
 
 export type AssistantMessageBlock =
   | { id: string; kind: "text"; text: string }
   | { call: ToolCall; id: string; kind: "tool" };
+
+export interface SessionMessageRenderingOptions {
+  permissionRequests?: readonly SessionPermissionRequestView[];
+}
 
 export function isRenderableSessionMessage(message: SessionViewMessage): boolean {
   if (message.content.trim().length > 0) {
@@ -26,11 +34,19 @@ export function isRenderableSessionMessage(message: SessionViewMessage): boolean
 // Order is preserved exactly.
 export function sessionMessageSegmentsToBlocks(
   segments: SessionViewSegment[],
+  options: SessionMessageRenderingOptions = {},
 ): AssistantMessageBlock[] {
   const blocks: AssistantMessageBlock[] = [];
   const completedByCallId = new Map<string, { blockIndex: number }>();
   const pendingByCallId = new Map<string, { blockIndex: number }>();
+  const approvalByCallId = new Map<string, SessionPermissionRequestView>();
   let textBlockSeq = 0;
+
+  for (const request of options.permissionRequests ?? []) {
+    if (request.toolCallId !== null) {
+      approvalByCallId.set(request.toolCallId, request);
+    }
+  }
 
   for (const segment of segments) {
     if (segment.kind === "text") {
@@ -48,6 +64,7 @@ export function sessionMessageSegmentsToBlocks(
     }
 
     if (segment.kind === "tool_use") {
+      const approval = approvalByCallId.get(segment.toolCallId);
       const completed = completedByCallId.get(segment.toolCallId);
 
       if (completed) {
@@ -72,9 +89,10 @@ export function sessionMessageSegmentsToBlocks(
 
       const block: AssistantMessageBlock = {
         call: {
+          approvalInput: approval?.rawInput ?? null,
           argsText: segment.argsText,
           path: segment.path ?? null,
-          status: "running",
+          status: approval === undefined ? "running" : "needs_approval",
           tool: segment.tool,
         },
         id: `tool-${segment.toolCallId}`,

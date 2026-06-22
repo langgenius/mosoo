@@ -499,6 +499,58 @@ describe("runtime event AG-UI adapter", () => {
     ]);
   });
 
+  test("projects running tool input updates as tool args without fabricating a new start", () => {
+    const event = createRuntimeEvent({
+      id: createPlatformId(),
+      kind: "tool.call.updated",
+      occurredAt: OCCURRED_AT,
+      payload: {
+        rawInput: '{"command":"pwd"}',
+        status: "running",
+        toolCallId: "tool-1",
+      },
+      sessionId: PLATFORM_ID_FIXTURES.session,
+    });
+
+    expect(appRuntimeEventToAgUiSessionEvents(event)).toEqual([
+      {
+        delta: '{"command":"pwd"}',
+        toolCallId: "tool-1",
+        type: EventType.TOOL_CALL_ARGS,
+      },
+    ]);
+  });
+
+  test("projects running tool start metadata before tool args", () => {
+    const event = createRuntimeEvent({
+      id: createPlatformId(),
+      kind: "tool.call.updated",
+      occurredAt: OCCURRED_AT,
+      payload: {
+        parentMessageId: "assistant-1",
+        rawInput: '{"command":"pwd"}',
+        status: "running",
+        title: "Bash",
+        toolCallId: "tool-1",
+      },
+      sessionId: PLATFORM_ID_FIXTURES.session,
+    });
+
+    expect(appRuntimeEventToAgUiSessionEvents(event)).toEqual([
+      {
+        parentMessageId: "assistant-1",
+        toolCallId: "tool-1",
+        toolCallName: "Bash",
+        type: EventType.TOOL_CALL_START,
+      },
+      {
+        delta: '{"command":"pwd"}',
+        toolCallId: "tool-1",
+        type: EventType.TOOL_CALL_ARGS,
+      },
+    ]);
+  });
+
   test("apps permission resolution through the same session permission event", () => {
     const event = createRuntimeEvent({
       id: createPlatformId(),

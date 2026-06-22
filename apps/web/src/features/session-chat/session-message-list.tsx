@@ -1,3 +1,4 @@
+import type { SessionPermissionRequestView } from "@mosoo/ag-ui-session";
 import React, { useMemo } from "react";
 
 import type { ChatMessage } from "@/domains/runtime/use-session-stream";
@@ -14,11 +15,13 @@ import { ToolCallCard } from "./tool-call-card";
 export interface SessionMessageListProps {
   messages: ChatMessage[];
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
+  permissionRequests: readonly SessionPermissionRequestView[];
   streaming: boolean;
 }
 
 interface AssistantMessageBodyProps {
   message: ChatMessage;
+  permissionRequests: readonly SessionPermissionRequestView[];
   showCaret: boolean;
 }
 
@@ -28,6 +31,7 @@ interface PlainMessageTextProps {
 
 interface MessageRowProps {
   message: ChatMessage;
+  permissionRequests: readonly SessionPermissionRequestView[];
   showCaret: boolean;
 }
 
@@ -47,6 +51,7 @@ function createStreamingPlaceholderMessage(messages: ChatMessage[]): ChatMessage
 export function SessionMessageList({
   messages,
   messagesEndRef,
+  permissionRequests,
   streaming,
 }: SessionMessageListProps): React.ReactElement {
   const visibleMessages = useMemo(() => {
@@ -72,6 +77,7 @@ export function SessionMessageList({
             <MessageRow
               key={message.id}
               message={message}
+              permissionRequests={permissionRequests}
               showCaret={
                 message.role === "assistant" && streaming && index === visibleMessages.length - 1
               }
@@ -84,13 +90,17 @@ export function SessionMessageList({
   );
 }
 
-function AssistantMessageBody({ message, showCaret }: AssistantMessageBodyProps): React.ReactNode {
+function AssistantMessageBody({
+  message,
+  permissionRequests,
+  showCaret,
+}: AssistantMessageBodyProps): React.ReactNode {
   const blocks = useMemo(
     () =>
       message.role === "assistant" && message.segments.length > 0
-        ? sessionMessageSegmentsToBlocks(message.segments)
+        ? sessionMessageSegmentsToBlocks(message.segments, { permissionRequests })
         : [],
-    [message.role, message.segments],
+    [message.role, message.segments, permissionRequests],
   );
 
   if (message.role === "user") {
@@ -146,6 +156,7 @@ function PlainMessageText({ children }: PlainMessageTextProps): React.ReactEleme
 
 const MessageRow = React.memo(function MessageRow({
   message,
+  permissionRequests,
   showCaret,
 }: MessageRowProps): React.ReactElement {
   return (
@@ -158,7 +169,11 @@ const MessageRow = React.memo(function MessageRow({
             : "w-full text-fg-1",
         )}
       >
-        <AssistantMessageBody message={message} showCaret={showCaret} />
+        <AssistantMessageBody
+          message={message}
+          permissionRequests={permissionRequests}
+          showCaret={showCaret}
+        />
       </div>
     </div>
   );

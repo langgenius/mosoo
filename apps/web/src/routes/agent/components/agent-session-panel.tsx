@@ -213,6 +213,7 @@ export function AgentSessionPanel({
             <SessionMessageList
               messages={model.messages}
               messagesEndRef={model.messagesEndRef}
+              permissionRequests={model.permissionRequests}
               streaming={model.streaming}
             />
           )}
