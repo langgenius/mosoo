@@ -133,8 +133,7 @@ function getRuntimeOutputFileName(path: string): string {
     .trim()
     .replaceAll("\\", "/")
     .split("/")
-    .filter((segment) => segment.length > 0)
-    .at(-1);
+    .findLast((segment) => segment.length > 0);
 
   if (name === undefined) {
     throw new Error("Runtime output path must include a file name.");

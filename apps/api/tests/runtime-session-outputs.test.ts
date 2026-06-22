@@ -46,7 +46,7 @@ function createSandboxHandle(files: ReadonlyMap<string, string>): SandboxHandle 
       const output = [...files.keys()]
         .filter((path) => path.startsWith(outputDir))
         .map((path) => path.slice(outputDir.length))
-        .sort()
+        .toSorted()
         .join("\n");
 
       return {
