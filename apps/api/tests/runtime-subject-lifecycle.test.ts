@@ -18,8 +18,10 @@ function createRuntimeSubjectLifecycleDatabase(): SqliteD1Database {
 
   database.execute(`
     CREATE TABLE sandbox (
+      bind_mount_ready integer DEFAULT false NOT NULL,
       claim_expires_at integer,
       claim_owner text,
+      created_at integer NOT NULL,
       global_mounts_json text DEFAULT '[]' NOT NULL,
       id text PRIMARY KEY NOT NULL,
       inactive_deadline_at integer,
@@ -34,6 +36,8 @@ function createRuntimeSubjectLifecycleDatabase(): SqliteD1Database {
       status_operation_id text,
       status_seq integer DEFAULT 0 NOT NULL,
       status_source text DEFAULT 'system' NOT NULL,
+      subject_id text NOT NULL,
+      subject_kind text NOT NULL,
       updated_at integer NOT NULL
     );
 
@@ -68,6 +72,7 @@ async function insertRuntimeSubject(
         INSERT INTO sandbox (
           claim_expires_at,
           claim_owner,
+          created_at,
           id,
           inactive_deadline_at,
           kind,
@@ -79,14 +84,17 @@ async function insertRuntimeSubject(
           status_event,
           status_seq,
           status_source,
+          subject_id,
+          subject_kind,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
     )
     .bind(
       null,
       null,
+      1,
       RUNTIME_SUBJECT_ID,
       1,
       "cattle",
@@ -98,6 +106,8 @@ async function insertRuntimeSubject(
       `runtime_subject.${input.status === "backing_up" ? "back_up" : input.status}`,
       input.statusSeq ?? 0,
       "test",
+      "01J00000000000000000000009",
+      "session",
       1,
     )
     .run();
@@ -131,7 +141,7 @@ async function readRuntimeSubject(database: D1Database): Promise<{
   return row;
 }
 
-function createSandboxHandle(): SandboxHandle {
+function createSandboxHandle(options: { readonly prepareError?: Error } = {}): SandboxHandle {
   const unavailable = async () => {
     throw new Error("Unexpected sandbox test method call.");
   };
@@ -143,7 +153,11 @@ function createSandboxHandle(): SandboxHandle {
     destroy: unavailable,
     exec: unavailable,
     getSession: unavailable,
-    mkdir: async () => {},
+    mkdir: async () => {
+      if (options.prepareError) {
+        throw options.prepareError;
+      }
+    },
     mountBucket: unavailable,
     readFile: unavailable,
     restoreBackup: unavailable,
@@ -156,11 +170,14 @@ function createSandboxHandle(): SandboxHandle {
   } as SandboxHandle;
 }
 
-function createBindings(database: D1Database): ApiBindings {
+function createBindings(
+  database: D1Database,
+  options: { readonly prepareError?: Error } = {},
+): ApiBindings {
   return {
     DB: database,
     SANDBOX_FILE_BUCKET_LOCAL: "true",
-    runtimeSubjectHandleFactory: () => createSandboxHandle(),
+    runtimeSubjectHandleFactory: () => createSandboxHandle(options),
   } as unknown as ApiBindings;
 }
 
@@ -328,6 +345,47 @@ describe("runtime subject lifecycle machine", () => {
       last_error: null,
       last_error_code: null,
       status: "active",
+    });
+  });
+
+  test("clears activation claim when filesystem preparation fails", async () => {
+    const database = createRuntimeSubjectLifecycleDatabase();
+    const prepareError = new Error("Runtime subject filesystem prepare timed out after 15000ms.");
+
+    await expect(
+      createRuntimeSubjectLifecycleService(createBindings(database, { prepareError })).activate({
+        executionOwnerUserId: "01J00000000000000000000002",
+        kind: "cattle",
+        runtimeSubjectId: RUNTIME_SUBJECT_ID,
+        spaceAliases: [],
+        subjectId: "01J00000000000000000000009",
+        subjectKind: "session",
+      }),
+    ).rejects.toThrow("Runtime subject filesystem prepare timed out after 15000ms.");
+
+    const row = await database
+      .prepare(
+        `
+          SELECT claim_expires_at, claim_owner, last_error, last_error_code, status
+          FROM sandbox
+          WHERE id = ?
+        `,
+      )
+      .bind(RUNTIME_SUBJECT_ID)
+      .first<{
+        claim_expires_at: number | null;
+        claim_owner: string | null;
+        last_error: string | null;
+        last_error_code: string | null;
+        status: string;
+      }>();
+
+    expect(row).toEqual({
+      claim_expires_at: null,
+      claim_owner: null,
+      last_error: "Runtime subject filesystem prepare timed out after 15000ms.",
+      last_error_code: "runtime.subject_activation_failed",
+      status: "error",
     });
   });
 });

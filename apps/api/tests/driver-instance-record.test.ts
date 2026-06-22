@@ -18,6 +18,7 @@ import {
   markDriverInstanceReady,
   recordDriverInstanceHello,
 } from "../src/modules/runtime/infrastructure/driver-instance/lifecycle";
+import { cleanupDriverInstances } from "../src/modules/runtime/infrastructure/driver-instance/maintenance";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -301,6 +302,21 @@ describe("driver instance records", () => {
     ).resolves.toMatchObject({
       id: DRIVER_INSTANCE_ID,
       status: "ready",
+    });
+  });
+
+  test("maintenance fails stale live driver records", async () => {
+    const database = createDriverInstanceRecordDatabase();
+    insertDriverRecord(database, {
+      status: "ready",
+      updatedAt: 1,
+    });
+
+    await cleanupDriverInstances(createBindings(database));
+
+    await expect(readDriverRecord(database)).resolves.toMatchObject({
+      errorMessage: "Runtime driver heartbeat timed out.",
+      status: "failed",
     });
   });
 

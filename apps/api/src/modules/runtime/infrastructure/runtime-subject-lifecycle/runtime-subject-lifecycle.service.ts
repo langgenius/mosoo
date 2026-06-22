@@ -178,11 +178,11 @@ export class RuntimeSubjectLifecycleService {
     const subject = await this.getHandle(input.runtimeSubjectId);
     const isCold = record === null || record.status === "cold";
 
-    await measureOptional(input.timing, "runtimeSubject.prepareFilesystem", () =>
-      prepareRuntimeSubjectFilesystem(subject),
-    );
-
     try {
+      await measureOptional(input.timing, "runtimeSubject.prepareFilesystem", () =>
+        prepareRuntimeSubjectFilesystem(subject),
+      );
+
       if (isCold) {
         const restoring = await measureOptional(input.timing, "runtimeSubject.markRestoring", () =>
           markRuntimeSubjectRestoring(this.#bindings.DB, {
