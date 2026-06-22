@@ -160,6 +160,43 @@ function appPermissionResolved(event: RuntimeEventEnvelope): AgUiSessionEvent[] 
   ];
 }
 
+function toolCallStartEvent(
+  toolCall: ReturnType<typeof readRuntimeEventToolCallUpdate>,
+): AgUiSessionEvent | null {
+  const parentMessageId = toolCall.parentMessageId ?? toolCall.messageId;
+
+  if (parentMessageId === null) {
+    return null;
+  }
+
+  return {
+    parentMessageId,
+    toolCallId: toolCall.toolCallId,
+    toolCallName: toolCall.title ?? toolCall.kind ?? "Tool",
+    type: EventType.TOOL_CALL_START,
+  };
+}
+
+function toolCallArgsEvent(
+  toolCall: ReturnType<typeof readRuntimeEventToolCallUpdate>,
+): AgUiSessionEvent | null {
+  if (toolCall.rawInput === null || toolCall.rawInput.length === 0) {
+    return null;
+  }
+
+  return {
+    delta: toolCall.rawInput,
+    toolCallId: toolCall.toolCallId,
+    type: EventType.TOOL_CALL_ARGS,
+  };
+}
+
+function appendIfPresent<T>(target: T[], value: T | null): void {
+  if (value !== null) {
+    target.push(value);
+  }
+}
+
 export function appRuntimeEventToAgUiSessionEvents(
   event: RuntimeEventEnvelope,
 ): AgUiSessionEvent[] {
@@ -240,14 +277,25 @@ export function appRuntimeEventToAgUiSessionEvents(
     }
     case "tool.call.updated": {
       const toolCall = readRuntimeEventToolCallUpdate(event);
+      const projected: AgUiSessionEvent[] = [];
 
-      if (toolCall.status === "completed") {
+      appendIfPresent(projected, toolCallStartEvent(toolCall));
+      appendIfPresent(projected, toolCallArgsEvent(toolCall));
+
+      if (toolCall.status === "completed" || toolCall.status === "failed") {
         const rawOutput = toolCall.rawOutput ?? toolCall.content;
-        return rawOutput === null
-          ? [{ toolCallId: toolCall.toolCallId, type: EventType.TOOL_CALL_END }]
+        const result =
+          rawOutput ??
+          (toolCall.status === "failed"
+            ? `${toolCall.title ?? toolCall.kind ?? "Tool"} failed.`
+            : null);
+
+        return result === null
+          ? [...projected, { toolCallId: toolCall.toolCallId, type: EventType.TOOL_CALL_END }]
           : [
+              ...projected,
               {
-                content: rawOutput,
+                content: result,
                 messageId: toolCall.messageId ?? event.id,
                 toolCallId: toolCall.toolCallId,
                 type: EventType.TOOL_CALL_RESULT,
@@ -256,14 +304,7 @@ export function appRuntimeEventToAgUiSessionEvents(
             ];
       }
 
-      return [
-        {
-          parentMessageId: toolCall.parentMessageId ?? event.id,
-          toolCallId: toolCall.toolCallId,
-          toolCallName: toolCall.title ?? toolCall.kind ?? "Tool",
-          type: EventType.TOOL_CALL_START,
-        },
-      ];
+      return projected;
     }
     case "plan.updated": {
       const payload = readRuntimeEventPayload(event);

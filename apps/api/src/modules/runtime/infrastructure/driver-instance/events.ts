@@ -1,4 +1,5 @@
 import {
+  EventType,
   MOSOO_CUSTOM_EVENT,
   createServerCustomEvent,
   parseNullableSessionUsageSummary,
@@ -12,6 +13,7 @@ import {
   readRuntimeEventPayload,
   readRuntimeEventPermissionRequest,
   readRuntimeEventString,
+  readRuntimeRunPayload,
 } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 import type { DriverEventEnvelope } from "agent-driver/events";
@@ -92,6 +94,58 @@ function readRuntimeFileChangeContentType(
 ): string | null {
   const contentType = metadata?.["contentType"] ?? metadata?.["mimeType"];
   return typeof contentType === "string" && contentType.trim().length > 0 ? contentType : null;
+}
+
+function readTerminalPendingToolResult(event: RuntimeEventEnvelope): string | null {
+  if (event.kind === "run.failed") {
+    const run = readRuntimeRunPayload(event).run;
+    const message = run?.error?.message ?? "Run failed before the tool returned a result.";
+    return `Tool failed before returning a result: ${message}`;
+  }
+
+  if (event.kind === "run.cancelled") {
+    return "Tool was cancelled before returning a result.";
+  }
+
+  return null;
+}
+
+function createPendingToolResultEvents(
+  state: SessionLiveState,
+  event: RuntimeEventEnvelope,
+): SessionDeliveryEvent[] {
+  const content = readTerminalPendingToolResult(event);
+
+  if (content === null) {
+    return [];
+  }
+
+  return state.messages.flatMap((message) => {
+    const completedToolCallIds = new Set(
+      message.segments.flatMap((segment) =>
+        segment.kind === "tool_result" ? [segment.toolCallId] : [],
+      ),
+    );
+
+    return message.segments.flatMap((segment) => {
+      if (segment.kind !== "tool_use" || completedToolCallIds.has(segment.toolCallId)) {
+        return [];
+      }
+
+      return [
+        {
+          content,
+          messageId: message.id,
+          toolCallId: segment.toolCallId,
+          type: EventType.TOOL_CALL_RESULT,
+        },
+        {
+          toolCallId: segment.toolCallId,
+          type: EventType.TOOL_CALL_END,
+        },
+      ];
+    });
+  });
 }
 
 async function recordRuntimeFileChanges(input: {
@@ -339,7 +393,10 @@ export async function appRuntimeDriverEvents(
       continue;
     }
 
-    const liveEvents = appRuntimeEventToSessionDeliveryEvents(event);
+    const liveEvents = [
+      ...createPendingToolResultEvents(nextLiveState, event),
+      ...appRuntimeEventToSessionDeliveryEvents(event),
+    ];
 
     const setSessionTitle = (title: string | null): void => {
       sessionTitle = title;

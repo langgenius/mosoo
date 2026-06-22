@@ -182,7 +182,66 @@ describe("session live-state transcript reducer", () => {
     ]);
   });
 
-  test("terminal run states complete pending tool rows", () => {
+  test("deduplicates repeated tool starts for the same tool call across transient messages", () => {
+    const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
+      {
+        parentMessageId: "assistant-1",
+        toolCallId: "tool-1",
+        toolCallName: "Bash",
+        type: "TOOL_CALL_START",
+      },
+      { delta: '{"command":"pwd"}', toolCallId: "tool-1", type: "TOOL_CALL_ARGS" },
+      {
+        parentMessageId: "runtime-event-1",
+        toolCallId: "tool-1",
+        toolCallName: "Tool",
+        type: "TOOL_CALL_START",
+      },
+    ]);
+
+    expect(nextState.messages).toHaveLength(1);
+    expect(nextState.messages[0]?.id).toBe("assistant-1");
+    expect(nextState.messages[0]?.segments).toEqual([
+      {
+        argsText: '{"command":"pwd"}',
+        kind: "tool_use",
+        path: null,
+        tool: "Bash",
+        toolCallId: "tool-1",
+      },
+    ]);
+  });
+
+  test("attaches tool results to an existing tool call when the result message id differs", () => {
+    const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
+      {
+        parentMessageId: "assistant-1",
+        toolCallId: "tool-1",
+        toolCallName: "Bash",
+        type: "TOOL_CALL_START",
+      },
+      {
+        content: "done",
+        messageId: "runtime-event-1",
+        toolCallId: "tool-1",
+        type: "TOOL_CALL_RESULT",
+      },
+    ]);
+
+    expect(nextState.messages).toHaveLength(1);
+    expect(nextState.messages[0]?.id).toBe("assistant-1");
+    expect(nextState.messages[0]?.segments).toEqual([
+      { argsText: "", kind: "tool_use", path: null, tool: "Bash", toolCallId: "tool-1" },
+      {
+        kind: "tool_result",
+        output: "done",
+        tool: "Bash",
+        toolCallId: "tool-1",
+      },
+    ]);
+  });
+
+  test("terminal run states do not synthesize missing tool results", () => {
     const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
       { runId: "run-1", threadId: "session-1", type: "RUN_STARTED" },
       { messageId: "assistant-1", role: "assistant", type: "TEXT_MESSAGE_START" },
@@ -200,7 +259,6 @@ describe("session live-state transcript reducer", () => {
     expect(nextState.permissionRequests).toEqual([]);
     expect(nextState.messages[0]?.segments).toEqual([
       { argsText: "", kind: "tool_use", path: null, tool: "Shell", toolCallId: "tool-1" },
-      { kind: "tool_result", output: "", tool: "Shell", toolCallId: "tool-1" },
     ]);
   });
 
@@ -240,8 +298,9 @@ describe("session live-state transcript reducer", () => {
     expect(nextState.run.status).toBe("failed");
     expect(nextState.run.error?.code).toBe("runtime.provision_failed");
     expect(nextState.messages[0]?.segments.at(-1)).toEqual({
-      kind: "tool_result",
-      output: "",
+      argsText: "",
+      kind: "tool_use",
+      path: null,
       tool: "Shell",
       toolCallId: "tool-1",
     });
@@ -566,8 +625,9 @@ describe("session live-state transcript reducer", () => {
     expect(nextState.run.status).toBe("failed");
     expect(nextState.run.error?.code).toBe("runtime.driver_stopped");
     expect(nextState.messages[0]?.segments.at(-1)).toEqual({
-      kind: "tool_result",
-      output: "",
+      argsText: "",
+      kind: "tool_use",
+      path: null,
       tool: "Shell",
       toolCallId: "tool-1",
     });

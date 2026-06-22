@@ -6,6 +6,7 @@ import {
   readRuntimeEventToolCallId,
   readRuntimeEventToolName,
   readRuntimeEventToolStatusFromEvent,
+  readRuntimeRunPayload,
 } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope, RuntimeEventToolStatus } from "@mosoo/runtime-events";
 
@@ -368,6 +369,7 @@ export class RuntimeEventPersistenceCompactor {
   ): ProjectedRuntimeEventRecord[] {
     const output: ProjectedRuntimeEventRecord[] = [];
     const runId = terminalEvent.runId ?? null;
+    const terminalToolResult = readTerminalToolResult(terminalEvent);
 
     for (const [key, accumulator] of this.#messages) {
       if (accumulator.sessionId !== terminalEvent.sessionId || accumulator.runId !== runId) {
@@ -406,9 +408,33 @@ export class RuntimeEventPersistenceCompactor {
         accumulator.status = terminalToolStatus;
       }
 
+      if (
+        terminalToolResult !== null &&
+        accumulator.status === "failed" &&
+        accumulator.rawOutput === null &&
+        accumulator.content.length === 0
+      ) {
+        accumulator.content = terminalToolResult;
+        accumulator.rawOutput = terminalToolResult;
+      }
+
       output.push(this.#createToolRecord(accumulator));
     }
 
     return output;
   }
+}
+
+function readTerminalToolResult(event: RuntimeEventEnvelope): string | null {
+  if (event.kind === "run.failed") {
+    const run = readRuntimeRunPayload(event).run;
+    const message = run?.error?.message ?? "Run failed before the tool returned a result.";
+    return `Tool failed before returning a result: ${message}`;
+  }
+
+  if (event.kind === "run.cancelled") {
+    return "Tool was cancelled before returning a result.";
+  }
+
+  return null;
 }
