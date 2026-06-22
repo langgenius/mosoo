@@ -1,3 +1,4 @@
+import type { CompleteFileUploadRequest } from "@mosoo/contracts/file";
 import { PUBLIC_API_VERSION_PREFIX } from "@mosoo/contracts/public-api";
 import type { PublicThreadId } from "@mosoo/id";
 import { Hono } from "hono";
@@ -165,6 +166,27 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
         archived: parseOptionalBoolean(c.req.query("archived")),
       }),
     ),
+  );
+
+  v1.put("/files/:fileId/content", async (c) =>
+    runPublicApiAuthenticatedJson(c, async (caller) => {
+      const service = await loadPublicThreadFileService();
+      await service.putPublicThreadFileContent(c.env, caller.viewer, {
+        body: c.req.raw.body,
+        fileId: parseFileIdParam(c.req.param("fileId")),
+      });
+      return { ok: true };
+    }),
+  );
+
+  v1.post("/files/:fileId/complete", async (c) =>
+    runPublicApiAuthenticatedJson(c, async (caller) => {
+      const service = await loadPublicThreadFileService();
+      return service.completePublicThreadFileUpload(c.env, caller.viewer, {
+        fileId: parseFileIdParam(c.req.param("fileId")),
+        request: await c.req.json<CompleteFileUploadRequest>(),
+      });
+    }),
   );
 
   v1.post("/threads/:threadId/events", async (c) => {

@@ -1,7 +1,12 @@
 import { PLATFORM_ID_INPUT_PATTERN } from "@mosoo/id";
 
 import { AGENT_KIND_VALUES } from "../agent/agent.contract.ts";
-import { FILE_UPLOAD_STATUSES, FILE_UPLOAD_STRATEGIES } from "../file/file.contract";
+import {
+  FILE_SESSION_KINDS,
+  FILE_STATUSES,
+  FILE_UPLOAD_STATUSES,
+  FILE_UPLOAD_STRATEGIES,
+} from "../file/file.contract";
 import {
   PUBLIC_API_ERROR_CODES,
   PUBLIC_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
@@ -228,6 +233,135 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
       "status",
       "strategy",
     ],
+    type: "object",
+  },
+  CompleteFileUploadPart: {
+    additionalProperties: false,
+    description:
+      "A completed multipart upload part. Public Thread MVP uploads use single PUT and do not send parts.",
+    properties: {
+      etag: {
+        description: "ETag returned by the uploaded multipart part.",
+        minLength: 1,
+        type: "string",
+      },
+      partNumber: {
+        description: "One-based multipart part number for completion ordering.",
+        minimum: 1,
+        type: "integer",
+      },
+    },
+    required: ["etag", "partNumber"],
+    type: "object",
+  },
+  CompleteFileUploadRequest: {
+    additionalProperties: false,
+    description:
+      "Request body for completing a files API upload session. Public Thread MVP single PUT uploads send an empty object.",
+    properties: {
+      parts: {
+        description:
+          "Multipart completion parts. Omit this field for public MVP single PUT uploads.",
+        items: { $ref: "#/components/schemas/CompleteFileUploadPart" },
+        type: "array",
+      },
+    },
+    required: [],
+    type: "object",
+  },
+  FileEntry: {
+    additionalProperties: false,
+    description: "Files API file entry returned after an upload completes.",
+    properties: {
+      createdAt: {
+        description: "Timestamp (RFC 3339) at which the file record was created.",
+        format: "date-time",
+        type: "string",
+      },
+      createdBy: {
+        ...PLATFORM_ID_SCHEMA,
+        description: "Account ID (bare ULID) that created the file record.",
+      },
+      etag: {
+        description: "Storage ETag for the finalized object, or null when unavailable.",
+        type: ["string", "null"],
+      },
+      expiresAt: {
+        description: "Expiration timestamp for temporary files, or null for durable Thread files.",
+        format: "date-time",
+        type: ["string", "null"],
+      },
+      id: {
+        ...createPublicApiPlatformIdSchema({
+          maxLength: PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
+          minLength: 1,
+        }),
+        description: "File ID (bare ULID) for the finalized file.",
+      },
+      mimeType: {
+        description: "Stored MIME type for the file bytes, or null when unknown.",
+        type: ["string", "null"],
+      },
+      name: {
+        description: "Original file name recorded for this file.",
+        type: "string",
+      },
+      path: {
+        description: "Files API record path for the finalized file.",
+        minLength: 1,
+        type: "string",
+      },
+      sessionKind: {
+        description: "Session file kind for Thread-scoped files, or null for non-session files.",
+        enum: [...FILE_SESSION_KINDS, null],
+      },
+      size: {
+        description: "Finalized file size in bytes.",
+        minimum: 0,
+        type: "integer",
+      },
+      status: {
+        description: "Current files API file lifecycle status.",
+        enum: FILE_STATUSES,
+      },
+      updatedAt: {
+        description: "Timestamp (RFC 3339) at which the file record was last updated.",
+        format: "date-time",
+        type: "string",
+      },
+      version: {
+        description: "Monotonic file version number within its path.",
+        minimum: 1,
+        type: "integer",
+      },
+    },
+    required: [
+      "createdAt",
+      "createdBy",
+      "etag",
+      "expiresAt",
+      "id",
+      "mimeType",
+      "name",
+      "path",
+      "sessionKind",
+      "size",
+      "status",
+      "updatedAt",
+      "version",
+    ],
+    type: "object",
+  },
+  CompleteFileUploadResponse: {
+    additionalProperties: false,
+    description: "Result of completing a files API upload session.",
+    properties: {
+      file: {
+        $ref: "#/components/schemas/FileEntry",
+        description: "Completed files API file entry.",
+      },
+    },
+    required: ["file"],
     type: "object",
   },
   ErrorResponse: {

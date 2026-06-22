@@ -1,4 +1,4 @@
-import type { CreateFileUploadResponse } from "@mosoo/contracts/file";
+import type { CompleteFileUploadResponse, CreateFileUploadResponse } from "@mosoo/contracts/file";
 import type { PublicThreadSummary } from "@mosoo/contracts/public-api";
 import type { SessionFile, SessionSummary } from "@mosoo/contracts/session";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
@@ -126,7 +126,7 @@ export function openApiJsonRequestExample(path: string, method: "post"): unknown
 
 function openApiJsonResponseContent(
   path: string,
-  method: "get" | "post",
+  method: "get" | "post" | "put",
   status: string,
 ): Record<string, unknown> {
   const document = createPublicApiOpenApiDocument("https://api.example.com");
@@ -145,7 +145,11 @@ function openApiJsonResponseContent(
   return requireRecord(content["application/json"], `${method} ${path} ${status} JSON content`);
 }
 
-export function openApiJsonResponseExample(path: string, method: "get" | "post", status: string) {
+export function openApiJsonResponseExample(
+  path: string,
+  method: "get" | "post" | "put",
+  status: string,
+) {
   return openApiJsonResponseContent(path, method, status)["example"];
 }
 
@@ -198,5 +202,25 @@ export function createFileUploadSummary(): CreateFileUploadResponse {
     path: `session-files/${PUBLIC_API_TEST_IDS.file}/brief.txt`,
     status: "pending",
     strategy: "single_put",
+  };
+}
+
+export function createCompleteFileUploadResponse(): CompleteFileUploadResponse {
+  return {
+    file: {
+      createdAt: "2026-05-19T00:02:00.000Z",
+      createdBy: PUBLIC_API_TEST_IDS.nonOwnerAccount,
+      etag: "etag-1",
+      expiresAt: null,
+      id: PUBLIC_API_TEST_IDS.file,
+      mimeType: "text/plain",
+      name: "brief.txt",
+      path: `session-files/${PUBLIC_API_TEST_IDS.file}/brief.txt`,
+      sessionKind: "attachment",
+      size: 19,
+      status: "ready",
+      updatedAt: "2026-05-19T00:03:00.000Z",
+      version: 1,
+    },
   };
 }
