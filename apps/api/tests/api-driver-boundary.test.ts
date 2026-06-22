@@ -270,7 +270,9 @@ describe("API to driver boundary", () => {
     expect(execution.configRevision.runId).toBe(API_DRIVER_BOUNDARY_IDS.sessionRun);
     expect(execution.profilePrompt).toContain("You are a helpful runtime.");
     expect(execution.profilePrompt).toContain("Runtime artifact delivery:");
-    expect(execution.profilePrompt).toContain(".mosoo/artifacts.json");
+    expect(execution.profilePrompt).toContain("only user-downloadable session output directory");
+    expect(execution.profilePrompt).toContain("even if the user does not explicitly ask");
+    expect(execution.profilePrompt).toContain("Files written anywhere else are scratch");
     expect(execution.environment.variables).toEqual({
       EXISTING_ENV: "kept",
     });

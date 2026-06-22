@@ -22,7 +22,7 @@ import { createErrorLogContext, logInfo, logWarn } from "../../../../platform/cl
 import { withDisposedRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../../shared/truthiness";
-import { fileStore } from "../../../files/application/file-store";
+import { fileStore, normalizeFileName } from "../../../files/application/file-store";
 import {
   applyAgUiEventToSessionLiveState,
   loadSessionViewerState,
@@ -58,11 +58,14 @@ import type {
 } from "./event-types";
 import { readNativeResumeRef } from "./native-resume-ref-event";
 import {
-  RUNTIME_ARTIFACT_MANIFEST_PATH,
-  getRuntimeArtifactFileName,
-  isRuntimeArtifactManifestPath,
-  readRuntimeArtifactManifestEntries,
-} from "./runtime-artifact-manifest";
+  RUNTIME_SESSION_OUTPUT_DIR_NAME,
+  RUNTIME_SESSION_OUTPUT_SCAN_MAX_FILES,
+  getRuntimeSessionOutputDirectory,
+  guessRuntimeSessionOutputContentType,
+  readRuntimeSessionOutputListing,
+  toRuntimeSessionOutputArtifactPath,
+  toRuntimeSessionOutputFile,
+} from "./runtime-session-outputs";
 import { getRuntimeSessionLink } from "./session-link.repository";
 export type {
   AppRuntimeDriverEventsResult,
@@ -80,16 +83,6 @@ function quoteShellArg(value: string): string {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
-async function sandboxRegularFileExists(
-  handle: ExecutionSessionHandle,
-  path: string,
-): Promise<boolean> {
-  const command = `if [ -f ${quoteShellArg(path)} ]; then printf 1; fi`;
-  const result = await handle.exec(`sh -lc ${quoteShellArg(command)}`);
-
-  return result.success && result.exitCode === 0 && result.stdout.trim() === "1";
-}
-
 function resolveRuntimeOutputCreator(link: RuntimeSessionLink): AccountId | null {
   const actorId = link.executionOwnerId ?? link.callerId ?? link.creatorId;
 
@@ -100,21 +93,97 @@ function resolveRuntimeOutputCreator(link: RuntimeSessionLink): AccountId | null
   return parsePlatformId<AccountId>(actorId, "runtime output creator account ID");
 }
 
-function resolveSandboxReadPath(cwd: string, path: string): string {
-  const normalizedPath = path.trim();
-
-  if (normalizedPath.startsWith("/")) {
-    return normalizedPath;
-  }
-
-  return `${cwd.replace(/\/+$/, "")}/${normalizedPath.replace(/^\/+/, "")}`;
-}
-
 function readRuntimeFileChangeContentType(
   metadata: Record<string, unknown> | undefined,
 ): string | null {
   const contentType = metadata?.["contentType"] ?? metadata?.["mimeType"];
   return typeof contentType === "string" && contentType.trim().length > 0 ? contentType : null;
+}
+
+function createRuntimeSessionOutputListCommand(outputDir: string): string {
+  const quotedOutputDir = quoteShellArg(outputDir);
+  const command = [
+    `if [ ! -d ${quotedOutputDir} ]; then exit 0; fi`,
+    `cd ${quotedOutputDir}`,
+    `find . -type f -print | sed 's#^\\./##' | sort | head -n ${RUNTIME_SESSION_OUTPUT_SCAN_MAX_FILES}`,
+  ].join(" && ");
+
+  return `sh -lc ${quoteShellArg(command)}`;
+}
+
+async function listRuntimeSessionOutputFiles(
+  handle: ExecutionSessionHandle,
+  outputDir: string,
+): Promise<string[]> {
+  const result = await handle.exec(createRuntimeSessionOutputListCommand(outputDir));
+
+  if (!result.success || result.exitCode !== 0) {
+    throw new Error(
+      result.stderr.trim() ||
+        result.stdout.trim() ||
+        `Failed to list runtime session outputs in ${outputDir}.`,
+    );
+  }
+
+  return readRuntimeSessionOutputListing(result.stdout);
+}
+
+function getRuntimeOutputFileName(path: string): string {
+  const name = path
+    .trim()
+    .replaceAll("\\", "/")
+    .split("/")
+    .filter((segment) => segment.length > 0)
+    .at(-1);
+
+  if (name === undefined) {
+    throw new Error("Runtime output path must include a file name.");
+  }
+
+  return normalizeFileName(name);
+}
+
+function createRecordedArtifactKey(input: { name: string; size: number }): string {
+  return `${input.name}\0${input.size}`;
+}
+
+function createRecordedArtifactSet(
+  files: Awaited<ReturnType<typeof fileStore.listReadySessionFiles>>,
+): Set<string> {
+  return new Set(
+    files
+      .filter((file) => file.kind === "artifact")
+      .map((file) => createRecordedArtifactKey({ name: file.name, size: file.size })),
+  );
+}
+
+async function recordRuntimeSessionOutputFile(input: {
+  bindings: ApiBindings;
+  body: Uint8Array;
+  contentType: string | null;
+  createdBy: AccountId;
+  path: string;
+  recordedArtifacts: Set<string>;
+  sessionId: SessionId;
+}): Promise<void> {
+  const artifactKey = createRecordedArtifactKey({
+    name: getRuntimeOutputFileName(input.path),
+    size: input.body.byteLength,
+  });
+
+  if (input.recordedArtifacts.has(artifactKey)) {
+    return;
+  }
+
+  await fileStore.recordRuntimeOutput({
+    bindings: input.bindings,
+    body: input.body,
+    contentType: input.contentType,
+    createdBy: input.createdBy,
+    path: input.path,
+    sessionId: input.sessionId,
+  });
+  input.recordedArtifacts.add(artifactKey);
 }
 
 function readTerminalPendingToolResult(event: RuntimeEventEnvelope): string | null {
@@ -178,7 +247,7 @@ async function recordRuntimeFileChanges(input: {
   const sandboxId = input.link.sandboxId;
   const createdBy = resolveRuntimeOutputCreator(input.link);
   const changes = readRuntimeEventFileChanges(input.event).filter(
-    (change) => change.change === "upsert" && !isRuntimeArtifactManifestPath(change.path),
+    (change) => change.change === "upsert",
   );
 
   if (changes.length === 0) {
@@ -205,28 +274,45 @@ async function recordRuntimeFileChanges(input: {
     return;
   }
 
+  const outputChanges = changes.flatMap((change) => {
+    const outputFile = toRuntimeSessionOutputFile({
+      contentType: readRuntimeFileChangeContentType(change.metadata),
+      cwd: conversation.cwd,
+      path: change.path,
+    });
+
+    return outputFile === null ? [] : [outputFile];
+  });
+
+  if (outputChanges.length === 0) {
+    return;
+  }
+
+  const parsedSessionId = parsePlatformId<SessionId>(sessionId, "runtime output session ID");
+  const recordedArtifacts = createRecordedArtifactSet(
+    await fileStore.listReadySessionFiles(input.bindings.DB, parsedSessionId),
+  );
+
   await withDisposedRpcResource(
     await getRuntimeSubjectKeepAliveHandle(input.bindings, sandboxId),
     async (sandbox) => {
       const sandboxSession = await sandbox.getSession(conversation.sandboxSessionId);
 
-      for (const change of changes) {
+      for (const outputFile of outputChanges) {
         try {
-          const readPath = resolveSandboxReadPath(conversation.cwd, change.path);
-          const bytes = await readSandboxFileBytes(sandboxSession, readPath);
-
-          await fileStore.recordRuntimeOutput({
+          await recordRuntimeSessionOutputFile({
             bindings: input.bindings,
-            body: bytes,
-            contentType: readRuntimeFileChangeContentType(change.metadata),
+            body: await readSandboxFileBytes(sandboxSession, outputFile.readPath),
+            contentType: outputFile.contentType,
             createdBy,
-            path: change.path,
-            sessionId: parsePlatformId<SessionId>(sessionId, "runtime output session ID"),
+            path: outputFile.artifactPath,
+            recordedArtifacts,
+            sessionId: parsedSessionId,
           });
         } catch (error) {
           logWarn("runtime.file_artifact.record_failed", {
             ...createErrorLogContext(error),
-            path: change.path,
+            path: outputFile.artifactPath,
             sandboxId,
             sessionId,
           });
@@ -236,7 +322,7 @@ async function recordRuntimeFileChanges(input: {
   );
 }
 
-async function recordRuntimeArtifactManifest(input: {
+async function recordRuntimeSessionOutputDirectory(input: {
   bindings: ApiBindings;
   event: RuntimeEventEnvelope;
   link: RuntimeSessionLink;
@@ -255,7 +341,7 @@ async function recordRuntimeArtifactManifest(input: {
   try {
     conversation = await getRuntimeConversationSession(input.bindings.DB, parsedSessionId);
   } catch (error) {
-    logWarn("runtime.file_artifact.manifest_session_lookup_failed", {
+    logWarn("runtime.file_artifact.output_scan_session_lookup_failed", {
       ...createErrorLogContext(error),
       driverInstanceId: input.event.driverInstanceId ?? null,
       sandboxId,
@@ -273,38 +359,10 @@ async function recordRuntimeArtifactManifest(input: {
       await getRuntimeSubjectKeepAliveHandle(input.bindings, sandboxId),
       async (sandbox) => {
         const sandboxSession = await sandbox.getSession(conversation.sandboxSessionId);
-        const manifestPath = resolveSandboxReadPath(
-          conversation.cwd,
-          RUNTIME_ARTIFACT_MANIFEST_PATH,
-        );
-        let manifestBytes: Uint8Array;
+        const outputDir = getRuntimeSessionOutputDirectory(conversation.cwd);
+        const outputPaths = await listRuntimeSessionOutputFiles(sandboxSession, outputDir);
 
-        if (!(await sandboxRegularFileExists(sandboxSession, manifestPath))) {
-          return;
-        }
-
-        try {
-          manifestBytes = await readSandboxFileBytes(sandboxSession, manifestPath);
-        } catch {
-          return;
-        }
-
-        let manifestEntries;
-
-        try {
-          manifestEntries = readRuntimeArtifactManifestEntries(manifestBytes);
-        } catch (error) {
-          logWarn("runtime.file_artifact.manifest_invalid", {
-            ...createErrorLogContext(error),
-            driverInstanceId: input.event.driverInstanceId ?? null,
-            path: RUNTIME_ARTIFACT_MANIFEST_PATH,
-            sandboxId,
-            sessionId,
-          });
-          return;
-        }
-
-        if (manifestEntries.length === 0) {
+        if (outputPaths.length === 0) {
           return;
         }
 
@@ -312,36 +370,25 @@ async function recordRuntimeArtifactManifest(input: {
           input.bindings.DB,
           parsedSessionId,
         );
-        const recordedArtifacts = new Set(
-          existingFiles
-            .filter((file) => file.kind === "artifact")
-            .map((file) => `${file.name}\0${file.size}`),
-        );
+        const recordedArtifacts = createRecordedArtifactSet(existingFiles);
 
-        for (const entry of manifestEntries) {
+        for (const outputPath of outputPaths) {
+          const artifactPath = toRuntimeSessionOutputArtifactPath(outputPath);
+
           try {
-            const readPath = resolveSandboxReadPath(conversation.cwd, entry.path);
-            const bytes = await readSandboxFileBytes(sandboxSession, readPath);
-            const fileName = getRuntimeArtifactFileName(entry.path);
-            const artifactKey = `${fileName}\0${bytes.length}`;
-
-            if (recordedArtifacts.has(artifactKey)) {
-              continue;
-            }
-
-            await fileStore.recordRuntimeOutput({
+            await recordRuntimeSessionOutputFile({
               bindings: input.bindings,
-              body: bytes,
-              contentType: entry.contentType,
+              body: await readSandboxFileBytes(sandboxSession, `${outputDir}/${outputPath}`),
+              contentType: guessRuntimeSessionOutputContentType(outputPath),
               createdBy,
-              path: entry.path,
+              path: artifactPath,
+              recordedArtifacts,
               sessionId: parsedSessionId,
             });
-            recordedArtifacts.add(artifactKey);
           } catch (error) {
-            logWarn("runtime.file_artifact.manifest_record_failed", {
+            logWarn("runtime.file_artifact.output_record_failed", {
               ...createErrorLogContext(error),
-              path: entry.path,
+              path: artifactPath,
               sandboxId,
               sessionId,
             });
@@ -350,9 +397,10 @@ async function recordRuntimeArtifactManifest(input: {
       },
     );
   } catch (error) {
-    logWarn("runtime.file_artifact.manifest_finalize_failed", {
+    logWarn("runtime.file_artifact.output_scan_failed", {
       ...createErrorLogContext(error),
       driverInstanceId: input.event.driverInstanceId ?? null,
+      outputDir: `${RUNTIME_SESSION_OUTPUT_DIR_NAME}/`,
       sandboxId,
       sessionId,
     });
@@ -494,7 +542,7 @@ export async function appRuntimeDriverEvents(
     }
 
     if (event.kind === "run.completed") {
-      await recordRuntimeArtifactManifest({
+      await recordRuntimeSessionOutputDirectory({
         bindings,
         event,
         link,

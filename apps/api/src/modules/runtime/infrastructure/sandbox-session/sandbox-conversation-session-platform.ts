@@ -2,6 +2,7 @@ import { discardPromiseResult } from "@mosoo/effects";
 import type { SandboxBackupId, SandboxSessionId } from "@mosoo/id";
 
 import { withDisposedRpcResult } from "../../../../platform/cloudflare/rpc-disposal";
+import { getRuntimeSessionOutputDirectory } from "../driver-instance/runtime-session-outputs";
 import { withRuntimeProvisionTimeout } from "../runtime-provision-timeout";
 import type { ExecutionSessionHandle, SandboxHandle } from "../sandbox-handles";
 
@@ -62,6 +63,7 @@ export async function prepareSandboxConversationDirectories(input: {
   readonly sandbox: SandboxHandle;
 }): Promise<void> {
   await input.sandbox.mkdir(input.cwd, { recursive: true });
+  await input.sandbox.mkdir(getRuntimeSessionOutputDirectory(input.cwd), { recursive: true });
 }
 
 export async function deleteSandboxConversationSessionBestEffort(input: {
