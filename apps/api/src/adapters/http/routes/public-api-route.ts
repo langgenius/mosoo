@@ -23,6 +23,7 @@ import {
   parseThreadEventsLimit,
   readCreateThreadRequest,
   readCreateThreadFileRequest,
+  readCreateThreadFileUploadRequest,
   readSendEventsRequest,
 } from "./public-thread-api-request";
 import type { ParsedCreateThreadRequest } from "./public-thread-api-request";
@@ -251,6 +252,20 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
           caller.viewer,
           threadId,
           await readCreateThreadFileRequest(c),
+        ),
+      201,
+    ),
+  );
+
+  v1.post("/threads/:threadId/files/uploads", async (c) =>
+    runPublicThreadFileRoute(
+      c,
+      async ({ caller, service, threadId }) =>
+        service.createPublicThreadFileUpload(
+          c.env,
+          caller.viewer,
+          threadId,
+          await readCreateThreadFileUploadRequest(c),
         ),
       201,
     ),

@@ -1,3 +1,4 @@
+import type { CreateFileUploadResponse } from "@mosoo/contracts/file";
 import type { PublicThreadSummary } from "@mosoo/contracts/public-api";
 import type { SessionFile, SessionSummary } from "@mosoo/contracts/session";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
@@ -184,5 +185,18 @@ export function createSessionFile(): SessionFile {
     mimeType: "text/plain",
     name: "brief.txt",
     size: 19,
+  };
+}
+
+export function createFileUploadSummary(): CreateFileUploadResponse {
+  return {
+    contentType: "text/plain",
+    expectedSize: 19,
+    expiresAt: "2026-05-20T00:02:00.000Z",
+    fileId: PUBLIC_API_TEST_IDS.file,
+    partSize: null,
+    path: `session-files/${PUBLIC_API_TEST_IDS.file}/brief.txt`,
+    status: "pending",
+    strategy: "single_put",
   };
 }

@@ -5,6 +5,7 @@ import {
   PUBLIC_THREAD_API_THREADS_MAX_LIMIT,
   PUBLIC_THREAD_EVENTS_DEFAULT_LIMIT,
   PUBLIC_THREAD_EVENTS_MAX_LIMIT,
+  PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES,
   PUBLIC_API_VERSION,
 } from "@mosoo/contracts/public-api";
 
@@ -58,6 +59,17 @@ const EXAMPLE_SESSION_FILE = {
   mimeType: "text/plain",
   name: "brief.txt",
   size: 19,
+};
+
+const EXAMPLE_FILE_UPLOAD_SUMMARY = {
+  contentType: "text/plain",
+  expectedSize: 19,
+  expiresAt: "2026-05-20T00:02:00.000Z",
+  fileId: EXAMPLE_FILE_ID,
+  partSize: null,
+  path: `session-files/${EXAMPLE_FILE_ID}/brief.txt`,
+  status: "pending",
+  strategy: "single_put",
 };
 
 function platformIdPathParameter(input: {
@@ -443,6 +455,33 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
           ),
         },
         summary: "Add a Thread file",
+      }),
+    },
+    "/threads/{threadId}/files/uploads": {
+      post: operation({
+        description: `Creates a files API upload session scoped to this Thread. The request only supplies file metadata; Mosoo resolves the backing App and Session from the Thread and creates a session attachment upload. MVP public uploads must be ${PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES} bytes or fewer and use single PUT.`,
+        parameters: [threadIdParameter],
+        security: ACCESS_TOKEN_SECURITY,
+        requestBody: jsonRequestBody(
+          {
+            $ref: "#/components/schemas/CreateThreadFileUploadRequest",
+          },
+          {
+            file: {
+              contentType: "text/plain",
+              name: "brief.txt",
+              size: 19,
+            },
+          },
+        ),
+        success: {
+          "201": jsonResponse(
+            "Created files API upload session.",
+            { $ref: "#/components/schemas/FileUploadSummary" },
+            EXAMPLE_FILE_UPLOAD_SUMMARY,
+          ),
+        },
+        summary: "Create a Thread file upload",
       }),
     },
     "/threads/{threadId}/files/{fileId}": {

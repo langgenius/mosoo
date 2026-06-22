@@ -1,4 +1,5 @@
 import type {
+  CreatePublicThreadFileUploadRequest,
   CreatePublicThreadFileRequest,
   PublicThreadApiSendEventsRequest,
 } from "@mosoo/contracts/public-api";
@@ -7,6 +8,7 @@ import {
   PUBLIC_THREAD_EVENTS_MAX_LIMIT,
   PUBLIC_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
   PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
+  PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES,
   PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
   PUBLIC_THREAD_JSON_BODY_MAX_BYTES,
 } from "@mosoo/contracts/public-api";
@@ -47,6 +49,12 @@ const THREAD_EVENT_PERMISSION_DECISION_FIELDS: ReadonlySet<string> = new Set([
 ]);
 const THREAD_EVENT_USER_INTERRUPT_FIELDS: ReadonlySet<string> = new Set(["type", "runId"]);
 const THREAD_FILE_REQUEST_FIELDS: ReadonlySet<string> = new Set(["fileId"]);
+const THREAD_FILE_UPLOAD_REQUEST_FIELDS: ReadonlySet<string> = new Set(["file"]);
+const THREAD_FILE_UPLOAD_FILE_FIELDS: ReadonlySet<string> = new Set([
+  "name",
+  "contentType",
+  "size",
+]);
 const CREATE_THREAD_REQUEST_FIELDS: ReadonlySet<string> = new Set([
   "input",
   "files",
@@ -202,6 +210,16 @@ function readStringField(input: Record<string, unknown>, field: string): string 
 
   if (typeof value !== "string" || value.trim().length === 0) {
     throw publicInvalidRequest(`${field} is required.`);
+  }
+
+  return value;
+}
+
+function readSafeIntegerField(input: Record<string, unknown>, field: string): number {
+  const value = input[field];
+
+  if (typeof value !== "number" || !Number.isSafeInteger(value)) {
+    throw publicInvalidRequest(`${field} must be an integer.`);
   }
 
   return value;
@@ -482,6 +500,44 @@ export async function readCreateThreadFileRequest(
       readLimitedStringField(body, "fileId", PUBLIC_THREAD_FILE_ID_MAX_LENGTH),
       "fileId",
     ) as FileId,
+  };
+}
+
+export async function readCreateThreadFileUploadRequest(
+  c: RawJsonRequestContext,
+): Promise<CreatePublicThreadFileUploadRequest> {
+  const body = await readJsonBodyWithLimit(c, PUBLIC_THREAD_JSON_BODY_MAX_BYTES);
+
+  if (!isRecord(body)) {
+    throw publicInvalidRequest("Request body must be an object.");
+  }
+
+  assertOnlyFields(body, THREAD_FILE_UPLOAD_REQUEST_FIELDS, "thread file upload request");
+  const file = body["file"];
+
+  if (!isRecord(file)) {
+    throw publicInvalidRequest("file must be an object.");
+  }
+
+  assertOnlyFields(file, THREAD_FILE_UPLOAD_FILE_FIELDS, "thread file upload file");
+  const size = readSafeIntegerField(file, "size");
+
+  if (size < 0) {
+    throw publicInvalidRequest("file.size must be a non-negative integer.");
+  }
+
+  if (size > PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES) {
+    throw publicInvalidRequest(
+      `file.size must be ${PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES} bytes or fewer.`,
+    );
+  }
+
+  return {
+    file: {
+      contentType: readStringField(file, "contentType"),
+      name: readStringField(file, "name"),
+      size,
+    },
   };
 }
 

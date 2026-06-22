@@ -1,12 +1,14 @@
 import { PLATFORM_ID_INPUT_PATTERN } from "@mosoo/id";
 
 import { AGENT_KIND_VALUES } from "../agent/agent.contract.ts";
+import { FILE_UPLOAD_STATUSES, FILE_UPLOAD_STRATEGIES } from "../file/file.contract";
 import {
   PUBLIC_API_ERROR_CODES,
   PUBLIC_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
   PUBLIC_THREAD_EVENT_LOG_STATUSES,
   PUBLIC_THREAD_EVENT_LOG_TYPES,
   PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
+  PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES,
   PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
 } from "./public-api-core.contract";
 
@@ -137,6 +139,95 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
       },
     },
     required: ["fileId"],
+    type: "object",
+  },
+  CreateThreadFileUploadRequest: {
+    additionalProperties: false,
+    description: "Request body for creating a files API upload session scoped to this Thread.",
+    properties: {
+      file: {
+        additionalProperties: false,
+        description: "Metadata for the file bytes that will be uploaded.",
+        properties: {
+          contentType: {
+            description: "MIME type for the file bytes.",
+            minLength: 1,
+            type: "string",
+          },
+          name: {
+            description: "Original file name to record for this Thread attachment.",
+            minLength: 1,
+            type: "string",
+          },
+          size: {
+            description:
+              "File size in bytes. Public Thread upload creation currently accepts single-put uploads only.",
+            maximum: PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES,
+            minimum: 0,
+            type: "integer",
+          },
+        },
+        required: ["name", "contentType", "size"],
+        type: "object",
+      },
+    },
+    required: ["file"],
+    type: "object",
+  },
+  FileUploadSummary: {
+    additionalProperties: false,
+    description: "Files API upload session summary returned after creating an upload target.",
+    properties: {
+      contentType: {
+        description: "Normalized MIME type the upload expects.",
+        type: "string",
+      },
+      expectedSize: {
+        description: "Expected file size in bytes for integrity validation.",
+        minimum: 0,
+        type: "integer",
+      },
+      expiresAt: {
+        description: "Timestamp (RFC 3339) when this upload session expires.",
+        format: "date-time",
+        type: "string",
+      },
+      fileId: {
+        ...createPublicApiPlatformIdSchema({
+          maxLength: PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
+          minLength: 1,
+        }),
+        description: "File ID (bare ULID) for this upload session.",
+      },
+      partSize: {
+        description: "Multipart part size in bytes, or null when the upload uses single PUT.",
+        minimum: 1,
+        type: ["integer", "null"],
+      },
+      path: {
+        description: "Materialized file path exposed by the files API upload summary.",
+        minLength: 1,
+        type: "string",
+      },
+      status: {
+        description: "Current files API upload session status.",
+        enum: FILE_UPLOAD_STATUSES,
+      },
+      strategy: {
+        description: "Files API upload transfer strategy selected for the file size.",
+        enum: FILE_UPLOAD_STRATEGIES,
+      },
+    },
+    required: [
+      "contentType",
+      "expectedSize",
+      "expiresAt",
+      "fileId",
+      "partSize",
+      "path",
+      "status",
+      "strategy",
+    ],
     type: "object",
   },
   ErrorResponse: {
