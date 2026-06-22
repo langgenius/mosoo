@@ -67,7 +67,7 @@ export function EnvironmentListTable({
           <div className="text-fg-2 text-[12px]">{networkLabel(environment)}</div>
           <div className="text-fg-2 font-mono text-[12px]">{environment.usedByAgentCount}</div>
           <div className="text-fg-3 text-[12px]" suppressHydrationWarning>
-            {new Date(environment.updatedAt).toLocaleDateString()}
+            {new Date(environment.updatedAt).toLocaleDateString("en-US")}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

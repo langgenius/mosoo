@@ -51,19 +51,19 @@ export const RUN_PURPOSE_FILTERS: { label: string; value: CostRunPurpose | "all"
   { label: "Preview", value: "preview" },
 ];
 
-const CURRENCY_FORMATTER_PRECISE = new Intl.NumberFormat(undefined, {
+const CURRENCY_FORMATTER_PRECISE = new Intl.NumberFormat("en-US", {
   currency: "USD",
   maximumFractionDigits: 2,
   style: "currency",
 });
 
-const CURRENCY_FORMATTER_WHOLE = new Intl.NumberFormat(undefined, {
+const CURRENCY_FORMATTER_WHOLE = new Intl.NumberFormat("en-US", {
   currency: "USD",
   maximumFractionDigits: 0,
   style: "currency",
 });
 
-const COMPACT_NUMBER_FORMATTER = new Intl.NumberFormat(undefined, {
+const COMPACT_NUMBER_FORMATTER = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
   notation: "compact",
 });

@@ -49,7 +49,7 @@ function formatRelativeTime(iso: string): string {
   if (diff < 7 * day) {
     return `${Math.floor(diff / day)}d ago`;
   }
-  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  return new Date(iso).toLocaleDateString("en-US", { day: "numeric", month: "short" });
 }
 
 function EmptyState(): ReactElement {

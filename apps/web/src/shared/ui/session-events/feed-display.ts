@@ -7,7 +7,7 @@ import type { SessionTurnStatus } from "./turns";
 const MAX_PREVIEW_LENGTH = 180;
 
 export function formatEventTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString(undefined, {
+  return new Date(iso).toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
