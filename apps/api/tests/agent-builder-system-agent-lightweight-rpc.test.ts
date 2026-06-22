@@ -1601,7 +1601,7 @@ describe("Agent Builder System Agent lightweight RPC", () => {
 
     expect(plannerOutput?.mode).toBe("plain_text");
     expect(plannerOutput?.nodes).toEqual([]);
-    expect(staleReplyResult.messages.at(-1)?.contentText).toContain("已过期");
+    expect(staleReplyResult.messages.at(-1)?.contentText).toContain("stale");
   });
 
   test("emits a secure create-Environment action for create-new Environment replies", async () => {

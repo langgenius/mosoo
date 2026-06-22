@@ -35,7 +35,7 @@ const REMOTE_MCP_OPTION_KEY = "action:create_remote_mcp_server";
 
 const OPTIONAL_COMPONENT_SPECS = [
   {
-    askText: "可以。你可以从当前可见的 Skills 中选择要绑定到这个 Agent 的能力，也可以先跳过。",
+    askText: "Sure. You can select capabilities to bind to this Agent from the currently visible Skills, or skip for now.",
     fieldPath: "skillIds",
     intentPatterns: [/\bskills?\b/iu, /\bpdf\b/iu, /\bdocx\b/iu, /\bxlsx\b/iu, /\bpptx\b/iu],
     listKey: "skills",
@@ -50,10 +50,10 @@ const OPTIONAL_COMPONENT_SPECS = [
     actionOptionKey: REMOTE_MCP_OPTION_KEY,
     actionSummary: "Open the secure remote MCP server creation UI.",
     actionText:
-      "创建远程 MCP server 需要打开专用安全配置 UI。Builder 会在 Agent Manifest 中引用创建后的 server，不把 credential 写进 YAML；点击 Create remote MCP server 继续。",
-    askText: "可以。你可以选择已有 MCP server，或通过安全 UI 创建新的远程 MCP server。",
+      "Creating a remote MCP server requires opening a dedicated secure configuration UI. The Builder references the created server in the Agent Manifest and does not write credentials into the YAML. Click Create remote MCP server to continue.",
+    askText: "Sure. You can select an existing MCP server, or create a new remote MCP server through the secure UI.",
     fieldPath: "mcpServerIds",
-    intentPatterns: [/\bmcp\b/iu, /\bserver\b/iu, /远程\s*mcp/iu],
+    intentPatterns: [/\bmcp\b/iu, /\bserver\b/iu, /\bremote\s*mcp\b/iu],
     listKey: "mcpServers",
     nodeKey: "ask_mcp_servers",
     optionPrefix: "mcp_server:",
@@ -171,7 +171,7 @@ function createComponentDraftPatchPlannerOutput(input: {
   readonly spec: OptionalComponentSpec;
 }): AgentBuilderPlannerOutput {
   return {
-    assistantText: "已选择组件。我会把这些绑定写入当前 Agent Manifest。",
+    assistantText: "Components selected. I'll write these bindings into the current Agent Manifest.",
     intentSummary: `Bind selected optional ${input.spec.fieldPath}.`,
     mode: "draft_patch",
     nodes: [
@@ -220,7 +220,7 @@ function createComponentDraftPatchWithRemoteMcpActionPlannerOutput(input: {
   return {
     ...patchOutput,
     assistantText:
-      "已选择已有 MCP server。我会先把它写入当前 Agent Manifest；新的远程 MCP server 需要通过安全 UI 继续创建。",
+      "Existing MCP server selected. I'll write it into the current Agent Manifest first; creating a new remote MCP server still needs to be done through the secure UI.",
     intentSummary:
       "Bind selected optional MCP servers and open the secure remote MCP server creation UI.",
     nodes: [...patchOutput.nodes, ...actionOutput.nodes],
@@ -265,7 +265,7 @@ export function planAgentBuilderOptionalComponentStructuredReply(input: {
 
   if (input.reply.mode !== "multi_select" && input.reply.mode !== "free_text") {
     return createAgentBuilderPlainTextPlannerOutput({
-      assistantText: "这个结构化回复的输入模式不属于当前组件选择流程；请重新选择组件。",
+      assistantText: "This structured reply's input mode doesn't belong to the current component selection flow. Please select components again.",
       intentSummary: "Reject a structured reply mode that does not match the component question.",
       plannerRunId: input.context.plannerRunId,
     });
@@ -273,7 +273,7 @@ export function planAgentBuilderOptionalComponentStructuredReply(input: {
 
   if (input.reply.skipped) {
     return createAgentBuilderPlainTextPlannerOutput({
-      assistantText: "已跳过这组可选组件；后续仍然可以回到 Builder 添加。",
+      assistantText: "Skipped this set of optional components. You can always come back to the Builder to add them later.",
       intentSummary: "Skip optional component binding.",
       plannerRunId: input.context.plannerRunId,
     });
@@ -295,7 +295,7 @@ export function planAgentBuilderOptionalComponentStructuredReply(input: {
 
     if (selectedAsset === null) {
       return createAgentBuilderPlainTextPlannerOutput({
-        assistantText: "有组件不在当前可见资产里。我不能直接绑定不可见资源；请重新选择。",
+        assistantText: "Some components aren't among the currently visible assets. I can't bind resources that aren't visible — please select again.",
         intentSummary:
           "Reject an optional component selection that is not visible in planner context.",
         plannerRunId: input.context.plannerRunId,

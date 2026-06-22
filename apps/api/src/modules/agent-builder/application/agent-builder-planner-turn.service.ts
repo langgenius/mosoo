@@ -153,7 +153,7 @@ function sanitizeNonDraftQuickstartActions(input: {
   return createAgentBuilderActionPlannerOutput({
     actionKey: "apply_agent_config",
     assistantText:
-      "这个 Agent 已经存在。我会把当前配置当成 Manifest refactor 来处理，不会重新带你走 Quickstart 初始化；如果右侧配置已经正确，可以点击 Apply changes 写回 Agent。",
+      "This Agent already exists. I'll treat the current configuration as a Manifest refactor instead of walking you through Quickstart initialization again. If the configuration on the right is already correct, click Apply changes to write it back to the Agent.",
     context: input.context,
     intentSummary: "Rewrite non-draft Quickstart action to Agent Manifest refactor apply.",
     label: "Apply changes",
@@ -170,7 +170,7 @@ async function runPlanner(input: {
   readonly viewer: AuthenticatedViewer;
 }): Promise<AgentBuilderPlannerExecution> {
   reportAgentBuilderProgress(input.progress, {
-    message: "正在读取当前配置并规划下一步",
+    message: "Reading the current configuration and planning the next step",
     stage: "planner:lightweight",
   });
 
@@ -222,7 +222,7 @@ export async function appendAgentBuilderPlannerTurnResult(
     const userMessageId = createAgentBuilderMessageId();
 
     reportAgentBuilderProgress(input.progress, {
-      message: "正在读取 Draft、历史消息和可见资产",
+      message: "Reading the Draft, message history, and visible assets",
       stage: "context",
     });
 
@@ -252,7 +252,7 @@ export async function appendAgentBuilderPlannerTurnResult(
     const requestDigest = await createAgentBuilderRequestDigest(plannerContext);
 
     reportAgentBuilderProgress(input.progress, {
-      message: "正在保存 Builder 结果",
+      message: "Saving the Builder result",
       stage: "ledger",
     });
 

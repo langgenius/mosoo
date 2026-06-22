@@ -52,7 +52,7 @@ function formatDateTime(value: string | null): string {
     return "Never";
   }
 
-  return new Date(value).toLocaleString(undefined, {
+  return new Date(value).toLocaleString("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
   });

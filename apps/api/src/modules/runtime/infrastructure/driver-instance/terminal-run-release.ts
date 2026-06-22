@@ -37,7 +37,7 @@ function createFinalizedDriverRunError(input: {
       details: {
         driverInstanceId: input.driverInstanceId,
       },
-      message: "本轮已中断。工作区和上下文已保留，请重新发送刚才的请求。",
+      message: "This turn was interrupted. Your workspace and context have been preserved — please resend your last request.",
       retryable: true,
     };
   }

@@ -47,7 +47,7 @@ function readMetadataString(
   return trimmed.length > 0 ? trimmed : null;
 }
 
-const TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(undefined, {
+const TIMESTAMP_FORMATTER = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
   timeStyle: "short",
 });

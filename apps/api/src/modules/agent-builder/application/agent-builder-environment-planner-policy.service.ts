@@ -89,7 +89,7 @@ export function createAgentBuilderEnvironmentQuestionPlannerOutput(input: {
 
   return {
     assistantText:
-      "基础 Agent 已经完整；下一步需要选择、创建或跳过 Environment。这个选择会决定工具运行的执行环境。",
+      "The base Agent is complete. The next step is to select, create, or skip an Environment. This choice determines the execution environment where tools run.",
     intentSummary: "Ask the user to configure Quickstart Step 2 Environment.",
     mode: "question",
     nodes: [node],
@@ -116,7 +116,7 @@ function createEnvironmentDraftPatchPlannerOutput(input: {
   readonly environmentName: string;
 }): AgentBuilderPlannerOutput {
   return {
-    assistantText: `已选择 Environment：${input.environmentName}。我会把它绑定到当前 Agent Manifest。`,
+    assistantText: `Environment selected: ${input.environmentName}. I'll bind it to the current Agent Manifest.`,
     intentSummary: "Bind the selected Environment to the Agent draft.",
     mode: "draft_patch",
     nodes: [
@@ -146,7 +146,7 @@ function createCreateEnvironmentGuidancePlannerOutput(
   return createAgentBuilderActionPlannerOutput({
     actionKey: CREATE_ENVIRONMENT_ACTION_KEY,
     assistantText:
-      "创建新的 Environment 需要打开专用安全配置 UI。运行环境脚本、包配置和凭据由 Environment 配置表面处理；点击 Create Environment 继续。",
+      "Creating a new Environment requires opening a dedicated secure configuration UI. Runtime scripts, package configuration, and credentials are handled by the Environment configuration surface. Click Create Environment to continue.",
     context,
     intentSummary: "Guide the user to the safe Environment creation UI.",
     label: "Create Environment",
@@ -159,7 +159,7 @@ function createSkipEnvironmentDecisionPlannerOutput(
 ): AgentBuilderPlannerOutput {
   return {
     assistantText:
-      "已收到跳过 Environment 的选择。我会把这个决定记录到当前 Agent Manifest；后续仍然可以回到 Builder 补上 Environment。",
+      "Got it — skipping the Environment. I'll record this decision in the current Agent Manifest. You can always come back to the Builder to add an Environment later.",
     intentSummary: "Persist the skipped Environment decision in the Agent draft.",
     mode: "draft_patch",
     nodes: [
@@ -198,7 +198,7 @@ export function planAgentBuilderEnvironmentStructuredReply(input: {
   if (input.reply.mode !== "single_select" && input.reply.mode !== "free_text") {
     return createAgentBuilderPlainTextPlannerOutput({
       assistantText:
-        "这个结构化回复的输入模式不属于 Environment 选择流程；请重新选择或输入 Environment 配置。",
+        "This structured reply's input mode doesn't belong to the Environment selection flow. Please select again or enter an Environment configuration.",
       intentSummary: "Reject a structured reply mode that does not match the Environment question.",
       plannerRunId: input.context.plannerRunId,
     });
@@ -210,7 +210,7 @@ export function planAgentBuilderEnvironmentStructuredReply(input: {
   ) {
     return createAgentBuilderPlainTextPlannerOutput({
       assistantText:
-        "这个结构化回复和当前 Environment 问题不匹配；请重新选择一个选项或输入自定义说明。",
+        "This structured reply doesn't match the current Environment question. Please select an option again or enter a custom description.",
       intentSummary: "Reject a malformed Environment structured reply.",
       plannerRunId: input.context.plannerRunId,
     });
@@ -248,7 +248,7 @@ export function planAgentBuilderEnvironmentStructuredReply(input: {
   if (selectedEnvironment === undefined || selectedEnvironment === null) {
     return createAgentBuilderPlainTextPlannerOutput({
       assistantText:
-        "这个 Environment 不在当前可见资产里。我不能直接绑定不可见资源；请重新选择一个可见 Environment。",
+        "This Environment isn't among the currently visible assets. I can't bind resources that aren't visible — please select a visible Environment instead.",
       intentSummary: "Reject an Environment selection that is not visible in planner context.",
       plannerRunId: input.context.plannerRunId,
     });

@@ -9,7 +9,7 @@ import { getRuntimeInfo } from "../runtime-catalog";
 import { RuntimeIcon } from "./runtime-icon";
 
 function formatVersionTime(value: string): string {
-  return new Date(value).toLocaleString(undefined, {
+  return new Date(value).toLocaleString("en-US", {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",

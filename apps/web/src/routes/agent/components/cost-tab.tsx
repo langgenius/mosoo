@@ -193,7 +193,7 @@ export function AgentCostTab({ agentId, appId }: { agentId: string; appId: strin
               className="border-border grid grid-cols-[120px_minmax(160px,1fr)_130px_130px_100px] items-center border-b px-4 py-3 text-sm last:border-b-0"
             >
               <div className="text-muted-foreground text-xs" suppressHydrationWarning>
-                {new Date(session.createdAt).toLocaleString()}
+                {new Date(session.createdAt).toLocaleString("en-US")}
               </div>
               <div className="min-w-0">
                 <div className="text-foreground truncate font-medium">{session.actorName}</div>
