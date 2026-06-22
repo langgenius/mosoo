@@ -21,7 +21,7 @@ import { Button } from "@/shared/ui/button";
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { AgentReadinessBlockersBanner } from "./agent-readiness-blockers-banner";
 import { AgentSessionPanelHeader } from "./agent-session-panel-header";
-import { getSessionControlMode, shouldBlockSessionFileUpload } from "./agent-session-panel-rules";
+import { getSessionControlMode } from "./agent-session-panel-rules";
 import {
   deriveSessionPill,
   readinessBlockSummary,
@@ -95,13 +95,6 @@ export function AgentSessionPanel({
       },
     ];
   });
-  const fileUploadDisabled = shouldBlockSessionFileUpload({
-    activeSessionId: model.activeSessionId,
-    tone,
-  });
-  const fileUploadDisabledReason = fileUploadDisabled
-    ? "Send a test message before attaching files to this preview chat."
-    : null;
   const sessionLoadErrorMessage = previewResetMode
     ? "Failed to load the previous preview chat. You can still send a new test message."
     : "Failed to load previous sessions. You can still start a new live run.";
@@ -119,7 +112,7 @@ export function AgentSessionPanel({
     : model.handleStartNewSession;
 
   const handleUploadFiles = async (files: File[]): Promise<void> => {
-    if (files.length === 0 || fileUploadDisabled) {
+    if (files.length === 0) {
       return;
     }
 
@@ -296,8 +289,6 @@ export function AgentSessionPanel({
 
           <SessionComposer
             composerError={model.composerError}
-            fileUploadDisabled={fileUploadDisabled}
-            fileUploadDisabledReason={fileUploadDisabledReason}
             fileInputRef={model.fileInputRef}
             input={model.input}
             inputRef={model.inputRef}

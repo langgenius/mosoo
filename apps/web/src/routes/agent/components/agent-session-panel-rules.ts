@@ -28,11 +28,6 @@ export interface RuntimeReadyWaitInput {
   waitForRuntimeReadyOnNewSession: boolean;
 }
 
-export interface SessionFileUploadBlockInput {
-  activeSessionId: string | null;
-  tone: AgentSessionPanelTone;
-}
-
 export function getReadinessBlockMessage(readiness: AgentReadiness | null): string | null {
   if (readiness === null || readiness.issues.length === 0 || readiness.ready) {
     return null;
@@ -85,10 +80,6 @@ export function shouldWaitForRuntimeReadyOnNewSession(input: RuntimeReadyWaitInp
 
 export function getSessionControlMode(tone: AgentSessionPanelTone): SessionControlMode {
   return tone === "preview" ? "reset" : "new_session";
-}
-
-export function shouldBlockSessionFileUpload(input: SessionFileUploadBlockInput): boolean {
-  return input.tone === "preview" && input.activeSessionId === null;
 }
 
 export function createSessionAutoTitle(typedText: string): string {

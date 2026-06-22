@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 
 import {
   getSessionControlMode,
-  shouldBlockSessionFileUpload,
   shouldWaitForRuntimeReadyOnNewSession,
 } from "../src/routes/agent/components/agent-session-panel-rules";
 import {
@@ -35,14 +34,6 @@ describe("agent session panel boundary", () => {
   test("uses Reset chat instead of New session in Preview mode", () => {
     expect(getSessionControlMode("preview")).toBe("reset");
     expect(getSessionControlMode("consume")).toBe("new_session");
-  });
-
-  test("blocks Preview file upload until a preview chat session exists", () => {
-    expect(shouldBlockSessionFileUpload({ activeSessionId: null, tone: "preview" })).toBe(true);
-    expect(shouldBlockSessionFileUpload({ activeSessionId: "session_1", tone: "preview" })).toBe(
-      false,
-    );
-    expect(shouldBlockSessionFileUpload({ activeSessionId: null, tone: "consume" })).toBe(false);
   });
 
   test("resets all known Preview chat sessions instead of falling back to older history", () => {

@@ -13,8 +13,6 @@ interface SessionComposerError {
 
 interface SessionComposerProps {
   composerError: SessionComposerError | null;
-  fileUploadDisabled?: boolean;
-  fileUploadDisabledReason?: string | null;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   input: string;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -83,8 +81,6 @@ function SessionResourceChips({
 
 export function SessionComposer({
   composerError,
-  fileUploadDisabled = false,
-  fileUploadDisabledReason = null,
   fileInputRef,
   input,
   inputRef,
@@ -152,13 +148,7 @@ export function SessionComposer({
             multiple
             className="hidden"
             aria-label="Attach files"
-            disabled={fileUploadDisabled}
             onChange={(event) => {
-              if (fileUploadDisabled) {
-                event.target.value = "";
-                return;
-              }
-
               if (event.target.files) {
                 onFilesSelected([...event.target.files]);
               }
@@ -168,15 +158,11 @@ export function SessionComposer({
           />
           <button
             type="button"
-            disabled={fileUploadDisabled}
             onClick={() => {
-              if (!fileUploadDisabled) {
-                fileInputRef.current?.click();
-              }
+              fileInputRef.current?.click();
             }}
             className="text-fg-3 hover:bg-ink-900/[0.05] hover:text-fg-1 inline-flex size-7 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Attach file"
-            title={fileUploadDisabledReason ?? undefined}
           >
             <Paperclip className="size-4" />
           </button>
