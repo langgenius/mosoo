@@ -1,5 +1,6 @@
 import type { DriverHeartbeatInput, DriverHelloInput, DriverReadyInput } from "agent-driver/orpc";
 
+import type { DriverDebugResumeSnapshot } from "./debug-resume-snapshot";
 import type { Deferred } from "./driver-instance-support";
 
 export interface DriverInstanceCloseSnapshot {
@@ -33,6 +34,7 @@ export interface DriverInstanceReadyResult {
 
 export interface DriverInstanceSnapshot {
   close: DriverInstanceCloseSnapshot | null;
+  debugResume: DriverDebugResumeSnapshot;
   driverSocketConnected: boolean;
   heartbeatCount: number;
   hello: DriverHelloInput | null;

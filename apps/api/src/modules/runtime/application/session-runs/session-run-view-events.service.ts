@@ -155,6 +155,7 @@ export function createFailedSessionRunRuntimeEvent(input: {
   run: SessionRunSummary;
   runError: RunError;
   sessionId: SessionId;
+  sourceEventId?: string;
 }): RuntimeEventEnvelope {
   return createSessionRuntimeEvent({
     kind: "run.failed",
@@ -170,6 +171,7 @@ export function createFailedSessionRunRuntimeEvent(input: {
     },
     runId: input.run.id,
     sessionId: input.sessionId,
+    ...(input.sourceEventId === undefined ? {} : { sourceEventId: input.sourceEventId }),
     traceId: input.run.traceId,
   });
 }
