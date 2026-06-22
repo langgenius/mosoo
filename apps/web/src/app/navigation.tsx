@@ -36,7 +36,7 @@ interface AppNavSection {
 const NAV_SECTIONS: AppNavSection[] = [
   {
     items: [
-      { icon: LayoutDashboard, label: "Overview", path: "/" },
+      { icon: LayoutDashboard, label: "Install", path: "/" },
       { icon: Inbox, label: "Threads", path: "/threads" },
       { icon: Bot, label: "Agents", path: "/agent" },
       { icon: Files, label: "Files", path: "/files" },
