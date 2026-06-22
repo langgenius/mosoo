@@ -6,15 +6,15 @@ function readSource(path: string): string {
 }
 
 describe("App navigation boundary", () => {
-  test("puts App Overview before Agent-first surfaces", () => {
+  test("puts App Install before Agent-first surfaces", () => {
     const source = readSource("../src/app/navigation.tsx");
-    const overviewIndex = source.indexOf('label: "Overview"');
+    const installIndex = source.indexOf('label: "Install"');
     const threadsIndex = source.indexOf('label: "Threads"');
     const agentsIndex = source.indexOf('label: "Agents"');
 
-    expect(overviewIndex).toBeGreaterThan(-1);
-    expect(overviewIndex).toBeLessThan(threadsIndex);
-    expect(overviewIndex).toBeLessThan(agentsIndex);
+    expect(installIndex).toBeGreaterThan(-1);
+    expect(installIndex).toBeLessThan(threadsIndex);
+    expect(installIndex).toBeLessThan(agentsIndex);
     expect(source).toContain('path: "/"');
     expect(source).not.toContain('label: "Members"');
   });
