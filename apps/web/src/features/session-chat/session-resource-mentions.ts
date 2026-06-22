@@ -26,7 +26,11 @@ export function appendSessionResourceMentionsToMessage(
   message: string,
   mentions: SessionResourceMention[],
 ): string {
-  const paths = uniqueMentions(mentions).map((mention) => `@${mention.path}`);
+  // Reference the file by its plain sandbox-relative path. The agent runtime does
+  // not resolve "@" mentions, so prefixing one would be passed to the model verbatim
+  // and treated as a literal path ("@session-files/...") that does not exist on disk,
+  // forcing the agent to hunt for the real "session-files/..." path. See YEF-713.
+  const paths = uniqueMentions(mentions).map((mention) => mention.path);
 
   if (paths.length === 0) {
     return message;
