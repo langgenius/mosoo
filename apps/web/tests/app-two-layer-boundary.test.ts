@@ -23,6 +23,15 @@ describe("Two-layer console boundary", () => {
     expect(shell).toContain("OrgNavigation");
   });
 
+  test("Org shell uses the shared lower-left account navigation", () => {
+    const shell = readSource("../src/app/app-shell.tsx");
+
+    expect(shell).toContain("ConsoleSidebarFooter");
+    expect(shell).toContain("<ConsoleSidebarFooter collapsed={false} />");
+    expect(shell).not.toContain('placement="topbar"');
+    expect(shell).not.toContain("<GithubLink />");
+  });
+
   test("New app creation is wired to the createApp mutation", () => {
     const appsList = readSource("../src/routes/apps/apps-list.route.tsx");
 
