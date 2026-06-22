@@ -182,7 +182,7 @@ describe("session live-state transcript reducer", () => {
     ]);
   });
 
-  test("terminal run states complete pending tool rows", () => {
+  test("terminal run states do not synthesize missing tool results", () => {
     const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
       { runId: "run-1", threadId: "session-1", type: "RUN_STARTED" },
       { messageId: "assistant-1", role: "assistant", type: "TEXT_MESSAGE_START" },
@@ -200,7 +200,6 @@ describe("session live-state transcript reducer", () => {
     expect(nextState.permissionRequests).toEqual([]);
     expect(nextState.messages[0]?.segments).toEqual([
       { argsText: "", kind: "tool_use", path: null, tool: "Shell", toolCallId: "tool-1" },
-      { kind: "tool_result", output: "", tool: "Shell", toolCallId: "tool-1" },
     ]);
   });
 
@@ -240,8 +239,9 @@ describe("session live-state transcript reducer", () => {
     expect(nextState.run.status).toBe("failed");
     expect(nextState.run.error?.code).toBe("runtime.provision_failed");
     expect(nextState.messages[0]?.segments.at(-1)).toEqual({
-      kind: "tool_result",
-      output: "",
+      argsText: "",
+      kind: "tool_use",
+      path: null,
       tool: "Shell",
       toolCallId: "tool-1",
     });
@@ -566,8 +566,9 @@ describe("session live-state transcript reducer", () => {
     expect(nextState.run.status).toBe("failed");
     expect(nextState.run.error?.code).toBe("runtime.driver_stopped");
     expect(nextState.messages[0]?.segments.at(-1)).toEqual({
-      kind: "tool_result",
-      output: "",
+      argsText: "",
+      kind: "tool_use",
+      path: null,
       tool: "Shell",
       toolCallId: "tool-1",
     });

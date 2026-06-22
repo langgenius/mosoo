@@ -379,6 +379,62 @@ describe("runtime event persistence compactor", () => {
     });
   });
 
+  test("stores terminal run failure as the pending tool result", () => {
+    const compactor = new RuntimeEventPersistenceCompactor();
+
+    expect(
+      compactor.compact([
+        record({
+          id: "tool-start",
+          kind: "item.started",
+          occurredAtMs: 3_000,
+          payload: {
+            itemId: "tool-1",
+            itemType: "tool_call",
+            title: "Shell",
+          },
+          runId: "run-1",
+        }),
+        record({
+          id: "tool-running",
+          kind: "tool.call.updated",
+          occurredAtMs: 3_010,
+          payload: {
+            rawInput: '{"cmd":"pwd"}',
+            status: "running",
+            toolCallId: "tool-1",
+          },
+          runId: "run-1",
+        }),
+      ]),
+    ).toEqual([]);
+
+    const compacted = compactor.compact([
+      record({
+        id: "run-failed",
+        kind: "run.failed",
+        occurredAtMs: 3_100,
+        payload: {
+          error: {
+            code: "runtime.failed",
+            message: "Runtime driver control socket is not connected.",
+          },
+        },
+        runId: "run-1",
+      }),
+    ]);
+
+    expect(compacted.map((entry) => entry.event.kind)).toEqual(["tool.call.updated", "run.failed"]);
+    expect(compacted[0]?.event.payload).toMatchObject({
+      rawInput: '{"cmd":"pwd"}',
+      rawOutput:
+        "Tool failed before returning a result: Runtime driver control socket is not connected.",
+      status: "failed",
+      title: "Shell",
+      toolCallId: "tool-1",
+    });
+  });
+
   test("drops stream fragment replays shadowed by durable terminal receipts", () => {
     const messageStart = record({
       id: "message-start",

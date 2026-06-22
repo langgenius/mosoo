@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-import { MOSOO_CUSTOM_EVENT } from "@mosoo/ag-ui-session";
+import { EventType, MOSOO_CUSTOM_EVENT } from "@mosoo/ag-ui-session";
 import { RUNTIME_EVENT_SCHEMA_VERSION, createRuntimeEvent } from "@mosoo/runtime-events";
 import {
   DRIVER_CONTROL_PORT_MAX,
@@ -476,6 +476,88 @@ describe("API to driver boundary", () => {
           },
         ],
       },
+    });
+  });
+
+  test("adds failed tool result delivery before terminal run update", async () => {
+    const link = createRuntimeSessionLink();
+    const baseLiveState = createBaseLiveState({
+      callerId: link.callerId,
+      creatorId: link.creatorId,
+      driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+      sessionId: link.sessionId,
+    });
+    const runFailed = createDriverEvent({
+      kind: "run.failed",
+      payload: {
+        error: {
+          code: "runtime.failed",
+          message: "Runtime driver control socket is not connected.",
+        },
+      },
+      runId: API_DRIVER_BOUNDARY_IDS.sessionRun,
+    });
+    const batch = parseDriverEventBatchInput({
+      driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+      events: [
+        {
+          event: runFailed,
+          eventId: "source-run-failed",
+          occurredAt: 1_000,
+        },
+      ],
+    });
+
+    const projection = await appRuntimeDriverEvents({ DB: new SqliteD1Database() } as ApiBindings, {
+      currentLiveState: {
+        ...baseLiveState,
+        lifecycle: "RUNNING",
+        messages: [
+          {
+            content: "",
+            createdAt: "2026-05-26T00:00:00.000Z",
+            id: "assistant-1",
+            plan: [],
+            role: "assistant",
+            segments: [
+              {
+                argsText: '{"cmd":"pwd"}',
+                kind: "tool_use",
+                path: null,
+                tool: "Shell",
+                toolCallId: "tool-1",
+              },
+            ],
+          },
+        ],
+        run: {
+          ...baseLiveState.run,
+          id: API_DRIVER_BOUNDARY_IDS.sessionRun,
+          status: "running",
+        },
+      },
+      driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+      events: batch.events,
+      link,
+    });
+
+    expect(projection.sessionDeliveryEvents.map((record) => record.event.type)).toEqual([
+      EventType.TOOL_CALL_RESULT,
+      EventType.TOOL_CALL_END,
+      EventType.CUSTOM,
+    ]);
+    expect(projection.sessionDeliveryEvents[0]?.event).toMatchObject({
+      content:
+        "Tool failed before returning a result: Runtime driver control socket is not connected.",
+      toolCallId: "tool-1",
+      type: EventType.TOOL_CALL_RESULT,
+    });
+    expect(projection.nextLiveState?.messages[0]?.segments.at(-1)).toEqual({
+      kind: "tool_result",
+      output:
+        "Tool failed before returning a result: Runtime driver control socket is not connected.",
+      tool: "Shell",
+      toolCallId: "tool-1",
     });
   });
 

@@ -469,6 +469,36 @@ describe("runtime event AG-UI adapter", () => {
     });
   });
 
+  test("projects failed tool output as a tool result before ending the call", () => {
+    const event = createRuntimeEvent({
+      id: createPlatformId(),
+      kind: "tool.call.updated",
+      occurredAt: OCCURRED_AT,
+      payload: {
+        rawOutput:
+          "Tool failed before returning a result: Runtime driver control socket is not connected.",
+        status: "failed",
+        title: "Shell",
+        toolCallId: "tool-1",
+      },
+      sessionId: PLATFORM_ID_FIXTURES.session,
+    });
+
+    expect(appRuntimeEventToAgUiSessionEvents(event)).toEqual([
+      {
+        content:
+          "Tool failed before returning a result: Runtime driver control socket is not connected.",
+        messageId: event.id,
+        toolCallId: "tool-1",
+        type: EventType.TOOL_CALL_RESULT,
+      },
+      {
+        toolCallId: "tool-1",
+        type: EventType.TOOL_CALL_END,
+      },
+    ]);
+  });
+
   test("apps permission resolution through the same session permission event", () => {
     const event = createRuntimeEvent({
       id: createPlatformId(),

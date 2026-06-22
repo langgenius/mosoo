@@ -241,13 +241,19 @@ export function appRuntimeEventToAgUiSessionEvents(
     case "tool.call.updated": {
       const toolCall = readRuntimeEventToolCallUpdate(event);
 
-      if (toolCall.status === "completed") {
+      if (toolCall.status === "completed" || toolCall.status === "failed") {
         const rawOutput = toolCall.rawOutput ?? toolCall.content;
-        return rawOutput === null
+        const result =
+          rawOutput ??
+          (toolCall.status === "failed"
+            ? `${toolCall.title ?? toolCall.kind ?? "Tool"} failed.`
+            : null);
+
+        return result === null
           ? [{ toolCallId: toolCall.toolCallId, type: EventType.TOOL_CALL_END }]
           : [
               {
-                content: rawOutput,
+                content: result,
                 messageId: toolCall.messageId ?? event.id,
                 toolCallId: toolCall.toolCallId,
                 type: EventType.TOOL_CALL_RESULT,
