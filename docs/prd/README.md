@@ -19,6 +19,7 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 
 - [Agent Type (Pet vs Cattle)](./agent-type.md)
 - [Agent Manifest](./agent-manifest.md)
+- [Agent Endpoint MVP](./agent-endpoint-mvp.md)
 - [Agent Import / Export & Fork](./agent-package-import-export-fork.md)
 - [Agent Versions](./agent-versions.md)
 - [Agent Exposure Identity & Deployment Version](./agent-service-identity.md)
