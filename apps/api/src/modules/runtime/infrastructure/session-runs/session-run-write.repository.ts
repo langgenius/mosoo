@@ -167,7 +167,7 @@ function applySessionRunStatusUpdate(
           code: input.error.code,
           details: input.error.details,
           message: input.error.message,
-          retryable: false,
+          retryable: input.error.retryable,
         }
       : null,
     startedAt:

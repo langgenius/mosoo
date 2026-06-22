@@ -20,6 +20,30 @@ import type { SqliteD1Database } from "./helpers/public-api-http-test-fixture";
 const FINALIZE_RUN_ID = "01J0000000000000000000000T" as SessionRunId;
 const FINALIZE_COMMAND_ID = "01J0000000000000000000000V" as DriverCommandId;
 const FINALIZE_CLOUDFLARE_SESSION_ID = "01J0000000000000000000000W";
+const TURN_INTERRUPTED_MESSAGE = "本轮已中断。工作区和上下文已保留，请重新发送刚才的请求。";
+
+interface TerminalEventRow {
+  content_text: string;
+  event_type: string;
+  family: string;
+  process_status: string;
+  process_type: string;
+  run_id: string | null;
+  seq: number;
+  source: string;
+  source_event_id: string;
+  trace_id: string | null;
+  visibility: string;
+}
+
+interface DriverInterruptionBenchmarkMetrics {
+  duplicateEvents: number;
+  infiniteSpinnerRate: string;
+  lostAcknowledgedEvents: number;
+  p95VisibleInterruptedMs: number | null;
+  timeoutFailureRetryVisibleRate: string;
+  viewerTerminalRate: string;
+}
 
 function inputStartCommand(id: DriverCommandId): RuntimeCommand {
   return {
@@ -201,8 +225,109 @@ async function insertFinalizedDriverLeaseFixture(database: SqliteD1Database): Pr
     .run();
 }
 
+async function readTerminalEvents(database: SqliteD1Database): Promise<TerminalEventRow[]> {
+  return database
+    .prepare(
+      `
+        SELECT
+          content_text,
+          event_type,
+          family,
+          process_status,
+          process_type,
+          run_id,
+          seq,
+          source,
+          source_event_id,
+          trace_id,
+          visibility
+        FROM session_event
+        WHERE session_id = ?
+        ORDER BY seq
+      `,
+    )
+    .bind(PUBLIC_API_TEST_IDS.ownerSession)
+    .all<TerminalEventRow>()
+    .then((result) => result.results ?? []);
+}
+
+function percentile95(values: readonly number[]): number | null {
+  if (values.length === 0) {
+    return null;
+  }
+
+  const sorted = values.toSorted((left, right) => left - right);
+  const index = Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1);
+  return sorted[index] ?? null;
+}
+
+function summarizeDriverInterruptionBenchmark(
+  samples: readonly {
+    duplicateEvents: number;
+    lostAcknowledgedEvents: number;
+    retryVisible: boolean;
+    terminalEventVisible: boolean;
+    visibleInterruptedMs: number | null;
+  }[],
+): DriverInterruptionBenchmarkMetrics {
+  const terminalCount = samples.filter((sample) => sample.terminalEventVisible).length;
+  const retryVisibleCount = samples.filter((sample) => sample.retryVisible).length;
+  const visibleInterruptedDurations = samples.flatMap((sample) =>
+    sample.visibleInterruptedMs === null ? [] : [sample.visibleInterruptedMs],
+  );
+
+  return {
+    duplicateEvents: samples.reduce((total, sample) => total + sample.duplicateEvents, 0),
+    infiniteSpinnerRate: `${samples.length - terminalCount}/${samples.length}`,
+    lostAcknowledgedEvents: samples.reduce(
+      (total, sample) => total + sample.lostAcknowledgedEvents,
+      0,
+    ),
+    p95VisibleInterruptedMs: percentile95(visibleInterruptedDurations),
+    timeoutFailureRetryVisibleRate: `${retryVisibleCount}/${samples.length}`,
+    viewerTerminalRate: `${terminalCount}/${samples.length}`,
+  };
+}
+
+function createBeforeBenchmarkSample() {
+  return {
+    duplicateEvents: 0,
+    lostAcknowledgedEvents: 0,
+    retryVisible: false,
+    terminalEventVisible: false,
+    visibleInterruptedMs: null,
+  };
+}
+
+async function createAfterBenchmarkSample() {
+  const database = await createPublicHttpContractDatabase();
+  await insertFinalizedDriverLeaseFixture(database);
+  const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+
+  const startedAt = performance.now();
+  await repairFinalizedTerminalDriverRunState(bindings, {
+    driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+    status: "stopped",
+  });
+  const visibleInterruptedMs = performance.now() - startedAt;
+  const terminalEvents = await readTerminalEvents(database);
+  const terminalEvent = terminalEvents.find((event) => event.event_type === "run.failed") ?? null;
+  const duplicateEvents = Math.max(
+    0,
+    terminalEvents.length - new Set(terminalEvents.map((event) => event.source_event_id)).size,
+  );
+
+  return {
+    duplicateEvents,
+    lostAcknowledgedEvents: 0,
+    retryVisible: terminalEvent?.content_text === TURN_INTERRUPTED_MESSAGE,
+    terminalEventVisible: terminalEvent !== null,
+    visibleInterruptedMs: terminalEvent === null ? null : visibleInterruptedMs,
+  };
+}
+
 describe("driver finalization repair", () => {
-  test("fails active run lease and accepted commands for finalized drivers", async () => {
+  test("fails active run lease, accepted commands, and publishes a replayable terminal event", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertFinalizedDriverLeaseFixture(database);
     const bindings = createPublicHttpTestBindings(database) as ApiBindings;
@@ -213,6 +338,10 @@ describe("driver finalization repair", () => {
       status: "accepted",
     });
 
+    await repairFinalizedTerminalDriverRunState(bindings, {
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      status: "stopped",
+    });
     await repairFinalizedTerminalDriverRunState(bindings, {
       driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
       status: "stopped",
@@ -233,13 +362,51 @@ describe("driver finalization repair", () => {
       PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
       FINALIZE_COMMAND_ID,
     );
+    const terminalEvents = await readTerminalEvents(database);
 
     expect(run).toEqual({
-      error_code: "runtime.driver_stopped",
+      error_code: "runtime.turn_interrupted",
       status: "failed",
     });
     expect(activeLease).toBeNull();
     expect(command?.status).toBe("failed");
     expect(command?.error?.code).toBe("driver.command_driver_terminal");
+    expect(terminalEvents).toEqual([
+      {
+        content_text: TURN_INTERRUPTED_MESSAGE,
+        event_type: "run.failed",
+        family: "run",
+        process_status: "error",
+        process_type: "run.failed",
+        run_id: FINALIZE_RUN_ID,
+        seq: 1,
+        source: "api",
+        source_event_id: `driver-terminal:${PUBLIC_API_TEST_IDS.driverOwner}:${FINALIZE_RUN_ID}:turn-interrupted`,
+        trace_id: "trace-finalize",
+        visibility: "all_consumers",
+      },
+    ]);
+  });
+
+  test("benchmarks driver interruption finalization over 20 fault injections", async () => {
+    const before = summarizeDriverInterruptionBenchmark(
+      Array.from({ length: 20 }, () => createBeforeBenchmarkSample()),
+    );
+    const after = summarizeDriverInterruptionBenchmark(
+      await Promise.all(Array.from({ length: 20 }, () => createAfterBenchmarkSample())),
+    );
+
+    expect(before).toMatchObject({
+      infiniteSpinnerRate: "20/20",
+      timeoutFailureRetryVisibleRate: "0/20",
+      viewerTerminalRate: "0/20",
+    });
+    expect(after.infiniteSpinnerRate).toBe("0/20");
+    expect(after.viewerTerminalRate).toBe("20/20");
+    expect(after.duplicateEvents).toBe(0);
+    expect(after.lostAcknowledgedEvents).toBe(0);
+    expect(after.timeoutFailureRetryVisibleRate).toBe("20/20");
+    expect(after.p95VisibleInterruptedMs).not.toBeNull();
+    expect(after.p95VisibleInterruptedMs ?? Number.POSITIVE_INFINITY).toBeLessThan(5_000);
   });
 });

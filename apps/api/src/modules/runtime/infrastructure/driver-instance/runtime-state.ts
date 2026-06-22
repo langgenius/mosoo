@@ -10,6 +10,8 @@ import type {
 
 import { isTruthy } from "../../../../shared/truthiness";
 import type { DriverInstanceCommandState, RuntimeCommandWaiter } from "./commands";
+import { createDriverDebugResumeSnapshot } from "./debug-resume-snapshot";
+import type { DriverDebugRecoveryMode } from "./debug-resume-snapshot";
 import {
   createReceiptsForDriverEvents,
   filterNewDriverEvents,
@@ -393,13 +395,35 @@ export class DriverInstanceRuntimeState {
   }
 
   snapshot(driverSocketConnected: boolean): DriverInstanceSnapshot {
+    const recoveryMode = this.#snapshotRecoveryMode(driverSocketConnected);
     return {
       close: this.close,
+      debugResume: createDriverDebugResumeSnapshot({
+        lastEventSeq: this.driverEventReceiptSeq,
+        recoveryMode,
+        sandboxId: this.runtimeSessionLink?.sandboxId ?? null,
+      }),
       driverSocketConnected,
       heartbeatCount: this.heartbeatCount,
       hello: this.hello,
       lastHeartbeatAt: this.lastHeartbeat?.at ?? null,
     };
+  }
+
+  #snapshotRecoveryMode(driverSocketConnected: boolean): DriverDebugRecoveryMode {
+    if (this.close !== null) {
+      return "turn_interrupted";
+    }
+
+    if (driverSocketConnected) {
+      return "ready";
+    }
+
+    if (this.hello !== null) {
+      return "disconnected";
+    }
+
+    return "fresh";
   }
 
   async waitForClose(timeoutMs: number): Promise<DriverInstanceWaitForCloseResult> {
@@ -506,8 +530,11 @@ export class DriverInstanceRuntimeState {
       throw new Error(`Driver instance ${this.requireDriverInstanceId()} is not closed yet.`);
     }
 
+    const snapshot = this.snapshot(false);
+
     return {
       close: this.close,
+      debugResume: snapshot.debugResume,
       driverSocketConnected: false,
       heartbeatCount: this.heartbeatCount,
       hello: this.hello,

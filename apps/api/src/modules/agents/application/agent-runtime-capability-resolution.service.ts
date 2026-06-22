@@ -40,7 +40,7 @@ interface RuntimeCapabilityIssueInput {
   selection: RuntimeCapabilitySelection;
 }
 
-const READINESS_PROVIDER_PROBE_TIMEOUT_MS = 2500;
+const READINESS_PROVIDER_PROBE_TIMEOUT_MS = 10_000;
 const OPENAI_SHAPED_PROVIDER_IDS = new Set([
   VENDOR_OPENAI.vendorId,
   VENDOR_OPENAI_COMPATIBLE.vendorId,

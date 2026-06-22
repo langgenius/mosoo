@@ -1,12 +1,13 @@
-import type { SessionRunStatus } from "@mosoo/contracts/session-run";
-import type { RunError } from "@mosoo/contracts/session-run";
+import type { RunError, SessionRunStatus, SessionRunSummary } from "@mosoo/contracts/session-run";
 import { sessionRunsTable } from "@mosoo/db";
-import type { DriverInstanceId, SessionRunId } from "@mosoo/id";
+import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, eq, inArray } from "drizzle-orm";
 
 import { logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
+import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
+import { createFailedSessionRunRuntimeEvent } from "../../application/session-runs/session-run-view-events.service";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
 import { recordRuntimeRunLeaseReleasedOutcome } from "../runtime-subject-lifecycle/runtime-run-lease-store";
 import { failAcceptedRuntimeCommandsForTerminalDriver } from "../session-runs/runtime-command-store.repository";
@@ -30,25 +31,38 @@ function createFinalizedDriverRunError(input: {
   readonly driverInstanceId: DriverInstanceId;
   readonly status: "failed" | "stopped";
 }): RunError {
+  if (input.status === "stopped") {
+    return {
+      code: "runtime.turn_interrupted",
+      details: {
+        driverInstanceId: input.driverInstanceId,
+      },
+      message: "本轮已中断。工作区和上下文已保留，请重新发送刚才的请求。",
+      retryable: true,
+    };
+  }
+
   return {
-    code: input.status === "failed" ? "runtime.driver_failed" : "runtime.driver_stopped",
+    code: "runtime.driver_failed",
     details: {
       driverInstanceId: input.driverInstanceId,
     },
-    message: "Runtime driver stopped before the run completed.",
-    retryable: false,
+    message: "Runtime driver failed before the run completed.",
+    retryable: true,
   };
 }
 
-function assertFinalizedDriverRunTransition(outcome: SessionRunTransitionOutcome): void {
+function toFinalizedDriverRunTransitionRun(
+  outcome: SessionRunTransitionOutcome,
+): SessionRunSummary | null {
   switch (outcome.kind) {
     case "applied":
     case "duplicate": {
-      return;
+      return outcome.run;
     }
     case "stale": {
       if (outcome.reason === "terminal_run") {
-        return;
+        return null;
       }
       throw new Error("Finalized driver repair lost a concurrent run transition.");
     }
@@ -59,6 +73,39 @@ function assertFinalizedDriverRunTransition(outcome: SessionRunTransitionOutcome
       throw new Error(`Finalized driver repair run transition was rejected: ${outcome.reason}.`);
     }
   }
+}
+
+function finalizedDriverRunSourceEventId(input: {
+  readonly driverInstanceId: DriverInstanceId;
+  readonly sessionRunId: SessionRunId;
+}): string {
+  return `driver-terminal:${input.driverInstanceId}:${input.sessionRunId}:turn-interrupted`;
+}
+
+async function appendFinalizedDriverRunEvent(
+  bindings: ApiBindings,
+  input: {
+    readonly driverInstanceId: DriverInstanceId;
+    readonly run: SessionRunSummary;
+    readonly runError: RunError;
+    readonly sessionId: SessionId;
+  },
+): Promise<void> {
+  await appendSessionRuntimeEvents({
+    bindings,
+    events: [
+      createFailedSessionRunRuntimeEvent({
+        run: input.run,
+        runError: input.runError,
+        sessionId: input.sessionId,
+        sourceEventId: finalizedDriverRunSourceEventId({
+          driverInstanceId: input.driverInstanceId,
+          sessionRunId: input.run.id,
+        }),
+      }),
+    ],
+    sessionId: input.sessionId,
+  });
 }
 
 export async function releaseTerminalDriverInstanceSessionRun(
@@ -108,13 +155,23 @@ export async function repairFinalizedTerminalDriverRunState(
   }
 
   if (!isTerminalSessionRunStatus(link.sessionRunStatus)) {
+    const runError = createFinalizedDriverRunError(input);
     const outcome = await setSessionRunStatus(bindings.DB, {
-      error: createFinalizedDriverRunError(input),
+      error: runError,
       runId: link.sessionRunId,
       source: "driver",
       status: "failed",
     });
-    assertFinalizedDriverRunTransition(outcome);
+    const run = toFinalizedDriverRunTransitionRun(outcome);
+
+    if (link.sessionId !== null && run !== null) {
+      await appendFinalizedDriverRunEvent(bindings, {
+        driverInstanceId: input.driverInstanceId,
+        run,
+        runError,
+        sessionId: link.sessionId,
+      });
+    }
   }
 
   return releaseTerminalDriverInstanceSessionRun(bindings, {
