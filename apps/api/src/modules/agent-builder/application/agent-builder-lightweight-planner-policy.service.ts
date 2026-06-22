@@ -31,7 +31,8 @@ export function createDefaultAgentBuilderLightweightPlanner(): AgentBuilderLight
 
       if (structuredReply !== null) {
         return createAgentBuilderPlainTextPlannerOutput({
-          assistantText: "This structured question is stale or no longer the current step. Please continue describing what you'd like to adjust.",
+          assistantText:
+            "This structured question is stale or no longer the current step. Please continue describing what you'd like to adjust.",
           intentSummary: "Reject a stale structured Builder reply.",
           plannerRunId: context.plannerRunId,
         });

@@ -35,7 +35,8 @@ const REMOTE_MCP_OPTION_KEY = "action:create_remote_mcp_server";
 
 const OPTIONAL_COMPONENT_SPECS = [
   {
-    askText: "Sure. You can select capabilities to bind to this Agent from the currently visible Skills, or skip for now.",
+    askText:
+      "Sure. You can select capabilities to bind to this Agent from the currently visible Skills, or skip for now.",
     fieldPath: "skillIds",
     intentPatterns: [/\bskills?\b/iu, /\bpdf\b/iu, /\bdocx\b/iu, /\bxlsx\b/iu, /\bpptx\b/iu],
     listKey: "skills",
@@ -51,7 +52,8 @@ const OPTIONAL_COMPONENT_SPECS = [
     actionSummary: "Open the secure remote MCP server creation UI.",
     actionText:
       "Creating a remote MCP server requires opening a dedicated secure configuration UI. The Builder references the created server in the Agent Manifest and does not write credentials into the YAML. Click Create remote MCP server to continue.",
-    askText: "Sure. You can select an existing MCP server, or create a new remote MCP server through the secure UI.",
+    askText:
+      "Sure. You can select an existing MCP server, or create a new remote MCP server through the secure UI.",
     fieldPath: "mcpServerIds",
     intentPatterns: [/\bmcp\b/iu, /\bserver\b/iu, /\bremote\s*mcp\b/iu],
     listKey: "mcpServers",
@@ -171,7 +173,8 @@ function createComponentDraftPatchPlannerOutput(input: {
   readonly spec: OptionalComponentSpec;
 }): AgentBuilderPlannerOutput {
   return {
-    assistantText: "Components selected. I'll write these bindings into the current Agent Manifest.",
+    assistantText:
+      "Components selected. I'll write these bindings into the current Agent Manifest.",
     intentSummary: `Bind selected optional ${input.spec.fieldPath}.`,
     mode: "draft_patch",
     nodes: [
@@ -265,7 +268,8 @@ export function planAgentBuilderOptionalComponentStructuredReply(input: {
 
   if (input.reply.mode !== "multi_select" && input.reply.mode !== "free_text") {
     return createAgentBuilderPlainTextPlannerOutput({
-      assistantText: "This structured reply's input mode doesn't belong to the current component selection flow. Please select components again.",
+      assistantText:
+        "This structured reply's input mode doesn't belong to the current component selection flow. Please select components again.",
       intentSummary: "Reject a structured reply mode that does not match the component question.",
       plannerRunId: input.context.plannerRunId,
     });
@@ -273,7 +277,8 @@ export function planAgentBuilderOptionalComponentStructuredReply(input: {
 
   if (input.reply.skipped) {
     return createAgentBuilderPlainTextPlannerOutput({
-      assistantText: "Skipped this set of optional components. You can always come back to the Builder to add them later.",
+      assistantText:
+        "Skipped this set of optional components. You can always come back to the Builder to add them later.",
       intentSummary: "Skip optional component binding.",
       plannerRunId: input.context.plannerRunId,
     });
@@ -295,7 +300,8 @@ export function planAgentBuilderOptionalComponentStructuredReply(input: {
 
     if (selectedAsset === null) {
       return createAgentBuilderPlainTextPlannerOutput({
-        assistantText: "Some components aren't among the currently visible assets. I can't bind resources that aren't visible — please select again.",
+        assistantText:
+          "Some components aren't among the currently visible assets. I can't bind resources that aren't visible — please select again.",
         intentSummary:
           "Reject an optional component selection that is not visible in planner context.",
         plannerRunId: input.context.plannerRunId,
