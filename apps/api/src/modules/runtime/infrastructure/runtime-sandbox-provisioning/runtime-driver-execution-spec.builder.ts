@@ -8,6 +8,7 @@ import type {
 } from "@mosoo/id";
 import type { DriverNativeRuntimeRef } from "agent-driver/runtime";
 
+import { appendRuntimeArtifactContextToPrompt } from "../../application/session-artifacts/session-artifact-prompt.service";
 import type {
   DriverBootMcpServer,
   DriverExecutionSpec,
@@ -182,7 +183,7 @@ export async function buildExecutionSpec(
       variables: { ...input.profile.envVars },
     },
     model: input.profile.model,
-    profilePrompt: input.profile.prompt,
+    profilePrompt: appendRuntimeArtifactContextToPrompt(input.profile.prompt),
     provider: input.profile.provider,
     providerOptions: input.profile.providerOptions,
     session: {

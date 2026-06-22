@@ -56,6 +56,12 @@ import type {
   RuntimeSessionLink,
 } from "./event-types";
 import { readNativeResumeRef } from "./native-resume-ref-event";
+import {
+  RUNTIME_ARTIFACT_MANIFEST_PATH,
+  getRuntimeArtifactFileName,
+  isRuntimeArtifactManifestPath,
+  readRuntimeArtifactManifestEntries,
+} from "./runtime-artifact-manifest";
 import { getRuntimeSessionLink } from "./session-link.repository";
 export type {
   AppRuntimeDriverEventsResult,
@@ -157,7 +163,7 @@ async function recordRuntimeFileChanges(input: {
   const sandboxId = input.link.sandboxId;
   const createdBy = resolveRuntimeOutputCreator(input.link);
   const changes = readRuntimeEventFileChanges(input.event).filter(
-    (change) => change.change === "upsert",
+    (change) => change.change === "upsert" && !isRuntimeArtifactManifestPath(change.path),
   );
 
   if (changes.length === 0) {
@@ -213,6 +219,125 @@ async function recordRuntimeFileChanges(input: {
       }
     },
   );
+}
+
+async function recordRuntimeArtifactManifest(input: {
+  bindings: ApiBindings;
+  event: RuntimeEventEnvelope;
+  link: RuntimeSessionLink;
+}): Promise<void> {
+  const sessionId = input.link.sessionId;
+  const sandboxId = input.link.sandboxId;
+  const createdBy = resolveRuntimeOutputCreator(input.link);
+
+  if (sessionId === null || sandboxId === null || createdBy === null) {
+    return;
+  }
+
+  const parsedSessionId = parsePlatformId<SessionId>(sessionId, "runtime output session ID");
+  let conversation;
+
+  try {
+    conversation = await getRuntimeConversationSession(input.bindings.DB, parsedSessionId);
+  } catch (error) {
+    logWarn("runtime.file_artifact.manifest_session_lookup_failed", {
+      ...createErrorLogContext(error),
+      driverInstanceId: input.event.driverInstanceId ?? null,
+      sandboxId,
+      sessionId,
+    });
+    return;
+  }
+
+  if (conversation === null) {
+    return;
+  }
+
+  try {
+    await withDisposedRpcResource(
+      await getRuntimeSubjectKeepAliveHandle(input.bindings, sandboxId),
+      async (sandbox) => {
+        const sandboxSession = await sandbox.getSession(conversation.sandboxSessionId);
+        const manifestPath = resolveSandboxReadPath(
+          conversation.cwd,
+          RUNTIME_ARTIFACT_MANIFEST_PATH,
+        );
+        let manifestBytes: Uint8Array;
+
+        try {
+          manifestBytes = await readSandboxFileBytes(sandboxSession, manifestPath);
+        } catch {
+          return;
+        }
+
+        let manifestEntries;
+
+        try {
+          manifestEntries = readRuntimeArtifactManifestEntries(manifestBytes);
+        } catch (error) {
+          logWarn("runtime.file_artifact.manifest_invalid", {
+            ...createErrorLogContext(error),
+            driverInstanceId: input.event.driverInstanceId ?? null,
+            path: RUNTIME_ARTIFACT_MANIFEST_PATH,
+            sandboxId,
+            sessionId,
+          });
+          return;
+        }
+
+        if (manifestEntries.length === 0) {
+          return;
+        }
+
+        const existingFiles = await fileStore.listReadySessionFiles(
+          input.bindings.DB,
+          parsedSessionId,
+        );
+        const recordedArtifacts = new Set(
+          existingFiles
+            .filter((file) => file.kind === "artifact")
+            .map((file) => `${file.name}\0${file.size}`),
+        );
+
+        for (const entry of manifestEntries) {
+          try {
+            const readPath = resolveSandboxReadPath(conversation.cwd, entry.path);
+            const bytes = await readSandboxFileBytes(sandboxSession, readPath);
+            const fileName = getRuntimeArtifactFileName(entry.path);
+            const artifactKey = `${fileName}\0${bytes.length}`;
+
+            if (recordedArtifacts.has(artifactKey)) {
+              continue;
+            }
+
+            await fileStore.recordRuntimeOutput({
+              bindings: input.bindings,
+              body: bytes,
+              contentType: entry.contentType,
+              createdBy,
+              path: entry.path,
+              sessionId: parsedSessionId,
+            });
+            recordedArtifacts.add(artifactKey);
+          } catch (error) {
+            logWarn("runtime.file_artifact.manifest_record_failed", {
+              ...createErrorLogContext(error),
+              path: entry.path,
+              sandboxId,
+              sessionId,
+            });
+          }
+        }
+      },
+    );
+  } catch (error) {
+    logWarn("runtime.file_artifact.manifest_finalize_failed", {
+      ...createErrorLogContext(error),
+      driverInstanceId: input.event.driverInstanceId ?? null,
+      sandboxId,
+      sessionId,
+    });
+  }
 }
 
 export async function appRuntimeDriverEvents(
@@ -349,6 +474,14 @@ export async function appRuntimeDriverEvents(
       continue;
     }
 
+    if (event.kind === "run.completed") {
+      await recordRuntimeArtifactManifest({
+        bindings,
+        event,
+        link,
+      });
+    }
+
     if (event.kind === "permission.requested") {
       const request = readRuntimeEventPermissionRequest(event);
 
@@ -405,7 +538,11 @@ export async function appRuntimeDriverEvents(
       usage = nextUsage;
     };
 
-    appendRuntimeDriverCanonicalSideEffects(event, { setSessionTitle, setUsage, transitions });
+    appendRuntimeDriverCanonicalSideEffects(event, {
+      setSessionTitle,
+      setUsage,
+      transitions,
+    });
 
     for (const liveEvent of liveEvents) {
       nextLiveState = applyAgUiEventToSessionLiveState(nextLiveState, liveEvent);
