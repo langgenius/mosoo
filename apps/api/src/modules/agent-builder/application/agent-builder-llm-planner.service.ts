@@ -528,7 +528,7 @@ export function createAgentBuilderLlmPlanner(input: {
       }
 
       reportAgentBuilderProgress(plannerInput.progress, {
-        message: "正在调用 System Agent 模型规划 Builder 输出",
+        message: "Calling the System Agent model to plan the Builder output",
         stage: "planner:llm",
       });
 

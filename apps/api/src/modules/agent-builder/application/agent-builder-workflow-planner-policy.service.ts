@@ -50,7 +50,7 @@ export function planAgentBuilderRefactorTurn(
   return createAgentBuilderActionPlannerOutput({
     actionKey: APPLY_AGENT_CONFIG_ACTION_KEY,
     assistantText:
-      "我会把当前 Agent 当成已存在的 Manifest 来协助 refactor：可以继续修改名称、描述、模型、系统提示词，或调整 Environment、Skill、MCP 绑定；不会重新带你走 Quickstart 初始化步骤。如果右侧配置已经是你想保存的版本，可以点击 Apply changes 写回 Agent 配置。",
+      "I'll treat the current Agent as an existing Manifest and help you refactor it: you can keep editing the name, description, model, and system prompt, or adjust the Environment, Skill, and MCP bindings. I won't walk you through the Quickstart initialization steps again. If the configuration on the right is already the version you want to save, click Apply changes to write it back to the Agent configuration.",
     context,
     intentSummary: "Continue lightweight Agent Manifest refactor.",
     label: "Apply changes",
@@ -70,7 +70,7 @@ export function planAgentBuilderWorkflowTurn(
   if (workflowState.activeStageId === "create_agent") {
     return createAgentBuilderPlainTextPlannerOutput({
       assistantText:
-        "我需要先补齐 Agent type、名称、描述、运行时、模型和系统提示词，才能创建这个 Agent。",
+        "I need the Agent type, name, description, runtime, model, and system prompt filled in before I can create this Agent.",
       intentSummary: "Guide the user to complete Quickstart Step 1.",
       plannerRunId: context.plannerRunId,
     });
@@ -93,7 +93,7 @@ export function planAgentBuilderWorkflowTurn(
     ) {
       return createNextActionPlannerOutput({
         assistantText:
-          "Step 1 的 Agent 必填字段已经齐全。先点击 Create this agent 保存并初始化这个 Agent，然后继续配置 Environment。",
+          "All required Agent fields for Step 1 are complete. Click Create this agent first to save and initialize this Agent, then continue configuring the Environment.",
         context,
         intentSummary: "Ask the user to apply Quickstart Step 1 before Step 2.",
         nextAction: {
@@ -113,7 +113,7 @@ export function planAgentBuilderWorkflowTurn(
   if (workflowState.nextAction.kind === "open_preview") {
     return createNextActionPlannerOutput({
       assistantText:
-        "配置已经可以进入 Preview。你可以点击 Test in Chat 复用 preview 会话进行真实测试。",
+        "The configuration is ready for Preview. You can click Test in Chat to reuse the preview session for real testing.",
       context,
       intentSummary: "Guide the user to open Builder Preview.",
       nextAction: workflowState.nextAction,
@@ -122,7 +122,7 @@ export function planAgentBuilderWorkflowTurn(
   }
 
   return createAgentBuilderPlainTextPlannerOutput({
-    assistantText: "我会继续根据当前 Manifest 帮你调整 Agent 配置。",
+    assistantText: "I'll keep helping you adjust the Agent configuration based on the current Manifest.",
     intentSummary: "Continue lightweight Agent Manifest refinement.",
     plannerRunId: context.plannerRunId,
   });

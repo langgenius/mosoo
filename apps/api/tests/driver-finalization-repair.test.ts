@@ -20,7 +20,8 @@ import type { SqliteD1Database } from "./helpers/public-api-http-test-fixture";
 const FINALIZE_RUN_ID = "01J0000000000000000000000T" as SessionRunId;
 const FINALIZE_COMMAND_ID = "01J0000000000000000000000V" as DriverCommandId;
 const FINALIZE_CLOUDFLARE_SESSION_ID = "01J0000000000000000000000W";
-const TURN_INTERRUPTED_MESSAGE = "本轮已中断。工作区和上下文已保留，请重新发送刚才的请求。";
+const TURN_INTERRUPTED_MESSAGE =
+  "This turn was interrupted. Your workspace and context have been preserved — please resend your last request.";
 
 interface TerminalEventRow {
   content_text: string;
