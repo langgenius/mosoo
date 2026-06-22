@@ -37,7 +37,8 @@ function createFinalizedDriverRunError(input: {
       details: {
         driverInstanceId: input.driverInstanceId,
       },
-      message: "This turn was interrupted. Your workspace and context have been preserved — please resend your last request.",
+      message:
+        "This turn was interrupted. Your workspace and context have been preserved — please resend your last request.",
       retryable: true,
     };
   }

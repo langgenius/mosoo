@@ -122,7 +122,8 @@ export function planAgentBuilderWorkflowTurn(
   }
 
   return createAgentBuilderPlainTextPlannerOutput({
-    assistantText: "I'll keep helping you adjust the Agent configuration based on the current Manifest.",
+    assistantText:
+      "I'll keep helping you adjust the Agent configuration based on the current Manifest.",
     intentSummary: "Continue lightweight Agent Manifest refinement.",
     plannerRunId: context.plannerRunId,
   });
