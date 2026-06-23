@@ -144,9 +144,16 @@ The current route family is:
 | Archive / unarchive Thread  | `POST /api/v1/threads/{threadId}/archive`      | Hide or restore a Thread for the caller.    |
 | Delete Thread               | `DELETE /api/v1/threads/{threadId}`            | Delete the Thread through the public API.   |
 | List Thread files           | `GET /api/v1/threads/{threadId}/files`         | List files attached to the Thread.          |
-| Attach Thread file          | `POST /api/v1/threads/{threadId}/files`        | Claim a draft file into the Thread.         |
+| Create Thread file upload   | `POST /api/v1/threads/{threadId}/files/uploads`| Open a Thread-scoped upload for raw bytes.  |
+| Upload Thread file bytes    | `PUT /api/v1/files/{fileId}/content`           | Send the file bytes for a pending upload.   |
+| Complete Thread file upload | `POST /api/v1/files/{fileId}/complete`         | Finalize a pending upload into a ready file. |
+| Attach Thread file          | `POST /api/v1/threads/{threadId}/files`        | Claim a ready file handle into the Thread.  |
 | Delete Thread file          | `DELETE /api/v1/threads/{threadId}/files/{id}` | Remove a file from the Thread.              |
 | Machine-readable API schema | `GET /api/v1/openapi.json`                     | Describe the Public Thread API for tooling. |
+
+Attaching a file is a two-stage flow: upload the bytes through the files data
+plane first (create upload → `PUT` content → complete), then claim the resulting
+`fileId` into the Thread. MVP public uploads are single `PUT` and size-capped.
 
 The public schema should keep runtime implementation details out of responses:
 driver ids, deployment internals, trace ids, vendor resume pointers, raw event
