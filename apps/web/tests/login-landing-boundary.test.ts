@@ -7,7 +7,7 @@ function readSource(path: string): string {
 
 describe("Login landing boundary", () => {
   test("keeps Invoke copy aligned with exported App reuse and Agent-owned delivery", () => {
-    const landingSource = readSource("../src/routes/login/landing/landing.tsx");
+    const landingSource = readSource("../src/routes/login/landing/landing-below-fold.tsx");
     const invokeSource = readSource("../src/routes/login/landing/invoke-section.tsx");
 
     expect(landingSource).toContain("InvokeSection");
