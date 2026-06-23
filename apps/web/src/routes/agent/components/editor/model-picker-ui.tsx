@@ -8,7 +8,6 @@ import {
 } from "@/domains/vendor-credential/model/provider-readiness-copy";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
-import { Button } from "@/shared/ui/button";
 import { DropdownMenuItem } from "@/shared/ui/dropdown-menu";
 
 import type { ResolvedModelEntry } from "../../../../domains/vendor-credential/api/vendor-credential-client";
@@ -36,25 +35,6 @@ export function ModelPickerEmptyItem(): ReactElement {
   return (
     <div className="text-muted-foreground px-3 py-6 text-center text-[12px]">
       No matching models. Configure a Provider to unlock models.
-    </div>
-  );
-}
-
-export function ModelPickerEmptyState(): ReactElement {
-  return (
-    <div className="border-amber/30 bg-amber-bg/60 flex items-start justify-between gap-3 rounded-md border border-dashed px-3 py-2.5">
-      <div className="space-y-0.5">
-        <div className="text-amber-fg text-[12px] font-medium">No models available</div>
-        <div className="text-amber-fg/80 text-[11px]">
-          Configure a Provider key (or add an OpenAI-compatible Provider) to unlock models.
-        </div>
-      </div>
-      <Button asChild size="xs" variant="outline">
-        <Link to="/providers">
-          {ADD_PROVIDER_KEY_TEXT}
-          <ExternalLink className="size-3" />
-        </Link>
-      </Button>
     </div>
   );
 }

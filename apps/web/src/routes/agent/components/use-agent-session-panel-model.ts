@@ -23,6 +23,7 @@ import {
   getReadinessBlockMessage,
   hasStaleSessionConfiguration,
   isComposerSendBlocked,
+  selectSessionPanelReadiness,
   shouldWaitForRuntimeReadyOnNewSession,
 } from "./agent-session-panel-rules";
 import {
@@ -119,7 +120,10 @@ export function useAgentSessionPanelModel(
     requireFreshConfiguration: input.requireFreshConfiguration,
   });
   const stream = useSessionStream(input.appId, activeSessionId);
-  const readiness = stream.readiness ?? input.readiness;
+  const readiness = selectSessionPanelReadiness({
+    agentReadiness: input.readiness,
+    streamReadiness: stream.readiness,
+  });
   const readinessBlockMessage = getReadinessBlockMessage(readiness);
   const permissionScrollSignal = useMemo(
     () => stream.permissionRequests.map((request) => request.requestId).join("|"),

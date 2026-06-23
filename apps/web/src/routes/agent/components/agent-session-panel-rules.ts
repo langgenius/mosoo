@@ -28,6 +28,36 @@ export interface RuntimeReadyWaitInput {
   waitForRuntimeReadyOnNewSession: boolean;
 }
 
+export interface SessionPanelReadinessInput {
+  agentReadiness: AgentReadiness | null;
+  streamReadiness: AgentReadiness | null;
+}
+
+export function selectSessionPanelReadiness(
+  input: SessionPanelReadinessInput,
+): AgentReadiness | null {
+  if (input.streamReadiness === null) {
+    return input.agentReadiness;
+  }
+
+  if (input.agentReadiness === null) {
+    return input.streamReadiness;
+  }
+
+  const agentCheckedAtMs = parseTimestampMs(input.agentReadiness.checkedAt);
+  const streamCheckedAtMs = parseTimestampMs(input.streamReadiness.checkedAt);
+
+  if (
+    agentCheckedAtMs !== null &&
+    streamCheckedAtMs !== null &&
+    agentCheckedAtMs >= streamCheckedAtMs
+  ) {
+    return input.agentReadiness;
+  }
+
+  return input.streamReadiness;
+}
+
 export function getReadinessBlockMessage(readiness: AgentReadiness | null): string | null {
   if (readiness === null || readiness.issues.length === 0 || readiness.ready) {
     return null;

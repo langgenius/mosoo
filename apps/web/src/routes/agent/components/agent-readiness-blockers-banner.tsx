@@ -30,10 +30,11 @@ export function AgentReadinessBlockersBanner({
   const providerPresentation = getPrimaryProviderReadinessPresentation(readiness.issues);
   const isRetrying = retrying === true;
   const hasSummary = summary !== null && summary !== "";
+  const visibleMessages = hasSummary ? [] : messages;
 
   return (
     <div
-      className="border-destructive/25 bg-destructive/[0.05] border-b px-4 py-3"
+      className="border-destructive/25 bg-destructive/[0.05] mb-3 rounded-lg border px-3 py-2.5"
       data-testid="agent-readiness-blockers"
       role="alert"
     >
@@ -67,9 +68,9 @@ export function AgentReadinessBlockersBanner({
           </Button>
         ) : null}
       </div>
-      {messages.length > 0 ? (
+      {visibleMessages.length > 0 ? (
         <ul className="text-fg-2 mt-2 space-y-1 text-[12px] leading-relaxed">
-          {messages.map((message) => (
+          {visibleMessages.map((message) => (
             <li key={message} className="flex gap-2">
               <span aria-hidden className="bg-destructive mt-[0.55em] size-1 rounded-full" />
               <span>{message}</span>
