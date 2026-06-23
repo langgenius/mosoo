@@ -1,13 +1,16 @@
+import { lazy, Suspense } from "react";
 import type { ReactElement } from "react";
 
-import { CostSection } from "./cost-section";
-import { CtaBand } from "./cta-band";
-import { DeploySection } from "./deploy-section";
-import { FaqSection } from "./faq-section";
 import { Hero } from "./hero";
-import { InvokeSection } from "./invoke-section";
-import { RuntimeShowcase } from "./runtime-showcase";
-import { SandboxSection } from "./sandbox-section";
+
+// The marketing sections below the hero are not part of the first viewport, so
+// they load as a separate chunk once the route has painted. Keeping them out of
+// the login route's initial bundle shrinks the first thing every unauthenticated
+// visitor downloads.
+const LandingBelowFold = lazy(async () => {
+  const mod = await import("./landing-below-fold");
+  return { default: mod.LandingBelowFold };
+});
 
 export function LoginLanding({ onContinue }: { onContinue: () => void }): ReactElement {
   return (
@@ -16,13 +19,9 @@ export function LoginLanding({ onContinue }: { onContinue: () => void }): ReactE
           height (the "wireframe"); sections are split by horizontal dividers. */}
       <div className="border-border-strong divide-border-strong mx-auto w-full max-w-[1280px] divide-y border-x">
         <Hero onContinue={onContinue} />
-        <DeploySection />
-        <RuntimeShowcase />
-        <SandboxSection />
-        <InvokeSection />
-        <CostSection />
-        <FaqSection />
-        <CtaBand onContinue={onContinue} />
+        <Suspense fallback={null}>
+          <LandingBelowFold onContinue={onContinue} />
+        </Suspense>
       </div>
     </div>
   );
