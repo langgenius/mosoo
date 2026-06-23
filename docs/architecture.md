@@ -25,7 +25,7 @@ The architecture is built on the Cloudflare platform and uses a Serverless shape
 - **Message queues: Cloudflare Queues**. Queues decouple the control plane from offline tasks. They provide consumer groups, ACK semantics, dead-letter queues, and at-least-once delivery for asynchronous work and cost log ingestion.
 - **Object storage: Cloudflare R2**. R2 stores Files Library objects, session-level file objects, sandbox state backups, and configuration attachments. Runtime-produced files are recorded as session artifacts in the MVP. Sandbox private state backups use a separate backup bucket and must not be mixed with user-visible file prefixes.
 - **Execution sandbox: Cloudflare Sandbox / Containers**. Heterogeneous Agents run in container-image-backed isolated environments, with Sandbox APIs and Durable Object boundaries controlling runtime lifecycle.
-- **System assistant framework: Cloudflare Agents SDK**. The current implementation is the `AgentBuilderSystemAgent` / agent-builder path. It provides lightweight system assistance for Agent configuration creation, prompt preparation, and control-plane operation planning. It does not enter the full Sandbox / Driver runtime path.
+- **Configuration editing**. Owner-side Agent configuration is currently edited through Preview, which combines the writable configuration form with in-context test chat. There is no dedicated `AgentBuilderSystemAgent` topology in the current codebase. Future configuration assistance must remain a control-plane feature and must not enter the full Sandbox / Driver runtime path.
 
 ---
 
@@ -54,7 +54,7 @@ graph TD
 
         subgraph Agent_Plane [Agent Plane]
             Profile[Profile Management]
-            SystemAgent[System Agent<br/>Lightweight LLM Control Helper]
+            PreviewConfig[Preview Config Editing]
             Runtime[Runtime Scheduler]
         end
 
@@ -132,9 +132,9 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
    - **Access boundary**: App access maps to the single Organization owner for this phase. No secondary principal model is part of the first cut.
 
 3. **Agent Plane**
-   The Agent Plane unifies configuration management, lightweight system assistance, and runtime scheduling. The public data entity is the bare `Agent`. Historical terms such as `AgentService` and `PublishedAgent` have been collapsed into `Agent`, and the module name `Agent Plane` avoids a naming collision with the entity itself.
+   The Agent Plane unifies configuration management, Preview configuration editing, and runtime scheduling. The public data entity is the bare `Agent`. Historical terms such as `AgentService` and `PublishedAgent` have been collapsed into `Agent`, and the module name `Agent Plane` avoids a naming collision with the entity itself.
    - **Profile management**: Agent definitions are stored under App in D1 and support CRUD plus import/export flows. The Profile manages Skill availability, MCP bindings, Runtime references, and Provider references for an App-local Agent. Runtime plaintext credentials are not stored in the Profile. New flows resolve them through Credential / Vault by `(execution_actor, app, provider)` and fail closed when App ownership cannot be proven. In the Runtime Session Kernel, the execution actor is the Agent owner; the caller is used only for ingress context and permission response attribution.
-   - **System Agent**: This path helps users create and edit Agent configuration, generate system prompts, choose models and tools, and validate configuration completeness. It uses lightweight LLM calls, does not start a Sandbox, does not launch an Agent Driver or Agent Process, and does not use Skills for dynamic expansion. It is made from model, system prompt, and controlled tool schemas, with Cloudflare Agents SDK used only as a thin session/state/RPC wrapper.
+   - **Preview configuration editing**: Owner-side editing currently happens in Preview. The surface writes through Agent profile/configuration services, auto-saves eligible form fields, keeps pending changes explicit, and tests the saved or draft configuration through Preview chat. It is a user-facing edit/test surface, not a separate publishable Agent or system-assistant topology.
    - **Runtime**: The Runtime validates execution rights and orchestrates Cloudflare Sandbox instances. It does not wait for an in-sandbox Driver to call back to a public endpoint. Instead, it uses Sandbox SDK `wsConnect()` to reach the Driver's local WebSocket / JSON-RPC interface inside the container. It also applies Agent `kind` to choose Pet Sandbox or Cattle Session Sandbox behavior, restores platform conversation history, materializes Session attachments, records Session artifacts, manages Sandbox Backup/Restore and destruction policy, and consumes file events on the Worker side.
      - **Pet Runtime path**: A Pet Agent is bound to a stable Agent Sandbox with subject `agent:{agentId}`. Multiple Sessions for the same Pet happen inside the same Sandbox. The default initial working directory is shared, and Session-to-Session isolation is not guaranteed. Backup/Restore preserves user-visible continuity across Sandbox startup and teardown. Reset agent-state clears only this stable Sandbox state and does not delete Agent config, Session history, Cost, logs, or Files Library records.
      - **Cattle Runtime path**: Each Cattle Agent Session is bound to an isolated Session Sandbox with subject `session:{sessionId}`. The Sandbox is the Session boundary. It is destroyed when the run ends or the lifecycle policy triggers. Temporary files, caches, login state, and native runtime state that are not explicitly captured as Session artifacts or by a restore policy disappear with the Sandbox.
@@ -201,44 +201,19 @@ The **Agent Driver** is a top-level independently built execution component beca
 
 ---
 
-### 4.4 Lightweight System Agent Path
+### 4.4 Configuration Assistance Boundary
 
-The System Agent is a control-plane capability, not a user-publishable, shareable, long-running business Agent. It helps turn user intent into platform configuration, such as creating Agent profiles, preparing default prompts, recommending models, generating tool binding drafts, checking configuration conflicts, and applying validated configuration writes.
+The current product does not ship a dedicated lightweight System Agent or Agent Builder system-assistant topology. Owner editing starts from a blank Agent when needed, opens Preview, and uses the same Preview form/test surface to configure and validate behavior.
 
-Design constraints:
+Future configuration assistance is allowed only as a control-plane capability layered over App / Agent form state. It must not be modeled as a user-publishable, shareable, long-running business Agent, and it must not enter the full Sandbox / Driver runtime path.
 
-- **No full Agent Runtime**: It does not create Runtime `AgentSession` or Sandbox execution resources, does not start Agent Driver, does not consume Pet/Cattle Sandbox paths or caches, and does not write Session artifacts.
-- **No Skill usage**: The goal is deterministic, fast, controlled assistance. Loading Skills would expand context, increase dynamic behavior, and raise cold-start cost.
-- **Direct LLM API call**: Inputs include system prompt, current user context, target config draft, and controlled tool schemas. Outputs must pass structured validation before persistence.
-- **Control-plane tools only**: Tools should be small and stable control-plane service functions such as `create_agent`, `patch_manifest_draft`, `apply_agent_config`, `inspect_builder_context`, and `search_builder_assets` (defined in `agent-builder-control-plane-tool-descriptor.service.ts`). Tools call existing Manifest / Vault / File / Permission services for writes and must not bypass domain services to operate directly on D1 or R2.
-- **Cloudflare Agents SDK as a thin wrapper**: The SDK may provide `Agent` class state, WebSocket, and callable RPC support for short sessions and frontend interaction state. Canonical configuration remains in D1, R2, and domain services.
-- **Explainable and rollback-safe failure**: LLM output creates a draft or a tool-call request. Real configuration mutation must show a diff, run permission checks, and run schema validation first. Write failures must not silently fall back.
+Design constraints for any future assistant:
 
-Minimal flow:
-
-```mermaid
-sequenceDiagram
-    participant Client as Web Frontend
-    participant Ingress as API: HTTP / WS Ingress Worker
-    participant SysAgent as API: System Agent<br/>Cloudflare Agents SDK
-    participant LLM as Vendor LLM API
-    participant Profile as API: Profile / Config Service
-    participant Store as D1 / R2
-
-    Client->>Ingress: Ask to create / edit Agent config
-    Ingress->>SysAgent: Route to lightweight system assistant
-    SysAgent->>LLM: model + system prompt + controlled tool schemas
-    LLM-->>SysAgent: structured draft or tool call
-    SysAgent->>Profile: Validate and preview config diff
-    Profile->>Store: Read current canonical config
-    Store-->>Profile: Existing config
-    Profile-->>SysAgent: Validated diff
-    SysAgent-->>Client: Present draft / diff
-    Client->>Ingress: Confirm apply
-    Ingress->>SysAgent: applyAgentConfig
-    SysAgent->>Profile: Write through domain service
-    Profile->>Store: Persist canonical config
-```
+- **No full Agent Runtime**: It must not create Runtime `AgentSession` or Sandbox execution resources, start Agent Driver, consume Pet/Cattle Sandbox paths or caches, or write Session artifacts.
+- **Form-visible writes**: Generated changes must be represented as visible form values or reviewable diffs before persistence.
+- **Control-plane tools only**: Tools should call existing App, Agent profile/configuration, Vault, File, Environment, and Permission services. They must not bypass domain services to operate directly on D1 or R2.
+- **Canonical configuration stays in domain storage**: App and Agent configuration remains in D1, R2, and domain services. Any assistant state is context, not the source of truth.
+- **Explainable and rollback-safe failure**: Real configuration mutation must show a diff, run permission checks, and run schema validation first. Write failures must not silently fall back.
 
 ---
 

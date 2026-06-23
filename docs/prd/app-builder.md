@@ -42,21 +42,23 @@ and not a traditional page builder.
 ## Current State
 
 The current product surface is still mostly Agent-first. The web app exposes
-Agents directly, and the existing Agent Builder helps users create or modify an
-Agent draft. This is the implementation base for App Builder, but it is not the
-final product framing.
+Agents directly. Creating an Agent now creates a blank Agent and opens Preview,
+where the owner edits configuration and tests through the same surface. Preview
+is the current owner editing baseline; it is not the final App-first product
+framing.
 
-Code evidence: `apps/web/src/app/navigation.tsx`, `apps/web/src/app/route-registry.tsx`, `apps/web/src/routes/agent/components/create-agent-launcher.tsx`, `apps/web/src/routes/agent/lifecycle/lifecycle-shell.tsx`, `apps/web/src/routes/agent/components/agent-builder/agent-builder-panel.tsx`, `apps/api/src/modules/agent-builder/**`, `pkgs/contracts/src/agent-builder/**`.
+Code evidence: `apps/web/src/app/navigation.tsx`, `apps/web/src/app/route-registry.tsx`, `apps/web/src/routes/agent/components/create-agent-launcher.tsx`, `apps/web/src/routes/agent/agent-detail.route.tsx`, `apps/web/src/routes/agent/components/preview-mode.tsx`, `apps/web/src/routes/agent/components/editor/draft.ts`, `pkgs/contracts/src/agent/agent-manifest.contract.ts`.
 
-A pure frontend App Builder prototype exists at
-`apps/web/src/routes/app-builder-mock/app-builder-mock.route.tsx`. It is a mock
-implementation of the desired App-first creation surface and publish
-instruction flow. The prototype is evidence for interaction shape, not backend
-contract completeness.
+The earlier Agent Builder system-agent path has been removed from the current
+codebase. App Builder implementation must not restore the old Agent Builder
+GraphQL surface, control-plane system Agent, DB tables, web domain, or
+single-Agent assistant panel as the default creation path.
 
-The current prototype also expresses the new multiple-Agent builder shape: one
-App draft owns multiple Agent drafts, and the right-side form area uses
-browser-like Agent tabs to switch between independently editable Agent forms.
+The App Builder surface described below is therefore a new App-level product
+surface to build from the Preview/form editing baseline. The target
+multiple-Agent shape remains: one App draft owns multiple Agent drafts, and the
+right-side form area uses browser-like Agent tabs to switch between
+independently editable Agent forms.
 
 ## Decision Summary
 
@@ -68,6 +70,9 @@ The latest product decisions are:
 - App Builder must not predefine a core Agent, primary Agent, or Agent
   hierarchy. Users may decide how Agents relate to each other in their own App
   design.
+- App Builder must be implemented as an App-level creation surface over the
+  Preview/form editing baseline. It must not revive the deleted single-Agent
+  Agent Builder system-agent stack.
 - Thread is under Agent.
 - Runtime resources are under Agent.
 - App Builder must preserve the full configuration form and help the user fill
@@ -304,11 +309,15 @@ Current code has two Agent YAML-adjacent shapes:
 - The current Agent editor draft YAML lives in
   `apps/web/src/routes/agent/components/editor/draft.ts`. It is a form-editing
   shape with `version: 1`, `identity`, `kind`, `runtime`, `prompt`,
-  `environment`, `assets`, and optional `builder` metadata.
+  `environment`, and `assets`.
 
 Neither shape is a multiple-Agent App YAML. App Builder should introduce an
 App-level manifest that reuses the Agent configuration sections from the current
 Agent manifest, but wraps them in a single App document.
+
+The removed Agent Builder contracts are not an App manifest baseline. New App
+Builder YAML must be introduced through explicit App-level contracts rather than
+by reusing deleted planner or system-agent contract shapes.
 
 The canonical App Builder YAML is one App-level manifest:
 
@@ -708,6 +717,8 @@ variant unless a design review specifically asks for visual evidence.
 - Do not move Threads out from under Agent.
 - Do not move runtime resources out from under Agent.
 - Do not hide the configuration form behind a chat-only experience.
+- Do not restore the deleted Agent Builder system-agent stack as the App Builder
+  implementation.
 - Do not force users to choose internal Agent type taxonomy in the primary App
   creation flow.
 - Do not collapse multiple Agent drafts into one hidden or shared form.
@@ -730,6 +741,9 @@ variant unless a design review specifically asks for visual evidence.
 - A new user can start from App, type a rough requirement, and land in an App creation page.
 - The App creation page clearly shows both the full form and App Builder assistance.
 - The App creation page can represent multiple Agents under one App draft.
+- The App Builder implementation does not depend on the deleted Agent Builder
+  GraphQL surface, control-plane system Agent, DB tables, or single-Agent web
+  assistant panel.
 - The right configuration area shows Agent tabs, with each tab owning an
   independent editable Agent form.
 - Switching Agent tabs preserves each Agent's form values.
