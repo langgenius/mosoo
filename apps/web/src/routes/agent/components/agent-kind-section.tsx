@@ -12,9 +12,8 @@ import { KindForkDialog } from "../lifecycle/kind-fork-dialog";
 import { KindLockBanner } from "./kind-lock-banner";
 import { KindSelector } from "./kind-selector";
 
-// Encapsulates the entire Agent Type UX: kind selector cards, Compare panel,
-// lock banner, and Fork dialog. Mounted at the top of Configure on both Draft
-// (LifecycleShell) and Live (DevMode) agents.
+// Encapsulates the Agent Type selector, comparison panel, lock banner, and Fork
+// dialog. Mounted at the top of the Preview configuration panel.
 // Lock state starts at first publish and stays locked after unpublish because
 // the live version snapshot remains attached to the original agent.
 export function AgentKindSection({
@@ -36,8 +35,6 @@ export function AgentKindSection({
   });
   const [forkDialog, setForkDialog] = useState<{ target: AgentKind } | null>(null);
 
-  // Re-selecting the current kind still counts: it confirms the default and
-  // marks the agent-type stage decision in the draft.
   const handleKindChange = useCallback(
     (next: AgentKind) => {
       onKindChange?.(next);

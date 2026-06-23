@@ -8,7 +8,7 @@ import { ChannelsListWidget } from "./channels-list-widget";
 import type { ChannelId } from "./settings-dialog-model";
 
 /**
- * Channels field for the Agent Builder right-side panel.
+ * Channels field for the Preview configuration panel.
  * Renders the same list widget as the Settings modal Distribution block,
  * and opens the LobeHub-style list/detail config in a standalone dialog
  * when a row is clicked.

@@ -70,62 +70,6 @@ CREATE TABLE `agent` (
 CREATE INDEX `agent_app_owner_account_idx` ON `agent` (`app_id`,`owner_account_id`);--> statement-breakpoint
 CREATE INDEX `agent_app_status_idx` ON `agent` (`app_id`,`status`);--> statement-breakpoint
 CREATE INDEX `agent_environment_idx` ON `agent` (`environment_id`);--> statement-breakpoint
-CREATE TABLE `agent_builder_message` (
-	`cards_json` text,
-	`content_text` text NOT NULL,
-	`created_at` integer NOT NULL,
-	`created_by_account_id` text CHECK ("created_by_account_id" = upper("created_by_account_id") AND length("created_by_account_id") = 26 AND substr("created_by_account_id", 1, 1) GLOB '[0-7]' AND "created_by_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
-	`input_kind` text,
-	`planner_run_id` text CHECK ("planner_run_id" = upper("planner_run_id") AND length("planner_run_id") = 26 AND substr("planner_run_id", 1, 1) GLOB '[0-7]' AND "planner_run_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
-	`role` text NOT NULL,
-	`seq` integer NOT NULL,
-	`thread_id` text CHECK ("thread_id" = upper("thread_id") AND length("thread_id") = 26 AND substr("thread_id", 1, 1) GLOB '[0-7]' AND "thread_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	FOREIGN KEY (`thread_id`) REFERENCES `agent_builder_thread`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `agent_builder_message_thread_seq_idx` ON `agent_builder_message` (`thread_id`,`seq`);--> statement-breakpoint
-CREATE INDEX `agent_builder_message_planner_run_idx` ON `agent_builder_message` (`planner_run_id`);--> statement-breakpoint
-CREATE TABLE `agent_builder_planner_run` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`completed_at` integer,
-	`context_json` text NOT NULL,
-	`created_at` integer NOT NULL,
-	`error_code` text,
-	`error_message` text,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
-	`model` text NOT NULL,
-	`output_json` text,
-	`provider` text NOT NULL,
-	`request_digest` text NOT NULL,
-	`status` text NOT NULL,
-	`thread_id` text CHECK ("thread_id" = upper("thread_id") AND length("thread_id") = 26 AND substr("thread_id", 1, 1) GLOB '[0-7]' AND "thread_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`trace_id` text NOT NULL,
-	`tool_trace_json` text,
-	`trigger_message_id` text CHECK ("trigger_message_id" = upper("trigger_message_id") AND length("trigger_message_id") = 26 AND substr("trigger_message_id", 1, 1) GLOB '[0-7]' AND "trigger_message_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
-	FOREIGN KEY (`agent_id`) REFERENCES `agent`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`thread_id`) REFERENCES `agent_builder_thread`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE INDEX `agent_builder_planner_run_thread_created_idx` ON `agent_builder_planner_run` (`thread_id`,`created_at`);--> statement-breakpoint
-CREATE INDEX `agent_builder_planner_run_agent_created_idx` ON `agent_builder_planner_run` (`agent_id`,`created_at`);--> statement-breakpoint
-CREATE INDEX `agent_builder_planner_run_trace_idx` ON `agent_builder_planner_run` (`trace_id`);--> statement-breakpoint
-CREATE TABLE `agent_builder_thread` (
-	`agent_id` text CHECK ("agent_id" = upper("agent_id") AND length("agent_id") = 26 AND substr("agent_id", 1, 1) GLOB '[0-7]' AND "agent_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`created_at` integer NOT NULL,
-	`creator_account_id` text CHECK ("creator_account_id" = upper("creator_account_id") AND length("creator_account_id") = 26 AND substr("creator_account_id", 1, 1) GLOB '[0-7]' AND "creator_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
-	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
-	`last_turn_at` integer,
-	`message_seq_cursor` integer DEFAULT 0 NOT NULL,
-	`preview_opened_at` integer,
-	`status` text DEFAULT 'active' NOT NULL,
-	`title` text,
-	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`agent_id`) REFERENCES `agent`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX `agent_builder_thread_agent_idx` ON `agent_builder_thread` (`agent_id`);--> statement-breakpoint
-CREATE INDEX `agent_builder_thread_creator_updated_idx` ON `agent_builder_thread` (`creator_account_id`,`updated_at`);--> statement-breakpoint
 CREATE TABLE `api_command` (
 	`attempt_count` integer DEFAULT 0 NOT NULL,
 	`claim_expires_at` integer,

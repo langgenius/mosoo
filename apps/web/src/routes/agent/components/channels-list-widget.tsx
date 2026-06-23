@@ -10,7 +10,7 @@ import type { ChannelId } from "./settings-dialog-model";
  * Compact list of channel provider rows.
  * Used by:
  *   - Settings modal Distribution block
- *   - Agent Builder right-side panel Channels section
+ *   - Preview configuration panel Channels section
  *
  * Click anywhere on a row → `onOpenChannelView(channelId)`. The parent decides
  * whether that opens the in-modal channels view or a standalone dialog.

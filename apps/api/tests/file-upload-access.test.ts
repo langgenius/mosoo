@@ -18,7 +18,7 @@ import {
 } from "../src/modules/files/infrastructure/file-record-store";
 import { createFileUpload } from "../src/modules/files/infrastructure/file-upload-create";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
-import { createAgentBuilderApiFixture } from "./helpers/agent-builder-api-fixture";
+import { createApiTestFixture } from "./helpers/api-test-fixture";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const VIEWER_ID = parsePlatformId<AccountId>("01J00000000000000000000001", "viewer ID");
@@ -544,7 +544,7 @@ describe("file upload access", () => {
   });
 
   test("requires matching App proof for raw session upload targets", async () => {
-    const fixture = await createAgentBuilderApiFixture();
+    const fixture = await createApiTestFixture();
     await fixture.client.loginAsMosooAiTestAccount();
     await insertRawFileRouteSessionFixture(fixture.database, {
       agentId: fixture.ids.agentId,
@@ -613,7 +613,7 @@ describe("file upload access", () => {
   });
 
   test("raw HTTP file list defaults to visible Thread files and filters by session", async () => {
-    const fixture = await createAgentBuilderApiFixture();
+    const fixture = await createApiTestFixture();
     await fixture.client.loginAsMosooAiTestAccount();
     await insertRawFileRouteSessionFixture(fixture.database, {
       agentId: fixture.ids.agentId,

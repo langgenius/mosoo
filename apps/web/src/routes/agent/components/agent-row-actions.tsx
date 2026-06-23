@@ -91,7 +91,7 @@ export function AgentRowActions({ agent }: { agent: Agent }): ReactElement {
   }
 
   function handleEdit(): void {
-    void navigate(`${getBasePath()}/${agent.id}?tab=dev`);
+    void navigate(`${getBasePath()}/${agent.id}?tab=preview`);
   }
 
   async function handleDuplicate(): Promise<void> {

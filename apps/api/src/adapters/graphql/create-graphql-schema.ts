@@ -1,7 +1,6 @@
 import { SESSION_PROCESS_EVENT_TYPE_BY_CODE } from "@mosoo/contracts/session";
 import { createSchema } from "graphql-yoga";
 
-import { agentBuilderGraphQLModule } from "../../modules/agent-builder/graphql/agent-builder-graphql";
 import { agentGraphQLModule } from "../../modules/agents/graphql/agent-graphql";
 import { appGraphQLModule } from "../../modules/apps/graphql/app-graphql";
 import { channelGraphQLModule } from "../../modules/channels/graphql/channel-graphql";
@@ -25,7 +24,6 @@ import { ulidScalar } from "./scalars/ulid-scalar";
 const composedGraphQLModules = composeGraphQLModules([
   commonGraphQLModule,
   agentGraphQLModule,
-  agentBuilderGraphQLModule,
   channelGraphQLModule,
   costGraphQLModule,
   environmentGraphQLModule,

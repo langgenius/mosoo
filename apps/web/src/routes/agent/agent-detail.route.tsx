@@ -16,13 +16,11 @@ import { mapAgentDetailToView } from "./agent-view.mapper";
 import type { Agent, AgentMode } from "./agent.types";
 import { ConsumeMode } from "./components/consume-mode";
 import { AgentCostTab } from "./components/cost-tab";
-import { DevMode } from "./components/dev-mode";
 import { LogsTab } from "./components/logs-tab";
 import { PreviewMode } from "./components/preview-mode";
 import { RuntimeIcon } from "./components/runtime-icon";
 import { SettingsSheet } from "./components/settings-dialog";
 import { VersionsTab } from "./components/versions-tab";
-import { LifecycleShell } from "./lifecycle/lifecycle-shell";
 import { getRuntimeInfo } from "./runtime-catalog";
 
 // The terminal pulls in the full xterm engine (~250 kB) and its stylesheet, yet
@@ -37,7 +35,6 @@ const TerminalMode = lazy(async () => {
 type DetailMode = AgentMode | "cost" | "logs" | "terminal";
 
 const MODE_TABS: { id: DetailMode; label: string; ownerOnly?: boolean }[] = [
-  { id: "dev", label: "Dev", ownerOnly: true },
   { id: "preview", label: "Preview" },
   { id: "logs", label: "Logs", ownerOnly: true },
   { id: "cost", label: "Cost", ownerOnly: true },
@@ -54,7 +51,6 @@ function toDetailMode(value: string | null): DetailMode | null {
     case "consume":
     case "cost":
     case "create":
-    case "dev":
     case "logs":
     case "preview":
     case "terminal":
@@ -68,10 +64,7 @@ function AgentDetailHeader({
   agent,
   debugItems,
   headerActionTargetRef,
-  headerCenterTargetRef,
-  isDraftLifecycle,
   isOwner,
-  lifecycleMode,
   mode,
   onBack,
   onOpenSettings,
@@ -82,10 +75,7 @@ function AgentDetailHeader({
   agent: Agent;
   debugItems: DebugModeItem[];
   headerActionTargetRef: (node: HTMLDivElement | null) => void;
-  headerCenterTargetRef: (node: HTMLDivElement | null) => void;
-  isDraftLifecycle: boolean;
   isOwner: boolean;
-  lifecycleMode: Extract<DetailMode, "dev" | "preview"> | null;
   mode: DetailMode;
   onBack: () => void;
   onOpenSettings: () => void;
@@ -102,7 +92,7 @@ function AgentDetailHeader({
 
         {runtime ? <RuntimeIcon runtime={runtime} size={28} /> : null}
         <span className="text-foreground text-[14px] font-medium">{agent.name}</span>
-        {isDraftLifecycle ? (
+        {agent.status === "draft" ? (
           <button
             type="button"
             onClick={onOpenVersions}
@@ -123,57 +113,48 @@ function AgentDetailHeader({
         ) : null}
       </div>
 
-      {isDraftLifecycle && lifecycleMode ? (
-        <div
-          className="absolute left-1/2 flex -translate-x-1/2 items-center"
-          ref={headerCenterTargetRef}
-        />
-      ) : (
-        <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1">
-          {MODE_TABS.flatMap((tab) =>
-            tab.ownerOnly === true && !isOwner
-              ? []
-              : [
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => {
-                      onSelectMode(tab.id);
-                    }}
-                    className={cn(
-                      "px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-all",
-                      mode === tab.id
-                        ? "bg-ink-100 text-fg-1"
-                        : "text-muted-foreground hover:bg-accent",
-                    )}
-                  >
-                    {tab.label}
-                  </button>,
-                ],
-          )}
-          {debugItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  onSelectMode(item.id);
-                }}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-all",
-                  mode === item.id
-                    ? "bg-ink-100 text-fg-1"
-                    : "text-muted-foreground hover:bg-accent",
-                )}
-              >
-                <Icon aria-hidden="true" size={14} />
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1">
+        {MODE_TABS.flatMap((tab) =>
+          tab.ownerOnly === true && !isOwner
+            ? []
+            : [
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    onSelectMode(tab.id);
+                  }}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-all",
+                    mode === tab.id
+                      ? "bg-ink-100 text-fg-1"
+                      : "text-muted-foreground hover:bg-accent",
+                  )}
+                >
+                  {tab.label}
+                </button>,
+              ],
+        )}
+        {debugItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => {
+                onSelectMode(item.id);
+              }}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-all",
+                mode === item.id ? "bg-ink-100 text-fg-1" : "text-muted-foreground hover:bg-accent",
+              )}
+            >
+              <Icon aria-hidden="true" size={14} />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
 
       <div className="flex items-center gap-2">
         <div ref={headerActionTargetRef} className="flex items-center gap-2" />
@@ -200,7 +181,6 @@ export function AgentDetailPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
   const [headerActionTarget, setHeaderActionTarget] = useState<HTMLDivElement | null>(null);
-  const [headerCenterTarget, setHeaderCenterTarget] = useState<HTMLDivElement | null>(null);
 
   const detailQuery = useAgentDetailQuery(activeAppId, agentId ?? null);
   const canEdit = detailQuery.data ? detailQuery.data.viewerRole === "owner" : false;
@@ -262,11 +242,11 @@ export function AgentDetailPage() {
     );
   }, [settingsParam, setSearchParams]);
 
-  // Default mode: Owner → Dev (config), others → Consume.
+  // Default mode: Owner → Preview (config + test chat), others → Consume.
   // Owners can still reach Consume via `?tab=consume` (e.g. the
   // post-publish success modal's "Open Chat" CTA) or the Preview tab for
   // an in-context test chat.
-  const defaultMode: DetailMode = isOwner ? "dev" : "consume";
+  const defaultMode: DetailMode = isOwner ? "preview" : "consume";
   const requestedMode = selectedMode ?? urlMode ?? defaultMode;
   const mode =
     !isOwner && requestedMode !== "consume"
@@ -340,18 +320,12 @@ export function AgentDetailPage() {
       <ConsumeMode
         agent={agent}
         onOpenConfig={() => {
-          handleSelectMode("dev");
+          handleSelectMode("preview");
         }}
         showConfigButton
       />
     );
   }
-
-  // Owner config modes (Create / Preview / Dev / Logs).
-  // Lifecycle shell wraps Draft agents in the Configure / Preview / Publish
-  // surfaces. Live agents fall through to the existing tabbed UI unchanged.
-  const isDraftLifecycle = agent.status === "draft";
-  const lifecycleMode = mode === "dev" || mode === "preview" ? mode : null;
 
   return (
     <div className="flex h-full flex-col">
@@ -359,10 +333,7 @@ export function AgentDetailPage() {
         agent={agent}
         debugItems={debugItems}
         headerActionTargetRef={setHeaderActionTarget}
-        headerCenterTargetRef={setHeaderCenterTarget}
-        isDraftLifecycle={isDraftLifecycle}
         isOwner={isOwner}
-        lifecycleMode={lifecycleMode}
         mode={mode}
         onBack={() => {
           void navigate(basePath);
@@ -379,31 +350,12 @@ export function AgentDetailPage() {
 
       {/* Content */}
       <div className="min-h-0 flex-1 overflow-hidden">
-        {isDraftLifecycle && lifecycleMode ? (
-          <LifecycleShell
+        {mode === "preview" && (
+          <PreviewMode
             agent={agent}
-            headerCenterTarget={headerCenterTarget}
-            mode={lifecycleMode}
             onSwitchMode={handleSelectMode}
             headerActionTarget={headerActionTarget}
           />
-        ) : (
-          <>
-            {mode === "preview" && (
-              <PreviewMode
-                agent={agent}
-                onSwitchMode={handleSelectMode}
-                headerActionTarget={headerActionTarget}
-              />
-            )}
-            {mode === "dev" && (
-              <DevMode
-                agent={agent}
-                onSwitchMode={handleSelectMode}
-                headerActionTarget={headerActionTarget}
-              />
-            )}
-          </>
         )}
         {mode === "logs" && <LogsTab agentId={agent.id} appId={agent.appId} />}
         {mode === "cost" && <AgentCostTab agentId={agent.id} appId={agent.appId} />}

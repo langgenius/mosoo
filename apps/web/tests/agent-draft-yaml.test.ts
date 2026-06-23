@@ -10,7 +10,6 @@ import {
 
 function draft(): AgentEditorDraft {
   return {
-    componentDecisions: {},
     description: "Reviews releases before publish.",
     environmentId: "01J000000000000000000000E2",
     kind: "pet",
@@ -59,25 +58,7 @@ describe("agent draft YAML codec", () => {
     expect(createSnapshotHash(parsed)).toBe(createSnapshotHash(current));
   });
 
-  test("round-trips Builder component decisions without changing runtime config snapshot", () => {
-    const current = {
-      ...draft(),
-      componentDecisions: {
-        environment: "skipped" as const,
-      },
-      environmentId: null,
-    };
-    const yaml = createDraftYaml(current);
-    const parsed = parseDraftYaml(yaml, draft());
-
-    expect(yaml).toContain("componentDecisions:");
-    expect(parsed.componentDecisions.environment).toBe("skipped");
-    expect(createSnapshotHash(parsed)).toBe(
-      createSnapshotHash({ ...parsed, componentDecisions: {} }),
-    );
-  });
-
-  test("ignores unsupported component decision keys in Draft YAML", () => {
+  test("ignores legacy Builder metadata in Draft YAML", () => {
     const current = draft();
     const parsed = parseDraftYaml(
       [
@@ -92,20 +73,7 @@ describe("agent draft YAML codec", () => {
       current,
     );
 
-    expect(parsed.componentDecisions).toEqual({ environment: "skipped" });
-  });
-
-  test("clears Environment component decision when the Draft YAML omits Builder metadata", () => {
-    const current = {
-      ...draft(),
-      componentDecisions: {
-        environment: "skipped" as const,
-      },
-    };
-    const yaml = createDraftYaml({ ...current, componentDecisions: {} });
-    const parsed = parseDraftYaml(yaml, current);
-
-    expect(yaml).not.toContain("componentDecisions:");
-    expect(parsed.componentDecisions).toEqual({});
+    expect(parsed).toEqual(current);
+    expect(createSnapshotHash(parsed)).toBe(createSnapshotHash(current));
   });
 });

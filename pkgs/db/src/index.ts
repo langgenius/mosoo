@@ -1,5 +1,4 @@
 export * from "./schema/agent.schema";
-export * from "./schema/agent-builder.schema";
 export * from "./schema/api-command.schema";
 export * from "./schema/auth.schema";
 export * from "./schema/channel.schema";

@@ -1,5 +1,4 @@
 export type * from "./account/account.contract";
-export * from "./agent-builder/agent-builder-planner.contract";
 export * from "./agent/agent-config-change-plan.contract";
 export * from "./agent/agent.contract";
 export * from "./agent/agent-manifest.contract";

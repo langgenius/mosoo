@@ -13,8 +13,8 @@ import type { ChannelId } from "./settings-dialog-model";
 /**
  * Standalone Channels configuration dialog — same provider list / detail body
  * as the Settings modal flow, but lives in its own Dialog instance so it can be
- * opened from anywhere outside the Settings modal (e.g. the Agent Builder
- * right-hand panel).
+ * opened from anywhere outside the Settings modal (e.g. the Preview
+ * configuration panel).
  *
  * No "Back to Settings" arrow: closing the dialog is the only way out.
  */

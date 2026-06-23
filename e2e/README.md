@@ -16,7 +16,6 @@ just e2e ui files-page
 just e2e ui preview
 just e2e public-api runtime
 just e2e public-api latency
-just e2e api agent-builder-planner
 ```
 
 The harness is grouped by layer. `just e2e <layer>` runs every case in that layer;

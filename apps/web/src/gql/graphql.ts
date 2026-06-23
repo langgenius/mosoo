@@ -18,64 +18,6 @@ export type AddSessionResourceInput = {
   sessionId: PlatformId;
 };
 
-export type AgentBuilderAgentTypeDecision =
-  | 'decided'
-  | 'skipped';
-
-export type AgentBuilderComponentDecision =
-  | 'bound'
-  | 'created'
-  | 'skipped';
-
-export type AgentBuilderComponentDecisionsInput = {
-  agentType?: AgentBuilderAgentTypeDecision | null | undefined;
-  environment?: AgentBuilderComponentDecision | null | undefined;
-};
-
-export type AgentBuilderControlPlaneActionStatus =
-  | 'applied'
-  | 'needs_secure_ui'
-  | 'noop';
-
-export type AgentBuilderCreateEnvironmentPayloadInput = {
-  description?: string | null | undefined;
-  name: string;
-};
-
-export type AgentBuilderCreateRemoteMcpServerPayloadInput = {
-  authType: McpAuthType;
-  description?: string | null | undefined;
-  name: string;
-  url: string;
-};
-
-export type AgentBuilderExecutableActionToolId =
-  | 'apply_agent_config'
-  | 'create_agent'
-  | 'create_environment'
-  | 'create_remote_mcp_server'
-  | 'open_preview'
-  | 'reset_preview_session';
-
-export type AgentBuilderMessageRole =
-  | 'assistant'
-  | 'system'
-  | 'tool'
-  | 'user';
-
-export type AgentBuilderMetadataInput = {
-  componentDecisions: AgentBuilderComponentDecisionsInput;
-};
-
-export type AgentBuilderSecureUiActionKind =
-  | 'connect_mcp_credential'
-  | 'create_environment'
-  | 'create_remote_mcp_server';
-
-export type AgentBuilderThreadStatus =
-  | 'active'
-  | 'archived';
-
 export type AgentChannelBindingStatus =
   | 'active'
   | 'error';
@@ -379,15 +321,6 @@ export type EnvironmentVariableStatus =
   | 'configured'
   | 'pending';
 
-export type ExecuteAgentBuilderControlPlaneActionInput = {
-  agentId: PlatformId;
-  appId: PlatformId;
-  createEnvironmentPayload?: AgentBuilderCreateEnvironmentPayloadInput | null | undefined;
-  createRemoteMcpServerPayload?: AgentBuilderCreateRemoteMcpServerPayloadInput | null | undefined;
-  draftYaml?: string | null | undefined;
-  toolId: AgentBuilderExecutableActionToolId;
-};
-
 export type FileListInput = {
   appId: PlatformId;
   scopeId?: PlatformId | null | undefined;
@@ -652,7 +585,6 @@ export type UpdateAccountProfileInput = {
 export type UpdateAgentConfigInput = {
   agentId: PlatformId;
   appId: PlatformId;
-  builder: AgentBuilderMetadataInput;
   description?: string | null | undefined;
   environment: AgentEnvironmentConfigInput;
   kind: AgentKind;
@@ -696,29 +628,6 @@ export type WeChatQrPairingStatus =
   | 'idle'
   | 'qr_pending'
   | 'scanned';
-
-export type EnsureAgentBuilderThreadMutationVariables = Exact<{
-  agentId: PlatformId;
-}>;
-
-
-export type EnsureAgentBuilderThreadMutation = { ensureAgentBuilderThread: { agentId: PlatformId, createdAt: string, creatorAccountId: PlatformId, id: PlatformId, lastTurnAt: string | null, status: AgentBuilderThreadStatus, title: string | null, updatedAt: string } };
-
-export type ExecuteAgentBuilderControlPlaneActionMutationVariables = Exact<{
-  input: ExecuteAgentBuilderControlPlaneActionInput;
-}>;
-
-
-export type ExecuteAgentBuilderControlPlaneActionMutation = { executeAgentBuilderControlPlaneAction: { message: string, sessionId: PlatformId | null, status: AgentBuilderControlPlaneActionStatus, toolId: AgentBuilderExecutableActionToolId, createdEnvironment: { id: PlatformId, name: string } | null, createdMcpServer: { authType: McpAuthType, id: PlatformId, name: string, url: string } | null, secureUi: { kind: AgentBuilderSecureUiActionKind, mcpServerId: PlatformId | null } | null } };
-
-export type AgentBuilderMessagesQueryVariables = Exact<{
-  agentId: PlatformId;
-  beforeSeq?: number | null | undefined;
-  limit?: number | null | undefined;
-}>;
-
-
-export type AgentBuilderMessagesQuery = { agentBuilderMessages: Array<{ cardsJson: string | null, contentText: string, createdAt: string, createdByAccountId: PlatformId | null, id: PlatformId, inputKind: string | null, plannerRunId: PlatformId | null, role: AgentBuilderMessageRole, seq: number, threadId: PlatformId }> };
 
 export type AgentChannelBindingFieldsFragment = { activityLastTriggeredAt: string | null, activitySessionCount7d: number, agentId: PlatformId, createdAt: string, displayMetadata: PrimitiveRecord, externalBotId: string, externalTenantId: string, id: PlatformId, lastErrorCode: string | null, provider: ChannelProvider, status: AgentChannelBindingStatus, updatedAt: string };
 
@@ -840,7 +749,7 @@ export type AgentEditorStateQueryVariables = Exact<{
 }>;
 
 
-export type AgentEditorStateQuery = { agentEditorState: { id: PlatformId, providerOptions: JsonObject, builder: { componentDecisions: { agentType: AgentBuilderAgentTypeDecision | null, environment: AgentBuilderComponentDecision | null } }, environment: { environmentId: PlatformId | null }, packageResolution: { recordedAt: string, source: AgentPackageResolutionSource, report: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } | null, mcpBindings: Array<{ authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialMode: AgentMcpCredentialMode, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, credentialSubject: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, serverId: PlatformId, source: McpServerSource, updatedAt: string, url: string }>, readiness: { checkedAt: string, ready: boolean, issues: Array<{ code: string, message: string, severity: AgentReadinessSeverity }> } } };
+export type AgentEditorStateQuery = { agentEditorState: { id: PlatformId, providerOptions: JsonObject, environment: { environmentId: PlatformId | null }, packageResolution: { recordedAt: string, source: AgentPackageResolutionSource, report: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } | null, mcpBindings: Array<{ authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialMode: AgentMcpCredentialMode, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, credentialSubject: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, serverId: PlatformId, source: McpServerSource, updatedAt: string, url: string }>, readiness: { checkedAt: string, ready: boolean, issues: Array<{ code: string, message: string, severity: AgentReadinessSeverity }> } } };
 
 export type UpdateAgentConfigMutationVariables = Exact<{
   input: UpdateAgentConfigInput;
@@ -1929,60 +1838,6 @@ export const SkillDetailFieldsFragmentDoc = new TypedDocumentString(`
   }
 }
     `, {"fragmentName":"SkillDetailFields"}) as unknown as TypedDocumentString<SkillDetailFieldsFragment, unknown>;
-export const EnsureAgentBuilderThreadDocument = new TypedDocumentString(`
-    mutation EnsureAgentBuilderThread($agentId: ULID!) {
-  ensureAgentBuilderThread(agentId: $agentId) {
-    agentId
-    createdAt
-    creatorAccountId
-    id
-    lastTurnAt
-    status
-    title
-    updatedAt
-  }
-}
-    `) as unknown as TypedDocumentString<EnsureAgentBuilderThreadMutation, EnsureAgentBuilderThreadMutationVariables>;
-export const ExecuteAgentBuilderControlPlaneActionDocument = new TypedDocumentString(`
-    mutation ExecuteAgentBuilderControlPlaneAction($input: ExecuteAgentBuilderControlPlaneActionInput!) {
-  executeAgentBuilderControlPlaneAction(input: $input) {
-    createdEnvironment {
-      id
-      name
-    }
-    createdMcpServer {
-      authType
-      id
-      name
-      url
-    }
-    message
-    secureUi {
-      kind
-      mcpServerId
-    }
-    sessionId
-    status
-    toolId
-  }
-}
-    `) as unknown as TypedDocumentString<ExecuteAgentBuilderControlPlaneActionMutation, ExecuteAgentBuilderControlPlaneActionMutationVariables>;
-export const AgentBuilderMessagesDocument = new TypedDocumentString(`
-    query AgentBuilderMessages($agentId: ULID!, $beforeSeq: Int, $limit: Int) {
-  agentBuilderMessages(agentId: $agentId, beforeSeq: $beforeSeq, limit: $limit) {
-    cardsJson
-    contentText
-    createdAt
-    createdByAccountId
-    id
-    inputKind
-    plannerRunId
-    role
-    seq
-    threadId
-  }
-}
-    `) as unknown as TypedDocumentString<AgentBuilderMessagesQuery, AgentBuilderMessagesQueryVariables>;
 export const AgentChannelBindingsDocument = new TypedDocumentString(`
     query AgentChannelBindings($appId: ULID!, $agentId: ULID!) {
   agentChannelBindingList(appId: $appId, agentId: $agentId) {
@@ -2336,12 +2191,6 @@ export const AgentEditorStateDocument = new TypedDocumentString(`
     query AgentEditorState($agentId: ULID!, $appId: ULID!) {
   agentEditorState(agentId: $agentId, appId: $appId) {
     id
-    builder {
-      componentDecisions {
-        agentType
-        environment
-      }
-    }
     environment {
       environmentId
     }

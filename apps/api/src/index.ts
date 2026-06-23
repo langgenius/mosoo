@@ -4,7 +4,6 @@ export { ChannelConnection } from "./adapters/durable-objects/channel-connection
 export { DriverConnection } from "./adapters/durable-objects/driver-connection.do";
 export { Sandbox } from "./adapters/durable-objects/sandbox.do";
 export { Session } from "./adapters/durable-objects/session.do";
-export { AgentBuilderSystemAgent } from "./modules/agent-builder/infrastructure/agent-builder-system-agent.do";
 
 void arktypeWorkerConfigInitialized;
 

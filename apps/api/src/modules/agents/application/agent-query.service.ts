@@ -40,7 +40,6 @@ export async function getAgentEditorState(
   const storedConfig = parseAgentStoredConfig(editable.agent.configJson);
 
   return {
-    builder: storedConfig.builder,
     environment,
     id: editable.agent.id,
     mcpBindings: await listAgentMcpBindings(database, viewer, editable.agent.id),

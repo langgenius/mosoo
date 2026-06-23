@@ -1,9 +1,6 @@
 import { normalizePlatformId } from "./index";
 import type {
   AccountId,
-  AgentBuilderMessageId,
-  AgentBuilderPlannerRunId,
-  AgentBuilderThreadId,
   AgentDeploymentVersionId,
   AgentId,
   AgentMcpBindingId,
@@ -32,9 +29,6 @@ function fixture(value: string): PlatformId {
 export const PLATFORM_ID_FIXTURES = {
   account: fixture("01J00000000000000000000001") as AccountId,
   agent: fixture("01J00000000000000000000002") as AgentId,
-  agentBuilderMessage: fixture("01J00000000000000000000003") as AgentBuilderMessageId,
-  agentBuilderPlannerRun: fixture("01J00000000000000000000004") as AgentBuilderPlannerRunId,
-  agentBuilderThread: fixture("01J00000000000000000000005") as AgentBuilderThreadId,
   agentDeploymentVersion: fixture("01J00000000000000000000006") as AgentDeploymentVersionId,
   agentMcpBinding: fixture("01J00000000000000000000007") as AgentMcpBindingId,
   driverInstance: fixture("01J00000000000000000000008") as DriverInstanceId,

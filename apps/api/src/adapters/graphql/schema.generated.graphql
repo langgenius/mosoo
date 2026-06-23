@@ -41,131 +41,6 @@ type Agent {
   visibility: AgentVisibility!
 }
 
-enum AgentBuilderAgentTypeDecision {
-  decided
-  skipped
-}
-
-enum AgentBuilderComponentDecision {
-  bound
-  created
-  skipped
-}
-
-type AgentBuilderComponentDecisions {
-  agentType: AgentBuilderAgentTypeDecision
-  environment: AgentBuilderComponentDecision
-}
-
-input AgentBuilderComponentDecisionsInput {
-  agentType: AgentBuilderAgentTypeDecision
-  environment: AgentBuilderComponentDecision
-}
-
-type AgentBuilderControlPlaneActionResult {
-  createdEnvironment: AgentBuilderCreatedEnvironment
-  createdMcpServer: AgentBuilderCreatedMcpServer
-  message: String!
-  secureUi: AgentBuilderSecureUiAction
-  sessionId: ULID
-  status: AgentBuilderControlPlaneActionStatus!
-  toolId: AgentBuilderExecutableActionToolId!
-}
-
-enum AgentBuilderControlPlaneActionStatus {
-  applied
-  needs_secure_ui
-  noop
-}
-
-input AgentBuilderCreateEnvironmentPayloadInput {
-  description: String
-  name: String!
-}
-
-input AgentBuilderCreateRemoteMcpServerPayloadInput {
-  authType: McpAuthType!
-  description: String
-  name: String!
-  url: String!
-}
-
-type AgentBuilderCreatedEnvironment {
-  id: ULID!
-  name: String!
-}
-
-type AgentBuilderCreatedMcpServer {
-  authType: McpAuthType!
-  id: ULID!
-  name: String!
-  url: String!
-}
-
-enum AgentBuilderExecutableActionToolId {
-  apply_agent_config
-  create_agent
-  create_environment
-  create_remote_mcp_server
-  open_preview
-  reset_preview_session
-}
-
-type AgentBuilderMessage {
-  cardsJson: String
-  contentText: String!
-  createdAt: String!
-  createdByAccountId: ULID
-  id: ULID!
-  inputKind: String
-  plannerRunId: ULID
-  role: AgentBuilderMessageRole!
-  seq: Int!
-  threadId: ULID!
-}
-
-enum AgentBuilderMessageRole {
-  assistant
-  system
-  tool
-  user
-}
-
-type AgentBuilderMetadata {
-  componentDecisions: AgentBuilderComponentDecisions!
-}
-
-input AgentBuilderMetadataInput {
-  componentDecisions: AgentBuilderComponentDecisionsInput!
-}
-
-type AgentBuilderSecureUiAction {
-  kind: AgentBuilderSecureUiActionKind!
-  mcpServerId: ULID
-}
-
-enum AgentBuilderSecureUiActionKind {
-  connect_mcp_credential
-  create_environment
-  create_remote_mcp_server
-}
-
-type AgentBuilderThread {
-  agentId: ULID!
-  createdAt: String!
-  creatorAccountId: ULID!
-  id: ULID!
-  lastTurnAt: String
-  status: AgentBuilderThreadStatus!
-  title: String
-  updatedAt: String!
-}
-
-enum AgentBuilderThreadStatus {
-  active
-  archived
-}
-
 type AgentChannelBinding {
   activityLastTriggeredAt: String
   activitySessionCount7d: Int!
@@ -237,7 +112,6 @@ type AgentDetail {
 }
 
 type AgentEditorState {
-  builder: AgentBuilderMetadata!
   environment: AgentEnvironmentConfig!
   id: ULID!
   mcpBindings: [AgentMcpBinding!]!
@@ -945,15 +819,6 @@ enum EnvironmentVariableStatus {
   pending
 }
 
-input ExecuteAgentBuilderControlPlaneActionInput {
-  agentId: ULID!
-  appId: ULID!
-  createEnvironmentPayload: AgentBuilderCreateEnvironmentPayloadInput
-  createRemoteMcpServerPayload: AgentBuilderCreateRemoteMcpServerPayloadInput
-  draftYaml: String
-  toolId: AgentBuilderExecutableActionToolId!
-}
-
 input FileListInput {
   appId: ULID!
   scopeId: ULID
@@ -1215,8 +1080,6 @@ type Mutation {
   deleteMcpServer(appId: ULID!, serverId: ULID!): OperationResult!
   deleteOwnedSkill(appId: ULID!, skillId: ULID!): OperationResult!
   deleteVendorCredential(input: DeleteVendorCredentialInput!): OperationResult!
-  ensureAgentBuilderThread(agentId: ULID!): AgentBuilderThread!
-  executeAgentBuilderControlPlaneAction(input: ExecuteAgentBuilderControlPlaneActionInput!): AgentBuilderControlPlaneActionResult!
   importAgentPackage(input: ImportAgentPackageInput!): AgentPackageImportResult!
   onboardingBootstrap(input: BootstrapOnboardingInput!): OnboardingStatus!
   pollLarkAgentChannelRegistration(input: PollLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!
@@ -1294,7 +1157,6 @@ input PublishAgentInput {
 type Query {
   accessibleAgentList(appId: ULID!): [AgentSummary!]!
   agent(agentId: ULID!, appId: ULID!): AgentDetail!
-  agentBuilderMessages(agentId: ULID!, beforeSeq: Int, limit: Int): [AgentBuilderMessage!]!
   agentChannelBindingList(agentId: ULID!, appId: ULID!): [AgentChannelBinding!]!
   agentCostCard(agentId: ULID!, appId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AgentCostCard!
   agentEditorState(agentId: ULID!, appId: ULID!): AgentEditorState!
@@ -1758,7 +1620,6 @@ input UpdateAccountProfileInput {
 input UpdateAgentConfigInput {
   agentId: ULID!
   appId: ULID!
-  builder: AgentBuilderMetadataInput!
   description: String
   environment: AgentEnvironmentConfigInput!
   kind: AgentKind!

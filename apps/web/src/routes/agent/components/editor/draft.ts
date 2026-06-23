@@ -1,9 +1,4 @@
 import type { JsonObject, JsonValue } from "@mosoo/contracts";
-import type {
-  AgentBuilderAgentTypeDecision,
-  AgentBuilderComponentDecision,
-  AgentBuilderComponentDecisions,
-} from "@mosoo/contracts/agent-builder";
 import type { AgentConfigChangeSnapshot } from "@mosoo/contracts/agent-config-change-plan";
 import { parseDocument, stringify } from "yaml";
 
@@ -13,7 +8,6 @@ import type { Agent, AgentKind, McpServer, RuntimeId, SkillInfo } from "../../ag
 import { getRuntimeInfo } from "../../runtime-catalog";
 
 export interface AgentEditorDraft {
-  componentDecisions: AgentBuilderComponentDecisions;
   description: string;
   environmentId: string | null;
   kind: AgentKind;
@@ -29,7 +23,6 @@ export interface AgentEditorDraft {
 
 export function createInitialDraft(agent: Agent): AgentEditorDraft {
   return {
-    componentDecisions: agent.config.builder.componentDecisions,
     description: agent.description,
     environmentId: agent.config.environmentId,
     kind: agent.kind,
@@ -49,12 +42,7 @@ export function createSnapshot(draft: AgentEditorDraft): string {
 }
 
 export function createEditorSaveSnapshot(draft: AgentEditorDraft): string {
-  return JSON.stringify({
-    builder: {
-      componentDecisions: draft.componentDecisions,
-    },
-    runtime: toAgentConfigChangeSnapshot(draft),
-  });
+  return createSnapshot(draft);
 }
 
 export function createSnapshotHash(draft: AgentEditorDraft): string {
@@ -107,9 +95,6 @@ interface AgentDraftYamlShape {
       url: string;
     }[];
   };
-  builder?: {
-    componentDecisions: AgentBuilderComponentDecisions;
-  };
   environment: {
     environmentId: string | null;
   };
@@ -139,9 +124,6 @@ function toDraftYamlShape(draft: AgentEditorDraft): AgentDraftYamlShape {
       })),
       mcpServers: normalizeMcpServers(draft.mcpServers).map(toDraftYamlMcpServer),
     },
-    ...(hasComponentDecisions(draft.componentDecisions)
-      ? { builder: { componentDecisions: draft.componentDecisions } }
-      : {}),
     environment: {
       environmentId: draft.environmentId,
     },
@@ -197,14 +179,12 @@ export function createDraftYamlHash(draft: AgentEditorDraft): string {
 export function parseDraftYaml(yaml: string, fallback: AgentEditorDraft): AgentEditorDraft {
   const parsed = parseDocument(yaml).toJSON();
   const root = asRecord(parsed);
-  const builder = asRecord(root["builder"]);
   const identity = asRecord(root["identity"]);
   const runtime = asRecord(root["runtime"]);
   const environment = asRecord(root["environment"]);
   const assets = asRecord(root["assets"]);
 
   return {
-    componentDecisions: readComponentDecisions(builder["componentDecisions"]),
     description: readString(identity["description"], fallback.description),
     environmentId: readNullableString(environment["environmentId"], fallback.environmentId),
     kind: readAgentKind(root["kind"], fallback.kind),
@@ -282,29 +262,6 @@ function readNullableString(value: unknown, fallback: string | null): string | n
 
 function readAgentKind(value: unknown, fallback: AgentKind): AgentKind {
   return value === "pet" || value === "cattle" ? value : fallback;
-}
-
-function readComponentDecision(value: unknown): AgentBuilderComponentDecision | null {
-  return value === "bound" || value === "created" || value === "skipped" ? value : null;
-}
-
-function readAgentTypeDecision(value: unknown): AgentBuilderAgentTypeDecision | null {
-  return value === "decided" || value === "skipped" ? value : null;
-}
-
-function hasComponentDecisions(decisions: AgentBuilderComponentDecisions): boolean {
-  return decisions.agentType !== undefined || decisions.environment !== undefined;
-}
-
-function readComponentDecisions(value: unknown): AgentBuilderComponentDecisions {
-  const decisions = asRecord(value);
-  const agentType = readAgentTypeDecision(decisions["agentType"]);
-  const environment = readComponentDecision(decisions["environment"]);
-
-  return {
-    ...(agentType === null ? {} : { agentType }),
-    ...(environment === null ? {} : { environment }),
-  };
 }
 
 function readSkills(value: unknown, fallback: SkillInfo[]): SkillInfo[] {

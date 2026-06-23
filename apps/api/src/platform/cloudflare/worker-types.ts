@@ -2,7 +2,6 @@ import type { ChannelConnection } from "../../adapters/durable-objects/channel-c
 import type { DriverConnection } from "../../adapters/durable-objects/driver-connection.do";
 import type { Sandbox } from "../../adapters/durable-objects/sandbox.do";
 import type { Session } from "../../adapters/durable-objects/session.do";
-import type { AgentBuilderSystemAgent } from "../../modules/agent-builder/infrastructure/agent-builder-system-agent.do";
 import type { ApiCommandMessage } from "../../modules/api-command/application/api-command-message";
 import type { ChannelFinalDeliveryMessage } from "../../modules/channels/application/channel-final-delivery-message";
 
@@ -20,10 +19,6 @@ interface OptionalDriverConnectionBinding {
 
 interface OptionalSessionBinding {
   Session?: DurableObjectNamespace<Session>;
-}
-
-interface OptionalAgentBuilderSystemAgentBinding {
-  AgentBuilderSystemAgent?: DurableObjectNamespace<AgentBuilderSystemAgent>;
 }
 
 interface ChannelFinalDeliveryQueueBinding {
@@ -81,7 +76,6 @@ export type ApiBindings = Env &
   OptionalSandboxBinding &
   OptionalDriverConnectionBinding &
   OptionalSessionBinding &
-  OptionalAgentBuilderSystemAgentBinding &
   OptionalLocalProviderFetchProxyBindings &
   OptionalRuntimeProxyBindings &
   OptionalSlackAdapterBindings &

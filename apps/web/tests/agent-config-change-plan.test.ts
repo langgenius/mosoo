@@ -10,7 +10,6 @@ const MCP_SERVER_ID = "01J000000000000000000000B2";
 
 function draft(overrides: Partial<AgentEditorDraft> = {}): AgentEditorDraft {
   return {
-    componentDecisions: {},
     description: "Description",
     environmentId: null,
     mcpServers: [],

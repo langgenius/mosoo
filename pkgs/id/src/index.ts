@@ -9,9 +9,6 @@ export type SemanticPlatformId<Name extends string> = PlatformId & {
 };
 
 export type AccountId = SemanticPlatformId<"AccountId">;
-export type AgentBuilderMessageId = SemanticPlatformId<"AgentBuilderMessageId">;
-export type AgentBuilderPlannerRunId = SemanticPlatformId<"AgentBuilderPlannerRunId">;
-export type AgentBuilderThreadId = SemanticPlatformId<"AgentBuilderThreadId">;
 export type AgentDeploymentVersionId = SemanticPlatformId<"AgentDeploymentVersionId">;
 export type AgentId = SemanticPlatformId<"AgentId">;
 export type AgentMcpBindingId = SemanticPlatformId<"AgentMcpBindingId">;

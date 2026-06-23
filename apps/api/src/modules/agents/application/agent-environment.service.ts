@@ -1,5 +1,5 @@
 import type { JsonObject } from "@mosoo/contracts";
-import type { AgentConfigBuilderMetadata, AgentEnvironmentConfig } from "@mosoo/contracts/agent";
+import type { AgentEnvironmentConfig } from "@mosoo/contracts/agent";
 import { agentsTable } from "@mosoo/db";
 import type { AgentId, EnvironmentId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
@@ -25,7 +25,6 @@ export async function loadAgentEnvironmentConfig(
 
 export function prepareAgentEnvironmentConfigWrite(input: {
   agentId: AgentId;
-  builder?: AgentConfigBuilderMetadata;
   currentConfigJson: string;
   environment: AgentEnvironmentConfig;
   providerOptions?: JsonObject;
@@ -33,7 +32,6 @@ export function prepareAgentEnvironmentConfigWrite(input: {
 }): PreparedAgentEnvironmentConfigWrite {
   const stored = parseAgentStoredConfig(input.currentConfigJson);
   const configJson = serializeAgentStoredConfig({
-    builder: input.builder ?? stored.builder,
     packageMcpServers: stored.packageMcpServers,
     packageSkills: stored.packageSkills,
     packageResolution: stored.packageResolution,

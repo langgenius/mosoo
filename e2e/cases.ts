@@ -59,12 +59,6 @@ export const e2eCases: readonly E2ECase[] = [
     setup: [bunTest(["e2e/cases/contract/harness.test.ts"])],
   },
   {
-    command: playwrightSpec("e2e/cases/ui/agent-builder.spec.ts"),
-    description: "Verify the Agent Builder development panel loads.",
-    id: ["ui", "agent-builder"],
-    layer: "ui",
-  },
-  {
     command: {
       ...playwrightSpec("e2e/cases/ui/files-page.spec.ts"),
       env: {
@@ -101,11 +95,5 @@ export const e2eCases: readonly E2ECase[] = [
     requiresEnv: [
       "MOSOO_E2E_PROVIDER_API_KEY|MOSOO_E2E_OPENAI_API_KEY|MOSOO_E2E_ANTHROPIC_API_KEY",
     ],
-  },
-  {
-    command: bunTest(["--timeout", "30000", "e2e/cases/api/agent-builder-planner.test.ts"]),
-    description: "Run the live Agent Builder planner API check.",
-    id: ["api", "agent-builder-planner"],
-    layer: "api",
   },
 ];
