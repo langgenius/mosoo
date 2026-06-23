@@ -365,7 +365,7 @@ export function NewThreadDialog({
           </div>
         </DialogHeader>
 
-        <div className="flex min-h-0 flex-col gap-3 px-5 py-4">
+        <div className="flex min-h-0 flex-col gap-4 px-5 py-4">
           <AgentAssignField
             agents={agents}
             locked={locked}
