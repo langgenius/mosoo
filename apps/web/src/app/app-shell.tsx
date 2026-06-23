@@ -195,6 +195,15 @@ function ConsoleSidebarFooter({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+const ORG_HEADER_TITLES = [{ path: "/apps", title: "Apps" }] as const;
+
+function getOrgHeaderTitle(pathname: string): string | null {
+  return (
+    ORG_HEADER_TITLES.find((item) => pathname === item.path || pathname.startsWith(`${item.path}/`))
+      ?.title ?? null
+  );
+}
+
 // Shared console chrome (brand, collapse toggle, help, account, content area).
 // The middle `sidebar` slot is what differs between the App and Org layers.
 function ConsoleShell({
@@ -301,20 +310,30 @@ export function Layout({ children }: { children: ReactNode }) {
 export function OrgLayout({ children }: { children: ReactNode }) {
   const { activeOrganization } = useAppSession();
   const location = useLocation();
+  const headerTitle = getOrgHeaderTitle(location.pathname);
 
   return (
     <div className="bg-background flex h-screen flex-col">
-      <header className="border-border-soft flex h-14 shrink-0 items-center gap-2 border-b px-4">
-        <Link to="/apps" aria-label="Apps" className="flex items-center">
-          <img src="/brand/logo-mark.svg" alt="Mosoo" className="block size-6" />
-        </Link>
-        {activeOrganization === null ? null : (
-          <>
-            <span className="text-fg-muted text-base font-light">/</span>
-            <span className="text-foreground max-w-[240px] truncate text-sm font-semibold">
-              {activeOrganization.name}
-            </span>
-          </>
+      <header className="border-border-soft flex shrink-0 border-b">
+        <div className="flex min-h-[76px] w-[224px] shrink-0 items-center gap-2 px-4">
+          <Link to="/apps" aria-label="Apps" className="flex items-center">
+            <img src="/brand/logo-mark.svg" alt="Mosoo" className="block size-6" />
+          </Link>
+          {activeOrganization === null ? null : (
+            <>
+              <span className="text-fg-muted text-base font-light">/</span>
+              <span className="text-foreground max-w-[144px] truncate text-sm font-semibold">
+                {activeOrganization.name}
+              </span>
+            </>
+          )}
+        </div>
+        {headerTitle === null ? null : (
+          <div className="flex min-w-0 flex-1 items-center px-8">
+            <h1 className="text-foreground truncate text-2xl font-semibold tracking-normal">
+              {headerTitle}
+            </h1>
+          </div>
         )}
       </header>
       <div className="flex min-h-0 flex-1">
