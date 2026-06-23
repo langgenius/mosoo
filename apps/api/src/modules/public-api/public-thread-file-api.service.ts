@@ -46,16 +46,24 @@ function assertPublicThreadFile(file: FileRecord, sessionId: SessionId): void {
   }
 }
 
-function requirePublicThreadAttachment(file: FileRecord): PublicThreadId {
+function requirePublicThreadFile(file: FileRecord): PublicThreadId {
   if (
     file.scope.kind !== "session" ||
     file.scope.id === null ||
-    file.sessionKind !== "attachment"
+    (file.sessionKind !== "attachment" && file.sessionKind !== "artifact")
   ) {
     throw new FileControlError(404, "file_not_found", `Thread file ${file.id} was not found.`);
   }
 
   return toPublicThreadId(parsePlatformId<SessionId>(file.scope.id, "File session ID"));
+}
+
+function requirePublicThreadAttachment(file: FileRecord): PublicThreadId {
+  if (file.sessionKind !== "attachment") {
+    throw new FileControlError(404, "file_not_found", `Thread file ${file.id} was not found.`);
+  }
+
+  return requirePublicThreadFile(file);
 }
 
 function toPublicThreadFile(file: FileEntry | FileRecord): PublicThreadFile {
@@ -132,6 +140,28 @@ export async function completePublicThreadFileUpload(
     fileId: input.fileId,
     input: input.request,
     viewer: caller,
+  });
+}
+
+export async function downloadPublicThreadFileContent(
+  bindings: ApiBindings,
+  caller: AuthenticatedViewer,
+  input: {
+    disposition: "attachment" | "inline";
+    fileId: FileId;
+  },
+): Promise<Response> {
+  const file = await fileStore.getRecord(bindings, caller, input.fileId);
+  const threadId = requirePublicThreadFile(file);
+
+  await admitPublicSessionCaller(bindings.DB, caller, threadId);
+  const response = await fileStore.streamContent(bindings, caller, input.fileId, input.disposition);
+  const headers = new Headers(response.headers);
+  headers.set("Cache-Control", "no-store");
+  return new Response(response.body, {
+    headers,
+    status: response.status,
+    statusText: response.statusText,
   });
 }
 

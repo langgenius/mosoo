@@ -162,6 +162,22 @@ export function parseOptionalBoolean(value: string | undefined): boolean | null 
   });
 }
 
+export function parseFileContentDisposition(value: string | undefined): "attachment" | "inline" {
+  if (value === undefined) {
+    return "attachment";
+  }
+
+  if (value === "attachment" || value === "inline") {
+    return value;
+  }
+
+  throw new PublicApiError({
+    code: "invalid_request",
+    message: "File content disposition must be attachment or inline.",
+    status: 400,
+  });
+}
+
 export function parseThreadEventsLimit(value: string | undefined): number {
   if (value === undefined) {
     return PUBLIC_THREAD_EVENTS_DEFAULT_LIMIT;

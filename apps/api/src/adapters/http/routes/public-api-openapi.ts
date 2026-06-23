@@ -147,6 +147,19 @@ const threadEventsLimitParameter = {
   },
 } satisfies OpenApiParameter;
 
+const fileContentDispositionParameter = {
+  description:
+    "Controls the Content-Disposition response header. Use attachment for downloads or inline for previewable content.",
+  example: "attachment",
+  in: "query",
+  name: "disposition",
+  schema: {
+    default: "attachment",
+    enum: ["attachment", "inline"],
+    type: "string",
+  },
+} satisfies OpenApiParameter;
+
 const standardResponses = {
   "400": {
     $ref: "#/components/responses/InvalidRequest",
@@ -211,6 +224,38 @@ function binaryRequestBody(description: string) {
     },
     description,
     required: true,
+  };
+}
+
+function binaryResponse(description: string) {
+  return {
+    content: {
+      "application/octet-stream": {
+        schema: {
+          format: "binary",
+          type: "string",
+        },
+      },
+    },
+    description,
+    headers: {
+      "Cache-Control": {
+        description: "Set to no-store for public API file downloads.",
+        schema: { type: "string" },
+      },
+      "Content-Disposition": {
+        description: "Download or inline content disposition for the returned file.",
+        schema: { type: "string" },
+      },
+      "Content-Length": {
+        description: "File size in bytes.",
+        schema: { minimum: 0, type: "integer" },
+      },
+      ETag: {
+        description: "Storage ETag for the returned object.",
+        schema: { type: "string" },
+      },
+    },
   };
 }
 
@@ -303,6 +348,16 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
       }),
     },
     "/files/{fileId}/content": {
+      get: operation({
+        description:
+          "Downloads bytes for a ready Thread attachment or Agent artifact. The file must belong to a public Thread visible to the Access Token caller.",
+        parameters: [fileIdParameter, fileContentDispositionParameter],
+        security: ACCESS_TOKEN_SECURITY,
+        success: {
+          "200": binaryResponse("Thread file content."),
+        },
+        summary: "Download Thread file content",
+      }),
       put: operation({
         description:
           "Uploads raw bytes for a pending single PUT Thread file upload. The file must have been created through POST /threads/{threadId}/files/uploads and belong to a public Thread visible to the Access Token caller.",

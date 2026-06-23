@@ -317,6 +317,18 @@ export async function runPublicApiAuthenticatedJson<T>(
   }
 }
 
+export async function runPublicApiAuthenticatedResponse(
+  c: PublicApiRouteContext,
+  operation: (caller: PersonalAccessTokenCaller) => Promise<Response>,
+): Promise<Response> {
+  try {
+    const caller = await requireRateLimitedAccessTokenCaller(c);
+    return await operation(caller);
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
 export async function runPublicApiSessionMutation<T, Prepared = undefined>(
   c: PublicApiRouteContext,
   input: {
