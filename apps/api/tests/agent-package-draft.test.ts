@@ -177,9 +177,6 @@ describe("agent package draft", () => {
       .first<{ config_json: string }>();
 
     expect(JSON.parse(row?.config_json ?? "{}")).toEqual({
-      builder: {
-        componentDecisions: {},
-      },
       packageMcpServers: [],
       packageResolution: null,
       packageSkills: [],

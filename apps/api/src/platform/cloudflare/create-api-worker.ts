@@ -24,16 +24,6 @@ function getHttpApp(): Promise<ApiHttpApp> {
 export function createApiWorker(): ExportedHandler<ApiBindings> {
   return {
     async fetch(request: Request, env: ApiBindings, ctx: ExecutionContext): Promise<Response> {
-      const agentBuilderSystemAgentResponse =
-        await import("../../modules/agent-builder/infrastructure/agent-builder-system-agent-route").then(
-          ({ routeAgentBuilderSystemAgentRequest }) =>
-            routeAgentBuilderSystemAgentRequest(request, env),
-        );
-
-      if (agentBuilderSystemAgentResponse !== null) {
-        return agentBuilderSystemAgentResponse;
-      }
-
       const app = await getHttpApp();
       const response = await app.fetch(request, env, ctx);
 

@@ -5,13 +5,12 @@ import type {
   AgentReadiness,
   AgentVisibility,
 } from "@mosoo/contracts/agent";
-import type { AgentConfigBuilderMetadata } from "@mosoo/contracts/agent";
 import type { AgentPackageResolutionState } from "@mosoo/contracts/agent-manifest";
 import type { McpAuthorizationState, McpCredentialStatus } from "@mosoo/contracts/mcp";
 
 export type AgentStatus = "draft" | "published";
 export type AgentRole = "owner" | "none";
-export type AgentMode = "create" | "preview" | "dev" | "consume";
+export type AgentMode = "create" | "preview" | "consume";
 export type { AgentKind };
 
 export type RuntimeId = string;
@@ -52,7 +51,7 @@ export interface McpServer {
   /**
    * Credential resolution mode for this Agent × Server binding.
    * runtime_resolved = resolve at runtime from the active credential source.
-   * agent_bound = persist the builder's credential on the agent itself.
+   * agent_bound = persist the selected credential on the agent itself.
    */
   credentialMode?: "runtime_resolved" | "agent_bound";
   credentialStatus?: McpCredentialStatus;
@@ -64,7 +63,6 @@ export interface McpServer {
 }
 
 export interface AgentConfig {
-  builder: AgentConfigBuilderMetadata;
   environmentId: string | null;
   mcpServers: McpServer[];
   model: string;

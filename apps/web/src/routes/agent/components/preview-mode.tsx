@@ -14,6 +14,7 @@ import type { LifecycleActionKind } from "../lifecycle/live-config-action-dialog
 import { PendingChangesBanner } from "../lifecycle/pending-changes-banner";
 import { PublishMenu } from "../lifecycle/publish-menu";
 import { PublishSuccessModal } from "../lifecycle/publish-success-modal";
+import { AgentKindSection } from "./agent-kind-section";
 import { AgentSessionPanel } from "./agent-session-panel";
 import { ChannelsConfigDialog } from "./channels-config-dialog";
 import { AgentFormView } from "./editor/form-view";
@@ -173,6 +174,10 @@ export function PreviewMode({
     publishBlockMessage,
     publishBlocked,
   });
+  const draftAgent: Agent = {
+    ...agent,
+    kind: model.draft.kind,
+  };
 
   return (
     <div className="flex h-full" data-testid="agent-preview-panel">
@@ -242,7 +247,10 @@ export function PreviewMode({
         />
 
         <div className="min-h-0 flex-1 overflow-y-auto bg-white p-5" data-agent-editor-scroll>
-          <AgentFormView agent={agent} model={model} />
+          <div className="space-y-5">
+            <AgentKindSection agent={draftAgent} onKindChange={model.setKind} />
+            <AgentFormView agent={draftAgent} model={model} />
+          </div>
         </div>
 
         {publishStatus ? (

@@ -272,7 +272,6 @@ function normalizeStoredConfigJson(input: { configJson: string }): string {
   const stored = parseAgentStoredConfig(input.configJson);
 
   return serializeAgentStoredConfig({
-    builder: stored.builder,
     packageMcpServers: stored.packageMcpServers,
     packageSkills: stored.packageSkills,
     packageResolution: stored.packageResolution,

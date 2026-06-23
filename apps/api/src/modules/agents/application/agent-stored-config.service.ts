@@ -1,9 +1,4 @@
 import type {
-  AgentConfigBuilderAgentTypeDecision,
-  AgentConfigBuilderMetadata,
-  AgentConfigBuilderComponentDecision,
-} from "@mosoo/contracts/agent";
-import type {
   AgentManifestMcpServerBinding,
   AgentPackageResolutionSource,
   AgentPackageResolutionState,
@@ -20,7 +15,6 @@ import { isTruthy } from "../../../shared/truthiness";
 import { readSkillId, readSkillSnapshotId } from "./agent-platform-ids";
 
 interface StoredAgentConfig {
-  builder: AgentConfigBuilderMetadata;
   packageMcpServers: AgentManifestMcpServerBinding[];
   packageSkills: AgentStoredPackageSkill[];
   packageResolution: AgentPackageResolutionState | null;
@@ -115,48 +109,6 @@ function readBoolean(value: unknown, fieldName: string): boolean {
   return value;
 }
 
-function readBuilderComponentDecision(value: unknown): AgentConfigBuilderComponentDecision {
-  if (value === "bound" || value === "created" || value === "skipped") {
-    return value;
-  }
-
-  throw new Error("Agent stored config builder component decision is invalid.");
-}
-
-function readBuilderAgentTypeDecision(value: unknown): AgentConfigBuilderAgentTypeDecision {
-  if (value === "decided" || value === "skipped") {
-    return value;
-  }
-
-  throw new Error("Agent stored config builder agent type decision is invalid.");
-}
-
-function readBuilderMetadata(value: unknown): AgentConfigBuilderMetadata {
-  if (value === undefined) {
-    return { componentDecisions: {} };
-  }
-
-  const builder = readRecord(value, "builder");
-  const componentDecisionsValue = builder["componentDecisions"];
-
-  if (componentDecisionsValue === undefined) {
-    return { componentDecisions: {} };
-  }
-
-  const componentDecisions = readRecord(componentDecisionsValue, "builder componentDecisions");
-  const agentType = componentDecisions["agentType"];
-  const environment = componentDecisions["environment"];
-
-  return {
-    componentDecisions: {
-      ...(agentType === undefined ? {} : { agentType: readBuilderAgentTypeDecision(agentType) }),
-      ...(environment === undefined
-        ? {}
-        : { environment: readBuilderComponentDecision(environment) }),
-    },
-  };
-}
-
 function readNumber(value: unknown, fieldName: string): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     throw new TypeError(`Agent stored config ${fieldName} must be a finite number.`);
@@ -230,7 +182,6 @@ export function isPackageSkillRuntimeId(skillId: string): boolean {
 
 function createEmptyStoredAgentConfig(): StoredAgentConfig {
   return {
-    builder: { componentDecisions: {} },
     packageMcpServers: [],
     packageSkills: [],
     packageResolution: null,
@@ -367,7 +318,6 @@ export function parseAgentStoredConfig(configJson: string): StoredAgentConfig {
   }
 
   return {
-    builder: readBuilderMetadata(parsed["builder"]),
     packageMcpServers: readPackageMcpServers(parsed["packageMcpServers"]),
     packageSkills: readPackageSkills(parsed["packageSkills"]),
     packageResolution: readPackageResolutionState(parsed["packageResolution"]),
@@ -380,7 +330,6 @@ export function parseAgentStoredConfig(configJson: string): StoredAgentConfig {
 
 export function serializeAgentStoredConfig(input: StoredAgentConfig): string {
   return JSON.stringify({
-    builder: readBuilderMetadata(input.builder),
     packageMcpServers: input.packageMcpServers.map((server) => ({
       authType: server.authType,
       credentialScope: server.credentialScope,

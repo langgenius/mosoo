@@ -123,12 +123,10 @@ function withPreviewEnv<T>(
 }
 
 describe("E2E CLI target matching", () => {
-  test("matches all cases in a layer when invoked with the layer name", () => {
+  test("returns null for an empty layer when invoked with the layer name", () => {
     const target = matchE2ERunTarget(e2eCases, ["api"]);
 
-    expect(target?.label).toBe("api");
-    expect(target?.args).toEqual([]);
-    expect(target === null ? [] : commandNames(target)).toEqual(["api agent-builder-planner"]);
+    expect(target).toBeNull();
   });
 
   test("keeps exact case matching more specific than layer matching", () => {

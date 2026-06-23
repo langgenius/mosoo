@@ -10,15 +10,15 @@ import type { ApiBindings } from "../../src/platform/cloudflare/worker-types";
 import { createPublicHttpTestBindings } from "./public-api-http-test-fixture";
 import { SqliteD1Database } from "./sqlite-d1";
 
-const AGENT_BUILDER_TEST_VIEWER = {
-  email: "agent.builder.fixture@mosoo.ai",
+const API_TEST_VIEWER = {
+  email: "api.fixture@mosoo.ai",
   emailVerified: true,
   id: "01J00000000000000000000051",
   imageUrl: null,
-  name: "Agent Builder User",
+  name: "API Fixture User",
 } satisfies AuthenticatedViewer;
 
-export const AGENT_BUILDER_TEST_IDS = {
+export const API_TEST_IDS = {
   agentId: "01J00000000000000000000053",
   environmentId: "01J00000000000000000000055",
   environmentRevisionId: "01J00000000000000000000056",
@@ -26,11 +26,11 @@ export const AGENT_BUILDER_TEST_IDS = {
   appId: "01J00000000000000000000054",
 } as const;
 
-export interface AgentBuilderApiFixture {
+export interface ApiTestFixture {
   readonly bindings: ApiBindings;
-  readonly client: AgentBuilderApiTestClient;
+  readonly client: ApiTestClient;
   readonly database: SqliteD1Database;
-  readonly ids: typeof AGENT_BUILDER_TEST_IDS;
+  readonly ids: typeof API_TEST_IDS;
   readonly viewer: AuthenticatedViewer;
 }
 
@@ -70,7 +70,7 @@ function readCookiePair(setCookie: string): readonly [string, string] | null {
   return [pair.slice(0, separatorIndex), pair.slice(separatorIndex + 1)] as const;
 }
 
-class AgentBuilderApiCookieJar {
+class ApiCookieJar {
   readonly #cookies = new Map<string, string>();
 
   header(): string | null {
@@ -98,9 +98,9 @@ class AgentBuilderApiCookieJar {
   }
 }
 
-export class AgentBuilderApiTestClient {
+export class ApiTestClient {
   readonly #bindings: ApiBindings;
-  readonly #cookieJar = new AgentBuilderApiCookieJar();
+  readonly #cookieJar = new ApiCookieJar();
 
   constructor(bindings: ApiBindings) {
     this.#bindings = bindings;
@@ -117,9 +117,7 @@ export class AgentBuilderApiTestClient {
     return headers;
   }
 
-  async loginAsMosooAiTestAccount(
-    email = AGENT_BUILDER_TEST_VIEWER.email,
-  ): Promise<MosooAiBackdoorResponse> {
+  async loginAsMosooAiTestAccount(email = API_TEST_VIEWER.email): Promise<MosooAiBackdoorResponse> {
     const response = await this.postJson(
       `${PUBLIC_API_PREFIX}/auth/development-backdoor/mosoo-ai-login`,
       {
@@ -178,7 +176,7 @@ export class AgentBuilderApiTestClient {
       headers,
     });
     if (!path.startsWith(`${PUBLIC_API_PREFIX}/auth/`)) {
-      throw new Error(`Unsupported Agent Builder API fixture path: ${path}`);
+      throw new Error(`Unsupported API fixture path: ${path}`);
     }
 
     const response = await getBetterAuth(this.#bindings).handler(request);
@@ -188,11 +186,11 @@ export class AgentBuilderApiTestClient {
   }
 }
 
-export async function createAgentBuilderApiFixture(): Promise<AgentBuilderApiFixture> {
+export async function createApiTestFixture(): Promise<ApiTestFixture> {
   const database = new SqliteD1Database({ foreignKeys: false });
 
-  createAgentBuilderApiSchema(database);
-  await seedAgentBuilderApiFixture(database);
+  createApiTestSchema(database);
+  await seedApiTestFixture(database);
 
   const bindings = {
     ...createPublicHttpTestBindings(database),
@@ -201,15 +199,15 @@ export async function createAgentBuilderApiFixture(): Promise<AgentBuilderApiFix
 
   return {
     bindings,
-    client: new AgentBuilderApiTestClient(bindings),
+    client: new ApiTestClient(bindings),
     database,
-    ids: AGENT_BUILDER_TEST_IDS,
-    viewer: AGENT_BUILDER_TEST_VIEWER,
+    ids: API_TEST_IDS,
+    viewer: API_TEST_VIEWER,
   };
 }
 
-export async function insertAgentBuilderVendorCredential(
-  fixture: AgentBuilderApiFixture,
+export async function insertTestVendorCredential(
+  fixture: ApiTestFixture,
   input: {
     readonly apiBase?: string | null;
     readonly apiKey?: string;
@@ -257,7 +255,7 @@ export async function insertAgentBuilderVendorCredential(
     .run();
 }
 
-function createAgentBuilderApiSchema(database: SqliteD1Database): void {
+function createApiTestSchema(database: SqliteD1Database): void {
   database.execute(`
     CREATE TABLE account (
       created_at integer NOT NULL,
@@ -309,14 +307,14 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       value text NOT NULL
     );
 
-	    CREATE TABLE organization (
-	      avatar_url text,
-	      created_at integer NOT NULL,
-	      creator_account_id text,
-	      id text PRIMARY KEY NOT NULL,
-	      name text NOT NULL,
-	      updated_at integer NOT NULL
-	    );
+    CREATE TABLE organization (
+      avatar_url text,
+      created_at integer NOT NULL,
+      creator_account_id text,
+      id text PRIMARY KEY NOT NULL,
+      name text NOT NULL,
+      updated_at integer NOT NULL
+    );
 
     CREATE TABLE app (
       created_at integer NOT NULL,
@@ -652,58 +650,10 @@ function createAgentBuilderApiSchema(database: SqliteD1Database): void {
       wrapped_dek text NOT NULL,
       wrapped_dek_iv text NOT NULL
     );
-
-    CREATE TABLE agent_builder_thread (
-      agent_id text NOT NULL,
-      created_at integer NOT NULL,
-      creator_account_id text NOT NULL,
-      id text PRIMARY KEY NOT NULL,
-      last_turn_at integer,
-      message_seq_cursor integer DEFAULT 0 NOT NULL,
-      preview_opened_at integer,
-      status text DEFAULT 'active' NOT NULL,
-      title text,
-      updated_at integer NOT NULL
-    );
-    CREATE UNIQUE INDEX agent_builder_thread_agent_idx ON agent_builder_thread (agent_id);
-
-    CREATE TABLE agent_builder_message (
-      cards_json text,
-      content_text text NOT NULL,
-      created_at integer NOT NULL,
-      created_by_account_id text,
-      id text PRIMARY KEY NOT NULL,
-      input_kind text,
-      planner_run_id text,
-      role text NOT NULL,
-      seq integer NOT NULL,
-      thread_id text NOT NULL
-    );
-    CREATE UNIQUE INDEX agent_builder_message_thread_seq_idx
-      ON agent_builder_message (thread_id, seq);
-
-    CREATE TABLE agent_builder_planner_run (
-      agent_id text NOT NULL,
-      completed_at integer,
-      context_json text NOT NULL,
-      created_at integer NOT NULL,
-      error_code text,
-      error_message text,
-      id text PRIMARY KEY NOT NULL,
-      model text NOT NULL,
-      output_json text,
-      provider text NOT NULL,
-      request_digest text NOT NULL,
-      status text NOT NULL,
-      thread_id text NOT NULL,
-      trace_id text NOT NULL,
-      tool_trace_json text,
-      trigger_message_id text
-    );
   `);
 }
 
-async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
+async function seedApiTestFixture(database: D1Database): Promise<void> {
   await database
     .prepare(
       `INSERT INTO account (
@@ -720,12 +670,12 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
     )
     .bind(
       1,
-      AGENT_BUILDER_TEST_VIEWER.email,
+      API_TEST_VIEWER.email,
       1,
-      AGENT_BUILDER_TEST_VIEWER.id,
+      API_TEST_VIEWER.id,
       null,
-      AGENT_BUILDER_TEST_IDS.organizationId,
-      AGENT_BUILDER_TEST_VIEWER.name,
+      API_TEST_IDS.organizationId,
+      API_TEST_VIEWER.name,
       JSON.stringify({ modelId: "gpt-5.4", vendor: "openai" }),
       1,
     )
@@ -734,20 +684,14 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
   await database
     .prepare(
       `INSERT INTO organization (
-	        created_at,
-	        creator_account_id,
-	        id,
-	        name,
-	        updated_at
-	      ) VALUES (?, ?, ?, ?, ?)`,
+        created_at,
+        creator_account_id,
+        id,
+        name,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?)`,
     )
-    .bind(
-      1,
-      AGENT_BUILDER_TEST_VIEWER.id,
-      AGENT_BUILDER_TEST_IDS.organizationId,
-      "Mosoo Agent Builder Test",
-      1,
-    )
+    .bind(1, API_TEST_VIEWER.id, API_TEST_IDS.organizationId, "Mosoo API Test", 1)
     .run();
 
   await database
@@ -761,14 +705,7 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
         updated_at
       ) VALUES (?, ?, ?, ?, ?, ?)`,
     )
-    .bind(
-      1,
-      AGENT_BUILDER_TEST_IDS.appId,
-      "Default App",
-      AGENT_BUILDER_TEST_IDS.organizationId,
-      AGENT_BUILDER_TEST_VIEWER.id,
-      1,
-    )
+    .bind(1, API_TEST_IDS.appId, "Default App", API_TEST_IDS.organizationId, API_TEST_VIEWER.id, 1)
     .run();
 
   await database
@@ -789,15 +726,15 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
     )
     .bind(
       1,
-      AGENT_BUILDER_TEST_IDS.environmentRevisionId,
-      "Reusable Agent Builder test environment.",
+      API_TEST_IDS.environmentRevisionId,
+      "Reusable API test environment.",
       null,
       null,
       null,
-      AGENT_BUILDER_TEST_IDS.environmentId,
-      "Agent Builder Test Environment",
-      AGENT_BUILDER_TEST_VIEWER.id,
-      AGENT_BUILDER_TEST_IDS.appId,
+      API_TEST_IDS.environmentId,
+      "API Test Environment",
+      API_TEST_VIEWER.id,
+      API_TEST_IDS.appId,
       1,
     )
     .run();
@@ -824,13 +761,13 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
       1,
       "[]",
       1,
-      AGENT_BUILDER_TEST_VIEWER.id,
+      API_TEST_VIEWER.id,
       "[]",
-      AGENT_BUILDER_TEST_IDS.environmentId,
-      AGENT_BUILDER_TEST_IDS.environmentRevisionId,
+      API_TEST_IDS.environmentId,
+      API_TEST_IDS.environmentRevisionId,
       "sandbox",
       "[]",
-      AGENT_BUILDER_TEST_IDS.appId,
+      API_TEST_IDS.appId,
       "",
     )
     .run();
@@ -860,16 +797,17 @@ async function seedAgentBuilderApiFixture(database: D1Database): Promise<void> {
         packageMcpServers: [],
         packageResolution: null,
         packageSkills: [],
+        providerOptions: {},
       }),
       1,
-      "Draft fixture for Agent Builder API tests.",
-      AGENT_BUILDER_TEST_IDS.agentId,
+      "Draft fixture for API tests.",
+      API_TEST_IDS.agentId,
       "pet",
       "gpt-5.4",
-      "Agent Builder Fixture",
-      AGENT_BUILDER_TEST_VIEWER.id,
-      AGENT_BUILDER_TEST_IDS.appId,
-      "Help the user assemble an Agent starter pack.",
+      "API Fixture Agent",
+      API_TEST_VIEWER.id,
+      API_TEST_IDS.appId,
+      "Help the user test API behavior.",
       "openai",
       "openai-runtime",
       "draft",

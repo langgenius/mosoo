@@ -7,7 +7,7 @@ import {
 } from "../src/modules/agents/application/agent-stored-config.service";
 
 describe("agent stored config", () => {
-  test("normalizes legacy config with empty Builder metadata", () => {
+  test("normalizes legacy config without Builder metadata", () => {
     const normalized = JSON.parse(
       normalizeAgentStoredConfigJson(
         JSON.stringify({
@@ -18,13 +18,13 @@ describe("agent stored config", () => {
       ),
     );
 
-    expect(normalized.builder).toEqual({ componentDecisions: {} });
+    expect(normalized).not.toHaveProperty("builder");
     expect(normalized).not.toHaveProperty("packageSharingEnabled");
     expect(normalized.providerOptions).toEqual({});
   });
 
-  test("round-trips Builder component decisions", () => {
-    const configJson = serializeAgentStoredConfig({
+  test("ignores legacy Builder metadata while parsing stored config", () => {
+    const configJson = JSON.stringify({
       builder: {
         componentDecisions: {
           environment: "skipped",
@@ -42,9 +42,6 @@ describe("agent stored config", () => {
       },
     });
 
-    expect(parseAgentStoredConfig(configJson).builder.componentDecisions.environment).toBe(
-      "skipped",
-    );
     expect(parseAgentStoredConfig(configJson).providerOptions).toEqual({
       model_providers: {
         "openai-compatible": {
@@ -54,23 +51,14 @@ describe("agent stored config", () => {
     });
   });
 
-  test("normalizes Builder metadata while serializing stored config", () => {
-    const staleConfig = {
-      builder: {
-        componentDecisions: {
-          environment: "skipped" as const,
-          skills: "skipped" as const,
-        },
-      },
+  test("serializes stored config without Builder metadata", () => {
+    const serialized = serializeAgentStoredConfig({
       packageMcpServers: [],
       packageResolution: null,
       packageSkills: [],
       providerOptions: {},
-    };
-    const serialized = serializeAgentStoredConfig(staleConfig);
-
-    expect(JSON.parse(serialized).builder.componentDecisions).toEqual({
-      environment: "skipped",
     });
+
+    expect(JSON.parse(serialized)).not.toHaveProperty("builder");
   });
 });

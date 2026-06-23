@@ -54,10 +54,6 @@ class_name = "ChannelConnection"
 name = "Sandbox"
 class_name = "Sandbox"
 
-[[durable_objects.bindings]]
-name = "AgentBuilderSystemAgent"
-class_name = "AgentBuilderSystemAgent"
-
 [[containers]]
 class_name = "Sandbox"
 image = "../driver/Dockerfile"
@@ -155,10 +151,6 @@ class_name = "ChannelConnection"
 name = "Sandbox"
 class_name = "Sandbox"
 
-[[env.prod.durable_objects.bindings]]
-name = "AgentBuilderSystemAgent"
-class_name = "AgentBuilderSystemAgent"
-
 [[env.prod.containers]]
 class_name = "Sandbox"
 image = "../driver/Dockerfile"
@@ -209,20 +201,8 @@ dead_letter_queue = "channel-final-delivery-dlq"
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = [
-  "DriverConnection",
-  "Sandbox",
-  "Session",
-  "ChannelConnection",
-  "AgentBuilderSystemAgent",
-]
+new_sqlite_classes = ["DriverConnection", "Sandbox", "Session", "ChannelConnection"]
 
 [[env.prod.migrations]]
 tag = "v1"
-new_sqlite_classes = [
-  "DriverConnection",
-  "Sandbox",
-  "Session",
-  "ChannelConnection",
-  "AgentBuilderSystemAgent",
-]
+new_sqlite_classes = ["DriverConnection", "Sandbox", "Session", "ChannelConnection"]

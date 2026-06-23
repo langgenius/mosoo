@@ -2,7 +2,7 @@ import type { JsonObject } from "@mosoo/contracts";
 import { classifyAgentConfigChanges } from "@mosoo/contracts/agent-config-change-plan";
 import type { AgentConfigChangePlan } from "@mosoo/contracts/agent-config-change-plan";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import {
   recreateSandbox,
@@ -21,8 +21,6 @@ import {
 
 import type { Agent, AgentKind, McpServer, RuntimeId, SkillInfo } from "../../agent.types";
 import {
-  createDraftYaml,
-  createDraftYamlHash,
   createEditorSaveSnapshot,
   createInitialDraft,
   createSnapshotHash,
@@ -30,9 +28,7 @@ import {
   toAgentConfigChangeSnapshot,
 } from "./draft";
 import type { AgentEditorDraft } from "./draft";
-import { applyAgentEditorBuilderPatch, applyAgentEditorPatch, withEnvironmentId } from "./patch";
-import type { AgentEditorBuilderPatch, AgentEditorBuilderPatchApplyResult } from "./patch";
-import { AGENT_FORM_HIGHLIGHT_DURATION_MS } from "./section-ids";
+import { applyAgentEditorPatch, withEnvironmentId } from "./patch";
 import type { AgentFormSectionId } from "./section-ids";
 
 export type { AgentEditorDraft } from "./draft";
@@ -53,8 +49,6 @@ function toRuntimeOperationTargetVersion(agent: {
 
 export interface AgentEditorModel {
   draft: AgentEditorDraft;
-  draftYaml: string;
-  draftYamlHash: string;
   changePlan: AgentConfigChangePlan;
   discard(): void;
   dirty: boolean;
@@ -76,19 +70,8 @@ export interface AgentEditorModel {
   setRuntime(runtime: RuntimeId): void;
   setSkills(skills: SkillInfo[]): void;
   applyPatch(patch: Record<string, unknown>): void;
-  applyBuilderPatch(patch: AgentEditorBuilderPatch): AgentEditorBuilderPatchApplyResult;
-  applyAndSaveBuilderPatch(
-    patch: AgentEditorBuilderPatch,
-  ): Promise<AgentEditorBuilderPatchAutoApplyResult>;
   focusSection: AgentFormSectionId | null;
   highlightedSections: ReadonlySet<AgentFormSectionId>;
-  focusBuilderPatchSection(sectionId: AgentFormSectionId): void;
-  markCurrentDraftSaved(draftYamlHash: string): void;
-}
-
-export interface AgentEditorBuilderPatchAutoApplyResult extends AgentEditorBuilderPatchApplyResult {
-  saveError: string | null;
-  saved: boolean;
 }
 
 export function useAgentEditorModel({
@@ -101,13 +84,11 @@ export function useAgentEditorModel({
   const queryClient = useQueryClient();
   const initialDraft = createInitialDraft(agent);
   const [draft, setDraft] = useState<AgentEditorDraft>(initialDraft);
-  const draftRef = useRef<AgentEditorDraft>(initialDraft);
   const [revision, setRevision] = useState(0);
   const [focusSection, setFocusSection] = useState<AgentFormSectionId | null>(null);
   const [highlightedSections, setHighlightedSections] = useState<ReadonlySet<AgentFormSectionId>>(
     new Set(),
   );
-  const highlightClearTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
   const [savedDraft, setSavedDraft] = useState<AgentEditorDraft>(initialDraft);
   const [savedSnapshot, setSavedSnapshot] = useState(() => createEditorSaveSnapshot(initialDraft));
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -143,37 +124,6 @@ export function useAgentEditorModel({
       });
     },
   });
-
-  useEffect(() => {
-    draftRef.current = draft;
-  }, [draft]);
-
-  useEffect(
-    () => () => {
-      if (highlightClearTimerRef.current !== null) {
-        globalThis.clearTimeout(highlightClearTimerRef.current);
-      }
-    },
-    [],
-  );
-
-  function focusAndHighlightSections(sectionIds: readonly AgentFormSectionId[]): void {
-    if (sectionIds.length === 0) {
-      return;
-    }
-
-    setFocusSection(sectionIds[0] ?? null);
-    setHighlightedSections(new Set(sectionIds));
-
-    if (highlightClearTimerRef.current !== null) {
-      globalThis.clearTimeout(highlightClearTimerRef.current);
-    }
-
-    highlightClearTimerRef.current = globalThis.setTimeout(() => {
-      setHighlightedSections(new Set());
-      highlightClearTimerRef.current = null;
-    }, AGENT_FORM_HIGHLIGHT_DURATION_MS);
-  }
 
   const dirty = createEditorSaveSnapshot(draft) !== savedSnapshot;
   const changePlan = classifyAgentConfigChanges({
@@ -238,9 +188,6 @@ export function useAgentEditorModel({
     try {
       const savedAgent = await configMutation.mutateAsync({
         agentId: typedAgentId,
-        builder: {
-          componentDecisions: draftToSave.componentDecisions,
-        },
         description: draftToSave.description.trim() || null,
         environment: {
           environmentId:
@@ -301,45 +248,6 @@ export function useAgentEditorModel({
   }
 
   return {
-    applyBuilderPatch(patch) {
-      const result = applyAgentEditorBuilderPatch(draft, patch);
-
-      if (createEditorSaveSnapshot(result.draft) !== createEditorSaveSnapshot(draft)) {
-        setDraft(result.draft);
-        setRevision((currentRevision) => currentRevision + 1);
-      }
-
-      focusAndHighlightSections(result.appliedSections);
-
-      return result;
-    },
-    async applyAndSaveBuilderPatch(patch) {
-      const result = applyAgentEditorBuilderPatch(draft, patch);
-      const changed = createEditorSaveSnapshot(result.draft) !== createEditorSaveSnapshot(draft);
-
-      if (changed) {
-        setDraft(result.draft);
-        setRevision((currentRevision) => currentRevision + 1);
-      }
-
-      focusAndHighlightSections(result.appliedSections);
-
-      if (!changed) {
-        return {
-          ...result,
-          saveError: null,
-          saved: false,
-        };
-      }
-
-      const saveResult = await persistDraft(result.draft, { runRuntimeOperations: true });
-
-      return {
-        ...result,
-        saveError: saveResult.error,
-        saved: saveResult.ok,
-      };
-    },
     applyPatch(patch) {
       updateDraft((current) => applyAgentEditorPatch(current, patch));
     },
@@ -353,25 +261,8 @@ export function useAgentEditorModel({
       setSaveError(null);
     },
     draft,
-    draftYaml: createDraftYaml(draft),
-    draftYamlHash: createDraftYamlHash(draft),
-    focusBuilderPatchSection(sectionId) {
-      setFocusSection(sectionId);
-      setHighlightedSections(new Set([sectionId]));
-    },
     focusSection,
     highlightedSections,
-    markCurrentDraftSaved(draftYamlHash) {
-      const currentDraft = draftRef.current;
-
-      if (createDraftYamlHash(currentDraft) !== draftYamlHash) {
-        return;
-      }
-
-      setSavedDraft(currentDraft);
-      setSavedSnapshot(createEditorSaveSnapshot(currentDraft));
-      setSaveError(null);
-    },
     readOnly,
     revision,
     save,
@@ -390,10 +281,6 @@ export function useAgentEditorModel({
     setKind(kind) {
       updateDraft((current) => ({
         ...current,
-        componentDecisions: {
-          ...current.componentDecisions,
-          agentType: "decided",
-        },
         kind,
       }));
     },

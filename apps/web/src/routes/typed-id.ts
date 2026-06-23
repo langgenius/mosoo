@@ -1,7 +1,6 @@
 import type {
   AccountId,
   AgentDeploymentVersionId,
-  AgentBuilderPlannerRunId,
   AgentId,
   AgentMcpBindingId,
   ChannelBindingId,
@@ -23,10 +22,6 @@ import { parsePlatformId } from "@mosoo/id";
 
 export function toAccountId(id: string): AccountId {
   return parsePlatformId(id, "Account ID") as AccountId;
-}
-
-export function toAgentBuilderPlannerRunId(id: string): AgentBuilderPlannerRunId {
-  return parsePlatformId(id, "Agent Builder planner run ID") as AgentBuilderPlannerRunId;
 }
 
 export function toAgentDeploymentVersionId(id: string): AgentDeploymentVersionId {

@@ -166,9 +166,6 @@ describe("app agent access", () => {
 
     expect(agent.appId).toBe(AGENT_ACCESS_IDS.app);
     expect(JSON.parse(agent.configJson)).toEqual({
-      builder: {
-        componentDecisions: {},
-      },
       packageMcpServers: [],
       packageResolution: null,
       packageSkills: [],

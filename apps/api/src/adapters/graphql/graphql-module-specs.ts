@@ -1,5 +1,4 @@
 import type { GraphQLModule } from "./graphql-module.ts";
-import { agentBuilderSchema } from "./schema/agent-builder-schema.ts";
 import { agentSchema } from "./schema/agent-schema.ts";
 import { appSchema } from "./schema/app-schema.ts";
 import { channelSchema } from "./schema/channel-schema.ts";
@@ -67,17 +66,6 @@ export const agentGraphQLSpec = {
     "exportAgentPackage(appId: ULID!, agentId: ULID!): AgentPackageExport!",
   ],
   typeDefs: agentSchema,
-} satisfies GraphQLModuleSpec;
-
-export const agentBuilderGraphQLSpec = {
-  mutationFields: [
-    "ensureAgentBuilderThread(agentId: ULID!): AgentBuilderThread!",
-    "executeAgentBuilderControlPlaneAction(input: ExecuteAgentBuilderControlPlaneActionInput!): AgentBuilderControlPlaneActionResult!",
-  ],
-  queryFields: [
-    "agentBuilderMessages(agentId: ULID!, beforeSeq: Int, limit: Int): [AgentBuilderMessage!]!",
-  ],
-  typeDefs: agentBuilderSchema,
 } satisfies GraphQLModuleSpec;
 
 export const environmentGraphQLSpec = {
@@ -206,7 +194,6 @@ export const organizationGraphQLSpec = {
 export const graphqlModuleSpecs = [
   commonGraphQLSpec,
   agentGraphQLSpec,
-  agentBuilderGraphQLSpec,
   channelGraphQLSpec,
   costGraphQLSpec,
   environmentGraphQLSpec,

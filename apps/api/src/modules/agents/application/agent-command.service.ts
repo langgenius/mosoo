@@ -76,7 +76,6 @@ export async function createAgent(
     .insert(agentsTable)
     .values({
       configJson: serializeAgentStoredConfig({
-        builder: { componentDecisions: {} },
         packageMcpServers: [],
         packageSkills: [],
         packageResolution: null,
@@ -186,7 +185,6 @@ export async function updateAgentConfig(
 
   const preparedEnvironment = prepareAgentEnvironmentConfigWrite({
     agentId: editable.agent.id,
-    builder: input.builder,
     currentConfigJson: editable.agent.configJson,
     environment: input.environment,
     providerOptions: input.providerOptions,

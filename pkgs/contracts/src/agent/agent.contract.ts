@@ -321,26 +321,12 @@ export interface AgentReadiness {
 }
 
 export interface AgentEditorState {
-  builder: AgentConfigBuilderMetadata;
   environment: AgentEnvironmentConfig;
   id: AgentId;
   packageResolution: AgentPackageResolutionState | null;
   mcpBindings: AgentMcpBinding[];
   providerOptions: JsonObject;
   readiness: AgentReadiness;
-}
-
-export type AgentConfigBuilderComponentDecision = "bound" | "created" | "skipped";
-
-export type AgentConfigBuilderAgentTypeDecision = "decided" | "skipped";
-
-export interface AgentConfigBuilderComponentDecisions {
-  agentType?: AgentConfigBuilderAgentTypeDecision;
-  environment?: AgentConfigBuilderComponentDecision;
-}
-
-export interface AgentConfigBuilderMetadata {
-  componentDecisions: AgentConfigBuilderComponentDecisions;
 }
 
 export interface CreateAgentInput {
@@ -357,7 +343,6 @@ export interface CreateAgentInput {
 
 export interface UpdateAgentConfigInput {
   agentId: AgentId;
-  builder: AgentConfigBuilderMetadata;
   description?: string | null;
   environment: AgentEnvironmentConfig;
   kind: AgentKind;

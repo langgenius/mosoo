@@ -10,16 +10,13 @@ import {
   setDefaultVendorCredential,
   updateVendorCredential,
 } from "../src/modules/vendor-credentials/application/vendor-credential-commands";
-import {
-  createAgentBuilderApiFixture,
-  insertAgentBuilderVendorCredential,
-} from "./helpers/agent-builder-api-fixture";
+import { createApiTestFixture, insertTestVendorCredential } from "./helpers/api-test-fixture";
 
 const OTHER_APP_ID = parsePlatformId<AppId>("01J000000000000000000000C9", "other app ID");
 const OTHER_ACCOUNT_ID = "01J000000000000000000000CA";
 
 async function insertOtherApp(
-  fixture: Awaited<ReturnType<typeof createAgentBuilderApiFixture>>,
+  fixture: Awaited<ReturnType<typeof createApiTestFixture>>,
   input: { ownerAccountId?: string } = {},
 ) {
   await fixture.database
@@ -46,7 +43,7 @@ async function insertOtherApp(
 
 describe("vendor credential commands", () => {
   test("rejects public HTTP custom API bases before storing a credential", async () => {
-    const fixture = await createAgentBuilderApiFixture();
+    const fixture = await createApiTestFixture();
 
     await expect(
       createVendorCredential(fixture.bindings, fixture.viewer, {
@@ -70,7 +67,7 @@ describe("vendor credential commands", () => {
   });
 
   test("rejects preset provider API bases that target another preset provider", async () => {
-    const fixture = await createAgentBuilderApiFixture();
+    const fixture = await createApiTestFixture();
 
     await expect(
       createVendorCredential(fixture.bindings, fixture.viewer, {
@@ -93,7 +90,7 @@ describe("vendor credential commands", () => {
   });
 
   test("rejects trailing-dot localhost API bases before storing a credential", async () => {
-    const fixture = await createAgentBuilderApiFixture();
+    const fixture = await createApiTestFixture();
 
     await expect(
       createVendorCredential(fixture.bindings, fixture.viewer, {
@@ -119,9 +116,9 @@ describe("vendor credential commands", () => {
   });
 
   test("rejects private custom API bases before updating a credential", async () => {
-    const fixture = await createAgentBuilderApiFixture();
+    const fixture = await createApiTestFixture();
     const credentialId = "01J000000000000000000000C2";
-    await insertAgentBuilderVendorCredential(fixture, {
+    await insertTestVendorCredential(fixture, {
       apiBase: "https://api.example.com/v1",
       credentialId,
       models: ["custom-model"],
@@ -150,9 +147,9 @@ describe("vendor credential commands", () => {
   });
 
   test("rejects cross-provider API bases before updating a preset provider credential", async () => {
-    const fixture = await createAgentBuilderApiFixture();
+    const fixture = await createApiTestFixture();
     const credentialId = "01J000000000000000000000C3";
-    await insertAgentBuilderVendorCredential(fixture, {
+    await insertTestVendorCredential(fixture, {
       credentialId,
       vendorId: VENDOR_OPENAI.vendorId,
     });
@@ -173,10 +170,10 @@ describe("vendor credential commands", () => {
   });
 
   test("rejects update when the credential is not in the requested App", async () => {
-    const fixture = await createAgentBuilderApiFixture();
+    const fixture = await createApiTestFixture();
     await insertOtherApp(fixture);
     const credentialId = "01J000000000000000000000C4";
-    await insertAgentBuilderVendorCredential(fixture, {
+    await insertTestVendorCredential(fixture, {
       credentialId,
       vendorId: VENDOR_OPENAI.vendorId,
     });
@@ -197,10 +194,10 @@ describe("vendor credential commands", () => {
   });
 
   test("rejects delete when the credential is not in the requested App", async () => {
-    const fixture = await createAgentBuilderApiFixture();
+    const fixture = await createApiTestFixture();
     await insertOtherApp(fixture);
     const credentialId = "01J000000000000000000000C5";
-    await insertAgentBuilderVendorCredential(fixture, {
+    await insertTestVendorCredential(fixture, {
       credentialId,
       vendorId: VENDOR_OPENAI.vendorId,
     });
@@ -224,10 +221,10 @@ describe("vendor credential commands", () => {
   });
 
   test("rejects update before row lookup when the requested App is not owned", async () => {
-    const fixture = await createAgentBuilderApiFixture();
+    const fixture = await createApiTestFixture();
     await insertOtherApp(fixture, { ownerAccountId: OTHER_ACCOUNT_ID });
     const credentialId = "01J000000000000000000000C6";
-    await insertAgentBuilderVendorCredential(fixture, {
+    await insertTestVendorCredential(fixture, {
       credentialId,
       vendorId: VENDOR_OPENAI.vendorId,
     });
@@ -248,10 +245,10 @@ describe("vendor credential commands", () => {
   });
 
   test("rejects delete before row lookup when the requested App is not owned", async () => {
-    const fixture = await createAgentBuilderApiFixture();
+    const fixture = await createApiTestFixture();
     await insertOtherApp(fixture, { ownerAccountId: OTHER_ACCOUNT_ID });
     const credentialId = "01J000000000000000000000C7";
-    await insertAgentBuilderVendorCredential(fixture, {
+    await insertTestVendorCredential(fixture, {
       credentialId,
       vendorId: VENDOR_OPENAI.vendorId,
     });
@@ -277,7 +274,7 @@ describe("vendor credential commands", () => {
 
 describe("vendor credential default selection", () => {
   async function readIsDefault(
-    fixture: Awaited<ReturnType<typeof createAgentBuilderApiFixture>>,
+    fixture: Awaited<ReturnType<typeof createApiTestFixture>>,
     id: string,
   ): Promise<number | undefined> {
     const row = await fixture.database
@@ -289,7 +286,7 @@ describe("vendor credential default selection", () => {
   }
 
   async function createAnthropicKey(
-    fixture: Awaited<ReturnType<typeof createAgentBuilderApiFixture>>,
+    fixture: Awaited<ReturnType<typeof createApiTestFixture>>,
     name: string,
   ) {
     return createVendorCredential(fixture.bindings, fixture.viewer, {
@@ -301,7 +298,7 @@ describe("vendor credential default selection", () => {
   }
 
   test("marks the first credential for a vendor as default and later ones non-default", async () => {
-    const fixture = await createAgentBuilderApiFixture();
+    const fixture = await createApiTestFixture();
     const first = await createAnthropicKey(fixture, "A");
     const second = await createAnthropicKey(fixture, "B");
 
@@ -310,7 +307,7 @@ describe("vendor credential default selection", () => {
   });
 
   test("setDefaultVendorCredential moves the default to the chosen credential", async () => {
-    const fixture = await createAgentBuilderApiFixture();
+    const fixture = await createApiTestFixture();
     const first = await createAnthropicKey(fixture, "A");
     const second = await createAnthropicKey(fixture, "B");
 
@@ -325,7 +322,7 @@ describe("vendor credential default selection", () => {
   });
 
   test("deleting the default promotes the next remaining credential", async () => {
-    const fixture = await createAgentBuilderApiFixture();
+    const fixture = await createApiTestFixture();
     const first = await createAnthropicKey(fixture, "A");
     const second = await createAnthropicKey(fixture, "B");
 
@@ -338,7 +335,7 @@ describe("vendor credential default selection", () => {
   });
 
   test("keeps the existing default when a non-default credential is deleted", async () => {
-    const fixture = await createAgentBuilderApiFixture();
+    const fixture = await createApiTestFixture();
     const first = await createAnthropicKey(fixture, "A");
     const second = await createAnthropicKey(fixture, "B");
 

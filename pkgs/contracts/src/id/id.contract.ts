@@ -1,8 +1,5 @@
 export type {
   AccountId,
-  AgentBuilderMessageId,
-  AgentBuilderPlannerRunId,
-  AgentBuilderThreadId,
   AgentDeploymentVersionId,
   AgentId,
   AgentMcpBindingId,

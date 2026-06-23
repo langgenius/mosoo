@@ -1,9 +1,6 @@
 import {
   accountsTable,
   agentDeploymentVersionsTable,
-  agentBuilderMessagesTable,
-  agentBuilderPlannerRunsTable,
-  agentBuilderThreadsTable,
   agentMcpBindingsTable,
   agentsTable,
   agentSkillsTable,
@@ -64,9 +61,6 @@ import { drizzle } from "drizzle-orm/d1";
 const schema = {
   accountsTable,
   agentDeploymentVersionsTable,
-  agentBuilderMessagesTable,
-  agentBuilderPlannerRunsTable,
-  agentBuilderThreadsTable,
   agentMcpBindingsTable,
   agentsTable,
   agentSkillsTable,

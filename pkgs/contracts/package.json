@@ -5,7 +5,6 @@
   "exports": {
     ".": "./src/index.ts",
     "./account": "./src/account/account.contract.ts",
-    "./agent-builder": "./src/agent-builder/agent-builder-planner.contract.ts",
     "./agent-config-change-plan": "./src/agent/agent-config-change-plan.contract.ts",
     "./agent": "./src/agent/agent.contract.ts",
     "./agent-manifest": "./src/agent/agent-manifest.contract.ts",
