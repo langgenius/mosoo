@@ -195,7 +195,10 @@ function ConsoleSidebarFooter({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-const ORG_HEADER_TITLES = [{ path: "/apps", title: "Apps" }] as const;
+const ORG_HEADER_TITLES = [
+  { path: "/apps", title: "Apps" },
+  { path: "/org/settings", title: "Org settings" },
+] as const;
 
 function getOrgHeaderTitle(pathname: string): string | null {
   return (
