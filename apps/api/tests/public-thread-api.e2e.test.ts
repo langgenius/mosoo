@@ -982,6 +982,45 @@ describe("Public Thread API e2e", () => {
         size: 23,
       });
 
+      const downloadAttachmentResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/files/${fileId}/content`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      expect(downloadAttachmentResponse.status).toBe(200);
+      expect(downloadAttachmentResponse.headers.get("cache-control")).toBe("no-store");
+      expect(downloadAttachmentResponse.headers.get("content-type")).toBe("text/plain");
+      expect(downloadAttachmentResponse.headers.get("content-disposition")).toContain(
+        'attachment; filename="launch-note.txt"',
+      );
+      expect(await downloadAttachmentResponse.text()).toBe("Launch note.\n");
+
+      const downloadArtifactResponse = await requestThreadApi(
+        new Request(
+          `https://api.example.com/api/v1/files/${PUBLIC_API_TEST_IDS.fileAlt}/content?disposition=inline`,
+          {
+            headers: { Authorization: bearer(TOKENS.owner) },
+          },
+        ),
+      );
+      expect(downloadArtifactResponse.status).toBe(200);
+      expect(downloadArtifactResponse.headers.get("cache-control")).toBe("no-store");
+      expect(downloadArtifactResponse.headers.get("content-type")).toBe("text/markdown");
+      expect(downloadArtifactResponse.headers.get("content-disposition")).toContain(
+        'inline; filename="summary.md"',
+      );
+      expect(await downloadArtifactResponse.text()).toBe("runtime summary");
+
+      const nonOwnerDownloadResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/files/${fileId}/content`, {
+          headers: { Authorization: bearer(TOKENS.nonOwner) },
+        }),
+      );
+      expect(nonOwnerDownloadResponse.status).toBe(404);
+      expect(expectRecord(await readJson(nonOwnerDownloadResponse))["error"]).toMatchObject({
+        code: "not_found",
+      });
+
       const deleteFileResponse = await requestThreadApi(
         new Request(`https://api.example.com/api/v1/threads/${threadId}/files/${fileId}`, {
           headers: { Authorization: bearer(TOKENS.owner) },
@@ -1199,6 +1238,17 @@ describe("Public Thread API e2e", () => {
         .first<{ status: string }>();
       expect(uploadedRow).toEqual({ status: "uploading" });
 
+      const pendingDownloadResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/files/${fileId}/content`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      expect(pendingDownloadResponse.status).toBe(400);
+      expect(expectRecord(await readJson(pendingDownloadResponse))["error"]).toMatchObject({
+        code: "invalid_request",
+        message: "Only a ready file can be downloaded.",
+      });
+
       const nonOwnerUploadResponse = await requestThreadApi(
         new Request(`https://api.example.com/api/v1/files/${fileId}/content`, {
           body: "non-owner overwrite\n",
@@ -1264,6 +1314,31 @@ describe("Public Thread API e2e", () => {
       expect(await finalObject?.text()).toBe(fileBody);
       expect(await bucket.get(pendingFileRow.object_key)).toBeNull();
 
+      const downloadContentResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/files/${fileId}/content?disposition=inline`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      expect(downloadContentResponse.status).toBe(200);
+      expect(downloadContentResponse.headers.get("cache-control")).toBe("no-store");
+      expect(downloadContentResponse.headers.get("content-length")).toBe(String(fileSize));
+      expect(downloadContentResponse.headers.get("content-type")).toBe("text/plain");
+      expect(downloadContentResponse.headers.get("content-disposition")).toContain(
+        'inline; filename="launch-note.txt"',
+      );
+      expect(await downloadContentResponse.text()).toBe(fileBody);
+
+      const invalidDispositionResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/files/${fileId}/content?disposition=download`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      expect(invalidDispositionResponse.status).toBe(400);
+      expect(expectRecord(await readJson(invalidDispositionResponse))["error"]).toMatchObject({
+        code: "invalid_request",
+        message: "File content disposition must be attachment or inline.",
+      });
+
       const completedFileRow = await database
         .prepare(
           `SELECT committed, expires_at, object_key, status
@@ -1323,6 +1398,22 @@ describe("Public Thread API e2e", () => {
       );
       expect(appDraftCompleteResponse.status).toBe(404);
       expect(expectRecord(await readJson(appDraftCompleteResponse))["error"]).toMatchObject({
+        code: "not_found",
+      });
+
+      const readyAppDraftFileId = await createReadyAppDraftFile({
+        body: "Ready app draft.\n",
+        bucket,
+        database,
+        name: "ready-app-draft.txt",
+      });
+      const appDraftDownloadResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/files/${readyAppDraftFileId}/content`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      expect(appDraftDownloadResponse.status).toBe(404);
+      expect(expectRecord(await readJson(appDraftDownloadResponse))["error"]).toMatchObject({
         code: "not_found",
       });
     });

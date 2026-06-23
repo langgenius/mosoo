@@ -8,6 +8,7 @@ import { useAppSession } from "@/app/session-provider";
 import { useVisibleAgentsQuery } from "@/domains/agent/query/agent-queries";
 import { createApp } from "@/domains/app/api/app-client";
 import { appKeys } from "@/domains/app/query/app-queries";
+import { AppIdBadge } from "@/shared/ui/app-id-badge";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
@@ -27,12 +28,14 @@ function AppCard({
     agentCount === undefined ? "—" : `${agentCount} ${agentCount === 1 ? "agent" : "agents"}`;
 
   return (
-    <button
-      type="button"
-      onClick={onEnter}
-      className="border-border bg-card hover:border-border-strong group flex flex-col gap-2.5 rounded-md border p-4 text-left transition-colors"
-    >
-      <div className="flex items-center gap-2">
+    <div className="border-border bg-card hover:border-border-strong group relative flex min-h-[120px] flex-col gap-3 rounded-md border p-4 text-left transition-colors">
+      <button
+        type="button"
+        onClick={onEnter}
+        aria-label={`Open ${app.name}`}
+        className="focus-visible:border-ring focus-visible:ring-ring absolute inset-0 rounded-md outline-none focus-visible:ring-[2px]"
+      />
+      <div className="pointer-events-none relative z-10 flex items-center gap-2">
         <span className="text-foreground min-w-0 flex-1 truncate text-sm font-semibold">
           {app.name}
         </span>
@@ -43,8 +46,11 @@ function AppCard({
         ) : null}
         <ChevronRight className="text-fg-3 group-hover:text-fg-1 size-4 shrink-0 transition-colors" />
       </div>
-      <div className="text-muted-foreground text-xs">{agentLabel}</div>
-    </button>
+      <div className="pointer-events-none relative z-10 flex min-w-0 flex-col gap-2">
+        <AppIdBadge appId={app.id} className="pointer-events-auto w-fit" />
+        <div className="text-muted-foreground text-xs">{agentLabel}</div>
+      </div>
+    </div>
   );
 }
 
@@ -101,10 +107,8 @@ export function AppsListPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <main className="min-h-0 flex-1 overflow-y-auto px-8 pt-7 pb-8">
-        <h1 className="text-fg-1 text-[24px] font-semibold tracking-[-0.01em]">Apps</h1>
-
-        <div className="mt-6 flex flex-wrap items-center gap-3">
+      <main className="min-h-0 flex-1 overflow-y-auto px-8 pt-6 pb-8">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative w-full max-w-[320px]">
             <Search className="text-fg-3 absolute top-1/2 left-3 size-3.5 -translate-y-1/2" />
             <Input

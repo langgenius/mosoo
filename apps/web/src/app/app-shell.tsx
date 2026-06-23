@@ -14,7 +14,6 @@ import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { HelpMenu } from "@/features/help/help-menu";
-import { MOSOO_GITHUB_URL } from "@/shared/config/external-links";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -148,23 +147,6 @@ function AppSwitcher({
   );
 }
 
-function GithubLink() {
-  return (
-    <a
-      href={MOSOO_GITHUB_URL}
-      target="_blank"
-      rel="noreferrer noopener"
-      aria-label="Mosoo on GitHub"
-      title="Mosoo on GitHub"
-      className="text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1 flex size-9 items-center justify-center rounded-md transition-colors"
-    >
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="size-[18px]">
-        <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56 0-.28-.01-1.01-.02-1.99-3.2.7-3.87-1.54-3.87-1.54-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.74-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.21-1.49 3.18-1.18 3.18-1.18.62 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14 0 1.55-.01 2.8-.01 3.18 0 .31.21.67.8.55C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5Z" />
-      </svg>
-    </a>
-  );
-}
-
 function NewAgentCta({ collapsed, disabled }: { collapsed: boolean; disabled: boolean }) {
   const className = cn("mb-4", collapsed ? "mx-auto size-9 p-0" : "w-full justify-center");
   const label = "New agent";
@@ -199,6 +181,29 @@ function NewAgentCta({ collapsed, disabled }: { collapsed: boolean; disabled: bo
   );
 }
 
+function ConsoleSidebarFooter({ collapsed }: { collapsed: boolean }) {
+  const { user } = useAppSession();
+
+  return (
+    <>
+      <div className={cn("pb-2", collapsed ? "flex justify-center" : "px-0.5")}>
+        <HelpMenu collapsed={collapsed} />
+      </div>
+      <Separator className="bg-border-soft" />
+      <AccountMenu collapsed={collapsed} user={user} />
+    </>
+  );
+}
+
+const ORG_HEADER_TITLES = [{ path: "/apps", title: "Apps" }] as const;
+
+function getOrgHeaderTitle(pathname: string): string | null {
+  return (
+    ORG_HEADER_TITLES.find((item) => pathname === item.path || pathname.startsWith(`${item.path}/`))
+      ?.title ?? null
+  );
+}
+
 // Shared console chrome (brand, collapse toggle, help, account, content area).
 // The middle `sidebar` slot is what differs between the App and Org layers.
 function ConsoleShell({
@@ -212,8 +217,6 @@ function ConsoleShell({
   onToggleCollapsed: () => void;
   sidebar: ReactNode;
 }) {
-  const { user } = useAppSession();
-
   const ToggleIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
   const toggleLabel = collapsed ? "Expand sidebar" : "Collapse sidebar";
 
@@ -253,11 +256,7 @@ function ConsoleShell({
         {sidebar}
 
         <div className="flex-1" />
-        <div className={cn("pb-2", collapsed ? "flex justify-center" : "px-0.5")}>
-          <HelpMenu collapsed={collapsed} />
-        </div>
-        <Separator className="bg-border-soft" />
-        <AccountMenu collapsed={collapsed} user={user} />
+        <ConsoleSidebarFooter collapsed={collapsed} />
       </nav>
 
       <div className="flex min-w-0 flex-1 md:py-2 md:pr-2">
@@ -305,35 +304,43 @@ export function Layout({ children }: { children: ReactNode }) {
   );
 }
 
-// Org-layer shell: a horizontal top bar (logo + org switcher + account) over a
+// Org-layer shell: a horizontal top bar (logo + org name) over a
 // dedicated Org sidebar. Deliberately distinct from the App shell so the Apps
 // list / pre-App console reads as the account layer, not an App detail page.
 export function OrgLayout({ children }: { children: ReactNode }) {
-  const { activeOrganization, user } = useAppSession();
+  const { activeOrganization } = useAppSession();
   const location = useLocation();
+  const headerTitle = getOrgHeaderTitle(location.pathname);
 
   return (
     <div className="bg-background flex h-screen flex-col">
-      <header className="border-border-soft flex h-14 shrink-0 items-center gap-2 border-b px-4">
-        <Link to="/apps" aria-label="Apps" className="flex items-center">
-          <img src="/brand/logo-mark.svg" alt="Mosoo" className="block size-6" />
-        </Link>
-        {activeOrganization === null ? null : (
-          <>
-            <span className="text-fg-muted text-base font-light">/</span>
-            <span className="text-foreground max-w-[240px] truncate text-sm font-semibold">
-              {activeOrganization.name}
-            </span>
-          </>
+      <header className="border-border-soft flex shrink-0 border-b">
+        <div className="flex min-h-[76px] w-[224px] shrink-0 items-center gap-2 px-4">
+          <Link to="/apps" aria-label="Apps" className="flex items-center">
+            <img src="/brand/logo-mark.svg" alt="Mosoo" className="block size-6" />
+          </Link>
+          {activeOrganization === null ? null : (
+            <>
+              <span className="text-fg-muted text-base font-light">/</span>
+              <span className="text-foreground max-w-[144px] truncate text-sm font-semibold">
+                {activeOrganization.name}
+              </span>
+            </>
+          )}
+        </div>
+        {headerTitle === null ? null : (
+          <div className="flex min-w-0 flex-1 items-center px-8">
+            <h1 className="text-foreground truncate text-2xl font-semibold tracking-normal">
+              {headerTitle}
+            </h1>
+          </div>
         )}
-        <div className="flex-1" />
-        <GithubLink />
-        <HelpMenu collapsed />
-        <AccountMenu collapsed placement="topbar" user={user} />
       </header>
       <div className="flex min-h-0 flex-1">
-        <aside className="border-border-soft w-[224px] shrink-0 border-r px-3 py-4">
+        <aside className="border-border-soft flex w-[224px] shrink-0 flex-col border-r px-3 py-4">
           <OrgNavigation collapsed={false} pathname={location.pathname} />
+          <div className="flex-1" />
+          <ConsoleSidebarFooter collapsed={false} />
         </aside>
         <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
       </div>

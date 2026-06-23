@@ -11,6 +11,7 @@ import { isEnumType, isInputObjectType, isObjectType } from "graphql";
 import { createGraphQLSchema } from "../src/adapters/graphql/create-graphql-schema";
 import { createPublicApiOpenApiDocument } from "../src/adapters/http/routes/public-api-openapi";
 import {
+  parseFileContentDisposition,
   parseOptionalBoolean,
   readCreateThreadRequest,
   readCreateThreadFileRequest,
@@ -296,6 +297,40 @@ describe("API to web boundary", () => {
       "/threads/{threadId}/files/{fileId}",
       "/threads/{threadId}/unarchive",
     ]);
+
+    const downloadContentOperation = document.paths["/files/{fileId}/content"]?.get;
+    expect(downloadContentOperation?.parameters?.map((parameter) => parameter.name)).toEqual([
+      "fileId",
+      "disposition",
+    ]);
+    const dispositionParameter = downloadContentOperation?.parameters?.find(
+      (parameter) => parameter.name === "disposition",
+    );
+    expect(dispositionParameter).toMatchObject({
+      in: "query",
+      schema: {
+        default: "attachment",
+        enum: ["attachment", "inline"],
+        type: "string",
+      },
+    });
+    expect(downloadContentOperation?.requestBody).toBeUndefined();
+    expect(downloadContentOperation?.responses["200"]).toMatchObject({
+      content: {
+        "application/octet-stream": {
+          schema: {
+            format: "binary",
+            type: "string",
+          },
+        },
+      },
+      headers: {
+        "Cache-Control": {},
+        "Content-Disposition": {},
+        "Content-Length": {},
+        ETag: {},
+      },
+    });
 
     const uploadContentOperation = document.paths["/files/{fileId}/content"]?.put;
     expect(uploadContentOperation?.parameters?.map((parameter) => parameter.name)).toContain(
@@ -916,10 +951,24 @@ describe("API to web boundary", () => {
     expect(parseOptionalBoolean(undefined)).toBeNull();
     expect(parseOptionalBoolean("true")).toBe(true);
     expect(parseOptionalBoolean("false")).toBe(false);
+    expect(parseFileContentDisposition(undefined)).toBe("attachment");
+    expect(parseFileContentDisposition("attachment")).toBe("attachment");
+    expect(parseFileContentDisposition("inline")).toBe("inline");
 
     try {
       parseOptionalBoolean("yes");
       throw new Error("Expected parseOptionalBoolean to reject.");
+    } catch (error) {
+      expect(error).toBeInstanceOf(PublicApiError);
+      expect(error).toMatchObject({
+        code: "invalid_request",
+        status: 400,
+      });
+    }
+
+    try {
+      parseFileContentDisposition("download");
+      throw new Error("Expected parseFileContentDisposition to reject.");
     } catch (error) {
       expect(error).toBeInstanceOf(PublicApiError);
       expect(error).toMatchObject({

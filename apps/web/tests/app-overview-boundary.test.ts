@@ -32,12 +32,15 @@ describe("App overview boundary", () => {
   test("hands the App to a coding agent with one CLI command on the console root", () => {
     const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
     const installSource = readSource("../src/routes/app-overview/app-overview-install.tsx");
+    const appIdBadgeSource = readSource("../src/shared/ui/app-id-badge.tsx");
 
     expect(routeSource).toContain("AppOverviewInstallGuide");
+    expect(routeSource).toContain("AppIdBadge");
     expect(installSource).toContain("Hand Mosoo to your agent");
     expect(installSource).toContain("npx mosoo login");
     expect(installSource).toContain("@mosoo skill");
     expect(installSource).toContain("Codex");
+    expect(appIdBadgeSource).toContain("Copy app ID");
     // The CLI token is minted on demand and only copied — never rendered.
     expect(installSource).toContain("createPersonalAccessToken");
     expect(installSource).toContain("MASKED_TOKEN");

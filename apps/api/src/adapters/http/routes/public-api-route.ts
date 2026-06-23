@@ -11,12 +11,14 @@ import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-
 import { createPublicApiOpenApiDocument } from "./public-api-openapi";
 import {
   runPublicApiAuthenticatedJson,
+  runPublicApiAuthenticatedResponse,
   runPublicApiSessionMutation,
   runPublicApiThreadMutation,
   runPublicApiThreadReadJson,
   runPublicApiThreadReadResponse,
 } from "./public-api-route-support";
 import {
+  parseFileContentDisposition,
   parseOptionalBoolean,
   parseAgentIdParam,
   parseFileIdParam,
@@ -166,6 +168,16 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
         archived: parseOptionalBoolean(c.req.query("archived")),
       }),
     ),
+  );
+
+  v1.get("/files/:fileId/content", async (c) =>
+    runPublicApiAuthenticatedResponse(c, async (caller) => {
+      const service = await loadPublicThreadFileService();
+      return service.downloadPublicThreadFileContent(c.env, caller.viewer, {
+        disposition: parseFileContentDisposition(c.req.query("disposition")),
+        fileId: parseFileIdParam(c.req.param("fileId")),
+      });
+    }),
   );
 
   v1.put("/files/:fileId/content", async (c) =>
