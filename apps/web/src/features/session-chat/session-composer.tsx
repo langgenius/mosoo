@@ -21,6 +21,7 @@ interface SessionComposerProps {
   onSend: () => void;
   pendingSessionFiles: PendingSessionFileChip[];
   sendDisabledReason?: string | null;
+  showSendDisabledReason?: boolean;
   sending: boolean;
   sessionResourceMentions: SessionResourceMention[];
   setInput: (value: string) => void;
@@ -89,6 +90,7 @@ export function SessionComposer({
   onSend,
   pendingSessionFiles,
   sendDisabledReason,
+  showSendDisabledReason = true,
   sending,
   sessionResourceMentions,
   setInput,
@@ -116,7 +118,7 @@ export function SessionComposer({
         </div>
       ) : null}
 
-      {isTruthy(sendDisabledReason) ? (
+      {showSendDisabledReason && isTruthy(sendDisabledReason) ? (
         <div className="border-border bg-muted/40 text-fg-2 mx-3 mt-3 rounded-md border px-3 py-2 text-[13px]">
           {sendDisabledReason}
         </div>

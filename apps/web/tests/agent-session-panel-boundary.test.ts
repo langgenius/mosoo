@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
+import type { AgentReadiness } from "@mosoo/contracts/agent";
+
 import {
   getSessionControlMode,
+  selectSessionPanelReadiness,
   shouldWaitForRuntimeReadyOnNewSession,
 } from "../src/routes/agent/components/agent-session-panel-rules";
 import {
@@ -9,7 +12,41 @@ import {
   removeSessionConfigurationRevisionKeys,
 } from "../src/routes/agent/components/use-agent-session-panel-model";
 
+function readiness(overrides: Partial<AgentReadiness>): AgentReadiness {
+  return {
+    checkedAt: "2026-06-23T00:00:00.000Z",
+    issues: [],
+    ready: true,
+    ...overrides,
+  };
+}
+
 describe("agent session panel boundary", () => {
+  test("uses latest ready agent readiness over a stale blocking stream snapshot", () => {
+    const staleStreamReadiness = readiness({
+      checkedAt: "2026-06-23T00:00:00.000Z",
+      issues: [
+        {
+          code: "agent.readiness.provider_credential.missing",
+          message: "Provider key required.",
+          severity: "error",
+        },
+      ],
+      ready: false,
+    });
+    const latestAgentReadiness = readiness({
+      checkedAt: "2026-06-23T00:01:00.000Z",
+      ready: true,
+    });
+
+    expect(
+      selectSessionPanelReadiness({
+        agentReadiness: latestAgentReadiness,
+        streamReadiness: staleStreamReadiness,
+      }),
+    ).toBe(latestAgentReadiness);
+  });
+
   test("only Preview New Session opts into runtime readiness wait", () => {
     expect(
       shouldWaitForRuntimeReadyOnNewSession({

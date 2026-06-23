@@ -175,15 +175,6 @@ export function AgentSessionPanel({
           </div>
         ) : null}
 
-        {setupBlocked && model.readiness ? (
-          <AgentReadinessBlockersBanner
-            onRetryProviderCheck={() => void model.retryProviderCheck()}
-            readiness={model.readiness}
-            retrying={model.sending}
-            summary={setupSummary}
-          />
-        ) : null}
-
         {model.configurationRefreshRequired ? (
           <div className="border-amber/30 bg-amber-bg border-b px-4 py-2.5">
             <div className="flex items-center justify-between gap-3">
@@ -287,6 +278,15 @@ export function AgentSessionPanel({
             </div>
           ) : null}
 
+          {setupBlocked && model.readiness ? (
+            <AgentReadinessBlockersBanner
+              onRetryProviderCheck={() => void model.retryProviderCheck()}
+              readiness={model.readiness}
+              retrying={model.sending}
+              summary={setupSummary}
+            />
+          ) : null}
+
           <SessionComposer
             composerError={model.composerError}
             fileInputRef={model.fileInputRef}
@@ -299,6 +299,7 @@ export function AgentSessionPanel({
             sending={model.sending}
             sessionResourceMentions={sessionResourceMentions}
             setInput={model.setInput}
+            showSendDisabledReason={!setupBlocked}
             streaming={model.streaming}
             sendDisabledReason={sendDisabledReason}
           />

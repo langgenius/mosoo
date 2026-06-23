@@ -1,6 +1,5 @@
 import { AlertTriangle } from "lucide-react";
 
-import { getPrimaryProviderReadinessPresentation } from "@/domains/vendor-credential/model/provider-readiness-copy";
 import { cn } from "@/shared/lib/class-names";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -17,54 +16,6 @@ import { RequiredMark } from "./required-mark";
 import { SectionHeader } from "./section-header";
 import { AgentSkillsField } from "./skills-field";
 import type { AgentEditorModel } from "./use-model";
-
-function ReadinessBanner({ agent }: { agent: Agent }) {
-  if (!agent.readiness || agent.readiness.ready || agent.readiness.issues.length === 0) {
-    return null;
-  }
-
-  const errors = agent.readiness.issues.filter((issue) => issue.severity === "error");
-
-  if (errors.length === 0) {
-    return null;
-  }
-
-  const primary = errors[0];
-  const providerPresentation = getPrimaryProviderReadinessPresentation(errors);
-
-  if (providerPresentation?.action === "add-provider-key") {
-    return null;
-  }
-
-  const message =
-    providerPresentation?.message ??
-    primary?.message ??
-    "Resolve configuration before preview or publish.";
-
-  return (
-    <div
-      className="border-amber/30 bg-amber-bg text-amber-fg rounded-lg border px-3 py-2.5"
-      role="alert"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-[13px] font-semibold">
-            <AlertTriangle className="size-4 shrink-0" />
-            {providerPresentation?.title ?? "Configuration required"}
-          </div>
-          <div className="mt-1 text-[12px] leading-relaxed">{message}</div>
-          {providerPresentation?.originalMessage !== undefined &&
-          providerPresentation.originalMessage !== null &&
-          providerPresentation.originalMessage !== message ? (
-            <div className="text-amber-fg/80 mt-1 text-[11px] leading-relaxed">
-              {providerPresentation.originalMessage}
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function PackageResolutionBanner({ agent }: { agent: Agent }) {
   const resolution = agent.packageResolution;
@@ -118,7 +69,6 @@ export function BasicsSection({
 }) {
   return (
     <div className="space-y-5">
-      <ReadinessBanner agent={agent} />
       {agent.packageResolution ? <PackageResolutionBanner agent={agent} /> : null}
 
       <div>

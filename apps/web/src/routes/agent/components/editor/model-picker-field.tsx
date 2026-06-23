@@ -20,12 +20,7 @@ import {
   listLockedVendorLabels,
   listModelPickerEntries,
 } from "./model-picker-availability";
-import {
-  ModelPickerEmptyItem,
-  ModelPickerEmptyState,
-  ModelPickerItem,
-  ModelProviderLink,
-} from "./model-picker-ui";
+import { ModelPickerEmptyItem, ModelPickerItem, ModelProviderLink } from "./model-picker-ui";
 import type { AgentEditorModel } from "./use-model";
 
 export function ModelPickerField({
@@ -56,7 +51,7 @@ export function ModelPickerField({
   const currentEntry = findCurrentModelEntry(entries, currentModelId, currentVendorId);
   const hasAvailable = entries.some((entry) => entry.available);
   const triggerLabel = currentEntry?.displayName ?? "Pick an available model";
-  const showInvalidHint = currentEntry?.available === false;
+  const showInvalidHint = currentEntry?.available === false && currentEntry.reason !== "needs-key";
   const isEmpty = !loading && !hasAvailable;
   const menuIsEmpty = !loading && pickerEntries.length === 0;
   const lockedVendors = listLockedVendorLabels(entries);
@@ -111,8 +106,6 @@ export function ModelPickerField({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-
-      {isEmpty ? <ModelPickerEmptyState /> : null}
 
       {showInvalidHint && currentEntry !== null ? (
         <p className="text-destructive text-[11px]">
