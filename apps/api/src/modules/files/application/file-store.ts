@@ -92,6 +92,17 @@ export interface RuntimeOutputFileInput {
   sessionId: SessionId;
 }
 
+export interface AgentPackageFileAdmissionInput {
+  appId: AppId;
+  fileId: FileId;
+}
+
+export interface AdmittedAgentPackageFile {
+  id: FileId;
+  name: string;
+  size: number;
+}
+
 export interface SessionResourcePathEntry {
   id: FileId;
   name: string;
@@ -101,6 +112,11 @@ export interface SessionResourcePathEntry {
 
 export interface FileStore {
   abortUpload(bindings: ApiBindings, viewer: AuthenticatedViewer, fileId: FileId): Promise<void>;
+  admitAgentPackageFile(
+    bindings: ApiBindings,
+    viewer: AuthenticatedViewer,
+    input: AgentPackageFileAdmissionInput,
+  ): Promise<AdmittedAgentPackageFile>;
   claimToSession(
     bindings: ApiBindings,
     viewer: AuthenticatedViewer,
@@ -393,6 +409,68 @@ async function createDownload(
   return {
     method: "GET",
     url: `/api/files/${fileId}/content?disposition=${encodeURIComponent(disposition)}`,
+  };
+}
+
+async function admitAgentPackageFile(
+  bindings: ApiBindings,
+  viewer: AuthenticatedViewer,
+  input: AgentPackageFileAdmissionInput,
+): Promise<AdmittedAgentPackageFile> {
+  await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
+
+  const file =
+    (await getAppDatabase(bindings.DB)
+      .select({
+        createdBy: fileRecordsTable.createdByAccountId,
+        expiresAtMs: fileRecordsTable.expiresAt,
+        id: fileRecordsTable.id,
+        name: fileRecordsTable.name,
+        ownerId: fileRecordsTable.ownerId,
+        ownerKind: fileRecordsTable.ownerKind,
+        purpose: fileRecordsTable.purpose,
+        scopeId: fileRecordsTable.scopeId,
+        scopeKind: fileRecordsTable.scopeKind,
+        size: fileRecordsTable.size,
+        status: fileRecordsTable.status,
+      })
+      .from(fileRecordsTable)
+      .where(eq(fileRecordsTable.id, input.fileId))
+      .limit(1)
+      .get()) ?? null;
+
+  if (file === null) {
+    throw new Error("Agent package file was not found.");
+  }
+
+  if (file.purpose !== "agent_package") {
+    throw new Error("Agent package file purpose must be agent_package.");
+  }
+
+  if (file.scopeKind !== "agent_package") {
+    throw new Error("Agent package file must use the agent_package scope.");
+  }
+
+  if (file.scopeId !== input.appId || file.ownerKind !== "app" || file.ownerId !== input.appId) {
+    throw new Error("Agent package file does not belong to the target App.");
+  }
+
+  if (file.createdBy !== viewer.id) {
+    throw new Error("Agent package file does not belong to the importing user.");
+  }
+
+  if (file.status !== "ready") {
+    throw new Error("Agent package file is not ready.");
+  }
+
+  if (file.expiresAtMs === null || file.expiresAtMs <= currentTimestampMs()) {
+    throw new Error("Agent package file is expired.");
+  }
+
+  return {
+    id: file.id,
+    name: file.name,
+    size: file.size,
   };
 }
 
@@ -763,6 +841,7 @@ export {
 
 export const fileStore: FileStore = {
   abortUpload,
+  admitAgentPackageFile,
   claimToSession,
   completeUpload,
   createDownload,
