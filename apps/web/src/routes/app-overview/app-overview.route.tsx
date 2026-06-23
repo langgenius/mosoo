@@ -2,6 +2,7 @@ import { Bot, Box, KeyRound } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { useAppSession } from "@/app/session-provider";
+import { AppIdBadge } from "@/shared/ui/app-id-badge";
 
 import { AppOverviewInstallGuide } from "./app-overview-install";
 
@@ -24,9 +25,12 @@ export function AppOverviewPage() {
             <Box className="size-3.5" />
             App
           </div>
-          <h1 className="text-foreground mt-1 truncate text-2xl font-semibold tracking-normal">
-            {activeApp.name}
-          </h1>
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+            <h1 className="text-foreground min-w-0 truncate text-2xl font-semibold tracking-normal">
+              {activeApp.name}
+            </h1>
+            <AppIdBadge appId={activeApp.id} />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Link
