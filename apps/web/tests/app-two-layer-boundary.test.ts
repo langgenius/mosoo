@@ -41,6 +41,15 @@ describe("Two-layer console boundary", () => {
     expect(appsList).not.toContain(">Apps</h1>");
   });
 
+  test("Org shell owns the Org settings title in the top band", () => {
+    const shell = readSource("../src/app/app-shell.tsx");
+    const orgSettings = readSource("../src/routes/org/org-settings.route.tsx");
+
+    expect(shell).toContain('path: "/org/settings", title: "Org settings"');
+    expect(orgSettings).not.toContain("<PageHeader");
+    expect(orgSettings).not.toContain('title="Org settings"');
+  });
+
   test("New app creation is wired to the createApp mutation", () => {
     const appsList = readSource("../src/routes/apps/apps-list.route.tsx");
 
