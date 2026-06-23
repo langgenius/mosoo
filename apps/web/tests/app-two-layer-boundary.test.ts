@@ -23,6 +23,24 @@ describe("Two-layer console boundary", () => {
     expect(shell).toContain("OrgNavigation");
   });
 
+  test("Org shell uses the shared lower-left account navigation", () => {
+    const shell = readSource("../src/app/app-shell.tsx");
+
+    expect(shell).toContain("ConsoleSidebarFooter");
+    expect(shell).toContain("<ConsoleSidebarFooter collapsed={false} />");
+    expect(shell).not.toContain('placement="topbar"');
+    expect(shell).not.toContain("<GithubLink />");
+  });
+
+  test("Org shell owns the Apps title in the top band", () => {
+    const shell = readSource("../src/app/app-shell.tsx");
+    const appsList = readSource("../src/routes/apps/apps-list.route.tsx");
+
+    expect(shell).toContain('title: "Apps"');
+    expect(shell).toContain("getOrgHeaderTitle");
+    expect(appsList).not.toContain(">Apps</h1>");
+  });
+
   test("New app creation is wired to the createApp mutation", () => {
     const appsList = readSource("../src/routes/apps/apps-list.route.tsx");
 

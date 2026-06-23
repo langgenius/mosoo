@@ -101,10 +101,8 @@ export function AppsListPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <main className="min-h-0 flex-1 overflow-y-auto px-8 pt-7 pb-8">
-        <h1 className="text-fg-1 text-[24px] font-semibold tracking-[-0.01em]">Apps</h1>
-
-        <div className="mt-6 flex flex-wrap items-center gap-3">
+      <main className="min-h-0 flex-1 overflow-y-auto px-8 pt-6 pb-8">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative w-full max-w-[320px]">
             <Search className="text-fg-3 absolute top-1/2 left-3 size-3.5 -translate-y-1/2" />
             <Input

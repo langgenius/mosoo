@@ -58,19 +58,12 @@ function UserAvatar({
 
 export function AccountMenu({
   collapsed,
-  placement = "sidebar",
   user,
 }: {
   collapsed: boolean;
-  placement?: "sidebar" | "topbar";
   user: AccountMenuUser | null;
 }) {
-  const wrapperClassName =
-    placement === "topbar"
-      ? ""
-      : cn(collapsed ? "flex justify-center pb-3 pt-2" : "px-2 pb-3 pt-2");
-  const menuSide = placement === "topbar" ? "bottom" : "top";
-  const menuAlign = placement === "topbar" ? "end" : "start";
+  const wrapperClassName = cn(collapsed ? "flex justify-center pb-3 pt-2" : "px-2 pb-3 pt-2");
   const trigger = collapsed ? (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -103,7 +96,7 @@ export function AccountMenu({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
 
-        <DropdownMenuContent align={menuAlign} side={menuSide} className="w-[220px] rounded-lg p-1">
+        <DropdownMenuContent align="start" side="top" className="w-[220px] rounded-lg p-1">
           <DropdownMenuLabel className="px-2 pb-1">
             <div className="text-fg-1 text-[13px] font-semibold">{user?.name}</div>
             <div className="text-fg-3 mt-0.5 text-[11.5px] font-normal">{user?.email}</div>
