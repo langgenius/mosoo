@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>简历优化器 · Resume Optimizer</title>
+    <style>
+      :root {
+        --ink: #16201c;
+        --muted: #5d6b63;
+        --line: #d9e0d6;
+        --bg: #f3f1e9;
+        --card: #fbfaf5;
+        --accent: #2f6b4f;
+        --accent-soft: #e4efe6;
+        --warn: #b4530f;
+        --danger: #a3331f;
+        --shadow: 0 1px 2px rgba(22, 32, 28, 0.06), 0 12px 32px rgba(22, 32, 28, 0.07);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue",
+          "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(1200px 600px at 110% -10%, #e7efe6 0%, transparent 55%),
+          var(--bg);
+        line-height: 1.6;
+      }
+      header {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 44px 24px 8px;
+      }
+      .brand {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      h1 {
+        font-size: 30px;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .brand .en {
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 16px;
+      }
+      .tag {
+        display: inline-block;
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+      main {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 16px 24px 80px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+      @media (max-width: 880px) {
+        main { grid-template-columns: 1fr; }
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+        padding: 22px;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        font-size: 14px;
+        margin: 0 0 6px;
+      }
+      .hint { color: var(--muted); font-weight: 400; font-size: 13px; }
+      textarea, input[type="text"] {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 11px 12px;
+        font: inherit;
+        font-size: 14px;
+        background: #fff;
+        color: var(--ink);
+        resize: vertical;
+      }
+      textarea:focus, input:focus {
+        outline: 2px solid var(--accent-soft);
+        border-color: var(--accent);
+      }
+      .field { margin-bottom: 16px; }
+      .row { display: flex; gap: 14px; }
+      .row .field { flex: 1; }
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-top: 4px;
+      }
+      button.primary {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        padding: 12px 22px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.05s ease, background 0.15s ease;
+      }
+      button.primary:hover { background: #275a43; }
+      button.primary:active { transform: translateY(1px); }
+      button.primary:disabled { background: #9bb1a4; cursor: progress; }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        overflow: hidden;
+      }
+      .seg button {
+        border: none;
+        background: #fff;
+        padding: 8px 14px;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+        color: var(--muted);
+      }
+      .seg button[aria-pressed="true"] {
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 600;
+      }
+      #result { grid-column: 1 / -1; display: none; }
+      #result.show { display: block; }
+      .scorewrap {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        flex-wrap: wrap;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 18px;
+        margin-bottom: 18px;
+      }
+      .score {
+        --val: 0;
+        width: 96px;
+        height: 96px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--accent);
+        background: conic-gradient(
+          var(--accent) calc(var(--val) * 1%),
+          #e7e3d6 0
+        );
+        flex: 0 0 auto;
+      }
+      .score span {
+        width: 76px;
+        height: 76px;
+        border-radius: 50%;
+        background: var(--card);
+        display: grid;
+        place-items: center;
+      }
+      .summary { flex: 1; min-width: 240px; color: var(--ink); }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+      @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+      h3 { font-size: 16px; margin: 0 0 10px; }
+      ul.clean { margin: 0; padding-left: 18px; }
+      ul.clean li { margin-bottom: 7px; }
+      .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+      .chip {
+        font-size: 12.5px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .chip.miss { background: #f6e3d6; color: var(--warn); }
+      .sug {
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--accent);
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+        background: #fff;
+      }
+      .sug.high { border-left-color: var(--danger); }
+      .sug.medium { border-left-color: var(--warn); }
+      .sug-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 6px;
+      }
+      .sug-head .sec { font-weight: 600; }
+      .pri {
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 2px 8px;
+        border-radius: 6px;
+        background: #eee;
+        color: #555;
+      }
+      .pri.high { background: #f4dcd6; color: var(--danger); }
+      .pri.medium { background: #f6e6d3; color: var(--warn); }
+      .pri.low { background: var(--accent-soft); color: var(--accent); }
+      .issue { color: var(--muted); font-size: 13.5px; margin-bottom: 4px; }
+      pre.resume {
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 16px;
+        font: inherit;
+        font-size: 13.5px;
+        max-height: 460px;
+        overflow: auto;
+      }
+      .resume-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      button.ghost {
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 8px;
+        padding: 7px 12px;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      button.ghost:hover { border-color: var(--accent); color: var(--accent); }
+      .err {
+        grid-column: 1 / -1;
+        display: none;
+        background: #f7e2dc;
+        border: 1px solid #e3b6a8;
+        color: var(--danger);
+        border-radius: 12px;
+        padding: 14px 16px;
+      }
+      .err.show { display: block; }
+      footer {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 24px 48px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .spin {
+        display: inline-block;
+        width: 15px; height: 15px;
+        border: 2px solid rgba(255,255,255,0.5);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        vertical-align: -2px;
+        margin-right: 7px;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <h1>简历优化器</h1>
+        <span class="en">Resume Optimizer</span>
+      </div>
+      <span class="tag">粘贴你的简历，由 Claude 给出评分、可执行的修改建议，并重写一版可直接使用的简历。</span>
+    </header>
+
+    <main>
+      <section class="card" aria-label="输入">
+        <div class="field">
+          <label for="resume">简历内容 <span class="hint">Resume — 必填</span></label>
+          <textarea id="resume" rows="14" placeholder="在此粘贴你的简历全文……"></textarea>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="role">目标岗位 <span class="hint">Target role — 可选</span></label>
+            <input id="role" type="text" placeholder="如：高级前端工程师" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="jd">目标职位描述 (JD) <span class="hint">Job description — 可选，提供后可做关键词匹配</span></label>
+          <textarea id="jd" rows="6" placeholder="粘贴目标岗位的 JD，用于 ATS 关键词对齐……"></textarea>
+        </div>
+        <div class="controls">
+          <button class="primary" id="go">开始优化</button>
+          <div class="seg" role="group" aria-label="输出语言">
+            <button id="lang-zh" aria-pressed="true">中文</button>
+            <button id="lang-en" aria-pressed="false">English</button>
+          </div>
+          <span class="hint" id="status"></span>
+        </div>
+      </section>
+
+      <section class="card" aria-label="说明">
+        <h3>它会帮你做什么</h3>
+        <ul class="clean">
+          <li><strong>综合评分</strong>：从 0–100 评估简历当前质量。</li>
+          <li><strong>优势 / 短板</strong>：指出真正影响录用的问题，而非泛泛而谈。</li>
+          <li><strong>逐条改写建议</strong>：按影响力排序，给出可直接套用的措辞。</li>
+          <li><strong>ATS 关键词</strong>：对照 JD，标出已命中与缺失的关键词。</li>
+          <li><strong>重写版简历</strong>：应用全部建议后的 Markdown 成稿，可一键复制。</li>
+        </ul>
+        <p class="hint" style="margin-top:14px">
+          模型不会编造你未提供的数字 —— 缺失指标会以 <code>[X%]</code> 占位，方便你自行填写。
+        </p>
+      </section>
+
+      <div class="err" id="error"></div>
+
+      <section class="card" id="result" aria-live="polite">
+        <div class="scorewrap">
+          <div class="score" id="score"><span id="score-num">0</span></div>
+          <p class="summary" id="summary"></p>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <h3>✅ 优势</h3>
+            <ul class="clean" id="strengths"></ul>
+          </div>
+          <div>
+            <h3>⚠️ 待改进</h3>
+            <ul class="clean" id="weaknesses"></ul>
+          </div>
+        </div>
+
+        <div id="kw-block" style="margin-bottom:18px">
+          <h3>🔑 ATS 关键词</h3>
+          <div style="margin-bottom:8px"><span class="hint">已命中：</span>
+            <span class="chips" id="kw-present" style="display:inline-flex"></span>
+          </div>
+          <div><span class="hint">建议补充：</span>
+            <span class="chips" id="kw-missing" style="display:inline-flex"></span>
+          </div>
+        </div>
+
+        <h3>🛠️ 修改建议</h3>
+        <div id="suggestions"></div>
+
+        <div class="resume-head">
+          <h3 style="margin:0">📄 重写版简历</h3>
+          <button class="ghost" id="copy">复制</button>
+        </div>
+        <pre class="resume" id="optimized"></pre>
+      </section>
+    </main>
+
+    <footer>
+      由 Claude（<code>claude-opus-4-8</code>）驱动 · 基于 Cloudflare Workers 部署 · mosoo example app
+    </footer>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let language = "zh";
+
+      $("lang-zh").addEventListener("click", () => setLang("zh"));
+      $("lang-en").addEventListener("click", () => setLang("en"));
+      function setLang(l) {
+        language = l;
+        $("lang-zh").setAttribute("aria-pressed", String(l === "zh"));
+        $("lang-en").setAttribute("aria-pressed", String(l === "en"));
+      }
+
+      function showError(msg) {
+        const e = $("error");
+        e.textContent = msg;
+        e.classList.add("show");
+      }
+      function clearError() { $("error").classList.remove("show"); }
+
+      function chip(text, missing) {
+        const s = document.createElement("span");
+        s.className = "chip" + (missing ? " miss" : "");
+        s.textContent = text;
+        return s;
+      }
+
+      function render(a) {
+        const score = Math.max(0, Math.min(100, Number(a.overall_score) || 0));
+        $("score").style.setProperty("--val", score);
+        $("score-num").textContent = score;
+        $("summary").textContent = a.summary || "";
+
+        const fill = (id, arr) => {
+          const el = $(id);
+          el.innerHTML = "";
+          (arr || []).forEach((t) => {
+            const li = document.createElement("li");
+            li.textContent = t;
+            el.appendChild(li);
+          });
+        };
+        fill("strengths", a.strengths);
+        fill("weaknesses", a.weaknesses);
+
+        const kp = $("kw-present"), km = $("kw-missing");
+        kp.innerHTML = ""; km.innerHTML = "";
+        const kw = a.keywords || { present: [], missing: [] };
+        (kw.present || []).forEach((t) => kp.appendChild(chip(t, false)));
+        (kw.missing || []).forEach((t) => km.appendChild(chip(t, true)));
+        if (!(kw.present || []).length) kp.appendChild(chip("—", false));
+        if (!(kw.missing || []).length) km.appendChild(chip("—", false));
+
+        const sug = $("suggestions");
+        sug.innerHTML = "";
+        (a.suggestions || []).forEach((s) => {
+          const pri = (s.priority || "low").toLowerCase();
+          const card = document.createElement("div");
+          card.className = "sug " + pri;
+          const head = document.createElement("div");
+          head.className = "sug-head";
+          const sec = document.createElement("span");
+          sec.className = "sec";
+          sec.textContent = s.section || "";
+          const pill = document.createElement("span");
+          pill.className = "pri " + pri;
+          pill.textContent = pri;
+          head.append(sec, pill);
+          const issue = document.createElement("div");
+          issue.className = "issue";
+          issue.textContent = s.issue || "";
+          const rec = document.createElement("div");
+          rec.textContent = s.recommendation || "";
+          card.append(head, issue, rec);
+          sug.appendChild(card);
+        });
+
+        $("optimized").textContent = a.optimized_resume || "";
+        $("result").classList.add("show");
+        $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      $("copy").addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText($("optimized").textContent || "");
+          $("copy").textContent = "已复制 ✓";
+          setTimeout(() => ($("copy").textContent = "复制"), 1600);
+        } catch { /* clipboard unavailable */ }
+      });
+
+      $("go").addEventListener("click", async () => {
+        clearError();
+        const resume = $("resume").value.trim();
+        if (resume.length < 30) {
+          showError("请粘贴至少 30 个字符的简历内容。");
+          return;
+        }
+        const btn = $("go");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spin"></span>分析中…';
+        $("status").textContent = "Claude 正在分析，通常需要 20–40 秒。";
+
+        try {
+          const resp = await fetch("/api/optimize", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              resume,
+              targetRole: $("role").value.trim(),
+              jobDescription: $("jd").value.trim(),
+              language,
+            }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.error || "请求失败");
+          render(data.analysis);
+        } catch (err) {
+          showError(err.message || "出错了，请稍后重试。");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "开始优化";
+          $("status").textContent = "";
+        }
+      });
+    </script>
+  </body>
+</html>

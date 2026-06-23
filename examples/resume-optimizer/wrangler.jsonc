@@ -1,0 +1,19 @@
+{
+  // Resume Optimizer — a Cloudflare Worker that serves a single-page UI and
+  // proxies resume-analysis requests to the Claude API (key stays server-side).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "resume-optimizer",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-01-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  }
+  // Set the Claude API key as a secret (never commit it):
+  //   wrangler secret put ANTHROPIC_API_KEY
+  // Optionally override the model with a var: ANTHROPIC_MODEL
+}
