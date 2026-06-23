@@ -46,6 +46,7 @@ describe("Two-layer console boundary", () => {
 
     expect(appsList).toContain("createApp");
     expect(appsList).toContain("New app");
+    expect(appsList).toContain("AppIdBadge");
     expect(appsList).not.toContain("coming soon");
   });
 });
