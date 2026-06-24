@@ -1,4 +1,6 @@
 import type { JsonObject } from "@mosoo/contracts";
+import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
+import { normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
 import type { RuntimeAdvancedSettingDefinition } from "@mosoo/runtime-catalog";
 import { listRuntimeAdvancedSettings } from "@mosoo/runtime-catalog";
 import { ChevronDown } from "lucide-react";
@@ -8,6 +10,10 @@ import type { ReactElement } from "react";
 import { cn } from "@/shared/lib/class-names";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
+
+import { BuiltInToolsField } from "./built-in-tools-field";
+
+const CLAUDE_AGENT_SDK_RUNTIME_ID = "claude-agent-sdk";
 
 function readSettingValue(
   settings: JsonObject,
@@ -62,6 +68,14 @@ function countCustomSettings(
       ? value !== undefined
       : value !== definition.defaultValue;
   }).length;
+}
+
+function countCustomBuiltInTools(tools: readonly AgentBuiltInToolConfig[] | undefined): number {
+  if (tools === undefined) {
+    return 0;
+  }
+
+  return normalizeAgentBuiltInTools(tools).filter((tool) => !tool.enabled).length;
 }
 
 function isCustomValue(
@@ -179,24 +193,33 @@ function NumberSettingControl({
 }
 
 export function RuntimeAdvancedSettingsField({
+  builtInTools,
   readOnly,
   runtimeId,
   settings,
+  setBuiltInTools,
   setSettings,
 }: {
+  builtInTools?: AgentBuiltInToolConfig[];
   readOnly: boolean;
   runtimeId: string;
   settings: JsonObject;
+  setBuiltInTools?(tools: AgentBuiltInToolConfig[]): void;
   setSettings(settings: JsonObject): void;
 }): ReactElement | null {
   const definitions = listRuntimeAdvancedSettings(runtimeId);
+  const showBuiltInTools =
+    runtimeId === CLAUDE_AGENT_SDK_RUNTIME_ID &&
+    builtInTools !== undefined &&
+    setBuiltInTools !== undefined;
   const [open, setOpen] = useState(false);
 
-  if (definitions.length === 0) {
+  if (definitions.length === 0 && !showBuiltInTools) {
     return null;
   }
 
-  const customCount = countCustomSettings(definitions, settings);
+  const customCount =
+    countCustomSettings(definitions, settings) + countCustomBuiltInTools(builtInTools);
 
   function setSetting(
     definition: RuntimeAdvancedSettingDefinition,
@@ -269,6 +292,20 @@ export function RuntimeAdvancedSettingsField({
               </div>
             );
           })}
+
+          {showBuiltInTools ? (
+            <div className="border-border/70 space-y-2 border-t pt-3">
+              <div className="flex items-center justify-between gap-3">
+                <Label className="text-muted-foreground text-[12px]">Tools</Label>
+                <span className="text-muted-foreground text-[10px]">tools</span>
+              </div>
+              <BuiltInToolsField
+                readOnly={readOnly}
+                tools={builtInTools}
+                setTools={setBuiltInTools}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
