@@ -48,7 +48,24 @@ import {
   planVersionedAgentConfigChange,
   summarizeVersionedAgentConfigChange,
 } from "./agent-versioned-config.service";
+import { assertRuntimeAdvancedSettings } from "./runtime-advanced-settings-validation.service";
 export { deleteAgent, publishAgent, unpublishAgent } from "./agent-lifecycle-command.service";
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => stableStringify(entry)).join(",")}]`;
+  }
+
+  if (typeof value === "object" && value !== null) {
+    const entries = Object.entries(value).toSorted(([left], [right]) => left.localeCompare(right));
+    return `{${entries
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`)
+      .join(",")}}`;
+  }
+
+  const serialized = JSON.stringify(value);
+  return typeof serialized === "string" ? serialized : "undefined";
+}
 
 export async function createAgent(
   bindings: Pick<ApiBindings, "DB">,
@@ -131,6 +148,13 @@ export async function updateAgentConfig(
   );
   const currentSkillIds = await listAgentSkillIds(database, editable.agent.id);
   const currentStoredConfig = parseAgentStoredConfig(editable.agent.configJson);
+  const providerOptionsUnchanged =
+    stableStringify(currentStoredConfig.providerOptions) === stableStringify(input.providerOptions);
+  const providerOptions = assertRuntimeAdvancedSettings({
+    allowLegacyUnsupportedSettings: providerOptionsUnchanged,
+    runtimeId,
+    settings: input.providerOptions,
+  });
   const currentMcpServerIds = (await listAgentMcpServerIds(database, editable.agent.id)).map(
     (serverId) => readMcpServerId(serverId),
   );
@@ -160,7 +184,7 @@ export async function updateAgentConfig(
         name: input.name,
         prompt: input.prompt,
         provider: input.provider,
-        providerOptions: input.providerOptions,
+        providerOptions,
         runtimeId,
       },
       environment: input.environment,
@@ -187,7 +211,7 @@ export async function updateAgentConfig(
     agentId: editable.agent.id,
     currentConfigJson: editable.agent.configJson,
     environment: input.environment,
-    providerOptions: input.providerOptions,
+    providerOptions,
     updatedAt: timestampMs,
   });
   const nextAgent = {

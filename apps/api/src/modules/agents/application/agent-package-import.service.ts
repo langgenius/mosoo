@@ -27,6 +27,7 @@ import {
   resolvePackageSkills,
 } from "./agent-package-resolution.service";
 import { readFileId, readAppId } from "./agent-platform-ids";
+import { assertRuntimeAdvancedSettings } from "./runtime-advanced-settings-validation.service";
 export async function importAgentPackage(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
@@ -49,6 +50,10 @@ export async function importAgentPackage(
   }
 
   const { manifest } = parsed;
+  const providerOptions = assertRuntimeAdvancedSettings({
+    runtimeId: manifest.runtime.id,
+    settings: manifest.runtime.providerOptions,
+  });
   issues.push(...collectPackageDeclarationIssues(parsed.package));
   issues.push(...(await collectRuntimeResolutionIssues(bindings.DB, viewer.id, app.id, manifest)));
 
@@ -92,7 +97,7 @@ export async function importAgentPackage(
     packageSkills: skillResolution.packageSkills,
     prompt: manifest.prompts.system,
     provider: manifest.runtime.provider,
-    providerOptions: manifest.runtime.providerOptions,
+    providerOptions,
     appId: app.id,
     runtimeId: manifest.runtime.id,
     skillIds: skillResolution.skillIds,

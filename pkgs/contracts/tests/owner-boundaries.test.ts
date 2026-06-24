@@ -134,11 +134,9 @@ describe("contracts owner boundaries", () => {
         id: "openai-runtime",
         model: "gpt-5",
         provider: "openai",
-        providerOptions: {
-          features: {
-            web_search: true,
-          },
-          reasoning_effort: "high",
+        settings: {
+          model_reasoning_effort: "high",
+          model_verbosity: "medium",
         },
       },
     });
@@ -149,10 +147,8 @@ describe("contracts owner boundaries", () => {
       model: "gpt-5",
       provider: "openai",
       providerOptions: {
-        features: {
-          web_search: true,
-        },
-        reasoning_effort: "high",
+        model_reasoning_effort: "high",
+        model_verbosity: "medium",
       },
     });
   });
@@ -185,11 +181,15 @@ describe("contracts owner boundaries", () => {
         prompts: { system: "Help with support." },
         provider: "openai",
         runtime: "openai-runtime",
+        settings: { model_reasoning_effort: "high" },
       }),
     );
 
     expect(parsed.issues).toEqual([]);
     expect(parsed.package?.manifest.kind).toBe("cattle");
+    expect(parsed.package?.manifest.runtime.providerOptions).toEqual({
+      model_reasoning_effort: "high",
+    });
   });
 
   test("runtime command parser rejects unknown or malformed command grammar", () => {

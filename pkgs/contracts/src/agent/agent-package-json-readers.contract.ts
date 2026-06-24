@@ -47,6 +47,7 @@ export function buildPackageManifest(input: Record<string, unknown>): AgentManif
   const prompts = readRecordField(input, "prompts");
   const systemPrompt = readString(prompts, "system");
   const name = readString(input, "name");
+  const runtimeSettings = input["settings"] ?? input["providerOptions"];
 
   if (
     kind === null ||
@@ -77,8 +78,8 @@ export function buildPackageManifest(input: Record<string, unknown>): AgentManif
       model,
       provider,
       providerOptions: parseJsonObject(
-        readJsonObjectField(input["providerOptions"], "providerOptions"),
-        "Agent package providerOptions",
+        readJsonObjectField(runtimeSettings, "settings"),
+        "Agent package settings",
       ),
     },
     skills: readParsedArray(input, "skills", readPackageSkill),

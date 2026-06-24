@@ -108,7 +108,7 @@ interface AgentDraftYamlShape {
     id: RuntimeId;
     model: string;
     provider: string;
-    providerOptions: JsonObject;
+    settings: JsonObject;
   };
   version: 1;
 }
@@ -137,7 +137,7 @@ function toDraftYamlShape(draft: AgentEditorDraft): AgentDraftYamlShape {
       id: draft.runtime,
       model: draft.model,
       provider: draft.provider,
-      providerOptions: draft.providerOptions,
+      settings: draft.providerOptions,
     },
     version: 1,
   };
@@ -193,7 +193,10 @@ export function parseDraftYaml(yaml: string, fallback: AgentEditorDraft): AgentE
     name: readString(identity["name"], fallback.name),
     prompt: readString(root["prompt"], fallback.prompt),
     provider: readString(runtime["provider"], fallback.provider),
-    providerOptions: readJsonObject(runtime["providerOptions"], fallback.providerOptions),
+    providerOptions: readJsonObject(
+      runtime["settings"] ?? runtime["providerOptions"],
+      fallback.providerOptions,
+    ),
     runtime: readString(runtime["id"], fallback.runtime),
     skills: readSkills(assets["skills"], fallback.skills),
   };

@@ -401,6 +401,23 @@ describe("agent package file import", () => {
     expect(bucket.objects.has(objectKey)).toBe(false);
   });
 
+  test("rejects packages with platform boundary runtime settings", async () => {
+    const packageFixture = createPackageFixture();
+    packageFixture.manifest.runtime.providerOptions = {
+      sandbox_mode: "danger-full-access",
+    };
+    const { bindings, fileId } = await createFixture({
+      archiveBytes: createAgentPackageArchiveBytes(packageFixture),
+    });
+
+    await expectImportRejected({
+      bindings,
+      fileId,
+      message:
+        "Runtime setting sandbox_mode is managed by Mosoo platform policy and cannot be set here.",
+    });
+  });
+
   test("does not resolve imported Environment IDs outside the target App", async () => {
     const otherAppId = "01J000000000000000000000B2";
     const otherEnvironmentId = "01J000000000000000000000B3";

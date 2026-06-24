@@ -217,6 +217,8 @@ function buildAgentManifest(
   input: Record<string, unknown>,
   sections: CompleteManifestSections,
 ): AgentManifest {
+  const runtimeSettings = sections.runtime["settings"] ?? sections.runtime["providerOptions"];
+
   return {
     advanced: null,
     environment: {
@@ -240,8 +242,8 @@ function buildAgentManifest(
       model: sections.model,
       provider: sections.provider,
       providerOptions: parseJsonObject(
-        readJsonObjectField(sections.runtime["providerOptions"], "runtime.providerOptions"),
-        "Agent Manifest runtime.providerOptions",
+        readJsonObjectField(runtimeSettings, "runtime.settings"),
+        "Agent Manifest runtime.settings",
       ),
     },
     skills: readParsedArray(input, "skills", readSkillReference),

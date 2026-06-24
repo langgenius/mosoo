@@ -92,7 +92,7 @@ export function serializeAgentManifestToYaml(
     `  id: ${yamlString(manifest.runtime.id)}`,
     `  provider: ${yamlString(manifest.runtime.provider)}`,
     `  model: ${yamlString(manifest.runtime.model)}`,
-    "  providerOptions:",
+    "  settings:",
   ];
 
   appendJsonYaml(lines, manifest.runtime.providerOptions, "    ");
@@ -152,11 +152,7 @@ export function serializeAgentManifestToJson(
   manifest: AgentManifest,
   sourceAgentId: string | null = null,
 ): string {
-  if (sourceAgentId === null) {
-    return JSON.stringify(manifest, null, 2);
-  }
-
-  return JSON.stringify({ sourceAgentId, ...manifest }, null, 2);
+  return JSON.stringify(toAgentManifestExportJson(manifest, sourceAgentId), null, 2);
 }
 
 export function serializeAgentPackageToJson(agentPackage: AgentPackage): string {
@@ -193,6 +189,22 @@ function toAgentPackageSkillPath(skill: AgentManifest["skills"][number]): string
   return createAgentPackageSkillPath(skill.skillName);
 }
 
+function toAgentManifestExportJson(
+  manifest: AgentManifest,
+  sourceAgentId: string | null,
+): Record<string, unknown> {
+  return {
+    ...(sourceAgentId === null ? {} : { sourceAgentId }),
+    ...manifest,
+    runtime: {
+      id: manifest.runtime.id,
+      model: manifest.runtime.model,
+      provider: manifest.runtime.provider,
+      settings: manifest.runtime.providerOptions,
+    },
+  };
+}
+
 export function toAgentPackageManifestJson(agentPackage: AgentPackage): Record<string, unknown> {
   const manifest = agentPackage.manifest;
 
@@ -210,7 +222,7 @@ export function toAgentPackageManifestJson(agentPackage: AgentPackage): Record<s
     runtime: manifest.runtime.id,
     model: manifest.runtime.model,
     provider: manifest.runtime.provider,
-    providerOptions: manifest.runtime.providerOptions,
+    settings: manifest.runtime.providerOptions,
     prompts: manifest.prompts,
     avatar: agentPackage.app.avatarAssetKey,
     skills: manifest.skills.map((skill) => ({
