@@ -1,15 +1,13 @@
+import AppWindowIcon from "@hugeicons/core-free-icons/AppWindowIcon";
+import CheckIcon from "@hugeicons/core-free-icons/CheckIcon";
+import ChevronLeftIcon from "@hugeicons/core-free-icons/ChevronLeftIcon";
+import ChevronsDownUpIcon from "@hugeicons/core-free-icons/ChevronsDownUpIcon";
+import GridViewIcon from "@hugeicons/core-free-icons/GridViewIcon";
+import PanelLeftCloseIcon from "@hugeicons/core-free-icons/PanelLeftCloseIcon";
+import PanelLeftOpenIcon from "@hugeicons/core-free-icons/PanelLeftOpenIcon";
+import PlusSignIcon from "@hugeicons/core-free-icons/PlusSignIcon";
+import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import type { AppSummary } from "@mosoo/contracts/app";
-import {
-  Box,
-  Check,
-  ChevronLeft,
-  ChevronsUpDown,
-  LayoutGrid,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Plus,
-  Settings,
-} from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
@@ -28,10 +26,21 @@ import { Separator } from "@/shared/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import { AccountMenu } from "./account-menu";
+import { createHugeicon } from "./hugeicon";
 import { AppNavigation } from "./navigation";
 import { OrgNavigation } from "./org-navigation";
 import { useAppSession } from "./session-provider";
 import { useSidebarCollapsed } from "./use-sidebar-collapsed";
+
+const AppSwitcherIcon = createHugeicon(AppWindowIcon, "AppSwitcherIcon");
+const BackIcon = createHugeicon(ChevronLeftIcon, "BackIcon");
+const CheckmarkIcon = createHugeicon(CheckIcon, "CheckmarkIcon");
+const CollapseSidebarIcon = createHugeicon(PanelLeftCloseIcon, "CollapseSidebarIcon");
+const ExpandSidebarIcon = createHugeicon(PanelLeftOpenIcon, "ExpandSidebarIcon");
+const ManageAppsIcon = createHugeicon(GridViewIcon, "ManageAppsIcon");
+const NewAgentIcon = createHugeicon(PlusSignIcon, "NewAgentIcon");
+const SettingsIcon = createHugeicon(Settings02Icon, "SettingsIcon");
+const SwitcherChevronIcon = createHugeicon(ChevronsDownUpIcon, "SwitcherChevronIcon");
 
 // One-click return to the parent Org layer (the Apps list).
 function BackToOrgLink({ collapsed, orgName }: { collapsed: boolean; orgName: string | null }) {
@@ -47,7 +56,7 @@ function BackToOrgLink({ collapsed, orgName }: { collapsed: boolean; orgName: st
           : "mx-0.5 mb-1.5 px-1.5 py-1 text-[12px] font-medium",
       )}
     >
-      <ChevronLeft className="size-3.5 shrink-0" />
+      <BackIcon className="size-3.5 shrink-0" />
       {collapsed ? null : <span className="truncate">{label}</span>}
     </Link>
   );
@@ -90,7 +99,7 @@ function AppSwitcher({
         collapsed ? "mx-auto mb-3 size-9 justify-center" : "mx-0.5 mb-4 gap-2 px-2.5 py-2",
       )}
     >
-      <Box className="size-4 shrink-0" />
+      <AppSwitcherIcon className="size-4 shrink-0" />
       {collapsed ? null : (
         <>
           <div className="min-w-0 flex-1 text-left">
@@ -99,7 +108,7 @@ function AppSwitcher({
             </div>
             <div className="truncate">{displayLabel}</div>
           </div>
-          <ChevronsUpDown className="text-fg-3 size-3.5 shrink-0" />
+          <SwitcherChevronIcon className="text-fg-3 size-3.5 shrink-0" />
         </>
       )}
     </button>
@@ -122,23 +131,23 @@ function AppSwitcher({
             className="cursor-pointer gap-2 rounded-md"
             onSelect={() => onSwitch(app.id)}
           >
-            <Box className="text-fg-3 size-4 shrink-0" />
+            <AppSwitcherIcon className="text-fg-3 size-4 shrink-0" />
             <span className="min-w-0 flex-1 truncate">{app.name}</span>
             {activeApp !== null && app.id === activeApp.id ? (
-              <Check className="text-accent-press size-4 shrink-0" />
+              <CheckmarkIcon className="text-fg-1 size-4 shrink-0" />
             ) : null}
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild className="cursor-pointer rounded-md">
           <Link to="/apps">
-            <LayoutGrid className="size-4" />
+            <ManageAppsIcon className="size-4" />
             Manage apps
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild className="cursor-pointer rounded-md">
           <Link to="/settings/app">
-            <Settings className="size-4" />
+            <SettingsIcon className="size-4" />
             App settings
           </Link>
         </DropdownMenuItem>
@@ -154,7 +163,7 @@ function NewAgentCta({ collapsed, disabled }: { collapsed: boolean; disabled: bo
   if (disabled) {
     return (
       <Button disabled aria-label={label} className={className}>
-        <Plus className="size-4" />
+        <NewAgentIcon className="size-4" />
         {collapsed ? null : label}
       </Button>
     );
@@ -163,7 +172,7 @@ function NewAgentCta({ collapsed, disabled }: { collapsed: boolean; disabled: bo
   const cta = (
     <Button asChild aria-label={label} className={className}>
       <Link to="/agent?create=1">
-        <Plus className="size-4" />
+        <NewAgentIcon className="size-4" />
         {collapsed ? null : label}
       </Link>
     </Button>
@@ -220,7 +229,7 @@ function ConsoleShell({
   onToggleCollapsed: () => void;
   sidebar: ReactNode;
 }) {
-  const ToggleIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
+  const ToggleIcon = collapsed ? ExpandSidebarIcon : CollapseSidebarIcon;
   const toggleLabel = collapsed ? "Expand sidebar" : "Collapse sidebar";
 
   return (
