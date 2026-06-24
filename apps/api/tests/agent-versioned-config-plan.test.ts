@@ -177,7 +177,7 @@ describe("agent versioned config plan", () => {
         agent: {
           ...agent,
           builtInTools: agent.builtInTools.map((tool) =>
-            tool.name === "bash" ? { ...tool, enabled: false } : tool,
+            tool.name === "bash" ? { enabled: false, name: tool.name } : tool,
           ),
         },
         environment,

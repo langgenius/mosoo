@@ -13,7 +13,7 @@ import {
 function draft(): AgentEditorDraft {
   return {
     builtInTools: createDefaultAgentBuiltInTools().map((tool) =>
-      tool.name === "bash" ? { ...tool, enabled: false } : tool,
+      tool.name === "bash" ? { enabled: false, name: tool.name } : tool,
     ),
     description: "Reviews releases before publish.",
     environmentId: "01J000000000000000000000E2",

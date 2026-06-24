@@ -21,7 +21,7 @@ function setToolEnabled(
   enabled: boolean,
 ): AgentBuiltInToolConfig[] {
   return normalizeAgentBuiltInTools(
-    tools.map((tool) => (tool.name === name ? { ...tool, enabled } : tool)),
+    tools.map((tool) => (tool.name === name ? { enabled, name: tool.name } : tool)),
   );
 }
 
