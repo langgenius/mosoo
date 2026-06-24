@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
+
 import {
   normalizeAgentStoredConfigJson,
   parseAgentStoredConfig,
@@ -20,6 +22,7 @@ describe("agent stored config", () => {
 
     expect(normalized).not.toHaveProperty("builder");
     expect(normalized).not.toHaveProperty("packageSharingEnabled");
+    expect(normalized.builtInTools).toEqual(createDefaultAgentBuiltInTools());
     expect(normalized.providerOptions).toEqual({});
   });
 
@@ -49,10 +52,17 @@ describe("agent stored config", () => {
         },
       },
     });
+    expect(parseAgentStoredConfig(configJson).builtInTools).toEqual(
+      createDefaultAgentBuiltInTools(),
+    );
   });
 
   test("serializes stored config without Builder metadata", () => {
     const serialized = serializeAgentStoredConfig({
+      builtInTools: [
+        { enabled: false, name: "bash" },
+        { enabled: true, name: "read" },
+      ],
       packageMcpServers: [],
       packageResolution: null,
       packageSkills: [],
@@ -60,5 +70,6 @@ describe("agent stored config", () => {
     });
 
     expect(JSON.parse(serialized)).not.toHaveProperty("builder");
+    expect(JSON.parse(serialized).builtInTools).toContainEqual({ enabled: false, name: "bash" });
   });
 });

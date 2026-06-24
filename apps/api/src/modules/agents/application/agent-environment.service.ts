@@ -1,5 +1,6 @@
 import type { JsonObject } from "@mosoo/contracts";
-import type { AgentEnvironmentConfig } from "@mosoo/contracts/agent";
+import type { AgentBuiltInToolConfig, AgentEnvironmentConfig } from "@mosoo/contracts/agent";
+import { normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
 import { agentsTable } from "@mosoo/db";
 import type { AgentId, EnvironmentId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
@@ -25,6 +26,7 @@ export async function loadAgentEnvironmentConfig(
 
 export function prepareAgentEnvironmentConfigWrite(input: {
   agentId: AgentId;
+  builtInTools?: readonly AgentBuiltInToolConfig[];
   currentConfigJson: string;
   environment: AgentEnvironmentConfig;
   providerOptions?: JsonObject;
@@ -32,6 +34,10 @@ export function prepareAgentEnvironmentConfigWrite(input: {
 }): PreparedAgentEnvironmentConfigWrite {
   const stored = parseAgentStoredConfig(input.currentConfigJson);
   const configJson = serializeAgentStoredConfig({
+    builtInTools:
+      input.builtInTools === undefined
+        ? stored.builtInTools
+        : normalizeAgentBuiltInTools(input.builtInTools),
     packageMcpServers: stored.packageMcpServers,
     packageSkills: stored.packageSkills,
     packageResolution: stored.packageResolution,

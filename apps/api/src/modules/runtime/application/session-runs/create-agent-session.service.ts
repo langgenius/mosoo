@@ -149,6 +149,9 @@ async function buildSessionExecutionPlan(input: {
   bindings: ApiBindings;
   source: AgentSessionExecutionSource;
 }): Promise<SessionExecutionPlan> {
+  const storedConfig = parseAgentStoredConfig(
+    input.source.liveVersion?.configJson ?? input.source.agent.configJson,
+  );
   const [skills, tools, environmentSnapshot] = await Promise.all([
     input.source.liveVersion
       ? Promise.resolve(input.source.liveVersion.skills)
@@ -187,6 +190,7 @@ async function buildSessionExecutionPlan(input: {
       provider: input.source.provider,
       runtimeId: input.source.runtimeId,
     },
+    builtInTools: storedConfig.builtInTools,
     environment: {
       allowMcpServers: environmentSnapshot.record.allowMcpServers === 1,
       allowPackageManagers: environmentSnapshot.record.allowPackageManagers === 1,

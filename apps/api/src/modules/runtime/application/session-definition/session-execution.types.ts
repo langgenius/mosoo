@@ -1,3 +1,4 @@
+import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
 import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
 import type {
   SessionExecutionBinding,
@@ -16,6 +17,7 @@ import type {
 
 export interface SessionExecutionPlan {
   binding: Omit<SessionExecutionBinding, "sessionId">;
+  builtInTools: AgentBuiltInToolConfig[];
   environment: {
     allowMcpServers: boolean;
     allowPackageManagers: boolean;
@@ -33,6 +35,7 @@ export interface SessionExecutionPlan {
 }
 
 export interface HydratedSessionRunContext {
+  builtInTools: AgentBuiltInToolConfig[];
   mcpServers: DriverResolvedMcpServer[];
   profile: DriverProfileConfig;
   skillCatalog: DriverSkillCatalogEntry[];

@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
+
 import { ensureAppAgentOwner } from "../src/modules/agents/application/agent-access.service";
 import { getAgentRow } from "../src/modules/agents/application/agent-repository";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
@@ -166,6 +168,7 @@ describe("app agent access", () => {
 
     expect(agent.appId).toBe(AGENT_ACCESS_IDS.app);
     expect(JSON.parse(agent.configJson)).toEqual({
+      builtInTools: createDefaultAgentBuiltInTools(),
       packageMcpServers: [],
       packageResolution: null,
       packageSkills: [],

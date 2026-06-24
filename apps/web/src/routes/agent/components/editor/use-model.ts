@@ -1,4 +1,6 @@
 import type { JsonObject } from "@mosoo/contracts";
+import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
+import { normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
 import { classifyAgentConfigChanges } from "@mosoo/contracts/agent-config-change-plan";
 import type { AgentConfigChangePlan } from "@mosoo/contracts/agent-config-change-plan";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -58,6 +60,7 @@ export interface AgentEditorModel {
   saving: boolean;
   revision: number;
   snapshotHash: string;
+  setBuiltInTools(tools: AgentBuiltInToolConfig[]): void;
   setDescription(description: string): void;
   setEnvironmentId(environmentId: string | null): void;
   setKind(kind: AgentKind): void;
@@ -188,6 +191,7 @@ export function useAgentEditorModel({
     try {
       const savedAgent = await configMutation.mutateAsync({
         agentId: typedAgentId,
+        builtInTools: normalizeAgentBuiltInTools(draftToSave.builtInTools),
         description: draftToSave.description.trim() || null,
         environment: {
           environmentId:
@@ -269,6 +273,12 @@ export function useAgentEditorModel({
     saveError,
     saving,
     snapshotHash: createSnapshotHash(draft),
+    setBuiltInTools(tools) {
+      updateDraft((current) => ({
+        ...current,
+        builtInTools: normalizeAgentBuiltInTools(tools),
+      }));
+    },
     setDescription(description) {
       updateDraft((current) => ({
         ...current,

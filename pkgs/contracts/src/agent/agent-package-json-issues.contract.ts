@@ -13,6 +13,7 @@ import { AGENT_KIND_LIST_LABEL } from "./agent.contract";
 const PACKAGE_MANIFEST_TOP_LEVEL_FIELDS = new Set([
   "author",
   "avatar",
+  "builtInTools",
   "description",
   "environment",
   "exportedAt",
@@ -27,6 +28,7 @@ const PACKAGE_MANIFEST_TOP_LEVEL_FIELDS = new Set([
   "provider",
   "providerOptions",
   "runtime",
+  "settings",
   "skills",
   "sourceAgentId",
   "version",

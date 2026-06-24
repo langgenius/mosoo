@@ -1,5 +1,9 @@
 import type { JsonObject } from "@mosoo/contracts";
-import type { AgentEnvironmentConfig, AgentKind } from "@mosoo/contracts/agent";
+import type {
+  AgentBuiltInToolConfig,
+  AgentEnvironmentConfig,
+  AgentKind,
+} from "@mosoo/contracts/agent";
 import type { AgentManifest, AgentManifestMcpServerBinding } from "@mosoo/contracts/agent-manifest";
 import { AGENT_MANIFEST_VERSION } from "@mosoo/contracts/agent-manifest";
 import type {
@@ -74,6 +78,7 @@ export interface AgentSpecMcpBinding {
 
 export interface AgentSpec {
   agentId: AgentId;
+  builtInTools: AgentBuiltInToolConfig[];
   configJson: string;
   description: string | null;
   environment: AgentEnvironmentConfig;
@@ -272,6 +277,7 @@ function normalizeStoredConfigJson(input: { configJson: string }): string {
   const stored = parseAgentStoredConfig(input.configJson);
 
   return serializeAgentStoredConfig({
+    builtInTools: stored.builtInTools,
     packageMcpServers: stored.packageMcpServers,
     packageSkills: stored.packageSkills,
     packageResolution: stored.packageResolution,
@@ -338,6 +344,7 @@ function buildAgentSpecFromProfile(input: {
 
   return {
     agentId: input.agent.id,
+    builtInTools: input.storedConfig.builtInTools,
     configJson: normalizeStoredConfigJson({
       configJson: input.agent.configJson,
     }),
@@ -380,6 +387,7 @@ export async function buildAgentSpecForPreparedProfile(
 export function toAgentManifest(spec: AgentSpec): AgentManifest {
   return {
     advanced: null,
+    builtInTools: spec.builtInTools,
     environment: {
       envVars: Object.fromEntries(spec.environmentManifest.secretNames.map((key) => [key, ""])),
       environmentId: spec.environment.environmentId,

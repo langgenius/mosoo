@@ -6,6 +6,7 @@ import type {
   AgentSummary,
   AgentViewerRole,
 } from "@mosoo/contracts/agent";
+import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
 import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 
 import type { AuthUser } from "@/domains/auth/use-auth";
@@ -130,6 +131,7 @@ function toOwner(
 
 function createEmptyAgentConfig(): Agent["config"] {
   return {
+    builtInTools: createDefaultAgentBuiltInTools(),
     environmentId: null,
     mcpServers: [],
     model: "",
@@ -175,6 +177,7 @@ export function mapAgentDetailToView(
 
   return {
     config: {
+      builtInTools: editorDetail?.builtInTools ?? createDefaultAgentBuiltInTools(),
       environmentId: environmentConfig.environmentId,
       mcpServers: editorDetail?.mcpBindings.map((binding) => toMcpServer(binding)) ?? [],
       model: profile.model,

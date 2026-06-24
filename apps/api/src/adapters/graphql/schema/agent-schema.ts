@@ -23,6 +23,17 @@ export const agentSchema = /* GraphQL */ `
     none
   }
 
+  enum AgentBuiltInToolName {
+    bash
+    read
+    write
+    edit
+    glob
+    grep
+    web_fetch
+    web_search
+  }
+
   enum AgentReadinessSeverity {
     error
     warning
@@ -108,6 +119,11 @@ export const agentSchema = /* GraphQL */ `
 
   type AgentEnvironmentConfig {
     environmentId: ULID
+  }
+
+  type AgentBuiltInToolConfig {
+    enabled: Boolean!
+    name: AgentBuiltInToolName!
   }
 
   type AgentReadinessIssue {
@@ -244,6 +260,7 @@ export const agentSchema = /* GraphQL */ `
   }
 
   type AgentEditorState {
+    builtInTools: [AgentBuiltInToolConfig!]!
     environment: AgentEnvironmentConfig!
     id: ULID!
     packageResolution: AgentPackageResolutionState
@@ -266,6 +283,7 @@ export const agentSchema = /* GraphQL */ `
 
   input UpdateAgentConfigInput {
     agentId: ULID!
+    builtInTools: [AgentBuiltInToolConfigInput!]
     description: String
     environment: AgentEnvironmentConfigInput!
     kind: AgentKind!
@@ -292,6 +310,11 @@ export const agentSchema = /* GraphQL */ `
 
   input AgentEnvironmentConfigInput {
     environmentId: ULID
+  }
+
+  input AgentBuiltInToolConfigInput {
+    enabled: Boolean!
+    name: AgentBuiltInToolName!
   }
 
   input ImportAgentPackageInput {

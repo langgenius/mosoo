@@ -8,6 +8,7 @@ import type { DriverBootPayloadPreparedHandler } from "../application/execution-
 import { createRuntimeTimingRecorder } from "../application/session-runs/session-runtime-timing";
 import type { RuntimeTimingSnapshot } from "../application/session-runs/session-runtime-timing";
 import type {
+  DriverExecutionSpec,
   DriverProfileConfig,
   DriverResolvedMcpServer,
   DriverResolvedSkill,
@@ -128,6 +129,7 @@ export async function ensureDriverSessionReady(
   bindings: ApiBindings,
   requestUrl: string,
   input: {
+    builtInTools: DriverExecutionSpec["builtInTools"];
     cloudflareSession: ExecutionSessionHandle;
     profile: DriverProfileConfig;
     resolvedMcpServers: DriverResolvedMcpServer[];
@@ -286,6 +288,7 @@ export async function ensureDriverSessionReady(
     }
 
     const provisionInput = {
+      builtInTools: input.builtInTools,
       cloudflareSession: input.cloudflareSession,
       driverRecordConflictStrategy: "insert-only" as const,
       driverInstanceId,
@@ -405,6 +408,7 @@ export async function prewarmDriverSession(
   bindings: ApiBindings,
   requestUrl: string,
   input: {
+    builtInTools: DriverExecutionSpec["builtInTools"];
     cloudflareSession: ExecutionSessionHandle;
     profile: DriverProfileConfig;
     resolvedMcpServers: DriverResolvedMcpServer[];
@@ -483,6 +487,7 @@ export async function prewarmDriverSession(
     }
 
     const provisionInput = {
+      builtInTools: input.builtInTools,
       cloudflareSession: input.cloudflareSession,
       driverRecordConflictStrategy: "insert-only" as const,
       driverInstanceId,

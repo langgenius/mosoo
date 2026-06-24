@@ -23,6 +23,7 @@ export interface RuntimeExecutionPlaneRunLease {
 
 export interface PrepareRuntimeRunInput {
   attachmentIds: FileId[];
+  builtInTools: HydratedSessionRunContext["builtInTools"];
   profile: HydratedSessionRunContext["profile"] & {
     runtimeId: DriverRuntime;
   };

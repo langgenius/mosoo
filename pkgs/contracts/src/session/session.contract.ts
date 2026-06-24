@@ -1,4 +1,4 @@
-import type { AgentKind } from "../agent/agent.contract";
+import type { AgentBuiltInToolConfig, AgentKind } from "../agent/agent.contract";
 import type { FileUploadSummary } from "../file/file.contract";
 import type {
   AgentDeploymentVersionId,
@@ -411,6 +411,7 @@ export function getAgentSessionUserLifecycleProjection(
 
 export interface AgentSessionExecutionDiagnostics {
   binding: SessionExecutionBinding;
+  builtInTools: AgentBuiltInToolConfig[];
   skills: SessionExecutionSkillReference[];
   tools: SessionExecutionToolReference[];
 }
