@@ -1,11 +1,14 @@
+import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import type { AgentReadiness } from "@mosoo/contracts/agent";
 import { useQueryClient } from "@tanstack/react-query";
 import { ShieldAlert, X } from "lucide-react";
-import type React from "react";
+import { useCallback, useRef } from "react";
 
 import { sessionResourcesQueryKey } from "@/domains/session/api/session-resources";
-import { SessionComposer } from "@/features/session-chat/session-composer";
-import { SessionMessageList } from "@/features/session-chat/session-message-list";
+import { SessionPermissionProvider } from "@/features/session-chat/assistant-ui/session-permission-context";
+import { SessionThread } from "@/features/session-chat/assistant-ui/session-thread";
+import { SessionThreadComposer } from "@/features/session-chat/assistant-ui/session-thread-composer";
+import { useSessionAssistantRuntime } from "@/features/session-chat/assistant-ui/use-session-assistant-runtime";
 import { useSessionResourceDraft } from "@/features/session-chat/use-session-resource-draft";
 import {
   completeSessionFileUpload,
@@ -138,173 +141,182 @@ export function AgentSessionPanel({
     );
   };
 
-  const handleSend = async (): Promise<void> => {
-    const sent = await model.handleSend({ sessionResourceMentions });
+  const lastSentTextRef = useRef("");
 
-    if (sent) {
-      resourceDraft.clearActiveMentions();
-    }
-  };
+  const handleSendText = useCallback(
+    async (text: string): Promise<void> => {
+      lastSentTextRef.current = text;
+      const sent = await model.handleSend({ sessionResourceMentions, text });
 
-  const handleKeyDown = async (event: React.KeyboardEvent): Promise<void> => {
-    const sent = await model.handleKeyDown(event, { sessionResourceMentions });
+      if (sent) {
+        resourceDraft.clearActiveMentions();
+      }
+    },
+    [model, resourceDraft, sessionResourceMentions],
+  );
 
-    if (sent) {
-      resourceDraft.clearActiveMentions();
-    }
-  };
+  const handleRetrySend = useCallback((): void => {
+    void handleSendText(lastSentTextRef.current);
+  }, [handleSendText]);
+
+  const runtime = useSessionAssistantRuntime({
+    isSendDisabled: Boolean(sendDisabledReason),
+    messages: model.messages,
+    onCancel: model.cancel,
+    onSend: handleSendText,
+    streaming: model.streaming,
+  });
 
   return (
     <div className="bg-paper-200 flex h-full" data-testid="agent-session-panel">
-      <div className="flex h-full min-w-0 flex-1 flex-col">
-        <AgentSessionPanelHeader
-          activeTitle={activeTitle}
-          agentName={agentName}
-          onSessionControlClick={handleSessionControlClick}
-          pill={pill}
-          reconnectingSubtitle={reconnectingSubtitle}
-          sessionControlMode={sessionControlMode}
-          sending={model.sending}
-          sessionCount={model.sessionCount}
-          tone={tone}
-        />
-
-        {isTruthy(model.sessionLoadError) ? (
-          <div className="border-amber/30 bg-amber-bg text-amber-fg border-b px-4 py-2.5 text-[12px] leading-relaxed">
-            {sessionLoadErrorMessage}
-          </div>
-        ) : null}
-
-        {model.configurationRefreshRequired ? (
-          <div className="border-amber/30 bg-amber-bg border-b px-4 py-2.5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-amber-fg min-w-0 text-[12px] font-medium">
-                {configurationRefreshMessage}
-              </div>
-              <Button onClick={() => void handleSessionControlClick()} size="xs" variant="outline">
-                {configurationRefreshActionLabel}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="relative min-h-0 flex-1 overflow-hidden">
-          {model.isConversationLoading ? (
-            <div className="text-muted-foreground flex h-full items-center justify-center text-[13px]">
-              Loading conversation…
-            </div>
-          ) : (
-            <SessionMessageList
-              messages={model.messages}
-              messagesEndRef={model.messagesEndRef}
-              permissionRequests={model.permissionRequests}
-              streaming={model.streaming}
+      <AssistantRuntimeProvider runtime={runtime}>
+        <SessionPermissionProvider requests={model.permissionRequests}>
+          <div className="flex h-full min-w-0 flex-1 flex-col">
+            <AgentSessionPanelHeader
+              activeTitle={activeTitle}
+              agentName={agentName}
+              onSessionControlClick={handleSessionControlClick}
+              pill={pill}
+              reconnectingSubtitle={reconnectingSubtitle}
+              sessionControlMode={sessionControlMode}
+              sending={model.sending}
+              sessionCount={model.sessionCount}
+              tone={tone}
             />
-          )}
-        </div>
 
-        <div className="relative z-10 mx-auto w-2/3 shrink-0 py-4">
-          {stopped ? (
-            <div
-              className="border-destructive/25 bg-destructive/[0.05] mb-3 rounded-lg border px-3 py-2.5"
-              role="alert"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-destructive text-[13px] font-semibold">Session stopped</div>
-                  <div className="text-fg-2 mt-0.5 text-[12px] leading-relaxed">
-                    {model.run.error?.message ??
-                      "Start a new session after fixing runtime diagnostics."}
+            {isTruthy(model.sessionLoadError) ? (
+              <div className="border-amber/30 bg-amber-bg text-amber-fg border-b px-4 py-2.5 text-[12px] leading-relaxed">
+                {sessionLoadErrorMessage}
+              </div>
+            ) : null}
+
+            {model.configurationRefreshRequired ? (
+              <div className="border-amber/30 bg-amber-bg border-b px-4 py-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-amber-fg min-w-0 text-[12px] font-medium">
+                    {configurationRefreshMessage}
                   </div>
+                  <Button
+                    onClick={() => void handleSessionControlClick()}
+                    size="xs"
+                    variant="outline"
+                  >
+                    {configurationRefreshActionLabel}
+                  </Button>
                 </div>
-                <Button
-                  onClick={() => void handleSessionControlClick()}
-                  size="sm"
-                  variant="outline"
+              </div>
+            ) : null}
+
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              {model.isConversationLoading ? (
+                <div className="text-muted-foreground flex h-full items-center justify-center text-[13px]">
+                  Loading conversation…
+                </div>
+              ) : (
+                <SessionThread />
+              )}
+            </div>
+
+            <div className="relative z-10 mx-auto w-2/3 shrink-0 py-4">
+              {stopped ? (
+                <div
+                  className="border-destructive/25 bg-destructive/[0.05] mb-3 rounded-lg border px-3 py-2.5"
+                  role="alert"
                 >
-                  {stoppedActionLabel}
-                </Button>
-              </div>
-            </div>
-          ) : null}
-
-          {model.permissionRequests[0] ? (
-            <div
-              className="border-amber/30 bg-amber-bg text-amber-fg relative z-20 mb-3 rounded-lg border px-3 py-2.5"
-              role="alert"
-            >
-              <div className="flex items-start gap-2">
-                <ShieldAlert className="mt-0.5 size-4 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <div className="text-[12px] font-semibold">
-                    {model.permissionRequests[0].title}
-                  </div>
-                  {isTruthy(model.permissionRequests[0].rawInput) ? (
-                    <div className="text-amber-fg/80 mt-1 truncate font-mono text-[11px]">
-                      {model.permissionRequests[0].rawInput}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-destructive text-[13px] font-semibold">
+                        Session stopped
+                      </div>
+                      <div className="text-fg-2 mt-0.5 text-[12px] leading-relaxed">
+                        {model.run.error?.message ??
+                          "Start a new session after fixing runtime diagnostics."}
+                      </div>
                     </div>
-                  ) : null}
+                    <Button
+                      onClick={() => void handleSessionControlClick()}
+                      size="sm"
+                      variant="outline"
+                    >
+                      {stoppedActionLabel}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex shrink-0 gap-1.5">
-                  <Button
-                    aria-label="Dismiss permission request"
-                    onClick={() =>
-                      void model.resolvePermission(model.permissionRequests[0]!, "reject_once")
-                    }
-                    size="icon-sm"
-                    variant="ghost"
-                  >
-                    <X className="size-4" />
-                  </Button>
-                  <Button
-                    onClick={() =>
-                      void model.resolvePermission(model.permissionRequests[0]!, "reject_once")
-                    }
-                    size="sm"
-                    variant="ghost"
-                  >
-                    Reject once
-                  </Button>
-                  <Button
-                    onClick={() =>
-                      void model.resolvePermission(model.permissionRequests[0]!, "allow_once")
-                    }
-                    size="sm"
-                  >
-                    Allow once
-                  </Button>
+              ) : null}
+
+              {model.permissionRequests[0] ? (
+                <div
+                  className="border-amber/30 bg-amber-bg text-amber-fg relative z-20 mb-3 rounded-lg border px-3 py-2.5"
+                  role="alert"
+                >
+                  <div className="flex items-start gap-2">
+                    <ShieldAlert className="mt-0.5 size-4 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[12px] font-semibold">
+                        {model.permissionRequests[0].title}
+                      </div>
+                      {isTruthy(model.permissionRequests[0].rawInput) ? (
+                        <div className="text-amber-fg/80 mt-1 truncate font-mono text-[11px]">
+                          {model.permissionRequests[0].rawInput}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 gap-1.5">
+                      <Button
+                        aria-label="Dismiss permission request"
+                        onClick={() =>
+                          void model.resolvePermission(model.permissionRequests[0]!, "reject_once")
+                        }
+                        size="icon-sm"
+                        variant="ghost"
+                      >
+                        <X className="size-4" />
+                      </Button>
+                      <Button
+                        onClick={() =>
+                          void model.resolvePermission(model.permissionRequests[0]!, "reject_once")
+                        }
+                        size="sm"
+                        variant="ghost"
+                      >
+                        Reject once
+                      </Button>
+                      <Button
+                        onClick={() =>
+                          void model.resolvePermission(model.permissionRequests[0]!, "allow_once")
+                        }
+                        size="sm"
+                      >
+                        Allow once
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : null}
+
+              {setupBlocked && model.readiness ? (
+                <AgentReadinessBlockersBanner
+                  onRetryProviderCheck={() => void model.retryProviderCheck()}
+                  readiness={model.readiness}
+                  retrying={model.sending}
+                  summary={setupSummary}
+                />
+              ) : null}
+
+              <SessionThreadComposer
+                composerError={model.composerError}
+                fileInputRef={model.fileInputRef}
+                onFilesSelected={(files) => void handleUploadFiles(files)}
+                onRetry={handleRetrySend}
+                pendingSessionFiles={pendingSessionFiles}
+                sendDisabledReason={sendDisabledReason}
+                sessionResourceMentions={sessionResourceMentions}
+                showSendDisabledReason={!setupBlocked}
+              />
             </div>
-          ) : null}
-
-          {setupBlocked && model.readiness ? (
-            <AgentReadinessBlockersBanner
-              onRetryProviderCheck={() => void model.retryProviderCheck()}
-              readiness={model.readiness}
-              retrying={model.sending}
-              summary={setupSummary}
-            />
-          ) : null}
-
-          <SessionComposer
-            composerError={model.composerError}
-            fileInputRef={model.fileInputRef}
-            input={model.input}
-            inputRef={model.inputRef}
-            onKeyDown={(event) => void handleKeyDown(event)}
-            onFilesSelected={(files) => void handleUploadFiles(files)}
-            onSend={() => void handleSend()}
-            pendingSessionFiles={pendingSessionFiles}
-            sending={model.sending}
-            sessionResourceMentions={sessionResourceMentions}
-            setInput={model.setInput}
-            showSendDisabledReason={!setupBlocked}
-            streaming={model.streaming}
-            sendDisabledReason={sendDisabledReason}
-          />
-        </div>
-      </div>
+          </div>
+        </SessionPermissionProvider>
+      </AssistantRuntimeProvider>
     </div>
   );
 }

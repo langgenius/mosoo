@@ -14,6 +14,10 @@ export interface ComposerError {
 
 export interface SendOptions {
   sessionResourceMentions?: SessionResourceMention[];
+  // Explicit text to send. When omitted, the model falls back to its own
+  // composer input state (legacy path). assistant-ui owns the composer text and
+  // passes it through here.
+  text?: string;
 }
 
 export type PermissionDecision = "allow_once" | "reject_once";
@@ -32,6 +36,7 @@ export interface UseAgentSessionPanelModelInput {
 export interface AgentSessionPanelModel {
   activeSession: SessionSummary | null;
   activeSessionId: string | null;
+  cancel: () => Promise<void>;
   composerError: ComposerError | null;
   configurationRefreshRequired: boolean;
   ensureActiveSession: () => Promise<string>;

@@ -271,8 +271,8 @@ function ConsoleShell({
         <ConsoleSidebarFooter collapsed={collapsed} />
       </nav>
 
-      <div className="flex min-w-0 flex-1 md:py-2 md:pr-2">
-        <main className="bg-background md:border-border-soft flex min-w-0 flex-1 flex-col overflow-hidden md:rounded-xl md:border md:shadow-sm">
+      <div className="flex min-w-0 flex-1">
+        <main className="bg-background md:border-border-soft flex min-w-0 flex-1 flex-col overflow-hidden md:rounded-md md:border-l">
           {children}
         </main>
       </div>
