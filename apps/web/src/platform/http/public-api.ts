@@ -1,4 +1,4 @@
-import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api";
+import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api-core";
 
 export type ApiPath = `/${string}`;
 

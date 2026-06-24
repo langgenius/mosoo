@@ -1,4 +1,4 @@
-import { PUBLIC_API_PREFIX, PUBLIC_API_VERSION_PREFIX } from "@mosoo/contracts/public-api";
+import { PUBLIC_API_PREFIX, PUBLIC_API_VERSION_PREFIX } from "@mosoo/contracts/public-api-core";
 
 import { MOSOO_API_REFERENCE_URL } from "@/shared/config/external-links";
 
