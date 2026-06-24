@@ -345,6 +345,7 @@ export type FileListInput = {
 };
 
 export type FileScopeKind =
+  | 'account'
   | 'agent_package'
   | 'app_draft'
   | 'library'

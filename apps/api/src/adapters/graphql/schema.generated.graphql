@@ -950,6 +950,7 @@ enum FileOwnerKind {
 }
 
 enum FilePurpose {
+  account_avatar
   agent_asset
   agent_package
   app_draft
@@ -983,6 +984,7 @@ type FileScope {
 }
 
 enum FileScopeKind {
+  account
   agent_package
   app_draft
   library
