@@ -87,3 +87,29 @@ export async function listOrganizationApps(
 
   return rows.map(toAppSummary);
 }
+
+export async function listOrganizationAppsPage(
+  database: D1Database,
+  viewer: AuthenticatedViewer,
+  input: {
+    limit: number;
+    organizationId: OrganizationId;
+  },
+): Promise<AppSummary[]> {
+  await ensureOrganizationOwnership(database, viewer.id, input.organizationId);
+
+  const rows = await getAppDatabase(database)
+    .select()
+    .from(appsTable)
+    .where(
+      and(
+        eq(appsTable.organizationId, input.organizationId),
+        eq(appsTable.ownerAccountId, viewer.id),
+      ),
+    )
+    .orderBy(asc(appsTable.id))
+    .limit(input.limit)
+    .all();
+
+  return rows.map(toAppSummary);
+}
