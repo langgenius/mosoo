@@ -1,20 +1,20 @@
-import type { LucideIcon } from "lucide-react";
-import {
-  Bot,
-  Box,
-  ChevronRight,
-  Files,
-  Inbox,
-  KeyRound,
-  LayoutDashboard,
-  Puzzle,
-} from "lucide-react";
+import BotIcon from "@hugeicons/core-free-icons/BotIcon";
+import ChevronRightIcon from "@hugeicons/core-free-icons/ChevronRightIcon";
+import DashboardSquare01Icon from "@hugeicons/core-free-icons/DashboardSquare01Icon";
+import Files02Icon from "@hugeicons/core-free-icons/Files02Icon";
+import InboxIcon from "@hugeicons/core-free-icons/InboxIcon";
+import Key01Icon from "@hugeicons/core-free-icons/Key01Icon";
+import PackageIcon from "@hugeicons/core-free-icons/PackageIcon";
+import PuzzleIcon from "@hugeicons/core-free-icons/PuzzleIcon";
 import type { MouseEvent } from "react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { cn } from "@/shared/lib/class-names";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
+
+import type { AppIcon } from "./hugeicon";
+import { createHugeicon } from "./hugeicon";
 
 interface AppNavChild {
   label: string;
@@ -23,7 +23,7 @@ interface AppNavChild {
 
 interface AppNavItem {
   children?: AppNavChild[];
-  icon: LucideIcon;
+  icon: AppIcon;
   label: string;
   path: string;
 }
@@ -36,11 +36,15 @@ interface AppNavSection {
 const NAV_SECTIONS: AppNavSection[] = [
   {
     items: [
-      { icon: LayoutDashboard, label: "Install", path: "/" },
-      { icon: Inbox, label: "Threads", path: "/threads" },
-      { icon: Bot, label: "Agents", path: "/agent" },
-      { icon: Files, label: "Files", path: "/files" },
-      { icon: Box, label: "Environments", path: "/environment" },
+      { icon: createHugeicon(DashboardSquare01Icon, "InstallIcon"), label: "Install", path: "/" },
+      { icon: createHugeicon(InboxIcon, "ThreadsIcon"), label: "Threads", path: "/threads" },
+      { icon: createHugeicon(BotIcon, "AgentsIcon"), label: "Agents", path: "/agent" },
+      { icon: createHugeicon(Files02Icon, "FilesIcon"), label: "Files", path: "/files" },
+      {
+        icon: createHugeicon(PackageIcon, "EnvironmentsIcon"),
+        label: "Environments",
+        path: "/environment",
+      },
     ],
   },
   {
@@ -50,14 +54,16 @@ const NAV_SECTIONS: AppNavSection[] = [
           { label: "Skills", path: "/integrations/skills" },
           { label: "MCP servers", path: "/integrations/mcp" },
         ],
-        icon: Puzzle,
+        icon: createHugeicon(PuzzleIcon, "IntegrationsIcon"),
         label: "Integrations",
         path: "/integrations",
       },
-      { icon: KeyRound, label: "Providers", path: "/providers" },
+      { icon: createHugeicon(Key01Icon, "ProvidersIcon"), label: "Providers", path: "/providers" },
     ],
   },
 ];
+
+const ExpandIcon = createHugeicon(ChevronRightIcon, "ExpandIcon");
 
 function isNavItemActive(pathname: string, path: string): boolean {
   return pathname === path || pathname.startsWith(`${path}/`);
@@ -71,7 +77,7 @@ function NavLink({
   path,
 }: {
   collapsed: boolean;
-  icon: LucideIcon;
+  icon: AppIcon;
   isActive: boolean;
   label: string;
   path: string;
@@ -181,7 +187,7 @@ function NavGroup({
             onClick={toggleExpansion}
             className="text-fg-3 hover:text-fg-1 flex w-7 shrink-0 items-center justify-center rounded-md transition-colors"
           >
-            <ChevronRight
+            <ExpandIcon
               className={cn(
                 "size-3.5 transition-transform duration-150 ease-out",
                 expanded ? "rotate-90" : "rotate-0",

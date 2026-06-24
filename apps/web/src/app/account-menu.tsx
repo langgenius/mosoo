@@ -1,4 +1,7 @@
-import { ChevronsUpDown, LayoutGrid, LogOut, Settings } from "lucide-react";
+import ChevronsDownUpIcon from "@hugeicons/core-free-icons/ChevronsDownUpIcon";
+import GridViewIcon from "@hugeicons/core-free-icons/GridViewIcon";
+import Logout01Icon from "@hugeicons/core-free-icons/Logout01Icon";
+import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import { Link } from "react-router-dom";
 
 import { cn } from "@/shared/lib/class-names";
@@ -16,6 +19,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { authClient } from "../domains/auth/api/auth-client";
 import { getAvatarBackground, getAvatarInitial } from "../shared/lib/avatar";
 import { isTruthy } from "../shared/lib/truthiness";
+import { createHugeicon } from "./hugeicon";
+
+const AccountMenuChevronIcon = createHugeicon(ChevronsDownUpIcon, "AccountMenuChevronIcon");
+const AccountMenuSettingsIcon = createHugeicon(Settings02Icon, "AccountMenuSettingsIcon");
+const AccountMenuSignOutIcon = createHugeicon(Logout01Icon, "AccountMenuSignOutIcon");
+const AccountMenuAppsIcon = createHugeicon(GridViewIcon, "AccountMenuAppsIcon");
+
 interface AccountMenuUser {
   email: string;
   id: string;
@@ -88,7 +98,7 @@ export function AccountMenu({
         <div className="text-fg-1 truncate text-[13px] font-bold">{user?.name}</div>
         <div className="text-fg-3 truncate text-[11.5px]">{user?.email}</div>
       </div>
-      <ChevronsUpDown className="text-fg-3 size-3.5 shrink-0" />
+      <AccountMenuChevronIcon className="text-fg-3 size-3.5 shrink-0" />
     </Button>
   );
 
@@ -105,13 +115,13 @@ export function AccountMenu({
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild className="cursor-pointer rounded-md">
             <Link to="/apps">
-              <LayoutGrid className="size-4" />
+              <AccountMenuAppsIcon className="size-4" />
               Apps
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild className="cursor-pointer rounded-md">
             <Link to="/settings">
-              <Settings className="size-4" />
+              <AccountMenuSettingsIcon className="size-4" />
               Settings
             </Link>
           </DropdownMenuItem>
@@ -124,7 +134,7 @@ export function AccountMenu({
               })();
             }}
           >
-            <LogOut className="size-4" />
+            <AccountMenuSignOutIcon className="size-4" />
             Sign out
           </DropdownMenuItem>
         </DropdownMenuContent>
