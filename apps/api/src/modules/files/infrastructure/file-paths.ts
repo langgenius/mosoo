@@ -1,4 +1,5 @@
 import {
+  createAccountAvatarPath as createContractAccountAvatarPath,
   createAttachmentPath as createContractAttachmentPath,
   createFileObjectKey as createContractFileObjectKey,
   createFileRecordObjectKey,
@@ -44,6 +45,10 @@ function translatePathAdmission<T>(read: () => T): T {
 
 export function createAttachmentPath(fileId: FileId, fileName: string): string {
   return translatePathAdmission(() => createContractAttachmentPath(fileId, fileName));
+}
+
+export function createAccountAvatarPath(fileId: FileId, fileName: string): string {
+  return translatePathAdmission(() => createContractAccountAvatarPath(fileId, fileName));
 }
 
 export function createSessionArtifactPath(fileId: FileId, fileName: string): string {

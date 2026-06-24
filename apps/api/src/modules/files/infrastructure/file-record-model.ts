@@ -127,6 +127,10 @@ function toFileScopeId(scopeKind: FileScopeKind, scopeId: PlatformId | null): Fi
     throw new Error(`${scopeKind} file scope ID is required.`);
   }
 
+  if (scopeKind === "account") {
+    return parsePlatformId<AccountId>(scopeId, "file account ID");
+  }
+
   if (scopeKind === "agent_package" || scopeKind === "app_draft" || scopeKind === "library") {
     return parsePlatformId<AppId>(scopeId, "file app ID");
   }

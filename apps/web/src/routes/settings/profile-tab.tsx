@@ -1,15 +1,27 @@
-import { Check, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Check, Loader2, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/shared/ui/button";
 
 import { useAppSession } from "../../app/session-provider";
+import { uploadAccountAvatar } from "../../domains/file/api/account-avatar-client";
 import { updateProfile } from "../../domains/user/api/user-client";
+import { apiPath } from "../../platform/http/public-api";
+import { getAvatarBackground, getAvatarInitial } from "../../shared/lib/avatar";
 import { isTruthy } from "../../shared/lib/truthiness";
+import { toAccountId } from "../typed-id";
 
 const MAX_AVATAR_URL_LENGTH = 2048;
+const MAX_AVATAR_FILE_BYTES = 5 * 1024 * 1024;
+const INTERNAL_FILE_PATH_PATTERN = new RegExp(
+  `^${apiPath("/files")}/[A-Za-z0-9]+/content(?:\\?disposition=inline)?$`,
+);
 
-function isValidAvatarUrl(value: string): boolean {
+function isValidAvatarValue(value: string): boolean {
+  if (INTERNAL_FILE_PATH_PATTERN.test(value)) {
+    return true;
+  }
+
   try {
     const parsed = new URL(value);
     return parsed.protocol === "http:" || parsed.protocol === "https:";
@@ -24,7 +36,9 @@ export function ProfileTab() {
   const [avatarInput, setAvatarInput] = useState(user?.image ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setName(user?.name ?? "");
@@ -43,10 +57,11 @@ export function ProfileTab() {
   const nameValid = trimmedName.length > 0;
   const avatarValid =
     trimmedAvatar === "" ||
-    (trimmedAvatar.length <= MAX_AVATAR_URL_LENGTH && isValidAvatarUrl(trimmedAvatar));
+    (trimmedAvatar.length <= MAX_AVATAR_URL_LENGTH && isValidAvatarValue(trimmedAvatar));
   const avatarPreview = trimmedAvatar || currentAvatar;
-  const avatarPreviewValid = avatarPreview === "" || isValidAvatarUrl(avatarPreview);
-  const canSave = dirty && nameValid && avatarValid && !saving;
+  const avatarPreviewValid = avatarPreview === "" || isValidAvatarValue(avatarPreview);
+  const canSave = dirty && nameValid && avatarValid && !saving && !uploading;
+  const avatarBackground = getAvatarBackground(user?.email ?? user?.name);
 
   async function handleSave() {
     if (!canSave) {
@@ -73,6 +88,35 @@ export function ProfileTab() {
     }
   }
 
+  async function handleFileSelected(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file.");
+      return;
+    }
+
+    if (file.size > MAX_AVATAR_FILE_BYTES) {
+      setError("Image must be 5 MB or smaller.");
+      return;
+    }
+
+    if (!isTruthy(user?.id)) {
+      setError("Unable to upload right now. Please try again.");
+      return;
+    }
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      const imageUrl = await uploadAccountAvatar(toAccountId(user.id), file);
+      setAvatarInput(imageUrl);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Failed to upload image.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <>
       <header className="border-border-subtle flex h-12 shrink-0 items-center border-b px-5">
@@ -91,29 +135,60 @@ export function ProfileTab() {
             ) : (
               <div
                 className="flex size-16 items-center justify-center rounded-full text-xl font-semibold text-white"
-                style={{
-                  background:
-                    "linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.08)), rgb(21, 90, 239)",
-                }}
+                style={{ background: avatarBackground }}
               >
-                {user?.name?.charAt(0)?.toUpperCase() ?? "?"}
+                {getAvatarInitial(user?.name)}
               </div>
             )}
             <div className="min-w-0">
               <div className="text-foreground truncate text-lg font-semibold">{user?.name}</div>
               <div className="text-muted-foreground truncate text-sm">{user?.email}</div>
+              <div className="mt-2">
+                <input
+                  ref={fileInputRef}
+                  aria-label="Upload profile picture"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (file) {
+                      void handleFileSelected(file);
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={uploading || saving}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="mr-1 size-4 animate-spin" /> Uploading…
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-1 size-4" /> Upload image
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
 
           <div className="space-y-2">
             <label className="text-foreground text-sm font-medium" htmlFor="profile-avatar-url">
-              Profile picture
+              Profile picture URL
             </label>
-            <p className="text-fg-2 text-[12px]">Paste an image URL to use as your avatar.</p>
+            <p className="text-fg-2 text-[12px]">
+              Upload an image above, or paste an image URL to use as your avatar.
+            </p>
             <input
               aria-label="Profile picture URL"
               id="profile-avatar-url"
-              type="url"
+              type="text"
               inputMode="url"
               placeholder="https://example.com/avatar.png"
               value={avatarInput}

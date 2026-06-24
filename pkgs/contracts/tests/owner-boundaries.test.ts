@@ -17,6 +17,7 @@ import {
 } from "@mosoo/contracts/agent-manifest-parser";
 import {
   SESSION_RESOURCE_MOUNT_DIR,
+  createAccountAvatarPath,
   createAttachmentPath,
   createDownloadDisposition,
   createFileObjectKey,
@@ -29,7 +30,7 @@ import {
   normalizeLibraryFilePath,
   toSessionResourceMaterializedPath,
 } from "@mosoo/contracts/file";
-import type { FileId, SessionId } from "@mosoo/contracts/id";
+import type { AccountId, FileId, SessionId } from "@mosoo/contracts/id";
 import {
   createRuntimeModelIdentity,
   isCustomRuntimeModelProvider,
@@ -44,6 +45,7 @@ import {
 
 const FILE_ID = "01J00000000000000000000001" as FileId;
 const SESSION_ID = "01J00000000000000000000002" as SessionId;
+const ACCOUNT_ID = "01J00000000000000000000003" as AccountId;
 
 function readFixture(path: string): string {
   return readFileSync(new URL(path, import.meta.url), "utf8");
@@ -313,6 +315,16 @@ describe("contracts owner boundaries", () => {
         scope: createScope("session", SESSION_ID),
       }),
     ).toBe(`session/${SESSION_ID}/attachment/${FILE_ID}/notes.txt`);
+
+    expect(createAccountAvatarPath(FILE_ID, " avatar.png ")).toBe(`avatar/${FILE_ID}/avatar.png`);
+    expect(
+      createFileObjectKey({
+        id: FILE_ID,
+        name: "avatar.png",
+        path: `avatar/${FILE_ID}/avatar.png`,
+        scope: createScope("account", ACCOUNT_ID),
+      }),
+    ).toBe(`account/${ACCOUNT_ID}/avatar/${FILE_ID}/avatar.png`);
 
     expect(() =>
       createFileObjectKey({

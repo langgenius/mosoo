@@ -543,6 +543,101 @@ describe("file upload access", () => {
     ).rejects.toThrow();
   });
 
+  test("creates account avatar uploads as account-owned files", async () => {
+    const database = createFileUploadAccessDatabase();
+    const bindings = { DB: database } as ApiBindings;
+
+    const upload = await createFileUpload(bindings, VIEWER, {
+      file: {
+        contentType: "image/png",
+        name: "avatar.png",
+        size: 42,
+      },
+      purpose: "account_avatar",
+      target: {
+        id: VIEWER_ID,
+        kind: "account",
+        name: "avatar.png",
+      },
+    });
+
+    expect(upload.path).toBe(`avatar/${upload.fileId}/avatar.png`);
+
+    const row = await database
+      .prepare(
+        `SELECT object_key, owner_id, owner_kind, purpose, scope_id, scope_kind, session_kind
+           FROM file_record
+          WHERE id = ?`,
+      )
+      .bind(upload.fileId)
+      .first<{
+        object_key: string;
+        owner_id: string;
+        owner_kind: string;
+        purpose: string;
+        scope_id: string;
+        scope_kind: string;
+        session_kind: string | null;
+      }>();
+
+    expect(row).toEqual({
+      object_key: `staging/account/${VIEWER_ID}/${upload.fileId}`,
+      owner_id: VIEWER_ID,
+      owner_kind: "account",
+      purpose: "account_avatar",
+      scope_id: VIEWER_ID,
+      scope_kind: "account",
+      session_kind: null,
+    });
+
+    await expect(
+      ensureFileAccess({
+        database,
+        fileId: upload.fileId,
+        requiredIntent: "read",
+        viewer: VIEWER,
+      }),
+    ).resolves.toMatchObject({ owner_kind: "account" });
+
+    await expect(
+      ensureUploadAccess({
+        database,
+        fileId: upload.fileId,
+        requiredIntent: "write",
+        viewer: { ...VIEWER, id: OTHER_VIEWER_ID },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      ensureFileAccess({
+        database,
+        fileId: upload.fileId,
+        requiredIntent: "read",
+        viewer: { ...VIEWER, id: OTHER_VIEWER_ID },
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("rejects account avatar uploads targeting another account", async () => {
+    const database = createFileUploadAccessDatabase();
+    const bindings = { DB: database } as ApiBindings;
+
+    await expect(
+      createFileUpload(bindings, VIEWER, {
+        file: {
+          contentType: "image/png",
+          name: "avatar.png",
+          size: 42,
+        },
+        purpose: "account_avatar",
+        target: {
+          id: OTHER_VIEWER_ID,
+          kind: "account",
+          name: "avatar.png",
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
   test("requires matching App proof for raw session upload targets", async () => {
     const fixture = await createApiTestFixture();
     await fixture.client.loginAsMosooAiTestAccount();

@@ -2,7 +2,13 @@ import { parsePlatformId } from "@mosoo/id";
 
 import type { AccountId, FileId, AppId, SessionId } from "../id/id.contract";
 
-export const FILE_SCOPE_KINDS = ["agent_package", "app_draft", "library", "session"] as const;
+export const FILE_SCOPE_KINDS = [
+  "account",
+  "agent_package",
+  "app_draft",
+  "library",
+  "session",
+] as const;
 export type FileScopeKind = (typeof FILE_SCOPE_KINDS)[number];
 
 export const FILE_STATUSES = ["deleting", "failed", "pending", "ready"] as const;
@@ -22,6 +28,7 @@ export type FileUploadStatus = (typeof FILE_UPLOAD_STATUSES)[number];
 export const FILE_UPLOAD_STRATEGIES = ["multipart", "single_put"] as const;
 export type FileUploadStrategy = (typeof FILE_UPLOAD_STRATEGIES)[number];
 export const FILE_PURPOSES = [
+  "account_avatar",
   "agent_asset",
   "agent_package",
   "app_draft",
@@ -235,7 +242,7 @@ export function choosePartSize(size: number): number {
   return Math.max(basePartSize, MIN_MULTIPART_PART_SIZE_BYTES);
 }
 
-export type FileScopeId = AppId | SessionId | null;
+export type FileScopeId = AccountId | AppId | SessionId | null;
 export type FileOwnerId = AccountId | AppId | SessionId;
 
 export function createScope(scopeKind: FileScopeKind, scopeId: FileScopeId): FileScope {
@@ -249,9 +256,14 @@ export const SESSION_RESOURCE_RECORD_DIR = "attachment";
 export const SESSION_RESOURCE_MOUNT_DIR = "session-files";
 export const SESSION_ARTIFACT_RECORD_DIR = "artifact";
 export const SESSION_ARTIFACT_MATERIALIZED_DIR = "session-artifacts";
+export const ACCOUNT_AVATAR_RECORD_DIR = "avatar";
 
 export function createAttachmentPath(fileId: FileId, fileName: string): string {
   return `${SESSION_RESOURCE_RECORD_DIR}/${fileId}/${normalizeFileName(fileName)}`;
+}
+
+export function createAccountAvatarPath(fileId: FileId, fileName: string): string {
+  return `${ACCOUNT_AVATAR_RECORD_DIR}/${fileId}/${normalizeFileName(fileName)}`;
 }
 
 export function createSessionArtifactPath(fileId: FileId, fileName: string): string {
@@ -346,6 +358,10 @@ export function createFileObjectKey(file: FileObjectKeyInput): string {
   }
 
   const fileName = requireProjectionFileName(file.name);
+
+  if (file.scope.kind === "account") {
+    return `account/${file.scope.id}/${ACCOUNT_AVATAR_RECORD_DIR}/${file.id}/${fileName}`;
+  }
 
   if (file.scope.kind === "app_draft") {
     return `app-draft/${file.scope.id}/attachment/${file.id}/${fileName}`;
@@ -470,6 +486,12 @@ export interface FileEntryListing {
   files: FileEntry[];
 }
 
+export interface CreateAccountAvatarUploadTarget {
+  id: AccountId;
+  kind: "account";
+  name: string;
+}
+
 export interface CreateLibraryFileUploadTarget {
   id: AppId;
   kind: "library";
@@ -496,6 +518,7 @@ export interface CreateAgentPackageFileUploadTarget {
 }
 
 export type CreateFileUploadTarget =
+  | CreateAccountAvatarUploadTarget
   | CreateSessionFileUploadTarget
   | CreateLibraryFileUploadTarget
   | CreateAgentPackageFileUploadTarget

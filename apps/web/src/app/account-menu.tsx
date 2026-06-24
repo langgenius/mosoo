@@ -14,6 +14,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import { authClient } from "../domains/auth/api/auth-client";
+import { getAvatarBackground, getAvatarInitial } from "../shared/lib/avatar";
 import { isTruthy } from "../shared/lib/truthiness";
 interface AccountMenuUser {
   email: string;
@@ -27,7 +28,7 @@ function UserAvatar({
   user,
 }: {
   size?: number;
-  user: { image?: string | null; name: string } | null;
+  user: { email?: string | null; image?: string | null; name: string } | null;
 }) {
   if (isTruthy(user?.image)) {
     return (
@@ -45,13 +46,13 @@ function UserAvatar({
     <div
       className="flex shrink-0 items-center justify-center rounded-full font-bold tracking-[0.02em] text-white"
       style={{
-        background: "linear-gradient(135deg, var(--green-600), var(--green-800))",
+        background: getAvatarBackground(user?.email ?? user?.name),
         fontSize: size * 0.4,
         height: size,
         width: size,
       }}
     >
-      {user?.name?.charAt(0)?.toUpperCase() ?? "?"}
+      {getAvatarInitial(user?.name)}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 
+import { getAvatarBackground, getAvatarInitial } from "@/shared/lib/avatar";
 import { cn } from "@/shared/lib/class-names";
 
 export function UserAvatar({
@@ -28,11 +29,11 @@ export function UserAvatar({
     <span
       className={cn(
         "flex shrink-0 items-center justify-center overflow-hidden rounded-md font-bold text-white",
-        "bg-[linear-gradient(135deg,var(--green-600),var(--green-800))]",
         sizeClassName,
       )}
+      style={{ background: getAvatarBackground(name) }}
     >
-      {name.charAt(0).toUpperCase() || "?"}
+      {getAvatarInitial(name)}
     </span>
   );
 }
