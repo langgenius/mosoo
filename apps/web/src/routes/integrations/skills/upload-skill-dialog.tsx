@@ -11,30 +11,42 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
+import { Input } from "@/shared/ui/input";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
 import type { useSkillRegistry } from "./use-skill-registry";
+type Mode = "file" | "url";
+
+type Prepared =
+  | { kind: "file"; file: File; preview: SkillInspectResult }
+  | { kind: "url"; url: string; preview: SkillInspectResult };
+
 interface Props {
   onOpenChange: (open: boolean) => void;
   onUpload: (file: File) => Promise<void> | void;
+  onImportUrl: (url: string) => Promise<void> | void;
   open: boolean;
   registry?: ReturnType<typeof useSkillRegistry>;
 }
 
-export function UploadSkillDialog({ onOpenChange, onUpload, open, registry }: Props) {
+export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, registry }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [mode, setMode] = useState<Mode>("file");
+  const [url, setUrl] = useState("");
   const [dragOver, setDragOver] = useState(false);
-  const [prepared, setPrepared] = useState<{ file: File; preview: SkillInspectResult } | null>(
-    null,
-  );
+  const [prepared, setPrepared] = useState<Prepared | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [inspecting, setInspecting] = useState(false);
 
   function reset() {
+    setMode("file");
+    setUrl("");
     setPrepared(null);
     setError(null);
     setDragOver(false);
     setSubmitting(false);
+    setInspecting(false);
     if (inputRef.current) {
       inputRef.current.value = "";
     }
@@ -60,12 +72,37 @@ export function UploadSkillDialog({ onOpenChange, onUpload, open, registry }: Pr
         throw new Error("Skill inspect service is unavailable.");
       }
 
-      setPrepared({ file, preview });
+      setPrepared({ kind: "file", file, preview });
     } catch (caughtError) {
       setError(
         "Failed to inspect: " +
           (caughtError instanceof Error ? caughtError.message : String(caughtError)),
       );
+    }
+  }
+
+  async function handleInspectUrl() {
+    const trimmed = url.trim();
+    setError(null);
+    if (!trimmed) {
+      return;
+    }
+    setInspecting(true);
+    try {
+      const preview = registry ? await registry.inspectGithub(trimmed) : null;
+
+      if (!preview) {
+        throw new Error("Skill inspect service is unavailable.");
+      }
+
+      setPrepared({ kind: "url", url: trimmed, preview });
+    } catch (caughtError) {
+      setError(
+        "Failed to inspect: " +
+          (caughtError instanceof Error ? caughtError.message : String(caughtError)),
+      );
+    } finally {
+      setInspecting(false);
     }
   }
 
@@ -75,11 +112,15 @@ export function UploadSkillDialog({ onOpenChange, onUpload, open, registry }: Pr
     }
     setSubmitting(true);
     try {
-      await onUpload(prepared.file);
+      if (prepared.kind === "file") {
+        await onUpload(prepared.file);
+      } else {
+        await onImportUrl(prepared.url);
+      }
       handleOpenChange(false);
     } catch (caughtError) {
       setError(
-        "Failed to upload: " +
+        "Failed to add skill: " +
           (caughtError instanceof Error ? caughtError.message : String(caughtError)),
       );
       setSubmitting(false);
@@ -90,9 +131,9 @@ export function UploadSkillDialog({ onOpenChange, onUpload, open, registry }: Pr
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Upload skill</DialogTitle>
+          <DialogTitle>Add skill</DialogTitle>
           <DialogDescription className="sr-only">
-            Upload a .md, .zip, or .skill file to your personal skills.
+            Upload a .md, .zip, or .skill file, or import a skill from a GitHub or skills.sh URL.
           </DialogDescription>
         </DialogHeader>
 
@@ -107,10 +148,34 @@ export function UploadSkillDialog({ onOpenChange, onUpload, open, registry }: Pr
           }}
         />
 
+        {!prepared ? (
+          <div className="border-border-strong bg-card inline-flex w-fit items-center overflow-hidden rounded-md border">
+            <ModeButton
+              active={mode === "file"}
+              label="Upload file"
+              onClick={() => {
+                setError(null);
+                setMode("file");
+              }}
+            />
+            <span className="bg-border-strong h-5 w-px" />
+            <ModeButton
+              active={mode === "url"}
+              label="From URL"
+              onClick={() => {
+                setError(null);
+                setMode("url");
+              }}
+            />
+          </div>
+        ) : null}
+
         {prepared ? (
           <div className="border-border bg-muted/30 flex flex-col gap-3 rounded-lg border p-4">
             <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground font-mono text-xs">{prepared.file.name}</span>
+              <span className="text-muted-foreground font-mono text-xs">
+                {prepared.kind === "file" ? prepared.file.name : prepared.url}
+              </span>
             </div>
             <div>
               <div className="text-muted-foreground text-[11px] tracking-wider uppercase">Name</div>
@@ -130,7 +195,7 @@ export function UploadSkillDialog({ onOpenChange, onUpload, open, registry }: Pr
               </div>
             ) : null}
           </div>
-        ) : (
+        ) : mode === "file" ? (
           <button
             className={cn(
               "group flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-14 transition-colors",
@@ -157,6 +222,34 @@ export function UploadSkillDialog({ onOpenChange, onUpload, open, registry }: Pr
               Drag and drop or click to upload
             </div>
           </button>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <Input
+                value={url}
+                placeholder="https://github.com/owner/repo or npx skills add … --skill name"
+                aria-label="Skill source URL or install command"
+                onChange={(e) => {
+                  setUrl(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleInspectUrl();
+                  }
+                }}
+              />
+              <Button
+                variant="outline"
+                onClick={() => {
+                  void handleInspectUrl();
+                }}
+                disabled={inspecting || url.trim().length === 0}
+              >
+                {inspecting ? "Checking…" : "Preview"}
+              </Button>
+            </div>
+          </div>
         )}
 
         {isTruthy(error) ? (
@@ -165,12 +258,37 @@ export function UploadSkillDialog({ onOpenChange, onUpload, open, registry }: Pr
           </div>
         ) : null}
 
-        {!prepared ? (
+        {!prepared && mode === "file" ? (
           <div className="space-y-2">
             <div className="text-foreground text-[13px] font-medium">File requirements</div>
             <ul className="text-muted-foreground marker:text-muted-foreground/60 list-disc space-y-1 pl-4 text-[12.5px]">
               <li>.md file must contain skill name and description formatted in YAML</li>
               <li>.zip or .skill file must include a SKILL.md file</li>
+            </ul>
+          </div>
+        ) : null}
+
+        {!prepared && mode === "url" ? (
+          <div className="space-y-2">
+            <div className="text-foreground text-[13px] font-medium">Supported sources</div>
+            <ul className="text-muted-foreground marker:text-muted-foreground/60 list-disc space-y-1 pl-4 text-[12.5px]">
+              <li>A GitHub repo, directory, or SKILL.md link</li>
+              <li>
+                A{" "}
+                <a
+                  href="https://www.skills.sh/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary underline-offset-2 hover:underline"
+                >
+                  skills.sh
+                </a>{" "}
+                skill page URL
+              </li>
+              <li>
+                The install command copied from skills.sh, e.g.{" "}
+                <code className="font-mono text-[11.5px]">npx skills add …&nbsp;--skill name</code>
+              </li>
             </ul>
           </div>
         ) : null}
@@ -187,14 +305,38 @@ export function UploadSkillDialog({ onOpenChange, onUpload, open, registry }: Pr
           </Button>
           {prepared ? (
             <Button variant="outline" onClick={reset} disabled={submitting}>
-              Change file
+              Change
             </Button>
           ) : null}
           <Button disabled={!prepared || submitting} onClick={handleConfirm}>
-            {submitting ? "Uploading…" : "Upload"}
+            {submitting ? "Adding…" : "Add skill"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ModeButton({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "h-8 px-3 text-[13px] font-medium transition-colors",
+        active ? "bg-paper-200 text-fg-1" : "text-fg-3 hover:bg-paper-200/50",
+      )}
+    >
+      {label}
+    </button>
   );
 }

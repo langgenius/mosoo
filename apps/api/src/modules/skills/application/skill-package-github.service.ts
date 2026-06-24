@@ -72,8 +72,9 @@ function parseGithubContentEntries(value: unknown, path: string): GithubContentE
 
 export async function loadSkillPackageFromGithub(
   githubUrl: string,
+  skillName?: string,
 ): Promise<NormalizedSkillPackage> {
-  const target = await resolveGithubSkillTarget(githubUrl);
+  const target = await resolveGithubSkillTarget(githubUrl, skillName);
 
   if (target.kind === "blob") {
     const body = await downloadGithubFile(target.owner, target.repo, target.ref, target.path);
@@ -182,7 +183,10 @@ async function walkGithubContents(
   }
 }
 
-async function resolveGithubSkillTarget(url: string): Promise<GithubSkillTarget> {
+async function resolveGithubSkillTarget(
+  url: string,
+  skillName?: string,
+): Promise<GithubSkillTarget> {
   let parsed: URL;
 
   try {
@@ -205,11 +209,24 @@ async function resolveGithubSkillTarget(url: string): Promise<GithubSkillTarget>
   const repo = stripDotGit(segments[1]!);
 
   if (segments.length === 2) {
+    const ref = await getDefaultBranch(owner, repo);
+
+    if (isTruthy(skillName)) {
+      return {
+        kind: "tree",
+        owner,
+        path: await resolveSkillSubdirectory(owner, repo, ref, skillName, ""),
+        ref,
+        relativePath: "",
+        repo,
+      };
+    }
+
     return {
       kind: "repository",
       owner,
       path: "",
-      ref: await getDefaultBranch(owner, repo),
+      ref,
       relativePath: "",
       repo,
     };
@@ -235,6 +252,17 @@ async function resolveGithubSkillTarget(url: string): Promise<GithubSkillTarget>
   const rawPathSegments = refAndPathSegments.slice(refSegmentCount);
   const path = rawPathSegments.join("/");
 
+  if (mode === "tree" && isTruthy(skillName)) {
+    return {
+      kind: "tree",
+      owner,
+      path: await resolveSkillSubdirectory(owner, repo, ref, skillName, path),
+      ref,
+      relativePath: "",
+      repo,
+    };
+  }
+
   if (mode === "blob" && !path) {
     throw new SkillRequestError(
       mode === "blob"
@@ -251,6 +279,73 @@ async function resolveGithubSkillTarget(url: string): Promise<GithubSkillTarget>
     relativePath: mode === "blob" ? (rawPathSegments.at(-1) ?? "SKILL.md") : "",
     repo,
   };
+}
+
+/**
+ * Resolves a `--skill <name>` selector (as used by skills.sh / `npx skills add`) to a concrete
+ * directory inside the repository. Skills live under a `skills/` folder by convention
+ * (e.g. vercel-labs/skills → skills/find-skills), but we also accept a top-level directory or a
+ * `.claude/skills/<name>` layout so single-skill repos and Claude-style repos work too.
+ */
+async function resolveSkillSubdirectory(
+  owner: string,
+  repo: string,
+  ref: string,
+  skillName: string,
+  basePath: string,
+): Promise<string> {
+  const base = basePath.replace(/^\/+|\/+$/g, "");
+  const candidates = [
+    joinGithubPath(base, "skills", skillName),
+    joinGithubPath(base, skillName),
+    joinGithubPath(base, ".claude", "skills", skillName),
+  ];
+
+  for (const candidate of candidates) {
+    if (await githubPathIsDirectory(owner, repo, ref, candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new SkillRequestError(
+    `Skill "${skillName}" was not found in ${owner}/${repo}. Looked in: ${candidates.join(", ")}.`,
+  );
+}
+
+function joinGithubPath(...parts: string[]): string {
+  return parts.filter((part) => part.length > 0).join("/");
+}
+
+async function githubPathIsDirectory(
+  owner: string,
+  repo: string,
+  ref: string,
+  path: string,
+): Promise<boolean> {
+  const normalizedPath = path.split("/").filter(Boolean).map(encodeURIComponent).join("/");
+  const response = await fetch(
+    `${GITHUB_API}/repos/${owner}/${repo}/contents/${normalizedPath}?ref=${encodeURIComponent(ref)}`,
+    {
+      headers: {
+        Accept: "application/vnd.github+json",
+      },
+    },
+  );
+
+  if (response.status === 404) {
+    return false;
+  }
+
+  if (response.status === 403) {
+    throw new SkillRequestError("GitHub API rate limited the request or requires authentication.");
+  }
+
+  if (!response.ok) {
+    throw new SkillRequestError(`GitHub API returned ${response.status}.`);
+  }
+
+  const payload: unknown = await response.json();
+  return Array.isArray(payload);
 }
 
 async function listGithubBranches(owner: string, repo: string): Promise<string[]> {
