@@ -1,7 +1,7 @@
 # Files API — Library And Session Artifacts Contract
 
 Status: revised MVP contract after OpenMA/VibeSDK product review (YEF-674)
-Scope: `apps/api/src/modules/files`, `pkgs/contracts/src/file`, and every module that reaches into file storage internals (`runtime`, `sessions`, `public-api`, `api-command`, `agents`, `agent-builder`).
+Scope: `apps/api/src/modules/files`, `pkgs/contracts/src/file`, and every module that reaches into file storage internals (`runtime`, `sessions`, `public-api`, `api-command`, `agents`).
 
 This document defines the MVP product contract for an App-scoped **Files Library** plus **session-scoped attachments/artifacts**. It deliberately does **not** introduce an App source tree, a generic `resources[]` model, `Mount` union, Memory Store, or Claude adapter contract. Those are separate products/contracts only when they exist. The MVP fixes the current leak by separating session data from non-session file records and removing the old shared-file product/API/Manifest surface.
 
@@ -198,7 +198,7 @@ apps/api/.../files/infrastructure       ← adapters that IMPLEMENT the ports (R
 
 1. No module outside `apps/api/src/modules/files/**` may import from `files/infrastructure/**`. Allowed import surface = `files/application/file-store` (+ the registry/types it re-exports).
 2. Files access is owned by the Files module and existing tenant/account/App access policy, not by a separate shared-file domain.
-3. `runtime`, `sessions`, `public-api`, `api-command`, `agents`, `agent-builder` obtain a `FileStore` (via DI/bindings) and call methods. They never re-implement upload/claim/transform.
+3. `runtime`, `sessions`, `public-api`, `api-command`, `agents` obtain a `FileStore` (via DI/bindings) and call methods. They never re-implement upload/claim/transform.
 4. Path/key helpers stay in `pkgs/contracts` and are called by the registry/adapters — not re-wrapped per module or imported from `files/infrastructure`.
 
 A mechanical boundary test or dependency-cruiser / eslint `no-restricted-imports` rule makes rules 1–2 checkable in CI.

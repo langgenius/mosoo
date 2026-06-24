@@ -26,7 +26,7 @@ The App owner needs a direct way to make an Agent useful:
 | -------------------------------------------- | -------------------------------------------------------------------- |
 | "This Agent needs to call Linear."           | Add a Linear MCP server inside the active App.                       |
 | "This Agent needs a credential."             | Connect an App-local Bearer or OAuth credential for that server.     |
-| "This Agent should use the tool at runtime." | Bind the App MCP server in Agent Builder.                            |
+| "This Agent should use the tool at runtime." | Bind the App MCP server in the Agent editor.                         |
 | "This Agent package is exported or forked."  | Export only the binding intent; require reconnect in the target App. |
 
 The current product path is intentionally narrow: one App owner configures MCP for one App, then runs Agents that belong to that same App.
@@ -98,12 +98,12 @@ The App owner can update metadata, reconnect, revoke, disable, enable, or delete
 
 ---
 
-## 5. Agent Builder Journey
+## 5. Agent Editor Journey
 
-Agent Builder only binds MCP servers already available in the same App:
+The Agent editor only binds MCP servers already available in the same App:
 
 ```text
-Agent Builder
+Agent editor
   Capabilities
     MCP
       Pick App MCP server
@@ -161,7 +161,7 @@ In scope:
 - Bearer and OAuth credentials stored through the vault.
 - App-local MCP server registry.
 - App-local credential lifecycle.
-- Agent Builder MCP binding to same-App servers.
+- Agent editor MCP binding to same-App servers.
 - Runtime credential resolution for app-scoped and agent-scoped rows.
 - Package export/import reconnect intent.
 

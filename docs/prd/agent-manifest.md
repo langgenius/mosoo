@@ -13,8 +13,8 @@
 The Agent Manifest is the **declarative product configuration** of a Mosoo Agent:
 
 - It uses **a small set of stable fields** to spell out who an Agent is, which runtime it runs on, which model it uses, which system prompt it follows, and which Skills / MCP / Environment it has installed.
-- Upstream: the Agent owner edits it through a UI form, or lets **Agent Builder** generate it.
-- Downstream: any tool — Agent Builder, the CLI, CI, a future IDE plugin — can read the same Manifest and package it into a **`.agent` file** to distribute, fork, and import across Apps, instances, and the community.
+- Upstream: the Agent owner edits it through the Agent editor / Preview form. (A natural-language configuration assistant — the former **Agent Builder** — is not part of the current product; see [architecture.md §4.4 Configuration Assistance Boundary](../architecture.md).)
+- Downstream: any tool — the CLI, CI, a future IDE plugin — can read the same Manifest and package it into a **`.agent` file** to distribute, fork, and import across Apps, instances, and the community.
 
 It is **not** a "super `agent.yaml`" that unifies the vendor configuration files of OpenAI runtime, Claude Agent SDK, OpenCode, Cursor, and so on. Those vendors have their own full-featured configuration formats, and we do not try to swallow them.
 
@@ -29,7 +29,7 @@ It is **not** a "super `agent.yaml`" that unifies the vendor configuration files
 
 The core points it solves are:
 
-1. **Consumable by downstream tools** — whether it is our own Agent Builder, other automation tools, or future third-party platforms, all of them can read the same Manifest to understand "who this Agent is and what it needs."
+1. **Consumable by downstream tools** — whether it is our own tooling, other automation tools, or future third-party platforms, all of them can read the same Manifest to understand "who this Agent is and what it needs."
 2. **Making `.agent` files easy to distribute** — a `.zip` that contains `manifest.json` plus asset files (skills / environment definition / etc.) can be attached to a GitHub, Notion, or Slack file and handed to another developer, and can also be imported into any Mosoo App.
 3. **Declarative** — the user expresses "what I want," and the platform renders it into something a concrete runtime can run. The user does **not** write startup commands, does not maintain a vendor `.toml`, and does not toggle dozens of advanced switches in a UI form.
 
@@ -58,7 +58,7 @@ If we built only the lowest common denominator:
 The real problem is not "how do we merge every vendor's fields into one," but rather:
 
 - **Agent authors need a readable, editable, publishable entry point for product configuration.**
-- **The platform needs a stable contract** that can create, start, diagnose, and recover Agents, and that can also be consumed by Agent Builder and other downstream tools.
+- **The platform needs a stable contract** that can create, start, diagnose, and recover Agents, and that can also be consumed by downstream tools.
 - **Each Agent's runtime environment** must still retain the vendor's full capabilities.
 - **When the UI, the Sandbox, and the vendor-native config disagree**, the user must clearly understand who is the source of truth and what to do next.
 
@@ -69,7 +69,7 @@ The real problem is not "how do we merge every vendor's fields into one," but ra
 ### What Agent authors can do
 
 - Define a long-lived Agent with a small set of stable fields: `kind`, runtime, model, system prompt, Skills, MCP, Environment.
-- Let Agent Builder take over the complex editing work: say in natural language "give me an agent that can read Linear tickets," and Builder translates it into a Manifest patch.
+- Edit the Manifest directly through the Agent editor / Preview form. (A natural-language authoring assistant that turns "give me an agent that can read Linear tickets" into a Manifest patch — the former Agent Builder — is **not** part of the current product; any future configuration assistance is constrained by [architecture.md §4.4 Configuration Assistance Boundary](../architecture.md).)
 - Export the Agent as a **`.agent` package** to send to another developer, upload to the community, or fork into another App.
 - Import someone else's `.agent` package: the Manifest lands, assets are reused, and **credentials / tokens are not carried along with it**.
 
@@ -183,7 +183,7 @@ The Manifest is a minimal common set → it is impossible to move all of the Ope
 
 ## 7. User journeys
 
-### Owner creates an Agent (through the UI or Agent Builder)
+### Owner creates an Agent (through the Agent editor)
 
 | Stage                     | Action                                                     | Experience                                                         |
 | ------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------ |
