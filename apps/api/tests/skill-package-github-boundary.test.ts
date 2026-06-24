@@ -97,4 +97,61 @@ describe("GitHub skill package boundary", () => {
     ]);
     expect(downloads).toEqual(new Map([...fileBodies.keys()].map((url) => [url, 1] as const)));
   });
+
+  test("resolves a --skill selector to the skills/<name> directory", async () => {
+    globalThis.fetch = async (input) => {
+      const url = typeof input === "string" ? input : input.url;
+
+      if (url === "https://api.github.com/repos/acme/repo") {
+        return Response.json({ default_branch: "main" });
+      }
+
+      // Probe order: skills/find-skills exists, so it is selected.
+      if (url === "https://api.github.com/repos/acme/repo/contents/skills/find-skills?ref=main") {
+        return Response.json([
+          {
+            download_url:
+              "https://raw.githubusercontent.com/acme/repo/main/skills/find-skills/SKILL.md",
+            path: "skills/find-skills/SKILL.md",
+            type: "file",
+          },
+        ]);
+      }
+
+      if (url === "https://raw.githubusercontent.com/acme/repo/main/skills/find-skills/SKILL.md") {
+        const body = "---\nname: find-skills\ndescription: find skills\n---\n# Find\n";
+        return new Response(body, {
+          headers: {
+            "content-length": String(new TextEncoder().encode(body).byteLength),
+          },
+        });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    };
+
+    const normalized = await loadSkillPackageFromGithub(
+      "https://github.com/acme/repo",
+      "find-skills",
+    );
+
+    expect(normalized.entries.map((entry) => entry.path)).toEqual(["SKILL.md"]);
+    expect(normalized.frontmatter.name).toBe("find-skills");
+  });
+
+  test("reports a clear error when the --skill selector is not found", async () => {
+    globalThis.fetch = async (input) => {
+      const url = typeof input === "string" ? input : input.url;
+
+      if (url === "https://api.github.com/repos/acme/repo") {
+        return Response.json({ default_branch: "main" });
+      }
+
+      return new Response("Not Found", { status: 404 });
+    };
+
+    await expect(
+      loadSkillPackageFromGithub("https://github.com/acme/repo", "missing"),
+    ).rejects.toThrow('Skill "missing" was not found in acme/repo');
+  });
 });

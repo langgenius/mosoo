@@ -19,6 +19,7 @@ import {
   SkillRequestError,
 } from "./skill-package.shared";
 import type { InspectSkillInput, UploadSkillFile } from "./skill-package.shared";
+import { parseSkillSourceUrl } from "./skill-source-url.service";
 export async function inspectSkillInput(input: InspectSkillInput): Promise<SkillInspectResult> {
   const normalized = await loadNormalizedSkillPackage(input);
 
@@ -53,7 +54,8 @@ export async function loadNormalizedSkillPackage(
     }
 
     if (isTruthy(input.githubUrl)) {
-      return await loadSkillPackageFromGithub(input.githubUrl);
+      const { githubUrl, skillName } = parseSkillSourceUrl(input.githubUrl);
+      return await loadSkillPackageFromGithub(githubUrl, skillName);
     }
   } catch (error) {
     if (error instanceof SkillRequestError) {
