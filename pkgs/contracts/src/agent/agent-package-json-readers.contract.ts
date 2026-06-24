@@ -2,6 +2,7 @@ import { parseJsonObject } from "../validation/primitives.contract";
 import {
   hasRequiredText,
   isRecord,
+  readBuiltInToolConfig,
   readAgentKind,
   readBooleanOrDefault,
   readNullableString,
@@ -17,6 +18,7 @@ import type {
   AgentManifestSkillReference,
   AgentPackage,
 } from "./agent-manifest.contract";
+import { normalizeAgentBuiltInTools } from "./agent.contract";
 
 export function readAgentPackageFromRecord(
   input: Record<string, unknown>,
@@ -62,6 +64,9 @@ export function buildPackageManifest(input: Record<string, unknown>): AgentManif
 
   return {
     advanced: null,
+    builtInTools: normalizeAgentBuiltInTools(
+      readParsedArray(input, "builtInTools", readBuiltInToolConfig),
+    ),
     environment: readPackageEnvironment(input["environment"]),
     kind,
     manifestVersion: AGENT_MANIFEST_VERSION,

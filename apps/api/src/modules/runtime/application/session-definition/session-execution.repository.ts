@@ -1,4 +1,10 @@
-import { AGENT_KIND_LIST_LABEL, AgentKind } from "@mosoo/contracts/agent";
+import {
+  AGENT_KIND_LIST_LABEL,
+  AgentKind,
+  createDefaultAgentBuiltInTools,
+  isAgentBuiltInToolName,
+  normalizeAgentBuiltInTools,
+} from "@mosoo/contracts/agent";
 import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
 import type { AgentMcpCredentialMode } from "@mosoo/contracts/mcp";
 import type { SkillResolutionMode } from "@mosoo/contracts/skill";
@@ -213,12 +219,41 @@ function parseToolReference(value: unknown, index: number): SessionExecutionPlan
   };
 }
 
+function parseBuiltInTool(
+  value: unknown,
+  index: number,
+): SessionExecutionPlan["builtInTools"][number] {
+  const field = `sessionExecutionPlan.builtInTools.${index}`;
+  const record = readRecord(value, field);
+  const name = readString(record["name"], `${field}.name`);
+
+  if (!isAgentBuiltInToolName(name)) {
+    throw new TypeError(`${field}.name is unsupported.`);
+  }
+
+  return {
+    enabled: readBoolean(record["enabled"], `${field}.enabled`),
+    name,
+  };
+}
+
+function parseBuiltInTools(value: unknown): SessionExecutionPlan["builtInTools"] {
+  if (value === undefined) {
+    return createDefaultAgentBuiltInTools();
+  }
+
+  return normalizeAgentBuiltInTools(
+    readArray(value, "sessionExecutionPlan.builtInTools").map(parseBuiltInTool),
+  );
+}
+
 function parseSessionExecutionPlanJson(planJson: string): SessionExecutionPlan {
   const parsed: unknown = JSON.parse(planJson);
   const record = readRecord(parsed, "sessionExecutionPlan");
 
   return {
     binding: parseBinding(record["binding"]),
+    builtInTools: parseBuiltInTools(record["builtInTools"]),
     environment: parseEnvironment(record["environment"]),
     skills: readArray(record["skills"], "sessionExecutionPlan.skills").map(parseSkillReference),
     tools: readArray(record["tools"], "sessionExecutionPlan.tools").map(parseToolReference),

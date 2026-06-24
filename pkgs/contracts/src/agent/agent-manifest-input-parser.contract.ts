@@ -5,6 +5,7 @@ import {
   hasRecordEntries,
   hasRequiredText,
   isRecord,
+  readBuiltInToolConfig,
   readAgentKind,
   readJsonObjectField,
   readMcpServerBinding,
@@ -22,7 +23,7 @@ import type {
   AgentResolutionIssue,
 } from "./agent-manifest.contract";
 import type { AgentKind } from "./agent.contract";
-import { AGENT_KIND_LIST_LABEL } from "./agent.contract";
+import { AGENT_KIND_LIST_LABEL, normalizeAgentBuiltInTools } from "./agent.contract";
 
 interface ManifestSections {
   environment: Record<string, unknown>;
@@ -221,6 +222,9 @@ function buildAgentManifest(
 
   return {
     advanced: null,
+    builtInTools: normalizeAgentBuiltInTools(
+      readParsedArray(input, "builtInTools", readBuiltInToolConfig),
+    ),
     environment: {
       envVars: readStringRecord(sections.environment["envVars"]),
       environmentId: readNullableString(sections.environment, "environmentId"),

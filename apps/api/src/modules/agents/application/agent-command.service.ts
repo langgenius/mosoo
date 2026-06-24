@@ -1,4 +1,5 @@
 import type { Agent, CreateAgentInput, UpdateAgentConfigInput } from "@mosoo/contracts/agent";
+import { createDefaultAgentBuiltInTools, normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
 import {
   agentDeploymentVersionsTable,
   agentMcpBindingsTable,
@@ -93,6 +94,7 @@ export async function createAgent(
     .insert(agentsTable)
     .values({
       configJson: serializeAgentStoredConfig({
+        builtInTools: createDefaultAgentBuiltInTools(),
         packageMcpServers: [],
         packageSkills: [],
         packageResolution: null,
@@ -148,6 +150,10 @@ export async function updateAgentConfig(
   );
   const currentSkillIds = await listAgentSkillIds(database, editable.agent.id);
   const currentStoredConfig = parseAgentStoredConfig(editable.agent.configJson);
+  const builtInTools =
+    input.builtInTools === undefined
+      ? currentStoredConfig.builtInTools
+      : normalizeAgentBuiltInTools(input.builtInTools);
   const providerOptionsUnchanged =
     stableStringify(currentStoredConfig.providerOptions) === stableStringify(input.providerOptions);
   const providerOptions = assertRuntimeAdvancedSettings({
@@ -169,6 +175,7 @@ export async function updateAgentConfig(
     current: createAgentConfigChangeSnapshot({
       agent: {
         ...editable.agent,
+        builtInTools: currentStoredConfig.builtInTools,
         providerOptions: currentStoredConfig.providerOptions,
       },
       environment: currentEnvironment,
@@ -178,6 +185,7 @@ export async function updateAgentConfig(
     next: createAgentConfigChangeSnapshot({
       agent: {
         ...editable.agent,
+        builtInTools,
         description: input.description ?? null,
         kind: input.kind,
         model: input.model,
@@ -211,6 +219,7 @@ export async function updateAgentConfig(
     agentId: editable.agent.id,
     currentConfigJson: editable.agent.configJson,
     environment: input.environment,
+    builtInTools,
     providerOptions,
     updatedAt: timestampMs,
   });

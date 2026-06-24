@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
 import { classifyAgentConfigChanges } from "@mosoo/contracts/agent-config-change-plan";
 
 import type { AgentEditorDraft } from "../src/routes/agent/components/editor/draft";
@@ -10,6 +11,7 @@ const MCP_SERVER_ID = "01J000000000000000000000B2";
 
 function draft(overrides: Partial<AgentEditorDraft> = {}): AgentEditorDraft {
   return {
+    builtInTools: createDefaultAgentBuiltInTools(),
     description: "Description",
     environmentId: null,
     mcpServers: [],

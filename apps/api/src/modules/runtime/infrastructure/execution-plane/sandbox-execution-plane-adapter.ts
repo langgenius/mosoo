@@ -209,6 +209,7 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
       };
       const driver = await timing.measure("ensureDriverSessionReady", () =>
         ensureDriverSessionReady(bindings, requestUrl, {
+          builtInTools: input.builtInTools,
           cloudflareSession: executionSession.cloudflareSession,
           ...(input.onBootPayloadPrepared
             ? { onBootPayloadPrepared: input.onBootPayloadPrepared }

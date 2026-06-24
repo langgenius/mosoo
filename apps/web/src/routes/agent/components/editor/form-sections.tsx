@@ -9,6 +9,7 @@ import { isRuntimeSelectable, listRuntimeOptions } from "../../runtime-catalog";
 import { AgentChannelsField } from "../channels-field";
 import { PackageResolutionIssueCard } from "../package-resolution-issue-card";
 import { RuntimeIcon } from "../runtime-icon";
+import { BuiltInToolsField } from "./built-in-tools-field";
 import { EnvironmentPicker } from "./environment-picker";
 import { AgentMcpBindingsField } from "./mcp-bindings-field";
 import { ModelPickerField } from "./model-picker-field";
@@ -222,6 +223,15 @@ export function IntegrationsSection({
           readOnly={readOnly}
           selectedSkills={model.draft.skills}
           setSkills={model.setSkills}
+        />
+      </div>
+
+      <div>
+        <SectionHeader>Tools</SectionHeader>
+        <BuiltInToolsField
+          readOnly={readOnly}
+          tools={model.draft.builtInTools}
+          setTools={model.setBuiltInTools}
         />
       </div>
 

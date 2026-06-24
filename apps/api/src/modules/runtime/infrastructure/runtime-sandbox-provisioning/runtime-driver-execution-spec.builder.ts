@@ -149,6 +149,7 @@ async function toRuntimeResolvedSkill(
 export async function buildExecutionSpec(
   bindings: RuntimeExecutionSpecBindings,
   input: {
+    builtInTools: DriverExecutionSpec["builtInTools"];
     driverInstanceId: DriverInstanceId;
     profile: DriverProfileConfig;
     requestUrl: string;
@@ -175,6 +176,7 @@ export async function buildExecutionSpec(
   ]);
 
   return {
+    builtInTools: input.builtInTools,
     configRevision: {
       ...input.profile.configRevision,
       runId: input.sessionRunId ?? null,

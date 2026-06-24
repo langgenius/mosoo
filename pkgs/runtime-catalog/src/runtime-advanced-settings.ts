@@ -1,20 +1,36 @@
 import type { JsonObject } from "@mosoo/contracts";
 
-export type RuntimeAdvancedSettingType = "select";
+export type RuntimeAdvancedSettingType = "number" | "select";
+export type RuntimeAdvancedSettingValueType = "integer" | "string";
 
 export interface RuntimeAdvancedSettingOption {
   readonly label: string;
   readonly value: string;
 }
 
-export interface RuntimeAdvancedSettingDefinition {
-  readonly defaultValue: string;
+export interface RuntimeAdvancedSettingBaseDefinition {
   readonly description: string;
   readonly key: string;
   readonly label: string;
-  readonly options: readonly RuntimeAdvancedSettingOption[];
-  readonly type: RuntimeAdvancedSettingType;
 }
+
+export interface RuntimeAdvancedSelectSettingDefinition extends RuntimeAdvancedSettingBaseDefinition {
+  readonly defaultValue?: string;
+  readonly options: readonly RuntimeAdvancedSettingOption[];
+  readonly type: "select";
+}
+
+export interface RuntimeAdvancedNumberSettingDefinition extends RuntimeAdvancedSettingBaseDefinition {
+  readonly defaultValue?: number;
+  readonly min: number;
+  readonly step?: number;
+  readonly type: "number";
+  readonly valueType: RuntimeAdvancedSettingValueType;
+}
+
+export type RuntimeAdvancedSettingDefinition =
+  | RuntimeAdvancedNumberSettingDefinition
+  | RuntimeAdvancedSelectSettingDefinition;
 
 export interface RuntimeAdvancedSettingsValidationIssue {
   readonly code:
@@ -39,7 +55,24 @@ function option(value: string): RuntimeAdvancedSettingOption {
 }
 
 export const RUNTIME_ADVANCED_SETTINGS_REGISTRY = {
-  "claude-agent-sdk": [],
+  "claude-agent-sdk": [
+    {
+      description: "Controls Claude Agent SDK reasoning effort for this runtime.",
+      key: "effort",
+      label: "Effort",
+      options: ["low", "medium", "high", "xhigh", "max"].map(option),
+      type: "select",
+    },
+    {
+      description: "Maximum number of Claude Agent SDK conversation turns before stopping.",
+      key: "maxTurns",
+      label: "Max turns",
+      min: 1,
+      step: 1,
+      type: "number",
+      valueType: "integer",
+    },
+  ],
   "openai-runtime": [
     {
       defaultValue: "medium",
@@ -107,8 +140,12 @@ function createDefinitionMap(
   return definitions;
 }
 
-function hasOption(definition: RuntimeAdvancedSettingDefinition, value: string): boolean {
+function hasOption(definition: RuntimeAdvancedSelectSettingDefinition, value: string): boolean {
   return definition.options.some((optionEntry) => optionEntry.value === value);
+}
+
+function isDefaultValue(definition: RuntimeAdvancedSettingDefinition, value: unknown): boolean {
+  return definition.defaultValue !== undefined && value === definition.defaultValue;
 }
 
 export function listRuntimeAdvancedSettings(
@@ -131,7 +168,7 @@ export function normalizeRuntimeAdvancedSettings(input: {
   for (const [key, value] of Object.entries(input.settings)) {
     const definition = definitions.get(key);
 
-    if (definition === undefined || value === definition.defaultValue) {
+    if (definition === undefined || isDefaultValue(definition, value)) {
       continue;
     }
 
@@ -168,13 +205,29 @@ export function validateRuntimeAdvancedSettings(input: {
       continue;
     }
 
-    if (typeof value !== "string" || !hasOption(definition, value)) {
+    if (definition.type === "select") {
+      if (typeof value !== "string" || !hasOption(definition, value)) {
+        issues.push({
+          code: "runtime_settings_invalid_value",
+          key,
+          message: `Runtime setting ${key} must be one of ${definition.options
+            .map((optionEntry) => optionEntry.value)
+            .join(", ")}.`,
+        });
+      }
+      continue;
+    }
+
+    if (
+      typeof value !== "number" ||
+      !Number.isFinite(value) ||
+      (definition.valueType === "integer" && !Number.isInteger(value)) ||
+      value < definition.min
+    ) {
       issues.push({
         code: "runtime_settings_invalid_value",
         key,
-        message: `Runtime setting ${key} must be one of ${definition.options
-          .map((optionEntry) => optionEntry.value)
-          .join(", ")}.`,
+        message: `Runtime setting ${key} must be an integer greater than or equal to ${definition.min}.`,
       });
     }
   }

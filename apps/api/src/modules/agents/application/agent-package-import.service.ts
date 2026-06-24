@@ -86,6 +86,7 @@ export async function importAgentPackage(
 
   const agent = await createDraftAgentBatch(bindings.DB, {
     agentName: parsed.package.app.name,
+    builtInTools: manifest.builtInTools,
     description: parsed.package.app.description,
     environmentId,
     kind: manifest.kind,

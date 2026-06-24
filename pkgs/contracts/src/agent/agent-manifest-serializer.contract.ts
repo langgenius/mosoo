@@ -1,5 +1,6 @@
 import type { JsonObject, JsonPrimitive, JsonValue } from "../validation/primitives.contract";
 import type { AgentManifest, AgentPackage } from "./agent-manifest.contract";
+import { normalizeAgentBuiltInTools } from "./agent.contract";
 
 function yamlString(value: string | null): string {
   if (value === null) {
@@ -81,6 +82,7 @@ export function serializeAgentManifestToYaml(
   manifest: AgentManifest,
   sourceAgentId: string | null = null,
 ): string {
+  const builtInTools = normalizeAgentBuiltInTools(manifest.builtInTools ?? []);
   const lines: string[] = [
     `manifestVersion: ${yamlString(manifest.manifestVersion)}`,
     ...(sourceAgentId === null ? [] : [`sourceAgentId: ${yamlString(sourceAgentId)}`]),
@@ -114,6 +116,16 @@ export function serializeAgentManifestToYaml(
       lines.push(`    skillName: ${yamlString(skill.skillName)}`);
       lines.push(`    ownerName: ${yamlString(skill.ownerName)}`);
       lines.push(`    state: ${yamlString(skill.state)}`);
+    }
+  }
+
+  lines.push("builtInTools:");
+  if (builtInTools.length === 0) {
+    lines.push("  []");
+  } else {
+    for (const tool of builtInTools) {
+      lines.push(`  - name: ${yamlString(tool.name)}`);
+      lines.push(`    enabled: ${tool.enabled ? "true" : "false"}`);
     }
   }
 
@@ -193,9 +205,12 @@ function toAgentManifestExportJson(
   manifest: AgentManifest,
   sourceAgentId: string | null,
 ): Record<string, unknown> {
+  const builtInTools = normalizeAgentBuiltInTools(manifest.builtInTools ?? []);
+
   return {
     ...(sourceAgentId === null ? {} : { sourceAgentId }),
     ...manifest,
+    builtInTools,
     runtime: {
       id: manifest.runtime.id,
       model: manifest.runtime.model,
@@ -207,6 +222,7 @@ function toAgentManifestExportJson(
 
 export function toAgentPackageManifestJson(agentPackage: AgentPackage): Record<string, unknown> {
   const manifest = agentPackage.manifest;
+  const builtInTools = normalizeAgentBuiltInTools(manifest.builtInTools ?? []);
 
   return {
     name: agentPackage.app.name,
@@ -225,6 +241,10 @@ export function toAgentPackageManifestJson(agentPackage: AgentPackage): Record<s
     settings: manifest.runtime.providerOptions,
     prompts: manifest.prompts,
     avatar: agentPackage.app.avatarAssetKey,
+    builtInTools: builtInTools.map((tool) => ({
+      enabled: tool.enabled,
+      name: tool.name,
+    })),
     skills: manifest.skills.map((skill) => ({
       name: skill.skillName,
       ownerName: skill.ownerName,

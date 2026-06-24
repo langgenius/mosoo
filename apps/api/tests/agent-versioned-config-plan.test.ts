@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AgentEnvironmentConfig } from "@mosoo/contracts/agent";
+import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
 
 import {
   createAgentConfigChangeSnapshot,
@@ -13,6 +14,7 @@ const environment: AgentEnvironmentConfig = {
 };
 
 const agent = {
+  builtInTools: createDefaultAgentBuiltInTools(),
   description: null,
   kind: "pet" as const,
   model: "gpt-5",
@@ -159,6 +161,36 @@ describe("agent versioned config plan", () => {
     expect(plan.requiresRuntimeOperation).toBe(true);
     expect(summarizeVersionedAgentConfigChange(plan)).toBe(
       "Patch native config + restart · Advanced settings",
+    );
+  });
+
+  test("classifies built-in tool edits as patch-and-restart", () => {
+    const plan = planVersionedAgentConfigChange({
+      agentStatus: "published",
+      current: createAgentConfigChangeSnapshot({
+        agent,
+        environment,
+        mcpServerIds: [],
+        skillIds: [],
+      }),
+      next: createAgentConfigChangeSnapshot({
+        agent: {
+          ...agent,
+          builtInTools: agent.builtInTools.map((tool) =>
+            tool.name === "bash" ? { ...tool, enabled: false } : tool,
+          ),
+        },
+        environment,
+        mcpServerIds: [],
+        skillIds: [],
+      }),
+    });
+
+    expect(plan.action).toBe("patch-and-restart");
+    expect(plan.requiresDeploymentVersion).toBe(true);
+    expect(plan.requiresRuntimeOperation).toBe(true);
+    expect(summarizeVersionedAgentConfigChange(plan)).toBe(
+      "Patch native config + restart · Built-in tools",
     );
   });
 

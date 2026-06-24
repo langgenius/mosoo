@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 import { EventType, MOSOO_CUSTOM_EVENT } from "@mosoo/ag-ui-session";
+import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
 import { RUNTIME_EVENT_SCHEMA_VERSION, createRuntimeEvent } from "@mosoo/runtime-events";
 import {
   DRIVER_CONTROL_PORT_MAX,
@@ -253,6 +254,16 @@ describe("API to driver boundary", () => {
 
   test("builds a driver execution spec with scoped grants and profile env", async () => {
     const execution = await buildExecutionSpec(bindings, {
+      builtInTools: [
+        { enabled: true, name: "bash" },
+        { enabled: true, name: "read" },
+        { enabled: true, name: "write" },
+        { enabled: true, name: "edit" },
+        { enabled: true, name: "glob" },
+        { enabled: true, name: "grep" },
+        { enabled: true, name: "web_fetch" },
+        { enabled: true, name: "web_search" },
+      ],
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
       nativeResumeRef: {
         kind: "openai_thread_id",
@@ -317,6 +328,7 @@ describe("API to driver boundary", () => {
 
   test("emits a boot payload that the driver protocol parser accepts", async () => {
     const execution = await buildExecutionSpec(bindings, {
+      builtInTools: createDefaultAgentBuiltInTools(),
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
       profile: createDriverProfile(),
       requestUrl: "https://api.example.com/api/driver/connect",

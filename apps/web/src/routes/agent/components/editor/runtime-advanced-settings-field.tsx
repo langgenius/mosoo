@@ -6,15 +6,29 @@ import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
+import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
 function readSettingValue(
   settings: JsonObject,
   definition: RuntimeAdvancedSettingDefinition,
-): string {
+): number | string | undefined {
   const value = settings[definition.key];
 
-  if (typeof value === "string" && definition.options.some((option) => option.value === value)) {
+  if (definition.type === "select") {
+    if (typeof value === "string" && definition.options.some((option) => option.value === value)) {
+      return value;
+    }
+
+    return definition.defaultValue;
+  }
+
+  if (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    (definition.valueType !== "integer" || Number.isInteger(value)) &&
+    value >= definition.min
+  ) {
     return value;
   }
 
@@ -30,7 +44,7 @@ function toCustomSettings(
   for (const definition of definitions) {
     const value = readSettingValue(settings, definition);
 
-    if (value !== definition.defaultValue) {
+    if (value !== undefined && value !== definition.defaultValue) {
       next[definition.key] = value;
     }
   }
@@ -44,8 +58,124 @@ function countCustomSettings(
 ): number {
   return definitions.filter((definition) => {
     const value = readSettingValue(settings, definition);
-    return value !== definition.defaultValue;
+    return definition.defaultValue === undefined
+      ? value !== undefined
+      : value !== definition.defaultValue;
   }).length;
+}
+
+function isCustomValue(
+  definition: RuntimeAdvancedSettingDefinition,
+  value: number | string | undefined,
+): boolean {
+  return definition.defaultValue === undefined
+    ? value !== undefined
+    : value !== definition.defaultValue;
+}
+
+function SelectSettingControl({
+  definition,
+  readOnly,
+  selected,
+  setSetting,
+}: {
+  definition: Extract<RuntimeAdvancedSettingDefinition, { type: "select" }>;
+  readOnly: boolean;
+  selected: number | string | undefined;
+  setSetting(value: string | undefined): void;
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
+      {definition.defaultValue === undefined ? (
+        <button
+          aria-pressed={selected === undefined}
+          className={cn(
+            "min-h-8 rounded-md border px-2 text-[12px] font-medium transition-colors",
+            selected === undefined
+              ? "border-brand bg-brand-light text-foreground"
+              : "border-border bg-white text-muted-foreground hover:border-brand/30 hover:text-foreground",
+            readOnly ? "pointer-events-none opacity-60" : null,
+          )}
+          disabled={readOnly}
+          onClick={() => {
+            setSetting(undefined);
+          }}
+          type="button"
+        >
+          Runtime default
+        </button>
+      ) : null}
+
+      {definition.options.map((option) => {
+        const optionSelected = option.value === selected;
+
+        return (
+          <button
+            aria-pressed={optionSelected}
+            className={cn(
+              "min-h-8 rounded-md border px-2 text-[12px] font-medium transition-colors",
+              optionSelected
+                ? "border-brand bg-brand-light text-foreground"
+                : "border-border bg-white text-muted-foreground hover:border-brand/30 hover:text-foreground",
+              readOnly ? "pointer-events-none opacity-60" : null,
+            )}
+            disabled={readOnly}
+            key={option.value}
+            onClick={() => {
+              setSetting(option.value);
+            }}
+            type="button"
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function NumberSettingControl({
+  definition,
+  readOnly,
+  selected,
+  setSetting,
+}: {
+  definition: Extract<RuntimeAdvancedSettingDefinition, { type: "number" }>;
+  readOnly: boolean;
+  selected: number | string | undefined;
+  setSetting(value: number | undefined): void;
+}) {
+  return (
+    <Input
+      aria-label={definition.label}
+      className="max-w-40"
+      disabled={readOnly}
+      min={definition.min}
+      onChange={(event) => {
+        const nextValue = event.target.value;
+
+        if (nextValue === "") {
+          setSetting(undefined);
+          return;
+        }
+
+        const parsed = Number(nextValue);
+
+        if (
+          Number.isFinite(parsed) &&
+          (definition.valueType !== "integer" || Number.isInteger(parsed)) &&
+          parsed >= definition.min
+        ) {
+          setSetting(parsed);
+        }
+      }}
+      placeholder="Runtime default"
+      readOnly={readOnly}
+      step={definition.step ?? 1}
+      type="number"
+      value={typeof selected === "number" ? String(selected) : ""}
+    />
+  );
 }
 
 export function RuntimeAdvancedSettingsField({
@@ -68,10 +198,13 @@ export function RuntimeAdvancedSettingsField({
 
   const customCount = countCustomSettings(definitions, settings);
 
-  function setSetting(definition: RuntimeAdvancedSettingDefinition, value: string): void {
+  function setSetting(
+    definition: RuntimeAdvancedSettingDefinition,
+    value: number | string | undefined,
+  ): void {
     const next = toCustomSettings(definitions, settings);
 
-    if (value === definition.defaultValue) {
+    if (!isCustomValue(definition, value) || value === undefined) {
       delete next[definition.key];
     } else {
       next[definition.key] = value;
@@ -114,32 +247,25 @@ export function RuntimeAdvancedSettingsField({
                   <Label className="text-muted-foreground text-[12px]">{definition.label}</Label>
                   <span className="text-muted-foreground text-[10px]">{definition.key}</span>
                 </div>
-                <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
-                  {definition.options.map((option) => {
-                    const optionSelected = option.value === selected;
-
-                    return (
-                      <button
-                        aria-pressed={optionSelected}
-                        className={cn(
-                          "min-h-8 rounded-md border px-2 text-[12px] font-medium transition-colors",
-                          optionSelected
-                            ? "border-brand bg-brand-light text-foreground"
-                            : "border-border bg-white text-muted-foreground hover:border-brand/30 hover:text-foreground",
-                          readOnly ? "pointer-events-none opacity-60" : null,
-                        )}
-                        disabled={readOnly}
-                        key={option.value}
-                        onClick={() => {
-                          setSetting(definition, option.value);
-                        }}
-                        type="button"
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                {definition.type === "select" ? (
+                  <SelectSettingControl
+                    definition={definition}
+                    readOnly={readOnly}
+                    selected={selected}
+                    setSetting={(value) => {
+                      setSetting(definition, value);
+                    }}
+                  />
+                ) : (
+                  <NumberSettingControl
+                    definition={definition}
+                    readOnly={readOnly}
+                    selected={selected}
+                    setSetting={(value) => {
+                      setSetting(definition, value);
+                    }}
+                  />
+                )}
               </div>
             );
           })}

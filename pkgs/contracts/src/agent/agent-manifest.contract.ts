@@ -1,7 +1,7 @@
 import type { AgentId, FileId, AppId } from "../id/id.contract";
 import type { JsonObject } from "../validation/primitives.contract";
 import { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION } from "./agent-manifest-version.contract";
-import type { AgentKind } from "./agent.contract";
+import type { AgentBuiltInToolConfig, AgentKind } from "./agent.contract";
 
 export { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION };
 
@@ -83,6 +83,7 @@ export interface AgentManifestAdvanced {
 
 export interface AgentManifest {
   advanced: AgentManifestAdvanced | null;
+  builtInTools: AgentBuiltInToolConfig[];
   environment: AgentManifestEnvironmentReference;
   kind: AgentKind;
   manifestVersion: typeof AGENT_MANIFEST_VERSION;
