@@ -154,12 +154,14 @@ export async function updateAgentConfig(
     input.builtInTools === undefined
       ? currentStoredConfig.builtInTools
       : normalizeAgentBuiltInTools(input.builtInTools);
+  const requestedProviderOptions = input.providerOptions ?? {};
   const providerOptionsUnchanged =
-    stableStringify(currentStoredConfig.providerOptions) === stableStringify(input.providerOptions);
+    stableStringify(currentStoredConfig.providerOptions) ===
+    stableStringify(requestedProviderOptions);
   const providerOptions = assertRuntimeAdvancedSettings({
     allowLegacyUnsupportedSettings: providerOptionsUnchanged,
     runtimeId,
-    settings: input.providerOptions,
+    settings: requestedProviderOptions,
   });
   const currentMcpServerIds = (await listAgentMcpServerIds(database, editable.agent.id)).map(
     (serverId) => readMcpServerId(serverId),
