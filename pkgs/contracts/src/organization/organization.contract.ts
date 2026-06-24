@@ -6,3 +6,8 @@ export interface OrganizationSummary {
   id: OrganizationId;
   name: string;
 }
+
+export interface RenameOrganizationInput {
+  organizationId: OrganizationId;
+  name: string;
+}

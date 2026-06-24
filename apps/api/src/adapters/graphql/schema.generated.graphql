@@ -1196,6 +1196,7 @@ type Mutation {
   recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
   removeSessionResource(input: RemoveSessionResourceInput!): OperationResult!
   renameApp(input: RenameAppInput!): App!
+  renameOrganization(input: RenameOrganizationInput!): Organization!
   renameSession(input: RenameSessionInput!): Session!
   resetAgentState(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
   restartDriver(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
@@ -1309,6 +1310,11 @@ input RemoveSessionResourceInput {
 input RenameAppInput {
   appId: ULID!
   name: String!
+}
+
+input RenameOrganizationInput {
+  name: String!
+  organizationId: ULID!
 }
 
 input RenameSessionInput {
