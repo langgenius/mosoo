@@ -355,6 +355,7 @@ async function hydrateRunContextFromSession(
   });
 
   return {
+    builtInTools: executionPlan.builtInTools,
     mcpServers,
     profile,
     skillCatalog,
@@ -484,6 +485,7 @@ async function refreshCachedRunContextVolatileFields(
 
   return {
     ...cached,
+    builtInTools: executionPlan.builtInTools,
     mcpServers,
     profile,
   };

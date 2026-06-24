@@ -18,6 +18,21 @@ export type AddSessionResourceInput = {
   sessionId: PlatformId;
 };
 
+export type AgentBuiltInToolConfigInput = {
+  enabled: boolean;
+  name: AgentBuiltInToolName;
+};
+
+export type AgentBuiltInToolName =
+  | 'bash'
+  | 'edit'
+  | 'glob'
+  | 'grep'
+  | 'read'
+  | 'web_fetch'
+  | 'web_search'
+  | 'write';
+
 export type AgentChannelBindingStatus =
   | 'active'
   | 'error';
@@ -585,6 +600,7 @@ export type UpdateAccountProfileInput = {
 export type UpdateAgentConfigInput = {
   agentId: PlatformId;
   appId: PlatformId;
+  builtInTools?: Array<AgentBuiltInToolConfigInput> | null | undefined;
   description?: string | null | undefined;
   environment: AgentEnvironmentConfigInput;
   kind: AgentKind;
@@ -749,7 +765,7 @@ export type AgentEditorStateQueryVariables = Exact<{
 }>;
 
 
-export type AgentEditorStateQuery = { agentEditorState: { id: PlatformId, providerOptions: JsonObject, environment: { environmentId: PlatformId | null }, packageResolution: { recordedAt: string, source: AgentPackageResolutionSource, report: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } | null, mcpBindings: Array<{ authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialMode: AgentMcpCredentialMode, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, credentialSubject: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, serverId: PlatformId, source: McpServerSource, updatedAt: string, url: string }>, readiness: { checkedAt: string, ready: boolean, issues: Array<{ code: string, message: string, severity: AgentReadinessSeverity }> } } };
+export type AgentEditorStateQuery = { agentEditorState: { id: PlatformId, providerOptions: JsonObject, builtInTools: Array<{ enabled: boolean, name: AgentBuiltInToolName }>, environment: { environmentId: PlatformId | null }, packageResolution: { recordedAt: string, source: AgentPackageResolutionSource, report: { issues: Array<{ actionLabel: string | null, code: string, message: string, required: boolean, severity: AgentResolutionSeverity, status: AgentResolutionStatus, targetLabel: string | null, targetType: AgentResolutionTargetType }>, summary: { boundMcpServerCount: number, boundSkillCount: number, copiedAssetCount: number, createdMcpServerCount: number, reusedMcpServerCount: number } } } | null, mcpBindings: Array<{ authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialMode: AgentMcpCredentialMode, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, credentialSubject: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, serverId: PlatformId, source: McpServerSource, updatedAt: string, url: string }>, readiness: { checkedAt: string, ready: boolean, issues: Array<{ code: string, message: string, severity: AgentReadinessSeverity }> } } };
 
 export type UpdateAgentConfigMutationVariables = Exact<{
   input: UpdateAgentConfigInput;
@@ -2191,6 +2207,10 @@ export const AgentEditorStateDocument = new TypedDocumentString(`
     query AgentEditorState($agentId: ULID!, $appId: ULID!) {
   agentEditorState(agentId: $agentId, appId: $appId) {
     id
+    builtInTools {
+      enabled
+      name
+    }
     environment {
       environmentId
     }

@@ -212,6 +212,50 @@ export type AgentStatus = "draft" | "published";
 export type AgentVisibility = "private";
 export type AgentSkillState = "active" | "tombstone";
 export type AgentViewerRole = "owner" | "none";
+export const AGENT_BUILT_IN_TOOL_NAMES = [
+  "bash",
+  "read",
+  "write",
+  "edit",
+  "glob",
+  "grep",
+  "web_fetch",
+  "web_search",
+] as const;
+export type AgentBuiltInToolName = (typeof AGENT_BUILT_IN_TOOL_NAMES)[number];
+
+export interface AgentBuiltInToolConfig {
+  enabled: boolean;
+  name: AgentBuiltInToolName;
+}
+
+export function isAgentBuiltInToolName(value: unknown): value is AgentBuiltInToolName {
+  return AGENT_BUILT_IN_TOOL_NAMES.some((toolName) => toolName === value);
+}
+
+export function createDefaultAgentBuiltInTools(): AgentBuiltInToolConfig[] {
+  return AGENT_BUILT_IN_TOOL_NAMES.map((name) => ({
+    enabled: true,
+    name,
+  }));
+}
+
+export function normalizeAgentBuiltInTools(
+  tools: readonly AgentBuiltInToolConfig[],
+): AgentBuiltInToolConfig[] {
+  const enabledByName = new Map<AgentBuiltInToolName, boolean>(
+    createDefaultAgentBuiltInTools().map((tool) => [tool.name, tool.enabled]),
+  );
+
+  for (const tool of tools) {
+    enabledByName.set(tool.name, tool.enabled);
+  }
+
+  return AGENT_BUILT_IN_TOOL_NAMES.map((name) => ({
+    enabled: enabledByName.get(name) ?? true,
+    name,
+  }));
+}
 
 export interface AgentSkillReference {
   ownerName: string | null;
@@ -321,6 +365,7 @@ export interface AgentReadiness {
 }
 
 export interface AgentEditorState {
+  builtInTools: AgentBuiltInToolConfig[];
   environment: AgentEnvironmentConfig;
   id: AgentId;
   packageResolution: AgentPackageResolutionState | null;
@@ -343,6 +388,7 @@ export interface CreateAgentInput {
 
 export interface UpdateAgentConfigInput {
   agentId: AgentId;
+  builtInTools?: AgentBuiltInToolConfig[];
   description?: string | null;
   environment: AgentEnvironmentConfig;
   kind: AgentKind;

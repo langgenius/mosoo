@@ -1,5 +1,6 @@
 import type { JsonObject } from "@mosoo/contracts";
 import type {
+  AgentBuiltInToolConfig,
   AgentDeploymentVersion,
   AgentKind,
   AgentReadiness,
@@ -63,6 +64,7 @@ export interface McpServer {
 }
 
 export interface AgentConfig {
+  builtInTools: AgentBuiltInToolConfig[];
   environmentId: string | null;
   mcpServers: McpServer[];
   model: string;

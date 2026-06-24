@@ -6,10 +6,12 @@ import type {
   AgentResolutionStatus,
   AgentResolutionTargetType,
 } from "./agent-manifest.contract";
-import { AgentKind } from "./agent.contract";
+import { AgentKind, isAgentBuiltInToolName } from "./agent.contract";
+import type { AgentBuiltInToolConfig } from "./agent.contract";
 
 const MANIFEST_TOP_LEVEL_KEYS = new Set<string>([
   "advanced",
+  "builtInTools",
   "environment",
   "kind",
   "manifestVersion",
@@ -197,6 +199,23 @@ export function readSkillReference(value: unknown): AgentManifestSkillReference 
     skillId,
     skillName,
     state,
+  };
+}
+
+export function readBuiltInToolConfig(value: unknown): AgentBuiltInToolConfig | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const name = readString(value, "name");
+
+  if (!isAgentBuiltInToolName(name)) {
+    throw new Error("Agent Manifest builtInTools name is invalid.");
+  }
+
+  return {
+    enabled: readBooleanOrDefault(value, "enabled", true),
+    name,
   };
 }
 

@@ -5,6 +5,7 @@ import {
   hasRecordEntries,
   hasRequiredText,
   isRecord,
+  readBuiltInToolConfig,
   readAgentKind,
   readJsonObjectField,
   readMcpServerBinding,
@@ -22,7 +23,7 @@ import type {
   AgentResolutionIssue,
 } from "./agent-manifest.contract";
 import type { AgentKind } from "./agent.contract";
-import { AGENT_KIND_LIST_LABEL } from "./agent.contract";
+import { AGENT_KIND_LIST_LABEL, normalizeAgentBuiltInTools } from "./agent.contract";
 
 interface ManifestSections {
   environment: Record<string, unknown>;
@@ -217,8 +218,13 @@ function buildAgentManifest(
   input: Record<string, unknown>,
   sections: CompleteManifestSections,
 ): AgentManifest {
+  const runtimeSettings = sections.runtime["settings"] ?? sections.runtime["providerOptions"];
+
   return {
     advanced: null,
+    builtInTools: normalizeAgentBuiltInTools(
+      readParsedArray(input, "builtInTools", readBuiltInToolConfig),
+    ),
     environment: {
       envVars: readStringRecord(sections.environment["envVars"]),
       environmentId: readNullableString(sections.environment, "environmentId"),
@@ -240,8 +246,8 @@ function buildAgentManifest(
       model: sections.model,
       provider: sections.provider,
       providerOptions: parseJsonObject(
-        readJsonObjectField(sections.runtime["providerOptions"], "runtime.providerOptions"),
-        "Agent Manifest runtime.providerOptions",
+        readJsonObjectField(runtimeSettings, "runtime.settings"),
+        "Agent Manifest runtime.settings",
       ),
     },
     skills: readParsedArray(input, "skills", readSkillReference),

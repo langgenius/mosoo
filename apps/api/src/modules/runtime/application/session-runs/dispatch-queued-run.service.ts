@@ -177,6 +177,7 @@ export async function dispatchQueuedSessionRun(
       attachmentIds: resolved.sessionResources.map((resource, index) =>
         parsePlatformId(resource.id, `session resource id ${index}`),
       ),
+      builtInTools: resolved.hydrated.value.builtInTools,
       profile: {
         ...resolved.hydrated.value.profile,
         runtimeId,

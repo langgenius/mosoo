@@ -1,5 +1,5 @@
 import type { JsonObject } from "@mosoo/contracts";
-import type { AgentKind, AgentReadiness } from "@mosoo/contracts/agent";
+import type { AgentBuiltInToolConfig, AgentKind, AgentReadiness } from "@mosoo/contracts/agent";
 import type {
   ActiveMcpAuthorizationState,
   ActiveMcpCredentialStatus,
@@ -168,6 +168,7 @@ export interface DriverExecutionSessionSpec {
 }
 
 export interface DriverExecutionSpec {
+  readonly builtInTools: AgentBuiltInToolConfig[];
   readonly configRevision: DriverConfigRevision;
   readonly environment: DriverExecutionEnvironment;
   readonly model: string;

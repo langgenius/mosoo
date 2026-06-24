@@ -41,6 +41,27 @@ type Agent {
   visibility: AgentVisibility!
 }
 
+type AgentBuiltInToolConfig {
+  enabled: Boolean!
+  name: AgentBuiltInToolName!
+}
+
+input AgentBuiltInToolConfigInput {
+  enabled: Boolean!
+  name: AgentBuiltInToolName!
+}
+
+enum AgentBuiltInToolName {
+  bash
+  edit
+  glob
+  grep
+  read
+  web_fetch
+  web_search
+  write
+}
+
 type AgentChannelBinding {
   activityLastTriggeredAt: String
   activitySessionCount7d: Int!
@@ -112,6 +133,7 @@ type AgentDetail {
 }
 
 type AgentEditorState {
+  builtInTools: [AgentBuiltInToolConfig!]!
   environment: AgentEnvironmentConfig!
   id: ULID!
   mcpBindings: [AgentMcpBinding!]!
@@ -1620,6 +1642,7 @@ input UpdateAccountProfileInput {
 input UpdateAgentConfigInput {
   agentId: ULID!
   appId: ULID!
+  builtInTools: [AgentBuiltInToolConfigInput!]
   description: String
   environment: AgentEnvironmentConfigInput!
   kind: AgentKind!
