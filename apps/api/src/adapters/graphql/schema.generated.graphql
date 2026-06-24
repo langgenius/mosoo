@@ -284,6 +284,26 @@ enum AgentResolutionTargetType {
   skill
 }
 
+type AgentRunEventSurface {
+  appId: ULID!
+  graphqlUrl: String!
+  messagesOperation: String!
+  processEventsOperation: String!
+  retrieveOperation: String!
+  sessionId: ULID!
+  streamUrl: String
+  suggestedPollIntervalMs: Int!
+}
+
+type AgentRunWorkflow {
+  acceptedAt: String!
+  createdSession: Boolean!
+  eventBatch: AgentSessionEventBatch!
+  eventSurface: AgentRunEventSurface!
+  run: SessionRun
+  session: Session!
+}
+
 type AgentSessionActionCapability {
   action: AgentSessionActionCapabilityName!
   reason: String
@@ -462,6 +482,60 @@ type AppInfo {
   runtime: String!
 }
 
+type AppOverview {
+  agents: AppOverviewAgentList!
+  app: App!
+  providerCredentials: AppOverviewProviderCredentialList!
+}
+
+type AppOverviewAgent {
+  appId: ULID!
+  description: String
+  id: ULID!
+  kind: AgentKind!
+  model: String!
+  name: String!
+  provider: String!
+  runtimeId: String!
+  status: AgentStatus!
+  updatedAt: String!
+}
+
+type AppOverviewAgentList {
+  hasMore: Boolean!
+  items: [AppOverviewAgent!]!
+  limit: Int!
+}
+
+type AppOverviewProviderCredential {
+  appId: ULID!
+  hasCustomApiBase: Boolean!
+  id: ULID!
+  isDefault: Boolean!
+  modelCount: Int!
+  name: String!
+  status: AppOverviewProviderCredentialStatus!
+  vendorId: String!
+}
+
+type AppOverviewProviderCredentialList {
+  byVendor: [AppOverviewProviderCredentialVendorCount!]!
+  configuredCount: Int!
+  hasMore: Boolean!
+  items: [AppOverviewProviderCredential!]!
+  limit: Int!
+}
+
+enum AppOverviewProviderCredentialStatus {
+  configured
+}
+
+type AppOverviewProviderCredentialVendorCount {
+  count: Int!
+  defaultCredentialId: ULID
+  vendorId: String!
+}
+
 enum AuthMethod {
   email_otp
   google_oauth
@@ -490,6 +564,17 @@ input ConnectMcpBearerInput {
   serverId: ULID!
   subjectLabel: String
   token: String!
+}
+
+type ControlPlaneOverview {
+  activeOrganization: Organization
+  apps: ControlPlaneOverviewAppList!
+}
+
+type ControlPlaneOverviewAppList {
+  hasMore: Boolean!
+  items: [AppOverview!]!
+  limit: Int!
 }
 
 type CostAgentRow implements CostAggregate {
@@ -1121,6 +1206,7 @@ type Mutation {
   setEnvironmentVariableValue(input: SetEnvironmentVariableValueInput!): EnvironmentDetail!
   setMcpServerEnabled(appId: ULID!, enabled: Boolean!, serverId: ULID!): McpServerWithCredential!
   setSystemAgentModel(input: SetSystemAgentModelInput!): Account!
+  startAgentRun(input: StartAgentRunInput!): AgentRunWorkflow!
   startLarkAgentChannelRegistration(input: StartLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!
   startMcpOAuth(input: StartMcpOAuthInput!): StartMcpOAuthPayload!
   startWeChatAgentChannelPairing(input: StartWeChatAgentChannelPairingInput!): WeChatAgentChannelPairing!
@@ -1190,8 +1276,10 @@ type Query {
   appEnvironmentList(appId: ULID!): [EnvironmentSummary!]!
   appInfo: AppInfo!
   appList(organizationId: ULID!): [App!]!
+  appOverview(agentLimit: Int, appId: ULID!, credentialLimit: Int): AppOverview!
   appSkillList(appId: ULID!): [SkillSummary!]!
   availableAgentModels(appId: ULID!, currentModelId: String, currentVendorId: String, runtimeId: String!): [ResolvedModelEntry!]!
+  controlPlaneOverview(agentLimit: Int, appLimit: Int, credentialLimit: Int): ControlPlaneOverview!
   environment(appId: ULID!, environmentId: ULID!): EnvironmentDetail!
   exportAgentPackage(agentId: ULID!, appId: ULID!): AgentPackageExport!
   fileList(input: FileListInput!): FileListing!
@@ -1589,6 +1677,16 @@ type SkillSummary {
   snapshotId: ULID!
   sourceKind: SkillSourceKind!
   updatedAt: String!
+}
+
+input StartAgentRunInput {
+  agentId: ULID
+  appId: ULID!
+  clientRequestId: String
+  prompt: String!
+  sessionId: ULID
+  type: SessionType
+  waitForRuntimeReady: Boolean
 }
 
 input StartLarkAgentChannelRegistrationInput {

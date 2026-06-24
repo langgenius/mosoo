@@ -464,6 +464,115 @@ V1 must not include:
    count.
 5. V1 does not show per-user drilldown.
 
+### App Overview API
+
+The App Overview API is the shared upstream surface for Web UI and generated CLI control-plane
+summaries. It must not be a CLI-only facade. `appOverview` serves one App's console overview;
+`controlPlaneOverview` serves current-user list flows such as generated CLI `ls` by returning
+limited Apps with nested App overview summaries.
+
+Rules:
+
+- App-scoped overview requires App owner proof; current-user control-plane overview resolves the
+  viewer's active Organization and applies the same App owner checks to each returned App.
+- The first cut returns App identity, a limited Agent summary page, and a limited Provider
+  credential metadata summary.
+- Agent summary fields include stable runtime selection fields (`runtimeId`, `provider`, `model`)
+  plus status and update time.
+- Provider credential overview returns metadata and counts only. It does not expose plaintext
+  secrets, masked keys, or custom endpoint URLs.
+- Limit arguments are bounded so generated clients can use one stable selection set without
+  accidentally expanding into an unbounded dashboard export.
+- Future Overview expansion should add explicit subobjects for usage, health, logs, exposure, and
+  resources rather than introducing a generic Service entity.
+
+### Agent Run Workflow API
+
+The Agent Run Workflow API is the shared upstream surface for Web UI and generated CLI run flows.
+It must not be implemented as a CLI-only facade over lower-level Thread commands. `startAgentRun`
+starts the shortest first-party workflow: create a Thread when needed, append one user prompt, and
+queue the resulting Run.
+
+GraphQL contract:
+
+```graphql
+mutation StartAgentRun($input: StartAgentRunInput!) {
+  startAgentRun(input: $input) {
+    acceptedAt
+    createdSession
+    session {
+      id
+      appId
+      agentId
+      status
+      title
+      lastRun {
+        id
+        status
+        trigger
+      }
+    }
+    run {
+      id
+      status
+      trigger
+    }
+    eventSurface {
+      appId
+      sessionId
+      graphqlUrl
+      retrieveOperation
+      processEventsOperation
+      messagesOperation
+      streamUrl
+      suggestedPollIntervalMs
+    }
+    eventBatch {
+      acceptedAt
+      events {
+        type
+        clientRequestId
+        run {
+          id
+          status
+        }
+      }
+      warnings {
+        code
+        message
+      }
+    }
+  }
+}
+```
+
+Input rules:
+
+- `appId` and `prompt` are required.
+- `agentId` is required when `sessionId` is omitted. This creates a new Thread with session type
+  `ui` by default, then queues a user-message Run.
+- `sessionId` continues an existing Thread. If `agentId` is also supplied, it must match the
+  Thread's bound Agent before any Run is queued.
+- `clientRequestId` is passed to the queued user-message event for generated client correlation.
+- `type` and `waitForRuntimeReady` intentionally mirror `createAgentSession`; readiness wait remains
+  limited by the existing Session creation rules.
+
+Rules:
+
+- The mutation reuses existing GraphQL authenticated Session services for App ownership, participant
+  access, action capabilities, audit attribution, runtime queueing, warnings, and GraphQL error
+  envelopes.
+- The response returns the canonical `Session`, `SessionRun`, and `AgentSessionEventBatch` shapes
+  instead of a private CLI DTO.
+- `eventSurface` gives generated clients stable identifiers and operation names for follow-up reads:
+  `threadAgentSessionRetrieve`, `threadSessionProcessEvents`, and `threadSessionMessages`.
+- `streamUrl` is nullable in V1 because the only current stream URL is the Personal Access Token
+  Public Thread API. First-party streaming can be added later by filling this field without changing
+  the mutation input.
+- The mutation returns after the Run is queued. It does not hold the GraphQL request open for model
+  output; generated clients should poll `threadSessionProcessEvents` using the returned `appId` and
+  `sessionId` unless a first-party stream URL is later provided.
+
 ## Access Rules
 
 - The Organization owner can access all Apps in that Organization.
