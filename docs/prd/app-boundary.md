@@ -99,7 +99,7 @@ Onboarding should create a default App. If an Organization has exactly one App, 
 - Generic `services` table, polymorphic `service.kind`, or generic Service CRUD for concrete
   App resources.
 - Multi-resource graphs as the default burden for simple Apps.
-- Reworking Agent Builder as the primary experience before App ownership and default App creation exist.
+- Reviving the removed Agent Builder system-assistant as the primary experience before App ownership and default App creation exist.
 
 ## Drift Rules
 
