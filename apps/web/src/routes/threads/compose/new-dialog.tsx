@@ -384,23 +384,25 @@ export function NewThreadDialog({
             selectedAgentId={selectedAgentId}
           />
 
-          <Textarea
-            value={body}
-            onChange={(event) => {
-              dispatch({ body: event.target.value, type: "changeBody" });
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                event.preventDefault();
-                void submit();
-              }
-            }}
-            className={cn(
-              "resize-none border-0 bg-transparent p-0 text-[14px] leading-relaxed shadow-none focus-visible:ring-0",
-              expanded ? "min-h-[420px]" : "min-h-[280px]",
-            )}
-            placeholder="Describe the goal, context, and success criteria for this task..."
-          />
+          <div className="border-border-subtle bg-card focus-within:border-ring focus-within:ring-ring/50 rounded-lg border px-3.5 py-3 shadow-[var(--shadow-sm)] transition-[color,box-shadow] focus-within:ring-[3px]">
+            <Textarea
+              value={body}
+              onChange={(event) => {
+                dispatch({ body: event.target.value, type: "changeBody" });
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                  event.preventDefault();
+                  void submit();
+                }
+              }}
+              className={cn(
+                "resize-none border-0 bg-transparent p-0 text-[14px] leading-relaxed shadow-none focus-visible:ring-0",
+                expanded ? "min-h-[420px]" : "min-h-[280px]",
+              )}
+              placeholder="Describe the goal, context, and success criteria for this task..."
+            />
+          </div>
 
           {files.length > 0 ? (
             <div className="flex flex-wrap items-center gap-2">
