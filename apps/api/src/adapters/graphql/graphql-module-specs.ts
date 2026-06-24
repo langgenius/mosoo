@@ -191,7 +191,7 @@ export const vendorCredentialGraphQLSpec = {
 } satisfies GraphQLModuleSpec;
 
 export const organizationGraphQLSpec = {
-  mutationFields: [],
+  mutationFields: ["renameOrganization(input: RenameOrganizationInput!): Organization!"],
   queryFields: [],
   typeDefs: organizationSchema,
 } satisfies GraphQLModuleSpec;
