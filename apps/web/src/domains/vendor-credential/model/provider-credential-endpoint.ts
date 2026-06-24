@@ -1,7 +1,9 @@
-import { PUBLIC_VENDORS } from "@mosoo/runtime-catalog";
+import { getVendor } from "@mosoo/runtime-catalog";
 
+// A vendor supports a custom Base URL when it declares an apiBaseEnvVar. This
+// must consult the full vendor catalog (getVendor), not PUBLIC_VENDORS, because
+// the OpenAI-Compatible custom provider is excluded from the public list yet
+// always requires a Base URL.
 export function canUseCustomEndpoint(providerId: string): boolean {
-  return PUBLIC_VENDORS.some(
-    (vendor) => vendor.vendorId === providerId && Boolean(vendor.apiBaseEnvVar),
-  );
+  return Boolean(getVendor(providerId)?.apiBaseEnvVar);
 }
