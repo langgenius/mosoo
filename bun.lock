@@ -247,6 +247,16 @@
         "vite-plus": "^0.1.23",
       },
     },
+    "pkgs/public-api-client": {
+      "name": "@mosoo/public-api-client",
+      "dependencies": {
+        "@mosoo/contracts": "workspace:*",
+      },
+      "devDependencies": {
+        "typescript": "^6.0.3",
+        "vite-plus": "^0.1.23",
+      },
+    },
     "pkgs/runtime-catalog": {
       "name": "@mosoo/runtime-catalog",
       "dependencies": {
@@ -894,6 +904,8 @@
     "@mosoo/id": ["@mosoo/id@workspace:pkgs/id"],
 
     "@mosoo/observability": ["@mosoo/observability@workspace:pkgs/observability"],
+
+    "@mosoo/public-api-client": ["@mosoo/public-api-client@workspace:pkgs/public-api-client"],
 
     "@mosoo/runtime-catalog": ["@mosoo/runtime-catalog@workspace:pkgs/runtime-catalog"],
 

@@ -289,7 +289,7 @@ function textEventStreamResponse(description: string) {
     content: {
       "text/event-stream": {
         example:
-          ': connected\n\nevent: thread.event\nid: 01J00000000000000000000010\ndata: {"id":"01J00000000000000000000010","type":"run.started","status":"completed","content":"01J0000000000000000000000A","occurredAt":"2026-05-19T00:00:01.000Z","durationMs":null,"tokens":null}\n\n',
+          ': connected\n\nevent: thread.event\nid: 01J00000000000000000000010\ndata: {"id":"01J00000000000000000000010","runId":"01J0000000000000000000000A","type":"run.started","status":"available","content":"01J0000000000000000000000A","occurredAt":"2026-05-19T00:00:01.000Z","durationMs":null,"tokens":null}\n\n',
         schema: { type: "string" },
       },
     },
@@ -493,7 +493,7 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
     "/threads/{threadId}/events": {
       get: operation({
         description:
-          "Returns the latest public event log entries for this Thread in chronological order. This is the stable snapshot read surface for CLI and API consumers; it does not expose raw runtime payloads, transcript, or diagnostics.",
+          "Returns the latest public event log entries for this Thread in chronological order. If older public entries are omitted because the limit was reached, `truncated` is true. Event IDs are stable, so callers can retry or poll without treating the same ID as a new event. This is the stable snapshot read surface for CLI and API consumers; it does not expose raw runtime payloads, transcript, or diagnostics.",
         parameters: [threadIdParameter, threadEventsLimitParameter],
         success: {
           "200": jsonResponse("Thread event list.", {
@@ -531,7 +531,7 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
     "/threads/{threadId}/events/stream": {
       get: operation({
         description:
-          "Streams public Thread event log entries as Server-Sent Events. Each `thread.event` data payload uses the same ThreadEventLogEntry shape as GET /threads/{threadId}/events. The stream is for long-running consumer UX and does not expose raw runtime payloads, internal diagnostics, or private transcripts.",
+          "Streams public Thread event log entries as Server-Sent Events. Each `thread.event` data payload uses the same ThreadEventLogEntry shape as GET /threads/{threadId}/events. Events are emitted by stable event ID and the stream suppresses duplicate IDs observed during polling. The stream is for long-running consumer UX and does not expose raw runtime payloads, internal diagnostics, or private transcripts.",
         parameters: [threadIdParameter, threadEventsLimitParameter],
         success: {
           "200": textEventStreamResponse("Thread event stream."),

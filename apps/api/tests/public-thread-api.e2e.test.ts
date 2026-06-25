@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
 import { PUBLIC_THREAD_API_THREADS_MAX_LIMIT } from "@mosoo/contracts/public-api";
-import { sessionsTable } from "@mosoo/db";
+import { sessionRunsTable, sessionsTable } from "@mosoo/db";
+import { eq } from "drizzle-orm";
 
 import { fileStore } from "../src/modules/files/application/file-store";
 import {
@@ -279,10 +280,11 @@ describe("Public Thread API e2e", () => {
       expect(threadId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
       expect(run["id"]).toBeString();
       expect(run["trigger"]).toBe("user_prompt");
+      expect(run["error"]).toBeNull();
+      expect(run["finalOutput"]).toBeNull();
       expectNoProperties(run, [
         "deploymentVersionId",
         "deploymentVersionNumber",
-        "error",
         "model",
         "provider",
         "traceId",
@@ -399,6 +401,48 @@ describe("Public Thread API e2e", () => {
         "Hello from runtime",
         runId,
       ]);
+      expect(events.map((event) => expectRecord(event)["runId"])).toEqual([runId, runId]);
+
+      await database
+        .app()
+        .update(sessionRunsTable)
+        .set({
+          completedAt: 1_150,
+          status: "completed",
+          updatedAt: 1_150,
+        })
+        .where(eq(sessionRunsTable.id, runId))
+        .run();
+
+      const completedRetrieveResponse = await requestPublicApi(
+        app,
+        database,
+        new Request(`https://api.example.com/api/v1/threads/${threadId}`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      expect(completedRetrieveResponse.status).toBe(200);
+      const completedRun = expectRecord(
+        expectRecord(await readJson(completedRetrieveResponse))["run"],
+      );
+      expect(completedRun).toMatchObject({
+        error: null,
+        finalOutput: { text: "Hello from runtime" },
+        id: runId,
+        status: "completed",
+      });
+
+      const repeatedRetrieveResponse = await requestPublicApi(
+        app,
+        database,
+        new Request(`https://api.example.com/api/v1/threads/${threadId}`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      const repeatedRun = expectRecord(
+        expectRecord(await readJson(repeatedRetrieveResponse))["run"],
+      );
+      expect(repeatedRun["finalOutput"]).toEqual({ text: "Hello from runtime" });
 
       const listResponse = await requestPublicApi(
         app,
@@ -492,6 +536,78 @@ describe("Public Thread API e2e", () => {
         code: "forbidden",
         message: "Caller is not the App owner for this Agent.",
       });
+    });
+  });
+
+  test("exposes failed run status and structured public error details", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+
+    await withProviderProbeMock(async () => {
+      const response = await requestPublicApi(
+        app,
+        database,
+        new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
+          body: JSON.stringify({
+            input: {
+              content: [{ text: "Trigger a failed public run.", type: "text" }],
+              type: "user.message",
+            },
+          }),
+          headers: {
+            Authorization: bearer(TOKENS.owner),
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        }),
+      );
+      expect(response.status).toBe(201);
+      const body = await readJson(response);
+      const threadId = expectString(expectRecord(body["thread"])["id"]);
+      const runId = expectString(expectRecord(body["run"])["id"]);
+
+      await database
+        .app()
+        .update(sessionRunsTable)
+        .set({
+          completedAt: 2_000,
+          errorCode: "provider_unavailable",
+          errorDetailsJson: JSON.stringify({ provider: "openai" }),
+          errorMessage: "Provider is temporarily unavailable.",
+          status: "failed",
+          updatedAt: 2_000,
+        })
+        .where(eq(sessionRunsTable.id, runId))
+        .run();
+
+      const retrieveResponse = await requestPublicApi(
+        app,
+        database,
+        new Request(`https://api.example.com/api/v1/threads/${threadId}`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      expect(retrieveResponse.status).toBe(200);
+      const run = expectRecord(expectRecord(await readJson(retrieveResponse))["run"]);
+
+      expect(run).toMatchObject({
+        error: {
+          code: "provider_unavailable",
+          details: { provider: "openai" },
+          message: "Provider is temporarily unavailable.",
+          retryable: false,
+        },
+        finalOutput: null,
+        id: runId,
+        status: "failed",
+      });
+      expectNoProperties(run, [
+        "deploymentVersionId",
+        "deploymentVersionNumber",
+        "model",
+        "provider",
+        "traceId",
+      ]);
     });
   });
 
@@ -751,6 +867,7 @@ describe("Public Thread API e2e", () => {
       expect(text).toContain("id: 01J00000000000000000000015");
       expect(text).toContain('"type":"agent.message.delta"');
       expect(text).toContain('"type":"run.completed"');
+      expect(text).toContain(`"runId":"${runId}"`);
       expect(text).toContain('"content":"');
       expect(text).not.toContain("owner_debug");
       expect(text).not.toContain("payload");

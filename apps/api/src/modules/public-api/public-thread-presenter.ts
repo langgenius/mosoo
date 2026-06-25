@@ -1,6 +1,7 @@
 import type {
   PublicThreadApiCreateThreadResponse,
   PublicThreadApiRetrieveThreadResponse,
+  PublicThreadFinalOutput,
   PublicThreadLinks,
   PublicThreadSummary,
 } from "@mosoo/contracts/public-api";
@@ -97,6 +98,7 @@ export function toCreateThreadResponse(input: {
 
 export function toRetrieveThreadResponse(input: {
   attributedUserId: AccountId | null;
+  finalOutput: PublicThreadFinalOutput | null;
   metadata: PublicApiThreadMetadata;
   session: SessionSummary;
 }): PublicThreadApiRetrieveThreadResponse {
@@ -104,7 +106,10 @@ export function toRetrieveThreadResponse(input: {
 
   return {
     links: createThreadLinks(session.id),
-    run: session.lastRun,
+    run:
+      input.session.lastRun === null
+        ? null
+        : toPublicThreadRunSummary(input.session.lastRun, { finalOutput: input.finalOutput }),
     thread: toPublicThreadSummary({
       attributedUserId: input.attributedUserId,
       metadata: input.metadata,

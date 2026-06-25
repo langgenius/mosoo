@@ -12,7 +12,7 @@ import type {
 import type { AgentKind } from "../agent/agent.contract";
 import { SINGLE_PUT_THRESHOLD_BYTES } from "../file/file.contract";
 import type { CreateFileUploadRequest } from "../file/file.contract";
-import type { UserWarning } from "../session/session-run.contract";
+import type { RunError, UserWarning } from "../session/session-run.contract";
 import {
   SESSION_PROCESS_EVENT_STATUSES,
   SESSION_PROCESS_EVENT_TYPES,
@@ -76,9 +76,26 @@ export type PublicThreadRunStatus =
 
 export type PublicThreadRunTrigger = "resume" | "retry" | "system" | "user_prompt";
 
+export const PUBLIC_THREAD_RUN_TERMINAL_STATUSES = [
+  "completed",
+  "failed",
+  "cancelled",
+  "expired",
+] as const;
+
+export type PublicThreadRunTerminalStatus = (typeof PUBLIC_THREAD_RUN_TERMINAL_STATUSES)[number];
+
+export interface PublicThreadFinalOutput {
+  text: string;
+}
+
+export type PublicThreadRunError = RunError;
+
 export interface PublicThreadRunSummary {
   completedAt: string | null;
   createdAt: string;
+  error: PublicThreadRunError | null;
+  finalOutput: PublicThreadFinalOutput | null;
   id: SessionRunId;
   startedAt: string | null;
   status: PublicThreadRunStatus;
@@ -175,6 +192,7 @@ export interface PublicThreadEventLogEntry {
   durationMs: number | null;
   id: RuntimeEventId;
   occurredAt: string;
+  runId: SessionRunId | null;
   status: PublicThreadEventLogStatus;
   tokens: number | null;
   type: PublicThreadEventLogType;
