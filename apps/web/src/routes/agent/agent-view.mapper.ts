@@ -4,7 +4,6 @@ import type {
   AgentEnvironmentConfig,
   AgentSkillReference,
   AgentSummary,
-  AgentViewerRole,
 } from "@mosoo/contracts/agent";
 import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
 import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
@@ -13,7 +12,6 @@ import type { AuthUser } from "@/domains/auth/use-auth";
 
 import type {
   Agent,
-  AgentRole,
   AgentStatus,
   McpServer,
   RuntimeId,
@@ -38,13 +36,6 @@ function toAgentStatus(status: string | null | undefined): AgentStatus {
     return "published";
   }
   return "draft";
-}
-
-function toAgentRole(viewerRole: AgentViewerRole): AgentRole {
-  if (viewerRole === "owner") {
-    return "owner";
-  }
-  return "none";
 }
 
 function toSkillInfo(skill: AgentSkillReference): SkillInfo {
@@ -158,7 +149,7 @@ export function mapAgentSummaryToListView(
     packageResolution: null,
     provider: "",
     readiness: null,
-    role: toAgentRole(profile.viewerRole),
+    role: "owner",
     runtime: parseKnownRuntimeId(profile.runtimeId),
     status: toAgentStatus(profile.status),
     tools: toEnabledToolInfos(profile.tools),
@@ -196,7 +187,7 @@ export function mapAgentDetailToView(
     packageResolution: editorDetail?.packageResolution ?? null,
     provider: profile.provider,
     readiness: editorDetail?.readiness ?? null,
-    role: toAgentRole(profile.viewerRole),
+    role: "owner",
     runtime: parseKnownRuntimeId(profile.runtimeId),
     status: toAgentStatus(profile.status),
     tools: toEnabledToolInfos(profile.tools),
