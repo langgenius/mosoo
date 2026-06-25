@@ -1,4 +1,4 @@
-import type { McpAuthType, McpCredentialScope, McpCredentialStatus } from "./mcp-types";
+import type { McpAuthType, McpCredentialStatus } from "./mcp-types";
 
 export function authTypeLabel(t: McpAuthType): string {
   switch (t) {
@@ -10,17 +10,6 @@ export function authTypeLabel(t: McpAuthType): string {
     }
     default: {
       return unreachableCase(t, "Unsupported MCP auth type.");
-    }
-  }
-}
-
-export function credentialScopeLabel(scope: McpCredentialScope): string {
-  switch (scope) {
-    case "app": {
-      return "App credential";
-    }
-    default: {
-      return unreachableCase(scope, "Unsupported MCP credential scope.");
     }
   }
 }
