@@ -2,6 +2,7 @@ import type {
   PublicThreadApiListThreadEventsResponse,
   PublicThreadEventLogEntry,
   PublicThreadEventLogType,
+  PublicThreadFinalOutput,
 } from "@mosoo/contracts/public-api";
 import {
   PUBLIC_THREAD_EVENT_LOG_TYPES,
@@ -10,7 +11,7 @@ import {
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
 import { sessionEventsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { RuntimeEventId, SessionId } from "@mosoo/id";
+import type { RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
@@ -41,6 +42,10 @@ interface PublicThreadEventWindow {
   truncated: boolean;
 }
 
+interface PublicThreadEventProcessRow extends SessionEventProcessRow {
+  run_id: SessionRunId | null;
+}
+
 function isPublicThreadEventLogType(value: string): value is PublicThreadEventLogType {
   return PUBLIC_THREAD_EVENT_LOG_TYPE_SET.has(value);
 }
@@ -53,7 +58,12 @@ function normalizePublicThreadEventsLimit(limit: number): number {
   return limit;
 }
 
-function toPublicThreadEventLogEntry(event: SessionProcessEvent): PublicThreadEventLogEntry | null {
+function toPublicThreadEventLogEntry(input: {
+  event: SessionProcessEvent;
+  runId: SessionRunId | null;
+}): PublicThreadEventLogEntry | null {
+  const { event } = input;
+
   if (!isPublicThreadEventLogType(event.type)) {
     return null;
   }
@@ -63,6 +73,7 @@ function toPublicThreadEventLogEntry(event: SessionProcessEvent): PublicThreadEv
     durationMs: event.durationMs,
     id: parsePlatformId(event.id, "Runtime event ID") as RuntimeEventId,
     occurredAt: event.occurredAt,
+    runId: input.runId,
     status: event.status,
     tokens: event.tokens,
     type: event.type,
@@ -70,10 +81,17 @@ function toPublicThreadEventLogEntry(event: SessionProcessEvent): PublicThreadEv
 }
 
 function toPublicThreadEventLogEntries(
-  rows: SessionEventProcessRow[],
+  rows: PublicThreadEventProcessRow[],
 ): PublicThreadEventLogEntry[] {
+  const runIdsByEventId = new Map<RuntimeEventId, SessionRunId | null>(
+    rows.map((row) => [row.id, row.run_id]),
+  );
+
   return createSessionProcessEventsFromSessionEventRows(rows).flatMap((event) => {
-    const publicEvent = toPublicThreadEventLogEntry(event);
+    const publicEvent = toPublicThreadEventLogEntry({
+      event,
+      runId: runIdsByEventId.get(event.id) ?? null,
+    });
     return publicEvent === null ? [] : [publicEvent];
   });
 }
@@ -92,6 +110,7 @@ function selectPublicThreadEventRows(input: {
       occurred_at: sessionEventsTable.occurredAt,
       process_status: sessionEventsTable.processStatus,
       process_type: sessionEventsTable.processType,
+      run_id: sessionEventsTable.runId,
       seq: sessionEventsTable.seq,
       tokens: sessionEventsTable.tokens,
     })
@@ -107,7 +126,7 @@ async function readPublicThreadEventWindow(input: {
   limit: number;
   sessionId: SessionId;
 }): Promise<PublicThreadEventWindow> {
-  const scannedRows: SessionEventProcessRow[] = [];
+  const scannedRows: PublicThreadEventProcessRow[] = [];
   let beforeSeq: number | null = null;
   let reachedStart = false;
   let latestSeq: number | null = null;
@@ -170,7 +189,7 @@ async function readPublicThreadEventRowsAfterSeq(input: {
   afterSeq: number;
   database: D1Database;
   sessionId: SessionId;
-}): Promise<SessionEventProcessRow[]> {
+}): Promise<PublicThreadEventProcessRow[]> {
   return selectPublicThreadEventRows({
     database: input.database,
     filters: [
@@ -181,6 +200,33 @@ async function readPublicThreadEventRowsAfterSeq(input: {
     order: asc(sessionEventsTable.seq),
     pageSize: THREAD_EVENT_ROW_PAGE_SIZE,
   });
+}
+
+export async function readPublicThreadRunFinalOutput(input: {
+  database: D1Database;
+  runId: SessionRunId;
+  sessionId: SessionId;
+}): Promise<PublicThreadFinalOutput> {
+  const rows = await getAppDatabase(input.database)
+    .select({
+      content_text: sessionEventsTable.contentText,
+    })
+    .from(sessionEventsTable)
+    .where(
+      and(
+        eq(sessionEventsTable.sessionId, input.sessionId),
+        eq(sessionEventsTable.runId, input.runId),
+        eq(sessionEventsTable.visibility, "all_consumers"),
+        eq(sessionEventsTable.processType, "agent.message.delta"),
+        eq(sessionEventsTable.processStatus, "available"),
+      ),
+    )
+    .orderBy(asc(sessionEventsTable.seq))
+    .all();
+
+  return {
+    text: rows.map((row) => row.content_text).join(""),
+  };
 }
 
 async function resolvePublicThreadEventSessionId(

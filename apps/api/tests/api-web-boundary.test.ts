@@ -513,15 +513,36 @@ describe("API to web boundary", () => {
     ]);
 
     const runProperties = openApiSchemaProperties("RunSummary");
-    expectProperties(runProperties, ["completedAt", "createdAt", "id", "status", "trigger"]);
+    expectProperties(runProperties, [
+      "completedAt",
+      "createdAt",
+      "error",
+      "finalOutput",
+      "id",
+      "status",
+      "trigger",
+    ]);
     expectNoProperties(runProperties, [
       "deploymentVersionId",
       "deploymentVersionNumber",
-      "error",
       "model",
       "provider",
       "traceId",
     ]);
+
+    const runErrorProperties = openApiSchemaProperties("RunError");
+    expectProperties(runErrorProperties, ["code", "message", "retryable"]);
+    expectNoProperties(runErrorProperties, [
+      "details",
+      "provider",
+      "raw",
+      "runtime",
+      "tool",
+      "traceId",
+    ]);
+
+    const eventProperties = openApiSchemaProperties("ThreadEventLogEntry");
+    expectProperties(eventProperties, ["content", "id", "occurredAt", "runId", "status", "type"]);
 
     const sendEventsProperties = openApiSchemaProperties("SendEventsResponse");
     expectProperties(sendEventsProperties, ["acceptedAt", "events", "thread", "warnings"]);
@@ -1032,6 +1053,8 @@ describe("API to web boundary", () => {
     }
 
     expect(eventRun).toMatchObject({
+      error: null,
+      finalOutput: null,
       id: PUBLIC_API_TEST_IDS.run,
       status: "running",
       trigger: "user_prompt",
@@ -1039,7 +1062,6 @@ describe("API to web boundary", () => {
     expectNoProperties(eventRun, [
       "deploymentVersionId",
       "deploymentVersionNumber",
-      "error",
       "model",
       "provider",
       "traceId",

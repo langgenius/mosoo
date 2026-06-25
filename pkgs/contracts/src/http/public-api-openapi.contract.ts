@@ -15,6 +15,7 @@ import {
   PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
   PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES,
   PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
+  PUBLIC_THREAD_RUN_TERMINAL_STATUSES,
 } from "./public-api-core.contract";
 
 export type PublicApiOpenApiSchema = Record<string, unknown>;
@@ -439,6 +440,11 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
         format: "date-time",
         type: "string",
       },
+      runId: {
+        description:
+          "Run ID (bare ULID) associated with this event, or null when the event is not run-scoped. Use this to reconstruct output for one current Run without mixing earlier Thread output.",
+        oneOf: [PLATFORM_ID_SCHEMA, { type: "null" }],
+      },
       status: {
         description:
           "Delivery status of the event: `available` when the event is fully populated, `error` when it failed, `unsupported` when this event type cannot be rendered on the public surface.",
@@ -455,7 +461,7 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
         enum: PUBLIC_THREAD_EVENT_LOG_TYPES,
       },
     },
-    required: ["content", "durationMs", "id", "occurredAt", "status", "tokens", "type"],
+    required: ["content", "durationMs", "id", "occurredAt", "runId", "status", "tokens", "type"],
     type: "object",
   },
   ThreadEventListResponse: {
@@ -805,6 +811,16 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
         format: "date-time",
         type: "string",
       },
+      error: {
+        description:
+          "Structured failure summary when status is `failed`; null for successful, active, cancelled, or expired Runs.",
+        oneOf: [{ $ref: "#/components/schemas/RunError" }, { type: "null" }],
+      },
+      finalOutput: {
+        description:
+          "Stable final answer for a completed Run. Mosoo builds this from that Run's public `agent.message.delta` events in chronological order. Null until the Run status is `completed`.",
+        oneOf: [{ $ref: "#/components/schemas/RunFinalOutput" }, { type: "null" }],
+      },
       id: {
         ...PLATFORM_ID_SCHEMA,
         description: "Unique Run ID (bare ULID).",
@@ -816,8 +832,7 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
         type: ["string", "null"],
       },
       status: {
-        description:
-          "Current Run status. `queued` and `booting` precede execution; `running` and `waiting_input` are active; `completed`, `failed`, `cancelled`, and `expired` are terminal.",
+        description: `Current Run status. \`queued\` and \`booting\` precede execution; \`running\` and \`waiting_input\` are active; ${PUBLIC_THREAD_RUN_TERMINAL_STATUSES.map((status) => `\`${status}\``).join(", ")} are terminal.`,
         enum: [
           "queued",
           "booting",
@@ -840,7 +855,52 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
         type: "string",
       },
     },
-    required: ["completedAt", "createdAt", "id", "startedAt", "status", "trigger", "updatedAt"],
+    required: [
+      "completedAt",
+      "createdAt",
+      "error",
+      "finalOutput",
+      "id",
+      "startedAt",
+      "status",
+      "trigger",
+      "updatedAt",
+    ],
+    type: "object",
+  },
+  RunError: {
+    additionalProperties: false,
+    description: "Public-safe Run failure summary exposed on failed public Runs.",
+    properties: {
+      code: {
+        description: "Stable, machine-readable failure code.",
+        minLength: 1,
+        type: "string",
+      },
+      message: {
+        description: "Human-readable failure summary.",
+        minLength: 1,
+        type: "string",
+      },
+      retryable: {
+        description: "Whether retrying the Run may succeed without changing input.",
+        type: "boolean",
+      },
+    },
+    required: ["code", "message", "retryable"],
+    type: "object",
+  },
+  RunFinalOutput: {
+    additionalProperties: false,
+    description: "Final assistant answer for a completed public Thread Run.",
+    properties: {
+      text: {
+        description:
+          "Text reconstructed from the current Run's public `agent.message.delta` events in chronological order.",
+        type: "string",
+      },
+    },
+    required: ["text"],
     type: "object",
   },
   UserWarning: {

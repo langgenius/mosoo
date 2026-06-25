@@ -85,7 +85,7 @@ records do not grant API access in V1.
 | **Public Thread API**        | The external API contract for creating, reading, continuing, archiving, deleting, streaming, and attaching files to Threads.               |
 | **Thread**                   | The product name for an Agent Session in V1. A Thread can be created empty or with an initial user message that queues the first Run.      |
 | **Run**                      | One execution attempt inside a Thread. Public responses expose a compact Run summary, not raw runtime internals.                           |
-| **Access Token**             | The caller credential. In V1, it must belong to the App owner for the target Agent API Endpoint.                                   |
+| **Access Token**             | The caller credential. In V1, it must belong to the App owner for the target Agent API Endpoint.                                           |
 | **Caller**                   | The token-authenticated account that issues the API request and receives Thread attribution.                                               |
 | **Execution owner**          | The Agent owner whose App-local resources, credentials, Environment, Skills, Storage, MCP, and Channel bindings the runtime uses.          |
 | **Thread file**              | Material attached to one Thread. The public list is the API truth for that Thread's file surface.                                          |
@@ -133,23 +133,23 @@ Key points:
 
 The current route family is:
 
-| Capability                  | Route shape                                    | Product meaning                             |
-| --------------------------- | ---------------------------------------------- | ------------------------------------------- |
-| Create Thread               | `POST /api/v1/agents/{agentId}/threads`        | Create a Thread for one Agent API Endpoint. |
-| List endpoint Threads       | `GET /api/v1/agents/{agentId}/threads`         | List Threads for that endpoint and caller.  |
-| Retrieve Thread             | `GET /api/v1/threads/{threadId}`               | Read one Thread by public Thread ID.        |
-| List Thread events          | `GET /api/v1/threads/{threadId}/events`        | Read public event projections.              |
-| Stream Thread events        | `GET /api/v1/threads/{threadId}/events/stream` | Stream public event projections.            |
-| Post Thread events          | `POST /api/v1/threads/{threadId}/events`       | Continue, interrupt, or answer permissions. |
-| Archive / unarchive Thread  | `POST /api/v1/threads/{threadId}/archive`      | Hide or restore a Thread for the caller.    |
-| Delete Thread               | `DELETE /api/v1/threads/{threadId}`            | Delete the Thread through the public API.   |
-| List Thread files           | `GET /api/v1/threads/{threadId}/files`         | List files attached to the Thread.          |
-| Create Thread file upload   | `POST /api/v1/threads/{threadId}/files/uploads`| Open a Thread-scoped upload for raw bytes.  |
-| Upload Thread file bytes    | `PUT /api/v1/files/{fileId}/content`           | Send the file bytes for a pending upload.   |
-| Complete Thread file upload | `POST /api/v1/files/{fileId}/complete`         | Finalize a pending upload into a ready file. |
-| Attach Thread file          | `POST /api/v1/threads/{threadId}/files`        | Claim a ready file handle into the Thread.  |
-| Delete Thread file          | `DELETE /api/v1/threads/{threadId}/files/{id}` | Remove a file from the Thread.              |
-| Machine-readable API schema | `GET /api/v1/openapi.json`                     | Describe the Public Thread API for tooling. |
+| Capability                  | Route shape                                     | Product meaning                              |
+| --------------------------- | ----------------------------------------------- | -------------------------------------------- |
+| Create Thread               | `POST /api/v1/agents/{agentId}/threads`         | Create a Thread for one Agent API Endpoint.  |
+| List endpoint Threads       | `GET /api/v1/agents/{agentId}/threads`          | List Threads for that endpoint and caller.   |
+| Retrieve Thread             | `GET /api/v1/threads/{threadId}`                | Read one Thread by public Thread ID.         |
+| List Thread events          | `GET /api/v1/threads/{threadId}/events`         | Read public event projections.               |
+| Stream Thread events        | `GET /api/v1/threads/{threadId}/events/stream`  | Stream public event projections.             |
+| Post Thread events          | `POST /api/v1/threads/{threadId}/events`        | Continue, interrupt, or answer permissions.  |
+| Archive / unarchive Thread  | `POST /api/v1/threads/{threadId}/archive`       | Hide or restore a Thread for the caller.     |
+| Delete Thread               | `DELETE /api/v1/threads/{threadId}`             | Delete the Thread through the public API.    |
+| List Thread files           | `GET /api/v1/threads/{threadId}/files`          | List files attached to the Thread.           |
+| Create Thread file upload   | `POST /api/v1/threads/{threadId}/files/uploads` | Open a Thread-scoped upload for raw bytes.   |
+| Upload Thread file bytes    | `PUT /api/v1/files/{fileId}/content`            | Send the file bytes for a pending upload.    |
+| Complete Thread file upload | `POST /api/v1/files/{fileId}/complete`          | Finalize a pending upload into a ready file. |
+| Attach Thread file          | `POST /api/v1/threads/{threadId}/files`         | Claim a ready file handle into the Thread.   |
+| Delete Thread file          | `DELETE /api/v1/threads/{threadId}/files/{id}`  | Remove a file from the Thread.               |
+| Machine-readable API schema | `GET /api/v1/openapi.json`                      | Describe the Public Thread API for tooling.  |
 
 Attaching a file is a two-stage flow: upload the bytes through the files data
 plane first (create upload → `PUT` content → complete), then claim the resulting
@@ -165,16 +165,99 @@ payloads, and sandbox paths are not part of the public contract.
 
 - Public identifiers are bare ULIDs in V1.
 - A public `threadId` maps directly to the backing Session ID.
+- Create Thread callers must use `response.thread.id` as the Thread ID for every
+  later retrieve, events, stream, file, archive, and delete request.
 - Creating a Thread may omit `input`; that creates an idle Thread with no Run.
 - Thread creation accepts only the public input fields: initial input, file
   handles, and caller external reference.
 - Thread events accept only user messages, permission decisions, and user
   interrupts.
-- Public event reads expose the stable event projection only; raw runtime payloads
-  and debug internals stay private.
+- Public event reads expose the stable `ThreadEventLogEntry` projection only; raw
+  runtime payloads and debug internals stay private.
+- `GET /threads/{threadId}/events` returns events in chronological order within
+  the returned window. If older public entries are omitted because the requested
+  limit was reached, `truncated` is `true`.
+- `GET /threads/{threadId}/events/stream` emits `thread.event` SSE messages whose
+  `data` payload is the same `ThreadEventLogEntry` shape returned by list-events.
+  Event IDs are stable; polling or reconnecting must not treat the same event ID
+  as new output.
+- Public Run terminal statuses are `completed`, `failed`, `cancelled`, and
+  `expired`. Active statuses are `queued`, `booting`, `running`, and
+  `waiting_input`.
+- Public Run summaries include `error` and `finalOutput`. Failed runs expose
+  structured `error.code`, `error.message`, and `error.retryable`; internal
+  runtime/provider/tool/debug details are not part of the public contract.
+- `run.finalOutput.text` is the stable Agent final answer for a completed run.
+  Mosoo reconstructs it from that run's public `agent.message.delta` events in
+  chronological order. If a caller needs to reconstruct it from events, filter to
+  the current `runId`, keep only `type === "agent.message.delta"` events with
+  `status === "available"`, and concatenate `content` in event order.
 - Machine-readable error codes can preserve stable historical values, but product
   copy must describe an Agent that is not exposed as an active API endpoint.
+- Non-2xx responses use the stable error envelope
+  `{ "error": { "code": "...", "message": "..." } }`. Client code should branch
+  on `error.code`; current public codes include `unauthenticated`, `forbidden`,
+  `not_found`, `rate_limited`, and `idempotency_conflict`.
 - Old task-shaped public routes are not part of this surface.
+
+### Raw API example
+
+```ts
+const createResponse = await fetch(`${baseUrl}/api/v1/agents/${agentId}/threads`, {
+  body: JSON.stringify({
+    input: {
+      content: [{ text: "Say hello from the API.", type: "text" }],
+      type: "user.message",
+    },
+  }),
+  headers: {
+    Authorization: `Bearer ${process.env.MOSOO_API_TOKEN}`,
+    "Content-Type": "application/json",
+    "Idempotency-Key": idempotencyKey,
+  },
+  method: "POST",
+});
+const created = await createResponse.json();
+const threadId = created.thread.id;
+```
+
+### Typed client workflow
+
+The CLI is for local smoke tests and debugging. Real application integrations
+should use a typed backend client or an equivalent server-side helper so app code
+does not duplicate polling and final-output parsing.
+
+This repository currently includes `@mosoo/public-api-client` as a private
+workspace helper and planned SDK reference; it is not published as an external
+npm package yet. Use it from this workspace, vendor the same server-side pattern,
+or wait for a published SDK before adding it as an external dependency.
+
+```ts
+import { MosooPublicThreadClient } from "@mosoo/public-api-client";
+
+const client = new MosooPublicThreadClient({
+  baseUrl,
+  token: process.env.MOSOO_API_TOKEN,
+});
+const result = await client.createThreadAndWait({
+  agentId,
+  idempotencyKey,
+  input: "Say hello from the API.",
+  timeoutMs: 60_000,
+});
+
+console.log(result.finalOutput.text);
+```
+
+`createThreadAndWait` throws a structured terminal-run error by default when the
+Run reaches `failed`, `cancelled`, or `expired`. Use lower-level `waitForRun` or
+`throwOnFailedRun: false` only when the integration deliberately handles all
+terminal statuses itself.
+
+`MOSOO_API_TOKEN` is a backend secret. Do not expose it in browser bundles,
+frontend environment variables, static pages, or mobile clients that cannot keep
+secrets. Route frontend requests through your own backend or Worker and call the
+Public Thread API from there.
 
 ---
 
