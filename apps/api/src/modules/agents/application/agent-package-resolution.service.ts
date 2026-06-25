@@ -31,17 +31,6 @@ interface PackageOwnedSkillReference {
   packagePath: string;
 }
 
-export function readAgentPackageAsset(
-  agentPackage: AgentPackage,
-  key: string | null,
-): AgentPackageAsset | null {
-  if (!isTruthy(key)) {
-    return null;
-  }
-
-  return agentPackage.assets.find((asset) => asset.key === key) ?? null;
-}
-
 export function collectPackageDeclarationIssues(
   agentPackage: AgentPackage,
 ): AgentResolutionIssue[] {

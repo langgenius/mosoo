@@ -14,7 +14,7 @@ export function canShowAgentDebugMenuItem(input: {
   }
 }
 
-export function canShowOwnerDebugTerminalItem(input: {
+function canShowOwnerDebugTerminalItem(input: {
   agentKind: AgentKind | null;
   viewerRole: AgentViewerRole | null;
 }): boolean {

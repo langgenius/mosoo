@@ -85,7 +85,7 @@ export interface SandboxHandle extends ExecutionSessionHandle {
   wsConnect(request: Request, port: number): Promise<Response>;
 }
 
-export const SANDBOX_HANDLE_METHODS = [
+const SANDBOX_HANDLE_METHODS = [
   "createBackup",
   "createSession",
   "deleteSession",

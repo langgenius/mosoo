@@ -78,25 +78,6 @@ function normalizeSystemAgentModel(input: SetSystemAgentModelInput): SystemAgent
   return { modelId, vendor };
 }
 
-export async function getSystemAgentModel(
-  database: D1Database,
-  accountId: AccountId,
-): Promise<SystemAgentModelSetting | null> {
-  const row =
-    (await getAppDatabase(database)
-      .select({ system_agent_model: accountsTable.systemAgentModel })
-      .from(accountsTable)
-      .where(eq(accountsTable.id, accountId))
-      .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    throw new Error("Account not found.");
-  }
-
-  return parseSystemAgentModel(row.system_agent_model);
-}
-
 async function getViewerAccountState(
   database: D1Database,
   accountId: AccountId,

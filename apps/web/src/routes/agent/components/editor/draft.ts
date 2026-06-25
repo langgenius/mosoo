@@ -41,7 +41,7 @@ export function createInitialDraft(agent: Agent): AgentEditorDraft {
   };
 }
 
-export function createSnapshot(draft: AgentEditorDraft): string {
+function createSnapshot(draft: AgentEditorDraft): string {
   return JSON.stringify(toAgentConfigChangeSnapshot(draft));
 }
 
