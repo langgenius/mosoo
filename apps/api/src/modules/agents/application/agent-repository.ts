@@ -31,7 +31,7 @@ import { normalizeAgentSkillIds } from "./agent-skill-resolution.service";
 import { normalizeAgentStoredConfigJson } from "./agent-stored-config.service";
 import type { AgentRow } from "./agent-types";
 
-export const agentRowColumns = {
+const agentRowColumns = {
   configJson: agentsTable.configJson,
   createdAt: agentsTable.createdAt,
   description: agentsTable.description,
