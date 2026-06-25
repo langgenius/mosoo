@@ -70,6 +70,7 @@ export async function createAgentFork(
 
   const agent = await createDraftAgent(bindings.DB, {
     agentName: `${sourceAgent.name} Copy`,
+    builtInTools: sourceStoredConfig.builtInTools,
     description: sourceAgent.description,
     environmentId: sourceAgent.environmentId,
     kind: forkKind,

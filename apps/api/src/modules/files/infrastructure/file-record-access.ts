@@ -57,6 +57,18 @@ async function ensureLibraryFileAccess(
   await ensureAppOwnership(database, viewerId, appId);
 }
 
+function ensureAccountFileAccess(
+  viewerId: AccountId,
+  file: FileRecordRow,
+  resourceKind: "file" | "upload",
+): void {
+  if (file.owner_kind !== "account" || file.owner_id !== viewerId) {
+    throw createFileNotFoundError(
+      resourceKind === "file" ? "File not found." : "Upload not found.",
+    );
+  }
+}
+
 export async function ensureUploadAccess({
   database,
   fileId,
@@ -69,7 +81,9 @@ export async function ensureUploadAccess({
     throw createFileNotFoundError("Upload not found.");
   }
 
-  if (context.upload.scope_kind === "library") {
+  if (context.upload.scope_kind === "account") {
+    ensureAccountFileAccess(viewerId, context.file, "upload");
+  } else if (context.upload.scope_kind === "library") {
     await ensureLibraryFileAccess(database, viewerId, context.file, "upload");
   } else if (context.upload.scope_kind === "session") {
     if (!context.sessionAccess) {
@@ -105,7 +119,9 @@ export async function ensureFileAccess({
     throw createFileNotFoundError("File not found.");
   }
 
-  if (file.scope_kind === "library") {
+  if (file.scope_kind === "account") {
+    ensureAccountFileAccess(viewerId, file, "file");
+  } else if (file.scope_kind === "library") {
     await ensureLibraryFileAccess(database, viewerId, file, "file");
   } else if (file.scope_kind === "session") {
     await ensureSessionFileAccess(

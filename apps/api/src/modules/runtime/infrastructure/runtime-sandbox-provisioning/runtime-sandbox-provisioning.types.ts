@@ -5,6 +5,7 @@ import type { DriverBootPayloadPreparedHandler } from "../../application/executi
 import type { RuntimeTimingSnapshot } from "../../application/session-runs/session-runtime-timing";
 import type {
   DriverProfileConfig,
+  DriverExecutionSpec,
   DriverResolvedMcpServer,
   DriverResolvedSkill,
   DriverRuntime,
@@ -28,6 +29,7 @@ export interface RuntimeSmokeProvision {
 }
 
 export interface ProvisionDriverInput {
+  builtInTools: DriverExecutionSpec["builtInTools"];
   cloudflareSession: ExecutionSessionHandle;
   driverRecordConflictStrategy?: "insert-only" | "replace";
   driverInstanceId: DriverInstanceId;

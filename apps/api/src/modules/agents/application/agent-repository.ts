@@ -31,7 +31,7 @@ import { normalizeAgentSkillIds } from "./agent-skill-resolution.service";
 import { normalizeAgentStoredConfigJson } from "./agent-stored-config.service";
 import type { AgentRow } from "./agent-types";
 
-export const agentRowColumns = {
+const agentRowColumns = {
   configJson: agentsTable.configJson,
   createdAt: agentsTable.createdAt,
   description: agentsTable.description,
@@ -150,6 +150,26 @@ export async function listAppOwnerAgentRows(
     .innerJoin(appsTable, eq(appsTable.id, agentsTable.appId))
     .where(and(eq(agentsTable.appId, input.appId), eq(agentsTable.ownerId, input.viewerId)))
     .orderBy(desc(agentsTable.updatedAt))
+    .all();
+
+  return rows.map(toAgentRow);
+}
+
+export async function listAppOwnerAgentRowsPage(
+  database: D1Database,
+  input: {
+    appId: AppId;
+    limit: number;
+    viewerId: AccountId;
+  },
+): Promise<AgentRow[]> {
+  const rows = await getAppDatabase(database)
+    .select(agentRowColumns)
+    .from(agentsTable)
+    .innerJoin(appsTable, eq(appsTable.id, agentsTable.appId))
+    .where(and(eq(agentsTable.appId, input.appId), eq(agentsTable.ownerId, input.viewerId)))
+    .orderBy(desc(agentsTable.updatedAt), asc(agentsTable.id))
+    .limit(input.limit)
     .all();
 
   return rows.map(toAgentRow);

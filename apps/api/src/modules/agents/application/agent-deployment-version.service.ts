@@ -4,13 +4,13 @@ import type {
   SessionExecutionToolReference,
 } from "@mosoo/contracts/session";
 import { NonEmptyString, parseSchemaValue } from "@mosoo/contracts/validation";
-import { agentDeploymentVersionsTable, agentsTable } from "@mosoo/db";
+import { agentDeploymentVersionsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type { AccountId, AgentDeploymentVersionId, AgentId, EnvironmentId } from "@mosoo/id";
 import { type } from "arktype";
 import { desc, eq, sql } from "drizzle-orm";
 
-import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
+import { getAppDatabase } from "../../../platform/db/drizzle";
 import { API_ERROR_CODE, createApiError } from "../../../platform/errors";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs, toIsoString } from "../../../time";
@@ -199,33 +199,6 @@ async function getNextVersionNumber(database: D1Database, agentId: AgentId): Pro
     .get();
 
   return row?.nextVersionNumber ?? 1;
-}
-
-export async function createLiveAgentDeploymentVersion(
-  database: D1Database,
-  viewer: AuthenticatedViewer,
-  input: {
-    agentId: AgentId;
-    summary: string;
-  },
-): Promise<AgentDeploymentVersionRecord> {
-  const agent = await getAgentRow(database, input.agentId);
-  const spec = await buildAgentSpec(database, agent);
-  const candidate = await prepareAgentDeploymentVersionCandidate(database, viewer, {
-    agent,
-    spec,
-    summary: input.summary,
-  });
-
-  await runAppDatabaseBatch(database, (db) => [
-    db.insert(agentDeploymentVersionsTable).values(candidate.values),
-    db
-      .update(agentsTable)
-      .set({ liveDeploymentVersionId: candidate.record.id, updatedAt: candidate.record.createdAt })
-      .where(eq(agentsTable.id, agent.id)),
-  ]);
-
-  return candidate.record;
 }
 
 export async function prepareAgentDeploymentVersionCandidate(

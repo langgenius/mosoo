@@ -30,7 +30,7 @@ function toRuntimeInfo(entry: (typeof PUBLIC_RUNTIME_CATALOG)[number]): RuntimeI
   };
 }
 
-export const RUNTIMES: RuntimeInfo[] = PUBLIC_RUNTIME_CATALOG.map((entry) => toRuntimeInfo(entry));
+const RUNTIMES: RuntimeInfo[] = PUBLIC_RUNTIME_CATALOG.map((entry) => toRuntimeInfo(entry));
 
 function createExternalRuntimeInfo(runtimeId: string): RuntimeInfo {
   if (runtimeId === "__private_runtime__") {

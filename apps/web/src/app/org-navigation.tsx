@@ -1,12 +1,17 @@
-import type { LucideIcon } from "lucide-react";
-import { BarChart3, LayoutGrid, Settings, Wallet } from "lucide-react";
+import ChartLineData01Icon from "@hugeicons/core-free-icons/ChartLineData01Icon";
+import GridViewIcon from "@hugeicons/core-free-icons/GridViewIcon";
+import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
+import Wallet02Icon from "@hugeicons/core-free-icons/Wallet02Icon";
 import { Link } from "react-router-dom";
 
 import { cn } from "@/shared/lib/class-names";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
+import type { AppIcon } from "./hugeicon";
+import { createHugeicon } from "./hugeicon";
+
 interface OrgNavItem {
-  icon: LucideIcon;
+  icon: AppIcon;
   label: string;
   path: string | null;
   soon?: boolean;
@@ -15,10 +20,19 @@ interface OrgNavItem {
 // Org layer = the account/billing shell. Usage and Billing are not built yet, so
 // they render as inert "coming soon" entries.
 const ORG_NAV_ITEMS: OrgNavItem[] = [
-  { icon: LayoutGrid, label: "Apps", path: "/apps" },
-  { icon: BarChart3, label: "Usage", path: null, soon: true },
-  { icon: Wallet, label: "Billing", path: null, soon: true },
-  { icon: Settings, label: "Org settings", path: "/org/settings" },
+  { icon: createHugeicon(GridViewIcon, "AppsIcon"), label: "Apps", path: "/apps" },
+  {
+    icon: createHugeicon(ChartLineData01Icon, "UsageIcon"),
+    label: "Usage",
+    path: null,
+    soon: true,
+  },
+  { icon: createHugeicon(Wallet02Icon, "BillingIcon"), label: "Billing", path: null, soon: true },
+  {
+    icon: createHugeicon(Settings02Icon, "OrgSettingsIcon"),
+    label: "Org settings",
+    path: "/org/settings",
+  },
 ];
 
 function isOrgNavItemActive(pathname: string, path: string): boolean {
@@ -31,7 +45,7 @@ function ComingSoonItem({
   label,
 }: {
   collapsed: boolean;
-  icon: LucideIcon;
+  icon: AppIcon;
   label: string;
 }) {
   const content = (
@@ -74,7 +88,7 @@ function OrgNavLink({
   path,
 }: {
   collapsed: boolean;
-  icon: LucideIcon;
+  icon: AppIcon;
   isActive: boolean;
   label: string;
   path: string;

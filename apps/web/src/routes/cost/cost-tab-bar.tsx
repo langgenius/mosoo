@@ -11,7 +11,7 @@ export function CostTabBar({
   setActiveTab: (tab: CostTab) => void;
 }) {
   return (
-    <div className="border-border-subtle flex shrink-0 gap-1 border-b px-8 py-3">
+    <div className="border-border-subtle flex shrink-0 gap-1 border-b px-6 py-3">
       {COST_TABS.map((tab) => (
         <button
           key={tab.id}

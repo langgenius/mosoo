@@ -40,6 +40,13 @@ export function SkillsTab() {
     }
   }
 
+  async function handleImportUrl(url: string) {
+    const created = await registry.publishFromGithub(url);
+    if (created) {
+      setDetailSkillId(created.id);
+    }
+  }
+
   return (
     <div className="flex h-full flex-col">
       <PageHeader title="Skills" description="Reusable capabilities you can attach to Agents.">
@@ -50,7 +57,7 @@ export function SkillsTab() {
           size="sm"
         >
           <Upload className="size-3.5" />
-          Upload skill
+          Add skill
         </Button>
       </PageHeader>
 
@@ -104,6 +111,7 @@ export function SkillsTab() {
         open={uploadOpen}
         onOpenChange={setUploadOpen}
         onUpload={handleUpload}
+        onImportUrl={handleImportUrl}
         registry={registry}
       />
       {detailSkill ? (
@@ -137,11 +145,11 @@ function SkillsEmptyState({ onUpload, searching }: { onUpload: () => void; searc
     <EmptyState
       icon={Sparkles}
       title="No skills yet"
-      description="Upload a `SKILL.md` file to get started, or fork an existing skill."
+      description="Upload a `SKILL.md` file, import from GitHub or skills.sh, or fork an existing skill."
     >
       <Button onClick={onUpload} size="sm">
         <Upload className="size-3.5" />
-        Upload skill
+        Add skill
       </Button>
     </EmptyState>
   );

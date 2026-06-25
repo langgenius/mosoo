@@ -127,7 +127,7 @@ function agentShare(agent: CostAgentRow, agents: CostAgentRow[]): number {
   return total > 0 ? agent.totalCostUsd / total : 0;
 }
 
-export function RunMixBar({ agent }: { agent: CostAgentRow }) {
+function RunMixBar({ agent }: { agent: CostAgentRow }) {
   const total = agent.totalCostUsd;
   const parts = runMixSegments(agent);
 

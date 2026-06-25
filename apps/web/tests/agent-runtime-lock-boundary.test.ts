@@ -13,7 +13,6 @@ describe("Agent runtime lock boundary", () => {
       "../src/routes/agent/components/editor/use-model.ts",
       "../src/routes/agent/components/kind-selector.tsx",
       "../src/routes/agent/components/kind-lock-banner.tsx",
-      "../src/routes/agent/components/config-panel.tsx",
       "../src/routes/agent/lifecycle/live-config-action-dialog.tsx",
     ].map(readSource);
     const combinedSource = sources.join("\n");
@@ -24,8 +23,9 @@ describe("Agent runtime lock boundary", () => {
     expect(combinedSource).toContain("Locked after publishing. Fork to switch type.");
     expect(combinedSource).toContain("Agent type is locked after publishing.");
     expect(combinedSource).toContain("Runtime changes are not allowed in-place after publishing.");
-    expect(combinedSource).toContain("Non-owner consume mode.");
-    expect(combinedSource).toContain("Owner consume mode keeps a config entry point.");
+    expect(combinedSource).toContain(
+      "Consume mode keeps a config entry point back into the editor.",
+    );
 
     expect(combinedSource.toLowerCase()).not.toContain("published agent");
     expect(combinedSource).not.toContain("Fork Agent to change type or runtime");

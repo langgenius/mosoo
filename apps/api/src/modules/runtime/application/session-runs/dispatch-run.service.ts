@@ -102,6 +102,7 @@ export async function dispatchSessionRun(
   requestUrl: string,
   input: {
     attachmentIds: FileId[];
+    builtInTools: HydratedSessionRunContext["builtInTools"];
     prompt: string;
     profile: HydratedSessionRunContext["profile"] & {
       runtimeId: DriverRuntime;
@@ -152,6 +153,7 @@ export async function dispatchSessionRun(
 
     runLease = await executionPlane.prepareRun(bindings, requestUrl, {
       attachmentIds: input.attachmentIds,
+      builtInTools: input.builtInTools,
       onBootPayloadPrepared: async ({ bootPayload }) => {
         const configTraceValue = buildSessionConfigTraceValue(bootPayload);
 

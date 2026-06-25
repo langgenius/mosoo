@@ -115,7 +115,11 @@ export const appGraphQLSpec = {
     "createApp(input: CreateAppInput!): App!",
     "renameApp(input: RenameAppInput!): App!",
   ],
-  queryFields: ["appList(organizationId: ULID!): [App!]!"],
+  queryFields: [
+    "appList(organizationId: ULID!): [App!]!",
+    "appOverview(appId: ULID!, agentLimit: Int, credentialLimit: Int): AppOverview!",
+    "controlPlaneOverview(appLimit: Int, agentLimit: Int, credentialLimit: Int): ControlPlaneOverview!",
+  ],
   typeDefs: appSchema,
 } satisfies GraphQLModuleSpec;
 
@@ -125,6 +129,7 @@ export const sessionGraphQLSpec = {
     "createAgentSession(input: CreateAgentSessionInput!): Session!",
     "prewarmAgentSession(appId: ULID!, sessionId: ULID!): SessionRuntimePrewarmAck!",
     "sendAgentSessionEvents(appId: ULID!, sessionId: ULID!, events: [AgentSessionEventInput!]!): AgentSessionEventBatch!",
+    "startAgentRun(input: StartAgentRunInput!): AgentRunWorkflow!",
     "archiveAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!",
     "autoTitleSession(input: RenameSessionInput!): Session!",
     "deleteAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!",
@@ -186,7 +191,7 @@ export const vendorCredentialGraphQLSpec = {
 } satisfies GraphQLModuleSpec;
 
 export const organizationGraphQLSpec = {
-  mutationFields: [],
+  mutationFields: ["renameOrganization(input: RenameOrganizationInput!): Organization!"],
   queryFields: [],
   typeDefs: organizationSchema,
 } satisfies GraphQLModuleSpec;

@@ -338,7 +338,7 @@ agents:
       id: "openai-runtime"
       provider: "openai"
       model: "gpt-4.1"
-      providerOptions: {}
+      settings: {}
     prompts:
       system: |
         Qualify inbound sales conversations and summarize next steps.
@@ -363,7 +363,7 @@ agents:
       id: "openai-runtime"
       provider: "openai"
       model: "gpt-4.1"
-      providerOptions: {}
+      settings: {}
     prompts:
       system: |
         Draft concise follow-up messages for owner review.

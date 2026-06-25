@@ -12,7 +12,6 @@ export {
 export {
   fileRecordRowColumns,
   toFileEntry,
-  toFileEntryFromRow,
   toFileRecord,
   toSessionFile,
   toUploadSummary,

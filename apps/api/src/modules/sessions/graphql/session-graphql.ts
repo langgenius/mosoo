@@ -8,6 +8,7 @@ import {
   sendAgentSessionEvents,
 } from "../../runtime/application/session-run.service";
 import { scheduleSessionPrewarm } from "../../runtime/application/session-runs/schedule-session-prewarm.service";
+import { startAgentRun } from "../application/agent-run-workflow.service";
 import { listAgentSessions } from "../application/agent-session-query.service";
 import {
   getAgentSessionDiagnostics,
@@ -69,6 +70,10 @@ interface SendAgentSessionEventsArgs {
   events: Parameters<typeof sendAgentSessionEvents>[0]["input"]["events"];
   appId: string;
   sessionId: string;
+}
+
+interface StartAgentRunArgs {
+  input: Parameters<typeof startAgentRun>[0]["input"];
 }
 
 interface AgentSessionListArgs {
@@ -163,6 +168,14 @@ export const sessionGraphQLModule = {
           appId: readAppId(args.appId),
           sessionId: readSessionId(args.sessionId),
         },
+        requestUrl: context.request.url,
+        viewer: context.viewer,
+      }),
+    startAgentRun: async (_parent, args: StartAgentRunArgs, context) =>
+      startAgentRun({
+        bindings: context.bindings,
+        executionContext: context.executionContext,
+        input: args.input,
         requestUrl: context.request.url,
         viewer: context.viewer,
       }),

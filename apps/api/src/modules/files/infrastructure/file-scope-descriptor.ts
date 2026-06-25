@@ -16,6 +16,7 @@ import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { createFileInvalidRequestError } from "./file-errors";
 import {
+  createAccountAvatarPath,
   createAttachmentPath,
   ensureLibraryFilePathHasExtension,
   normalizeFileName,
@@ -99,6 +100,40 @@ function defineFileScopeDescriptor<Kind extends FileUploadTargetKind>(
     },
   };
 }
+
+const accountDescriptor = defineFileScopeDescriptor({
+  capabilities: {
+    moveRename: {
+      enabled: false,
+    },
+    pathLocks: false,
+    versioning: false,
+  },
+  kind: "account",
+  uploadPurpose: "account_avatar",
+  async resolveUploadTargetContext({ fileId, target, viewer }) {
+    const viewerId: AccountId = parsePlatformId(viewer.id, "viewer ID");
+    const targetId: AccountId = parsePlatformId(target.id, "upload account ID");
+
+    if (targetId !== viewerId) {
+      throw createFileInvalidRequestError("Avatars can only be uploaded for the current account.");
+    }
+
+    const name = normalizeFileName(target.name);
+    const logicalPath = createAccountAvatarPath(fileId, name);
+
+    return {
+      logicalPath,
+      name,
+      ownerId: viewerId,
+      ownerKind: "account",
+      parentPath: getParentPath(logicalPath),
+      scopeId: viewerId,
+      scopeKind: "account",
+      sessionKind: null,
+    };
+  },
+});
 
 const libraryDescriptor = defineFileScopeDescriptor({
   capabilities: {
@@ -230,6 +265,7 @@ const appDraftDescriptor = defineFileScopeDescriptor({
 });
 
 const fileScopeDescriptors = {
+  account: accountDescriptor,
   agent_package: agentPackageDescriptor,
   app_draft: appDraftDescriptor,
   library: libraryDescriptor,

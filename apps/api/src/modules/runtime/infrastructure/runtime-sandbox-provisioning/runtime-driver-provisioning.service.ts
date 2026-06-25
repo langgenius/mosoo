@@ -244,6 +244,7 @@ async function provisionDriver(
 
     const execution = await timing.measure("buildExecutionSpec", () =>
       buildExecutionSpec(env, {
+        builtInTools: input.builtInTools,
         driverInstanceId,
         nativeResumeRef,
         profile: input.profile,

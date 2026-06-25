@@ -271,7 +271,7 @@ export function useAgentSessionPanelModel(
   }
 
   async function handleSend(options: SendOptions = {}): Promise<boolean> {
-    const typedText = inputValue.trim();
+    const typedText = (options.text ?? inputValue).trim();
     const text = appendSessionResourceMentionsToMessage(
       typedText,
       options.sessionResourceMentions ?? [],
@@ -369,9 +369,18 @@ export function useAgentSessionPanelModel(
     });
   }
 
+  async function cancel(): Promise<void> {
+    if (activeSessionId === null) {
+      return;
+    }
+
+    await stream.sendUserInterrupt({ runId: stream.run.id, sessionId: activeSessionId });
+  }
+
   return {
     activeSession,
     activeSessionId,
+    cancel,
     composerError,
     configurationRefreshRequired,
     ensureActiveSession,

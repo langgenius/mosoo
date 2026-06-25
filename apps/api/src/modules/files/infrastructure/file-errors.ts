@@ -40,10 +40,6 @@ export function createFileNotFoundError(message: string): FileControlError {
   return new FileControlError(404, "file_not_found", message);
 }
 
-export function createFileForbiddenError(message: string): FileControlError {
-  return new FileControlError(403, "file_forbidden", message);
-}
-
 export function createUploadExpiredError(): FileControlError {
   return new FileControlError(410, "file_upload_expired", "Upload session has expired.");
 }

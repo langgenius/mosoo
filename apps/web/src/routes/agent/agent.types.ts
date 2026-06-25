@@ -1,5 +1,6 @@
 import type { JsonObject } from "@mosoo/contracts";
 import type {
+  AgentBuiltInToolConfig,
   AgentDeploymentVersion,
   AgentKind,
   AgentReadiness,
@@ -9,7 +10,10 @@ import type { AgentPackageResolutionState } from "@mosoo/contracts/agent-manifes
 import type { McpAuthorizationState, McpCredentialStatus } from "@mosoo/contracts/mcp";
 
 export type AgentStatus = "draft" | "published";
-export type AgentRole = "owner" | "none";
+// The web console only ever loads agents the viewer owns — the API returns
+// `viewerRole: "owner"` and 403s every other caller — so the view model role
+// is always "owner". Non-owner consumption is a separate (future) surface.
+export type AgentRole = "owner";
 export type AgentMode = "create" | "preview" | "consume";
 export type { AgentKind };
 
@@ -63,6 +67,7 @@ export interface McpServer {
 }
 
 export interface AgentConfig {
+  builtInTools: AgentBuiltInToolConfig[];
   environmentId: string | null;
   mcpServers: McpServer[];
   model: string;

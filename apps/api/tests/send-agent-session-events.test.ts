@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
+
 import { dispatchQueuedSessionRun } from "../src/modules/runtime/application/session-runs/dispatch-queued-run.service";
 import { sendAgentSessionEvents } from "../src/modules/runtime/application/session-runs/send-agent-session-events.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
@@ -26,6 +28,7 @@ function createQueuedRunExecutionPlan() {
       provider: "openai",
       runtimeId: "openai-runtime",
     },
+    builtInTools: createDefaultAgentBuiltInTools(),
     environment: {
       allowMcpServers: true,
       allowPackageManagers: true,
@@ -335,6 +338,7 @@ describe("send agent session events", () => {
         provider: "openai",
         runtimeId: "openai-runtime",
       },
+      builtInTools: createDefaultAgentBuiltInTools(),
       environment: {
         allowMcpServers: true,
         allowPackageManagers: true,

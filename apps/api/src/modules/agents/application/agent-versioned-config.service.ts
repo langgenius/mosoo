@@ -1,5 +1,5 @@
 import type { JsonObject } from "@mosoo/contracts";
-import type { AgentEnvironmentConfig } from "@mosoo/contracts/agent";
+import type { AgentBuiltInToolConfig, AgentEnvironmentConfig } from "@mosoo/contracts/agent";
 import { classifyAgentConfigChanges } from "@mosoo/contracts/agent-config-change-plan";
 import type {
   AgentConfigChangePlan,
@@ -71,12 +71,13 @@ export function createAgentConfigChangeSnapshot(input: {
   agent: Pick<
     AgentRow,
     "description" | "kind" | "model" | "name" | "prompt" | "provider" | "runtimeId"
-  > & { providerOptions: JsonObject };
+  > & { builtInTools: readonly AgentBuiltInToolConfig[]; providerOptions: JsonObject };
   environment: AgentEnvironmentConfig;
   mcpServerIds: readonly McpServerId[];
   skillIds: readonly SkillId[];
 }): AgentConfigChangeSnapshot {
   return {
+    builtInTools: input.agent.builtInTools,
     description: input.agent.description ?? "",
     environmentId: input.environment.environmentId,
     kind: input.agent.kind,

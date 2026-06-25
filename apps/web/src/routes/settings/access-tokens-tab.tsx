@@ -13,6 +13,7 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 
 import { isTruthy } from "../../shared/lib/truthiness";
+import { SettingsTabBody, SettingsTabHeader } from "./settings-tab-layout";
 
 const ACCESS_TOKEN_QUERY_KEY = ["auth", "personal-access-tokens"] as const;
 
@@ -121,17 +122,19 @@ export function AccessTokensTab() {
 
   return (
     <>
-      <header className="border-border-subtle flex h-12 shrink-0 items-center justify-between gap-3 border-b px-5">
-        <span className="text-sm font-medium">API Tokens</span>
-        <Button asChild className="gap-1 text-[11.5px]" size="xs" variant="outline">
-          <a href={MOSOO_API_REFERENCE_URL} rel="noreferrer noopener" target="_blank">
-            <ExternalLink className="size-3" />
-            API reference
-          </a>
-        </Button>
-      </header>
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="mx-auto max-w-4xl space-y-5">
+      <SettingsTabHeader
+        title="API Tokens"
+        actions={
+          <Button asChild className="gap-1 text-[11.5px]" size="xs" variant="outline">
+            <a href={MOSOO_API_REFERENCE_URL} rel="noreferrer noopener" target="_blank">
+              <ExternalLink className="size-3" />
+              API reference
+            </a>
+          </Button>
+        }
+      />
+      <SettingsTabBody width="wide">
+        <div className="space-y-5">
           <PersonalTokenSection
             copied={copied}
             createError={createMutation.error}
@@ -154,7 +157,7 @@ export function AccessTokensTab() {
             tokens={tokensQuery.data?.tokens ?? null}
           />
         </div>
-      </div>
+      </SettingsTabBody>
     </>
   );
 }

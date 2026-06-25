@@ -1,3 +1,9 @@
+import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
+import {
+  createDefaultAgentBuiltInTools,
+  isAgentBuiltInToolName,
+  normalizeAgentBuiltInTools,
+} from "@mosoo/contracts/agent";
 import type {
   AgentManifestMcpServerBinding,
   AgentPackageResolutionSource,
@@ -15,6 +21,7 @@ import { isTruthy } from "../../../shared/truthiness";
 import { readSkillId, readSkillSnapshotId } from "./agent-platform-ids";
 
 interface StoredAgentConfig {
+  builtInTools: AgentBuiltInToolConfig[];
   packageMcpServers: AgentManifestMcpServerBinding[];
   packageSkills: AgentStoredPackageSkill[];
   packageResolution: AgentPackageResolutionState | null;
@@ -109,6 +116,28 @@ function readBoolean(value: unknown, fieldName: string): boolean {
   return value;
 }
 
+function readBuiltInToolConfig(value: unknown): AgentBuiltInToolConfig {
+  const record = readRecord(value, "builtInTools entry");
+  const name = readString(record["name"], "builtInTools name");
+
+  if (!isAgentBuiltInToolName(name)) {
+    throw new Error("Agent stored config builtInTools name is invalid.");
+  }
+
+  return {
+    enabled: readBoolean(record["enabled"], "builtInTools enabled"),
+    name,
+  };
+}
+
+function readBuiltInTools(value: unknown): AgentBuiltInToolConfig[] {
+  if (value === undefined) {
+    return createDefaultAgentBuiltInTools();
+  }
+
+  return normalizeAgentBuiltInTools(readArray(value, "builtInTools").map(readBuiltInToolConfig));
+}
+
 function readNumber(value: unknown, fieldName: string): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     throw new TypeError(`Agent stored config ${fieldName} must be a finite number.`);
@@ -182,6 +211,7 @@ export function isPackageSkillRuntimeId(skillId: string): boolean {
 
 function createEmptyStoredAgentConfig(): StoredAgentConfig {
   return {
+    builtInTools: createDefaultAgentBuiltInTools(),
     packageMcpServers: [],
     packageSkills: [],
     packageResolution: null,
@@ -318,6 +348,7 @@ export function parseAgentStoredConfig(configJson: string): StoredAgentConfig {
   }
 
   return {
+    builtInTools: readBuiltInTools(parsed["builtInTools"]),
     packageMcpServers: readPackageMcpServers(parsed["packageMcpServers"]),
     packageSkills: readPackageSkills(parsed["packageSkills"]),
     packageResolution: readPackageResolutionState(parsed["packageResolution"]),
@@ -330,6 +361,10 @@ export function parseAgentStoredConfig(configJson: string): StoredAgentConfig {
 
 export function serializeAgentStoredConfig(input: StoredAgentConfig): string {
   return JSON.stringify({
+    builtInTools: normalizeAgentBuiltInTools(input.builtInTools).map((tool) => ({
+      enabled: tool.enabled,
+      name: tool.name,
+    })),
     packageMcpServers: input.packageMcpServers.map((server) => ({
       authType: server.authType,
       credentialScope: server.credentialScope,

@@ -169,6 +169,36 @@ export const sessionSchema = /* GraphQL */ `
     warnings: [UserWarning!]!
   }
 
+  input StartAgentRunInput {
+    agentId: ULID
+    appId: ULID!
+    clientRequestId: String
+    prompt: String!
+    sessionId: ULID
+    type: SessionType
+    waitForRuntimeReady: Boolean
+  }
+
+  type AgentRunEventSurface {
+    appId: ULID!
+    graphqlUrl: String!
+    messagesOperation: String!
+    processEventsOperation: String!
+    retrieveOperation: String!
+    sessionId: ULID!
+    streamUrl: String
+    suggestedPollIntervalMs: Int!
+  }
+
+  type AgentRunWorkflow {
+    acceptedAt: String!
+    createdSession: Boolean!
+    eventBatch: AgentSessionEventBatch!
+    eventSurface: AgentRunEventSurface!
+    run: SessionRun
+    session: Session!
+  }
+
   type SessionRuntimePrewarmAck {
     scheduledAt: String!
     sessionId: ULID!

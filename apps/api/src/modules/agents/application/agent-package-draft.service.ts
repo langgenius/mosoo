@@ -1,5 +1,6 @@
 import type { JsonObject } from "@mosoo/contracts";
-import type { AgentKind } from "@mosoo/contracts/agent";
+import type { AgentBuiltInToolConfig, AgentKind } from "@mosoo/contracts/agent";
+import { createDefaultAgentBuiltInTools, normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
 import type {
   AgentManifestMcpServerBinding,
   AgentPackageResolutionState,
@@ -27,6 +28,7 @@ import type { AgentRow } from "./agent-types";
 
 export interface CreateDraftAgentInput {
   agentName: string;
+  builtInTools?: readonly AgentBuiltInToolConfig[];
   description: string | null;
   environmentId: EnvironmentId | null;
   kind: AgentKind;
@@ -68,6 +70,10 @@ export async function createDraftAgentBatch(
   await runAppDatabaseBatch(database, (db) => {
     const agentInsert = db.insert(agentsTable).values({
       configJson: serializeAgentStoredConfig({
+        builtInTools:
+          input.builtInTools === undefined
+            ? createDefaultAgentBuiltInTools()
+            : normalizeAgentBuiltInTools(input.builtInTools),
         packageMcpServers: input.packageMcpServers,
         packageSkills: input.packageSkills,
         packageResolution: input.packageResolution,

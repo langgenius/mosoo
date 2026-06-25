@@ -118,6 +118,7 @@ export async function prewarmAgentSessionRuntime(
     };
     const driverPrewarm = await timing.measure("prewarmDriverSession", () =>
       prewarmDriverSession(bindings, request.requestUrl, {
+        builtInTools: hydrated.value.builtInTools,
         cloudflareSession: executionSession.cloudflareSession,
         profile: driverProfile,
         resolvedMcpServers: hydrated.value.mcpServers,

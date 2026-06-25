@@ -51,7 +51,7 @@ Sentences Agent owners / configurators often say:
 
 When this is done, an Agent owner should be able to:
 
-- Upload a `.md` / `.zip` / `.skill` file into the active App's Skill registry
+- Upload a `.md` / `.zip` / `.skill` file, or import a skill from a GitHub or skills.sh URL (or a pasted `npx skills add … --skill <name>` install command), into the active App's Skill registry
 - Open an App-local Skill detail view to read `SKILL.md` or download the `.skill` archive
 - Mount App-local Skills in an Agent configuration
 - Copy or fork an App-local Skill when they want an independent package to edit
@@ -87,7 +87,7 @@ Future multi-user governance may add additional views, but V1 should not expose 
 
 ### 5.1 Upload/import: visible inside the active App
 
-- The App owner uploads a `.md`, `.zip`, or `.skill` package, or imports one from an Agent package
+- The App owner uploads a `.md`, `.zip`, or `.skill` package, imports one from an Agent package, or imports a skill from a GitHub / skills.sh URL
 - The Skill row belongs to the active App
 - The Skill appears in the active App's Skill registry and nowhere else
 

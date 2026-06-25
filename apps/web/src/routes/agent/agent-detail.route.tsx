@@ -34,10 +34,10 @@ const TerminalMode = lazy(async () => {
 
 type DetailMode = AgentMode | "cost" | "logs" | "terminal";
 
-const MODE_TABS: { id: DetailMode; label: string; ownerOnly?: boolean }[] = [
+const MODE_TABS: { id: DetailMode; label: string }[] = [
   { id: "preview", label: "Preview" },
-  { id: "logs", label: "Logs", ownerOnly: true },
-  { id: "cost", label: "Cost", ownerOnly: true },
+  { id: "logs", label: "Logs" },
+  { id: "cost", label: "Cost" },
 ];
 
 interface DebugModeItem {
@@ -64,7 +64,6 @@ function AgentDetailHeader({
   agent,
   debugItems,
   headerActionTargetRef,
-  isOwner,
   mode,
   onBack,
   onOpenSettings,
@@ -75,7 +74,6 @@ function AgentDetailHeader({
   agent: Agent;
   debugItems: DebugModeItem[];
   headerActionTargetRef: (node: HTMLDivElement | null) => void;
-  isOwner: boolean;
   mode: DetailMode;
   onBack: () => void;
   onOpenSettings: () => void;
@@ -114,27 +112,21 @@ function AgentDetailHeader({
       </div>
 
       <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1">
-        {MODE_TABS.flatMap((tab) =>
-          tab.ownerOnly === true && !isOwner
-            ? []
-            : [
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => {
-                    onSelectMode(tab.id);
-                  }}
-                  className={cn(
-                    "px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-all",
-                    mode === tab.id
-                      ? "bg-ink-100 text-fg-1"
-                      : "text-muted-foreground hover:bg-accent",
-                  )}
-                >
-                  {tab.label}
-                </button>,
-              ],
-        )}
+        {MODE_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => {
+              onSelectMode(tab.id);
+            }}
+            className={cn(
+              "px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-all",
+              mode === tab.id ? "bg-ink-100 text-fg-1" : "text-muted-foreground hover:bg-accent",
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
         {debugItems.map((item) => {
           const Icon = item.icon;
           return (
@@ -196,7 +188,6 @@ export function AgentDetailPage() {
 
   const basePath = globalThis.location.pathname.startsWith("/demo") ? "/demo/agent" : "/agent";
   const runtime = useMemo(() => (agent ? getRuntimeInfo(agent.runtime) : null), [agent]);
-  const isOwner = agent?.role === "owner";
   const canManageAgentAccess = detailQuery.data?.viewerRole === "owner";
   const canUseTerminal = canShowAgentDebugMenuItem({
     agentKind: agent?.kind ?? null,
@@ -242,18 +233,12 @@ export function AgentDetailPage() {
     );
   }, [settingsParam, setSearchParams]);
 
-  // Default mode: Owner → Preview (config + test chat), others → Consume.
-  // Owners can still reach Consume via `?tab=consume` (e.g. the
-  // post-publish success modal's "Open Chat" CTA) or the Preview tab for
-  // an in-context test chat.
-  const defaultMode: DetailMode = isOwner ? "preview" : "consume";
+  // Default mode is Preview (config + test chat). Consume is still reachable
+  // via `?tab=consume` (e.g. the post-publish success modal's "Open Chat" CTA),
+  // and the Preview tab offers an in-context test chat.
+  const defaultMode: DetailMode = "preview";
   const requestedMode = selectedMode ?? urlMode ?? defaultMode;
-  const mode =
-    !isOwner && requestedMode !== "consume"
-      ? "consume"
-      : requestedMode === "terminal" && !canUseTerminal
-        ? defaultMode
-        : requestedMode;
+  const mode = requestedMode === "terminal" && !canUseTerminal ? defaultMode : requestedMode;
 
   if (!isTruthy(agentId)) {
     return (
@@ -309,12 +294,7 @@ export function AgentDetailPage() {
     );
   }
 
-  // Non-owner consume mode.
-  if (!isOwner) {
-    return <ConsumeMode agent={agent} />;
-  }
-
-  // Owner consume mode keeps a config entry point.
+  // Consume mode keeps a config entry point back into the editor.
   if (mode === "consume") {
     return (
       <ConsumeMode
@@ -333,7 +313,6 @@ export function AgentDetailPage() {
         agent={agent}
         debugItems={debugItems}
         headerActionTargetRef={setHeaderActionTarget}
-        isOwner={isOwner}
         mode={mode}
         onBack={() => {
           void navigate(basePath);

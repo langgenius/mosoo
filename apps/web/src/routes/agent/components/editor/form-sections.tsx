@@ -13,6 +13,7 @@ import { EnvironmentPicker } from "./environment-picker";
 import { AgentMcpBindingsField } from "./mcp-bindings-field";
 import { ModelPickerField } from "./model-picker-field";
 import { RequiredMark } from "./required-mark";
+import { RuntimeAdvancedSettingsField } from "./runtime-advanced-settings-field";
 import { SectionHeader } from "./section-header";
 import { AgentSkillsField } from "./skills-field";
 import type { AgentEditorModel } from "./use-model";
@@ -173,6 +174,14 @@ export function BasicsSection({
           </div>
 
           <ModelPickerField model={model} appId={agent.appId} readOnly={readOnly} />
+          <RuntimeAdvancedSettingsField
+            builtInTools={model.draft.builtInTools}
+            readOnly={readOnly}
+            runtimeId={model.draft.runtime}
+            settings={model.draft.providerOptions}
+            setBuiltInTools={model.setBuiltInTools}
+            setSettings={model.setProviderOptions}
+          />
         </div>
       </div>
 

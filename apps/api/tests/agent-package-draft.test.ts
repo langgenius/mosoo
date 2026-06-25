@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { createEmptyResolutionSummary } from "@mosoo/agent-package";
+import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
 import type { AgentManifest } from "@mosoo/contracts/agent-manifest";
 import { AGENT_MANIFEST_VERSION } from "@mosoo/contracts/agent-manifest";
 import { parsePlatformId } from "@mosoo/id";
@@ -177,6 +178,7 @@ describe("agent package draft", () => {
       .first<{ config_json: string }>();
 
     expect(JSON.parse(row?.config_json ?? "{}")).toEqual({
+      builtInTools: createDefaultAgentBuiltInTools(),
       packageMcpServers: [],
       packageResolution: null,
       packageSkills: [],

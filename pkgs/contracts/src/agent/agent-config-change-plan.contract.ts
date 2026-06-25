@@ -1,6 +1,11 @@
 import type { EnvironmentId, McpServerId, SkillId } from "../id/id.contract";
 import type { JsonObject } from "../validation/primitives.contract";
-import type { AgentKind, AgentStatus, RuntimeStateApplyActionKind } from "./agent.contract";
+import type {
+  AgentBuiltInToolConfig,
+  AgentKind,
+  AgentStatus,
+  RuntimeStateApplyActionKind,
+} from "./agent.contract";
 import { agentKindPreservesRuntimeState } from "./agent.contract";
 
 export type AgentConfigChangeAction = "direct-update" | "fork-agent" | RuntimeStateApplyActionKind;
@@ -11,6 +16,7 @@ export interface AgentConfigChangeSkill {
 }
 
 export interface AgentConfigChangeSnapshot {
+  builtInTools: readonly AgentBuiltInToolConfig[];
   description: string;
   environmentId: EnvironmentId | null;
   kind: AgentKind;
@@ -140,6 +146,12 @@ export function classifyAgentConfigChanges(input: {
     action: "patch-and-restart",
     changed: changed(input.current.providerOptions, input.saved.providerOptions),
     label: "Advanced settings",
+    rank: 2,
+  });
+  pushIfChanged(fieldPlans, {
+    action: "patch-and-restart",
+    changed: changed(input.current.builtInTools, input.saved.builtInTools),
+    label: "Built-in tools",
     rank: 2,
   });
   pushIfChanged(fieldPlans, {

@@ -1,4 +1,4 @@
-import type { AgentKind } from "../agent/agent.contract";
+import type { AgentBuiltInToolConfig, AgentKind } from "../agent/agent.contract";
 import type { FileUploadSummary } from "../file/file.contract";
 import type {
   AgentDeploymentVersionId,
@@ -304,6 +304,36 @@ export interface AgentSessionEventBatch {
   warnings: UserWarning[];
 }
 
+export interface StartAgentRunInput {
+  agentId?: AgentId | null;
+  appId: AppId;
+  clientRequestId?: string | null;
+  prompt: string;
+  sessionId?: SessionId | null;
+  type?: SessionType | null;
+  waitForRuntimeReady?: boolean | null;
+}
+
+export interface AgentRunEventSurface {
+  appId: AppId;
+  graphqlUrl: string;
+  messagesOperation: "threadSessionMessages";
+  processEventsOperation: "threadSessionProcessEvents";
+  retrieveOperation: "threadAgentSessionRetrieve";
+  sessionId: SessionId;
+  streamUrl: string | null;
+  suggestedPollIntervalMs: number;
+}
+
+export interface AgentRunWorkflow {
+  acceptedAt: string;
+  createdSession: boolean;
+  eventBatch: AgentSessionEventBatch;
+  eventSurface: AgentRunEventSurface;
+  run: SessionRunSummary | null;
+  session: SessionSummary;
+}
+
 export const AGENT_SESSION_RECOVERABILITY_STATUSES = [
   "not_recoverable",
   "read_only",
@@ -381,6 +411,7 @@ export function getAgentSessionUserLifecycleProjection(
 
 export interface AgentSessionExecutionDiagnostics {
   binding: SessionExecutionBinding;
+  builtInTools: AgentBuiltInToolConfig[];
   skills: SessionExecutionSkillReference[];
   tools: SessionExecutionToolReference[];
 }

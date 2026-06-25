@@ -6,14 +6,14 @@ export type Locale = (typeof LOCALES)[number];
 
 export const DEFAULT_LOCALE: Locale = "en";
 
-export const localeLabels: Record<Locale, string> = {
+const localeLabels: Record<Locale, string> = {
   zh: "中文",
   en: "EN",
 };
 
 export const getPostLocale = (post: CollectionEntry<"blog">): Locale => post.data.locale;
 
-export const getPostSlug = (post: CollectionEntry<"blog">): string =>
+const getPostSlug = (post: CollectionEntry<"blog">): string =>
   post.data.permalink ?? post.id.replace(/-(en|zh)$/, "");
 
 export const getPostPath = (post: CollectionEntry<"blog">): string => {
@@ -26,15 +26,6 @@ export const getPostHref = (post: CollectionEntry<"blog">, base: string): string
 
 export const getIndexHref = (locale: Locale, base: string): string =>
   locale === DEFAULT_LOCALE ? `${base || "/"}` : `${base}/${locale}`;
-
-export const getLocaleFromPath = (pathname: string, base: string): Locale => {
-  const normalizedBase = base.replace(/\/$/, "");
-  const withoutBase =
-    normalizedBase && pathname.startsWith(normalizedBase)
-      ? pathname.slice(normalizedBase.length)
-      : pathname;
-  return withoutBase === "/zh" || withoutBase.startsWith("/zh/") ? "zh" : DEFAULT_LOCALE;
-};
 
 export const getAlternateLocaleHref = (
   pathname: string,

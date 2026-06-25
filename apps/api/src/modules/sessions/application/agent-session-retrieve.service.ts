@@ -147,6 +147,7 @@ async function loadSessionExecutionDiagnostics(
       ...plan.binding,
       sessionId,
     },
+    builtInTools: plan.builtInTools,
     skills: plan.skills
       .toSorted((left, right) => left.sortOrder - right.sortOrder)
       .map((skill) => toDiagnosticSkillReference(sessionId, skill)),

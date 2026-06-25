@@ -1,4 +1,6 @@
 import type { JsonObject, JsonValue } from "@mosoo/contracts";
+import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
+import { isAgentBuiltInToolName, normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
 import type { AgentConfigChangeSnapshot } from "@mosoo/contracts/agent-config-change-plan";
 import { parseDocument, stringify } from "yaml";
 
@@ -8,6 +10,7 @@ import type { Agent, AgentKind, McpServer, RuntimeId, SkillInfo } from "../../ag
 import { getRuntimeInfo } from "../../runtime-catalog";
 
 export interface AgentEditorDraft {
+  builtInTools: AgentBuiltInToolConfig[];
   description: string;
   environmentId: string | null;
   kind: AgentKind;
@@ -23,6 +26,7 @@ export interface AgentEditorDraft {
 
 export function createInitialDraft(agent: Agent): AgentEditorDraft {
   return {
+    builtInTools: normalizeAgentBuiltInTools(agent.config.builtInTools),
     description: agent.description,
     environmentId: agent.config.environmentId,
     kind: agent.kind,
@@ -37,7 +41,7 @@ export function createInitialDraft(agent: Agent): AgentEditorDraft {
   };
 }
 
-export function createSnapshot(draft: AgentEditorDraft): string {
+function createSnapshot(draft: AgentEditorDraft): string {
   return JSON.stringify(toAgentConfigChangeSnapshot(draft));
 }
 
@@ -51,6 +55,7 @@ export function createSnapshotHash(draft: AgentEditorDraft): string {
 
 export function toAgentConfigChangeSnapshot(draft: AgentEditorDraft): AgentConfigChangeSnapshot {
   return {
+    builtInTools: normalizeAgentBuiltInTools(draft.builtInTools),
     description: draft.description,
     environmentId: draft.environmentId === null ? null : toEnvironmentId(draft.environmentId),
     kind: draft.kind,
@@ -79,6 +84,7 @@ export function normalizeMcpServers(servers: McpServer[]): McpServer[] {
 }
 
 interface AgentDraftYamlShape {
+  builtInTools: AgentBuiltInToolConfig[];
   assets: {
     skills: {
       filename: string;
@@ -108,13 +114,14 @@ interface AgentDraftYamlShape {
     id: RuntimeId;
     model: string;
     provider: string;
-    providerOptions: JsonObject;
+    settings: JsonObject;
   };
   version: 1;
 }
 
 function toDraftYamlShape(draft: AgentEditorDraft): AgentDraftYamlShape {
   return {
+    builtInTools: normalizeAgentBuiltInTools(draft.builtInTools),
     assets: {
       skills: draft.skills.map((skill) => ({
         filename: skill.filename,
@@ -137,7 +144,7 @@ function toDraftYamlShape(draft: AgentEditorDraft): AgentDraftYamlShape {
       id: draft.runtime,
       model: draft.model,
       provider: draft.provider,
-      providerOptions: draft.providerOptions,
+      settings: draft.providerOptions,
     },
     version: 1,
   };
@@ -185,6 +192,7 @@ export function parseDraftYaml(yaml: string, fallback: AgentEditorDraft): AgentE
   const assets = asRecord(root["assets"]);
 
   return {
+    builtInTools: readBuiltInTools(root["builtInTools"], fallback.builtInTools),
     description: readString(identity["description"], fallback.description),
     environmentId: readNullableString(environment["environmentId"], fallback.environmentId),
     kind: readAgentKind(root["kind"], fallback.kind),
@@ -193,7 +201,10 @@ export function parseDraftYaml(yaml: string, fallback: AgentEditorDraft): AgentE
     name: readString(identity["name"], fallback.name),
     prompt: readString(root["prompt"], fallback.prompt),
     provider: readString(runtime["provider"], fallback.provider),
-    providerOptions: readJsonObject(runtime["providerOptions"], fallback.providerOptions),
+    providerOptions: readJsonObject(
+      runtime["settings"] ?? runtime["providerOptions"],
+      fallback.providerOptions,
+    ),
     runtime: readString(runtime["id"], fallback.runtime),
     skills: readSkills(assets["skills"], fallback.skills),
   };
@@ -262,6 +273,29 @@ function readNullableString(value: unknown, fallback: string | null): string | n
 
 function readAgentKind(value: unknown, fallback: AgentKind): AgentKind {
   return value === "pet" || value === "cattle" ? value : fallback;
+}
+
+function readBuiltInTools(
+  value: unknown,
+  fallback: AgentBuiltInToolConfig[],
+): AgentBuiltInToolConfig[] {
+  if (!Array.isArray(value)) {
+    return normalizeAgentBuiltInTools(fallback);
+  }
+
+  return normalizeAgentBuiltInTools(
+    value.flatMap((entry) => {
+      const tool = asRecord(entry);
+      const name = tool["name"];
+      const enabled = tool["enabled"];
+
+      if (!isAgentBuiltInToolName(name) || typeof enabled !== "boolean") {
+        return [];
+      }
+
+      return [{ enabled, name }];
+    }),
+  );
 }
 
 function readSkills(value: unknown, fallback: SkillInfo[]): SkillInfo[] {

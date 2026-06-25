@@ -217,8 +217,9 @@ It should not say:
 
 Some runtime controls are important without being universal product semantics.
 Examples include Codex `model_reasoning_effort`, Codex `model_verbosity`,
-Claude effort / thinking controls, web-search toggles, and other vendor-native
-configuration keys.
+Claude effort / thinking controls, and other vendor-native configuration keys.
+(Web search and other built-in tool toggles are a separate Agent capability
+surface — see `agent-manifest.md` — not advanced runtime settings.)
 
 These controls must not become first-class Manifest fields unless Mosoo gives
 them a stable cross-runtime product meaning. They also cannot disappear into an
