@@ -530,6 +530,17 @@ describe("API to web boundary", () => {
       "traceId",
     ]);
 
+    const runErrorProperties = openApiSchemaProperties("RunError");
+    expectProperties(runErrorProperties, ["code", "message", "retryable"]);
+    expectNoProperties(runErrorProperties, [
+      "details",
+      "provider",
+      "raw",
+      "runtime",
+      "tool",
+      "traceId",
+    ]);
+
     const eventProperties = openApiSchemaProperties("ThreadEventLogEntry");
     expectProperties(eventProperties, ["content", "id", "occurredAt", "runId", "status", "type"]);
 

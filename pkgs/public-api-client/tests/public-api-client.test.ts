@@ -8,6 +8,7 @@ import type {
 } from "@mosoo/contracts/public-api";
 import type { MosooPublicApiError } from "@mosoo/public-api-client";
 import { MosooPublicThreadClient } from "@mosoo/public-api-client";
+import { MosooPublicThreadTerminalRunError } from "@mosoo/public-api-client";
 import { extractFinalOutput } from "@mosoo/public-api-client";
 
 interface RecordedRequest {
@@ -37,11 +38,18 @@ function threadResponse(status: "RUNNING" | "IDLE" = "RUNNING") {
   } as const;
 }
 
-function runResponse(status: "completed" | "running" = "running") {
+function runResponse(status: "completed" | "failed" | "running" = "running") {
   return {
-    completedAt: status === "completed" ? "2026-05-19T00:00:02.000Z" : null,
+    completedAt: status === "running" ? null : "2026-05-19T00:00:02.000Z",
     createdAt: "2026-05-19T00:00:00.000Z",
-    error: null,
+    error:
+      status === "failed"
+        ? {
+            code: "provider_unavailable",
+            message: "Provider is temporarily unavailable.",
+            retryable: true,
+          }
+        : null,
     finalOutput: null,
     id: RUN_ID,
     startedAt: "2026-05-19T00:00:01.000Z",
@@ -160,6 +168,126 @@ describe("MosooPublicThreadClient", () => {
       `/api/v1/threads/${THREAD_ID}`,
       `/api/v1/threads/${THREAD_ID}/events`,
     ]);
+  });
+
+  test("throws a structured error when createThreadAndWait reaches a failed run", async () => {
+    const fetchMock: typeof fetch = async (input, init) => {
+      const request = new Request(input, init);
+
+      if (request.method === "POST" && request.url.endsWith("/agents/agent-1/threads")) {
+        return jsonResponse(
+          {
+            links: { thread: `/api/v1/threads/${THREAD_ID}` },
+            run: runResponse("running"),
+            thread: threadResponse(),
+          } satisfies PublicThreadApiCreateThreadResponse,
+          201,
+        );
+      }
+
+      if (request.method === "GET" && request.url.endsWith(`/threads/${THREAD_ID}`)) {
+        return jsonResponse({
+          links: { thread: `/api/v1/threads/${THREAD_ID}` },
+          run: runResponse("failed"),
+          thread: threadResponse("IDLE"),
+        } satisfies PublicThreadApiRetrieveThreadResponse);
+      }
+
+      if (request.method === "GET" && request.url.includes(`/threads/${THREAD_ID}/events`)) {
+        return jsonResponse({
+          events: [],
+          truncated: false,
+        } satisfies PublicThreadApiListThreadEventsResponse);
+      }
+
+      return jsonResponse({ error: { code: "not_found", message: "Not found." } }, 404);
+    };
+    const client = new MosooPublicThreadClient({
+      baseUrl: "https://api.example.com",
+      fetch: fetchMock,
+      token: "mst_test",
+    });
+    let thrown: unknown = null;
+
+    try {
+      await client.createThreadAndWait({
+        agentId: "agent-1",
+        input: "Fail loudly.",
+        timeoutMs: 1_000,
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(MosooPublicThreadTerminalRunError);
+    expect(thrown).toMatchObject({
+      code: "run_terminal_failure",
+      finalOutput: null,
+      run: {
+        error: {
+          code: "provider_unavailable",
+          message: "Provider is temporarily unavailable.",
+          retryable: true,
+        },
+        status: "failed",
+      },
+      runStatus: "failed",
+      truncated: false,
+    });
+  });
+
+  test("can opt out of failed terminal run throwing", async () => {
+    const fetchMock: typeof fetch = async (input, init) => {
+      const request = new Request(input, init);
+
+      if (request.method === "POST" && request.url.endsWith("/agents/agent-1/threads")) {
+        return jsonResponse(
+          {
+            links: { thread: `/api/v1/threads/${THREAD_ID}` },
+            run: runResponse("running"),
+            thread: threadResponse(),
+          } satisfies PublicThreadApiCreateThreadResponse,
+          201,
+        );
+      }
+
+      if (request.method === "GET" && request.url.endsWith(`/threads/${THREAD_ID}`)) {
+        return jsonResponse({
+          links: { thread: `/api/v1/threads/${THREAD_ID}` },
+          run: runResponse("failed"),
+          thread: threadResponse("IDLE"),
+        } satisfies PublicThreadApiRetrieveThreadResponse);
+      }
+
+      if (request.method === "GET" && request.url.includes(`/threads/${THREAD_ID}/events`)) {
+        return jsonResponse({
+          events: [],
+          truncated: false,
+        } satisfies PublicThreadApiListThreadEventsResponse);
+      }
+
+      return jsonResponse({ error: { code: "not_found", message: "Not found." } }, 404);
+    };
+    const client = new MosooPublicThreadClient({
+      baseUrl: "https://api.example.com",
+      fetch: fetchMock,
+      token: "mst_test",
+    });
+
+    const result = await client.createThreadAndWait({
+      agentId: "agent-1",
+      input: "Return terminal status.",
+      throwOnFailedRun: false,
+      timeoutMs: 1_000,
+    });
+
+    expect(result.run.status).toBe("failed");
+    expect(result.finalOutput).toBeNull();
+    expect(result.run.error).toMatchObject({
+      code: "provider_unavailable",
+      message: "Provider is temporarily unavailable.",
+      retryable: true,
+    });
   });
 
   test("extracts final output from one run without duplicating other events", () => {

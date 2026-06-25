@@ -12,7 +12,7 @@ import type {
 import type { AgentKind } from "../agent/agent.contract";
 import { SINGLE_PUT_THRESHOLD_BYTES } from "../file/file.contract";
 import type { CreateFileUploadRequest } from "../file/file.contract";
-import type { RunError, UserWarning } from "../session/session-run.contract";
+import type { UserWarning } from "../session/session-run.contract";
 import {
   SESSION_PROCESS_EVENT_STATUSES,
   SESSION_PROCESS_EVENT_TYPES,
@@ -89,7 +89,11 @@ export interface PublicThreadFinalOutput {
   text: string;
 }
 
-export type PublicThreadRunError = RunError;
+export interface PublicThreadRunError {
+  code: string;
+  message: string;
+  retryable: boolean;
+}
 
 export interface PublicThreadRunSummary {
   completedAt: string | null;

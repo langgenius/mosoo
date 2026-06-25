@@ -813,7 +813,7 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
       },
       error: {
         description:
-          "Structured failure details when status is `failed`; null for successful, active, cancelled, or expired Runs.",
+          "Structured failure summary when status is `failed`; null for successful, active, cancelled, or expired Runs.",
         oneOf: [{ $ref: "#/components/schemas/RunError" }, { type: "null" }],
       },
       finalOutput: {
@@ -870,17 +870,12 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
   },
   RunError: {
     additionalProperties: false,
-    description: "Structured Run failure details exposed on failed public Runs.",
+    description: "Public-safe Run failure summary exposed on failed public Runs.",
     properties: {
       code: {
         description: "Stable, machine-readable failure code.",
         minLength: 1,
         type: "string",
-      },
-      details: {
-        additionalProperties: true,
-        description: "Primitive diagnostic details safe for programmatic branching.",
-        type: "object",
       },
       message: {
         description: "Human-readable failure summary.",
@@ -892,7 +887,7 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
         type: "boolean",
       },
     },
-    required: ["code", "details", "message", "retryable"],
+    required: ["code", "message", "retryable"],
     type: "object",
   },
   RunFinalOutput: {

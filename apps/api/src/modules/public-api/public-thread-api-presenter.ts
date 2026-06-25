@@ -2,6 +2,7 @@ import type { AgentKind } from "@mosoo/contracts/agent";
 import type {
   PublicThreadApiSendEventsResponse,
   PublicThreadFinalOutput,
+  PublicThreadRunError,
   PublicThreadRunSummary,
   PublicThreadSummary,
 } from "@mosoo/contracts/public-api";
@@ -30,6 +31,18 @@ interface PublicThreadRunSummaryOptions {
   finalOutput?: PublicThreadFinalOutput | null;
 }
 
+function toPublicThreadRunError(error: SessionRunSummary["error"]): PublicThreadRunError | null {
+  if (error === null) {
+    return null;
+  }
+
+  return {
+    code: error.code,
+    message: error.message,
+    retryable: error.retryable,
+  };
+}
+
 export function toPublicThreadRunSummary(
   run: SessionRunSummary,
   options?: PublicThreadRunSummaryOptions,
@@ -50,7 +63,7 @@ export function toPublicThreadRunSummary(
   return {
     completedAt: run.completedAt,
     createdAt: run.createdAt,
-    error: run.error,
+    error: toPublicThreadRunError(run.error),
     finalOutput: options.finalOutput ?? null,
     id: parsePlatformId(run.id, "Run ID") as SessionRunId,
     startedAt: run.startedAt,

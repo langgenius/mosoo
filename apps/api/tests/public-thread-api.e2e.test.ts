@@ -539,7 +539,7 @@ describe("Public Thread API e2e", () => {
     });
   });
 
-  test("exposes failed run status and structured public error details", async () => {
+  test("exposes failed run status without internal error details", async () => {
     const database = await createPublicHttpContractDatabase();
     const app = createPublicThreadApiTestApp();
 
@@ -572,7 +572,13 @@ describe("Public Thread API e2e", () => {
         .set({
           completedAt: 2_000,
           errorCode: "provider_unavailable",
-          errorDetailsJson: JSON.stringify({ provider: "openai" }),
+          errorDetailsJson: JSON.stringify({
+            provider: "openai",
+            raw: "debug response",
+            runtime: "driver",
+            tool: "search",
+            traceId: "trace-123",
+          }),
           errorMessage: "Provider is temporarily unavailable.",
           status: "failed",
           updatedAt: 2_000,
@@ -589,11 +595,11 @@ describe("Public Thread API e2e", () => {
       );
       expect(retrieveResponse.status).toBe(200);
       const run = expectRecord(expectRecord(await readJson(retrieveResponse))["run"]);
+      const error = expectRecord(run["error"]);
 
       expect(run).toMatchObject({
         error: {
           code: "provider_unavailable",
-          details: { provider: "openai" },
           message: "Provider is temporarily unavailable.",
           retryable: false,
         },
@@ -608,6 +614,7 @@ describe("Public Thread API e2e", () => {
         "provider",
         "traceId",
       ]);
+      expectNoProperties(error, ["details", "provider", "raw", "runtime", "tool", "traceId"]);
     });
   });
 

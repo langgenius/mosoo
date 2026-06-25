@@ -185,8 +185,8 @@ payloads, and sandbox paths are not part of the public contract.
   `expired`. Active statuses are `queued`, `booting`, `running`, and
   `waiting_input`.
 - Public Run summaries include `error` and `finalOutput`. Failed runs expose
-  structured `error.code`, `error.message`, `error.details`, and
-  `error.retryable`.
+  structured `error.code`, `error.message`, and `error.retryable`; internal
+  runtime/provider/tool/debug details are not part of the public contract.
 - `run.finalOutput.text` is the stable Agent final answer for a completed run.
   Mosoo reconstructs it from that run's public `agent.message.delta` events in
   chronological order. If a caller needs to reconstruct it from events, filter to
@@ -224,8 +224,13 @@ const threadId = created.thread.id;
 ### Typed client workflow
 
 The CLI is for local smoke tests and debugging. Real application integrations
-should use the typed backend client or an equivalent server-side helper so app
-code does not duplicate polling and final-output parsing.
+should use a typed backend client or an equivalent server-side helper so app code
+does not duplicate polling and final-output parsing.
+
+This repository currently includes `@mosoo/public-api-client` as a private
+workspace helper and planned SDK reference; it is not published as an external
+npm package yet. Use it from this workspace, vendor the same server-side pattern,
+or wait for a published SDK before adding it as an external dependency.
 
 ```ts
 import { MosooPublicThreadClient } from "@mosoo/public-api-client";
@@ -241,8 +246,13 @@ const result = await client.createThreadAndWait({
   timeoutMs: 60_000,
 });
 
-console.log(result.finalOutput?.text);
+console.log(result.finalOutput.text);
 ```
+
+`createThreadAndWait` throws a structured terminal-run error by default when the
+Run reaches `failed`, `cancelled`, or `expired`. Use lower-level `waitForRun` or
+`throwOnFailedRun: false` only when the integration deliberately handles all
+terminal statuses itself.
 
 `MOSOO_API_TOKEN` is a backend secret. Do not expose it in browser bundles,
 frontend environment variables, static pages, or mobile clients that cannot keep

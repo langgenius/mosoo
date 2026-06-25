@@ -79,12 +79,51 @@ export interface MosooCreateThreadAndWaitInput extends MosooCreateThreadInput {
   eventLimit?: number;
   pollIntervalMs?: number;
   timeoutMs?: number;
+  throwOnFailedRun?: boolean;
 }
 
 export interface MosooPublicThreadWaitResult {
   events: PublicThreadEventLogEntry[];
   finalOutput: PublicThreadFinalOutput | null;
   run: PublicThreadRunSummary;
+  thread: PublicThreadSummary;
+  truncated: boolean;
+}
+
+export interface MosooCreateThreadAndWaitFinalOutputInput extends MosooCreateThreadAndWaitInput {
+  throwOnFailedRun?: true;
+}
+
+export interface MosooCreateThreadAndWaitTerminalInput extends MosooCreateThreadAndWaitInput {
+  throwOnFailedRun: false;
+}
+
+export type MosooPublicThreadUnsuccessfulTerminalStatus = Exclude<
+  PublicThreadRunTerminalStatus,
+  "completed"
+>;
+
+export interface MosooPublicThreadCompletedRunSummary extends PublicThreadRunSummary {
+  finalOutput: PublicThreadFinalOutput;
+  status: "completed";
+}
+
+export interface MosooPublicThreadUnsuccessfulRunSummary extends PublicThreadRunSummary {
+  status: MosooPublicThreadUnsuccessfulTerminalStatus;
+}
+
+export interface MosooPublicThreadFinalOutputResult {
+  events: PublicThreadEventLogEntry[];
+  finalOutput: PublicThreadFinalOutput;
+  run: MosooPublicThreadCompletedRunSummary;
+  thread: PublicThreadSummary;
+  truncated: boolean;
+}
+
+export interface MosooPublicThreadTerminalRunErrorInput {
+  events: PublicThreadEventLogEntry[];
+  finalOutput: PublicThreadFinalOutput | null;
+  run: MosooPublicThreadUnsuccessfulRunSummary;
   thread: PublicThreadSummary;
   truncated: boolean;
 }
@@ -121,6 +160,27 @@ export class MosooPublicApiTimeoutError extends Error {
     super(`Timed out waiting for Public Thread run after ${timeoutMs} ms.`);
     this.name = "MosooPublicApiTimeoutError";
     this.timeoutMs = timeoutMs;
+  }
+}
+
+export class MosooPublicThreadTerminalRunError extends Error {
+  readonly code = "run_terminal_failure";
+  readonly events: PublicThreadEventLogEntry[];
+  readonly finalOutput: PublicThreadFinalOutput | null;
+  readonly run: MosooPublicThreadUnsuccessfulRunSummary;
+  readonly runStatus: MosooPublicThreadUnsuccessfulTerminalStatus;
+  readonly thread: PublicThreadSummary;
+  readonly truncated: boolean;
+
+  constructor(input: MosooPublicThreadTerminalRunErrorInput) {
+    super(`Public Thread run ${input.run.id} finished with status ${input.run.status}.`);
+    this.name = "MosooPublicThreadTerminalRunError";
+    this.events = input.events;
+    this.finalOutput = input.finalOutput;
+    this.run = input.run;
+    this.runStatus = input.run.status;
+    this.thread = input.thread;
+    this.truncated = input.truncated;
   }
 }
 
@@ -339,6 +399,55 @@ export function isPublicThreadRunTerminalStatus(
   return TERMINAL_STATUS_SET.has(status);
 }
 
+function isUnsuccessfulTerminalStatus(
+  status: PublicThreadRunStatus,
+): status is MosooPublicThreadUnsuccessfulTerminalStatus {
+  return isPublicThreadRunTerminalStatus(status) && status !== "completed";
+}
+
+function assertFinalOutputResult(
+  result: MosooPublicThreadWaitResult,
+): MosooPublicThreadFinalOutputResult {
+  if (isUnsuccessfulTerminalStatus(result.run.status)) {
+    const run: MosooPublicThreadUnsuccessfulRunSummary = {
+      ...result.run,
+      status: result.run.status,
+    };
+
+    throw new MosooPublicThreadTerminalRunError({
+      events: result.events,
+      finalOutput: result.finalOutput,
+      run,
+      thread: result.thread,
+      truncated: result.truncated,
+    });
+  }
+
+  if (result.run.status !== "completed") {
+    throw new Error(
+      `Public Thread run ${result.run.id} has non-terminal status ${result.run.status}.`,
+    );
+  }
+
+  if (result.finalOutput === null) {
+    throw new Error(`Completed Public Thread run ${result.run.id} did not include final output.`);
+  }
+
+  const run: MosooPublicThreadCompletedRunSummary = {
+    ...result.run,
+    finalOutput: result.finalOutput,
+    status: "completed",
+  };
+
+  return {
+    events: result.events,
+    finalOutput: result.finalOutput,
+    run,
+    thread: result.thread,
+    truncated: result.truncated,
+  };
+}
+
 export function extractFinalOutput(
   events: readonly PublicThreadEventLogEntry[],
   options: ExtractFinalOutputOptions = {},
@@ -538,6 +647,12 @@ export class MosooPublicThreadClient {
     return this.waitForRun(input);
   }
 
+  async waitForFinalOutput(
+    input: MosooWaitForRunInput,
+  ): Promise<MosooPublicThreadFinalOutputResult> {
+    return assertFinalOutputResult(await this.waitForRun(input));
+  }
+
   extractFinalOutput(
     events: readonly PublicThreadEventLogEntry[],
     options: ExtractFinalOutputOptions = {},
@@ -546,8 +661,17 @@ export class MosooPublicThreadClient {
   }
 
   async createThreadAndWait(
+    input: MosooCreateThreadAndWaitTerminalInput,
+  ): Promise<MosooPublicThreadWaitResult>;
+  async createThreadAndWait(
+    input: MosooCreateThreadAndWaitFinalOutputInput,
+  ): Promise<MosooPublicThreadFinalOutputResult>;
+  async createThreadAndWait(
     input: MosooCreateThreadAndWaitInput,
-  ): Promise<MosooPublicThreadWaitResult> {
+  ): Promise<MosooPublicThreadWaitResult | MosooPublicThreadFinalOutputResult>;
+  async createThreadAndWait(
+    input: MosooCreateThreadAndWaitInput,
+  ): Promise<MosooPublicThreadWaitResult | MosooPublicThreadFinalOutputResult> {
     const created = await this.createThread(input);
 
     if (created.run === null) {
@@ -575,7 +699,13 @@ export class MosooPublicThreadClient {
       waitInput.timeoutMs = input.timeoutMs;
     }
 
-    return this.waitForRun(waitInput);
+    const result = await this.waitForRun(waitInput);
+
+    if (input.throwOnFailedRun === false) {
+      return result;
+    }
+
+    return assertFinalOutputResult(result);
   }
 
   private url(path: string): URL {
