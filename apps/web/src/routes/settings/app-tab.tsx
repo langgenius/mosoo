@@ -10,6 +10,8 @@ import { isTruthy } from "@/shared/lib/truthiness";
 import { Button } from "@/shared/ui/button";
 import { CommandBlock } from "@/shared/ui/command-block";
 
+import { SettingsTabBody, SettingsTabHeader } from "./settings-tab-layout";
+
 export function AppTab() {
   const { activeApp } = useAppSession();
   const queryClient = useQueryClient();
@@ -51,61 +53,57 @@ export function AppTab() {
 
   return (
     <>
-      <header className="border-border-subtle flex h-12 shrink-0 items-center border-b px-5">
-        <span className="text-sm font-medium">App</span>
-      </header>
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[520px] p-6">
-          <div className="space-y-2">
-            <label className="text-foreground text-sm font-medium" htmlFor="app-name">
-              App name
-            </label>
-            <p className="text-fg-2 text-[12px]">
-              The App is your engineering and delivery boundary for Agents and resources.
-            </p>
-            <input
-              aria-label="App name"
-              id="app-name"
-              type="text"
-              value={name}
-              disabled={activeApp === null}
-              onChange={(event) => {
-                setName(event.target.value);
-              }}
-              className="border-border bg-background text-foreground focus:ring-primary/20 focus:border-primary disabled:bg-muted disabled:text-muted-foreground h-10 w-full rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none disabled:cursor-not-allowed"
-            />
-            {isTruthy(error) ? <p className="text-destructive text-[12px]">{error}</p> : null}
-          </div>
-
-          <div className="mt-6">
-            <Button onClick={() => void handleSave()} disabled={!canSave} size="sm">
-              {saving ? (
-                <>
-                  <Loader2 className="mr-1 size-4 animate-spin" /> Saving…
-                </>
-              ) : saved ? (
-                <>
-                  <Check className="mr-1 size-4" /> Saved
-                </>
-              ) : (
-                "Save changes"
-              )}
-            </Button>
-          </div>
-
-          {activeApp === null ? null : (
-            <div className="mt-8 space-y-6">
-              <div className="space-y-2">
-                <div className="text-foreground text-sm font-medium">App ID</div>
-                <p className="text-fg-2 text-[12px]">
-                  The CLI and API use this id to target this App.
-                </p>
-                <CommandBlock command={activeApp.id} prompt={null} />
-              </div>
-            </div>
-          )}
+      <SettingsTabHeader title="App" />
+      <SettingsTabBody>
+        <div className="space-y-2">
+          <label className="text-foreground text-sm font-medium" htmlFor="app-name">
+            App name
+          </label>
+          <p className="text-fg-2 text-[12px]">
+            The App is your engineering and delivery boundary for Agents and resources.
+          </p>
+          <input
+            aria-label="App name"
+            id="app-name"
+            type="text"
+            value={name}
+            disabled={activeApp === null}
+            onChange={(event) => {
+              setName(event.target.value);
+            }}
+            className="border-border bg-background text-foreground focus:ring-primary/20 focus:border-primary disabled:bg-muted disabled:text-muted-foreground h-10 w-full rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none disabled:cursor-not-allowed"
+          />
+          {isTruthy(error) ? <p className="text-destructive text-[12px]">{error}</p> : null}
         </div>
-      </div>
+
+        <div className="mt-6">
+          <Button onClick={() => void handleSave()} disabled={!canSave} size="sm">
+            {saving ? (
+              <>
+                <Loader2 className="mr-1 size-4 animate-spin" /> Saving…
+              </>
+            ) : saved ? (
+              <>
+                <Check className="mr-1 size-4" /> Saved
+              </>
+            ) : (
+              "Save changes"
+            )}
+          </Button>
+        </div>
+
+        {activeApp === null ? null : (
+          <div className="mt-8 space-y-6">
+            <div className="space-y-2">
+              <div className="text-foreground text-sm font-medium">App ID</div>
+              <p className="text-fg-2 text-[12px]">
+                The CLI and API use this id to target this App.
+              </p>
+              <CommandBlock command={activeApp.id} prompt={null} />
+            </div>
+          </div>
+        )}
+      </SettingsTabBody>
     </>
   );
 }
