@@ -61,5 +61,4 @@ MOSOO_E2E_LATENCY_LABEL=current
 MOSOO_E2E_LATENCY_OUTPUT=.tmp/e2e/preview-latency-current.json
 ```
 
-Runtime signal artifacts are collected by `lib/runtime-progress.ts` and exported through
-`reporter.ts`.
+Runtime signal artifacts are collected by `lib/runtime-progress.ts`.

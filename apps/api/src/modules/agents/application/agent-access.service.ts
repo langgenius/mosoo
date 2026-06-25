@@ -86,11 +86,3 @@ export async function ensureAgentOwner(
 ): Promise<AgentRow> {
   return ensureOwnedAgentRow(database, viewerId, agentId);
 }
-
-export async function ensureAgentDestructiveAccess(
-  database: D1Database,
-  viewerId: AccountId,
-  agentId: AgentId,
-): Promise<AgentPrivilegedAccess> {
-  return ensureAgentEditor(database, viewerId, agentId);
-}

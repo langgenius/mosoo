@@ -1,8 +1,4 @@
-export {
-  ensureModelAvailableForSelection,
-  resolveAvailableModelsForViewer,
-  type ResolvedModelEntry,
-} from "./available-models";
+export { resolveAvailableModelsForViewer, type ResolvedModelEntry } from "./available-models";
 
 export {
   createVendorCredential,

@@ -28,7 +28,7 @@ export function toOrganizationSummary(row: OrganizationSummaryRow): Organization
   };
 }
 
-export function organizationSummaryColumns() {
+function organizationSummaryColumns() {
   return {
     avatar_url: organizationsTable.avatarUrl,
     created_at: organizationsTable.createdAt,
@@ -37,7 +37,7 @@ export function organizationSummaryColumns() {
   };
 }
 
-export async function getOrganizationOwnerAccountId(
+async function getOrganizationOwnerAccountId(
   database: D1Database,
   organizationId: OrganizationId,
 ): Promise<AccountId> {
@@ -90,19 +90,4 @@ export async function getOrganizationSummary(
       .get()) ?? null;
 
   return row === null ? null : toOrganizationSummary(row);
-}
-
-export async function getOrganizationSummaryForOwner(
-  database: D1Database,
-  organizationId: OrganizationId,
-  viewerId: AccountId,
-): Promise<OrganizationSummary> {
-  await ensureOrganizationOwnership(database, viewerId, organizationId);
-  const organization = await getOrganizationSummary(database, organizationId);
-
-  if (organization === null) {
-    throw new Error("Organization not found.");
-  }
-
-  return organization;
 }

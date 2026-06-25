@@ -13,8 +13,6 @@
     "test": "vp exec bun test tests"
   },
   "dependencies": {
-    "@cloudflare/ai-chat": "^0.8.6",
-    "@cloudflare/codemode": "^0.4.1",
     "@cloudflare/sandbox": "0.12.1",
     "@larksuiteoapi/node-sdk": "^1.66.0",
     "@mosoo/ag-ui-session": "workspace:*",
@@ -31,8 +29,6 @@
     "@mosoo/skill-package": "workspace:*",
     "@orpc/server": "^1.14.3",
     "agent-driver": "workspace:*",
-    "agents": "^0.16.2",
-    "ai": "^6.0.193",
     "arktype": "^2.2.0",
     "better-auth": "1.6.20",
     "drizzle-orm": "^0.45.2",
@@ -40,8 +36,7 @@
     "graphql": "^16.13.2",
     "graphql-yoga": "^5.21.0",
     "hono": "^4.12.19",
-    "xstate": "^5.32.0",
-    "yaml": "^2.9.0"
+    "xstate": "^5.32.0"
   },
   "devDependencies": {
     "@types/node": "^25.8.0",

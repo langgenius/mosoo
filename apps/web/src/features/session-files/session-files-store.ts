@@ -122,19 +122,3 @@ export function failSessionFileUpload(sessionId: string, fileId: string): void {
     status: "failed",
   }));
 }
-
-export function dismissFailedSessionFile(sessionId: string, fileId: string): void {
-  updatePendingFile(sessionId, fileId, () => null);
-}
-
-export function openDeleteConfirm(id: string): void {
-  setState({ deleteConfirmFor: id });
-}
-
-export function closeDeleteConfirm(): void {
-  setState({ deleteConfirmFor: null });
-}
-
-export function closeDeleteConfirmFor(id: string): void {
-  setState((prev) => (prev.deleteConfirmFor === id ? { deleteConfirmFor: null } : {}));
-}

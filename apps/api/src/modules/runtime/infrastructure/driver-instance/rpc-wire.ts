@@ -165,11 +165,11 @@ export interface RuntimeOrpcContext {
   onWatchCommands(): AsyncIteratorObject<RuntimeCommand>;
 }
 
-export function parseDriverCommandUpdateInput(input: unknown): DriverCommandUpdateInput {
+function parseDriverCommandUpdateInput(input: unknown): DriverCommandUpdateInput {
   return parseSchemaValue(DriverCommandUpdateInputWire, input);
 }
 
-export function parseDriverCompletionInput(input: unknown): DriverCompletionInput {
+function parseDriverCompletionInput(input: unknown): DriverCompletionInput {
   return parseSchemaValue(DriverCompletionInputWire, input);
 }
 
@@ -182,15 +182,15 @@ export function parseDriverEventBatchInput(input: unknown): DriverEventBatchInpu
   };
 }
 
-export function parseDriverFailureInput(input: unknown): DriverFailureInput {
+function parseDriverFailureInput(input: unknown): DriverFailureInput {
   return parseSchemaValue(DriverFailureInputWire, input);
 }
 
-export function parseDriverLogBatchInput(input: unknown): DriverLogBatchInput {
+function parseDriverLogBatchInput(input: unknown): DriverLogBatchInput {
   return parseSchemaValue(DriverLogBatchInputWire, input);
 }
 
-export function parseDriverNextCommandInput(input: unknown): DriverNextCommandInput {
+function parseDriverNextCommandInput(input: unknown): DriverNextCommandInput {
   return parseSchemaValue(DriverNextCommandInputWire, input);
 }
 

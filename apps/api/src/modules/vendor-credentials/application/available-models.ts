@@ -319,25 +319,3 @@ export async function resolveAvailableModelsForViewer(
     runtimeId: input.runtimeId,
   });
 }
-
-export async function ensureModelAvailableForSelection(
-  database: D1Database,
-  input: AvailableModelsInput & {
-    modelId: string;
-    vendorId: string;
-  },
-): Promise<void> {
-  const entries = await resolveAvailableModels(database, {
-    ...(input.modelId ? { currentModelId: input.modelId } : {}),
-    currentVendorId: input.vendorId,
-    appId: input.appId,
-    runtimeId: input.runtimeId,
-  });
-  const entry = entries.find(
-    (candidate) => candidate.vendorId === input.vendorId && candidate.modelId === input.modelId,
-  );
-
-  if (!entry || !entry.available) {
-    throw new Error(`Model ${input.modelId} is not available for runtime ${input.runtimeId}.`);
-  }
-}
