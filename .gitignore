@@ -10,3 +10,4 @@ dist
 playwright-report
 test-results
 outputs/sandbox-agent-bench/
+tools/dead-code/logs/
