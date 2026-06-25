@@ -2,7 +2,6 @@ import { Download } from "lucide-react";
 
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
-import { PageHeader } from "@/shared/ui/page-header";
 
 import { downloadCsv } from "./cost-csv";
 import {
@@ -30,57 +29,61 @@ export function CostPageHeader({
   setRunPurpose: (value: CostRunPurpose | "all") => void;
 }) {
   return (
-    <PageHeader
-      className="border-border-subtle border-b"
-      title="App Usage"
-      description={`${card?.appName ?? "App"} · ${rangeLabel(range)} · ${formatCurrency(card?.totals.totalCostUsd ?? 0)}`}
-    >
-      <div className="border-border bg-card flex rounded-md border p-0.5">
-        {RUN_PURPOSE_FILTERS.map((item) => (
-          <button
-            key={item.value}
-            type="button"
-            onClick={() => {
-              setRunPurpose(item.value);
-            }}
-            className={cn(
-              "rounded px-2.5 py-1.5 text-xs font-semibold",
-              runPurpose === item.value ? "bg-ink-100 text-fg-1" : "text-muted-foreground",
-            )}
-          >
-            {item.label}
-          </button>
-        ))}
+    <header className="border-border-subtle flex h-12 shrink-0 items-center justify-between gap-3 border-b px-6">
+      <div className="flex min-w-0 items-baseline gap-2">
+        <span className="text-sm font-medium">App Usage</span>
+        <span className="text-fg-3 hidden truncate text-xs sm:inline">
+          {`${card?.appName ?? "App"} · ${rangeLabel(range)} · ${formatCurrency(card?.totals.totalCostUsd ?? 0)}`}
+        </span>
       </div>
-      <div className="border-border bg-card flex rounded-md border p-0.5">
-        {COST_RANGES.map((value) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => {
-              setRange(value);
-            }}
-            className={cn(
-              "rounded px-3 py-1.5 text-xs font-semibold uppercase",
-              range === value ? "bg-ink-100 text-fg-1" : "text-muted-foreground",
-            )}
-          >
-            {value}
-          </button>
-        ))}
+      <div className="flex shrink-0 items-center gap-2">
+        <div className="border-border bg-card flex rounded-md border p-0.5">
+          {RUN_PURPOSE_FILTERS.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => {
+                setRunPurpose(item.value);
+              }}
+              className={cn(
+                "rounded px-2.5 py-1 text-xs font-semibold",
+                runPurpose === item.value ? "bg-ink-100 text-fg-1" : "text-muted-foreground",
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="border-border bg-card flex rounded-md border p-0.5">
+          {COST_RANGES.map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => {
+                setRange(value);
+              }}
+              className={cn(
+                "rounded px-3 py-1 text-xs font-semibold uppercase",
+                range === value ? "bg-ink-100 text-fg-1" : "text-muted-foreground",
+              )}
+            >
+              {value}
+            </button>
+          ))}
+        </div>
+        <Button
+          variant="outline"
+          size="xs"
+          onClick={() => {
+            exportCostCsv(effectiveTab, card);
+          }}
+          disabled={!card}
+        >
+          <Download className="size-3.5" />
+          Export CSV
+        </Button>
       </div>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => {
-          exportCostCsv(effectiveTab, card);
-        }}
-        disabled={!card}
-      >
-        <Download className="size-3.5" />
-        Export CSV
-      </Button>
-    </PageHeader>
+    </header>
   );
 }
 
