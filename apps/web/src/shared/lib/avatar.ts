@@ -1,14 +1,21 @@
-// Solid, on-brand background colors for the default (no-image) avatar. A single
-// color is picked deterministically from a seed so a given account always renders
-// the same avatar, while different accounts get some variety. All colors are dark
+// Solid background colors for the default (no-image) avatar. A single color is
+// picked deterministically from a seed so a given account always renders the same
+// avatar, while different accounts get some variety. These are literal hex values
+// (not theme tokens) so the fill always renders regardless of which stylesheets are
+// loaded — earlier the palette referenced CSS variables that were undefined in the
+// web app, leaving the avatar with no background color at all. All colors are dark
 // enough to keep white initials legible.
 const AVATAR_BACKGROUNDS = [
-  "var(--green-600)",
-  "var(--green-700)",
-  "var(--green-800)",
-  "var(--forest-600)",
-  "var(--forest-700)",
-  "var(--forest-800)",
+  "#2563eb", // blue
+  "#7c3aed", // violet
+  "#db2777", // pink
+  "#dc2626", // red
+  "#ea580c", // orange
+  "#0d9488", // teal
+  "#0891b2", // cyan
+  "#4f46e5", // indigo
+  "#16a34a", // green
+  "#ca8a04", // amber
 ] as const;
 
 function hashSeed(seed: string): number {
