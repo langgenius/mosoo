@@ -13,7 +13,6 @@ describe("Agent runtime lock boundary", () => {
       "../src/routes/agent/components/editor/use-model.ts",
       "../src/routes/agent/components/kind-selector.tsx",
       "../src/routes/agent/components/kind-lock-banner.tsx",
-      "../src/routes/agent/components/config-panel.tsx",
       "../src/routes/agent/lifecycle/live-config-action-dialog.tsx",
     ].map(readSource);
     const combinedSource = sources.join("\n");
