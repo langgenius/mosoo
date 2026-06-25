@@ -204,10 +204,6 @@ export function toFileEntry(file: FileRecord): FileEntry {
   };
 }
 
-export function toFileEntryFromRow(row: FileRecordRow): FileEntry {
-  return toFileEntry(toFileRecord(row));
-}
-
 export function toUploadSummary(upload: FileUploadRow, file: FileRecordRow): FileUploadSummary {
   return {
     contentType: upload.content_type,

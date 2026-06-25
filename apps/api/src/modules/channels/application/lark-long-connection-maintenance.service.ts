@@ -13,17 +13,9 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { parseLarkCredentials } from "../lark/lark-credentials";
 import type { LarkChannelCredentials } from "../lark/lark-credentials";
-import type {
-  LarkGatewaySnapshot,
-  LarkGatewayStartResult,
-  LarkGatewayStopResult,
-} from "../lark/lark-gateway.do";
+import type { LarkGatewayStopResult } from "../lark/lark-gateway.do";
 import { resolveAgentChannelBindingContextById } from "./channel-binding-context";
-import {
-  readChannelConnectionSnapshot,
-  startChannelConnection,
-  stopChannelConnection,
-} from "./channel-connection-client";
+import { stopChannelConnection } from "./channel-connection-client";
 
 export interface LarkGatewayBindingRecord {
   readonly bindingId: ChannelBindingId;
@@ -37,31 +29,11 @@ export interface ReconcileLarkLongConnectionsResult {
   readonly errors: readonly { bindingId: ChannelBindingId; reason: string }[];
 }
 
-export async function startLarkLongConnection(input: {
-  bindingId: ChannelBindingId;
-  bindings: ApiBindings;
-}): Promise<LarkGatewayStartResult> {
-  return await startChannelConnection(input.bindings, {
-    bindingId: input.bindingId,
-    provider: "lark",
-  });
-}
-
 export async function stopLarkLongConnection(input: {
   bindingId: ChannelBindingId;
   bindings: ApiBindings;
 }): Promise<LarkGatewayStopResult> {
   return await stopChannelConnection(input.bindings, {
-    bindingId: input.bindingId,
-    provider: "lark",
-  });
-}
-
-export async function readLarkLongConnectionSnapshot(input: {
-  bindingId: ChannelBindingId;
-  bindings: ApiBindings;
-}): Promise<LarkGatewaySnapshot> {
-  return await readChannelConnectionSnapshot(input.bindings, {
     bindingId: input.bindingId,
     provider: "lark",
   });
@@ -77,7 +49,7 @@ export async function readLarkLongConnectionSnapshot(input: {
  * The DB list resolver is injected so the scheduled entry can wire it
  * after L-003 makes `connectionMode` part of the canonical creds schema.
  */
-export async function reconcileLarkLongConnections(input: {
+async function reconcileLarkLongConnections(input: {
   bindings: ApiBindings;
   records: readonly LarkGatewayBindingRecord[];
 }): Promise<ReconcileLarkLongConnectionsResult> {
