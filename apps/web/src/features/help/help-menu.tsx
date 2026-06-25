@@ -1,10 +1,17 @@
 import { HelpCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 import { cn } from "@/shared/lib/class-names";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
-import { HelpDocsDialog } from "./help-docs-dialog";
+// Loaded on demand the first time Help is opened. The dialog drags in the Radix
+// dialog primitive and the help-docs search index, none of which the app shell
+// needs for its initial render, so it stays out of the entry bundle that loads
+// on every page.
+const HelpDocsDialog = lazy(async () => {
+  const helpDocsDialog = await import("./help-docs-dialog");
+  return { default: helpDocsDialog.HelpDocsDialog };
+});
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
@@ -17,6 +24,16 @@ function isTypingTarget(target: EventTarget | null): boolean {
 
 export function HelpMenu({ collapsed }: { collapsed: boolean }) {
   const [open, setOpen] = useState(false);
+  // Keep the dialog mounted once it has been opened so its close animation can
+  // still play, but never mount it before the first open so the chunk is not
+  // fetched on a normal page load.
+  const [hasOpened, setHasOpened] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setHasOpened(true);
+    }
+  }, [open]);
 
   // Press "?" anywhere outside a text field to open help, matching the common
   // shortcut used by other apps.
@@ -66,7 +83,11 @@ export function HelpMenu({ collapsed }: { collapsed: boolean }) {
       ) : (
         button
       )}
-      <HelpDocsDialog open={open} onOpenChange={setOpen} />
+      {hasOpened ? (
+        <Suspense fallback={null}>
+          <HelpDocsDialog open={open} onOpenChange={setOpen} />
+        </Suspense>
+      ) : null}
     </>
   );
 }
