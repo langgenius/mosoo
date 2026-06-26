@@ -86,6 +86,7 @@ export interface CompleteFileUploadCommand {
 export interface RuntimeOutputFileInput {
   bindings: ApiBindings;
   body: Uint8Array;
+  contentSha256?: string;
   contentType?: string | null;
   createdBy: AccountId;
   path: string;
@@ -177,6 +178,7 @@ export interface FileStore {
     viewer: AuthenticatedViewer,
     query: FileListQuery,
   ): Promise<FileListing>;
+  listReadySessionArtifactKeys(database: D1Database, sessionId: SessionId): Promise<string[]>;
   listReadySessionFiles(database: D1Database, sessionId: SessionId): Promise<SessionFile[]>;
   listSessionResourcePathEntries(
     database: D1Database,
@@ -219,16 +221,43 @@ async function publishSessionResourceUpsert(
   await publishSessionResourceUpsertEvent(bindings, file);
 }
 
-function getRuntimeOutputName(path: string): string {
+function readRuntimeOutputPathSegments(path: string): string[] {
   const normalizedPath = path.trim().replaceAll("\\", "/");
-  const segments = normalizedPath.split("/").filter((segment) => segment.length > 0);
-  const name = segments.at(-1);
+  const segments = normalizedPath
+    .split("/")
+    .filter((segment) => segment.length > 0)
+    .map(normalizeFileName);
+
+  if (segments.length === 0) {
+    throw createFileInvalidRequestError("Runtime output path must include a file name.");
+  }
+
+  return segments;
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer instanceof ArrayBuffer
+    ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+    : Uint8Array.from(bytes).buffer;
+}
+
+export function getRuntimeOutputName(path: string): string {
+  const name = readRuntimeOutputPathSegments(path).at(-1);
 
   if (name === undefined) {
     throw createFileInvalidRequestError("Runtime output path must include a file name.");
   }
 
-  return normalizeFileName(name);
+  return name;
+}
+
+export async function createRuntimeOutputContentSha256(body: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", toArrayBuffer(body));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export function createRuntimeOutputParentPath(path: string, contentSha256: string): string {
+  return ["runtime-output", ...readRuntimeOutputPathSegments(path), contentSha256].join("/");
 }
 
 function toSessionResource(file: FileRecord): SessionResource {
@@ -587,6 +616,28 @@ async function listReadySessionFiles(
   return rows.map(toSessionFile);
 }
 
+async function listReadySessionArtifactKeys(
+  database: D1Database,
+  sessionId: SessionId,
+): Promise<string[]> {
+  const rows = await getAppDatabase(database)
+    .select({
+      parentPath: fileRecordsTable.parentPath,
+    })
+    .from(fileRecordsTable)
+    .where(
+      and(
+        eq(fileRecordsTable.scopeKind, "session"),
+        eq(fileRecordsTable.scopeId, sessionId),
+        eq(fileRecordsTable.status, "ready"),
+        eq(fileRecordsTable.sessionKind, "artifact"),
+      ),
+    )
+    .all();
+
+  return rows.map((row) => row.parentPath);
+}
+
 async function listSessionResources(
   database: D1Database,
   sessionId: SessionId,
@@ -774,6 +825,7 @@ async function recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileR
   const fileId = createPlatformId<FileId>();
   const name = getRuntimeOutputName(input.path);
   const contentType = normalizeContentType(input.contentType ?? "application/octet-stream");
+  const contentSha256 = input.contentSha256 ?? (await createRuntimeOutputContentSha256(input.body));
   const path = createSessionArtifactPath(fileId, name);
   const timestampMs = currentTimestampMs();
   const objectKey = createFinalObjectKey({
@@ -806,7 +858,7 @@ async function recordRuntimeOutput(input: RuntimeOutputFileInput): Promise<FileR
       objectKey,
       ownerId: input.sessionId,
       ownerKind: "session",
-      parentPath: `artifact/${fileId}`,
+      parentPath: createRuntimeOutputParentPath(input.path, contentSha256),
       path,
       purpose: "session_artifact",
       scopeId: input.sessionId,
@@ -855,6 +907,7 @@ export const fileStore: FileStore = {
   getRecord,
   getUpload,
   list,
+  listReadySessionArtifactKeys,
   listReadySessionFiles,
   listSessionResourcePathEntries,
   listSessionResources,
