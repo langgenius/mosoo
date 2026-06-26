@@ -21,6 +21,7 @@ AUTH_EMAIL_FROM = "Mosoo AUTH <auth@mosoo.ai>"
 FILE_BUCKET_NAME = "mosoo-file"
 SANDBOX_STATE_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_FILE_BUCKET_LOCAL = "true"
+MOSOO_APP_DEPLOYMENT_DOMAIN = "apps.localhost"
 
 [[send_email]]
 name = "AUTH_EMAIL"
@@ -33,6 +34,8 @@ required = [
   "R2_ACCESS_KEY_ID",
   "R2_SECRET_ACCESS_KEY",
   "CLOUDFLARE_ACCOUNT_ID",
+  "CLOUDFLARE_API_TOKEN",
+  "CLOUDFLARE_ZONE_ID",
 ]
 
 [triggers]
@@ -117,6 +120,7 @@ AUTH_EMAIL_FROM = "Mosoo AUTH <auth@mosoo.ai>"
 FILE_BUCKET_NAME = "mosoo-file"
 SANDBOX_STATE_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_FILE_BUCKET_LOCAL = "false"
+MOSOO_APP_DEPLOYMENT_DOMAIN = "apps.mosoo.ai"
 
 [[env.prod.send_email]]
 name = "AUTH_EMAIL"
@@ -129,6 +133,8 @@ required = [
   "R2_ACCESS_KEY_ID",
   "R2_SECRET_ACCESS_KEY",
   "CLOUDFLARE_ACCOUNT_ID",
+  "CLOUDFLARE_API_TOKEN",
+  "CLOUDFLARE_ZONE_ID",
 ]
 
 [[env.prod.routes]]
