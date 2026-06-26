@@ -22,7 +22,11 @@ import { createErrorLogContext, logInfo, logWarn } from "../../../../platform/cl
 import { withDisposedRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../../shared/truthiness";
-import { fileStore, normalizeFileName } from "../../../files/application/file-store";
+import {
+  createRuntimeOutputContentSha256,
+  createRuntimeOutputParentPath,
+  fileStore,
+} from "../../../files/application/file-store";
 import {
   applyAgUiEventToSessionLiveState,
   loadSessionViewerState,
@@ -128,61 +132,34 @@ async function listRuntimeSessionOutputFiles(
   return readRuntimeSessionOutputListing(result.stdout);
 }
 
-function getRuntimeOutputFileName(path: string): string {
-  const name = path
-    .trim()
-    .replaceAll("\\", "/")
-    .split("/")
-    .findLast((segment) => segment.length > 0);
-
-  if (name === undefined) {
-    throw new Error("Runtime output path must include a file name.");
-  }
-
-  return normalizeFileName(name);
-}
-
-function createRecordedArtifactKey(input: { name: string; size: number }): string {
-  return `${input.name}\0${input.size}`;
-}
-
-function createRecordedArtifactSet(
-  files: Awaited<ReturnType<typeof fileStore.listReadySessionFiles>>,
-): Set<string> {
-  return new Set(
-    files
-      .filter((file) => file.kind === "artifact")
-      .map((file) => createRecordedArtifactKey({ name: file.name, size: file.size })),
-  );
-}
-
 async function recordRuntimeSessionOutputFile(input: {
   bindings: ApiBindings;
   body: Uint8Array;
   contentType: string | null;
   createdBy: AccountId;
+  existingArtifacts: Set<string>;
   path: string;
   recordedArtifacts: Set<string>;
   sessionId: SessionId;
 }): Promise<void> {
-  const artifactKey = createRecordedArtifactKey({
-    name: getRuntimeOutputFileName(input.path),
-    size: input.body.byteLength,
-  });
+  const contentSha256 = await createRuntimeOutputContentSha256(input.body);
+  const artifactKey = createRuntimeOutputParentPath(input.path, contentSha256);
 
-  if (input.recordedArtifacts.has(artifactKey)) {
+  if (input.recordedArtifacts.has(artifactKey) || input.existingArtifacts.has(artifactKey)) {
     return;
   }
 
   await fileStore.recordRuntimeOutput({
     bindings: input.bindings,
     body: input.body,
+    contentSha256,
     contentType: input.contentType,
     createdBy: input.createdBy,
     path: input.path,
     sessionId: input.sessionId,
   });
   input.recordedArtifacts.add(artifactKey);
+  input.existingArtifacts.add(artifactKey);
 }
 
 function readTerminalPendingToolResult(event: RuntimeEventEnvelope): string | null {
@@ -288,9 +265,10 @@ async function recordRuntimeFileChanges(input: {
   }
 
   const parsedSessionId = parsePlatformId<SessionId>(sessionId, "runtime output session ID");
-  const recordedArtifacts = createRecordedArtifactSet(
-    await fileStore.listReadySessionFiles(input.bindings.DB, parsedSessionId),
+  const existingArtifacts = new Set(
+    await fileStore.listReadySessionArtifactKeys(input.bindings.DB, parsedSessionId),
   );
+  const recordedArtifacts = new Set<string>();
 
   await withDisposedRpcResource(
     await getRuntimeSubjectKeepAliveHandle(input.bindings, sandboxId),
@@ -304,6 +282,7 @@ async function recordRuntimeFileChanges(input: {
             body: await readSandboxFileBytes(sandboxSession, outputFile.readPath),
             contentType: outputFile.contentType,
             createdBy,
+            existingArtifacts,
             path: outputFile.artifactPath,
             recordedArtifacts,
             sessionId: parsedSessionId,
@@ -365,11 +344,10 @@ async function recordRuntimeSessionOutputDirectory(input: {
           return;
         }
 
-        const existingFiles = await fileStore.listReadySessionFiles(
-          input.bindings.DB,
-          parsedSessionId,
+        const existingArtifacts = new Set(
+          await fileStore.listReadySessionArtifactKeys(input.bindings.DB, parsedSessionId),
         );
-        const recordedArtifacts = createRecordedArtifactSet(existingFiles);
+        const recordedArtifacts = new Set<string>();
 
         for (const outputPath of outputPaths) {
           const artifactPath = toRuntimeSessionOutputArtifactPath(outputPath);
@@ -380,6 +358,7 @@ async function recordRuntimeSessionOutputDirectory(input: {
               body: await readSandboxFileBytes(sandboxSession, `${outputDir}/${outputPath}`),
               contentType: guessRuntimeSessionOutputContentType(outputPath),
               createdBy,
+              existingArtifacts,
               path: artifactPath,
               recordedArtifacts,
               sessionId: parsedSessionId,

@@ -169,7 +169,7 @@ function createCompletedRunEvent() {
   });
 }
 
-function createFileChangedEvent() {
+function createFileChangedEvent(path = "outputs/live.txt") {
   return createRuntimeEvent({
     driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner,
     id: API_DRIVER_BOUNDARY_IDS.runtimeEvent,
@@ -180,7 +180,7 @@ function createFileChangedEvent() {
         {
           change: "upsert",
           metadata: { contentType: "text/plain" },
-          path: "outputs/live.txt",
+          path,
         },
         {
           change: "upsert",
@@ -338,6 +338,55 @@ describe("runtime session outputs", () => {
       },
     ]);
     expect([...bucket.objects.values()]).toHaveLength(2);
+  });
+
+  test("deduplicates runtime outputs by source path and content", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertOwnerSession(database);
+    await insertActiveSandboxSession(database);
+
+    const files = new Map([
+      ["/workspace/session/outputs/one/report.txt", "alpha"],
+      ["/workspace/session/outputs/two/report.txt", "bravo"],
+    ]);
+    const { bindings } = await createBindings({
+      database,
+      files,
+    });
+    const link = createRuntimeLink();
+    const readReportCount = async () => {
+      const row = await database
+        .prepare(
+          "SELECT count(*) AS count FROM file_record WHERE session_kind = 'artifact' AND name = 'report.txt' AND size = 5",
+        )
+        .first<{ count: number }>();
+
+      return row?.count;
+    };
+
+    await dispatchRuntimeEvent({
+      bindings,
+      event: createFileChangedEvent("outputs/one/report.txt"),
+      link,
+    });
+
+    await dispatchRuntimeEvent({
+      bindings,
+      event: createCompletedRunEvent(),
+      link,
+    });
+
+    expect(await readReportCount()).toBe(2);
+
+    files.set("/workspace/session/outputs/one/report.txt", "gamma");
+
+    await dispatchRuntimeEvent({
+      bindings,
+      event: createFileChangedEvent("outputs/one/report.txt"),
+      link,
+    });
+
+    expect(await readReportCount()).toBe(3);
   });
 
   test("records file change events only when the path is under outputs", async () => {
