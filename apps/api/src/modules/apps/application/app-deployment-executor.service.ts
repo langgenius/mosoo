@@ -17,16 +17,13 @@ import type {
   SandboxHandle,
 } from "../../runtime/infrastructure/sandbox-handles";
 import { ACTIVE_APP_DEPLOYMENT_RUN_STATUSES } from "../domain/app-deployment-lifecycle";
-import {
-  createCloudflareDeploymentClient,
-  type CloudflareDeploymentClient,
-} from "./app-deployment-cloudflare-client";
+import type { CloudflareDeploymentClient } from "./app-deployment-cloudflare-client";
+import { createCloudflareDeploymentClient } from "./app-deployment-cloudflare-client";
 import {
   APP_DEPLOYMENT_COMPATIBILITY_DATE,
   detectAppDeploymentPlan,
-  type AppDeploymentPlan,
-  type AppDeploymentRepositorySnapshot,
 } from "./app-deployment-detector";
+import type { AppDeploymentPlan, AppDeploymentRepositorySnapshot } from "./app-deployment-detector";
 
 interface AppDeploymentDispatchContext {
   deployment: AppDeploymentRow;
@@ -93,7 +90,6 @@ const SNAPSHOT_FILE_NAMES = new Set([
   "yarn.lock",
 ]);
 const WORKER_JS_ENTRY_PATTERN = /\.(?:mjs|js)$/u;
-
 export function appDeploymentBuildSandboxId(runId: AppDeploymentRunId): string {
   return `${runId}-build`;
 }

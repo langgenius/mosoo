@@ -19,10 +19,8 @@ import {
   listAppVendorCredentialRowsPage,
 } from "../../vendor-credentials/application/vendor-credential.repository";
 import type { VendorCredentialRow } from "../../vendor-credentials/application/vendor-credential.types";
-import {
-  readAppDeploymentForOwnedApp,
-  type AppDeploymentReadBindings,
-} from "./app-deployment.service";
+import type { AppDeploymentReadBindings } from "./app-deployment.service";
+import { readAppDeploymentForOwnedApp } from "./app-deployment.service";
 import { ensureAppOwnership, listOrganizationAppsPage, toAppSummary } from "./app.service";
 
 const DEFAULT_OVERVIEW_LIMIT = 50;

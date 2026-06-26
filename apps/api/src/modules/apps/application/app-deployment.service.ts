@@ -25,8 +25,10 @@ import {
   createCloudflareDeploymentClient,
   deleteCloudflareDeploymentResources,
   logCloudflareDeploymentResourceDeleteFailures,
-  type CloudflareClientBindings,
-  type CloudflareDeploymentClient,
+} from "./app-deployment-cloudflare-client";
+import type {
+  CloudflareClientBindings,
+  CloudflareDeploymentClient,
 } from "./app-deployment-cloudflare-client";
 import { destroyAppDeploymentRunSandboxesBestEffort } from "./app-deployment-executor.service";
 import { ensureAppOwnership } from "./app.service";

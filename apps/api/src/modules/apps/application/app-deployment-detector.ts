@@ -1,5 +1,6 @@
 import type { AppDeploymentTargetKind } from "@mosoo/db";
-import { parse as parseJsonc, type ParseError } from "jsonc-parser";
+import type { ParseError } from "jsonc-parser";
+import { parse as parseJsonc } from "jsonc-parser";
 import { parse as parseToml, stringify } from "smol-toml";
 
 export type AppDeploymentPackageManager = "bun" | "none" | "npm" | "pnpm" | "yarn";

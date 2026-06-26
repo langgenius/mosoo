@@ -41,8 +41,8 @@ import {
   markApiCommandFailed,
   releaseApiCommandForRetry,
   renewApiCommandClaim,
-  type ApiCommandClaim,
 } from "./api-command-ledger";
+import type { ApiCommandClaim } from "./api-command-ledger";
 import { parseApiCommandMessage } from "./api-command-message";
 import type { ApiCommandMessage } from "./api-command-message";
 import { ApiCommandPayloadError, parseApiCommandPayload } from "./api-command-payload";

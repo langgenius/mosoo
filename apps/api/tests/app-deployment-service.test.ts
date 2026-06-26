@@ -6,10 +6,8 @@ import { eq } from "drizzle-orm";
 import { createAppDeploymentRunDispatchDedupeKey } from "../src/modules/api-command/application/api-command-enqueue";
 import { processApiCommandDeadLetterMessage } from "../src/modules/api-command/application/api-command-processor";
 import type { CloudflareDeploymentClient } from "../src/modules/apps/application/app-deployment-cloudflare-client";
-import {
-  dispatchAppDeploymentRun,
-  type AppDeploymentBuildRunner,
-} from "../src/modules/apps/application/app-deployment-executor.service";
+import type { AppDeploymentBuildRunner } from "../src/modules/apps/application/app-deployment-executor.service";
+import { dispatchAppDeploymentRun } from "../src/modules/apps/application/app-deployment-executor.service";
 import {
   deleteAppDeployment,
   deployApp,
