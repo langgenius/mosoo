@@ -77,6 +77,15 @@ function createAvailableModelsDatabase(): SqliteD1Database {
       NULL
     ),
     (
+      'credential-opencode',
+      '${APP_ID}',
+      'opencode',
+      'OpenCode Zen default',
+      'secret-opencode',
+      NULL,
+      NULL
+    ),
+    (
       'credential-custom',
       '${APP_ID}',
       'openai-compatible',
@@ -136,6 +145,51 @@ describe("available models", () => {
       reason: "wrong-runtime",
       statusDetail: "Anthropic is not available for System Agent.",
       statusLabel: "Not available",
+    });
+  });
+
+  test("makes OpenCode Zen models available for the OpenCode runtime", async () => {
+    const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
+      appId: APP_ID,
+      runtimeId: "acp-fallback",
+    });
+
+    expect(
+      entries.find((entry) => entry.vendorId === "opencode" && entry.modelId === "deepseek-v4-pro"),
+    ).toMatchObject({
+      available: true,
+      statusDetail: null,
+      statusLabel: "Available",
+    });
+    expect(
+      entries.find((entry) => entry.vendorId === "opencode" && entry.modelId === "qwen3.6-plus"),
+    ).toMatchObject({
+      available: true,
+      statusDetail: null,
+      statusLabel: "Available",
+    });
+    expect(
+      entries.find((entry) => entry.vendorId === "opencode" && entry.modelId === "glm-5.2"),
+    ).toMatchObject({
+      available: true,
+      statusDetail: null,
+      statusLabel: "Available",
+    });
+    expect(
+      entries.find((entry) => entry.vendorId === "opencode" && entry.modelId === "minimax-m2.7"),
+    ).toMatchObject({
+      available: true,
+      statusDetail: null,
+      statusLabel: "Available",
+    });
+    expect(
+      entries.find(
+        (entry) => entry.vendorId === "opencode" && entry.modelId === "gemini-3.5-flash",
+      ),
+    ).toMatchObject({
+      available: true,
+      statusDetail: null,
+      statusLabel: "Available",
     });
   });
 

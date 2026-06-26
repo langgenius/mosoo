@@ -8,6 +8,7 @@ import openclawSvgUrl from "@lobehub/icons-static-svg/icons/openclaw-color.svg";
 import opencodeSvgUrl from "@lobehub/icons-static-svg/icons/opencode.svg";
 
 export const RUNTIME_ICON_URL: Record<string, string> = {
+  "acp-fallback": opencodeSvgUrl,
   "claude-agent-sdk": claudeCodeSvgUrl,
   "cursor-agent": cursorAgentSvgUrl,
   gemini: geminiSvgUrl,

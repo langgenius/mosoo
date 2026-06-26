@@ -96,6 +96,38 @@ const MODEL_PRICING: readonly ModelPricing[] = [
     provider: "alibaba",
     vendor: "Alibaba",
   },
+  opencodePricing({
+    cacheReadUsdPerMillion: 0.145,
+    inputUsdPerMillion: 1.74,
+    model: "deepseek-v4-pro",
+    outputUsdPerMillion: 3.48,
+  }),
+  opencodePricing({
+    cacheReadUsdPerMillion: 0.05,
+    cacheWriteUsdPerMillion: 0.625,
+    inputUsdPerMillion: 0.5,
+    model: "qwen3.6-plus",
+    outputUsdPerMillion: 3,
+  }),
+  opencodePricing({
+    cacheReadUsdPerMillion: 0.26,
+    inputUsdPerMillion: 1.4,
+    model: "glm-5.2",
+    outputUsdPerMillion: 4.4,
+  }),
+  opencodePricing({
+    cacheReadUsdPerMillion: 0.06,
+    cacheWriteUsdPerMillion: 0.375,
+    inputUsdPerMillion: 0.3,
+    model: "minimax-m2.7",
+    outputUsdPerMillion: 1.2,
+  }),
+  opencodePricing({
+    cacheReadUsdPerMillion: 0.15,
+    inputUsdPerMillion: 1.5,
+    model: "gemini-3.5-flash",
+    outputUsdPerMillion: 9,
+  }),
 ];
 
 function anthropicPricing(input: {
@@ -127,6 +159,24 @@ function openAiPricing(input: {
     outputUsdPerMillion: input.outputUsdPerMillion,
     provider: "openai",
     vendor: "OpenAI",
+  };
+}
+
+function opencodePricing(input: {
+  cacheReadUsdPerMillion: number;
+  cacheWriteUsdPerMillion?: number;
+  inputUsdPerMillion: number;
+  model: string;
+  outputUsdPerMillion: number;
+}): ModelPricing {
+  return {
+    cacheReadUsdPerMillion: input.cacheReadUsdPerMillion,
+    cacheWriteUsdPerMillion: input.cacheWriteUsdPerMillion ?? 0,
+    inputUsdPerMillion: input.inputUsdPerMillion,
+    model: input.model,
+    outputUsdPerMillion: input.outputUsdPerMillion,
+    provider: "opencode",
+    vendor: "OpenCode Zen",
   };
 }
 

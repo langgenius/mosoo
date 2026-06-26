@@ -1,3 +1,4 @@
+import { listPresetModelsForVendor } from "@mosoo/contracts/models";
 import { PUBLIC_RUNTIME_CATALOG, VENDOR_OPENAI_COMPATIBLE } from "@mosoo/runtime-catalog";
 
 import type { VendorCredential } from "@/domains/vendor-credential/api/vendor-credential-client";
@@ -12,6 +13,22 @@ function isVendorConfigured(credentials: readonly VendorCredential[], vendorId: 
   return credentials.some((credential) => credential.vendorId === vendorId);
 }
 
+function defaultModelForVendor(
+  entry: (typeof PUBLIC_RUNTIME_CATALOG)[number],
+  vendorId: string,
+): string {
+  if (vendorId === entry.defaultProvider) {
+    return entry.defaultModel;
+  }
+
+  const supportedModels = entry.supportedModelIds;
+  const model = listPresetModelsForVendor(vendorId).find(
+    (candidate) => supportedModels === undefined || supportedModels.includes(candidate.modelId),
+  );
+
+  return model?.modelId ?? entry.defaultModel;
+}
+
 export function resolveDefaultAgentRuntime(
   credentials: readonly VendorCredential[],
 ): DefaultAgentRuntimeSelection | null {
@@ -22,8 +39,8 @@ export function resolveDefaultAgentRuntime(
 
     if (configuredVendor !== undefined) {
       return {
-        model: entry.defaultModel,
-        provider: entry.defaultProvider,
+        model: defaultModelForVendor(entry, configuredVendor.vendorId),
+        provider: configuredVendor.vendorId,
         runtimeId: entry.runtimeId,
       };
     }
