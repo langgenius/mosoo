@@ -19,8 +19,6 @@ import type {
 import { ACTIVE_APP_DEPLOYMENT_RUN_STATUSES } from "../domain/app-deployment-lifecycle";
 import {
   createCloudflareDeploymentClient,
-  deleteCloudflareDeploymentResources,
-  logCloudflareDeploymentResourceDeleteFailures,
   type CloudflareDeploymentClient,
 } from "./app-deployment-cloudflare-client";
 import {
@@ -70,13 +68,6 @@ export interface DispatchAppDeploymentRunOptions {
   runner?: AppDeploymentBuildRunner;
 }
 
-export class AppDeploymentActivationPendingError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "AppDeploymentActivationPendingError";
-  }
-}
-
 export class AppDeploymentNonRetryableError extends Error {
   constructor(message: string) {
     super(message);
@@ -121,24 +112,6 @@ function deploymentHostname(deployment: AppDeploymentRow, domain: string): strin
 
 function deploymentUrl(deployment: AppDeploymentRow, domain: string): string {
   return `https://${deploymentHostname(deployment, domain)}`;
-}
-
-async function deleteDeployedResourcesAfterInactiveRun(
-  cloudflareClient: CloudflareDeploymentClient | null,
-  hostname: string,
-  resourceName: string,
-): Promise<void> {
-  if (cloudflareClient === null) {
-    return;
-  }
-
-  logCloudflareDeploymentResourceDeleteFailures(
-    "app-deployment.cloudflare_inactive_run_cleanup_failed",
-    await deleteCloudflareDeploymentResources(cloudflareClient, {
-      hostname,
-      resourceName,
-    }),
-  );
 }
 
 function isActiveRunStatus(status: AppDeploymentRunStatus): boolean {
@@ -187,16 +160,6 @@ async function execChecked(
   }
 
   throw new Error(message);
-}
-
-function assertActivePagesDomain(hostname: string, status: string | null): void {
-  if (status === "active") {
-    return;
-  }
-
-  throw new AppDeploymentActivationPendingError(
-    `Cloudflare Pages domain ${hostname} is not active.`,
-  );
 }
 
 function assertSelfContainedWorkerModule(scriptContent: string): void {
@@ -674,13 +637,20 @@ class SandboxAppDeploymentBuildRunner implements AppDeploymentBuildRunner {
           projectName: targetName,
         }),
       ]);
-      assertActivePagesDomain(hostname, domainResult.status);
+      const url =
+        domainResult.status === "active"
+          ? deploymentUrl(input.deployment, domain)
+          : latestDeployment.url;
+
+      if (url === null) {
+        throw new Error("Cloudflare Pages deployment response did not include a live URL.");
+      }
 
       return {
         externalDeploymentId: latestDeployment.deploymentId,
         externalProjectId: project.projectId,
         externalVersionId: null,
-        url: deploymentUrl(input.deployment, domain),
+        url,
       };
     }
 
@@ -836,11 +806,9 @@ export async function dispatchAppDeploymentRun(
       return;
     }
 
-    const hostname = deploymentHostname(context.deployment, bindings.MOSOO_APP_DEPLOYMENT_DOMAIN);
     const result = await runner.deploy({ ...context, plan, prepared });
 
     if (!(await updateRunStatus(bindings.DB, input.appDeploymentRunId, "submitted"))) {
-      await deleteDeployedResourcesAfterInactiveRun(cloudflareClient, hostname, targetName);
       await failDeploymentRunIfActive({
         database: bindings.DB,
         errorCode: "deployment_submission_lost",
@@ -851,7 +819,6 @@ export async function dispatchAppDeploymentRun(
     }
 
     if (!(await updateRunStatus(bindings.DB, input.appDeploymentRunId, "activating"))) {
-      await deleteDeployedResourcesAfterInactiveRun(cloudflareClient, hostname, targetName);
       await failDeploymentRunIfActive({
         database: bindings.DB,
         errorCode: "deployment_activation_lost",
@@ -869,7 +836,6 @@ export async function dispatchAppDeploymentRun(
     });
 
     if (!completed) {
-      await deleteDeployedResourcesAfterInactiveRun(cloudflareClient, hostname, targetName);
       await failDeploymentRunIfActive({
         database: bindings.DB,
         errorCode: "deployment_completion_lost",

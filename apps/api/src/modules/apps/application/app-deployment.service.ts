@@ -8,7 +8,7 @@ import type { AppDeploymentRunRow, AppDeploymentRow } from "@mosoo/db";
 import { apiCommandsTable, appDeploymentRunsTable, appDeploymentsTable } from "@mosoo/db";
 import type { AppDeploymentId, AppDeploymentRunId, AppId } from "@mosoo/id";
 import { createPlatformId } from "@mosoo/id";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, getD1ChangeCount } from "../../../platform/db/drizzle";
@@ -18,6 +18,7 @@ import {
   createAppDeploymentRunDispatchDedupeKey,
   enqueueAppDeploymentRunDispatchCommand,
 } from "../../api-command/application/api-command-enqueue";
+import { API_COMMAND_LEASE_MS } from "../../api-command/application/api-command-ledger";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ACTIVE_APP_DEPLOYMENT_RUN_STATUSES } from "../domain/app-deployment-lifecycle";
 import {
@@ -53,7 +54,6 @@ interface AppDeploymentServiceOptions {
 }
 
 type JsonRecord = Record<string, unknown>;
-const DISPATCH_MISSING_RECOVERY_DELAY_MS = 5 * 60 * 1000;
 
 export async function readAppDeploymentForOwnedApp(
   bindings: AppDeploymentReadBindings,
@@ -65,7 +65,6 @@ export async function readAppDeploymentForOwnedApp(
     return null;
   }
 
-  await readActiveDeploymentRun(bindings.DB, appId);
   const latestRun = await readLatestDeploymentRun(bindings.DB, appId);
 
   return toAppDeployment(deployment, latestRun, bindings.MOSOO_APP_DEPLOYMENT_DOMAIN);
@@ -86,7 +85,6 @@ export async function getAppDeploymentStatus(
   appId: AppId,
 ): Promise<AppDeploymentRun | null> {
   await ensureAppOwnership(bindings.DB, viewer.id, appId);
-  await readActiveDeploymentRun(bindings.DB, appId);
 
   const run = await readLatestDeploymentRun(bindings.DB, appId);
 
@@ -111,7 +109,9 @@ export async function deployApp(
     input.repoUrl,
     options.fetch ?? globalThis.fetch,
   );
-  const activeRun = await readActiveDeploymentRun(bindings.DB, input.appId);
+  const activeRun = await readActiveDeploymentRun(bindings.DB, input.appId, {
+    recoverMissingDispatch: true,
+  });
 
   if (activeRun !== null) {
     throw validationError("An App deployment run is already active.");
@@ -412,6 +412,7 @@ async function readLatestDeploymentRun(
 async function readActiveDeploymentRun(
   database: D1Database,
   appId: AppId,
+  options: { recoverMissingDispatch?: boolean } = {},
 ): Promise<Pick<AppDeploymentRunRow, "id" | "status" | "updatedAt"> | null> {
   const run =
     (await getAppDatabase(database)
@@ -434,6 +435,11 @@ async function readActiveDeploymentRun(
     return null;
   }
 
+  if (options.recoverMissingDispatch !== true) {
+    return run;
+  }
+
+  const nowMs = currentTimestampMs();
   const dispatchCommand =
     (await getAppDatabase(database)
       .select({ id: apiCommandsTable.id })
@@ -441,7 +447,10 @@ async function readActiveDeploymentRun(
       .where(
         and(
           eq(apiCommandsTable.dedupeKey, createAppDeploymentRunDispatchDedupeKey(run.id)),
-          inArray(apiCommandsTable.status, ["queued", "running"]),
+          or(
+            eq(apiCommandsTable.status, "queued"),
+            and(eq(apiCommandsTable.status, "running"), gt(apiCommandsTable.claimExpiresAt, nowMs)),
+          ),
         ),
       )
       .limit(1)
@@ -451,9 +460,7 @@ async function readActiveDeploymentRun(
     return run;
   }
 
-  const nowMs = currentTimestampMs();
-
-  if (nowMs - run.updatedAt < DISPATCH_MISSING_RECOVERY_DELAY_MS) {
+  if (nowMs - run.updatedAt < API_COMMAND_LEASE_MS) {
     return run;
   }
 

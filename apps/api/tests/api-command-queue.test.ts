@@ -3,7 +3,12 @@ import { describe, expect, test } from "bun:test";
 import { apiCommandsTable } from "@mosoo/db";
 import { eq } from "drizzle-orm";
 
-import { enqueueApiCommand } from "../src/modules/api-command/application/api-command-ledger";
+import {
+  API_COMMAND_LEASE_MS,
+  claimApiCommand,
+  enqueueApiCommand,
+  renewApiCommandClaim,
+} from "../src/modules/api-command/application/api-command-ledger";
 import type { ApiCommandMessage } from "../src/modules/api-command/application/api-command-message";
 import { processApiCommandMessage } from "../src/modules/api-command/application/api-command-processor";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
@@ -89,5 +94,45 @@ describe("API command queue", () => {
       status: "failed",
     });
     expect(recorded.recorded).toEqual([{ type: "ack" }]);
+  });
+
+  test("renews a running command claim for the current owner", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const queue = createApiCommandQueueStub();
+    const bindings = createPublicHttpTestBindings(database, {
+      apiCommandQueue: queue,
+    }) as ApiBindings;
+    const commandId = await enqueueApiCommand(bindings, {
+      dedupeKey: "scheduled:renew",
+      kind: "scheduled_maintenance",
+      payload: { scheduledTime: nowMsForTest() },
+    });
+
+    await claimApiCommand({
+      commandId,
+      database,
+      nowMs: 1_000,
+      ownerId: "owner-1",
+    });
+
+    await expect(
+      renewApiCommandClaim({
+        commandId,
+        database,
+        nowMs: 2_000,
+        ownerId: "owner-1",
+      }),
+    ).resolves.toBe(true);
+
+    const row = await database
+      .app()
+      .select({
+        claimExpiresAt: apiCommandsTable.claimExpiresAt,
+      })
+      .from(apiCommandsTable)
+      .where(eq(apiCommandsTable.id, commandId))
+      .get();
+
+    expect(row?.claimExpiresAt).toBe(2_000 + API_COMMAND_LEASE_MS);
   });
 });

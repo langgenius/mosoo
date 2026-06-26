@@ -52,7 +52,7 @@ export interface CloudflareDeploymentClient {
   ensureWorkerRoute(input: { hostname: string; scriptName: string }): Promise<void>;
   getLatestPagesDeployment(input: {
     projectName: string;
-  }): Promise<{ deploymentId: string | null }>;
+  }): Promise<{ deploymentId: string | null; url: string | null }>;
 }
 
 export type CloudflareClientBindings = Pick<
@@ -228,10 +228,10 @@ export function createCloudflareDeploymentClient(
       });
 
       for await (const deployment of deployments) {
-        return { deploymentId: deployment.id ?? null };
+        return { deploymentId: deployment.id ?? null, url: deployment.url ?? null };
       }
 
-      return { deploymentId: null };
+      return { deploymentId: null, url: null };
     },
   };
 }

@@ -34,11 +34,14 @@ import { runSandboxMaintenance } from "../../runtime/application/runtime-mainten
 import { dispatchQueuedSessionRun } from "../../runtime/application/session-runs/dispatch-queued-run.service";
 import { APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX } from "./api-command-enqueue";
 import {
+  API_COMMAND_LEASE_RENEWAL_INTERVAL_MS,
   claimApiCommand,
   completeApiCommand,
   markApiCommandDeadLettered,
   markApiCommandFailed,
   releaseApiCommandForRetry,
+  renewApiCommandClaim,
+  type ApiCommandClaim,
 } from "./api-command-ledger";
 import { parseApiCommandMessage } from "./api-command-message";
 import type { ApiCommandMessage } from "./api-command-message";
@@ -354,13 +357,6 @@ async function failActiveAppDeploymentRun(
     .run();
 }
 
-async function processAppDeploymentRunDispatchCommand(
-  bindings: ApiBindings,
-  payload: AppDeploymentRunDispatchCommandPayload,
-): Promise<void> {
-  await dispatchAppDeploymentRun(bindings, payload);
-}
-
 async function failAppDeploymentRunFromPayloadJson(
   bindings: ApiBindings,
   input: {
@@ -370,31 +366,22 @@ async function failAppDeploymentRunFromPayloadJson(
     nowMs: number;
     payloadJson: string;
   },
-): Promise<void> {
-  const runId = readAppDeploymentRunIdFromPayload(input);
-
-  if (runId === null) {
-    return;
-  }
-
-  await failActiveAppDeploymentRun(bindings, runId, input);
-}
-
-async function tryFailAppDeploymentRunFromPayloadJson(
-  bindings: ApiBindings,
-  input: {
-    errorCode: string;
-    errorMessage: string;
-    fallbackDedupeKey?: string;
-    nowMs: number;
-    payloadJson: string;
-  },
-  eventName: string,
+  logEventName?: string,
 ): Promise<void> {
   try {
-    await failAppDeploymentRunFromPayloadJson(bindings, input);
+    const runId = readAppDeploymentRunIdFromPayload(input);
+
+    if (runId === null) {
+      return;
+    }
+
+    await failActiveAppDeploymentRun(bindings, runId, input);
   } catch (error) {
-    logError(eventName, {
+    if (logEventName === undefined) {
+      throw error;
+    }
+
+    logError(logEventName, {
       ...createErrorLogContext(error),
       errorCode: getErrorCode(error),
     });
@@ -443,16 +430,13 @@ function readAppDeploymentRunIdFromPayload(input: {
 
 async function processClaimedApiCommand(
   bindings: ApiBindings,
-  claim: NonNullable<Awaited<ReturnType<typeof claimApiCommand>>>,
+  claim: ApiCommandClaim,
 ): Promise<void> {
   const payload = parseApiCommandPayload(claim.kind, claim.payloadJson);
 
   switch (claim.kind) {
     case "app_deployment_run_dispatch": {
-      await processAppDeploymentRunDispatchCommand(
-        bindings,
-        payload as AppDeploymentRunDispatchCommandPayload,
-      );
+      await dispatchAppDeploymentRun(bindings, payload as AppDeploymentRunDispatchCommandPayload);
       return;
     }
     case "channel_work_trigger": {
@@ -470,6 +454,56 @@ async function processClaimedApiCommand(
       await processSessionRunDispatchCommand(bindings, payload as SessionRunDispatchCommandPayload);
       return;
     }
+  }
+}
+
+async function processClaimedApiCommandWithLeaseRenewal(
+  bindings: ApiBindings,
+  claim: ApiCommandClaim,
+  ownerId: string,
+): Promise<void> {
+  let stopped = false;
+  let renewal = Promise.resolve();
+  const timer = setInterval(() => {
+    if (stopped) {
+      return;
+    }
+
+    renewal = renewal
+      .then(() =>
+        renewApiCommandClaim({
+          commandId: claim.commandId,
+          database: bindings.DB,
+          ownerId,
+        }),
+      )
+      .then((renewed) => {
+        if (renewed) {
+          return;
+        }
+
+        stopped = true;
+        logError("api-command.claim_lost", {
+          commandId: claim.commandId,
+          kind: claim.kind,
+        });
+      })
+      .catch((error: unknown) => {
+        logError("api-command.claim_renew_failed", {
+          ...createErrorLogContext(error),
+          commandId: claim.commandId,
+          kind: claim.kind,
+        });
+      });
+  }, API_COMMAND_LEASE_RENEWAL_INTERVAL_MS);
+
+  try {
+    await processClaimedApiCommand(bindings, claim);
+    stopped = true;
+    await renewal;
+  } finally {
+    stopped = true;
+    clearInterval(timer);
   }
 }
 
@@ -506,7 +540,7 @@ export async function processApiCommandMessage(
   }
 
   try {
-    await processClaimedApiCommand(bindings, claim);
+    await processClaimedApiCommandWithLeaseRenewal(bindings, claim, ownerId);
     await completeApiCommand({
       commandId,
       database: bindings.DB,
@@ -535,7 +569,7 @@ export async function processApiCommandMessage(
 
     if (shouldFailAppDeploymentRun) {
       const failedAtMs = nowMs();
-      await tryFailAppDeploymentRunFromPayloadJson(
+      await failAppDeploymentRunFromPayloadJson(
         bindings,
         {
           errorCode,
@@ -605,7 +639,7 @@ export async function processApiCommandDeadLetterMessage(
         .get()) ?? null;
 
     if (command?.kind === "app_deployment_run_dispatch") {
-      await tryFailAppDeploymentRunFromPayloadJson(
+      await failAppDeploymentRunFromPayloadJson(
         bindings,
         {
           errorCode: "queue_dead_lettered",

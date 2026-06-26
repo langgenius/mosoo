@@ -11,9 +11,7 @@ import type {
 
 export const APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX = "app_deployment_run_dispatch:" as const;
 
-export function createAppDeploymentRunDispatchDedupeKey(
-  runId: AppDeploymentRunId,
-): string {
+export function createAppDeploymentRunDispatchDedupeKey(runId: AppDeploymentRunId): string {
   return `${APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX}${runId}`;
 }
 
