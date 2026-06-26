@@ -8,6 +8,7 @@ import type { AccountId, AppId } from "@mosoo/id";
 import {
   VENDOR_OPENAI,
   VENDOR_OPENAI_COMPATIBLE,
+  VENDOR_OPENCODE,
   getRuntimeCatalogEntry,
 } from "@mosoo/runtime-catalog";
 import { and, asc, eq } from "drizzle-orm";
@@ -44,6 +45,7 @@ const READINESS_PROVIDER_PROBE_TIMEOUT_MS = 10_000;
 const OPENAI_SHAPED_PROVIDER_IDS = new Set([
   VENDOR_OPENAI.vendorId,
   VENDOR_OPENAI_COMPATIBLE.vendorId,
+  VENDOR_OPENCODE.vendorId,
 ]);
 
 async function hasAppCredential(

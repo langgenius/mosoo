@@ -9,10 +9,12 @@ import {
 describe("Preview runtime release gate", () => {
   test("maps public Preview live smoke providers to public driver runtimes", () => {
     expect(PUBLIC_RUNTIME_CATALOG.map((runtime) => runtime.runtimeId).toSorted()).toEqual([
+      "acp-fallback",
       "claude-agent-sdk",
       "openai-runtime",
     ]);
     expect(PUBLIC_RUNTIME_CATALOG.map((runtime) => runtime.transport).toSorted()).toEqual([
+      "acp-fallback",
       "claude-agent-sdk",
       "openai-app-server",
     ]);
@@ -23,15 +25,15 @@ describe("Preview runtime release gate", () => {
     }
   });
 
-  test("keeps ACP fallback as an internal driver transport outside public Preview smoke", () => {
+  test("exposes ACP fallback as the public OpenCode runtime", () => {
     const acpRuntime = RUNTIME_CATALOG.find((runtime) => runtime.runtimeId === "acp-fallback");
 
     expect(acpRuntime).toMatchObject({
+      label: "OpenCode",
       runtimeId: "acp-fallback",
       transport: "acp-fallback",
-      visibility: "internal",
+      visibility: "public",
     });
-    expect(acpRuntime?.disabledReason).toMatch(/internal transport/u);
     expect(SUPPORTED_DRIVER_RUNTIMES).toContain("acp-fallback");
     expect(SUPPORTED_DRIVER_RUNTIME_TRANSPORTS).toContain("acp-fallback");
   });

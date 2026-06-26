@@ -155,10 +155,22 @@ export const VENDOR_OPENAI_COMPATIBLE = runtimeCatalogVendor({
   vendorId: "openai-compatible",
 });
 
+export const VENDOR_OPENCODE = runtimeCatalogVendor({
+  apiKeyEnvVar: "OPENCODE_API_KEY",
+  authHeader: {
+    apiKeyHeader: "Authorization",
+    scheme: "bearer",
+  },
+  defaultApiBase: "https://opencode.ai/zen/v1",
+  label: "OpenCode Zen",
+  vendorId: "opencode",
+});
+
 export const ALL_VENDORS = [
   VENDOR_ANTHROPIC,
   VENDOR_OPENAI,
   VENDOR_OPENAI_COMPATIBLE,
+  VENDOR_OPENCODE,
 ] as const satisfies readonly RuntimeCatalogVendor[];
 
 function modelIdsForVendor(vendorId: string): readonly string[] {
@@ -167,10 +179,12 @@ function modelIdsForVendor(vendorId: string): readonly string[] {
 
 const CLAUDE_AGENT_SDK_SUPPORTED_MODEL_IDS = modelIdsForVendor(VENDOR_ANTHROPIC.vendorId);
 const OPENAI_RUNTIME_SUPPORTED_MODEL_IDS = modelIdsForVendor(VENDOR_OPENAI.vendorId);
+const OPENCODE_SUPPORTED_MODEL_IDS = modelIdsForVendor(VENDOR_OPENCODE.vendorId);
 
 const ACP_FALLBACK_SUPPORTED_MODEL_IDS = [
   ...CLAUDE_AGENT_SDK_SUPPORTED_MODEL_IDS,
   ...OPENAI_RUNTIME_SUPPORTED_MODEL_IDS,
+  ...OPENCODE_SUPPORTED_MODEL_IDS,
 ] as const;
 
 const STANDARD_RUNTIME_CAPABILITIES = [
@@ -262,13 +276,12 @@ export const RUNTIME_CATALOG = [
       providerId: VENDOR_OPENAI.vendorId,
       runtimeId: "acp-fallback",
     }),
-    disabledReason: "ACP fallback is an internal transport.",
-    label: "ACP Fallback",
+    label: "OpenCode",
     runtimeId: "acp-fallback",
     supportedModelIds: ACP_FALLBACK_SUPPORTED_MODEL_IDS,
     transport: "acp-fallback",
-    vendors: [VENDOR_OPENAI, VENDOR_ANTHROPIC],
-    visibility: "internal",
+    vendors: [VENDOR_OPENAI, VENDOR_ANTHROPIC, VENDOR_OPENCODE],
+    visibility: "public",
   }),
 ] as const satisfies readonly RuntimeCatalogEntry[];
 

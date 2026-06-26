@@ -9,6 +9,7 @@ import {
   RUNTIME_CATALOG,
   SYSTEM_AGENT_RUNTIME_ID,
   VENDOR_ANTHROPIC,
+  VENDOR_OPENCODE,
   VENDOR_OPENAI,
   VENDOR_OPENAI_COMPATIBLE,
   admitRuntimeModelIdentity,
@@ -139,6 +140,16 @@ describe("runtime catalog identity admission", () => {
         runtimeId: "openai-runtime",
       }),
     );
+    const opencodePreset = admitRuntimeModelIdentity(
+      createRuntimeModelIdentity({
+        modelId: "deepseek-v4-pro",
+        provider: {
+          kind: "preset",
+          providerId: VENDOR_OPENCODE.vendorId,
+        },
+        runtimeId: "acp-fallback",
+      }),
+    );
 
     expect(preset).toMatchObject({
       ok: true,
@@ -155,6 +166,16 @@ describe("runtime catalog identity admission", () => {
       model: null,
       vendor: {
         vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
+      },
+    });
+    expect(opencodePreset).toMatchObject({
+      ok: true,
+      model: {
+        modelId: "deepseek-v4-pro",
+        vendorId: VENDOR_OPENCODE.vendorId,
+      },
+      vendor: {
+        vendorId: VENDOR_OPENCODE.vendorId,
       },
     });
   });
