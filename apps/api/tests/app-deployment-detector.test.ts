@@ -5,8 +5,10 @@ import {
   detectAppDeploymentPlan,
 } from "../src/modules/apps/application/app-deployment-detector";
 
+const RESOURCE_NAME = "app-01j00000000000000000000054";
+
 function detect(files: Record<string, string>) {
-  return detectAppDeploymentPlan({ files });
+  return detectAppDeploymentPlan({ files }, { resourceName: RESOURCE_NAME });
 }
 
 describe("app deployment detector", () => {
@@ -20,6 +22,12 @@ describe("app deployment detector", () => {
       targetKind: "cloudflare_pages",
       targetMode: "static_assets",
     });
+  });
+
+  test("uses the caller-provided Cloudflare resource name", () => {
+    expect(detect({ "index.html": "<main>Hello</main>" }).generatedWranglerConfig).toContain(
+      `name = "${RESOURCE_NAME}"`,
+    );
   });
 
   test("detects Vite static output", () => {

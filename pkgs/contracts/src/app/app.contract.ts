@@ -124,6 +124,7 @@ export interface AppOverviewProviderCredentialList {
 export interface AppOverview {
   agents: AppOverviewAgentList;
   app: AppSummary;
+  deployment: AppDeployment | null;
   providerCredentials: AppOverviewProviderCredentialList;
 }
 

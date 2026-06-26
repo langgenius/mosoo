@@ -476,6 +476,52 @@ type AppCostCard {
   totals: CostTotals!
 }
 
+type AppDeployment {
+  appId: ULID!
+  createdAt: String!
+  defaultBranch: String!
+  id: ULID!
+  latestRun: AppDeploymentRun
+  liveUrl: String
+  plannedUrl: String!
+  repoName: String!
+  repoOwner: String!
+  repoUrl: String!
+  updatedAt: String!
+}
+
+type AppDeploymentRun {
+  appId: ULID!
+  createdAt: String!
+  deploymentId: ULID!
+  errorCode: String
+  errorMessage: String
+  id: ULID!
+  liveUrl: String
+  plannedUrl: String!
+  sourceBranch: String!
+  sourceCommitSha: String!
+  status: AppDeploymentRunStatus!
+  targetKind: AppDeploymentTargetKind
+  updatedAt: String!
+}
+
+enum AppDeploymentRunStatus {
+  activating
+  building
+  failed
+  preparing
+  queued
+  submitted
+  submitting
+  success
+}
+
+enum AppDeploymentTargetKind {
+  cloudflare_pages
+  cloudflare_worker
+}
+
 type AppInfo {
   api: String!
   name: String!
@@ -485,6 +531,7 @@ type AppInfo {
 type AppOverview {
   agents: AppOverviewAgentList!
   app: App!
+  deployment: AppDeployment
   providerCredentials: AppOverviewProviderCredentialList!
 }
 
@@ -808,6 +855,10 @@ input DeleteAgentInput {
   appId: ULID!
 }
 
+input DeleteAppDeploymentInput {
+  appId: ULID!
+}
+
 input DeleteEnvironmentInput {
   appId: ULID!
   environmentId: ULID!
@@ -816,6 +867,12 @@ input DeleteEnvironmentInput {
 input DeleteVendorCredentialInput {
   appId: ULID!
   id: ULID!
+}
+
+input DeployAppInput {
+  appId: ULID!
+  configPath: String
+  repoUrl: String!
 }
 
 type EnvironmentDetail {
@@ -1185,10 +1242,12 @@ type Mutation {
   deleteAgent(input: DeleteAgentInput!): OperationResult!
   deleteAgentChannelBinding(input: DeleteAgentChannelBindingInput!): OperationResult!
   deleteAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!
+  deleteAppDeployment(input: DeleteAppDeploymentInput!): OperationResult!
   deleteEnvironment(input: DeleteEnvironmentInput!): OperationResult!
   deleteMcpServer(appId: ULID!, serverId: ULID!): OperationResult!
   deleteOwnedSkill(appId: ULID!, skillId: ULID!): OperationResult!
   deleteVendorCredential(input: DeleteVendorCredentialInput!): OperationResult!
+  deployApp(input: DeployAppInput!): AppDeploymentRun!
   importAgentPackage(input: ImportAgentPackageInput!): AgentPackageImportResult!
   onboardingBootstrap(input: BootstrapOnboardingInput!): OnboardingStatus!
   pollLarkAgentChannelRegistration(input: PollLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!
@@ -1276,6 +1335,7 @@ type Query {
   agentSessionList(agentId: ULID!, appId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!
   agentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!
   appCostCard(appId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AppCostCard!
+  appDeploymentStatus(appId: ULID!): AppDeploymentRun
   appEnvironmentList(appId: ULID!): [EnvironmentSummary!]!
   appInfo: AppInfo!
   appList(organizationId: ULID!): [App!]!

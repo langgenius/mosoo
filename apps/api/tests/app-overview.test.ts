@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { isObjectType } from "graphql";
+import { isInputObjectType, isObjectType } from "graphql";
 
 import { createGraphQLSchema } from "../src/adapters/graphql/create-graphql-schema";
 import {
@@ -9,6 +9,13 @@ import {
 } from "../src/modules/apps/application/app-overview.service";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { createApiTestFixture } from "./helpers/api-test-fixture";
+
+const OVERVIEW_DEPLOYMENT_ID = "01J000000000000000000000D1";
+const OVERVIEW_DEPLOYMENT_RUN_ID = "01J000000000000000000000D2";
+
+function createOverviewDeploymentUrl(appId: string, domain: string): string {
+  return `https://app-${appId.toLowerCase()}.${domain}`;
+}
 
 function makeForeignViewer(): AuthenticatedViewer {
   return {
@@ -106,23 +113,125 @@ async function insertOverviewCredentialMetadata(
     .run();
 }
 
+async function insertOverviewDeploymentMetadata(
+  fixture: Awaited<ReturnType<typeof createApiTestFixture>>,
+): Promise<{ liveUrl: string }> {
+  const liveUrl = createOverviewDeploymentUrl(
+    fixture.ids.appId,
+    fixture.bindings.MOSOO_APP_DEPLOYMENT_DOMAIN,
+  );
+
+  await fixture.database
+    .prepare(
+      `INSERT INTO app_deployment (
+        app_id,
+        created_at,
+        default_branch,
+        deleted_at,
+        id,
+        last_successful_url,
+        mosoo_subdomain,
+        owner_account_id,
+        repo_name,
+        repo_owner,
+        repo_url,
+        source_kind,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      fixture.ids.appId,
+      1,
+      "main",
+      null,
+      OVERVIEW_DEPLOYMENT_ID,
+      liveUrl,
+      `app-${fixture.ids.appId.toLowerCase()}`,
+      fixture.viewer.id,
+      "awire",
+      "samzong",
+      "https://github.com/samzong/awire.git",
+      "github_public",
+      2,
+    )
+    .run();
+
+  await fixture.database
+    .prepare(
+      `INSERT INTO app_deployment_run (
+        app_id,
+        created_at,
+        deployment_id,
+        error_code,
+        error_message,
+        id,
+        source_branch,
+        source_commit_sha,
+        status,
+        target_kind,
+        updated_at,
+        url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      fixture.ids.appId,
+      1,
+      OVERVIEW_DEPLOYMENT_ID,
+      null,
+      null,
+      OVERVIEW_DEPLOYMENT_RUN_ID,
+      "main",
+      "abc123",
+      "success",
+      "cloudflare_pages",
+      2,
+      liveUrl,
+    )
+    .run();
+
+  return { liveUrl };
+}
+
 describe("App overview", () => {
   test("keeps the GraphQL overview surface App-scoped and secret-free", () => {
     const schema = createGraphQLSchema();
     const query = schema.getQueryType();
+    const mutation = schema.getMutationType();
+    const appOverview = schema.getType("AppOverview");
     const credential = schema.getType("AppOverviewProviderCredential");
+    const deployment = schema.getType("AppDeployment");
+    const deploymentRun = schema.getType("AppDeploymentRun");
+    const deployInput = schema.getType("DeployAppInput");
 
-    if (!query || !isObjectType(credential)) {
+    if (
+      !query ||
+      !mutation ||
+      !isObjectType(appOverview) ||
+      !isObjectType(credential) ||
+      !isObjectType(deployment) ||
+      !isObjectType(deploymentRun) ||
+      !isInputObjectType(deployInput)
+    ) {
       throw new Error("Expected App overview GraphQL types.");
     }
 
     const overview = query.getFields().appOverview;
+    const deploymentStatus = query.getFields().appDeploymentStatus;
     const controlPlaneOverview = query.getFields().controlPlaneOverview;
+    const deploy = mutation.getFields().deployApp;
+    const deleteDeployment = mutation.getFields().deleteAppDeployment;
 
     expect(overview).toBeDefined();
     expect(String(overview.args.find((arg) => arg.name === "appId")?.type)).toBe("ULID!");
     expect(String(overview.args.find((arg) => arg.name === "agentLimit")?.type)).toBe("Int");
     expect(String(overview.args.find((arg) => arg.name === "credentialLimit")?.type)).toBe("Int");
+    expect(String(appOverview.getFields().deployment.type)).toBe("AppDeployment");
+    expect(String(deployment.getFields().latestRun.type)).toBe("AppDeploymentRun");
+    expect(String(deploymentRun.getFields().status.type)).toBe("AppDeploymentRunStatus!");
+    expect(String(deploymentStatus.type)).toBe("AppDeploymentRun");
+    expect(String(deploy.type)).toBe("AppDeploymentRun!");
+    expect(String(deleteDeployment.type)).toBe("OperationResult!");
+    expect(String(deployInput.getFields().repoUrl.type)).toBe("String!");
     expect(controlPlaneOverview).toBeDefined();
     expect(String(controlPlaneOverview.args.find((arg) => arg.name === "appLimit")?.type)).toBe(
       "Int",
@@ -140,8 +249,9 @@ describe("App overview", () => {
       updatedAt: 2,
     });
     await insertOverviewCredentialMetadata(fixture);
+    const deploymentFixture = await insertOverviewDeploymentMetadata(fixture);
 
-    const overview = await getAppOverview(fixture.bindings.DB, fixture.viewer, {
+    const overview = await getAppOverview(fixture.bindings, fixture.viewer, {
       agentLimit: 1,
       appId: fixture.ids.appId,
       credentialLimit: 10,
@@ -150,6 +260,17 @@ describe("App overview", () => {
     expect(overview.app).toMatchObject({
       id: fixture.ids.appId,
       name: "Default App",
+    });
+    expect(overview.deployment).toMatchObject({
+      latestRun: {
+        liveUrl: deploymentFixture.liveUrl,
+        status: "success",
+        targetKind: "cloudflare_pages",
+      },
+      liveUrl: deploymentFixture.liveUrl,
+      plannedUrl: deploymentFixture.liveUrl,
+      repoName: "awire",
+      repoOwner: "samzong",
     });
     expect(overview.agents).toMatchObject({
       hasMore: true,
@@ -195,7 +316,7 @@ describe("App overview", () => {
     const fixture = await createApiTestFixture();
     await insertOverviewCredentialMetadata(fixture);
 
-    const overview = await getControlPlaneOverview(fixture.bindings.DB, fixture.viewer, {
+    const overview = await getControlPlaneOverview(fixture.bindings, fixture.viewer, {
       agentLimit: 10,
       appLimit: 10,
       credentialLimit: 10,
@@ -215,6 +336,7 @@ describe("App overview", () => {
         id: fixture.ids.appId,
         name: "Default App",
       },
+      deployment: null,
       agents: {
         hasMore: false,
         limit: 10,
@@ -231,7 +353,7 @@ describe("App overview", () => {
     const fixture = await createApiTestFixture();
 
     await expect(
-      getAppOverview(fixture.bindings.DB, makeForeignViewer(), {
+      getAppOverview(fixture.bindings, makeForeignViewer(), {
         appId: fixture.ids.appId,
       }),
     ).rejects.toThrow("You do not have permission");
@@ -241,7 +363,7 @@ describe("App overview", () => {
     const fixture = await createApiTestFixture();
 
     await expect(
-      getAppOverview(fixture.bindings.DB, fixture.viewer, {
+      getAppOverview(fixture.bindings, fixture.viewer, {
         agentLimit: 0,
         appId: fixture.ids.appId,
       }),

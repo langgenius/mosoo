@@ -383,6 +383,27 @@ async function failAppDeploymentRunFromPayloadJson(
   await failActiveAppDeploymentRun(bindings, runId, input);
 }
 
+async function tryFailAppDeploymentRunFromPayloadJson(
+  bindings: ApiBindings,
+  input: {
+    errorCode: string;
+    errorMessage: string;
+    fallbackDedupeKey?: string;
+    nowMs: number;
+    payloadJson: string;
+  },
+  eventName: string,
+): Promise<void> {
+  try {
+    await failAppDeploymentRunFromPayloadJson(bindings, input);
+  } catch (error) {
+    logError(eventName, {
+      ...createErrorLogContext(error),
+      errorCode: getErrorCode(error),
+    });
+  }
+}
+
 function readAppDeploymentRunIdFromPayload(input: {
   fallbackDedupeKey?: string;
   payloadJson: string;
@@ -508,18 +529,33 @@ export async function processApiCommandMessage(
       kind: claim.kind,
     });
 
-    if (error instanceof ApiCommandPayloadError) {
-      if (claim.kind === "app_deployment_run_dispatch") {
-        const failedAtMs = nowMs();
-        await failAppDeploymentRunFromPayloadJson(bindings, {
+    if (claim.kind === "app_deployment_run_dispatch") {
+      const failedAtMs = nowMs();
+      await tryFailAppDeploymentRunFromPayloadJson(
+        bindings,
+        {
           errorCode,
           errorMessage,
           fallbackDedupeKey: claim.dedupeKey,
           nowMs: failedAtMs,
           payloadJson: claim.payloadJson,
-        });
-      }
+        },
+        "api-command.app_deployment_run_fail_failed",
+      );
 
+      await markApiCommandFailed({
+        commandId,
+        database: bindings.DB,
+        errorCode,
+        errorMessage,
+        nowMs: failedAtMs,
+        ownerId,
+      });
+      message.ack();
+      return;
+    }
+
+    if (error instanceof ApiCommandPayloadError) {
       await markApiCommandFailed({
         commandId,
         database: bindings.DB,
@@ -565,13 +601,17 @@ export async function processApiCommandDeadLetterMessage(
         .get()) ?? null;
 
     if (command?.kind === "app_deployment_run_dispatch") {
-      await failAppDeploymentRunFromPayloadJson(bindings, {
-        errorCode: "queue_dead_lettered",
-        errorMessage: "Deployment dispatch reached the queue dead-letter consumer.",
-        fallbackDedupeKey: command.dedupeKey,
-        nowMs: deadLetteredAtMs,
-        payloadJson: command.payloadJson,
-      });
+      await tryFailAppDeploymentRunFromPayloadJson(
+        bindings,
+        {
+          errorCode: "queue_dead_lettered",
+          errorMessage: "Deployment dispatch reached the queue dead-letter consumer.",
+          fallbackDedupeKey: command.dedupeKey,
+          nowMs: deadLetteredAtMs,
+          payloadJson: command.payloadJson,
+        },
+        "api-command.app_deployment_run_dead_letter_fail_failed",
+      );
     }
 
     await markApiCommandDeadLettered({

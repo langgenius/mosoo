@@ -26,6 +26,10 @@ export interface AppDeploymentRepositorySnapshot {
   files: Readonly<Record<string, string>>;
 }
 
+export interface AppDeploymentDetectionOptions {
+  resourceName: string;
+}
+
 interface PackageJson {
   dependencies: Readonly<Record<string, string>>;
   devDependencies: Readonly<Record<string, string>>;
@@ -51,7 +55,6 @@ interface RepositoryFiles {
 }
 
 const COMPATIBILITY_DATE = "2026-06-26";
-const GENERATED_RESOURCE_NAME = "mosoo-app";
 
 export class AppDeploymentDetectionError extends Error {
   readonly code: AppDeploymentDetectionErrorCode;
@@ -65,18 +68,24 @@ export class AppDeploymentDetectionError extends Error {
 
 export function detectAppDeploymentPlan(
   snapshot: AppDeploymentRepositorySnapshot,
+  options: AppDeploymentDetectionOptions,
 ): AppDeploymentPlan {
   const files = createRepositoryFiles(snapshot.files);
   const mosooConfig = files.read(".mosoo.toml");
+  const resourceName = normalizeResourceName(options.resourceName);
 
   if (mosooConfig !== null) {
-    return detectFromMosooConfig(files, mosooConfig);
+    return detectFromMosooConfig(files, mosooConfig, resourceName);
   }
 
-  return detectFromRepository(files, ".");
+  return detectFromRepository(files, ".", resourceName);
 }
 
-function detectFromMosooConfig(files: RepositoryFiles, source: string): AppDeploymentPlan {
+function detectFromMosooConfig(
+  files: RepositoryFiles,
+  source: string,
+  resourceName: string,
+): AppDeploymentPlan {
   const config = parseMosooConfig(source);
   const packageJson = readPackageJson(files, config.rootDir);
   const packageManager = detectPackageManager(files, config.rootDir, packageJson);
@@ -95,6 +104,7 @@ function detectFromMosooConfig(files: RepositoryFiles, source: string): AppDeplo
       mosooConfigPath: ".mosoo.toml",
       outputDir,
       packageManager,
+      resourceName,
       routesFallback: config.routesFallback,
       rootDir: config.rootDir,
     });
@@ -116,12 +126,17 @@ function detectFromMosooConfig(files: RepositoryFiles, source: string): AppDeplo
     installCommand,
     mosooConfigPath: ".mosoo.toml",
     packageManager,
+    resourceName,
     rootDir: config.rootDir,
     workerEntry,
   });
 }
 
-function detectFromRepository(files: RepositoryFiles, rootDir: string): AppDeploymentPlan {
+function detectFromRepository(
+  files: RepositoryFiles,
+  rootDir: string,
+  resourceName: string,
+): AppDeploymentPlan {
   const packageJson = readPackageJson(files, rootDir);
   const packageManager = detectPackageManager(files, rootDir, packageJson);
   const wranglerMain = readWranglerMain(files, rootDir);
@@ -132,6 +147,7 @@ function detectFromRepository(files: RepositoryFiles, rootDir: string): AppDeplo
       installCommand: installCommandFor(packageManager, files, rootDir),
       mosooConfigPath: null,
       packageManager,
+      resourceName,
       rootDir,
       workerEntry: wranglerMain,
     });
@@ -145,6 +161,7 @@ function detectFromRepository(files: RepositoryFiles, rootDir: string): AppDeplo
         mosooConfigPath: null,
         outputDir: ".",
         packageManager: "none",
+        resourceName,
         routesFallback: null,
         rootDir,
       });
@@ -157,20 +174,20 @@ function detectFromRepository(files: RepositoryFiles, rootDir: string): AppDeplo
   }
 
   if (hasDependency(packageJson, "vite")) {
-    return packagePagesPlan(files, rootDir, packageJson, packageManager, "dist");
+    return packagePagesPlan(files, rootDir, packageJson, packageManager, "dist", resourceName);
   }
 
   if (hasDependency(packageJson, "astro")) {
-    return packagePagesPlan(files, rootDir, packageJson, packageManager, "dist");
+    return packagePagesPlan(files, rootDir, packageJson, packageManager, "dist", resourceName);
   }
 
   if (hasDependency(packageJson, "@docusaurus/core")) {
-    return packagePagesPlan(files, rootDir, packageJson, packageManager, "build");
+    return packagePagesPlan(files, rootDir, packageJson, packageManager, "build", resourceName);
   }
 
   if (hasDependency(packageJson, "next")) {
     if (isNextStaticExport(files, rootDir, packageJson)) {
-      return packagePagesPlan(files, rootDir, packageJson, packageManager, "out");
+      return packagePagesPlan(files, rootDir, packageJson, packageManager, "out", resourceName);
     }
 
     throw new AppDeploymentDetectionError(
@@ -186,6 +203,7 @@ function detectFromRepository(files: RepositoryFiles, rootDir: string): AppDeplo
       mosooConfigPath: null,
       outputDir: ".",
       packageManager: "none",
+      resourceName,
       routesFallback: null,
       rootDir,
     });
@@ -203,6 +221,7 @@ function packagePagesPlan(
   packageJson: PackageJson,
   packageManager: AppDeploymentPackageManager,
   outputDir: string,
+  resourceName: string,
 ): AppDeploymentPlan {
   const buildCommand =
     buildCommandFor(packageManager, packageJson) ??
@@ -214,6 +233,7 @@ function packagePagesPlan(
     mosooConfigPath: null,
     outputDir,
     packageManager,
+    resourceName,
     routesFallback: null,
     rootDir,
   });
@@ -225,6 +245,7 @@ function pagesPlan(input: {
   mosooConfigPath: ".mosoo.toml" | null;
   outputDir: string;
   packageManager: AppDeploymentPackageManager;
+  resourceName: string;
   routesFallback: string | null;
   rootDir: string;
 }): AppDeploymentPlan {
@@ -232,7 +253,7 @@ function pagesPlan(input: {
     buildCommand: input.buildCommand,
     generatedWranglerConfig: stringify({
       compatibility_date: COMPATIBILITY_DATE,
-      name: GENERATED_RESOURCE_NAME,
+      name: input.resourceName,
       pages_build_output_dir: input.outputDir,
     }),
     installCommand: input.installCommand,
@@ -252,6 +273,7 @@ function workerPlan(input: {
   installCommand: string | null;
   mosooConfigPath: ".mosoo.toml" | null;
   packageManager: AppDeploymentPackageManager;
+  resourceName: string;
   rootDir: string;
   workerEntry: string;
 }): AppDeploymentPlan {
@@ -260,7 +282,7 @@ function workerPlan(input: {
     generatedWranglerConfig: stringify({
       compatibility_date: COMPATIBILITY_DATE,
       main: input.workerEntry,
-      name: GENERATED_RESOURCE_NAME,
+      name: input.resourceName,
     }),
     installCommand: input.installCommand,
     mosooConfigPath: input.mosooConfigPath,
@@ -677,6 +699,19 @@ function normalizeOptionalRelativePath(path: string | null, field: string): stri
   }
 
   return normalizeRelativePath(path, field);
+}
+
+function normalizeResourceName(value: string): string {
+  const name = value.trim();
+
+  if (name.length === 0) {
+    throw new AppDeploymentDetectionError(
+      "deployment_config_required",
+      "deployment resource name is required",
+    );
+  }
+
+  return name;
 }
 
 function normalizeRelativePath(path: string, field: string): string {

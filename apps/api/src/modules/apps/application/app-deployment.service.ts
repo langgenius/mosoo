@@ -27,20 +27,23 @@ type AppDeploymentBindings = Pick<
   "API_COMMAND_QUEUE" | "DB" | "MOSOO_APP_DEPLOYMENT_DOMAIN"
 >;
 
+export type AppDeploymentReadBindings = Pick<
+  AppDeploymentBindings,
+  "DB" | "MOSOO_APP_DEPLOYMENT_DOMAIN"
+>;
+
 interface AppDeploymentServiceOptions {
   fetch?: typeof fetch;
   nowMs?: () => number;
 }
 
 type JsonRecord = Record<string, unknown>;
+const DISPATCH_MISSING_RECOVERY_DELAY_MS = 5 * 60 * 1000;
 
-export async function getAppDeployment(
-  bindings: Pick<AppDeploymentBindings, "DB" | "MOSOO_APP_DEPLOYMENT_DOMAIN">,
-  viewer: AuthenticatedViewer,
+export async function readAppDeploymentForOwnedApp(
+  bindings: AppDeploymentReadBindings,
   appId: AppId,
 ): Promise<AppDeployment | null> {
-  await ensureAppOwnership(bindings.DB, viewer.id, appId);
-
   const deployment = await readActiveDeployment(bindings.DB, appId);
 
   if (deployment === null) {
@@ -52,8 +55,17 @@ export async function getAppDeployment(
   return toAppDeployment(deployment, latestRun, bindings.MOSOO_APP_DEPLOYMENT_DOMAIN);
 }
 
+export async function getAppDeployment(
+  bindings: AppDeploymentReadBindings,
+  viewer: AuthenticatedViewer,
+  appId: AppId,
+): Promise<AppDeployment | null> {
+  await ensureAppOwnership(bindings.DB, viewer.id, appId);
+  return readAppDeploymentForOwnedApp(bindings, appId);
+}
+
 export async function getAppDeploymentStatus(
-  bindings: Pick<AppDeploymentBindings, "DB" | "MOSOO_APP_DEPLOYMENT_DOMAIN">,
+  bindings: AppDeploymentReadBindings,
   viewer: AuthenticatedViewer,
   appId: AppId,
 ): Promise<AppDeploymentRun | null> {
@@ -328,10 +340,14 @@ async function readLatestDeploymentRun(
 async function readActiveDeploymentRun(
   database: D1Database,
   appId: AppId,
-): Promise<Pick<AppDeploymentRunRow, "id" | "status"> | null> {
+): Promise<Pick<AppDeploymentRunRow, "id" | "status" | "updatedAt"> | null> {
   const run =
     (await getAppDatabase(database)
-      .select({ id: appDeploymentRunsTable.id, status: appDeploymentRunsTable.status })
+      .select({
+        id: appDeploymentRunsTable.id,
+        status: appDeploymentRunsTable.status,
+        updatedAt: appDeploymentRunsTable.updatedAt,
+      })
       .from(appDeploymentRunsTable)
       .where(
         and(
@@ -363,12 +379,18 @@ async function readActiveDeploymentRun(
     return run;
   }
 
+  const nowMs = currentTimestampMs();
+
+  if (nowMs - run.updatedAt < DISPATCH_MISSING_RECOVERY_DELAY_MS) {
+    return run;
+  }
+
   await markDeploymentRunFailed(
     database,
     run.id,
     "deployment_dispatch_missing",
     new Error("Deployment dispatch command is missing."),
-    currentTimestampMs(),
+    nowMs,
   );
 
   return null;

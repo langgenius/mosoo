@@ -12,6 +12,7 @@ import {
 } from "../src/modules/apps/application/app-deployment.service";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
+import { currentTimestampMs } from "../src/time";
 import {
   createApiCommandQueueStub,
   createRecordedQueueMessage,
@@ -236,6 +237,10 @@ describe("app deployment service", () => {
     );
 
     await database.prepare("DELETE FROM api_command").run();
+    await database
+      .prepare("UPDATE app_deployment_run SET updated_at = ? WHERE id = ?")
+      .bind(1, firstRun.id)
+      .run();
 
     const secondRun = await deployApp(
       bindings,
@@ -258,6 +263,46 @@ describe("app deployment service", () => {
     expect(firstRunRow).toMatchObject({
       errorCode: "deployment_dispatch_missing",
       status: "failed",
+    });
+  });
+
+  test("keeps a fresh active deployment run without a dispatch command active", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+
+    const firstRun = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: currentTimestampMs },
+    );
+
+    await database.prepare("DELETE FROM api_command").run();
+    await database
+      .prepare("UPDATE app_deployment_run SET updated_at = ? WHERE id = ?")
+      .bind(currentTimestampMs(), firstRun.id)
+      .run();
+
+    await expect(
+      deployApp(
+        bindings,
+        VIEWER,
+        { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+        { fetch: githubFetch, nowMs: currentTimestampMs },
+      ),
+    ).rejects.toThrow("An App deployment run is already active.");
+
+    const firstRunRow = await database
+      .app()
+      .select()
+      .from(appDeploymentRunsTable)
+      .where(eq(appDeploymentRunsTable.id, firstRun.id))
+      .limit(1)
+      .get();
+
+    expect(firstRunRow).toMatchObject({
+      errorCode: null,
+      status: "queued",
     });
   });
 
