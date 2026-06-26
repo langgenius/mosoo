@@ -6,6 +6,7 @@ import { platformIdColumn } from "./id-column";
 export type ApiCommandId = SemanticPlatformId<"ApiCommandId">;
 
 export type ApiCommandKind =
+  | "app_deployment_run_dispatch"
   | "channel_work_trigger"
   | "scheduled_maintenance"
   | "session_run_dispatch";

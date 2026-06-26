@@ -1,8 +1,14 @@
+import { apiCommandsTable, appDeploymentRunsTable } from "@mosoo/db";
 import type { ApiCommandId } from "@mosoo/db";
+import type { AppDeploymentRunId } from "@mosoo/id";
+import { parsePlatformId } from "@mosoo/id";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { createErrorLogContext, logError, logInfo } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
+import { ACTIVE_APP_DEPLOYMENT_RUN_STATUSES } from "../../apps/domain/app-deployment-lifecycle";
 import { cleanupOrphanChannelBindingCredentialSecrets } from "../../channels/application/agent-channel-binding-maintenance.service";
 import { resolveAgentChannelBindingContextById } from "../../channels/application/channel-binding-context";
 import { createChannelFinalDeliveryScheduler } from "../../channels/application/channel-final-delivery.service";
@@ -32,10 +38,12 @@ import {
   markApiCommandFailed,
   releaseApiCommandForRetry,
 } from "./api-command-ledger";
+import { APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX } from "./api-command-enqueue";
 import { parseApiCommandMessage } from "./api-command-message";
 import type { ApiCommandMessage } from "./api-command-message";
 import { ApiCommandPayloadError, parseApiCommandPayload } from "./api-command-payload";
 import type {
+  AppDeploymentRunDispatchCommandPayload,
   ChannelWorkTriggerCommandPayload,
   ScheduledMaintenanceCommandPayload,
   SessionRunDispatchCommandPayload,
@@ -323,6 +331,98 @@ async function processSessionRunDispatchCommand(
   });
 }
 
+async function failActiveAppDeploymentRun(
+  bindings: ApiBindings,
+  runId: AppDeploymentRunId,
+  input: { errorCode: string; errorMessage: string; nowMs: number },
+): Promise<void> {
+  await getAppDatabase(bindings.DB)
+    .update(appDeploymentRunsTable)
+    .set({
+      errorCode: input.errorCode,
+      errorMessage: input.errorMessage,
+      status: "failed",
+      updatedAt: input.nowMs,
+    })
+    .where(
+      and(
+        eq(appDeploymentRunsTable.id, runId),
+        inArray(appDeploymentRunsTable.status, ACTIVE_APP_DEPLOYMENT_RUN_STATUSES),
+      ),
+    )
+    .run();
+}
+
+async function processAppDeploymentRunDispatchCommand(
+  bindings: ApiBindings,
+  payload: AppDeploymentRunDispatchCommandPayload,
+): Promise<void> {
+  await failActiveAppDeploymentRun(bindings, payload.appDeploymentRunId, {
+    errorCode: "deployment_executor_not_implemented",
+    errorMessage: "App deployment executor is not implemented.",
+    nowMs: currentTimestampMs(),
+  });
+}
+
+async function failAppDeploymentRunFromPayloadJson(
+  bindings: ApiBindings,
+  input: {
+    errorCode: string;
+    errorMessage: string;
+    fallbackDedupeKey?: string;
+    nowMs: number;
+    payloadJson: string;
+  },
+): Promise<void> {
+  const runId = readAppDeploymentRunIdFromPayload(input);
+
+  if (runId === null) {
+    return;
+  }
+
+  await failActiveAppDeploymentRun(bindings, runId, input);
+}
+
+function readAppDeploymentRunIdFromPayload(input: {
+  fallbackDedupeKey?: string;
+  payloadJson: string;
+}): AppDeploymentRunId | null {
+  try {
+    return (
+      parseApiCommandPayload(
+        "app_deployment_run_dispatch",
+        input.payloadJson,
+      ) as AppDeploymentRunDispatchCommandPayload
+    ).appDeploymentRunId;
+  } catch (error) {
+    logError("api-command.app_deployment_run_payload_invalid", {
+      ...createErrorLogContext(error),
+      errorCode: getErrorCode(error),
+    });
+  }
+
+  if (input.fallbackDedupeKey === undefined) {
+    return null;
+  }
+
+  if (!input.fallbackDedupeKey.startsWith(APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX)) {
+    return null;
+  }
+
+  try {
+    return parsePlatformId<AppDeploymentRunId>(
+      input.fallbackDedupeKey.slice(APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX.length),
+      "app deployment run dispatch dedupe key",
+    );
+  } catch (error) {
+    logError("api-command.app_deployment_run_dedupe_invalid", {
+      ...createErrorLogContext(error),
+      errorCode: getErrorCode(error),
+    });
+    return null;
+  }
+}
+
 async function processClaimedApiCommand(
   bindings: ApiBindings,
   claim: NonNullable<Awaited<ReturnType<typeof claimApiCommand>>>,
@@ -330,6 +430,13 @@ async function processClaimedApiCommand(
   const payload = parseApiCommandPayload(claim.kind, claim.payloadJson);
 
   switch (claim.kind) {
+    case "app_deployment_run_dispatch": {
+      await processAppDeploymentRunDispatchCommand(
+        bindings,
+        payload as AppDeploymentRunDispatchCommandPayload,
+      );
+      return;
+    }
     case "channel_work_trigger": {
       await processChannelWorkTriggerCommand(bindings, payload as ChannelWorkTriggerCommandPayload);
       return;
@@ -402,6 +509,17 @@ export async function processApiCommandMessage(
     });
 
     if (error instanceof ApiCommandPayloadError) {
+      if (claim.kind === "app_deployment_run_dispatch") {
+        const failedAtMs = nowMs();
+        await failAppDeploymentRunFromPayloadJson(bindings, {
+          errorCode,
+          errorMessage,
+          fallbackDedupeKey: claim.dedupeKey,
+          nowMs: failedAtMs,
+          payloadJson: claim.payloadJson,
+        });
+      }
+
       await markApiCommandFailed({
         commandId,
         database: bindings.DB,
@@ -433,12 +551,35 @@ export async function processApiCommandDeadLetterMessage(
 ): Promise<void> {
   try {
     const { commandId } = parseApiCommandMessage(message.body);
+    const deadLetteredAtMs = nowMs();
+    const command =
+      (await getAppDatabase(bindings.DB)
+        .select({
+          dedupeKey: apiCommandsTable.dedupeKey,
+          kind: apiCommandsTable.kind,
+          payloadJson: apiCommandsTable.payloadJson,
+        })
+        .from(apiCommandsTable)
+        .where(eq(apiCommandsTable.id, commandId))
+        .limit(1)
+        .get()) ?? null;
+
+    if (command?.kind === "app_deployment_run_dispatch") {
+      await failAppDeploymentRunFromPayloadJson(bindings, {
+        errorCode: "queue_dead_lettered",
+        errorMessage: "Deployment dispatch reached the queue dead-letter consumer.",
+        fallbackDedupeKey: command.dedupeKey,
+        nowMs: deadLetteredAtMs,
+        payloadJson: command.payloadJson,
+      });
+    }
+
     await markApiCommandDeadLettered({
       commandId,
       database: bindings.DB,
       errorCode: "queue_dead_lettered",
       errorMessage: "API command reached the queue dead-letter consumer.",
-      nowMs: nowMs(),
+      nowMs: deadLetteredAtMs,
     });
   } catch (error) {
     logError("api-command.dead_letter_invalid", {

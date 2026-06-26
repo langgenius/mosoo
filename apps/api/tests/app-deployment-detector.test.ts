@@ -43,6 +43,7 @@ describe("app deployment detector", () => {
   test("requires a build script for Vite static output", () => {
     expect(() =>
       detect({
+        "index.html": "<main></main>",
         "package.json": JSON.stringify({
           devDependencies: { vite: "^7.0.0" },
         }),

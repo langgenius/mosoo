@@ -156,18 +156,6 @@ function detectFromRepository(files: RepositoryFiles, rootDir: string): AppDeplo
     );
   }
 
-  if (files.has(pathInRoot(rootDir, "index.html")) && packageJson.scripts["build"] === undefined) {
-    return pagesPlan({
-      buildCommand: null,
-      installCommand: null,
-      mosooConfigPath: null,
-      outputDir: ".",
-      packageManager: "none",
-      routesFallback: null,
-      rootDir,
-    });
-  }
-
   if (hasDependency(packageJson, "vite")) {
     return packagePagesPlan(files, rootDir, packageJson, packageManager, "dist");
   }
@@ -189,6 +177,18 @@ function detectFromRepository(files: RepositoryFiles, rootDir: string): AppDeplo
       "deployment_config_required",
       "Next.js deployment requires explicit static export",
     );
+  }
+
+  if (files.has(pathInRoot(rootDir, "index.html")) && packageJson.scripts["build"] === undefined) {
+    return pagesPlan({
+      buildCommand: null,
+      installCommand: null,
+      mosooConfigPath: null,
+      outputDir: ".",
+      packageManager: "none",
+      routesFallback: null,
+      rootDir,
+    });
   }
 
   throw new AppDeploymentDetectionError(
