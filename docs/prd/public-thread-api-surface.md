@@ -141,11 +141,13 @@ The current route family is:
 | List Thread events          | `GET /api/v1/threads/{threadId}/events`         | Read public event projections.               |
 | Stream Thread events        | `GET /api/v1/threads/{threadId}/events/stream`  | Stream public event projections.             |
 | Post Thread events          | `POST /api/v1/threads/{threadId}/events`        | Continue, interrupt, or answer permissions.  |
-| Archive / unarchive Thread  | `POST /api/v1/threads/{threadId}/archive`       | Hide or restore a Thread for the caller.     |
+| Archive Thread              | `POST /api/v1/threads/{threadId}/archive`       | Hide a Thread for the caller.                |
+| Unarchive Thread            | `POST /api/v1/threads/{threadId}/unarchive`     | Restore an archived Thread for the caller.   |
 | Delete Thread               | `DELETE /api/v1/threads/{threadId}`             | Delete the Thread through the public API.    |
 | List Thread files           | `GET /api/v1/threads/{threadId}/files`          | List files attached to the Thread.           |
 | Create Thread file upload   | `POST /api/v1/threads/{threadId}/files/uploads` | Open a Thread-scoped upload for raw bytes.   |
 | Upload Thread file bytes    | `PUT /api/v1/files/{fileId}/content`            | Send the file bytes for a pending upload.    |
+| Download Thread file bytes  | `GET /api/v1/files/{fileId}/content`            | Read the bytes of a ready Thread file.       |
 | Complete Thread file upload | `POST /api/v1/files/{fileId}/complete`          | Finalize a pending upload into a ready file. |
 | Attach Thread file          | `POST /api/v1/threads/{threadId}/files`         | Claim a ready file handle into the Thread.   |
 | Delete Thread file          | `DELETE /api/v1/threads/{threadId}/files/{id}`  | Remove a file from the Thread.               |

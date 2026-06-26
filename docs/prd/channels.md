@@ -9,9 +9,10 @@
 > no App-level channel bot, and no App-level public endpoint.
 >
 > **Current UI status**: the App-level Channels surface is not exposed in the
-> main Web console yet. The current visible distribution panel shows Channels as
-> `Coming soon`; provider setup widgets exist behind gated Agent screens and are
-> implementation slices, not the committed V1 IA.
+> main Web console yet. The gated Agent channels settings dialog renders
+> unsupported Channel providers as `Coming soon`; provider setup widgets exist
+> behind gated Agent screens and are implementation slices, not the committed
+> V1 IA.
 
 ---
 
@@ -178,7 +179,7 @@ Current shipping state:
 - No top-level `/channels` route is exposed in the Web console.
 - Main navigation does not show Channels.
 - App Settings does not show Channels.
-- The visible distribution panel treats Channels as `Coming soon`.
+- The gated Agent channels settings dialog treats unsupported Channel providers as `Coming soon`.
 - Provider setup components exist, but their current gated Agent-screen location
   is implementation scaffolding until the App-level Channel surface ships.
 
