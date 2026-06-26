@@ -92,7 +92,7 @@ the repository passes the cheap checks. The default path is automatic detection;
 GitHub facts:
 
 - `owner`, `repo`, visibility, default branch, clone URL.
-- selected branch and commit SHA.
+- default branch commit SHA.
 - language byte map.
 - root files from Contents API.
 - recursive tree listing when small enough.
@@ -221,8 +221,8 @@ Mosoo config schema first. Do not pass through arbitrary Wrangler config.
 
 The control plane does not run arbitrary repository code inline.
 
-1. `setDeploymentSource` stores the GitHub source URL, owner, repo, branch, and
-   normalized source kind.
+1. `setDeploymentSource` stores the GitHub source URL, owner, repo, default
+   branch, and normalized source kind.
 2. `analyzeDeployment` creates or refreshes a `DeploymentPlan`.
 3. `startDeployment` creates a `DeploymentRun` and enqueues it.
 4. The worker clones the exact commit in an isolated build sandbox.
@@ -293,7 +293,6 @@ dynamic-site need with fewer product branches.
 - `repo_owner`
 - `repo_name`
 - `default_branch`
-- `selected_branch`
 - `mosoo_subdomain`
 - `latest_run_id`
 - `last_successful_url`
@@ -333,9 +332,9 @@ camelCase names, and mutation inputs with explicit `appId`.
 
 First-cut fields:
 
-- `appDeployment(appId: ULID!): AppDeployment!`
+- `appDeployment(appId: ULID!): AppDeployment`
 - `deployApp(input: DeployAppInput!): AppDeploymentRun!`
-- `appDeploymentStatus(appId: ULID!): AppDeploymentRun!`
+- `appDeploymentStatus(appId: ULID!): AppDeploymentRun`
 - `deleteAppDeployment(input: DeleteAppDeploymentInput!): OperationResult!`
 
 First-cut input:
@@ -355,6 +354,10 @@ input DeleteAppDeploymentInput {
 `appId` is required. Do not infer the App from the current account or repository.
 First-cut status always targets the latest DeploymentRun for the App. `configPath`
 is optional and must be absent or `.mosoo.toml` in the first cut.
+`appDeployment` returns null when the App has no configured Deployment.
+`appDeploymentStatus` returns null when the App has no DeploymentRun.
+Deployment always uses the GitHub repository's current default branch; explicit
+branch selection is not part of the first cut.
 
 CLI is out of scope for this API PRD. A future CLI wrapper should call these
 GraphQL fields and must not accept Cloudflare credential flags.
@@ -435,7 +438,7 @@ Build this first:
 - Public GitHub repository source only.
 - Automatic app type and command detection by default.
 - Optional root `.mosoo.toml` override.
-- Explicit branch, defaulting to GitHub default branch.
+- GitHub default branch only.
 - Static Pages deploy for known static output.
 - Worker deploy for detected or configured Worker projects.
 - Cloudflare TypeScript SDK adapter for Pages and Workers deploy/delete.
@@ -448,6 +451,7 @@ Skip for now:
 - CLI implementation.
 - Deployment logs API and CLI.
 - Private GitHub repositories.
+- Explicit branch selection.
 - GitHub webhooks and automatic redeploy.
 - Custom domains.
 - Preview branches.
