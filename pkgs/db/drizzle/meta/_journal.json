@@ -8,20 +8,6 @@
       "when": 1780272000000,
       "tag": "0000_baseline",
       "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1782054657000,
-      "tag": "0001_clear_legacy_account_library_files",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1782223510000,
-      "tag": "0002_drop_agent_builder_tables",
-      "breakpoints": true
     }
   ]
 }
