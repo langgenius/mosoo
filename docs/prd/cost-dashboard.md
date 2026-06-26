@@ -94,9 +94,10 @@ and purpose level.
 
 ### App Usage surface
 
-The current Web console routes App usage through `/cost`; `/usage` and the old
-settings cost path redirect there. The page belongs to the active App context and
-has a unified header:
+The current Web console routes App usage through `/settings/usage` (rendered
+inside the Settings shell as the **App usage** tab); `/cost`, `/usage`, and the
+legacy `/settings/cost` path all redirect there. The page belongs to the active
+App context and has a unified header:
 
 - Period switcher: `7d`, `30d`, `MTD`, `90d`.
 - KPI strip: spend, requests, tokens, cache usage, unpriced usage.
