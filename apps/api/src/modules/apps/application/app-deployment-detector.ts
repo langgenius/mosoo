@@ -20,6 +20,7 @@ export interface AppDeploymentPlan {
   targetKind: AppDeploymentTargetKind;
   targetMode: AppDeploymentTargetMode;
   warnings: string[];
+  workerEntry: string | null;
 }
 
 export interface AppDeploymentRepositorySnapshot {
@@ -54,7 +55,8 @@ interface RepositoryFiles {
   read(path: string): string | null;
 }
 
-const COMPATIBILITY_DATE = "2026-06-26";
+export const APP_DEPLOYMENT_COMPATIBILITY_DATE = "2026-06-26";
+const WORKER_JS_ENTRY_PATTERN = /\.(?:mjs|js)$/u;
 
 export class AppDeploymentDetectionError extends Error {
   readonly code: AppDeploymentDetectionErrorCode;
@@ -252,7 +254,7 @@ function pagesPlan(input: {
   return {
     buildCommand: input.buildCommand,
     generatedWranglerConfig: stringify({
-      compatibility_date: COMPATIBILITY_DATE,
+      compatibility_date: APP_DEPLOYMENT_COMPATIBILITY_DATE,
       name: input.resourceName,
       pages_build_output_dir: input.outputDir,
     }),
@@ -265,6 +267,7 @@ function pagesPlan(input: {
     targetKind: "cloudflare_pages",
     targetMode: "static_assets",
     warnings: [],
+    workerEntry: null,
   };
 }
 
@@ -277,10 +280,17 @@ function workerPlan(input: {
   rootDir: string;
   workerEntry: string;
 }): AppDeploymentPlan {
+  if (!WORKER_JS_ENTRY_PATTERN.test(input.workerEntry)) {
+    throw new AppDeploymentDetectionError(
+      "deployment_config_required",
+      "worker.entry must point to a JavaScript module file",
+    );
+  }
+
   return {
     buildCommand: input.buildCommand,
     generatedWranglerConfig: stringify({
-      compatibility_date: COMPATIBILITY_DATE,
+      compatibility_date: APP_DEPLOYMENT_COMPATIBILITY_DATE,
       main: input.workerEntry,
       name: input.resourceName,
     }),
@@ -293,6 +303,7 @@ function workerPlan(input: {
     targetKind: "cloudflare_worker",
     targetMode: "worker_module",
     warnings: [],
+    workerEntry: input.workerEntry,
   };
 }
 

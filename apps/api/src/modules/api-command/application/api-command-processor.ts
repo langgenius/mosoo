@@ -8,6 +8,7 @@ import { createErrorLogContext, logError, logInfo } from "../../../platform/clou
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
+import { dispatchAppDeploymentRun } from "../../apps/application/app-deployment-executor.service";
 import { ACTIVE_APP_DEPLOYMENT_RUN_STATUSES } from "../../apps/domain/app-deployment-lifecycle";
 import { cleanupOrphanChannelBindingCredentialSecrets } from "../../channels/application/agent-channel-binding-maintenance.service";
 import { resolveAgentChannelBindingContextById } from "../../channels/application/channel-binding-context";
@@ -31,6 +32,7 @@ import { processTelegramWorkTrigger } from "../../channels/telegram/telegram-fir
 import { runUsageDailyRollup } from "../../cost/application/cost-rollup.service";
 import { runSandboxMaintenance } from "../../runtime/application/runtime-maintenance.service";
 import { dispatchQueuedSessionRun } from "../../runtime/application/session-runs/dispatch-queued-run.service";
+import { APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX } from "./api-command-enqueue";
 import {
   claimApiCommand,
   completeApiCommand,
@@ -38,7 +40,6 @@ import {
   markApiCommandFailed,
   releaseApiCommandForRetry,
 } from "./api-command-ledger";
-import { APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX } from "./api-command-enqueue";
 import { parseApiCommandMessage } from "./api-command-message";
 import type { ApiCommandMessage } from "./api-command-message";
 import { ApiCommandPayloadError, parseApiCommandPayload } from "./api-command-payload";
@@ -357,11 +358,7 @@ async function processAppDeploymentRunDispatchCommand(
   bindings: ApiBindings,
   payload: AppDeploymentRunDispatchCommandPayload,
 ): Promise<void> {
-  await failActiveAppDeploymentRun(bindings, payload.appDeploymentRunId, {
-    errorCode: "deployment_executor_not_implemented",
-    errorMessage: "App deployment executor is not implemented.",
-    nowMs: currentTimestampMs(),
-  });
+  await dispatchAppDeploymentRun(bindings, payload);
 }
 
 async function failAppDeploymentRunFromPayloadJson(
@@ -529,7 +526,14 @@ export async function processApiCommandMessage(
       kind: claim.kind,
     });
 
-    if (claim.kind === "app_deployment_run_dispatch") {
+    const shouldFailAppDeploymentRun =
+      claim.kind === "app_deployment_run_dispatch" &&
+      (error instanceof ApiCommandPayloadError ||
+        (error instanceof Error &&
+          (error.name === "AppDeploymentDetectionError" ||
+            error.name === "AppDeploymentNonRetryableError")));
+
+    if (shouldFailAppDeploymentRun) {
       const failedAtMs = nowMs();
       await tryFailAppDeploymentRunFromPayloadJson(
         bindings,

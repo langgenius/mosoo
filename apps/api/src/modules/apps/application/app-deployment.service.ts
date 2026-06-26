@@ -20,12 +20,26 @@ import {
 } from "../../api-command/application/api-command-enqueue";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ACTIVE_APP_DEPLOYMENT_RUN_STATUSES } from "../domain/app-deployment-lifecycle";
+import {
+  createCloudflareDeploymentClient,
+  deleteCloudflareDeploymentResources,
+  logCloudflareDeploymentResourceDeleteFailures,
+  type CloudflareClientBindings,
+  type CloudflareDeploymentClient,
+} from "./app-deployment-cloudflare-client";
+import { destroyAppDeploymentRunSandboxesBestEffort } from "./app-deployment-executor.service";
 import { ensureAppOwnership } from "./app.service";
 
 type AppDeploymentBindings = Pick<
   ApiBindings,
   "API_COMMAND_QUEUE" | "DB" | "MOSOO_APP_DEPLOYMENT_DOMAIN"
 >;
+type AppDeploymentDeleteBindings = Pick<
+  AppDeploymentBindings,
+  "DB" | "MOSOO_APP_DEPLOYMENT_DOMAIN"
+> &
+  CloudflareClientBindings &
+  Partial<Pick<ApiBindings, "Sandbox" | "runtimeSubjectHandleFactory">>;
 
 export type AppDeploymentReadBindings = Pick<
   AppDeploymentBindings,
@@ -33,6 +47,7 @@ export type AppDeploymentReadBindings = Pick<
 >;
 
 interface AppDeploymentServiceOptions {
+  cloudflareClient?: CloudflareDeploymentClient;
   fetch?: typeof fetch;
   nowMs?: () => number;
 }
@@ -50,6 +65,7 @@ export async function readAppDeploymentForOwnedApp(
     return null;
   }
 
+  await readActiveDeploymentRun(bindings.DB, appId);
   const latestRun = await readLatestDeploymentRun(bindings.DB, appId);
 
   return toAppDeployment(deployment, latestRun, bindings.MOSOO_APP_DEPLOYMENT_DOMAIN);
@@ -70,6 +86,7 @@ export async function getAppDeploymentStatus(
   appId: AppId,
 ): Promise<AppDeploymentRun | null> {
   await ensureAppOwnership(bindings.DB, viewer.id, appId);
+  await readActiveDeploymentRun(bindings.DB, appId);
 
   const run = await readLatestDeploymentRun(bindings.DB, appId);
 
@@ -246,9 +263,10 @@ export async function deployApp(
 }
 
 export async function deleteAppDeployment(
-  bindings: Pick<AppDeploymentBindings, "DB">,
+  bindings: AppDeploymentDeleteBindings,
   viewer: AuthenticatedViewer,
   input: DeleteAppDeploymentInput,
+  options: AppDeploymentServiceOptions = {},
 ): Promise<{ ok: true }> {
   await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
 
@@ -258,6 +276,7 @@ export async function deleteAppDeployment(
     return { ok: true };
   }
 
+  const activeRunIds = await readActiveDeploymentRunIds(bindings.DB, input.appId);
   const nowMs = currentTimestampMs();
 
   await getAppDatabase(bindings.DB)
@@ -286,7 +305,42 @@ export async function deleteAppDeployment(
     )
     .run();
 
+  await destroyActiveDeploymentRunSandboxes(bindings, activeRunIds);
+
+  logCloudflareDeploymentResourceDeleteFailures(
+    "app-deployment.cloudflare_delete_failed",
+    await deleteCloudflareDeploymentResources(
+      options.cloudflareClient ?? createCloudflareDeploymentClient(bindings),
+      {
+        hostname: createPlannedHost(
+          deployment.mosooSubdomain,
+          bindings.MOSOO_APP_DEPLOYMENT_DOMAIN,
+        ),
+        resourceName: deployment.mosooSubdomain,
+      },
+    ),
+  );
+
   return { ok: true };
+}
+
+async function destroyActiveDeploymentRunSandboxes(
+  bindings: AppDeploymentDeleteBindings,
+  runIds: readonly AppDeploymentRunId[],
+): Promise<void> {
+  if (!hasRuntimeSubjectDestroyBinding(bindings)) {
+    return;
+  }
+
+  await Promise.all(
+    runIds.map((runId) =>
+      destroyAppDeploymentRunSandboxesBestEffort(bindings as ApiBindings, runId),
+    ),
+  );
+}
+
+function hasRuntimeSubjectDestroyBinding(bindings: AppDeploymentDeleteBindings): boolean {
+  return bindings.runtimeSubjectHandleFactory !== undefined || bindings.Sandbox !== undefined;
 }
 
 async function readActiveDeployment(
@@ -301,6 +355,24 @@ async function readActiveDeployment(
       .limit(1)
       .get()) ?? null
   );
+}
+
+async function readActiveDeploymentRunIds(
+  database: D1Database,
+  appId: AppId,
+): Promise<AppDeploymentRunId[]> {
+  const rows = await getAppDatabase(database)
+    .select({ id: appDeploymentRunsTable.id })
+    .from(appDeploymentRunsTable)
+    .where(
+      and(
+        eq(appDeploymentRunsTable.appId, appId),
+        inArray(appDeploymentRunsTable.status, ACTIVE_APP_DEPLOYMENT_RUN_STATUSES),
+      ),
+    )
+    .all();
+
+  return rows.map((row) => row.id);
 }
 
 async function readDeploymentById(
@@ -411,7 +483,12 @@ async function markDeploymentRunFailed(
       status: "failed",
       updatedAt: nowMs,
     })
-    .where(eq(appDeploymentRunsTable.id, runId))
+    .where(
+      and(
+        eq(appDeploymentRunsTable.id, runId),
+        inArray(appDeploymentRunsTable.status, ACTIVE_APP_DEPLOYMENT_RUN_STATUSES),
+      ),
+    )
     .run();
 }
 
@@ -447,7 +524,7 @@ function toAppDeploymentRun(
     errorCode: row.errorCode,
     errorMessage: row.errorMessage,
     id: row.id,
-    liveUrl: row.status === "success" ? row.url : null,
+    liveUrl: row.status === "success" && deployment.deletedAt === null ? row.url : null,
     plannedUrl: createPlannedUrl(deployment.mosooSubdomain, domain),
     sourceBranch: row.sourceBranch,
     sourceCommitSha: row.sourceCommitSha,
@@ -462,7 +539,11 @@ function createMosooSubdomain(appId: AppId): string {
 }
 
 function createPlannedUrl(subdomain: string, domain: string): string {
-  return `https://${subdomain}.${domain}`;
+  return `https://${createPlannedHost(subdomain, domain)}`;
+}
+
+function createPlannedHost(subdomain: string, domain: string): string {
+  return `${subdomain}.${domain}`;
 }
 
 function normalizeConfigPath(value: string | null | undefined): ".mosoo.toml" | null {

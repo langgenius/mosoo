@@ -140,7 +140,7 @@ fallback = "index.html"
 type = "worker"
 
 [worker]
-entry = "src/index.ts"
+entry = "src/index.js"
 `,
       }),
     ).toMatchObject({
@@ -150,6 +150,19 @@ entry = "src/index.ts"
       targetKind: "cloudflare_worker",
       targetMode: "worker_module",
     });
+  });
+
+  test("rejects TypeScript worker entry in the first cut", () => {
+    expect(() =>
+      detect({
+        ".mosoo.toml": `
+type = "worker"
+
+[worker]
+entry = "src/index.ts"
+`,
+      }),
+    ).toThrow(AppDeploymentDetectionError);
   });
 
   test("rejects routes fallback for worker override", () => {
@@ -175,7 +188,7 @@ fallback = "index.html"
           dependencies: { hono: "^4.0.0" },
           scripts: { build: "tsc" },
         }),
-        "wrangler.jsonc": '{ "main": "src/index.ts" }',
+        "wrangler.jsonc": '{ "main": "src/index.js" }',
       }),
     ).toMatchObject({
       buildCommand: "npm run build",
@@ -190,7 +203,7 @@ fallback = "index.html"
     expect(
       detect({
         "package.json": JSON.stringify({ scripts: { build: "tsc" } }),
-        "wrangler.jsonc": '{ "main": "src/index.ts" }',
+        "wrangler.jsonc": '{ "main": "src/index.js" }',
         "wrangler.toml": "name = ",
       }),
     ).toMatchObject({
