@@ -5,6 +5,7 @@ import { useAppSession } from "@/app/session-provider";
 import { renameOrganization } from "@/domains/organization/api/organization-client";
 import { isTruthy } from "@/shared/lib/truthiness";
 import { Button } from "@/shared/ui/button";
+import { CommandBlock } from "@/shared/ui/command-block";
 
 // Org-layer General settings — the account/billing shell's identity.
 export function OrgSettingsPage() {
@@ -86,6 +87,18 @@ export function OrgSettingsPage() {
                     "Save changes"
                   )}
                 </Button>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-foreground text-sm font-medium">Org ID</div>
+                <p className="text-fg-2 text-[12px]">
+                  This is the identifier for the active organization.
+                </p>
+                <CommandBlock
+                  command={activeOrganization.id}
+                  copyLabel="Copy org ID"
+                  prompt={null}
+                />
               </div>
             </div>
           )}

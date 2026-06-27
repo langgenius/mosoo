@@ -22,10 +22,12 @@ async function writeClipboardText(value: string): Promise<boolean> {
 export function CommandBlock({
   className,
   command,
+  copyLabel = "Copy command",
   prompt = "$",
 }: {
   className?: string;
   command: string;
+  copyLabel?: string;
   prompt?: string | null;
 }): ReactElement {
   const [copied, setCopied] = useState(false);
@@ -56,7 +58,7 @@ export function CommandBlock({
       </code>
       <button
         type="button"
-        aria-label={copied ? "Copied" : "Copy command"}
+        aria-label={copied ? "Copied" : copyLabel}
         onClick={copy}
         className="text-fg-3 hover:bg-ink-900/[0.06] hover:text-fg-1 flex size-7 shrink-0 items-center justify-center rounded-md transition-colors"
       >
