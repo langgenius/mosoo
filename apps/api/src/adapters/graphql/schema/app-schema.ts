@@ -3,12 +3,58 @@ export const appSchema = /* GraphQL */ `
     configured
   }
 
+  enum AppDeploymentRunStatus {
+    activating
+    building
+    failed
+    preparing
+    queued
+    submitted
+    submitting
+    success
+  }
+
+  enum AppDeploymentTargetKind {
+    cloudflare_pages
+    cloudflare_worker
+  }
+
   type App {
     createdAt: String!
     defaultEnvironmentId: ULID
     id: ULID!
     name: String!
     ownerAccountId: ULID!
+  }
+
+  type AppDeploymentRun {
+    appId: ULID!
+    createdAt: String!
+    deploymentId: ULID!
+    errorCode: String
+    errorMessage: String
+    id: ULID!
+    liveUrl: String
+    plannedUrl: String!
+    sourceBranch: String!
+    sourceCommitSha: String!
+    status: AppDeploymentRunStatus!
+    targetKind: AppDeploymentTargetKind
+    updatedAt: String!
+  }
+
+  type AppDeployment {
+    appId: ULID!
+    createdAt: String!
+    defaultBranch: String!
+    id: ULID!
+    latestRun: AppDeploymentRun
+    liveUrl: String
+    plannedUrl: String!
+    repoName: String!
+    repoOwner: String!
+    repoUrl: String!
+    updatedAt: String!
   }
 
   type AppOverviewAgent {
@@ -58,6 +104,7 @@ export const appSchema = /* GraphQL */ `
   type AppOverview {
     agents: AppOverviewAgentList!
     app: App!
+    deployment: AppDeployment
     providerCredentials: AppOverviewProviderCredentialList!
   }
 
@@ -75,6 +122,16 @@ export const appSchema = /* GraphQL */ `
   input CreateAppInput {
     name: String!
     organizationId: ULID!
+  }
+
+  input DeployAppInput {
+    appId: ULID!
+    configPath: String
+    repoUrl: String!
+  }
+
+  input DeleteAppDeploymentInput {
+    appId: ULID!
   }
 
   input RenameAppInput {

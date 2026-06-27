@@ -326,6 +326,46 @@ function createApiTestSchema(database: SqliteD1Database): void {
       updated_at integer NOT NULL
     );
 
+    CREATE TABLE app_deployment (
+      app_id text NOT NULL,
+      created_at integer NOT NULL,
+      default_branch text NOT NULL,
+      deleted_at integer,
+      id text PRIMARY KEY NOT NULL,
+      last_successful_url text,
+      latest_run_id text,
+      mosoo_subdomain text NOT NULL,
+      owner_account_id text NOT NULL,
+      repo_name text NOT NULL,
+      repo_owner text NOT NULL,
+      repo_url text NOT NULL,
+      source_kind text NOT NULL,
+      updated_at integer NOT NULL
+    );
+
+    CREATE TABLE app_deployment_run (
+      app_id text NOT NULL,
+      created_at integer NOT NULL,
+      deployment_id text NOT NULL,
+      error_code text,
+      error_message text,
+      external_deployment_id text,
+      external_project_id text,
+      external_version_id text,
+      generated_wrangler_config_json text,
+      id text PRIMARY KEY NOT NULL,
+      mosoo_config_json text,
+      plan_json text,
+      source_branch text NOT NULL,
+      source_commit_sha text NOT NULL,
+      status text NOT NULL,
+      target_kind text,
+      target_project_name text,
+      target_script_name text,
+      updated_at integer NOT NULL,
+      url text
+    );
+
     CREATE TABLE agent (
       config_json text NOT NULL,
       created_at integer NOT NULL,

@@ -2,6 +2,7 @@ import type { ApiCommandKind } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type {
   AccountId,
+  AppDeploymentRunId,
   ChannelBindingId,
   FileId,
   AppId,
@@ -16,6 +17,7 @@ import type { SlackWorkTrigger } from "../../channels/slack/slack-events";
 import type { TelegramWorkTrigger } from "../../channels/telegram/telegram-events";
 
 type ApiCommandPayload =
+  | AppDeploymentRunDispatchCommandPayload
   | ChannelWorkTriggerCommandPayload
   | ScheduledMaintenanceCommandPayload
   | SessionRunDispatchCommandPayload;
@@ -52,6 +54,10 @@ export type ChannelWorkTriggerCommandPayload =
 
 export interface ScheduledMaintenanceCommandPayload {
   scheduledTime: number;
+}
+
+export interface AppDeploymentRunDispatchCommandPayload {
+  appDeploymentRunId: AppDeploymentRunId;
 }
 
 export interface SessionRunDispatchCommandPayload {
@@ -430,6 +436,19 @@ function parseScheduledMaintenancePayload(value: unknown): ScheduledMaintenanceC
   };
 }
 
+function parseAppDeploymentRunDispatchPayload(
+  value: unknown,
+): AppDeploymentRunDispatchCommandPayload {
+  const record = requireRecord(value, "app_deployment_run_dispatch payload");
+
+  return {
+    appDeploymentRunId: parsePlatformId<AppDeploymentRunId>(
+      record["appDeploymentRunId"],
+      "app_deployment_run_dispatch payload.appDeploymentRunId",
+    ),
+  };
+}
+
 function parsePayloadJson(payloadJson: string): unknown {
   try {
     return JSON.parse(payloadJson) as unknown;
@@ -445,6 +464,9 @@ export function parseApiCommandPayload(
   const parsed = parsePayloadJson(payloadJson);
 
   switch (kind) {
+    case "app_deployment_run_dispatch": {
+      return parseAppDeploymentRunDispatchPayload(parsed);
+    }
     case "channel_work_trigger": {
       return parseChannelWorkTriggerPayload(parsed);
     }

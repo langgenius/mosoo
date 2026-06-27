@@ -8,7 +8,9 @@ import { getAppDatabase, getD1ChangeCount } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import type { ApiCommandMessage } from "./api-command-message";
 
-const API_COMMAND_LEASE_MS = 5 * 60 * 1000;
+export const API_COMMAND_LEASE_MS = 5 * 60 * 1000;
+
+export const API_COMMAND_LEASE_RENEWAL_INTERVAL_MS = API_COMMAND_LEASE_MS / 5;
 
 export interface EnqueueApiCommandInput {
   dedupeKey: string;
@@ -19,6 +21,7 @@ export interface EnqueueApiCommandInput {
 export interface ApiCommandClaim {
   attemptCount: number;
   commandId: ApiCommandId;
+  dedupeKey: string;
   kind: ApiCommandKind;
   payloadJson: string;
 }
@@ -138,12 +141,38 @@ export async function claimApiCommand(input: {
       .returning({
         attemptCount: apiCommandsTable.attemptCount,
         commandId: apiCommandsTable.id,
+        dedupeKey: apiCommandsTable.dedupeKey,
         kind: apiCommandsTable.kind,
         payloadJson: apiCommandsTable.payloadJson,
       })
       .get()) ?? null;
 
   return row;
+}
+
+export async function renewApiCommandClaim(input: {
+  commandId: ApiCommandId;
+  database: D1Database;
+  nowMs?: number;
+  ownerId: string;
+}): Promise<boolean> {
+  const nowMs = input.nowMs ?? currentTimestampMs();
+  const result = await getAppDatabase(input.database)
+    .update(apiCommandsTable)
+    .set({
+      claimExpiresAt: nowMs + API_COMMAND_LEASE_MS,
+      updatedAt: nowMs,
+    })
+    .where(
+      and(
+        eq(apiCommandsTable.id, input.commandId),
+        eq(apiCommandsTable.status, "running"),
+        eq(apiCommandsTable.claimOwner, input.ownerId),
+      ),
+    )
+    .run();
+
+  return getD1ChangeCount(result) > 0;
 }
 
 export async function completeApiCommand(input: {

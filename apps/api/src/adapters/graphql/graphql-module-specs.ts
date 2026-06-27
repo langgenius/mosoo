@@ -113,9 +113,12 @@ export const onboardingGraphQLSpec = {
 export const appGraphQLSpec = {
   mutationFields: [
     "createApp(input: CreateAppInput!): App!",
+    "deleteAppDeployment(input: DeleteAppDeploymentInput!): OperationResult!",
+    "deployApp(input: DeployAppInput!): AppDeploymentRun!",
     "renameApp(input: RenameAppInput!): App!",
   ],
   queryFields: [
+    "appDeploymentStatus(appId: ULID!): AppDeploymentRun",
     "appList(organizationId: ULID!): [App!]!",
     "appOverview(appId: ULID!, agentLimit: Int, credentialLimit: Int): AppOverview!",
     "controlPlaneOverview(appLimit: Int, agentLimit: Int, credentialLimit: Int): ControlPlaneOverview!",

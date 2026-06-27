@@ -19,6 +19,8 @@ import {
   listAppVendorCredentialRowsPage,
 } from "../../vendor-credentials/application/vendor-credential.repository";
 import type { VendorCredentialRow } from "../../vendor-credentials/application/vendor-credential.types";
+import type { AppDeploymentReadBindings } from "./app-deployment.service";
+import { readAppDeploymentForOwnedApp } from "./app-deployment.service";
 import { ensureAppOwnership, listOrganizationAppsPage, toAppSummary } from "./app.service";
 
 const DEFAULT_OVERVIEW_LIMIT = 50;
@@ -67,7 +69,7 @@ function toOverviewProviderCredential(row: VendorCredentialRow): AppOverviewProv
 }
 
 export async function getAppOverview(
-  database: D1Database,
+  bindings: AppDeploymentReadBindings,
   viewer: AuthenticatedViewer,
   input: {
     agentLimit?: number | null;
@@ -77,16 +79,17 @@ export async function getAppOverview(
 ): Promise<AppOverview> {
   const agentLimit = normalizeOverviewLimit(input.agentLimit, "agentLimit");
   const credentialLimit = normalizeOverviewLimit(input.credentialLimit, "credentialLimit");
-  const app = await ensureAppOwnership(database, viewer.id, input.appId);
+  const app = await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
 
-  const [agentRows, credentialRows, credentialCounts] = await Promise.all([
-    listAppOwnerAgentRowsPage(database, {
+  const [agentRows, credentialRows, credentialCounts, deployment] = await Promise.all([
+    listAppOwnerAgentRowsPage(bindings.DB, {
       appId: input.appId,
       limit: agentLimit + 1,
       viewerId: viewer.id,
     }),
-    listAppVendorCredentialRowsPage(database, input.appId, credentialLimit + 1),
-    listAppVendorCredentialCountsByVendor(database, input.appId),
+    listAppVendorCredentialRowsPage(bindings.DB, input.appId, credentialLimit + 1),
+    listAppVendorCredentialCountsByVendor(bindings.DB, input.appId),
+    readAppDeploymentForOwnedApp(bindings, input.appId),
   ]);
 
   return {
@@ -96,6 +99,7 @@ export async function getAppOverview(
       limit: agentLimit,
     },
     app: toAppSummary(app),
+    deployment,
     providerCredentials: {
       byVendor: credentialCounts,
       configuredCount: credentialCounts.reduce((sum, row) => sum + row.count, 0),
@@ -107,7 +111,7 @@ export async function getAppOverview(
 }
 
 export async function getControlPlaneOverview(
-  database: D1Database,
+  bindings: AppDeploymentReadBindings,
   viewer: AuthenticatedViewer,
   input: {
     agentLimit?: number | null;
@@ -116,7 +120,7 @@ export async function getControlPlaneOverview(
   } = {},
 ): Promise<ControlPlaneOverview> {
   const appLimit = normalizeOverviewLimit(input.appLimit, "appLimit");
-  const activeOrganization = await resolveActiveOrganization(database, viewer.id);
+  const activeOrganization = await resolveActiveOrganization(bindings.DB, viewer.id);
 
   if (activeOrganization === null) {
     return {
@@ -129,7 +133,7 @@ export async function getControlPlaneOverview(
     };
   }
 
-  const apps = await listOrganizationAppsPage(database, viewer, {
+  const apps = await listOrganizationAppsPage(bindings.DB, viewer, {
     limit: appLimit + 1,
     organizationId: activeOrganization.id,
   });
@@ -140,7 +144,7 @@ export async function getControlPlaneOverview(
       hasMore: apps.length > appLimit,
       items: await Promise.all(
         apps.slice(0, appLimit).map((app) =>
-          getAppOverview(database, viewer, {
+          getAppOverview(bindings, viewer, {
             ...(input.agentLimit === undefined ? {} : { agentLimit: input.agentLimit }),
             appId: app.id,
             ...(input.credentialLimit === undefined
