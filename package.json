@@ -42,7 +42,7 @@
     "@graphql-codegen/schema-ast": "^6.0.1",
     "@j178/prek": "^0.4.3",
     "graphql": "^16.14.0",
-    "knip": "^6.15.0",
+    "knip": "^6.21.0",
     "react-doctor": "0.5.8",
     "tsx": "^4.22.4",
     "vite-plus": "^0.1.23"
