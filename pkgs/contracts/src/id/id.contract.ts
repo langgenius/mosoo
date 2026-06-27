@@ -6,6 +6,7 @@ export type {
   AppDeploymentId,
   AppDeploymentRunId,
   ChannelBindingId,
+  CliOAuthFlowId,
   CredentialId,
   DriverCommandId,
   DriverInstanceId,

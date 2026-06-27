@@ -15,6 +15,7 @@ export type AgentMcpBindingId = SemanticPlatformId<"AgentMcpBindingId">;
 export type AppDeploymentId = SemanticPlatformId<"AppDeploymentId">;
 export type AppDeploymentRunId = SemanticPlatformId<"AppDeploymentRunId">;
 export type ChannelBindingId = SemanticPlatformId<"ChannelBindingId">;
+export type CliOAuthFlowId = SemanticPlatformId<"CliOAuthFlowId">;
 export type CredentialId = SemanticPlatformId<"CredentialId">;
 export type DriverCommandId = SemanticPlatformId<"DriverCommandId">;
 export type DriverInstanceId = SemanticPlatformId<"DriverInstanceId">;

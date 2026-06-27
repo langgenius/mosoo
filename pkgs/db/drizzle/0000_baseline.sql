@@ -132,6 +132,24 @@ CREATE TABLE `auth_verification` (
 --> statement-breakpoint
 CREATE INDEX `auth_verification_expires_at_idx` ON `auth_verification` (`expires_at`);--> statement-breakpoint
 CREATE INDEX `auth_verification_identifier_idx` ON `auth_verification` (`identifier`);--> statement-breakpoint
+CREATE TABLE `cli_oauth_flow` (
+	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'),
+	`authorized_at` integer,
+	`completed_at` integer,
+	`created_at` integer NOT NULL,
+	`device_code_hash` text NOT NULL,
+	`expires_at` integer NOT NULL,
+	`hostname` text,
+	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
+	`provider` text NOT NULL,
+	`status` text NOT NULL,
+	`updated_at` integer NOT NULL,
+	`user_code` text NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX `cli_oauth_flow_status_expires_idx` ON `cli_oauth_flow` (`status`,`expires_at`);--> statement-breakpoint
+CREATE UNIQUE INDEX `cli_oauth_flow_device_code_hash_idx` ON `cli_oauth_flow` (`device_code_hash`);--> statement-breakpoint
+CREATE UNIQUE INDEX `cli_oauth_flow_user_code_idx` ON `cli_oauth_flow` (`user_code`);--> statement-breakpoint
 CREATE TABLE `personal_access_token` (
 	`account_id` text CHECK ("account_id" = upper("account_id") AND length("account_id") = 26 AND substr("account_id", 1, 1) GLOB '[0-7]' AND "account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
