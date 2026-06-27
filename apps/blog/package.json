@@ -10,7 +10,7 @@
     "lint": "vp lint ."
   },
   "dependencies": {
-    "@astrojs/mdx": "^6.0.3",
+    "@astrojs/mdx": "^7.0.0",
     "@astrojs/sitemap": "^3.7.3",
     "@mosoo/design-tokens": "workspace:*",
     "@tailwindcss/vite": "^4.3.1",
