@@ -1,7 +1,9 @@
-import type { AccountId, PersonalAccessTokenId } from "@mosoo/id";
+import type { AccountId, CliOAuthFlowId, PersonalAccessTokenId } from "@mosoo/id";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 import { platformIdColumn } from "./id-column";
+
+type CliOAuthFlowStatus = "pending" | "authorized" | "consumed" | "denied" | "expired";
 
 export const authSessionsTable = sqliteTable(
   "auth_session",
@@ -88,3 +90,28 @@ export const personalAccessTokensTable = sqliteTable(
 );
 
 export type PersonalAccessTokenRow = typeof personalAccessTokensTable.$inferSelect;
+
+export const cliOAuthFlowsTable = sqliteTable(
+  "cli_oauth_flow",
+  {
+    accountId: platformIdColumn<AccountId>("account_id"),
+    authorizedAt: integer("authorized_at", { mode: "timestamp_ms" }),
+    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    deviceCodeHash: text("device_code_hash").notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    hostname: text("hostname"),
+    id: platformIdColumn<CliOAuthFlowId>("id").primaryKey(),
+    provider: text("provider").notNull(),
+    status: text("status").$type<CliOAuthFlowStatus>().notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+    userCode: text("user_code").notNull(),
+  },
+  (table) => [
+    index("cli_oauth_flow_status_expires_idx").on(table.status, table.expiresAt),
+    uniqueIndex("cli_oauth_flow_device_code_hash_idx").on(table.deviceCodeHash),
+    uniqueIndex("cli_oauth_flow_user_code_idx").on(table.userCode),
+  ],
+);
+
+export type CliOAuthFlowRow = typeof cliOAuthFlowsTable.$inferSelect;

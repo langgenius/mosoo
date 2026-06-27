@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e046a0fc-f0ee-57bb-8925-4cb04c5215cc",
+  "id": "38a2c3cf-7781-52b6-82e8-53906d6b66ac",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_deployment_version": {
@@ -797,6 +797,116 @@
           "name": "auth_verification_identifier_idx",
           "columns": ["identifier"],
           "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "cli_oauth_flow": {
+      "name": "cli_oauth_flow",
+      "columns": {
+        "account_id": {
+          "name": "account_id",
+          "type": "text CHECK (\"account_id\" = upper(\"account_id\") AND length(\"account_id\") = 26 AND substr(\"account_id\", 1, 1) GLOB '[0-7]' AND \"account_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "authorized_at": {
+          "name": "authorized_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "device_code_hash": {
+          "name": "device_code_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "hostname": {
+          "name": "hostname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "id": {
+          "name": "id",
+          "type": "text CHECK (\"id\" = upper(\"id\") AND length(\"id\") = 26 AND substr(\"id\", 1, 1) GLOB '[0-7]' AND \"id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_code": {
+          "name": "user_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "cli_oauth_flow_status_expires_idx": {
+          "name": "cli_oauth_flow_status_expires_idx",
+          "columns": ["status", "expires_at"],
+          "isUnique": false
+        },
+        "cli_oauth_flow_device_code_hash_idx": {
+          "name": "cli_oauth_flow_device_code_hash_idx",
+          "columns": ["device_code_hash"],
+          "isUnique": true
+        },
+        "cli_oauth_flow_user_code_idx": {
+          "name": "cli_oauth_flow_user_code_idx",
+          "columns": ["user_code"],
+          "isUnique": true
         }
       },
       "foreignKeys": {},

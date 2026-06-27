@@ -55,6 +55,7 @@ const McpOAuthComplete = lazyNamed(
   async () => import("../routes/integrations/mcp/oauth-complete.route"),
   "McpOAuthCompletePage",
 );
+const CliAuth = lazyNamed(async () => import("../routes/cli-auth/cli-auth.route"), "CliAuthPage");
 const Providers = lazyNamed(
   async () => import("../routes/providers/providers.route"),
   "ProvidersPage",
@@ -110,6 +111,7 @@ const appRoutes = [
     path: "/onboarding",
   },
   { element: <McpOAuthComplete />, path: "/integrations/mcp/oauth-complete" },
+  { element: protectedRoute(<CliAuth />), path: "/cli-auth" },
   { element: protectedRoute(<AppOverview />), path: "/" },
   { element: orgProtectedRoute(<AppsList />), path: "/apps" },
   { element: orgProtectedRoute(<OrgSettings />), path: "/org/settings" },
