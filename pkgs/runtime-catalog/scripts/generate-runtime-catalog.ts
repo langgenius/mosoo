@@ -57,7 +57,14 @@ interface RawVendor {
   authHeader: unknown;
   defaultApiBase?: string;
   label: string;
+  openCodeProvider?: RawOpenCodeProvider;
   vendorId: string;
+}
+
+interface RawOpenCodeProvider {
+  apiBaseOption: string;
+  kind: string;
+  npmPackage: string;
 }
 
 interface RawModel {
@@ -228,6 +235,30 @@ function readAuthHeader(value: unknown, label: string): RawVendor["authHeader"] 
   fail(`${label}.scheme must be bearer or api-key.`);
 }
 
+function readOpenCodeProvider(value: unknown, label: string): RawOpenCodeProvider | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const record = readRecord(value, label);
+  const kind = readString(record["kind"], `${label}.kind`);
+  const apiBaseOption = readString(record["apiBaseOption"], `${label}.apiBaseOption`);
+
+  if (kind !== "openai-compatible") {
+    fail(`${label}.kind must be openai-compatible.`);
+  }
+
+  if (apiBaseOption !== "baseURL") {
+    fail(`${label}.apiBaseOption must be baseURL.`);
+  }
+
+  return {
+    apiBaseOption,
+    kind,
+    npmPackage: readString(record["npmPackage"], `${label}.npmPackage`),
+  };
+}
+
 function parseSource(): RawCatalog {
   const errors: ParseError[] = [];
   const value = parseJsonc(readFileSync(SOURCE_PATH, "utf8"), errors, {
@@ -313,6 +344,10 @@ function readVendors(value: unknown): RawVendor[] {
         `vendors[${index}].defaultApiBase`,
       ),
       label: readString(vendor["label"], `vendors[${index}].label`),
+      openCodeProvider: readOpenCodeProvider(
+        vendor["openCodeProvider"],
+        `vendors[${index}].openCodeProvider`,
+      ),
       vendorId: readString(vendor["vendorId"], `vendors[${index}].vendorId`),
     };
   });

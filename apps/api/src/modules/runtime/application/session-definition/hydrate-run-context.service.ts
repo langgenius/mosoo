@@ -170,20 +170,45 @@ export function buildRuntimeVendorEnvVars(
 
 function buildOpenCodeConfig(input: RuntimeVendorEnvironmentInput): string {
   const model = input.model.includes("/") ? input.model : `${input.vendor.vendorId}/${input.model}`;
+  const providerConfig = buildOpenCodeProviderConfig(input);
 
   return JSON.stringify({
     $schema: "https://opencode.ai/config.json",
     enabled_providers: [input.vendor.vendorId],
     model,
     provider: {
-      [input.vendor.vendorId]: {
-        options: {
-          apiKey: `{env:${input.vendor.apiKeyEnvVar}}`,
-        },
-      },
+      [input.vendor.vendorId]: providerConfig,
     },
     small_model: model,
   });
+}
+
+function buildOpenCodeProviderConfig(
+  input: RuntimeVendorEnvironmentInput,
+): Record<string, unknown> {
+  const options: Record<string, string> = {
+    apiKey: `{env:${input.vendor.apiKeyEnvVar}}`,
+  };
+  const openCodeProvider = input.vendor.openCodeProvider;
+
+  if (openCodeProvider?.kind === "openai-compatible") {
+    const apiBase = input.credential.apiBase ?? input.vendor.defaultApiBase;
+
+    if (!isTruthy(apiBase)) {
+      throw new Error(`${input.vendor.label} requires a base URL for OpenCode.`);
+    }
+
+    enforceSafeApiBase(apiBase);
+    options[openCodeProvider.apiBaseOption] = apiBase;
+
+    return {
+      name: input.vendor.label,
+      npm: openCodeProvider.npmPackage,
+      options,
+    };
+  }
+
+  return { options };
 }
 
 async function hydrateRunContextFromSession(

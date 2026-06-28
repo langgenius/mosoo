@@ -86,6 +86,15 @@ function createAvailableModelsDatabase(): SqliteD1Database {
       NULL
     ),
     (
+      'credential-deepseek',
+      '${APP_ID}',
+      'deepseek',
+      'DeepSeek default',
+      'secret-deepseek',
+      NULL,
+      NULL
+    ),
+    (
       'credential-custom',
       '${APP_ID}',
       'openai-compatible',
@@ -148,14 +157,14 @@ describe("available models", () => {
     });
   });
 
-  test("makes OpenCode Zen models available for the OpenCode runtime", async () => {
+  test("makes OpenCode runtime models available through their owning providers", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
       appId: APP_ID,
       runtimeId: "acp-fallback",
     });
 
     expect(
-      entries.find((entry) => entry.vendorId === "opencode" && entry.modelId === "deepseek-v4-pro"),
+      entries.find((entry) => entry.vendorId === "deepseek" && entry.modelId === "deepseek-v4-pro"),
     ).toMatchObject({
       available: true,
       statusDetail: null,

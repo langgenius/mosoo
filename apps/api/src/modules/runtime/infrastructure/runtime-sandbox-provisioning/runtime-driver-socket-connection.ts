@@ -1,3 +1,4 @@
+import { sleepPromise } from "@mosoo/effects";
 import type { DriverInstanceId, SandboxId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -16,6 +17,10 @@ function isDriverSocketAlreadyConnectedError(error: unknown): boolean {
   return (
     error instanceof Error && error.message.includes("Driver control socket is already connected")
   );
+}
+
+function isTransientSandboxSocketConnectionError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes("Container is not listening to port");
 }
 
 export async function waitForDriverControlPort(
@@ -39,14 +44,26 @@ export async function connectDriverSocketThroughSandbox(
     traceparent: string;
   },
 ): Promise<void> {
+  const deadlineMs = Date.now() + DRIVER_SOCKET_CONNECT_TIMEOUT_MS;
+
   try {
-    await connectDriverInstanceSandboxWebSocket(env, input.driverInstanceId, {
-      bootToken: input.bootToken,
-      port: input.driverControlPort,
-      sandboxId: input.sandboxId,
-      traceparent: input.traceparent,
-    });
-    return;
+    while (true) {
+      try {
+        await connectDriverInstanceSandboxWebSocket(env, input.driverInstanceId, {
+          bootToken: input.bootToken,
+          port: input.driverControlPort,
+          sandboxId: input.sandboxId,
+          traceparent: input.traceparent,
+        });
+        return;
+      } catch (error) {
+        if (!isTransientSandboxSocketConnectionError(error) || Date.now() >= deadlineMs) {
+          throw error;
+        }
+
+        await sleepPromise(DRIVER_SOCKET_CONNECT_RETRY_MS);
+      }
+    }
   } catch (error) {
     if (!isDriverSocketAlreadyConnectedError(error)) {
       throw error;

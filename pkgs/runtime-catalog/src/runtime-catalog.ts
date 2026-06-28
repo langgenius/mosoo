@@ -55,6 +55,12 @@ export type RuntimeCatalogVendorAuthHeader =
       readonly scheme: "api-key";
     };
 
+export interface RuntimeCatalogVendorOpenCodeProvider {
+  readonly apiBaseOption: "baseURL";
+  readonly kind: "openai-compatible";
+  readonly npmPackage: string;
+}
+
 /**
  * Describes the vendor whose API key is required to power a runtime,
  * and the env var names used to inject credentials into the agent process.
@@ -72,6 +78,7 @@ export interface RuntimeCatalogVendor {
   readonly defaultApiBase?: string;
   readonly apiKeyEnvVar: string;
   readonly label: string;
+  readonly openCodeProvider?: RuntimeCatalogVendorOpenCodeProvider;
   readonly vendorId: string;
 }
 
@@ -171,6 +178,7 @@ function runtimeCatalogVendor(
 ): RuntimeCatalogVendor {
   const apiBaseEnvVar = "apiBaseEnvVar" in input ? input.apiBaseEnvVar : undefined;
   const defaultApiBase = "defaultApiBase" in input ? input.defaultApiBase : undefined;
+  const openCodeProvider = "openCodeProvider" in input ? input.openCodeProvider : undefined;
 
   return {
     ...(apiBaseEnvVar !== undefined ? { apiBaseEnvVar } : {}),
@@ -178,6 +186,15 @@ function runtimeCatalogVendor(
     apiKeyEnvVar: input.apiKeyEnvVar,
     authHeader: runtimeCatalogVendorAuthHeader(input.authHeader),
     label: input.label,
+    ...(openCodeProvider !== undefined
+      ? {
+          openCodeProvider: {
+            apiBaseOption: openCodeProvider.apiBaseOption,
+            kind: openCodeProvider.kind,
+            npmPackage: openCodeProvider.npmPackage,
+          },
+        }
+      : {}),
     vendorId: admitProviderId(input.vendorId),
   };
 }
@@ -298,12 +315,14 @@ export const PRESET_MODEL_CATALOG: readonly PresetModelEntry[] =
   GENERATED_PRESET_MODEL_CATALOG.map(presetModel);
 
 export const ANTHROPIC_DEFAULT_MODEL_ID = admitModelId(GENERATED_MODEL_DEFAULT_IDS.anthropic);
+export const DEEPSEEK_DEFAULT_MODEL_ID = admitModelId(GENERATED_MODEL_DEFAULT_IDS.deepseek);
 export const OPENAI_DEFAULT_MODEL_ID = admitModelId(GENERATED_MODEL_DEFAULT_IDS.openai);
 
 export const ALL_VENDORS: readonly RuntimeCatalogVendor[] =
   GENERATED_VENDOR_CATALOG.map(runtimeCatalogVendor);
 
 export const VENDOR_ANTHROPIC = requireVendor("anthropic");
+export const VENDOR_DEEPSEEK = requireVendor("deepseek");
 export const VENDOR_OPENAI = requireVendor("openai");
 export const VENDOR_OPENAI_COMPATIBLE = requireVendor("openai-compatible");
 export const VENDOR_OPENCODE = requireVendor("opencode");

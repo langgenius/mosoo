@@ -17,9 +17,17 @@ function credential(vendorId: string): VendorCredential {
 }
 
 describe("default agent runtime", () => {
+  test("uses the official DeepSeek provider when only DeepSeek is configured", () => {
+    expect(resolveDefaultAgentRuntime([credential("deepseek")])).toEqual({
+      model: "deepseek-v4-pro",
+      provider: "deepseek",
+      runtimeId: "acp-fallback",
+    });
+  });
+
   test("uses an OpenCode Zen model when only OpenCode Zen is configured", () => {
     expect(resolveDefaultAgentRuntime([credential("opencode")])).toEqual({
-      model: "deepseek-v4-pro",
+      model: "qwen3.6-plus",
       provider: "opencode",
       runtimeId: "acp-fallback",
     });

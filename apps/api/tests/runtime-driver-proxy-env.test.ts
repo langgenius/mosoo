@@ -17,6 +17,7 @@ describe("runtime driver proxy env", () => {
     ).toEqual({
       ALL_PROXY: "http://host.docker.internal:1080",
       HTTPS_PROXY: "http://host.docker.internal:1080",
+      NODE_USE_ENV_PROXY: "1",
       NO_PROXY: "metadata.local,localhost,127.0.0.1,::1,host.docker.internal",
       all_proxy: "http://host.docker.internal:1080",
       https_proxy: "http://host.docker.internal:1080",

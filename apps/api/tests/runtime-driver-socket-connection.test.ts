@@ -77,4 +77,46 @@ describe("runtime driver socket connection", () => {
 
     expect(callCount).toBe(1);
   });
+
+  test("retries transient sandbox proxy port readiness failures", async () => {
+    let callCount = 0;
+    const bindings = {
+      DriverConnection: {
+        get() {
+          return {
+            async fetch() {
+              callCount += 1;
+
+              if (callCount === 1) {
+                return Response.json(
+                  {
+                    error:
+                      "Sandbox driver WebSocket rejected: Error proxying request to container: Container is not listening to port 50665",
+                  },
+                  { status: 500 },
+                );
+              }
+
+              return Response.json({ ok: true });
+            },
+          };
+        },
+        idFromName() {
+          return "driver-1";
+        },
+      },
+    } as unknown as ApiBindings;
+
+    await expect(
+      connectDriverSocketThroughSandbox(bindings, {
+        bootToken: "boot-token-1",
+        driverControlPort: 50_665,
+        driverInstanceId: "driver-1",
+        sandboxId: "01J0000000000000000000000D",
+        traceparent: "traceparent-1",
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(callCount).toBe(2);
+  });
 });

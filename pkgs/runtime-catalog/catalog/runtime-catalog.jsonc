@@ -3,6 +3,7 @@
   // metadata. Do not edit src/catalog.generated.ts directly; regenerate it from this file.
   "modelDefaults": {
     "anthropic": "claude-sonnet-4-5",
+    "deepseek": "deepseek-v4-pro",
     "openai": "gpt-5.4",
   },
   "vendors": [
@@ -39,6 +40,22 @@
       "authHeader": {
         "scheme": "bearer",
         "apiKeyHeader": "Authorization",
+      },
+    },
+    {
+      "vendorId": "deepseek",
+      "label": "DeepSeek",
+      "apiKeyEnvVar": "DEEPSEEK_API_KEY",
+      "apiBaseEnvVar": "DEEPSEEK_BASE_URL",
+      "defaultApiBase": "https://api.deepseek.com",
+      "authHeader": {
+        "scheme": "bearer",
+        "apiKeyHeader": "Authorization",
+      },
+      "openCodeProvider": {
+        "kind": "openai-compatible",
+        "npmPackage": "@ai-sdk/openai-compatible",
+        "apiBaseOption": "baseURL",
       },
     },
     {
@@ -123,7 +140,7 @@
       "displayName": "DeepSeek V4 Pro",
       "modelId": "deepseek-v4-pro",
       "protocol": "openai-chat-completions",
-      "vendorId": "opencode",
+      "vendorId": "deepseek",
     },
     {
       "displayName": "Qwen3.6 Plus",
@@ -243,13 +260,13 @@
         "providerId": "openai",
         "modelId": "gpt-5.4",
       },
-      "vendorIds": ["openai", "anthropic", "opencode"],
+      "vendorIds": ["openai", "anthropic", "deepseek", "opencode"],
       "supportedModels": {
-        "vendorIds": ["anthropic", "openai", "opencode"],
+        "vendorIds": ["anthropic", "openai", "deepseek", "opencode"],
       },
       "display": {
         "iconKey": "opencode",
-        "providerLabel": "OpenCode Zen",
+        "providerLabel": "OpenCode",
       },
     },
   ],

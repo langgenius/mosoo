@@ -48,6 +48,7 @@ When a maintainer adds a runtime, they should be able to:
 | Runtime          | A launchable Agent driver choice shown to users, such as Claude Agent SDK, OpenAI Runtime, or OpenCode.                          |
 | Transport        | The control path Runtime uses to talk to the Driver backend, such as `claude-agent-sdk`, `openai-app-server`, or `acp-fallback`. |
 | Vendor           | A credential provider that can back one or more runtimes.                                                                        |
+| Adapter profile  | The provider-specific protocol shape a runtime backend must render, such as OpenAI Responses API or OpenAI-compatible base URL.  |
 | Preset model     | A known model option shipped by Mosoo for a preset vendor.                                                                       |
 | Public runtime   | A runtime visible and selectable in Agent creation.                                                                              |
 | Internal runtime | A cataloged runtime that is not user-selectable.                                                                                 |
@@ -77,6 +78,15 @@ Key decision: display-only planned runtimes sit beside public runtime display en
 5. Run `vp run --filter @mosoo/runtime-catalog catalog:generate`.
 6. Run `vp run --filter @mosoo/runtime-catalog test` and the affected API/Web type checks.
 7. Confirm the Driver transport path exists before making a runtime public.
+
+## 7.1 Provider And Adapter Decision Rule
+
+When adding a model source, first decide the identity boundary:
+
+- Add a new **Vendor** when credentials, billing, model ownership, or user-facing provider identity differ. DeepSeek is a vendor because it uses `DEEPSEEK_API_KEY`, DeepSeek-owned models, and a DeepSeek API base.
+- Add or reuse an **Adapter profile** when the same runtime transport must render a different protocol config for that vendor. DeepSeek on OpenCode reuses the OpenAI-compatible profile by emitting an OpenCode provider config with `npm: "@ai-sdk/openai-compatible"` and `baseURL`.
+- Do not encode a vendor as another vendor's model prefix. `opencode/deepseek-v4-pro` means OpenCode Zen owns the credential and endpoint; `deepseek/deepseek-v4-pro` means DeepSeek owns them, even if OpenCode launches the ACP process.
+- OpenAI can have multiple adapter profiles across runtimes: the OpenAI Runtime path uses the OpenAI runtime / Responses-style backend contract, while ACP fallback may use OpenCode-native or OpenAI-compatible config. The provider id remains `openai`; the adapter profile changes by runtime path.
 
 ## 8. Acceptance Criteria
 

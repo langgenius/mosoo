@@ -4,6 +4,7 @@
 
 export const GENERATED_MODEL_DEFAULT_IDS = {
   anthropic: "claude-sonnet-4-5",
+  deepseek: "deepseek-v4-pro",
   openai: "gpt-5.4",
 } as const;
 
@@ -42,6 +43,22 @@ export const GENERATED_VENDOR_CATALOG = [
     },
     label: "OpenAI-Compatible",
     vendorId: "openai-compatible",
+  },
+  {
+    apiBaseEnvVar: "DEEPSEEK_BASE_URL",
+    apiKeyEnvVar: "DEEPSEEK_API_KEY",
+    authHeader: {
+      apiKeyHeader: "Authorization",
+      scheme: "bearer",
+    },
+    defaultApiBase: "https://api.deepseek.com",
+    label: "DeepSeek",
+    openCodeProvider: {
+      apiBaseOption: "baseURL",
+      kind: "openai-compatible",
+      npmPackage: "@ai-sdk/openai-compatible",
+    },
+    vendorId: "deepseek",
   },
   {
     apiKeyEnvVar: "OPENCODE_API_KEY",
@@ -137,8 +154,8 @@ export const GENERATED_PRESET_MODEL_CATALOG = [
     displayName: "DeepSeek V4 Pro",
     modelId: "deepseek-v4-pro",
     protocol: "openai-chat-completions",
-    vendorId: "opencode",
-    vendorLabel: "OpenCode Zen",
+    vendorId: "deepseek",
+    vendorLabel: "DeepSeek",
   },
   {
     displayName: "Qwen3.6 Plus",
@@ -366,12 +383,12 @@ export const GENERATED_RUNTIME_CATALOG = [
     },
     display: {
       iconKey: "opencode",
-      providerLabel: "OpenCode Zen",
+      providerLabel: "OpenCode",
     },
     label: "OpenCode",
     runtimeId: "acp-fallback",
     transport: "acp-fallback",
-    vendorIds: ["openai", "anthropic", "opencode"],
+    vendorIds: ["openai", "anthropic", "deepseek", "opencode"],
     visibility: "public",
     capabilities: [
       {
