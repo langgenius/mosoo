@@ -332,7 +332,7 @@ camelCase names, and mutation inputs with explicit `appId`.
 
 First-cut fields:
 
-- `appDeployment(appId: ULID!): AppDeployment`
+- `appOverview(appId: ULID!): AppOverview!` exposes `deployment: AppDeployment` (the App's configured Deployment, or null).
 - `deployApp(input: DeployAppInput!): AppDeploymentRun!`
 - `appDeploymentStatus(appId: ULID!): AppDeploymentRun`
 - `deleteAppDeployment(input: DeleteAppDeploymentInput!): OperationResult!`
@@ -354,7 +354,7 @@ input DeleteAppDeploymentInput {
 `appId` is required. Do not infer the App from the current account or repository.
 First-cut status always targets the latest DeploymentRun for the App. `configPath`
 is optional and must be absent or `.mosoo.toml` in the first cut.
-`appDeployment` returns null when the App has no configured Deployment.
+`AppOverview.deployment` returns null when the App has no configured Deployment.
 `appDeploymentStatus` returns null when the App has no DeploymentRun.
 Deployment always uses the GitHub repository's current default branch; explicit
 branch selection is not part of the first cut.
