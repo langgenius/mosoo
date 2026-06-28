@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
 
-import { RUNTIME_ICON_URL } from "./runtime-icon-data";
+import { getRuntimeIconUrl } from "./runtime-icon-data";
 
 export { hasRuntimeIcon } from "./runtime-icon-data";
 
@@ -13,9 +13,9 @@ export function RuntimeIcon({
   className?: string;
   runtimeId: string;
 }): ReactElement | null {
-  const iconUrl = RUNTIME_ICON_URL[runtimeId];
+  const iconUrl = getRuntimeIconUrl(runtimeId);
 
-  if (iconUrl === undefined) {
+  if (iconUrl === null) {
     return null;
   }
 

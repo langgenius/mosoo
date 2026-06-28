@@ -29,7 +29,7 @@ const FAQS: readonly Faq[] = [
   },
   {
     q: "Which runtimes does Mosoo support, and am I locked to one vendor?",
-    a: "In the current alpha the Claude Agent SDK and OpenAI runtime are live, and every harness is normalized to the same interface: streaming, tool calls, native resume, MCP permissions, and session replay. OpenClaw, Hermes, OpenCode, and Gemini are on the roadmap. Because the runtime is a swappable harness, an agent is configured once and resolves a single provider credential at launch, so you can move between vendors without touching the agent definition.",
+    a: "In the current alpha the Claude Agent SDK, OpenAI runtime, and OpenCode fallback runtime are live, and every harness is normalized to the same interface: streaming, tool calls, native resume, MCP permissions, and session replay. OpenClaw, Hermes, and Gemini are on the roadmap. Because the runtime is a swappable harness, an agent is configured once and resolves a single provider credential at launch, so you can move between vendors without touching the agent definition.",
   },
   {
     q: "When should I use a deterministic workflow versus a general agent?",

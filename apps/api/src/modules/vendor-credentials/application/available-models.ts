@@ -1,7 +1,10 @@
-import { PRESET_MODEL_CATALOG } from "@mosoo/contracts/models";
 import type { PresetModelEntry } from "@mosoo/contracts/models";
 import type { AppId } from "@mosoo/id";
-import { VENDOR_OPENAI_COMPATIBLE, getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
+import {
+  PRESET_MODEL_CATALOG,
+  VENDOR_OPENAI_COMPATIBLE,
+  getRuntimeCatalogEntry,
+} from "@mosoo/runtime-catalog";
 
 import { isTruthy } from "../../../shared/truthiness";
 import { ensureAppOwnership } from "../../apps/application/app.service";

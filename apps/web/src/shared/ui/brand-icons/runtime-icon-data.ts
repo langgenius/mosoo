@@ -6,19 +6,25 @@ import piSvgUrl from "@lobehub/icons-static-svg/icons/inflection.svg";
 import openaiSvgUrl from "@lobehub/icons-static-svg/icons/openai.svg";
 import openclawSvgUrl from "@lobehub/icons-static-svg/icons/openclaw-color.svg";
 import opencodeSvgUrl from "@lobehub/icons-static-svg/icons/opencode.svg";
+import { getRuntimeIconKey } from "@mosoo/runtime-catalog";
 
-export const RUNTIME_ICON_URL: Record<string, string> = {
-  "acp-fallback": opencodeSvgUrl,
-  "claude-agent-sdk": claudeCodeSvgUrl,
-  "cursor-agent": cursorAgentSvgUrl,
+const RUNTIME_ICON_URL_BY_KEY: Record<string, string> = {
+  "claude-code": claudeCodeSvgUrl,
+  cursor: cursorAgentSvgUrl,
   gemini: geminiSvgUrl,
   hermes: hermesSvgUrl,
-  "openai-runtime": openaiSvgUrl,
-  openclaw: openclawSvgUrl,
+  openai: openaiSvgUrl,
   opencode: opencodeSvgUrl,
+  openclaw: openclawSvgUrl,
   pi: piSvgUrl,
 };
 
+export function getRuntimeIconUrl(runtimeId: string): string | null {
+  const iconKey = getRuntimeIconKey(runtimeId) ?? runtimeId;
+
+  return RUNTIME_ICON_URL_BY_KEY[iconKey] ?? null;
+}
+
 export function hasRuntimeIcon(runtimeId: string): boolean {
-  return runtimeId in RUNTIME_ICON_URL;
+  return getRuntimeIconUrl(runtimeId) !== null;
 }

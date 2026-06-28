@@ -1,5 +1,8 @@
-import { listPresetModelsForVendor } from "@mosoo/contracts/models";
-import { PUBLIC_RUNTIME_CATALOG, VENDOR_OPENAI_COMPATIBLE } from "@mosoo/runtime-catalog";
+import {
+  PUBLIC_RUNTIME_CATALOG,
+  VENDOR_OPENAI_COMPATIBLE,
+  listPresetModelsForVendor,
+} from "@mosoo/runtime-catalog";
 
 import type { VendorCredential } from "@/domains/vendor-credential/api/vendor-credential-client";
 

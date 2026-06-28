@@ -6,14 +6,17 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "catalog:check": "vp exec bun scripts/generate-runtime-catalog.ts --check",
+    "catalog:generate": "vp exec bun scripts/generate-runtime-catalog.ts",
     "lint": "vp lint .",
-    "test": "vp exec bun test tests",
+    "test": "vp exec bun test tests && vp exec bun scripts/generate-runtime-catalog.ts --check",
     "tc": "vp exec tsc --noEmit"
   },
   "dependencies": {
     "@mosoo/contracts": "workspace:*"
   },
   "devDependencies": {
+    "jsonc-parser": "3.3.1",
     "typescript": "^6.0.3",
     "vite-plus": "^0.1.23"
   }

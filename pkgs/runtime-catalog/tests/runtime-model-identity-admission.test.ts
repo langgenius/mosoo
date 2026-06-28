@@ -1,11 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
+import { createRuntimeModelIdentity } from "@mosoo/contracts/models";
 import {
   ANTHROPIC_DEFAULT_MODEL_ID,
   OPENAI_DEFAULT_MODEL_ID,
-  createRuntimeModelIdentity,
-} from "@mosoo/contracts/models";
-import {
+  PUBLIC_RUNTIME_DISPLAY_CATALOG,
   RUNTIME_CATALOG,
   SYSTEM_AGENT_RUNTIME_ID,
   VENDOR_ANTHROPIC,
@@ -14,6 +13,10 @@ import {
   VENDOR_OPENAI_COMPATIBLE,
   admitRuntimeModelIdentity,
   admitRuntimeModelIdentityForCatalog,
+  getRuntimeDisplayColor,
+  getRuntimeIconKey,
+  listPlannedRuntimeDisplayEntries,
+  listRuntimeShowcaseDisplayEntries,
 } from "@mosoo/runtime-catalog";
 import type { RuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 
@@ -204,6 +207,30 @@ describe("runtime catalog identity admission", () => {
         },
       });
     }
+  });
+
+  test("exposes display metadata without changing runtime admission", () => {
+    expect(PUBLIC_RUNTIME_DISPLAY_CATALOG.every((entry) => entry.status === "available")).toBe(
+      true,
+    );
+    expect(listRuntimeShowcaseDisplayEntries()).toContainEqual(
+      expect.objectContaining({
+        iconKey: "opencode",
+        label: "OpenCode",
+        runtimeId: "acp-fallback",
+        status: "available",
+      }),
+    );
+    expect(listRuntimeShowcaseDisplayEntries()).not.toContainEqual(
+      expect.objectContaining({
+        runtimeId: "opencode",
+      }),
+    );
+    expect(
+      listPlannedRuntimeDisplayEntries("provider-settings").map((entry) => entry.runtimeId),
+    ).toEqual(["openclaw", "hermes", "pi"]);
+    expect(getRuntimeIconKey("acp-fallback")).toBe("opencode");
+    expect(getRuntimeDisplayColor("openai-runtime")).toBe("#7A9DFF");
   });
 });
 

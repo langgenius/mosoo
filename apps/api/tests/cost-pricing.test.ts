@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { PRESET_MODEL_CATALOG } from "@mosoo/contracts/models";
+import { PRESET_MODEL_CATALOG } from "@mosoo/runtime-catalog";
 
 import { findModelPricing } from "../src/modules/cost/domain/cost-pricing";
 

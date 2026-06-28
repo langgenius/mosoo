@@ -1,3 +1,4 @@
+import { listRuntimeShowcaseDisplayEntries } from "@mosoo/runtime-catalog";
 import { Check, Clock } from "lucide-react";
 import { AnimatePresence, m, useReducedMotion } from "motion/react";
 import { useState } from "react";
@@ -10,30 +11,9 @@ import { Reveal } from "./motion";
 import { EASE_OUT } from "./motion-variants";
 import { sectionHeadingStyle } from "./typography";
 
-type Runtime = {
-  runtimeId: string;
-  label: string;
-  provider: string;
-  available: boolean;
-};
+type Runtime = ReturnType<typeof listRuntimeShowcaseDisplayEntries>[number];
 
-// The agent drivers (harnesses) a Mosoo agent can run on — runtime ids match the
-// brand-icon catalog. Status mirrors the live runtime availability.
-const RUNTIMES: readonly Runtime[] = [
-  {
-    runtimeId: "claude-agent-sdk",
-    label: "Claude Agent SDK",
-    provider: "Anthropic",
-    available: true,
-  },
-  { runtimeId: "openai-runtime", label: "OpenAI", provider: "OpenAI", available: true },
-  { runtimeId: "opencode", label: "OpenCode", provider: "sst", available: false },
-  { runtimeId: "openclaw", label: "OpenClaw", provider: "OpenClaw", available: false },
-  { runtimeId: "hermes", label: "Hermes", provider: "Hermes", available: false },
-  { runtimeId: "gemini", label: "Gemini", provider: "Google", available: false },
-  { runtimeId: "pi", label: "Pi", provider: "Inflection AI", available: false },
-  { runtimeId: "cursor-agent", label: "Cursor Agent", provider: "Cursor", available: false },
-];
+const RUNTIMES: readonly Runtime[] = listRuntimeShowcaseDisplayEntries();
 
 // Mosoo normalises every harness to the same interface — so the capability set is
 // identical no matter which runtime you pick. That sameness is the whole point.
@@ -53,6 +33,8 @@ function CheckDot(): ReactElement {
 }
 
 function RuntimeCard({ runtime }: { runtime: Runtime }): ReactElement {
+  const available = runtime.status === "available";
+
   return (
     <div className="border-border-soft bg-bg-elevated rounded-[18px] border p-5 shadow-sm">
       <div className="flex items-center gap-3">
@@ -61,9 +43,9 @@ function RuntimeCard({ runtime }: { runtime: Runtime }): ReactElement {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-fg-1 text-[15px] font-semibold tracking-[-0.01em]">{runtime.label}</p>
-          <p className="text-fg-3 text-[12.5px]">{runtime.provider}</p>
+          <p className="text-fg-3 text-[12.5px]">{runtime.providerLabel}</p>
         </div>
-        {runtime.available ? (
+        {available ? (
           <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-800">
             <span className="size-1.5 rounded-full bg-green-600" />
             Available
