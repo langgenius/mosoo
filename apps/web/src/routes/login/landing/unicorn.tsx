@@ -1,23 +1,74 @@
-import { lazy, Suspense, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactElement } from "react";
 
-// `unicornstudio-react` bundles the full ~1.3 MB WebGL engine. The landing page
-// is the first thing every unauthenticated visitor loads, and this background is
-// purely decorative (aria-hidden, non-interactive, behind the content). Loading
-// it lazily keeps the engine out of the login route's critical path: the form and
-// copy paint immediately and the aurora streams in once its chunk arrives. The
-// runtime SDK is fetched separately from the CDN below, so deferring the wrapper
-// costs nothing visually.
-const UnicornScene = lazy(async () => {
-  const mod = await import("unicornstudio-react");
-  return { default: mod.UnicornScene };
-});
-
-// Shared Unicorn Studio WebGL background. A single SDK version is used across the
-// whole landing so the global runtime loads once and every scene renders on the
-// same build (the loader injects the SDK only on first mount).
+// The landing page is the first thing every unauthenticated visitor loads, and
+// this background is purely decorative (aria-hidden, non-interactive, behind the
+// content). The actual rendering is done by the Unicorn Studio runtime fetched
+// from the CDN below — we deliberately do NOT depend on `unicornstudio-react`,
+// whose single module inlines the full ~1.3 MB WebGL engine. Importing that
+// wrapper shipped the engine in our own bundle (a 252 KB gzip route chunk) on
+// top of the CDN script, so the landing route paid for the engine twice. This
+// thin wrapper drives the same CDN SDK directly via `window.UnicornStudio`, so
+// the only WebGL bytes on the critical path are the ones we already loaded.
 const UNICORN_SDK_URL =
   "https://cdn.jsdelivr.net/gh/hiunicornstudio/unicornstudio.js@v2.2.0/dist/unicornStudio.umd.js";
+
+interface UnicornScene {
+  destroy: () => void;
+}
+
+interface UnicornStudioSdk {
+  addScene: (config: {
+    element: HTMLElement;
+    projectId: string;
+    fps?: number;
+    scale?: number;
+    dpi?: number;
+    lazyLoad?: boolean;
+    production?: boolean;
+  }) => Promise<UnicornScene>;
+}
+
+declare global {
+  interface Window {
+    UnicornStudio?: UnicornStudioSdk;
+  }
+}
+
+// Inject the runtime SDK once and share the in-flight promise across every scene
+// on the page, so the hero and CTA backgrounds load the global engine a single
+// time instead of racing two identical <script> fetches.
+let sdkPromise: Promise<UnicornStudioSdk> | null = null;
+
+function loadUnicornSdk(): Promise<UnicornStudioSdk> {
+  if (window.UnicornStudio) {
+    return Promise.resolve(window.UnicornStudio);
+  }
+  if (sdkPromise) {
+    return sdkPromise;
+  }
+
+  sdkPromise = new Promise<UnicornStudioSdk>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = UNICORN_SDK_URL;
+    script.async = true;
+    script.addEventListener("load", () => {
+      if (window.UnicornStudio) {
+        resolve(window.UnicornStudio);
+      } else {
+        reject(new Error("Unicorn Studio SDK loaded without exposing a runtime"));
+      }
+    });
+    script.addEventListener("error", () => {
+      // Let a later mount retry the fetch rather than caching the failure.
+      sdkPromise = null;
+      reject(new Error("Failed to load the Unicorn Studio SDK"));
+    });
+    document.head.append(script);
+  });
+
+  return sdkPromise;
+}
 
 /**
  * Full-bleed, non-interactive WebGL scene pinned behind a section's content.
@@ -26,7 +77,39 @@ const UNICORN_SDK_URL =
  * readable instead of sitting on a black canvas.
  */
 export function UnicornBackground({ sceneId }: { sceneId: string }): ReactElement | null {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (element === null) {
+      return;
+    }
+
+    let cancelled = false;
+    let scene: UnicornScene | null = null;
+
+    loadUnicornSdk()
+      .then(async (sdk) => sdk.addScene({ element, projectId: sceneId }))
+      .then((created) => {
+        if (cancelled) {
+          // Unmounted before the scene resolved — tear it down immediately.
+          created.destroy();
+          return;
+        }
+        scene = created;
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFailed(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      scene?.destroy();
+    };
+  }, [sceneId]);
 
   if (failed) {
     return null;
@@ -34,18 +117,9 @@ export function UnicornBackground({ sceneId }: { sceneId: string }): ReactElemen
 
   return (
     <div
+      ref={containerRef}
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 z-0 [&>div]:!h-full [&>div]:!w-full"
-    >
-      <Suspense fallback={null}>
-        <UnicornScene
-          projectId={sceneId}
-          sdkUrl={UNICORN_SDK_URL}
-          width="100%"
-          height="100%"
-          onError={() => setFailed(true)}
-        />
-      </Suspense>
-    </div>
+      className="pointer-events-none absolute inset-0 z-0"
+    />
   );
 }
