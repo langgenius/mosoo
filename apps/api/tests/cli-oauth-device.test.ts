@@ -124,6 +124,31 @@ describe("CLI OAuth device flow", () => {
     expect(consumed).toEqual({ status: "consumed" });
   });
 
+  test("consumes an authorized device code only once under concurrent polling", async () => {
+    const database = createCliOAuthDatabase();
+    const start = await startCliOAuthDeviceFlow(database, {
+      provider: "google",
+      webOrigin: "http://localhost:5173",
+    });
+
+    await confirmCliOAuthDeviceFlow(database, VIEWER, {
+      user_code: start.user_code,
+    });
+
+    const results = await Promise.all([
+      pollCliOAuthDeviceToken(database, { device_code: start.device_code }),
+      pollCliOAuthDeviceToken(database, { device_code: start.device_code }),
+    ]);
+
+    expect(results.filter((result) => result.status === "authorized")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "consumed")).toHaveLength(1);
+
+    const tokenCount = await database
+      .prepare("SELECT COUNT(*) AS count FROM personal_access_token")
+      .first<{ count: number }>();
+    expect(tokenCount?.count).toBe(1);
+  });
+
   test("rejects unsupported providers", async () => {
     const database = createCliOAuthDatabase();
 

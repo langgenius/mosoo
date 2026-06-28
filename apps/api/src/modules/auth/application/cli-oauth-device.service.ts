@@ -10,7 +10,7 @@ import type {
 import { accountsTable, cliOAuthFlowsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type { AccountId, CliOAuthFlowId } from "@mosoo/id";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
@@ -108,7 +108,7 @@ export async function pollCliOAuthDeviceToken(
 
   const now = currentTimestampMs();
   if (flow.expiresAt.getTime() <= now) {
-    await markCliOAuthFlowStatus(database, flow.id, "expired", now);
+    await markCliOAuthFlowStatus(database, flow.id, "expired", now, ["pending", "authorized"]);
     return { status: "expired" };
   }
 
@@ -129,10 +129,14 @@ export async function pollCliOAuthDeviceToken(
     throw new CliOAuthDeviceError(500, "invalid_flow", "CLI OAuth account no longer exists.");
   }
 
+  const consumed = await markCliOAuthFlowStatus(database, flow.id, "consumed", now, ["authorized"]);
+  if (!consumed) {
+    return { status: (await readCliOAuthFlowStatus(database, flow.id)) ?? "expired" };
+  }
+
   const token = await createPersonalAccessToken(database, viewer, {
     label: `CLI OAuth (${flow.provider})`,
   });
-  await markCliOAuthFlowStatus(database, flow.id, "consumed", now);
 
   return {
     access_token: token.value,
@@ -169,7 +173,7 @@ export async function confirmCliOAuthDeviceFlow(
 
   const now = currentTimestampMs();
   if (flow.expiresAt.getTime() <= now) {
-    await markCliOAuthFlowStatus(database, flow.id, "expired", now);
+    await markCliOAuthFlowStatus(database, flow.id, "expired", now, ["pending"]);
     return { status: "expired", user_code: userCode };
   }
 
@@ -177,16 +181,25 @@ export async function confirmCliOAuthDeviceFlow(
     return { status: flow.status, user_code: userCode };
   }
 
-  await getAppDatabase(database)
-    .update(cliOAuthFlowsTable)
-    .set({
-      accountId: viewer.id,
-      authorizedAt: new Date(now),
-      status: "authorized",
-      updatedAt: new Date(now),
-    })
-    .where(eq(cliOAuthFlowsTable.id, flow.id))
-    .run();
+  const authorized =
+    (await getAppDatabase(database)
+      .update(cliOAuthFlowsTable)
+      .set({
+        accountId: viewer.id,
+        authorizedAt: new Date(now),
+        status: "authorized",
+        updatedAt: new Date(now),
+      })
+      .where(and(eq(cliOAuthFlowsTable.id, flow.id), eq(cliOAuthFlowsTable.status, "pending")))
+      .returning({ id: cliOAuthFlowsTable.id })
+      .get()) ?? null;
+
+  if (!authorized) {
+    return {
+      status: (await readCliOAuthFlowStatus(database, flow.id)) ?? "expired",
+      user_code: userCode,
+    };
+  }
 
   return { status: "authorized", user_code: userCode };
 }
@@ -273,18 +286,43 @@ async function markCliOAuthFlowStatus(
   flowId: CliOAuthFlowId,
   status: CliOAuthDeviceStatus,
   timestampMs: number,
-): Promise<void> {
+  expectedStatuses?: CliOAuthDeviceStatus[],
+): Promise<boolean> {
   const timestamp = new Date(timestampMs);
-  await getAppDatabase(database)
-    .update(cliOAuthFlowsTable)
-    .set({
-      completedAt:
-        status === "expired" || status === "consumed" || status === "denied" ? timestamp : null,
-      status,
-      updatedAt: timestamp,
-    })
-    .where(eq(cliOAuthFlowsTable.id, flowId))
-    .run();
+  const predicates = [eq(cliOAuthFlowsTable.id, flowId)];
+  if (expectedStatuses && expectedStatuses.length > 0) {
+    predicates.push(inArray(cliOAuthFlowsTable.status, expectedStatuses));
+  }
+
+  const updated =
+    (await getAppDatabase(database)
+      .update(cliOAuthFlowsTable)
+      .set({
+        completedAt:
+          status === "expired" || status === "consumed" || status === "denied" ? timestamp : null,
+        status,
+        updatedAt: timestamp,
+      })
+      .where(and(...predicates))
+      .returning({ id: cliOAuthFlowsTable.id })
+      .get()) ?? null;
+
+  return updated !== null;
+}
+
+async function readCliOAuthFlowStatus(
+  database: D1Database,
+  flowId: CliOAuthFlowId,
+): Promise<CliOAuthDeviceStatus | null> {
+  const row =
+    (await getAppDatabase(database)
+      .select({ status: cliOAuthFlowsTable.status })
+      .from(cliOAuthFlowsTable)
+      .where(eq(cliOAuthFlowsTable.id, flowId))
+      .limit(1)
+      .get()) ?? null;
+
+  return row?.status ?? null;
 }
 
 async function getViewerByAccountId(
