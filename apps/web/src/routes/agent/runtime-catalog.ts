@@ -6,17 +6,12 @@ import {
 
 import type { RuntimeInfo } from "./agent.types";
 
-const RUNTIME_COLOR_BY_ID: Record<string, string> = {
-  "claude-agent-sdk": "#D97757",
-  "openai-runtime": "#7A9DFF",
-};
-
 const FALLBACK_RUNTIME_COLOR_INK_700 = "#3d434b";
 const FALLBACK_RUNTIME_COLOR_INK_500 = "#656c75";
 
 function toRuntimeInfo(entry: (typeof PUBLIC_RUNTIME_CATALOG)[number]): RuntimeInfo {
   return {
-    color: RUNTIME_COLOR_BY_ID[entry.runtimeId] ?? FALLBACK_RUNTIME_COLOR_INK_700,
+    color: entry.display.color ?? FALLBACK_RUNTIME_COLOR_INK_700,
     defaultModel: entry.defaultModel,
     icon: entry.label
       .split(/\s+/)
@@ -26,7 +21,7 @@ function toRuntimeInfo(entry: (typeof PUBLIC_RUNTIME_CATALOG)[number]): RuntimeI
     id: entry.runtimeId,
     name: entry.label,
     provider: entry.defaultProvider,
-    vendor: entry.vendors[0]?.label ?? entry.defaultProvider,
+    vendor: entry.display.providerLabel ?? entry.vendors[0]?.label ?? entry.defaultProvider,
   };
 }
 

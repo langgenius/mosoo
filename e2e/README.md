@@ -45,11 +45,24 @@ Live provider cases require one of:
 MOSOO_E2E_PROVIDER_API_KEY=...
 MOSOO_E2E_OPENAI_API_KEY=...
 MOSOO_E2E_ANTHROPIC_API_KEY=...
+MOSOO_E2E_DEEPSEEK_API_KEY=...
 ```
 
-Use `MOSOO_E2E_PROVIDER=openai|anthropic` to choose the runtime provider.
+Use `MOSOO_E2E_PROVIDER=openai|anthropic|deepseek` to choose the runtime provider.
 Optional environment can live in `.env`, `MOSOO_ENV_FILE`, or
 `MOSOO_E2E_ENV_FILE`.
+
+`MOSOO_E2E_PROVIDER=deepseek` is supported by the `public-api runtime` case. It creates an
+OpenAI-Compatible credential with:
+
+```bash
+MOSOO_E2E_DEEPSEEK_BASE_URL=https://api.deepseek.com
+MOSOO_E2E_DEEPSEEK_MODEL=deepseek-v4-pro
+```
+
+By default it runs through `openai-runtime`. Set `MOSOO_E2E_RUNTIME_ID` to target another
+public runtime; the target must accept OpenAI-Compatible custom providers. Planned display-only
+runtimes such as OpenClaw are rejected until they become public launchable runtimes.
 
 Common optional values:
 
@@ -57,6 +70,7 @@ Common optional values:
 MOSOO_E2E_EMAIL=preview-smoke@mosoo.ai
 MOSOO_E2E_BASE_URL=http://127.0.0.1:5173
 WEB_DEV_PORT=5173
+MOSOO_E2E_RUNTIME_ID=openai-runtime
 MOSOO_E2E_LATENCY_LABEL=current
 MOSOO_E2E_LATENCY_OUTPUT=.tmp/e2e/preview-latency-current.json
 ```

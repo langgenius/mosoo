@@ -1,23 +1,11 @@
-import { PUBLIC_RUNTIME_CATALOG } from "@mosoo/runtime-catalog";
+import { PUBLIC_RUNTIME_CATALOG, listPlannedRuntimeDisplayEntries } from "@mosoo/runtime-catalog";
 import type { ReactElement } from "react";
 
 import type { VendorCredential } from "@/domains/vendor-credential/api/vendor-credential-client";
 import { cn } from "@/shared/lib/class-names";
 import { RuntimeIcon, hasRuntimeIcon } from "@/shared/ui/brand-icons";
 
-interface ComingSoonRuntime {
-  label: string;
-  provider: string;
-  runtimeId: string;
-}
-
-// Runtimes we have not shipped credential support for yet. Not catalog vendors,
-// so they never resolve a key — they render as inert "Coming soon" rows.
-const COMING_SOON_RUNTIMES: readonly ComingSoonRuntime[] = [
-  { label: "Pi", provider: "Inflection AI", runtimeId: "pi" },
-  { label: "Hermes", provider: "Hermes", runtimeId: "hermes" },
-  { label: "OpenClaw", provider: "OpenClaw", runtimeId: "openclaw" },
-];
+const COMING_SOON_RUNTIMES = listPlannedRuntimeDisplayEntries("provider-settings");
 
 function RuntimeRow({
   label,
@@ -103,7 +91,7 @@ export function RuntimeAvailabilitySection({
           <RuntimeRow
             key={runtime.runtimeId}
             label={runtime.label}
-            provider={runtime.provider}
+            provider={runtime.providerLabel}
             runtimeId={runtime.runtimeId}
             status="Coming soon"
             tone="muted"

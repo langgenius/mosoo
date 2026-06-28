@@ -1,16 +1,29 @@
 import {
-  ANTHROPIC_DEFAULT_MODEL_ID,
-  OPENAI_DEFAULT_MODEL_ID,
+  admitModelId,
   admitProviderId,
   admitRuntimeId,
   createRuntimeModelIdentity,
-  getPresetModelForIdentity,
-  listPresetModelsForVendor,
 } from "@mosoo/contracts/models";
-import type { PresetModelEntry, RuntimeModelIdentity } from "@mosoo/contracts/models";
+import type {
+  ModelId,
+  PresetModelEntry,
+  PresetModelProtocol,
+  RuntimeModelIdentity,
+  RuntimeModelProviderRef,
+} from "@mosoo/contracts/models";
+
+import {
+  GENERATED_MODEL_DEFAULT_IDS,
+  GENERATED_PLANNED_RUNTIME_DISPLAY_CATALOG,
+  GENERATED_PRESET_MODEL_CATALOG,
+  GENERATED_RUNTIME_CATALOG,
+  GENERATED_VENDOR_CATALOG,
+} from "./catalog.generated";
 
 export type RuntimeCatalogTransport = "openai-app-server" | "claude-agent-sdk" | "acp-fallback";
 export type RuntimeCatalogVisibility = "internal" | "public";
+export type RuntimeDisplaySurface = "landing" | "provider-settings";
+export type RuntimeDisplayStatus = "available" | "coming-soon";
 export type RuntimeCatalogCapabilityId =
   | "custom_tool_execute"
   | "input_start"
@@ -24,11 +37,13 @@ export type RuntimeCatalogCapabilityId =
   | "turn_cancel"
   | "usage"
   | "visible_activity";
+
 export interface RuntimeCatalogCapability {
   readonly id: RuntimeCatalogCapabilityId;
   readonly status: "supported" | "unsupported";
   readonly version: 1;
 }
+
 export type RuntimeCatalogVendorAuthHeader =
   | {
       readonly apiKeyHeader: "Authorization";
@@ -60,6 +75,13 @@ export interface RuntimeCatalogVendor {
   readonly vendorId: string;
 }
 
+export interface RuntimeCatalogDisplay {
+  readonly color?: string;
+  readonly iconKey: string;
+  readonly providerLabel?: string;
+  readonly showcaseLabel?: string;
+}
+
 export interface RuntimeCatalogEntry {
   readonly acceptsCustomProvider: boolean;
   readonly capabilities: readonly RuntimeCatalogCapability[];
@@ -67,6 +89,7 @@ export interface RuntimeCatalogEntry {
   readonly defaultModel: string;
   readonly defaultProvider: string;
   readonly disabledReason?: string;
+  readonly display: RuntimeCatalogDisplay;
   readonly label: string;
   readonly runtimeId: string;
   /**
@@ -84,9 +107,22 @@ export interface RuntimeCatalogEntry {
   readonly visibility: RuntimeCatalogVisibility;
 }
 
-type RuntimeCatalogVendorInput = Omit<RuntimeCatalogVendor, "vendorId"> & {
-  readonly vendorId: string;
-};
+export interface RuntimeDisplayCatalogEntry {
+  readonly color?: string;
+  readonly iconKey: string;
+  readonly label: string;
+  readonly providerLabel: string;
+  readonly runtimeId: string;
+  readonly status: RuntimeDisplayStatus;
+}
+
+export interface PlannedRuntimeDisplayEntry {
+  readonly iconKey: string;
+  readonly label: string;
+  readonly providerLabel: string;
+  readonly runtimeId: string;
+  readonly surfaces: readonly RuntimeDisplaySurface[];
+}
 
 type RuntimeCatalogEntryInput = Omit<
   RuntimeCatalogEntry,
@@ -95,9 +131,45 @@ type RuntimeCatalogEntryInput = Omit<
   readonly runtimeId: string;
 };
 
-function runtimeCatalogVendor(input: RuntimeCatalogVendorInput): RuntimeCatalogVendor {
+function presetModel(input: (typeof GENERATED_PRESET_MODEL_CATALOG)[number]): PresetModelEntry {
   return {
-    ...input,
+    displayName: input.displayName,
+    modelId: admitModelId(input.modelId),
+    protocol: input.protocol as PresetModelProtocol,
+    vendorId: admitProviderId(input.vendorId),
+    vendorLabel: input.vendorLabel,
+  };
+}
+
+function runtimeCatalogVendorAuthHeader(
+  input: (typeof GENERATED_VENDOR_CATALOG)[number]["authHeader"],
+): RuntimeCatalogVendorAuthHeader {
+  if (input.scheme === "bearer") {
+    return {
+      apiKeyHeader: "Authorization",
+      scheme: "bearer",
+    };
+  }
+
+  return {
+    apiKeyHeader: "x-api-key",
+    extraHeaders: input.extraHeaders,
+    scheme: "api-key",
+  };
+}
+
+function runtimeCatalogVendor(
+  input: (typeof GENERATED_VENDOR_CATALOG)[number],
+): RuntimeCatalogVendor {
+  const apiBaseEnvVar = "apiBaseEnvVar" in input ? input.apiBaseEnvVar : undefined;
+  const defaultApiBase = "defaultApiBase" in input ? input.defaultApiBase : undefined;
+
+  return {
+    ...(apiBaseEnvVar !== undefined ? { apiBaseEnvVar } : {}),
+    ...(defaultApiBase !== undefined ? { defaultApiBase } : {}),
+    apiKeyEnvVar: input.apiKeyEnvVar,
+    authHeader: runtimeCatalogVendorAuthHeader(input.authHeader),
+    label: input.label,
     vendorId: admitProviderId(input.vendorId),
   };
 }
@@ -117,92 +189,154 @@ function runtimeCatalogEntry(input: RuntimeCatalogEntryInput): RuntimeCatalogEnt
   };
 }
 
-export const VENDOR_ANTHROPIC = runtimeCatalogVendor({
-  apiBaseEnvVar: "ANTHROPIC_BASE_URL",
-  apiKeyEnvVar: "ANTHROPIC_API_KEY",
-  authHeader: {
-    apiKeyHeader: "x-api-key",
-    extraHeaders: {
-      "anthropic-version": "2023-06-01",
-    },
-    scheme: "api-key",
-  },
-  defaultApiBase: "https://api.anthropic.com",
-  label: "Anthropic",
-  vendorId: "anthropic",
-});
-
-export const VENDOR_OPENAI = runtimeCatalogVendor({
-  apiBaseEnvVar: "OPENAI_BASE_URL",
-  apiKeyEnvVar: "OPENAI_API_KEY",
-  authHeader: {
-    apiKeyHeader: "Authorization",
-    scheme: "bearer",
-  },
-  defaultApiBase: "https://api.openai.com/v1",
-  label: "OpenAI",
-  vendorId: "openai",
-});
-
-export const VENDOR_OPENAI_COMPATIBLE = runtimeCatalogVendor({
-  apiBaseEnvVar: "OPENAI_COMPATIBLE_BASE_URL",
-  apiKeyEnvVar: "OPENAI_COMPATIBLE_API_KEY",
-  authHeader: {
-    apiKeyHeader: "Authorization",
-    scheme: "bearer",
-  },
-  label: "OpenAI-Compatible",
-  vendorId: "openai-compatible",
-});
-
-export const VENDOR_OPENCODE = runtimeCatalogVendor({
-  apiKeyEnvVar: "OPENCODE_API_KEY",
-  authHeader: {
-    apiKeyHeader: "Authorization",
-    scheme: "bearer",
-  },
-  defaultApiBase: "https://opencode.ai/zen/v1",
-  label: "OpenCode Zen",
-  vendorId: "opencode",
-});
-
-export const ALL_VENDORS = [
-  VENDOR_ANTHROPIC,
-  VENDOR_OPENAI,
-  VENDOR_OPENAI_COMPATIBLE,
-  VENDOR_OPENCODE,
-] as const satisfies readonly RuntimeCatalogVendor[];
-
-function modelIdsForVendor(vendorId: string): readonly string[] {
-  return listPresetModelsForVendor(vendorId).map((model) => model.modelId);
+function runtimeCatalogCapability(input: {
+  readonly id: string;
+  readonly status: "supported" | "unsupported";
+  readonly version: 1;
+}): RuntimeCatalogCapability {
+  return {
+    id: input.id as RuntimeCatalogCapabilityId,
+    status: input.status,
+    version: input.version,
+  };
 }
 
-const CLAUDE_AGENT_SDK_SUPPORTED_MODEL_IDS = modelIdsForVendor(VENDOR_ANTHROPIC.vendorId);
-const OPENAI_RUNTIME_SUPPORTED_MODEL_IDS = modelIdsForVendor(VENDOR_OPENAI.vendorId);
-const OPENCODE_SUPPORTED_MODEL_IDS = modelIdsForVendor(VENDOR_OPENCODE.vendorId);
+function requireVendor(vendorId: string): RuntimeCatalogVendor {
+  const vendor = ALL_VENDORS.find((candidate) => candidate.vendorId === vendorId);
 
-const ACP_FALLBACK_SUPPORTED_MODEL_IDS = [
-  ...CLAUDE_AGENT_SDK_SUPPORTED_MODEL_IDS,
-  ...OPENAI_RUNTIME_SUPPORTED_MODEL_IDS,
-  ...OPENCODE_SUPPORTED_MODEL_IDS,
-] as const;
+  if (vendor === undefined) {
+    throw new Error(`Runtime catalog references unknown vendor ${vendorId}.`);
+  }
 
-const STANDARD_RUNTIME_CAPABILITIES = [
-  { id: "custom_tool_execute", status: "unsupported", version: 1 },
-  { id: "input_start", status: "supported", version: 1 },
-  { id: "mcp_execute", status: "supported", version: 1 },
-  { id: "native_resume", status: "supported", version: 1 },
-  { id: "permission_request", status: "supported", version: 1 },
-  { id: "session_stop", status: "supported", version: 1 },
-  { id: "thinking_stream", status: "supported", version: 1 },
-  { id: "text_stream", status: "supported", version: 1 },
-  { id: "tool_stream", status: "supported", version: 1 },
-  { id: "turn_cancel", status: "supported", version: 1 },
-  { id: "usage", status: "supported", version: 1 },
-  { id: "visible_activity", status: "supported", version: 1 },
-] as const satisfies readonly RuntimeCatalogCapability[];
+  return vendor;
+}
+
+function createGeneratedRuntimeCatalogEntry(
+  input: (typeof GENERATED_RUNTIME_CATALOG)[number],
+): RuntimeCatalogEntry {
+  const disabledReason = "disabledReason" in input ? input.disabledReason : undefined;
+  const color = "color" in input.display ? input.display.color : undefined;
+  const providerLabel = "providerLabel" in input.display ? input.display.providerLabel : undefined;
+  const showcaseLabel = "showcaseLabel" in input.display ? input.display.showcaseLabel : undefined;
+
+  return runtimeCatalogEntry({
+    acceptsCustomProvider: input.acceptsCustomProvider,
+    capabilities: input.capabilities.map(runtimeCatalogCapability),
+    defaultIdentity: createCatalogRuntimeModelIdentity({
+      modelId: input.defaultIdentity.modelId,
+      providerId: input.defaultIdentity.providerId,
+      runtimeId: input.runtimeId,
+    }),
+    ...(disabledReason !== undefined ? { disabledReason } : {}),
+    display: {
+      ...(color !== undefined ? { color } : {}),
+      ...(providerLabel !== undefined ? { providerLabel } : {}),
+      ...(showcaseLabel !== undefined ? { showcaseLabel } : {}),
+      iconKey: input.display.iconKey,
+    },
+    label: input.label,
+    runtimeId: input.runtimeId,
+    supportedModelIds: input.supportedModelIds.map((modelId) => admitModelId(modelId)),
+    transport: input.transport,
+    vendors: input.vendorIds.map(requireVendor),
+    visibility: input.visibility,
+  });
+}
+
+function plannedRuntimeDisplayEntry(
+  input: (typeof GENERATED_PLANNED_RUNTIME_DISPLAY_CATALOG)[number],
+): PlannedRuntimeDisplayEntry {
+  return {
+    iconKey: input.iconKey,
+    label: input.label,
+    providerLabel: input.providerLabel,
+    runtimeId: input.runtimeId,
+    surfaces: input.surfaces.map(admitRuntimeDisplaySurface),
+  };
+}
+
+function admitRuntimeDisplaySurface(value: string): RuntimeDisplaySurface {
+  if (value === "landing" || value === "provider-settings") {
+    return value;
+  }
+
+  throw new Error(`Unsupported runtime display surface ${value}.`);
+}
+
+function toPublicRuntimeDisplayEntry(entry: RuntimeCatalogEntry): RuntimeDisplayCatalogEntry {
+  return {
+    ...(entry.display.color !== undefined ? { color: entry.display.color } : {}),
+    iconKey: entry.display.iconKey,
+    label: entry.display.showcaseLabel ?? entry.label,
+    providerLabel: entry.display.providerLabel ?? entry.vendors[0]?.label ?? entry.defaultProvider,
+    runtimeId: entry.runtimeId,
+    status: "available",
+  };
+}
+
+function toComingSoonRuntimeDisplayEntry(
+  entry: PlannedRuntimeDisplayEntry,
+): RuntimeDisplayCatalogEntry {
+  return {
+    iconKey: entry.iconKey,
+    label: entry.label,
+    providerLabel: entry.providerLabel,
+    runtimeId: entry.runtimeId,
+    status: "coming-soon",
+  };
+}
+
+export const PRESET_MODEL_CATALOG: readonly PresetModelEntry[] =
+  GENERATED_PRESET_MODEL_CATALOG.map(presetModel);
+
+export const ANTHROPIC_DEFAULT_MODEL_ID = admitModelId(GENERATED_MODEL_DEFAULT_IDS.anthropic);
+export const OPENAI_DEFAULT_MODEL_ID = admitModelId(GENERATED_MODEL_DEFAULT_IDS.openai);
+
+export const ALL_VENDORS: readonly RuntimeCatalogVendor[] =
+  GENERATED_VENDOR_CATALOG.map(runtimeCatalogVendor);
+
+export const VENDOR_ANTHROPIC = requireVendor("anthropic");
+export const VENDOR_OPENAI = requireVendor("openai");
+export const VENDOR_OPENAI_COMPATIBLE = requireVendor("openai-compatible");
+export const VENDOR_OPENCODE = requireVendor("opencode");
 
 export const SYSTEM_AGENT_RUNTIME_ID = "system-agent";
+
+export function listPresetModelsForProvider(provider: RuntimeModelProviderRef): PresetModelEntry[] {
+  if (provider.kind !== "preset") {
+    return [];
+  }
+
+  return PRESET_MODEL_CATALOG.filter((entry) => entry.vendorId === provider.providerId);
+}
+
+export function listPresetModelsForVendor(vendorId: string): PresetModelEntry[] {
+  return PRESET_MODEL_CATALOG.filter((entry) => entry.vendorId === vendorId);
+}
+
+export function getPresetModelForIdentity(identity: RuntimeModelIdentity): PresetModelEntry | null {
+  if (identity.provider.kind !== "preset") {
+    return null;
+  }
+
+  return (
+    PRESET_MODEL_CATALOG.find(
+      (entry) =>
+        entry.vendorId === identity.provider.providerId && entry.modelId === identity.modelId,
+    ) ?? null
+  );
+}
+
+export function getPresetModel(input: {
+  readonly modelId: string;
+  readonly vendorId: string;
+}): PresetModelEntry | null {
+  return (
+    PRESET_MODEL_CATALOG.find(
+      (entry) => entry.vendorId === input.vendorId && entry.modelId === input.modelId,
+    ) ?? null
+  );
+}
 
 export function createCatalogRuntimeModelIdentity(input: {
   readonly modelId: string;
@@ -221,69 +355,9 @@ export function createCatalogRuntimeModelIdentity(input: {
   });
 }
 
-export const RUNTIME_CATALOG = [
-  runtimeCatalogEntry({
-    acceptsCustomProvider: false,
-    capabilities: STANDARD_RUNTIME_CAPABILITIES,
-    defaultIdentity: createCatalogRuntimeModelIdentity({
-      modelId: ANTHROPIC_DEFAULT_MODEL_ID,
-      providerId: VENDOR_ANTHROPIC.vendorId,
-      runtimeId: "claude-agent-sdk",
-    }),
-    label: "Claude Agent SDK",
-    runtimeId: "claude-agent-sdk",
-    supportedModelIds: CLAUDE_AGENT_SDK_SUPPORTED_MODEL_IDS,
-    transport: "claude-agent-sdk",
-    vendors: [VENDOR_ANTHROPIC],
-    visibility: "public",
-  }),
-  runtimeCatalogEntry({
-    acceptsCustomProvider: true,
-    capabilities: [],
-    defaultIdentity: createCatalogRuntimeModelIdentity({
-      modelId: OPENAI_DEFAULT_MODEL_ID,
-      providerId: VENDOR_OPENAI.vendorId,
-      runtimeId: SYSTEM_AGENT_RUNTIME_ID,
-    }),
-    disabledReason: "System Agent is an internal configuration helper.",
-    label: "System Agent",
-    runtimeId: SYSTEM_AGENT_RUNTIME_ID,
-    supportedModelIds: OPENAI_RUNTIME_SUPPORTED_MODEL_IDS,
-    transport: "openai-app-server",
-    vendors: [VENDOR_OPENAI],
-    visibility: "internal",
-  }),
-  runtimeCatalogEntry({
-    acceptsCustomProvider: true,
-    capabilities: STANDARD_RUNTIME_CAPABILITIES,
-    defaultIdentity: createCatalogRuntimeModelIdentity({
-      modelId: OPENAI_DEFAULT_MODEL_ID,
-      providerId: VENDOR_OPENAI.vendorId,
-      runtimeId: "openai-runtime",
-    }),
-    label: "OpenAI Runtime",
-    runtimeId: "openai-runtime",
-    supportedModelIds: OPENAI_RUNTIME_SUPPORTED_MODEL_IDS,
-    transport: "openai-app-server",
-    vendors: [VENDOR_OPENAI],
-    visibility: "public",
-  }),
-  runtimeCatalogEntry({
-    acceptsCustomProvider: false,
-    capabilities: STANDARD_RUNTIME_CAPABILITIES,
-    defaultIdentity: createCatalogRuntimeModelIdentity({
-      modelId: OPENAI_DEFAULT_MODEL_ID,
-      providerId: VENDOR_OPENAI.vendorId,
-      runtimeId: "acp-fallback",
-    }),
-    label: "OpenCode",
-    runtimeId: "acp-fallback",
-    supportedModelIds: ACP_FALLBACK_SUPPORTED_MODEL_IDS,
-    transport: "acp-fallback",
-    vendors: [VENDOR_OPENAI, VENDOR_ANTHROPIC, VENDOR_OPENCODE],
-    visibility: "public",
-  }),
-] as const satisfies readonly RuntimeCatalogEntry[];
+export const RUNTIME_CATALOG: readonly RuntimeCatalogEntry[] = GENERATED_RUNTIME_CATALOG.map(
+  createGeneratedRuntimeCatalogEntry,
+);
 
 export const PUBLIC_RUNTIME_CATALOG: readonly RuntimeCatalogEntry[] = RUNTIME_CATALOG.filter(
   (entry) => entry.visibility === "public",
@@ -298,6 +372,40 @@ export const PUBLIC_VENDORS: readonly RuntimeCatalogVendor[] = ALL_VENDORS.filte
       entry.vendors.some((runtimeVendor) => runtimeVendor.vendorId === vendor.vendorId),
     ),
 );
+
+export const PLANNED_RUNTIME_DISPLAY_CATALOG: readonly PlannedRuntimeDisplayEntry[] =
+  GENERATED_PLANNED_RUNTIME_DISPLAY_CATALOG.map(plannedRuntimeDisplayEntry);
+
+export const PUBLIC_RUNTIME_DISPLAY_CATALOG: readonly RuntimeDisplayCatalogEntry[] =
+  PUBLIC_RUNTIME_CATALOG.map(toPublicRuntimeDisplayEntry);
+
+export function listPlannedRuntimeDisplayEntries(
+  surface: RuntimeDisplaySurface,
+): RuntimeDisplayCatalogEntry[] {
+  return PLANNED_RUNTIME_DISPLAY_CATALOG.filter((entry) => entry.surfaces.includes(surface)).map(
+    toComingSoonRuntimeDisplayEntry,
+  );
+}
+
+export function listRuntimeShowcaseDisplayEntries(): RuntimeDisplayCatalogEntry[] {
+  return [...PUBLIC_RUNTIME_DISPLAY_CATALOG, ...listPlannedRuntimeDisplayEntries("landing")];
+}
+
+export function getRuntimeIconKey(runtimeId: string): string | null {
+  const publicRuntime = RUNTIME_CATALOG.find((entry) => entry.runtimeId === runtimeId);
+
+  if (publicRuntime !== undefined) {
+    return publicRuntime.display.iconKey;
+  }
+
+  return (
+    PLANNED_RUNTIME_DISPLAY_CATALOG.find((entry) => entry.runtimeId === runtimeId)?.iconKey ?? null
+  );
+}
+
+export function getRuntimeDisplayColor(runtimeId: string): string | null {
+  return RUNTIME_CATALOG.find((entry) => entry.runtimeId === runtimeId)?.display.color ?? null;
+}
 
 export function getRuntimeCatalogEntry(runtimeId: string): RuntimeCatalogEntry | null {
   return RUNTIME_CATALOG.find((candidate) => candidate.runtimeId === runtimeId) ?? null;
@@ -351,7 +459,7 @@ function isOpenAiCompatibleProvider(providerId: string): boolean {
   return providerId === VENDOR_OPENAI_COMPATIBLE.vendorId;
 }
 
-function runtimeSupportsPresetModel(runtime: RuntimeCatalogEntry, modelId: string): boolean {
+function runtimeSupportsPresetModel(runtime: RuntimeCatalogEntry, modelId: ModelId): boolean {
   return runtime.supportedModelIds === undefined || runtime.supportedModelIds.includes(modelId);
 }
 

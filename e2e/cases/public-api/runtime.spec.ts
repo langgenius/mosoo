@@ -1,11 +1,19 @@
 import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api";
-import { PUBLIC_RUNTIME_CATALOG } from "@mosoo/runtime-catalog";
+import {
+  PUBLIC_RUNTIME_CATALOG,
+  VENDOR_OPENAI_COMPATIBLE,
+  listPresetModelsForVendor,
+} from "@mosoo/runtime-catalog";
 import { expect, test } from "@playwright/test";
 import type { APIRequestContext } from "@playwright/test";
 
 import { createRuntimeSignalCollector } from "../../lib/runtime-progress";
 
-type ProviderId = "anthropic" | "openai";
+type ProviderId = "anthropic" | "deepseek" | "openai";
+type RuntimeCredentialVendorId = "anthropic" | "openai" | typeof VENDOR_OPENAI_COMPATIBLE.vendorId;
+
+const DEFAULT_DEEPSEEK_API_BASE = "https://api.deepseek.com";
+const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
 
 interface GraphQLResponse<TData> {
   data?: TData;
@@ -13,8 +21,11 @@ interface GraphQLResponse<TData> {
 }
 
 interface RuntimeSelection {
+  apiBase: string | null;
+  credentialVendorId: RuntimeCredentialVendorId;
   model: string;
   providerId: ProviderId;
+  providerModelIds: readonly string[];
   runtimeId: string;
 }
 
@@ -29,6 +40,10 @@ function readProviderId(): ProviderId {
     return "anthropic";
   }
 
+  if (provider === "deepseek") {
+    return "deepseek";
+  }
+
   throw new Error(`Unsupported MOSOO_E2E_PROVIDER=${provider}.`);
 }
 
@@ -37,7 +52,9 @@ function requireProviderApiKey(providerId: ProviderId): string {
     process.env["MOSOO_E2E_PROVIDER_API_KEY"]?.trim() ||
     (providerId === "anthropic"
       ? process.env["MOSOO_E2E_ANTHROPIC_API_KEY"]?.trim()
-      : process.env["MOSOO_E2E_OPENAI_API_KEY"]?.trim()) ||
+      : providerId === "deepseek"
+        ? process.env["MOSOO_E2E_DEEPSEEK_API_KEY"]?.trim()
+        : process.env["MOSOO_E2E_OPENAI_API_KEY"]?.trim()) ||
     "";
 
   if (apiKey.length === 0) {
@@ -47,22 +64,92 @@ function requireProviderApiKey(providerId: ProviderId): string {
   return apiKey;
 }
 
-function getRuntimeSelection(providerId: ProviderId): RuntimeSelection {
-  const runtime = PUBLIC_RUNTIME_CATALOG.find(
-    (entry) =>
-      entry.defaultProvider === providerId &&
-      entry.vendors.some((vendor) => vendor.vendorId === providerId),
-  );
+function findPublicRuntime(runtimeId: string) {
+  return PUBLIC_RUNTIME_CATALOG.find((entry) => entry.runtimeId === runtimeId);
+}
+
+function readRuntimeIdOverride(): string | null {
+  return process.env["MOSOO_E2E_RUNTIME_ID"]?.trim() || null;
+}
+
+function selectPresetRuntime(providerId: "anthropic" | "openai"): RuntimeSelection {
+  const runtimeIdOverride = readRuntimeIdOverride();
+  const runtime =
+    runtimeIdOverride === null
+      ? PUBLIC_RUNTIME_CATALOG.find(
+          (entry) =>
+            entry.defaultProvider === providerId &&
+            entry.vendors.some((vendor) => vendor.vendorId === providerId),
+        )
+      : findPublicRuntime(runtimeIdOverride);
 
   if (runtime === undefined) {
-    throw new Error(`No public runtime catalog entry for provider ${providerId}.`);
+    throw new Error(
+      runtimeIdOverride === null
+        ? `No public runtime catalog entry for provider ${providerId}.`
+        : `No public runtime catalog entry for MOSOO_E2E_RUNTIME_ID=${runtimeIdOverride}.`,
+    );
+  }
+
+  if (!runtime.vendors.some((vendor) => vendor.vendorId === providerId)) {
+    throw new Error(`Runtime ${runtime.runtimeId} does not support provider ${providerId}.`);
+  }
+
+  const model =
+    runtime.defaultProvider === providerId
+      ? runtime.defaultModel
+      : listPresetModelsForVendor(providerId).find((entry) =>
+          runtime.supportedModelIds?.includes(entry.modelId),
+        )?.modelId;
+
+  if (model === undefined) {
+    throw new Error(
+      `Runtime ${runtime.runtimeId} does not expose a model for provider ${providerId}.`,
+    );
   }
 
   return {
-    model: runtime.defaultModel,
+    apiBase: null,
+    credentialVendorId: providerId,
+    model,
     providerId,
+    providerModelIds: [],
     runtimeId: runtime.runtimeId,
   };
+}
+
+function selectDeepSeekRuntime(): RuntimeSelection {
+  const runtimeId = readRuntimeIdOverride() ?? "openai-runtime";
+  const runtime = findPublicRuntime(runtimeId);
+
+  if (runtime === undefined) {
+    throw new Error(`No public runtime catalog entry for MOSOO_E2E_RUNTIME_ID=${runtimeId}.`);
+  }
+
+  if (!runtime.acceptsCustomProvider) {
+    throw new Error(
+      `Runtime ${runtime.runtimeId} does not accept OpenAI-compatible custom providers. Use a public runtime with acceptsCustomProvider=true before running DeepSeek live E2E.`,
+    );
+  }
+
+  const model = process.env["MOSOO_E2E_DEEPSEEK_MODEL"]?.trim() || DEFAULT_DEEPSEEK_MODEL;
+
+  return {
+    apiBase: process.env["MOSOO_E2E_DEEPSEEK_BASE_URL"]?.trim() || DEFAULT_DEEPSEEK_API_BASE,
+    credentialVendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
+    model,
+    providerId: "deepseek",
+    providerModelIds: [model],
+    runtimeId: runtime.runtimeId,
+  };
+}
+
+function getRuntimeSelection(providerId: ProviderId): RuntimeSelection {
+  if (providerId === "deepseek") {
+    return selectDeepSeekRuntime();
+  }
+
+  return selectPresetRuntime(providerId);
 }
 
 function runId(): string {
@@ -231,7 +318,7 @@ async function createAgent(
         name: input.name,
         appId: input.appId,
         prompt: "Reply concisely. Do not use tools.",
-        provider: input.runtime.providerId,
+        provider: input.runtime.credentialVendorId,
         runtimeId: input.runtime.runtimeId,
         skillIds: [],
       },
@@ -245,9 +332,11 @@ async function configureProviderCredential(
   request: APIRequestContext,
   input: {
     apiKey: string;
+    apiBase: string | null;
     appId: string;
     label: string;
-    providerId: ProviderId;
+    providerId: RuntimeCredentialVendorId;
+    providerModelIds: readonly string[];
   },
 ): Promise<void> {
   const created = await requestGraphQL<{
@@ -265,8 +354,9 @@ async function configureProviderCredential(
     `,
     {
       input: {
+        apiBase: input.apiBase,
         apiKey: input.apiKey,
-        models: [],
+        models: input.providerModelIds,
         name: input.label,
         appId: input.appId,
         vendorId: input.providerId,
@@ -484,11 +574,16 @@ test("Public API creates a real runtime thread and receives runtime events", asy
   });
   await configureProviderCredential(request, {
     apiKey,
+    apiBase: runtime.apiBase,
     appId,
     label: `Public API runtime ${label}`,
-    providerId,
+    providerId: runtime.credentialVendorId,
+    providerModelIds: runtime.providerModelIds,
   });
-  signals.checkpoint("api.provider.configured", { provider: providerId });
+  signals.checkpoint("api.provider.configured", {
+    provider: providerId,
+    runtimeProvider: runtime.credentialVendorId,
+  });
   await publishAgent(request, { agentId, appId });
   signals.checkpoint("api.agent.published", { agentId });
   const pat = await createPersonalAccessToken(request, `Public API runtime ${label}`);

@@ -26,6 +26,7 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 
 ### Runtime & sessions
 
+- [Runtime Catalog Extension](./runtime-catalog.md)
 - [Runtime Session Kernel](./runtime-session-kernel.md)
 - [Agent Session API](./agent-session-api.md)
 - [Runtime State Operations](./runtime-state-operations.md)
