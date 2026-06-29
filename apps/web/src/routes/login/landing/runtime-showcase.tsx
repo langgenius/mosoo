@@ -1,5 +1,5 @@
 import { listRuntimeShowcaseDisplayEntries } from "@mosoo/runtime-catalog";
-import { Check, Clock } from "lucide-react";
+import { Check } from "lucide-react";
 import { AnimatePresence, m, useReducedMotion } from "motion/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
@@ -33,8 +33,6 @@ function CheckDot(): ReactElement {
 }
 
 function RuntimeCard({ runtime }: { runtime: Runtime }): ReactElement {
-  const available = runtime.status === "available";
-
   return (
     <div className="border-border-soft bg-bg-elevated rounded-[18px] border p-5 shadow-sm">
       <div className="flex items-center gap-3">
@@ -45,17 +43,10 @@ function RuntimeCard({ runtime }: { runtime: Runtime }): ReactElement {
           <p className="text-fg-1 text-[15px] font-semibold tracking-[-0.01em]">{runtime.label}</p>
           <p className="text-fg-3 text-[12.5px]">{runtime.providerLabel}</p>
         </div>
-        {available ? (
-          <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-800">
-            <span className="size-1.5 rounded-full bg-green-600" />
-            Available
-          </span>
-        ) : (
-          <span className="bg-bg-sunken text-fg-3 inline-flex items-center gap-1.5 rounded-[6px] px-2 py-1 text-[11px] font-semibold">
-            <Clock className="size-3" />
-            Coming soon
-          </span>
-        )}
+        <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-800">
+          <span className="size-1.5 rounded-full bg-green-600" />
+          Available
+        </span>
       </div>
 
       <div className="border-border-soft text-fg-2 mt-4 flex items-center gap-2 border-t pt-4 text-[13px]">

@@ -253,41 +253,5 @@
       },
     },
   ],
-  "plannedRuntimes": [
-    {
-      "runtimeId": "openclaw",
-      "label": "OpenClaw",
-      "providerLabel": "OpenClaw",
-      "iconKey": "openclaw",
-      "surfaces": ["landing", "provider-settings"],
-    },
-    {
-      "runtimeId": "hermes",
-      "label": "Hermes",
-      "providerLabel": "Hermes",
-      "iconKey": "hermes",
-      "surfaces": ["landing", "provider-settings"],
-    },
-    {
-      "runtimeId": "gemini",
-      "label": "Gemini",
-      "providerLabel": "Google",
-      "iconKey": "gemini",
-      "surfaces": ["landing"],
-    },
-    {
-      "runtimeId": "pi",
-      "label": "Pi",
-      "providerLabel": "Inflection AI",
-      "iconKey": "pi",
-      "surfaces": ["landing", "provider-settings"],
-    },
-    {
-      "runtimeId": "cursor-agent",
-      "label": "Cursor Agent",
-      "providerLabel": "Cursor",
-      "iconKey": "cursor",
-      "surfaces": ["landing"],
-    },
-  ],
+  "plannedRuntimes": [],
 }

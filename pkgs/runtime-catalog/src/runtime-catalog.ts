@@ -124,6 +124,14 @@ export interface PlannedRuntimeDisplayEntry {
   readonly surfaces: readonly RuntimeDisplaySurface[];
 }
 
+interface GeneratedPlannedRuntimeDisplayEntry {
+  readonly iconKey: string;
+  readonly label: string;
+  readonly providerLabel: string;
+  readonly runtimeId: string;
+  readonly surfaces: readonly string[];
+}
+
 type RuntimeCatalogEntryInput = Omit<
   RuntimeCatalogEntry,
   "defaultModel" | "defaultProvider" | "runtimeId"
@@ -244,7 +252,7 @@ function createGeneratedRuntimeCatalogEntry(
 }
 
 function plannedRuntimeDisplayEntry(
-  input: (typeof GENERATED_PLANNED_RUNTIME_DISPLAY_CATALOG)[number],
+  input: GeneratedPlannedRuntimeDisplayEntry,
 ): PlannedRuntimeDisplayEntry {
   return {
     iconKey: input.iconKey,
@@ -373,8 +381,9 @@ export const PUBLIC_VENDORS: readonly RuntimeCatalogVendor[] = ALL_VENDORS.filte
     ),
 );
 
-export const PLANNED_RUNTIME_DISPLAY_CATALOG: readonly PlannedRuntimeDisplayEntry[] =
-  GENERATED_PLANNED_RUNTIME_DISPLAY_CATALOG.map(plannedRuntimeDisplayEntry);
+export const PLANNED_RUNTIME_DISPLAY_CATALOG: readonly PlannedRuntimeDisplayEntry[] = (
+  GENERATED_PLANNED_RUNTIME_DISPLAY_CATALOG as readonly GeneratedPlannedRuntimeDisplayEntry[]
+).map(plannedRuntimeDisplayEntry);
 
 export const PUBLIC_RUNTIME_DISPLAY_CATALOG: readonly RuntimeDisplayCatalogEntry[] =
   PUBLIC_RUNTIME_CATALOG.map(toPublicRuntimeDisplayEntry);

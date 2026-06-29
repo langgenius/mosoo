@@ -456,40 +456,4 @@ export const GENERATED_RUNTIME_CATALOG = [
   },
 ] as const;
 
-export const GENERATED_PLANNED_RUNTIME_DISPLAY_CATALOG = [
-  {
-    iconKey: "openclaw",
-    label: "OpenClaw",
-    providerLabel: "OpenClaw",
-    runtimeId: "openclaw",
-    surfaces: ["landing", "provider-settings"],
-  },
-  {
-    iconKey: "hermes",
-    label: "Hermes",
-    providerLabel: "Hermes",
-    runtimeId: "hermes",
-    surfaces: ["landing", "provider-settings"],
-  },
-  {
-    iconKey: "gemini",
-    label: "Gemini",
-    providerLabel: "Google",
-    runtimeId: "gemini",
-    surfaces: ["landing"],
-  },
-  {
-    iconKey: "pi",
-    label: "Pi",
-    providerLabel: "Inflection AI",
-    runtimeId: "pi",
-    surfaces: ["landing", "provider-settings"],
-  },
-  {
-    iconKey: "cursor",
-    label: "Cursor Agent",
-    providerLabel: "Cursor",
-    runtimeId: "cursor-agent",
-    surfaces: ["landing"],
-  },
-] as const;
+export const GENERATED_PLANNED_RUNTIME_DISPLAY_CATALOG = [] as const;

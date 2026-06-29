@@ -1,11 +1,10 @@
-import { PUBLIC_RUNTIME_CATALOG, listPlannedRuntimeDisplayEntries } from "@mosoo/runtime-catalog";
 import type { ReactElement } from "react";
 
 import type { VendorCredential } from "@/domains/vendor-credential/api/vendor-credential-client";
 import { cn } from "@/shared/lib/class-names";
 import { RuntimeIcon, hasRuntimeIcon } from "@/shared/ui/brand-icons";
 
-const COMING_SOON_RUNTIMES = listPlannedRuntimeDisplayEntries("provider-settings");
+import { listRuntimeAvailabilityRows } from "./runtime-availability-model";
 
 function RuntimeRow({
   label,
@@ -56,7 +55,7 @@ export function RuntimeAvailabilitySection({
 }: {
   credentials: readonly VendorCredential[];
 }): ReactElement {
-  const configuredVendorIds = new Set(credentials.map((credential) => credential.vendorId));
+  const rows = listRuntimeAvailabilityRows(credentials);
 
   return (
     <section className="border-border bg-card rounded-lg border p-4">
@@ -68,33 +67,14 @@ export function RuntimeAvailabilitySection({
         </p>
       </div>
       <div className="space-y-2">
-        {PUBLIC_RUNTIME_CATALOG.map((runtime) => {
-          const [vendor] = runtime.vendors;
-          const ready = vendor !== undefined && configuredVendorIds.has(vendor.vendorId);
-          const provider = vendor?.label ?? runtime.defaultProvider;
-          const status =
-            runtime.disabledReason ??
-            (ready ? "Ready" : `Add a ${vendor?.label ?? "provider"} key`);
-
-          return (
-            <RuntimeRow
-              key={runtime.runtimeId}
-              label={runtime.label}
-              provider={provider}
-              runtimeId={runtime.runtimeId}
-              status={status}
-              tone={ready && runtime.disabledReason === undefined ? "ready" : "muted"}
-            />
-          );
-        })}
-        {COMING_SOON_RUNTIMES.map((runtime) => (
+        {rows.map((runtime) => (
           <RuntimeRow
             key={runtime.runtimeId}
             label={runtime.label}
-            provider={runtime.providerLabel}
+            provider={runtime.provider}
             runtimeId={runtime.runtimeId}
-            status="Coming soon"
-            tone="muted"
+            status={runtime.status}
+            tone={runtime.tone}
           />
         ))}
       </div>

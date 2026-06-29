@@ -226,9 +226,9 @@ describe("runtime catalog identity admission", () => {
         runtimeId: "opencode",
       }),
     );
-    expect(
-      listPlannedRuntimeDisplayEntries("provider-settings").map((entry) => entry.runtimeId),
-    ).toEqual(["openclaw", "hermes", "pi"]);
+    expect(listPlannedRuntimeDisplayEntries("provider-settings")).toEqual([]);
+    expect(listPlannedRuntimeDisplayEntries("landing")).toEqual([]);
+    expect(listRuntimeShowcaseDisplayEntries()).toEqual(PUBLIC_RUNTIME_DISPLAY_CATALOG);
     expect(getRuntimeIconKey("acp-fallback")).toBe("opencode");
     expect(getRuntimeDisplayColor("openai-runtime")).toBe("#7A9DFF");
   });
