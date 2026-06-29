@@ -27,7 +27,7 @@ describe("default agent runtime", () => {
 
   test("uses an OpenCode Zen model when only OpenCode Zen is configured", () => {
     expect(resolveDefaultAgentRuntime([credential("opencode")])).toEqual({
-      model: "qwen3.6-plus",
+      model: "deepseek-v4-pro",
       provider: "opencode",
       runtimeId: "acp-fallback",
     });

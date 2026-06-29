@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
 import type { AccountId, OrganizationId, AppId, VendorCredentialId } from "@mosoo/id";
-import { VENDOR_OPENAI, VENDOR_OPENAI_COMPATIBLE } from "@mosoo/runtime-catalog";
+import { VENDOR_DEEPSEEK, VENDOR_OPENAI, VENDOR_OPENAI_COMPATIBLE } from "@mosoo/runtime-catalog";
 
 import { collectRuntimeCapabilityIssues } from "../src/modules/agents/application/agent-runtime-capability-resolution.service";
 import {
@@ -36,6 +36,10 @@ const CUSTOM_PRIMARY_CREDENTIAL_ID = parsePlatformId<VendorCredentialId>(
 const CUSTOM_SECONDARY_CREDENTIAL_ID = parsePlatformId<VendorCredentialId>(
   "01J00000000000000000000005",
   "secondary custom credential ID",
+);
+const DEEPSEEK_CREDENTIAL_ID = parsePlatformId<VendorCredentialId>(
+  "01J00000000000000000000006",
+  "DeepSeek credential ID",
 );
 
 function createCredentialRuntimeDatabase(): SqliteD1Database {
@@ -143,6 +147,18 @@ async function insertVendorCredential(
       input.vendorId,
     )
     .run();
+}
+
+function readFetchRequestUrl(input: Parameters<typeof fetch>[0]): string {
+  if (typeof input === "string") {
+    return input;
+  }
+
+  if (input instanceof URL) {
+    return input.href;
+  }
+
+  return input.url;
 }
 
 describe("vendor credential runtime selection", () => {
@@ -302,5 +318,70 @@ describe("vendor credential runtime selection", () => {
         targetLabel: VENDOR_OPENAI.vendorId,
       }),
     );
+  });
+
+  test("allows DeepSeek readiness to verify preset models through chat completions", async () => {
+    const database = createCredentialRuntimeDatabase();
+    const bindings = {
+      DB: database,
+      VAULT_ROOT_SECRET: "test-vault-root-secret",
+    } as ApiBindings;
+    const deepSeekSecretId = await storeVendorCredentialSecret(bindings, {
+      apiKey: "deepseek-key",
+      credentialId: DEEPSEEK_CREDENTIAL_ID,
+      appId: APP_ID,
+      providerId: VENDOR_DEEPSEEK.vendorId,
+      purpose: "credential_create_api_key",
+    });
+
+    await insertVendorCredential(database, {
+      apiBase: null,
+      credentialId: DEEPSEEK_CREDENTIAL_ID,
+      models: null,
+      name: "DeepSeek",
+      secretId: deepSeekSecretId,
+      vendorId: VENDOR_DEEPSEEK.vendorId,
+    });
+
+    const originalFetch = globalThis.fetch;
+    const requestedUrls: string[] = [];
+    globalThis.fetch = async (...args: Parameters<typeof fetch>): Promise<Response> => {
+      const requestUrl = readFetchRequestUrl(args[0]);
+      requestedUrls.push(requestUrl);
+
+      if (requestUrl.endsWith("/models")) {
+        return Response.json({ data: [] });
+      }
+
+      if (requestUrl.endsWith("/chat/completions")) {
+        return Response.json({ id: "probe-ok" });
+      }
+
+      return new Response("not found", { status: 404 });
+    };
+
+    try {
+      const issues = await collectRuntimeCapabilityIssues({
+        actorAccountId: APP_OWNER_ID,
+        bindings,
+        codePrefix: "agent.readiness",
+        database,
+        appId: APP_ID,
+        selection: {
+          model: "deepseek-v4-pro",
+          provider: VENDOR_DEEPSEEK.vendorId,
+          runtimeId: "acp-fallback",
+        },
+      });
+
+      expect(issues).not.toContainEqual(
+        expect.objectContaining({
+          code: "agent.readiness.provider.error",
+        }),
+      );
+      expect(requestedUrls.some((url) => url.endsWith("/chat/completions"))).toBe(true);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

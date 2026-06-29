@@ -1,4 +1,5 @@
 import { PUBLIC_VENDORS, getVendor } from "@mosoo/runtime-catalog";
+import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { ReactElement } from "react";
@@ -17,6 +18,7 @@ import { canUseCustomEndpoint } from "@/domains/vendor-credential/model/provider
 import { getErrorMessage } from "@/domains/vendor-credential/model/provider-credential-error";
 import { formatProviderErrorMessage } from "@/domains/vendor-credential/model/provider-readiness-copy";
 import { toAppId, toVendorCredentialId } from "@/routes/typed-id";
+import { VendorIcon, hasVendorIcon } from "@/shared/ui/brand-icons";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
@@ -25,6 +27,11 @@ import { ProviderTestStatus } from "./provider-test-status";
 import { RuntimeAvailabilitySection } from "./runtime-availability-section";
 
 const CUSTOM_PROVIDER_VENDOR_ID = "openai-compatible";
+const CUSTOM_PROVIDER_DISPLAY: Pick<RuntimeCatalogVendor, "iconKey" | "label" | "vendorId"> = {
+  iconKey: "openai",
+  label: "Custom models",
+  vendorId: CUSTOM_PROVIDER_VENDOR_ID,
+};
 
 type TestState = "failure" | "idle" | "running" | "success";
 
@@ -60,8 +67,8 @@ const providerCredentialKeys = {
   list: (appId: string) => ["vendor-credentials", appId] as const,
 };
 
-// Preset providers (Anthropic, OpenAI) carry a default endpoint; pre-fill it so
-// the user does not have to look it up. OpenAI-compatible has no default.
+// Preset providers can carry a default endpoint; pre-fill it so the user does
+// not have to look it up. OpenAI-compatible has no default.
 function defaultApiBaseForVendor(vendorId: string): string {
   return getVendor(vendorId)?.defaultApiBase ?? "";
 }
@@ -271,7 +278,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
       >
         <Button onClick={() => startCreate(CUSTOM_PROVIDER_VENDOR_ID)} size="sm" variant="outline">
           <Plus className="size-3.5" />
-          Add OpenAI-compatible provider
+          Add custom model
         </Button>
       </PageHeader>
 
@@ -310,27 +317,30 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
                   setError(getErrorMessage(caughtError, "Failed to set default provider key."));
                 });
               }}
-              vendorId={vendor.vendorId}
+              vendor={vendor}
             />
           ))}
 
-          <ProviderCredentialSection
-            credentials={groupedCredentials.get(CUSTOM_PROVIDER_VENDOR_ID) ?? []}
-            formControls={formControls}
-            onCreate={() => startCreate(CUSTOM_PROVIDER_VENDOR_ID)}
-            onDelete={(credential) => {
-              void deleteMutation.mutateAsync(credential).catch((caughtError) => {
-                setError(getErrorMessage(caughtError, "Failed to delete provider key."));
-              });
-            }}
-            onEdit={startEdit}
-            onSetDefault={(credential) => {
-              void setDefaultMutation.mutateAsync(credential).catch((caughtError) => {
-                setError(getErrorMessage(caughtError, "Failed to set default provider key."));
-              });
-            }}
-            vendorId={CUSTOM_PROVIDER_VENDOR_ID}
-          />
+          {(groupedCredentials.get(CUSTOM_PROVIDER_VENDOR_ID)?.length ?? 0) > 0 ||
+          form.vendorId === CUSTOM_PROVIDER_VENDOR_ID ? (
+            <ProviderCredentialSection
+              credentials={groupedCredentials.get(CUSTOM_PROVIDER_VENDOR_ID) ?? []}
+              formControls={formControls}
+              onCreate={() => startCreate(CUSTOM_PROVIDER_VENDOR_ID)}
+              onDelete={(credential) => {
+                void deleteMutation.mutateAsync(credential).catch((caughtError) => {
+                  setError(getErrorMessage(caughtError, "Failed to delete provider key."));
+                });
+              }}
+              onEdit={startEdit}
+              onSetDefault={(credential) => {
+                void setDefaultMutation.mutateAsync(credential).catch((caughtError) => {
+                  setError(getErrorMessage(caughtError, "Failed to set default provider key."));
+                });
+              }}
+              vendor={CUSTOM_PROVIDER_DISPLAY}
+            />
+          ) : null}
         </div>
       </main>
     </div>
@@ -436,7 +446,7 @@ function ProviderCredentialSection({
   onDelete,
   onEdit,
   onSetDefault,
-  vendorId,
+  vendor,
 }: {
   credentials: readonly VendorCredential[];
   formControls: ProviderFormControls;
@@ -444,16 +454,25 @@ function ProviderCredentialSection({
   onDelete: (credential: VendorCredential) => void;
   onEdit: (credential: VendorCredential) => void;
   onSetDefault: (credential: VendorCredential) => void;
-  vendorId: string;
+  vendor: Pick<RuntimeCatalogVendor, "iconKey" | "label" | "vendorId">;
 }): ReactElement {
+  const { vendorId } = vendor;
   const isFormOpen = formControls.form.vendorId === vendorId;
 
   return (
     <section className="border-border bg-card space-y-3 rounded-lg border p-4">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-fg-1 text-[15px] font-semibold">{vendorLabel(vendorId)}</h2>
-          <p className="text-muted-foreground text-[12px]">App-level provider keys</p>
+        <div className="flex min-w-0 items-center gap-3">
+          {hasVendorIcon(vendor.iconKey) ? (
+            <VendorIcon
+              className="size-7 shrink-0 rounded-md bg-white p-1"
+              iconKey={vendor.iconKey}
+            />
+          ) : null}
+          <div className="min-w-0">
+            <h2 className="text-fg-1 truncate text-[15px] font-semibold">{vendor.label}</h2>
+            <p className="text-muted-foreground text-[12px]">App-level provider keys</p>
+          </div>
         </div>
         {isFormOpen ? null : (
           <Button onClick={onCreate} size="sm" variant="outline">

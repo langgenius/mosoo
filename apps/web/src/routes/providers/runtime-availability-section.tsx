@@ -8,13 +8,11 @@ import { listRuntimeAvailabilityRows } from "./runtime-availability-model";
 
 function RuntimeRow({
   label,
-  provider,
   runtimeId,
   status,
   tone,
 }: {
   label: string;
-  provider: string;
   runtimeId: string;
   status: string;
   tone: "muted" | "ready";
@@ -32,17 +30,21 @@ function RuntimeRow({
         ) : null}
         <div className="min-w-0">
           <div className="text-foreground truncate text-sm font-medium">{label}</div>
-          <div className="text-muted-foreground truncate text-xs">{provider}</div>
         </div>
       </div>
       <span
-        className={
-          tone === "ready"
-            ? "text-success-fg shrink-0 text-xs font-medium"
-            : "text-muted-foreground shrink-0 text-xs"
-        }
+        className={cn(
+          "flex min-w-0 shrink items-center gap-1.5 truncate text-xs font-medium",
+          tone === "ready" ? "text-success-fg" : "text-muted-foreground",
+        )}
       >
-        {status}
+        <span
+          className={cn(
+            "size-1.5 shrink-0 rounded-full",
+            tone === "ready" ? "bg-success-fg" : "bg-muted-foreground/60",
+          )}
+        />
+        <span className="truncate">{status}</span>
       </span>
     </div>
   );
@@ -71,7 +73,6 @@ export function RuntimeAvailabilitySection({
           <RuntimeRow
             key={runtime.runtimeId}
             label={runtime.label}
-            provider={runtime.provider}
             runtimeId={runtime.runtimeId}
             status={runtime.status}
             tone={runtime.tone}

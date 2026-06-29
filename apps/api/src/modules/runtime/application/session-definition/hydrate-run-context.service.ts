@@ -68,6 +68,12 @@ const OPENCODE_CONFIG_CONTENT_ENV = "OPENCODE_CONFIG_CONTENT";
 const HYDRATED_RUN_CONTEXT_CACHE_TTL_MS = 20_000;
 const hydratedRunContextCache = new Map<string, HydratedRunContextCacheEntry>();
 
+interface OpenCodeProviderConfig {
+  readonly name?: string;
+  readonly npm?: string;
+  readonly options: Record<string, string>;
+}
+
 async function resolveRuntimeProfileIds(
   bindings: ApiBindings,
   input: {
@@ -183,32 +189,36 @@ function buildOpenCodeConfig(input: RuntimeVendorEnvironmentInput): string {
   });
 }
 
-function buildOpenCodeProviderConfig(
-  input: RuntimeVendorEnvironmentInput,
-): Record<string, unknown> {
+function buildOpenCodeProviderConfig(input: RuntimeVendorEnvironmentInput): OpenCodeProviderConfig {
   const options: Record<string, string> = {
     apiKey: `{env:${input.vendor.apiKeyEnvVar}}`,
   };
-  const openCodeProvider = input.vendor.openCodeProvider;
+  const provider = input.vendor.openCodeProvider;
 
-  if (openCodeProvider?.kind === "openai-compatible") {
-    const apiBase = input.credential.apiBase ?? input.vendor.defaultApiBase;
-
-    if (!isTruthy(apiBase)) {
-      throw new Error(`${input.vendor.label} requires a base URL for OpenCode.`);
-    }
-
-    enforceSafeApiBase(apiBase);
-    options[openCodeProvider.apiBaseOption] = apiBase;
-
-    return {
-      name: input.vendor.label,
-      npm: openCodeProvider.npmPackage,
-      options,
-    };
+  if (provider === undefined) {
+    return { options };
   }
 
-  return { options };
+  if (provider.apiBaseOption !== undefined) {
+    options[provider.apiBaseOption] = resolveOpenCodeProviderApiBase(input);
+  }
+
+  return {
+    name: provider.name,
+    npm: provider.npmPackage,
+    options,
+  };
+}
+
+function resolveOpenCodeProviderApiBase(input: RuntimeVendorEnvironmentInput): string {
+  const apiBase = input.credential.apiBase ?? input.vendor.defaultApiBase ?? null;
+
+  if (!isTruthy(apiBase)) {
+    throw new Error(`${input.vendor.label} requires a Base URL before it can be used by OpenCode.`);
+  }
+
+  enforceSafeApiBase(apiBase);
+  return apiBase;
 }
 
 async function hydrateRunContextFromSession(

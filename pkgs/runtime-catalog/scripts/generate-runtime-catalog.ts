@@ -56,14 +56,25 @@ interface RawVendor {
   apiKeyEnvVar: string;
   authHeader: unknown;
   defaultApiBase?: string;
+  iconKey: string;
   label: string;
+  modelSource?: RawVendorModelSource;
   openCodeProvider?: RawOpenCodeProvider;
   vendorId: string;
 }
 
+type RawVendorModelSource =
+  | {
+      kind: "manual";
+    }
+  | {
+      kind: "models.dev";
+      providerId: string;
+    };
+
 interface RawOpenCodeProvider {
-  apiBaseOption: string;
-  kind: string;
+  apiBaseOption?: "baseURL";
+  name: string;
   npmPackage: string;
 }
 
@@ -235,27 +246,47 @@ function readAuthHeader(value: unknown, label: string): RawVendor["authHeader"] 
   fail(`${label}.scheme must be bearer or api-key.`);
 }
 
+function readVendorModelSource(value: unknown, label: string): RawVendorModelSource | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const source = readRecord(value, label);
+  const kind = readString(source["kind"], `${label}.kind`);
+
+  if (kind === "manual") {
+    return { kind };
+  }
+
+  if (kind === "models.dev") {
+    return {
+      kind,
+      providerId: readString(source["providerId"], `${label}.providerId`),
+    };
+  }
+
+  fail(`${label}.kind must be manual or models.dev.`);
+}
+
 function readOpenCodeProvider(value: unknown, label: string): RawOpenCodeProvider | undefined {
   if (value === undefined) {
     return undefined;
   }
 
-  const record = readRecord(value, label);
-  const kind = readString(record["kind"], `${label}.kind`);
-  const apiBaseOption = readString(record["apiBaseOption"], `${label}.apiBaseOption`);
+  const provider = readRecord(value, label);
+  const apiBaseOption =
+    provider["apiBaseOption"] === undefined
+      ? undefined
+      : readString(provider["apiBaseOption"], `${label}.apiBaseOption`);
 
-  if (kind !== "openai-compatible") {
-    fail(`${label}.kind must be openai-compatible.`);
-  }
-
-  if (apiBaseOption !== "baseURL") {
+  if (apiBaseOption !== undefined && apiBaseOption !== "baseURL") {
     fail(`${label}.apiBaseOption must be baseURL.`);
   }
 
   return {
-    apiBaseOption,
-    kind,
-    npmPackage: readString(record["npmPackage"], `${label}.npmPackage`),
+    ...(apiBaseOption === undefined ? {} : { apiBaseOption }),
+    name: readString(provider["name"], `${label}.name`),
+    npmPackage: readString(provider["npmPackage"], `${label}.npmPackage`),
   };
 }
 
@@ -334,21 +365,36 @@ function readCapabilityProfiles(value: unknown): Record<string, RawCapability[]>
 function readVendors(value: unknown): RawVendor[] {
   return readArray(value, "catalog.vendors").map((item, index) => {
     const vendor = readRecord(item, `vendors[${index}]`);
+    const defaultApiBase = readOptionalString(
+      vendor["defaultApiBase"],
+      `vendors[${index}].defaultApiBase`,
+    );
+    const openCodeProvider = readOpenCodeProvider(
+      vendor["openCodeProvider"],
+      `vendors[${index}].openCodeProvider`,
+    );
+    const vendorId = readString(vendor["vendorId"], `vendors[${index}].vendorId`);
+
+    if (
+      openCodeProvider?.apiBaseOption === "baseURL" &&
+      defaultApiBase === undefined &&
+      vendorId !== "openai-compatible"
+    ) {
+      fail(
+        `vendors[${index}].openCodeProvider.apiBaseOption requires defaultApiBase unless the vendor is openai-compatible.`,
+      );
+    }
 
     return {
       apiBaseEnvVar: readOptionalString(vendor["apiBaseEnvVar"], `vendors[${index}].apiBaseEnvVar`),
       apiKeyEnvVar: readString(vendor["apiKeyEnvVar"], `vendors[${index}].apiKeyEnvVar`),
       authHeader: readAuthHeader(vendor["authHeader"], `vendors[${index}].authHeader`),
-      defaultApiBase: readOptionalString(
-        vendor["defaultApiBase"],
-        `vendors[${index}].defaultApiBase`,
-      ),
+      defaultApiBase,
+      iconKey: readString(vendor["iconKey"], `vendors[${index}].iconKey`),
       label: readString(vendor["label"], `vendors[${index}].label`),
-      openCodeProvider: readOpenCodeProvider(
-        vendor["openCodeProvider"],
-        `vendors[${index}].openCodeProvider`,
-      ),
-      vendorId: readString(vendor["vendorId"], `vendors[${index}].vendorId`),
+      modelSource: readVendorModelSource(vendor["modelSource"], `vendors[${index}].modelSource`),
+      openCodeProvider,
+      vendorId,
     };
   });
 }
@@ -631,7 +677,7 @@ function arrayLiteral(items: readonly unknown[], depth: number): string {
   if (items.every(isPrimitiveLiteral)) {
     const inline = `[${items.map((item) => literal(item, depth)).join(", ")}]`;
 
-    if (inline.length + indentation(depth).length <= 100) {
+    if (inline.length + indentation(depth).length <= 80) {
       return inline;
     }
   }

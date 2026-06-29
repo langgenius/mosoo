@@ -8,7 +8,15 @@ export function toVendorProbeEndpointUrl(
   suffix: "chat/completions" | "models",
 ): string {
   const trimmed = apiBase.replace(/\/+$/u, "");
-  return trimmed.endsWith("/v1") ? `${trimmed}/${suffix}` : `${trimmed}/v1/${suffix}`;
+
+  try {
+    const url = new URL(trimmed);
+    const hasPathBase = url.pathname.replace(/\/+$/u, "").length > 0;
+
+    return hasPathBase ? `${trimmed}/${suffix}` : `${trimmed}/v1/${suffix}`;
+  } catch {
+    return trimmed.endsWith("/v1") ? `${trimmed}/${suffix}` : `${trimmed}/v1/${suffix}`;
+  }
 }
 
 export function toVendorProbeAuthHeaders(
