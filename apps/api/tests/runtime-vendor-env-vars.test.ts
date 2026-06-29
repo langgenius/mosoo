@@ -23,6 +23,7 @@ describe("runtime vendor env vars", () => {
           apiBase: "http://api.example.com/v1",
           apiKey: "sk-runtime",
           credentialId: "01J000000000000000000000C3",
+          models: null,
         },
         model: "gpt-5.4",
         runtimeId: "openai-runtime",
@@ -38,6 +39,7 @@ describe("runtime vendor env vars", () => {
           apiBase: "https://localhost./v1",
           apiKey: "sk-runtime",
           credentialId: "01J000000000000000000000C4",
+          models: null,
         },
         model: "gpt-5.4",
         runtimeId: "openai-runtime",
@@ -54,6 +56,7 @@ describe("runtime vendor env vars", () => {
         apiBase: null,
         apiKey: "sk-opencode",
         credentialId: "01J000000000000000000000C5",
+        models: null,
       },
       model: "qwen3.6-plus",
       runtimeId: "acp-fallback",
@@ -85,6 +88,7 @@ describe("runtime vendor env vars", () => {
         apiBase: null,
         apiKey: "sk-deepseek",
         credentialId: "01J000000000000000000000C6",
+        models: null,
       },
       model: "deepseek-v4-pro",
       runtimeId: "acp-fallback",
@@ -155,6 +159,7 @@ describe("runtime vendor env vars", () => {
           apiBase: null,
           apiKey: "sk-provider",
           credentialId: "01J000000000000000000000C7",
+          models: null,
         },
         model,
         runtimeId: "acp-fallback",
@@ -184,14 +189,15 @@ describe("runtime vendor env vars", () => {
     },
   );
 
-  test("generates OpenCode custom provider config from stored OpenAI-compatible Base URL", () => {
+  test("generates OpenCode custom provider config for a DeepSeek-backed OpenAI-compatible model", () => {
     const envVars = buildRuntimeVendorEnvVars({
       credential: {
-        apiBase: "https://models.example.com/v1",
+        apiBase: "https://api.deepseek.com",
         apiKey: "sk-custom",
         credentialId: "01J000000000000000000000C8",
+        models: ["deepseek-v4-flash"],
       },
-      model: "qwen-coder",
+      model: "deepseek-v4-flash",
       runtimeId: "acp-fallback",
       vendor: VENDOR_OPENAI_COMPATIBLE,
     });
@@ -201,18 +207,23 @@ describe("runtime vendor env vars", () => {
     >;
 
     expect(envVars["OPENAI_COMPATIBLE_API_KEY"]).toBe("sk-custom");
-    expect(envVars["OPENAI_COMPATIBLE_BASE_URL"]).toBe("https://models.example.com/v1");
+    expect(envVars["OPENAI_COMPATIBLE_BASE_URL"]).toBe("https://api.deepseek.com");
     expect(config).toMatchObject({
       enabled_providers: ["openai-compatible"],
-      model: "openai-compatible/qwen-coder",
-      small_model: "openai-compatible/qwen-coder",
+      model: "openai-compatible/deepseek-v4-flash",
+      small_model: "openai-compatible/deepseek-v4-flash",
       provider: {
         "openai-compatible": {
+          models: {
+            "deepseek-v4-flash": {
+              name: "deepseek-v4-flash",
+            },
+          },
           name: "OpenAI Compatible",
           npm: "@ai-sdk/openai-compatible",
           options: {
             apiKey: "{env:OPENAI_COMPATIBLE_API_KEY}",
-            baseURL: "https://models.example.com/v1",
+            baseURL: "https://api.deepseek.com",
           },
         },
       },

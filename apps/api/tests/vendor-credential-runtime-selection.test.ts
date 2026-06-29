@@ -199,17 +199,17 @@ describe("vendor credential runtime selection", () => {
       vendorId: "openai",
     });
     await insertVendorCredential(database, {
-      apiBase: "https://secondary.example.com/v1",
+      apiBase: "https://secondary.deepseek.example/v1",
       credentialId: CUSTOM_SECONDARY_CREDENTIAL_ID,
-      models: ["qwen-coder"],
+      models: ["deepseek-v4-flash"],
       name: "B Custom",
       secretId: secondaryCustomSecretId,
       vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
     });
     await insertVendorCredential(database, {
-      apiBase: "https://primary.example.com/v1",
+      apiBase: "https://api.deepseek.com",
       credentialId: CUSTOM_PRIMARY_CREDENTIAL_ID,
-      models: ["qwen-coder"],
+      models: ["deepseek-v4-flash"],
       name: "A Custom",
       secretId: primaryCustomSecretId,
       vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
@@ -218,22 +218,23 @@ describe("vendor credential runtime selection", () => {
     const credential = await resolveVendorApiKey({
       bindings,
       executionOwnerUserId: APP_OWNER_ID,
-      options: { modelId: "qwen-coder" },
+      options: { modelId: "deepseek-v4-flash" },
       appId: APP_ID,
       vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
     });
 
     expect(credential).toEqual({
-      apiBase: "https://primary.example.com/v1",
+      apiBase: "https://api.deepseek.com",
       apiKey: "custom-primary-key",
       credentialId: CUSTOM_PRIMARY_CREDENTIAL_ID,
+      models: ["deepseek-v4-flash"],
     });
 
     await expect(
       resolveVendorApiKey({
         bindings,
         executionOwnerUserId: OTHER_ACCOUNT_ID,
-        options: { modelId: "qwen-coder" },
+        options: { modelId: "deepseek-v4-flash" },
         appId: APP_ID,
         vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
       }),
@@ -285,6 +286,7 @@ describe("vendor credential runtime selection", () => {
       apiBase: null,
       apiKey: "openai-key",
       credentialId: OPENAI_CREDENTIAL_ID,
+      models: null,
     });
   });
 

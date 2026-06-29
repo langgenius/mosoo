@@ -69,6 +69,7 @@ const HYDRATED_RUN_CONTEXT_CACHE_TTL_MS = 20_000;
 const hydratedRunContextCache = new Map<string, HydratedRunContextCacheEntry>();
 
 interface OpenCodeProviderConfig {
+  readonly models?: Record<string, { name: string }>;
   readonly name?: string;
   readonly npm?: string;
   readonly options: Record<string, string>;
@@ -193,10 +194,17 @@ function buildOpenCodeProviderConfig(input: RuntimeVendorEnvironmentInput): Open
   const options: Record<string, string> = {
     apiKey: `{env:${input.vendor.apiKeyEnvVar}}`,
   };
+  const models =
+    input.credential.models === null
+      ? undefined
+      : Object.fromEntries(input.credential.models.map((modelId) => [modelId, { name: modelId }]));
   const provider = input.vendor.openCodeProvider;
 
   if (provider === undefined) {
-    return { options };
+    return {
+      ...(models === undefined ? {} : { models }),
+      options,
+    };
   }
 
   if (provider.apiBaseOption !== undefined) {
@@ -204,6 +212,7 @@ function buildOpenCodeProviderConfig(input: RuntimeVendorEnvironmentInput): Open
   }
 
   return {
+    ...(models === undefined ? {} : { models }),
     name: provider.name,
     npm: provider.npmPackage,
     options,

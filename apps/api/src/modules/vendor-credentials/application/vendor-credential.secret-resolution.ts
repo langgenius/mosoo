@@ -13,6 +13,7 @@ import {
   storeSecret,
 } from "../../mcp/application/mcp-secret-store";
 import { findCustomCredentialRowForModel } from "./vendor-credential-custom-models";
+import { parseCredentialModels } from "./vendor-credential.mapper";
 import {
   getAppVendorCredentialRow,
   listAppCustomCredentialRows,
@@ -241,6 +242,7 @@ async function resolveCredentialFromRow(
     apiBase: command.credential.apiBase,
     apiKey: secret.apiKey,
     credentialId: command.credential.id,
+    models: parseCredentialModels(command.credential.modelsJson),
   };
 }
 
