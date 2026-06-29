@@ -121,6 +121,7 @@ export function toRuntimeProcessProxyEnv(bindings: RuntimeProxyBindings): Record
   const noProxy = mergeRuntimeNoProxy(readRuntimeProxyBinding(bindings, "MOSOO_RUNTIME_NO_PROXY"));
   env["NO_PROXY"] = noProxy;
   env["no_proxy"] = noProxy;
+  env["NODE_USE_ENV_PROXY"] = "1";
 
   return env;
 }

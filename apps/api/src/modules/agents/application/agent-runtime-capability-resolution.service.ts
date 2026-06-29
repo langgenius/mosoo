@@ -6,10 +6,12 @@ import type {
 import { vendorCredentialsTable } from "@mosoo/db";
 import type { AccountId, AppId } from "@mosoo/id";
 import {
+  VENDOR_DEEPSEEK,
   VENDOR_OPENAI,
   VENDOR_OPENAI_COMPATIBLE,
   VENDOR_OPENCODE,
   getRuntimeCatalogEntry,
+  getVendor,
 } from "@mosoo/runtime-catalog";
 import { and, asc, eq } from "drizzle-orm";
 
@@ -42,11 +44,21 @@ interface RuntimeCapabilityIssueInput {
 }
 
 const READINESS_PROVIDER_PROBE_TIMEOUT_MS = 10_000;
-const OPENAI_SHAPED_PROVIDER_IDS = new Set([
+const BUILT_IN_OPENAI_SHAPED_PROVIDER_IDS = new Set([
+  VENDOR_DEEPSEEK.vendorId,
   VENDOR_OPENAI.vendorId,
   VENDOR_OPENAI_COMPATIBLE.vendorId,
   VENDOR_OPENCODE.vendorId,
 ]);
+const OPENAI_COMPATIBLE_AI_SDK_PACKAGE = "@ai-sdk/openai-compatible";
+
+function allowsOpenAiChatCompletionProbe(providerId: string): boolean {
+  if (BUILT_IN_OPENAI_SHAPED_PROVIDER_IDS.has(providerId)) {
+    return true;
+  }
+
+  return getVendor(providerId)?.openCodeProvider?.npmPackage === OPENAI_COMPATIBLE_AI_SDK_PACKAGE;
+}
 
 async function hasAppCredential(
   database: D1Database,
@@ -156,7 +168,7 @@ async function collectProviderProbeIssues(
   }
 
   const result = await probeVendorCredential({
-    allowChatCompletionProbe: OPENAI_SHAPED_PROVIDER_IDS.has(input.selection.provider),
+    allowChatCompletionProbe: allowsOpenAiChatCompletionProbe(input.selection.provider),
     apiBase: credential.apiBase,
     apiKey: credential.apiKey,
     emitEvent: false,

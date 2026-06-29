@@ -16,6 +16,12 @@ describe("vendor credential probe", () => {
     expect(toVendorProbeEndpointUrl("https://api.example.com/v1/", "chat/completions")).toBe(
       "https://api.example.com/v1/chat/completions",
     );
+    expect(
+      toVendorProbeEndpointUrl("https://generativelanguage.googleapis.com/v1beta/openai", "models"),
+    ).toBe("https://generativelanguage.googleapis.com/v1beta/openai/models");
+    expect(toVendorProbeEndpointUrl("https://api.z.ai/api/paas/v4", "models")).toBe(
+      "https://api.z.ai/api/paas/v4/models",
+    );
   });
 
   test("rejects local and private API base URLs", () => {

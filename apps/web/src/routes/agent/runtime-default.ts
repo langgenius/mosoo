@@ -1,6 +1,7 @@
 import {
   PUBLIC_RUNTIME_CATALOG,
   VENDOR_OPENAI_COMPATIBLE,
+  getDefaultModelIdForVendor,
   listPresetModelsForVendor,
 } from "@mosoo/runtime-catalog";
 
@@ -25,6 +26,15 @@ function defaultModelForVendor(
   }
 
   const supportedModels = entry.supportedModelIds;
+  const defaultModel = getDefaultModelIdForVendor(vendorId);
+
+  if (
+    defaultModel !== null &&
+    (supportedModels === undefined || supportedModels.includes(defaultModel))
+  ) {
+    return defaultModel;
+  }
+
   const model = listPresetModelsForVendor(vendorId).find(
     (candidate) => supportedModels === undefined || supportedModels.includes(candidate.modelId),
   );

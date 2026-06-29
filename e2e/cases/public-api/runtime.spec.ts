@@ -1,18 +1,13 @@
 import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api";
-import {
-  PUBLIC_RUNTIME_CATALOG,
-  VENDOR_OPENAI_COMPATIBLE,
-  listPresetModelsForVendor,
-} from "@mosoo/runtime-catalog";
+import { PUBLIC_RUNTIME_CATALOG, listPresetModelsForVendor } from "@mosoo/runtime-catalog";
 import { expect, test } from "@playwright/test";
 import type { APIRequestContext } from "@playwright/test";
 
 import { createRuntimeSignalCollector } from "../../lib/runtime-progress";
 
-type ProviderId = "anthropic" | "deepseek" | "openai";
-type RuntimeCredentialVendorId = "anthropic" | "openai" | typeof VENDOR_OPENAI_COMPATIBLE.vendorId;
+type ProviderId = "anthropic" | "deepseek" | "openai" | "opencode";
+type RuntimeCredentialVendorId = "anthropic" | "deepseek" | "openai" | "opencode";
 
-const DEFAULT_DEEPSEEK_API_BASE = "https://api.deepseek.com";
 const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
 
 interface GraphQLResponse<TData> {
@@ -40,8 +35,8 @@ function readProviderId(): ProviderId {
     return "anthropic";
   }
 
-  if (provider === "deepseek") {
-    return "deepseek";
+  if (provider === "deepseek" || provider === "opencode") {
+    return provider;
   }
 
   throw new Error(`Unsupported MOSOO_E2E_PROVIDER=${provider}.`);
@@ -54,7 +49,9 @@ function requireProviderApiKey(providerId: ProviderId): string {
       ? process.env["MOSOO_E2E_ANTHROPIC_API_KEY"]?.trim()
       : providerId === "deepseek"
         ? process.env["MOSOO_E2E_DEEPSEEK_API_KEY"]?.trim()
-        : process.env["MOSOO_E2E_OPENAI_API_KEY"]?.trim()) ||
+        : providerId === "opencode"
+          ? process.env["MOSOO_E2E_OPENCODE_API_KEY"]?.trim()
+          : process.env["MOSOO_E2E_OPENAI_API_KEY"]?.trim()) ||
     "";
 
   if (apiKey.length === 0) {
@@ -118,35 +115,52 @@ function selectPresetRuntime(providerId: "anthropic" | "openai"): RuntimeSelecti
   };
 }
 
-function selectDeepSeekRuntime(): RuntimeSelection {
-  const runtimeId = readRuntimeIdOverride() ?? "openai-runtime";
+function selectAcpFallbackRuntime(providerId: "deepseek" | "opencode"): RuntimeSelection {
+  const runtimeId = readRuntimeIdOverride() ?? "acp-fallback";
   const runtime = findPublicRuntime(runtimeId);
 
   if (runtime === undefined) {
     throw new Error(`No public runtime catalog entry for MOSOO_E2E_RUNTIME_ID=${runtimeId}.`);
   }
 
-  if (!runtime.acceptsCustomProvider) {
+  if (!runtime.vendors.some((vendor) => vendor.vendorId === providerId)) {
+    throw new Error(`Runtime ${runtime.runtimeId} does not support provider ${providerId}.`);
+  }
+
+  const model =
+    providerId === "deepseek"
+      ? process.env["MOSOO_E2E_DEEPSEEK_MODEL"]?.trim() || DEFAULT_DEEPSEEK_MODEL
+      : process.env["MOSOO_E2E_OPENCODE_MODEL"]?.trim() ||
+        listPresetModelsForVendor("opencode").find((entry) =>
+          runtime.supportedModelIds?.includes(entry.modelId),
+        )?.modelId;
+
+  if (model === undefined) {
     throw new Error(
-      `Runtime ${runtime.runtimeId} does not accept OpenAI-compatible custom providers. Use a public runtime with acceptsCustomProvider=true before running DeepSeek live E2E.`,
+      `Runtime ${runtime.runtimeId} does not expose a model for provider ${providerId}.`,
     );
   }
 
-  const model = process.env["MOSOO_E2E_DEEPSEEK_MODEL"]?.trim() || DEFAULT_DEEPSEEK_MODEL;
+  const supportsModel = runtime.supportedModelIds?.includes(model) ?? true;
+
+  if (!supportsModel) {
+    throw new Error(`Runtime ${runtime.runtimeId} does not expose ${providerId} model ${model}.`);
+  }
 
   return {
-    apiBase: process.env["MOSOO_E2E_DEEPSEEK_BASE_URL"]?.trim() || DEFAULT_DEEPSEEK_API_BASE,
-    credentialVendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
+    apiBase:
+      providerId === "deepseek" ? process.env["MOSOO_E2E_DEEPSEEK_BASE_URL"]?.trim() || null : null,
+    credentialVendorId: providerId,
     model,
-    providerId: "deepseek",
-    providerModelIds: [model],
+    providerId,
+    providerModelIds: [],
     runtimeId: runtime.runtimeId,
   };
 }
 
 function getRuntimeSelection(providerId: ProviderId): RuntimeSelection {
-  if (providerId === "deepseek") {
-    return selectDeepSeekRuntime();
+  if (providerId === "deepseek" || providerId === "opencode") {
+    return selectAcpFallbackRuntime(providerId);
   }
 
   return selectPresetRuntime(providerId);

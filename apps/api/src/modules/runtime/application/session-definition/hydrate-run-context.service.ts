@@ -68,6 +68,12 @@ const OPENCODE_CONFIG_CONTENT_ENV = "OPENCODE_CONFIG_CONTENT";
 const HYDRATED_RUN_CONTEXT_CACHE_TTL_MS = 20_000;
 const hydratedRunContextCache = new Map<string, HydratedRunContextCacheEntry>();
 
+interface OpenCodeProviderConfig {
+  readonly name?: string;
+  readonly npm?: string;
+  readonly options: Record<string, string>;
+}
+
 async function resolveRuntimeProfileIds(
   bindings: ApiBindings,
   input: {
@@ -170,20 +176,49 @@ export function buildRuntimeVendorEnvVars(
 
 function buildOpenCodeConfig(input: RuntimeVendorEnvironmentInput): string {
   const model = input.model.includes("/") ? input.model : `${input.vendor.vendorId}/${input.model}`;
+  const providerConfig = buildOpenCodeProviderConfig(input);
 
   return JSON.stringify({
     $schema: "https://opencode.ai/config.json",
     enabled_providers: [input.vendor.vendorId],
     model,
     provider: {
-      [input.vendor.vendorId]: {
-        options: {
-          apiKey: `{env:${input.vendor.apiKeyEnvVar}}`,
-        },
-      },
+      [input.vendor.vendorId]: providerConfig,
     },
     small_model: model,
   });
+}
+
+function buildOpenCodeProviderConfig(input: RuntimeVendorEnvironmentInput): OpenCodeProviderConfig {
+  const options: Record<string, string> = {
+    apiKey: `{env:${input.vendor.apiKeyEnvVar}}`,
+  };
+  const provider = input.vendor.openCodeProvider;
+
+  if (provider === undefined) {
+    return { options };
+  }
+
+  if (provider.apiBaseOption !== undefined) {
+    options[provider.apiBaseOption] = resolveOpenCodeProviderApiBase(input);
+  }
+
+  return {
+    name: provider.name,
+    npm: provider.npmPackage,
+    options,
+  };
+}
+
+function resolveOpenCodeProviderApiBase(input: RuntimeVendorEnvironmentInput): string {
+  const apiBase = input.credential.apiBase ?? input.vendor.defaultApiBase ?? null;
+
+  if (!isTruthy(apiBase)) {
+    throw new Error(`${input.vendor.label} requires a Base URL before it can be used by OpenCode.`);
+  }
+
+  enforceSafeApiBase(apiBase);
+  return apiBase;
 }
 
 async function hydrateRunContextFromSession(

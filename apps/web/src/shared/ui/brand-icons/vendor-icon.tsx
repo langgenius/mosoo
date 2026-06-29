@@ -6,12 +6,12 @@ import { VENDOR_ICON_URL } from "./vendor-icon-data";
 
 export function VendorIcon({
   className,
-  vendorId,
+  iconKey,
 }: {
   className?: string;
-  vendorId: string;
+  iconKey: string;
 }): ReactElement | null {
-  const iconUrl = VENDOR_ICON_URL[vendorId];
+  const iconUrl = VENDOR_ICON_URL[iconKey];
 
   if (iconUrl === undefined) {
     return null;

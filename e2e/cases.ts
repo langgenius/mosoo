@@ -84,7 +84,7 @@ export const e2eCases: readonly E2ECase[] = [
     id: ["public-api", "runtime"],
     layer: "public-api",
     requiresEnv: [
-      "MOSOO_E2E_PROVIDER_API_KEY|MOSOO_E2E_OPENAI_API_KEY|MOSOO_E2E_ANTHROPIC_API_KEY|MOSOO_E2E_DEEPSEEK_API_KEY",
+      "MOSOO_E2E_PROVIDER_API_KEY|MOSOO_E2E_OPENAI_API_KEY|MOSOO_E2E_ANTHROPIC_API_KEY|MOSOO_E2E_OPENCODE_API_KEY|MOSOO_E2E_DEEPSEEK_API_KEY",
     ],
   },
   {

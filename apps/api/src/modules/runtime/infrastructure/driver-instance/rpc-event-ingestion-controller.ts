@@ -8,6 +8,7 @@ import type {
   DriverLogBatchOutput,
 } from "agent-driver/orpc";
 
+import { createErrorLogContext, logError } from "../../../../platform/cloudflare/logger";
 import type { SessionDeliveryEvent } from "../../../sessions/application/session-live-state.service";
 import { getSessionRuntimeEventSourceReceipts } from "../../../sessions/infrastructure/session-runtime-event-store.repository";
 import { EVENT_BATCH_MAX_SIZE, LOG_BATCH_MAX_SIZE } from "./connections";
@@ -23,6 +24,14 @@ import type { DriverInstanceRpcOperationContext } from "./rpc";
 import type { DriverInstanceRpcControllerDependencies } from "./rpc-controller-dependencies";
 import { RuntimeEventPersistenceCompactor } from "./runtime-event-persistence-compactor";
 import { filterDurablyAcceptedRuntimeStreamReplays } from "./runtime-event-replay-filter";
+
+function summarizeDriverEvents(events: readonly DriverEventEnvelope[]) {
+  return {
+    eventCount: events.length,
+    eventKinds: events.map((event) => event.event.kind).slice(0, 24),
+    sourceEventIds: events.map((event) => event.eventId).slice(0, 24),
+  };
+}
 
 export class DriverInstanceRpcEventIngestionController {
   readonly #dependencies: DriverInstanceRpcControllerDependencies;
@@ -79,24 +88,52 @@ export class DriverInstanceRpcEventIngestionController {
         return { accepted: replayedAccepted };
       }
 
-      const projection = await appRuntimeDriverEvents(env, {
-        assertCurrentConnection: () => context.assertActiveConnection(),
-        currentLiveState: viewCache.currentState,
-        driverInstanceId,
-        events,
-        link,
-      });
+      const projection = await (async () => {
+        try {
+          return await appRuntimeDriverEvents(env, {
+            assertCurrentConnection: () => context.assertActiveConnection(),
+            currentLiveState: viewCache.currentState,
+            driverInstanceId,
+            events,
+            link,
+          });
+        } catch (error) {
+          logError("runtime.driver.events.projection_failed", {
+            ...createErrorLogContext(error),
+            driverInstanceId,
+            ...summarizeDriverEvents(events),
+          });
+          throw error;
+        }
+      })();
       const persistenceRuntimeEvents = this.#runtimeEventPersistenceCompactor.compact(
         projection.runtimeEvents,
       );
 
-      const commit = await persistProjectedRuntimeDriverEvents(env, {
-        driverInstanceId,
-        projection: {
-          ...projection,
-          runtimeEvents: persistenceRuntimeEvents,
-        },
-      });
+      const commit = await (async () => {
+        try {
+          return await persistProjectedRuntimeDriverEvents(env, {
+            driverInstanceId,
+            projection: {
+              ...projection,
+              runtimeEvents: persistenceRuntimeEvents,
+            },
+          });
+        } catch (error) {
+          logError("runtime.driver.events.persistence_failed", {
+            ...createErrorLogContext(error),
+            driverInstanceId,
+            ...summarizeDriverEvents(events),
+            persistenceEventKinds: persistenceRuntimeEvents
+              .map((event) => event.event.kind)
+              .slice(0, 24),
+            persistenceEventSourceIds: persistenceRuntimeEvents
+              .map((event) => event.sourceEventId)
+              .slice(0, 24),
+          });
+          throw error;
+        }
+      })();
       context.assertActiveConnection();
 
       if (commit.liveState) {

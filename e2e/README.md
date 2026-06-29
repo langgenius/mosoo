@@ -45,24 +45,28 @@ Live provider cases require one of:
 MOSOO_E2E_PROVIDER_API_KEY=...
 MOSOO_E2E_OPENAI_API_KEY=...
 MOSOO_E2E_ANTHROPIC_API_KEY=...
+MOSOO_E2E_OPENCODE_API_KEY=...
 MOSOO_E2E_DEEPSEEK_API_KEY=...
 ```
 
-Use `MOSOO_E2E_PROVIDER=openai|anthropic|deepseek` to choose the runtime provider.
+Use `MOSOO_E2E_PROVIDER=openai|anthropic|opencode|deepseek` to choose the runtime provider.
 Optional environment can live in `.env`, `MOSOO_ENV_FILE`, or
 `MOSOO_E2E_ENV_FILE`.
 
 `MOSOO_E2E_PROVIDER=deepseek` is supported by the `public-api runtime` case. It creates an
-OpenAI-Compatible credential with:
+official DeepSeek credential and runs the DeepSeek preset through the OpenCode ACP fallback
+runtime:
 
 ```bash
+MOSOO_E2E_RUNTIME_ID=acp-fallback
+MOSOO_E2E_DEEPSEEK_API_KEY=...
 MOSOO_E2E_DEEPSEEK_BASE_URL=https://api.deepseek.com
 MOSOO_E2E_DEEPSEEK_MODEL=deepseek-v4-pro
 ```
 
-By default it runs through `openai-runtime`. Set `MOSOO_E2E_RUNTIME_ID` to target another
-public runtime; the target must accept OpenAI-Compatible custom providers. Planned display-only
-runtimes such as OpenClaw are rejected until they become public launchable runtimes.
+Use `MOSOO_E2E_OPENCODE_API_KEY` only for the OpenCode Zen provider. DeepSeek official keys must use
+`MOSOO_E2E_DEEPSEEK_API_KEY` or the generic `MOSOO_E2E_PROVIDER_API_KEY` with
+`MOSOO_E2E_PROVIDER=deepseek`.
 
 Common optional values:
 

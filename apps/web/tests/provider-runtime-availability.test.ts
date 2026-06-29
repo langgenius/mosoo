@@ -30,4 +30,29 @@ describe("provider runtime availability", () => {
     expect(listPlannedRuntimeDisplayEntries("provider-settings")).toEqual([]);
     expect(availabilityRuntimeIds).toEqual(publicRuntimeIds);
   });
+
+  test("marks OpenCode ready from any supported provider, not only the first vendor", () => {
+    const availabilityRows = listRuntimeAvailabilityRows([credential("gemini")]);
+    const openCodeRow = availabilityRows.find((runtime) => runtime.runtimeId === "acp-fallback");
+
+    expect(openCodeRow).toMatchObject({
+      status: "Ready · Gemini configured",
+      tone: "ready",
+    });
+  });
+
+  test("marks custom OpenAI-compatible credentials as runtime readiness for custom-capable runtimes", () => {
+    const availabilityRows = listRuntimeAvailabilityRows([credential("openai-compatible")]);
+    const openCodeRow = availabilityRows.find((runtime) => runtime.runtimeId === "acp-fallback");
+    const claudeRow = availabilityRows.find((runtime) => runtime.runtimeId === "claude-agent-sdk");
+
+    expect(openCodeRow).toMatchObject({
+      status: "Ready · Custom model configured",
+      tone: "ready",
+    });
+    expect(claudeRow).toMatchObject({
+      status: "Needs key · Add Anthropic",
+      tone: "muted",
+    });
+  });
 });

@@ -55,6 +55,21 @@ export type RuntimeCatalogVendorAuthHeader =
       readonly scheme: "api-key";
     };
 
+export type RuntimeCatalogVendorModelSource =
+  | {
+      readonly kind: "manual";
+    }
+  | {
+      readonly kind: "models.dev";
+      readonly providerId: string;
+    };
+
+export interface RuntimeCatalogOpenCodeProvider {
+  readonly apiBaseOption?: "baseURL";
+  readonly name: string;
+  readonly npmPackage: string;
+}
+
 /**
  * Describes the vendor whose API key is required to power a runtime,
  * and the env var names used to inject credentials into the agent process.
@@ -71,7 +86,10 @@ export interface RuntimeCatalogVendor {
   readonly authHeader: RuntimeCatalogVendorAuthHeader;
   readonly defaultApiBase?: string;
   readonly apiKeyEnvVar: string;
+  readonly iconKey: string;
   readonly label: string;
+  readonly modelSource?: RuntimeCatalogVendorModelSource;
+  readonly openCodeProvider?: RuntimeCatalogOpenCodeProvider;
   readonly vendorId: string;
 }
 
@@ -171,13 +189,28 @@ function runtimeCatalogVendor(
 ): RuntimeCatalogVendor {
   const apiBaseEnvVar = "apiBaseEnvVar" in input ? input.apiBaseEnvVar : undefined;
   const defaultApiBase = "defaultApiBase" in input ? input.defaultApiBase : undefined;
+  const modelSource = "modelSource" in input ? input.modelSource : undefined;
+  const openCodeProvider = "openCodeProvider" in input ? input.openCodeProvider : undefined;
 
   return {
     ...(apiBaseEnvVar !== undefined ? { apiBaseEnvVar } : {}),
     ...(defaultApiBase !== undefined ? { defaultApiBase } : {}),
+    ...(modelSource !== undefined ? { modelSource } : {}),
     apiKeyEnvVar: input.apiKeyEnvVar,
     authHeader: runtimeCatalogVendorAuthHeader(input.authHeader),
+    iconKey: input.iconKey,
     label: input.label,
+    ...(openCodeProvider !== undefined
+      ? {
+          openCodeProvider: {
+            ...("apiBaseOption" in openCodeProvider
+              ? { apiBaseOption: openCodeProvider.apiBaseOption }
+              : {}),
+            name: openCodeProvider.name,
+            npmPackage: openCodeProvider.npmPackage,
+          },
+        }
+      : {}),
     vendorId: admitProviderId(input.vendorId),
   };
 }
@@ -298,15 +331,22 @@ export const PRESET_MODEL_CATALOG: readonly PresetModelEntry[] =
   GENERATED_PRESET_MODEL_CATALOG.map(presetModel);
 
 export const ANTHROPIC_DEFAULT_MODEL_ID = admitModelId(GENERATED_MODEL_DEFAULT_IDS.anthropic);
+export const DEEPSEEK_DEFAULT_MODEL_ID = admitModelId(GENERATED_MODEL_DEFAULT_IDS.deepseek);
 export const OPENAI_DEFAULT_MODEL_ID = admitModelId(GENERATED_MODEL_DEFAULT_IDS.openai);
 
 export const ALL_VENDORS: readonly RuntimeCatalogVendor[] =
   GENERATED_VENDOR_CATALOG.map(runtimeCatalogVendor);
 
 export const VENDOR_ANTHROPIC = requireVendor("anthropic");
+export const VENDOR_DEEPSEEK = requireVendor("deepseek");
+export const VENDOR_GEMINI = requireVendor("gemini");
+export const VENDOR_KIMI = requireVendor("kimi");
+export const VENDOR_MINIMAX = requireVendor("minimax");
 export const VENDOR_OPENAI = requireVendor("openai");
 export const VENDOR_OPENAI_COMPATIBLE = requireVendor("openai-compatible");
 export const VENDOR_OPENCODE = requireVendor("opencode");
+export const VENDOR_QWEN = requireVendor("qwen");
+export const VENDOR_ZHIPU = requireVendor("zhipu");
 
 export const SYSTEM_AGENT_RUNTIME_ID = "system-agent";
 
@@ -320,6 +360,11 @@ export function listPresetModelsForProvider(provider: RuntimeModelProviderRef): 
 
 export function listPresetModelsForVendor(vendorId: string): PresetModelEntry[] {
   return PRESET_MODEL_CATALOG.filter((entry) => entry.vendorId === vendorId);
+}
+
+export function getDefaultModelIdForVendor(vendorId: string): ModelId | null {
+  const modelId = (GENERATED_MODEL_DEFAULT_IDS as Readonly<Record<string, string>>)[vendorId];
+  return modelId === undefined ? null : admitModelId(modelId);
 }
 
 export function getPresetModelForIdentity(identity: RuntimeModelIdentity): PresetModelEntry | null {
