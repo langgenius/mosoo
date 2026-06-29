@@ -342,6 +342,6 @@ just deploy-web
 just deploy
 ```
 
-API production config lives in `apps/api/wrangler.toml`; web production config lives in `apps/web/wrangler.toml`. Cloudflare routes send `mosoo.ai/api/*` to the API Worker and `mosoo.ai/*` to the web Worker.
+API production config lives in `apps/api/wrangler.toml`; web production config lives in `apps/web/wrangler.toml`. Cloudflare routes send `try.mosoo.ai/api/*` to the API Worker, `try.mosoo.ai/*` to the console Web Worker, and `mosoo.ai/*` to the marketing / landing surface.
 
 Do not deploy production directly from an unreviewed local branch.

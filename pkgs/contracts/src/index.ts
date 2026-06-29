@@ -10,6 +10,7 @@ export type * from "./environment/environment.contract";
 export * from "./file/file.contract";
 export type * from "./mcp/mcp.contract";
 export type * from "./metadata/app-info.contract";
+export * from "./metadata/origin.contract";
 export type * from "./transport/operation-result.contract";
 export * from "./http/public-api.contract";
 export type * from "./id/id.contract";

@@ -1,3 +1,4 @@
+import { MOSOO_CONSOLE_ORIGIN, MOSOO_MARKETING_ORIGIN } from "@mosoo/contracts/origin";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -80,6 +81,20 @@ function clearPersistedLoginState(): void {
   } catch {
     // Session storage can be unavailable in restricted browser contexts.
   }
+}
+
+function isMarketingOrigin(): boolean {
+  return globalThis.location.origin === MOSOO_MARKETING_ORIGIN;
+}
+
+function toConsoleLoginUrl(redirectPath: string): string {
+  const url = new URL("/login", MOSOO_CONSOLE_ORIGIN);
+
+  if (redirectPath !== "/") {
+    url.searchParams.set("redirect", redirectPath);
+  }
+
+  return url.toString();
 }
 
 export function useLoginFlow(): LoginFlow {
@@ -197,6 +212,11 @@ export function useLoginFlow(): LoginFlow {
   }
 
   function openAuth(): void {
+    if (isMarketingOrigin()) {
+      globalThis.location.assign(toConsoleLoginUrl(redirectPath));
+      return;
+    }
+
     setStep("auth");
     setError(null);
     setEmail("");

@@ -19,6 +19,7 @@
     "./mcp": "./src/mcp/mcp.contract.ts",
     "./models": "./models/index.ts",
     "./operation-result": "./src/transport/operation-result.contract.ts",
+    "./origin": "./src/metadata/origin.contract.ts",
     "./app": "./src/app/app.contract.ts",
     "./public-api": "./src/http/public-api.contract.ts",
     "./public-api-core": "./src/http/public-api-core.contract.ts",

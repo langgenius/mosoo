@@ -1,4 +1,4 @@
-const MOSOO_DEFAULT_WEB_ORIGIN = "https://mosoo.ai";
+import { MOSOO_CONSOLE_ORIGIN } from "@mosoo/contracts/origin";
 
 function readViteOriginOverride(): string | null {
   const value = import.meta.env.VITE_CHANNEL_WEBHOOK_ORIGIN;
@@ -28,7 +28,7 @@ export function resolveChannelWebhookOrigin(): string {
   }
 
   if (typeof globalThis.location === "undefined") {
-    return MOSOO_DEFAULT_WEB_ORIGIN;
+    return MOSOO_CONSOLE_ORIGIN;
   }
 
   return globalThis.location.origin;

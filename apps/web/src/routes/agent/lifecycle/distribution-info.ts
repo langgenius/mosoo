@@ -1,3 +1,4 @@
+import { MOSOO_CONSOLE_ORIGIN } from "@mosoo/contracts/origin";
 import { PUBLIC_API_PREFIX, PUBLIC_API_VERSION_PREFIX } from "@mosoo/contracts/public-api-core";
 
 import { MOSOO_API_REFERENCE_URL } from "@/shared/config/external-links";
@@ -19,7 +20,6 @@ export interface AgentDistribution {
 }
 
 const ACCESS_TOKEN_SETTINGS_PATH = "/settings/access-tokens";
-const MOSOO_PUBLIC_WEB_ORIGIN = "https://mosoo.ai";
 const AGENT_API_ENDPOINT_BASE_PATH = `${PUBLIC_API_PREFIX}${PUBLIC_API_VERSION_PREFIX}`;
 const AGENT_API_ENDPOINT_OPENAPI_PATH = `${AGENT_API_ENDPOINT_BASE_PATH}/openapi.json`;
 
@@ -42,7 +42,7 @@ function nameSlug(name: string): string {
 }
 
 function currentOrigin(): string {
-  return globalThis.window !== undefined ? globalThis.location.origin : MOSOO_PUBLIC_WEB_ORIGIN;
+  return globalThis.window !== undefined ? globalThis.location.origin : MOSOO_CONSOLE_ORIGIN;
 }
 
 /**
