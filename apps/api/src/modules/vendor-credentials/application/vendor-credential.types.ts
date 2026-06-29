@@ -15,4 +15,5 @@ export interface ResolvedVendorCredential {
   apiBase: string | null;
   apiKey: string;
   credentialId: VendorCredentialId;
+  models: string[] | null;
 }
