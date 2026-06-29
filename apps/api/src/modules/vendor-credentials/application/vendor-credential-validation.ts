@@ -47,6 +47,10 @@ function readUrlOrigin(value: string): string | null {
 }
 
 function enforcePresetProviderApiBase(vendorId: string, apiBase: string): void {
+  if (vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId) {
+    return;
+  }
+
   const apiBaseOrigin = readUrlOrigin(apiBase);
 
   if (apiBaseOrigin === null) {

@@ -20,6 +20,14 @@ import { formatProviderErrorMessage } from "@/domains/vendor-credential/model/pr
 import { toAppId, toVendorCredentialId } from "@/routes/typed-id";
 import { VendorIcon, hasVendorIcon } from "@/shared/ui/brand-icons";
 import { Button } from "@/shared/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 
@@ -54,6 +62,7 @@ const EMPTY_FORM: CredentialForm = {
 };
 
 interface ProviderFormControls {
+  error: string | null;
   form: CredentialForm;
   onCancel: () => void;
   onChange: (form: CredentialForm) => void;
@@ -91,6 +100,10 @@ function formModels(form: CredentialForm): string[] | undefined {
 }
 
 function vendorLabel(vendorId: string): string {
+  if (vendorId === CUSTOM_PROVIDER_VENDOR_ID) {
+    return CUSTOM_PROVIDER_DISPLAY.label;
+  }
+
   return PUBLIC_VENDORS.find((vendor) => vendor.vendorId === vendorId)?.label ?? vendorId;
 }
 
@@ -110,7 +123,8 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
   const typedAppId = toAppId(appId);
   const queryClient = useQueryClient();
   const [form, setForm] = useState<CredentialForm>(EMPTY_FORM);
-  const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
   const [testState, setTestState] = useState<TestState>("idle");
   const credentialsQuery = useQuery({
     queryFn: async () => listVendorCredentials(typedAppId),
@@ -165,6 +179,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
     },
     onSuccess: async () => {
       setForm(EMPTY_FORM);
+      setFormError(null);
       setTestState("idle");
       await invalidateCredentials();
     },
@@ -187,11 +202,11 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
   });
 
   async function handleSave(): Promise<void> {
-    setError(null);
+    setFormError(null);
     try {
       await saveMutation.mutateAsync(form);
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError, "Failed to save provider key."));
+      setFormError(getErrorMessage(caughtError, "Failed to save provider key."));
     }
   }
 
@@ -200,12 +215,12 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
     const firstModel = formModels(form)?.[0] ?? null;
 
     if (form.vendorId.length === 0 || apiKey.length === 0) {
-      setError("Provider and API key are required before testing.");
+      setFormError("Provider and API key are required before testing.");
       return;
     }
 
     setTestState("running");
-    setError(null);
+    setFormError(null);
 
     try {
       const result = await testVendorCredential({
@@ -217,17 +232,19 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
       });
       setTestState(result.ok ? "success" : "failure");
       if (!result.ok && result.errorCode !== null) {
-        setError(formatProviderErrorMessage(result.errorCode));
+        setFormError(formatProviderErrorMessage(result.errorCode));
       }
     } catch (caughtError) {
       setTestState("failure");
-      setError(formatProviderErrorMessage(getErrorMessage(caughtError, "Connection test failed.")));
+      setFormError(
+        formatProviderErrorMessage(getErrorMessage(caughtError, "Connection test failed.")),
+      );
     }
   }
 
   function startCreate(vendorId: string): void {
     setForm({ ...EMPTY_FORM, apiBase: defaultApiBaseForVendor(vendorId), vendorId });
-    setError(null);
+    setFormError(null);
     setTestState("idle");
   }
 
@@ -240,23 +257,23 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
       name: credential.name,
       vendorId: credential.vendorId,
     });
-    setError(null);
+    setFormError(null);
     setTestState("idle");
   }
 
-  // Shared add/edit form controls, rendered inline inside whichever vendor card
-  // is being edited (form.vendorId), so the form expands in place rather than as
-  // a separate card at the top of the list.
+  function closeFormDialog(): void {
+    setForm(EMPTY_FORM);
+    setFormError(null);
+    setTestState("idle");
+  }
+
   const formControls: ProviderFormControls = {
+    error: formError,
     form,
-    onCancel: () => {
-      setForm(EMPTY_FORM);
-      setError(null);
-      setTestState("idle");
-    },
+    onCancel: closeFormDialog,
     onChange: (nextForm) => {
       setForm(nextForm);
-      setError(null);
+      setFormError(null);
       setTestState("idle");
     },
     onSave: () => {
@@ -268,6 +285,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
     saving: saveMutation.isPending,
     testState,
   };
+  const formDialogOpen = form.vendorId.length > 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -290,9 +308,9 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
             </div>
           ) : null}
 
-          {error === null ? null : (
+          {pageError === null ? null : (
             <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-sm">
-              {error}
+              {pageError}
             </div>
           )}
 
@@ -303,39 +321,36 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
           {PUBLIC_VENDORS.map((vendor) => (
             <ProviderCredentialSection
               credentials={groupedCredentials.get(vendor.vendorId) ?? []}
-              formControls={formControls}
               key={vendor.vendorId}
               onCreate={() => startCreate(vendor.vendorId)}
               onDelete={(credential) => {
                 void deleteMutation.mutateAsync(credential).catch((caughtError) => {
-                  setError(getErrorMessage(caughtError, "Failed to delete provider key."));
+                  setPageError(getErrorMessage(caughtError, "Failed to delete provider key."));
                 });
               }}
               onEdit={startEdit}
               onSetDefault={(credential) => {
                 void setDefaultMutation.mutateAsync(credential).catch((caughtError) => {
-                  setError(getErrorMessage(caughtError, "Failed to set default provider key."));
+                  setPageError(getErrorMessage(caughtError, "Failed to set default provider key."));
                 });
               }}
               vendor={vendor}
             />
           ))}
 
-          {(groupedCredentials.get(CUSTOM_PROVIDER_VENDOR_ID)?.length ?? 0) > 0 ||
-          form.vendorId === CUSTOM_PROVIDER_VENDOR_ID ? (
+          {(groupedCredentials.get(CUSTOM_PROVIDER_VENDOR_ID)?.length ?? 0) > 0 ? (
             <ProviderCredentialSection
               credentials={groupedCredentials.get(CUSTOM_PROVIDER_VENDOR_ID) ?? []}
-              formControls={formControls}
               onCreate={() => startCreate(CUSTOM_PROVIDER_VENDOR_ID)}
               onDelete={(credential) => {
                 void deleteMutation.mutateAsync(credential).catch((caughtError) => {
-                  setError(getErrorMessage(caughtError, "Failed to delete provider key."));
+                  setPageError(getErrorMessage(caughtError, "Failed to delete provider key."));
                 });
               }}
               onEdit={startEdit}
               onSetDefault={(credential) => {
                 void setDefaultMutation.mutateAsync(credential).catch((caughtError) => {
-                  setError(getErrorMessage(caughtError, "Failed to set default provider key."));
+                  setPageError(getErrorMessage(caughtError, "Failed to set default provider key."));
                 });
               }}
               vendor={CUSTOM_PROVIDER_DISPLAY}
@@ -343,11 +358,25 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
           ) : null}
         </div>
       </main>
+
+      <Dialog
+        open={formDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeFormDialog();
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[560px]">
+          {formDialogOpen ? <ProviderCredentialDialogForm {...formControls} /> : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function ProviderCredentialForm({
+function ProviderCredentialDialogForm({
+  error,
   form,
   onCancel,
   onChange,
@@ -356,6 +385,7 @@ function ProviderCredentialForm({
   saving,
   testState,
 }: {
+  error: string | null;
   form: CredentialForm;
   onCancel: () => void;
   onChange: (form: CredentialForm) => void;
@@ -372,76 +402,85 @@ function ProviderCredentialForm({
   const modelsInputId = `${formId}-models`;
 
   return (
-    <div className="border-border-soft mt-1 space-y-3 border-t pt-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-fg-1 text-[13px] font-semibold">
+    <>
+      <DialogHeader>
+        <DialogTitle>
           {form.id === null ? "Add" : "Edit"} {vendorLabel(form.vendorId)} key
+        </DialogTitle>
+        <DialogDescription>Store this Provider credential inside the active App.</DialogDescription>
+      </DialogHeader>
+      <div className="space-y-3">
+        <div className={endpointEnabled ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}>
+          <label className="space-y-1" htmlFor={nameInputId}>
+            <div className="text-muted-foreground text-xs font-medium">Name</div>
+            <Input
+              id={nameInputId}
+              placeholder="Production"
+              value={form.name}
+              onChange={(event) => onChange({ ...form, name: event.target.value })}
+            />
+          </label>
+          {endpointEnabled ? (
+            <label className="space-y-1" htmlFor={apiBaseInputId}>
+              <div className="text-muted-foreground text-xs font-medium">Base URL</div>
+              <Input
+                id={apiBaseInputId}
+                placeholder={defaultApiBaseForVendor(form.vendorId) || "https://api.example.com/v1"}
+                value={form.apiBase}
+                onChange={(event) => onChange({ ...form, apiBase: event.target.value })}
+              />
+            </label>
+          ) : null}
         </div>
-        <Button onClick={onCancel} size="sm" variant="ghost">
-          Cancel
-        </Button>
-      </div>
-      <div className={endpointEnabled ? "grid gap-3 sm:grid-cols-2" : "grid gap-3"}>
-        <label className="space-y-1" htmlFor={nameInputId}>
-          <div className="text-muted-foreground text-xs font-medium">Name</div>
+        <label className="block space-y-1" htmlFor={apiKeyInputId}>
+          <div className="text-muted-foreground text-xs font-medium">API key</div>
           <Input
-            id={nameInputId}
-            placeholder="Production"
-            value={form.name}
-            onChange={(event) => onChange({ ...form, name: event.target.value })}
+            id={apiKeyInputId}
+            placeholder={form.id === null ? "sk-..." : "Leave blank to keep current key"}
+            type="password"
+            value={form.apiKey}
+            onChange={(event) => onChange({ ...form, apiKey: event.target.value })}
           />
         </label>
-        {endpointEnabled ? (
-          <label className="space-y-1" htmlFor={apiBaseInputId}>
-            <div className="text-muted-foreground text-xs font-medium">Base URL</div>
+        {form.vendorId === CUSTOM_PROVIDER_VENDOR_ID ? (
+          <label className="block space-y-1" htmlFor={modelsInputId}>
+            <div className="text-muted-foreground text-xs font-medium">Models</div>
             <Input
-              id={apiBaseInputId}
-              placeholder={defaultApiBaseForVendor(form.vendorId) || "https://api.example.com/v1"}
-              value={form.apiBase}
-              onChange={(event) => onChange({ ...form, apiBase: event.target.value })}
+              id={modelsInputId}
+              placeholder="gpt-4.1, claude-sonnet-4"
+              value={form.modelsText}
+              onChange={(event) => onChange({ ...form, modelsText: event.target.value })}
             />
           </label>
         ) : null}
+        {error === null ? null : (
+          <div className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-sm">
+            {error}
+          </div>
+        )}
       </div>
-      <label className="block space-y-1" htmlFor={apiKeyInputId}>
-        <div className="text-muted-foreground text-xs font-medium">API key</div>
-        <Input
-          id={apiKeyInputId}
-          placeholder={form.id === null ? "sk-..." : "Leave blank to keep current key"}
-          type="password"
-          value={form.apiKey}
-          onChange={(event) => onChange({ ...form, apiKey: event.target.value })}
-        />
-      </label>
-      {form.vendorId === CUSTOM_PROVIDER_VENDOR_ID ? (
-        <label className="block space-y-1" htmlFor={modelsInputId}>
-          <div className="text-muted-foreground text-xs font-medium">Models</div>
-          <Input
-            id={modelsInputId}
-            placeholder="gpt-4.1, claude-sonnet-4"
-            value={form.modelsText}
-            onChange={(event) => onChange({ ...form, modelsText: event.target.value })}
-          />
-        </label>
-      ) : null}
-      <div className="flex items-center justify-between gap-3">
+      <DialogFooter>
+        <div className="flex flex-1 items-center gap-2">
+          <Button onClick={onCancel} size="sm" variant="ghost">
+            Cancel
+          </Button>
+        </div>
         <div className="flex items-center gap-2">
           <Button disabled={testState === "running"} onClick={onTest} size="sm" variant="outline">
             {testState === "running" ? "Testing..." : "Test"}
           </Button>
-          <ProviderTestStatus error={null} state={testState} />
+          <ProviderTestStatus error={error} state={testState} />
         </div>
         <Button disabled={saving} onClick={onSave} size="sm">
           {saving ? "Saving..." : "Save"}
         </Button>
-      </div>
-    </div>
+      </DialogFooter>
+    </>
   );
 }
 
 function ProviderCredentialSection({
   credentials,
-  formControls,
   onCreate,
   onDelete,
   onEdit,
@@ -449,16 +488,12 @@ function ProviderCredentialSection({
   vendor,
 }: {
   credentials: readonly VendorCredential[];
-  formControls: ProviderFormControls;
   onCreate: () => void;
   onDelete: (credential: VendorCredential) => void;
   onEdit: (credential: VendorCredential) => void;
   onSetDefault: (credential: VendorCredential) => void;
   vendor: Pick<RuntimeCatalogVendor, "iconKey" | "label" | "vendorId">;
 }): ReactElement {
-  const { vendorId } = vendor;
-  const isFormOpen = formControls.form.vendorId === vendorId;
-
   return (
     <section className="border-border bg-card space-y-3 rounded-lg border p-4">
       <div className="flex items-center justify-between gap-3">
@@ -474,12 +509,10 @@ function ProviderCredentialSection({
             <p className="text-muted-foreground text-[12px]">App-level provider keys</p>
           </div>
         </div>
-        {isFormOpen ? null : (
-          <Button onClick={onCreate} size="sm" variant="outline">
-            <Plus className="size-3.5" />
-            Add key
-          </Button>
-        )}
+        <Button onClick={onCreate} size="sm" variant="outline">
+          <Plus className="size-3.5" />
+          Add key
+        </Button>
       </div>
       {credentials.length > 0 ? (
         <div className="space-y-2">
@@ -532,12 +565,11 @@ function ProviderCredentialSection({
             </div>
           ))}
         </div>
-      ) : isFormOpen ? null : (
+      ) : (
         <div className="text-muted-foreground/70 rounded-md border border-dashed px-3 py-3 text-[13px]">
           No key configured in this App.
         </div>
       )}
-      {isFormOpen ? <ProviderCredentialForm {...formControls} /> : null}
     </section>
   );
 }

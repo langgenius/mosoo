@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
 import type { AppId } from "@mosoo/id";
-import { VENDOR_ANTHROPIC, VENDOR_OPENAI, VENDOR_OPENAI_COMPATIBLE } from "@mosoo/runtime-catalog";
+import {
+  VENDOR_ANTHROPIC,
+  VENDOR_DEEPSEEK,
+  VENDOR_OPENAI,
+  VENDOR_OPENAI_COMPATIBLE,
+} from "@mosoo/runtime-catalog";
 
 import {
   createVendorCredential,
@@ -87,6 +92,65 @@ describe("vendor credential commands", () => {
       .first<{ count: number }>();
     expect(credentialCount?.count).toBe(0);
     expect(secretCount?.count).toBe(0);
+
+    await expect(
+      createVendorCredential(fixture.bindings, fixture.viewer, {
+        apiBase: VENDOR_DEEPSEEK.defaultApiBase,
+        apiKey: "sk-create",
+        name: "OpenAI pointed at DeepSeek",
+        appId: fixture.ids.appId,
+        vendorId: VENDOR_OPENAI.vendorId,
+      }),
+    ).rejects.toThrow("Custom endpoint for openai cannot target DeepSeek.");
+
+    const finalCredentialCount = await fixture.database
+      .prepare("SELECT COUNT(*) AS count FROM vendor_credential")
+      .first<{ count: number }>();
+    const finalSecretCount = await fixture.database
+      .prepare("SELECT COUNT(*) AS count FROM vault_secret")
+      .first<{ count: number }>();
+    expect(finalCredentialCount?.count).toBe(0);
+    expect(finalSecretCount?.count).toBe(0);
+  });
+
+  test("allows OpenAI-compatible credentials to target DeepSeek-compatible endpoints", async () => {
+    const fixture = await createApiTestFixture();
+
+    const credential = await createVendorCredential(fixture.bindings, fixture.viewer, {
+      apiBase: VENDOR_DEEPSEEK.defaultApiBase,
+      apiKey: "sk-create",
+      models: ["deepseek-chat"],
+      name: "DeepSeek custom gateway",
+      appId: fixture.ids.appId,
+      vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
+    });
+
+    expect(credential).toMatchObject({
+      apiBase: VENDOR_DEEPSEEK.defaultApiBase,
+      isDefault: true,
+      maskedApiKey: expect.any(String),
+      models: ["deepseek-chat"],
+      name: "DeepSeek custom gateway",
+      appId: fixture.ids.appId,
+      vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
+    });
+
+    const row = await fixture.database
+      .prepare(
+        "SELECT api_base AS apiBase, models AS modelsJson, vendor_id AS vendorId FROM vendor_credential WHERE id = ?",
+      )
+      .bind(credential.id)
+      .first<{ apiBase: string; modelsJson: string; vendorId: string }>();
+    const secretCount = await fixture.database
+      .prepare("SELECT COUNT(*) AS count FROM vault_secret")
+      .first<{ count: number }>();
+
+    expect(row).toEqual({
+      apiBase: VENDOR_DEEPSEEK.defaultApiBase,
+      modelsJson: JSON.stringify(["deepseek-chat"]),
+      vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
+    });
+    expect(secretCount?.count).toBe(1);
   });
 
   test("rejects trailing-dot localhost API bases before storing a credential", async () => {
