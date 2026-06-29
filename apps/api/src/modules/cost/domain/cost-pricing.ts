@@ -78,6 +78,12 @@ const MODEL_PRICING: readonly ModelPricing[] = [
     model: "gpt-5.2",
     outputUsdPerMillion: 14,
   }),
+  deepseekPricing({
+    cacheReadUsdPerMillion: 0.145,
+    inputUsdPerMillion: 1.74,
+    model: "deepseek-v4-pro",
+    outputUsdPerMillion: 3.48,
+  }),
   {
     cacheReadUsdPerMillion: 0.125,
     cacheWriteUsdPerMillion: 1.875,
@@ -159,6 +165,24 @@ function openAiPricing(input: {
     outputUsdPerMillion: input.outputUsdPerMillion,
     provider: "openai",
     vendor: "OpenAI",
+  };
+}
+
+function deepseekPricing(input: {
+  cacheReadUsdPerMillion: number;
+  cacheWriteUsdPerMillion?: number;
+  inputUsdPerMillion: number;
+  model: string;
+  outputUsdPerMillion: number;
+}): ModelPricing {
+  return {
+    cacheReadUsdPerMillion: input.cacheReadUsdPerMillion,
+    cacheWriteUsdPerMillion: input.cacheWriteUsdPerMillion ?? 0,
+    inputUsdPerMillion: input.inputUsdPerMillion,
+    model: input.model,
+    outputUsdPerMillion: input.outputUsdPerMillion,
+    provider: "deepseek",
+    vendor: "DeepSeek",
   };
 }
 
