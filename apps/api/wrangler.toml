@@ -115,7 +115,7 @@ head_sampling_rate = 0.1
 
 [env.prod.vars]
 APP_NAME = "mosoo"
-WEB_ORIGIN = "https://mosoo.ai"
+WEB_ORIGIN = "https://try.mosoo.ai"
 AUTH_EMAIL_FROM = "Mosoo AUTH <auth@mosoo.ai>"
 FILE_BUCKET_NAME = "mosoo-file"
 SANDBOX_STATE_BUCKET_NAME = "mosoo-sandbox-state"
@@ -135,11 +135,13 @@ required = [
   "CLOUDFLARE_ACCOUNT_ID",
   "CLOUDFLARE_API_TOKEN",
   "CLOUDFLARE_ZONE_ID",
+  "GOOGLE_OAUTH_CLIENT_ID",
+  "GOOGLE_OAUTH_CLIENT_SECRET",
 ]
 
 [[env.prod.routes]]
 zone_name = "mosoo.ai"
-pattern = "mosoo.ai/api/*"
+pattern = "try.mosoo.ai/api/*"
 
 [[env.prod.durable_objects.bindings]]
 name = "DriverConnection"

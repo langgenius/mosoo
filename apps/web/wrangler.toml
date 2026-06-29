@@ -17,6 +17,12 @@ not_found_handling = "none"
 name = "mosoo-web-prod"
 workers_dev = false
 
+# Marketing landing and blog stay on the apex domain. Authenticated console
+# traffic uses try.mosoo.ai so OAuth, cookies, and API calls stay same-origin.
 [[env.prod.routes]]
 pattern = "mosoo.ai"
+custom_domain = true
+
+[[env.prod.routes]]
+pattern = "try.mosoo.ai"
 custom_domain = true

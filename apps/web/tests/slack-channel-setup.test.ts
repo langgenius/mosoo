@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { buildAgentChannelWebhookUrl } from "@mosoo/contracts/channel";
+import { MOSOO_CONSOLE_ORIGIN } from "@mosoo/contracts/origin";
 import { parse } from "yaml";
 
 import { buildSlackManifest } from "../src/routes/agent/components/settings-dialog-slack-manifest";
@@ -13,7 +14,7 @@ describe("Slack channel setup", () => {
     expect(parsed.display_information.name).toBe("Launch Agent");
     expect(parsed.settings.event_subscriptions.request_url).toBe(
       buildAgentChannelWebhookUrl({
-        origin: "https://mosoo.ai",
+        origin: MOSOO_CONSOLE_ORIGIN,
         provider: "slack",
       }),
     );
