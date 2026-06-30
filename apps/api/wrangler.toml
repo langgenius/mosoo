@@ -176,7 +176,7 @@ bucket_name = "mosoo-sandbox-state"
 [[env.prod.d1_databases]]
 binding = "DB"
 database_name = "mosoo-prod"
-database_id = "36b60a1f-b724-42e1-adb7-1d759ed16d2d"
+database_id = "c851724c-2aa2-4c10-ac92-df74ae6e5dd0"
 migrations_dir = "../../pkgs/db/drizzle"
 
 [[env.prod.queues.producers]]
