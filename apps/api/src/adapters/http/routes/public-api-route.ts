@@ -5,6 +5,8 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 
 import type { PersonalAccessTokenCaller } from "../../../modules/auth/application/personal-access-token.service";
+import { parseBoundAgentCallBody } from "../../../modules/public-api/app-agent-bound-call";
+import { renderBoundAgentCallError } from "../../../modules/public-api/app-agent-bound-errors";
 import { hashPublicApiIdempotencyBody } from "../../../modules/public-api/public-api-idempotency.service";
 import { listAgentApiEndpointThreads } from "../../../modules/public-api/public-thread-session-query.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
@@ -46,6 +48,10 @@ async function loadPublicThreadFileService() {
   return import("../../../modules/public-api/public-thread-file-api.service");
 }
 
+async function loadBoundAgentAskService() {
+  return import("../../../modules/public-api/app-agent-bound-ask.service");
+}
+
 async function runPublicThreadFileRoute<T>(
   c: PublicApiRouteContext,
   operation: (input: {
@@ -81,6 +87,25 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
   const v1 = new Hono<ApiGatewayEnvironment>();
 
   v1.get("/openapi.json", (c) => c.json(createPublicApiOpenApiDocument(new URL(c.req.url).origin)));
+
+  v1.post("/bound/:token", async (c) => {
+    try {
+      const body = (await c.req.json()) as unknown;
+      const { createBoundAgentThreadAndWait } = await loadBoundAgentAskService();
+      const result = await createBoundAgentThreadAndWait({
+        bindings: c.env,
+        executionContext: c.executionCtx,
+        input: parseBoundAgentCallBody(body),
+        requestUrl: c.req.url,
+        token: c.req.param("token") ?? "",
+      });
+
+      return Response.json(result, { status: 200 });
+    } catch (error) {
+      const rendered = renderBoundAgentCallError(error);
+      return Response.json(rendered.body, { status: rendered.status });
+    }
+  });
 
   v1.post("/agents/:agentId/threads", async (c) => {
     return runPublicApiThreadMutation(c, {
