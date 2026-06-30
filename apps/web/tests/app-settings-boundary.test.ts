@@ -39,16 +39,23 @@ describe("App settings boundary", () => {
     );
   });
 
-  test("splits Settings into Account and App sections", () => {
+  test("keeps App settings standalone from account Settings", () => {
     const settingsNav = readSource("../src/routes/settings/settings-nav.tsx");
     const routeRegistry = readSource("../src/app/route-registry.tsx");
+    const primaryNav = readSource("../src/app/navigation.tsx");
 
     expect(settingsNav).toContain('label: "Account"');
     expect(settingsNav).toContain('label: "App"');
-    expect(settingsNav).toContain('label: "General"');
-    expect(settingsNav).toContain('path: "/settings/app"');
-    // App General is App-owned identity, not Organization-owned settings.
-    expect(routeRegistry).toContain('{ element: <SettingsApp />, path: "app" }');
+    expect(settingsNav).not.toContain('label: "General"');
+    expect(settingsNav).not.toContain('path: "/settings/app"');
+    expect(primaryNav).toContain('label: "App settings"');
+    expect(primaryNav).toContain('path: "/app-settings"');
+    expect(routeRegistry).toContain(
+      '{ element: protectedRoute(<SettingsApp />), path: "/app-settings" }',
+    );
+    expect(routeRegistry).toContain(
+      '{ element: <Navigate to="/app-settings" replace />, path: "app" }',
+    );
     expect(routeRegistry).not.toContain("OrganizationGeneralTab");
   });
 

@@ -63,7 +63,7 @@ const NAV_SECTIONS: AppNavSection[] = [
       {
         icon: createHugeicon(Settings02Icon, "AppSettingsIcon"),
         label: "App settings",
-        path: "/settings/app",
+        path: "/app-settings",
       },
     ],
   },

@@ -33,7 +33,7 @@ describe("App navigation boundary", () => {
 
     expect(providersIndex).toBeGreaterThan(-1);
     expect(appSettingsIndex).toBeGreaterThan(providersIndex);
-    expect(source).toContain('path: "/settings/app"');
+    expect(source).toContain('path: "/app-settings"');
   });
 
   test("App shell offers back-to-org, an app switcher, and a New agent action", () => {
