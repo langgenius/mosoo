@@ -75,6 +75,15 @@ export interface DeleteAppDeploymentInput {
   appId: AppId;
 }
 
+export type AppOverviewBoundAgentExposure = "public_thread";
+
+export interface AppOverviewBoundAgent {
+  agentId: AgentId;
+  envVar: string;
+  expose: AppOverviewBoundAgentExposure;
+  name: string;
+}
+
 export type AppOverviewProviderCredentialStatus = "configured";
 
 export interface AppOverviewAgent {
@@ -124,6 +133,7 @@ export interface AppOverviewProviderCredentialList {
 export interface AppOverview {
   agents: AppOverviewAgentList;
   app: AppSummary;
+  boundAgents: AppOverviewBoundAgent[];
   deployment: AppDeployment | null;
   providerCredentials: AppOverviewProviderCredentialList;
 }

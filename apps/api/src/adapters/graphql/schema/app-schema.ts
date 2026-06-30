@@ -1,4 +1,8 @@
 export const appSchema = /* GraphQL */ `
+  enum AppOverviewBoundAgentExposure {
+    public_thread
+  }
+
   enum AppOverviewProviderCredentialStatus {
     configured
   }
@@ -76,6 +80,13 @@ export const appSchema = /* GraphQL */ `
     limit: Int!
   }
 
+  type AppOverviewBoundAgent {
+    agentId: ULID!
+    envVar: String!
+    expose: AppOverviewBoundAgentExposure!
+    name: String!
+  }
+
   type AppOverviewProviderCredential {
     appId: ULID!
     hasCustomApiBase: Boolean!
@@ -104,6 +115,7 @@ export const appSchema = /* GraphQL */ `
   type AppOverview {
     agents: AppOverviewAgentList!
     app: App!
+    boundAgents: [AppOverviewBoundAgent!]!
     deployment: AppDeployment
     providerCredentials: AppOverviewProviderCredentialList!
   }
