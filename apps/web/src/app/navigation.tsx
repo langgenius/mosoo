@@ -6,6 +6,7 @@ import InboxIcon from "@hugeicons/core-free-icons/InboxIcon";
 import Key01Icon from "@hugeicons/core-free-icons/Key01Icon";
 import PackageIcon from "@hugeicons/core-free-icons/PackageIcon";
 import PuzzleIcon from "@hugeicons/core-free-icons/PuzzleIcon";
+import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import type { MouseEvent } from "react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -59,6 +60,11 @@ const NAV_SECTIONS: AppNavSection[] = [
         path: "/integrations",
       },
       { icon: createHugeicon(Key01Icon, "ProvidersIcon"), label: "Providers", path: "/providers" },
+      {
+        icon: createHugeicon(Settings02Icon, "AppSettingsIcon"),
+        label: "App settings",
+        path: "/app-settings",
+      },
     ],
   },
 ];
