@@ -1,5 +1,4 @@
 import ChevronsDownUpIcon from "@hugeicons/core-free-icons/ChevronsDownUpIcon";
-import GridViewIcon from "@hugeicons/core-free-icons/GridViewIcon";
 import Logout01Icon from "@hugeicons/core-free-icons/Logout01Icon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import { Link } from "react-router-dom";
@@ -24,7 +23,6 @@ import { createHugeicon } from "./hugeicon";
 const AccountMenuChevronIcon = createHugeicon(ChevronsDownUpIcon, "AccountMenuChevronIcon");
 const AccountMenuSettingsIcon = createHugeicon(Settings02Icon, "AccountMenuSettingsIcon");
 const AccountMenuSignOutIcon = createHugeicon(Logout01Icon, "AccountMenuSignOutIcon");
-const AccountMenuAppsIcon = createHugeicon(GridViewIcon, "AccountMenuAppsIcon");
 
 interface AccountMenuUser {
   email: string;
@@ -113,12 +111,6 @@ export function AccountMenu({
             <div className="text-fg-3 mt-0.5 text-[11.5px] font-normal">{user?.email}</div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem asChild className="cursor-pointer rounded-md">
-            <Link to="/apps">
-              <AccountMenuAppsIcon className="size-4" />
-              Apps
-            </Link>
-          </DropdownMenuItem>
           <DropdownMenuItem asChild className="cursor-pointer rounded-md">
             <Link to="/settings">
               <AccountMenuSettingsIcon className="size-4" />
