@@ -44,11 +44,16 @@ describe("provider runtime availability", () => {
   test("marks custom OpenAI-compatible credentials as runtime readiness for custom-capable runtimes", () => {
     const availabilityRows = listRuntimeAvailabilityRows([credential("openai-compatible")]);
     const openCodeRow = availabilityRows.find((runtime) => runtime.runtimeId === "acp-fallback");
+    const openAiRow = availabilityRows.find((runtime) => runtime.runtimeId === "openai-runtime");
     const claudeRow = availabilityRows.find((runtime) => runtime.runtimeId === "claude-agent-sdk");
 
     expect(openCodeRow).toMatchObject({
       status: "Ready · Custom model configured",
       tone: "ready",
+    });
+    expect(openAiRow).toMatchObject({
+      status: "Needs key · Add OpenAI",
+      tone: "muted",
     });
     expect(claudeRow).toMatchObject({
       status: "Needs key · Add Anthropic",

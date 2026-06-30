@@ -122,7 +122,7 @@ describe("runtime catalog identity admission", () => {
     });
   });
 
-  test("admits supported preset and custom runtime model identities", () => {
+  test("admits supported preset and ACP custom runtime model identities", () => {
     const preset = admitRuntimeModelIdentity(
       createRuntimeModelIdentity({
         modelId: ANTHROPIC_DEFAULT_MODEL_ID,
@@ -140,7 +140,7 @@ describe("runtime catalog identity admission", () => {
           kind: "custom",
           providerId: VENDOR_OPENAI_COMPATIBLE.vendorId,
         },
-        runtimeId: "openai-runtime",
+        runtimeId: "acp-fallback",
       }),
     );
     const deepseekPreset = admitRuntimeModelIdentity(
@@ -180,6 +180,44 @@ describe("runtime catalog identity admission", () => {
       vendor: {
         vendorId: VENDOR_DEEPSEEK.vendorId,
       },
+    });
+  });
+
+  test("rejects custom providers for OpenAI app-server runtime", () => {
+    const systemAgentRuntime = RUNTIME_CATALOG.find(
+      (runtime) => runtime.runtimeId === SYSTEM_AGENT_RUNTIME_ID,
+    );
+    const openAiRuntime = RUNTIME_CATALOG.find((runtime) => runtime.runtimeId === "openai-runtime");
+    const custom = admitRuntimeModelIdentity(
+      createRuntimeModelIdentity({
+        modelId: "qwen-coder",
+        provider: {
+          kind: "custom",
+          providerId: VENDOR_OPENAI_COMPATIBLE.vendorId,
+        },
+        runtimeId: "openai-runtime",
+      }),
+    );
+    const systemAgentCustom = admitRuntimeModelIdentity(
+      createRuntimeModelIdentity({
+        modelId: "qwen-coder",
+        provider: {
+          kind: "custom",
+          providerId: VENDOR_OPENAI_COMPATIBLE.vendorId,
+        },
+        runtimeId: SYSTEM_AGENT_RUNTIME_ID,
+      }),
+    );
+
+    expect(systemAgentRuntime?.acceptsCustomProvider).toBe(false);
+    expect(openAiRuntime?.acceptsCustomProvider).toBe(false);
+    expect(custom).toMatchObject({
+      code: "provider-unsupported",
+      ok: false,
+    });
+    expect(systemAgentCustom).toMatchObject({
+      code: "runtime-disabled",
+      ok: false,
     });
   });
 

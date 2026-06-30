@@ -412,7 +412,7 @@
       "label": "System Agent",
       "visibility": "internal",
       "transport": "openai-app-server",
-      "acceptsCustomProvider": true,
+      "acceptsCustomProvider": false,
       "capabilityProfile": "none",
       "disabledReason": "System Agent is an internal configuration helper.",
       "defaultIdentity": {
@@ -433,7 +433,7 @@
       "label": "OpenAI Runtime",
       "visibility": "public",
       "transport": "openai-app-server",
-      "acceptsCustomProvider": true,
+      "acceptsCustomProvider": false,
       "capabilityProfile": "standard",
       "defaultIdentity": {
         "providerId": "openai",
