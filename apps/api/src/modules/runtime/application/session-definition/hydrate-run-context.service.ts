@@ -176,18 +176,39 @@ export function buildRuntimeVendorEnvVars(
 }
 
 function buildOpenCodeConfig(input: RuntimeVendorEnvironmentInput): string {
-  const model = input.model.includes("/") ? input.model : `${input.vendor.vendorId}/${input.model}`;
+  const openCodeProviderId = resolveOpenCodeProviderId(input.vendor);
+  const model = resolveOpenCodeModelId(input.vendor, input.model);
   const providerConfig = buildOpenCodeProviderConfig(input);
 
   return JSON.stringify({
     $schema: "https://opencode.ai/config.json",
-    enabled_providers: [input.vendor.vendorId],
+    enabled_providers: [openCodeProviderId],
     model,
     provider: {
-      [input.vendor.vendorId]: providerConfig,
+      [openCodeProviderId]: providerConfig,
     },
     small_model: model,
   });
+}
+
+function resolveOpenCodeProviderId(vendor: RuntimeCatalogVendor): string {
+  return vendor.openCodeProvider?.providerId ?? vendor.vendorId;
+}
+
+function resolveOpenCodeModelId(vendor: RuntimeCatalogVendor, model: string): string {
+  const openCodeProviderId = resolveOpenCodeProviderId(vendor);
+
+  if (!model.includes("/")) {
+    return `${openCodeProviderId}/${model}`;
+  }
+
+  const vendorPrefix = `${vendor.vendorId}/`;
+
+  if (openCodeProviderId !== vendor.vendorId && model.startsWith(vendorPrefix)) {
+    return `${openCodeProviderId}/${model.slice(vendorPrefix.length)}`;
+  }
+
+  return model;
 }
 
 function buildOpenCodeProviderConfig(input: RuntimeVendorEnvironmentInput): OpenCodeProviderConfig {

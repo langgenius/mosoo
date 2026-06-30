@@ -76,6 +76,7 @@ interface RawOpenCodeProvider {
   apiBaseOption?: "baseURL";
   name: string;
   npmPackage: string;
+  providerId?: string;
 }
 
 interface RawModel {
@@ -282,11 +283,13 @@ function readOpenCodeProvider(value: unknown, label: string): RawOpenCodeProvide
   if (apiBaseOption !== undefined && apiBaseOption !== "baseURL") {
     fail(`${label}.apiBaseOption must be baseURL.`);
   }
+  const providerId = readOptionalString(provider["providerId"], `${label}.providerId`);
 
   return {
     ...(apiBaseOption === undefined ? {} : { apiBaseOption }),
     name: readString(provider["name"], `${label}.name`),
     npmPackage: readString(provider["npmPackage"], `${label}.npmPackage`),
+    ...(providerId === undefined ? {} : { providerId }),
   };
 }
 

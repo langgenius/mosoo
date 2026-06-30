@@ -68,6 +68,12 @@ export interface RuntimeCatalogOpenCodeProvider {
   readonly apiBaseOption?: "baseURL";
   readonly name: string;
   readonly npmPackage: string;
+  /**
+   * Provider id expected by OpenCode for this adapter. Mosoo keeps its own
+   * product-facing provider id in `vendorId`; this field is only for rendered
+   * OpenCode config/model ids when upstream uses a different provider key.
+   */
+  readonly providerId?: string;
 }
 
 /**
@@ -208,6 +214,9 @@ function runtimeCatalogVendor(
               : {}),
             name: openCodeProvider.name,
             npmPackage: openCodeProvider.npmPackage,
+            ...("providerId" in openCodeProvider
+              ? { providerId: openCodeProvider.providerId }
+              : {}),
           },
         }
       : {}),

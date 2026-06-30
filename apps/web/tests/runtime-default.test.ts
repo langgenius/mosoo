@@ -40,4 +40,12 @@ describe("default agent runtime", () => {
       runtimeId: "acp-fallback",
     });
   });
+
+  test("uses the Mosoo Zhipu provider identity when only Zhipu is configured", () => {
+    expect(resolveDefaultAgentRuntime([credential("zhipu")])).toEqual({
+      model: "glm-4.7",
+      provider: "zhipu",
+      runtimeId: "acp-fallback",
+    });
+  });
 });

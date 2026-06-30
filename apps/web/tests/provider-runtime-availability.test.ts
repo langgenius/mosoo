@@ -41,6 +41,16 @@ describe("provider runtime availability", () => {
     });
   });
 
+  test("marks Zhipu credentials as OpenCode-ready through the catalog adapter mapping", () => {
+    const availabilityRows = listRuntimeAvailabilityRows([credential("zhipu")]);
+    const openCodeRow = availabilityRows.find((runtime) => runtime.runtimeId === "acp-fallback");
+
+    expect(openCodeRow).toMatchObject({
+      status: "Ready · Zhipu configured",
+      tone: "ready",
+    });
+  });
+
   test("marks custom OpenAI-compatible credentials as runtime readiness for custom-capable runtimes", () => {
     const availabilityRows = listRuntimeAvailabilityRows([credential("openai-compatible")]);
     const openCodeRow = availabilityRows.find((runtime) => runtime.runtimeId === "acp-fallback");

@@ -104,6 +104,15 @@ function createAvailableModelsDatabase(): SqliteD1Database {
       NULL
     ),
     (
+      'credential-zhipu',
+      '${APP_ID}',
+      'zhipu',
+      'Zhipu default',
+      'secret-zhipu',
+      NULL,
+      NULL
+    ),
+    (
       'credential-custom',
       '${APP_ID}',
       'openai-compatible',
@@ -182,6 +191,13 @@ describe("available models", () => {
     });
     expect(
       entries.find((entry) => entry.vendorId === "gemini" && entry.modelId === "gemini-3.5-flash"),
+    ).toMatchObject({
+      available: true,
+      statusDetail: null,
+      statusLabel: "Available",
+    });
+    expect(
+      entries.find((entry) => entry.vendorId === "zhipu" && entry.modelId === "glm-4.7"),
     ).toMatchObject({
       available: true,
       statusDetail: null,

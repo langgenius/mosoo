@@ -46,19 +46,19 @@ When a maintainer adds a runtime, they should be able to:
 
 ## 5. Concept Definitions
 
-| Concept                    | Product definition                                                                                                               |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Runtime                    | A launchable Agent driver choice shown to users, such as Claude Agent SDK, OpenAI Runtime, or OpenCode.                          |
-| Transport                  | The control path Runtime uses to talk to the Driver backend, such as `claude-agent-sdk`, `openai-app-server`, or `acp-fallback`. |
-| Provider                   | A Mosoo product-facing credential provider that can back one or more runtimes. Its id is chosen by Mosoo, not by an upstream registry. |
-| Adapter profile            | The provider-specific protocol shape a runtime backend must render, such as OpenAI Responses API, Anthropic Messages, or OpenAI-compatible base URL. |
-| Provider model source      | Metadata describing where Mosoo can import or refresh a Provider's model list, such as a `models.dev` provider id or a Provider `/models` endpoint. |
-| Provider model             | A known model option shipped by Mosoo for a first-class Provider.                                                                |
-| Custom OpenAI-compatible   | App-defined credentials with user-provided Base URL and Model IDs. It is an action entry point, not a fixed Provider card.       |
-| Public runtime             | A runtime visible and selectable in Agent creation.                                                                              |
-| Internal runtime           | A cataloged runtime that is not user-selectable.                                                                                 |
-| Planned runtime            | Display-only roadmap metadata. It must not affect runtime admission or launchability.                                            |
-| Icon key                   | A catalog-owned symbolic key that Web maps to an imported brand asset.                                                           |
+| Concept                  | Product definition                                                                                                                                   |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime                  | A launchable Agent driver choice shown to users, such as Claude Agent SDK, OpenAI Runtime, or OpenCode.                                              |
+| Transport                | The control path Runtime uses to talk to the Driver backend, such as `claude-agent-sdk`, `openai-app-server`, or `acp-fallback`.                     |
+| Provider                 | A Mosoo product-facing credential provider that can back one or more runtimes. Its id is chosen by Mosoo, not by an upstream registry.               |
+| Adapter profile          | The provider-specific protocol shape a runtime backend must render, such as OpenAI Responses API, Anthropic Messages, or OpenAI-compatible base URL. |
+| Provider model source    | Metadata describing where Mosoo can import or refresh a Provider's model list, such as a `models.dev` provider id or a Provider `/models` endpoint.  |
+| Provider model           | A known model option shipped by Mosoo for a first-class Provider.                                                                                    |
+| Custom OpenAI-compatible | App-defined credentials with user-provided Base URL and Model IDs. It is an action entry point, not a fixed Provider card.                           |
+| Public runtime           | A runtime visible and selectable in Agent creation.                                                                                                  |
+| Internal runtime         | A cataloged runtime that is not user-selectable.                                                                                                     |
+| Planned runtime          | Display-only roadmap metadata. It must not affect runtime admission or launchability.                                                                |
+| Icon key                 | A catalog-owned symbolic key that Web maps to an imported brand asset.                                                                               |
 
 ## 6. Relationship Lock
 
@@ -95,12 +95,12 @@ Provider ids are Mosoo product ids. They should be stable, readable, and aligned
 
 Examples:
 
-| Mosoo Provider id | User-facing label | Possible upstream model source |
-| ----------------- | ----------------- | ------------------------------ |
-| `gemini`          | Gemini            | `models.dev` provider `google` |
+| Mosoo Provider id | User-facing label | Possible upstream model source                               |
+| ----------------- | ----------------- | ------------------------------------------------------------ |
+| `gemini`          | Gemini            | `models.dev` provider `google`                               |
 | `qwen`            | Qwen              | `models.dev` provider `alibaba` or regional Alibaba variants |
-| `kimi`            | Kimi              | `models.dev` provider `moonshotai` |
-| `zhipu`           | Zhipu             | `models.dev` provider `zai` or `zhipuai` |
+| `kimi`            | Kimi              | `models.dev` provider `moonshotai`                           |
+| `zhipu`           | Zhipu             | `models.dev` provider `zai` or `zhipuai`                     |
 | `minimax`         | MiniMax           | `models.dev` provider `minimax` or regional MiniMax variants |
 
 This is not a runtime mapping layer. The catalog generator may use `modelSource` to import or refresh Provider model metadata, but generated Mosoo artifacts should expose Mosoo Provider ids to API, Web, and Driver code.
@@ -141,6 +141,7 @@ When adding a model source, first decide the identity boundary:
 
 - Add a new **Vendor** when credentials, billing, model ownership, or user-facing provider identity differ. DeepSeek is a vendor because it uses `DEEPSEEK_API_KEY`, DeepSeek-owned models, and a DeepSeek API base.
 - Add or reuse an **Adapter profile** when the same runtime transport must render a different protocol config for that vendor. If OpenCode already ships a native provider such as DeepSeek, Mosoo should use the native provider shape and avoid an adapter shim.
+- When an OpenCode upstream provider id differs from the Mosoo Provider id, keep the Mosoo `vendorId` as the product identity and set the adapter's OpenCode provider id in the catalog. For example, Mosoo `zhipu` renders as OpenCode `zai/...` while credentials and UI remain `zhipu`.
 - Do not encode a vendor as another vendor's model prefix. `opencode/deepseek-v4-pro` means OpenCode Zen owns the credential and endpoint; `deepseek/deepseek-v4-pro` means DeepSeek owns them, even if OpenCode launches the ACP process.
 - OpenAI can have multiple adapter profiles across runtimes: the OpenAI Runtime path uses the OpenAI runtime / Responses-style backend contract, while ACP fallback may use OpenCode-native or OpenAI-compatible config. The provider id remains `openai`; the adapter profile changes by runtime path.
 
