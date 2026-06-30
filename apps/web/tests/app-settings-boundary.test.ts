@@ -93,6 +93,7 @@ describe("App settings boundary", () => {
     const primaryNav = readSource("../src/app/navigation.tsx");
 
     expect(accountMenu).toContain('to="/settings"');
+    expect(accountMenu).not.toContain('to="/apps"');
     expect(primaryNav).not.toContain('label: "Settings"');
   });
 });
