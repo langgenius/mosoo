@@ -76,7 +76,7 @@ describe("App settings boundary", () => {
     expect(organizationApiIndex.trim()).toBe('export type * from "./organization-types";');
   });
 
-  test("keeps Settings entry in the account menu without adding it to primary App nav", () => {
+  test("keeps account Settings in the account menu without adding a generic primary nav item", () => {
     const accountMenu = readSource("../src/app/account-menu.tsx");
     const primaryNav = readSource("../src/app/navigation.tsx");
 

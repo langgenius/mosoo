@@ -26,12 +26,24 @@ describe("App navigation boundary", () => {
     expect(source).not.toContain('path: "/channels"');
   });
 
+  test("places App settings directly below Providers in primary App nav", () => {
+    const source = readSource("../src/app/navigation.tsx");
+    const providersIndex = source.indexOf('label: "Providers"');
+    const appSettingsIndex = source.indexOf('label: "App settings"');
+
+    expect(providersIndex).toBeGreaterThan(-1);
+    expect(appSettingsIndex).toBeGreaterThan(providersIndex);
+    expect(source).toContain('path: "/settings/app"');
+  });
+
   test("App shell offers back-to-org, an app switcher, and a New agent action", () => {
     const source = readSource("../src/app/app-shell.tsx");
 
     expect(source).toContain("BackToOrgLink");
     expect(source).toContain("AppSwitcher");
     expect(source).toContain("New agent");
+    expect(source).not.toContain("Manage apps");
+    expect(source).not.toContain("App settings");
     expect(source).not.toContain("OrganizationSwitcher");
   });
 });
