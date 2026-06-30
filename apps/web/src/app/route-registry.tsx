@@ -95,6 +95,14 @@ const AppOverview = lazyNamed(
   "AppOverviewPage",
 );
 const AppsList = lazyNamed(async () => import("../routes/apps/apps-list.route"), "AppsListPage");
+const Deployments = lazyNamed(
+  async () => import("../routes/deployments/deployments.route"),
+  "DeploymentsPage",
+);
+const V0DeployPreview = lazyNamed(
+  async () => import("../routes/deployments/v0-deploy-preview.route"),
+  "V0DeployPreviewPage",
+);
 const OrgSettings = lazyNamed(
   async () => import("../routes/org/org-settings.route"),
   "OrgSettingsPage",
@@ -139,6 +147,8 @@ const appRoutes = [
   { element: protectedRoute(<Navigate to="/integrations/mcp" replace />), path: "/mcp" },
   { element: protectedRoute(<SkillsTabRoute />), path: "/integrations/skills" },
   { element: protectedRoute(<McpTabRoute />), path: "/integrations/mcp" },
+  { element: protectedRoute(<Deployments />), path: "/deployments" },
+  { element: <V0DeployPreview />, path: "/v0-deploy-preview" },
   { element: protectedRoute(<AgentList />), path: "/agent" },
   { element: protectedRoute(<AgentDetail />), path: "/agent/:agentId" },
   { element: protectedRoute(<Threads />), path: "/threads" },
