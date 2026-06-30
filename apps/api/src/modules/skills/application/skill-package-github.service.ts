@@ -266,7 +266,10 @@ function resolveGithubArchiveTargets(url: string): GithubArchiveTarget[] {
     owner,
     path,
     ref,
-    relativePath: mode === "blob" ? (path.split("/").filter(Boolean).at(-1) ?? "SKILL.md") : "",
+    relativePath:
+      mode === "blob"
+        ? (path.split("/").findLast((segment) => segment.length > 0) ?? "SKILL.md")
+        : "",
     repo,
   }));
 }
