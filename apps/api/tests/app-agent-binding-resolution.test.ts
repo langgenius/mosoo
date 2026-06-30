@@ -19,7 +19,12 @@ describe("resolveAppAgentBindings", () => {
         { id: "agt_9wz", name: "triage", published: true },
       ]),
     ).toEqual([
-      { agentId: "agt_3kf", envVar: "ROADMAP_THREAD_URL", expose: "public_thread", name: "roadmap" },
+      {
+        agentId: "agt_3kf",
+        envVar: "ROADMAP_THREAD_URL",
+        expose: "public_thread",
+        name: "roadmap",
+      },
       { agentId: "agt_9wz", envVar: "TRIAGE_THREAD_URL", expose: "public_thread", name: "triage" },
     ]);
   });

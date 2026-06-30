@@ -66,9 +66,9 @@ export function BoundAgents({ agents }: { agents: BoundAgentVM[] }) {
           Console actions
         </div>
         <p className="text-fg-2 text-[12.5px] leading-relaxed">
-          <span className="text-fg-1 font-semibold">Retry</span> re-pulls the default branch HEAD and
-          redeploys · <span className="text-fg-1 font-semibold">Delete</span> removes the App, Worker,
-          and bindings.
+          <span className="text-fg-1 font-semibold">Retry</span> re-pulls the default branch HEAD
+          and redeploys · <span className="text-fg-1 font-semibold">Delete</span> removes the App,
+          Worker, and bindings.
         </p>
       </div>
     </div>

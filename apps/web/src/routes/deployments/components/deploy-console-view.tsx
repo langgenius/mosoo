@@ -15,8 +15,8 @@ import {
 
 import type { DeployConsoleState } from "../deploy-console-data";
 import { DeployOverview } from "./deploy-overview";
-import { DeploymentsHistory } from "./deployments-history";
 import { StatusBadge } from "./deploy-status-badge";
+import { DeploymentsHistory } from "./deployments-history";
 
 export interface DeployConsoleViewProps {
   appName: string;

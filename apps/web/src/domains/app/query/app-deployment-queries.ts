@@ -69,8 +69,7 @@ export function useAppDeploymentStatusQuery(
     enabled: appId !== null,
     queryFn: async () => getAppDeploymentStatus(toAppId(requireAppId(appId))),
     queryKey: appId !== null ? appDeploymentKeys.status(appId) : appDeploymentKeys.missingStatus(),
-    refetchInterval: (query) =>
-      isDeploymentRunInFlight(query.state.data?.status) ? 2_500 : false,
+    refetchInterval: (query) => (isDeploymentRunInFlight(query.state.data?.status) ? 2_500 : false),
   });
 }
 

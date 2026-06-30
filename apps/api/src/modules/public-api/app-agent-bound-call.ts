@@ -19,7 +19,11 @@ import {
 } from "./app-agent-bound-errors";
 import { verifyAppAgentCapabilityToken } from "./app-agent-capability";
 import type { AppAgentCapabilityClaims } from "./app-agent-capability";
-import { publicAgentNotExposed, publicInvalidRequest, publicUnauthenticated } from "./public-api-errors";
+import {
+  publicAgentNotExposed,
+  publicInvalidRequest,
+  publicUnauthenticated,
+} from "./public-api-errors";
 
 export interface BoundAgentCallInput {
   message: string;

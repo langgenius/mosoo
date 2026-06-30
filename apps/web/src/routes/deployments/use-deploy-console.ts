@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-
 import type { AppDeploymentRunStatus } from "@mosoo/contracts/app";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { createDeployConsoleFixture, DEPLOY_APP_IDENTITY } from "./deploy-console-data";
 import type { DeployConsoleState, DeploymentRunVM } from "./deploy-console-data";

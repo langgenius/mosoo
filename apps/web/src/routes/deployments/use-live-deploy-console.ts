@@ -8,8 +8,8 @@ import {
 } from "@/domains/app/query/app-deployment-queries";
 import { toAppId } from "@/routes/typed-id";
 
-import { toDeployConsoleState } from "./deploy-console-mapping";
 import type { DeployConsoleState } from "./deploy-console-data";
+import { toDeployConsoleState } from "./deploy-console-mapping";
 
 const EMPTY_STATE: DeployConsoleState = { agents: [], deployment: null, runs: [] };
 
@@ -34,7 +34,10 @@ export interface LiveDeployConsole {
  * `useDeployConsole`, so {@link file://./components/deploy-console-view.tsx} can
  * render either without branching.
  */
-export function useLiveDeployConsole(appId: string | null, fallbackName: string): LiveDeployConsole {
+export function useLiveDeployConsole(
+  appId: string | null,
+  fallbackName: string,
+): LiveDeployConsole {
   const overviewQuery = useAppDeploymentOverviewQuery(appId);
   const deployMutation = useDeployAppMutation(appId);
   const deleteMutation = useDeleteAppDeploymentMutation(appId);

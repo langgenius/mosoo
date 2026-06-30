@@ -1,14 +1,7 @@
 import { RotateCw, Trash2 } from "lucide-react";
 
 import { Button } from "@/shared/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/shared/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 
 import type { DeploymentRunVM } from "../deploy-console-data";
 import { StatusBadge } from "./deploy-status-badge";
@@ -51,11 +44,15 @@ export function DeploymentsHistory({
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead className="text-fg-3 w-14 pl-4 text-[12px] font-medium">#</TableHead>
-            <TableHead className="text-fg-3 text-[12px] font-medium">commit (default HEAD)</TableHead>
+            <TableHead className="text-fg-3 text-[12px] font-medium">
+              commit (default HEAD)
+            </TableHead>
             <TableHead className="text-fg-3 text-[12px] font-medium">worker</TableHead>
             <TableHead className="text-fg-3 text-[12px] font-medium">created</TableHead>
             <TableHead className="text-fg-3 text-[12px] font-medium">status</TableHead>
-            <TableHead className="text-fg-3 pr-4 text-right text-[12px] font-medium">actions</TableHead>
+            <TableHead className="text-fg-3 pr-4 text-right text-[12px] font-medium">
+              actions
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

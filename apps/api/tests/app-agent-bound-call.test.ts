@@ -1,5 +1,6 @@
-import type { SessionRunStatus } from "@mosoo/contracts/session-run";
 import { describe, expect, test } from "bun:test";
+
+import type { SessionRunStatus } from "@mosoo/contracts/session-run";
 
 import {
   isTerminalRunStatus,
