@@ -65,6 +65,18 @@ describe("App settings boundary", () => {
     expect(combinedSource.toLowerCase()).not.toContain("published agent");
   });
 
+  test("routes publish API token guidance to Access Tokens settings", () => {
+    const apiAccessPanel = readSource("../src/routes/agent/lifecycle/api-access-panel.tsx");
+    const distributionInfo = readSource("../src/routes/agent/lifecycle/distribution-info.ts");
+
+    expect(distributionInfo).toContain(
+      'const ACCESS_TOKEN_SETTINGS_PATH = "/settings/access-tokens";',
+    );
+    expect(apiAccessPanel).toContain('import { Link } from "react-router-dom";');
+    expect(apiAccessPanel).toContain("<Link to={distribution.tokenSettingsPath}>");
+    expect(apiAccessPanel).not.toContain("<a href={distribution.tokenSettingsPath}>");
+  });
+
   test("does not expose Web organization mutation clients", () => {
     const organizationApiIndex = readSource("../src/domains/organization/api/index.ts");
 

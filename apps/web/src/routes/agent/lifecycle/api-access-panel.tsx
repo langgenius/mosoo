@@ -1,6 +1,7 @@
 import { BookOpen, Check, Code, Copy, KeyRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
@@ -108,10 +109,10 @@ export function AgentApiAccessPanel({
         <ApiAccessDetailRow
           action={
             <Button asChild className="gap-1 text-[11.5px]" size="xs" variant="outline">
-              <a href={distribution.tokenSettingsPath}>
+              <Link to={distribution.tokenSettingsPath}>
                 <KeyRound className="size-3" />
                 Create token
-              </a>
+              </Link>
             </Button>
           }
           label="API token"
