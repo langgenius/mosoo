@@ -47,6 +47,7 @@ interface CredentialForm {
   apiBase: string;
   apiKey: string;
   id: string | null;
+  maskedApiKey: string | null;
   modelsText: string;
   name: string;
   vendorId: string;
@@ -56,6 +57,7 @@ const EMPTY_FORM: CredentialForm = {
   apiBase: "",
   apiKey: "",
   id: null,
+  maskedApiKey: null,
   modelsText: "",
   name: "",
   vendorId: "",
@@ -105,6 +107,14 @@ function vendorLabel(vendorId: string): string {
   }
 
   return PUBLIC_VENDORS.find((vendor) => vendor.vendorId === vendorId)?.label ?? vendorId;
+}
+
+function apiKeyPlaceholder(form: CredentialForm): string {
+  if (form.id === null) {
+    return "sk-...";
+  }
+
+  return form.maskedApiKey ? `Current key: ${form.maskedApiKey}` : "Current key is saved";
 }
 
 function credentialsByVendor(
@@ -253,6 +263,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
       apiBase: credential.apiBase ?? "",
       apiKey: "",
       id: credential.id,
+      maskedApiKey: credential.maskedApiKey,
       modelsText: credential.models?.join("\n") ?? "",
       name: credential.name,
       vendorId: credential.vendorId,
@@ -435,8 +446,11 @@ function ProviderCredentialDialogForm({
         <label className="block space-y-1" htmlFor={apiKeyInputId}>
           <div className="text-muted-foreground text-xs font-medium">API key</div>
           <Input
+            autoComplete="new-password"
+            data-1p-ignore="true"
             id={apiKeyInputId}
-            placeholder={form.id === null ? "sk-..." : "Leave blank to keep current key"}
+            name={`${apiKeyInputId}-provider-secret`}
+            placeholder={apiKeyPlaceholder(form)}
             type="password"
             value={form.apiKey}
             onChange={(event) => onChange({ ...form, apiKey: event.target.value })}
@@ -550,10 +564,16 @@ function ProviderCredentialSection({
                     Set default
                   </Button>
                 )}
-                <Button onClick={() => onEdit(credential)} size="icon" variant="ghost">
+                <Button
+                  aria-label={`Edit ${credential.name} key`}
+                  onClick={() => onEdit(credential)}
+                  size="icon"
+                  variant="ghost"
+                >
                   <Pencil className="size-4" />
                 </Button>
                 <Button
+                  aria-label={`Delete ${credential.name} key`}
                   className="text-destructive hover:text-destructive"
                   onClick={() => onDelete(credential)}
                   size="icon"
