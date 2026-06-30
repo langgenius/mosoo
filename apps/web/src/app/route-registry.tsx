@@ -72,9 +72,13 @@ const SettingsAccessTokens = lazyNamed(
   async () => import("../routes/settings/access-tokens-tab"),
   "AccessTokensTab",
 );
-const AppSettings = lazyNamed(
-  async () => import("../routes/app-settings/settings-tab"),
-  "AppSettingsTab",
+const AppSettingsLayout = lazyNamed(
+  async () => import("../routes/app-settings/app-settings.route"),
+  "AppSettingsLayout",
+);
+const AppSettingsGeneral = lazyNamed(
+  async () => import("../routes/app-settings/general-tab"),
+  "GeneralTab",
 );
 const AppUsage = lazyNamed(async () => import("../routes/app-settings/usage-tab"), "AppUsageTab");
 const AgentList = lazyNamed(
@@ -139,14 +143,22 @@ const appRoutes = [
   { element: protectedRoute(<AgentDetail />), path: "/agent/:agentId" },
   { element: protectedRoute(<Threads />), path: "/threads" },
   { element: protectedRoute(<Threads />), path: "/threads/:threadId" },
-  { element: protectedRoute(<AppSettings />), path: "/app-settings" },
-  { element: protectedRoute(<AppUsage />), path: "/app-settings/usage" },
+  {
+    children: [
+      { element: <Navigate to="/app-settings/general" replace />, index: true },
+      { element: <AppSettingsGeneral />, path: "general" },
+      { element: <AppUsage />, path: "usage" },
+      { element: <Navigate to="/app-settings/usage" replace />, path: "cost" },
+    ],
+    element: protectedRoute(<AppSettingsLayout />),
+    path: "/app-settings",
+  },
   {
     children: [
       { element: <Navigate to="/settings/profile" replace />, index: true },
       { element: <SettingsProfile />, path: "profile" },
       { element: <SettingsAccessTokens />, path: "access-tokens" },
-      { element: <Navigate to="/app-settings" replace />, path: "app" },
+      { element: <Navigate to="/app-settings/general" replace />, path: "app" },
       { element: <Navigate to="/app-settings/usage" replace />, path: "usage" },
       { element: <Navigate to="/environment" replace />, path: "environments" },
       { element: <Navigate to="/app-settings/usage" replace />, path: "cost" },

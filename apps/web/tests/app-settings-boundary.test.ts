@@ -12,7 +12,6 @@ describe("App settings boundary", () => {
 
     expect(routeRegistry).not.toContain("organization-general-tab");
     expect(routeRegistry).not.toContain("OrganizationGeneralTab");
-    expect(routeRegistry).not.toContain('path: "general"');
     expect(settingsNav).not.toContain('label: "Organization"');
     expect(settingsNav).not.toContain('path: "/settings/general"');
     expect(settingsNav).not.toContain("ownerOnly");
@@ -39,6 +38,7 @@ describe("App settings boundary", () => {
 
   test("keeps App settings in the App sidebar as Settings", () => {
     const settingsNav = readSource("../src/routes/settings/settings-nav.tsx");
+    const appSettingsNav = readSource("../src/routes/app-settings/app-settings-nav.tsx");
     const routeRegistry = readSource("../src/app/route-registry.tsx");
     const primaryNav = readSource("../src/app/navigation.tsx");
 
@@ -46,17 +46,22 @@ describe("App settings boundary", () => {
     expect(settingsNav).not.toContain('label: "General"');
     expect(settingsNav).not.toContain('path: "/settings/app"');
     expect(primaryNav).toContain('label: "Settings"');
-    expect(primaryNav).toContain('label: "App usage"');
+    expect(primaryNav).not.toContain('label: "App usage"');
     expect(primaryNav).toContain('path: "/app-settings"');
-    expect(primaryNav).toContain('path: "/app-settings/usage"');
+    expect(appSettingsNav).toContain('label: "General"');
+    expect(appSettingsNav).toContain('label: "App usage"');
+    expect(appSettingsNav).toContain('path: "/app-settings/general"');
+    expect(appSettingsNav).toContain('path: "/app-settings/usage"');
     expect(routeRegistry).toContain(
-      '{ element: protectedRoute(<AppSettings />), path: "/app-settings" }',
+      'async () => import("../routes/app-settings/app-settings.route")',
     );
     expect(routeRegistry).toContain(
-      '{ element: protectedRoute(<AppUsage />), path: "/app-settings/usage" }',
+      '{ element: <Navigate to="/app-settings/general" replace />, index: true }',
     );
+    expect(routeRegistry).toContain('{ element: <AppSettingsGeneral />, path: "general" }');
+    expect(routeRegistry).toContain('{ element: <AppUsage />, path: "usage" }');
     expect(routeRegistry).toContain(
-      '{ element: <Navigate to="/app-settings" replace />, path: "app" }',
+      '{ element: <Navigate to="/app-settings/general" replace />, path: "app" }',
     );
     expect(routeRegistry).not.toContain("OrganizationGeneralTab");
   });

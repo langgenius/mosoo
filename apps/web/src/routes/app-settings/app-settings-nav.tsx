@@ -1,0 +1,45 @@
+import { BarChart3, Box } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { NavLink } from "react-router-dom";
+
+import { cn } from "@/shared/lib/class-names";
+
+interface AppSettingsNavItem {
+  icon: LucideIcon;
+  label: string;
+  path: string;
+}
+
+const APP_SETTINGS_NAV_ITEMS: AppSettingsNavItem[] = [
+  { icon: Box, label: "General", path: "/app-settings/general" },
+  { icon: BarChart3, label: "App usage", path: "/app-settings/usage" },
+];
+
+export function AppSettingsNav() {
+  return (
+    <aside className="border-border-soft flex w-[220px] shrink-0 flex-col gap-3 border-r px-3 py-5">
+      <div className="text-fg-3 px-2.5 pb-1 text-[10px] font-semibold tracking-[0.14em] uppercase">
+        App
+      </div>
+      <div className="flex flex-col gap-0.5">
+        {APP_SETTINGS_NAV_ITEMS.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors",
+                isActive
+                  ? "bg-ink-100 text-fg-1"
+                  : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
+              )
+            }
+          >
+            <item.icon className="size-4" />
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+      </div>
+    </aside>
+  );
+}

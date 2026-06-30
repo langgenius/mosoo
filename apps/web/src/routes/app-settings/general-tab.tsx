@@ -13,14 +13,14 @@ import { CommandBlock } from "@/shared/ui/command-block";
 
 import { SettingsTabBody, SettingsTabHeader } from "../settings/settings-tab-layout";
 
-export function AppSettingsTab() {
+export function GeneralTab() {
   const { activeApp } = useAppSession();
   const formKey = activeApp === null ? "no-app" : `${activeApp.id}:${activeApp.name}`;
 
-  return <AppSettingsForm key={formKey} activeApp={activeApp} />;
+  return <GeneralForm key={formKey} activeApp={activeApp} />;
 }
 
-function AppSettingsForm({ activeApp }: { activeApp: AppSummary | null }) {
+function GeneralForm({ activeApp }: { activeApp: AppSummary | null }) {
   const queryClient = useQueryClient();
 
   const [name, setName] = useState(activeApp?.name ?? "");
@@ -56,7 +56,7 @@ function AppSettingsForm({ activeApp }: { activeApp: AppSummary | null }) {
 
   return (
     <>
-      <SettingsTabHeader title="Settings" />
+      <SettingsTabHeader title="General" />
       <SettingsTabBody>
         <div className="space-y-2">
           <label className="text-foreground text-sm font-medium" htmlFor="app-name">
