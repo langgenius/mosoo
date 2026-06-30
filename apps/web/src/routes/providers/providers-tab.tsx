@@ -483,7 +483,7 @@ function ProviderCredentialDialogForm({
           <Button disabled={testState === "running"} onClick={onTest} size="sm" variant="outline">
             {testState === "running" ? "Testing..." : "Test"}
           </Button>
-          <ProviderTestStatus error={error} state={testState} />
+          <ProviderTestStatus state={testState} />
         </div>
         <Button disabled={saving} onClick={onSave} size="sm">
           {saving ? "Saving..." : "Save"}
