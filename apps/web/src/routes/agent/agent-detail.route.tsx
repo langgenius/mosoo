@@ -330,11 +330,7 @@ export function AgentDetailPage() {
       {/* Content */}
       <div className="min-h-0 flex-1 overflow-hidden">
         {mode === "preview" && (
-          <PreviewMode
-            agent={agent}
-            onSwitchMode={handleSelectMode}
-            headerActionTarget={headerActionTarget}
-          />
+          <PreviewMode agent={agent} headerActionTarget={headerActionTarget} />
         )}
         {mode === "logs" && <LogsTab agentId={agent.id} appId={agent.appId} />}
         {mode === "cost" && <AgentCostTab agentId={agent.id} appId={agent.appId} />}

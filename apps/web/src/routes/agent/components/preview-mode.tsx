@@ -8,7 +8,7 @@ import { publishAgent } from "@/domains/agent/api/agent-client";
 import { agentKeys } from "@/domains/agent/query/agent-queries";
 import { toAgentId, toAppId } from "@/routes/typed-id";
 
-import type { Agent, AgentMode } from "../agent.types";
+import type { Agent } from "../agent.types";
 import { AgentApiAccessDialog } from "../lifecycle/api-access-panel";
 import type { LifecycleActionKind } from "../lifecycle/live-config-action-dialog";
 import { PendingChangesBanner } from "../lifecycle/pending-changes-banner";
@@ -59,7 +59,6 @@ const PREVIEW_MODE_INITIAL_STATE: PreviewModeState = {
 export interface PreviewModeProps {
   agent: Agent;
   headerActionTarget: HTMLDivElement | null;
-  onSwitchMode: (mode: AgentMode | "logs") => void;
 }
 
 function publishStatusMessage({
@@ -107,11 +106,7 @@ function previewModeReducer(state: PreviewModeState, action: PreviewModeAction):
 
 // Preview surface for Draft stage 2 and Live debug-and-iterate flows.
 // The writable form classifies dirty fields and routes them to the right apply action.
-export function PreviewMode({
-  agent,
-  headerActionTarget,
-  onSwitchMode,
-}: PreviewModeProps): ReactElement {
+export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): ReactElement {
   const queryClient = useQueryClient();
   const model = useAgentEditorModel({ agent });
   useAgentEditorAutoSave(model);
@@ -286,12 +281,6 @@ export function PreviewMode({
         agent={agent}
         onOpenChange={(next) => {
           dispatch({ open: next, type: "setSuccessModalOpen" });
-          if (!next) {
-            onSwitchMode("consume");
-          }
-        }}
-        onOpenChat={() => {
-          onSwitchMode("consume");
         }}
         open={showSuccessModal}
       />

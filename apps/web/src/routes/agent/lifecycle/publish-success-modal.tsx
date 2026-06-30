@@ -1,5 +1,5 @@
-import { ArrowRight, Check, Copy, ExternalLink, Globe } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowRight, Check, Globe } from "lucide-react";
+import { useMemo } from "react";
 
 import { Button } from "@/shared/ui/button";
 import {
@@ -15,45 +15,21 @@ import type { Agent } from "../agent.types";
 import { AgentApiAccessPanel } from "./api-access-panel";
 import { buildAgentDistribution } from "./distribution-info";
 
-async function writeClipboardText(text: string): Promise<boolean> {
-  if (!navigator.clipboard) {
-    return false;
-  }
-
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export function PublishSuccessModal({
   agent,
-  onOpenChat,
   onOpenChange,
   onViewDistribution,
   open,
 }: {
   agent: Agent;
   onOpenChange: (open: boolean) => void;
-  onOpenChat?: () => void;
   onViewDistribution?: () => void;
   open: boolean;
 }) {
   const distribution = useMemo(() => buildAgentDistribution(agent), [agent]);
-  const [copiedKey, setCopiedKey] = useState<"web" | null>(null);
 
-  async function copy(text: string, key: "web") {
-    const didCopy = await writeClipboardText(text);
-    if (!didCopy) {
-      return;
-    }
-
-    setCopiedKey(key);
-    globalThis.setTimeout(() => {
-      setCopiedKey(null);
-    }, 1500);
+  function openThreadDialog(): void {
+    globalThis.location.assign(distribution.threadsPath);
   }
 
   return (
@@ -79,30 +55,18 @@ export function PublishSuccessModal({
             <div className="flex items-start gap-3">
               <Globe className="text-fg-3 mt-0.5 size-4 shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="text-foreground text-[13px] font-medium">Web UI</div>
-                <div className="text-fg-2 mt-0.5 truncate font-mono text-[12px]">
-                  {distribution.webUrl}
-                </div>
+                <div className="text-foreground text-[13px] font-medium">Try in Mosoo</div>
+                <div className="text-fg-2 mt-0.5 text-[12px]">Start a Thread with this agent.</div>
               </div>
-              <div className="flex shrink-0 gap-1">
-                <Button
-                  className="gap-1 text-[11.5px]"
-                  onClick={() => {
-                    void copy(distribution.webUrl, "web");
-                  }}
-                  size="xs"
-                  variant="outline"
-                >
-                  {copiedKey === "web" ? <Check className="size-3" /> : <Copy className="size-3" />}
-                  {copiedKey === "web" ? "Copied" : "Copy"}
-                </Button>
-                <Button asChild className="gap-1 text-[11.5px]" size="xs" variant="outline">
-                  <a href={distribution.webUrl} rel="noreferrer" target="_blank">
-                    <ExternalLink className="size-3" />
-                    Open
-                  </a>
-                </Button>
-              </div>
+              <Button
+                className="gap-1 text-[11.5px]"
+                onClick={openThreadDialog}
+                size="xs"
+                variant="outline"
+              >
+                Open
+                <ArrowRight className="size-3" />
+              </Button>
             </div>
           </div>
 
@@ -117,15 +81,8 @@ export function PublishSuccessModal({
               View distribution
             </Button>
           ) : null}
-          <Button
-            className="gap-1.5"
-            onClick={() => {
-              onOpenChange(false);
-              onOpenChat?.();
-            }}
-            size="sm"
-          >
-            Open in Chat
+          <Button className="gap-1.5" onClick={openThreadDialog} size="sm">
+            Try in Mosoo
             <ArrowRight className="size-3.5" />
           </Button>
         </div>
