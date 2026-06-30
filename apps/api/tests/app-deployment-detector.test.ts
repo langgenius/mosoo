@@ -152,6 +152,172 @@ entry = "src/index.js"
     });
   });
 
+  test("keeps the legacy flat worker override taking precedence over wrangler main", () => {
+    expect(
+      detect({
+        ".mosoo.toml": `
+type = "worker"
+
+[worker]
+entry = "src/index.js"
+`,
+        "wrangler.toml": 'main = "src/other.js"\n',
+      }),
+    ).toMatchObject({
+      mosooConfigPath: ".mosoo.toml",
+      targetKind: "cloudflare_worker",
+      targetMode: "worker_module",
+      workerEntry: "src/index.js",
+    });
+  });
+
+  test("parses .mosoo.toml [[agents]] bindings", () => {
+    expect(
+      detect({
+        ".mosoo.toml": `
+type = "worker"
+
+[worker]
+entry = "src/index.js"
+
+[[agents]]
+name = "roadmap"
+expose = "public_thread"
+env = "ROADMAP_THREAD_URL"
+
+[[agents]]
+name = "triage"
+expose = "public_thread"
+env = "TRIAGE_THREAD_URL"
+`,
+      }).agentBindings,
+    ).toEqual([
+      { env: "ROADMAP_THREAD_URL", expose: "public_thread", name: "roadmap" },
+      { env: "TRIAGE_THREAD_URL", expose: "public_thread", name: "triage" },
+    ]);
+  });
+
+  test("parses the schema-v1 product manifest into a worker target", () => {
+    const plan = detect({
+      ".mosoo.toml": `
+schema = 1
+name = "roadmap-board"
+
+[deploy]
+adapter = "cloudflare-workers"
+wrangler = "wrangler.toml"
+
+[[agents]]
+name = "roadmap"
+expose = "public_thread"
+env = "MOSOO_AGENT_ROADMAP_URL"
+`,
+      "wrangler.toml": 'name = "roadmap-board"\nmain = "src/index.js"\n',
+    });
+
+    expect(plan).toMatchObject({
+      mosooConfigPath: ".mosoo.toml",
+      outputDir: null,
+      rootDir: ".",
+      targetKind: "cloudflare_worker",
+      targetMode: "worker_module",
+      workerEntry: "src/index.js",
+    });
+    expect(plan.agentBindings).toEqual([
+      { env: "MOSOO_AGENT_ROADMAP_URL", expose: "public_thread", name: "roadmap" },
+    ]);
+  });
+
+  test("rejects duplicate agent names", () => {
+    expect(() =>
+      detect({
+        ".mosoo.toml": `
+schema = 1
+
+[deploy]
+adapter = "cloudflare-workers"
+wrangler = "wrangler.toml"
+
+[[agents]]
+name = "roadmap"
+expose = "public_thread"
+env = "ROADMAP_THREAD_URL"
+
+[[agents]]
+name = "roadmap"
+expose = "public_thread"
+env = "TRIAGE_THREAD_URL"
+`,
+        "wrangler.toml": 'main = "src/index.js"\n',
+      }),
+    ).toThrow(AppDeploymentDetectionError);
+  });
+
+  test("rejects duplicate agent env vars", () => {
+    expect(() =>
+      detect({
+        ".mosoo.toml": `
+schema = 1
+
+[deploy]
+adapter = "cloudflare-workers"
+wrangler = "wrangler.toml"
+
+[[agents]]
+name = "roadmap"
+expose = "public_thread"
+env = "SHARED_THREAD_URL"
+
+[[agents]]
+name = "triage"
+expose = "public_thread"
+env = "SHARED_THREAD_URL"
+`,
+        "wrangler.toml": 'main = "src/index.js"\n',
+      }),
+    ).toThrow(AppDeploymentDetectionError);
+  });
+
+  test("rejects an agent binding that is not public_thread", () => {
+    expect(() =>
+      detect({
+        ".mosoo.toml": `
+type = "worker"
+
+[worker]
+entry = "src/index.js"
+
+[[agents]]
+name = "roadmap"
+expose = "private"
+env = "ROADMAP_THREAD_URL"
+`,
+      }),
+    ).toThrow(AppDeploymentDetectionError);
+  });
+
+  test("rejects [[agents]] on a static deployment", () => {
+    expect(() =>
+      detect({
+        ".mosoo.toml": `
+type = "static"
+
+[build]
+output = "dist"
+
+[[agents]]
+name = "roadmap"
+expose = "public_thread"
+env = "ROADMAP_THREAD_URL"
+`,
+      }),
+    ).toThrow(AppDeploymentDetectionError);
+  });
+
+  test("repository-shape detection yields no agent bindings", () => {
+    expect(detect({ "index.html": "<main>Hello</main>" }).agentBindings).toEqual([]);
+  });
+
   test("rejects TypeScript worker entry in the first cut", () => {
     expect(() =>
       detect({

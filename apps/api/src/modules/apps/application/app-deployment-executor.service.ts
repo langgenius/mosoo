@@ -8,6 +8,8 @@ import { createErrorLogContext, logError } from "../../../platform/cloudflare/lo
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, getD1ChangeCount } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
+import { listAppOwnerAgentRows } from "../../agents/application/agent-repository";
+import { boundAgentUrl, mintAppAgentCapabilityToken } from "../../public-api/app-agent-capability";
 import {
   destroyRuntimeSubjectContainer,
   getRuntimeSubjectKeepAliveHandle,
@@ -17,6 +19,11 @@ import type {
   SandboxHandle,
 } from "../../runtime/infrastructure/sandbox-handles";
 import { ACTIVE_APP_DEPLOYMENT_RUN_STATUSES } from "../domain/app-deployment-lifecycle";
+import {
+  AppAgentBindingResolutionError,
+  resolveAppAgentBindings,
+} from "./app-agent-binding-resolution";
+import type { ResolvableAppAgent } from "./app-agent-binding-resolution";
 import type { CloudflareDeploymentClient } from "./app-deployment-cloudflare-client";
 import { createCloudflareDeploymentClient } from "./app-deployment-cloudflare-client";
 import {
@@ -50,6 +57,7 @@ export interface AppDeploymentBuildRunner {
   cleanup?(): Promise<void>;
   deploy(input: {
     deployment: AppDeploymentRow;
+    envVars: Record<string, string>;
     plan: AppDeploymentPlan;
     prepared: PreparedAppDeploymentRepository;
     run: AppDeploymentRunRow;
@@ -566,6 +574,7 @@ class SandboxAppDeploymentBuildRunner implements AppDeploymentBuildRunner {
 
   async deploy(input: {
     deployment: AppDeploymentRow;
+    envVars: Record<string, string>;
     plan: AppDeploymentPlan;
     prepared: PreparedAppDeploymentRepository;
     run: AppDeploymentRunRow;
@@ -677,6 +686,7 @@ class SandboxAppDeploymentBuildRunner implements AppDeploymentBuildRunner {
       mainModuleName,
       scriptContent,
       scriptName: targetName,
+      vars: input.envVars,
     });
     await this.#cloudflareClient.ensureWorkerRoute({
       hostname,
@@ -732,6 +742,49 @@ class SandboxAppDeploymentBuildRunner implements AppDeploymentBuildRunner {
   }
 }
 
+// Long-lived: the injected URL lives with the deployed Worker and is revoked by
+// deleting the deployment (which destroys the Worker) plus the ask endpoint's
+// re-check that the agent is still published. See docs/prd/app-deployment.md.
+const APP_AGENT_CAPABILITY_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000;
+
+// Resolve `.mosoo.toml [[agents]]` bindings to published agents and mint one
+// self-authorizing capability URL per binding (fail-fast on an unpublished or
+// missing agent). Returns the env var map injected into the deployed Worker.
+async function resolveDeploymentEnvVars(
+  bindings: ApiBindings,
+  deployment: AppDeploymentRow,
+  plan: AppDeploymentPlan,
+): Promise<Record<string, string>> {
+  if (plan.agentBindings.length === 0) {
+    return {};
+  }
+
+  const agentRows = await listAppOwnerAgentRows(bindings.DB, {
+    appId: deployment.appId,
+    viewerId: deployment.ownerAccountId,
+  });
+  const resolvable: ResolvableAppAgent[] = agentRows.map((agent) => ({
+    id: agent.id,
+    name: agent.name,
+    published: agent.status === "published" && agent.liveDeploymentVersionId !== null,
+  }));
+  const resolved = resolveAppAgentBindings(plan.agentBindings, resolvable);
+  const expiresAtMs = currentTimestampMs() + APP_AGENT_CAPABILITY_TTL_MS;
+  const envVars: Record<string, string> = {};
+
+  for (const binding of resolved) {
+    const token = await mintAppAgentCapabilityToken(bindings.RUNTIME_ACTION_TOKEN_SECRET, {
+      agentId: binding.agentId,
+      appId: deployment.appId,
+      exp: expiresAtMs,
+      expose: binding.expose,
+    });
+    envVars[binding.envVar] = boundAgentUrl(bindings.WEB_ORIGIN, token);
+  }
+
+  return envVars;
+}
+
 export async function dispatchAppDeploymentRun(
   bindings: ApiBindings,
   input: { appDeploymentRunId: AppDeploymentRunId },
@@ -774,6 +827,22 @@ export async function dispatchAppDeploymentRun(
       return;
     }
 
+    let envVars: Record<string, string>;
+    try {
+      envVars = await resolveDeploymentEnvVars(bindings, context.deployment, plan);
+    } catch (error) {
+      if (error instanceof AppAgentBindingResolutionError) {
+        await failDeploymentRunIfActive({
+          database: bindings.DB,
+          errorCode: error.code,
+          errorMessage: error.message,
+          runId: context.run.id,
+        });
+        return;
+      }
+      throw error;
+    }
+
     if (!(await updateRunStatus(bindings.DB, input.appDeploymentRunId, "building"))) {
       return;
     }
@@ -802,7 +871,7 @@ export async function dispatchAppDeploymentRun(
       return;
     }
 
-    const result = await runner.deploy({ ...context, plan, prepared });
+    const result = await runner.deploy({ ...context, envVars, plan, prepared });
 
     if (!(await updateRunStatus(bindings.DB, input.appDeploymentRunId, "submitted"))) {
       await failDeploymentRunIfActive({

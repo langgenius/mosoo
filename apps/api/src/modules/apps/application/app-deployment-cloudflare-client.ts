@@ -18,6 +18,8 @@ export interface CloudflareWorkerModuleInput {
   mainModuleName: string;
   scriptContent: string;
   scriptName: string;
+  /** Plain-text env vars injected into the Worker (e.g. agent thread URLs). */
+  vars: Record<string, string>;
 }
 
 export interface CloudflareWorkerDeploymentResult {
@@ -137,6 +139,11 @@ export function createCloudflareDeploymentClient(
         account_id: accountId,
         files: [file],
         metadata: {
+          bindings: Object.entries(input.vars).map(([name, text]) => ({
+            name,
+            text,
+            type: "plain_text" as const,
+          })),
           compatibility_date: input.compatibilityDate,
           main_module: input.mainModuleName,
         },

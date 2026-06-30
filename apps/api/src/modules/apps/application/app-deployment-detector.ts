@@ -9,7 +9,14 @@ export type AppDeploymentDetectionErrorCode =
   | "deployment_config_required"
   | "deployment_shape_unsupported";
 
+export interface AppDeploymentAgentBinding {
+  env: string;
+  expose: "public_thread";
+  name: string;
+}
+
 export interface AppDeploymentPlan {
+  agentBindings: AppDeploymentAgentBinding[];
   buildCommand: string | null;
   generatedWranglerConfig: string;
   installCommand: string | null;
@@ -42,12 +49,14 @@ interface PackageJson {
 }
 
 interface MosooConfig {
+  agents: AppDeploymentAgentBinding[];
   buildCommand: string | null;
   installCommand: string | null;
   outputDir: string | null;
   routesFallback: string | null;
   rootDir: string;
   workerEntry: string | null;
+  wranglerConfigPath: string | null;
   type: "static" | "worker";
 }
 
@@ -97,11 +106,19 @@ function detectFromMosooConfig(
   const buildCommand = config.buildCommand ?? buildCommandFor(packageManager, packageJson);
 
   if (config.type === "static") {
+    if (config.agents.length > 0) {
+      throw new AppDeploymentDetectionError(
+        "deployment_shape_unsupported",
+        "agent bindings ([[agents]]) require a worker deployment",
+      );
+    }
+
     const outputDir =
       config.outputDir ??
       fail("deployment_config_required", "static deployment requires build.output");
 
     return pagesPlan({
+      agentBindings: config.agents,
       buildCommand,
       installCommand,
       mosooConfigPath: ".mosoo.toml",
@@ -115,6 +132,7 @@ function detectFromMosooConfig(
 
   const workerEntry =
     config.workerEntry ??
+    readWranglerMain(files, config.rootDir, config.wranglerConfigPath) ??
     fail("deployment_config_required", "worker deployment requires worker.entry");
 
   if (config.routesFallback !== null) {
@@ -125,6 +143,7 @@ function detectFromMosooConfig(
   }
 
   return workerPlan({
+    agentBindings: config.agents,
     buildCommand,
     installCommand,
     mosooConfigPath: ".mosoo.toml",
@@ -146,6 +165,7 @@ function detectFromRepository(
 
   if (wranglerMain !== null) {
     return workerPlan({
+      agentBindings: [],
       buildCommand: buildCommandFor(packageManager, packageJson),
       installCommand: installCommandFor(packageManager, files, rootDir),
       mosooConfigPath: null,
@@ -159,6 +179,7 @@ function detectFromRepository(
   if (packageJson === null) {
     if (files.has("index.html")) {
       return pagesPlan({
+        agentBindings: [],
         buildCommand: null,
         installCommand: null,
         mosooConfigPath: null,
@@ -201,6 +222,7 @@ function detectFromRepository(
 
   if (files.has(pathInRoot(rootDir, "index.html")) && packageJson.scripts["build"] === undefined) {
     return pagesPlan({
+      agentBindings: [],
       buildCommand: null,
       installCommand: null,
       mosooConfigPath: null,
@@ -231,6 +253,7 @@ function packagePagesPlan(
     fail("deployment_config_required", "static framework deployment requires scripts.build");
 
   return pagesPlan({
+    agentBindings: [],
     buildCommand,
     installCommand: installCommandFor(packageManager, files, rootDir),
     mosooConfigPath: null,
@@ -243,6 +266,7 @@ function packagePagesPlan(
 }
 
 function pagesPlan(input: {
+  agentBindings: AppDeploymentAgentBinding[];
   buildCommand: string | null;
   installCommand: string | null;
   mosooConfigPath: ".mosoo.toml" | null;
@@ -253,6 +277,7 @@ function pagesPlan(input: {
   rootDir: string;
 }): AppDeploymentPlan {
   return {
+    agentBindings: input.agentBindings,
     buildCommand: input.buildCommand,
     generatedWranglerConfig: stringify({
       compatibility_date: APP_DEPLOYMENT_COMPATIBILITY_DATE,
@@ -273,6 +298,7 @@ function pagesPlan(input: {
 }
 
 function workerPlan(input: {
+  agentBindings: AppDeploymentAgentBinding[];
   buildCommand: string | null;
   installCommand: string | null;
   mosooConfigPath: ".mosoo.toml" | null;
@@ -289,6 +315,7 @@ function workerPlan(input: {
   }
 
   return {
+    agentBindings: input.agentBindings,
     buildCommand: input.buildCommand,
     generatedWranglerConfig: stringify({
       compatibility_date: APP_DEPLOYMENT_COMPATIBILITY_DATE,
@@ -327,16 +354,26 @@ function createRepositoryFiles(files: Readonly<Record<string, string>>): Reposit
 
 function parseMosooConfig(source: string): MosooConfig {
   const value = parseTomlObject(source, ".mosoo.toml");
-  requireAllowedKeys(value, ["build", "name", "root", "routes", "type", "worker"], ".mosoo.toml");
+  requireAllowedKeys(
+    value,
+    ["agents", "build", "deploy", "name", "root", "routes", "schema", "type", "worker"],
+    ".mosoo.toml",
+  );
 
-  const type = readRequiredString(value, "type", ".mosoo.toml");
+  readSchemaVersion(value);
 
-  if (type !== "static" && type !== "worker") {
-    throw new AppDeploymentDetectionError(
-      "deployment_shape_unsupported",
-      ".mosoo.toml type must be static or worker",
-    );
-  }
+  const deploy = readTable(value, "deploy", ".mosoo.toml");
+  requireAllowedKeys(deploy, ["adapter", "wrangler"], ".mosoo.toml deploy");
+  const deployAdapter = value["deploy"] === undefined ? null : readDeployAdapter(deploy);
+  const wranglerConfigPath = normalizeOptionalRelativePath(
+    readOptionalString(deploy, "wrangler", ".mosoo.toml deploy"),
+    "deploy.wrangler",
+  );
+
+  const type = resolveDeploymentType(
+    readOptionalString(value, "type", ".mosoo.toml"),
+    deployAdapter,
+  );
 
   const build = readTable(value, "build", ".mosoo.toml");
   const worker = readTable(value, "worker", ".mosoo.toml");
@@ -352,6 +389,7 @@ function parseMosooConfig(source: string): MosooConfig {
   readOptionalString(value, "name", ".mosoo.toml");
 
   return {
+    agents: readAgentBindings(value),
     buildCommand: readOptionalString(build, "command", ".mosoo.toml build"),
     installCommand: readOptionalString(build, "install", ".mosoo.toml build"),
     outputDir: normalizeOptionalRelativePath(
@@ -365,7 +403,68 @@ function parseMosooConfig(source: string): MosooConfig {
       readOptionalString(worker, "entry", ".mosoo.toml worker"),
       "worker.entry",
     ),
+    wranglerConfigPath,
   };
+}
+
+function readSchemaVersion(value: Readonly<Record<string, unknown>>): void {
+  const schema = value["schema"];
+
+  if (schema === undefined) {
+    return;
+  }
+
+  if (typeof schema !== "number" || !Number.isInteger(schema)) {
+    throw new AppDeploymentDetectionError(
+      "deployment_config_required",
+      ".mosoo.toml schema must be an integer",
+    );
+  }
+
+  if (schema !== 1) {
+    throw new AppDeploymentDetectionError(
+      "deployment_shape_unsupported",
+      ".mosoo.toml schema must be 1",
+    );
+  }
+}
+
+function readDeployAdapter(deploy: Readonly<Record<string, unknown>>): "cloudflare-workers" {
+  const adapter = readRequiredString(deploy, "adapter", ".mosoo.toml deploy");
+
+  if (adapter !== "cloudflare-workers") {
+    throw new AppDeploymentDetectionError(
+      "deployment_shape_unsupported",
+      ".mosoo.toml deploy.adapter must be cloudflare-workers",
+    );
+  }
+
+  return "cloudflare-workers";
+}
+
+function resolveDeploymentType(
+  flatType: string | null,
+  deployAdapter: "cloudflare-workers" | null,
+): "static" | "worker" {
+  if (flatType !== null) {
+    if (flatType !== "static" && flatType !== "worker") {
+      throw new AppDeploymentDetectionError(
+        "deployment_shape_unsupported",
+        ".mosoo.toml type must be static or worker",
+      );
+    }
+
+    return flatType;
+  }
+
+  if (deployAdapter === "cloudflare-workers") {
+    return "worker";
+  }
+
+  throw new AppDeploymentDetectionError(
+    "deployment_config_required",
+    ".mosoo.toml must declare type or [deploy].adapter",
+  );
 }
 
 function readPackageJson(files: RepositoryFiles, rootDir: string): PackageJson | null {
@@ -388,38 +487,37 @@ function readPackageJson(files: RepositoryFiles, rootDir: string): PackageJson |
   };
 }
 
-function readWranglerMain(files: RepositoryFiles, rootDir: string): string | null {
-  const toml = files.read(pathInRoot(rootDir, "wrangler.toml"));
+function readWranglerMain(
+  files: RepositoryFiles,
+  rootDir: string,
+  configPath: string | null = null,
+): string | null {
+  const candidates =
+    configPath === null ? ["wrangler.toml", "wrangler.json", "wrangler.jsonc"] : [configPath];
 
-  if (toml !== null) {
-    const main = readWranglerConfigMain(() => {
-      const value = parseTomlObject(toml, pathInRoot(rootDir, "wrangler.toml"));
-
-      return normalizeOptionalRelativePath(
-        readOptionalString(value, "main", "wrangler.toml"),
-        "main",
-      );
-    });
+  for (const file of candidates) {
+    const main = readWranglerMainFromFile(files, pathInRoot(rootDir, file));
 
     if (main !== null) return main;
   }
 
-  for (const file of ["wrangler.json", "wrangler.jsonc"]) {
-    const path = pathInRoot(rootDir, file);
-    const content = files.read(path);
+  return null;
+}
 
-    if (content !== null) {
-      const main = readWranglerConfigMain(() => {
-        const value = parseJsonObject(content, path);
+function readWranglerMainFromFile(files: RepositoryFiles, path: string): string | null {
+  const content = files.read(path);
 
-        return normalizeOptionalRelativePath(readOptionalString(value, "main", path), "main");
-      });
-
-      if (main !== null) return main;
-    }
+  if (content === null) {
+    return null;
   }
 
-  return null;
+  return readWranglerConfigMain(() => {
+    const value = path.endsWith(".toml")
+      ? parseTomlObject(content, path)
+      : parseJsonObject(content, path);
+
+    return normalizeOptionalRelativePath(readOptionalString(value, "main", path), "main");
+  });
 }
 
 function readWranglerConfigMain(readMain: () => string | null): string | null {
@@ -656,6 +754,83 @@ function readTable(
   }
 
   return value;
+}
+
+function readTableArray(
+  source: Readonly<Record<string, unknown>>,
+  key: string,
+  path: string,
+): readonly Record<string, unknown>[] {
+  const value = source[key];
+
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new AppDeploymentDetectionError(
+      "deployment_config_required",
+      `${path}.${key} must be an array of tables`,
+    );
+  }
+
+  return value.map((entry, index) => {
+    if (!isRecord(entry)) {
+      throw new AppDeploymentDetectionError(
+        "deployment_config_required",
+        `${path}.${key}[${index}] must be a table`,
+      );
+    }
+
+    return entry;
+  });
+}
+
+function readAgentBindings(value: Readonly<Record<string, unknown>>): AppDeploymentAgentBinding[] {
+  const bindings = readTableArray(value, "agents", ".mosoo.toml").map(
+    (entry, index): AppDeploymentAgentBinding => {
+      const path = `.mosoo.toml agents[${index}]`;
+      requireAllowedKeys(entry, ["env", "expose", "name"], path);
+
+      if (readRequiredString(entry, "expose", path) !== "public_thread") {
+        throw new AppDeploymentDetectionError(
+          "deployment_shape_unsupported",
+          `${path}.expose must be public_thread`,
+        );
+      }
+
+      return {
+        env: readRequiredString(entry, "env", path),
+        expose: "public_thread",
+        name: readRequiredString(entry, "name", path),
+      };
+    },
+  );
+
+  const seenNames = new Set<string>();
+  const seenEnvs = new Set<string>();
+
+  for (const binding of bindings) {
+    if (seenNames.has(binding.name)) {
+      throw new AppDeploymentDetectionError(
+        "deployment_config_required",
+        `.mosoo.toml agents.name "${binding.name}" is duplicated`,
+      );
+    }
+
+    seenNames.add(binding.name);
+
+    if (seenEnvs.has(binding.env)) {
+      throw new AppDeploymentDetectionError(
+        "deployment_config_required",
+        `.mosoo.toml agents.env "${binding.env}" is duplicated`,
+      );
+    }
+
+    seenEnvs.add(binding.env);
+  }
+
+  return bindings;
 }
 
 function readRequiredString(
