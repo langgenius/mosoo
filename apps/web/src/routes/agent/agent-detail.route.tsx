@@ -1,5 +1,4 @@
-import { ArrowLeft, Settings, TerminalSquare } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { ArrowLeft, Settings } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -40,12 +39,6 @@ const MODE_TABS: { id: DetailMode; label: string }[] = [
   { id: "cost", label: "Cost" },
 ];
 
-interface DebugModeItem {
-  icon: LucideIcon;
-  id: Extract<DetailMode, "terminal">;
-  label: string;
-}
-
 function toDetailMode(value: string | null): DetailMode | null {
   switch (value) {
     case "consume":
@@ -62,7 +55,6 @@ function toDetailMode(value: string | null): DetailMode | null {
 
 function AgentDetailHeader({
   agent,
-  debugItems,
   headerActionTargetRef,
   mode,
   onBack,
@@ -72,7 +64,6 @@ function AgentDetailHeader({
   runtime,
 }: {
   agent: Agent;
-  debugItems: DebugModeItem[];
   headerActionTargetRef: (node: HTMLDivElement | null) => void;
   mode: DetailMode;
   onBack: () => void;
@@ -127,25 +118,6 @@ function AgentDetailHeader({
             {tab.label}
           </button>
         ))}
-        {debugItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => {
-                onSelectMode(item.id);
-              }}
-              className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-all",
-                mode === item.id ? "bg-ink-100 text-fg-1" : "text-muted-foreground hover:bg-accent",
-              )}
-            >
-              <Icon aria-hidden="true" size={14} />
-              {item.label}
-            </button>
-          );
-        })}
       </div>
 
       <div className="flex items-center gap-2">
@@ -194,10 +166,6 @@ export function AgentDetailPage() {
     itemId: "terminal",
     viewerRole: detailQuery.data?.viewerRole ?? null,
   });
-  const debugItems: DebugModeItem[] = [];
-  if (canUseTerminal) {
-    debugItems.push({ icon: TerminalSquare, id: "terminal", label: "Terminal" });
-  }
   const urlMode = toDetailMode(searchParams.get("tab") ?? searchParams.get("mode"));
 
   const handleSelectMode = useCallback(
@@ -311,7 +279,6 @@ export function AgentDetailPage() {
     <div className="flex h-full flex-col">
       <AgentDetailHeader
         agent={agent}
-        debugItems={debugItems}
         headerActionTargetRef={setHeaderActionTarget}
         mode={mode}
         onBack={() => {
