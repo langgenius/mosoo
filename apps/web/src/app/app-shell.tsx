@@ -2,11 +2,9 @@ import AppWindowIcon from "@hugeicons/core-free-icons/AppWindowIcon";
 import CheckIcon from "@hugeicons/core-free-icons/CheckIcon";
 import ChevronLeftIcon from "@hugeicons/core-free-icons/ChevronLeftIcon";
 import ChevronsDownUpIcon from "@hugeicons/core-free-icons/ChevronsDownUpIcon";
-import GridViewIcon from "@hugeicons/core-free-icons/GridViewIcon";
 import PanelLeftCloseIcon from "@hugeicons/core-free-icons/PanelLeftCloseIcon";
 import PanelLeftOpenIcon from "@hugeicons/core-free-icons/PanelLeftOpenIcon";
 import PlusSignIcon from "@hugeicons/core-free-icons/PlusSignIcon";
-import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import type { AppSummary } from "@mosoo/contracts/app";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -19,7 +17,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { Separator } from "@/shared/ui/separator";
@@ -37,9 +34,7 @@ const BackIcon = createHugeicon(ChevronLeftIcon, "BackIcon");
 const CheckmarkIcon = createHugeicon(CheckIcon, "CheckmarkIcon");
 const CollapseSidebarIcon = createHugeicon(PanelLeftCloseIcon, "CollapseSidebarIcon");
 const ExpandSidebarIcon = createHugeicon(PanelLeftOpenIcon, "ExpandSidebarIcon");
-const ManageAppsIcon = createHugeicon(GridViewIcon, "ManageAppsIcon");
 const NewAgentIcon = createHugeicon(PlusSignIcon, "NewAgentIcon");
-const SettingsIcon = createHugeicon(Settings02Icon, "SettingsIcon");
 const SwitcherChevronIcon = createHugeicon(ChevronsDownUpIcon, "SwitcherChevronIcon");
 
 // One-click return to the parent Org layer (the Apps list).
@@ -73,8 +68,7 @@ function BackToOrgLink({ collapsed, orgName }: { collapsed: boolean; orgName: st
   );
 }
 
-// App switcher: shows the active App and switches Apps inline via a dropdown,
-// plus shortcuts to manage Apps and open App settings.
+// App switcher: shows the active App and switches Apps inline via a dropdown.
 function AppSwitcher({
   activeApp,
   apps,
@@ -138,19 +132,6 @@ function AppSwitcher({
             ) : null}
           </DropdownMenuItem>
         ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild className="cursor-pointer rounded-md">
-          <Link to="/apps">
-            <ManageAppsIcon className="size-4" />
-            Manage apps
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild className="cursor-pointer rounded-md">
-          <Link to="/settings/app">
-            <SettingsIcon className="size-4" />
-            App settings
-          </Link>
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -136,12 +136,13 @@ const appRoutes = [
   { element: protectedRoute(<AgentDetail />), path: "/agent/:agentId" },
   { element: protectedRoute(<Threads />), path: "/threads" },
   { element: protectedRoute(<Threads />), path: "/threads/:threadId" },
+  { element: protectedRoute(<SettingsApp />), path: "/app-settings" },
   {
     children: [
       { element: <Navigate to="/settings/profile" replace />, index: true },
       { element: <SettingsProfile />, path: "profile" },
       { element: <SettingsAccessTokens />, path: "access-tokens" },
-      { element: <SettingsApp />, path: "app" },
+      { element: <Navigate to="/app-settings" replace />, path: "app" },
       { element: <SettingsUsage />, path: "usage" },
       { element: <Navigate to="/environment" replace />, path: "environments" },
       { element: <Navigate to="/settings/usage" replace />, path: "cost" },

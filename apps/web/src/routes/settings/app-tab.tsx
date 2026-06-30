@@ -53,7 +53,7 @@ export function AppTab() {
 
   return (
     <>
-      <SettingsTabHeader title="App" />
+      <SettingsTabHeader title="App settings" />
       <SettingsTabBody>
         <div className="space-y-2">
           <label className="text-foreground text-sm font-medium" htmlFor="app-name">
