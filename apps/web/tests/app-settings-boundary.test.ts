@@ -19,39 +19,41 @@ describe("App settings boundary", () => {
     expect(settingsNav).not.toContain("viewerRole");
   });
 
-  test("keeps Settings to account controls and App usage rendered in-shell", () => {
+  test("keeps account Settings to account controls", () => {
     const routeRegistry = readSource("../src/app/route-registry.tsx");
     const settingsNav = readSource("../src/routes/settings/settings-nav.tsx");
 
     expect(settingsNav).toContain('label: "Profile"');
     expect(settingsNav).toContain('label: "API tokens"');
-    expect(settingsNav).toContain('label: "App usage"');
-    // App usage is a nested Settings tab (like Profile / API tokens), not a jump
-    // to a standalone /cost page.
-    expect(settingsNav).toContain('path: "/settings/usage"');
-    expect(settingsNav).not.toContain('path: "/cost"');
-    expect(routeRegistry).toContain('{ element: <SettingsUsage />, path: "usage" }');
+    expect(settingsNav).not.toContain('label: "App usage"');
+    expect(settingsNav).not.toContain('label: "App"');
+    expect(settingsNav).not.toContain('path: "/settings/usage"');
     expect(routeRegistry).toContain(
-      '{ element: <Navigate to="/settings/usage" replace />, path: "cost" }',
+      '{ element: <Navigate to="/app-settings/usage" replace />, path: "usage" }',
     );
     expect(routeRegistry).toContain(
-      '{ element: protectedRoute(<Navigate to="/settings/usage" replace />), path: "/usage" }',
+      '{ element: <Navigate to="/app-settings/usage" replace />, path: "cost" }',
     );
+    expect(routeRegistry).not.toContain("<SettingsUsage />");
   });
 
-  test("keeps App settings standalone from account Settings", () => {
+  test("keeps App settings in the App sidebar as Settings", () => {
     const settingsNav = readSource("../src/routes/settings/settings-nav.tsx");
     const routeRegistry = readSource("../src/app/route-registry.tsx");
     const primaryNav = readSource("../src/app/navigation.tsx");
 
     expect(settingsNav).toContain('label: "Account"');
-    expect(settingsNav).toContain('label: "App"');
     expect(settingsNav).not.toContain('label: "General"');
     expect(settingsNav).not.toContain('path: "/settings/app"');
-    expect(primaryNav).toContain('label: "App settings"');
+    expect(primaryNav).toContain('label: "Settings"');
+    expect(primaryNav).toContain('label: "App usage"');
     expect(primaryNav).toContain('path: "/app-settings"');
+    expect(primaryNav).toContain('path: "/app-settings/usage"');
     expect(routeRegistry).toContain(
-      '{ element: protectedRoute(<SettingsApp />), path: "/app-settings" }',
+      '{ element: protectedRoute(<AppSettings />), path: "/app-settings" }',
+    );
+    expect(routeRegistry).toContain(
+      '{ element: protectedRoute(<AppUsage />), path: "/app-settings/usage" }',
     );
     expect(routeRegistry).toContain(
       '{ element: <Navigate to="/app-settings" replace />, path: "app" }',
@@ -101,6 +103,7 @@ describe("App settings boundary", () => {
 
     expect(accountMenu).toContain('to="/settings"');
     expect(accountMenu).not.toContain('to="/apps"');
-    expect(primaryNav).not.toContain('label: "Settings"');
+    expect(primaryNav).toContain('label: "Settings"');
+    expect(primaryNav).toContain('path: "/app-settings"');
   });
 });

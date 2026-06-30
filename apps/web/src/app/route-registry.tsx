@@ -72,8 +72,11 @@ const SettingsAccessTokens = lazyNamed(
   async () => import("../routes/settings/access-tokens-tab"),
   "AccessTokensTab",
 );
-const SettingsUsage = lazyNamed(async () => import("../routes/settings/usage-tab"), "UsageTab");
-const SettingsApp = lazyNamed(async () => import("../routes/settings/app-tab"), "AppTab");
+const AppSettings = lazyNamed(
+  async () => import("../routes/app-settings/settings-tab"),
+  "AppSettingsTab",
+);
+const AppUsage = lazyNamed(async () => import("../routes/app-settings/usage-tab"), "AppUsageTab");
 const AgentList = lazyNamed(
   async () => import("../routes/agent/agent-list.route"),
   "AgentListPage",
@@ -136,24 +139,25 @@ const appRoutes = [
   { element: protectedRoute(<AgentDetail />), path: "/agent/:agentId" },
   { element: protectedRoute(<Threads />), path: "/threads" },
   { element: protectedRoute(<Threads />), path: "/threads/:threadId" },
-  { element: protectedRoute(<SettingsApp />), path: "/app-settings" },
+  { element: protectedRoute(<AppSettings />), path: "/app-settings" },
+  { element: protectedRoute(<AppUsage />), path: "/app-settings/usage" },
   {
     children: [
       { element: <Navigate to="/settings/profile" replace />, index: true },
       { element: <SettingsProfile />, path: "profile" },
       { element: <SettingsAccessTokens />, path: "access-tokens" },
       { element: <Navigate to="/app-settings" replace />, path: "app" },
-      { element: <SettingsUsage />, path: "usage" },
+      { element: <Navigate to="/app-settings/usage" replace />, path: "usage" },
       { element: <Navigate to="/environment" replace />, path: "environments" },
-      { element: <Navigate to="/settings/usage" replace />, path: "cost" },
+      { element: <Navigate to="/app-settings/usage" replace />, path: "cost" },
     ],
     element: protectedRoute(<SettingsLayout />),
     path: "/settings",
   },
   { element: protectedRoute(<Navigate to="/settings/profile" replace />), path: "/profile" },
-  { element: protectedRoute(<Navigate to="/settings/usage" replace />), path: "/usage" },
+  { element: protectedRoute(<Navigate to="/app-settings/usage" replace />), path: "/usage" },
   { element: protectedRoute(<Providers />), path: "/providers" },
-  { element: protectedRoute(<Navigate to="/settings/usage" replace />), path: "/cost" },
+  { element: protectedRoute(<Navigate to="/app-settings/usage" replace />), path: "/cost" },
 ] satisfies RouteObject[];
 
 export function AppRoutes(): ReactNode {
