@@ -11,6 +11,7 @@ import {
   VENDOR_DEEPSEEK,
   VENDOR_OPENAI,
   VENDOR_OPENAI_COMPATIBLE,
+  VENDOR_ZHIPU,
   admitRuntimeModelIdentity,
   admitRuntimeModelIdentityForCatalog,
   getRuntimeDisplayColor,
@@ -269,6 +270,17 @@ describe("runtime catalog identity admission", () => {
     expect(listRuntimeShowcaseDisplayEntries()).toEqual(PUBLIC_RUNTIME_DISPLAY_CATALOG);
     expect(getRuntimeIconKey("acp-fallback")).toBe("opencode");
     expect(getRuntimeDisplayColor("openai-runtime")).toBe("#7A9DFF");
+  });
+
+  test("keeps Mosoo Zhipu identity while rendering OpenCode with the Z.ai provider id", () => {
+    expect(VENDOR_ZHIPU.vendorId).toBe("zhipu");
+    expect(VENDOR_ZHIPU.modelSource).toMatchObject({
+      kind: "models.dev",
+      providerId: "zai",
+    });
+    expect(VENDOR_ZHIPU.openCodeProvider).toMatchObject({
+      providerId: "zai",
+    });
   });
 });
 

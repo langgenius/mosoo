@@ -157,6 +157,7 @@
       },
       "openCodeProvider": {
         "name": "Zhipu",
+        "providerId": "zai",
         "npmPackage": "@ai-sdk/openai-compatible",
         "apiBaseOption": "baseURL",
       },

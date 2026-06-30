@@ -138,6 +138,7 @@ describe("runtime vendor env vars", () => {
     },
     {
       baseURL: "https://api.z.ai/api/paas/v4",
+      openCodeProviderId: "zai",
       model: "glm-4.7",
       name: "Zhipu",
       npm: "@ai-sdk/openai-compatible",
@@ -152,8 +153,9 @@ describe("runtime vendor env vars", () => {
     },
   ])(
     "generates OpenCode adapter provider config for $name official API keys",
-    ({ baseURL, model, name, npm, vendor }) => {
+    ({ baseURL, model, name, npm, openCodeProviderId, vendor }) => {
       const typedVendor: RuntimeCatalogVendor = vendor;
+      const providerId = openCodeProviderId ?? typedVendor.vendorId;
       const envVars = buildRuntimeVendorEnvVars({
         credential: {
           apiBase: null,
@@ -172,11 +174,11 @@ describe("runtime vendor env vars", () => {
 
       expect(envVars[typedVendor.apiKeyEnvVar]).toBe("sk-provider");
       expect(config).toMatchObject({
-        enabled_providers: [typedVendor.vendorId],
-        model: `${typedVendor.vendorId}/${model}`,
-        small_model: `${typedVendor.vendorId}/${model}`,
+        enabled_providers: [providerId],
+        model: `${providerId}/${model}`,
+        small_model: `${providerId}/${model}`,
         provider: {
-          [typedVendor.vendorId]: {
+          [providerId]: {
             name,
             npm,
             options: {
@@ -188,6 +190,38 @@ describe("runtime vendor env vars", () => {
       });
     },
   );
+
+  test("rewrites Mosoo Zhipu model prefix to OpenCode's Z.ai provider id", () => {
+    const envVars = buildRuntimeVendorEnvVars({
+      credential: {
+        apiBase: null,
+        apiKey: "sk-zhipu",
+        credentialId: "01J000000000000000000000C9",
+        models: null,
+      },
+      model: "zhipu/glm-4.6",
+      runtimeId: "acp-fallback",
+      vendor: VENDOR_ZHIPU,
+    });
+    const config = JSON.parse(envVars["OPENCODE_CONFIG_CONTENT"] ?? "{}") as Record<
+      string,
+      unknown
+    >;
+
+    expect(config).toMatchObject({
+      enabled_providers: ["zai"],
+      model: "zai/glm-4.6",
+      provider: {
+        zai: {
+          options: {
+            apiKey: "{env:ZHIPU_API_KEY}",
+            baseURL: "https://api.z.ai/api/paas/v4",
+          },
+        },
+      },
+      small_model: "zai/glm-4.6",
+    });
+  });
 
   test("generates OpenCode custom provider config for a DeepSeek-backed OpenAI-compatible model", () => {
     const envVars = buildRuntimeVendorEnvVars({

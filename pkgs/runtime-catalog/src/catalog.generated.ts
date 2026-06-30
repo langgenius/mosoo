@@ -164,6 +164,7 @@ export const GENERATED_VENDOR_CATALOG = [
       apiBaseOption: "baseURL",
       name: "Zhipu",
       npmPackage: "@ai-sdk/openai-compatible",
+      providerId: "zai",
     },
     vendorId: "zhipu",
   },
