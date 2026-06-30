@@ -48,6 +48,20 @@ describe("parseSkillSourceUrl", () => {
     });
   });
 
+  test("parses a pasted github URL followed by a skill flag", () => {
+    expect(parseSkillSourceUrl("https://github.com/mattpocock/skills --skill grill-me")).toEqual({
+      githubUrl: "https://github.com/mattpocock/skills",
+      skillName: "grill-me",
+    });
+  });
+
+  test("parses a pasted github URL followed by the --skill=name form", () => {
+    expect(parseSkillSourceUrl("https://github.com/mattpocock/skills --skill=grill-me")).toEqual({
+      githubUrl: "https://github.com/mattpocock/skills",
+      skillName: "grill-me",
+    });
+  });
+
   test("command --skill flag overrides a skills.sh slug skill", () => {
     expect(
       parseSkillSourceUrl(
