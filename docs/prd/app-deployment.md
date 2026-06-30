@@ -461,6 +461,110 @@ Skip for now:
 - Pages Functions as a first-class branch.
 - User-owned Cloudflare account deployment.
 
+## Agent Binding Wedge (v0 Addendum)
+
+The base PRD deploys a public repo to a Mosoo-owned URL. This addendum adds the
+v0 differentiator: a deployed app can call the App's own Mosoo Agents through
+values injected at deploy time, with no secret in app code. Aligned with the PM
+on 2026-06-30 via `pm-reverse-interview.md`; the four decisions below are
+product-level (user-visible), the rest is engineering freedom.
+
+### Product Decisions (PM-aligned)
+
+1. **Zero secrets in app code.** When a deployed app calls a bound Agent, it
+   reads exactly one "just works" value per agent and nothing else. Implemented
+   as a self-authorizing capability URL scoped to (App, Agent); no token, PAT, or
+   rotation is exposed to the app.
+2. **One call returns the reply.** The deployed app sends the user's message to
+   the injected URL in a single request and gets the Agent's final answer back in
+   the response. Mosoo runs the create-thread → run → wait → final-output behind
+   the URL (bounded by a timeout). Streaming and long-running runs are Next.
+3. **Deploy aborts on an unpublished binding.** If `.mosoo.toml` binds an Agent
+   that is not published/live, deploy fails fast with an actionable error and
+   ships nothing — consistent with the private-repo rejection. No partial-bind
+   state, no auto-publish.
+4. **Deployments is its own console section.** An App that has never deployed
+   shows a deploy guide (the `npx mosoo deploy` golden path + the two-file
+   contract) as the empty state. It does not merge into the Install page.
+
+### `.mosoo.toml` Binding Contract
+
+Adds an optional repeated `[[agents]]` table to the override contract:
+
+```toml
+[[agents]]
+name   = "roadmap"            # Agent name within this App (the binding key)
+expose = "public_thread"      # only supported mode in v0
+env    = "ROADMAP_THREAD_URL" # env var the deployed app reads
+```
+
+- `name` resolves an Agent within the deploying App. `id` is optional for
+  disambiguation only (default: reference by name — PM may veto in review).
+- `expose` must be `public_thread` in v0.
+- `env` is the exact environment variable name the deployed app reads. Mosoo does
+  not auto-derive it; the app code and the manifest must agree.
+- Mosoo still owns all other env/secrets (base PRD). `[[agents]]` only declares
+  agent bindings.
+
+### Injected Binding Behavior
+
+For each `[[agents]]` entry, the deploy step injects one environment variable
+(`env`) whose value is a self-authorizing URL. The deployed app does:
+
+```
+POST <injected_url>   body: { "message": "…" }   → { final agent output }
+```
+
+The URL is a capability scoped to (App, Agent, `public_thread`), minted at the
+deploy injection step (after untrusted build, alongside the authenticated deploy
+— never exposed to repo-owned scripts). It is revoked when the App deployment or
+binding is deleted. Behind it, Mosoo creates a thread, sends the message, waits
+for the run to complete within a bounded timeout, and returns the final output.
+
+### Deploy-Time Resolution
+
+Between build and the authenticated deploy: parse `[[agents]]`; resolve each
+`name` to a published Agent in the App; if any binding is unpublished/missing,
+abort the run with `deployment_agent_not_published` and inject nothing. On
+success, mint one capability URL per binding and inject the declared `env` vars
+into the deployed Worker/Pages environment.
+
+### Console Surface
+
+Deployments section shows, per the new pages: the live URL + ledger, the bound
+Agents with their `public_thread` exposure and injected `env` names, and the
+runs history with retry/delete. Empty state is the deploy guide (decision 4).
+Injected URLs are capabilities — show the env var name, not the URL value.
+
+### Failure Model Additions
+
+- `deployment_agent_not_published` — a `[[agents]]` binding references an Agent
+  that is not published/live.
+- `deployment_agent_call_timeout` — the one-call "ask" exceeded its bounded wait
+  (surfaced to the deployed app, not the deploy run).
+
+### MVP Cut Additions
+
+Build with the base cut:
+
+- Parse `[[agents]]` (`name`, `expose=public_thread`, `env`).
+- Resolve bindings to published Agents; fail fast on unpublished.
+- Mint one self-authorizing capability URL per binding; inject as the declared
+  `env`.
+- One blocking "ask" endpoint behind the capability URL (reuse the public-thread
+  `createThreadAndWait` path) with a bounded timeout.
+- Console shows bound Agents + injected env names; deploy-guide empty state.
+
+Skip for now (Next): streaming / long-running ask, expose modes other than
+`public_thread`, binding Agents from other Apps, user-supplied tokens, and
+binding-name-collision UI.
+
+### Engineering Decisions (owned, not PM — record in `architecture.md`)
+
+GraphQL document + codegen wiring; capability-URL crypto (signing vs stored
+token row); where the injection hooks in the executor; poll-vs-stream for the
+ask endpoint's wait; TanStack query keys for the console.
+
 ## External References
 
 Checked on 2026-06-26:
