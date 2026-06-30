@@ -26,9 +26,18 @@ const HMAC_PARAMS: HmacKeyGenParams = { hash: "SHA-256", name: "HMAC" };
 /** Path the deployed app's injected URL points at (the capability ask endpoint). */
 export const APP_AGENT_BOUND_PATH_PREFIX = "/api/v1/bound";
 
+/** Strip trailing slashes without a backtracking regex (avoids ReDoS on library input). */
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47 /* "/" */) {
+    end -= 1;
+  }
+  return value.slice(0, end);
+}
+
 /** Build the self-authorizing URL injected as a bound agent's env var. */
 export function boundAgentUrl(apiOrigin: string, token: string): string {
-  return `${apiOrigin.replace(/\/+$/u, "")}${APP_AGENT_BOUND_PATH_PREFIX}/${token}`;
+  return `${stripTrailingSlashes(apiOrigin)}${APP_AGENT_BOUND_PATH_PREFIX}/${token}`;
 }
 
 function bytesToBase64Url(bytes: Uint8Array): string {
