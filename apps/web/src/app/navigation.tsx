@@ -61,8 +61,9 @@ const NAV_SECTIONS: AppNavSection[] = [
       },
       { icon: createHugeicon(Key01Icon, "ProvidersIcon"), label: "Providers", path: "/providers" },
       {
+        children: [{ label: "App usage", path: "/app-settings/usage" }],
         icon: createHugeicon(Settings02Icon, "AppSettingsIcon"),
-        label: "App settings",
+        label: "Settings",
         path: "/app-settings",
       },
     ],
