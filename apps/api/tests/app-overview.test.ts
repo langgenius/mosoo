@@ -272,6 +272,7 @@ describe("App overview", () => {
       repoName: "awire",
       repoOwner: "samzong",
     });
+    expect(overview.boundAgents).toEqual([]);
     expect(overview.agents).toMatchObject({
       hasMore: true,
       limit: 1,
