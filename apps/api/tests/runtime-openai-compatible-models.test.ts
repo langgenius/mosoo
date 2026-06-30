@@ -66,6 +66,24 @@ function createAvailableModelsDatabase(): D1Database {
 }
 
 describe("OpenAI-compatible runtime model support", () => {
+  test("marks current custom models as wrong-runtime for OpenAI app-server runtime", async () => {
+    const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
+      currentModelId: "qwen-coder",
+      currentVendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
+      appId: APP_ID,
+      runtimeId: "openai-runtime",
+    });
+    const currentCustomEntry = entries.find(
+      (entry) =>
+        entry.vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId && entry.modelId === "qwen-coder",
+    );
+
+    expect(currentCustomEntry).toMatchObject({
+      available: false,
+      reason: "wrong-runtime",
+    });
+  });
+
   test("marks current custom models as wrong-runtime when the selected runtime rejects custom providers", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
       currentModelId: "qwen-coder",

@@ -145,7 +145,6 @@ function resolvePresetEntry(
 }
 
 function resolveCustomEntries(
-  input: AvailableModelsInput,
   acceptsCustomProvider: boolean,
   runtimeLabel: string | null,
   credentialRows: readonly VendorCredentialRow[],
@@ -154,10 +153,6 @@ function resolveCustomEntries(
   const entries: ResolvedModelEntry[] = [];
 
   for (const { modelId, row } of listEffectiveCustomCredentialModelRows(rows)) {
-    if (!acceptsCustomProvider && modelId !== input.currentModelId) {
-      continue;
-    }
-
     entries.push({
       available: acceptsCustomProvider,
       displayName: `${modelId} (custom)`,
@@ -265,7 +260,6 @@ export async function resolveAvailableModels(
   const credentialRows = await listAppVendorCredentialRows(database, input.appId);
   const availableVendorIds = collectAvailableVendorIds(credentialRows);
   const customEntries = resolveCustomEntries(
-    input,
     scope.acceptsCustomProvider,
     scope.label,
     credentialRows,
