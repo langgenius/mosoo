@@ -140,7 +140,7 @@ export function toEntryRecord(entries: SkillPackageEntry[]): Record<
       isExecutable: boolean;
     }
   > = {};
-  const admission = createSkillPackageArchivePathAdmission();
+  const admission = createSkillPackagePathAdmission();
 
   for (const entry of entries) {
     const admittedPath = admission.admit(entry.path, entry.entryKind).path;
