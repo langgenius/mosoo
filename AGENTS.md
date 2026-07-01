@@ -23,6 +23,14 @@
 - Commit messages must at least satisfy `type(scope): subject`. Use `!` only for intentional breaking changes, and keep `type`, `scope`, and `subject` semantically accurate.
 - Commit policy is enforced locally by `prek` (`commit-msg`, `pre-push`) and in CI (`pr-title-lint`, `pr-commits-lint`). `commit-msg` validates subject format plus author, committer, and `Co-authored-by` / `Signed-off-by` identity. Use a real human contributor identity; never commit as `claude-code`, `[codex]`, a bot, or a ticket-prefixed subject.
 
+## Production Deployment And D1 Safety
+
+- Production D1 deploys must never reset, wipe, drop, recreate, or replace the production database as part of a normal release.
+- `just deploy-api` and any production API deploy script may only apply pending remote D1 migrations before deploying the Worker.
+- Once production has data, schema changes must be represented as new migration files under `pkgs/db/drizzle`; do not rewrite an already-applied baseline and expect production to update.
+- Any destructive production D1 SQL, including `DROP TABLE`, table recreation, truncation, or lossy data transformation, requires explicit user approval plus a backup and rollback plan before execution.
+- Before changing deployment scripts or D1 migrations, verify the diff contains no production reset path and no destructive SQL unless the user explicitly requested it.
+
 ## Monorepo Scaling And Performance Constraints
 
 - Design database queries explicitly around access paths. Prefer `ORDER BY id` for list sorting, and do not default to `ORDER BY created_at`. ORM layers must not hide default filters or sorting; query conditions must be declared at the call site.
