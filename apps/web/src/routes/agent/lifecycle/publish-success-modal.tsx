@@ -73,19 +73,16 @@ export function PublishSuccessModal({
           <AgentApiAccessPanel agent={agent} />
         </div>
 
-        <Separator />
-
-        <div className="flex justify-end gap-2 px-6 py-3">
-          {onViewDistribution ? (
-            <Button onClick={onViewDistribution} size="sm" variant="outline">
-              View distribution
-            </Button>
-          ) : null}
-          <Button className="gap-1.5" onClick={openThreadDialog} size="sm">
-            Try in Mosoo
-            <ArrowRight className="size-3.5" />
-          </Button>
-        </div>
+        {onViewDistribution ? (
+          <>
+            <Separator />
+            <div className="flex justify-end gap-2 px-6 py-3">
+              <Button onClick={onViewDistribution} size="sm" variant="outline">
+                View distribution
+              </Button>
+            </div>
+          </>
+        ) : null}
       </DialogContent>
     </Dialog>
   );
