@@ -1,4 +1,4 @@
-import { ActionBarPrimitive, MessagePrimitive } from "@assistant-ui/react";
+import { ActionBarPrimitive, MessagePrimitive, useMessage } from "@assistant-ui/react";
 import type { TextMessagePartComponent } from "@assistant-ui/react";
 import { Copy } from "lucide-react";
 import type { ReactElement } from "react";
@@ -54,6 +54,16 @@ export function UserMessage(): ReactElement {
 }
 
 export function AssistantMessage(): ReactElement {
+  // Copy only makes sense when the turn actually produced prose. Tool-only turns
+  // (e.g. a file write that emits just tool cards) have nothing to copy, so we
+  // drop the action bar entirely rather than render an empty copy button under
+  // the card. This also reclaims the h-6 slot the bar used to reserve even while
+  // hidden — that reserved space was what inflated the gap between consecutive
+  // tool cards.
+  const hasCopyableText = useMessage((message) =>
+    message.content.some((part) => part.type === "text" && part.text.trim().length > 0),
+  );
+
   return (
     <MessagePrimitive.Root className="group/aui-msg flex min-w-0 justify-start">
       <div className="text-fg-1 w-full min-w-0 text-[14.5px] leading-[1.55]">
@@ -69,17 +79,19 @@ export function AssistantMessage(): ReactElement {
         </div>
         {/* In-flow, compact, hover-revealed — kept off the next message so it
             neither overlaps it nor inflates the gap the way the old layout did. */}
-        <ActionBarPrimitive.Root
-          hideWhenRunning
-          className="text-fg-3 mt-1 flex h-6 gap-1 opacity-0 transition-opacity group-hover/aui-msg:opacity-100"
-        >
-          <ActionBarPrimitive.Copy
-            aria-label="Copy message"
-            className="hover:bg-ink-900/[0.05] hover:text-fg-1 inline-flex size-6 items-center justify-center rounded-md transition-colors"
+        {hasCopyableText ? (
+          <ActionBarPrimitive.Root
+            hideWhenRunning
+            className="text-fg-3 mt-1 flex h-6 gap-1 opacity-0 transition-opacity group-hover/aui-msg:opacity-100"
           >
-            <Copy className="size-3.5" />
-          </ActionBarPrimitive.Copy>
-        </ActionBarPrimitive.Root>
+            <ActionBarPrimitive.Copy
+              aria-label="Copy message"
+              className="hover:bg-ink-900/[0.05] hover:text-fg-1 inline-flex size-6 items-center justify-center rounded-md transition-colors"
+            >
+              <Copy className="size-3.5" />
+            </ActionBarPrimitive.Copy>
+          </ActionBarPrimitive.Root>
+        ) : null}
       </div>
     </MessagePrimitive.Root>
   );
