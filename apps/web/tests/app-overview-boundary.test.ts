@@ -29,7 +29,7 @@ describe("App overview boundary", () => {
     expect(routeSource).not.toContain('to="/join');
   });
 
-  test("hands the App to a coding agent with one CLI command on the console root", () => {
+  test("hands the App to a coding agent with the installer command on the console root", () => {
     const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
     const installSource = readSource("../src/routes/app-overview/app-overview-install.tsx");
     const appIdBadgeSource = readSource("../src/shared/ui/app-id-badge.tsx");
@@ -37,17 +37,43 @@ describe("App overview boundary", () => {
     expect(routeSource).toContain("AppOverviewInstallGuide");
     expect(routeSource).toContain("AppIdBadge");
     expect(installSource).toContain("Hand Mosoo to your agent");
-    expect(installSource).toContain("npx mosoo login");
+    expect(installSource).toContain("curl -fsSL https://install.mosoo.ai/install.sh | bash");
+    expect(installSource).toContain("Installs or updates Mosoo CLI");
+    expect(installSource).toContain("Updates the Codex @mosoo skill");
+    expect(installSource).toContain("Signs in to cloud and runs doctor");
+    expect(installSource).toContain("try.mosoo.ai");
     expect(installSource).toContain("@mosoo skill");
     expect(installSource).toContain("Codex");
     expect(appIdBadgeSource).toContain("Copy app ID");
-    // The CLI token is minted on demand and only copied — never rendered.
-    expect(installSource).toContain("createPersonalAccessToken");
-    expect(installSource).toContain("MASKED_TOKEN");
+    expect(installSource).not.toContain("createPersonalAccessToken");
+    expect(installSource).not.toContain("MASKED_TOKEN");
+    expect(installSource).not.toContain("Signs the CLI in");
+    expect(installSource).not.toContain("Ready to deploy");
+    expect(installSource).not.toContain("No global config");
+    expect(installSource).not.toContain("Using another agent");
+    expect(installSource).not.toContain("Copy or download");
+    expect(installSource).not.toContain("Copy skill");
+    expect(installSource).not.toContain("Download SKILL.md");
 
     expect(installSource).not.toContain("Organization");
     expect(installSource).not.toContain("Members");
     expect(installSource).not.toContain("Invite");
+  });
+
+  test("keeps the install guide responsive and accessible", () => {
+    const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
+    const installSource = readSource("../src/routes/app-overview/app-overview-install.tsx");
+
+    expect(routeSource).toContain("max-w-4xl");
+    expect(routeSource).toContain("lg:flex-row");
+    expect(installSource).toContain("max-w-3xl");
+    expect(installSource).toContain("sm:flex-row");
+    expect(installSource).not.toContain("aria-expanded");
+    expect(installSource).not.toContain("aria-controls");
+    expect(installSource).not.toContain("Codex, Cursor, Cline");
+    expect(installSource).not.toContain("whitespace-pre-wrap");
+    expect(installSource).not.toContain("—");
+    expect(installSource).not.toContain(" · ");
   });
 
   test("keeps the App console root free of Chinese copy", () => {
