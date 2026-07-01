@@ -55,6 +55,7 @@ function toDetailMode(value: string | null): DetailMode | null {
 
 function AgentDetailHeader({
   agent,
+  canUseTerminal,
   headerActionTargetRef,
   mode,
   onBack,
@@ -64,6 +65,7 @@ function AgentDetailHeader({
   runtime,
 }: {
   agent: Agent;
+  canUseTerminal: boolean;
   headerActionTargetRef: (node: HTMLDivElement | null) => void;
   mode: DetailMode;
   onBack: () => void;
@@ -118,6 +120,23 @@ function AgentDetailHeader({
             {tab.label}
           </button>
         ))}
+        {canUseTerminal && (
+          <button
+            type="button"
+            onClick={() => {
+              onSelectMode("terminal");
+            }}
+            className={cn(
+              "rounded-lg px-3.5 py-1.5 text-[13px] font-medium transition-all",
+              mode === "terminal"
+                ? "bg-ink-100 text-fg-1"
+                : "text-muted-foreground hover:bg-accent",
+            )}
+            aria-label="Open Terminal"
+          >
+            Terminal
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
@@ -279,6 +298,7 @@ export function AgentDetailPage() {
     <div className="flex h-full flex-col">
       <AgentDetailHeader
         agent={agent}
+        canUseTerminal={canUseTerminal}
         headerActionTargetRef={setHeaderActionTarget}
         mode={mode}
         onBack={() => {

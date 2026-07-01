@@ -254,6 +254,76 @@ describe("cost usage event", () => {
     });
   });
 
+  test("prices OpenCode-run Kimi usage from the persisted provider identity", async () => {
+    const database = createUsageEventDatabase();
+    const runContext = {
+      ...RUN_CONTEXT,
+      model: "kimi-k2.6",
+      provider: "kimi",
+      runtimeId: "opencode",
+    };
+    const usage = {
+      cachedReadTokens: 100,
+      cachedWriteTokens: 40,
+      inputTokens: 1_000,
+      model: "opencode/kimi-k2.6",
+      outputTokens: 200,
+      provider: "opencode",
+      source: "prompt_response",
+      usageContract: "openai_total_with_cached_breakdown",
+    } satisfies SessionUsageSummary;
+
+    await recordRuntimeUsageEvent(database, {
+      callKey: "opencode-kimi-call",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      nativeCallId: null,
+      run: runContext,
+      usage,
+    });
+
+    const row = await database
+      .prepare(
+        `
+          SELECT
+            model,
+            price_snapshot_json,
+            pricing_status,
+            provider,
+            runtime_id,
+            total_cost_usd_micros
+          FROM usage_event
+        `,
+      )
+      .first<
+        Pick<
+          UsageEventProjection,
+          | "model"
+          | "price_snapshot_json"
+          | "pricing_status"
+          | "provider"
+          | "runtime_id"
+          | "total_cost_usd_micros"
+        >
+      >();
+
+    expect(row).toMatchObject({
+      model: "kimi-k2.6",
+      pricing_status: "priced",
+      provider: "kimi",
+      runtime_id: "opencode",
+      total_cost_usd_micros: 1_671,
+    });
+    const priceSnapshot = JSON.parse(row?.price_snapshot_json ?? "{}") as Record<string, unknown>;
+    expect(priceSnapshot).toMatchObject({
+      billableInputTokens: 900,
+      cacheReadUsdPerMillion: 0.16,
+      inputUsdPerMillion: 0.95,
+      model: "kimi-k2.6",
+      outputUsdPerMillion: 4,
+      provider: "kimi",
+    });
+  });
+
   test("apps channel session usage into channel run purpose", async () => {
     const database = createUsageEventDatabase();
     const usage = {
