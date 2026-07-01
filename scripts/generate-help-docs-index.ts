@@ -1,5 +1,5 @@
 // Regenerates the HELP_DOCS index in apps/web/src/shared/config/help-docs.ts from
-// the public documentation manifest at https://docs.mosoo.ai/llms.txt.
+// the public documentation manifest at https://mosoo.ai/docs/llms.txt.
 //
 // Usage:
 //   just help-docs-index
@@ -11,7 +11,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-const MANIFEST_URL = "https://docs.mosoo.ai/llms.txt";
+const MANIFEST_URL = "https://mosoo.ai/docs/llms.txt";
 const TARGET_PATH = fileURLToPath(
   new URL("../apps/web/src/shared/config/help-docs.ts", import.meta.url),
 );
@@ -22,9 +22,9 @@ const SECTION_ORDER = ["Getting started", "CLI", "API reference"] as const;
 type Section = (typeof SECTION_ORDER)[number];
 
 const TITLE_OVERRIDES_BY_PATHNAME: Record<string, string> = {
-  "api-reference/create-a-thread-for-a-published-agent":
+  "api-reference/create-a-thread-for-an-agent-api-endpoint":
     "Create a Thread for an Agent API Endpoint",
-  "api-reference/list-threads-for-a-published-agent": "List Threads for an Agent API Endpoint",
+  "api-reference/list-threads-for-an-agent-api-endpoint": "List Threads for an Agent API Endpoint",
 };
 
 // Lower number sorts first within "Getting started"; everything else keeps
@@ -43,7 +43,7 @@ interface HelpDocEntry {
 }
 
 function classifySection(pathname: string): Section {
-  if (pathname.startsWith("api-reference/")) {
+  if (pathname === "api-reference" || pathname.startsWith("api-reference/")) {
     return "API reference";
   }
   if (pathname.startsWith("cli/")) {
@@ -53,19 +53,24 @@ function classifySection(pathname: string): Section {
 }
 
 function toPageUrl(rawUrl: string): { pathname: string; url: string } {
-  const parsed = new URL(rawUrl);
-  let pathname = parsed.pathname.replace(/^\/+/, "").replace(/\.md$/, "");
-  if (pathname === "index") {
-    pathname = "";
+  const parsed = new URL(rawUrl, "https://mosoo.ai");
+  const publicPathname = parsed.pathname.replace(/^\/+/, "").replace(/\.md$/, "");
+  let docsPathname = publicPathname;
+  if (docsPathname === "docs" || docsPathname === "docs/index" || docsPathname === "index") {
+    docsPathname = "";
+  } else if (docsPathname.startsWith("docs/")) {
+    docsPathname = docsPathname.slice("docs/".length);
   }
-  return { pathname, url: `${parsed.origin}/${pathname}` };
+  const pageUrl =
+    docsPathname === "" ? "https://mosoo.ai/docs/" : `${parsed.origin}/${publicPathname}`;
+  return { pathname: docsPathname, url: pageUrl };
 }
 
 function parseManifest(text: string): HelpDocEntry[] {
   // The manifest is a markdown link list: "- [Title](url): optional description".
   // We index the rendered help pages only, so non-".md" links (e.g. OpenAPI JSON
   // specs) are skipped.
-  const linePattern = /^\s*-\s+\[([^\]]+)\]\((https?:\/\/[^)]+)\)/;
+  const linePattern = /^\s*-\s+\[([^\]]+)\]\(([^)]+)\)/;
   const entries: HelpDocEntry[] = [];
 
   for (const line of text.split("\n")) {
@@ -75,11 +80,23 @@ function parseManifest(text: string): HelpDocEntry[] {
     }
 
     const rawUrl = match[2].trim();
-    if (!rawUrl.endsWith(".md")) {
+    if (
+      !rawUrl.startsWith("/") &&
+      !rawUrl.startsWith("http://") &&
+      !rawUrl.startsWith("https://")
+    ) {
+      continue;
+    }
+
+    if (rawUrl.endsWith(".json")) {
       continue;
     }
 
     const { pathname, url } = toPageUrl(rawUrl);
+    if (pathname === "zh-Hans" || pathname.startsWith("zh-Hans/")) {
+      continue;
+    }
+
     const title = TITLE_OVERRIDES_BY_PATHNAME[pathname] ?? match[1].trim();
     entries.push({ manifestIndex: entries.length, section: classifySection(pathname), title, url });
   }

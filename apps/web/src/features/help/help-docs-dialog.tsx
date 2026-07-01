@@ -82,7 +82,7 @@ export function HelpDocsDialog({
         <DialogHeader className="sr-only">
           <DialogTitle>Help &amp; docs</DialogTitle>
           <DialogDescription>
-            Search the Mosoo documentation hosted at docs.mosoo.ai.
+            Search the Mosoo documentation hosted at mosoo.ai/docs.
           </DialogDescription>
         </DialogHeader>
 
