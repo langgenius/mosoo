@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import type { SkillPackageEntry } from "@mosoo/skill-package";
 import {
   SkillPackageError,
   createZipArchive,
@@ -191,7 +192,106 @@ describe("skill package path admission", () => {
     ).toThrow(SkillPackageError);
   });
 
-  test("rejects unsupported zip roots before building an entry record", () => {
+  test("normalizes single wrapper zip archives to root-flat entries", () => {
+    const normalized = normalizeZipEntries([
+      {
+        body: markdown,
+        entryKind: "file",
+        isExecutable: false,
+        path: "mosoo/SKILL.md",
+      },
+      {
+        body: data,
+        entryKind: "file",
+        isExecutable: false,
+        path: "mosoo/references/guide.md",
+      },
+    ]);
+
+    expect(normalized.skillMarkdownPath).toBe("SKILL.md");
+    expect(normalized.entries.map((entry) => entry.path).toSorted()).toEqual(
+      ["references", "references/guide.md", "SKILL.md"].toSorted(),
+    );
+  });
+
+  test("keeps root-flat zip archives root-flat", () => {
+    const normalized = normalizeZipEntries([
+      {
+        body: markdown,
+        entryKind: "file",
+        isExecutable: false,
+        path: "SKILL.md",
+      },
+      {
+        body: data,
+        entryKind: "file",
+        isExecutable: false,
+        path: "references/guide.md",
+      },
+    ]);
+
+    expect(normalized.skillMarkdownPath).toBe("SKILL.md");
+    expect(normalized.entries.map((entry) => entry.path).toSorted()).toEqual(
+      ["references", "references/guide.md", "SKILL.md"].toSorted(),
+    );
+  });
+
+  test("rejects unsupported roots after stripping single wrapper zip archives", () => {
+    expect(() =>
+      normalizeZipEntries([
+        {
+          body: markdown,
+          entryKind: "file",
+          isExecutable: false,
+          path: "mosoo/SKILL.md",
+        },
+        {
+          body: data,
+          entryKind: "file",
+          isExecutable: false,
+          path: "mosoo/examples/a.md",
+        },
+      ]),
+    ).toThrow(SkillPackageError);
+  });
+
+  test("rejects zip archives with multiple wrappers or wrapper-external files", () => {
+    expect(() =>
+      normalizeZipEntries([
+        {
+          body: markdown,
+          entryKind: "file",
+          isExecutable: false,
+          path: "mosoo/SKILL.md",
+        },
+        {
+          body: data,
+          entryKind: "file",
+          isExecutable: false,
+          path: "other/references/guide.md",
+        },
+      ]),
+    ).toThrow(SkillPackageError);
+
+    expect(() =>
+      normalizeZipEntries([
+        {
+          body: markdown,
+          entryKind: "file",
+          isExecutable: false,
+          path: "mosoo/SKILL.md",
+        },
+        {
+          body: data,
+          entryKind: "file",
+          isExecutable: false,
+          path: "README.md",
+        },
+      ]),
+    ).toThrow(SkillPackageError);
+  });
+
+  test("rejects unsupported zip roots when normalizing entry records", () => {
     const archive = createZipArchive([
       {
         body: markdown,
@@ -206,7 +306,15 @@ describe("skill package path admission", () => {
         path: "notes.txt",
       },
     ]);
+    const record = toEntryRecord(extractZipArchive(archive));
 
-    expect(() => toEntryRecord(extractZipArchive(archive))).toThrow(SkillPackageError);
+    expect(record["notes.txt"]).toBeDefined();
+    expect(() => normalizeSkillEntries(record)).toThrow(SkillPackageError);
   });
 });
+
+function normalizeZipEntries(entries: SkillPackageEntry[]) {
+  const archive = createZipArchive(entries);
+
+  return normalizeSkillEntries(toEntryRecord(extractZipArchive(archive)));
+}
