@@ -6,9 +6,10 @@ function readSource(path: string): string {
 }
 
 describe("agent publish success boundary", () => {
-  test("routes Try in Mosoo through locked Threads instead of exposing a web URL", () => {
+  test("keeps the Thread entry in the modal body without the footer Try CTA", () => {
     const source = readSource("../src/routes/agent/lifecycle/publish-success-modal.tsx");
 
+    expect(source.match(/Try in Mosoo/g)?.length ?? 0).toBe(1);
     expect(source).toContain("Try in Mosoo");
     expect(source).toContain("Start a Thread with this agent.");
     expect(source).toContain("globalThis.location.assign(distribution.threadsPath)");
