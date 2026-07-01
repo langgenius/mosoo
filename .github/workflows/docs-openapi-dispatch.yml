@@ -26,7 +26,7 @@ jobs:
           fi
 
           curl --fail --request POST \
-            --url "https://api.github.com/repos/KurosawaGeeker/mosoo-docs/dispatches" \
+            --url "https://api.github.com/repos/langgenius/mosoo-docs/dispatches" \
             --header "Accept: application/vnd.github+json" \
             --header "Authorization: Bearer ${GH_TOKEN}" \
             --header "X-GitHub-Api-Version: 2022-11-28" \

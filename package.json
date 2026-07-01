@@ -27,6 +27,7 @@
     "graphql:codegen": "vp exec tsx node_modules/.bin/graphql-codegen --config config/graphql-codegen.ts",
     "commit:check": "vp exec bun scripts/validate-commit-range.ts origin/main HEAD",
     "graphql:codegen:check": "vp exec tsx scripts/check-graphql-codegen.ts",
+    "help-docs-index": "bun scripts/generate-help-docs-index.ts",
     "hooks:install": "vp exec prek -c config/prek.toml install",
     "knip": "vp exec knip --config config/knip.jsonc",
     "lint": "vp run -w cf:types && vp lint vite.config.ts config/bun-script-types.d.ts config/vite-plus.shared.ts scripts apps pkgs e2e",
