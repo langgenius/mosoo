@@ -19,8 +19,8 @@ import {
   toRuntimeMcpProxyPublicErrorDetails,
 } from "../../../modules/runtime/application/runtime-mcp-proxy-errors";
 import { resolveRuntimeMcpProxyTarget } from "../../../modules/runtime/application/runtime-mcp-proxy.service";
-import { readSkillPackageBytesFromSnapshot } from "../../../modules/skills/application/skill-package-snapshot.service";
 import { getDriverInstanceRecord } from "../../../modules/runtime/infrastructure/driver-instance/driver-instance-record.repository";
+import { readSkillPackageBytesFromSnapshot } from "../../../modules/skills/application/skill-package-snapshot.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { toPlatformId } from "../../../shared/platform-id";
 import { toArrayBufferResponseBody } from "../../../shared/response-body";

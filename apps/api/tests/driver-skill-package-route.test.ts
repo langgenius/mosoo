@@ -62,7 +62,9 @@ function createDriverRouteTestApp(): Hono<ApiGatewayEnvironment> {
   return app;
 }
 
-async function insertSkillSnapshot(database: Awaited<ReturnType<typeof createPublicHttpContractDatabase>>) {
+async function insertSkillSnapshot(
+  database: Awaited<ReturnType<typeof createPublicHttpContractDatabase>>,
+) {
   await database
     .app()
     .insert(skillSnapshotsTable)
