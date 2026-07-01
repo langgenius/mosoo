@@ -2,6 +2,7 @@ import type { CredentialId, DriverInstanceId, McpServerId, SkillSnapshotId } fro
 import type { Context } from "hono";
 import { Hono } from "hono";
 
+import type { RuntimeActionTokenPayload } from "../../../modules/runtime/application/runtime-driver-access.service";
 import {
   cleanupDriverInstances,
   requireRuntimeDriverInstanceGrant,
@@ -18,6 +19,7 @@ import {
   toRuntimeMcpProxyPublicErrorDetails,
 } from "../../../modules/runtime/application/runtime-mcp-proxy-errors";
 import { resolveRuntimeMcpProxyTarget } from "../../../modules/runtime/application/runtime-mcp-proxy.service";
+import { getDriverInstanceRecord } from "../../../modules/runtime/infrastructure/driver-instance/driver-instance-record.repository";
 import { readSkillPackageBytesFromSnapshot } from "../../../modules/skills/application/skill-package-snapshot.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { toPlatformId } from "../../../shared/platform-id";
@@ -100,6 +102,47 @@ function driverPlatformIdErrorResponse(error: unknown): Response | null {
   return platformIdRouteErrorResponse(error, (message) => ({ error: message }));
 }
 
+async function isStartupSkillDownloadGrant(
+  c: Context<ApiGatewayEnvironment>,
+  grant: RuntimeActionTokenPayload & { action: "skill_snapshot" },
+): Promise<boolean> {
+  const driver = await getDriverInstanceRecord(c.env.DB, grant.driverInstanceId);
+  return driver?.status === "provisioning" || driver?.status === "connecting";
+}
+
+async function requireSkillSnapshotDownloadGrant(
+  c: Context<ApiGatewayEnvironment>,
+  input: {
+    grant: RuntimeActionTokenPayload & { action: "skill_snapshot" };
+    snapshotId: SkillSnapshotId;
+  },
+): Promise<void> {
+  try {
+    await requireRuntimeDriverInstanceGrant(c.env.DB, {
+      driverInstanceId: input.grant.driverInstanceId,
+      requireAction: "skill_snapshot",
+      snapshotId: input.snapshotId,
+    });
+    return;
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      error.message !== "Snapshot is not available for this driver instance."
+    ) {
+      throw error;
+    }
+
+    // Cold drivers materialize skills during boot, before the run lease is linked
+    // to session_run.driver_instance_id. The signed action token already binds
+    // this request to the driver instance and snapshot; this fallback only spans
+    // that provisioning window.
+    if (await isStartupSkillDownloadGrant(c, input.grant)) {
+      return;
+    }
+    throw error;
+  }
+}
+
 async function proxyRuntimeMcpRequest(
   request: Request,
   input: {
@@ -169,9 +212,8 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
     }
 
     try {
-      await requireRuntimeDriverInstanceGrant(c.env.DB, {
-        driverInstanceId: grant.driverInstanceId,
-        requireAction: "skill_snapshot",
+      await requireSkillSnapshotDownloadGrant(c, {
+        grant,
         snapshotId,
       });
     } catch (error) {
