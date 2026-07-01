@@ -7,6 +7,7 @@ import type { Root } from "react-dom/client";
 
 const APP_ID = "01J00000000000000000000009";
 const CUSTOM_CREDENTIAL_ID = "01J000000000000000000000AA";
+const MINIMAX_CREDENTIAL_ID = "01J000000000000000000000MM";
 const originalFetch = globalThis.fetch;
 let dom: JSDOM | null = null;
 let root: Root | null = null;
@@ -137,6 +138,23 @@ function createdCustomCredentialResponse(): Response {
   });
 }
 
+function updatedMinimaxCredentialResponse(): Response {
+  return Response.json({
+    data: {
+      updateVendorCredential: {
+        apiBase: "https://api.minimax.io/anthropic/v1",
+        id: MINIMAX_CREDENTIAL_ID,
+        isDefault: true,
+        maskedApiKey: "eyJh••••OSmA",
+        models: null,
+        name: "mm",
+        appId: APP_ID,
+        vendorId: "minimax",
+      },
+    },
+  });
+}
+
 function setupFetch(credentials: unknown[] = []): CapturedGraphQLBody[] {
   const capturedBodies: CapturedGraphQLBody[] = [];
 
@@ -146,6 +164,10 @@ function setupFetch(credentials: unknown[] = []): CapturedGraphQLBody[] {
 
     if (body.query.includes("createVendorCredential")) {
       return createdCustomCredentialResponse();
+    }
+
+    if (body.query.includes("updateVendorCredential")) {
+      return updatedMinimaxCredentialResponse();
     }
 
     return listResponse(credentials);
@@ -222,6 +244,18 @@ function getButton(name: string): HTMLButtonElement {
 
   if (!(button instanceof HTMLButtonElement)) {
     throw new Error(`Unable to find button: ${name}`);
+  }
+
+  return button;
+}
+
+function getButtonByLabel(label: string): HTMLButtonElement {
+  const button = Array.from(document.querySelectorAll("button")).find(
+    (element) => element.getAttribute("aria-label") === label,
+  );
+
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`Unable to find button with aria-label: ${label}`);
   }
 
   return button;
@@ -338,6 +372,51 @@ describe("ProvidersTab custom model dialog", () => {
         name: "Custom gateway",
         appId: APP_ID,
         vendorId: "openai-compatible",
+      },
+    });
+  });
+
+  test("edit mode shows the masked key without resubmitting it when unchanged", async () => {
+    const capturedBodies = setupFetch([
+      {
+        apiBase: "https://api.minimax.io/anthropic/v1",
+        id: MINIMAX_CREDENTIAL_ID,
+        isDefault: true,
+        maskedApiKey: "eyJh••••OSmA",
+        models: null,
+        name: "mm",
+        appId: APP_ID,
+        vendorId: "minimax",
+      },
+    ]);
+    await renderProviders();
+
+    await click(getButtonByLabel("Edit mm key"));
+
+    await waitFor(() => {
+      expect(queryDialog()?.textContent).toContain("Edit MiniMax key");
+    });
+
+    const apiKeyInput = getInputByLabel("API key");
+    expect(apiKeyInput.value).toBe("");
+    expect(apiKeyInput.placeholder).toBe("Current key: eyJh••••OSmA");
+    expect(apiKeyInput.autocomplete).toBe("new-password");
+    expect(apiKeyInput.name).toContain("provider-secret");
+
+    await click(getButton("Save"));
+
+    await waitFor(() => {
+      expect(queryDialog()).toBeNull();
+    });
+
+    const updateBody = capturedBodies.find((body) => body.query.includes("updateVendorCredential"));
+
+    expect(updateBody?.variables).toEqual({
+      input: {
+        apiBase: "https://api.minimax.io/anthropic/v1",
+        id: MINIMAX_CREDENTIAL_ID,
+        name: "mm",
+        appId: APP_ID,
       },
     });
   });

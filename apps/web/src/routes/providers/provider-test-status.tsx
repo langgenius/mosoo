@@ -1,35 +1,20 @@
-import { Check, X } from "lucide-react";
+import { Check } from "lucide-react";
 import type { ReactElement } from "react";
 
 type TestConnectionState = "failure" | "idle" | "running" | "success";
 
-export function ProviderTestStatus({
-  error,
-  state,
-}: {
-  error: string | null;
-  state: TestConnectionState;
-}): ReactElement | null {
-  if (state === "success") {
-    return (
-      <span className="inline-flex items-center gap-1 text-[12px] text-green-700">
-        <Check className="size-3.5 shrink-0" />
-        Connection ok
-      </span>
-    );
-  }
-
-  if (state !== "failure") {
+// Only the success state renders inline next to the Test button. Failures are
+// surfaced by the form-level alert above the footer, so showing them here too
+// would duplicate the same message between the Test and Save buttons.
+export function ProviderTestStatus({ state }: { state: TestConnectionState }): ReactElement | null {
+  if (state !== "success") {
     return null;
   }
 
   return (
-    <output
-      aria-live="polite"
-      className="text-destructive inline-flex max-w-[32rem] items-start gap-1 text-[12px] leading-snug break-words whitespace-normal"
-    >
-      <X className="mt-0.5 size-3.5 shrink-0" />
-      {error ?? "Provider error"}
-    </output>
+    <span className="inline-flex items-center gap-1 text-[12px] text-green-700">
+      <Check className="size-3.5 shrink-0" />
+      Connection ok
+    </span>
   );
 }

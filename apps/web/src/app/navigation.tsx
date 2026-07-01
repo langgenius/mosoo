@@ -6,6 +6,7 @@ import InboxIcon from "@hugeicons/core-free-icons/InboxIcon";
 import Key01Icon from "@hugeicons/core-free-icons/Key01Icon";
 import PackageIcon from "@hugeicons/core-free-icons/PackageIcon";
 import PuzzleIcon from "@hugeicons/core-free-icons/PuzzleIcon";
+import Rocket01Icon from "@hugeicons/core-free-icons/Rocket01Icon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import type { MouseEvent } from "react";
 import { useState } from "react";
@@ -40,6 +41,11 @@ const NAV_SECTIONS: AppNavSection[] = [
       { icon: createHugeicon(DashboardSquare01Icon, "InstallIcon"), label: "Install", path: "/" },
       { icon: createHugeicon(InboxIcon, "ThreadsIcon"), label: "Threads", path: "/threads" },
       { icon: createHugeicon(BotIcon, "AgentsIcon"), label: "Agents", path: "/agent" },
+      {
+        icon: createHugeicon(Rocket01Icon, "DeploymentsIcon"),
+        label: "Deployments",
+        path: "/deployments",
+      },
       { icon: createHugeicon(Files02Icon, "FilesIcon"), label: "Files", path: "/files" },
       {
         icon: createHugeicon(PackageIcon, "EnvironmentsIcon"),

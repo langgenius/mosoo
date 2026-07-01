@@ -1,11 +1,15 @@
 import type {
   AppOverview,
   AppOverviewAgent,
+  AppOverviewBoundAgent,
   AppOverviewProviderCredential,
   ControlPlaneOverview,
 } from "@mosoo/contracts/app";
+import { appDeploymentRunsTable } from "@mosoo/db";
 import type { AppId } from "@mosoo/id";
+import { eq } from "drizzle-orm";
 
+import { getAppDatabase } from "../../../platform/db/drizzle";
 import { validationError } from "../../../platform/errors";
 import { toIsoString } from "../../../time";
 import { listAppOwnerAgentRowsPage } from "../../agents/application/agent-repository";
@@ -19,6 +23,7 @@ import {
   listAppVendorCredentialRowsPage,
 } from "../../vendor-credentials/application/vendor-credential.repository";
 import type { VendorCredentialRow } from "../../vendor-credentials/application/vendor-credential.types";
+import type { AppDeploymentAgentBinding } from "./app-deployment-detector";
 import type { AppDeploymentReadBindings } from "./app-deployment.service";
 import { readAppDeploymentForOwnedApp } from "./app-deployment.service";
 import { ensureAppOwnership, listOrganizationAppsPage, toAppSummary } from "./app.service";
@@ -68,6 +73,56 @@ function toOverviewProviderCredential(row: VendorCredentialRow): AppOverviewProv
   };
 }
 
+// The bound agents shown on the overview come from the deployed manifest's
+// `.mosoo.toml [[agents]]` (persisted in the latest run's planJson). We surface
+// only the env var NAME each agent injects, never the capability URL value.
+async function readDeploymentAgentBindings(
+  bindings: AppDeploymentReadBindings,
+  deployment: AppOverview["deployment"],
+): Promise<AppDeploymentAgentBinding[]> {
+  const latestRunId = deployment?.latestRun?.id ?? null;
+
+  if (latestRunId === null) {
+    return [];
+  }
+
+  const rows = await getAppDatabase(bindings.DB)
+    .select({ planJson: appDeploymentRunsTable.planJson })
+    .from(appDeploymentRunsTable)
+    .where(eq(appDeploymentRunsTable.id, latestRunId))
+    .all();
+  const planJson = rows[0]?.planJson ?? null;
+
+  if (planJson === null) {
+    return [];
+  }
+
+  try {
+    const plan = JSON.parse(planJson) as { agentBindings?: AppDeploymentAgentBinding[] };
+    return Array.isArray(plan.agentBindings) ? plan.agentBindings : [];
+  } catch {
+    return [];
+  }
+}
+
+function toBoundAgent(
+  binding: AppDeploymentAgentBinding,
+  agentsByName: Map<string, AgentRow>,
+): AppOverviewBoundAgent | null {
+  const agent = agentsByName.get(binding.name);
+
+  if (agent === undefined) {
+    return null;
+  }
+
+  return {
+    agentId: agent.id,
+    envVar: binding.env,
+    expose: binding.expose,
+    name: binding.name,
+  };
+}
+
 export async function getAppOverview(
   bindings: AppDeploymentReadBindings,
   viewer: AuthenticatedViewer,
@@ -92,6 +147,11 @@ export async function getAppOverview(
     readAppDeploymentForOwnedApp(bindings, input.appId),
   ]);
 
+  const agentsByName = new Map(agentRows.map((agent) => [agent.name, agent]));
+  const boundAgents = (await readDeploymentAgentBindings(bindings, deployment))
+    .map((binding) => toBoundAgent(binding, agentsByName))
+    .filter((agent): agent is AppOverviewBoundAgent => agent !== null);
+
   return {
     agents: {
       hasMore: agentRows.length > agentLimit,
@@ -99,6 +159,7 @@ export async function getAppOverview(
       limit: agentLimit,
     },
     app: toAppSummary(app),
+    boundAgents,
     deployment,
     providerCredentials: {
       byVendor: credentialCounts,

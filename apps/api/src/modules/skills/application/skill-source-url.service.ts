@@ -18,6 +18,7 @@ const SKILLS_SH_HOSTS = new Set(["skills.sh", "www.skills.sh"]);
  *   - a skills.sh skill URL, e.g. https://www.skills.sh/<owner>/<repo>/<skill>
  *   - the full install command copied from skills.sh,
  *     e.g. `npx skills add https://github.com/owner/repo --skill find-skills`
+ *   - a repository URL plus a copied `--skill` flag
  */
 export function parseSkillSourceUrl(raw: string): ParsedSkillSource {
   const trimmed = raw.trim();
@@ -26,7 +27,7 @@ export function parseSkillSourceUrl(raw: string): ParsedSkillSource {
     throw new SkillRequestError("A skill URL or install command is required.");
   }
 
-  if (!/^https?:\/\//i.test(trimmed)) {
+  if (!/^https?:\/\/\S+$/i.test(trimmed)) {
     return parseInstallCommand(trimmed);
   }
 

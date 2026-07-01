@@ -28,13 +28,13 @@ describe("help docs index", () => {
     expect(HELP_DOCS).toContainEqual(
       expect.objectContaining({
         title: "Create a Thread for an Agent API Endpoint",
-        url: "https://docs.mosoo.ai/api-reference/create-a-thread-for-a-published-agent",
+        url: "https://mosoo.ai/docs/api-reference/create-a-thread-for-an-agent-api-endpoint",
       }),
     );
     expect(HELP_DOCS).toContainEqual(
       expect.objectContaining({
         title: "List Threads for an Agent API Endpoint",
-        url: "https://docs.mosoo.ai/api-reference/list-threads-for-a-published-agent",
+        url: "https://mosoo.ai/docs/api-reference/list-threads-for-an-agent-api-endpoint",
       }),
     );
     expect(HELP_DOCS.map((doc) => doc.title.toLowerCase()).join("\n")).not.toContain(

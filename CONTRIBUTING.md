@@ -133,10 +133,10 @@ just test-file apps/api/tests/session-run-cancel.test.ts
 
 ## Database And Migrations
 
-During alpha, historical migrations are not maintained. The database policy stays simple:
+During alpha, local historical migrations are not maintained. The local database policy stays simple:
 
 - The schema source of truth is `pkgs/db/src/schema/**`.
-- The current baseline is `pkgs/db/drizzle/**`.
+- The current local bootstrap baseline is `pkgs/db/drizzle/**`.
 - When schema and database state diverge, do not add compatibility patches for old local data.
 - Rebuild the local database state directly.
 
@@ -147,7 +147,9 @@ just db-regen
 just db-migrate
 ```
 
-If local database state is dirty, delete the corresponding local database and `.wrangler` state directories, then rebuild. Production release follows the same no-history posture: unless the current schema explicitly supports old data, old data is not considered compatible.
+If local database state is dirty, delete the corresponding local database and `.wrangler` state directories, then rebuild.
+
+Production D1 is not reset during deploy. `just deploy-api` applies only pending remote D1 migrations before deploying the API Worker. Once production has data, schema changes must add a new migration under `pkgs/db/drizzle` instead of rewriting an already-applied baseline.
 
 ## GraphQL Codegen
 
@@ -345,3 +347,6 @@ just deploy
 API production config lives in `apps/api/wrangler.toml`; web production config lives in `apps/web/wrangler.toml`. Cloudflare routes send `try.mosoo.ai/api/*` to the API Worker, `try.mosoo.ai/*` to the console Web Worker, and `mosoo.ai/*` to the marketing / landing surface.
 
 Do not deploy production directly from an unreviewed local branch.
+
+Before a production release, run the tracked simulation and acceptance checklist
+in [Production Deploy Verification](./docs/production-deploy-verification.md).

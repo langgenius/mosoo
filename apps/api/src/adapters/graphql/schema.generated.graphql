@@ -531,6 +531,7 @@ type AppInfo {
 type AppOverview {
   agents: AppOverviewAgentList!
   app: App!
+  boundAgents: [AppOverviewBoundAgent!]!
   deployment: AppDeployment
   providerCredentials: AppOverviewProviderCredentialList!
 }
@@ -552,6 +553,17 @@ type AppOverviewAgentList {
   hasMore: Boolean!
   items: [AppOverviewAgent!]!
   limit: Int!
+}
+
+type AppOverviewBoundAgent {
+  agentId: ULID!
+  envVar: String!
+  expose: AppOverviewBoundAgentExposure!
+  name: String!
+}
+
+enum AppOverviewBoundAgentExposure {
+  public_thread
 }
 
 type AppOverviewProviderCredential {
