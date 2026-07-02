@@ -7,12 +7,14 @@ import type { NormalizedSkillPackage, SkillPackageEntry } from "@mosoo/skill-pac
 import { and, asc, eq, inArray } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { getAppDatabase } from "../../../platform/db/drizzle";
+import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { currentTimestampMs, toIsoString } from "../../../time";
 import { buildSkillBlobKey, readSkillBlobBytes, writeSkillBlob } from "./skill-blob-store";
 import { loadNormalizedSkillPackage } from "./skill-package-source.service";
 import { inferMimeType, SKILL_ARCHIVE_EXTRACT_OPTIONS, sha256Hex } from "./skill-package.shared";
 import type { InspectSkillInput } from "./skill-package.shared";
+
+const SKILL_SNAPSHOT_ENTRY_INSERT_BATCH_SIZE = 10;
 
 export interface PublishedSkillSnapshot {
   entries: SkillSnapshotEntry[];
@@ -44,6 +46,7 @@ export async function publishSkillSnapshot(
   const normalized = await loadNormalizedSkillPackage(input);
   const archiveBytes = createZipArchive(normalized.entries);
   const blobSha256 = await sha256Hex(archiveBytes);
+  const entries = await Promise.all(normalized.entries.map(toSkillSnapshotEntry));
   const existingSnapshot =
     (await getAppDatabase(bindings.DB)
       .select(skillSnapshotColumns())
@@ -58,6 +61,8 @@ export async function publishSkillSnapshot(
       .get()) ?? null;
 
   if (existingSnapshot) {
+    await ensureSkillSnapshotEntries(bindings.DB, existingSnapshot.id, entries);
+
     return {
       entries: await listSkillSnapshotEntries(bindings.DB, existingSnapshot.id),
       snapshot: toSkillSnapshotRecord(existingSnapshot),
@@ -67,7 +72,6 @@ export async function publishSkillSnapshot(
   const timestampMs = currentTimestampMs();
   const snapshotId = createPlatformId<SkillSnapshotId>();
   const blobKey = buildSkillBlobKey(owner.appId, blobSha256);
-  const entries = await Promise.all(normalized.entries.map(toSkillSnapshotEntry));
   const snapshotAuthor = normalized.frontmatter.author ?? normalized.frontmatter.name;
   const uncompressedSize = calculateUncompressedSize(normalized);
 
@@ -76,9 +80,8 @@ export async function publishSkillSnapshot(
     bytes: archiveBytes,
   });
 
-  await getAppDatabase(bindings.DB)
-    .insert(skillSnapshotsTable)
-    .values({
+  await runAppDatabaseBatch(bindings.DB, (database) => [
+    database.insert(skillSnapshotsTable).values({
       author: snapshotAuthor,
       blobKey,
       blobSha256,
@@ -91,25 +94,9 @@ export async function publishSkillSnapshot(
       skillMarkdownPath: normalized.skillMarkdownPath,
       uncompressedSize,
       version: normalized.frontmatter.version ?? null,
-    })
-    .run();
-
-  if (entries.length > 0) {
-    await getAppDatabase(bindings.DB)
-      .insert(skillSnapshotEntriesTable)
-      .values(
-        entries.map((entry) => ({
-          entryKind: entry.entryKind,
-          isExecutable: entry.isExecutable,
-          mimeType: entry.mimeType,
-          path: entry.path,
-          sha256: entry.sha256,
-          size: entry.size,
-          snapshotId,
-        })),
-      )
-      .run();
-  }
+    }),
+    ...createSkillSnapshotEntryInsertQueries(database, snapshotId, entries),
+  ]);
 
   return {
     entries,
@@ -129,6 +116,57 @@ export async function publishSkillSnapshot(
       version: normalized.frontmatter.version ?? null,
     },
   };
+}
+
+async function ensureSkillSnapshotEntries(
+  database: D1Database,
+  snapshotId: SkillSnapshotId,
+  entries: SkillSnapshotEntry[],
+): Promise<void> {
+  const existingEntries = await listSkillSnapshotEntries(database, snapshotId);
+
+  if (existingEntries.length === entries.length) {
+    return;
+  }
+
+  await runAppDatabaseBatch(database, (db) => [
+    db
+      .delete(skillSnapshotEntriesTable)
+      .where(eq(skillSnapshotEntriesTable.snapshotId, snapshotId)),
+    ...createSkillSnapshotEntryInsertQueries(db, snapshotId, entries),
+  ]);
+}
+
+function createSkillSnapshotEntryInsertQueries(
+  database: ReturnType<typeof getAppDatabase>,
+  snapshotId: SkillSnapshotId,
+  entries: SkillSnapshotEntry[],
+) {
+  const queries = [];
+
+  for (let index = 0; index < entries.length; index += SKILL_SNAPSHOT_ENTRY_INSERT_BATCH_SIZE) {
+    const batch = entries.slice(index, index + SKILL_SNAPSHOT_ENTRY_INSERT_BATCH_SIZE);
+
+    if (batch.length === 0) {
+      continue;
+    }
+
+    queries.push(
+      database.insert(skillSnapshotEntriesTable).values(
+        batch.map((entry) => ({
+          entryKind: entry.entryKind,
+          isExecutable: entry.isExecutable,
+          mimeType: entry.mimeType,
+          path: entry.path,
+          sha256: entry.sha256,
+          size: entry.size,
+          snapshotId,
+        })),
+      ),
+    );
+  }
+
+  return queries;
 }
 
 export async function listSkillSnapshotEntries(
