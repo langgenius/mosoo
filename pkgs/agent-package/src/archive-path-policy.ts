@@ -19,7 +19,6 @@ interface ArchivePathDeclaration {
   targetType: AgentResolutionIssue["targetType"];
 }
 
-const SKILL_ALLOWED_ROOTS = ["assets/", "references/", "scripts/"] as const;
 const ARCHIVE_PATH_FORBIDDEN_SEGMENTS = new Set([
   ".env",
   ".state",
@@ -321,10 +320,7 @@ function isAllowedArchivePath(
 
     const relativePath = path.slice(skillPath.length);
 
-    if (
-      relativePath === "SKILL.md" ||
-      SKILL_ALLOWED_ROOTS.some((allowedRoot) => relativePath.startsWith(allowedRoot))
-    ) {
+    if (relativePath.length > 0) {
       return true;
     }
   }
