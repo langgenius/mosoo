@@ -26,6 +26,7 @@ import {
   parseFileIdParam,
   parseThreadIdParam,
   parseThreadEventsLimit,
+  readBoundAgentCallRequestBody,
   readCreateThreadRequest,
   readCreateThreadFileRequest,
   readCreateThreadFileUploadRequest,
@@ -90,7 +91,7 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
 
   v1.post("/bound/:token", async (c) => {
     try {
-      const body = (await c.req.json()) as unknown;
+      const body = await readBoundAgentCallRequestBody(c);
       const { createBoundAgentThreadAndWait } = await loadBoundAgentAskService();
       const result = await createBoundAgentThreadAndWait({
         bindings: c.env,
