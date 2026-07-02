@@ -11,15 +11,38 @@ Mosoo is still in alpha exploration. Product boundaries, data models, deployment
 
 ## Local Development
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full development flow. Install `bun >= 1.4.0-canary.1`, `just >= 1.51`, and a running Docker-compatible CLI / daemon first. The shortest local path is:
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full development flow.
+
+Prerequisites:
+
+- `bun >= 1.4.0-canary.1`
+- `just >= 1.51`
+- Agent runtime / sandbox flows also need Docker Desktop; see the contribution guide before validating those paths.
+
+From a clean clone:
 
 ```bash
+git clone --recurse-submodules https://github.com/langgenius/mosoo.git
+cd mosoo
 just setup
 just dev
 ```
 
+`just setup` installs dependencies, initializes submodules, creates or completes `apps/api/.dev.vars`, installs Git hooks, and applies the local D1 baseline. `just dev` reapplies the local D1 migration before starting the web, API, and blog dev servers.
+
+Local URLs:
+
 - Web: `http://localhost:5173`
 - API: `http://localhost:8787`
 - Blog: `http://localhost:4321/blog`
-- Regular email login uses OTP.
-- In local development, email addresses ending with `@mosoo.ai` skip OTP and log in directly.
+
+Minimum smoke:
+
+```bash
+curl http://localhost:5173/api/health
+curl http://localhost:8787/api/health
+```
+
+API health is `/api/health`, not `/health`. Regular email login uses OTP; under local loopback origins, addresses ending with `@mosoo.ai` skip OTP and log in directly.
+
+If setup fails, start with the focused recipe: submodule issues use `git submodule update --init`, missing local secrets use `just env-init`, and D1 schema errors use `just db-migrate`. For details and verification expectations, read [CONTRIBUTING.md](./CONTRIBUTING.md).
