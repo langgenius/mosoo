@@ -1,7 +1,6 @@
 import type { ReactElement } from "react";
 
 import { LoginAuthCard } from "./auth-card";
-import { LandingShell } from "./landing/landing-shell";
 import { LoginAuthTopbar } from "./topbar";
 import { useLoginFlow } from "./use-login";
 
@@ -16,8 +15,6 @@ export function LoginPage(): ReactElement {
   const handleGoogleLogin = () => {
     void login.handleGoogleLogin();
   };
-  const handleLandingOpen = login.openLanding;
-  const handleOpenAuth = login.openAuth;
   const handleOtpChange = login.updateOtp;
   const handleSendOtp = () => {
     void login.handleSendOtp();
@@ -27,13 +24,9 @@ export function LoginPage(): ReactElement {
     void login.handleVerifyOtp();
   };
 
-  if (login.step === "landing") {
-    return <LandingShell onContinue={handleOpenAuth} />;
-  }
-
   return (
     <div className="fixed inset-0 flex flex-col" style={authBackgroundStyle}>
-      <LoginAuthTopbar onBack={handleLandingOpen} />
+      <LoginAuthTopbar />
       <LoginAuthCard
         email={login.email}
         error={login.error}

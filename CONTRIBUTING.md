@@ -20,7 +20,7 @@ This repository is a monorepo:
 | Path                   | Description                                                                                                                     |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/api`             | Cloudflare Worker API with GraphQL, auth, sessions, channels, runtime control plane, and D1/R2/DO bindings.                     |
-| `apps/web`             | React web app built with Vite Plus and deployed as Cloudflare Worker assets.                                                    |
+| `apps/web`             | React console app built with Vite Plus and deployed as Cloudflare Worker assets on `try.mosoo.ai`.                              |
 | `apps/driver`          | Agent runtime driver bundle used by API Worker / Sandbox paths.                                                                 |
 | `pkgs/contracts`       | Cross-boundary TypeScript contracts and parser surfaces; cross app / package DTOs should go here first.                         |
 | `pkgs/db`              | Drizzle schema and the current generated baseline migration.                                                                    |
@@ -95,13 +95,14 @@ Start the regular local stack:
 just dev
 ```
 
-This command runs local D1 migration first, then starts the driver build, API Worker, web app, and blog.
+This command runs local D1 migration first, then starts the driver build, API Worker, and web app.
 
 Default local URLs:
 
 - Web: `http://localhost:5173`
 - API: `http://localhost:8787`
-- Blog: `http://localhost:4321/blog` (Astro dev server; mounted at the `/blog` base path with `trailingSlash: "never"`, so the URL must be `/blog` with no trailing slash — `/` and `/blog/` both 404)
+
+The public landing page and blog live in the private `langgenius/mosoo-website` repository and are deployed separately on `mosoo.ai`.
 
 Local login:
 
@@ -351,7 +352,7 @@ just deploy-web
 just deploy
 ```
 
-API production config lives in `apps/api/wrangler.toml`; web production config lives in `apps/web/wrangler.toml`. Cloudflare routes send `try.mosoo.ai/api/*` to the API Worker, `try.mosoo.ai/*` to the console Web Worker, and `mosoo.ai/*` to the marketing / landing surface.
+API production config lives in `apps/api/wrangler.toml`; web production config lives in `apps/web/wrangler.toml`. Cloudflare routes send `try.mosoo.ai/api/*` to the API Worker and `try.mosoo.ai/*` to the console Web Worker. The public landing page and blog on `mosoo.ai/*` are owned by `langgenius/mosoo-website`.
 
 Do not deploy production directly from an unreviewed local branch.
 

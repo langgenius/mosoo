@@ -1,16 +1,16 @@
 # Design
 
 Visual system for the Mosoo web app. Tokens are the source of truth and live in
-`src/shared/styles/app.css` (`:root`, `[data-theme="landing"]`, `.dark`, and the
-`@theme inline` Tailwind bridge). This document describes them; the CSS implements them.
+`src/shared/styles/app.css` (`:root`, `.dark`, and the `@theme inline` Tailwind bridge).
+This document describes them; the CSS implements them.
 
 ## Theme
 
 Light, neutral-first, GitHub-like. Cool grays carry the surface; a bright Moso-bamboo
 green is a disciplined accent only. Primary actions are black (`--ink-900`) in light
-mode and green in dark mode (where black would disappear). A separate
-`[data-theme="landing"]` scope keeps the pre-auth marketing surface on a warmer
-paper/forest palette. Dark theme (`.dark` / `[data-theme="dark"]`) is fully supported.
+mode and green in dark mode (where black would disappear). Dark theme (`.dark` /
+`[data-theme="dark"]`) is fully supported. The public landing page and blog are owned
+by the private `langgenius/mosoo-website` repository.
 
 ## Color
 
@@ -34,15 +34,13 @@ Selection fills are neutral (`--color-brand-light` = ink-50), not green washes.
 
 ## Typography
 
-Families (cap at 3): `--font-sans` / `--font-display` = Geist → Inter → system; landing
-display = Cabinet Grotesk; `--font-mono` = Geist Mono. Product UI uses one sans with
-weight contrast; display faces are for the landing only.
+Families (cap at 3): `--font-sans` / `--font-display` = Geist → Inter → system;
+`--font-mono` = Geist Mono. Product UI uses one sans with weight contrast.
 
 Fixed rem scale (not fluid in product UI): `--fs-12 … --fs-64`. Line heights
 `--lh-tight/-snug/-normal/-loose`. Type component classes: `.h-display/.h1/.h2/.h3/.h4`,
 `.t-body/.t-body-sm/.t-caption/.t-micro/.t-eyebrow/.t-mono/.t-link`. Base body is
-`--fs-15` / weight 500 with `ss01`. Landing section headings use `clamp()`; product
-headings stay fixed.
+`--fs-15` / weight 500 with `ss01`. Product headings stay fixed.
 
 ## Spacing & Radius
 

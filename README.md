@@ -28,13 +28,14 @@ just setup
 just dev
 ```
 
-`just setup` installs dependencies, initializes submodules, creates or completes `apps/api/.dev.vars`, installs Git hooks, and applies the local D1 baseline. `just dev` reapplies the local D1 migration before starting the web, API, and blog dev servers.
+`just setup` installs dependencies, initializes submodules, creates or completes `apps/api/.dev.vars`, installs Git hooks, and applies the local D1 baseline. `just dev` reapplies the local D1 migration before starting the web and API dev servers.
 
 Local URLs:
 
 - Web: `http://localhost:5173`
 - API: `http://localhost:8787`
-- Blog: `http://localhost:4321/blog`
+
+The public landing page and blog live in the private `langgenius/mosoo-website` repository and are deployed on `mosoo.ai`.
 
 Minimum smoke:
 
