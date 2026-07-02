@@ -1,4 +1,3 @@
-import { MOSOO_CONSOLE_ORIGIN, MOSOO_MARKETING_ORIGIN } from "@mosoo/contracts/origin";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -17,7 +16,7 @@ import {
   getSocialAuthErrorMessage,
 } from "./copy";
 
-export type AuthStep = "landing" | "auth" | "otp";
+export type AuthStep = "auth" | "otp";
 
 const LOGIN_STEP_KEY = "mosoo_login_step";
 const LOGIN_EMAIL_KEY = "mosoo_login_email";
@@ -28,8 +27,6 @@ export interface LoginFlow {
   handleGoogleLogin: () => Promise<void>;
   handleSendOtp: () => Promise<void>;
   handleVerifyOtp: () => Promise<void>;
-  openAuth: () => void;
-  openLanding: () => void;
   otp: string;
   otpSending: boolean;
   otpVerifying: boolean;
@@ -62,13 +59,8 @@ function getPersistedEmail(): string {
 
 function persistLoginState(step: AuthStep, email: string): void {
   try {
-    if (step === "landing") {
-      sessionStorage.removeItem(LOGIN_STEP_KEY);
-      sessionStorage.removeItem(LOGIN_EMAIL_KEY);
-    } else {
-      sessionStorage.setItem(LOGIN_STEP_KEY, step);
-      sessionStorage.setItem(LOGIN_EMAIL_KEY, email);
-    }
+    sessionStorage.setItem(LOGIN_STEP_KEY, step);
+    sessionStorage.setItem(LOGIN_EMAIL_KEY, email);
   } catch {
     // Session storage can be unavailable in restricted browser contexts.
   }
@@ -81,20 +73,6 @@ function clearPersistedLoginState(): void {
   } catch {
     // Session storage can be unavailable in restricted browser contexts.
   }
-}
-
-function isMarketingOrigin(): boolean {
-  return globalThis.location.origin === MOSOO_MARKETING_ORIGIN;
-}
-
-function toConsoleLoginUrl(redirectPath: string): string {
-  const url = new URL("/login", MOSOO_CONSOLE_ORIGIN);
-
-  if (redirectPath !== "/") {
-    url.searchParams.set("redirect", redirectPath);
-  }
-
-  return url.toString();
 }
 
 export function useLoginFlow(): LoginFlow {
@@ -110,7 +88,7 @@ export function useLoginFlow(): LoginFlow {
     decodeAuthError(searchParams.get("auth_error"));
 
   const persistedStep = getPersistedStep();
-  const initialStep: AuthStep = authError === null ? (persistedStep ?? "landing") : "auth";
+  const initialStep: AuthStep = authError === null ? (persistedStep ?? "auth") : "auth";
   const initialEmail = persistedStep === null ? "" : getPersistedEmail();
 
   const [step, setStep] = useState<AuthStep>(initialStep);
@@ -211,24 +189,6 @@ export function useLoginFlow(): LoginFlow {
     }
   }
 
-  function openAuth(): void {
-    if (isMarketingOrigin()) {
-      globalThis.location.assign(toConsoleLoginUrl(redirectPath));
-      return;
-    }
-
-    setStep("auth");
-    setError(null);
-    setEmail("");
-    setOtp("");
-    persistLoginState("auth", "");
-  }
-
-  function openLanding(): void {
-    setStep("landing");
-    clearPersistedLoginState();
-  }
-
   function useDifferentEmail(): void {
     setStep("auth");
     setOtp("");
@@ -253,8 +213,6 @@ export function useLoginFlow(): LoginFlow {
     handleGoogleLogin,
     handleSendOtp,
     handleVerifyOtp,
-    openAuth,
-    openLanding,
     otp,
     otpSending,
     otpVerifying,

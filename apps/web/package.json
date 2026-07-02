@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vp dev",
-    "build": "vp run --filter @mosoo/blog build && vp build && rm -rf dist/blog && cp -R ../blog/dist dist/blog",
+    "build": "vp build",
     "preview": "vp preview",
     "deploy": "vp run build && vp exec wrangler deploy --env prod",
     "lint": "vp lint .",

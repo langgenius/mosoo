@@ -17,10 +17,10 @@ tools like GitHub, Linear, and Vercel is assumed; the UI should feel native to t
 Mosoo (formerly Dify-Lite) is an open-source Agent Cloud. It lets developers deploy,
 configure, run, and debug agents (Claude Code, OpenAI, and more) as cloud workers in
 isolated sandboxes, then ship them to users. The web app is the production + governance
-console: Agents, Spaces, Environments, Integrations (Skills, MCP), Providers, Threads,
-Members, and Cost. Success is a developer closing the full loop (configure → launch →
-debug → govern) without operational overhead, and a clean marketing landing that
-converts a developer in one read.
+console: Agents, Apps, Environments, Integrations (Skills, MCP), Providers, Threads,
+and Cost. Success is a developer closing the full loop (configure → launch → debug →
+govern) without operational overhead. Public landing and blog content live in
+`langgenius/mosoo-website`.
 
 ## Brand Personality
 
@@ -31,8 +31,7 @@ Confidence through clarity, not decoration.
 
 ## Anti-references
 
-- SaaS-cream marketing-template landing pages (gradient blobs everywhere, hero-metric
-  template, identical icon-card grids, eyebrow on every section).
+- Marketing-template console pages that trade task density for decorative hero metrics.
 - Heavy enterprise dashboards drowning in chrome, modals-first flows, and decorative
   motion.
 - Over-rounded, glassmorphic, shadow-heavy "AI startup" component kits.

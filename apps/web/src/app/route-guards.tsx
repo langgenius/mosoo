@@ -8,7 +8,7 @@ import { useAppSession } from "./session-provider";
 // The authenticated app shell (sidebar navigation, account/help menus, org
 // chrome) only renders once a signed-in user clears the guards below. Loading
 // it lazily keeps the whole shell subtree out of the entry chunk, so the
-// public /login + landing route — the cold-start page for first-time and
+// public /login route — the cold-start page for first-time and
 // logged-out visitors, where the shell never mounts — no longer pays to
 // download it. Both wrappers pull the same "./app-shell" module, so they share
 // one chunk and a signed-in visitor fetches it in parallel with the first route

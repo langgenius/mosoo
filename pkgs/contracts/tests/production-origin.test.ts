@@ -22,15 +22,17 @@ describe("production origins", () => {
     expect(apiWrangler).toContain(`pattern = "${MOSOO_PRODUCTION_API_ROUTE_PATTERN}"`);
     expect(apiWrangler).toContain('"GOOGLE_OAUTH_CLIENT_ID"');
     expect(apiWrangler).toContain('"GOOGLE_OAUTH_CLIENT_SECRET"');
-    expect(webWrangler).toContain(`pattern = "${MOSOO_MARKETING_HOST}"`);
     expect(webWrangler).toContain(`pattern = "${MOSOO_CONSOLE_HOST}"`);
+    expect(webWrangler).not.toContain(`pattern = "${MOSOO_MARKETING_HOST}"`);
   });
 
   test("documents the marketing and console split", () => {
     const architecture = readRepoFile("docs/architecture.md");
     const contributing = readRepoFile("CONTRIBUTING.md");
 
-    expect(architecture).toContain(`\`${MOSOO_MARKETING_HOST}\` is the marketing / landing origin`);
+    expect(architecture).toContain(
+      `\`${MOSOO_MARKETING_HOST}\` is the marketing / landing / blog origin`,
+    );
     expect(architecture).toContain(`${MOSOO_PRODUCTION_API_ROUTE_PATTERN}`);
     expect(contributing).toContain(`${MOSOO_PRODUCTION_API_ROUTE_PATTERN}`);
   });
