@@ -35,6 +35,10 @@ fmt:
 fmt-check:
     bun run fmt:check
 
+# Check Markdown/MDX local links and image references.
+docs-check:
+    bun run docs:check
+
 # Check formatting for one file or directory.
 fmt-check-path path:
     bun run fmt:check:path -- "{{ path }}"
