@@ -109,6 +109,16 @@ dead_letter_queue = "channel-final-delivery-dlq"
 name = "mosoo-api-prod"
 workers_dev = false
 
+# Named envs do not inherit the top-level [observability] block, so prod had no
+# queryable Workers Logs (only traces). Enable logs so structured log lines
+# (e.g. "closed before ready", driver/ready/socket events) are retrievable.
+[env.prod.observability]
+enabled = true
+
+[env.prod.observability.logs]
+enabled = true
+head_sampling_rate = 1
+
 [env.prod.observability.traces]
 enabled = true
 head_sampling_rate = 0.1
@@ -190,7 +200,10 @@ queue = "channel-final-delivery"
 [[env.prod.queues.consumers]]
 queue = "api-command"
 max_batch_size = 10
-max_batch_timeout = 5
+# Interactive runs dispatch inline (executionContext.waitUntil); this queue is
+# the durable fallback for executionContext-less paths (replay, DO-originated).
+# Drop the batch window 5s -> 2s so those paths don't eat a 5s dispatch delay.
+max_batch_timeout = 2
 max_retries = 5
 dead_letter_queue = "api-command-dlq"
 

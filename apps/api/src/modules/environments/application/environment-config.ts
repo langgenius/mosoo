@@ -316,22 +316,28 @@ export async function decryptEnvironmentVariables(
     envVars: StoredEnvironmentVariable[];
   },
 ): Promise<Record<string, string>> {
-  const record: Record<string, string> = {};
+  // Decrypt all secrets concurrently. Each readEnvironmentVariableSecret does
+  // D1 reads + an AES-GCM unwrap; run serially this was N sequential D1
+  // round-trips per hydration (the dominant cause of the multi-second
+  // context_hydration tail on prod), and hydration runs on every run —
+  // including cache hits, since the volatile fields are re-resolved.
+  const entries = await Promise.all(
+    input.envVars.map(async (envVar) => {
+      if (envVar.secretId === null) {
+        throw new Error(`Environment variable ${envVar.key} is pending and has no secret value.`);
+      }
 
-  for (const envVar of input.envVars) {
-    if (envVar.secretId === null) {
-      throw new Error(`Environment variable ${envVar.key} is pending and has no secret value.`);
-    }
+      const value = await readEnvironmentVariableSecret(bindings, {
+        environmentId: input.environmentId,
+        envVarKey: envVar.key,
+        purpose: "runtime_snapshot_hydration",
+        secretId: envVar.secretId,
+      });
+      return [envVar.key, value] as const;
+    }),
+  );
 
-    record[envVar.key] = await readEnvironmentVariableSecret(bindings, {
-      environmentId: input.environmentId,
-      envVarKey: envVar.key,
-      purpose: "runtime_snapshot_hydration",
-      secretId: envVar.secretId,
-    });
-  }
-
-  return record;
+  return Object.fromEntries(entries);
 }
 
 export function serializeConfig(input: EnvironmentMutableConfig): {
