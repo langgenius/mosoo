@@ -1,5 +1,5 @@
-import { useMutation } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, KeyRound, Loader2 } from "lucide-react";
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { confirmCliOAuthDeviceFlow } from "@/domains/auth/api/cli-oauth-client";
@@ -8,11 +8,24 @@ import { Button } from "@/shared/ui/button";
 export function CliAuthPage() {
   const [searchParams] = useSearchParams();
   const code = searchParams.get("code")?.trim() ?? "";
-  const confirmMutation = useMutation({
-    mutationFn: () => confirmCliOAuthDeviceFlow(code),
-  });
-  const status = confirmMutation.data?.status ?? null;
-  const canConfirm = code !== "" && !confirmMutation.isPending && status === null;
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const canConfirm = code !== "" && !confirming && status === null;
+
+  async function handleConfirm(): Promise<void> {
+    setConfirming(true);
+    setError(null);
+
+    try {
+      const result = await confirmCliOAuthDeviceFlow(code);
+      setStatus(result.status);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError : new Error("Failed to authorize CLI."));
+    } finally {
+      setConfirming(false);
+    }
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-xl flex-col gap-5 px-6 py-12">
@@ -33,11 +46,11 @@ export function CliAuthPage() {
         </div>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Button disabled={!canConfirm} onClick={() => confirmMutation.mutate()}>
-            {confirmMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+          <Button disabled={!canConfirm} onClick={() => void handleConfirm()}>
+            {confirming ? <Loader2 className="size-4 animate-spin" /> : null}
             Authorize CLI
           </Button>
-          <StatusMessage error={confirmMutation.error} status={status} />
+          <StatusMessage error={error} status={status} />
         </div>
       </div>
     </main>

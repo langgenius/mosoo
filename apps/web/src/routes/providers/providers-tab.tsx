@@ -91,10 +91,10 @@ function displayApiBase(credential: VendorCredential): string {
 function formModels(form: CredentialForm): string[] | undefined {
   const models = [
     ...new Set(
-      form.modelsText
-        .split(/\r?\n|,/u)
-        .map((modelId) => modelId.trim())
-        .filter(Boolean),
+      form.modelsText.split(/\r?\n|,/u).flatMap((modelId) => {
+        const trimmed = modelId.trim();
+        return trimmed ? [trimmed] : [];
+      }),
     ),
   ];
 
@@ -136,16 +136,11 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
   const [formError, setFormError] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const [testState, setTestState] = useState<TestState>("idle");
-  const credentialsQuery = useQuery({
+  const { data: credentials = [], isLoading: credentialsLoading } = useQuery({
     queryFn: async () => listVendorCredentials(typedAppId),
     queryKey: providerCredentialKeys.list(appId),
   });
-  const credentials = credentialsQuery.data ?? [];
   const groupedCredentials = useMemo(() => credentialsByVendor(credentials), [credentials]);
-
-  const invalidateCredentials = async (): Promise<void> => {
-    await queryClient.invalidateQueries({ queryKey: providerCredentialKeys.list(appId) });
-  };
 
   const saveMutation = useMutation({
     mutationFn: async (nextForm: CredentialForm) => {
@@ -191,7 +186,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
       setForm(EMPTY_FORM);
       setFormError(null);
       setTestState("idle");
-      await invalidateCredentials();
+      await queryClient.invalidateQueries({ queryKey: providerCredentialKeys.list(appId) });
     },
   });
 
@@ -199,7 +194,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
     mutationFn: async (credential: VendorCredential) =>
       deleteVendorCredential({ id: credential.id, appId: typedAppId }),
     onSuccess: async () => {
-      await invalidateCredentials();
+      await queryClient.invalidateQueries({ queryKey: providerCredentialKeys.list(appId) });
     },
   });
 
@@ -207,7 +202,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
     mutationFn: async (credential: VendorCredential) =>
       setDefaultVendorCredential({ id: credential.id, appId: typedAppId }),
     onSuccess: async () => {
-      await invalidateCredentials();
+      await queryClient.invalidateQueries({ queryKey: providerCredentialKeys.list(appId) });
     },
   });
 
@@ -313,7 +308,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
 
       <main className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
         <div className="mx-auto max-w-4xl space-y-6">
-          {credentialsQuery.isLoading ? (
+          {credentialsLoading ? (
             <div className="border-border bg-card text-muted-foreground rounded-lg border px-4 py-6 text-sm">
               Loading providers…
             </div>
@@ -325,9 +320,7 @@ export function ProvidersTab({ appId }: { appId: string }): ReactElement {
             </div>
           )}
 
-          {credentialsQuery.isLoading ? null : (
-            <RuntimeAvailabilitySection credentials={credentials} />
-          )}
+          {credentialsLoading ? null : <RuntimeAvailabilitySection credentials={credentials} />}
 
           {PUBLIC_VENDORS.map((vendor) => (
             <ProviderCredentialSection

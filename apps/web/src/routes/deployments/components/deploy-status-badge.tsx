@@ -58,7 +58,7 @@ export function StatusBadge({ status }: { status: DeploymentRunDisplayStatus }) 
     <Badge variant="success">
       <span
         className={cn("size-1.5 rounded-full bg-current")}
-        style={{ animation: "pulse 2s cubic-bezier(0.4,0,0.6,1) infinite" }}
+        style={{ animation: "pulse 900ms cubic-bezier(0.4,0,0.6,1) infinite" }}
         aria-hidden
       />
       {label}

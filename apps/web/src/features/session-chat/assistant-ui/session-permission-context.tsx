@@ -1,5 +1,5 @@
 import type { SessionPermissionRequestView } from "@mosoo/ag-ui-session";
-import { createContext, useContext, useMemo } from "react";
+import { createContext, use, useMemo } from "react";
 import type { ReactNode } from "react";
 
 // Permission requests arrive as a separate live-state array, matched to tool
@@ -40,7 +40,7 @@ export function SessionPermissionProvider({
 export function useSessionPermissionForToolCall(
   toolCallId: string | undefined,
 ): SessionPermissionRequestView | null {
-  const byToolCallId = useContext(SessionPermissionContext);
+  const byToolCallId = use(SessionPermissionContext);
 
   if (toolCallId === undefined) {
     return null;

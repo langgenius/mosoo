@@ -22,12 +22,11 @@ export function CostPage() {
   const [agentSort, setAgentSort] = useState<AgentCostSort>("cost_desc");
   const [runPurpose, setRunPurpose] = useState<CostRunPurpose | "all">("all");
   const runPurposes = runPurposeToQuery(runPurpose);
-  const costQuery = useQuery({
+  const { data: card, isLoading } = useQuery({
     enabled: activeApp !== null,
     queryFn: async () => fetchAppCost(toAppId(activeApp!.id), rangeToInput(range), runPurposes),
     queryKey: ["cost", "app-card", activeApp?.id, range, runPurpose],
   });
-  const card = costQuery.data;
 
   if (!activeApp) {
     return (
@@ -51,7 +50,7 @@ export function CostPage() {
 
       <main className="min-h-0 flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl space-y-5">
-          {costQuery.isLoading ? (
+          {isLoading ? (
             <div className="border-border bg-card text-muted-foreground rounded-lg border px-4 py-10 text-center text-sm">
               Loading cost data…
             </div>

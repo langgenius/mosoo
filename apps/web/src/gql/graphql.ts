@@ -245,11 +245,6 @@ export type CreateDiscordAgentChannelBindingInput = {
   relaySecret: string;
 };
 
-export type CreateEnvironmentForkInput = {
-  appId: PlatformId;
-  environmentId: PlatformId;
-};
-
 export type CreateEnvironmentInput = {
   allowMcpServers: boolean;
   allowPackageManagers: boolean;
@@ -471,12 +466,6 @@ export type PublishAgentInput = {
   appId: PlatformId;
 };
 
-export type RemoveSessionResourceInput = {
-  appId: PlatformId;
-  resourceId: PlatformId;
-  sessionId: PlatformId;
-};
-
 export type RenameAppInput = {
   appId: PlatformId;
   name: string;
@@ -585,11 +574,6 @@ export type SetAppDefaultEnvironmentInput = {
 export type SetDefaultVendorCredentialInput = {
   appId: PlatformId;
   id: PlatformId;
-};
-
-export type SetSystemAgentModelInput = {
-  modelId: string;
-  vendor: string;
 };
 
 export type SkillSnapshotEntryKind =
@@ -901,13 +885,6 @@ export type AppDeploymentOverviewQueryVariables = Exact<{
 
 export type AppDeploymentOverviewQuery = { appOverview: { app: { id: PlatformId, name: string }, boundAgents: Array<{ agentId: PlatformId, envVar: string, expose: AppOverviewBoundAgentExposure, name: string }>, deployment: { appId: PlatformId, createdAt: string, defaultBranch: string, id: PlatformId, liveUrl: string | null, plannedUrl: string, repoName: string, repoOwner: string, repoUrl: string, updatedAt: string, latestRun: { appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string } | null } | null } };
 
-export type AppDeploymentStatusQueryVariables = Exact<{
-  appId: PlatformId;
-}>;
-
-
-export type AppDeploymentStatusQuery = { appDeploymentStatus: { appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string } | null };
-
 export type DeployAppMutationVariables = Exact<{
   input: DeployAppInput;
 }>;
@@ -966,15 +943,6 @@ export type AgentCostCardQueryVariables = Exact<{
 
 export type AgentCostCardQuery = { agentCostCard: { agentId: PlatformId, agentName: string, ownerId: PlatformId, ownerName: string, agents: Array<{ activeUsers: number, agentId: PlatformId, agentName: string, cacheCreationTokens: number, cacheReadTokens: number, debugCostUsd: number, evalCostUsd: number, inputTokens: number, outputTokens: number, ownerEmail: string | null, ownerId: PlatformId, ownerName: string, previousCostUsd: number | null, previewCostUsd: number, productionCostUsd: number, requestCount: number, scheduledCostUsd: number, totalCostUsd: number, unpricedRequestCount: number }>, daily: Array<{ activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, date: string, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number }>, models: Array<{ activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, cacheReadUsdPerMillion: number | null, cacheWriteUsdPerMillion: number | null, inputTokens: number, inputUsdPerMillion: number | null, model: string, outputTokens: number, outputUsdPerMillion: number | null, provider: string, requestCount: number, totalCostUsd: number, unpricedRequestCount: number, vendor: string }>, recentSessions: Array<{ actorEmail: string | null, actorName: string, cacheCreationTokens: number, cacheReadTokens: number, createdAt: string, inputTokens: number, model: string, outputTokens: number, provider: string, runPurpose: string, sessionId: PlatformId | null, sessionRunId: PlatformId | null, totalCostUsd: number }>, totals: { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number } } };
 
-export type OrganizationBillingCostCardQueryVariables = Exact<{
-  organizationId: PlatformId;
-  range: CostRange;
-  runPurposes?: Array<CostRunPurpose> | null | undefined;
-}>;
-
-
-export type OrganizationBillingCostCardQuery = { organizationBillingCostCard: { daily: Array<{ activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, date: string, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number }>, models: Array<{ activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, cacheReadUsdPerMillion: number | null, cacheWriteUsdPerMillion: number | null, inputTokens: number, inputUsdPerMillion: number | null, model: string, outputTokens: number, outputUsdPerMillion: number | null, provider: string, requestCount: number, totalCostUsd: number, unpricedRequestCount: number, vendor: string }>, previousTotals: { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number }, totals: { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number } } };
-
 export type EnvironmentPackageFieldsFragment = { manager: EnvironmentPackageManager, packages: Array<string> };
 
 export type EnvironmentVariableFieldsFragment = { key: string, preview: string, status: EnvironmentVariableStatus };
@@ -1013,13 +981,6 @@ export type UpdateEnvironmentMutationVariables = Exact<{
 
 
 export type UpdateEnvironmentMutation = { updateEnvironment: { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, appId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> } };
-
-export type CreateEnvironmentForkMutationVariables = Exact<{
-  input: CreateEnvironmentForkInput;
-}>;
-
-
-export type CreateEnvironmentForkMutation = { createEnvironmentFork: { allowMcpServers: boolean, allowPackageManagers: boolean, allowedHosts: Array<string>, canDelete: boolean, canEdit: boolean, createdAt: string, currentRevisionId: PlatformId, description: string, id: PlatformId, isBuiltIn: boolean, isDefault: boolean, isEditable: boolean, name: string, networkPolicy: EnvironmentNetworkPolicy, role: EnvironmentRegistryRole, setupScript: string, updatedAt: string, usedByAgentCount: number, appId: PlatformId, envVars: Array<{ key: string, preview: string, status: EnvironmentVariableStatus }>, forkOrigin: { environmentId: PlatformId, name: string, ownerName: string } | null, owner: { id: PlatformId | null, imageUrl: string | null, name: string | null }, packages: Array<{ manager: EnvironmentPackageManager, packages: Array<string> }> } };
 
 export type DeleteEnvironmentMutationVariables = Exact<{
   input: DeleteEnvironmentInput;
@@ -1188,15 +1149,6 @@ export type PrewarmAgentSessionMutationVariables = Exact<{
 
 export type PrewarmAgentSessionMutation = { prewarmAgentSession: { scheduledAt: string, sessionId: PlatformId } };
 
-export type SessionsQueryVariables = Exact<{
-  appId: PlatformId;
-  archived?: boolean | null | undefined;
-  type?: SessionType | null | undefined;
-}>;
-
-
-export type SessionsQuery = { sessionList: { nodes: Array<{ agentId: PlatformId, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, appId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null }> } };
-
 export type ThreadAgentSessionListQueryVariables = Exact<{
   appId: PlatformId;
   archived?: boolean | null | undefined;
@@ -1243,21 +1195,6 @@ export type AddSessionResourceMutationVariables = Exact<{
 
 
 export type AddSessionResourceMutation = { addSessionResource: { contentType: string, expectedSize: number, expiresAt: string, fileId: PlatformId, partSize: number | null, path: string, status: FileUploadStatus, strategy: FileUploadStrategy } };
-
-export type ListSessionResourcesQueryVariables = Exact<{
-  appId: PlatformId;
-  sessionId: PlatformId;
-}>;
-
-
-export type ListSessionResourcesQuery = { listSessionResources: Array<{ createdAt: string, id: PlatformId, kind: FileSessionKind, mimeType: string | null, name: string, path: string, size: number }> };
-
-export type RemoveSessionResourceMutationVariables = Exact<{
-  input: RemoveSessionResourceInput;
-}>;
-
-
-export type RemoveSessionResourceMutation = { removeSessionResource: { ok: boolean } };
 
 export type SessionProcessEventsQueryVariables = Exact<{
   limit: number;
@@ -1313,13 +1250,6 @@ export type UpdateProfileMutationVariables = Exact<{
 
 
 export type UpdateProfileMutation = { updateProfile: { imageUrl: string | null, name: string } };
-
-export type SetSystemAgentModelMutationVariables = Exact<{
-  input: SetSystemAgentModelInput;
-}>;
-
-
-export type SetSystemAgentModelMutation = { setSystemAgentModel: { id: PlatformId, systemAgentModel: { modelId: string, vendor: string } | null } };
 
 export type VendorCredentialListQueryVariables = Exact<{
   appId: PlatformId;
@@ -2725,25 +2655,6 @@ export const AppDeploymentOverviewDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AppDeploymentOverviewQuery, AppDeploymentOverviewQueryVariables>;
-export const AppDeploymentStatusDocument = new TypedDocumentString(`
-    query AppDeploymentStatus($appId: ULID!) {
-  appDeploymentStatus(appId: $appId) {
-    appId
-    createdAt
-    deploymentId
-    errorCode
-    errorMessage
-    id
-    liveUrl
-    plannedUrl
-    sourceBranch
-    sourceCommitSha
-    status
-    targetKind
-    updatedAt
-  }
-}
-    `) as unknown as TypedDocumentString<AppDeploymentStatusQuery, AppDeploymentStatusQueryVariables>;
 export const DeployAppDocument = new TypedDocumentString(`
     mutation DeployApp($input: DeployAppInput!) {
   deployApp(input: $input) {
@@ -2972,65 +2883,6 @@ fragment CostRecentSessionFields on CostRecentSession {
   sessionRunId
   totalCostUsd
 }`) as unknown as TypedDocumentString<AgentCostCardQuery, AgentCostCardQueryVariables>;
-export const OrganizationBillingCostCardDocument = new TypedDocumentString(`
-    query OrganizationBillingCostCard($organizationId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
-  organizationBillingCostCard(
-    organizationId: $organizationId
-    range: $range
-    runPurposes: $runPurposes
-  ) {
-    daily {
-      ...CostDailyFields
-    }
-    models {
-      ...CostModelFields
-    }
-    previousTotals {
-      ...CostTotalsFields
-    }
-    totals {
-      ...CostTotalsFields
-    }
-  }
-}
-    fragment CostTotalsFields on CostAggregate {
-  activeUsers
-  cacheCreationTokens
-  cacheReadTokens
-  inputTokens
-  outputTokens
-  requestCount
-  totalCostUsd
-  unpricedRequestCount
-}
-fragment CostDailyFields on CostDailyPoint {
-  activeUsers
-  cacheCreationTokens
-  cacheReadTokens
-  date
-  inputTokens
-  outputTokens
-  requestCount
-  totalCostUsd
-  unpricedRequestCount
-}
-fragment CostModelFields on CostModelRow {
-  activeUsers
-  cacheCreationTokens
-  cacheReadTokens
-  cacheReadUsdPerMillion
-  cacheWriteUsdPerMillion
-  inputTokens
-  inputUsdPerMillion
-  model
-  outputTokens
-  outputUsdPerMillion
-  provider
-  requestCount
-  totalCostUsd
-  unpricedRequestCount
-  vendor
-}`) as unknown as TypedDocumentString<OrganizationBillingCostCardQuery, OrganizationBillingCostCardQueryVariables>;
 export const AppEnvironmentsDocument = new TypedDocumentString(`
     query AppEnvironments($appId: ULID!) {
   appEnvironmentList(appId: $appId) {
@@ -3251,61 +3103,6 @@ fragment EnvironmentDetailFields on EnvironmentDetail {
   usedByAgentCount
   appId
 }`) as unknown as TypedDocumentString<UpdateEnvironmentMutation, UpdateEnvironmentMutationVariables>;
-export const CreateEnvironmentForkDocument = new TypedDocumentString(`
-    mutation CreateEnvironmentFork($input: CreateEnvironmentForkInput!) {
-  createEnvironmentFork(input: $input) {
-    ...EnvironmentSummaryFields
-  }
-}
-    fragment EnvironmentPackageFields on EnvironmentPackageSpec {
-  manager
-  packages
-}
-fragment EnvironmentVariableFields on EnvironmentVariablePreview {
-  key
-  preview
-  status
-}
-fragment EnvironmentOwnerFields on EnvironmentOwnerSummary {
-  id
-  imageUrl
-  name
-}
-fragment EnvironmentSummaryFields on EnvironmentSummary {
-  allowMcpServers
-  allowPackageManagers
-  allowedHosts
-  canDelete
-  canEdit
-  createdAt
-  currentRevisionId
-  description
-  envVars {
-    ...EnvironmentVariableFields
-  }
-  forkOrigin {
-    environmentId
-    name
-    ownerName
-  }
-  id
-  isBuiltIn
-  isDefault
-  isEditable
-  name
-  networkPolicy
-  owner {
-    ...EnvironmentOwnerFields
-  }
-  packages {
-    ...EnvironmentPackageFields
-  }
-  role
-  setupScript
-  updatedAt
-  usedByAgentCount
-  appId
-}`) as unknown as TypedDocumentString<CreateEnvironmentForkMutation, CreateEnvironmentForkMutationVariables>;
 export const DeleteEnvironmentDocument = new TypedDocumentString(`
     mutation DeleteEnvironment($input: DeleteEnvironmentInput!) {
   deleteEnvironment(input: $input) {
@@ -3894,50 +3691,6 @@ export const PrewarmAgentSessionDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<PrewarmAgentSessionMutation, PrewarmAgentSessionMutationVariables>;
-export const SessionsDocument = new TypedDocumentString(`
-    query Sessions($appId: ULID!, $archived: Boolean, $type: SessionType) {
-  sessionList(appId: $appId, archived: $archived, type: $type) {
-    nodes {
-      agentId
-      archivedAt
-      createdAt
-      deploymentVersionId
-      deploymentVersionNumber
-      id
-      kind
-      lastMessageAt
-      lastRun {
-        completedAt
-        createdAt
-        deploymentVersionId
-        deploymentVersionNumber
-        error {
-          code
-          details
-          message
-          retryable
-        }
-        id
-        model
-        provider
-        startedAt
-        status
-        traceId
-        trigger
-        updatedAt
-      }
-      model
-      provider
-      appId
-      runtimeId
-      status
-      title
-      type
-      updatedAt
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<SessionsQuery, SessionsQueryVariables>;
 export const ThreadAgentSessionListDocument = new TypedDocumentString(`
     query ThreadAgentSessionList($appId: ULID!, $archived: Boolean, $type: SessionType) {
   threadAgentSessionList(appId: $appId, archived: $archived, type: $type) {
@@ -4031,26 +3784,6 @@ export const AddSessionResourceDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AddSessionResourceMutation, AddSessionResourceMutationVariables>;
-export const ListSessionResourcesDocument = new TypedDocumentString(`
-    query ListSessionResources($appId: ULID!, $sessionId: ULID!) {
-  listSessionResources(appId: $appId, sessionId: $sessionId) {
-    createdAt
-    id
-    kind
-    mimeType
-    name
-    path
-    size
-  }
-}
-    `) as unknown as TypedDocumentString<ListSessionResourcesQuery, ListSessionResourcesQueryVariables>;
-export const RemoveSessionResourceDocument = new TypedDocumentString(`
-    mutation RemoveSessionResource($input: RemoveSessionResourceInput!) {
-  removeSessionResource(input: $input) {
-    ok
-  }
-}
-    `) as unknown as TypedDocumentString<RemoveSessionResourceMutation, RemoveSessionResourceMutationVariables>;
 export const SessionProcessEventsDocument = new TypedDocumentString(`
     query SessionProcessEvents($limit: Int!, $appId: ULID!, $sessionId: ULID!) {
   threadSessionProcessEvents(limit: $limit, appId: $appId, sessionId: $sessionId) {
@@ -4206,17 +3939,6 @@ export const UpdateProfileDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<UpdateProfileMutation, UpdateProfileMutationVariables>;
-export const SetSystemAgentModelDocument = new TypedDocumentString(`
-    mutation SetSystemAgentModel($input: SetSystemAgentModelInput!) {
-  setSystemAgentModel(input: $input) {
-    id
-    systemAgentModel {
-      modelId
-      vendor
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<SetSystemAgentModelMutation, SetSystemAgentModelMutationVariables>;
 export const VendorCredentialListDocument = new TypedDocumentString(`
     query VendorCredentialList($appId: ULID!) {
   vendorCredentialList(appId: $appId) {

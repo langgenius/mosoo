@@ -54,6 +54,7 @@ interface AppSessionContextValue {
 }
 
 const AppSessionContext = createContext<AppSessionContextValue | null>(null);
+const EMPTY_APPS: AppSummary[] = [];
 const EMPTY_ORGANIZATIONS: OrganizationSummary[] = [];
 
 function toSessionUser(account: AccountProfile | null): SessionUser | null {
@@ -92,7 +93,7 @@ export function AppSessionProvider({ children }: { children: ReactNode }) {
   const organizations = useMemo(() => viewer?.organizations ?? EMPTY_ORGANIZATIONS, [viewer]);
   const activeOrganization = viewer?.activeOrganization ?? null;
   const appsQuery = useOrganizationAppsQuery(activeOrganization?.id ?? null);
-  const apps = activeOrganization === null ? [] : (appsQuery.data ?? []);
+  const apps = activeOrganization === null ? EMPTY_APPS : (appsQuery.data ?? EMPTY_APPS);
   const [selectedAppId, setSelectedAppId] = useState<string | null>(readSelectedAppId);
   const activeApp = resolveActiveApp(apps, selectedAppId);
   const setActiveApp = useCallback((appId: string) => {

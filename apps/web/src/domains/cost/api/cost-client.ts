@@ -1,11 +1,10 @@
-import type { AgentId, OrganizationId, AppId } from "@mosoo/contracts/id";
+import type { AgentId, AppId } from "@mosoo/contracts/id";
 
 import type {
   AgentCostCardQuery,
   CostAgentFieldsFragment,
   CostAttributionFieldsFragment,
   CostRecentSessionFieldsFragment,
-  OrganizationBillingCostCardQuery,
   AppCostCardQuery,
 } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
@@ -17,16 +16,11 @@ import {
   toAppId,
 } from "@/routes/typed-id";
 
-import {
-  AGENT_COST_QUERY,
-  ORGANIZATION_BILLING_COST_QUERY,
-  APP_COST_QUERY,
-} from "./cost-graphql-documents";
+import { AGENT_COST_QUERY, APP_COST_QUERY } from "./cost-graphql-documents";
 import type {
   AgentCostCard,
   CostAgentRow,
   CostAttributionCard,
-  OrganizationBillingCostCard,
   CostRangeInput,
   CostRecentSession,
   CostRunPurpose,
@@ -80,17 +74,6 @@ function toAppCostCard(card: AppCostCardQuery["appCostCard"]): AppCostCard {
   };
 }
 
-function toOrganizationBillingCostCard(
-  card: OrganizationBillingCostCardQuery["organizationBillingCostCard"],
-): OrganizationBillingCostCard {
-  return {
-    daily: card.daily,
-    models: card.models,
-    previousTotals: card.previousTotals,
-    totals: card.totals,
-  };
-}
-
 function toAgentCostCard(card: AgentCostCardQuery["agentCostCard"]): AgentCostCard {
   return {
     ...toCostAttributionCard(card),
@@ -112,19 +95,6 @@ export async function fetchAppCost(
     runPurposes: runPurposes.length > 0 ? runPurposes : null,
   });
   return toAppCostCard(payload.appCostCard);
-}
-
-export async function fetchOrganizationBillingCost(
-  organizationId: OrganizationId,
-  range: CostRangeInput,
-  runPurposes: CostRunPurpose[] = [],
-): Promise<OrganizationBillingCostCard> {
-  const payload = await requestGraphQL(ORGANIZATION_BILLING_COST_QUERY, {
-    organizationId,
-    range,
-    runPurposes: runPurposes.length > 0 ? runPurposes : null,
-  });
-  return toOrganizationBillingCostCard(payload.organizationBillingCostCard);
 }
 
 export async function fetchAgentCost(input: {

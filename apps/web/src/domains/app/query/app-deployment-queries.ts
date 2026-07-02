@@ -13,11 +13,10 @@ import {
   deleteAppDeployment,
   deployApp,
   getAppDeploymentOverview,
-  getAppDeploymentStatus,
 } from "../api/app-deployment-client";
 import type { AppDeploymentOverview } from "../api/app-deployment-client";
 
-export const appDeploymentKeys = {
+const appDeploymentKeys = {
   all: ["app-deployment"] as const,
   missingOverview: () => [...appDeploymentKeys.overviews(), "missing"] as const,
   missingStatus: () => [...appDeploymentKeys.statuses(), "missing"] as const,
@@ -59,17 +58,6 @@ export function useAppDeploymentOverviewQuery(
       appId !== null ? appDeploymentKeys.overview(appId) : appDeploymentKeys.missingOverview(),
     refetchInterval: (query) =>
       isDeploymentRunInFlight(query.state.data?.deployment?.latestRun?.status) ? 2_500 : false,
-  });
-}
-
-export function useAppDeploymentStatusQuery(
-  appId: string | null,
-): UseQueryResult<AppDeploymentRun | null> {
-  return useQuery<AppDeploymentRun | null>({
-    enabled: appId !== null,
-    queryFn: async () => getAppDeploymentStatus(toAppId(requireAppId(appId))),
-    queryKey: appId !== null ? appDeploymentKeys.status(appId) : appDeploymentKeys.missingStatus(),
-    refetchInterval: (query) => (isDeploymentRunInFlight(query.state.data?.status) ? 2_500 : false),
   });
 }
 

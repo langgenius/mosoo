@@ -173,30 +173,3 @@ export const AGENT_COST_QUERY = graphql(/* GraphQL */ `
     }
   }
 `);
-
-export const ORGANIZATION_BILLING_COST_QUERY = graphql(/* GraphQL */ `
-  query OrganizationBillingCostCard(
-    $organizationId: ULID!
-    $range: CostRange!
-    $runPurposes: [CostRunPurpose!]
-  ) {
-    organizationBillingCostCard(
-      organizationId: $organizationId
-      range: $range
-      runPurposes: $runPurposes
-    ) {
-      daily {
-        ...CostDailyFields
-      }
-      models {
-        ...CostModelFields
-      }
-      previousTotals {
-        ...CostTotalsFields
-      }
-      totals {
-        ...CostTotalsFields
-      }
-    }
-  }
-`);

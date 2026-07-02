@@ -46,7 +46,7 @@
     "knip": "^6.21.0",
     "react-doctor": "0.5.8",
     "tsx": "^4.22.4",
-    "vite-plus": "^0.1.23"
+    "vite-plus": "^0.1.24"
   },
   "engines": {
     "bun": ">=1.4.0-canary.1"

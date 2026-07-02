@@ -35,7 +35,7 @@ export function ModelPickerField({
   const runtimeId = model.draft.runtime;
   const currentModelId = model.draft.model === "" ? null : model.draft.model;
   const currentVendorId = model.draft.provider === "" ? null : model.draft.provider;
-  const entriesQuery = useQuery({
+  const { data: entries = [], isLoading: loading } = useQuery({
     queryFn: async () =>
       listAvailableAgentModels({
         currentModelId,
@@ -45,8 +45,6 @@ export function ModelPickerField({
       }),
     queryKey: ["available-agent-models", appId, runtimeId, currentModelId, currentVendorId],
   });
-  const entries = entriesQuery.data ?? [];
-  const loading = entriesQuery.isLoading;
   const pickerEntries = listModelPickerEntries(entries, currentModelId, currentVendorId);
   const currentEntry = findCurrentModelEntry(entries, currentModelId, currentVendorId);
   const hasAvailable = entries.some((entry) => entry.available);

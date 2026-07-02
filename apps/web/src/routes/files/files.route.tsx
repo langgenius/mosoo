@@ -30,6 +30,14 @@ const SESSION_KIND_OPTIONS: { label: string; value: SessionKindFilter }[] = [
   { label: "Attachments", value: "attachment" },
   { label: "Artifacts", value: "artifact" },
 ];
+const EMPTY_FILES: FileEntry[] = [];
+const FILE_UPDATED_AT_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  month: "short",
+  year: "numeric",
+});
 
 function SegmentedButtonGroup<T extends string>({
   label,
@@ -112,13 +120,7 @@ function formatBytes(size: number): string {
 }
 
 function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
+  return FILE_UPDATED_AT_FORMATTER.format(new Date(value));
 }
 
 function formatFileCategory(file: FileEntry): string {
@@ -209,7 +211,11 @@ export function FilesPage(): ReactElement {
   const [sessionKind, setSessionKind] = useState<SessionKindFilter>("all");
   const [search, setSearch] = useState("");
   const normalizedSessionId = sessionId.trim();
-  const sessionOptionsQuery = useQuery({
+  const {
+    data: sessionOptions = [],
+    error: sessionOptionsError,
+    isLoading: sessionOptionsLoading,
+  } = useQuery({
     enabled: activeAppId !== null,
     queryFn: async () => {
       if (activeAppId === null) {
@@ -220,7 +226,13 @@ export function FilesPage(): ReactElement {
     },
     queryKey: [...fileKeys.all, "session-options", activeAppId],
   });
-  const filesQuery = useQuery({
+  const {
+    data: fileList,
+    error: filesError,
+    isFetching: filesFetching,
+    isLoading: filesLoading,
+    refetch: refetchFiles,
+  } = useQuery({
     enabled: activeAppId !== null,
     queryFn: async () => {
       if (activeAppId === null) {
@@ -231,7 +243,7 @@ export function FilesPage(): ReactElement {
     },
     queryKey: [...fileKeys.lists(), activeAppId, normalizedSessionId, sessionKind],
   });
-  const files = filesQuery.data?.files ?? [];
+  const files = fileList?.files ?? EMPTY_FILES;
   const filteredFiles = useMemo(
     () => files.filter((file) => matchesSearch(file, search)),
     [files, search],
@@ -241,14 +253,14 @@ export function FilesPage(): ReactElement {
     <div className="bg-background flex h-full flex-1 flex-col overflow-hidden">
       <PageHeader title="Files" description="App files, Thread attachments, and runtime artifacts.">
         <Button
-          disabled={filesQuery.isFetching}
+          disabled={filesFetching}
           onClick={() => {
-            void filesQuery.refetch();
+            void refetchFiles();
           }}
           size="sm"
           variant="outline"
         >
-          <RefreshCw className={cn("size-3.5", filesQuery.isFetching && "animate-spin")} />
+          <RefreshCw className={cn("size-3.5", filesFetching && "animate-spin")} />
           Refresh
         </Button>
       </PageHeader>
@@ -257,18 +269,14 @@ export function FilesPage(): ReactElement {
         <select
           aria-label="Thread filter"
           className="bg-card border-border-strong text-fg-2 focus:border-ring h-8 min-w-[220px] rounded-md border px-2 text-[12.5px] transition-colors outline-none"
-          disabled={sessionOptionsQuery.isLoading || sessionOptionsQuery.error !== null}
+          disabled={sessionOptionsLoading || sessionOptionsError !== null}
           onChange={(event) => {
             setSessionId(event.target.value);
           }}
-          value={
-            sessionOptionsQuery.data?.some((entry) => entry.session.id === sessionId)
-              ? sessionId
-              : ""
-          }
+          value={sessionOptions.some((entry) => entry.session.id === sessionId) ? sessionId : ""}
         >
           <option value="">All files</option>
-          {(sessionOptionsQuery.data ?? []).map((entry) => (
+          {sessionOptions.map((entry) => (
             <option key={entry.session.id} value={entry.session.id}>
               {entry.session.title ?? entry.session.id}
             </option>
@@ -299,11 +307,11 @@ export function FilesPage(): ReactElement {
       </ListPageToolbar>
 
       <ListPageContent className="space-y-3">
-        {filesQuery.error ? (
+        {filesError ? (
           <div className="text-destructive border-destructive/20 bg-destructive/[0.06] rounded-md border px-3 py-2 text-[13px]">
-            {filesQuery.error instanceof Error ? filesQuery.error.message : "Failed to load files."}
+            {filesError instanceof Error ? filesError.message : "Failed to load files."}
           </div>
-        ) : filesQuery.isLoading ? (
+        ) : filesLoading ? (
           <div className="text-fg-3 py-12 text-center text-[13px]">Loading files...</div>
         ) : filteredFiles.length === 0 ? (
           <EmptyState

@@ -1,5 +1,4 @@
 import type {
-  CreateEnvironmentForkInput,
   CreateEnvironmentInput,
   DeleteEnvironmentInput,
   EnvironmentDetail,
@@ -182,14 +181,6 @@ const UPDATE_ENVIRONMENT_MUTATION = graphql(/* GraphQL */ `
   }
 `);
 
-const CREATE_ENVIRONMENT_FORK_MUTATION = graphql(/* GraphQL */ `
-  mutation CreateEnvironmentFork($input: CreateEnvironmentForkInput!) {
-    createEnvironmentFork(input: $input) {
-      ...EnvironmentSummaryFields
-    }
-  }
-`);
-
 const DELETE_ENVIRONMENT_MUTATION = graphql(/* GraphQL */ `
   mutation DeleteEnvironment($input: DeleteEnvironmentInput!) {
     deleteEnvironment(input: $input) {
@@ -229,13 +220,6 @@ export async function createEnvironment(
 export async function updateEnvironment(input: UpdateEnvironmentInput): Promise<EnvironmentDetail> {
   const payload = await requestGraphQL(UPDATE_ENVIRONMENT_MUTATION, { input });
   return toEnvironmentDetail(payload.updateEnvironment);
-}
-
-export async function createEnvironmentFork(
-  input: CreateEnvironmentForkInput,
-): Promise<EnvironmentSummary> {
-  const payload = await requestGraphQL(CREATE_ENVIRONMENT_FORK_MUTATION, { input });
-  return toEnvironmentSummary(payload.createEnvironmentFork);
 }
 
 export async function deleteEnvironment(input: DeleteEnvironmentInput): Promise<void> {

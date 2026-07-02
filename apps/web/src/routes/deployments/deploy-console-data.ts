@@ -84,7 +84,7 @@ export const DEPLOY_APP_IDENTITY = {
   workerName: "roadmap-board-7f3",
 } as const;
 
-export const DEPLOY_CONSOLE_AGENTS: BoundAgentVM[] = [
+const DEPLOY_CONSOLE_AGENTS: BoundAgentVM[] = [
   {
     id: "agt_3kf",
     name: "roadmap",

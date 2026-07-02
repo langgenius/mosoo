@@ -1,5 +1,5 @@
 import type { SkillInspectResult } from "@mosoo/contracts/skill";
-import { useRef, useState } from "react";
+import { useReducer, useRef } from "react";
 
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
@@ -21,6 +21,60 @@ type Prepared =
   | { kind: "file"; file: File; preview: SkillInspectResult }
   | { kind: "url"; url: string; preview: SkillInspectResult };
 
+interface UploadSkillState {
+  dragOver: boolean;
+  error: string | null;
+  inspecting: boolean;
+  mode: Mode;
+  prepared: Prepared | null;
+  submitting: boolean;
+  url: string;
+}
+
+type UploadSkillAction =
+  | { type: "clearError" }
+  | { type: "inspectUrlStart" }
+  | { type: "prepare"; prepared: Prepared }
+  | { type: "reset" }
+  | { type: "setDragOver"; dragOver: boolean }
+  | { type: "setError"; error: string }
+  | { type: "setMode"; mode: Mode }
+  | { type: "setSubmitting"; submitting: boolean }
+  | { type: "setUrl"; url: string };
+
+const UPLOAD_SKILL_INITIAL_STATE: UploadSkillState = {
+  dragOver: false,
+  error: null,
+  inspecting: false,
+  mode: "file",
+  prepared: null,
+  submitting: false,
+  url: "",
+};
+
+function uploadSkillReducer(state: UploadSkillState, action: UploadSkillAction): UploadSkillState {
+  switch (action.type) {
+    case "clearError":
+      return { ...state, error: null };
+    case "inspectUrlStart":
+      return { ...state, error: null, inspecting: true };
+    case "prepare":
+      return { ...state, error: null, inspecting: false, prepared: action.prepared };
+    case "reset":
+      return UPLOAD_SKILL_INITIAL_STATE;
+    case "setDragOver":
+      return { ...state, dragOver: action.dragOver };
+    case "setError":
+      return { ...state, error: action.error, inspecting: false, submitting: false };
+    case "setMode":
+      return { ...state, error: null, mode: action.mode };
+    case "setSubmitting":
+      return { ...state, submitting: action.submitting };
+    case "setUrl":
+      return { ...state, url: action.url };
+  }
+}
+
 interface Props {
   onOpenChange: (open: boolean) => void;
   onUpload: (file: File) => Promise<void> | void;
@@ -31,22 +85,11 @@ interface Props {
 
 export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, registry }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [mode, setMode] = useState<Mode>("file");
-  const [url, setUrl] = useState("");
-  const [dragOver, setDragOver] = useState(false);
-  const [prepared, setPrepared] = useState<Prepared | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [inspecting, setInspecting] = useState(false);
+  const [state, dispatch] = useReducer(uploadSkillReducer, UPLOAD_SKILL_INITIAL_STATE);
+  const { dragOver, error, inspecting, mode, prepared, submitting, url } = state;
 
   function reset() {
-    setMode("file");
-    setUrl("");
-    setPrepared(null);
-    setError(null);
-    setDragOver(false);
-    setSubmitting(false);
-    setInspecting(false);
+    dispatch({ type: "reset" });
     if (inputRef.current) {
       inputRef.current.value = "";
     }
@@ -60,7 +103,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
   }
 
   async function handleFiles(files: FileList | null) {
-    setError(null);
+    dispatch({ type: "clearError" });
     if (!files || files.length === 0) {
       return;
     }
@@ -72,22 +115,24 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
         throw new Error("Skill inspect service is unavailable.");
       }
 
-      setPrepared({ kind: "file", file, preview });
+      dispatch({ prepared: { kind: "file", file, preview }, type: "prepare" });
     } catch (caughtError) {
-      setError(
-        "Failed to inspect: " +
+      dispatch({
+        error:
+          "Failed to inspect: " +
           (caughtError instanceof Error ? caughtError.message : String(caughtError)),
-      );
+        type: "setError",
+      });
     }
   }
 
   async function handleInspectUrl() {
     const trimmed = url.trim();
-    setError(null);
     if (!trimmed) {
+      dispatch({ type: "clearError" });
       return;
     }
-    setInspecting(true);
+    dispatch({ type: "inspectUrlStart" });
     try {
       const preview = registry ? await registry.inspectGithub(trimmed) : null;
 
@@ -95,14 +140,14 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
         throw new Error("Skill inspect service is unavailable.");
       }
 
-      setPrepared({ kind: "url", url: trimmed, preview });
+      dispatch({ prepared: { kind: "url", preview, url: trimmed }, type: "prepare" });
     } catch (caughtError) {
-      setError(
-        "Failed to inspect: " +
+      dispatch({
+        error:
+          "Failed to inspect: " +
           (caughtError instanceof Error ? caughtError.message : String(caughtError)),
-      );
-    } finally {
-      setInspecting(false);
+        type: "setError",
+      });
     }
   }
 
@@ -110,7 +155,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
     if (!prepared) {
       return;
     }
-    setSubmitting(true);
+    dispatch({ submitting: true, type: "setSubmitting" });
     try {
       if (prepared.kind === "file") {
         await onUpload(prepared.file);
@@ -119,11 +164,12 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
       }
       handleOpenChange(false);
     } catch (caughtError) {
-      setError(
-        "Failed to add skill: " +
+      dispatch({
+        error:
+          "Failed to add skill: " +
           (caughtError instanceof Error ? caughtError.message : String(caughtError)),
-      );
-      setSubmitting(false);
+        type: "setError",
+      });
     }
   }
 
@@ -154,8 +200,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
               active={mode === "file"}
               label="Upload file"
               onClick={() => {
-                setError(null);
-                setMode("file");
+                dispatch({ mode: "file", type: "setMode" });
               }}
             />
             <span className="bg-border-strong h-5 w-px" />
@@ -163,8 +208,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
               active={mode === "url"}
               label="From URL"
               onClick={() => {
-                setError(null);
-                setMode("url");
+                dispatch({ mode: "url", type: "setMode" });
               }}
             />
           </div>
@@ -205,14 +249,14 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
             )}
             onDragOver={(e) => {
               e.preventDefault();
-              setDragOver(true);
+              dispatch({ dragOver: true, type: "setDragOver" });
             }}
             onDragLeave={() => {
-              setDragOver(false);
+              dispatch({ dragOver: false, type: "setDragOver" });
             }}
             onDrop={(e) => {
               e.preventDefault();
-              setDragOver(false);
+              dispatch({ dragOver: false, type: "setDragOver" });
               void handleFiles(e.dataTransfer.files);
             }}
             onClick={() => inputRef.current?.click()}
@@ -230,7 +274,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
                 placeholder="https://github.com/owner/repo or npx skills add … --skill name"
                 aria-label="Skill source URL or install command"
                 onChange={(e) => {
-                  setUrl(e.target.value);
+                  dispatch({ type: "setUrl", url: e.target.value });
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
