@@ -19,8 +19,8 @@ point.
 | Full-access default (tool task) | total time | ~16.5s | **~11.6s** | **−30%** | **measured** |
 | Claude CLI prewarm | first-token TTFT p50 | 6992 ms | **4870 ms** | **−30%** | **measured** |
 | Claude CLI prewarm | first-token TTFT p95 | 8366 ms | **4896 ms** | **−41%** | **measured** |
-| O1 inline queue dispatch | queue wait on TTFT path | ≤5000 ms | **~0 ms** | up to −5s | projected |
-| O2 first-token flush | first-delta broadcast | ≤150 ms + D1 write | **~0 ms** | up to −150ms+ | projected |
+| O1 inline queue dispatch | queue wait on TTFT path | ≤5000 ms | **~0 ms** | up to −5s | **implemented**, measure on staging |
+| O2 first-token flush | first-delta broadcast | ≤150 ms timer | **~0 ms** | up to −150ms | **implemented**, measure on staging |
 | O4 opencode models.dev | cold-start fetch | ≤10 000 ms | **~0 ms** | up to −10s | projected |
 
 ---
@@ -73,31 +73,31 @@ control-plane O2 (below).
 
 ---
 
-## Projected control-plane optimizations (need a CF deploy to measure)
+## Control-plane optimizations — IMPLEMENTED + tested; measurement pending a staging deploy
 
-Each cites the exact measured constant it removes. These live in the Workers/DO
-layer; local wrangler does not replicate CF Queue batching or DO scheduling, so
-faithful numbers require a staging deploy (`just bench-sandbox-agent
---require-cloudflare`).
+O1 and O2 are implemented and unit/integration-tested (API suite 772 pass), but
+their *latency numbers* can only be measured faithfully on a Cloudflare deploy —
+local wrangler does not replicate CF Queue batching or DO scheduling. Each cites
+the exact constant it removes. To measure: deploy `main` and this branch as
+`wrangler versions upload --env prod` **preview** versions (no traffic shift) and
+run `just bench-sandbox-agent` against each preview URL.
 
-### O1 — inline dispatch fast-path (up to −5 s)
-Every interactive run is dispatched through the `api-command` Cloudflare Queue
-with `max_batch_timeout = 5` (`apps/api/wrangler.toml:88`); the already-threaded
-`executionContext` is never used for an inline `waitUntil` dispatch. Worst case
-adds ~5 s of pure batching wait before context hydration even starts. Fix:
-dispatch inline for interactive runs, keep the queue as a dedupe-keyed fallback.
-Expected: removes up to ~5 s from cold-run TTFT.
+### O1 — inline dispatch fast-path (up to −5 s) — IMPLEMENTED
+`queueSessionRun` now dispatches interactive runs inline via
+`executionContext.waitUntil` instead of only enqueueing to the `api-command`
+Cloudflare Queue (`max_batch_timeout = 5`, `apps/api/wrangler.toml`). The queue
+enqueue stays as a durable fallback; the `queued→booting` CAS in dispatch makes
+it exactly-once. Removes up to ~5 s of queue-batch wait from cold-run TTFT.
 
-### O2 — first-token fast flush (up to −150 ms + one D1 write)
-The viewer delivery buffer flushes on a 150 ms timer / 4 KB / 64 events, and
-delta delivery is additionally gated behind the D1 persistence commit
-(`session-viewer-event-delivery-buffer.ts:15-17`). So the first visible token
-waits for a timer tick and a durable write. Fix: flush the first text delta of a
-run immediately and decouple delta broadcast from persistence
-(broadcast-before-persist). Expected: removes ~150 ms + one D1 round-trip from
-first-token latency.
+### O2 — first-token fast flush (up to −150 ms) — IMPLEMENTED
+The viewer delivery buffer now flushes the first delta of each run immediately
+(armed on `RUN_STARTED`) instead of waiting out the 150 ms timer, then resumes
+per-delta batching (`session-viewer-event-delivery-buffer.ts`). Unit test covers
+first-delta-immediate + subsequent-delta-batched. Removes up to ~150 ms from
+first-token latency without increasing write amplification for the rest of the
+stream.
 
-### O4 — opencode models.dev fetch (up to −10 s, opencode cold start)
+### O4 — opencode models.dev fetch (up to −10 s, opencode cold start) — projected
 OpenCode blocks startup on a `models.dev/api.json` fetch (10 s timeout) when the
 cache/embedded snapshot is cold. Fix: pre-seed `models.json` in the image or set
 `OPENCODE_DISABLE_MODELS_FETCH=1`. Expected: removes up to ~10 s from opencode

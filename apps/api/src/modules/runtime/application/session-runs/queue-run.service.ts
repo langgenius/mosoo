@@ -13,13 +13,13 @@ import { logError, logInfo } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { toIsoString } from "../../../../time";
 import { enqueueSessionRunDispatchCommand } from "../../../api-command/application/api-command-enqueue";
-import { dispatchQueuedSessionRun } from "./dispatch-queued-run.service";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { fileStore } from "../../../files/application/file-store";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { insertSessionMessageRecord } from "../../../sessions/application/session-message-write.service";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import { createSessionRunRecordIfSessionIdle } from "../../infrastructure/session-runs/session-run-store.repository";
+import { dispatchQueuedSessionRun } from "./dispatch-queued-run.service";
 import { createQueuedSessionRunRuntimeEvents } from "./session-run-view-events.service";
 import { reconcileStaleActiveSessionRun } from "./stale-run-reconciliation.service";
 
