@@ -3,7 +3,12 @@ import type { AgentKind, AgentReadiness } from "@mosoo/contracts/agent";
 import type { AccountId, AgentId, SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
 import { getSessionOrganizationPath, getSessionRuntimeStatePath } from "agent-driver/paths";
 
-import type { DriverConfigRevision, DriverProfileConfig } from "../domain/driver-snapshot";
+import type {
+  DriverConfigRevision,
+  DriverPermissionPolicy,
+  DriverProfileConfig,
+} from "../domain/driver-snapshot";
+import { DEFAULT_DRIVER_PERMISSION_POLICY } from "../domain/driver-snapshot";
 import { getSupportedRuntimeId } from "../domain/runtime-config";
 import { resolveAgentRuntimeSandboxSubject } from "../domain/runtime-sandbox-subject";
 
@@ -16,6 +21,7 @@ export function createAgentRuntimeProfile(input: {
   executionOwnerUserId: AccountId;
   kind: AgentKind;
   model: string;
+  permissionPolicy?: DriverPermissionPolicy;
   prompt: string;
   provider: string;
   providerOptions: JsonObject;
@@ -41,6 +47,7 @@ export function createAgentRuntimeProfile(input: {
     envVars: input.envVars,
     kind: input.kind,
     model: input.model,
+    permissionPolicy: input.permissionPolicy ?? DEFAULT_DRIVER_PERMISSION_POLICY,
     prompt: input.prompt,
     provider: input.provider,
     providerOptions: input.providerOptions,

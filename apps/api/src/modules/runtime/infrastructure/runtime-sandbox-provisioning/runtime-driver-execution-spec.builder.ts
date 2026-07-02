@@ -185,6 +185,7 @@ export async function buildExecutionSpec(
       variables: { ...input.profile.envVars },
     },
     model: input.profile.model,
+    permissionPolicy: input.profile.permissionPolicy,
     profilePrompt: appendRuntimeArtifactContextToPrompt(input.profile.prompt),
     provider: input.profile.provider,
     providerOptions: input.profile.providerOptions,
