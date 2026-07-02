@@ -9,10 +9,11 @@ import type {
   SessionId,
 } from "@mosoo/id";
 
-import { logInfo } from "../../../../platform/cloudflare/logger";
+import { logError, logInfo } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { toIsoString } from "../../../../time";
 import { enqueueSessionRunDispatchCommand } from "../../../api-command/application/api-command-enqueue";
+import { dispatchQueuedSessionRun } from "./dispatch-queued-run.service";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { fileStore } from "../../../files/application/file-store";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
@@ -157,11 +158,42 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     ...(input.accessViewer ? { accessViewer: input.accessViewer } : {}),
   });
 
+  // O1: dispatch inline via waitUntil so an interactive run does not wait for
+  // the api-command queue's batch window (max_batch_timeout = 5s). The queue
+  // enqueue above stays as the durable fallback if the worker is evicted before
+  // waitUntil runs; the queued->booting CAS inside dispatch makes this
+  // exactly-once (whichever path wins, the other logs dispatch.skipped).
+  if (request.executionContext) {
+    const inlineDispatch = dispatchQueuedSessionRun({
+      bindings,
+      input: {
+        attachmentIds: input.attachmentIds,
+        prompt: input.prompt,
+        queuedAtMs,
+        session: { id: input.session.id, app_id: input.session.app_id },
+        sessionRunId: createdRun.id,
+        traceId: createdRun.traceId,
+        ...(input.accessViewer ? { accessViewer: input.accessViewer } : {}),
+      },
+      requestUrl,
+      viewer,
+    }).catch((error: unknown) => {
+      logError("session.run.inline_dispatch.failed", {
+        message: error instanceof Error ? error.message : String(error),
+        runId: createdRun.id,
+        sessionId: input.session.id,
+        traceId: createdRun.traceId,
+      });
+    });
+    request.executionContext.waitUntil(inlineDispatch);
+  }
+
   logInfo("session.run.accepted", {
     acceptedLatencyMs: Date.now() - queueStartedAtMs,
     agentId: input.session.agent_id,
     attachmentCount: input.attachmentIds.length,
     clientRequestId: input.clientRequestId,
+    inlineDispatch: Boolean(request.executionContext),
     runId: createdRun.id,
     runtimeId,
     sessionId: input.session.id,
