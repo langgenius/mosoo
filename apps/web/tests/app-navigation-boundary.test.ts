@@ -6,17 +6,20 @@ function readSource(path: string): string {
 }
 
 describe("App navigation boundary", () => {
-  test("puts App Install before Agent-first surfaces", () => {
+  test("puts App Overview before Agent-first surfaces", () => {
     const source = readSource("../src/app/navigation.tsx");
-    const installIndex = source.indexOf('label: "Install"');
+    const overviewIndex = source.indexOf('label: "Overview"');
     const threadsIndex = source.indexOf('label: "Threads"');
     const agentsIndex = source.indexOf('label: "Agents"');
 
-    expect(installIndex).toBeGreaterThan(-1);
-    expect(installIndex).toBeLessThan(threadsIndex);
-    expect(installIndex).toBeLessThan(agentsIndex);
+    expect(overviewIndex).toBeGreaterThan(-1);
+    expect(overviewIndex).toBeLessThan(threadsIndex);
+    expect(overviewIndex).toBeLessThan(agentsIndex);
     expect(source).toContain('path: "/"');
     expect(source).not.toContain('label: "Members"');
+    expect(source).not.toContain('label: "Install"');
+    expect(source).not.toContain('label: "Deployments"');
+    expect(source).not.toContain('label: "Files"');
   });
 
   test("drops the standalone Channels tab from the primary nav", () => {

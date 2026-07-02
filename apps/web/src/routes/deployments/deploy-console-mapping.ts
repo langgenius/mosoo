@@ -12,10 +12,11 @@ import type {
 /**
  * Pure mappers from the shared `@mosoo/contracts/app` deployment payloads onto
  * the fixture-shaped {@link DeployConsoleState} view models, so the live and
- * preview consoles render through the exact same components.
+ * preview Overviews render through the exact same components.
  *
- * v0 keeps only the latest run server-side, so {@link toDeployConsoleState}
- * yields at most one run and uses `1` as its display number.
+ * Runs come from `appDeploymentRunList` newest-first: display numbers count
+ * from the oldest run (#1 = total - index), and any success older than the
+ * newest success renders as "superseded".
  */
 
 function stripProtocol(url: string): string {
@@ -24,10 +25,6 @@ function stripProtocol(url: string): string {
 
 function hostOf(url: string): string {
   return stripProtocol(url).split("/")[0] ?? stripProtocol(url);
-}
-
-function workerLabel(host: string): string {
-  return host.split(".")[0] ?? host;
 }
 
 function shortSha(sha: string): string {
@@ -60,7 +57,7 @@ function toBoundAgentVM(agent: AppOverviewBoundAgent): BoundAgentVM {
   };
 }
 
-function toRunVM(run: AppDeploymentRun, host: string): DeploymentRunVM {
+function toRunVM(run: AppDeploymentRun, number: number): DeploymentRunVM {
   return {
     commitSha: shortSha(run.sourceCommitSha),
     createdLabel: relativeLabel(run.createdAt),
@@ -68,27 +65,38 @@ function toRunVM(run: AppDeploymentRun, host: string): DeploymentRunVM {
     errorMessage: run.errorMessage,
     id: run.id,
     liveUrl: run.liveUrl,
-    number: 1,
+    number,
     status: run.status,
-    targetKind: run.targetKind ?? "cloudflare_worker",
-    workerName: workerLabel(host),
+    targetKind: run.targetKind,
   };
 }
 
-function toDeploymentVM(appName: string, deployment: AppDeployment, host: string): DeploymentVM {
+function toRunVMs(runs: AppDeploymentRun[]): DeploymentRunVM[] {
+  let liveSeen = false;
+
+  return runs.map((run, index) => {
+    const superseded = run.status === "success" && liveSeen;
+    liveSeen = liveSeen || run.status === "success";
+    const vm = toRunVM(run, runs.length - index);
+
+    return superseded ? { ...vm, liveUrl: null, status: "superseded" } : vm;
+  });
+}
+
+function toDeploymentVM(appName: string, deployment: AppDeployment): DeploymentVM {
   return {
     appName,
     defaultBranch: deployment.defaultBranch,
-    latestCommit:
-      deployment.latestRun === null ? "—" : shortSha(deployment.latestRun.sourceCommitSha),
-    latestNumber: 1,
-    liveUrl: deployment.liveUrl ?? deployment.plannedUrl,
+    liveUrl: deployment.liveUrl,
     repoUrl: stripProtocol(deployment.repoUrl),
-    subdomain: host,
+    subdomain: deployment.liveUrl === null ? null : hostOf(deployment.liveUrl),
   };
 }
 
-export function toDeployConsoleState(overview: AppDeploymentOverview): DeployConsoleState {
+export function toDeployConsoleState(
+  overview: AppDeploymentOverview,
+  runs: AppDeploymentRun[],
+): DeployConsoleState {
   const agents = overview.boundAgents.map(toBoundAgentVM);
   const { deployment } = overview;
 
@@ -96,11 +104,14 @@ export function toDeployConsoleState(overview: AppDeploymentOverview): DeployCon
     return { agents, deployment: null, runs: [] };
   }
 
-  const host = hostOf(deployment.liveUrl ?? deployment.plannedUrl);
+  // The run list loads in parallel with the overview; until it lands, fall
+  // back to the embedded latest run so a deployment never renders without one.
+  const sourceRuns =
+    runs.length > 0 ? runs : deployment.latestRun === null ? [] : [deployment.latestRun];
 
   return {
     agents,
-    deployment: toDeploymentVM(overview.appName, deployment, host),
-    runs: deployment.latestRun === null ? [] : [toRunVM(deployment.latestRun, host)],
+    deployment: toDeploymentVM(overview.appName, deployment),
+    runs: toRunVMs(sourceRuns),
   };
 }

@@ -885,6 +885,14 @@ export type AppDeploymentOverviewQueryVariables = Exact<{
 
 export type AppDeploymentOverviewQuery = { appOverview: { app: { id: PlatformId, name: string }, boundAgents: Array<{ agentId: PlatformId, envVar: string, expose: AppOverviewBoundAgentExposure, name: string }>, deployment: { appId: PlatformId, createdAt: string, defaultBranch: string, id: PlatformId, liveUrl: string | null, plannedUrl: string, repoName: string, repoOwner: string, repoUrl: string, updatedAt: string, latestRun: { appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string } | null } | null } };
 
+export type AppDeploymentRunListQueryVariables = Exact<{
+  appId: PlatformId;
+  limit?: number | null | undefined;
+}>;
+
+
+export type AppDeploymentRunListQuery = { appDeploymentRunList: Array<{ appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string }> };
+
 export type DeployAppMutationVariables = Exact<{
   input: DeployAppInput;
 }>;
@@ -2655,6 +2663,25 @@ export const AppDeploymentOverviewDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AppDeploymentOverviewQuery, AppDeploymentOverviewQueryVariables>;
+export const AppDeploymentRunListDocument = new TypedDocumentString(`
+    query AppDeploymentRunList($appId: ULID!, $limit: Int) {
+  appDeploymentRunList(appId: $appId, limit: $limit) {
+    appId
+    createdAt
+    deploymentId
+    errorCode
+    errorMessage
+    id
+    liveUrl
+    plannedUrl
+    sourceBranch
+    sourceCommitSha
+    status
+    targetKind
+    updatedAt
+  }
+}
+    `) as unknown as TypedDocumentString<AppDeploymentRunListQuery, AppDeploymentRunListQueryVariables>;
 export const DeployAppDocument = new TypedDocumentString(`
     mutation DeployApp($input: DeployAppInput!) {
   deployApp(input: $input) {

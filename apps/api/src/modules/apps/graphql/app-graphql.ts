@@ -7,6 +7,7 @@ import {
   deleteAppDeployment,
   deployApp,
   getAppDeploymentStatus,
+  listAppDeploymentRuns,
 } from "../application/app-deployment.service";
 import { getAppOverview, getControlPlaneOverview } from "../application/app-overview.service";
 import { createApp } from "../application/app-provisioning.service";
@@ -14,6 +15,11 @@ import { listOrganizationApps, renameApp } from "../application/app.service";
 
 interface OrganizationIdArgs {
   organizationId: OrganizationId;
+}
+
+interface AppDeploymentRunListArgs {
+  appId: string;
+  limit?: number | null;
 }
 
 interface AppOverviewArgs {
@@ -64,6 +70,8 @@ export const appGraphQLModule = {
       renameApp(context.bindings.DB, context.viewer, args.input),
   },
   authenticatedQueryResolvers: {
+    appDeploymentRunList: async (_parent, args: AppDeploymentRunListArgs, context) =>
+      listAppDeploymentRuns(context.bindings, context.viewer, parseAppId(args.appId), args.limit),
     appDeploymentStatus: async (_parent, args: { appId: string }, context) =>
       getAppDeploymentStatus(context.bindings, context.viewer, parseAppId(args.appId)),
     appList: async (_parent, args: OrganizationIdArgs, context) =>

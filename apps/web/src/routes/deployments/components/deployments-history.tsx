@@ -1,35 +1,25 @@
-import { RotateCw, Trash2 } from "lucide-react";
+import { Fragment } from "react";
 
-import { Button } from "@/shared/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 
+import { DEPLOY_TARGET_LABELS } from "../deploy-console-data";
 import type { DeploymentRunVM } from "../deploy-console-data";
 import { StatusBadge } from "./deploy-status-badge";
 
-const IN_FLIGHT: ReadonlySet<string> = new Set([
-  "queued",
-  "preparing",
-  "building",
-  "submitting",
-  "submitted",
-  "activating",
-]);
+/** Dashed placeholder rendered on the pre-deploy Overview instead of the table. */
+export function ActivityEmptyHint() {
+  return (
+    <p className="text-fg-3 border-border bg-bg-sunken rounded-lg border border-dashed px-4 py-6 text-center text-[13px]">
+      After your first deploy, every build shows up here: commit · status · target · duration.
+    </p>
+  );
+}
 
 /**
- * Deployment runs for the App. Every deploy targets the default branch HEAD;
- * retry redeploys that HEAD (not a rollback to an arbitrary version).
+ * Deployment runs for the App, newest first. Every deploy targets the default
+ * branch HEAD; failed runs expose their error inline below the row.
  */
-export function DeploymentsHistory({
-  runs,
-  deploying,
-  onRetry,
-  onDelete,
-}: {
-  runs: DeploymentRunVM[];
-  deploying: boolean;
-  onRetry: () => void;
-  onDelete: () => void;
-}) {
+export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
   if (runs.length === 0) {
     return (
       <p className="text-fg-3 border-border bg-bg-sunken rounded-lg border border-dashed px-4 py-6 text-center text-[13px]">
@@ -47,53 +37,46 @@ export function DeploymentsHistory({
             <TableHead className="text-fg-3 text-[12px] font-medium">
               commit (default HEAD)
             </TableHead>
-            <TableHead className="text-fg-3 text-[12px] font-medium">worker</TableHead>
-            <TableHead className="text-fg-3 text-[12px] font-medium">created</TableHead>
-            <TableHead className="text-fg-3 text-[12px] font-medium">status</TableHead>
-            <TableHead className="text-fg-3 pr-4 text-right text-[12px] font-medium">
-              actions
-            </TableHead>
+            <TableHead className="text-fg-3 text-[12px] font-medium">target</TableHead>
+            <TableHead className="text-fg-3 text-[12px] font-medium">when</TableHead>
+            <TableHead className="text-fg-3 pr-4 text-[12px] font-medium">status</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {runs.map((run) => {
-            const isLive = run.status === "success" || IN_FLIGHT.has(run.status);
+            const error = run.status === "failed" ? (run.errorMessage ?? run.errorCode) : null;
             return (
-              <TableRow key={run.id}>
-                <TableCell className="text-fg-1 pl-4 font-mono text-[12.5px]">
-                  #{run.number}
-                </TableCell>
-                <TableCell className="text-fg-1 font-mono text-[12.5px]">{run.commitSha}</TableCell>
-                <TableCell className="text-fg-3 font-mono text-[12px]">{run.workerName}</TableCell>
-                <TableCell className="text-fg-3 text-[12.5px]">{run.createdLabel}</TableCell>
-                <TableCell>
-                  <StatusBadge status={run.status} />
-                </TableCell>
-                <TableCell className="pr-4">
-                  <div className="flex items-center justify-end gap-1">
-                    {isLive ? (
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={onRetry}
-                        disabled={deploying}
-                        aria-label={`Retry deploy #${run.number}`}
-                      >
-                        <RotateCw className="size-3" />
-                        retry
-                      </Button>
-                    ) : null}
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={onDelete}
-                      aria-label={`Delete app (from #${run.number})`}
-                    >
-                      <Trash2 className="text-destructive size-3.5" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
+              <Fragment key={run.id}>
+                <TableRow>
+                  <TableCell className="text-fg-1 pl-4 font-mono text-[12.5px]">
+                    #{run.number}
+                  </TableCell>
+                  <TableCell className="text-fg-1 font-mono text-[12.5px]">
+                    {run.commitSha}
+                  </TableCell>
+                  <TableCell className="text-fg-3 font-mono text-[12px]">
+                    {run.targetKind === null ? "—" : DEPLOY_TARGET_LABELS[run.targetKind]}
+                  </TableCell>
+                  <TableCell className="text-fg-3 text-[12.5px]">{run.createdLabel}</TableCell>
+                  <TableCell className="pr-4">
+                    <StatusBadge status={run.status} />
+                  </TableCell>
+                </TableRow>
+                {error === null ? null : (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={5} className="pt-0 pb-2.5 pl-4">
+                      <div className="bg-destructive/8 rounded-md px-3 py-1.5 text-[12.5px]">
+                        {run.errorCode === null ? null : (
+                          <span className="text-destructive mr-2 font-mono font-semibold">
+                            {run.errorCode}
+                          </span>
+                        )}
+                        <span className="text-fg-2">{run.errorMessage ?? ""}</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </Fragment>
             );
           })}
         </TableBody>

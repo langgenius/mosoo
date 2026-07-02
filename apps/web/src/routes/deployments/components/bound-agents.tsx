@@ -1,76 +1,40 @@
 import { Bot } from "lucide-react";
-
-import { Badge } from "@/shared/ui/badge";
+import { Link } from "react-router-dom";
 
 import type { BoundAgentVM } from "../deploy-console-data";
 
-function AgentCard({ agent }: { agent: BoundAgentVM }) {
-  return (
-    <div className="border-border bg-background flex items-start gap-3 rounded-md border px-3 py-2.5">
-      <span className="bg-accent-soft text-accent-press mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md">
-        <Bot className="size-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="text-fg-1 text-sm font-semibold">{agent.name}</span>
-          <Badge variant="primary">{agent.expose}</Badge>
-        </div>
-        <div className="text-fg-3 mt-0.5 text-[12.5px]">
-          <span className="font-mono">{agent.id}</span> · injects{" "}
-          <span className="text-fg-2 font-mono">{agent.envVar}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
+/**
+ * Bound agents as a chip row: each chip links to the Agents surface. Bindings
+ * come from `.mosoo.toml [[agents]]` and inject a self-authorizing thread URL
+ * env var into the deployed Worker.
+ */
 export function BoundAgents({ agents }: { agents: BoundAgentVM[] }) {
   return (
-    <div className="flex flex-col gap-3">
-      <div>
-        <div className="text-fg-3 mb-2 text-[10.5px] font-semibold tracking-wider uppercase">
-          Bound agents · structural value
-        </div>
-        <div className="flex flex-col gap-2">
-          {agents.map((agent) => (
-            <AgentCard key={agent.id} agent={agent} />
-          ))}
-        </div>
+    <div className="border-border bg-background rounded-lg border px-4 py-3.5">
+      <div className="text-fg-3 mb-2 text-[10.5px] font-semibold tracking-wider uppercase">
+        Bound agents
       </div>
-
-      <div className="border-border bg-bg-sunken rounded-md border border-dashed px-3 py-3">
-        <div className="text-fg-3 mb-2 text-[10.5px] font-semibold tracking-wider uppercase">
-          Injected env (from .mosoo.toml)
-        </div>
-        <div className="flex flex-col gap-1.5">
-          {agents.map((agent) => (
-            <div key={agent.id} className="flex items-center gap-2">
-              <code className="text-fg-1 font-mono text-[12.5px]">{agent.envVar}</code>
-              <span className="text-fg-3 select-none">=</span>
-              {agent.threadUrl === null ? (
-                <span className="text-fg-3 min-w-0 truncate text-[12px] italic">
-                  self-authorizing URL · minted at deploy
-                </span>
-              ) : (
-                <code className="text-fg-3 min-w-0 truncate font-mono text-[12px]">
-                  {agent.threadUrl}
-                </code>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-secondary rounded-md px-3 py-2.5">
-        <div className="text-fg-3 mb-1 text-[10.5px] font-semibold tracking-wider uppercase">
-          Console actions
-        </div>
-        <p className="text-fg-2 text-[12.5px] leading-relaxed">
-          <span className="text-fg-1 font-semibold">Retry</span> re-pulls the default branch HEAD
-          and redeploys · <span className="text-fg-1 font-semibold">Delete</span> removes the App,
-          Worker, and bindings.
+      {agents.length === 0 ? (
+        <p className="text-fg-3 text-[12.5px]">
+          No agents bound yet. Add an [[agents]] section to .mosoo.toml to inject thread URLs.
         </p>
-      </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          {agents.map((agent) => (
+            <Link
+              key={agent.id}
+              to="/agent"
+              className="border-border bg-card hover:bg-paper-200 inline-flex items-center gap-1.5 rounded-full border py-1 pr-3 pl-1.5 transition-colors"
+            >
+              <span className="bg-accent-soft text-accent-press flex size-5 items-center justify-center rounded-full">
+                <Bot className="size-3" />
+              </span>
+              <span className="text-fg-1 text-[12.5px] font-semibold">{agent.name}</span>
+              <span className="text-fg-3 font-mono text-[11px]">{agent.envVar}</span>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

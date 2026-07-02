@@ -118,6 +118,7 @@ export const appGraphQLSpec = {
     "renameApp(input: RenameAppInput!): App!",
   ],
   queryFields: [
+    "appDeploymentRunList(appId: ULID!, limit: Int): [AppDeploymentRun!]!",
     "appDeploymentStatus(appId: ULID!): AppDeploymentRun",
     "appList(organizationId: ULID!): [App!]!",
     "appOverview(appId: ULID!, agentLimit: Int, credentialLimit: Int): AppOverview!",

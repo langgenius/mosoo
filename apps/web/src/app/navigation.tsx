@@ -1,13 +1,9 @@
 import BotIcon from "@hugeicons/core-free-icons/BotIcon";
 import ChevronRightIcon from "@hugeicons/core-free-icons/ChevronRightIcon";
 import DashboardSquare01Icon from "@hugeicons/core-free-icons/DashboardSquare01Icon";
-import Files02Icon from "@hugeicons/core-free-icons/Files02Icon";
 import InboxIcon from "@hugeicons/core-free-icons/InboxIcon";
-import Key01Icon from "@hugeicons/core-free-icons/Key01Icon";
-import PackageIcon from "@hugeicons/core-free-icons/PackageIcon";
-import PuzzleIcon from "@hugeicons/core-free-icons/PuzzleIcon";
-import Rocket01Icon from "@hugeicons/core-free-icons/Rocket01Icon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
+import SlidersHorizontalIcon from "@hugeicons/core-free-icons/SlidersHorizontalIcon";
 import type { MouseEvent } from "react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -38,40 +34,32 @@ interface AppNavSection {
 const NAV_SECTIONS: AppNavSection[] = [
   {
     items: [
-      { icon: createHugeicon(DashboardSquare01Icon, "InstallIcon"), label: "Install", path: "/" },
+      { icon: createHugeicon(DashboardSquare01Icon, "OverviewIcon"), label: "Overview", path: "/" },
       { icon: createHugeicon(InboxIcon, "ThreadsIcon"), label: "Threads", path: "/threads" },
       { icon: createHugeicon(BotIcon, "AgentsIcon"), label: "Agents", path: "/agent" },
-      {
-        icon: createHugeicon(Rocket01Icon, "DeploymentsIcon"),
-        label: "Deployments",
-        path: "/deployments",
-      },
-      { icon: createHugeicon(Files02Icon, "FilesIcon"), label: "Files", path: "/files" },
-      {
-        icon: createHugeicon(PackageIcon, "EnvironmentsIcon"),
-        label: "Environments",
-        path: "/environment",
-      },
-    ],
-  },
-  {
-    items: [
       {
         children: [
           { label: "Skills", path: "/integrations/skills" },
           { label: "MCP servers", path: "/integrations/mcp" },
+          { label: "Providers", path: "/providers" },
+          { label: "Environments", path: "/environment" },
         ],
-        icon: createHugeicon(PuzzleIcon, "IntegrationsIcon"),
-        label: "Integrations",
+        icon: createHugeicon(SlidersHorizontalIcon, "ConfigIcon"),
+        label: "Config",
         path: "/integrations",
       },
-      { icon: createHugeicon(Key01Icon, "ProvidersIcon"), label: "Providers", path: "/providers" },
+    ],
+    label: "App",
+  },
+  {
+    items: [
       {
         icon: createHugeicon(Settings02Icon, "AppSettingsIcon"),
         label: "Settings",
         path: "/app-settings",
       },
     ],
+    label: "Account",
   },
 ];
 
@@ -132,7 +120,9 @@ function NavGroup({
 }) {
   const navigate = useNavigate();
   const Icon = item.icon;
-  const onPath = isNavItemActive(pathname, item.path);
+  const onPath =
+    isNavItemActive(pathname, item.path) ||
+    (item.children ?? []).some((child) => isNavItemActive(pathname, child.path));
   const [manuallyExpanded, setManuallyExpanded] = useState<boolean | null>(null);
   const expanded = manuallyExpanded ?? onPath;
   const parentSelfActive = pathname === item.path;

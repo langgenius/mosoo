@@ -13,15 +13,19 @@ import {
   deleteAppDeployment,
   deployApp,
   getAppDeploymentOverview,
+  listAppDeploymentRuns,
 } from "../api/app-deployment-client";
 import type { AppDeploymentOverview } from "../api/app-deployment-client";
 
 const appDeploymentKeys = {
   all: ["app-deployment"] as const,
   missingOverview: () => [...appDeploymentKeys.overviews(), "missing"] as const,
+  missingRunList: () => [...appDeploymentKeys.runLists(), "missing"] as const,
   missingStatus: () => [...appDeploymentKeys.statuses(), "missing"] as const,
   overview: (appId: string) => [...appDeploymentKeys.overviews(), appId] as const,
   overviews: () => [...appDeploymentKeys.all, "overview"] as const,
+  runList: (appId: string) => [...appDeploymentKeys.runLists(), appId] as const,
+  runLists: () => [...appDeploymentKeys.all, "run-list"] as const,
   status: (appId: string) => [...appDeploymentKeys.statuses(), appId] as const,
   statuses: () => [...appDeploymentKeys.all, "status"] as const,
 };
@@ -61,6 +65,19 @@ export function useAppDeploymentOverviewQuery(
   });
 }
 
+export function useAppDeploymentRunsQuery(
+  appId: string | null,
+): UseQueryResult<AppDeploymentRun[]> {
+  return useQuery<AppDeploymentRun[]>({
+    enabled: appId !== null,
+    queryFn: async () => listAppDeploymentRuns(toAppId(requireAppId(appId))),
+    queryKey:
+      appId !== null ? appDeploymentKeys.runList(appId) : appDeploymentKeys.missingRunList(),
+    refetchInterval: (query) =>
+      isDeploymentRunInFlight(query.state.data?.[0]?.status) ? 2_500 : false,
+  });
+}
+
 export function useDeployAppMutation(
   appId: string | null,
 ): UseMutationResult<AppDeploymentRun, Error, DeployAppInput> {
@@ -74,6 +91,7 @@ export function useDeployAppMutation(
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: appDeploymentKeys.overview(appId) }),
+        queryClient.invalidateQueries({ queryKey: appDeploymentKeys.runList(appId) }),
         queryClient.invalidateQueries({ queryKey: appDeploymentKeys.status(appId) }),
       ]);
     },
@@ -93,6 +111,7 @@ export function useDeleteAppDeploymentMutation(
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: appDeploymentKeys.overview(appId) }),
+        queryClient.invalidateQueries({ queryKey: appDeploymentKeys.runList(appId) }),
         queryClient.invalidateQueries({ queryKey: appDeploymentKeys.status(appId) }),
       ]);
     },
