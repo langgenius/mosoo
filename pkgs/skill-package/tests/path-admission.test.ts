@@ -85,7 +85,7 @@ describe("skill package path admission", () => {
     ).toThrow(SkillPackageError);
   });
 
-  test("admits only the manifest file and declared skill roots", () => {
+  test("admits the manifest file and arbitrary supporting roots", () => {
     const normalized = normalizeSkillEntries({
       "SKILL.md": { body: markdown },
       "assets/logo.png": { body: data },
@@ -106,26 +106,32 @@ describe("skill package path admission", () => {
       ].toSorted(),
     );
 
-    expect(() =>
+    expect(
       normalizeSkillEntries({
         "SKILL.md": { body: markdown },
         "README.md": { body: data },
-      }),
-    ).toThrow(SkillPackageError);
-
-    expect(() =>
-      normalizeSkillEntries({
-        "SKILL.md": { body: markdown },
         examples: { body: data, entryKind: "directory" },
-      }),
-    ).toThrow(SkillPackageError);
+      }).entries.map((entry) => entry.path),
+    ).toContain("README.md");
+  });
 
-    expect(() =>
-      normalizeSkillEntries({
-        "SKILL.md": { body: markdown },
-        scripts: { body: data },
-      }),
-    ).toThrow(SkillPackageError);
+  test("admits anthropics-style skills with custom support directories", () => {
+    const normalized = normalizeSkillEntries({
+      "SKILL.md": { body: markdown },
+      "LICENSE.txt": { body: data },
+      "canvas-fonts/WorkSans-Regular.ttf": { body: data },
+      "canvas-fonts/WorkSans-OFL.txt": { body: data },
+    });
+
+    expect(normalized.entries.map((entry) => entry.path).toSorted()).toEqual(
+      [
+        "canvas-fonts",
+        "canvas-fonts/WorkSans-OFL.txt",
+        "canvas-fonts/WorkSans-Regular.ttf",
+        "LICENSE.txt",
+        "SKILL.md",
+      ].toSorted(),
+    );
   });
 
   test("rejects invalid manifest entry shapes", () => {
@@ -142,18 +148,18 @@ describe("skill package path admission", () => {
     ).toThrow(SkillPackageError);
   });
 
-  test("rejects traversal and unsupported roots in frontmatter paths", () => {
+  test("rejects traversal in frontmatter paths but allows custom roots", () => {
     expect(() =>
       parseSkillMarkdown(
         "---\nname: Test\ndescription: Test skill.\ndependencies:\n  - ../shared\n---\n",
       ),
     ).toThrow(SkillPackageError);
 
-    expect(() =>
+    expect(
       parseSkillMarkdown(
         "---\nname: Test\ndescription: Test skill.\ndependencies:\n  - docs/guide.md\n---\n",
-      ),
-    ).toThrow(SkillPackageError);
+      ).frontmatter.dependencies,
+    ).toEqual(["docs/guide.md"]);
 
     expect(
       parseSkillMarkdown(
@@ -236,23 +242,25 @@ describe("skill package path admission", () => {
     );
   });
 
-  test("rejects unsupported roots after stripping single wrapper zip archives", () => {
-    expect(() =>
-      normalizeZipEntries([
-        {
-          body: markdown,
-          entryKind: "file",
-          isExecutable: false,
-          path: "mosoo/SKILL.md",
-        },
-        {
-          body: data,
-          entryKind: "file",
-          isExecutable: false,
-          path: "mosoo/examples/a.md",
-        },
-      ]),
-    ).toThrow(SkillPackageError);
+  test("admits custom roots after stripping single wrapper zip archives", () => {
+    const normalized = normalizeZipEntries([
+      {
+        body: markdown,
+        entryKind: "file",
+        isExecutable: false,
+        path: "mosoo/SKILL.md",
+      },
+      {
+        body: data,
+        entryKind: "file",
+        isExecutable: false,
+        path: "mosoo/examples/a.md",
+      },
+    ]);
+
+    expect(normalized.entries.map((entry) => entry.path).toSorted()).toEqual(
+      ["examples", "examples/a.md", "SKILL.md"].toSorted(),
+    );
   });
 
   test("rejects zip archives with multiple wrappers or wrapper-external files", () => {
@@ -291,7 +299,7 @@ describe("skill package path admission", () => {
     ).toThrow(SkillPackageError);
   });
 
-  test("rejects unsupported zip roots when normalizing entry records", () => {
+  test("admits root-level support files when normalizing entry records", () => {
     const archive = createZipArchive([
       {
         body: markdown,
@@ -309,7 +317,11 @@ describe("skill package path admission", () => {
     const record = toEntryRecord(extractZipArchive(archive));
 
     expect(record["notes.txt"]).toBeDefined();
-    expect(() => normalizeSkillEntries(record)).toThrow(SkillPackageError);
+    expect(
+      normalizeSkillEntries(record)
+        .entries.map((entry) => entry.path)
+        .toSorted(),
+    ).toEqual(["notes.txt", "SKILL.md"].toSorted());
   });
 });
 

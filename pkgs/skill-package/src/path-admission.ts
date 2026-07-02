@@ -12,7 +12,6 @@ export interface SkillPackagePathAdmission {
 }
 
 export const SKILL_PACKAGE_MANIFEST_PATH = "SKILL.md";
-export const SKILL_PACKAGE_ALLOWED_ROOTS = ["assets", "references", "scripts"] as const;
 
 const RESERVED_PATH_KEYS = new Set([
   "__proto__",
@@ -31,7 +30,6 @@ const RESERVED_PATH_KEYS = new Set([
   "tokens",
   "vault",
 ]);
-const ALLOWED_ROOTS = new Set<string>(SKILL_PACKAGE_ALLOWED_ROOTS);
 
 export function createSkillPackagePathAdmission(): SkillPackagePathAdmission {
   const entries = new Map<string, SkillPackagePathKind>();
@@ -186,18 +184,6 @@ function rejectUnsupportedArchivePath(admitted: AdmittedSkillPackagePath): void 
     throw new SkillPackageError(
       `The skill package manifest path cannot contain child entries: ${admitted.path}`,
     );
-  }
-
-  const [root] = admitted.path.split("/");
-
-  if (root === undefined || !ALLOWED_ROOTS.has(root)) {
-    throw new SkillPackageError(
-      `The skill package path is outside allowed roots: ${admitted.path}`,
-    );
-  }
-
-  if (admitted.path === root && admitted.entryKind !== "directory") {
-    throw new SkillPackageError(`The skill package root must be a directory: ${root}`);
   }
 }
 

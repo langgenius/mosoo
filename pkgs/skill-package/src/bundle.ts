@@ -250,4 +250,4 @@ export function admitSkillPackageArchivePath(path: string): string {
   return admitSkillPackageArchivePathValue(path).path;
 }
 
-export { SKILL_PACKAGE_ALLOWED_ROOTS, SKILL_PACKAGE_MANIFEST_PATH } from "./path-admission";
+export { SKILL_PACKAGE_MANIFEST_PATH } from "./path-admission";
