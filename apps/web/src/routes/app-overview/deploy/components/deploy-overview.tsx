@@ -1,9 +1,9 @@
 import { ExternalLink } from "lucide-react";
-import type { CSSProperties } from "react";
 import { useState } from "react";
 
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { Separator } from "@/shared/ui/separator";
 
 import { DEPLOY_TARGET_LABELS } from "../deploy-console-data";
 import type { BoundAgentVM, DeploymentRunVM, DeploymentVM } from "../deploy-console-data";
@@ -12,12 +12,39 @@ import { BoundAgents } from "./bound-agents";
 import { RepoDeployForm } from "./deploy-repo-card";
 import { DeployUrlCard } from "./deploy-url-card";
 
-const HATCH_STYLE: CSSProperties = {
-  backgroundImage:
-    "repeating-linear-gradient(135deg, var(--bg-sunken) 0, var(--bg-sunken) 10px, transparent 10px, transparent 20px)",
-};
+function PreviewFrame({
+  deployment,
+  latestRun,
+}: {
+  deployment: DeploymentVM;
+  latestRun: DeploymentRunVM | undefined;
+}) {
+  const live = deployment.liveUrl !== null && latestRun?.status === "success";
 
-function SourceCard({
+  return (
+    <div className="border-border bg-bg-sunken/60 rounded-2xl border p-1.5">
+      <div className="border-border/60 bg-background flex aspect-[16/10] items-center justify-center rounded-xl border">
+        {live && deployment.liveUrl !== null ? (
+          <a
+            href={deployment.liveUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="border-border text-fg-2 hover:text-fg-1 hover:border-accent inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-1.5 font-mono text-[12.5px] transition-colors"
+          >
+            {hostOf(deployment.liveUrl)}
+            <ExternalLink className="size-3" />
+          </a>
+        ) : (
+          <span className="border-border text-fg-3 rounded-lg border px-3.5 py-1.5 text-[12.5px]">
+            Preview unavailable
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SourceGroup({
   deployment,
   latestRun,
   deploying,
@@ -33,69 +60,57 @@ function SourceCard({
   const [changingRepo, setChangingRepo] = useState(false);
 
   return (
-    <div className="border-border bg-background rounded-lg border px-4 py-3.5">
-      <div className="text-fg-3 mb-2 text-[10.5px] font-semibold tracking-wider uppercase">
-        Source
+    <div className="flex flex-col gap-2">
+      <div className="text-fg-3 text-[13px]">Source</div>
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <a
+          href={`https://${deployment.repoUrl}`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-fg-1 hover:text-accent-press inline-flex min-w-0 items-center gap-1.5 text-[13.5px] font-semibold transition-colors hover:underline"
+        >
+          <span className="truncate">{deployment.repoUrl}</span>
+          <ExternalLink className="text-fg-3 size-3.5 shrink-0" />
+        </a>
+        <Badge variant="success">public</Badge>
       </div>
-      <div className="flex flex-col gap-1.5">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <a
-            href={`https://${deployment.repoUrl}`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-accent-press inline-flex min-w-0 items-center gap-1 font-mono text-[12.5px] hover:underline"
-          >
-            <span className="truncate">{deployment.repoUrl}</span>
-            <ExternalLink className="size-3 shrink-0" />
-          </a>
-          <Badge variant="success">public</Badge>
-        </div>
-        <div className="text-fg-3 text-[12.5px]">
+      <div className="text-fg-3 flex flex-wrap items-center gap-x-1.5 text-[13px]">
+        <span>
           branch <span className="text-fg-2 font-mono">{deployment.defaultBranch}</span>
-          {latestRun === undefined ? null : (
-            <>
-              {" "}
-              · HEAD <span className="text-fg-2 font-mono">{latestRun.commitSha}</span>
-            </>
-          )}
-          {latestRun === undefined || latestRun.targetKind === null ? null : (
-            <>
-              {" "}
-              <Badge variant="outline">{DEPLOY_TARGET_LABELS[latestRun.targetKind]}</Badge>
-            </>
-          )}
-        </div>
-        {changingRepo ? (
-          <div className="mt-2">
-            <RepoDeployForm
-              deploying={deploying}
-              serverError={deployError}
-              onDeploy={onDeployRepo}
-            />
-            <Button
-              variant="ghost"
-              size="xs"
-              className="mt-1"
-              onClick={() => setChangingRepo(false)}
-            >
-              Cancel
-            </Button>
-          </div>
-        ) : (
-          <div>
-            <Button variant="ghost" size="xs" onClick={() => setChangingRepo(true)}>
-              Change repo…
-            </Button>
-          </div>
+        </span>
+        {latestRun === undefined ? null : (
+          <span>
+            · HEAD <span className="text-fg-2 font-mono">{latestRun.commitSha}</span>
+          </span>
+        )}
+        {latestRun === undefined || latestRun.targetKind === null ? null : (
+          <Badge variant="outline">{DEPLOY_TARGET_LABELS[latestRun.targetKind]}</Badge>
         )}
       </div>
+      {changingRepo ? (
+        <div className="mt-1">
+          <RepoDeployForm deploying={deploying} serverError={deployError} onDeploy={onDeployRepo} />
+          <Button variant="ghost" size="xs" className="mt-1" onClick={() => setChangingRepo(false)}>
+            Cancel
+          </Button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setChangingRepo(true)}
+          className="text-accent-press w-fit cursor-pointer text-[13px] font-medium hover:underline"
+        >
+          Change repo…
+        </button>
+      )}
     </div>
   );
 }
 
 /**
- * The deployed-state Overview body: the hatch preview on the left, then the
- * URL, Source, and bound-agent cards stacked on the right.
+ * The deployed-state hero: the preview frame is the protagonist on the left;
+ * the right column is an unboxed typographic stack — Domain, Source, and
+ * bound agents separated by hairlines, no card chrome.
  */
 export function DeployOverview({
   deployment,
@@ -113,27 +128,20 @@ export function DeployOverview({
   onDeployRepo: (repoUrl: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
-      <div
-        className="border-border text-fg-3 flex min-h-48 items-center justify-center rounded-lg border text-[12.5px]"
-        style={HATCH_STYLE}
-      >
-        <span className="bg-background rounded-md px-2.5 py-1 font-mono">
-          {deployment.liveUrl === null
-            ? deployment.appName
-            : `live · ${hostOf(deployment.liveUrl)}`}
-        </span>
-      </div>
+    <div className="grid grid-cols-1 items-start gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(300px,0.9fr)]">
+      <PreviewFrame deployment={deployment} latestRun={latestRun} />
 
-      <div className="flex min-w-0 flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-5 lg:pt-1">
         <DeployUrlCard deployment={deployment} latestRun={latestRun} />
-        <SourceCard
+        <Separator />
+        <SourceGroup
           deployment={deployment}
           latestRun={latestRun}
           deploying={deploying}
           deployError={deployError}
           onDeployRepo={onDeployRepo}
         />
+        <Separator />
         <BoundAgents agents={agents} />
       </div>
     </div>

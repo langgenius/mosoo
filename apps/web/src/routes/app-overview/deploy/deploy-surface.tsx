@@ -128,7 +128,7 @@ export function DeploySurface({
             <ActivitySection preDeploy runs={[]} error={runsError} />
           </div>
         ) : (
-          <div className="mx-auto max-w-5xl">
+          <div className="mx-auto max-w-5xl pt-2">
             {deleteError === null ? null : (
               <p className="text-destructive mb-4 text-[12.5px]">{deleteError}</p>
             )}
@@ -141,7 +141,7 @@ export function DeploySurface({
               deployError={deployError}
               onDeployRepo={deploy.deployRepo}
             />
-            <ActivitySection className="mt-12" runs={runs} error={runsError} />
+            <ActivitySection className="mt-14" runs={runs} error={runsError} />
           </div>
         )}
       </main>

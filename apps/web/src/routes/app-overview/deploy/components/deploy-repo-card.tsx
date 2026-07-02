@@ -91,19 +91,19 @@ export function DeployRepoCard({
   onDeploy: (repoUrl: string) => void;
 }) {
   return (
-    <section className="border-border bg-background rounded-lg border px-5 py-5">
+    <section className="border-border bg-background rounded-xl border px-6 py-6">
       <div className="flex items-center gap-2">
         <GitBranch className="text-fg-2 size-4" />
         <h2 className="text-fg-1 text-sm font-semibold">Deploy from a public GitHub repo</h2>
       </div>
-      <p className="text-fg-3 mt-1 text-[13px] leading-relaxed">
+      <p className="text-fg-3 mt-1.5 text-[13.5px] leading-relaxed">
         Mosoo pulls your default branch HEAD, builds it, and binds your agents.
       </p>
       <div className="mt-4">
         <RepoDeployForm deploying={deploying} serverError={serverError} onDeploy={onDeploy} />
       </div>
       <div className="mt-4">
-        <div className="text-fg-3 mb-1.5 text-[12px]">Or deploy from your terminal:</div>
+        <div className="text-fg-3 mb-2 text-[13px]">Or deploy from your terminal:</div>
         <CommandBlock command={deployAppCommand(appId)} />
       </div>
     </section>
