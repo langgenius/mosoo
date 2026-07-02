@@ -11,7 +11,7 @@ Mosoo is still in alpha exploration. Product boundaries, data models, deployment
 
 ## Local Development
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full development flow. The shortest local path is:
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full development flow. Install `bun >= 1.4.0-canary.1`, `just >= 1.51`, and a running Docker-compatible CLI / daemon first. The shortest local path is:
 
 ```bash
 just setup
