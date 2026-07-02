@@ -66,6 +66,26 @@ const APP_DEPLOYMENT_OVERVIEW_QUERY = graphql(/* GraphQL */ `
   }
 `);
 
+const APP_DEPLOYMENT_RUN_LIST_QUERY = graphql(/* GraphQL */ `
+  query AppDeploymentRunList($appId: ULID!, $limit: Int) {
+    appDeploymentRunList(appId: $appId, limit: $limit) {
+      appId
+      createdAt
+      deploymentId
+      errorCode
+      errorMessage
+      id
+      liveUrl
+      plannedUrl
+      sourceBranch
+      sourceCommitSha
+      status
+      targetKind
+      updatedAt
+    }
+  }
+`);
+
 const DEPLOY_APP_MUTATION = graphql(/* GraphQL */ `
   mutation DeployApp($input: DeployAppInput!) {
     deployApp(input: $input) {
@@ -193,6 +213,19 @@ export async function getAppDeploymentOverview(appId: AppId): Promise<AppDeploym
     boundAgents: boundAgents.map(toBoundAgent),
     deployment: deployment === null ? null : toAppDeployment(deployment),
   };
+}
+
+/** Deployment runs for the App, newest first (server default 20, cap 50). */
+export async function listAppDeploymentRuns(
+  appId: AppId,
+  limit?: number,
+): Promise<AppDeploymentRun[]> {
+  const payload = await requestGraphQL(APP_DEPLOYMENT_RUN_LIST_QUERY, {
+    appId,
+    limit: limit ?? null,
+  });
+
+  return payload.appDeploymentRunList.map(toAppDeploymentRun);
 }
 
 export async function deployApp(input: DeployAppInput): Promise<AppDeploymentRun> {

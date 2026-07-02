@@ -13,6 +13,7 @@ import {
   deployApp,
   getAppDeployment,
   getAppDeploymentStatus,
+  listAppDeploymentRuns,
 } from "../src/modules/apps/application/app-deployment.service";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
@@ -26,6 +27,9 @@ import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const OWNER_ID = "01J00000000000000000000001";
 const APP_ID = "01J0000000000000000000000Q";
+const OTHER_APP_ID = "01J0000000000000000000000R";
+const DEPLOYMENT_ID = "01J0000000000000000000000D";
+const OTHER_DEPLOYMENT_ID = "01J0000000000000000000000E";
 const NOW_MS = Date.parse("2026-06-26T00:00:00.000Z");
 
 const VIEWER: AuthenticatedViewer = {
@@ -198,6 +202,65 @@ async function seedExpiredRunningDispatch(
     .bind(createAppDeploymentRunDispatchDedupeKey(runId))
     .run();
   await setDeploymentRunUpdatedAt(database, runId, 1);
+}
+
+async function seedDeployment(
+  database: SqliteD1Database,
+  input: { appId: string; deploymentId: string },
+): Promise<void> {
+  await database
+    .prepare(
+      `INSERT INTO app_deployment (
+        app_id, created_at, default_branch, deleted_at, id, last_successful_url,
+        latest_run_id, mosoo_subdomain, owner_account_id, repo_name, repo_owner,
+        repo_url, source_kind, updated_at
+      )
+      VALUES (?, ?, 'main', NULL, ?, NULL, NULL, ?, ?, 'awire', 'samzong',
+        'https://github.com/samzong/awire.git', 'github_public', ?)`,
+    )
+    .bind(
+      input.appId,
+      NOW_MS,
+      input.deploymentId,
+      `app-${input.appId.toLowerCase()}`,
+      OWNER_ID,
+      NOW_MS,
+    )
+    .run();
+}
+
+async function seedDeploymentRun(
+  database: SqliteD1Database,
+  input: {
+    appId: string;
+    deploymentId: string;
+    runId: string;
+    status?: string;
+    url?: string | null;
+  },
+): Promise<void> {
+  await database
+    .prepare(
+      `INSERT INTO app_deployment_run (
+        app_id, created_at, deployment_id, id, source_branch, source_commit_sha,
+        status, updated_at, url
+      )
+      VALUES (?, ?, ?, ?, 'main', 'abc123', ?, ?, ?)`,
+    )
+    .bind(
+      input.appId,
+      NOW_MS,
+      input.deploymentId,
+      input.runId,
+      input.status ?? "failed",
+      NOW_MS,
+      input.url ?? null,
+    )
+    .run();
+}
+
+function runListRunId(index: number): string {
+  return `01J00000000000000000${String(index).padStart(6, "0")}`;
 }
 
 const unexpectedSandboxCall = async (): Promise<never> => {
@@ -827,6 +890,171 @@ describe("app deployment service", () => {
       errorCode: "queue_dead_lettered",
       id: run.id,
       status: "failed",
+    });
+  });
+
+  test("lists deployment runs newest-first", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const targetUrl = `https://app-${APP_ID.toLowerCase()}.apps.localhost`;
+
+    await seedDeployment(database, { appId: APP_ID, deploymentId: DEPLOYMENT_ID });
+    await seedDeploymentRun(database, {
+      appId: APP_ID,
+      deploymentId: DEPLOYMENT_ID,
+      runId: runListRunId(1),
+      status: "failed",
+    });
+    await seedDeploymentRun(database, {
+      appId: APP_ID,
+      deploymentId: DEPLOYMENT_ID,
+      runId: runListRunId(2),
+      status: "success",
+      url: targetUrl,
+    });
+    await seedDeploymentRun(database, {
+      appId: APP_ID,
+      deploymentId: DEPLOYMENT_ID,
+      runId: runListRunId(3),
+      status: "queued",
+    });
+
+    const runs = await listAppDeploymentRuns(bindings, VIEWER, APP_ID);
+
+    expect(runs.map((run) => run.id)).toEqual([runListRunId(3), runListRunId(2), runListRunId(1)]);
+    expect(runs[0]).toMatchObject({ liveUrl: null, status: "queued" });
+    expect(runs[1]).toMatchObject({
+      appId: APP_ID,
+      deploymentId: DEPLOYMENT_ID,
+      liveUrl: targetUrl,
+      plannedUrl: targetUrl,
+      sourceBranch: "main",
+      sourceCommitSha: "abc123",
+      status: "success",
+    });
+  });
+
+  test("applies the default run list limit and caps requested limits", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+
+    await seedDeployment(database, { appId: APP_ID, deploymentId: DEPLOYMENT_ID });
+
+    for (let index = 1; index <= 55; index += 1) {
+      await seedDeploymentRun(database, {
+        appId: APP_ID,
+        deploymentId: DEPLOYMENT_ID,
+        runId: runListRunId(index),
+      });
+    }
+
+    const defaultRuns = await listAppDeploymentRuns(bindings, VIEWER, APP_ID);
+    expect(defaultRuns).toHaveLength(20);
+    expect(defaultRuns[0]?.id).toBe(runListRunId(55));
+    expect(defaultRuns[19]?.id).toBe(runListRunId(36));
+
+    const limitedRuns = await listAppDeploymentRuns(bindings, VIEWER, APP_ID, 5);
+    expect(limitedRuns.map((run) => run.id)).toEqual([
+      runListRunId(55),
+      runListRunId(54),
+      runListRunId(53),
+      runListRunId(52),
+      runListRunId(51),
+    ]);
+
+    const cappedRuns = await listAppDeploymentRuns(bindings, VIEWER, APP_ID, 200);
+    expect(cappedRuns).toHaveLength(50);
+    expect(cappedRuns[49]?.id).toBe(runListRunId(6));
+
+    await expect(listAppDeploymentRuns(bindings, VIEWER, APP_ID, 0)).rejects.toThrow(
+      "limit must be a positive integer.",
+    );
+  });
+
+  test("does not list deployment runs from another app", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+
+    await database
+      .prepare(
+        `INSERT INTO app (id, organization_id, owner_account_id, name, created_at, updated_at)
+         VALUES (?, '01J00000000000000000000006', ?, 'Other App', 1, 1)`,
+      )
+      .bind(OTHER_APP_ID, OWNER_ID)
+      .run();
+    await seedDeployment(database, { appId: APP_ID, deploymentId: DEPLOYMENT_ID });
+    await seedDeployment(database, { appId: OTHER_APP_ID, deploymentId: OTHER_DEPLOYMENT_ID });
+    await seedDeploymentRun(database, {
+      appId: APP_ID,
+      deploymentId: DEPLOYMENT_ID,
+      runId: runListRunId(1),
+    });
+    await seedDeploymentRun(database, {
+      appId: OTHER_APP_ID,
+      deploymentId: OTHER_DEPLOYMENT_ID,
+      runId: runListRunId(2),
+    });
+
+    const runs = await listAppDeploymentRuns(bindings, VIEWER, APP_ID);
+    const otherRuns = await listAppDeploymentRuns(bindings, VIEWER, OTHER_APP_ID);
+
+    expect(runs.map((run) => run.id)).toEqual([runListRunId(1)]);
+    expect(otherRuns.map((run) => run.id)).toEqual([runListRunId(2)]);
+  });
+
+  test("keeps listing runs after deleteAppDeployment and hides their live URLs", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const targetUrl = `https://app-${APP_ID.toLowerCase()}.apps.localhost`;
+    const runner: AppDeploymentBuildRunner = {
+      async build() {},
+      async deploy() {
+        return {
+          externalDeploymentId: "pages-deployment-1",
+          externalProjectId: "pages-project-1",
+          externalVersionId: null,
+          url: targetUrl,
+        };
+      },
+      async prepare() {
+        return {
+          repoDir: "/repo",
+          snapshot: { files: { "index.html": "<main>Hello</main>" } },
+        };
+      },
+    };
+
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      {
+        runner,
+      },
+    );
+    await deleteAppDeployment(
+      bindings,
+      VIEWER,
+      { appId: APP_ID },
+      {
+        cloudflareClient: createCloudflareDeleteRecorder([]),
+      },
+    );
+
+    // The deployment is soft-deleted: run history stays listed, but liveUrl is
+    // suppressed because the deployment row carries deletedAt.
+    const runs = await listAppDeploymentRuns(bindings, VIEWER, APP_ID);
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({
+      id: run.id,
+      liveUrl: null,
+      status: "success",
     });
   });
 });

@@ -1347,6 +1347,7 @@ type Query {
   agentSessionList(agentId: ULID!, appId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!
   agentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!
   appCostCard(appId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AppCostCard!
+  appDeploymentRunList(appId: ULID!, limit: Int): [AppDeploymentRun!]!
   appDeploymentStatus(appId: ULID!): AppDeploymentRun
   appEnvironmentList(appId: ULID!): [EnvironmentSummary!]!
   appInfo: AppInfo!

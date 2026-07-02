@@ -32,6 +32,7 @@ import type {
 } from "./app-deployment-cloudflare-client";
 import { destroyAppDeploymentRunSandboxesBestEffort } from "./app-deployment-executor.service";
 import { ensureAppOwnership } from "./app.service";
+import { normalizeLimit } from "./normalize-limit";
 
 type AppDeploymentBindings = Pick<
   ApiBindings,
@@ -56,6 +57,8 @@ interface AppDeploymentServiceOptions {
 }
 
 type JsonRecord = Record<string, unknown>;
+
+const RUN_LIST_LIMITS = { defaultLimit: 20, maxLimit: 50 };
 
 export async function readAppDeploymentForOwnedApp(
   bindings: AppDeploymentReadBindings,
@@ -97,6 +100,42 @@ export async function getAppDeploymentStatus(
   const deployment = await readDeploymentById(bindings.DB, run.deploymentId);
 
   return toAppDeploymentRun(run, deployment, bindings.MOSOO_APP_DEPLOYMENT_DOMAIN);
+}
+
+export async function listAppDeploymentRuns(
+  bindings: AppDeploymentReadBindings,
+  viewer: AuthenticatedViewer,
+  appId: AppId,
+  limit?: number | null,
+): Promise<AppDeploymentRun[]> {
+  await ensureAppOwnership(bindings.DB, viewer.id, appId);
+
+  const runLimit = normalizeLimit(limit, "limit", RUN_LIST_LIMITS);
+  const runs = await getAppDatabase(bindings.DB)
+    .select()
+    .from(appDeploymentRunsTable)
+    .where(eq(appDeploymentRunsTable.appId, appId))
+    .orderBy(desc(appDeploymentRunsTable.id))
+    .limit(runLimit)
+    .all();
+
+  if (runs.length === 0) {
+    return [];
+  }
+
+  const deploymentsById = await readDeploymentsByIds(bindings.DB, [
+    ...new Set(runs.map((run) => run.deploymentId)),
+  ]);
+
+  return runs.map((run) => {
+    const deployment = deploymentsById.get(run.deploymentId);
+
+    if (deployment === undefined) {
+      throw new Error("App deployment row could not be loaded.");
+    }
+
+    return toAppDeploymentRun(run, deployment, bindings.MOSOO_APP_DEPLOYMENT_DOMAIN);
+  });
 }
 
 export async function deployApp(
@@ -394,6 +433,19 @@ async function readDeploymentById(
   }
 
   return row;
+}
+
+async function readDeploymentsByIds(
+  database: D1Database,
+  deploymentIds: readonly AppDeploymentId[],
+): Promise<Map<AppDeploymentId, AppDeploymentRow>> {
+  const rows = await getAppDatabase(database)
+    .select()
+    .from(appDeploymentsTable)
+    .where(inArray(appDeploymentsTable.id, [...deploymentIds]))
+    .all();
+
+  return new Map(rows.map((row) => [row.id, row]));
 }
 
 async function readLatestDeploymentRun(
