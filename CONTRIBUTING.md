@@ -39,6 +39,12 @@ The following generated files must not be edited by hand:
 
 If generated output is wrong, fix the schema, contract, resolver, or PRD source that produced it.
 
+Minimum generated-file rules:
+
+- GraphQL schema, scalar mapping, query, mutation, or fragment changes require `just graphql-codegen`.
+- DB schema changes require `just db-regen`; production migrations are covered in [Database And Migrations](#database-and-migrations).
+- Dependency changes require committing the resulting `bun.lock`; install-only lockfile churn should stay out of the PR.
+
 ## Toolchain
 
 Required tools:
@@ -79,6 +85,7 @@ Reusable coding-agent skills live in the [`langgenius/mosoo-skills`](https://git
 - The skills become available after `git submodule update --init` (or cloning with `--recurse-submodules`). Without it, `.claude/skills` points at an empty submodule directory.
 - To bump to the latest skills: `git submodule update --remote .skills/mosoo-skills`, then commit the updated submodule pointer.
 - Do not edit skills under `.skills/mosoo-skills` here — they are owned upstream in `mosoo-skills`.
+- Fork contributors should initialize submodules before validating a PR; maintainers update submodule pointers only when the PR intentionally changes the vendored revision.
 
 ## Local Development
 
@@ -265,17 +272,17 @@ fix/auth-local-backdoor
 chore/dev-docs-layout
 ```
 
-Use `!` only for intentional breaking changes. Every Issue and PR must be self-assigned. PRs should keep a clear scope, describe verification results, and explicitly state whether they include generated files, GraphQL codegen, or DB baseline updates.
+Use `!` only for intentional breaking changes. PRs should keep a clear scope, describe verification results, and explicitly state whether they include generated files, GraphQL codegen, DB baseline updates, or lockfile changes.
 
 ### Pull Requests
 
 - Open PRs **only to `main`** (or `release/*`). No PR chains between feature branches.
-- Private-stage PRs should use branches in the upstream repository so required `pull_request` checks can run.
-- Fork PRs are usable only when private fork workflows are enabled, or when a maintainer handles verification and bypass explicitly.
-- Metadata gates support fork PRs through `pull_request_target`; upstream branch PRs still use `pull_request`.
-- Repository code checks stay on `pull_request`.
-- Branch names use `type/scope-subject` above.
-- Run `just check` before marking ready for review. CI runs the same gate for non-draft `pull_request` PRs.
+- Public contributors use a fork PR. Fork branch names may vary, but `type/scope-subject` is preferred when practical.
+- Maintainers with repository write access use upstream branches named `type/scope-subject`.
+- External contributors may mark maintainer-only items as N/A: assignee, internal verification, release or deployment checks, and any upstream-branch-only workflow notes.
+- CLA Assistant runs on PR metadata. If it asks you to sign, read `CLA.md` and post the exact requested PR comment once; do not paste the signature into the PR description.
+- CI metadata gates validate PR title, commit messages, CLA status, and ship policy. Non-draft PRs also run the repository check from `.github/workflows/pr-check.yml`.
+- Run `just check` before marking ready for review when practical. If you cannot run it, list the smaller commands you did run and why the full gate was skipped.
 - Big pivots: update the boundary docs first, then prefer **one umbrella PR** with `just check` and boundary tests as the review contract.
 
 ### Enforced Commit Policy
