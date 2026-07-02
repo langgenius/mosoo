@@ -3,11 +3,12 @@ import { sessionRunsTable } from "@mosoo/db";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, eq, inArray } from "drizzle-orm";
 
-import { logWarn } from "../../../../platform/cloudflare/logger";
+import { logInfo, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { createFailedSessionRunRuntimeEvent } from "../../application/session-runs/session-run-view-events.service";
+import { classifyReclaim, decideReclaimRecovery } from "../../domain/session-run-reclaim-recovery";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
 import { recordRuntimeRunLeaseReleasedOutcome } from "../runtime-subject-lifecycle/runtime-run-lease-store";
 import { failAcceptedRuntimeCommandsForTerminalDriver } from "../session-runs/runtime-command-store.repository";
@@ -25,32 +26,6 @@ interface LinkedSessionRunStatusRow {
 export interface TerminalDriverInstanceSessionRunReleaseResult {
   readonly link: RuntimeSessionLink | null;
   readonly released: boolean;
-}
-
-function createFinalizedDriverRunError(input: {
-  readonly driverInstanceId: DriverInstanceId;
-  readonly status: "failed" | "stopped";
-}): RunError {
-  if (input.status === "stopped") {
-    return {
-      code: "runtime.turn_interrupted",
-      details: {
-        driverInstanceId: input.driverInstanceId,
-      },
-      message:
-        "This turn was interrupted. Your workspace and context have been preserved — please resend your last request.",
-      retryable: true,
-    };
-  }
-
-  return {
-    code: "runtime.driver_failed",
-    details: {
-      driverInstanceId: input.driverInstanceId,
-    },
-    message: "Runtime driver failed before the run completed.",
-    retryable: true,
-  };
 }
 
 function toFinalizedDriverRunTransitionRun(
@@ -156,7 +131,11 @@ export async function repairFinalizedTerminalDriverRunState(
   }
 
   if (!isTerminalSessionRunStatus(link.sessionRunStatus)) {
-    const runError = createFinalizedDriverRunError(input);
+    const runError = classifyReclaim({
+      driverInstanceId: input.driverInstanceId,
+      driverTerminalStatus: input.status,
+      reclaimReason: "socket_closed",
+    });
     const outcome = await setSessionRunStatus(bindings.DB, {
       error: runError,
       runId: link.sessionRunId,
@@ -170,6 +149,25 @@ export async function repairFinalizedTerminalDriverRunState(
         driverInstanceId: input.driverInstanceId,
         run,
         runError,
+        sessionId: link.sessionId,
+      });
+
+      // Decide recovery for the reclaimed run. v1 records the decision so it is
+      // observable and unit-testable; executing the auto-requeue (a fresh
+      // `resume` run + re-dispatch) is a follow-up because this DO finalize
+      // context lacks the viewer + requestUrl that enqueueSessionRunDispatchCommand
+      // needs to rebuild the sandbox's action-token callback URLs.
+      const recovery = decideReclaimRecovery({
+        driverTerminalStatus: input.status,
+        priorTrigger: run.trigger,
+        reclaimReason: "socket_closed",
+        runStatus: link.sessionRunStatus,
+      });
+      logInfo("runtime.reclaim.recovery.decided", {
+        action: recovery.kind,
+        driverInstanceId: input.driverInstanceId,
+        priorTrigger: run.trigger,
+        runId: run.id,
         sessionId: link.sessionId,
       });
     }
