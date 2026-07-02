@@ -76,7 +76,7 @@ export function AccessTokensTab() {
   const queryClient = useQueryClient();
   const [state, dispatch] = useReducer(accessTokensReducer, ACCESS_TOKENS_INITIAL_STATE);
   const { copied, createdToken, label } = state;
-  const tokensQuery = useQuery({
+  const { data: tokensData, isLoading: tokensLoading } = useQuery({
     queryFn: listPersonalAccessTokens,
     queryKey: ACCESS_TOKEN_QUERY_KEY,
   });
@@ -149,12 +149,12 @@ export function AccessTokensTab() {
           />
 
           <AccessTokensTable
-            loading={tokensQuery.isLoading}
+            loading={tokensLoading}
             onRevoke={(tokenId) => {
               revokeMutation.mutate(tokenId);
             }}
             pending={revokeMutation.isPending}
-            tokens={tokensQuery.data?.tokens ?? null}
+            tokens={tokensData?.tokens ?? null}
           />
         </div>
       </SettingsTabBody>

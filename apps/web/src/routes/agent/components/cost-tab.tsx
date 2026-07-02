@@ -31,7 +31,7 @@ export function AgentCostTab({ agentId, appId }: { agentId: string; appId: strin
   const [range, setRange] = useState<CostRange>("30d");
   const [purpose, setPurpose] = useState<CostRunPurpose | "all">("all");
   const runPurposes = purpose === "all" ? [] : [purpose];
-  const costQuery = useQuery({
+  const { data: card, isLoading } = useQuery({
     queryFn: async () =>
       fetchAgentCost({
         agentId: toAgentId(agentId),
@@ -41,7 +41,6 @@ export function AgentCostTab({ agentId, appId }: { agentId: string; appId: strin
       }),
     queryKey: ["cost", "agent-card", appId, agentId, range, purpose],
   });
-  const card = costQuery.data;
   const totals = card?.totals;
 
   return (
@@ -113,7 +112,7 @@ export function AgentCostTab({ agentId, appId }: { agentId: string; appId: strin
           ))}
         </div>
 
-        {costQuery.isLoading ? (
+        {isLoading ? (
           <div className="border-border bg-card text-muted-foreground rounded-lg border px-4 py-10 text-center text-sm">
             Loading agent cost…
           </div>

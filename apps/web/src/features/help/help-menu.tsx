@@ -29,11 +29,17 @@ export function HelpMenu({ collapsed }: { collapsed: boolean }) {
   // fetched on a normal page load.
   const [hasOpened, setHasOpened] = useState(false);
 
-  useEffect(() => {
-    if (open) {
+  function openHelp(): void {
+    setHasOpened(true);
+    setOpen(true);
+  }
+
+  function handleOpenChange(nextOpen: boolean): void {
+    if (nextOpen) {
       setHasOpened(true);
     }
-  }, [open]);
+    setOpen(nextOpen);
+  }
 
   // Press "?" anywhere outside a text field to open help, matching the common
   // shortcut used by other apps.
@@ -47,7 +53,7 @@ export function HelpMenu({ collapsed }: { collapsed: boolean }) {
       }
 
       event.preventDefault();
-      setOpen(true);
+      openHelp();
     }
 
     globalThis.addEventListener("keydown", handleKeyDown);
@@ -60,7 +66,7 @@ export function HelpMenu({ collapsed }: { collapsed: boolean }) {
     <button
       type="button"
       onClick={() => {
-        setOpen(true);
+        openHelp();
       }}
       aria-label="Help & docs"
       className={cn(
@@ -85,7 +91,7 @@ export function HelpMenu({ collapsed }: { collapsed: boolean }) {
       )}
       {hasOpened ? (
         <Suspense fallback={null}>
-          <HelpDocsDialog open={open} onOpenChange={setOpen} />
+          <HelpDocsDialog open={open} onOpenChange={handleOpenChange} />
         </Suspense>
       ) : null}
     </>

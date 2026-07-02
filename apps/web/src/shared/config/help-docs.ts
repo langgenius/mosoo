@@ -11,9 +11,6 @@
 
 export const HELP_DOCS_BASE_URL = "https://mosoo.ai/docs";
 
-/** Public manifest listing every help page, consumed by the generator script. */
-export const HELP_DOCS_MANIFEST_URL = `${HELP_DOCS_BASE_URL}/llms.txt`;
-
 /** Documentation home, used as the "Browse all docs" entry point. */
 export const HELP_DOCS_HOME_URL = `${HELP_DOCS_BASE_URL}/`;
 

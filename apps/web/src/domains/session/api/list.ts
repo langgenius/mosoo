@@ -16,51 +16,6 @@ export interface ThreadSessionListItem {
   session: SessionSummary;
 }
 
-const SESSIONS_QUERY = graphql(/* GraphQL */ `
-  query Sessions($appId: ULID!, $archived: Boolean, $type: SessionType) {
-    sessionList(appId: $appId, archived: $archived, type: $type) {
-      nodes {
-        agentId
-        archivedAt
-        createdAt
-        deploymentVersionId
-        deploymentVersionNumber
-        id
-        kind
-        lastMessageAt
-        lastRun {
-          completedAt
-          createdAt
-          deploymentVersionId
-          deploymentVersionNumber
-          error {
-            code
-            details
-            message
-            retryable
-          }
-          id
-          model
-          provider
-          startedAt
-          status
-          traceId
-          trigger
-          updatedAt
-        }
-        model
-        provider
-        appId
-        runtimeId
-        status
-        title
-        type
-        updatedAt
-      }
-    }
-  }
-`);
-
 const THREAD_AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
   query ThreadAgentSessionList($appId: ULID!, $archived: Boolean, $type: SessionType) {
     threadAgentSessionList(appId: $appId, archived: $archived, type: $type) {
@@ -112,24 +67,6 @@ const THREAD_AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
     }
   }
 `);
-
-async function fetchSessions(
-  appId: AppId,
-  archived: boolean,
-  type?: SessionType | null,
-): Promise<SessionSummary[]> {
-  const payload = await requestGraphQL(SESSIONS_QUERY, {
-    archived,
-    appId,
-    type: type ?? null,
-  });
-
-  return payload.sessionList.nodes.map(toSessionSummary);
-}
-
-export async function sessions(appId: AppId, type?: SessionType | null): Promise<SessionSummary[]> {
-  return fetchSessions(appId, false, type);
-}
 
 function toThreadSessionListItem(
   node: ThreadAgentSessionListQuery["threadAgentSessionList"]["nodes"][number],

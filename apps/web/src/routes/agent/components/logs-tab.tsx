@@ -250,12 +250,16 @@ function SessionDetailView({
   onBack: () => void;
 }): ReactElement {
   const sessionLive = isSessionLive(selected.status);
-  const processEventsQuery = useQuery({
+  const {
+    data: processEvents = [],
+    error: processEventsError,
+    isLoading: processEventsLoading,
+  } = useQuery({
     queryFn: async () => getAgentSessionProcessEvents(selected.appId, selected.id),
     queryKey: ["session-process-events", selected.id],
     refetchInterval: sessionLive ? SESSION_EVENTS_REFRESH_MS : false,
   });
-  const sessionDiagnosticsQuery = useQuery({
+  const { data: sessionDiagnostics, isLoading: sessionDiagnosticsLoading } = useQuery({
     queryFn: async () =>
       getAgentSessionDiagnostics({
         appId: selected.appId,
@@ -264,8 +268,7 @@ function SessionDetailView({
     queryKey: ["agent-session-diagnostics", selected.id],
     refetchInterval: sessionLive ? SESSION_DIAGNOSTICS_REFRESH_MS : false,
   });
-  const processEvents = processEventsQuery.data ?? [];
-  const diagnostics = sessionDiagnosticsQuery.data?.agentSessionDiagnostics ?? null;
+  const diagnostics = sessionDiagnostics?.agentSessionDiagnostics ?? null;
   const runtimeChip = formatRuntimeChip(selected);
   const replay = getReplayTimestamp(selected);
 
@@ -328,14 +331,14 @@ function SessionDetailView({
 
       <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {processEventsQuery.isLoading ? (
+          {processEventsLoading ? (
             <div className="text-muted-foreground flex flex-1 items-center justify-center text-[13px]">
               Loading session events…
             </div>
-          ) : processEventsQuery.error ? (
+          ) : processEventsError ? (
             <div className="text-destructive flex flex-1 items-center justify-center px-6 text-[13px]">
-              {processEventsQuery.error instanceof Error
-                ? processEventsQuery.error.message
+              {processEventsError instanceof Error
+                ? processEventsError.message
                 : "Failed to load session events."}
             </div>
           ) : (
@@ -345,7 +348,7 @@ function SessionDetailView({
 
         <SessionDiagnosticsPanel
           diagnostics={diagnostics}
-          loading={sessionDiagnosticsQuery.isLoading}
+          loading={sessionDiagnosticsLoading}
           selected={selected}
         />
       </div>
@@ -356,12 +359,11 @@ function SessionDetailView({
 export function LogsTab({ agentId, appId }: { agentId: string; appId: string }): ReactElement {
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionParam = searchParams.get(SESSION_QUERY_PARAM);
-  const sessionsQuery = useQuery({
+  const { data: agentSessions = [], isLoading } = useQuery({
     queryFn: async () => listAgentSessions(toAppId(appId), toAgentId(agentId)),
     queryKey: ["agent-session-list", appId, agentId, "all"],
     refetchInterval: SESSION_LIST_REFRESH_MS,
   });
-  const agentSessions = sessionsQuery.data ?? [];
   const selected =
     sessionParam === null
       ? null
@@ -396,7 +398,7 @@ export function LogsTab({ agentId, appId }: { agentId: string; appId: string }):
     [navigateToSession],
   );
 
-  if (sessionsQuery.isLoading) {
+  if (isLoading) {
     return (
       <div className="text-muted-foreground flex h-full items-center justify-center text-[13px]">
         Loading sessions…

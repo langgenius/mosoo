@@ -6,7 +6,7 @@ import type { RefObject } from "react";
 // taken over scroll control and stop forcing the view back down on new content.
 const STICK_TO_BOTTOM_THRESHOLD_PX = 32;
 
-function getLastMessageSignature(message: SessionViewMessage | null): string | null {
+function getLastMessageSnapshot(message: SessionViewMessage | null): string | null {
   if (message === null) {
     return null;
   }
@@ -50,7 +50,7 @@ export function useSessionChatLayoutState(
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previousLastMessageIdRef = useRef<string | null>(null);
   const previousMessageCountRef = useRef(0);
-  const previousLastMessageSignatureRef = useRef<string | null>(null);
+  const previousLastMessageSnapshotRef = useRef<string | null>(null);
   // Whether new content should keep pinning the view to the bottom. Flips to false
   // as soon as the user scrolls up (takes over control via the mouse wheel) and back
   // to true once they return to the bottom.
@@ -85,15 +85,15 @@ export function useSessionChatLayoutState(
   useEffect(() => {
     const lastMessage = messages.at(-1) ?? null;
     const lastMessageId = lastMessage?.id ?? null;
-    const lastMessageSignature = getLastMessageSignature(lastMessage);
+    const lastMessageSnapshot = getLastMessageSnapshot(lastMessage);
     const messageCountChanged = previousMessageCountRef.current !== messages.length;
     const lastMessageChanged = previousLastMessageIdRef.current !== lastMessageId;
     const lastMessageContentChanged =
-      previousLastMessageSignatureRef.current !== lastMessageSignature;
+      previousLastMessageSnapshotRef.current !== lastMessageSnapshot;
 
     previousMessageCountRef.current = messages.length;
     previousLastMessageIdRef.current = lastMessageId;
-    previousLastMessageSignatureRef.current = lastMessageSignature;
+    previousLastMessageSnapshotRef.current = lastMessageSnapshot;
 
     if (
       !messageCountChanged &&

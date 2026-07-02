@@ -49,18 +49,6 @@ const UPDATE_PROFILE_MUTATION = graphql(/* GraphQL */ `
   }
 `);
 
-const SET_SYSTEM_AGENT_MODEL_MUTATION = graphql(/* GraphQL */ `
-  mutation SetSystemAgentModel($input: SetSystemAgentModelInput!) {
-    setSystemAgentModel(input: $input) {
-      id
-      systemAgentModel {
-        modelId
-        vendor
-      }
-    }
-  }
-`);
-
 function toViewer(viewer: ViewerQuery["viewer"]): Viewer {
   return {
     ...viewer,
@@ -94,12 +82,4 @@ export async function updateProfile(input: {
     imageUrl: payload.updateProfile.imageUrl ?? null,
     name: payload.updateProfile.name,
   };
-}
-
-export async function setSystemAgentModel(input: {
-  modelId: string;
-  vendor: string;
-}): Promise<{ modelId: string; vendor: string } | null> {
-  const payload = await requestGraphQL(SET_SYSTEM_AGENT_MODEL_MUTATION, { input });
-  return payload.setSystemAgentModel.systemAgentModel ?? null;
 }

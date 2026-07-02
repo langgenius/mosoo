@@ -66,26 +66,6 @@ const APP_DEPLOYMENT_OVERVIEW_QUERY = graphql(/* GraphQL */ `
   }
 `);
 
-const APP_DEPLOYMENT_STATUS_QUERY = graphql(/* GraphQL */ `
-  query AppDeploymentStatus($appId: ULID!) {
-    appDeploymentStatus(appId: $appId) {
-      appId
-      createdAt
-      deploymentId
-      errorCode
-      errorMessage
-      id
-      liveUrl
-      plannedUrl
-      sourceBranch
-      sourceCommitSha
-      status
-      targetKind
-      updatedAt
-    }
-  }
-`);
-
 const DEPLOY_APP_MUTATION = graphql(/* GraphQL */ `
   mutation DeployApp($input: DeployAppInput!) {
     deployApp(input: $input) {
@@ -213,14 +193,6 @@ export async function getAppDeploymentOverview(appId: AppId): Promise<AppDeploym
     boundAgents: boundAgents.map(toBoundAgent),
     deployment: deployment === null ? null : toAppDeployment(deployment),
   };
-}
-
-export async function getAppDeploymentStatus(appId: AppId): Promise<AppDeploymentRun | null> {
-  const payload = await requestGraphQL(APP_DEPLOYMENT_STATUS_QUERY, { appId });
-
-  return payload.appDeploymentStatus === null
-    ? null
-    : toAppDeploymentRun(payload.appDeploymentStatus);
 }
 
 export async function deployApp(input: DeployAppInput): Promise<AppDeploymentRun> {

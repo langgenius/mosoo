@@ -74,7 +74,7 @@ export function AgentKindSection({
         ? `/demo/agent/${result.agent.id}`
         : `/agent/${result.agent.id}`,
     );
-  }, [agent.id, forkDialog, forkMutation, navigate]);
+  }, [agent.appId, agent.id, forkDialog, forkMutation, navigate]);
 
   return (
     <>

@@ -1,5 +1,5 @@
 import { Check, Loader2, Upload } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef } from "react";
 
 import { Button } from "@/shared/ui/button";
 
@@ -17,6 +17,58 @@ const MAX_AVATAR_FILE_BYTES = 5 * 1024 * 1024;
 const INTERNAL_FILE_PATH_PATTERN = new RegExp(
   `^${apiPath("/files")}/[A-Za-z0-9]+/content(?:\\?disposition=inline)?$`,
 );
+
+interface ProfileFormState {
+  avatarInput: string;
+  error: string | null;
+  name: string;
+  saved: boolean;
+  saving: boolean;
+  uploading: boolean;
+}
+
+type ProfileFormAction =
+  | { type: "changeAvatar"; avatarInput: string }
+  | { type: "changeName"; name: string }
+  | { type: "clearSaved" }
+  | { type: "saveError"; error: string }
+  | { type: "saveStart" }
+  | { type: "saveSuccess" }
+  | { type: "setError"; error: string }
+  | { type: "syncAvatar"; avatarInput: string }
+  | { type: "syncName"; name: string }
+  | { type: "uploadError"; error: string }
+  | { type: "uploadStart" }
+  | { type: "uploadSuccess"; avatarInput: string };
+
+function profileFormReducer(state: ProfileFormState, action: ProfileFormAction): ProfileFormState {
+  switch (action.type) {
+    case "changeAvatar":
+      return { ...state, avatarInput: action.avatarInput };
+    case "changeName":
+      return { ...state, name: action.name };
+    case "clearSaved":
+      return { ...state, saved: false };
+    case "saveError":
+      return { ...state, error: action.error, saving: false };
+    case "saveStart":
+      return { ...state, error: null, saving: true };
+    case "saveSuccess":
+      return { ...state, saved: true, saving: false };
+    case "setError":
+      return { ...state, error: action.error };
+    case "syncAvatar":
+      return { ...state, avatarInput: action.avatarInput };
+    case "syncName":
+      return { ...state, name: action.name };
+    case "uploadError":
+      return { ...state, error: action.error, uploading: false };
+    case "uploadStart":
+      return { ...state, error: null, uploading: true };
+    case "uploadSuccess":
+      return { ...state, avatarInput: action.avatarInput, uploading: false };
+  }
+}
 
 function isValidAvatarValue(value: string): boolean {
   if (INTERNAL_FILE_PATH_PATTERN.test(value)) {
@@ -40,20 +92,23 @@ function sanitizeAvatarSrc(value: string): string {
 
 export function ProfileTab() {
   const { refreshOrganizations, user } = useAppSession();
-  const [name, setName] = useState(user?.name ?? "");
-  const [avatarInput, setAvatarInput] = useState(user?.image ?? "");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [state, dispatch] = useReducer(profileFormReducer, {
+    avatarInput: user?.image ?? "",
+    error: null,
+    name: user?.name ?? "",
+    saved: false,
+    saving: false,
+    uploading: false,
+  });
+  const { avatarInput, error, name, saved, saving, uploading } = state;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setName(user?.name ?? "");
+    dispatch({ name: user?.name ?? "", type: "syncName" });
   }, [user?.name]);
 
   useEffect(() => {
-    setAvatarInput(user?.image ?? "");
+    dispatch({ avatarInput: user?.image ?? "", type: "syncAvatar" });
   }, [user?.image]);
 
   const trimmedName = name.trim();
@@ -76,8 +131,7 @@ export function ProfileTab() {
       return;
     }
 
-    setSaving(true);
-    setError(null);
+    dispatch({ type: "saveStart" });
 
     try {
       await updateProfile({
@@ -85,43 +139,44 @@ export function ProfileTab() {
         name: trimmedName,
       });
       await refreshOrganizations();
-      setSaved(true);
+      dispatch({ type: "saveSuccess" });
       setTimeout(() => {
-        setSaved(false);
+        dispatch({ type: "clearSaved" });
       }, 2000);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Failed to save changes.");
-    } finally {
-      setSaving(false);
+      dispatch({
+        error: nextError instanceof Error ? nextError.message : "Failed to save changes.",
+        type: "saveError",
+      });
     }
   }
 
   async function handleFileSelected(file: File) {
     if (!file.type.startsWith("image/")) {
-      setError("Please choose an image file.");
+      dispatch({ error: "Please choose an image file.", type: "setError" });
       return;
     }
 
     if (file.size > MAX_AVATAR_FILE_BYTES) {
-      setError("Image must be 5 MB or smaller.");
+      dispatch({ error: "Image must be 5 MB or smaller.", type: "setError" });
       return;
     }
 
     if (!isTruthy(user?.id)) {
-      setError("Unable to upload right now. Please try again.");
+      dispatch({ error: "Unable to upload right now. Please try again.", type: "setError" });
       return;
     }
 
-    setUploading(true);
-    setError(null);
+    dispatch({ type: "uploadStart" });
 
     try {
       const imageUrl = await uploadAccountAvatar(toAccountId(user.id), file);
-      setAvatarInput(imageUrl);
+      dispatch({ avatarInput: imageUrl, type: "uploadSuccess" });
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Failed to upload image.");
-    } finally {
-      setUploading(false);
+      dispatch({
+        error: nextError instanceof Error ? nextError.message : "Failed to upload image.",
+        type: "uploadError",
+      });
     }
   }
 
@@ -198,7 +253,7 @@ export function ProfileTab() {
             placeholder="https://example.com/avatar.png"
             value={avatarInput}
             onChange={(event) => {
-              setAvatarInput(event.target.value);
+              dispatch({ avatarInput: event.target.value, type: "changeAvatar" });
             }}
             className="border-border bg-background text-foreground focus:ring-primary/20 focus:border-primary h-10 w-full rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
           />
@@ -217,7 +272,7 @@ export function ProfileTab() {
             type="text"
             value={name}
             onChange={(event) => {
-              setName(event.target.value);
+              dispatch({ name: event.target.value, type: "changeName" });
             }}
             className="border-border bg-background text-foreground focus:ring-primary/20 focus:border-primary h-10 w-full rounded-lg border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
           />
