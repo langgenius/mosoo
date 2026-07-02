@@ -7,6 +7,7 @@ import { alias } from "drizzle-orm/sqlite-core";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
 import { RUNTIME_SOCKET_TIMEOUT_MS } from "../../domain/runtime-config";
+import { classifyReclaim } from "../../domain/session-run-reclaim-recovery";
 import { setSessionRunStatus } from "../../infrastructure/session-runs/session-run-store.repository";
 
 export interface ActiveRunDriverRow {
@@ -34,19 +35,18 @@ function latestRuntimeObservationMs(row: ActiveRunDriverRow): number {
 }
 
 function staleRunError(row: ActiveRunDriverRow): RunError {
-  const driverFailed = row.driver_status === "failed" || row.driver_status === "stopped";
-  const message =
-    row.driver_error_message ??
-    (driverFailed
-      ? "Runtime driver stopped before the run completed."
-      : "Runtime session became inactive before the run completed.");
+  // A run found stale by the sweep is the same physical event class as a
+  // synchronous socket-close reclaim, so classify it identically (retryable) —
+  // this removes the retryable:true (sync) vs retryable:false (sweep)
+  // contradiction for the same eviction.
+  const driverTerminalStatus =
+    row.driver_status === "failed" || row.driver_status === "stopped" ? row.driver_status : null;
 
-  return {
-    code: driverFailed ? "runtime.driver_stopped" : "runtime.inactive",
-    details: {},
-    message,
-    retryable: false,
-  };
+  return classifyReclaim({
+    driverErrorMessage: row.driver_error_message,
+    driverTerminalStatus,
+    reclaimReason: "heartbeat_stale",
+  });
 }
 
 function shouldFailActiveRunAsStale(row: ActiveRunDriverRow, nowMs: number): boolean {
