@@ -15,10 +15,9 @@ import type { AppDeploymentRunStatus, AppDeploymentTargetKind } from "@mosoo/con
  *   - mutate `deployApp(input)`            -> deploy / redeploy / retry
  *   - mutate `deleteAppDeployment(input)`  -> delete (App deployment + Worker + bindings)
  *
- * Known backend gap (the v0 differentiator): `AppOverviewAgent` does not yet
- * carry the injected public-thread URL. The per-agent `envVar` / `threadUrl`
- * binding below is what the planned `.mosoo.toml [[agents]]` section feeds into
- * the deployment env. See docs/prd/app-deployment.md.
+ * The injected public-thread capability URL is minted per deploy and is NOT
+ * surfaced by `appOverview` (see docs/prd/app-deployment.md), so the console
+ * shows only the binding's env var name, never a URL.
  */
 
 export type AgentExposure = "public_thread";
@@ -30,12 +29,6 @@ export interface BoundAgentVM {
   expose: AgentExposure;
   /** Env var injected into the deployed Worker, e.g. "ROADMAP_THREAD_URL". */
   envVar: string;
-  /**
-   * Public Thread API base the env var resolves to. `null` for live bindings:
-   * the real value is a per-deploy self-authorizing capability URL minted at
-   * deploy time and not surfaced by `appOverview`.
-   */
-  threadUrl: string | null;
 }
 
 /** Run status plus the console-only "superseded" display state for old runs. */
@@ -49,15 +42,20 @@ export const DEPLOY_TARGET_LABELS: Record<AppDeploymentTargetKind, string> = {
 
 export interface DeploymentRunVM {
   id: string;
-  /** Monotonic deploy number shown as "#4" — oldest run is #1. */
-  number: number;
+  /**
+   * Deploy number shown as "#4", counted from the oldest fetched run (#1)
+   * within the run-list window (the server caps the list at 50). `null` while
+   * only the overview's embedded latest run is available — a lone run cannot
+   * know its place in history, so the console shows no number over a wrong one.
+   */
+  number: number | null;
   /** Short commit sha of the default-branch HEAD that was deployed. */
   commitSha: string;
   /** Detected deploy target; `null` while detection has not run yet. */
   targetKind: AppDeploymentTargetKind | null;
   status: DeploymentRunDisplayStatus;
-  /** Relative time label, e.g. "just now", "3h", "1d". */
-  createdLabel: string;
+  /** ISO timestamp the run was created — formatted relative at render time. */
+  createdAt: string;
   liveUrl: string | null;
   errorCode: string | null;
   errorMessage: string | null;
@@ -73,7 +71,6 @@ export interface DeploymentVM {
    * — the console never shows a reserved/planned URL before the first deploy.
    */
   liveUrl: string | null;
-  subdomain: string | null;
 }
 
 export interface DeployConsoleState {
@@ -88,30 +85,21 @@ export const DEPLOY_APP_IDENTITY = {
   appName: "roadmap-board",
   repoUrl: "github.com/me/roadmap-board",
   defaultBranch: "main",
-  subdomain: "roadmap-board.apps.mosoo.ai",
   liveUrl: "https://roadmap-board.apps.mosoo.ai",
 } as const;
 
 const DEPLOY_CONSOLE_AGENTS: BoundAgentVM[] = [
-  {
-    id: "agt_3kf",
-    name: "roadmap",
-    expose: "public_thread",
-    envVar: "ROADMAP_THREAD_URL",
-    threadUrl: "https://api.mosoo.ai/api/v1/agents/agt_3kf/threads",
-  },
-  {
-    id: "agt_9wz",
-    name: "triage",
-    expose: "public_thread",
-    envVar: "TRIAGE_THREAD_URL",
-    threadUrl: "https://api.mosoo.ai/api/v1/agents/agt_9wz/threads",
-  },
+  { id: "agt_3kf", name: "roadmap", expose: "public_thread", envVar: "ROADMAP_THREAD_URL" },
+  { id: "agt_9wz", name: "triage", expose: "public_thread", envVar: "TRIAGE_THREAD_URL" },
 ];
+
+function isoAgo(deltaMs: number): string {
+  return new Date(Date.now() - deltaMs).toISOString();
+}
 
 /** The seeded "happy path" scenario shown on first load — matches the wireframe. */
 export function createDeployConsoleFixture(): DeployConsoleState {
-  const { appName, repoUrl, defaultBranch, subdomain, liveUrl } = DEPLOY_APP_IDENTITY;
+  const { appName, repoUrl, defaultBranch, liveUrl } = DEPLOY_APP_IDENTITY;
 
   return {
     deployment: {
@@ -119,7 +107,6 @@ export function createDeployConsoleFixture(): DeployConsoleState {
       repoUrl,
       defaultBranch,
       liveUrl,
-      subdomain,
     },
     agents: DEPLOY_CONSOLE_AGENTS,
     runs: [
@@ -129,7 +116,7 @@ export function createDeployConsoleFixture(): DeployConsoleState {
         commitSha: "a91c3f",
         targetKind: "cloudflare_worker",
         status: "success",
-        createdLabel: "just now",
+        createdAt: isoAgo(30_000),
         liveUrl,
         errorCode: null,
         errorMessage: null,
@@ -140,7 +127,7 @@ export function createDeployConsoleFixture(): DeployConsoleState {
         commitSha: "7d20ab",
         targetKind: "cloudflare_worker",
         status: "superseded",
-        createdLabel: "3h",
+        createdAt: isoAgo(3 * 3_600_000),
         liveUrl: null,
         errorCode: null,
         errorMessage: null,
@@ -151,7 +138,7 @@ export function createDeployConsoleFixture(): DeployConsoleState {
         commitSha: "1188ee",
         targetKind: "cloudflare_worker",
         status: "superseded",
-        createdLabel: "1d",
+        createdAt: isoAgo(26 * 3_600_000),
         liveUrl: null,
         errorCode: null,
         errorMessage: null,
@@ -162,7 +149,7 @@ export function createDeployConsoleFixture(): DeployConsoleState {
         commitSha: "c0ffee",
         targetKind: "cloudflare_worker",
         status: "superseded",
-        createdLabel: "2d",
+        createdAt: isoAgo(50 * 3_600_000),
         liveUrl: null,
         errorCode: null,
         errorMessage: null,

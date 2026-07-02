@@ -4,14 +4,57 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 import { DEPLOY_TARGET_LABELS } from "../deploy-console-data";
 import type { DeploymentRunVM } from "../deploy-console-data";
+import { relativeLabel } from "../deploy-console-mapping";
+import { useNowTick } from "../use-now-tick";
 import { StatusBadge } from "./deploy-status-badge";
 
-/** Dashed placeholder rendered on the pre-deploy Overview instead of the table. */
-export function ActivityEmptyHint() {
+const PRE_DEPLOY_HINT =
+  "After your first deploy, every build shows up here: commit · status · target · duration.";
+
+function ActivityPlaceholder({ children }: { children: string }) {
   return (
     <p className="text-fg-3 border-border bg-bg-sunken rounded-lg border border-dashed px-4 py-6 text-center text-[13px]">
-      After your first deploy, every build shows up here: commit · status · target · duration.
+      {children}
     </p>
+  );
+}
+
+/**
+ * The Activity block of the Overview: one row per deployment run (newest
+ * first), a dashed placeholder before any run exists, and an inline error when
+ * the run-list read failed while the rest of the page loaded fine.
+ */
+export function ActivitySection({
+  className,
+  error = null,
+  preDeploy = false,
+  runs,
+}: {
+  className?: string;
+  /** `appDeploymentRunList` read error — history is missing, not empty. */
+  error?: string | null;
+  /** Pre-deploy Overview: explain what will appear here instead of "empty". */
+  preDeploy?: boolean;
+  runs: DeploymentRunVM[];
+}) {
+  return (
+    <section className={className}>
+      <h2 className="text-fg-3 mb-3 text-[10.5px] font-semibold tracking-wider uppercase">
+        Activity
+      </h2>
+      {error === null ? null : (
+        <p className="text-destructive mb-2 text-[12.5px]">
+          Couldn&apos;t load the run history: {error}
+        </p>
+      )}
+      {runs.length > 0 ? (
+        <DeploymentsHistory runs={runs} />
+      ) : (
+        <ActivityPlaceholder>
+          {preDeploy ? PRE_DEPLOY_HINT : "No deployment runs yet."}
+        </ActivityPlaceholder>
+      )}
+    </section>
   );
 }
 
@@ -20,13 +63,7 @@ export function ActivityEmptyHint() {
  * branch HEAD; failed runs expose their error inline below the row.
  */
 export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
-  if (runs.length === 0) {
-    return (
-      <p className="text-fg-3 border-border bg-bg-sunken rounded-lg border border-dashed px-4 py-6 text-center text-[13px]">
-        No deployment runs yet.
-      </p>
-    );
-  }
+  const now = useNowTick();
 
   return (
     <div className="border-border bg-background overflow-hidden rounded-lg border">
@@ -49,7 +86,7 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
               <Fragment key={run.id}>
                 <TableRow>
                   <TableCell className="text-fg-1 pl-4 font-mono text-[12.5px]">
-                    #{run.number}
+                    {run.number === null ? "—" : `#${String(run.number)}`}
                   </TableCell>
                   <TableCell className="text-fg-1 font-mono text-[12.5px]">
                     {run.commitSha}
@@ -57,7 +94,9 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                   <TableCell className="text-fg-3 font-mono text-[12px]">
                     {run.targetKind === null ? "—" : DEPLOY_TARGET_LABELS[run.targetKind]}
                   </TableCell>
-                  <TableCell className="text-fg-3 text-[12.5px]">{run.createdLabel}</TableCell>
+                  <TableCell className="text-fg-3 text-[12.5px]">
+                    {relativeLabel(run.createdAt, now)}
+                  </TableCell>
                   <TableCell className="pr-4">
                     <StatusBadge status={run.status} />
                   </TableCell>

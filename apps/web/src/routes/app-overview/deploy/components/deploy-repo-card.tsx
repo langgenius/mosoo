@@ -6,7 +6,9 @@ import { Button } from "@/shared/ui/button";
 import { CommandBlock } from "@/shared/ui/command-block";
 import { Input } from "@/shared/ui/input";
 
-const GITHUB_REPO_URL_PATTERN = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/;
+// Owner/repo charsets mirror the server-side parseGitHubRepoUrl validation
+// (apps/api app-deployment.service.ts): owners have no underscore on GitHub.
+const GITHUB_REPO_URL_PATTERN = /^https:\/\/github\.com\/[A-Za-z0-9.-]+\/[A-Za-z0-9._-]+\/?$/;
 
 const REPO_SHAPE_ERROR = "Enter a public GitHub repo URL like https://github.com/owner/repo.";
 

@@ -6,9 +6,15 @@ import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import SlidersHorizontalIcon from "@hugeicons/core-free-icons/SlidersHorizontalIcon";
 import type { MouseEvent } from "react";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import { cn } from "@/shared/lib/class-names";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import type { AppIcon } from "./hugeicon";
@@ -118,14 +124,16 @@ function NavGroup({
   item: AppNavItem;
   pathname: string;
 }) {
-  const navigate = useNavigate();
   const Icon = item.icon;
   const onPath =
     isNavItemActive(pathname, item.path) ||
     (item.children ?? []).some((child) => isNavItemActive(pathname, child.path));
   const [manuallyExpanded, setManuallyExpanded] = useState<boolean | null>(null);
   const expanded = manuallyExpanded ?? onPath;
-  const parentSelfActive = pathname === item.path;
+  // The group path itself instantly redirects to its first child, so pathname
+  // never equals it — a child on-path is what makes the group "active". The
+  // expanded row defers to the highlighted child link unless disclosure is shut.
+  const rowActive = pathname === item.path || (onPath && !expanded);
 
   function toggleExpansion(event: MouseEvent) {
     event.preventDefault();
@@ -133,33 +141,38 @@ function NavGroup({
     setManuallyExpanded(!expanded);
   }
 
-  function handleCollapsedTrigger() {
-    void navigate(item.path);
-  }
-
   if (collapsed) {
-    const trigger = (
-      <button
-        type="button"
-        aria-label={item.label}
-        aria-expanded={expanded}
-        onClick={handleCollapsedTrigger}
-        className={cn(
-          "flex size-9 items-center justify-center self-center rounded-md text-[13.5px] font-semibold transition-colors",
-          parentSelfActive
-            ? "bg-ink-100 text-fg-1"
-            : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
-        )}
-      >
-        <Icon className="size-4 shrink-0" />
-      </button>
-    );
-
+    // Collapsed rail: the icon opens a menu of the child pages — every child
+    // stays one click away, exactly like when they were top-level items.
     return (
-      <Tooltip>
-        <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-        <TooltipContent side="right">{item.label}</TooltipContent>
-      </Tooltip>
+      <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label={item.label}
+                className={cn(
+                  "flex size-9 items-center justify-center self-center rounded-md text-[13.5px] font-semibold transition-colors",
+                  onPath
+                    ? "bg-ink-100 text-fg-1"
+                    : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
+                )}
+              >
+                <Icon className="size-4 shrink-0" />
+              </button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="right">{item.label}</TooltipContent>
+        </Tooltip>
+        <DropdownMenuContent side="right" align="start">
+          {(item.children ?? []).map((child) => (
+            <DropdownMenuItem key={child.path} asChild>
+              <Link to={child.path}>{child.label}</Link>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   }
 
@@ -168,9 +181,7 @@ function NavGroup({
       <div
         className={cn(
           "group/row flex items-stretch rounded-md transition-colors",
-          parentSelfActive
-            ? "bg-ink-100 text-fg-1"
-            : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
+          rowActive ? "bg-ink-100 text-fg-1" : "text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1",
         )}
       >
         <Link

@@ -7,6 +7,7 @@ import { Button } from "@/shared/ui/button";
 
 import { DEPLOY_TARGET_LABELS } from "../deploy-console-data";
 import type { BoundAgentVM, DeploymentRunVM, DeploymentVM } from "../deploy-console-data";
+import { hostOf } from "../deploy-console-mapping";
 import { BoundAgents } from "./bound-agents";
 import { RepoDeployForm } from "./deploy-repo-card";
 import { DeployUrlCard } from "./deploy-url-card";
@@ -118,7 +119,9 @@ export function DeployOverview({
         style={HATCH_STYLE}
       >
         <span className="bg-background rounded-md px-2.5 py-1 font-mono">
-          {deployment.subdomain === null ? deployment.appName : `live · ${deployment.subdomain}`}
+          {deployment.liveUrl === null
+            ? deployment.appName
+            : `live · ${hostOf(deployment.liveUrl)}`}
         </span>
       </div>
 

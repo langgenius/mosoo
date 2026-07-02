@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { createDeployConsoleFixture, DEPLOY_APP_IDENTITY } from "./deploy-console-data";
 import type { DeployConsoleState, DeploymentRunVM } from "./deploy-console-data";
+import { stripProtocol } from "./deploy-console-mapping";
 
 /**
  * Status steps a freshly triggered deploy walks through. This mirrors the real
@@ -31,6 +32,8 @@ const STEP_INTERVAL_MS = 750;
 export interface DeployConsole {
   state: DeployConsoleState;
   deploying: boolean;
+  /** Mirrors the live console: a redeploy needs an existing deployment. */
+  canDeploy: boolean;
   /** Bind a public GitHub repo and deploy its default branch HEAD. */
   deployRepo: (repoUrl: string) => void;
   /** Re-pull the default branch HEAD and deploy a new run (no rollback). */
@@ -48,11 +51,7 @@ function nextCommitSha(): string {
 }
 
 function nextRunNumber(runs: DeploymentRunVM[]): number {
-  return runs.reduce((max, run) => Math.max(max, run.number), 0) + 1;
-}
-
-function stripProtocol(url: string): string {
-  return url.replace(/^https?:\/\//, "");
+  return runs.reduce((max, run) => Math.max(max, run.number ?? 0), 0) + 1;
 }
 
 export function useDeployConsole(): DeployConsole {
@@ -88,18 +87,24 @@ export function useDeployConsole(): DeployConsole {
           commitSha,
           targetKind: null,
           status: "queued",
-          createdLabel: "just now",
+          createdAt: new Date().toISOString(),
           liveUrl: null,
           errorCode: null,
           errorMessage: null,
         };
-        const deployment = prev.deployment ?? {
-          appName: DEPLOY_APP_IDENTITY.appName,
-          repoUrl: repoUrl === null ? DEPLOY_APP_IDENTITY.repoUrl : stripProtocol(repoUrl),
-          defaultBranch: DEPLOY_APP_IDENTITY.defaultBranch,
-          liveUrl: null,
-          subdomain: null,
-        };
+        // A submitted repo URL re-binds the source even when a deployment
+        // already exists — mirroring the live deployApp semantics.
+        const deployment =
+          prev.deployment === null
+            ? {
+                appName: DEPLOY_APP_IDENTITY.appName,
+                repoUrl: repoUrl === null ? DEPLOY_APP_IDENTITY.repoUrl : stripProtocol(repoUrl),
+                defaultBranch: DEPLOY_APP_IDENTITY.defaultBranch,
+                liveUrl: null,
+              }
+            : repoUrl === null
+              ? prev.deployment
+              : { ...prev.deployment, repoUrl: stripProtocol(repoUrl) };
         return { ...prev, deployment, runs: [inflight, ...prev.runs] };
       });
 
@@ -132,7 +137,6 @@ export function useDeployConsole(): DeployConsole {
                 deployment: {
                   ...prev.deployment,
                   liveUrl: DEPLOY_APP_IDENTITY.liveUrl,
-                  subdomain: DEPLOY_APP_IDENTITY.subdomain,
                 },
               };
             });
@@ -169,5 +173,7 @@ export function useDeployConsole(): DeployConsole {
     setState((prev) => ({ ...prev, deployment: null, runs: [] }));
   }, [clearTimers]);
 
-  return { state, deploying, deployRepo, retryDeploy, failDeploy, deleteDeployment };
+  const canDeploy = state.deployment !== null && !deploying;
+
+  return { state, deploying, canDeploy, deployRepo, retryDeploy, failDeploy, deleteDeployment };
 }

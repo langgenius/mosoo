@@ -10,7 +10,6 @@ import type { AppId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
-import { validationError } from "../../../platform/errors";
 import { toIsoString } from "../../../time";
 import { listAppOwnerAgentRowsPage } from "../../agents/application/agent-repository";
 import { toAgentRuntimeModelProjection } from "../../agents/application/agent-runtime-model-identity";
@@ -27,21 +26,9 @@ import type { AppDeploymentAgentBinding } from "./app-deployment-detector";
 import type { AppDeploymentReadBindings } from "./app-deployment.service";
 import { readAppDeploymentForOwnedApp } from "./app-deployment.service";
 import { ensureAppOwnership, listOrganizationAppsPage, toAppSummary } from "./app.service";
+import { normalizeLimit } from "./normalize-limit";
 
-const DEFAULT_OVERVIEW_LIMIT = 50;
-const MAX_OVERVIEW_LIMIT = 100;
-
-function normalizeOverviewLimit(value: number | null | undefined, field: string): number {
-  if (value === null || value === undefined) {
-    return DEFAULT_OVERVIEW_LIMIT;
-  }
-
-  if (!Number.isInteger(value) || value < 1) {
-    throw validationError(`${field} must be a positive integer.`);
-  }
-
-  return Math.min(value, MAX_OVERVIEW_LIMIT);
-}
+const OVERVIEW_LIMITS = { defaultLimit: 50, maxLimit: 100 };
 
 function toOverviewAgent(row: AgentRow): AppOverviewAgent {
   const runtimeModel = toAgentRuntimeModelProjection(row);
@@ -132,8 +119,8 @@ export async function getAppOverview(
     credentialLimit?: number | null;
   },
 ): Promise<AppOverview> {
-  const agentLimit = normalizeOverviewLimit(input.agentLimit, "agentLimit");
-  const credentialLimit = normalizeOverviewLimit(input.credentialLimit, "credentialLimit");
+  const agentLimit = normalizeLimit(input.agentLimit, "agentLimit", OVERVIEW_LIMITS);
+  const credentialLimit = normalizeLimit(input.credentialLimit, "credentialLimit", OVERVIEW_LIMITS);
   const app = await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
 
   const [agentRows, credentialRows, credentialCounts, deployment] = await Promise.all([
@@ -180,7 +167,7 @@ export async function getControlPlaneOverview(
     credentialLimit?: number | null;
   } = {},
 ): Promise<ControlPlaneOverview> {
-  const appLimit = normalizeOverviewLimit(input.appLimit, "appLimit");
+  const appLimit = normalizeLimit(input.appLimit, "appLimit", OVERVIEW_LIMITS);
   const activeOrganization = await resolveActiveOrganization(bindings.DB, viewer.id);
 
   if (activeOrganization === null) {

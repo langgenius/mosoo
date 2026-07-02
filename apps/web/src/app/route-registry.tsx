@@ -96,7 +96,7 @@ const AppOverview = lazyNamed(
 );
 const AppsList = lazyNamed(async () => import("../routes/apps/apps-list.route"), "AppsListPage");
 const V0DeployPreview = lazyNamed(
-  async () => import("../routes/deployments/v0-deploy-preview.route"),
+  async () => import("../routes/app-overview/deploy/v0-deploy-preview.route"),
   "V0DeployPreviewPage",
 );
 const OrgSettings = lazyNamed(

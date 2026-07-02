@@ -21,16 +21,16 @@ const appDeploymentKeys = {
   all: ["app-deployment"] as const,
   missingOverview: () => [...appDeploymentKeys.overviews(), "missing"] as const,
   missingRunList: () => [...appDeploymentKeys.runLists(), "missing"] as const,
-  missingStatus: () => [...appDeploymentKeys.statuses(), "missing"] as const,
   overview: (appId: string) => [...appDeploymentKeys.overviews(), appId] as const,
   overviews: () => [...appDeploymentKeys.all, "overview"] as const,
   runList: (appId: string) => [...appDeploymentKeys.runLists(), appId] as const,
   runLists: () => [...appDeploymentKeys.all, "run-list"] as const,
-  status: (appId: string) => [...appDeploymentKeys.statuses(), appId] as const,
-  statuses: () => [...appDeploymentKeys.all, "status"] as const,
 };
 
-const IN_FLIGHT_STATUSES: ReadonlySet<AppDeploymentRunStatus> = new Set([
+/** Match the server-side cap so run numbering covers the widest window. */
+const RUN_LIST_LIMIT = 50;
+
+export const IN_FLIGHT_STATUSES: ReadonlySet<AppDeploymentRunStatus> = new Set([
   "activating",
   "building",
   "preparing",
@@ -65,16 +65,21 @@ export function useAppDeploymentOverviewQuery(
   });
 }
 
+/**
+ * Run history for the Activity table. Disabled until the overview shows a
+ * deployment (a pre-deploy app has no runs to fetch), and never polls on its
+ * own — the overview query is the single 2.5s poller while a run is in flight,
+ * and the console refetches this list when the overview's latest run moves.
+ */
 export function useAppDeploymentRunsQuery(
   appId: string | null,
+  hasDeployment: boolean,
 ): UseQueryResult<AppDeploymentRun[]> {
   return useQuery<AppDeploymentRun[]>({
-    enabled: appId !== null,
-    queryFn: async () => listAppDeploymentRuns(toAppId(requireAppId(appId))),
+    enabled: appId !== null && hasDeployment,
+    queryFn: async () => listAppDeploymentRuns(toAppId(requireAppId(appId)), RUN_LIST_LIMIT),
     queryKey:
       appId !== null ? appDeploymentKeys.runList(appId) : appDeploymentKeys.missingRunList(),
-    refetchInterval: (query) =>
-      isDeploymentRunInFlight(query.state.data?.[0]?.status) ? 2_500 : false,
   });
 }
 
@@ -92,7 +97,6 @@ export function useDeployAppMutation(
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: appDeploymentKeys.overview(appId) }),
         queryClient.invalidateQueries({ queryKey: appDeploymentKeys.runList(appId) }),
-        queryClient.invalidateQueries({ queryKey: appDeploymentKeys.status(appId) }),
       ]);
     },
   });
@@ -112,7 +116,6 @@ export function useDeleteAppDeploymentMutation(
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: appDeploymentKeys.overview(appId) }),
         queryClient.invalidateQueries({ queryKey: appDeploymentKeys.runList(appId) }),
-        queryClient.invalidateQueries({ queryKey: appDeploymentKeys.status(appId) }),
       ]);
     },
   });

@@ -32,6 +32,7 @@ import type {
 } from "./app-deployment-cloudflare-client";
 import { destroyAppDeploymentRunSandboxesBestEffort } from "./app-deployment-executor.service";
 import { ensureAppOwnership } from "./app.service";
+import { normalizeLimit } from "./normalize-limit";
 
 type AppDeploymentBindings = Pick<
   ApiBindings,
@@ -57,20 +58,7 @@ interface AppDeploymentServiceOptions {
 
 type JsonRecord = Record<string, unknown>;
 
-const DEFAULT_RUN_LIST_LIMIT = 20;
-const MAX_RUN_LIST_LIMIT = 50;
-
-function normalizeRunListLimit(value: number | null | undefined): number {
-  if (value === null || value === undefined) {
-    return DEFAULT_RUN_LIST_LIMIT;
-  }
-
-  if (!Number.isInteger(value) || value < 1) {
-    throw validationError("limit must be a positive integer.");
-  }
-
-  return Math.min(value, MAX_RUN_LIST_LIMIT);
-}
+const RUN_LIST_LIMITS = { defaultLimit: 20, maxLimit: 50 };
 
 export async function readAppDeploymentForOwnedApp(
   bindings: AppDeploymentReadBindings,
@@ -122,7 +110,7 @@ export async function listAppDeploymentRuns(
 ): Promise<AppDeploymentRun[]> {
   await ensureAppOwnership(bindings.DB, viewer.id, appId);
 
-  const runLimit = normalizeRunListLimit(limit);
+  const runLimit = normalizeLimit(limit, "limit", RUN_LIST_LIMITS);
   const runs = await getAppDatabase(bindings.DB)
     .select()
     .from(appDeploymentRunsTable)

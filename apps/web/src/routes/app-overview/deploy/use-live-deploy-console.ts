@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 import {
   isDeploymentRunInFlight,
@@ -20,8 +20,10 @@ export interface LiveDeployConsole {
   /** A deploy is settling (mutation in flight or the latest run is in progress). */
   deploying: boolean;
   loading: boolean;
-  /** The overview read failed — the page has no deployment state to render. */
+  /** The overview read failed — shown as a banner over whichever body renders. */
   loadError: string | null;
+  /** The run-list read failed — the Activity history is missing, not empty. */
+  runsError: string | null;
   /** The `deployApp` mutation failed — surfaced inline next to the deploy form. */
   deployError: string | null;
   /** The `deleteAppDeployment` mutation failed. */
@@ -41,24 +43,40 @@ export interface LiveDeployConsole {
  * plus `appDeploymentRunList` for the active App and exposes the same shape as
  * the fixture-backed `useDeployConsole`, so the Overview composition renders
  * either without branching.
+ *
+ * Polling discipline: the overview query is the only 2.5s poller while a run
+ * is in flight; the run list refetches whenever the overview's latest run
+ * moves (new run or status change) instead of polling in parallel.
  */
 export function useLiveDeployConsole(
   appId: string | null,
   fallbackName: string,
 ): LiveDeployConsole {
   const overviewQuery = useAppDeploymentOverviewQuery(appId);
-  const runsQuery = useAppDeploymentRunsQuery(appId);
+  const overview = overviewQuery.data ?? null;
+  const deployment = overview?.deployment ?? null;
+
+  const runsQuery = useAppDeploymentRunsQuery(appId, deployment !== null);
   const deployMutation = useDeployAppMutation(appId);
   const deleteMutation = useDeleteAppDeploymentMutation(appId);
 
-  const overview = overviewQuery.data ?? null;
   const runs = runsQuery.data ?? null;
   const state = useMemo<DeployConsoleState>(
     () => (overview === null ? EMPTY_STATE : toDeployConsoleState(overview, runs ?? [])),
     [overview, runs],
   );
 
-  const deployment = overview?.deployment ?? null;
+  // Keep the run list in step with the polled overview without a second
+  // poller: refetch it whenever the latest run appears or changes status.
+  const latestRun = deployment?.latestRun ?? null;
+  const latestRunKey = latestRun === null ? null : `${latestRun.id}:${latestRun.status}`;
+  const refetchRuns = runsQuery.refetch;
+  useEffect(() => {
+    if (latestRunKey !== null) {
+      void refetchRuns();
+    }
+  }, [latestRunKey, refetchRuns]);
+
   const deploying =
     deployMutation.isPending || isDeploymentRunInFlight(deployment?.latestRun?.status);
   const canDeploy = deployment !== null && !deploying && !deleteMutation.isPending;
@@ -98,6 +116,7 @@ export function useLiveDeployConsole(
     loadError: overviewQuery.error?.message ?? null,
     loading: overviewQuery.isLoading,
     retryDeploy,
+    runsError: runsQuery.error?.message ?? null,
     state,
   };
 }
