@@ -62,6 +62,17 @@ export interface DriverConfigRevision {
   readonly sessionId: SessionId;
 }
 
+/**
+ * How the driver mediates tool-permission requests. Mirrors the driver-side
+ * `DriverPermissionPolicy` (agent-driver). `full_access` (default) = the
+ * sandbox is the isolation boundary, tool calls auto-approved with no
+ * control-plane round-trip; `supervised` = route every tool call to the
+ * permission broker for an interactive decision.
+ */
+export type DriverPermissionPolicy = "full_access" | "supervised";
+
+export const DEFAULT_DRIVER_PERMISSION_POLICY = "full_access" satisfies DriverPermissionPolicy;
+
 export interface DriverProfileConfig {
   readonly agentId: AgentId;
   readonly configRevision: DriverConfigRevision;
@@ -69,6 +80,7 @@ export interface DriverProfileConfig {
   readonly envVars: Record<string, string>;
   readonly kind: AgentKind;
   readonly model: string;
+  readonly permissionPolicy: DriverPermissionPolicy;
   readonly prompt: string;
   readonly provider: string;
   readonly providerOptions: JsonObject;
@@ -172,6 +184,7 @@ export interface DriverExecutionSpec {
   readonly configRevision: DriverConfigRevision;
   readonly environment: DriverExecutionEnvironment;
   readonly model: string;
+  readonly permissionPolicy: DriverPermissionPolicy;
   readonly profilePrompt: string;
   readonly provider: string;
   readonly providerOptions: JsonObject;

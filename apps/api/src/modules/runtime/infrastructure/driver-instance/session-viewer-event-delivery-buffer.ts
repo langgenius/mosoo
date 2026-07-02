@@ -2,6 +2,7 @@ import {
   appendCompactedAgUiSessionEvents,
   compactAgUiSessionEvents,
   getAgUiSessionEventDeltaLength,
+  isAgUiSessionRunStartedEvent,
   isAgUiSessionRunTerminalEvent,
 } from "@mosoo/ag-ui-session";
 import { discardPromiseResult, ignorePromiseRejection } from "@mosoo/effects";
@@ -33,12 +34,21 @@ function hasTerminalEvent(events: SessionDeliveryEvent[]): boolean {
   return events.some(isAgUiSessionRunTerminalEvent);
 }
 
+function hasRunStartedEvent(events: SessionDeliveryEvent[]): boolean {
+  return events.some(isAgUiSessionRunStartedEvent);
+}
+
+function hasDeltaEvent(events: SessionDeliveryEvent[]): boolean {
+  return events.some((event) => getAgUiSessionEventDeltaLength(event) > 0);
+}
+
 function estimateDeltaBytes(events: SessionDeliveryEvent[]): number {
   return events.reduce((bytes, event) => bytes + getAgUiSessionEventDeltaLength(event), 0);
 }
 
 export class SessionViewerEventDeliveryBuffer {
   #buffer: BufferedSessionViewerEvents | null = null;
+  #pendingFirstDelta = false;
   readonly #ctx: DurableObjectState;
   readonly #env: ApiBindings;
   #gate: Promise<void> = Promise.resolve();
@@ -73,9 +83,22 @@ export class SessionViewerEventDeliveryBuffer {
       sessionId: buffered?.sessionId ?? sessionId,
     };
 
+    // O2: cut first-token latency. Arm on RUN_STARTED, then flush the first
+    // delta of the run immediately instead of waiting out the 150ms timer.
+    // This fires at most once per run, so per-delta batching for the rest of
+    // the stream is preserved.
+    if (hasRunStartedEvent(compactedEvents)) {
+      this.#pendingFirstDelta = true;
+    }
+    const isFirstDeltaOfRun = this.#pendingFirstDelta && hasDeltaEvent(compactedEvents);
+    if (isFirstDeltaOfRun) {
+      this.#pendingFirstDelta = false;
+    }
+
     if (
       nextEvents.length >= SESSION_VIEWER_EVENT_DELIVERY_MAX_EVENTS ||
       nextDeltaBytes >= SESSION_VIEWER_EVENT_DELIVERY_MAX_DELTA_BYTES ||
+      isFirstDeltaOfRun ||
       hasTerminalEvent(compactedEvents)
     ) {
       this.#startFlush();
@@ -153,6 +176,7 @@ export class SessionViewerEventDeliveryBuffer {
 
   resetAfterFlush(): void {
     this.#buffer = null;
+    this.#pendingFirstDelta = false;
     this.#gate = Promise.resolve();
 
     if (this.#timer !== null) {

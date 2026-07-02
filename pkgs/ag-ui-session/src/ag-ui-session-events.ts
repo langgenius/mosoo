@@ -192,3 +192,7 @@ export function isAgUiSessionRunTerminalEvent(event: AgUiSessionEvent): boolean 
     isTerminalSessionRunStatus(event.value.run.status)
   );
 }
+
+export function isAgUiSessionRunStartedEvent(event: AgUiSessionEvent): boolean {
+  return event.type === EventType.RUN_STARTED;
+}

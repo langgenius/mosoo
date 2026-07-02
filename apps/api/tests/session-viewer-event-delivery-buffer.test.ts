@@ -163,6 +163,43 @@ describe("SessionViewerEventDeliveryBuffer", () => {
     ]);
   });
 
+  test("flushes the first delta of a run immediately, then batches the rest", async () => {
+    const { buffer, published, waitForWaitUntil } = createBufferHarness();
+    const runStarted = {
+      input: null,
+      parentRunId: null,
+      runId: "run-1",
+      threadId: "thread-1",
+      type: "RUN_STARTED",
+    } satisfies AgUiSessionEvent;
+
+    // RUN_STARTED + first delta: must publish without an explicit flush() —
+    // i.e. it bypassed the 150ms timer.
+    buffer.enqueue("session-1", [
+      runStarted,
+      { delta: "hi", messageId: "assistant-1", type: "TEXT_MESSAGE_CONTENT" },
+    ]);
+    await waitForWaitUntil();
+
+    expect(published).toHaveLength(1);
+    expect(published[0]?.events).toContainEqual({
+      delta: "hi",
+      messageId: "assistant-1",
+      type: "TEXT_MESSAGE_CONTENT",
+    });
+
+    // A subsequent small delta must NOT flush immediately (batching preserved):
+    // nothing new is published until an explicit flush.
+    buffer.enqueue("session-1", [
+      { delta: "there", messageId: "assistant-1", type: "TEXT_MESSAGE_CONTENT" },
+    ]);
+    await waitForWaitUntil();
+    expect(published).toHaveLength(1);
+
+    await buffer.flush();
+    expect(published).toHaveLength(2);
+  });
+
   test("requeues failed deliveries before events enqueued during the failed publish", async () => {
     const { buffer, published, pushResponse, waitForPublish } = createBufferHarness();
     const failedResponse = createDeferred<Response>();
