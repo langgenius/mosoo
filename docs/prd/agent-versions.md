@@ -26,7 +26,7 @@ On top of that:
 
 - With a 4-week launch window and 3 engineers, **Terminal / Logs / Files are the capabilities the ops surface actually lacks**.
 - The "what if we publish the wrong version and need to roll back" case has no real evidence of frequency pre-launch (and if it does happen, a quick shout in Slack and we roll it back by hand).
-- Applying Musk's "delete 10% then add it back" test to the 10 scope items in v1.1: 9 of them would not be added back after deletion — a sign of over-engineering.
+- Applying Musk's deletion test (delete aggressively; if you don't end up adding back at least 10% of what you deleted, you didn't delete enough) to the 10 scope items in v1.1: 9 of them would not be added back after deletion — a sign of over-engineering.
 
 So: **the v1.1 design is frozen and kept on the shelf, to be picked back up when a real signal appears.** The Versions tab UI does not change by a single character.
 
