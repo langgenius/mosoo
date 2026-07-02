@@ -45,7 +45,7 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 - [MCP (Connector)](./mcp-interaction.md)
 - [Skill](./skill-interaction.md)
 - [Files API Contract](./files-api-contract.md) — Files Library plus session-scoped attachments/artifacts.
-- [Space](./space-interaction.md) — **superseded** by scoped Files (#64); retained for history only.
+- Space — **superseded** by [Files API Contract](./files-api-contract.md) (#64).
 - [Credentials](./credentials.md) — Provider and MCP secrets owned by the active App; runtime resolves them from that same App boundary.
 
 Surface boundary: public HTTPS exposure is an Agent API Endpoint inside one App. Thread is the public conversation object, Session is the runtime record, and Thread files are scoped to the admitted Thread/backing Session. Organization remains account and billing context, not a public API authorization boundary.

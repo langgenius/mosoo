@@ -44,14 +44,14 @@ heroAlt: "A young moso bamboo culm pushing through paper"
 In the post body, use standard markdown:
 
 ```md
-![A young moso bamboo culm pushing through paper](/blog/blog/the-journey-begins-with-an-imagine-if/culm.jpg)
+![A young moso bamboo culm pushing through paper](/blog/blog/the-journey-begins-with-an-imagine-if/hero.jpg)
 ```
 
 Add a caption by wrapping in a `<figure>`:
 
 ```mdx
 <figure>
-  ![Alt text](/blog/blog/the-journey-begins-with-an-imagine-if/culm.jpg)
+  ![Alt text](/blog/blog/the-journey-begins-with-an-imagine-if/hero.jpg)
   <figcaption>A young moso bamboo culm pushing through paper.</figcaption>
 </figure>
 ```
