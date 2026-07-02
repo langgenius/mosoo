@@ -1,9 +1,26 @@
+import { lazy } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
 import { UploadRecoveryDialog } from "../features/files/upload-recovery/upload-recovery-dialog";
-import { Layout, OrgLayout } from "./app-shell";
 import { useAppSession } from "./session-provider";
+
+// The authenticated app shell (sidebar navigation, account/help menus, org
+// chrome) only renders once a signed-in user clears the guards below. Loading
+// it lazily keeps the whole shell subtree out of the entry chunk, so the
+// public /login + landing route — the cold-start page for first-time and
+// logged-out visitors, where the shell never mounts — no longer pays to
+// download it. Both wrappers pull the same "./app-shell" module, so they share
+// one chunk and a signed-in visitor fetches it in parallel with the first route
+// chunk (both are dynamic imports resolved after the same auth check).
+const Layout = lazy(async () => {
+  const appShell = await import("./app-shell");
+  return { default: appShell.Layout };
+});
+const OrgLayout = lazy(async () => {
+  const appShell = await import("./app-shell");
+  return { default: appShell.OrgLayout };
+});
 
 interface RouteChildrenProps {
   children: ReactNode;
