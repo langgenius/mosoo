@@ -28,6 +28,7 @@ import {
 } from "./app-agent-bound-call";
 import type { BoundAgentCallInput } from "./app-agent-bound-call";
 import { publicNotFound } from "./public-api-errors";
+import { enforcePublicApiRateLimit } from "./public-api-rate-limit.service";
 import { readPublicThreadRunFinalOutput } from "./public-thread-events";
 import { cleanupFailedThreadCreation } from "./public-thread-store";
 
@@ -154,6 +155,12 @@ export async function createBoundAgentThreadAndWait(
 
   const agent = await getAgentRow(request.bindings.DB, claims.agentId);
   ensureBoundAgentServable(agent, claims);
+
+  // The capability URL is keyless, long-lived, and internet-facing: without a
+  // limit a single leaked URL could launch unbounded owner-billed runs. Reuse
+  // the shared public-API limiter keyed on the capability identity, in a
+  // dedicated `bound:` bucket namespace so it never collides with PAT tokenIds.
+  await enforcePublicApiRateLimit(request.bindings.DB, `bound:${agent.appId}:${agent.id}`);
 
   const ownerViewer = await resolveBoundAgentOwnerViewer(request.bindings, agent.appId);
 
