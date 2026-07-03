@@ -52,6 +52,11 @@ import type {
   ScheduledMaintenanceCommandPayload,
   SessionRunDispatchCommandPayload,
 } from "./api-command-payload";
+import {
+  APP_DEPLOYMENT_RUN_DISPATCH_MAX_ATTEMPTS,
+  APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE,
+  createAppDeploymentDispatchRetryExhaustedMessage,
+} from "./api-command-policy";
 
 const API_COMMAND_RETRY_DELAY_SECONDS = 30;
 
@@ -560,20 +565,36 @@ export async function processApiCommandMessage(
       kind: claim.kind,
     });
 
-    const shouldFailAppDeploymentRun =
+    const appDeploymentRunHasTerminalError =
       claim.kind === "app_deployment_run_dispatch" &&
       (error instanceof ApiCommandPayloadError ||
         (error instanceof Error &&
           (error.name === "AppDeploymentDetectionError" ||
             error.name === "AppDeploymentNonRetryableError")));
+    const appDeploymentRunRetryExhausted =
+      claim.kind === "app_deployment_run_dispatch" &&
+      !appDeploymentRunHasTerminalError &&
+      claim.attemptCount >= APP_DEPLOYMENT_RUN_DISPATCH_MAX_ATTEMPTS;
+    const shouldFailAppDeploymentRun =
+      appDeploymentRunHasTerminalError || appDeploymentRunRetryExhausted;
 
     if (shouldFailAppDeploymentRun) {
       const failedAtMs = nowMs();
+      const failureCode = appDeploymentRunRetryExhausted
+        ? APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE
+        : errorCode;
+      const failureMessage = appDeploymentRunRetryExhausted
+        ? createAppDeploymentDispatchRetryExhaustedMessage({
+            attemptCount: claim.attemptCount,
+            lastErrorMessage: errorMessage,
+          })
+        : errorMessage;
+
       await failAppDeploymentRunFromPayloadJson(
         bindings,
         {
-          errorCode,
-          errorMessage,
+          errorCode: failureCode,
+          errorMessage: failureMessage,
           fallbackDedupeKey: claim.dedupeKey,
           nowMs: failedAtMs,
           payloadJson: claim.payloadJson,
@@ -584,8 +605,8 @@ export async function processApiCommandMessage(
       await markApiCommandFailed({
         commandId,
         database: bindings.DB,
-        errorCode,
-        errorMessage,
+        errorCode: failureCode,
+        errorMessage: failureMessage,
         nowMs: failedAtMs,
         ownerId,
       });

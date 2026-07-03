@@ -94,6 +94,7 @@ function toDeploymentVM(
     appName,
     defaultBranch: deployment.defaultBranch,
     liveUrl,
+    plannedUrl: deployment.plannedUrl,
     repoUrl: stripProtocol(deployment.repoUrl),
   };
 }

@@ -67,8 +67,14 @@ export interface DeploymentVM {
   repoUrl: string;
   defaultBranch: string;
   /**
-   * Mosoo-managed URL the app is served from. `null` until a run has succeeded
-   * — the console never shows a reserved/planned URL before the first deploy.
+   * Mosoo-managed production URL reserved for this deployment. It may exist
+   * before a deploy succeeds, so the console can show the production pipe
+   * independently from the current run status.
+   */
+  plannedUrl: string | null;
+  /**
+   * Mosoo-managed URL currently serving production traffic. `null` until a run
+   * has reached the live state.
    */
   liveUrl: string | null;
 }
@@ -85,6 +91,7 @@ export const DEPLOY_APP_IDENTITY = {
   appName: "roadmap-board",
   repoUrl: "github.com/me/roadmap-board",
   defaultBranch: "main",
+  plannedUrl: "https://roadmap-board.apps.mosoo.ai",
   liveUrl: "https://roadmap-board.apps.mosoo.ai",
 } as const;
 
@@ -99,13 +106,14 @@ function isoAgo(deltaMs: number): string {
 
 /** The seeded "happy path" scenario shown on first load — matches the wireframe. */
 export function createDeployConsoleFixture(): DeployConsoleState {
-  const { appName, repoUrl, defaultBranch, liveUrl } = DEPLOY_APP_IDENTITY;
+  const { appName, repoUrl, defaultBranch, plannedUrl, liveUrl } = DEPLOY_APP_IDENTITY;
 
   return {
     deployment: {
       appName,
       repoUrl,
       defaultBranch,
+      plannedUrl,
       liveUrl,
     },
     agents: DEPLOY_CONSOLE_AGENTS,

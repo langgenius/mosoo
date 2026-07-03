@@ -366,6 +366,23 @@ function createApiTestSchema(database: SqliteD1Database): void {
       url text
     );
 
+    CREATE TABLE api_command (
+      attempt_count integer DEFAULT 0 NOT NULL,
+      claim_expires_at integer,
+      claim_owner text,
+      completed_at integer,
+      created_at integer NOT NULL,
+      dedupe_key text NOT NULL,
+      id text PRIMARY KEY NOT NULL,
+      kind text NOT NULL,
+      last_error_code text,
+      last_error_message text,
+      payload_json text NOT NULL,
+      status text NOT NULL,
+      updated_at integer NOT NULL
+    );
+    CREATE UNIQUE INDEX api_command_dedupe_idx ON api_command (dedupe_key);
+
     CREATE TABLE agent (
       config_json text NOT NULL,
       created_at integer NOT NULL,

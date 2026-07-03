@@ -7,7 +7,7 @@ import type {
 } from "@mosoo/contracts/app";
 import { appDeploymentRunsTable } from "@mosoo/db";
 import type { AppId } from "@mosoo/id";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { toIsoString } from "../../../time";
@@ -68,17 +68,41 @@ async function readDeploymentAgentBindings(
   deployment: AppOverview["deployment"],
 ): Promise<AppDeploymentAgentBinding[]> {
   const latestRunId = deployment?.latestRun?.id ?? null;
+  const deploymentId = deployment?.id ?? null;
 
-  if (latestRunId === null) {
+  if (deploymentId === null) {
     return [];
   }
 
-  const rows = await getAppDatabase(bindings.DB)
-    .select({ planJson: appDeploymentRunsTable.planJson })
-    .from(appDeploymentRunsTable)
-    .where(eq(appDeploymentRunsTable.id, latestRunId))
-    .all();
-  const planJson = rows[0]?.planJson ?? null;
+  const latestRunPlan =
+    latestRunId === null
+      ? null
+      : ((await getAppDatabase(bindings.DB)
+          .select({ planJson: appDeploymentRunsTable.planJson })
+          .from(appDeploymentRunsTable)
+          .where(eq(appDeploymentRunsTable.id, latestRunId))
+          .limit(1)
+          .get()) ?? null);
+
+  let planJson = latestRunPlan?.planJson ?? null;
+
+  if (planJson === null) {
+    const latestParsedPlan =
+      (await getAppDatabase(bindings.DB)
+        .select({ planJson: appDeploymentRunsTable.planJson })
+        .from(appDeploymentRunsTable)
+        .where(
+          and(
+            eq(appDeploymentRunsTable.deploymentId, deploymentId),
+            isNotNull(appDeploymentRunsTable.planJson),
+          ),
+        )
+        .orderBy(desc(appDeploymentRunsTable.id))
+        .limit(1)
+        .get()) ?? null;
+
+    planJson = latestParsedPlan?.planJson ?? null;
+  }
 
   if (planJson === null) {
     return [];

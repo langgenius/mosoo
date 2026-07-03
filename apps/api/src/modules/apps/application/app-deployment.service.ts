@@ -4,11 +4,11 @@ import type {
   DeleteAppDeploymentInput,
   DeployAppInput,
 } from "@mosoo/contracts/app";
-import type { AppDeploymentRunRow, AppDeploymentRow } from "@mosoo/db";
+import type { ApiCommandId, AppDeploymentRunRow, AppDeploymentRow } from "@mosoo/db";
 import { apiCommandsTable, appDeploymentRunsTable, appDeploymentsTable } from "@mosoo/db";
 import type { AppDeploymentId, AppDeploymentRunId, AppId } from "@mosoo/id";
 import { createPlatformId } from "@mosoo/id";
-import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, getD1ChangeCount } from "../../../platform/db/drizzle";
@@ -19,6 +19,11 @@ import {
   enqueueAppDeploymentRunDispatchCommand,
 } from "../../api-command/application/api-command-enqueue";
 import { API_COMMAND_LEASE_MS } from "../../api-command/application/api-command-ledger";
+import {
+  APP_DEPLOYMENT_RUN_DISPATCH_MAX_ATTEMPTS,
+  APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE,
+  createAppDeploymentDispatchRetryExhaustedMessage,
+} from "../../api-command/application/api-command-policy";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ACTIVE_APP_DEPLOYMENT_RUN_STATUSES } from "../domain/app-deployment-lifecycle";
 import {
@@ -70,6 +75,8 @@ export async function readAppDeploymentForOwnedApp(
     return null;
   }
 
+  await recoverStaleActiveDeploymentRun(bindings.DB, appId);
+
   const latestRun = await readLatestDeploymentRun(bindings.DB, appId);
 
   return toAppDeployment(deployment, latestRun, bindings.MOSOO_APP_DEPLOYMENT_DOMAIN);
@@ -90,6 +97,7 @@ export async function getAppDeploymentStatus(
   appId: AppId,
 ): Promise<AppDeploymentRun | null> {
   await ensureAppOwnership(bindings.DB, viewer.id, appId);
+  await recoverStaleActiveDeploymentRun(bindings.DB, appId);
 
   const run = await readLatestDeploymentRun(bindings.DB, appId);
 
@@ -109,6 +117,7 @@ export async function listAppDeploymentRuns(
   limit?: number | null,
 ): Promise<AppDeploymentRun[]> {
   await ensureAppOwnership(bindings.DB, viewer.id, appId);
+  await recoverStaleActiveDeploymentRun(bindings.DB, appId);
 
   const runLimit = normalizeLimit(limit, "limit", RUN_LIST_LIMITS);
   const runs = await getAppDatabase(bindings.DB)
@@ -496,21 +505,53 @@ async function readActiveDeploymentRun(
   const nowMs = currentTimestampMs();
   const dispatchCommand =
     (await getAppDatabase(database)
-      .select({ id: apiCommandsTable.id })
+      .select({
+        attemptCount: apiCommandsTable.attemptCount,
+        claimExpiresAt: apiCommandsTable.claimExpiresAt,
+        id: apiCommandsTable.id,
+        lastErrorCode: apiCommandsTable.lastErrorCode,
+        lastErrorMessage: apiCommandsTable.lastErrorMessage,
+        status: apiCommandsTable.status,
+      })
       .from(apiCommandsTable)
-      .where(
-        and(
-          eq(apiCommandsTable.dedupeKey, createAppDeploymentRunDispatchDedupeKey(run.id)),
-          or(
-            eq(apiCommandsTable.status, "queued"),
-            and(eq(apiCommandsTable.status, "running"), gt(apiCommandsTable.claimExpiresAt, nowMs)),
-          ),
-        ),
-      )
+      .where(eq(apiCommandsTable.dedupeKey, createAppDeploymentRunDispatchDedupeKey(run.id)))
       .limit(1)
       .get()) ?? null;
 
-  if (dispatchCommand !== null) {
+  const dispatchRetryExhausted =
+    dispatchCommand !== null &&
+    (dispatchCommand.status === "queued" || dispatchCommand.status === "running") &&
+    dispatchCommand.attemptCount >= APP_DEPLOYMENT_RUN_DISPATCH_MAX_ATTEMPTS &&
+    dispatchCommand.lastErrorCode !== null;
+
+  if (dispatchRetryExhausted) {
+    const errorMessage = createAppDeploymentDispatchRetryExhaustedMessage({
+      attemptCount: dispatchCommand.attemptCount,
+      lastErrorMessage: dispatchCommand.lastErrorMessage ?? dispatchCommand.lastErrorCode,
+    });
+
+    await markDeploymentRunFailed(
+      database,
+      run.id,
+      APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE,
+      new Error(errorMessage),
+      nowMs,
+    );
+    await markDeploymentDispatchCommandFailed(database, dispatchCommand.id, {
+      errorCode: APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE,
+      errorMessage,
+      nowMs,
+    });
+
+    return null;
+  }
+
+  if (
+    dispatchCommand?.status === "queued" ||
+    (dispatchCommand?.status === "running" &&
+      dispatchCommand.claimExpiresAt !== null &&
+      dispatchCommand.claimExpiresAt > nowMs)
+  ) {
     return run;
   }
 
@@ -518,15 +559,53 @@ async function readActiveDeploymentRun(
     return run;
   }
 
+  const staleDispatch =
+    dispatchCommand?.status === "running" &&
+    dispatchCommand.claimExpiresAt !== null &&
+    dispatchCommand.claimExpiresAt <= nowMs;
+
   await markDeploymentRunFailed(
     database,
     run.id,
-    "deployment_dispatch_missing",
-    new Error("Deployment dispatch command is missing."),
+    staleDispatch ? "deployment_dispatch_expired" : "deployment_dispatch_missing",
+    new Error(
+      staleDispatch
+        ? "Deployment dispatch claim expired before completion."
+        : "Deployment dispatch command is missing.",
+    ),
     nowMs,
   );
 
   return null;
+}
+
+async function markDeploymentDispatchCommandFailed(
+  database: D1Database,
+  commandId: ApiCommandId,
+  input: { errorCode: string; errorMessage: string; nowMs: number },
+): Promise<void> {
+  await getAppDatabase(database)
+    .update(apiCommandsTable)
+    .set({
+      claimExpiresAt: null,
+      claimOwner: null,
+      completedAt: input.nowMs,
+      lastErrorCode: input.errorCode,
+      lastErrorMessage: input.errorMessage,
+      status: "failed",
+      updatedAt: input.nowMs,
+    })
+    .where(
+      and(
+        eq(apiCommandsTable.id, commandId),
+        inArray(apiCommandsTable.status, ["queued", "running"]),
+      ),
+    )
+    .run();
+}
+
+async function recoverStaleActiveDeploymentRun(database: D1Database, appId: AppId): Promise<void> {
+  await readActiveDeploymentRun(database, appId, { recoverMissingDispatch: true });
 }
 
 async function markDeploymentRunFailed(
