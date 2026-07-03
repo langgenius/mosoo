@@ -5,32 +5,26 @@ import type { ReactElement, ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { fetchAgentCost } from "@/domains/cost/api/cost-client";
-import type { CostRunPurpose } from "@/domains/cost/api/cost-client";
 import { exportAttributionCostCsv } from "@/routes/cost/cost-csv";
 import {
   COST_RANGES,
+  RUN_PURPOSE_FILTERS,
   cacheHitRate,
   formatCompactNumber,
   formatCurrency,
   formatPlainPercent,
   rangeToInput,
+  runPurposeToQuery,
   tokensTotal,
 } from "@/routes/cost/cost-model";
-import type { CostRange } from "@/routes/cost/cost-model";
+import type { CostRange, CostRunPurpose } from "@/routes/cost/cost-model";
 import { toAgentId, toAppId } from "@/routes/typed-id";
 import { cn } from "@/shared/lib/class-names";
-
-const RUN_PURPOSES: { label: string; value: CostRunPurpose | "all" }[] = [
-  { label: "All", value: "all" },
-  { label: "Production", value: "production" },
-  { label: "Debug", value: "debug" },
-  { label: "Preview", value: "preview" },
-];
 
 export function AgentCostTab({ agentId, appId }: { agentId: string; appId: string }): ReactElement {
   const [range, setRange] = useState<CostRange>("30d");
   const [purpose, setPurpose] = useState<CostRunPurpose | "all">("all");
-  const runPurposes = purpose === "all" ? [] : [purpose];
+  const runPurposes = runPurposeToQuery(purpose);
   const { data: card, isLoading } = useQuery({
     queryFn: async () =>
       fetchAgentCost({
@@ -93,7 +87,7 @@ export function AgentCostTab({ agentId, appId }: { agentId: string; appId: strin
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {RUN_PURPOSES.map((item) => (
+          {RUN_PURPOSE_FILTERS.map((item) => (
             <button
               key={item.value}
               type="button"
@@ -211,7 +205,7 @@ export function AgentCostTab({ agentId, appId }: { agentId: string; appId: strin
 
         <div className="border-border bg-card text-muted-foreground flex items-center gap-2 rounded-lg border px-4 py-3 text-xs">
           <BarChart3 className="size-3.5" />
-          Agent cost includes production, debug, and preview run purposes.
+          Agent cost separates production usage from debug usage.
         </div>
       </div>
     </div>
