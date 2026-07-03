@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 
+import { DocumentTitle } from "./document-title";
 import { AppLoading } from "./route-guards";
 import { AppRoutes } from "./route-registry";
 
@@ -7,8 +8,11 @@ const appLoadingFallback = <AppLoading />;
 
 export function App() {
   return (
-    <Suspense fallback={appLoadingFallback}>
-      <AppRoutes />
-    </Suspense>
+    <>
+      <DocumentTitle />
+      <Suspense fallback={appLoadingFallback}>
+        <AppRoutes />
+      </Suspense>
+    </>
   );
 }
