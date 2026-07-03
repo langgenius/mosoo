@@ -22,6 +22,7 @@ import type { HydratedSessionRunContext } from "../session-definition/session-ex
 import { cleanupDispatchedDriver } from "./dispatch-run-cleanup.service";
 import { persistSessionRunSkills } from "./session-run-skill-snapshot.repository";
 import {
+  acquireSessionRunDispatch,
   SessionRunNoLongerActiveError,
   ensureSessionRunIsActive,
   getSessionRunState,
@@ -125,10 +126,7 @@ export async function dispatchSessionRun(
 
     await persistSessionRunSkills(bindings.DB, input.sessionRunId, input.resolvedSkills);
 
-    const bootingRun = await updateSessionRunStatusIfActive(bindings.DB, {
-      runId: input.sessionRunId,
-      status: "booting",
-    });
+    const bootingRun = await acquireSessionRunDispatch(bindings.DB, input.sessionRunId);
 
     if (!bootingRun) {
       const state = await getSessionRunState(bindings.DB, input.sessionRunId);
