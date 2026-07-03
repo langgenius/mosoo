@@ -512,18 +512,23 @@
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(28, 32, 36, 0.12);
-  border-radius: 3px;
+  background: rgba(28, 32, 36, 0.07);
+  border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(28, 32, 36, 0.2);
+  background: rgba(28, 32, 36, 0.16);
+}
+
+html {
+  scrollbar-color: rgba(28, 32, 36, 0.08) transparent;
+  scrollbar-width: thin;
 }
 
 /* Streaming "Thinking…" indicator — a soft highlight sweeping left-to-right. */

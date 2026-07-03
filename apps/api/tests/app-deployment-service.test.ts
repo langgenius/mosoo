@@ -4,6 +4,10 @@ import { apiCommandsTable, appDeploymentRunsTable, appDeploymentsTable } from "@
 import { eq } from "drizzle-orm";
 
 import { createAppDeploymentRunDispatchDedupeKey } from "../src/modules/api-command/application/api-command-enqueue";
+import {
+  APP_DEPLOYMENT_RUN_DISPATCH_MAX_ATTEMPTS,
+  APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE,
+} from "../src/modules/api-command/application/api-command-policy";
 import { processApiCommandDeadLetterMessage } from "../src/modules/api-command/application/api-command-processor";
 import type { CloudflareDeploymentClient } from "../src/modules/apps/application/app-deployment-cloudflare-client";
 import type { AppDeploymentBuildRunner } from "../src/modules/apps/application/app-deployment-executor.service";
@@ -202,6 +206,66 @@ async function seedExpiredRunningDispatch(
     .bind(createAppDeploymentRunDispatchDedupeKey(runId))
     .run();
   await setDeploymentRunUpdatedAt(database, runId, 1);
+}
+
+async function seedExhaustedRunningDispatch(
+  database: SqliteD1Database,
+  runId: string,
+): Promise<void> {
+  await database
+    .prepare(
+      `UPDATE api_command
+       SET status = 'running',
+           claim_owner = 'worker-owner',
+           claim_expires_at = ?,
+           attempt_count = ?,
+           last_error_code = 'SandboxError',
+           last_error_message = 'Container is starting. Please retry in a moment.'
+       WHERE dedupe_key = ?`,
+    )
+    .bind(
+      NOW_MS + 60_000,
+      APP_DEPLOYMENT_RUN_DISPATCH_MAX_ATTEMPTS,
+      createAppDeploymentRunDispatchDedupeKey(runId),
+    )
+    .run();
+}
+
+async function seedQueuedDispatch(database: SqliteD1Database, runId: string): Promise<void> {
+  await database
+    .prepare(
+      `INSERT INTO api_command (
+        attempt_count,
+        claim_expires_at,
+        claim_owner,
+        completed_at,
+        created_at,
+        dedupe_key,
+        id,
+        kind,
+        last_error_code,
+        last_error_message,
+        payload_json,
+        status,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      0,
+      null,
+      null,
+      null,
+      NOW_MS,
+      createAppDeploymentRunDispatchDedupeKey(runId),
+      `cmd-${runId}`,
+      "app_deployment_run_dispatch",
+      null,
+      null,
+      JSON.stringify({ appDeploymentRunId: runId }),
+      "queued",
+      NOW_MS,
+    )
+    .run();
 }
 
 async function seedDeployment(
@@ -512,12 +576,12 @@ describe("app deployment service", () => {
       .get();
 
     expect(firstRunRow).toMatchObject({
-      errorCode: "deployment_dispatch_missing",
+      errorCode: "deployment_dispatch_expired",
       status: "failed",
     });
   });
 
-  test("does not fail an expired running dispatch command from status reads", async () => {
+  test("recovers an active deployment run with an expired running dispatch from reads", async () => {
     const database = createDatabase();
     const { bindings } = createBindings(database);
 
@@ -531,9 +595,26 @@ describe("app deployment service", () => {
     await seedExpiredRunningDispatch(database, run.id);
 
     await expect(getAppDeploymentStatus(bindings, VIEWER, APP_ID)).resolves.toMatchObject({
+      errorCode: "deployment_dispatch_expired",
       id: run.id,
-      status: "queued",
+      status: "failed",
     });
+
+    await expect(getAppDeployment(bindings, VIEWER, APP_ID)).resolves.toMatchObject({
+      latestRun: {
+        errorCode: "deployment_dispatch_expired",
+        id: run.id,
+        status: "failed",
+      },
+    });
+
+    await expect(listAppDeploymentRuns(bindings, VIEWER, APP_ID, 10)).resolves.toEqual([
+      expect.objectContaining({
+        errorCode: "deployment_dispatch_expired",
+        id: run.id,
+        status: "failed",
+      }),
+    ]);
 
     const runRow = await database
       .app()
@@ -544,9 +625,56 @@ describe("app deployment service", () => {
       .get();
 
     expect(runRow).toMatchObject({
-      errorCode: null,
-      status: "queued",
+      errorCode: "deployment_dispatch_expired",
+      status: "failed",
     });
+  });
+
+  test("fails an active deployment run when dispatch retries are exhausted", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+
+    const firstRun = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+
+    await seedExhaustedRunningDispatch(database, firstRun.id);
+
+    await expect(getAppDeploymentStatus(bindings, VIEWER, APP_ID)).resolves.toMatchObject({
+      errorCode: APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE,
+      errorMessage: expect.stringContaining("Container is starting"),
+      id: firstRun.id,
+      status: "failed",
+    });
+
+    const dispatchCommand = await database
+      .app()
+      .select({
+        lastErrorCode: apiCommandsTable.lastErrorCode,
+        status: apiCommandsTable.status,
+      })
+      .from(apiCommandsTable)
+      .where(eq(apiCommandsTable.dedupeKey, createAppDeploymentRunDispatchDedupeKey(firstRun.id)))
+      .limit(1)
+      .get();
+
+    expect(dispatchCommand).toMatchObject({
+      lastErrorCode: APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE,
+      status: "failed",
+    });
+
+    const secondRun = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS + 1 },
+    );
+
+    expect(secondRun.id).not.toBe(firstRun.id);
+    expect(secondRun.status).toBe("queued");
   });
 
   test("keeps a fresh active deployment run without a dispatch command active", async () => {
@@ -918,6 +1046,7 @@ describe("app deployment service", () => {
       runId: runListRunId(3),
       status: "queued",
     });
+    await seedQueuedDispatch(database, runListRunId(3));
 
     const runs = await listAppDeploymentRuns(bindings, VIEWER, APP_ID);
 

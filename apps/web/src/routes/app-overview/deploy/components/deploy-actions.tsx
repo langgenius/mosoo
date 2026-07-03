@@ -19,6 +19,9 @@ import {
 } from "@/shared/ui/dropdown-menu";
 
 import type { DeploymentRunDisplayStatus } from "../deploy-console-data";
+import type { LocalDeploymentPreviewStatus } from "../local-preview-url";
+
+type DeployActionScope = "development" | "production";
 
 /**
  * Header actions for a deployed App: the primary Redeploy/Retry button, plus an
@@ -33,6 +36,8 @@ export function DeployActions({
   canDeploy,
   onRetry,
   onDelete,
+  scope = "production",
+  developmentStatus = null,
 }: {
   appName: string;
   agentCount: number;
@@ -41,10 +46,23 @@ export function DeployActions({
   canDeploy: boolean;
   onRetry: () => void;
   onDelete: () => void;
+  scope?: DeployActionScope;
+  developmentStatus?: LocalDeploymentPreviewStatus | null;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  const label = deploying ? "Deploying…" : latestStatus === "failed" ? "Retry" : "Redeploy";
+  const label =
+    scope === "development"
+      ? deploying
+        ? "Checking development..."
+        : developmentStatus === "online"
+          ? "Refresh development"
+          : "Retry development"
+      : deploying
+        ? "Refreshing production…"
+        : latestStatus === "failed"
+          ? "Retry production"
+          : "Refresh production";
 
   function confirmDelete() {
     onDelete();

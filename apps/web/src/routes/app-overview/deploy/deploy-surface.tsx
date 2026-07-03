@@ -1,8 +1,9 @@
-import { Box } from "lucide-react";
+import { Box, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "@/shared/lib/class-names";
 import { AppIdBadge } from "@/shared/ui/app-id-badge";
+import { Badge } from "@/shared/ui/badge";
 
 import { DeployActions } from "./components/deploy-actions";
 import { DeployOverview } from "./components/deploy-overview";
@@ -10,6 +11,8 @@ import { DeployRepoCard } from "./components/deploy-repo-card";
 import { StatusBadge } from "./components/deploy-status-badge";
 import { ActivitySection } from "./components/deployments-history";
 import type { DeployConsoleState } from "./deploy-console-data";
+import type { LocalDeploymentPreviewState } from "./local-preview-url";
+import { useLocalDeploymentPreview } from "./local-preview-url";
 
 /** The console shape both data sources (live GraphQL, fixture) expose. */
 export interface DeployConsoleController {
@@ -30,6 +33,32 @@ function LoadErrorBanner({ className, message }: { className?: string; message: 
   );
 }
 
+function DevelopmentPreviewBadge({ localPreview }: { localPreview: LocalDeploymentPreviewState }) {
+  if (localPreview.url === null) {
+    return null;
+  }
+
+  if (localPreview.status === "online") {
+    return (
+      <Badge variant="success">
+        <span className="size-1.5 rounded-full bg-current" aria-hidden />
+        Development ready
+      </Badge>
+    );
+  }
+
+  if (localPreview.status === "checking") {
+    return (
+      <Badge variant="warning">
+        <Loader2 className="size-3 animate-spin" />
+        Development checking
+      </Badge>
+    );
+  }
+
+  return <Badge variant="outline">Development offline</Badge>;
+}
+
 /**
  * The Overview deploy surface shared verbatim by the live "/" route and the
  * fixture-backed /v0-deploy-preview acceptance route — one composition, two
@@ -37,7 +66,7 @@ function LoadErrorBanner({ className, message }: { className?: string; message: 
  *
  * Pre-deploy the body is the empty state: `emptyHero` (the install guide) and
  * the repo-deploy card. Once a deployment exists it is the deploy console:
- * status pill + actions, preview hatch, URL/Source/agents cards, Activity.
+ * status pill + actions, preview hatch, URL/Source cards, Activity.
  * A load error never blanks the page — the empty state needs no data at all.
  */
 export function DeploySurface({
@@ -74,6 +103,8 @@ export function DeploySurface({
 }) {
   const { deployment, runs, agents } = deploy.state;
   const latestRun = runs[0];
+  const localPreview = useLocalDeploymentPreview();
+  const developmentMode = deployment !== null && localPreview.url !== null;
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -88,8 +119,9 @@ export function DeploySurface({
               {appName}
             </h1>
             <AppIdBadge appId={appId} />
-            {deployment !== null && latestRun !== undefined ? (
-              <StatusBadge status={latestRun.status} />
+            {deployment !== null ? <DevelopmentPreviewBadge localPreview={localPreview} /> : null}
+            {deployment !== null && !developmentMode && latestRun !== undefined ? (
+              <StatusBadge scopeLabel="Production" status={latestRun.status} />
             ) : null}
             {headerBadges}
           </div>
@@ -99,11 +131,13 @@ export function DeploySurface({
             <DeployActions
               appName={appName}
               agentCount={agents.length}
-              latestStatus={latestRun?.status ?? null}
-              deploying={deploy.deploying}
-              canDeploy={deploy.canDeploy}
-              onRetry={deploy.retryDeploy}
+              latestStatus={developmentMode ? null : (latestRun?.status ?? null)}
+              deploying={developmentMode ? localPreview.status === "checking" : deploy.deploying}
+              canDeploy={developmentMode ? true : deploy.canDeploy}
+              onRetry={developmentMode ? localPreview.refresh : deploy.retryDeploy}
               onDelete={deploy.deleteDeployment}
+              scope={developmentMode ? "development" : "production"}
+              developmentStatus={developmentMode ? localPreview.status : null}
             />
           )}
           {headerActions}
@@ -136,7 +170,7 @@ export function DeploySurface({
             <DeployOverview
               deployment={deployment}
               latestRun={latestRun}
-              agents={agents}
+              localPreview={localPreview}
               deploying={deploy.deploying}
               deployError={deployError}
               onDeployRepo={deploy.deployRepo}

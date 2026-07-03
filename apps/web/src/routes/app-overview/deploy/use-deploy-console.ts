@@ -100,6 +100,7 @@ export function useDeployConsole(): DeployConsole {
                 appName: DEPLOY_APP_IDENTITY.appName,
                 repoUrl: repoUrl === null ? DEPLOY_APP_IDENTITY.repoUrl : stripProtocol(repoUrl),
                 defaultBranch: DEPLOY_APP_IDENTITY.defaultBranch,
+                plannedUrl: DEPLOY_APP_IDENTITY.plannedUrl,
                 liveUrl: null,
               }
             : repoUrl === null

@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { isInputObjectType, isObjectType } from "graphql";
 
 import { createGraphQLSchema } from "../src/adapters/graphql/create-graphql-schema";
+import { createAppDeploymentRunDispatchDedupeKey } from "../src/modules/api-command/application/api-command-enqueue";
 import {
   getAppOverview,
   getControlPlaneOverview,
@@ -309,6 +310,111 @@ describe("App overview", () => {
         count: 1,
         defaultCredentialId: "01J000000000000000000000F3",
         vendorId: "openai-compatible",
+      },
+    ]);
+  });
+
+  test("keeps bound agents from the latest parsed deployment plan during a new active run", async () => {
+    const fixture = await createApiTestFixture();
+    await insertOverviewDeploymentMetadata(fixture);
+    await insertOverviewAgent(fixture, {
+      id: "01J000000000000000000000F4",
+      name: "quizmaster",
+      updatedAt: 2,
+    });
+
+    await fixture.database
+      .prepare("UPDATE app_deployment_run SET plan_json = ? WHERE id = ?")
+      .bind(
+        JSON.stringify({
+          agentBindings: [{ env: "QUIZ_THREAD_URL", expose: "public_thread", name: "quizmaster" }],
+        }),
+        OVERVIEW_DEPLOYMENT_RUN_ID,
+      )
+      .run();
+
+    await fixture.database
+      .prepare(
+        `INSERT INTO app_deployment_run (
+          app_id,
+          created_at,
+          deployment_id,
+          error_code,
+          error_message,
+          id,
+          source_branch,
+          source_commit_sha,
+          status,
+          target_kind,
+          updated_at,
+          url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        fixture.ids.appId,
+        3,
+        OVERVIEW_DEPLOYMENT_ID,
+        null,
+        null,
+        "01J000000000000000000000E2",
+        "main",
+        "def456",
+        "preparing",
+        null,
+        4,
+        null,
+      )
+      .run();
+
+    await fixture.database
+      .prepare(
+        `INSERT INTO api_command (
+          attempt_count,
+          claim_expires_at,
+          claim_owner,
+          completed_at,
+          created_at,
+          dedupe_key,
+          id,
+          kind,
+          last_error_code,
+          last_error_message,
+          payload_json,
+          status,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        0,
+        null,
+        null,
+        null,
+        3,
+        createAppDeploymentRunDispatchDedupeKey("01J000000000000000000000E2"),
+        "01J000000000000000000000E3",
+        "app_deployment_run_dispatch",
+        null,
+        null,
+        JSON.stringify({ appDeploymentRunId: "01J000000000000000000000E2" }),
+        "queued",
+        3,
+      )
+      .run();
+
+    const overview = await getAppOverview(fixture.bindings, fixture.viewer, {
+      appId: fixture.ids.appId,
+    });
+
+    expect(overview.deployment?.latestRun).toMatchObject({
+      id: "01J000000000000000000000E2",
+      status: "preparing",
+    });
+    expect(overview.boundAgents).toEqual([
+      {
+        agentId: "01J000000000000000000000F4",
+        envVar: "QUIZ_THREAD_URL",
+        expose: "public_thread",
+        name: "quizmaster",
       },
     ]);
   });

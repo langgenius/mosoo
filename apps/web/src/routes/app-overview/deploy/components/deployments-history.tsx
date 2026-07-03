@@ -1,5 +1,5 @@
-import { Rocket } from "lucide-react";
-import { Fragment } from "react";
+import { ChevronDown, Code2, GitBranch, Rocket } from "lucide-react";
+import { Fragment, useState } from "react";
 
 import { cn } from "@/shared/lib/class-names";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
@@ -11,7 +11,7 @@ import { useNowTick } from "../use-now-tick";
 import { StatusBadge } from "./deploy-status-badge";
 
 const PRE_DEPLOY_HINT =
-  "After your first deploy, every build shows up here: commit · status · target · duration.";
+  "After your first production deploy, every build shows up here: commit · status · target · duration.";
 
 function ActivityPlaceholder({ children }: { children: string }) {
   return (
@@ -41,7 +41,7 @@ export function ActivitySection({
 }) {
   return (
     <section className={className}>
-      <h2 className="text-fg-1 mb-4 text-[15px] font-semibold">Activity</h2>
+      <h2 className="text-fg-1 mb-4 text-[15px] font-semibold">Production Activity</h2>
       {error === null ? null : (
         <p className="text-destructive mb-2 text-[13px]">
           Couldn&apos;t load the run history: {error}
@@ -64,6 +64,19 @@ export function ActivitySection({
  */
 export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
   const now = useNowTick();
+  const [expandedRunIds, setExpandedRunIds] = useState<ReadonlySet<string>>(() => new Set());
+
+  function toggleRun(runId: string): void {
+    setExpandedRunIds((current) => {
+      const next = new Set(current);
+      if (next.has(runId)) {
+        next.delete(runId);
+      } else {
+        next.add(runId);
+      }
+      return next;
+    });
+  }
 
   return (
     <div className="border-border overflow-hidden rounded-xl border">
@@ -79,9 +92,10 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
           {runs.map((run) => {
             const failedError =
               run.status === "failed" ? (run.errorMessage ?? run.errorCode) : null;
+            const expanded = expandedRunIds.has(run.id);
             return (
               <Fragment key={run.id}>
-                <TableRow className={cn(failedError !== null && "border-0")}>
+                <TableRow>
                   <TableCell className="py-4 pl-5">
                     <div className="flex items-center gap-3">
                       <span className="bg-bg-sunken text-fg-3 flex size-8 shrink-0 items-center justify-center rounded-full">
@@ -101,19 +115,49 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                     <StatusBadge status={run.status} />
                   </TableCell>
                   <TableCell className="py-4 pr-5 align-middle">
-                    <div className="text-fg-2 text-[13px]">
-                      commit <span className="text-fg-1 font-mono">{run.commitSha}</span>
-                      <span className="text-fg-3"> · default branch HEAD</span>
-                    </div>
-                    <div className="text-fg-3 mt-0.5 font-mono text-[12px]">
-                      {run.targetKind === null ? "—" : DEPLOY_TARGET_LABELS[run.targetKind]}
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-fg-2 flex min-w-0 items-center gap-1.5 text-[13px]">
+                          <Code2 className="text-fg-3 size-3.5 shrink-0" />
+                          <span>commit</span>
+                          <span className="text-fg-1 truncate font-mono">{run.commitSha}</span>
+                          <span className="text-fg-3">· default branch HEAD</span>
+                        </div>
+                        <div className="text-fg-3 mt-0.5 flex items-center gap-1.5 text-[12px]">
+                          <GitBranch className="size-3.5" />
+                          <span className="font-mono">
+                            {run.targetKind === null
+                              ? "detecting target"
+                              : DEPLOY_TARGET_LABELS[run.targetKind]}
+                          </span>
+                        </div>
+                      </div>
+                      {failedError === null ? null : (
+                        <button
+                          type="button"
+                          aria-expanded={expanded}
+                          onClick={() => toggleRun(run.id)}
+                          className="text-fg-3 hover:text-fg-1 focus-visible:ring-ring inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[12px] font-medium transition-colors focus:outline-none focus-visible:ring-2"
+                        >
+                          Details
+                          <ChevronDown
+                            className={cn(
+                              "size-3.5 transition-transform",
+                              expanded && "rotate-180",
+                            )}
+                          />
+                        </button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
-                {failedError === null ? null : (
+                {failedError === null || !expanded ? null : (
                   <TableRow className="hover:bg-transparent">
                     <TableCell colSpan={3} className="px-5 pt-0 pb-4">
-                      <div className="bg-destructive/6 rounded-lg px-3.5 py-2 text-[13px]">
+                      <div className="border-border bg-bg-sunken/40 rounded-md border px-3.5 py-2.5 text-[13px]">
+                        <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
+                          Failure details
+                        </div>
                         {run.errorCode === null ? null : (
                           <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">
                             {run.errorCode}
