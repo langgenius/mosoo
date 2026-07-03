@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { updateSessionRunStatusIfActive } from "../src/modules/runtime/application/session-runs/session-run-state.repository";
+import {
+  acquireSessionRunDispatch,
+  updateSessionRunStatusIfActive,
+} from "../src/modules/runtime/application/session-runs/session-run-state.repository";
 import {
   createPublicHttpContractDatabase,
   insertNonOwnerSession,
@@ -61,6 +64,25 @@ describe("session run state", () => {
 
     expect(run?.id).toBe("run-active-transition");
     expect(run?.status).toBe("booting");
+
+    const stored = await database
+      .prepare("SELECT status FROM session_run WHERE id = ?")
+      .bind("run-active-transition")
+      .first<{ status: string }>();
+    expect(stored).toEqual({ status: "booting" });
+  });
+
+  test("only the first dispatch acquire can continue a run", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertNonOwnerSession(database);
+    await insertQueuedSessionRun(database);
+
+    const first = await acquireSessionRunDispatch(database, "run-active-transition");
+    const second = await acquireSessionRunDispatch(database, "run-active-transition");
+
+    expect(first?.id).toBe("run-active-transition");
+    expect(first?.status).toBe("booting");
+    expect(second).toBeNull();
 
     const stored = await database
       .prepare("SELECT status FROM session_run WHERE id = ?")

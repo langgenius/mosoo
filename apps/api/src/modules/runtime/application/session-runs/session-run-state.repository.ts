@@ -88,3 +88,28 @@ export async function updateSessionRunStatusIfActive(
     }
   }
 }
+
+export async function acquireSessionRunDispatch(
+  database: D1Database,
+  runId: SessionRunId,
+): Promise<SessionRunSummary | null> {
+  const outcome = await setSessionRunStatus(database, {
+    runId,
+    source: "api",
+    status: "booting",
+  });
+
+  switch (outcome.kind) {
+    case "applied": {
+      return outcome.run;
+    }
+    case "duplicate":
+    case "rejected":
+    case "stale": {
+      return null;
+    }
+    case "repair_needed": {
+      throw new Error("Session lifecycle projection needs repair.");
+    }
+  }
+}
