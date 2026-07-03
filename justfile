@@ -124,14 +124,6 @@ help-docs-index:
 e2e *args:
     bun run e2e -- {{args}}
 
-# Check credentials and local/Cloudflare visibility for the sandbox Agent benchmark.
-bench-sandbox-agent-preflight *args:
-    vp exec bun benchmarks/sandbox-agent/sandbox-agent-bench.ts preflight {{ args }}
-
-# Run the sandbox Agent benchmark.
-bench-sandbox-agent *args:
-    vp exec bun benchmarks/sandbox-agent/sandbox-agent-bench.ts run {{ args }}
-
 # Export the standalone Agent Driver repository.
 driver-repo-export:
     bun run driver:repo:export

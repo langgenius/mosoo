@@ -5,7 +5,7 @@ Date: 2026-07-02. Evidence-first. Every claim carries a `file:line` or an extern
 ## Scope (from user)
 
 1. **Goal A — permissions**: make full-access / yolo the DEFAULT for all three runtimes (claude-agent-sdk, codex app-server, opencode ACP), like multica.
-2. **Goal B — measurement + optimization**: build a measurement system; quantitatively optimize (i) time-to-first-token (TTFT) and (ii) streaming-output UX along the journey *configure provider key → create agent → create run → response streams to console*. 没有测量就没有优化.
+2. **Goal B — measurement + optimization**: build a measurement system; quantitatively optimize (i) time-to-first-token (TTFT) and (ii) streaming-output UX along the journey _configure provider key → create agent → create run → response streams to console_. 没有测量就没有优化.
 3. **Goal C — lifecycle**: simplify/harden run lifecycle state management + state machine on that path.
 
 Deliverable: research the reference map (15 repos), rate P0/P1/P2, then optimize → PR.
@@ -14,7 +14,7 @@ Deliverable: research the reference map (15 repos), rate P0/P1/P2, then optimize
 
 ## Part 1 — Reference-map verdict (15 repos, all cloned & read at source level; 15/15 real)
 
-7 P0, 5 P1, 3 P2. **Unanimous convergence on Goal A**: every P0 defaults to full-access with the same rationale — *the sandbox is the isolation boundary; do not gate per-tool-call*.
+7 P0, 5 P1, 3 P2. **Unanimous convergence on Goal A**: every P0 defaults to full-access with the same rationale — _the sandbox is the isolation boundary; do not gate per-tool-call_.
 
 ### P0 (borrow before implementing)
 
@@ -62,13 +62,14 @@ Deliverable: research the reference map (15 repos), rate P0/P1/P2, then optimize
 4. **RuntimeSubject** (full XState guard): `cold/restoring/active/backing_up/destroying/error`. — `runtime-subject-lifecycle.machine.ts:43-170`.
 
 Known-rough:
-- **Involuntary reclaim**: driver socket close → fails active run with retryable `runtime.turn_interrupted — please resend` but **nothing retries**; RESCHEDULING/120s-window is only entered by runtime *state operations*, never reclaim. Backstop = stale-run-reconciliation (heartbeat 1s, cutoff 30s) fails runs **non-retryably** — contradicts terminal-run-release's retryable:true for the same physical event. — `driver-instance/do.ts:135-166`, `terminal-run-release.ts:30-54`, `stale-run-reconciliation.service.ts:36-59`, `runtime-config.ts:7-9`.
+
+- **Involuntary reclaim**: driver socket close → fails active run with retryable `runtime.turn_interrupted — please resend` but **nothing retries**; RESCHEDULING/120s-window is only entered by runtime _state operations_, never reclaim. Backstop = stale-run-reconciliation (heartbeat 1s, cutoff 30s) fails runs **non-retryably** — contradicts terminal-run-release's retryable:true for the same physical event. — `driver-instance/do.ts:135-166`, `terminal-run-release.ts:30-54`, `stale-run-reconciliation.service.ts:36-59`, `runtime-config.ts:7-9`.
 - **Half-built ack**: driver keeps `lastAcceptedSeq` from receipts but **nothing consumes it** (grep: only debug logs); dedupe = in-memory receipts + per-batch D1 receipt read under serial gate. — `driver-event-publisher.ts:19-89`, `rpc-event-ingestion-controller.ts:65-157`.
 - `session.status` redundant projection with 2 repair paths + multiple write sites = main complexity hotspot.
 
 ### Latency / measurement
 
-- Have: `runtime.timing.recorded` phase recorder (hydration→prepare_run→provisioning→dispatch on API; driver_backend/driver_turn on driver; Claude times provider first event) — `session-runtime-timing.ts:27-110`, `driver-runtime-timing.ts:48-74`. End-to-end bench `benchmarks/sandbox-agent` (createThreadMs/firstAssistantTextMs/tokenCompletedMs, p50/p95). **claude-agent-sdk emits its own `ttft_ms`/`ttft_stream_ms`/`warm_spare_claimed`.**
+- Have: `runtime.timing.recorded` phase recorder (hydration→prepare_run→provisioning→dispatch on API; driver_backend/driver_turn on driver; Claude times provider first event) — `session-runtime-timing.ts:27-110`, `driver-runtime-timing.ts:48-74`. **claude-agent-sdk emits its own `ttft_ms`/`ttft_stream_ms`/`warm_spare_claimed`.**
 - Missing/broken:
   - **CF Queue hop `max_batch_timeout=5s`** on the TTFT-critical path, unmeasured; `executionContext` threaded but never used → no inline fast path. — `wrangler.toml:88-92`, `queue-run.service.ts:70-76`, `api-command-processor.ts:453-456`.
   - First delta gated behind D1-persistence-commit + ≤150ms viewer buffer; no first-token fast flush. — `session-viewer-event-delivery-buffer.ts:15-17,56-86`.
@@ -84,6 +85,7 @@ Known-rough:
 ## Part 3 — latest SDK/protocol facts (external, read at source level 2026-07-02)
 
 ### claude-agent-sdk (latest 0.3.198; `^0.3.158` resolves to it)
+
 - `PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | 'dontAsk' | 'auto'`.
 - yolo = `permissionMode:'bypassPermissions'` + **required** `allowDangerouslySkipPermissions:true`. **Cannot run as root on Unix** (check Dockerfile user!). Deny rules + hooks still apply even under bypass.
 - **0.3.198 warns** if `canUseTool` is set alongside `bypassPermissions`/`allowedTools` (shadowed) → must NOT pass canUseTool when bypassing.
@@ -92,6 +94,7 @@ Known-rough:
 - Behavior changes to verify vs current code: 0.3.162 Grep/Glob→embedded search; native-binary spawn since 0.2.113.
 
 ### codex app-server (latest stable 0.142.5; main 0.143-alpha; **mosoo ships 0.135.0**)
+
 - `AskForApproval` wire values are **kebab-case**: `"untrusted" | "on-request" | "never"` (+ experimental `granular`). `"on-failure"` removed on main (PR #28418, 2026-06-23) but still present/aliased in 0.142.x and 0.135.
 - `thread/start.sandbox` = `SandboxMode` shorthand `"read-only"|"workspace-write"|"danger-full-access"`. `turn/start.sandboxPolicy` = full tagged union with **camelCase** `type` tags (`dangerFullAccess`, `workspaceWrite{...}`).
 - **yolo** = `thread/start {approvalPolicy:"never", sandbox:"danger-full-access"}` (== CLI `--dangerously-bypass-approvals-and-sandbox`). mosoo already has the sandbox; only needs `on-request`→`never` at the 4 sites.
@@ -100,12 +103,14 @@ Known-rough:
 - **Doc footgun**: README/site examples show camelCase `unlessTrusted`/`workspaceWrite` — STALE; generated schema + serde tests are authoritative (kebab-case for `AskForApproval`/`SandboxMode`).
 
 ### opencode over ACP (sst/opencode → now anomalyco/opencode; mosoo ships 1.17.7)
+
 - opencode.json `permission`: keys `read/edit/glob/grep/bash/task/skill/lsp/question/webfetch/websearch/external_directory/doom_loop` + `*`; values `allow|ask|deny`; per-command/path globs; agent-level overrides.
 - **yolo cleanest path**: inject config `permission:{"*":"allow"}` (or per-key) so `permission.asked` never fires → no ACP `session/request_permission` at all. `OPENCODE_CONFIG_CONTENT` env (mosoo already uses this for acp-fallback) is the injection channel. **Multica warning: do NOT use `OPENCODE_PERMISSION` env** (key-order deep-merge footgun) — use config content.
 - ACP: if client doesn't implement `requestPermission`, opencode auto-**rejects** — explains why non-interactive currently blocks. Option kinds `allow_once/allow_always/reject_once` (no reject_always). ACP `session/set_mode` maps to opencode agents (could define a `yolo` agent, but config injection is simpler).
 - TTFT footgun: **blocking models.dev fetch up to 10s** on cold start (`models-dev.ts:138-238`) → pre-seed `models.json` cache or `OPENCODE_DISABLE_MODELS_FETCH=1`. Built-in profiler `OPENCODE_ACP_PROFILE=1`.
 
 ### Cloudflare Sandbox SDK (GA Apr 2026, 0.8.9)
+
 - `sleepAfter` (default 10m), `keepAlive` (heartbeat 30s, survives DO hibernation), `containerTimeouts` (instanceGet 30s, portReady 90s).
 - Instance types lite→standard-4; cold start "1–3s" (image-dependent); Cloudflare pre-schedules/pre-fetches images (no user pre-warm API); **active-CPU pricing** (idle-on-LLM is free → keepAlive pool is cheap).
 - **Backup/restore API** (Feb 2026 GA): `createBackup`/`restoreBackup`, restore ~2s vs ~30s fresh clone+install; COW FUSE overlay; lost on sleep (re-restore). Directory-level only (no memory snapshot yet).
@@ -116,6 +121,7 @@ Known-rough:
 ## Part 4 — P0/P1/P2 optimization backlog (mosoo changes)
 
 ### Goal A — full-access defaults (P0, small, high-value)
+
 - **A1** Claude: default `permissionMode:'bypassPermissions'` + `allowDangerouslySkipPermissions:true`; drop `canUseTool` when bypassing (0.3.198 shadow warning). Keep broker path for opt-in stricter modes. — `agent-sdk-query-options.ts:137`. **Precondition: verify Dockerfile runs driver as non-root** (bypass forbidden as root).
 - **A2** Codex: `on-request`→`never` at all 4 sites (sandbox already danger-full-access). — `app-server-driver-backend.ts:35,71,178,182`.
 - **A3** ACP/opencode: inject `permission:{"*":"allow"}` via `OPENCODE_CONFIG_CONTENT` (NOT `OPENCODE_PERMISSION`) so requests never fire; belt-and-braces: broker policy auto-selects allow option under full-access. — `hydrate-run-context.service.ts` (buildOpenCodeConfig) + `acp-client-request-handler.ts`.
@@ -125,17 +131,19 @@ Known-rough:
 - Compensating controls (eve/agentos): keep secrets in env/firewall, scope sandbox egress — "no prompts" ≠ "no boundary".
 
 ### Goal B — measurement system (P0, required before optimizing)
+
 - **B1** T0 accept-stage timing + stamp `queuedAtMs` on run row. — `queue-run.service.ts`.
 - **B2** `queue_wait` timing event (`now - queuedAtMs`) in dispatch consumer → quantify the 5s exposure. — `api-command-processor.ts`.
 - **B3** Timing parity: ACP `driver_backend`+`driver_turn` provider.first_event; OpenAI provider.first_event (not just turn/start ack). Split skill.materialize as its own phase. — `acp-driver-backend.ts`, `app-server-event-bridge.ts`, `agent-sdk-driver-backend.ts`.
 - **B4** Driver publisher: per-push ack-RTT / batch size / pending-queue depth → per-run summary (chunk count, mean/p95/max inter-push gap) emitted once at run.completed (NOT per delta). — `driver-event-publisher.ts`.
 - **B5** Server-side TTFT from the event log (eve pattern): first `agent.message.delta` viewer-delivery `at` − run-accept `at`; emit as timing event + wide event. — `session-runtime-timing.ts`.
 - **B6** Thread real traceId (not null) in provisioning/prewarm recorders. — `runtime-driver-provisioning.service.ts`, `driver-session.service.ts`.
-- **B7** Bench upgrade: inter-chunk gap distribution per case; join runtime.timing events by runId into a per-stage waterfall in results.csv; use WS path (not 2s SSE poll) or document quantization. — `sandbox-agent-bench.ts`.
-- **B8** Deterministic mock-provider bench + committed `baseline.json` regression gate (agentos pattern), p50/p95 per phase, `--gate`/`--update-baseline`. — new under `benchmarks/`.
+- **B7** Latency harness replacement: inter-chunk gap distribution per case; join runtime.timing events by runId into a per-stage waterfall; use WS path (not 2s SSE poll) or document quantization.
+- **B8** Deterministic mock-provider regression gate (agentos pattern), p50/p95 per phase, `--gate`/`--update-baseline`.
 - **B9** apps/web: consume `sessionRuntimeTiming` (already emitted, dropped) → per-run waterfall; `performance.mark` send→first-render. — `process-timeline.tsx`, `session-stream-socket.ts`.
 
 ### Goal B — optimizations (apply by measured bottleneck, theory-of-constraints order)
+
 - **O1** (biggest measured): inline dispatch fast-path via `executionContext.waitUntil` for interactive runs, queue as dedupe-keyed fallback; OR a dedicated low-latency queue `max_batch_timeout=0/1`. Prove with B2. — `queue-run.service.ts`, `wrangler.toml`.
 - **O2** First-token fast flush: flush the first text delta of a run immediately (like terminal-event fast flush); decouple delta viewer-delivery from D1-persistence gating (broadcast-before-persist, agentos/openhands). — `session-viewer-event-delivery-buffer.ts`.
 - **O3** Claude prewarm via `startup()`/`WarmQuery` in driver boot; verify `includePartialMessages:true`. — `agent-sdk-driver-backend.ts`.
@@ -144,6 +152,7 @@ Known-rough:
 - **O6** "Never-hit-by-normal-use" timeout audit (agentos) across DO ws/viewer/queue caps/RPC timeouts.
 
 ### Goal C — lifecycle (P1, larger/riskier)
+
 - **C1** Involuntary reclaim → requeue/resume (or RESCHEDULING window) instead of dead-ending at "please resend"; reconcile retryable semantics. — `terminal-run-release.ts`, `stale-run-reconciliation.service.ts`.
 - **C2** Finish OR delete the ack cursor (persist `lastAcceptedSeq`, resume-from-cursor on reconnect, skip D1 receipt reads for seq≤cursor) — per prior audit, do NOT rebuild ingest. — `driver-event-publisher.ts`, ingestion controller.
 - **C3** `decideDriverInstanceTransition` guard (mirror run/subject machines) → one validated chokepoint. — `driver-instance-lifecycle.machine.ts`.
