@@ -1329,7 +1329,7 @@ export class TypedDocumentString<TResult, TVariables>
     return this.value;
   }
 }
-export const LarkAgentChannelRegistrationFieldsFragmentDoc = new TypedDocumentString(`
+export const LarkAgentChannelRegistrationFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment LarkAgentChannelRegistrationFields on LarkAgentChannelRegistration {
   appId
   appSecret
@@ -1344,7 +1344,7 @@ export const LarkAgentChannelRegistrationFieldsFragmentDoc = new TypedDocumentSt
   userCode
 }
     `, {"fragmentName":"LarkAgentChannelRegistrationFields"}) as unknown as TypedDocumentString<LarkAgentChannelRegistrationFieldsFragment, unknown>;
-export const AgentChannelBindingFieldsFragmentDoc = new TypedDocumentString(`
+export const AgentChannelBindingFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment AgentChannelBindingFields on AgentChannelBinding {
   activityLastTriggeredAt
   activitySessionCount7d
@@ -1360,7 +1360,7 @@ export const AgentChannelBindingFieldsFragmentDoc = new TypedDocumentString(`
   updatedAt
 }
     `, {"fragmentName":"AgentChannelBindingFields"}) as unknown as TypedDocumentString<AgentChannelBindingFieldsFragment, unknown>;
-export const WeChatAgentChannelPairingFieldsFragmentDoc = new TypedDocumentString(`
+export const WeChatAgentChannelPairingFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment WeChatAgentChannelPairingFields on WeChatAgentChannelPairing {
   binding {
     ...AgentChannelBindingFields
@@ -1384,7 +1384,7 @@ export const WeChatAgentChannelPairingFieldsFragmentDoc = new TypedDocumentStrin
   status
   updatedAt
 }`, {"fragmentName":"WeChatAgentChannelPairingFields"}) as unknown as TypedDocumentString<WeChatAgentChannelPairingFieldsFragment, unknown>;
-export const AgentDeploymentVersionFieldsFragmentDoc = new TypedDocumentString(`
+export const AgentDeploymentVersionFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   agentId
   createdAt
@@ -1400,7 +1400,7 @@ export const AgentDeploymentVersionFieldsFragmentDoc = new TypedDocumentString(`
   versionNumber
 }
     `, {"fragmentName":"AgentDeploymentVersionFields"}) as unknown as TypedDocumentString<AgentDeploymentVersionFieldsFragment, unknown>;
-export const AgentFieldsFragmentDoc = new TypedDocumentString(`
+export const AgentFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment AgentFields on Agent {
   createdAt
   description
@@ -1439,7 +1439,7 @@ export const AgentFieldsFragmentDoc = new TypedDocumentString(`
   summary
   versionNumber
 }`, {"fragmentName":"AgentFields"}) as unknown as TypedDocumentString<AgentFieldsFragment, unknown>;
-export const AgentToolSummaryFieldsFragmentDoc = new TypedDocumentString(`
+export const AgentToolSummaryFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment AgentToolSummaryFields on AgentToolSummary {
   enabled
   iconUrl
@@ -1447,14 +1447,14 @@ export const AgentToolSummaryFieldsFragmentDoc = new TypedDocumentString(`
   serverId
 }
     `, {"fragmentName":"AgentToolSummaryFields"}) as unknown as TypedDocumentString<AgentToolSummaryFieldsFragment, unknown>;
-export const AgentOwnerFieldsFragmentDoc = new TypedDocumentString(`
+export const AgentOwnerFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment AgentOwnerFields on AgentOwnerSummary {
   id
   imageUrl
   name
 }
     `, {"fragmentName":"AgentOwnerFields"}) as unknown as TypedDocumentString<AgentOwnerFieldsFragment, unknown>;
-export const CostAgentFieldsFragmentDoc = new TypedDocumentString(`
+export const CostAgentFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment CostAgentFields on CostAgentRow {
   activeUsers
   agentId
@@ -1477,7 +1477,7 @@ export const CostAgentFieldsFragmentDoc = new TypedDocumentString(`
   unpricedRequestCount
 }
     `, {"fragmentName":"CostAgentFields"}) as unknown as TypedDocumentString<CostAgentFieldsFragment, unknown>;
-export const CostDailyFieldsFragmentDoc = new TypedDocumentString(`
+export const CostDailyFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment CostDailyFields on CostDailyPoint {
   activeUsers
   cacheCreationTokens
@@ -1490,7 +1490,7 @@ export const CostDailyFieldsFragmentDoc = new TypedDocumentString(`
   unpricedRequestCount
 }
     `, {"fragmentName":"CostDailyFields"}) as unknown as TypedDocumentString<CostDailyFieldsFragment, unknown>;
-export const CostModelFieldsFragmentDoc = new TypedDocumentString(`
+export const CostModelFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment CostModelFields on CostModelRow {
   activeUsers
   cacheCreationTokens
@@ -1509,7 +1509,7 @@ export const CostModelFieldsFragmentDoc = new TypedDocumentString(`
   vendor
 }
     `, {"fragmentName":"CostModelFields"}) as unknown as TypedDocumentString<CostModelFieldsFragment, unknown>;
-export const CostRecentSessionFieldsFragmentDoc = new TypedDocumentString(`
+export const CostRecentSessionFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment CostRecentSessionFields on CostRecentSession {
   actorEmail
   actorName
@@ -1526,7 +1526,7 @@ export const CostRecentSessionFieldsFragmentDoc = new TypedDocumentString(`
   totalCostUsd
 }
     `, {"fragmentName":"CostRecentSessionFields"}) as unknown as TypedDocumentString<CostRecentSessionFieldsFragment, unknown>;
-export const CostTotalsFieldsFragmentDoc = new TypedDocumentString(`
+export const CostTotalsFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment CostTotalsFields on CostAggregate {
   activeUsers
   cacheCreationTokens
@@ -1538,7 +1538,7 @@ export const CostTotalsFieldsFragmentDoc = new TypedDocumentString(`
   unpricedRequestCount
 }
     `, {"fragmentName":"CostTotalsFields"}) as unknown as TypedDocumentString<CostTotalsFieldsFragment, unknown>;
-export const CostAttributionFieldsFragmentDoc = new TypedDocumentString(`
+export const CostAttributionFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment CostAttributionFields on CostAttributionCard {
   agents {
     ...CostAgentFields
@@ -1630,27 +1630,27 @@ fragment CostRecentSessionFields on CostRecentSession {
   sessionRunId
   totalCostUsd
 }`, {"fragmentName":"CostAttributionFields"}) as unknown as TypedDocumentString<CostAttributionFieldsFragment, unknown>;
-export const EnvironmentVariableFieldsFragmentDoc = new TypedDocumentString(`
+export const EnvironmentVariableFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment EnvironmentVariableFields on EnvironmentVariablePreview {
   key
   preview
   status
 }
     `, {"fragmentName":"EnvironmentVariableFields"}) as unknown as TypedDocumentString<EnvironmentVariableFieldsFragment, unknown>;
-export const EnvironmentOwnerFieldsFragmentDoc = new TypedDocumentString(`
+export const EnvironmentOwnerFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment EnvironmentOwnerFields on EnvironmentOwnerSummary {
   id
   imageUrl
   name
 }
     `, {"fragmentName":"EnvironmentOwnerFields"}) as unknown as TypedDocumentString<EnvironmentOwnerFieldsFragment, unknown>;
-export const EnvironmentPackageFieldsFragmentDoc = new TypedDocumentString(`
+export const EnvironmentPackageFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment EnvironmentPackageFields on EnvironmentPackageSpec {
   manager
   packages
 }
     `, {"fragmentName":"EnvironmentPackageFields"}) as unknown as TypedDocumentString<EnvironmentPackageFieldsFragment, unknown>;
-export const EnvironmentSummaryFieldsFragmentDoc = new TypedDocumentString(`
+export const EnvironmentSummaryFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment EnvironmentSummaryFields on EnvironmentSummary {
   allowMcpServers
   allowPackageManagers
@@ -1700,7 +1700,7 @@ fragment EnvironmentOwnerFields on EnvironmentOwnerSummary {
   imageUrl
   name
 }`, {"fragmentName":"EnvironmentSummaryFields"}) as unknown as TypedDocumentString<EnvironmentSummaryFieldsFragment, unknown>;
-export const EnvironmentDetailFieldsFragmentDoc = new TypedDocumentString(`
+export const EnvironmentDetailFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment EnvironmentDetailFields on EnvironmentDetail {
   allowMcpServers
   allowPackageManagers
@@ -1750,7 +1750,7 @@ fragment EnvironmentOwnerFields on EnvironmentOwnerSummary {
   imageUrl
   name
 }`, {"fragmentName":"EnvironmentDetailFields"}) as unknown as TypedDocumentString<EnvironmentDetailFieldsFragment, unknown>;
-export const McpCredentialFieldsFragmentDoc = new TypedDocumentString(`
+export const McpCredentialFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment McpCredentialFields on McpCredentialSummary {
   authType
   createdAt
@@ -1763,7 +1763,7 @@ export const McpCredentialFieldsFragmentDoc = new TypedDocumentString(`
   updatedAt
 }
     `, {"fragmentName":"McpCredentialFields"}) as unknown as TypedDocumentString<McpCredentialFieldsFragment, unknown>;
-export const McpServerFieldsFragmentDoc = new TypedDocumentString(`
+export const McpServerFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment McpServerFields on McpServerWithCredential {
   authType
   authorizationState
@@ -1797,7 +1797,7 @@ export const McpServerFieldsFragmentDoc = new TypedDocumentString(`
   subjectLabel
   updatedAt
 }`, {"fragmentName":"McpServerFields"}) as unknown as TypedDocumentString<McpServerFieldsFragment, unknown>;
-export const SkillSummaryFieldsFragmentDoc = new TypedDocumentString(`
+export const SkillSummaryFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment SkillSummaryFields on SkillSummary {
   author
   createdAt
@@ -1817,7 +1817,7 @@ export const SkillSummaryFieldsFragmentDoc = new TypedDocumentString(`
   updatedAt
 }
     `, {"fragmentName":"SkillSummaryFields"}) as unknown as TypedDocumentString<SkillSummaryFieldsFragment, unknown>;
-export const SkillDetailFieldsFragmentDoc = new TypedDocumentString(`
+export const SkillDetailFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment SkillDetailFields on SkillDetail {
   author
   createdAt
@@ -1860,7 +1860,7 @@ export const SkillDetailFieldsFragmentDoc = new TypedDocumentString(`
   }
 }
     `, {"fragmentName":"SkillDetailFields"}) as unknown as TypedDocumentString<SkillDetailFieldsFragment, unknown>;
-export const AgentChannelBindingsDocument = new TypedDocumentString(`
+export const AgentChannelBindingsDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AgentChannelBindings($appId: ULID!, $agentId: ULID!) {
   agentChannelBindingList(appId: $appId, agentId: $agentId) {
     ...AgentChannelBindingFields
@@ -1880,7 +1880,7 @@ export const AgentChannelBindingsDocument = new TypedDocumentString(`
   status
   updatedAt
 }`) as unknown as TypedDocumentString<AgentChannelBindingsQuery, AgentChannelBindingsQueryVariables>;
-export const CreateSlackAgentChannelBindingDocument = new TypedDocumentString(`
+export const CreateSlackAgentChannelBindingDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateSlackAgentChannelBinding($input: CreateSlackAgentChannelBindingInput!) {
   createSlackAgentChannelBinding(input: $input) {
     ...AgentChannelBindingFields
@@ -1900,7 +1900,7 @@ export const CreateSlackAgentChannelBindingDocument = new TypedDocumentString(`
   status
   updatedAt
 }`) as unknown as TypedDocumentString<CreateSlackAgentChannelBindingMutation, CreateSlackAgentChannelBindingMutationVariables>;
-export const CreateLarkAgentChannelBindingDocument = new TypedDocumentString(`
+export const CreateLarkAgentChannelBindingDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateLarkAgentChannelBinding($input: CreateLarkAgentChannelBindingInput!) {
   createLarkAgentChannelBinding(input: $input) {
     ...AgentChannelBindingFields
@@ -1920,7 +1920,7 @@ export const CreateLarkAgentChannelBindingDocument = new TypedDocumentString(`
   status
   updatedAt
 }`) as unknown as TypedDocumentString<CreateLarkAgentChannelBindingMutation, CreateLarkAgentChannelBindingMutationVariables>;
-export const StartLarkAgentChannelRegistrationDocument = new TypedDocumentString(`
+export const StartLarkAgentChannelRegistrationDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation StartLarkAgentChannelRegistration($input: StartLarkAgentChannelRegistrationInput!) {
   startLarkAgentChannelRegistration(input: $input) {
     ...LarkAgentChannelRegistrationFields
@@ -1939,7 +1939,7 @@ export const StartLarkAgentChannelRegistrationDocument = new TypedDocumentString
   status
   userCode
 }`) as unknown as TypedDocumentString<StartLarkAgentChannelRegistrationMutation, StartLarkAgentChannelRegistrationMutationVariables>;
-export const PollLarkAgentChannelRegistrationDocument = new TypedDocumentString(`
+export const PollLarkAgentChannelRegistrationDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation PollLarkAgentChannelRegistration($input: PollLarkAgentChannelRegistrationInput!) {
   pollLarkAgentChannelRegistration(input: $input) {
     ...LarkAgentChannelRegistrationFields
@@ -1958,7 +1958,7 @@ export const PollLarkAgentChannelRegistrationDocument = new TypedDocumentString(
   status
   userCode
 }`) as unknown as TypedDocumentString<PollLarkAgentChannelRegistrationMutation, PollLarkAgentChannelRegistrationMutationVariables>;
-export const CreateTelegramAgentChannelBindingDocument = new TypedDocumentString(`
+export const CreateTelegramAgentChannelBindingDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateTelegramAgentChannelBinding($input: CreateTelegramAgentChannelBindingInput!) {
   createTelegramAgentChannelBinding(input: $input) {
     ...AgentChannelBindingFields
@@ -1978,7 +1978,7 @@ export const CreateTelegramAgentChannelBindingDocument = new TypedDocumentString
   status
   updatedAt
 }`) as unknown as TypedDocumentString<CreateTelegramAgentChannelBindingMutation, CreateTelegramAgentChannelBindingMutationVariables>;
-export const CreateDiscordAgentChannelBindingDocument = new TypedDocumentString(`
+export const CreateDiscordAgentChannelBindingDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateDiscordAgentChannelBinding($input: CreateDiscordAgentChannelBindingInput!) {
   createDiscordAgentChannelBinding(input: $input) {
     ...AgentChannelBindingFields
@@ -1998,7 +1998,7 @@ export const CreateDiscordAgentChannelBindingDocument = new TypedDocumentString(
   status
   updatedAt
 }`) as unknown as TypedDocumentString<CreateDiscordAgentChannelBindingMutation, CreateDiscordAgentChannelBindingMutationVariables>;
-export const StartWeChatAgentChannelPairingDocument = new TypedDocumentString(`
+export const StartWeChatAgentChannelPairingDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation StartWeChatAgentChannelPairing($input: StartWeChatAgentChannelPairingInput!) {
   startWeChatAgentChannelPairing(input: $input) {
     ...WeChatAgentChannelPairingFields
@@ -2027,7 +2027,7 @@ fragment WeChatAgentChannelPairingFields on WeChatAgentChannelPairing {
   qrToken
   status
 }`) as unknown as TypedDocumentString<StartWeChatAgentChannelPairingMutation, StartWeChatAgentChannelPairingMutationVariables>;
-export const PollWeChatAgentChannelPairingDocument = new TypedDocumentString(`
+export const PollWeChatAgentChannelPairingDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation PollWeChatAgentChannelPairing($input: PollWeChatAgentChannelPairingInput!) {
   pollWeChatAgentChannelPairing(input: $input) {
     ...WeChatAgentChannelPairingFields
@@ -2056,14 +2056,14 @@ fragment WeChatAgentChannelPairingFields on WeChatAgentChannelPairing {
   qrToken
   status
 }`) as unknown as TypedDocumentString<PollWeChatAgentChannelPairingMutation, PollWeChatAgentChannelPairingMutationVariables>;
-export const DeleteAgentChannelBindingDocument = new TypedDocumentString(`
+export const DeleteAgentChannelBindingDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation DeleteAgentChannelBinding($input: DeleteAgentChannelBindingInput!) {
   deleteAgentChannelBinding(input: $input) {
     ok
   }
 }
     `) as unknown as TypedDocumentString<DeleteAgentChannelBindingMutation, DeleteAgentChannelBindingMutationVariables>;
-export const CreateAgentDocument = new TypedDocumentString(`
+export const CreateAgentDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateAgent($input: CreateAgentInput!) {
   createAgent(input: $input) {
     ...AgentFields
@@ -2107,14 +2107,14 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   summary
   versionNumber
 }`) as unknown as TypedDocumentString<CreateAgentMutation, CreateAgentMutationVariables>;
-export const DeleteAgentDocument = new TypedDocumentString(`
+export const DeleteAgentDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation DeleteAgent($input: DeleteAgentInput!) {
   deleteAgent(input: $input) {
     ok
   }
 }
     `) as unknown as TypedDocumentString<DeleteAgentMutation, DeleteAgentMutationVariables>;
-export const AccessibleAgentsDocument = new TypedDocumentString(`
+export const AccessibleAgentsDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AccessibleAgents($appId: ULID!) {
   accessibleAgentList(appId: $appId) {
     createdAt
@@ -2147,7 +2147,7 @@ fragment AgentOwnerFields on AgentOwnerSummary {
   imageUrl
   name
 }`) as unknown as TypedDocumentString<AccessibleAgentsQuery, AccessibleAgentsQueryVariables>;
-export const AgentDocument = new TypedDocumentString(`
+export const AgentDocument = /*#__PURE__*/ new TypedDocumentString(`
     query Agent($agentId: ULID!, $appId: ULID!) {
   agent(agentId: $agentId, appId: $appId) {
     createdAt
@@ -2209,7 +2209,7 @@ fragment AgentOwnerFields on AgentOwnerSummary {
   imageUrl
   name
 }`) as unknown as TypedDocumentString<AgentQuery, AgentQueryVariables>;
-export const AgentEditorStateDocument = new TypedDocumentString(`
+export const AgentEditorStateDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AgentEditorState($agentId: ULID!, $appId: ULID!) {
   agentEditorState(agentId: $agentId, appId: $appId) {
     id
@@ -2274,7 +2274,7 @@ export const AgentEditorStateDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AgentEditorStateQuery, AgentEditorStateQueryVariables>;
-export const UpdateAgentConfigDocument = new TypedDocumentString(`
+export const UpdateAgentConfigDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation UpdateAgentConfig($input: UpdateAgentConfigInput!) {
   updateAgentConfig(input: $input) {
     ...AgentFields
@@ -2318,7 +2318,7 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   summary
   versionNumber
 }`) as unknown as TypedDocumentString<UpdateAgentConfigMutation, UpdateAgentConfigMutationVariables>;
-export const AgentManifestDocument = new TypedDocumentString(`
+export const AgentManifestDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AgentManifest($agentId: ULID!, $appId: ULID!) {
   agentManifest(agentId: $agentId, appId: $appId) {
     agentId
@@ -2327,7 +2327,7 @@ export const AgentManifestDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AgentManifestQuery, AgentManifestQueryVariables>;
-export const ExportAgentPackageDocument = new TypedDocumentString(`
+export const ExportAgentPackageDocument = /*#__PURE__*/ new TypedDocumentString(`
     query ExportAgentPackage($agentId: ULID!, $appId: ULID!) {
   exportAgentPackage(agentId: $agentId, appId: $appId) {
     agentId
@@ -2339,7 +2339,7 @@ export const ExportAgentPackageDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ExportAgentPackageQuery, ExportAgentPackageQueryVariables>;
-export const ImportAgentPackageDocument = new TypedDocumentString(`
+export const ImportAgentPackageDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation ImportAgentPackage($input: ImportAgentPackageInput!) {
   importAgentPackage(input: $input) {
     agent {
@@ -2404,7 +2404,7 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   summary
   versionNumber
 }`) as unknown as TypedDocumentString<ImportAgentPackageMutation, ImportAgentPackageMutationVariables>;
-export const CreateAgentForkDocument = new TypedDocumentString(`
+export const CreateAgentForkDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateAgentFork($input: CreateAgentForkInput!) {
   createAgentFork(input: $input) {
     agent {
@@ -2469,7 +2469,7 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   summary
   versionNumber
 }`) as unknown as TypedDocumentString<CreateAgentForkMutation, CreateAgentForkMutationVariables>;
-export const PublishAgentDocument = new TypedDocumentString(`
+export const PublishAgentDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation PublishAgent($input: PublishAgentInput!) {
   publishAgent(input: $input) {
     ...AgentFields
@@ -2513,7 +2513,7 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   summary
   versionNumber
 }`) as unknown as TypedDocumentString<PublishAgentMutation, PublishAgentMutationVariables>;
-export const UnpublishAgentDocument = new TypedDocumentString(`
+export const UnpublishAgentDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation UnpublishAgent($agentId: ULID!, $appId: ULID!) {
   unpublishAgent(agentId: $agentId, appId: $appId) {
     ...AgentFields
@@ -2557,7 +2557,7 @@ fragment AgentDeploymentVersionFields on AgentDeploymentVersion {
   summary
   versionNumber
 }`) as unknown as TypedDocumentString<UnpublishAgentMutation, UnpublishAgentMutationVariables>;
-export const RestartDriverDocument = new TypedDocumentString(`
+export const RestartDriverDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation RestartDriver($input: RuntimeStateOperationInput!) {
   restartDriver(input: $input) {
     affectedSessionCount
@@ -2567,7 +2567,7 @@ export const RestartDriverDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<RestartDriverMutation, RestartDriverMutationVariables>;
-export const RecreateSandboxDocument = new TypedDocumentString(`
+export const RecreateSandboxDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation RecreateSandbox($input: RuntimeStateOperationInput!) {
   recreateSandbox(input: $input) {
     affectedSessionCount
@@ -2577,7 +2577,7 @@ export const RecreateSandboxDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<RecreateSandboxMutation, RecreateSandboxMutationVariables>;
-export const ResetAgentStateDocument = new TypedDocumentString(`
+export const ResetAgentStateDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation ResetAgentState($input: RuntimeStateOperationInput!) {
   resetAgentState(input: $input) {
     affectedSessionCount
@@ -2587,7 +2587,7 @@ export const ResetAgentStateDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ResetAgentStateMutation, ResetAgentStateMutationVariables>;
-export const AppListDocument = new TypedDocumentString(`
+export const AppListDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AppList($organizationId: ULID!) {
   appList(organizationId: $organizationId) {
     createdAt
@@ -2598,7 +2598,7 @@ export const AppListDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AppListQuery, AppListQueryVariables>;
-export const CreateAppDocument = new TypedDocumentString(`
+export const CreateAppDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateApp($input: CreateAppInput!) {
   createApp(input: $input) {
     createdAt
@@ -2609,7 +2609,7 @@ export const CreateAppDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<CreateAppMutation, CreateAppMutationVariables>;
-export const RenameAppDocument = new TypedDocumentString(`
+export const RenameAppDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation RenameApp($input: RenameAppInput!) {
   renameApp(input: $input) {
     createdAt
@@ -2620,7 +2620,7 @@ export const RenameAppDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<RenameAppMutation, RenameAppMutationVariables>;
-export const AppDeploymentOverviewDocument = new TypedDocumentString(`
+export const AppDeploymentOverviewDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AppDeploymentOverview($appId: ULID!) {
   appOverview(appId: $appId) {
     app {
@@ -2663,7 +2663,7 @@ export const AppDeploymentOverviewDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AppDeploymentOverviewQuery, AppDeploymentOverviewQueryVariables>;
-export const AppDeploymentRunListDocument = new TypedDocumentString(`
+export const AppDeploymentRunListDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AppDeploymentRunList($appId: ULID!, $limit: Int) {
   appDeploymentRunList(appId: $appId, limit: $limit) {
     appId
@@ -2682,7 +2682,7 @@ export const AppDeploymentRunListDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AppDeploymentRunListQuery, AppDeploymentRunListQueryVariables>;
-export const DeployAppDocument = new TypedDocumentString(`
+export const DeployAppDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation DeployApp($input: DeployAppInput!) {
   deployApp(input: $input) {
     appId
@@ -2701,14 +2701,14 @@ export const DeployAppDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<DeployAppMutation, DeployAppMutationVariables>;
-export const DeleteAppDeploymentDocument = new TypedDocumentString(`
+export const DeleteAppDeploymentDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation DeleteAppDeployment($input: DeleteAppDeploymentInput!) {
   deleteAppDeployment(input: $input) {
     ok
   }
 }
     `) as unknown as TypedDocumentString<DeleteAppDeploymentMutation, DeleteAppDeploymentMutationVariables>;
-export const AppCostCardDocument = new TypedDocumentString(`
+export const AppCostCardDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AppCostCard($appId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
   appCostCard(appId: $appId, range: $range, runPurposes: $runPurposes) {
     appId
@@ -2807,7 +2807,7 @@ fragment CostRecentSessionFields on CostRecentSession {
   sessionRunId
   totalCostUsd
 }`) as unknown as TypedDocumentString<AppCostCardQuery, AppCostCardQueryVariables>;
-export const AgentCostCardDocument = new TypedDocumentString(`
+export const AgentCostCardDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AgentCostCard($appId: ULID!, $agentId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
   agentCostCard(
     appId: $appId
@@ -2910,7 +2910,7 @@ fragment CostRecentSessionFields on CostRecentSession {
   sessionRunId
   totalCostUsd
 }`) as unknown as TypedDocumentString<AgentCostCardQuery, AgentCostCardQueryVariables>;
-export const AppEnvironmentsDocument = new TypedDocumentString(`
+export const AppEnvironmentsDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AppEnvironments($appId: ULID!) {
   appEnvironmentList(appId: $appId) {
     ...EnvironmentSummaryFields
@@ -2965,7 +2965,7 @@ fragment EnvironmentSummaryFields on EnvironmentSummary {
   usedByAgentCount
   appId
 }`) as unknown as TypedDocumentString<AppEnvironmentsQuery, AppEnvironmentsQueryVariables>;
-export const EnvironmentDetailDocument = new TypedDocumentString(`
+export const EnvironmentDetailDocument = /*#__PURE__*/ new TypedDocumentString(`
     query EnvironmentDetail($appId: ULID!, $environmentId: ULID!) {
   environment(appId: $appId, environmentId: $environmentId) {
     ...EnvironmentDetailFields
@@ -3020,7 +3020,7 @@ fragment EnvironmentDetailFields on EnvironmentDetail {
   usedByAgentCount
   appId
 }`) as unknown as TypedDocumentString<EnvironmentDetailQuery, EnvironmentDetailQueryVariables>;
-export const CreateEnvironmentDocument = new TypedDocumentString(`
+export const CreateEnvironmentDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateEnvironment($input: CreateEnvironmentInput!) {
   createEnvironment(input: $input) {
     ...EnvironmentSummaryFields
@@ -3075,7 +3075,7 @@ fragment EnvironmentSummaryFields on EnvironmentSummary {
   usedByAgentCount
   appId
 }`) as unknown as TypedDocumentString<CreateEnvironmentMutation, CreateEnvironmentMutationVariables>;
-export const UpdateEnvironmentDocument = new TypedDocumentString(`
+export const UpdateEnvironmentDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation UpdateEnvironment($input: UpdateEnvironmentInput!) {
   updateEnvironment(input: $input) {
     ...EnvironmentDetailFields
@@ -3130,14 +3130,14 @@ fragment EnvironmentDetailFields on EnvironmentDetail {
   usedByAgentCount
   appId
 }`) as unknown as TypedDocumentString<UpdateEnvironmentMutation, UpdateEnvironmentMutationVariables>;
-export const DeleteEnvironmentDocument = new TypedDocumentString(`
+export const DeleteEnvironmentDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation DeleteEnvironment($input: DeleteEnvironmentInput!) {
   deleteEnvironment(input: $input) {
     ok
   }
 }
     `) as unknown as TypedDocumentString<DeleteEnvironmentMutation, DeleteEnvironmentMutationVariables>;
-export const SetAppDefaultEnvironmentDocument = new TypedDocumentString(`
+export const SetAppDefaultEnvironmentDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation SetAppDefaultEnvironment($input: SetAppDefaultEnvironmentInput!) {
   setAppDefaultEnvironment(input: $input) {
     ...EnvironmentSummaryFields
@@ -3192,7 +3192,7 @@ fragment EnvironmentSummaryFields on EnvironmentSummary {
   usedByAgentCount
   appId
 }`) as unknown as TypedDocumentString<SetAppDefaultEnvironmentMutation, SetAppDefaultEnvironmentMutationVariables>;
-export const FileListDocument = new TypedDocumentString(`
+export const FileListDocument = /*#__PURE__*/ new TypedDocumentString(`
     query FileList($input: FileListInput!) {
   fileList(input: $input) {
     files {
@@ -3213,7 +3213,7 @@ export const FileListDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<FileListQuery, FileListQueryVariables>;
-export const McpRegistryDocument = new TypedDocumentString(`
+export const McpRegistryDocument = /*#__PURE__*/ new TypedDocumentString(`
     query McpRegistry($appId: ULID!) {
   mcpRegistry(appId: $appId) {
     currentUserEmail
@@ -3258,7 +3258,7 @@ fragment McpServerFields on McpServerWithCredential {
     ...McpCredentialFields
   }
 }`) as unknown as TypedDocumentString<McpRegistryQuery, McpRegistryQueryVariables>;
-export const CreateAppMcpServerDocument = new TypedDocumentString(`
+export const CreateAppMcpServerDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateAppMcpServer($input: CreateAppMcpServerInput!) {
   createAppMcpServer(input: $input) {
     ...McpServerFields
@@ -3297,7 +3297,7 @@ fragment McpServerFields on McpServerWithCredential {
     ...McpCredentialFields
   }
 }`) as unknown as TypedDocumentString<CreateAppMcpServerMutation, CreateAppMcpServerMutationVariables>;
-export const ConnectMcpBearerDocument = new TypedDocumentString(`
+export const ConnectMcpBearerDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation ConnectMcpBearer($input: ConnectMcpBearerInput!) {
   connectMcpBearer(input: $input) {
     ...McpServerFields
@@ -3336,7 +3336,7 @@ fragment McpServerFields on McpServerWithCredential {
     ...McpCredentialFields
   }
 }`) as unknown as TypedDocumentString<ConnectMcpBearerMutation, ConnectMcpBearerMutationVariables>;
-export const RevokeMcpCredentialDocument = new TypedDocumentString(`
+export const RevokeMcpCredentialDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation RevokeMcpCredential($appId: ULID!, $serverId: ULID!) {
   revokeMcpCredential(appId: $appId, serverId: $serverId) {
     ...McpServerFields
@@ -3375,7 +3375,7 @@ fragment McpServerFields on McpServerWithCredential {
     ...McpCredentialFields
   }
 }`) as unknown as TypedDocumentString<RevokeMcpCredentialMutation, RevokeMcpCredentialMutationVariables>;
-export const SetMcpServerEnabledDocument = new TypedDocumentString(`
+export const SetMcpServerEnabledDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation SetMcpServerEnabled($appId: ULID!, $serverId: ULID!, $enabled: Boolean!) {
   setMcpServerEnabled(appId: $appId, serverId: $serverId, enabled: $enabled) {
     ...McpServerFields
@@ -3414,14 +3414,14 @@ fragment McpServerFields on McpServerWithCredential {
     ...McpCredentialFields
   }
 }`) as unknown as TypedDocumentString<SetMcpServerEnabledMutation, SetMcpServerEnabledMutationVariables>;
-export const DeleteMcpServerDocument = new TypedDocumentString(`
+export const DeleteMcpServerDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation DeleteMcpServer($appId: ULID!, $serverId: ULID!) {
   deleteMcpServer(appId: $appId, serverId: $serverId) {
     ok
   }
 }
     `) as unknown as TypedDocumentString<DeleteMcpServerMutation, DeleteMcpServerMutationVariables>;
-export const StartMcpOAuthDocument = new TypedDocumentString(`
+export const StartMcpOAuthDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation StartMcpOAuth($input: StartMcpOAuthInput!) {
   startMcpOAuth(input: $input) {
     authorizationUrl
@@ -3429,7 +3429,7 @@ export const StartMcpOAuthDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<StartMcpOAuthMutation, StartMcpOAuthMutationVariables>;
-export const McpOAuthFlowStatusDocument = new TypedDocumentString(`
+export const McpOAuthFlowStatusDocument = /*#__PURE__*/ new TypedDocumentString(`
     query McpOAuthFlowStatus($flowId: ULID!) {
   mcpOAuthFlowStatus(flowId: $flowId) {
     authorizationState
@@ -3441,7 +3441,7 @@ export const McpOAuthFlowStatusDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<McpOAuthFlowStatusQuery, McpOAuthFlowStatusQueryVariables>;
-export const OnboardingBootstrapDocument = new TypedDocumentString(`
+export const OnboardingBootstrapDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation OnboardingBootstrap($input: BootstrapOnboardingInput!) {
   onboardingBootstrap(input: $input) {
     completed
@@ -3454,7 +3454,7 @@ export const OnboardingBootstrapDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<OnboardingBootstrapMutation, OnboardingBootstrapMutationVariables>;
-export const RenameOrganizationDocument = new TypedDocumentString(`
+export const RenameOrganizationDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation RenameOrganization($input: RenameOrganizationInput!) {
   renameOrganization(input: $input) {
     avatarUrl
@@ -3464,7 +3464,7 @@ export const RenameOrganizationDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<RenameOrganizationMutation, RenameOrganizationMutationVariables>;
-export const ThreadAgentSessionRetrieveDocument = new TypedDocumentString(`
+export const ThreadAgentSessionRetrieveDocument = /*#__PURE__*/ new TypedDocumentString(`
     query ThreadAgentSessionRetrieve($appId: ULID!, $sessionId: ULID!) {
   threadAgentSessionRetrieve(appId: $appId, sessionId: $sessionId) {
     capabilities {
@@ -3516,7 +3516,7 @@ export const ThreadAgentSessionRetrieveDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ThreadAgentSessionRetrieveQuery, ThreadAgentSessionRetrieveQueryVariables>;
-export const AgentSessionDiagnosticsDocument = new TypedDocumentString(`
+export const AgentSessionDiagnosticsDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AgentSessionDiagnostics($appId: ULID!, $sessionId: ULID!) {
   agentSessionDiagnostics(appId: $appId, sessionId: $sessionId) {
     execution {
@@ -3569,7 +3569,7 @@ export const AgentSessionDiagnosticsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AgentSessionDiagnosticsQuery, AgentSessionDiagnosticsQueryVariables>;
-export const CreateAgentSessionDocument = new TypedDocumentString(`
+export const CreateAgentSessionDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateAgentSession($input: CreateAgentSessionInput!) {
   createAgentSession(input: $input) {
     agentId
@@ -3611,7 +3611,7 @@ export const CreateAgentSessionDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<CreateAgentSessionMutation, CreateAgentSessionMutationVariables>;
-export const AgentSessionListDocument = new TypedDocumentString(`
+export const AgentSessionListDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AgentSessionList($agentId: ULID!, $archived: Boolean, $participantOnly: Boolean, $appId: ULID!, $type: SessionType) {
   agentSessionList(
     agentId: $agentId
@@ -3661,7 +3661,7 @@ export const AgentSessionListDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AgentSessionListQuery, AgentSessionListQueryVariables>;
-export const AgentSessionProcessEventsDocument = new TypedDocumentString(`
+export const AgentSessionProcessEventsDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AgentSessionProcessEvents($limit: Int!, $appId: ULID!, $sessionId: ULID!) {
   sessionProcessEvents(limit: $limit, appId: $appId, sessionId: $sessionId) {
     content
@@ -3674,7 +3674,7 @@ export const AgentSessionProcessEventsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AgentSessionProcessEventsQuery, AgentSessionProcessEventsQueryVariables>;
-export const ThreadSessionMessagesDocument = new TypedDocumentString(`
+export const ThreadSessionMessagesDocument = /*#__PURE__*/ new TypedDocumentString(`
     query ThreadSessionMessages($appId: ULID!, $sessionId: ULID!) {
   threadSessionMessages(appId: $appId, sessionId: $sessionId) {
     content
@@ -3699,7 +3699,7 @@ export const ThreadSessionMessagesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ThreadSessionMessagesQuery, ThreadSessionMessagesQueryVariables>;
-export const SendAgentSessionEventsDocument = new TypedDocumentString(`
+export const SendAgentSessionEventsDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation SendAgentSessionEvents($appId: ULID!, $sessionId: ULID!, $events: [AgentSessionEventInput!]!) {
   sendAgentSessionEvents(appId: $appId, sessionId: $sessionId, events: $events) {
     acceptedAt
@@ -3710,7 +3710,7 @@ export const SendAgentSessionEventsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SendAgentSessionEventsMutation, SendAgentSessionEventsMutationVariables>;
-export const PrewarmAgentSessionDocument = new TypedDocumentString(`
+export const PrewarmAgentSessionDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation PrewarmAgentSession($appId: ULID!, $sessionId: ULID!) {
   prewarmAgentSession(appId: $appId, sessionId: $sessionId) {
     scheduledAt
@@ -3718,7 +3718,7 @@ export const PrewarmAgentSessionDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<PrewarmAgentSessionMutation, PrewarmAgentSessionMutationVariables>;
-export const ThreadAgentSessionListDocument = new TypedDocumentString(`
+export const ThreadAgentSessionListDocument = /*#__PURE__*/ new TypedDocumentString(`
     query ThreadAgentSessionList($appId: ULID!, $archived: Boolean, $type: SessionType) {
   threadAgentSessionList(appId: $appId, archived: $archived, type: $type) {
     nodes {
@@ -3769,35 +3769,35 @@ export const ThreadAgentSessionListDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ThreadAgentSessionListQuery, ThreadAgentSessionListQueryVariables>;
-export const AutoTitleSessionDocument = new TypedDocumentString(`
+export const AutoTitleSessionDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation AutoTitleSession($input: RenameSessionInput!) {
   autoTitleSession(input: $input) {
     id
   }
 }
     `) as unknown as TypedDocumentString<AutoTitleSessionMutation, AutoTitleSessionMutationVariables>;
-export const ArchiveSessionDocument = new TypedDocumentString(`
+export const ArchiveSessionDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation ArchiveSession($appId: ULID!, $sessionId: ULID!) {
   archiveAgentSession(appId: $appId, sessionId: $sessionId) {
     ok
   }
 }
     `) as unknown as TypedDocumentString<ArchiveSessionMutation, ArchiveSessionMutationVariables>;
-export const RestoreSessionDocument = new TypedDocumentString(`
+export const RestoreSessionDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation RestoreSession($appId: ULID!, $sessionId: ULID!) {
   unarchiveAgentSession(appId: $appId, sessionId: $sessionId) {
     ok
   }
 }
     `) as unknown as TypedDocumentString<RestoreSessionMutation, RestoreSessionMutationVariables>;
-export const DeleteAgentSessionDocument = new TypedDocumentString(`
+export const DeleteAgentSessionDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation DeleteAgentSession($appId: ULID!, $sessionId: ULID!) {
   deleteAgentSession(appId: $appId, sessionId: $sessionId) {
     ok
   }
 }
     `) as unknown as TypedDocumentString<DeleteAgentSessionMutation, DeleteAgentSessionMutationVariables>;
-export const AddSessionResourceDocument = new TypedDocumentString(`
+export const AddSessionResourceDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation AddSessionResource($input: AddSessionResourceInput!) {
   addSessionResource(input: $input) {
     contentType
@@ -3811,7 +3811,7 @@ export const AddSessionResourceDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AddSessionResourceMutation, AddSessionResourceMutationVariables>;
-export const SessionProcessEventsDocument = new TypedDocumentString(`
+export const SessionProcessEventsDocument = /*#__PURE__*/ new TypedDocumentString(`
     query SessionProcessEvents($limit: Int!, $appId: ULID!, $sessionId: ULID!) {
   threadSessionProcessEvents(limit: $limit, appId: $appId, sessionId: $sessionId) {
     content
@@ -3824,7 +3824,7 @@ export const SessionProcessEventsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SessionProcessEventsQuery, SessionProcessEventsQueryVariables>;
-export const SkillDetailDocument = new TypedDocumentString(`
+export const SkillDetailDocument = /*#__PURE__*/ new TypedDocumentString(`
     query SkillDetail($appId: ULID!, $skillId: ULID!) {
   skillDetail(appId: $appId, skillId: $skillId) {
     ...SkillDetailFields
@@ -3871,7 +3871,7 @@ export const SkillDetailDocument = new TypedDocumentString(`
     size
   }
 }`) as unknown as TypedDocumentString<SkillDetailQuery, SkillDetailQueryVariables>;
-export const AppSkillsDocument = new TypedDocumentString(`
+export const AppSkillsDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AppSkills($appId: ULID!) {
   appSkillList(appId: $appId) {
     ...SkillSummaryFields
@@ -3895,7 +3895,7 @@ export const AppSkillsDocument = new TypedDocumentString(`
   sourceKind
   updatedAt
 }`) as unknown as TypedDocumentString<AppSkillsQuery, AppSkillsQueryVariables>;
-export const CreateSkillForkDocument = new TypedDocumentString(`
+export const CreateSkillForkDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateSkillFork($input: CreateSkillForkInput!) {
   createSkillFork(input: $input) {
     ...SkillSummaryFields
@@ -3919,14 +3919,14 @@ export const CreateSkillForkDocument = new TypedDocumentString(`
   sourceKind
   updatedAt
 }`) as unknown as TypedDocumentString<CreateSkillForkMutation, CreateSkillForkMutationVariables>;
-export const DeleteOwnedSkillDocument = new TypedDocumentString(`
+export const DeleteOwnedSkillDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation DeleteOwnedSkill($appId: ULID!, $skillId: ULID!) {
   deleteOwnedSkill(appId: $appId, skillId: $skillId) {
     ok
   }
 }
     `) as unknown as TypedDocumentString<DeleteOwnedSkillMutation, DeleteOwnedSkillMutationVariables>;
-export const ViewerDocument = new TypedDocumentString(`
+export const ViewerDocument = /*#__PURE__*/ new TypedDocumentString(`
     query Viewer {
   viewer {
     account {
@@ -3958,7 +3958,7 @@ export const ViewerDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ViewerQuery, ViewerQueryVariables>;
-export const UpdateProfileDocument = new TypedDocumentString(`
+export const UpdateProfileDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation UpdateProfile($input: UpdateAccountProfileInput!) {
   updateProfile(input: $input) {
     imageUrl
@@ -3966,7 +3966,7 @@ export const UpdateProfileDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<UpdateProfileMutation, UpdateProfileMutationVariables>;
-export const VendorCredentialListDocument = new TypedDocumentString(`
+export const VendorCredentialListDocument = /*#__PURE__*/ new TypedDocumentString(`
     query VendorCredentialList($appId: ULID!) {
   vendorCredentialList(appId: $appId) {
     apiBase
@@ -3980,7 +3980,7 @@ export const VendorCredentialListDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<VendorCredentialListQuery, VendorCredentialListQueryVariables>;
-export const CreateVendorCredentialDocument = new TypedDocumentString(`
+export const CreateVendorCredentialDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateVendorCredential($input: CreateVendorCredentialInput!) {
   createVendorCredential(input: $input) {
     apiBase
@@ -3994,7 +3994,7 @@ export const CreateVendorCredentialDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<CreateVendorCredentialMutation, CreateVendorCredentialMutationVariables>;
-export const UpdateVendorCredentialDocument = new TypedDocumentString(`
+export const UpdateVendorCredentialDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation UpdateVendorCredential($input: UpdateVendorCredentialInput!) {
   updateVendorCredential(input: $input) {
     apiBase
@@ -4008,14 +4008,14 @@ export const UpdateVendorCredentialDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<UpdateVendorCredentialMutation, UpdateVendorCredentialMutationVariables>;
-export const DeleteVendorCredentialDocument = new TypedDocumentString(`
+export const DeleteVendorCredentialDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation DeleteVendorCredential($input: DeleteVendorCredentialInput!) {
   deleteVendorCredential(input: $input) {
     ok
   }
 }
     `) as unknown as TypedDocumentString<DeleteVendorCredentialMutation, DeleteVendorCredentialMutationVariables>;
-export const SetDefaultVendorCredentialDocument = new TypedDocumentString(`
+export const SetDefaultVendorCredentialDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation SetDefaultVendorCredential($input: SetDefaultVendorCredentialInput!) {
   setDefaultVendorCredential(input: $input) {
     apiBase
@@ -4029,7 +4029,7 @@ export const SetDefaultVendorCredentialDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<SetDefaultVendorCredentialMutation, SetDefaultVendorCredentialMutationVariables>;
-export const AvailableAgentModelsDocument = new TypedDocumentString(`
+export const AvailableAgentModelsDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AvailableAgentModels($appId: ULID!, $runtimeId: String!, $currentModelId: String, $currentVendorId: String) {
   availableAgentModels(
     appId: $appId
@@ -4049,7 +4049,7 @@ export const AvailableAgentModelsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AvailableAgentModelsQuery, AvailableAgentModelsQueryVariables>;
-export const TestVendorCredentialDocument = new TypedDocumentString(`
+export const TestVendorCredentialDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation TestVendorCredential($input: TestVendorCredentialInput!) {
   testVendorCredential(input: $input) {
     errorCode
