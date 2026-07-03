@@ -3,7 +3,7 @@ import { relative } from "node:path";
 
 import { generate } from "@graphql-codegen/cli";
 
-import config, { ensureTrailingNewline } from "../config/graphql-codegen.ts";
+import config, { applyWriteHooks } from "../config/graphql-codegen.ts";
 
 interface GeneratedFile {
   content?: string;
@@ -60,7 +60,7 @@ for (const item of output) {
     throw new TypeError("GraphQL codegen returned an invalid generated file.");
   }
 
-  const expected = ensureTrailingNewline(item.filename, item.content ?? "");
+  const expected = applyWriteHooks(item.filename, item.content ?? "");
   const actual = await readText(item.filename);
 
   if (actual !== expected) {
