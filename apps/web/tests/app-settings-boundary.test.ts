@@ -66,6 +66,15 @@ describe("App settings boundary", () => {
     expect(routeRegistry).not.toContain("OrganizationGeneralTab");
   });
 
+  test("keeps Agent Cost run-purpose filters aligned with App Usage", () => {
+    const agentCostTab = readSource("../src/routes/agent/components/cost-tab.tsx");
+
+    expect(agentCostTab).toContain("RUN_PURPOSE_FILTERS.map");
+    expect(agentCostTab).toContain("runPurposeToQuery(purpose)");
+    expect(agentCostTab).not.toContain('label: "Preview"');
+    expect(agentCostTab).not.toContain("preview run purposes");
+  });
+
   test("uses Agent API Endpoint wording for API tokens and API reference help", () => {
     const accessTokens = readSource("../src/routes/settings/access-tokens-tab.tsx");
     const helpDocs = readSource("../src/shared/config/help-docs.ts");
