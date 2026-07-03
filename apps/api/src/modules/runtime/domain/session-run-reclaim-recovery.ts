@@ -14,9 +14,10 @@ import { isTerminalSessionRunStatus } from "./session-run-status";
  * both, so an eviction is classified identically everywhere, and it exposes the
  * pure decision — requeue vs fail-clean — that the recovery wiring consumes.
  *
- * Design references (see docs/perf-permission-work/00-findings.md): OMA's
- * `recoverInterruptedState`, agentos/opencomputer's "reclaim = lazy resume,
- * fail cleanly, never loop", OpenHands's durable-pause-then-resume.
+ * Design references (see
+ * https://github.com/Yevanchen/mosoo-product-doc/blob/main/plan/runtime-session/perf-permission-work/00-findings.md):
+ * OMA's `recoverInterruptedState`, agentos/opencomputer's "reclaim = lazy
+ * resume, fail cleanly, never loop", OpenHands's durable-pause-then-resume.
  */
 
 /** Terminal status of the driver instance behind the reclaimed run. */
