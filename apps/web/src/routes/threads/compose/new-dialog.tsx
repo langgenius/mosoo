@@ -233,7 +233,7 @@ function AgentAssignField({
               <ChevronDown className="text-fg-3 size-4 shrink-0" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="max-h-[320px] w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto">
+          <DropdownMenuContent className="max-h-[320px] w-[var(--anchor-width)] overflow-y-auto">
             {agents.map((agent) => {
               const isSelected = agent.id === selectedAgentId;
 

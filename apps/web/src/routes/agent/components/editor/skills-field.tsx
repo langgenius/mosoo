@@ -118,7 +118,7 @@ export function AgentSkillsField({
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="start"
-              className="max-h-[320px] w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto"
+              className="max-h-[320px] w-[var(--anchor-width)] overflow-y-auto"
             >
               {dropdownContent}
               <DropdownMenuSeparator />

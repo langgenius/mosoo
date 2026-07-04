@@ -77,7 +77,7 @@ export function ModelPickerField({
             <ChevronDown className="text-muted-foreground size-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)]">
+        <DropdownMenuContent align="start" className="w-[var(--anchor-width)]">
           <DropdownMenuLabel>Available models</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <div className="max-h-[280px] overflow-y-auto">

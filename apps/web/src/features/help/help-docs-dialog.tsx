@@ -72,10 +72,7 @@ function HelpDocsDialogContent({ onOpenChange }: { onOpenChange: (open: boolean)
     <DialogContent
       showCloseButton={false}
       className="gap-0 overflow-hidden p-0 sm:max-w-xl"
-      onOpenAutoFocus={(event) => {
-        event.preventDefault();
-        inputRef.current?.focus();
-      }}
+      initialFocus={inputRef}
     >
       <DialogHeader className="sr-only">
         <DialogTitle>Help &amp; docs</DialogTitle>

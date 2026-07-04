@@ -1,6 +1,6 @@
 "use client";
 
-import { Avatar as AvatarPrimitive } from "radix-ui";
+import { Avatar as AvatarPrimitive } from "@base-ui/react/avatar";
 import type { ComponentProps, ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";

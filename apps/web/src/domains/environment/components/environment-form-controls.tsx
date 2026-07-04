@@ -47,7 +47,7 @@ export function NetworkPolicySelect({
       <SelectButton disabled={disabled} label={NETWORK_POLICY_LABELS[value]} />
       <DropdownMenuContent
         align="start"
-        className="environment-scroll-area max-h-64 w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto"
+        className="environment-scroll-area max-h-64 w-[var(--anchor-width)] overflow-y-auto"
       >
         {(["limited", "full"] as const).map((policy) => (
           <DropdownMenuItem
@@ -80,7 +80,7 @@ export function PackageManagerSelect({
       <SelectButton disabled={disabled} label={value ? PACKAGE_MANAGER_LABELS[value] : "Manager"} />
       <DropdownMenuContent
         align="start"
-        className="environment-scroll-area max-h-56 w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto"
+        className="environment-scroll-area max-h-56 w-[var(--anchor-width)] overflow-y-auto"
       >
         {PACKAGE_MANAGERS.map((manager) => (
           <DropdownMenuItem

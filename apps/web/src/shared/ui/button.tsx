@@ -1,6 +1,7 @@
+import { useRender } from "@base-ui/react/use-render";
 import { cva } from "class-variance-authority";
 import type { VariantProps } from "class-variance-authority";
-import { Slot } from "radix-ui";
+import { isValidElement } from "react";
 import type { ComponentProps, ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
@@ -39,27 +40,42 @@ const buttonVariants = cva(
   },
 );
 
+type ButtonProps = ComponentProps<"button"> &
+  VariantProps<typeof buttonVariants> & {
+    /** Radix-style escape hatch: render the single child element as the button. */
+    asChild?: boolean;
+    /** Base UI native composition: element (or render fn) to render instead of a button. */
+    render?: useRender.RenderProp;
+  };
+
 function Button({
   className,
   variant = "default",
   size = "default",
   asChild = false,
+  render,
+  children,
   ...props
-}: ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean;
-  }): ReactElement {
-  const Comp = asChild ? Slot.Root : "button";
+}: ButtonProps): ReactElement {
+  // `asChild` uses the single child element AS the rendered element (its own
+  // children come with it), so they must not also be passed as a prop. The
+  // native `render` prop is different: `children` is separate content Base UI
+  // merges into the render target, so it must be forwarded.
+  const asChildElement =
+    asChild && isValidElement(children) ? (children as ReactElement) : undefined;
 
-  return (
-    <Comp
-      data-slot="button"
-      data-variant={variant}
-      data-size={size}
-      className={cn(buttonVariants({ className, size, variant }))}
-      {...props}
-    />
-  );
+  return useRender({
+    render: render ?? asChildElement,
+    defaultTagName: "button",
+    props: {
+      "data-slot": "button",
+      "data-variant": variant,
+      "data-size": size,
+      className: cn(buttonVariants({ className, size, variant })),
+      ...props,
+      ...(asChildElement ? {} : { children }),
+    },
+  });
 }
 
 export { Button };

@@ -28,15 +28,18 @@ interface CapturedGraphQLBody {
 function installDom(): void {
   dom = new JSDOM("<!doctype html><html><body></body></html>", {
     url: "http://localhost/providers",
+    pretendToBeVisual: true,
   });
   const { window } = dom;
 
   globalThis.window = window as unknown as Window & typeof globalThis;
   globalThis.document = window.document;
+  globalThis.Element = window.Element;
   globalThis.HTMLElement = window.HTMLElement;
   globalThis.HTMLButtonElement = window.HTMLButtonElement;
   globalThis.HTMLInputElement = window.HTMLInputElement;
   globalThis.Node = window.Node;
+  globalThis.ShadowRoot = window.ShadowRoot;
   globalThis.NodeFilter = window.NodeFilter;
   globalThis.Event = window.Event;
   globalThis.MouseEvent = window.MouseEvent;
@@ -44,6 +47,8 @@ function installDom(): void {
   globalThis.KeyboardEvent = window.KeyboardEvent;
   globalThis.MutationObserver = window.MutationObserver;
   globalThis.getComputedStyle = window.getComputedStyle.bind(window);
+  globalThis.requestAnimationFrame = window.requestAnimationFrame.bind(window);
+  globalThis.cancelAnimationFrame = window.cancelAnimationFrame.bind(window);
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
     value: window.navigator,
@@ -73,10 +78,12 @@ function uninstallDom(): void {
   dom = null;
   delete globalThis.window;
   delete globalThis.document;
+  delete globalThis.Element;
   delete globalThis.HTMLElement;
   delete globalThis.HTMLButtonElement;
   delete globalThis.HTMLInputElement;
   delete globalThis.Node;
+  delete globalThis.ShadowRoot;
   delete globalThis.NodeFilter;
   delete globalThis.Event;
   delete globalThis.MouseEvent;
@@ -84,6 +91,8 @@ function uninstallDom(): void {
   delete globalThis.KeyboardEvent;
   delete globalThis.MutationObserver;
   delete globalThis.getComputedStyle;
+  delete globalThis.requestAnimationFrame;
+  delete globalThis.cancelAnimationFrame;
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
     value: undefined,
