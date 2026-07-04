@@ -4,7 +4,10 @@ import codexSvgUrl from "@lobehub/icons-static-svg/icons/codex-color.svg";
 import cursorSvgUrl from "@lobehub/icons-static-svg/icons/cursor.svg";
 import openaiSvgUrl from "@lobehub/icons-static-svg/icons/openai.svg";
 import opencodeSvgUrl from "@lobehub/icons-static-svg/icons/opencode.svg";
-import { getRuntimeIconKey } from "@mosoo/runtime-catalog";
+// Import from the lean /icons entry point, not the package root: the root
+// pulls the full catalog plus @mosoo/contracts' arktype runtime (~50 KB gz)
+// into every chunk that renders a RuntimeIcon, which is nearly every page.
+import { getRuntimeIconKey } from "@mosoo/runtime-catalog/icons";
 
 const RUNTIME_ICON_URL_BY_KEY: Record<string, string> = {
   "claude-code": claudeCodeSvgUrl,

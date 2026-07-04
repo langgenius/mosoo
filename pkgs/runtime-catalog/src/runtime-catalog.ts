@@ -454,18 +454,6 @@ export function listRuntimeShowcaseDisplayEntries(): RuntimeDisplayCatalogEntry[
   return [...PUBLIC_RUNTIME_DISPLAY_CATALOG, ...listPlannedRuntimeDisplayEntries("landing")];
 }
 
-export function getRuntimeIconKey(runtimeId: string): string | null {
-  const publicRuntime = RUNTIME_CATALOG.find((entry) => entry.runtimeId === runtimeId);
-
-  if (publicRuntime !== undefined) {
-    return publicRuntime.display.iconKey;
-  }
-
-  return (
-    PLANNED_RUNTIME_DISPLAY_CATALOG.find((entry) => entry.runtimeId === runtimeId)?.iconKey ?? null
-  );
-}
-
 export function getRuntimeDisplayColor(runtimeId: string): string | null {
   return RUNTIME_CATALOG.find((entry) => entry.runtimeId === runtimeId)?.display.color ?? null;
 }

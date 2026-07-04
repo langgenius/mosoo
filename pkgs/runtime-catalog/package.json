@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./icons": "./src/runtime-icons.ts"
   },
   "scripts": {
     "catalog:check": "vp exec bun scripts/generate-runtime-catalog.ts --check",
