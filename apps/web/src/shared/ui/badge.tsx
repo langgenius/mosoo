@@ -1,6 +1,7 @@
+import { useRender } from "@base-ui/react/use-render";
 import { cva } from "class-variance-authority";
 import type { VariantProps } from "class-variance-authority";
-import { Slot } from "radix-ui";
+import { isValidElement } from "react";
 import type { ComponentProps, ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
@@ -32,25 +33,39 @@ const badgeVariants = cva(
   },
 );
 
+type BadgeProps = ComponentProps<"span"> &
+  VariantProps<typeof badgeVariants> & {
+    /** Radix-style escape hatch: render the single child element as the badge. */
+    asChild?: boolean;
+    /** Base UI native composition: element (or render fn) to render instead of a span. */
+    render?: useRender.RenderProp;
+  };
+
 function Badge({
   className,
   variant = "default",
   asChild = false,
+  render,
+  children,
   ...props
-}: ComponentProps<"span"> &
-  VariantProps<typeof badgeVariants> & {
-    asChild?: boolean;
-  }): ReactElement {
-  const Comp = asChild ? Slot.Root : "span";
+}: BadgeProps): ReactElement {
+  // `asChild` uses the single child element AS the rendered element (its own
+  // children come with it); the native `render` prop instead keeps `children`
+  // as separate content Base UI merges into the render target.
+  const asChildElement =
+    asChild && isValidElement(children) ? (children as ReactElement) : undefined;
 
-  return (
-    <Comp
-      data-slot="badge"
-      data-variant={variant}
-      className={cn(badgeVariants({ variant }), className)}
-      {...props}
-    />
-  );
+  return useRender({
+    render: render ?? asChildElement,
+    defaultTagName: "span",
+    props: {
+      "data-slot": "badge",
+      "data-variant": variant,
+      className: cn(badgeVariants({ variant }), className),
+      ...props,
+      ...(asChildElement ? {} : { children }),
+    },
+  });
 }
 
 export { Badge };
