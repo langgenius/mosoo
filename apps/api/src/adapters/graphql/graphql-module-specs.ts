@@ -97,6 +97,7 @@ export const mcpGraphQLSpec = {
     "revokeMcpCredential(appId: ULID!, serverId: ULID!): McpServerWithCredential!",
     "setMcpServerEnabled(appId: ULID!, serverId: ULID!, enabled: Boolean!): McpServerWithCredential!",
     "startMcpOAuth(input: StartMcpOAuthInput!): StartMcpOAuthPayload!",
+    "updateAppMcpServer(input: UpdateAppMcpServerInput!): McpServerWithCredential!",
   ],
   queryFields: [
     "mcpOAuthFlowStatus(flowId: ULID!): McpOAuthFlowState!",

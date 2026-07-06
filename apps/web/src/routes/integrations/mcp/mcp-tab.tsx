@@ -7,6 +7,7 @@ import { Input } from "@/shared/ui/input";
 import { PageHeader } from "@/shared/ui/page-header";
 
 import { AddMcpDialog } from "./add-mcp-dialog";
+import { EditMcpDialog } from "./edit-mcp-dialog";
 import { McpListItem } from "./mcp-list-item";
 import type { McpServerWithCredential } from "./mcp-types";
 import { OAuthConnectDialog } from "./oauth-connect-dialog";
@@ -14,17 +15,20 @@ import { useMcpRegistry } from "./use-mcp-registry";
 
 interface McpTabState {
   addOpen: boolean;
+  editServer: McpServerWithCredential | null;
   oauthServer: McpServerWithCredential | null;
   search: string;
 }
 
 type McpTabAction =
   | { type: "setAddOpen"; open: boolean }
+  | { type: "setEditServer"; server: McpServerWithCredential | null }
   | { type: "setOauthServer"; server: McpServerWithCredential | null }
   | { type: "setSearch"; search: string };
 
 const MCP_TAB_INITIAL_STATE: McpTabState = {
   addOpen: false,
+  editServer: null,
   oauthServer: null,
   search: "",
 };
@@ -33,6 +37,8 @@ function mcpTabReducer(state: McpTabState, action: McpTabAction): McpTabState {
   switch (action.type) {
     case "setAddOpen":
       return { ...state, addOpen: action.open };
+    case "setEditServer":
+      return { ...state, editServer: action.server };
     case "setOauthServer":
       return { ...state, oauthServer: action.server };
     case "setSearch":
@@ -43,7 +49,7 @@ function mcpTabReducer(state: McpTabState, action: McpTabAction): McpTabState {
 export function McpTab() {
   const registry = useMcpRegistry();
   const [state, dispatch] = useReducer(mcpTabReducer, MCP_TAB_INITIAL_STATE);
-  const { addOpen, oauthServer, search } = state;
+  const { addOpen, editServer, oauthServer, search } = state;
 
   const list: McpServerWithCredential[] = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -134,6 +140,9 @@ export function McpTab() {
                   onConnect={() => {
                     dispatch({ server, type: "setOauthServer" });
                   }}
+                  onEdit={() => {
+                    dispatch({ server, type: "setEditServer" });
+                  }}
                   onDelete={() => void registry.deleteServer(server.id)}
                   onRevoke={() => void registry.revokeCredential(server.id)}
                   onToggleEnabled={() => void registry.setServerEnabled(server.id, !server.enabled)}
@@ -151,6 +160,23 @@ export function McpTab() {
         }}
         onSubmit={handleAddSubmit}
       />
+      {editServer !== null && (
+        <EditMcpDialog
+          key={editServer.id}
+          server={editServer}
+          onOpenChange={(next) => {
+            if (!next) {
+              dispatch({ server: null, type: "setEditServer" });
+            }
+          }}
+          onSubmit={async (input) => {
+            await registry.updateServer({
+              serverId: editServer.id,
+              ...input,
+            });
+          }}
+        />
+      )}
       <OAuthConnectDialog
         open={oauthServer !== null}
         server={oauthServer}

@@ -81,6 +81,7 @@ type Documents = {
     "\n  mutation ConnectMcpBearer($input: ConnectMcpBearerInput!) {\n    connectMcpBearer(input: $input) {\n      ...McpServerFields\n    }\n  }\n": typeof types.ConnectMcpBearerDocument,
     "\n  mutation RevokeMcpCredential($appId: ULID!, $serverId: ULID!) {\n    revokeMcpCredential(appId: $appId, serverId: $serverId) {\n      ...McpServerFields\n    }\n  }\n": typeof types.RevokeMcpCredentialDocument,
     "\n  mutation SetMcpServerEnabled($appId: ULID!, $serverId: ULID!, $enabled: Boolean!) {\n    setMcpServerEnabled(appId: $appId, serverId: $serverId, enabled: $enabled) {\n      ...McpServerFields\n    }\n  }\n": typeof types.SetMcpServerEnabledDocument,
+    "\n  mutation UpdateAppMcpServer($input: UpdateAppMcpServerInput!) {\n    updateAppMcpServer(input: $input) {\n      ...McpServerFields\n    }\n  }\n": typeof types.UpdateAppMcpServerDocument,
     "\n  mutation DeleteMcpServer($appId: ULID!, $serverId: ULID!) {\n    deleteMcpServer(appId: $appId, serverId: $serverId) {\n      ok\n    }\n  }\n": typeof types.DeleteMcpServerDocument,
     "\n  mutation StartMcpOAuth($input: StartMcpOAuthInput!) {\n    startMcpOAuth(input: $input) {\n      authorizationUrl\n      flowId\n    }\n  }\n": typeof types.StartMcpOAuthDocument,
     "\n  query McpOAuthFlowStatus($flowId: ULID!) {\n    mcpOAuthFlowStatus(flowId: $flowId) {\n      authorizationState\n      errorMessage\n      flowId\n      serverId\n      status\n      subjectLabel\n    }\n  }\n": typeof types.McpOAuthFlowStatusDocument,
@@ -184,6 +185,7 @@ const documents: Documents = {
     "\n  mutation ConnectMcpBearer($input: ConnectMcpBearerInput!) {\n    connectMcpBearer(input: $input) {\n      ...McpServerFields\n    }\n  }\n": types.ConnectMcpBearerDocument,
     "\n  mutation RevokeMcpCredential($appId: ULID!, $serverId: ULID!) {\n    revokeMcpCredential(appId: $appId, serverId: $serverId) {\n      ...McpServerFields\n    }\n  }\n": types.RevokeMcpCredentialDocument,
     "\n  mutation SetMcpServerEnabled($appId: ULID!, $serverId: ULID!, $enabled: Boolean!) {\n    setMcpServerEnabled(appId: $appId, serverId: $serverId, enabled: $enabled) {\n      ...McpServerFields\n    }\n  }\n": types.SetMcpServerEnabledDocument,
+    "\n  mutation UpdateAppMcpServer($input: UpdateAppMcpServerInput!) {\n    updateAppMcpServer(input: $input) {\n      ...McpServerFields\n    }\n  }\n": types.UpdateAppMcpServerDocument,
     "\n  mutation DeleteMcpServer($appId: ULID!, $serverId: ULID!) {\n    deleteMcpServer(appId: $appId, serverId: $serverId) {\n      ok\n    }\n  }\n": types.DeleteMcpServerDocument,
     "\n  mutation StartMcpOAuth($input: StartMcpOAuthInput!) {\n    startMcpOAuth(input: $input) {\n      authorizationUrl\n      flowId\n    }\n  }\n": types.StartMcpOAuthDocument,
     "\n  query McpOAuthFlowStatus($flowId: ULID!) {\n    mcpOAuthFlowStatus(flowId: $flowId) {\n      authorizationState\n      errorMessage\n      flowId\n      serverId\n      status\n      subjectLabel\n    }\n  }\n": types.McpOAuthFlowStatusDocument,
@@ -485,6 +487,10 @@ export function graphql(source: "\n  mutation RevokeMcpCredential($appId: ULID!,
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation SetMcpServerEnabled($appId: ULID!, $serverId: ULID!, $enabled: Boolean!) {\n    setMcpServerEnabled(appId: $appId, serverId: $serverId, enabled: $enabled) {\n      ...McpServerFields\n    }\n  }\n"): typeof import('./graphql').SetMcpServerEnabledDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation UpdateAppMcpServer($input: UpdateAppMcpServerInput!) {\n    updateAppMcpServer(input: $input) {\n      ...McpServerFields\n    }\n  }\n"): typeof import('./graphql').UpdateAppMcpServerDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

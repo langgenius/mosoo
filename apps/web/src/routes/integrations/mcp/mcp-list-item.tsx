@@ -1,4 +1,4 @@
-import { MoreHorizontal, Trash2, Unplug } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Unplug } from "lucide-react";
 
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
@@ -17,12 +17,20 @@ import type { McpServerWithCredential } from "./mcp-types";
 interface Props {
   server: McpServerWithCredential;
   onConnect: () => void;
+  onEdit: () => void;
   onRevoke: () => void;
   onDelete: () => void;
   onToggleEnabled: () => void;
 }
 
-export function McpListItem({ server, onConnect, onRevoke, onDelete, onToggleEnabled }: Props) {
+export function McpListItem({
+  server,
+  onConnect,
+  onEdit,
+  onRevoke,
+  onDelete,
+  onToggleEnabled,
+}: Props) {
   const status = server.credentialStatus;
   const isAuthorized = status === "active";
   const metaParts = [authTypeLabel(server.authType)];
@@ -77,6 +85,10 @@ export function McpListItem({ server, onConnect, onRevoke, onDelete, onToggleEna
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onEdit}>
+              <Pencil />
+              Edit
+            </DropdownMenuItem>
             {isAuthorized && (
               <DropdownMenuItem onClick={onRevoke}>
                 <Unplug />

@@ -9,6 +9,7 @@ import {
   getMcpRegistry,
   revokeMcpCredential,
   setMcpServerEnabled,
+  updateAppMcpServer,
 } from "../application/mcp-server.service";
 
 interface AppIdArgs {
@@ -40,6 +41,10 @@ interface ConnectMcpBearerArgs {
 
 interface StartMcpOAuthArgs {
   input: Parameters<typeof startMcpOAuth>[3];
+}
+
+interface UpdateAppMcpServerArgs {
+  input: Parameters<typeof updateAppMcpServer>[2];
 }
 
 export const mcpGraphQLModule = {
@@ -82,6 +87,12 @@ export const mcpGraphQLModule = {
       ),
     startMcpOAuth: async (_parent, args: StartMcpOAuthArgs, context) =>
       startMcpOAuth(context.bindings, context.request.url, context.viewer, {
+        ...args.input,
+        appId: readAppId(args.input.appId),
+        serverId: readMcpServerId(args.input.serverId),
+      }),
+    updateAppMcpServer: async (_parent, args: UpdateAppMcpServerArgs, context) =>
+      updateAppMcpServer(context.bindings.DB, context.viewer, {
         ...args.input,
         appId: readAppId(args.input.appId),
         serverId: readMcpServerId(args.input.serverId),
