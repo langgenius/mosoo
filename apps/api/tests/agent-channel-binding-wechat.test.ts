@@ -22,7 +22,7 @@ import {
   readWeChatChannelAccountWithCredentials,
   readWeChatContextTokenForPeer,
 } from "../src/modules/channels/wechat/wechat-runtime-store";
-import { readSecretOutcome, storeSecret } from "../src/modules/mcp/application/mcp-secret-store";
+import { readSecretOutcome, storeSecret } from "../src/modules/vault/application/vault-secret-store";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { isApiError } from "../src/platform/errors";
 import {

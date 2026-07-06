@@ -11,7 +11,7 @@ import {
   deleteSecret,
   readSecretOutcome,
   storeSecret,
-} from "../../mcp/application/mcp-secret-store";
+} from "../../vault/application/vault-secret-store";
 import { findCustomCredentialRowForModel } from "./vendor-credential-custom-models";
 import { parseCredentialModels } from "./vendor-credential.mapper";
 import {

@@ -1,13 +1,23 @@
 import type { AccountId, McpOAuthFlowId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import { fromBase64Url, toArrayBuffer, toBase64Url } from "../../../shared/bytes";
 import { isTruthy } from "../../../shared/truthiness";
 import { readAccountId, readMcpOAuthFlowId } from "./mcp-platform-ids";
-import { fromBase64Url, requireStateSecret, toArrayBuffer, toBase64Url } from "./mcp-secret-store";
 
 interface OAuthStatePayload {
   flowId: McpOAuthFlowId;
   userId: AccountId;
+}
+
+function requireStateSecret(bindings: ApiBindings): string {
+  const secret = bindings.BETTER_AUTH_SECRET?.trim();
+
+  if (!secret) {
+    throw new Error("BETTER_AUTH_SECRET is required.");
+  }
+
+  return secret;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, getD1ChangeCount } from "../../../platform/db/drizzle";
-import { deleteSecret } from "../../mcp/application/mcp-secret-store";
+import { deleteSecret } from "../../vault/application/vault-secret-store";
 import { storeWeChatContextTokenSecret } from "./wechat-context-token-secret-store";
 import type {
   WeChatPollingOwnerContextTokenRecord,

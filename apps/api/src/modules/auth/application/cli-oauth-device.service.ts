@@ -13,6 +13,7 @@ import type { AccountId, CliOAuthFlowId } from "@mosoo/id";
 import { and, eq, inArray } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
+import { toBase64Url } from "../../../shared/bytes";
 import { currentTimestampMs } from "../../../time";
 import { createPersonalAccessToken } from "./personal-access-token.service";
 import type { AuthenticatedViewer } from "./viewer-auth.service";
@@ -206,7 +207,7 @@ export async function confirmCliOAuthDeviceFlow(
 
 export async function hashCliOAuthDeviceCode(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return encodeBase64Url(new Uint8Array(digest));
+  return toBase64Url(new Uint8Array(digest));
 }
 
 export function normalizeCliOAuthUserCode(value: string): string | null {
@@ -260,7 +261,7 @@ function normalizeHostname(value: string | undefined): string | null {
 function createDeviceCode(): string {
   const bytes = new Uint8Array(CLI_OAUTH_DEVICE_CODE_BYTES);
   crypto.getRandomValues(bytes);
-  return `cli_${encodeBase64Url(bytes)}`;
+  return `cli_${toBase64Url(bytes)}`;
 }
 
 function createUserCode(): string {
@@ -271,14 +272,6 @@ function createUserCode(): string {
     return CLI_OAUTH_USER_CODE_ALPHABET[index] ?? "A";
   }).join("");
   return `${chars.slice(0, 4)}-${chars.slice(4)}`;
-}
-
-function encodeBase64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
 async function markCliOAuthFlowStatus(

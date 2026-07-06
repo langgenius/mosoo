@@ -5,6 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
+import { fromBase64, toArrayBuffer, toBase64 } from "../../../shared/bytes";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
 
@@ -24,16 +25,6 @@ function readVaultSecretId(secretId: string): PlatformId {
   return parsePlatformId(secretId, "secretId");
 }
 
-export function requireStateSecret(bindings: ApiBindings): string {
-  const secret = bindings.BETTER_AUTH_SECRET?.trim();
-
-  if (!secret) {
-    throw new Error("BETTER_AUTH_SECRET is required.");
-  }
-
-  return secret;
-}
-
 async function sha256Bytes(value: string): Promise<Uint8Array> {
   return new Uint8Array(
     await crypto.subtle.digest("SHA-256", toArrayBuffer(new TextEncoder().encode(value))),
@@ -48,42 +39,6 @@ async function importAesKey(secret: string): Promise<CryptoKey> {
     false,
     ["decrypt", "encrypt"],
   );
-}
-
-export function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-}
-
-function toBase64(bytes: Uint8Array): string {
-  let binary = "";
-
-  for (const byte of bytes) {
-    binary += String.fromCodePoint(byte);
-  }
-
-  return btoa(binary);
-}
-
-function fromBase64(value: string): Uint8Array {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.codePointAt(index) ?? 0;
-  }
-
-  return bytes;
-}
-
-export function toBase64Url(value: Uint8Array | string): string {
-  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
-  return toBase64(bytes).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
-}
-
-export function fromBase64Url(value: string): Uint8Array {
-  const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
-  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
-  return fromBase64(padded);
 }
 
 async function encryptSecretPayload(

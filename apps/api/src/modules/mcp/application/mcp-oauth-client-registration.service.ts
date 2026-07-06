@@ -1,5 +1,5 @@
+import { toArrayBuffer, toBase64Url } from "../../../shared/bytes";
 import { isTruthy } from "../../../shared/truthiness";
-import { toArrayBuffer, toBase64Url } from "./mcp-secret-store";
 import type { OAuthMetadata } from "./mcp-types";
 
 interface DynamicOAuthClientRegistration {

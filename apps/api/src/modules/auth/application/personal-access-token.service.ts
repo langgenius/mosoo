@@ -10,6 +10,7 @@ import type { PersonalAccessTokenId } from "@mosoo/id";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
+import { toBase64Url } from "../../../shared/bytes";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs, toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "./viewer-auth.service";
@@ -46,20 +47,10 @@ function normalizeTokenLabel(label: string): string {
   return normalized;
 }
 
-function encodeBase64Url(bytes: Uint8Array): string {
-  let binary = "";
-
-  for (const byte of bytes) {
-    binary += String.fromCodePoint(byte);
-  }
-
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
-}
-
 function createTokenValue(): string {
   const bytes = new Uint8Array(TOKEN_SECRET_BYTE_LENGTH);
   crypto.getRandomValues(bytes);
-  return `${TOKEN_VALUE_PREFIX}${encodeBase64Url(bytes)}`;
+  return `${TOKEN_VALUE_PREFIX}${toBase64Url(bytes)}`;
 }
 
 export function isPersonalAccessTokenValue(tokenValue: string): boolean {

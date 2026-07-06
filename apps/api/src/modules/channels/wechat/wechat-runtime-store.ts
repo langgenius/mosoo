@@ -14,7 +14,7 @@ import { validationError } from "../../../platform/errors";
 import { currentTimestampMs, toIsoString } from "../../../time";
 import { ensureAppAgentOwner } from "../../agents/application/agent-access.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { deleteSecretsById } from "../../mcp/application/mcp-secret-store";
+import { deleteSecretsById } from "../../vault/application/vault-secret-store";
 import {
   cleanupStoredAgentChannelBindingCredentialSecret,
   readAgentChannelBindingCredentialSecret,

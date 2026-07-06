@@ -24,7 +24,7 @@ import { getDriverInstanceRecord } from "../../../modules/runtime/infrastructure
 import { readSkillPackageBytesFromSnapshot } from "../../../modules/skills/application/skill-package-snapshot.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { toPlatformId } from "../../../shared/platform-id";
-import { toArrayBufferResponseBody } from "../../../shared/response-body";
+import { toArrayBuffer } from "../../../shared/bytes";
 import { isTruthy } from "../../../shared/truthiness";
 import { platformIdRouteErrorResponse } from "./platform-id-route-error";
 const HOP_BY_HOP_HEADERS = new Set([
@@ -257,7 +257,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
 
     const bytes = await readSkillPackageBytesFromSnapshot(c.env, snapshotId);
 
-    return new Response(toArrayBufferResponseBody(bytes), {
+    return new Response(toArrayBuffer(bytes), {
       headers: {
         "Content-Type": "application/zip",
       },

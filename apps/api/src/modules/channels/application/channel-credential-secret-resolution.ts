@@ -13,7 +13,7 @@ import {
   deleteSecret,
   readSecretOutcome,
   storeSecret,
-} from "../../mcp/application/mcp-secret-store";
+} from "../../vault/application/vault-secret-store";
 
 export type ChannelCredentialSecretReadPurpose =
   | "channel_callback"
