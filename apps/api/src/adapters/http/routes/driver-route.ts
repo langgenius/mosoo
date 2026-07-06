@@ -8,11 +8,11 @@ import {
   requireRuntimeDriverInstanceGrant,
   verifyRuntimeActionToken,
 } from "../../../modules/runtime/application/runtime-driver-access.service";
-import { getRuntimeDriverRoutePrefix } from "../../../modules/runtime/application/runtime-driver-routes.service";
 import {
   invalidateRuntimeCredential,
   refreshRuntimeCredential,
-} from "../../../modules/runtime/application/runtime-mcp-credential.service";
+} from "../../../modules/mcp/application/mcp-runtime.service";
+import { getRuntimeDriverRoutePrefix } from "../../../modules/runtime/domain/runtime-driver-routes";
 import {
   createRuntimeMcpProxyError,
   runtimeMcpProxyErrorBody,

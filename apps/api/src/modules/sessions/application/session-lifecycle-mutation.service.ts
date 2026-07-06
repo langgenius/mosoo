@@ -9,11 +9,9 @@ import { getAppDatabase } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import { listLiveRuntimeDriverInstanceIdsForSession } from "../../runtime/application/runtime-driver-instance-query.service";
-import {
-  closeSandboxConversationSession,
-  stopDriverSession,
-} from "../../runtime/application/runtime-session-lifecycle.service";
+import { listLiveDriverInstanceIdsForSandboxSessions } from "../../runtime/infrastructure/driver-instance/live-driver-instance.repository";
+import { stopDriverSession } from "../../runtime/infrastructure/driver-session-stop.service";
+import { closeSandboxConversationSession } from "../../runtime/infrastructure/sandbox-session.service";
 import {
   createSessionStatusTransitionPatch,
   setSystemSessionRunStatus,
@@ -179,10 +177,9 @@ export async function archiveAgentSession({
         .limit(1)
         .get()) ?? null;
 
-    const liveDriverInstanceIds = await listLiveRuntimeDriverInstanceIdsForSession(
-      bindings.DB,
+    const liveDriverInstanceIds = await listLiveDriverInstanceIdsForSandboxSessions(bindings.DB, [
       sessionId,
-    );
+    ]);
 
     return {
       liveDriverInstanceIds,

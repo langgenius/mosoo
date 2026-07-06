@@ -8,7 +8,7 @@ import type {
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import { sessionsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, AppId, SessionId, SessionRunId } from "@mosoo/id";
+import type { AccountId, AppId, SessionId, SessionRunId } from "@mosoo/id";
 import { getAvailableAgentSessionActionCapability } from "@mosoo/session-policy";
 import { and, eq, isNull } from "drizzle-orm";
 
@@ -27,7 +27,7 @@ import { getActiveSessionRunId } from "../../infrastructure/session-runs/session
 import { cancelRun } from "./cancel-run.service";
 import type { QueuedSessionRunState } from "./queue-run.service";
 import { resolveSessionPermissionDecision } from "./session-permission-decision.service";
-import { startRuns } from "./start-runs.service";
+import { parseAttachmentIds, startRuns } from "./start-runs.service";
 
 interface SendAgentSessionEventsInput {
   events: AgentSessionEventInput[];
@@ -85,12 +85,6 @@ function parsePermissionDecision(value: unknown): "allow_once" | "reject_once" {
   }
 
   throw new Error("Permission decision is required.");
-}
-
-function parseAttachmentIds(values: readonly string[] | null | undefined): FileId[] {
-  return (values ?? []).map((value, index) =>
-    parsePlatformId<FileId>(value, `attachment id ${index}`),
-  );
 }
 
 async function getRunToInterrupt(

@@ -16,9 +16,8 @@ export class DriverConnection extends DurableObject {
     super(ctx, env);
 
     this.#delegatePromise =
-      import("../../modules/runtime/application/driver-instance-do.service").then(
-        ({ DriverConnection: DriverConnectionImplementation }) =>
-          new DriverConnectionImplementation(ctx, env),
+      import("../../modules/runtime/infrastructure/driver-instance/do").then(
+        ({ DriverInstance }) => new DriverInstance(ctx, env),
       );
   }
 

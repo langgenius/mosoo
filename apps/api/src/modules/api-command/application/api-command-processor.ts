@@ -30,7 +30,7 @@ import { processSlackWorkTrigger } from "../../channels/slack/slack-first-party-
 import { parseTelegramCredentials } from "../../channels/telegram/telegram-credentials";
 import { processTelegramWorkTrigger } from "../../channels/telegram/telegram-first-party-adapter";
 import { runUsageDailyRollup } from "../../cost/application/cost-rollup.service";
-import { runSandboxMaintenance } from "../../runtime/application/runtime-maintenance.service";
+import { runSandboxMaintenance } from "../../runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-maintenance.service";
 import { dispatchQueuedSessionRun } from "../../runtime/application/session-runs/dispatch-queued-run.service";
 import { APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX } from "./api-command-enqueue";
 import {
