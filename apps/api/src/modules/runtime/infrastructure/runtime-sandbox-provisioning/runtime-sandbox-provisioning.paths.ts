@@ -2,14 +2,15 @@ import { SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH } from "agent-driver/paths";
 
 import type { DriverProfileConfig } from "../../domain/driver-snapshot";
 
-const WRANGLER_DEV_PORT = "8787";
-
 export function toContainerReachableOrigin(requestUrl: string): string {
   const url = new URL(requestUrl);
 
+  // Keep the original port: local requests reach the API through whichever
+  // dev server received them (vite on WEB_DEV_PORT or wrangler on
+  // WRANGLER_DEV_PORT), and both listen on all interfaces. Forcing a fixed
+  // port breaks any dev setup that does not run wrangler on that port.
   if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
     url.hostname = "host.docker.internal";
-    url.port = WRANGLER_DEV_PORT;
   }
 
   return url.toString();
