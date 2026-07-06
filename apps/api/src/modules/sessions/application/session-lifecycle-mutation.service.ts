@@ -6,6 +6,7 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
+import { forbiddenError } from "../../../platform/errors";
 import { currentTimestampMs } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { listLiveRuntimeDriverInstanceIdsForSession } from "../../runtime/application/runtime-driver-instance-query.service";
@@ -24,6 +25,7 @@ import type {
 } from "../domain/session-access.policy";
 import {
   getAppSessionParticipantCapabilityAccess,
+  lookupAppSessionParticipantCapabilityAccess,
   resolveSessionActionCreatorFlag,
 } from "../domain/session-access.policy";
 import {
@@ -312,14 +314,26 @@ export async function deleteAgentSession({
   sessionId,
   viewer,
 }: DeleteAgentSessionRequest): Promise<void> {
-  const session = await getAppSessionParticipantCapabilityAccess(bindings.DB, viewer.id, {
+  const lookup = await lookupAppSessionParticipantCapabilityAccess(bindings.DB, viewer.id, {
     appId,
     sessionId,
   });
+
+  // Delete must stay idempotent: clients can hold a session id that was
+  // already removed (stale tab, replaced preview session). Treat the missing
+  // row as deleted instead of reporting a permission error.
+  if (lookup.kind === "missing") {
+    return;
+  }
+
+  if (lookup.kind === "not_participant") {
+    throw forbiddenError();
+  }
+
   ensureLifecycleActionCapability({
     action: "delete_session",
     authorization,
-    session,
+    session: lookup.row,
   });
 
   await deleteSessionCascade(bindings, sessionId);

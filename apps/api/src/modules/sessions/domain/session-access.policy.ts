@@ -138,6 +138,53 @@ export async function getAppSessionParticipantTimelineAccess(
   return row;
 }
 
+export type AppSessionParticipantCapabilityAccessLookup =
+  | { kind: "found"; row: SessionParticipantCapabilityAccessRow }
+  | { kind: "missing" }
+  | { kind: "not_participant" };
+
+export async function lookupAppSessionParticipantCapabilityAccess(
+  database: D1Database,
+  viewerId: AccountId,
+  input: {
+    appId: AppId;
+    sessionId: SessionId;
+  },
+): Promise<AppSessionParticipantCapabilityAccessLookup> {
+  await ensureAppOwnership(database, viewerId, input.appId);
+  const row =
+    (await getAppDatabase(database)
+      .select({
+        archived_at: sessionsTable.archivedAt,
+        is_participant: sessionParticipantFlag(viewerId).as("is_participant"),
+        is_session_creator: sessionCreatorFlag(viewerId).as("is_session_creator"),
+        runtime_id: sessionsTable.runtimeId,
+        status: sessionsTable.status,
+      })
+      .from(sessionsTable)
+      .where(and(eq(sessionsTable.id, input.sessionId), eq(sessionsTable.appId, input.appId)))
+      .limit(1)
+      .get()) ?? null;
+
+  if (!row) {
+    return { kind: "missing" };
+  }
+
+  if (row.is_participant !== 1) {
+    return { kind: "not_participant" };
+  }
+
+  return {
+    kind: "found",
+    row: {
+      archived_at: row.archived_at,
+      is_session_creator: row.is_session_creator,
+      runtime_id: row.runtime_id,
+      status: row.status,
+    },
+  };
+}
+
 export async function getAppSessionParticipantCapabilityAccess(
   database: D1Database,
   viewerId: AccountId,
@@ -146,31 +193,13 @@ export async function getAppSessionParticipantCapabilityAccess(
     sessionId: SessionId;
   },
 ): Promise<SessionParticipantCapabilityAccessRow> {
-  await ensureAppOwnership(database, viewerId, input.appId);
-  const row =
-    (await getAppDatabase(database)
-      .select({
-        archived_at: sessionsTable.archivedAt,
-        is_session_creator: sessionCreatorFlag(viewerId).as("is_session_creator"),
-        runtime_id: sessionsTable.runtimeId,
-        status: sessionsTable.status,
-      })
-      .from(sessionsTable)
-      .where(
-        and(
-          eq(sessionsTable.id, input.sessionId),
-          eq(sessionsTable.appId, input.appId),
-          sessionParticipantCondition(viewerId),
-        ),
-      )
-      .limit(1)
-      .get()) ?? null;
+  const lookup = await lookupAppSessionParticipantCapabilityAccess(database, viewerId, input);
 
-  if (!row) {
+  if (lookup.kind !== "found") {
     throw forbiddenError();
   }
 
-  return row;
+  return lookup.row;
 }
 
 export async function getActiveAppSessionParticipantAccess(
