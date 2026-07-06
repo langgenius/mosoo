@@ -14,3 +14,7 @@ export function getRuntimeDriverSkillPackagePath(snapshotId: SkillSnapshotId): s
 export function getRuntimeDriverMcpProxyPath(serverId: McpServerId): string {
   return `${RUNTIME_DRIVER_ROUTE_PREFIX}/mcp/proxy/${encodeURIComponent(serverId)}`;
 }
+
+export function getRuntimeDriverSocketPath(): string {
+  return `${RUNTIME_DRIVER_ROUTE_PREFIX}/socket`;
+}

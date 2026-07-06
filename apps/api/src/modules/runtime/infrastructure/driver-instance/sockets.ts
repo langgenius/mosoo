@@ -1,35 +1,22 @@
 import { sleepPromise } from "@mosoo/effects";
 
-interface DriverInstanceSocketRegistryOptions {
-  ctx: DurableObjectState;
-  onDriverClose: (socket: WebSocket, code: number, reason: string) => Promise<void>;
-  onDriverError: (socket: WebSocket, error: unknown) => Promise<void>;
-  onDriverMessage: (socket: WebSocket, message: ArrayBuffer | string) => Promise<void>;
-  onDriverSocketClosed: (socket: WebSocket) => Promise<void> | void;
-}
+const DRIVER_SOCKET_TAG = "driver";
 
 export class DriverInstanceSocketRegistry {
   readonly #ctx: DurableObjectState;
   #activeDriverSocket: WebSocket | null = null;
-  readonly #onDriverClose: DriverInstanceSocketRegistryOptions["onDriverClose"];
-  readonly #onDriverError: DriverInstanceSocketRegistryOptions["onDriverError"];
-  readonly #onDriverMessage: DriverInstanceSocketRegistryOptions["onDriverMessage"];
-  readonly #onDriverSocketClosed: DriverInstanceSocketRegistryOptions["onDriverSocketClosed"];
 
-  constructor(options: DriverInstanceSocketRegistryOptions) {
-    this.#ctx = options.ctx;
-    this.#onDriverClose = options.onDriverClose;
-    this.#onDriverError = options.onDriverError;
-    this.#onDriverMessage = options.onDriverMessage;
-    this.#onDriverSocketClosed = options.onDriverSocketClosed;
+  constructor(ctx: DurableObjectState) {
+    this.#ctx = ctx;
   }
 
   acceptDriverSocket(socket: WebSocket): void {
-    // The driver command stream keeps an in-memory waiter while it long-polls
-    // for the next command. Hibernating this socket can resume the send path in
-    // a fresh Durable Object instance with no waiter to resolve, leaving driver
-    // commands permanently queued.
-    this.#acceptEphemeralDriverSocket(socket);
+    // Hibernation accept: the socket survives Durable Object eviction, and
+    // driver messages re-instantiate this object. Command delivery does not
+    // depend on in-memory waiters — the driver polls nextCommand, which
+    // claims from D1 — so waking into a fresh instance is safe.
+    this.#ctx.acceptWebSocket(socket, [DRIVER_SOCKET_TAG]);
+    this.#activeDriverSocket = socket;
   }
 
   getDriverSocket(): WebSocket | null {
@@ -37,12 +24,28 @@ export class DriverInstanceSocketRegistry {
       return this.#activeDriverSocket;
     }
 
-    const [socket] = this.#ctx.getWebSockets("driver");
+    const [socket] = this.#ctx.getWebSockets(DRIVER_SOCKET_TAG);
     return socket ?? null;
   }
 
   isActiveDriverSocket(socket: WebSocket): boolean {
-    return this.#activeDriverSocket === socket && socket.readyState !== WebSocket.CLOSED;
+    return this.getDriverSocket() === socket;
+  }
+
+  /**
+   * True when a different, still-open driver socket has superseded this one.
+   * Close/error events from superseded sockets must not finalize the state
+   * that now belongs to the successor connection.
+   */
+  isSupersededDriverSocket(socket: WebSocket): boolean {
+    const current = this.getDriverSocket();
+    return current !== null && current !== socket;
+  }
+
+  releaseDriverSocket(socket: WebSocket): void {
+    if (this.#activeDriverSocket === socket) {
+      this.#activeDriverSocket = null;
+    }
   }
 
   replaceDriverSockets(): void {
@@ -51,7 +54,7 @@ export class DriverInstanceSocketRegistry {
       this.#activeDriverSocket = null;
     }
 
-    for (const existingSocket of this.#ctx.getWebSockets("driver")) {
+    for (const existingSocket of this.#ctx.getWebSockets(DRIVER_SOCKET_TAG)) {
       existingSocket.close(1012, "runtime.socket.replaced");
     }
   }
@@ -78,51 +81,5 @@ export class DriverInstanceSocketRegistry {
     if (socket.readyState === WebSocket.OPEN) {
       socket.close(code, reason);
     }
-  }
-
-  #acceptEphemeralDriverSocket(socket: WebSocket): void {
-    (socket as WebSocket & { accept: () => void }).accept();
-
-    this.#activeDriverSocket = socket;
-    socket.addEventListener("message", (event: MessageEvent) => {
-      if (this.#activeDriverSocket !== socket) {
-        return;
-      }
-
-      const { data } = event;
-
-      if (typeof data !== "string" && !(data instanceof ArrayBuffer)) {
-        socket.close(1003, "runtime.unsupported-message");
-        return;
-      }
-
-      this.#ctx.waitUntil(this.#onDriverMessage(socket, data));
-    });
-    socket.addEventListener("close", (event: CloseEvent) => {
-      this.#ctx.waitUntil(this.#handleEphemeralDriverSocketClose(socket, event.code, event.reason));
-    });
-    socket.addEventListener("error", (event: Event) => {
-      if (this.#activeDriverSocket !== socket) {
-        return;
-      }
-
-      this.#ctx.waitUntil(this.#onDriverError(socket, event));
-    });
-  }
-
-  async #handleEphemeralDriverSocketClose(
-    socket: WebSocket,
-    code: number,
-    reason: string,
-  ): Promise<void> {
-    await this.#onDriverSocketClosed(socket);
-
-    if (this.#activeDriverSocket !== socket) {
-      return;
-    }
-
-    this.#activeDriverSocket = null;
-
-    await this.#onDriverClose(socket, code, reason);
   }
 }

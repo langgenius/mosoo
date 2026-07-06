@@ -21,18 +21,19 @@ import {
   toRuntimeDiagnosticBaseValue,
   toRuntimeDiagnosticReason,
 } from "../../application/runtime-diagnostic-events";
+import { decodeAndHashBootToken } from "../runtime-boot-token";
 import { toDriverInstanceRequestErrorStatus } from "./connections";
 import { json, toErrorMessage } from "./driver-instance-support";
+import { claimDriverInstanceByBootTokenHash } from "./driver-instance-token.repository";
 import { runtimeSessionLinkNeedsRefresh } from "./event-types";
 import { handleDriverInstanceRequest } from "./http";
-import type { DriverInstanceHttpHandler, DriverInstanceSandboxSocketRequest } from "./http";
+import type { DriverInstanceHttpHandler } from "./http";
 import { getDriverInstanceStatus, markDriverInstanceConnected } from "./lifecycle";
 import { createDriverInstanceRpcContext } from "./rpc";
 import type { DriverInstanceRpcContext } from "./rpc";
 import { DriverInstanceRpcController } from "./rpc-controller";
 import { RuntimeSessionViewCache } from "./runtime-session-view-cache";
 import { DriverInstanceRuntimeState } from "./runtime-state";
-import { connectDriverInstanceSandboxSocket } from "./sandbox-socket-connection";
 import { getRuntimeSessionLink } from "./session-link.repository";
 import { SessionViewerEventDeliveryBuffer } from "./session-viewer-event-delivery-buffer";
 import { DriverInstanceSocketRegistry } from "./sockets";
@@ -66,15 +67,7 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
 
     this.#state = new DriverInstanceRuntimeState(ctx);
     this.#viewCache = new RuntimeSessionViewCache();
-    this.#sockets = new DriverInstanceSocketRegistry({
-      ctx,
-      onDriverClose: async (socket, code, reason) => this.webSocketClose(socket, code, reason),
-      onDriverError: async (socket, error) => this.webSocketError(socket, error),
-      onDriverMessage: async (socket, message) => this.webSocketMessage(socket, message),
-      onDriverSocketClosed: (socket) => {
-        this.#rpcHandler?.close(socket);
-      },
-    });
+    this.#sockets = new DriverInstanceSocketRegistry(ctx);
     this.#viewerEventDelivery = new SessionViewerEventDeliveryBuffer({
       ctx,
       env,
@@ -138,6 +131,15 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
     }
 
     this.#rpcHandler?.close(ws);
+
+    // A socket replaced by a newer accepted connection must not finalize the
+    // state that now belongs to its successor.
+    if (this.#sockets.isSupersededDriverSocket(ws)) {
+      this.#sockets.releaseDriverSocket(ws);
+      return;
+    }
+
+    this.#sockets.releaseDriverSocket(ws);
 
     const close: DriverInstanceCloseSnapshot = {
       at: new Date().toISOString(),
@@ -232,8 +234,12 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
     return this.#rpcHandlerPromise;
   }
 
-  override async webSocketError(_ws: WebSocket, _error: unknown): Promise<void> {
+  override async webSocketError(ws: WebSocket, _error: unknown): Promise<void> {
     if (this.#destroyed) {
+      return;
+    }
+
+    if (this.#sockets.isSupersededDriverSocket(ws)) {
       return;
     }
 
@@ -255,14 +261,79 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
     }
   }
 
-  async connectDriverInstanceSandboxSocket(
-    input: DriverInstanceSandboxSocketRequest,
-  ): Promise<void> {
-    await connectDriverInstanceSandboxSocket(input, {
-      acceptDriverSocket: async (socket, traceparent, bootTokenHash, driverGeneration) =>
-        this.#acceptDriverSocket(socket, traceparent, bootTokenHash, driverGeneration),
-      env: this.env,
-      requireDriverInstanceId: () => this.#state.requireDriverInstanceId(),
+  async acceptDriverSocket(request: Request): Promise<Response> {
+    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+      return json({ error: "Driver socket requires a WebSocket upgrade." }, { status: 426 });
+    }
+
+    const url = new URL(request.url);
+    const token = url.searchParams.get("token");
+
+    if (!isTruthy(token)) {
+      return json({ error: "Driver boot token is required." }, { status: 401 });
+    }
+
+    let bootTokenHash: Uint8Array;
+
+    try {
+      bootTokenHash = await decodeAndHashBootToken(token);
+    } catch {
+      return json({ error: "Boot token is invalid." }, { status: 401 });
+    }
+
+    if (this.#state.terminalized) {
+      await this.#terminalState.resetForReuse();
+    }
+
+    const claim = await claimDriverInstanceByBootTokenHash(this.env, bootTokenHash);
+
+    if (
+      claim.driverInstanceId === null ||
+      claim.generation === null ||
+      claim.driverInstanceId !== this.#state.requireDriverInstanceId()
+    ) {
+      return json({ error: claim.error ?? "Boot token is invalid." }, { status: 401 });
+    }
+
+    const connectedAt = Date.now();
+    const connectionId = createPlatformId();
+    const connected = await markDriverInstanceConnected(this.env, {
+      bootTokenHash,
+      connectedAt,
+      connectionId,
+      driverInstanceId: this.#state.requireDriverInstanceId(),
+      generation: claim.generation,
+    });
+
+    if (!connected) {
+      return json({ error: "Driver connection is no longer current." }, { status: 409 });
+    }
+
+    const traceparent = url.searchParams.get("traceparent");
+    const parsedTraceparent = isTruthy(traceparent) ? parseTraceparent(traceparent) : null;
+    const pair = new WebSocketPair();
+    const [clientSocket, serverSocket] = [pair[0], pair[1]];
+
+    this.#sockets.replaceDriverSockets();
+    this.#sockets.acceptDriverSocket(serverSocket);
+
+    await this.#state.recordAcceptedConnection({
+      connectedAt,
+      connectionId,
+      driverGeneration: claim.generation,
+      traceId: parsedTraceparent?.traceId ?? null,
+    });
+
+    this.#withRuntimeLogContext(() => {
+      logInfo("runtime.socket.accepted", {
+        connectionId,
+        driverInstanceId: this.#state.requireDriverInstanceId(),
+      });
+    });
+
+    return new Response(null, {
+      status: 101,
+      webSocket: clientSocket,
     });
   }
 
@@ -357,50 +428,6 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
 
   async waitForReady(timeoutMs: number): Promise<DriverInstanceReadyResult> {
     return this.#state.waitForReady(timeoutMs);
-  }
-
-  async #acceptDriverSocket(
-    socket: WebSocket,
-    traceparent: string | null,
-    bootTokenHash: Uint8Array,
-    driverGeneration: number,
-  ): Promise<void> {
-    if (this.#state.terminalized) {
-      await this.#terminalState.resetForReuse();
-    }
-
-    const parsedTraceparent = isTruthy(traceparent) ? parseTraceparent(traceparent) : null;
-    const connectedAt = Date.now();
-    const connectionId = createPlatformId();
-    const connected = await markDriverInstanceConnected(this.env, {
-      bootTokenHash,
-      connectedAt,
-      connectionId,
-      driverInstanceId: this.#state.requireDriverInstanceId(),
-      generation: driverGeneration,
-    });
-
-    if (!connected) {
-      socket.close(1008, "runtime.connection.stale");
-      throw new Error("Driver connection is no longer current.");
-    }
-
-    this.#sockets.replaceDriverSockets();
-    this.#sockets.acceptDriverSocket(socket);
-
-    await this.#state.recordAcceptedConnection({
-      connectedAt,
-      connectionId,
-      driverGeneration,
-      traceId: parsedTraceparent?.traceId ?? null,
-    });
-
-    this.#withRuntimeLogContext(() => {
-      logInfo("runtime.socket.accepted", {
-        connectionId,
-        driverInstanceId: this.#state.requireDriverInstanceId(),
-      });
-    });
   }
 
   async #getRuntimeSessionLink() {

@@ -19,6 +19,7 @@ import {
 } from "../../application/runtime-diagnostic-events";
 import { createRuntimeTimingRecorder } from "../../application/session-runs/session-runtime-timing";
 import { DRIVER_HEARTBEAT_INTERVAL_MS } from "../../domain/runtime-config";
+import { getRuntimeDriverSocketPath } from "../../domain/runtime-driver-routes";
 import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
 import { getDriverControlPort } from "../../domain/sandbox-layout";
 import {
@@ -42,10 +43,6 @@ import {
   usesInsertOnlyDriverRecord,
 } from "./runtime-driver-prewarm-ownership";
 import { stopProvisionProcess } from "./runtime-driver-process-cleanup";
-import {
-  connectDriverSocketThroughSandbox,
-  waitForDriverControlPort,
-} from "./runtime-driver-socket-connection";
 import {
   appendRuntimeEnvironmentInstallFailed,
   createRuntimeEnvironmentInstallState,
@@ -259,6 +256,7 @@ async function provisionDriver(
 
     const bootPayload = createDriverBootPayload({
       bootToken: bootToken.encoded,
+      controlUrl: new URL(getRuntimeDriverSocketPath(), containerRequestUrl).toString(),
       driverControlPort,
       driverGeneration: activeDriverGeneration,
       driverInstanceId,
@@ -328,50 +326,12 @@ async function provisionDriver(
         }
       }
     });
-    const waitForDriverControlPortPromise = timing.measure("waitForDriverControlPort", () =>
-      waitForDriverControlPort(startedProcess, driverControlPort),
-    );
     void processRecordPromise.catch(() => undefined);
-    void waitForDriverControlPortPromise.catch(() => undefined);
     await Promise.all([
       bootPayloadPreparedPromise,
       launchStartedEventPromise,
       processRecordPromise,
-      waitForDriverControlPortPromise,
     ]);
-
-    await timing.measure("wsConnect", async () => {
-      try {
-        await connectDriverSocketThroughSandbox(env, {
-          bootToken: bootToken.encoded,
-          driverControlPort,
-          driverInstanceId,
-          sandboxId,
-          traceparent,
-        });
-      } catch (error) {
-        await appendRuntimeDiagnosticEvent(env, {
-          eventName: RUNTIME_DIAGNOSTIC_EVENT.transportRpcError.name,
-          sessionId: input.sandboxSessionId,
-          value: {
-            ...runtimeBase,
-            driverInstanceId,
-            errorCode: "RPC_TRANSPORT_ERROR",
-            reason: toRuntimeDiagnosticReason(error, "Runtime driver transport connection failed."),
-          },
-        });
-        throw error;
-      }
-    });
-    await appendRuntimeDiagnosticEvent(env, {
-      eventName: RUNTIME_DIAGNOSTIC_EVENT.transportWsConnected.name,
-      sessionId: input.sandboxSessionId,
-      value: {
-        ...runtimeBase,
-        driverInstanceId,
-        port: driverControlPort,
-      },
-    });
 
     const timingSnapshot = timing.snapshot();
 

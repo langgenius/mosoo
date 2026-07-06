@@ -1,11 +1,14 @@
 import { driverInstancesTable } from "@mosoo/db";
-import { and, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
 import { toDriverInstanceStatusLifecycleEventName } from "../../domain/driver-instance-lifecycle.machine";
-import { RUNTIME_SOCKET_TIMEOUT_MS } from "../../domain/runtime-config";
+import {
+  DRIVER_COLD_READY_TIMEOUT_MS,
+  RUNTIME_SOCKET_TIMEOUT_MS,
+} from "../../domain/runtime-config";
 import { driverInstanceExpiresAt } from "./status";
 
 export async function cleanupDriverInstances(bindings: ApiBindings): Promise<void> {
@@ -45,7 +48,26 @@ export async function cleanupDriverInstances(bindings: ApiBindings): Promise<voi
     })
     .where(
       and(
-        inArray(driverInstancesTable.status, ["connecting", "ready", "stopping"]),
+        eq(driverInstancesTable.status, "connecting"),
+        lte(
+          sql<number>`COALESCE(${driverInstancesTable.lastHeartbeatAt}, ${driverInstancesTable.updatedAt})`,
+          now - DRIVER_COLD_READY_TIMEOUT_MS,
+        ),
+      ),
+    )
+    .run();
+
+  await getAppDatabase(bindings.DB)
+    .update(driverInstancesTable)
+    .set({
+      ...failedStatusPatch,
+      closeCode: sql`COALESCE(${driverInstancesTable.closeCode}, 1011)`,
+      closeReason: sql`COALESCE(${driverInstancesTable.closeReason}, 'runtime.heartbeat_timeout')`,
+      errorMessage: sql`COALESCE(${driverInstancesTable.errorMessage}, 'Runtime driver heartbeat timed out.')`,
+    })
+    .where(
+      and(
+        inArray(driverInstancesTable.status, ["ready", "stopping"]),
         lte(
           sql<number>`COALESCE(${driverInstancesTable.lastHeartbeatAt}, ${driverInstancesTable.updatedAt})`,
           now - RUNTIME_SOCKET_TIMEOUT_MS,

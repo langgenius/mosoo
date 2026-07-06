@@ -18,6 +18,7 @@ import type { DriverBootPayloadPreparedHandler } from "./driver-boot-payload-pre
 export interface RuntimeExecutionPlaneRunLease {
   driverInstanceId: DriverInstanceId;
   timing: RuntimeTimingSnapshot;
+  readiness(): Promise<RuntimeTimingSnapshot>;
   release(): void;
 }
 

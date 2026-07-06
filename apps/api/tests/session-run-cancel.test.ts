@@ -65,6 +65,27 @@ async function ensureRuntimeLeaseTables(database: D1Database): Promise<void> {
   await database
     .prepare(
       `
+        CREATE TABLE IF NOT EXISTS driver_command (
+          acked_at integer,
+          completed_at integer,
+          delivery_connection_id text,
+          driver_instance_id text NOT NULL,
+          error_json text,
+          expires_at integer,
+          id text PRIMARY KEY NOT NULL,
+          issued_at integer NOT NULL,
+          kind text NOT NULL,
+          payload_json text NOT NULL,
+          result_json text,
+          seq integer NOT NULL,
+          status text NOT NULL
+        )
+      `,
+    )
+    .run();
+  await database
+    .prepare(
+      `
         CREATE TABLE IF NOT EXISTS sandbox (
           id text PRIMARY KEY NOT NULL,
           inactive_deadline_at integer,

@@ -11,6 +11,7 @@ import { DRIVER_PROTOCOL_VERSION, parseDriverBootPayload } from "agent-driver/bo
 
 export interface CreateBootPayloadInput {
   bootToken: string;
+  controlUrl: string;
   driverControlPort: number;
   driverGeneration: number;
   driverInstanceId: DriverInstanceId;
@@ -263,6 +264,7 @@ export async function verifyRuntimeActionToken(
 export function createDriverBootPayload(input: CreateBootPayloadInput): DriverBootPayload {
   return parseDriverBootPayload({
     bootToken: input.bootToken,
+    controlUrl: input.controlUrl,
     driverControlPort: input.driverControlPort,
     driverGeneration: input.driverGeneration,
     driverInstanceId: input.driverInstanceId,

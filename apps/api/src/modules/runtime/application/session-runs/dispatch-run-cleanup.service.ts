@@ -4,6 +4,7 @@ import { logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { stopDriverSession } from "../../infrastructure/driver-session.service";
 import { createRuntimeSubjectLifecycleService } from "../../infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
+import { expireUndeliveredInputStartCommandsForRun } from "../../infrastructure/session-runs/runtime-command-store.repository";
 
 export async function cleanupDispatchedDriver(
   bindings: ApiBindings,
@@ -16,6 +17,10 @@ export async function cleanupDispatchedDriver(
   },
 ): Promise<void> {
   try {
+    await expireUndeliveredInputStartCommandsForRun(bindings.DB, {
+      driverInstanceId: input.driverInstanceId,
+      runId: input.runId,
+    });
     await stopDriverSession(bindings, {
       driverInstanceId: input.driverInstanceId,
       reason: input.reason,

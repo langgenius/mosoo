@@ -1,5 +1,5 @@
 import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
-import type { DriverInstanceId, SandboxId } from "@mosoo/id";
+import type { DriverInstanceId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type {
@@ -64,26 +64,26 @@ function createDoRequest(
   });
 }
 
-export async function connectDriverInstanceSandboxWebSocket(
+export async function upgradeDriverInstanceSocket(
   env: ApiBindings,
   driverInstanceId: DriverInstanceId,
-  input: {
-    bootToken: string;
-    port: number;
-    sandboxId: SandboxId;
-    traceparent: string;
-  },
-): Promise<{ ok: true }> {
-  return expectJson<{ ok: true }>(
-    await getDriverConnectionStub(env, driverInstanceId).fetch(
-      createDoRequest(driverInstanceId, "/sandbox/ws-connect", {
-        body: JSON.stringify(input),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-      }),
-    ),
+  request: Request,
+): Promise<Response> {
+  const incoming = new URL(request.url);
+  const target = new URL("https://driver-instance.internal/driver-socket");
+
+  for (const [key, value] of incoming.searchParams) {
+    target.searchParams.set(key, value);
+  }
+
+  const headers = new Headers(request.headers);
+  headers.set(DRIVER_INSTANCE_ID_HEADER, driverInstanceId);
+
+  return getDriverConnectionStub(env, driverInstanceId).fetch(
+    new Request(target.toString(), {
+      headers,
+      method: "GET",
+    }),
   );
 }
 

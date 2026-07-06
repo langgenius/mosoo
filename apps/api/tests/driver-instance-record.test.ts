@@ -5,6 +5,10 @@ import type { DriverInstanceId, SandboxId, SessionId, SessionRunId } from "@moso
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 
 import {
+  DRIVER_COLD_READY_TIMEOUT_MS,
+  RUNTIME_SOCKET_TIMEOUT_MS,
+} from "../src/modules/runtime/domain/runtime-config";
+import {
   createDriverInstanceRecord,
   driverInstanceRecordMatchesBootToken,
   getReusableDriverInstanceRecord,
@@ -311,6 +315,34 @@ describe("driver instance records", () => {
       status: "ready",
       updatedAt: 1,
     });
+
+    await cleanupDriverInstances(createBindings(database));
+
+    await expect(readDriverRecord(database)).resolves.toMatchObject({
+      errorMessage: "Runtime driver heartbeat timed out.",
+      status: "failed",
+    });
+  });
+
+  test("maintenance gives connecting drivers the cold ready budget", async () => {
+    const database = createDriverInstanceRecordDatabase();
+    insertDriverRecord(database, {
+      status: "connecting",
+      updatedAt: Date.now() - RUNTIME_SOCKET_TIMEOUT_MS - 1_000,
+    });
+
+    await cleanupDriverInstances(createBindings(database));
+
+    await expect(readDriverRecord(database)).resolves.toMatchObject({
+      errorMessage: null,
+      status: "connecting",
+    });
+
+    database.execute(`
+      UPDATE driver_instance
+      SET updated_at = ${Date.now() - DRIVER_COLD_READY_TIMEOUT_MS - 1_000}
+      WHERE id = '${DRIVER_INSTANCE_ID}'
+    `);
 
     await cleanupDriverInstances(createBindings(database));
 

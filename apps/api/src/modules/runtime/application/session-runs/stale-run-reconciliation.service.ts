@@ -1,12 +1,15 @@
 import type { RunError } from "@mosoo/contracts/session-run";
 import { driverInstancesTable, sessionRunsTable } from "@mosoo/db";
 import type { SessionId, SessionRunId } from "@mosoo/id";
-import { and, asc, desc, eq, inArray, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lte, notInArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
-import { RUNTIME_SOCKET_TIMEOUT_MS } from "../../domain/runtime-config";
+import {
+  DRIVER_COLD_READY_TIMEOUT_MS,
+  RUNTIME_SOCKET_TIMEOUT_MS,
+} from "../../domain/runtime-config";
 import { classifyReclaim } from "../../domain/session-run-reclaim-recovery";
 import { setSessionRunStatus } from "../../infrastructure/session-runs/session-run-store.repository";
 
@@ -54,7 +57,10 @@ function shouldFailActiveRunAsStale(row: ActiveRunDriverRow, nowMs: number): boo
     return true;
   }
 
-  const staleBeforeMs = nowMs - RUNTIME_SOCKET_TIMEOUT_MS;
+  const staleBeforeMs =
+    row.driver_status === "connecting"
+      ? nowMs - DRIVER_COLD_READY_TIMEOUT_MS
+      : nowMs - RUNTIME_SOCKET_TIMEOUT_MS;
   return latestRuntimeObservationMs(row) < staleBeforeMs;
 }
 
@@ -86,7 +92,17 @@ function latestRuntimeObservationSql() {
 function staleActiveRunPredicate(nowMs: number) {
   return or(
     inArray(runDriverInstancesTable.status, ["failed", "stopped"]),
-    lte(latestRuntimeObservationSql(), nowMs - RUNTIME_SOCKET_TIMEOUT_MS),
+    and(
+      eq(runDriverInstancesTable.status, "connecting"),
+      lte(latestRuntimeObservationSql(), nowMs - DRIVER_COLD_READY_TIMEOUT_MS),
+    ),
+    and(
+      or(
+        isNull(runDriverInstancesTable.status),
+        notInArray(runDriverInstancesTable.status, ["connecting", "failed", "stopped"]),
+      ),
+      lte(latestRuntimeObservationSql(), nowMs - RUNTIME_SOCKET_TIMEOUT_MS),
+    ),
   );
 }
 
