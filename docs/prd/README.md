@@ -17,6 +17,8 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 
 ### Agents & packaging
 
+Drift note (Native Deployment Protocol): the protocol repo supersedes the `.agent` package as the deliverable (the package's name-resolution philosophy becomes the deploy upsert engine); for repo-backed apps `AgentDeploymentVersion` becomes a derived snapshot of the commit; agent ULIDs leave consumer-facing API paths. Where these PRDs conflict with the [protocol PRD](./mosoo-native-deployment-protocol.md), the protocol PRD wins.
+
 - [Agent Type (Pet vs Cattle)](./agent-type.md)
 - [Agent Manifest](./agent-manifest.md)
 - [Agent Endpoint MVP](./agent-endpoint-mvp.md)
@@ -39,8 +41,8 @@ Implementation contracts and shipped product behavior. Each PRD is the high-read
 
 - [Default Consumption Surface (Threads)](./default-consumption-surface.md)
 - [Channels](./channels.md)
-- [App Deployment](./app-deployment.md) — proposed App-owned Cloudflare Pages / Workers deployment resource, scoped separately from Agent versions and App runtime.
-- [Mosoo Native Deployment Protocol](./mosoo-native-deployment-protocol.md)
+- [App Deployment](./app-deployment.md) — proposed App-owned Cloudflare Pages / Workers deployment resource, scoped separately from Agent versions and App runtime. Drift: repo detection and `[[agents]]` name-binding are superseded by the Native Deployment Protocol; the AppDeployment / DeploymentRun resources remain the Web deploy anchor.
+- [Mosoo Native Deployment Protocol](./mosoo-native-deployment-protocol.md) — **single source of truth** for the Native deployable contract (repo protocol, deploy/upsert semantics, API namespace, validator). Proof layer: [Happy Path demo contract](../product/native-deployment-happy-path.md); execution map: [Workplan](../product/native-deployment-workplan.md).
 - [Public Thread API Surface](./public-thread-api-surface.md)
 - [Public Thread API legacy link](./public-task-api.md) — old filename kept readable; use the surface PRD above as the canonical contract.
 - [MCP (Connector)](./mcp-interaction.md)

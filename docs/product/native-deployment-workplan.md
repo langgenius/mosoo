@@ -4,7 +4,7 @@
 >
 > The demo contract this plan serves is [Native Deployment Happy Path](./native-deployment-happy-path.md) — read it first; this document adds the implementation-facing inventories: what is locked, what is agent-first legacy to rethink, what changes where, in which order. Code facts are grounded in `main` @ `1c590f3` and `langgenius/mosoo-connector` @ `9bc9644`.
 >
-> Companion drafts still local-only (not in-repo): `docs/prd/mosoo-native-deployment-protocol.md`, ADR 0001–0003, `docs/product/mosoo-native-deployment-protocol.md`, `agent-app-market-decision-map.md`, `CONTEXT.md`. Their delta checklist is §7.
+> Companion docs are in-repo as of 2026-07-07 and the §7 delta checklist has been executed: the [protocol PRD](../prd/mosoo-native-deployment-protocol.md) is the single source of truth for the contract (the standalone `docs/product/mosoo-native-deployment-protocol.md` draft was folded into it and removed). §7 is kept below as the record of what was reconciled.
 
 ## 1. Locked decisions
 
@@ -109,7 +109,7 @@ The CLI is generated Go via Lathe from Mosoo's exported OpenAPI/GraphQL specs; o
 
 ## 7. Local companion-doc delta checklist
 
-These drafts live only on the author's machine; verify each against the locked decisions when landing them:
+Executed 2026-07-07 — the table remains as the reconciliation record (the `product/mosoo-native-deployment-protocol.md` row ended in fold-and-delete rather than fix-in-place):
 
 | Document | Action |
 | --- | --- |

@@ -2,11 +2,9 @@
 
 > **Status**: Draft for discussion · **Last updated**: 2026-07-06 · **Owner**: Evan (product)
 >
-> 中文版: [native-deployment-happy-path.zh.md](./native-deployment-happy-path.zh.md) (readable mirror; this English file is canonical).
->
 > Method stack per [PRD writing standard §2](../prd/good-prd.md): Working Backwards (script the demo first), Job Definition (JTBD), Crazy 8s to diverge, criteria vote to converge.
 >
-> Companion documents (local drafts, not yet in-repo): the `mosoo-native-deployment-protocol` PRD, ADR 0001–0003, and `agent-app-market-decision-map`. This document does not restate the protocol contract. It locks the thing the protocol must make true: **which moment we record as the product demo**.
+> Companion documents: the [protocol PRD](../prd/mosoo-native-deployment-protocol.md) — **the single source of truth for the contract** — plus ADR 0001–0003 and the [market decision map](./agent-app-market-decision-map.md). This document does not restate the protocol contract. It locks the thing the protocol must make true: **which moment we record as the product demo**.
 >
 > Implementation handoff — locked decisions, agent-first legacy inventory, change map, phases: [Native Deployment Workplan](./native-deployment-workplan.md).
 
@@ -223,6 +221,8 @@ flowchart LR
 | Why automation is deferred | Auto-redeploy/webhooks would lengthen the video without strengthening any persona's aha; they arrive after the portability thesis is proven. |
 
 ## Open questions (need a PM decision before the protocol PRD locks)
+
+> Status 2026-07-07: #3 is locked in the PRD (the artifact noun is **Mosoo Native Deployable**); #1, #5, #6 are tracked as the PRD's Open Decisions 4, 1, 3; #2 and #4 remain video-staging choices owned here.
 
 1. **Does console Publish materialize the repo in v1** (export/push to GitHub), or only guarantee shape-conformance with export available on demand? Path B's beat depends on the answer.
 2. **Which second instance appears in the video** — try.mosoo.ai (brand credibility, implies our hosted offer) or a second self-hosted instance (purest portability claim)?

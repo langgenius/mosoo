@@ -1,5 +1,7 @@
 # Mosoo Agent App 市场决策地图
 
+> 状态（2026-07-07）：#16–#25 的全部决策已收敛进单一事实来源 [docs/prd/mosoo-native-deployment-protocol.md](../prd/mosoo-native-deployment-protocol.md)。其中两条已被 2026-07-06 design session 的 locked decisions 修订并在 PRD 中标注 Superseded：#17（文本-only validator → doctor 式版本化 JSON）、#24（一次性 Agent API token → v1 认证走 account PAT）。本文保留为决策依据存档 + 附录市场原始材料；市场线（fork / distribution / community）的技术前置 = portability SLO，Fork-someone's-app 推迟到 market phase（见 workplan）。
+
 ## #16：Native spec/version 字段怎么定义？
 
 依赖：Native protocol spec 草案
