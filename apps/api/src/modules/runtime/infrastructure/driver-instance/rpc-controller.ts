@@ -71,7 +71,11 @@ export class DriverInstanceRpcController implements DriverInstanceRpcHandler {
     input: DriverHelloInput,
     context: DriverInstanceRpcOperationContext,
   ): Promise<DriverHelloOutput> {
-    return this.#handshake.handleHello(input, context);
+    const result = await this.#handshake.handleHello(input, context);
+    // Publish batches the driver flushed while hello was still in flight
+    // without extending the hello round-trip that gates the driver's boot.
+    void this.#events.publishPendingPreHelloLogs();
+    return result;
   }
 
   async handleNextCommand(

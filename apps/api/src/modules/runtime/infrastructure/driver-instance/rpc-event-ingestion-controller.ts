@@ -33,9 +33,13 @@ function summarizeDriverEvents(events: readonly DriverEventEnvelope[]) {
   };
 }
 
+const PRE_HELLO_LOG_BATCH_LIMIT = 16;
+
 export class DriverInstanceRpcEventIngestionController {
   readonly #dependencies: DriverInstanceRpcControllerDependencies;
   #driverEventGate: Promise<unknown> = Promise.resolve();
+  #droppedPreHelloLogBatches = 0;
+  readonly #pendingPreHelloLogBatches: DriverLogBatchInput[] = [];
   readonly #runtimeEventPersistenceCompactor = new RuntimeEventPersistenceCompactor();
 
   public constructor(dependencies: DriverInstanceRpcControllerDependencies) {
@@ -163,10 +167,6 @@ export class DriverInstanceRpcEventIngestionController {
   ): Promise<DriverLogBatchOutput> {
     const { env, state } = this.#dependencies;
 
-    if (!state.hello) {
-      throw new Error("Driver hello is required before pushLogs.");
-    }
-
     if (input.driverInstanceId !== state.requireDriverInstanceId()) {
       throw new Error("Driver instance id mismatch.");
     }
@@ -176,9 +176,50 @@ export class DriverInstanceRpcEventIngestionController {
     }
     context.assertActiveConnection();
 
+    if (!state.hello) {
+      // Drivers can flush their first batches while the hello round-trip is
+      // still in flight (production DO latency routinely exceeds the flush
+      // interval). Rejecting here used to kill boots; hold a bounded window
+      // instead and publish it once hello commits.
+      if (this.#pendingPreHelloLogBatches.length >= PRE_HELLO_LOG_BATCH_LIMIT) {
+        this.#pendingPreHelloLogBatches.shift();
+        this.#droppedPreHelloLogBatches += 1;
+      }
+
+      this.#pendingPreHelloLogBatches.push(input);
+
+      return { ok: true };
+    }
+
     await publishDriverLogBatch(env, state, input);
 
     return { ok: true };
+  }
+
+  public async publishPendingPreHelloLogs(): Promise<void> {
+    const { env, state } = this.#dependencies;
+    const pending = this.#pendingPreHelloLogBatches.splice(0);
+    const dropped = this.#droppedPreHelloLogBatches;
+    this.#droppedPreHelloLogBatches = 0;
+
+    if (dropped > 0) {
+      logError("runtime.driver.log.pre_hello_overflow", {
+        driverInstanceId: state.requireDriverInstanceId(),
+        droppedBatches: dropped,
+      });
+    }
+
+    for (const batch of pending) {
+      try {
+        await publishDriverLogBatch(env, state, batch);
+      } catch (error) {
+        logError("runtime.driver.log.pre_hello_publish_failed", {
+          ...createErrorLogContext(error),
+          batchSize: batch.logs.length,
+          driverInstanceId: state.requireDriverInstanceId(),
+        });
+      }
+    }
   }
 
   async #getRuntimeSessionLink(options: { refresh?: boolean } = {}): Promise<RuntimeSessionLink> {
