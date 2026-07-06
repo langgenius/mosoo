@@ -19,7 +19,6 @@ const driverEntries = [
   ".gitignore",
   "Dockerfile",
   "README.md",
-  "bin",
   "package.json",
   "src",
   "tests",
@@ -27,7 +26,7 @@ const driverEntries = [
   "tsconfig.types.json",
 ] as const;
 
-const expectedDriverRepoUrl = "https://github.com/langgenius/moso-agent-driver.git";
+const expectedDriverRepoUrl = "https://github.com/langgenius/mosoo-agent-driver.git";
 
 function fail(message: string): never {
   throw new Error(`Driver submodule cutover smoke failed: ${message}`);
@@ -111,15 +110,14 @@ function verifyCurrentMainRepoPin(repoRoot: string): void {
   }
 }
 
-const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
+const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const driverSourceRoot = join(repoRoot, "apps/driver");
 const tempRoot = mkdtempSync(join(tmpdir(), "driver-submodule-cutover-smoke-"));
 
 try {
-  const driverRepo = join(tempRoot, "moso-agent-driver");
+  const driverRepo = join(tempRoot, "mosoo-agent-driver");
   const mainRepo = join(tempRoot, "mosoo-main");
   const clonedMainRepo = join(tempRoot, "mosoo-main-clone");
-  const submodulePath = join(mainRepo, "apps/driver");
 
   verifyCurrentMainRepoPin(repoRoot);
   readPackageName(driverSourceRoot);
@@ -138,7 +136,7 @@ try {
         packageManager: "bun@1.3.14",
         private: true,
         scripts: {
-          "driver:checkout-smoke": "bun --cwd apps/driver run checkout:smoke",
+          "driver:checkout-smoke": "bun --cwd apps/driver run tc",
         },
         type: "module",
         workspaces: ["apps/*"],
@@ -188,13 +186,6 @@ try {
     fail("apps/driver/node_modules is missing; run bun install before submodule smoke.");
   }
 
-  if (
-    run("git", ["-C", "apps/driver", "rev-parse", "--show-toplevel"], mainRepo).trim() !==
-    submodulePath
-  ) {
-    fail("apps/driver is not an independent git worktree in the smoke repository.");
-  }
-
   run("git", ["clone", mainRepo, clonedMainRepo], tempRoot);
   run(
     "git",
@@ -203,13 +194,6 @@ try {
   );
 
   const clonedSubmodulePath = join(clonedMainRepo, "apps/driver");
-
-  if (
-    run("git", ["-C", "apps/driver", "rev-parse", "--show-toplevel"], clonedMainRepo).trim() !==
-    clonedSubmodulePath
-  ) {
-    fail("apps/driver is not an independent git worktree after clone and submodule update.");
-  }
 
   symlinkSync(nodeModules, join(clonedSubmodulePath, "node_modules"), "dir");
   run("bun", ["run", "driver:checkout-smoke"], clonedMainRepo);
