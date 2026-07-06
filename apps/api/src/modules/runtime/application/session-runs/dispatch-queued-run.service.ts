@@ -11,6 +11,7 @@ import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import { hydrateCachedRunContextFromSession } from "../session-definition/hydrate-run-context.service";
 import { appendSessionResourceContextToPrompt } from "../session-resources/session-resource-prompt.service";
 import { dispatchSessionRun } from "./dispatch-run.service";
+import { describeRunError } from "./run-error-message";
 import { getSessionRunState, updateSessionRunStatusIfActive } from "./session-run-state.repository";
 import { createFailedSessionRunRuntimeEvent } from "./session-run-view-events.service";
 import {
@@ -27,8 +28,7 @@ async function failQueuedSessionRunBeforeDispatch(
     traceId: string;
   },
 ): Promise<void> {
-  const message =
-    input.error instanceof Error ? input.error.message : "Session run context hydration failed.";
+  const message = describeRunError(input.error, "Session run context hydration failed.");
   const runError = {
     code: "runtime.context_hydration_failed",
     details: {},

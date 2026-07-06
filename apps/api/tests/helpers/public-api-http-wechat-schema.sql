@@ -154,6 +154,21 @@ CREATE TABLE session_run (
   updated_at integer
 );
 
+CREATE TABLE session_run_skill (
+  session_run_id text NOT NULL,
+  skill_id text NOT NULL,
+  skill_name text NOT NULL,
+  snapshot_id text,
+  blob_sha256 text,
+  mount_path text NOT NULL,
+  resolution_mode text NOT NULL,
+  materialization_status text NOT NULL,
+  warning_code text,
+  created_at integer NOT NULL,
+  updated_at integer NOT NULL,
+  PRIMARY KEY (session_run_id, skill_id)
+);
+
 CREATE TABLE session_execution_snapshot (
   session_id text PRIMARY KEY NOT NULL,
   plan_json text NOT NULL,
