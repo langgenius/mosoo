@@ -10,7 +10,7 @@ import type {
 } from "./state";
 
 export interface DriverInstanceHttpHandler {
-  connectDriverInstanceSandboxSocket(input: DriverInstanceSandboxSocketRequest): Promise<void>;
+  acceptDriverSocket(request: Request): Promise<Response>;
   destroy(reason: string): Promise<void>;
   fail(message: string): Promise<void>;
   sendControlCommand(command: RuntimeCommand): Promise<void>;
@@ -19,13 +19,6 @@ export interface DriverInstanceHttpHandler {
   waitForHeartbeat(afterCount: number, timeoutMs: number): Promise<DriverInstanceHeartbeatResult>;
   waitForHello(timeoutMs: number): Promise<DriverInstanceHelloResult>;
   waitForReady(timeoutMs: number): Promise<DriverInstanceReadyResult>;
-}
-
-export interface DriverInstanceSandboxSocketRequest {
-  bootToken: string;
-  port: number;
-  sandboxId: string;
-  traceparent: string;
 }
 
 interface RuntimeFailRequest {
@@ -48,20 +41,6 @@ function readObject(value: unknown, name: string): Record<string, unknown> {
   return value;
 }
 
-function readRequiredString(
-  record: Record<string, unknown>,
-  key: string,
-  requestName: string,
-): string {
-  const value = record[key];
-
-  if (typeof value !== "string") {
-    throw new TypeError(`${requestName}.${key} must be a string.`);
-  }
-
-  return value;
-}
-
 function readOptionalString(
   record: Record<string, unknown>,
   key: string,
@@ -78,23 +57,6 @@ function readOptionalString(
   }
 
   return value;
-}
-
-function parseSandboxSocketRequest(value: unknown): DriverInstanceSandboxSocketRequest {
-  const requestName = "DriverInstanceSandboxSocketRequest";
-  const record = readObject(value, requestName);
-  const port = record["port"];
-
-  if (typeof port !== "number" || !Number.isInteger(port) || port < 1024 || port > 65_535) {
-    throw new TypeError(`${requestName}.port must be an integer between 1024 and 65535.`);
-  }
-
-  return {
-    bootToken: readRequiredString(record, "bootToken", requestName),
-    port,
-    sandboxId: readRequiredString(record, "sandboxId", requestName),
-    traceparent: readRequiredString(record, "traceparent", requestName),
-  };
 }
 
 function parseFailRequest(value: unknown): RuntimeFailRequest {
@@ -132,22 +94,8 @@ export async function handleDriverInstanceRequest(
 ): Promise<Response> {
   const url = new URL(request.url);
 
-  if (request.method === "POST" && url.pathname === "/sandbox/ws-connect") {
-    let body: DriverInstanceSandboxSocketRequest;
-
-    try {
-      body = parseSandboxSocketRequest(await request.json());
-    } catch (error) {
-      return json(
-        {
-          error: toErrorMessage(error, "Sandbox WebSocket request is invalid."),
-        },
-        { status: 400 },
-      );
-    }
-
-    await handler.connectDriverInstanceSandboxSocket(body);
-    return json({ ok: true });
+  if (request.method === "GET" && url.pathname === "/driver-socket") {
+    return handler.acceptDriverSocket(request);
   }
 
   if (request.method === "GET" && url.pathname === "/wait/hello") {

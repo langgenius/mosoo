@@ -8,7 +8,7 @@ import type { RunError } from "@mosoo/contracts/session-run";
 import { parseSchemaValue } from "@mosoo/contracts/validation";
 import { driverCommandsTable, driverInstancesTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { DriverCommandId, DriverInstanceId } from "@mosoo/id";
+import type { DriverCommandId, DriverInstanceId, SessionRunId } from "@mosoo/id";
 import { and, asc, eq, exists, gt, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 
 import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
@@ -457,6 +457,44 @@ async function expireRuntimeCommandDeliveryLeases(
         inArray(driverCommandsTable.status, [...expirableStatuses]),
         or(eq(driverCommandsTable.status, queuedStatus), isNull(driverCommandsTable.ackedAt)),
         lte(driverCommandsTable.expiresAt, nowMs),
+      ),
+    )
+    .run();
+
+  return createRuntimeCommandBatchTransitionOutcome(targetStatus, getD1ChangeCount(result));
+}
+
+export async function expireUndeliveredInputStartCommandsForRun(
+  database: D1Database,
+  input: {
+    driverInstanceId: DriverInstanceId;
+    nowMs?: number;
+    runId: SessionRunId;
+  },
+): Promise<RuntimeCommandBatchTransitionOutcome> {
+  const nowMs = input.nowMs ?? currentTimestampMs();
+  const expirableStatuses = getRuntimeCommandDeliveryLeaseExpirableStatuses();
+  const queuedStatus = "queued" satisfies RuntimeCommandStatus;
+  const targetStatus = "expired" satisfies RuntimeCommandStatus;
+  const error = createRuntimeCommandDeliveryExpiredError({
+    driverInstanceId: input.driverInstanceId,
+    runId: input.runId,
+  });
+
+  const result = await getAppDatabase(database)
+    .update(driverCommandsTable)
+    .set({
+      completedAt: sql`COALESCE(${driverCommandsTable.completedAt}, ${nowMs})`,
+      errorJson: JSON.stringify(error),
+      status: targetStatus,
+    })
+    .where(
+      and(
+        eq(driverCommandsTable.driverInstanceId, input.driverInstanceId),
+        eq(driverCommandsTable.kind, "input.start"),
+        sql`json_extract(${driverCommandsTable.payloadJson}, '$.runId') = ${input.runId}`,
+        inArray(driverCommandsTable.status, [...expirableStatuses]),
+        or(eq(driverCommandsTable.status, queuedStatus), isNull(driverCommandsTable.ackedAt)),
       ),
     )
     .run();

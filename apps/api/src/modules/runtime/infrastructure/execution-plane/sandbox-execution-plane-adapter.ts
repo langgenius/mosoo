@@ -228,9 +228,19 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
       for (const phase of driver.timing.phases) {
         timing.addPhase(phase.name, phase.durationMs);
       }
+      const initialDriverPhaseCount = driver.timing.phases.length;
 
       return {
         driverInstanceId: driver.driverInstanceId,
+        readiness: async () => {
+          const driverTiming = await driver.readiness();
+
+          for (const phase of driverTiming.phases.slice(initialDriverPhaseCount)) {
+            timing.addPhase(phase.name, phase.durationMs);
+          }
+
+          return timing.snapshot({ path: driverTiming.path });
+        },
         timing: timing.snapshot({ path: driver.timing.path }),
         release: () => {
           releaseRunResources(handles);

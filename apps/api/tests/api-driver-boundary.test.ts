@@ -339,6 +339,7 @@ describe("API to driver boundary", () => {
     });
     const bootPayload = createDriverBootPayload({
       bootToken: "boot-token-1",
+      controlUrl: "https://api.example.com/api/driver/socket",
       driverControlPort: DRIVER_CONTROL_PORT_MIN,
       driverGeneration: 0,
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,

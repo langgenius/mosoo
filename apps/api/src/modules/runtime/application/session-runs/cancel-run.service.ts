@@ -22,6 +22,8 @@ import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { sessionParticipantCondition } from "../../../sessions/domain/session-access.policy";
 import { sendDriverInstanceCommand } from "../../infrastructure/driver-instance/client";
+import { isDriverControlSocketMissingError } from "../../infrastructure/driver-session-stop-errors";
+import { expireUndeliveredInputStartCommandsForRun } from "../../infrastructure/session-runs/runtime-command-store.repository";
 import { toSessionRunSummary } from "../../infrastructure/session-runs/session-run-row.mapper";
 import type { SessionRunRow } from "../../infrastructure/session-runs/session-run-row.mapper";
 import {
@@ -123,6 +125,13 @@ export async function cancelRun(
       viewerId: viewer.id,
     });
 
+    if (isTruthy(run.driverInstanceId)) {
+      await expireUndeliveredInputStartCommandsForRun(database, {
+        driverInstanceId: run.driverInstanceId,
+        runId,
+      });
+    }
+
     return {
       run: currentRun,
     };
@@ -135,7 +144,13 @@ export async function cancelRun(
       reason: "viewer.cancelled",
     };
 
-    await sendDriverInstanceCommand(bindings, run.driverInstanceId, command);
+    try {
+      await sendDriverInstanceCommand(bindings, run.driverInstanceId, command);
+    } catch (error) {
+      if (!isDriverControlSocketMissingError(error)) {
+        throw error;
+      }
+    }
   }
 
   const outcome = await setSessionRunStatus(database, {
@@ -149,6 +164,13 @@ export async function cancelRun(
   }
 
   if (outcome.kind === "duplicate") {
+    if (isTruthy(run.driverInstanceId)) {
+      await expireUndeliveredInputStartCommandsForRun(database, {
+        driverInstanceId: run.driverInstanceId,
+        runId,
+      });
+    }
+
     return {
       run: outcome.run,
     };
@@ -163,6 +185,14 @@ export async function cancelRun(
   }
 
   const updatedRun = outcome.run;
+
+  if (isTruthy(run.driverInstanceId)) {
+    await expireUndeliveredInputStartCommandsForRun(database, {
+      driverInstanceId: run.driverInstanceId,
+      runId,
+    });
+  }
+
   const cancelledEvent = createCancelledSessionRunRuntimeEvent({
     eventId: createPlatformId<RuntimeEventId>(),
     run: updatedRun,

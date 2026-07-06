@@ -7,6 +7,7 @@ import type { DriverCommandId, DriverInstanceId, SessionRunId } from "@mosoo/id"
 import {
   claimNextQueuedRuntimeCommandRecord,
   createRuntimeCommandRecord,
+  expireUndeliveredInputStartCommandsForRun,
   repairRuntimeCommandRecords,
   getRuntimeCommandRecord,
   markRuntimeCommandRecordDelivered,
@@ -28,6 +29,7 @@ const SESSION_RUN_ID = parsePlatformId<SessionRunId>("01J0000000000000000000000N
 const COMMAND_IDS = {
   accepted: parsePlatformId<DriverCommandId>("01J00000000000000000000015"),
   current: parsePlatformId<DriverCommandId>("01J00000000000000000000017"),
+  currentRunQueued: parsePlatformId<DriverCommandId>("01J00000000000000000000026"),
   delivered: parsePlatformId<DriverCommandId>("01J00000000000000000000014"),
   expired: parsePlatformId<DriverCommandId>("01J00000000000000000000013"),
   first: parsePlatformId<DriverCommandId>("01J00000000000000000000011"),
@@ -40,6 +42,7 @@ const COMMAND_IDS = {
   redelivery: parsePlatformId<DriverCommandId>("01J00000000000000000000020"),
   second: parsePlatformId<DriverCommandId>("01J00000000000000000000012"),
   stale: parsePlatformId<DriverCommandId>("01J00000000000000000000016"),
+  otherRunQueued: parsePlatformId<DriverCommandId>("01J00000000000000000000027"),
   staleUpdate: parsePlatformId<DriverCommandId>("01J00000000000000000000019"),
 } as const;
 const RUNTIME_COMMAND_STATUSES = [
@@ -237,7 +240,11 @@ describe("runtime command store", () => {
       expiresAt: Date.now() + 60_000,
     });
 
-    await claimNextQueuedRuntimeCommandRecord(database, DRIVER_INSTANCE_ID, "connection-1");
+    await markRuntimeCommandRecordDelivered(database, {
+      commandId: COMMAND_IDS.accepted,
+      connectionId: "connection-1",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+    });
     database.execute(`
       UPDATE driver_command
       SET expires_at = ${Date.now() - 1_000}
@@ -270,7 +277,11 @@ describe("runtime command store", () => {
       expiresAt: Date.now() + 60_000,
     });
 
-    await claimNextQueuedRuntimeCommandRecord(database, DRIVER_INSTANCE_ID, "connection-1");
+    await markRuntimeCommandRecordDelivered(database, {
+      commandId: COMMAND_IDS.accepted,
+      connectionId: "connection-1",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+    });
     await updateRuntimeCommandRecord(database, {
       commandId: COMMAND_IDS.accepted,
       deliveryConnectionId: "connection-1",
@@ -482,6 +493,72 @@ describe("runtime command store", () => {
     expect(recovered?.status).toBe("queued");
     expect(failed?.status).toBe("failed");
     expect(failed?.error?.code).toBe("driver.command_driver_terminal");
+  });
+
+  test("expires undelivered input commands for one run", async () => {
+    const database = createRuntimeCommandDatabase();
+    const otherRunId = parsePlatformId<SessionRunId>("01J0000000000000000000000P");
+
+    await createRuntimeCommandRecord(database, {
+      command: inputStartCommand(COMMAND_IDS.currentRunQueued),
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      expiresAt: Date.now() + 60_000,
+    });
+    await createRuntimeCommandRecord(database, {
+      command: inputStartCommand(COMMAND_IDS.accepted),
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      expiresAt: Date.now() + 60_000,
+    });
+    await createRuntimeCommandRecord(database, {
+      command: {
+        ...inputStartCommand(COMMAND_IDS.otherRunQueued),
+        runId: otherRunId,
+      },
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      expiresAt: Date.now() + 60_000,
+    });
+    await markRuntimeCommandRecordDelivered(database, {
+      commandId: COMMAND_IDS.accepted,
+      connectionId: "connection-1",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+    });
+    await updateRuntimeCommandRecord(database, {
+      commandId: COMMAND_IDS.accepted,
+      deliveryConnectionId: "connection-1",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      status: "accepted",
+    });
+
+    await expect(
+      expireUndeliveredInputStartCommandsForRun(database, {
+        driverInstanceId: DRIVER_INSTANCE_ID,
+        runId: SESSION_RUN_ID,
+      }),
+    ).resolves.toEqual({
+      appliedCount: 1,
+      kind: "batch_applied",
+      status: "expired",
+    });
+
+    const expired = await getRuntimeCommandRecord(
+      database,
+      DRIVER_INSTANCE_ID,
+      COMMAND_IDS.currentRunQueued,
+    );
+    const accepted = await getRuntimeCommandRecord(
+      database,
+      DRIVER_INSTANCE_ID,
+      COMMAND_IDS.accepted,
+    );
+    const otherRun = await getRuntimeCommandRecord(
+      database,
+      DRIVER_INSTANCE_ID,
+      COMMAND_IDS.otherRunQueued,
+    );
+
+    expect(expired?.status).toBe("expired");
+    expect(accepted?.status).toBe("accepted");
+    expect(otherRun?.status).toBe("queued");
   });
 
   test("does not mark commands delivered for stale connections", async () => {

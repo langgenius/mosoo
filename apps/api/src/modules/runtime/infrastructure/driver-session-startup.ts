@@ -8,7 +8,7 @@ import {
   appendRuntimeDiagnosticEvent,
   toRuntimeDiagnosticBaseValue,
 } from "../application/runtime-diagnostic-events";
-import { DRIVER_READY_TIMEOUT_MS } from "../domain/runtime-config";
+import { DRIVER_COLD_READY_TIMEOUT_MS } from "../domain/runtime-config";
 import { failDriverInstance, waitForDriverInstanceReady } from "./driver-instance/client";
 import { relayDriverProcessLogs } from "./driver-process-log-relay";
 import { runBestEffortRuntimeCleanup } from "./runtime-cleanup";
@@ -85,7 +85,7 @@ export async function waitForDriverReady(
   const readyPromise = waitForDriverInstanceReady(
     bindings,
     input.driverInstanceId,
-    DRIVER_READY_TIMEOUT_MS,
+    DRIVER_COLD_READY_TIMEOUT_MS,
   ).then(() => {
     ready = true;
   });
@@ -142,7 +142,7 @@ export async function waitForDriverReady(
       value: {
         ...toRuntimeDiagnosticBaseValue(input.eventContext),
         driverInstanceId: input.driverInstanceId,
-        elapsedMs: DRIVER_READY_TIMEOUT_MS,
+        elapsedMs: DRIVER_COLD_READY_TIMEOUT_MS,
         port: input.eventContext.driverControlPort,
       },
     });

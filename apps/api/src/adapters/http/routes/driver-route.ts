@@ -19,6 +19,7 @@ import {
   toRuntimeMcpProxyPublicErrorDetails,
 } from "../../../modules/runtime/application/runtime-mcp-proxy-errors";
 import { resolveRuntimeMcpProxyTarget } from "../../../modules/runtime/application/runtime-mcp-proxy.service";
+import { upgradeDriverInstanceSocket } from "../../../modules/runtime/infrastructure/driver-instance/client";
 import { getDriverInstanceRecord } from "../../../modules/runtime/infrastructure/driver-instance/driver-instance-record.repository";
 import { readSkillPackageBytesFromSnapshot } from "../../../modules/skills/application/skill-package-snapshot.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
@@ -170,6 +171,32 @@ async function proxyRuntimeMcpRequest(
 
 export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
   const driver = new Hono<ApiGatewayEnvironment>();
+
+  driver.get("/socket", async (c) => {
+    if (c.req.header("Upgrade")?.toLowerCase() !== "websocket") {
+      return Response.json(
+        { error: "Driver socket requires a WebSocket upgrade." },
+        { status: 426 },
+      );
+    }
+
+    let driverInstanceId: DriverInstanceId;
+
+    try {
+      driverInstanceId = toPlatformId<DriverInstanceId>(
+        c.req.query("driverInstanceId") ?? "",
+        "Driver instance ID",
+      );
+    } catch (error) {
+      const response = driverPlatformIdErrorResponse(error);
+      if (response !== null) {
+        return response;
+      }
+      throw error;
+    }
+
+    return upgradeDriverInstanceSocket(c.env, driverInstanceId, c.req.raw);
+  });
 
   driver.get("/skill/:snapshotId/package", async (c) => {
     await cleanupDriverInstances(c.env);

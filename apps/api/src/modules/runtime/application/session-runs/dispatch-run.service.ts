@@ -193,10 +193,6 @@ export async function dispatchSessionRun(
       runLease = preparedRunLease;
       driverInstanceId = preparedRunLease.driverInstanceId;
       const preparedDriverInstanceId = preparedRunLease.driverInstanceId;
-      prepareTimingEventPromise = appendSessionRuntimeTimingEventBestEffort({
-        bindings,
-        timing: preparedRunLease.timing,
-      });
       logInfo("session.run.prepared", {
         driverInstanceId,
         runId: input.sessionRunId,
@@ -224,6 +220,12 @@ export async function dispatchSessionRun(
           sessionRunId: input.sessionRunId,
         }),
       );
+      const readyTiming = await preparedRunLease.readiness();
+      await ensureSessionRunIsActive(bindings.DB, input.sessionRunId);
+      prepareTimingEventPromise = appendSessionRuntimeTimingEventBestEffort({
+        bindings,
+        timing: readyTiming,
+      });
       await prepareTimingEventPromise;
       await appendSessionRuntimeTimingEventBestEffort({
         bindings,
