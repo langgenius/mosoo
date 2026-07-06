@@ -1,3 +1,4 @@
+import { printSchema } from "graphql";
 import { createSchema } from "graphql-yoga";
 
 import { graphqlModuleSpecs } from "./graphql-module-specs.ts";
@@ -28,9 +29,11 @@ const codegenTypeDefs = `
   }
 `;
 
-const schema = createSchema({
-  typeDefs: codegenTypeDefs,
-});
+const schema = printSchema(
+  createSchema({
+    typeDefs: codegenTypeDefs,
+  }),
+);
 
 export { schema };
 export default schema;
