@@ -4,6 +4,7 @@ import type {
   McpRegistry,
   McpServerWithCredential,
   StartMcpOAuthPayload,
+  UpdateAppMcpServerInput,
 } from "@mosoo/contracts/mcp";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -17,6 +18,7 @@ import {
   revokeMcpCredential,
   setMcpServerEnabled,
   startMcpOAuth,
+  updateAppMcpServer,
 } from "@/domains/mcp/api/mcp-client";
 import { mcpKeys, useMcpRegistryQuery } from "@/domains/mcp/query/mcp-queries";
 import { toMcpOAuthFlowId, toMcpServerId, toAppId } from "@/routes/typed-id";
@@ -61,6 +63,21 @@ export function useMcpRegistry() {
     });
     await refresh();
     return created;
+  }
+
+  async function updateServer(
+    input: Omit<UpdateAppMcpServerInput, "appId">,
+  ): Promise<McpServerWithCredential> {
+    if (!isTruthy(appId)) {
+      throw new Error("MCP registry is not ready.");
+    }
+
+    const updated = await updateAppMcpServer({
+      ...input,
+      appId: toAppId(appId),
+    });
+    await refresh();
+    return updated;
   }
 
   async function connectBearerCredential(
@@ -141,5 +158,6 @@ export function useMcpRegistry() {
     servers: registry?.servers ?? [],
     setServerEnabled: toggleServerEnabled,
     startOAuth: startOAuthFlow,
+    updateServer,
   };
 }

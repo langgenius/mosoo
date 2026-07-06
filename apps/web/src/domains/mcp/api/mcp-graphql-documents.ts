@@ -89,6 +89,14 @@ export const SET_MCP_SERVER_ENABLED_MUTATION = graphql(/* GraphQL */ `
   }
 `);
 
+export const UPDATE_APP_MCP_SERVER_MUTATION = graphql(/* GraphQL */ `
+  mutation UpdateAppMcpServer($input: UpdateAppMcpServerInput!) {
+    updateAppMcpServer(input: $input) {
+      ...McpServerFields
+    }
+  }
+`);
+
 export const DELETE_MCP_SERVER_MUTATION = graphql(/* GraphQL */ `
   mutation DeleteMcpServer($appId: ULID!, $serverId: ULID!) {
     deleteMcpServer(appId: $appId, serverId: $serverId) {

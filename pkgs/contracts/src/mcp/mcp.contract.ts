@@ -156,6 +156,15 @@ export interface CreateAppMcpServerInput {
   url: string;
 }
 
+export interface UpdateAppMcpServerInput {
+  appId: AppId;
+  description?: string | null;
+  iconUrl?: string | null;
+  name: string;
+  serverId: McpServerId;
+  url: string;
+}
+
 export interface ConnectMcpBearerInput {
   appId: AppId;
   serverId: McpServerId;

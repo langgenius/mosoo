@@ -7,6 +7,7 @@ import type {
   McpServerWithCredential,
   StartMcpOAuthInput,
   StartMcpOAuthPayload,
+  UpdateAppMcpServerInput,
 } from "@mosoo/contracts/mcp";
 
 import type {
@@ -17,6 +18,7 @@ import type {
   RevokeMcpCredentialMutation,
   SetMcpServerEnabledMutation,
   StartMcpOAuthMutation,
+  UpdateAppMcpServerMutation,
 } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
 import {
@@ -36,6 +38,7 @@ import {
   REVOKE_MCP_CREDENTIAL_MUTATION,
   SET_MCP_SERVER_ENABLED_MUTATION,
   START_MCP_OAUTH_MUTATION,
+  UPDATE_APP_MCP_SERVER_MUTATION,
 } from "./mcp-graphql-documents";
 
 type GraphQLMcpServerWithCredential = McpRegistryQuery["mcpRegistry"]["servers"][number];
@@ -43,7 +46,8 @@ type GraphQLMcpServerMutationResult =
   | CreateAppMcpServerMutation["createAppMcpServer"]
   | ConnectMcpBearerMutation["connectMcpBearer"]
   | RevokeMcpCredentialMutation["revokeMcpCredential"]
-  | SetMcpServerEnabledMutation["setMcpServerEnabled"];
+  | SetMcpServerEnabledMutation["setMcpServerEnabled"]
+  | UpdateAppMcpServerMutation["updateAppMcpServer"];
 
 function toMcpServerWithCredential(
   server: GraphQLMcpServerWithCredential | GraphQLMcpServerMutationResult,
@@ -134,6 +138,14 @@ export async function setMcpServerEnabled(
   });
 
   return toMcpServerWithCredential(payload.setMcpServerEnabled);
+}
+
+export async function updateAppMcpServer(
+  input: UpdateAppMcpServerInput,
+): Promise<McpServerWithCredential> {
+  const payload = await requestGraphQL(UPDATE_APP_MCP_SERVER_MUTATION, { input });
+
+  return toMcpServerWithCredential(payload.updateAppMcpServer);
 }
 
 export async function deleteMcpServer(appId: AppId, serverId: McpServerId): Promise<void> {

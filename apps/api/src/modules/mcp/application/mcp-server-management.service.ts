@@ -1,4 +1,8 @@
-import type { CreateAppMcpServerInput, McpServerWithCredential } from "@mosoo/contracts/mcp";
+import type {
+  CreateAppMcpServerInput,
+  McpServerWithCredential,
+  UpdateAppMcpServerInput,
+} from "@mosoo/contracts/mcp";
 import { agentMcpBindingsTable, mcpServersTable } from "@mosoo/db";
 import type { McpServerId, AppId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
@@ -10,9 +14,11 @@ import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import {
   deleteCredentialArtifactsBatch,
+  getAppCredentialRow,
   hasAppCredential,
   listCredentialRowsByServerId,
   resolveRegistryCredential,
+  revokeCredential,
 } from "./mcp-credential.repository";
 import { parseHttpsUrl, toServerWithCredential } from "./mcp-mappers";
 import {
@@ -99,6 +105,48 @@ export async function createAppMcpServer(
 
   const server = await getServerRow(bindings.DB, serverId);
   return toServerWithCredential(server, null, false);
+}
+
+export async function updateAppMcpServer(
+  database: D1Database,
+  viewer: AuthenticatedViewer,
+  input: UpdateAppMcpServerInput,
+): Promise<McpServerWithCredential> {
+  const { server: existing } = await ensureServerManageAccess(
+    database,
+    viewer,
+    input.appId,
+    input.serverId,
+  );
+  const nextUrl = parseHttpsUrl(input.url);
+  // A stored credential is bound to the previous endpoint, so a URL change
+  // revokes it and drops cached OAuth discovery metadata for re-discovery.
+  const urlChanged = nextUrl !== existing.url;
+
+  if (urlChanged) {
+    await revokeCredential(database, await getAppCredentialRow(database, existing.id));
+  }
+
+  await getAppDatabase(database)
+    .update(mcpServersTable)
+    .set({
+      description: input.description ?? null,
+      iconUrl: input.iconUrl ?? null,
+      name: input.name,
+      updatedAt: currentTimestampMs(),
+      url: nextUrl,
+      ...(urlChanged && { oauthMetadataJson: null }),
+    })
+    .where(eq(mcpServersTable.id, input.serverId))
+    .run();
+
+  const server = await getServerRow(database, input.serverId);
+  const [credential, hasCredential] = await Promise.all([
+    resolveRegistryCredential(database, server),
+    hasAppCredential(database, server.id),
+  ]);
+
+  return toServerWithCredential(server, credential, hasCredential);
 }
 
 export async function setMcpServerEnabled(

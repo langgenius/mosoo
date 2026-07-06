@@ -147,6 +147,15 @@ export const mcpSchema = /* GraphQL */ `
     url: String!
   }
 
+  input UpdateAppMcpServerInput {
+    appId: ULID!
+    description: String
+    iconUrl: String
+    name: String!
+    serverId: ULID!
+    url: String!
+  }
+
   input ConnectMcpBearerInput {
     appId: ULID!
     serverId: ULID!

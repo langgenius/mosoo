@@ -1288,6 +1288,7 @@ type Mutation {
   unarchiveAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!
   unpublishAgent(agentId: ULID!, appId: ULID!): Agent!
   updateAgentConfig(input: UpdateAgentConfigInput!): Agent!
+  updateAppMcpServer(input: UpdateAppMcpServerInput!): McpServerWithCredential!
   updateEnvironment(input: UpdateEnvironmentInput!): EnvironmentDetail!
   updateProfile(input: UpdateAccountProfileInput!): Account!
   updateVendorCredential(input: UpdateVendorCredentialInput!): VendorCredential!
@@ -1833,6 +1834,15 @@ input UpdateAgentConfigInput {
   providerOptions: JsonObject!
   runtimeId: String!
   skillIds: [ULID!]!
+}
+
+input UpdateAppMcpServerInput {
+  appId: ULID!
+  description: String
+  iconUrl: String
+  name: String!
+  serverId: ULID!
+  url: String!
 }
 
 input UpdateEnvironmentInput {
