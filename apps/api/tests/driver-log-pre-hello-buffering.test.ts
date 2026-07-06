@@ -7,19 +7,14 @@ const publishedBatches: DriverLogBatchInput[] = [];
 void mock.module(
   "../src/modules/runtime/infrastructure/driver-instance/driver-log-batch-publisher",
   () => ({
-    publishDriverLogBatch: async (
-      _env: unknown,
-      _state: unknown,
-      input: DriverLogBatchInput,
-    ) => {
+    publishDriverLogBatch: async (_env: unknown, _state: unknown, input: DriverLogBatchInput) => {
       publishedBatches.push(input);
     },
   }),
 );
 
-const { DriverInstanceRpcEventIngestionController } = await import(
-  "../src/modules/runtime/infrastructure/driver-instance/rpc-event-ingestion-controller"
-);
+const { DriverInstanceRpcEventIngestionController } =
+  await import("../src/modules/runtime/infrastructure/driver-instance/rpc-event-ingestion-controller");
 
 const DRIVER_INSTANCE_ID = "01J000000000000000000000DR";
 
