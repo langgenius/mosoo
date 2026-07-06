@@ -1,11 +1,10 @@
 import type { McpServerWithCredential as PoolServer } from "@mosoo/contracts/mcp";
-import { ChevronDown, ExternalLink, X } from "lucide-react";
+import { ExternalLink, Plus, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useMcpRegistryQuery } from "@/domains/mcp/query/mcp-queries";
 import { cn } from "@/shared/lib/class-names";
-import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,12 +63,13 @@ function McpAddDropdown({
   return (
     <DropdownMenu onOpenChange={onOpenChange} open={open}>
       <DropdownMenuTrigger asChild>
-        <Button className="w-full justify-between" type="button" variant="outline">
-          <span className="text-foreground truncate text-left text-[13px] font-medium">
-            Add MCP
-          </span>
-          <ChevronDown className="text-muted-foreground size-4" />
-        </Button>
+        <button
+          className="text-muted-foreground hover:bg-accent/30 hover:text-foreground flex w-full items-center gap-1.5 px-3 py-2.5 text-left text-[13px] font-medium transition-colors"
+          type="button"
+        >
+          <Plus className="size-3.5 shrink-0" />
+          Add MCP
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
@@ -173,8 +173,12 @@ export function AgentMcpBindingsField({
     );
   }
 
+  if (selectedServers.length === 0 && readOnly) {
+    return null;
+  }
+
   return (
-    <div className="space-y-1">
+    <div className="border-border divide-border-subtle divide-y overflow-hidden rounded-lg border">
       {selectedServers.map((server) => {
         const pool = poolServers.find((candidate) => candidate.id === server.id);
         const sourceLabel = `App · ${pool?.ownerName ?? "Owner"}`;
@@ -182,7 +186,7 @@ export function AgentMcpBindingsField({
         return (
           <div
             className={cn(
-              "group flex items-center gap-3 rounded-lg p-3 transition-colors",
+              "group flex items-center gap-3 px-3 py-2.5 transition-colors",
               server.enabled ? "hover:bg-accent/30" : "opacity-60 hover:bg-accent/20",
             )}
             key={server.id}
