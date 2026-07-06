@@ -41,7 +41,7 @@ const NAV_SECTIONS: AppNavSection[] = [
   {
     items: [
       { icon: createHugeicon(DashboardSquare01Icon, "OverviewIcon"), label: "Overview", path: "/" },
-      { icon: createHugeicon(InboxIcon, "ThreadsIcon"), label: "Threads", path: "/threads" },
+      { icon: createHugeicon(InboxIcon, "ThreadsIcon"), label: "Runs", path: "/threads" },
       { icon: createHugeicon(BotIcon, "AgentsIcon"), label: "Agents", path: "/agent" },
       {
         children: [

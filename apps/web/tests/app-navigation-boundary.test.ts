@@ -9,11 +9,12 @@ describe("App navigation boundary", () => {
   test("puts App Overview before Agent-first surfaces", () => {
     const source = readSource("../src/app/navigation.tsx");
     const overviewIndex = source.indexOf('label: "Overview"');
-    const threadsIndex = source.indexOf('label: "Threads"');
+    const runsIndex = source.indexOf('label: "Runs"');
     const agentsIndex = source.indexOf('label: "Agents"');
 
     expect(overviewIndex).toBeGreaterThan(-1);
-    expect(overviewIndex).toBeLessThan(threadsIndex);
+    expect(runsIndex).toBeGreaterThan(-1);
+    expect(overviewIndex).toBeLessThan(runsIndex);
     expect(overviewIndex).toBeLessThan(agentsIndex);
     expect(source).toContain('path: "/"');
     expect(source).not.toContain('label: "Members"');
