@@ -1,167 +1,121 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
-const prepareRunCalls: string[] = [];
-const dispatchTurnCalls: string[] = [];
-const cleanupCalls: string[] = [];
-let prepareRunFailures: Error[] = [];
-let dispatchTurnFailures: Error[] = [];
-let nextDriverIndex = 0;
-
-void mock.module(
-  "../src/modules/runtime/infrastructure/execution-plane/sandbox-execution-plane-adapter",
-  () => ({
-    createSandboxExecutionPlaneAdapter: () => ({
-      dispatchTurn: async (_bindings: unknown, input: { driverInstanceId: string }) => {
-        const failure = dispatchTurnFailures.shift();
-        if (failure) {
-          throw failure;
-        }
-        dispatchTurnCalls.push(input.driverInstanceId);
-      },
-      prepareRun: async () => {
-        const failure = prepareRunFailures.shift();
-        if (failure) {
-          throw failure;
-        }
-        nextDriverIndex += 1;
-        const driverInstanceId = `driver-${nextDriverIndex}`;
-        prepareRunCalls.push(driverInstanceId);
-        return {
-          driverInstanceId,
-          release: () => undefined,
-          timing: { path: "cold", phases: [] },
-        };
-      },
-    }),
-  }),
-);
-
-void mock.module(
-  "../src/modules/runtime/application/session-runs/session-run-state.repository",
-  () => ({
-    SessionRunNoLongerActiveError: class SessionRunNoLongerActiveError extends Error {},
-    acquireSessionRunDispatch: async () => ({
-      id: "run-1",
-      status: "booting",
-    }),
-    ensureSessionRunIsActive: async () => undefined,
-    getSessionRunState: async () => ({ driverInstanceId: null, status: "booting" }),
-    updateSessionRunStatusIfActive: async () => ({ id: "run-1", status: "failed" }),
-  }),
-);
-
-void mock.module(
-  "../src/modules/runtime/application/session-runs/session-run-skill-snapshot.repository",
-  () => ({
-    persistSessionRunSkills: async () => undefined,
-  }),
-);
-
-void mock.module("../src/modules/sessions/application/session-event-write.service", () => ({
-  appendOneSessionRuntimeEventPerSession: async () => ({ appended: [] }),
-  appendSessionRuntimeEvents: async () => undefined,
-  createSessionRuntimeEvent: (input: Record<string, unknown>) => input,
-}));
-
-void mock.module(
-  "../src/modules/runtime/application/session-runs/session-run-view-events.service",
-  () => ({
-    createFailedSessionRunRuntimeEvent: (input: Record<string, unknown>) => input,
-    createSessionRunUpdatedEvent: (run: unknown, sessionId: unknown) => ({ run, sessionId }),
-  }),
-);
-
-void mock.module("../src/modules/runtime/application/session-runs/session-runtime-timing", () => ({
-  appendSessionRuntimeTimingEventBestEffort: async () => undefined,
-  createRuntimeTimingRecorder: () => ({
-    addPhase: () => undefined,
-    measure: async <T>(_name: string, fn: () => Promise<T>) => fn(),
-    snapshot: () => ({ path: "cold", phases: [] }),
-  }),
-}));
-
-void mock.module(
-  "../src/modules/runtime/application/session-runs/dispatch-run-cleanup.service",
-  () => ({
-    cleanupDispatchedDriver: async (_bindings: unknown, input: { driverInstanceId: string }) => {
-      cleanupCalls.push(input.driverInstanceId);
-    },
-  }),
-);
-
-const { dispatchSessionRun } =
-  await import("../src/modules/runtime/application/session-runs/dispatch-run.service");
-
-function dispatchInput() {
-  return {
-    attachmentIds: [],
-    builtInTools: [],
-    profile: {
-      configRevision: { agentId: "01J00000000000000000000009" },
-      runtimeId: "acp-fallback",
-      sandbox: { id: "sandbox-1" },
-    },
-    prompt: "hello",
-    resolvedMcpServers: [],
-    resolvedSkillCatalog: [],
-    resolvedSkills: [],
-    sessionId: "session-1",
-    sessionRunId: "run-1",
-    traceId: "trace-1",
-  } as never;
-}
+import {
+  isDriverClosedBeforeReadyError,
+  withPreReadyRetry,
+} from "../src/modules/runtime/application/session-runs/pre-ready-retry";
 
 function closedBeforeReadyError(): Error {
   return new Error("Driver instance driver-x closed before ready.");
 }
 
-beforeEach(() => {
-  prepareRunCalls.length = 0;
-  dispatchTurnCalls.length = 0;
-  cleanupCalls.length = 0;
-  prepareRunFailures = [];
-  dispatchTurnFailures = [];
-  nextDriverIndex = 0;
+describe("isDriverClosedBeforeReadyError", () => {
+  test("matches the closed-before-ready signature", () => {
+    expect(isDriverClosedBeforeReadyError(closedBeforeReadyError())).toBe(true);
+    expect(isDriverClosedBeforeReadyError(new Error("Driver process exited before ready."))).toBe(
+      false,
+    );
+    expect(
+      isDriverClosedBeforeReadyError(
+        new Error("Runtime subject is busy with lifecycle maintenance."),
+      ),
+    ).toBe(false);
+    expect(isDriverClosedBeforeReadyError("closed before ready")).toBe(false);
+  });
 });
 
-describe("dispatchSessionRun pre-ready retry", () => {
-  test("retries once with a fresh driver when prepareRun dies before ready", async () => {
-    prepareRunFailures = [closedBeforeReadyError()];
+describe("withPreReadyRetry", () => {
+  test("returns the first successful attempt without retrying", async () => {
+    const retries: number[] = [];
 
-    await dispatchSessionRun({ DB: {} } as never, "https://example.test", dispatchInput());
+    const result = await withPreReadyRetry({
+      attempt: async () => "ok",
+      onRetry: async (_error, remaining) => {
+        retries.push(remaining);
+      },
+      retryLimit: 1,
+    });
 
-    expect(prepareRunCalls).toEqual(["driver-1"]);
-    expect(dispatchTurnCalls).toEqual(["driver-1"]);
+    expect(result).toBe("ok");
+    expect(retries).toEqual([]);
   });
 
-  test("retries once when dispatchTurn hits a driver that closed before ready", async () => {
-    dispatchTurnFailures = [closedBeforeReadyError()];
+  test("retries a closed-before-ready failure and succeeds", async () => {
+    const failures = [closedBeforeReadyError()];
+    const attempts: number[] = [];
+    const retried: { message: string; remaining: number }[] = [];
 
-    await dispatchSessionRun({ DB: {} } as never, "https://example.test", dispatchInput());
+    const result = await withPreReadyRetry({
+      attempt: async () => {
+        attempts.push(attempts.length + 1);
+        const failure = failures.shift();
+        if (failure) {
+          throw failure;
+        }
+        return "recovered";
+      },
+      onRetry: async (error, remaining) => {
+        retried.push({ message: error.message, remaining });
+      },
+      retryLimit: 1,
+    });
 
-    expect(prepareRunCalls).toEqual(["driver-1", "driver-2"]);
-    expect(cleanupCalls).toEqual(["driver-1"]);
-    expect(dispatchTurnCalls).toEqual(["driver-2"]);
+    expect(result).toBe("recovered");
+    expect(attempts).toEqual([1, 2]);
+    expect(retried).toEqual([
+      { message: "Driver instance driver-x closed before ready.", remaining: 0 },
+    ]);
   });
 
-  test("gives up after the retry budget and fails the run", async () => {
-    prepareRunFailures = [closedBeforeReadyError(), closedBeforeReadyError()];
+  test("gives up once the retry budget is exhausted", async () => {
+    let attempts = 0;
 
     await expect(
-      dispatchSessionRun({ DB: {} } as never, "https://example.test", dispatchInput()),
+      withPreReadyRetry({
+        attempt: async () => {
+          attempts += 1;
+          throw closedBeforeReadyError();
+        },
+        onRetry: async () => undefined,
+        retryLimit: 1,
+      }),
     ).rejects.toThrow("closed before ready");
 
-    expect(dispatchTurnCalls).toEqual([]);
+    expect(attempts).toBe(2);
   });
 
-  test("does not retry other provisioning errors", async () => {
-    prepareRunFailures = [new Error("Runtime subject is busy with lifecycle maintenance.")];
+  test("does not retry other errors", async () => {
+    let attempts = 0;
+    const retries: number[] = [];
 
     await expect(
-      dispatchSessionRun({ DB: {} } as never, "https://example.test", dispatchInput()),
+      withPreReadyRetry({
+        attempt: async () => {
+          attempts += 1;
+          throw new Error("Runtime subject is busy with lifecycle maintenance.");
+        },
+        onRetry: async (_error, remaining) => {
+          retries.push(remaining);
+        },
+        retryLimit: 1,
+      }),
     ).rejects.toThrow("busy with lifecycle maintenance");
 
-    expect(prepareRunCalls).toEqual([]);
-    expect(dispatchTurnCalls).toEqual([]);
+    expect(attempts).toBe(1);
+    expect(retries).toEqual([]);
+  });
+
+  test("propagates onRetry failures such as run-no-longer-active", async () => {
+    await expect(
+      withPreReadyRetry({
+        attempt: async () => {
+          throw closedBeforeReadyError();
+        },
+        onRetry: async () => {
+          throw new Error("Session run is already cancelled.");
+        },
+        retryLimit: 1,
+      }),
+    ).rejects.toThrow("already cancelled");
   });
 });
