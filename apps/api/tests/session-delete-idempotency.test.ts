@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { deleteAgentSession } from "../src/modules/sessions/application/session-lifecycle-mutation.service";
 import { lookupAppSessionParticipantCapabilityAccess } from "../src/modules/sessions/domain/session-access.policy";
+import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   PUBLIC_API_TEST_IDS,
   createPublicHttpContractDatabase,
