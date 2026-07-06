@@ -125,7 +125,7 @@ export async function dispatchSessionRun(
 ): Promise<void> {
   const sandboxId = input.profile.sandbox.id;
   let driverInstanceId: DriverInstanceId | null = null;
-  let prepareTimingEventPromise: Promise<void> | null = null;
+  let prepareTimingEventPromise: Promise<void> = Promise.resolve();
   let runLease: RuntimeExecutionPlaneRunLease | null = null;
 
   try {
@@ -247,7 +247,7 @@ export async function dispatchSessionRun(
 
         preReadyRetriesRemaining -= 1;
         await prepareTimingEventPromise;
-        prepareTimingEventPromise = null;
+        prepareTimingEventPromise = Promise.resolve();
 
         logWarn("session.run.dispatch.pre_ready_retry", {
           driverInstanceId,
