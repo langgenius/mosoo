@@ -6,6 +6,8 @@ export * from "./agent/agent-manifest-parser.contract";
 export * from "./agent/agent-manifest-serializer.contract";
 export type * from "./auth/auth.contract";
 export * from "./channel/channel.contract";
+export * from "./deployment/native-deployment.contract";
+export * from "./deployment/native-repo-fixtures";
 export type * from "./environment/environment.contract";
 export * from "./file/file.contract";
 export type * from "./mcp/mcp.contract";
