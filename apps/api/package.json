@@ -8,6 +8,7 @@
     "env:init": "vp exec bun bin/init-dev-vars.ts",
     "cf:types": "mkdir -p .tmp/.config .tmp/types && XDG_CONFIG_HOME=$PWD/.tmp/.config vp exec wrangler types .tmp/types/worker-configuration.d.ts",
     "db:migrate:local": "vp exec wrangler d1 migrations apply DB --local",
+    "native:demo": "vp exec bun bin/validate-native-fixtures.ts",
     "lint": "vp lint .",
     "tc": "vp run cf:types && vp exec tsc --noEmit",
     "test": "vp exec bun test tests"
