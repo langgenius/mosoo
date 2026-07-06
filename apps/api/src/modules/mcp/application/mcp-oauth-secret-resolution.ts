@@ -7,7 +7,11 @@ import { createErrorLogContext, logError } from "../../../platform/cloudflare/lo
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
-import { deleteSecret, readSecretOutcome, storeSecret } from "../../vault/application/vault-secret-store";
+import {
+  deleteSecret,
+  readSecretOutcome,
+  storeSecret,
+} from "../../vault/application/vault-secret-store";
 import type { OAuthFlowRow, ServerRow } from "./mcp-types";
 
 type McpOAuthSecretBindings = Pick<ApiBindings, "DB" | "VAULT_ROOT_SECRET">;

@@ -15,8 +15,8 @@ import {
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { isApiError } from "../../../platform/errors";
-import { toPlatformId } from "../../../shared/platform-id";
 import { toArrayBuffer } from "../../../shared/bytes";
+import { toPlatformId } from "../../../shared/platform-id";
 import { platformIdRouteErrorMessage } from "./platform-id-route-error";
 
 const MAX_SKILL_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB per PRD

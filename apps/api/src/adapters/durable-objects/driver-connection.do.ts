@@ -15,10 +15,9 @@ export class DriverConnection extends DurableObject {
   constructor(ctx: DurableObjectState, env: ApiBindings) {
     super(ctx, env);
 
-    this.#delegatePromise =
-      import("../../modules/runtime/infrastructure/driver-instance/do").then(
-        ({ DriverInstance }) => new DriverInstance(ctx, env),
-      );
+    this.#delegatePromise = import("../../modules/runtime/infrastructure/driver-instance/do").then(
+      ({ DriverInstance }) => new DriverInstance(ctx, env),
+    );
   }
 
   override async fetch(request: Request): Promise<Response> {

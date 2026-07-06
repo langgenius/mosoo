@@ -8,8 +8,8 @@ import {
   replaceMcpCredentialSecret,
 } from "../src/modules/mcp/application/mcp-credential-secret-resolution";
 import type { McpCredentialSecretReadPurpose } from "../src/modules/mcp/application/mcp-credential-secret-resolution";
-import { readSecretOutcome } from "../src/modules/vault/application/vault-secret-store";
 import type { CredentialRow, ServerRow } from "../src/modules/mcp/application/mcp-types";
+import { readSecretOutcome } from "../src/modules/vault/application/vault-secret-store";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
