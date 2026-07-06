@@ -631,6 +631,15 @@ export type UpdateAgentConfigInput = {
   skillIds: Array<PlatformId>;
 };
 
+export type UpdateAppMcpServerInput = {
+  appId: PlatformId;
+  description?: string | null | undefined;
+  iconUrl?: string | null | undefined;
+  name: string;
+  serverId: PlatformId;
+  url: string;
+};
+
 export type UpdateEnvironmentInput = {
   allowMcpServers: boolean;
   allowPackageManagers: boolean;
@@ -1052,6 +1061,13 @@ export type SetMcpServerEnabledMutationVariables = Exact<{
 
 
 export type SetMcpServerEnabledMutation = { setMcpServerEnabled: { authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null } };
+
+export type UpdateAppMcpServerMutationVariables = Exact<{
+  input: UpdateAppMcpServerInput;
+}>;
+
+
+export type UpdateAppMcpServerMutation = { updateAppMcpServer: { authType: McpAuthType, authorizationState: McpAuthorizationState, createdAt: string, credentialScope: McpCredentialScope, credentialStatus: McpCredentialStatus, description: string | null, enabled: boolean, hasCredential: boolean, iconUrl: string | null, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, source: McpServerSource, updatedAt: string, url: string, credential: { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string } | null } };
 
 export type DeleteMcpServerMutationVariables = Exact<{
   appId: PlatformId;
@@ -3414,6 +3430,45 @@ fragment McpServerFields on McpServerWithCredential {
     ...McpCredentialFields
   }
 }`) as unknown as TypedDocumentString<SetMcpServerEnabledMutation, SetMcpServerEnabledMutationVariables>;
+export const UpdateAppMcpServerDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation UpdateAppMcpServer($input: UpdateAppMcpServerInput!) {
+  updateAppMcpServer(input: $input) {
+    ...McpServerFields
+  }
+}
+    fragment McpCredentialFields on McpCredentialSummary {
+  authType
+  createdAt
+  expiresAt
+  id
+  scope
+  scopeValues
+  status
+  subjectLabel
+  updatedAt
+}
+fragment McpServerFields on McpServerWithCredential {
+  authType
+  authorizationState
+  createdAt
+  credentialScope
+  credentialStatus
+  description
+  enabled
+  hasCredential
+  iconUrl
+  id
+  name
+  ownerId
+  ownerName
+  appId
+  source
+  updatedAt
+  url
+  credential {
+    ...McpCredentialFields
+  }
+}`) as unknown as TypedDocumentString<UpdateAppMcpServerMutation, UpdateAppMcpServerMutationVariables>;
 export const DeleteMcpServerDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation DeleteMcpServer($appId: ULID!, $serverId: ULID!) {
   deleteMcpServer(appId: $appId, serverId: $serverId) {
