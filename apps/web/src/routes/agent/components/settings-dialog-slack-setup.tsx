@@ -1,10 +1,10 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Check, ChevronDown, Copy, ExternalLink, Loader2 } from "lucide-react";
 import { useMemo, useReducer } from "react";
 import type { FormEvent } from "react";
 
 import { createSlackAgentChannelBinding } from "@/domains/agent/api/agent-client";
-import { agentKeys } from "@/domains/agent/query/agent-queries";
+import { useInvalidateAgentChannelBindings } from "@/domains/agent/query/agent-queries";
 import { toAgentId, toAppId } from "@/routes/typed-id";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
@@ -88,7 +88,7 @@ export function SlackChannelInlineSetup({
   agent: ChannelInlineSetupAgent;
   onSuccess?: () => void;
 }) {
-  const queryClient = useQueryClient();
+  const invalidateChannelBindings = useInvalidateAgentChannelBindings(agent.appId, agent.id);
   const [state, dispatch] = useReducer(
     slackChannelInlineSetupReducer,
     SLACK_CHANNEL_INLINE_SETUP_INITIAL_STATE,
@@ -107,9 +107,7 @@ export function SlackChannelInlineSetup({
   const mutation = useMutation({
     mutationFn: createSlackAgentChannelBinding,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: agentKeys.channelBindings(agent.appId, agent.id),
-      });
+      await invalidateChannelBindings();
       onSuccess?.();
     },
   });

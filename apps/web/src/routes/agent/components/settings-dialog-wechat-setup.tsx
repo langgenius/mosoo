@@ -1,5 +1,5 @@
 import type { AgentId, AppId } from "@mosoo/contracts/id";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Loader2, RefreshCw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useState } from "react";
@@ -8,7 +8,7 @@ import {
   pollWeChatAgentChannelPairing,
   startWeChatAgentChannelPairing,
 } from "@/domains/agent/api/agent-client";
-import { agentKeys } from "@/domains/agent/query/agent-queries";
+import { useInvalidateAgentChannelBindings } from "@/domains/agent/query/agent-queries";
 import type {
   PollWeChatAgentChannelPairingInput,
   WeChatAgentChannelPairingFieldsFragment,
@@ -124,7 +124,7 @@ export function WeChatChannelInlineSetup({
   agent: ChannelInlineSetupAgent;
   onSuccess?: () => void;
 }) {
-  const queryClient = useQueryClient();
+  const invalidateChannelBindings = useInvalidateAgentChannelBindings(agent.appId, agent.id);
   const [pairing, setPairing] = useState<WeChatAgentChannelPairingFieldsFragment | null>(null);
   const typedAgentId = toAgentId(agent.id);
   const typedAppId = toAppId(agent.appId);
@@ -133,9 +133,7 @@ export function WeChatChannelInlineSetup({
     mutationFn: startWeChatAgentChannelPairing,
     onSuccess: async (result) => {
       setPairing(result);
-      await queryClient.invalidateQueries({
-        queryKey: agentKeys.channelBindings(agent.appId, agent.id),
-      });
+      await invalidateChannelBindings();
     },
   });
   const pollMutation = useMutation({
@@ -144,9 +142,7 @@ export function WeChatChannelInlineSetup({
       setPairing((current) => mergePairing(current, result));
 
       if (result.status === "confirmed" && result.binding) {
-        await queryClient.invalidateQueries({
-          queryKey: agentKeys.channelBindings(agent.appId, agent.id),
-        });
+        await invalidateChannelBindings();
         onSuccess?.();
       }
     },

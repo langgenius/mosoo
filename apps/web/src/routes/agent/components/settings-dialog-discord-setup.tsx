@@ -1,10 +1,10 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
 
 import { createDiscordAgentChannelBinding } from "@/domains/agent/api/agent-client";
-import { agentKeys } from "@/domains/agent/query/agent-queries";
+import { useInvalidateAgentChannelBindings } from "@/domains/agent/query/agent-queries";
 import { toAgentId, toAppId } from "@/routes/typed-id";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
@@ -26,7 +26,7 @@ export function DiscordChannelInlineSetup({
   agent: ChannelInlineSetupAgent;
   onSuccess?: () => void;
 }) {
-  const queryClient = useQueryClient();
+  const invalidateChannelBindings = useInvalidateAgentChannelBindings(agent.appId, agent.id);
   const [applicationId, setApplicationId] = useState("");
   const [botToken, setBotToken] = useState("");
   const [relaySecret, setRelaySecret] = useState("");
@@ -34,9 +34,7 @@ export function DiscordChannelInlineSetup({
   const mutation = useMutation({
     mutationFn: createDiscordAgentChannelBinding,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: agentKeys.channelBindings(agent.appId, agent.id),
-      });
+      await invalidateChannelBindings();
       onSuccess?.();
     },
   });
