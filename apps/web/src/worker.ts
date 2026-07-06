@@ -19,10 +19,11 @@ export default {
     }
 
     // SPA route — react-router decides what to render client-side, so we
-    // intentionally return /index.html with 200.
-    const indexRes = await env.ASSETS.fetch(
-      new Request(new URL("/index.html", url.origin).href, request),
-    );
+    // intentionally return the index document with 200. Fetch "/" rather than
+    // "/index.html": the assets binding's default html_handling
+    // ("auto-trailing-slash") answers "/index.html" with a 307 to "/", and
+    // passing that redirect through breaks every deep link.
+    const indexRes = await env.ASSETS.fetch(new Request(new URL("/", url.origin).href, request));
     return indexRes;
   },
 };
