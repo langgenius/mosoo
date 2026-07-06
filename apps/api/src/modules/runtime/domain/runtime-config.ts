@@ -3,6 +3,7 @@ import { isSupportedDriverRuntime } from "agent-driver/runtime";
 import type { DriverRuntime } from "agent-driver/runtime";
 
 export const DRIVER_BOOT_TOKEN_TTL_MS = 60_000;
+export const DRIVER_READY_TIMEOUT_MS = 120_000;
 export const RUNTIME_ACTION_TOKEN_TTL_MS = 10 * 60_000;
 export const DRIVER_HEARTBEAT_INTERVAL_MS = 1000;
 export const RUNTIME_RUN_RETENTION_MS = 24 * 60 * 60 * 1000;
