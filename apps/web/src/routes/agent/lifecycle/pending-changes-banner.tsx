@@ -106,6 +106,12 @@ export function PendingChangesBanner({
             </Button>
           </div>
         </div>
+        <p className="text-amber-fg/80 mt-1 pl-[22px] text-[12px] leading-relaxed">
+          The preview chat keeps using the saved config until you apply.
+          {agent.status === "published"
+            ? " After applying, Re-publish to roll the new version out."
+            : null}
+        </p>
       </div>
 
       {dialogEnabled ? (

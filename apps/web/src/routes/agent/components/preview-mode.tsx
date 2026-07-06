@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle } from "lucide-react";
 import type { ReactElement } from "react";
 import { useEffect, useReducer } from "react";
 import { createPortal } from "react-dom";
@@ -18,7 +17,7 @@ import { AgentKindSection } from "./agent-kind-section";
 import { AgentSessionPanel } from "./agent-session-panel";
 import { ChannelsConfigDialog } from "./channels-config-dialog";
 import { AgentFormView } from "./editor/form-view";
-import { isAutoSaveEligible, useAgentEditorAutoSave } from "./editor/use-auto-save";
+import { useAgentEditorAutoSave } from "./editor/use-auto-save";
 import { useAgentEditorModel } from "./editor/use-model";
 import type { ChannelId } from "./settings-dialog-model";
 
@@ -62,12 +61,10 @@ export interface PreviewModeProps {
 }
 
 function publishStatusMessage({
-  dirty,
   error,
   publishBlockMessage,
   publishBlocked,
 }: {
-  dirty: boolean;
   error: Error | null;
   publishBlockMessage: string | undefined;
   publishBlocked: boolean;
@@ -78,10 +75,6 @@ function publishStatusMessage({
 
   if (publishBlocked && publishBlockMessage !== undefined) {
     return { text: publishBlockMessage, tone: "neutral" };
-  }
-
-  if (dirty) {
-    return { text: "Apply or discard changes before publishing.", tone: "neutral" };
   }
 
   return null;
@@ -110,7 +103,6 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
   const queryClient = useQueryClient();
   const model = useAgentEditorModel({ agent });
   useAgentEditorAutoSave(model);
-  const autoSaveEligible = isAutoSaveEligible(model.changePlan);
   const [state, dispatch] = useReducer(previewModeReducer, PREVIEW_MODE_INITIAL_STATE);
   const {
     apiAccessDialogOpen,
@@ -164,7 +156,6 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
   const publishDisabled = publishBlocked || publishMutation.isPending || model.dirty;
   const publishError = publishMutation.error instanceof Error ? publishMutation.error : null;
   const publishStatus = publishStatusMessage({
-    dirty: model.dirty,
     error: publishError,
     publishBlockMessage,
     publishBlocked,
@@ -197,16 +188,6 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
           )
         : null}
       <div className="border-border-subtle flex min-h-0 w-1/2 shrink-0 flex-col border-r">
-        {model.dirty && !autoSaveEligible ? (
-          <div className="border-amber/30 bg-amber-bg/70 text-amber-fg flex shrink-0 items-start gap-2 border-b px-4 py-2 text-[12px]">
-            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-            <span>
-              Pending changes are not yet applied; the chat below is still using the saved config.
-              Apply on the right to test the new behavior.
-            </span>
-          </div>
-        ) : null}
-
         <div className="min-h-0 flex-1 overflow-hidden">
           <AgentSessionPanel
             agentId={agent.id}
