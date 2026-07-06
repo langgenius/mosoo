@@ -215,9 +215,9 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
         ) : null}
 
         {prepared ? (
-          <div className="border-border bg-muted/30 flex flex-col gap-3 rounded-lg border p-4">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground font-mono text-xs">
+          <div className="border-border bg-muted/30 flex min-w-0 flex-col gap-3 rounded-lg border p-4">
+            <div className="flex min-w-0 items-center gap-2 text-sm">
+              <span className="text-muted-foreground min-w-0 font-mono text-xs break-all">
                 {prepared.kind === "file" ? prepared.file.name : prepared.url}
               </span>
             </div>
