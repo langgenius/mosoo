@@ -20,6 +20,7 @@ import type { RuntimeDiagnosticEventInput } from "../runtime-diagnostic-events";
 import { buildSessionConfigTraceValue } from "../session-definition/session-config-trace-event";
 import type { HydratedSessionRunContext } from "../session-definition/session-execution.types";
 import { cleanupDispatchedDriver } from "./dispatch-run-cleanup.service";
+import { describeRunError } from "./run-error-message";
 import { persistSessionRunSkills } from "./session-run-skill-snapshot.repository";
 import {
   acquireSessionRunDispatch,
@@ -124,8 +125,6 @@ export async function dispatchSessionRun(
   try {
     await ensureSessionRunIsActive(bindings.DB, input.sessionRunId);
 
-    await persistSessionRunSkills(bindings.DB, input.sessionRunId, input.resolvedSkills);
-
     const bootingRun = await acquireSessionRunDispatch(bindings.DB, input.sessionRunId);
 
     if (!bootingRun) {
@@ -142,6 +141,10 @@ export async function dispatchSessionRun(
 
       return;
     }
+
+    // Only the dispatch winner writes run state; the losing path above must
+    // stay write-free so it cannot fail a run the winner is provisioning.
+    await persistSessionRunSkills(bindings.DB, input.sessionRunId, input.resolvedSkills);
 
     await appendSessionRuntimeEvents({
       bindings,
@@ -256,7 +259,7 @@ export async function dispatchSessionRun(
       return;
     }
 
-    const message = error instanceof Error ? error.message : "Session run provisioning failed.";
+    const message = describeRunError(error, "Session run provisioning failed.");
     const runError = {
       code: "runtime.provision_failed",
       details: {},

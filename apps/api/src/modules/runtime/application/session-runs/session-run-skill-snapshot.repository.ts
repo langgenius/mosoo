@@ -15,6 +15,9 @@ export async function persistSessionRunSkills(
 
   const timestampMs = Date.now();
 
+  // A run can reach this insert more than once (inline dispatch, queue
+  // fallback, queue retry). The first writer wins; a duplicate (run, skill)
+  // pair must not fail the run.
   await getAppDatabase(database)
     .insert(sessionRunSkillsTable)
     .values(
@@ -32,5 +35,6 @@ export async function persistSessionRunSkills(
         warningCode: skill.warningCode,
       })),
     )
+    .onConflictDoNothing()
     .run();
 }
