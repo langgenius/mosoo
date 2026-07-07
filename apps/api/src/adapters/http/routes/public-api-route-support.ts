@@ -45,7 +45,15 @@ interface PublicApiThreadOperation {
   caller: PublicApiCaller;
 }
 
-type RouteValue<T> = T | (() => T);
+/**
+ * Route params are either parsed synchronously (bare ULID segments) or
+ * resolved asynchronously against the database — the name-addressed App
+ * namespace routes turn {appSlug, agentName} into an Agent ULID with a
+ * lookup. Resolution always runs inside the wrapper try block, after
+ * authentication, so misses render as public API errors and never before a
+ * 401.
+ */
+type RouteValue<T> = T | (() => T | Promise<T>);
 
 interface PublicApiJsonErrorResponse {
   body: {
@@ -58,8 +66,8 @@ interface PublicApiJsonErrorResponse {
   status: number;
 }
 
-function resolveRequiredRouteValue<T>(value: RouteValue<T>): T {
-  return typeof value === "function" ? (value as () => T)() : value;
+function resolveRequiredRouteValue<T>(value: RouteValue<T>): T | Promise<T> {
+  return typeof value === "function" ? (value as () => T | Promise<T>)() : value;
 }
 
 async function requireAccessTokenCaller(
@@ -346,7 +354,7 @@ export async function runPublicApiSessionMutation<T, Prepared = undefined>(
 ): Promise<Response> {
   try {
     const caller = await requireAccessTokenCaller(c);
-    const threadId = resolveRequiredRouteValue(input.threadId);
+    const threadId = await resolveRequiredRouteValue(input.threadId);
     const operationInput: PublicApiAuthenticatedOperation = { caller };
     const prepared = input.prepare ? await input.prepare(operationInput) : (undefined as Prepared);
     const status = input.status ?? 200;
@@ -380,7 +388,7 @@ export async function runPublicApiThreadReadJson<T>(
 ): Promise<Response> {
   try {
     const caller = await requireRateLimitedPublicApiCaller(c);
-    const threadId = resolveRequiredRouteValue(input.threadId);
+    const threadId = await resolveRequiredRouteValue(input.threadId);
     const status = input.status ?? 200;
 
     return Response.json(await input.operation({ caller, threadId }), { status });
@@ -400,7 +408,7 @@ export async function runPublicApiThreadReadResponse(
 ): Promise<Response> {
   try {
     const caller = await requireRateLimitedPublicApiCaller(c);
-    const threadId = resolveRequiredRouteValue(input.threadId);
+    const threadId = await resolveRequiredRouteValue(input.threadId);
 
     return await input.operation({ caller, threadId });
   } catch (error) {
@@ -422,7 +430,7 @@ export async function runPublicApiThreadMutation<T, Prepared = undefined>(
 ): Promise<Response> {
   try {
     const caller = await requirePublicApiCaller(c);
-    const agentId = resolveRequiredRouteValue(input.agentId);
+    const agentId = await resolveRequiredRouteValue(input.agentId);
     const operationInput: PublicApiThreadOperation = { caller };
     const prepared = input.prepare ? await input.prepare(operationInput) : (undefined as Prepared);
     const status = input.status ?? 200;

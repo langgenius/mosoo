@@ -10,6 +10,7 @@ import { renderBoundAgentCallError } from "../../../modules/public-api/app-agent
 import { hashPublicApiIdempotencyBody } from "../../../modules/public-api/public-api-idempotency.service";
 import { listAgentApiEndpointThreads } from "../../../modules/public-api/public-thread-session-query.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
+import { registerAppNamespaceRoute } from "./app-namespace-route";
 import { createPublicApiOpenApiDocument } from "./public-api-openapi";
 import {
   runPublicApiAuthenticatedJson,
@@ -20,6 +21,7 @@ import {
   runPublicApiThreadReadResponse,
 } from "./public-api-route-support";
 import {
+  hashCreateThreadIdempotencyBody,
   parseFileContentDisposition,
   parseOptionalBoolean,
   parseAgentIdParam,
@@ -32,7 +34,6 @@ import {
   readCreateThreadFileUploadRequest,
   readSendEventsRequest,
 } from "./public-thread-api-request";
-import type { ParsedCreateThreadRequest } from "./public-thread-api-request";
 
 type PublicApiRouteContext = Context<ApiGatewayEnvironment>;
 type PublicThreadFileService = Awaited<ReturnType<typeof loadPublicThreadFileService>>;
@@ -72,16 +73,6 @@ async function runPublicThreadFileRoute<T>(
       }),
     status,
   );
-}
-
-async function hashCreateThreadIdempotencyBody(
-  body: ParsedCreateThreadRequest,
-): Promise<string | null> {
-  return hashPublicApiIdempotencyBody({
-    clientExternalRef: body.clientExternalRef ?? null,
-    fileIds: body.fileIds,
-    inputText: body.inputText ?? null,
-  });
 }
 
 export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
@@ -340,6 +331,10 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
       return { ok: true };
     }),
   );
+
+  // Name-addressed App namespace routes (PRD "API Namespace & Access") ride
+  // the same /api/v1 prefix, so they register on v1 before it is mounted.
+  registerAppNamespaceRoute(v1);
 
   app.route(PUBLIC_API_VERSION_PREFIX, v1);
 }

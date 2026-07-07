@@ -38,6 +38,24 @@ export async function getAppRow(database: D1Database, appId: AppId): Promise<App
   return row;
 }
 
+/**
+ * Resolves an App by its API namespace slug (PRD "API Namespace & Access").
+ * Returns null instead of throwing: namespace callers render every
+ * resolution miss as the same anti-enumeration publicNotFound, not a console
+ * 404. The slug column carries a global partial unique index, so at most one
+ * row matches.
+ */
+export async function getAppRowBySlug(database: D1Database, slug: string): Promise<AppRow | null> {
+  return (
+    (await getAppDatabase(database)
+      .select()
+      .from(appsTable)
+      .where(eq(appsTable.slug, slug))
+      .limit(1)
+      .get()) ?? null
+  );
+}
+
 export async function ensureAppOwnership(
   database: D1Database,
   viewerId: AccountId,

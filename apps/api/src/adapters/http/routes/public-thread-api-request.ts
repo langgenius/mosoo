@@ -19,6 +19,7 @@ import {
   PublicApiError,
   publicInvalidRequest,
 } from "../../../modules/public-api/public-api-errors";
+import { hashPublicApiIdempotencyBody } from "../../../modules/public-api/public-api-idempotency.service";
 
 interface JsonRequestContext {
   req: {
@@ -207,6 +208,36 @@ function parsePublicPlatformId(value: string, label: string) {
 
 export function parseAgentIdParam(value: string): AgentId {
   return parsePublicPlatformId(value, "Agent ID") as AgentId;
+}
+
+/**
+ * Path-segment shape shared by App slugs and exposed Agent names (PRD "API
+ * Namespace & Access"). Mirrors the native validator's URL-safety gate
+ * (`native.agent.name_not_url_safe`) and the minted slug alphabet in
+ * modules/apps/domain/app-slug.ts: lowercase kebab starting with a letter or
+ * digit, at most 64 characters. Values inside the shape that match nothing
+ * resolve to publicNotFound at the service level.
+ */
+const APP_NAMESPACE_SEGMENT_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+export function parseAppSlugParam(value: string): string {
+  if (!APP_NAMESPACE_SEGMENT_PATTERN.test(value)) {
+    throw publicInvalidRequest(
+      "App slug must be a lowercase kebab-case path segment of at most 64 characters.",
+    );
+  }
+
+  return value;
+}
+
+export function parseAgentNameParam(value: string): string {
+  if (!APP_NAMESPACE_SEGMENT_PATTERN.test(value)) {
+    throw publicInvalidRequest(
+      "Agent name must be a lowercase kebab-case path segment of at most 64 characters.",
+    );
+  }
+
+  return value;
 }
 
 export function parseThreadIdParam(value: string): PublicThreadId {
@@ -565,6 +596,21 @@ export async function readCreateThreadFileUploadRequest(
  */
 export async function readBoundAgentCallRequestBody(c: RawJsonRequestContext): Promise<unknown> {
   return readJsonBodyWithLimit(c, PUBLIC_THREAD_JSON_BODY_MAX_BYTES);
+}
+
+/**
+ * Canonical idempotency projection of a parsed create-thread body. Shared by
+ * the ULID route and the name-addressed App namespace route so both surfaces
+ * hash identical requests identically.
+ */
+export async function hashCreateThreadIdempotencyBody(
+  body: ParsedCreateThreadRequest,
+): Promise<string | null> {
+  return hashPublicApiIdempotencyBody({
+    clientExternalRef: body.clientExternalRef ?? null,
+    fileIds: body.fileIds,
+    inputText: body.inputText ?? null,
+  });
 }
 
 export async function readCreateThreadRequest(

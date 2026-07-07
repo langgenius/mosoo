@@ -137,6 +137,66 @@ export async function getAppAgentRow(
   return row === null ? null : toAgentRow(row);
 }
 
+/**
+ * Name-addressed API namespace lookup (PRD "API Namespace & Access"): the
+ * routable rows for (App, name) are exactly the published Agents whose repo
+ * deploy exposed them (`exposedViaApi = 1`; NULL console rows and 0 internal
+ * rows never match). Callers must treat anything but a single row as
+ * publicNotFound — zero rows means not routable, and two rows are legacy
+ * duplicate names the service level refuses to guess between (no
+ * (app_id, name) unique index in v1; the native upsert blocks duplicates on
+ * protocol Apps).
+ */
+export async function listExposedAgentApiEndpointRowsByName(
+  database: D1Database,
+  input: {
+    appId: AppId;
+    name: string;
+  },
+): Promise<AgentRow[]> {
+  const rows = await getAppDatabase(database)
+    .select(agentRowColumns)
+    .from(agentsTable)
+    .where(
+      and(
+        eq(agentsTable.appId, input.appId),
+        eq(agentsTable.name, input.name),
+        eq(agentsTable.exposedViaApi, 1),
+        eq(agentsTable.status, "published"),
+      ),
+    )
+    .limit(2)
+    .all();
+
+  return rows.map(toAgentRow);
+}
+
+/**
+ * Distinct exposed+published Agent names for an App's namespace OpenAPI
+ * document, in stable name order. Duplicate names collapse to one entry;
+ * the thread routes still refuse them as ambiguous until a dedupe backfill
+ * allows the unique index.
+ */
+export async function listExposedAgentApiNames(
+  database: D1Database,
+  appId: AppId,
+): Promise<string[]> {
+  const rows = await getAppDatabase(database)
+    .selectDistinct({ name: agentsTable.name })
+    .from(agentsTable)
+    .where(
+      and(
+        eq(agentsTable.appId, appId),
+        eq(agentsTable.exposedViaApi, 1),
+        eq(agentsTable.status, "published"),
+      ),
+    )
+    .orderBy(asc(agentsTable.name))
+    .all();
+
+  return rows.map((row) => row.name);
+}
+
 export async function listAppOwnerAgentRows(
   database: D1Database,
   input: {
