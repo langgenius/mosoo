@@ -30,7 +30,7 @@ type Documents = {
     "\n  mutation DeleteAgentChannelBinding($input: DeleteAgentChannelBindingInput!) {\n    deleteAgentChannelBinding(input: $input) {\n      ok\n    }\n  }\n": typeof types.DeleteAgentChannelBindingDocument,
     "\n  fragment AgentFields on Agent {\n    createdAt\n    description\n    id\n    kind\n    liveVersion {\n      ...AgentDeploymentVersionFields\n    }\n    model\n    name\n    appId\n    prompt\n    provider\n    runtimeId\n    skills {\n      ownerName\n      skillId\n      skillName\n      state\n    }\n    status\n    updatedAt\n    visibility\n  }\n": typeof types.AgentFieldsFragmentDoc,
     "\n  fragment AgentToolSummaryFields on AgentToolSummary {\n    enabled\n    iconUrl\n    name\n    serverId\n  }\n": typeof types.AgentToolSummaryFieldsFragmentDoc,
-    "\n  fragment AgentDeploymentVersionFields on AgentDeploymentVersion {\n    agentId\n    createdAt\n    createdByAccountId\n    environmentId\n    id\n    isLive\n    kind\n    model\n    provider\n    runtimeId\n    summary\n    versionNumber\n  }\n": typeof types.AgentDeploymentVersionFieldsFragmentDoc,
+    "\n  fragment AgentDeploymentVersionFields on AgentDeploymentVersion {\n    agentId\n    createdAt\n    createdByAccountId\n    environmentId\n    id\n    isLive\n    kind\n    model\n    provider\n    runtimeId\n    sourceCommitSha\n    summary\n    versionNumber\n  }\n": typeof types.AgentDeploymentVersionFieldsFragmentDoc,
     "\n  fragment AgentOwnerFields on AgentOwnerSummary {\n    id\n    imageUrl\n    name\n  }\n": typeof types.AgentOwnerFieldsFragmentDoc,
     "\n  mutation CreateAgent($input: CreateAgentInput!) {\n    createAgent(input: $input) {\n      ...AgentFields\n    }\n  }\n": typeof types.CreateAgentDocument,
     "\n  mutation DeleteAgent($input: DeleteAgentInput!) {\n    deleteAgent(input: $input) {\n      ok\n    }\n  }\n": typeof types.DeleteAgentDocument,
@@ -40,6 +40,7 @@ type Documents = {
     "\n  mutation UpdateAgentConfig($input: UpdateAgentConfigInput!) {\n    updateAgentConfig(input: $input) {\n      ...AgentFields\n    }\n  }\n": typeof types.UpdateAgentConfigDocument,
     "\n  query AgentManifest($agentId: ULID!, $appId: ULID!) {\n    agentManifest(agentId: $agentId, appId: $appId) {\n      agentId\n      json\n      yaml\n    }\n  }\n": typeof types.AgentManifestDocument,
     "\n  query ExportAgentPackage($agentId: ULID!, $appId: ULID!) {\n    exportAgentPackage(agentId: $agentId, appId: $appId) {\n      agentId\n      contentType\n      fileId\n      fileName\n      manifestYaml\n      size\n    }\n  }\n": typeof types.ExportAgentPackageDocument,
+    "\n  mutation ExportAgentNativeRepo($agentId: ULID!) {\n    exportAgentNativeRepo(agentId: $agentId) {\n      agentId\n      contentType\n      fileId\n      fileName\n      manifestYaml\n      size\n    }\n  }\n": typeof types.ExportAgentNativeRepoDocument,
     "\n  mutation ImportAgentPackage($input: ImportAgentPackageInput!) {\n    importAgentPackage(input: $input) {\n      agent {\n        ...AgentFields\n      }\n      resolution {\n        issues {\n          actionLabel\n          code\n          message\n          required\n          severity\n          status\n          targetLabel\n          targetType\n        }\n        summary {\n          boundMcpServerCount\n          boundSkillCount\n          copiedAssetCount\n          createdMcpServerCount\n          reusedMcpServerCount\n        }\n      }\n    }\n  }\n": typeof types.ImportAgentPackageDocument,
     "\n  mutation CreateAgentFork($input: CreateAgentForkInput!) {\n    createAgentFork(input: $input) {\n      agent {\n        ...AgentFields\n      }\n      resolution {\n        issues {\n          actionLabel\n          code\n          message\n          required\n          severity\n          status\n          targetLabel\n          targetType\n        }\n        summary {\n          boundMcpServerCount\n          boundSkillCount\n          copiedAssetCount\n          createdMcpServerCount\n          reusedMcpServerCount\n        }\n      }\n    }\n  }\n": typeof types.CreateAgentForkDocument,
     "\n  mutation PublishAgent($input: PublishAgentInput!) {\n    publishAgent(input: $input) {\n      ...AgentFields\n    }\n  }\n": typeof types.PublishAgentDocument,
@@ -135,7 +136,7 @@ const documents: Documents = {
     "\n  mutation DeleteAgentChannelBinding($input: DeleteAgentChannelBindingInput!) {\n    deleteAgentChannelBinding(input: $input) {\n      ok\n    }\n  }\n": types.DeleteAgentChannelBindingDocument,
     "\n  fragment AgentFields on Agent {\n    createdAt\n    description\n    id\n    kind\n    liveVersion {\n      ...AgentDeploymentVersionFields\n    }\n    model\n    name\n    appId\n    prompt\n    provider\n    runtimeId\n    skills {\n      ownerName\n      skillId\n      skillName\n      state\n    }\n    status\n    updatedAt\n    visibility\n  }\n": types.AgentFieldsFragmentDoc,
     "\n  fragment AgentToolSummaryFields on AgentToolSummary {\n    enabled\n    iconUrl\n    name\n    serverId\n  }\n": types.AgentToolSummaryFieldsFragmentDoc,
-    "\n  fragment AgentDeploymentVersionFields on AgentDeploymentVersion {\n    agentId\n    createdAt\n    createdByAccountId\n    environmentId\n    id\n    isLive\n    kind\n    model\n    provider\n    runtimeId\n    summary\n    versionNumber\n  }\n": types.AgentDeploymentVersionFieldsFragmentDoc,
+    "\n  fragment AgentDeploymentVersionFields on AgentDeploymentVersion {\n    agentId\n    createdAt\n    createdByAccountId\n    environmentId\n    id\n    isLive\n    kind\n    model\n    provider\n    runtimeId\n    sourceCommitSha\n    summary\n    versionNumber\n  }\n": types.AgentDeploymentVersionFieldsFragmentDoc,
     "\n  fragment AgentOwnerFields on AgentOwnerSummary {\n    id\n    imageUrl\n    name\n  }\n": types.AgentOwnerFieldsFragmentDoc,
     "\n  mutation CreateAgent($input: CreateAgentInput!) {\n    createAgent(input: $input) {\n      ...AgentFields\n    }\n  }\n": types.CreateAgentDocument,
     "\n  mutation DeleteAgent($input: DeleteAgentInput!) {\n    deleteAgent(input: $input) {\n      ok\n    }\n  }\n": types.DeleteAgentDocument,
@@ -145,6 +146,7 @@ const documents: Documents = {
     "\n  mutation UpdateAgentConfig($input: UpdateAgentConfigInput!) {\n    updateAgentConfig(input: $input) {\n      ...AgentFields\n    }\n  }\n": types.UpdateAgentConfigDocument,
     "\n  query AgentManifest($agentId: ULID!, $appId: ULID!) {\n    agentManifest(agentId: $agentId, appId: $appId) {\n      agentId\n      json\n      yaml\n    }\n  }\n": types.AgentManifestDocument,
     "\n  query ExportAgentPackage($agentId: ULID!, $appId: ULID!) {\n    exportAgentPackage(agentId: $agentId, appId: $appId) {\n      agentId\n      contentType\n      fileId\n      fileName\n      manifestYaml\n      size\n    }\n  }\n": types.ExportAgentPackageDocument,
+    "\n  mutation ExportAgentNativeRepo($agentId: ULID!) {\n    exportAgentNativeRepo(agentId: $agentId) {\n      agentId\n      contentType\n      fileId\n      fileName\n      manifestYaml\n      size\n    }\n  }\n": types.ExportAgentNativeRepoDocument,
     "\n  mutation ImportAgentPackage($input: ImportAgentPackageInput!) {\n    importAgentPackage(input: $input) {\n      agent {\n        ...AgentFields\n      }\n      resolution {\n        issues {\n          actionLabel\n          code\n          message\n          required\n          severity\n          status\n          targetLabel\n          targetType\n        }\n        summary {\n          boundMcpServerCount\n          boundSkillCount\n          copiedAssetCount\n          createdMcpServerCount\n          reusedMcpServerCount\n        }\n      }\n    }\n  }\n": types.ImportAgentPackageDocument,
     "\n  mutation CreateAgentFork($input: CreateAgentForkInput!) {\n    createAgentFork(input: $input) {\n      agent {\n        ...AgentFields\n      }\n      resolution {\n        issues {\n          actionLabel\n          code\n          message\n          required\n          severity\n          status\n          targetLabel\n          targetType\n        }\n        summary {\n          boundMcpServerCount\n          boundSkillCount\n          copiedAssetCount\n          createdMcpServerCount\n          reusedMcpServerCount\n        }\n      }\n    }\n  }\n": types.CreateAgentForkDocument,
     "\n  mutation PublishAgent($input: PublishAgentInput!) {\n    publishAgent(input: $input) {\n      ...AgentFields\n    }\n  }\n": types.PublishAgentDocument,
@@ -288,7 +290,7 @@ export function graphql(source: "\n  fragment AgentToolSummaryFields on AgentToo
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  fragment AgentDeploymentVersionFields on AgentDeploymentVersion {\n    agentId\n    createdAt\n    createdByAccountId\n    environmentId\n    id\n    isLive\n    kind\n    model\n    provider\n    runtimeId\n    summary\n    versionNumber\n  }\n"): typeof import('./graphql').AgentDeploymentVersionFieldsFragmentDoc;
+export function graphql(source: "\n  fragment AgentDeploymentVersionFields on AgentDeploymentVersion {\n    agentId\n    createdAt\n    createdByAccountId\n    environmentId\n    id\n    isLive\n    kind\n    model\n    provider\n    runtimeId\n    sourceCommitSha\n    summary\n    versionNumber\n  }\n"): typeof import('./graphql').AgentDeploymentVersionFieldsFragmentDoc;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -325,6 +327,10 @@ export function graphql(source: "\n  query AgentManifest($agentId: ULID!, $appId
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query ExportAgentPackage($agentId: ULID!, $appId: ULID!) {\n    exportAgentPackage(agentId: $agentId, appId: $appId) {\n      agentId\n      contentType\n      fileId\n      fileName\n      manifestYaml\n      size\n    }\n  }\n"): typeof import('./graphql').ExportAgentPackageDocument;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation ExportAgentNativeRepo($agentId: ULID!) {\n    exportAgentNativeRepo(agentId: $agentId) {\n      agentId\n      contentType\n      fileId\n      fileName\n      manifestYaml\n      size\n    }\n  }\n"): typeof import('./graphql').ExportAgentNativeRepoDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

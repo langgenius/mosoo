@@ -83,6 +83,14 @@ export function VersionsTab({ agent }: { agent: Agent }): ReactElement {
                       <span className="truncate">{version.runtimeId}</span>
                       <span>·</span>
                       <span className="truncate">{version.model}</span>
+                      {version.sourceCommitSha ? (
+                        <>
+                          <span>·</span>
+                          <span className="truncate font-mono" data-testid="version-commit-sha">
+                            commit {version.sourceCommitSha.slice(0, 7)}
+                          </span>
+                        </>
+                      ) : null}
                     </div>
                   </div>
 

@@ -23,6 +23,19 @@ export const EXPORT_AGENT_PACKAGE_QUERY = graphql(/* GraphQL */ `
   }
 `);
 
+export const EXPORT_AGENT_NATIVE_REPO_MUTATION = graphql(/* GraphQL */ `
+  mutation ExportAgentNativeRepo($agentId: ULID!) {
+    exportAgentNativeRepo(agentId: $agentId) {
+      agentId
+      contentType
+      fileId
+      fileName
+      manifestYaml
+      size
+    }
+  }
+`);
+
 export const IMPORT_AGENT_PACKAGE_MUTATION = graphql(/* GraphQL */ `
   mutation ImportAgentPackage($input: ImportAgentPackageInput!) {
     importAgentPackage(input: $input) {

@@ -37,6 +37,7 @@ import type {
   CreateTelegramAgentChannelBindingInput,
   CreateAgentForkMutation,
   DeleteAgentChannelBindingInput,
+  ExportAgentNativeRepoMutation,
   ExportAgentPackageQuery,
   ImportAgentPackageMutation,
   LarkAgentChannelRegistrationFieldsFragment,
@@ -87,6 +88,7 @@ import {
 } from "./agent-documents";
 import {
   CREATE_AGENT_FORK_MUTATION,
+  EXPORT_AGENT_NATIVE_REPO_MUTATION,
   EXPORT_AGENT_PACKAGE_QUERY,
   GET_AGENT_MANIFEST_QUERY,
   IMPORT_AGENT_PACKAGE_MUTATION,
@@ -205,7 +207,9 @@ function toAgentManifest(manifest: AgentManifestQuery["agentManifest"]): AgentMa
 }
 
 function toAgentPackageExport(
-  exportedPackage: ExportAgentPackageQuery["exportAgentPackage"],
+  exportedPackage:
+    | ExportAgentNativeRepoMutation["exportAgentNativeRepo"]
+    | ExportAgentPackageQuery["exportAgentPackage"],
 ): AgentPackageExport {
   return {
     ...exportedPackage,
@@ -358,6 +362,12 @@ export async function exportAgentPackage(
   const payload = await requestGraphQL(EXPORT_AGENT_PACKAGE_QUERY, { agentId, appId });
 
   return toAgentPackageExport(payload.exportAgentPackage);
+}
+
+export async function exportAgentNativeRepo(agentId: AgentId): Promise<AgentPackageExport> {
+  const payload = await requestGraphQL(EXPORT_AGENT_NATIVE_REPO_MUTATION, { agentId });
+
+  return toAgentPackageExport(payload.exportAgentNativeRepo);
 }
 
 export async function publishAgent(input: PublishAgentInput): Promise<Agent> {

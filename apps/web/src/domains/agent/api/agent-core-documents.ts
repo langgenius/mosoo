@@ -48,6 +48,7 @@ const AGENT_DEPLOYMENT_VERSION_FIELDS = graphql(/* GraphQL */ `
     model
     provider
     runtimeId
+    sourceCommitSha
     summary
     versionNumber
   }
