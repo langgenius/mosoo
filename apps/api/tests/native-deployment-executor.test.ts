@@ -4,10 +4,11 @@ import { MOSOO_NATIVE_SPEC } from "@mosoo/contracts/native-deployment";
 import { parseNativeDeploymentRunResult } from "@mosoo/contracts/native-deployment-run";
 import { createAgentManifestJson } from "@mosoo/contracts/native-repo-fixtures";
 import type { AppDeploymentRunRow } from "@mosoo/db";
-import { appDeploymentRunsTable } from "@mosoo/db";
+import { agentsTable, appDeploymentRunsTable } from "@mosoo/db";
 import type { AppId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
+import { detectAppDeploymentPlan } from "../src/modules/apps/application/app-deployment-detector";
 import type { AppDeploymentBuildRunner } from "../src/modules/apps/application/app-deployment-executor.service";
 import {
   admitAgentSnapshotFileContent,
@@ -22,10 +23,10 @@ import {
 } from "../src/modules/apps/application/app-deployment.service";
 import { validateNativeDeployment } from "../src/modules/apps/application/native-deployment-validator";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
-import { currentTimestampMs } from "../src/time";
 import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
+  nowMsForTest,
   PUBLIC_API_TEST_IDS,
   PublicApiMemoryFileBucket,
 } from "./helpers/public-api-http-test-fixture";
@@ -33,6 +34,7 @@ import type { SqliteD1Database } from "./helpers/sqlite-d1";
 import { OWNER_VIEWER, withProviderProbeMock } from "./public-thread-api-fixtures";
 
 const APP_ID = PUBLIC_API_TEST_IDS.app as AppId;
+const APP_TARGET_NAME = `app-${APP_ID.toLowerCase()}`;
 const NATIVE_MARKER_TOML = `spec = "${MOSOO_NATIVE_SPEC}"\n`;
 const DEPLOY_URL = "https://deployed.example";
 
@@ -200,7 +202,7 @@ async function dispatchRepo(
     bindings,
     OWNER_VIEWER,
     { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
-    { fetch: githubFetch, nowMs: currentTimestampMs },
+    { fetch: githubFetch, nowMs: nowMsForTest },
   );
   const { runner, state } = createFakeRunner(files);
 
@@ -236,13 +238,47 @@ async function readAgentRowByName(database: SqliteD1Database, name: string) {
   return database
     .prepare(
       `
-        SELECT id, live_deployment_version_id, status
+        SELECT id, live_deployment_version_id, prompt, status
           FROM agent
          WHERE app_id = ? AND name = ?
       `,
     )
     .bind(APP_ID, name)
-    .first<{ id: string; live_deployment_version_id: string | null; status: string }>();
+    .first<{
+      id: string;
+      live_deployment_version_id: string | null;
+      prompt: string;
+      status: string;
+    }>();
+}
+
+async function seedDraftAgent(database: SqliteD1Database, id: string, name: string): Promise<void> {
+  await database
+    .app()
+    .insert(agentsTable)
+    .values({
+      appId: APP_ID,
+      configJson: JSON.stringify({
+        packageMcpServers: [],
+        packageResolution: null,
+        packageSkills: [],
+      }),
+      createdAt: nowMsForTest(),
+      description: null,
+      environmentId: null,
+      id,
+      kind: "pet",
+      model: "gpt-5.4",
+      name,
+      ownerId: PUBLIC_API_TEST_IDS.ownerAccount,
+      prompt: "Duplicate.",
+      provider: "openai",
+      runtimeId: "openai-runtime",
+      status: "draft",
+      updatedAt: nowMsForTest(),
+      visibility: "private",
+    })
+    .run();
 }
 
 function parsePlanJson(runRow: AppDeploymentRunRow): Record<string, unknown> {
@@ -256,10 +292,11 @@ function parsePlanJson(runRow: AppDeploymentRunRow): Record<string, unknown> {
 describe("native deployment executor", () => {
   test("keeps a plain repo without the marker on the legacy path", async () => {
     const { bindings, database } = await createFixture();
-
-    const { runRow, state } = await dispatchRepo(bindings, database, {
+    const files = {
       "index.html": "<main>Hello</main>",
-    });
+    };
+
+    const { runRow, state } = await dispatchRepo(bindings, database, files);
 
     expect(runRow).toMatchObject({
       errorCode: null,
@@ -271,6 +308,14 @@ describe("native deployment executor", () => {
     expect(state.buildCount).toBe(1);
     expect(state.deployCount).toBe(1);
     expect(await countAppAgents(database)).toBe(1);
+
+    // The stored plan is exactly what the legacy detector produces: the
+    // native branch never touched the run.
+    const legacyPlan: unknown = JSON.parse(
+      JSON.stringify(detectAppDeploymentPlan({ files }, { resourceName: APP_TARGET_NAME })),
+    );
+
+    expect(parsePlanJson(runRow)).toEqual(legacyPlan as Record<string, unknown>);
   });
 
   test("keeps a legacy .mosoo.toml without a spec key on the legacy path", async () => {
@@ -406,6 +451,171 @@ describe("native deployment executor", () => {
       { action: "unchanged", exposed: true, name: "quiz-master" },
     ]);
     expect(await countAppAgents(database)).toBe(2);
+  });
+
+  test("re-dispatching a modified manifest reports updated and flips the live pointer", async () => {
+    const { bindings, database } = await createFixture();
+
+    const first = await dispatchRepo(bindings, database, {
+      ".agent/manifest.json": openaiAgentManifest("quiz-master"),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+
+    expect(first.runRow.status).toBe("success");
+
+    const before = await readAgentRowByName(database, "quiz-master");
+    const second = await dispatchRepo(bindings, database, {
+      ".agent/manifest.json": openaiAgentManifest("quiz-master", {
+        prompts: { system: "You are the improved quiz master." },
+      }),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+
+    expect(second.runRow.status).toBe("success");
+    expect(second.runRow.errorCode).toBeNull();
+
+    const native = parseNativeDeploymentRunResult(second.runRow.nativeResultJson);
+
+    expect(native?.facts?.agents).toEqual([
+      { action: "updated", exposed: true, name: "quiz-master", versionNumber: 2 },
+    ]);
+
+    const after = await readAgentRowByName(database, "quiz-master");
+
+    expect(after?.id).toBe(before?.id ?? "");
+    expect(after?.status).toBe("published");
+    expect(after?.prompt).toBe("You are the improved quiz master.");
+    expect(after?.live_deployment_version_id).toBeTruthy();
+    expect(after?.live_deployment_version_id).not.toBe(before?.live_deployment_version_id);
+
+    const liveVersion = await database
+      .prepare("SELECT version_number FROM agent_deployment_version WHERE id = ?")
+      .bind(after?.live_deployment_version_id ?? "")
+      .first<{ version_number: number }>();
+
+    expect(liveVersion?.version_number).toBe(2);
+  });
+
+  test("provisions a multi-agent repo with per-agent exposed flags in facts", async () => {
+    const { bindings, database } = await createFixture();
+
+    const { runRow, state } = await dispatchRepo(bindings, database, {
+      ".agent/agents/support/manifest.json": openaiAgentManifest("support"),
+      ".agent/agents/triage/manifest.json": openaiAgentManifest("triage"),
+      ".agent/manifest.json": openaiAgentManifest("concierge"),
+      ".mosoo.toml": `spec = "${MOSOO_NATIVE_SPEC}"\n\n[expose]\nagents = ["concierge", "support"]\n`,
+    });
+
+    expect(runRow).toMatchObject({
+      errorCode: null,
+      status: "success",
+      targetKind: null,
+      url: null,
+    });
+    expect(state.buildCount).toBe(0);
+    expect(state.deployCount).toBe(0);
+
+    const native = parseNativeDeploymentRunResult(runRow.nativeResultJson);
+
+    expect(native?.facts).toEqual({
+      agentCount: 3,
+      agents: [
+        { action: "created", exposed: true, name: "concierge", versionNumber: 1 },
+        { action: "created", exposed: true, name: "support", versionNumber: 1 },
+        { action: "created", exposed: false, name: "triage", versionNumber: 1 },
+      ],
+      specVersion: MOSOO_NATIVE_SPEC,
+      web: { declared: false },
+    });
+
+    // The internal agent is provisioned and published like the exposed ones;
+    // only the facts flag differs.
+    for (const name of ["concierge", "support", "triage"]) {
+      const row = await readAgentRowByName(database, name);
+
+      expect(row?.status).toBe("published");
+      expect(row?.live_deployment_version_id).toBeTruthy();
+    }
+
+    // The stored native_result_json survives the GraphQL mapper unchanged
+    // (toAppDeploymentRun parses it via the contracts helper).
+    const runs = await listAppDeploymentRuns(bindings, OWNER_VIEWER, APP_ID, 10);
+
+    expect(runs[0]?.native).not.toBeNull();
+    expect(runs[0]?.native).toEqual(native);
+  });
+
+  test("fails with native_agent_name_ambiguous when a repo name matches two agents", async () => {
+    const { bindings, database } = await createFixture();
+
+    await seedDraftAgent(database, "01J000000000000000000000D1", "quiz-master");
+    await seedDraftAgent(database, "01J000000000000000000000D2", "quiz-master");
+
+    const { runRow, state } = await dispatchRepo(bindings, database, {
+      ".agent/manifest.json": openaiAgentManifest("quiz-master"),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+
+    expect(runRow.status).toBe("failed");
+    expect(runRow.errorCode).toBe("native_agent_name_ambiguous");
+    expect(runRow.errorMessage).toContain('"quiz-master"');
+    expect(state.buildCount).toBe(0);
+    expect(state.deployCount).toBe(0);
+
+    const native = parseNativeDeploymentRunResult(runRow.nativeResultJson);
+
+    expect(native?.validate.valid).toBe(true);
+    expect(native?.facts?.agents).toEqual([
+      { action: "failed", exposed: true, name: "quiz-master" },
+    ]);
+    // Baseline fixture agent + the two seeded duplicates; nothing created.
+    expect(await countAppAgents(database)).toBe(3);
+  });
+
+  test("fails with native_setup_required and leaves the draft when secrets are pending", async () => {
+    const { bindings, database } = await createFixture();
+
+    const { runRow, state } = await dispatchRepo(bindings, database, {
+      ".agent/environment/definition.json": `${JSON.stringify(
+        {
+          expectedName: "Default",
+          secretNames: ["QUIZ_API_TOKEN"],
+          setupScript: "",
+        },
+        null,
+        2,
+      )}\n`,
+      ".agent/manifest.json": openaiAgentManifest("quiz-master", {
+        environment: { ref: "environment/definition.json" },
+      }),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+
+    expect(runRow.status).toBe("failed");
+    expect(runRow.errorCode).toBe("native_setup_required");
+    expect(runRow.errorMessage).toContain('Agent "quiz-master"');
+    expect(runRow.errorMessage).toContain("QUIZ_API_TOKEN");
+    expect(runRow.errorMessage).toContain("App settings");
+    expect(state.buildCount).toBe(0);
+    expect(state.deployCount).toBe(0);
+
+    const agent = await readAgentRowByName(database, "quiz-master");
+
+    expect(agent?.status).toBe("draft");
+    expect(agent?.live_deployment_version_id).toBeNull();
+
+    const native = parseNativeDeploymentRunResult(runRow.nativeResultJson);
+
+    expect(native?.validate.valid).toBe(true);
+    expect(native?.facts?.agents).toEqual([
+      { action: "failed", exposed: true, name: "quiz-master" },
+    ]);
+
+    // The failed run's native payload also round-trips through the mapper.
+    const status = await getAppDeploymentStatus(bindings, OWNER_VIEWER, APP_ID);
+
+    expect(status?.status).toBe("failed");
+    expect(status?.native).toEqual(native);
   });
 
   test("deploys an [expose.web] worker repo with the agent capability env var", async () => {
