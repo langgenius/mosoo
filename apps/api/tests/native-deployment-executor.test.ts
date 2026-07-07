@@ -22,6 +22,10 @@ import {
   listAppDeploymentRuns,
 } from "../src/modules/apps/application/app-deployment.service";
 import { validateNativeDeployment } from "../src/modules/apps/application/native-deployment-validator";
+import {
+  APP_AGENT_BOUND_PATH_PREFIX,
+  verifyAppAgentCapabilityToken,
+} from "../src/modules/public-api/app-agent-capability";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
@@ -719,6 +723,52 @@ describe("native deployment executor", () => {
     expect(native?.facts?.web).toEqual({ agent: "quiz-master", declared: true });
   });
 
+  test("binds [expose.web] to a NAMED non-primary agent's capability, not the primary", async () => {
+    const { bindings, database } = await createFixture();
+    const files = {
+      ".agent/agents/support/manifest.json": openaiAgentManifest("support"),
+      ".agent/manifest.json": openaiAgentManifest("concierge"),
+      ".mosoo.toml": `spec = "${MOSOO_NATIVE_SPEC}"\n\n[expose]\nagents = ["concierge", "support"]\n\n[expose.web]\nagent = "support"\n`,
+      "wrangler.toml": 'main = "worker.js"\n',
+      "worker.js": "export default { fetch: () => new Response('ok') };\n",
+    };
+
+    const { runRow, state } = await dispatchRepo(bindings, database, files);
+
+    expect(runRow).toMatchObject({
+      errorCode: null,
+      status: "success",
+      targetKind: "cloudflare_worker",
+    });
+
+    const plan = parsePlanJson(runRow);
+
+    // The stored plan binds the NAMED agent, not the defaulted primary.
+    expect(plan["agentBindings"]).toEqual([
+      { env: "MOSOO_AGENT_URL", expose: "public_thread", name: "support" },
+    ]);
+
+    const concierge = await readAgentRowByName(database, "concierge");
+    const support = await readAgentRowByName(database, "support");
+    const boundUrl = (state.deployedEnvVars ?? {})["MOSOO_AGENT_URL"] ?? "";
+    const prefix = `${bindings.WEB_ORIGIN}${APP_AGENT_BOUND_PATH_PREFIX}/`;
+
+    expect(boundUrl).toStartWith(prefix);
+
+    // Decode the self-authorizing capability token: it must grant the SUPPORT
+    // agent, proving the web env var resolves the named target rather than
+    // silently falling back to the primary (concierge).
+    const claims = await verifyAppAgentCapabilityToken(
+      bindings.RUNTIME_ACTION_TOKEN_SECRET,
+      boundUrl.slice(prefix.length),
+      Date.now(),
+    );
+
+    expect(claims?.agentId).toBe(support?.id);
+    expect(claims?.agentId).not.toBe(concierge?.id);
+    expect(claims?.expose).toBe("public_thread");
+  });
+
   test("honors an [expose.web] build override the package.json cannot infer", async () => {
     const { bindings, database } = await createFixture();
     const files = {
@@ -727,7 +777,10 @@ describe("native deployment executor", () => {
       // No default `build` script: bare detection would yield buildCommand=null
       // and deploy a Worker with no build step (broken/stale artifact) unless the
       // declared override is threaded through.
-      "package.json": JSON.stringify({ name: "worker", scripts: { "build:cf": "wrangler deploy" } }),
+      "package.json": JSON.stringify({
+        name: "worker",
+        scripts: { "build:cf": "wrangler deploy" },
+      }),
       "wrangler.toml": 'main = "worker.js"\n',
       "worker.js": "export default { fetch: () => new Response('ok') };\n",
     };
