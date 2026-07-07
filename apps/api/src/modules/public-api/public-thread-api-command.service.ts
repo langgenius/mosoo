@@ -1,7 +1,9 @@
 import type {
+  PublicThreadEventInput,
   PublicThreadApiSendEventsRequest,
   PublicThreadApiSendEventsResponse,
 } from "@mosoo/contracts/public-api";
+import type { AgentSessionEventInput } from "@mosoo/contracts/session";
 import { accountsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type { AccountId, PublicThreadId } from "@mosoo/id";
@@ -21,6 +23,7 @@ import {
   toPublicThreadEventBatch,
   toPublicThreadSessionSummary,
 } from "./public-thread-api-presenter";
+import { claimPublicThreadFiles } from "./public-thread-file-api.service";
 import { toBackingSessionId } from "./public-thread-ids";
 import { toPublicThreadSummary } from "./public-thread-presenter";
 import { admitPublicSessionCaller } from "./public-thread-session-query.service";
@@ -77,6 +80,29 @@ export interface UnarchivePublicThreadSessionRequest {
   threadId: PublicThreadId;
 }
 
+async function toAgentSessionEventInput(input: {
+  bindings: ApiBindings;
+  caller: AuthenticatedViewer;
+  event: PublicThreadEventInput;
+  threadId: PublicThreadId;
+}): Promise<AgentSessionEventInput> {
+  if (input.event.type !== "user_message") {
+    return input.event;
+  }
+
+  const fileIds = (input.event.resources ?? []).map((resource) => resource.file_id);
+  const attachmentIds = await claimPublicThreadFiles(input.bindings, input.caller, {
+    fileIds,
+    threadId: input.threadId,
+  });
+  const { resources: _resources, ...event } = input.event;
+
+  return {
+    ...event,
+    ...(attachmentIds.length === 0 ? {} : { attachmentIds }),
+  };
+}
+
 export async function sendPublicThreadSessionEvents(
   request: SendPublicThreadSessionEventsRequest,
 ): Promise<PublicThreadApiSendEventsResponse> {
@@ -87,11 +113,21 @@ export async function sendPublicThreadSessionEvents(
     request.threadId,
   );
   const accessViewer = await getAccountViewer(request.bindings.DB, admission.agent.ownerId);
+  const events = await Promise.all(
+    request.input.events.map((event) =>
+      toAgentSessionEventInput({
+        bindings: request.bindings,
+        caller: request.caller,
+        event,
+        threadId: request.threadId,
+      }),
+    ),
+  );
   const batch = await sendAgentSessionEvents({
     bindings: request.bindings,
     executionContext: request.executionContext,
     input: {
-      events: request.input.events,
+      events,
       appId: admission.session.app_id,
       sessionId,
     },

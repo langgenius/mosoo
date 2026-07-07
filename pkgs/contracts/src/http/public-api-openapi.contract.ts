@@ -2,18 +2,11 @@ import { PLATFORM_ID_INPUT_PATTERN } from "@mosoo/id";
 
 import { AGENT_KIND_VALUES } from "../agent/agent.contract.ts";
 import {
-  FILE_SESSION_KINDS,
-  FILE_STATUSES,
-  FILE_UPLOAD_STATUSES,
-  FILE_UPLOAD_STRATEGIES,
-} from "../file/file.contract";
-import {
   PUBLIC_API_ERROR_CODES,
   PUBLIC_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
   PUBLIC_THREAD_EVENT_LOG_STATUSES,
   PUBLIC_THREAD_EVENT_LOG_TYPES,
   PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
-  PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES,
   PUBLIC_THREAD_INPUT_TEXT_MAX_LENGTH,
   PUBLIC_THREAD_RUN_TERMINAL_STATUSES,
 } from "./public-api-core.contract";
@@ -50,10 +43,10 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
         additionalProperties: false,
         description: "Send a new user message into the Thread, optionally with file attachments.",
         properties: {
-          attachmentIds: {
+          resources: {
             description:
-              "File IDs (bare ULIDs) to attach to this message. Each file must already be uploaded and claimed into this Thread.",
-            items: PLATFORM_ID_SCHEMA,
+              "Files to attach to this message. Each file must be a ready draft file uploaded through the Agent file endpoint by the same Access Token caller.",
+            items: { $ref: "#/components/schemas/FileResource" },
             type: "array",
           },
           clientRequestId: {
@@ -131,235 +124,65 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
     required: ["events"],
     type: "object",
   },
-  CreateThreadFileRequest: {
+  FileResource: {
     additionalProperties: false,
-    description: "Request body for claiming a previously uploaded draft file handle into a Thread.",
+    description: "A file resource to mount into a Thread or user message.",
     properties: {
-      fileId: {
+      file_id: {
         ...createPublicApiPlatformIdSchema({
           maxLength: PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
           minLength: 1,
         }),
-        description:
-          "ID of a ready draft file (bare ULID) previously uploaded through the files data plane by the same Access Token caller.",
+        description: "ID of a ready draft file uploaded through the Agent file endpoint.",
+      },
+      type: {
+        const: "file",
+        description: "Resource discriminator. Only `file` is supported today.",
       },
     },
-    required: ["fileId"],
+    required: ["type", "file_id"],
     type: "object",
   },
-  CreateThreadFileUploadRequest: {
+  PublicFile: {
     additionalProperties: false,
-    description: "Request body for creating a files API upload session scoped to this Thread.",
-    properties: {
-      file: {
-        additionalProperties: false,
-        description: "Metadata for the file bytes that will be uploaded.",
-        properties: {
-          contentType: {
-            description: "MIME type for the file bytes.",
-            minLength: 1,
-            type: "string",
-          },
-          name: {
-            description: "Original file name to record for this Thread attachment.",
-            minLength: 1,
-            type: "string",
-          },
-          size: {
-            description:
-              "File size in bytes. Public Thread upload creation currently accepts single-put uploads only.",
-            maximum: PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES,
-            minimum: 0,
-            type: "integer",
-          },
-        },
-        required: ["name", "contentType", "size"],
-        type: "object",
-      },
-    },
-    required: ["file"],
-    type: "object",
-  },
-  FileUploadSummary: {
-    additionalProperties: false,
-    description: "Files API upload session summary returned after creating an upload target.",
-    properties: {
-      contentType: {
-        description: "Normalized MIME type the upload expects.",
-        type: "string",
-      },
-      expectedSize: {
-        description: "Expected file size in bytes for integrity validation.",
-        minimum: 0,
-        type: "integer",
-      },
-      expiresAt: {
-        description: "Timestamp (RFC 3339) when this upload session expires.",
-        format: "date-time",
-        type: "string",
-      },
-      fileId: {
-        ...createPublicApiPlatformIdSchema({
-          maxLength: PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
-          minLength: 1,
-        }),
-        description: "File ID (bare ULID) for this upload session.",
-      },
-      partSize: {
-        description: "Multipart part size in bytes, or null when the upload uses single PUT.",
-        minimum: 1,
-        type: ["integer", "null"],
-      },
-      path: {
-        description: "Materialized file path exposed by the files API upload summary.",
-        minLength: 1,
-        type: "string",
-      },
-      status: {
-        description: "Current files API upload session status.",
-        enum: FILE_UPLOAD_STATUSES,
-      },
-      strategy: {
-        description: "Files API upload transfer strategy selected for the file size.",
-        enum: FILE_UPLOAD_STRATEGIES,
-      },
-    },
-    required: [
-      "contentType",
-      "expectedSize",
-      "expiresAt",
-      "fileId",
-      "partSize",
-      "path",
-      "status",
-      "strategy",
-    ],
-    type: "object",
-  },
-  CompleteFileUploadPart: {
-    additionalProperties: false,
-    description:
-      "A completed multipart upload part. Public Thread MVP uploads use single PUT and do not send parts.",
-    properties: {
-      etag: {
-        description: "ETag returned by the uploaded multipart part.",
-        minLength: 1,
-        type: "string",
-      },
-      partNumber: {
-        description: "One-based multipart part number for completion ordering.",
-        minimum: 1,
-        type: "integer",
-      },
-    },
-    required: ["etag", "partNumber"],
-    type: "object",
-  },
-  CompleteFileUploadRequest: {
-    additionalProperties: false,
-    description:
-      "Request body for completing a files API upload session. Public Thread MVP single PUT uploads send an empty object.",
-    properties: {
-      parts: {
-        description:
-          "Multipart completion parts. Omit this field for public MVP single PUT uploads.",
-        items: { $ref: "#/components/schemas/CompleteFileUploadPart" },
-        type: "array",
-      },
-    },
-    required: [],
-    type: "object",
-  },
-  FileEntry: {
-    additionalProperties: false,
-    description: "Files API file entry returned after an upload completes.",
+    description: "Public file metadata.",
     properties: {
       createdAt: {
         description: "Timestamp (RFC 3339) at which the file record was created.",
         format: "date-time",
         type: "string",
       },
-      createdBy: {
-        ...PLATFORM_ID_SCHEMA,
-        description: "Account ID (bare ULID) that created the file record.",
-      },
-      etag: {
-        description: "Storage ETag for the finalized object, or null when unavailable.",
-        type: ["string", "null"],
-      },
-      expiresAt: {
-        description: "Expiration timestamp for temporary files, or null for durable Thread files.",
-        format: "date-time",
-        type: ["string", "null"],
-      },
       id: {
         ...createPublicApiPlatformIdSchema({
           maxLength: PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
           minLength: 1,
         }),
-        description: "File ID (bare ULID) for the finalized file.",
+        description: "File ID (bare ULID).",
       },
       mimeType: {
-        description: "Stored MIME type for the file bytes, or null when unknown.",
+        description: "Detected MIME type of the file, or null when unknown.",
         type: ["string", "null"],
       },
       name: {
-        description: "Original file name recorded for this file.",
+        description: "Original file name.",
         type: "string",
-      },
-      path: {
-        description: "Files API record path for the finalized file.",
-        minLength: 1,
-        type: "string",
-      },
-      sessionKind: {
-        description: "Session file kind for Thread-scoped files, or null for non-session files.",
-        enum: [...FILE_SESSION_KINDS, null],
       },
       size: {
-        description: "Finalized file size in bytes.",
+        description: "File size in bytes.",
         minimum: 0,
         type: "integer",
       },
-      status: {
-        description: "Current files API file lifecycle status.",
-        enum: FILE_STATUSES,
-      },
-      updatedAt: {
-        description: "Timestamp (RFC 3339) at which the file record was last updated.",
-        format: "date-time",
-        type: "string",
-      },
-      version: {
-        description: "Monotonic file version number within its path.",
-        minimum: 1,
-        type: "integer",
-      },
     },
-    required: [
-      "createdAt",
-      "createdBy",
-      "etag",
-      "expiresAt",
-      "id",
-      "mimeType",
-      "name",
-      "path",
-      "sessionKind",
-      "size",
-      "status",
-      "updatedAt",
-      "version",
-    ],
+    required: ["createdAt", "id", "mimeType", "name", "size"],
     type: "object",
   },
-  CompleteFileUploadResponse: {
+  PublicFileResponse: {
     additionalProperties: false,
-    description: "Result of completing a files API upload session.",
+    description: "A single public file.",
     properties: {
       file: {
-        $ref: "#/components/schemas/FileEntry",
-        description: "Completed files API file entry.",
+        $ref: "#/components/schemas/PublicFile",
+        description: "Public file metadata.",
       },
     },
     required: ["file"],
@@ -515,23 +338,10 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
         maxLength: PUBLIC_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
         type: "string",
       },
-      files: {
-        description: "Draft file handles uploaded by the same Access Token caller.",
-        items: {
-          additionalProperties: false,
-          description: "Reference to a single uploaded draft file to attach to the Thread.",
-          properties: {
-            file_id: {
-              ...createPublicApiPlatformIdSchema({
-                maxLength: PUBLIC_THREAD_FILE_ID_MAX_LENGTH,
-                minLength: 1,
-              }),
-              description: "ID (bare ULID) of a ready draft file uploaded by the same caller.",
-            },
-          },
-          required: ["file_id"],
-          type: "object",
-        },
+      resources: {
+        description:
+          "Files uploaded through the Agent file endpoint and mounted into the first Run.",
+        items: { $ref: "#/components/schemas/FileResource" },
         type: "array",
       },
       input: {

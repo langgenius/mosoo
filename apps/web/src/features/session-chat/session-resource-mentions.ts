@@ -6,6 +6,11 @@ export interface SessionResourceMention {
 
 export type DraftSessionResourceMentions = Record<string, SessionResourceMention[]>;
 
+export interface SessionResourceMentionMessagePayload {
+  attachmentIds: string[];
+  text: string;
+}
+
 function uniqueMentions(mentions: SessionResourceMention[]): SessionResourceMention[] {
   const seen = new Set<string>();
   const unique: SessionResourceMention[] = [];
@@ -43,6 +48,16 @@ export function appendSessionResourceMentionsToMessage(
   }
 
   return `${trimmedMessage}\n\n${paths.join("\n")}`;
+}
+
+export function createSessionResourceMentionMessagePayload(input: {
+  mentions: SessionResourceMention[];
+  message: string;
+}): SessionResourceMentionMessagePayload {
+  return {
+    attachmentIds: input.mentions.map((mention) => mention.id),
+    text: appendSessionResourceMentionsToMessage(input.message, input.mentions),
+  };
 }
 
 export function appendDraftSessionResourceMention(

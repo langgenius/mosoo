@@ -5,7 +5,6 @@ import {
   PUBLIC_THREAD_API_THREADS_MAX_LIMIT,
   PUBLIC_THREAD_EVENTS_DEFAULT_LIMIT,
   PUBLIC_THREAD_EVENTS_MAX_LIMIT,
-  PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES,
   PUBLIC_API_VERSION,
 } from "@mosoo/contracts/public-api";
 
@@ -49,7 +48,6 @@ interface PublicApiOpenApiDocument {
 const EXAMPLE_AGENT_ID = "01J00000000000000000000001";
 const EXAMPLE_THREAD_ID = "01J00000000000000000000009";
 const EXAMPLE_FILE_ID = "01J0000000000000000000000J";
-const EXAMPLE_ACCOUNT_ID = "01J00000000000000000000002";
 const ACCESS_TOKEN_SECURITY: Array<Record<string, []>> = [{ accessToken: [] }];
 
 const EXAMPLE_SESSION_FILE = {
@@ -62,31 +60,12 @@ const EXAMPLE_SESSION_FILE = {
   size: 19,
 };
 
-const EXAMPLE_FILE_UPLOAD_SUMMARY = {
-  contentType: "text/plain",
-  expectedSize: 19,
-  expiresAt: "2026-05-20T00:02:00.000Z",
-  fileId: EXAMPLE_FILE_ID,
-  partSize: null,
-  path: `session-files/${EXAMPLE_FILE_ID}/brief.txt`,
-  status: "pending",
-  strategy: "single_put",
-};
-
-const EXAMPLE_FILE_ENTRY = {
+const EXAMPLE_PUBLIC_FILE = {
   createdAt: "2026-05-19T00:02:00.000Z",
-  createdBy: EXAMPLE_ACCOUNT_ID,
-  etag: "etag-1",
-  expiresAt: null,
   id: EXAMPLE_FILE_ID,
   mimeType: "text/plain",
   name: "brief.txt",
-  path: `session-files/${EXAMPLE_FILE_ID}/brief.txt`,
-  sessionKind: "attachment",
   size: 19,
-  status: "ready",
-  updatedAt: "2026-05-19T00:03:00.000Z",
-  version: 1,
 };
 
 function platformIdPathParameter(input: {
@@ -212,17 +191,24 @@ function jsonRequestBodyExamples(
   };
 }
 
-function binaryRequestBody(description: string) {
+function multipartFileRequestBody() {
   return {
     content: {
-      "application/octet-stream": {
+      "multipart/form-data": {
         schema: {
-          format: "binary",
-          type: "string",
+          additionalProperties: false,
+          properties: {
+            file: {
+              description: "File bytes to upload before attaching them to a Thread.",
+              format: "binary",
+              type: "string",
+            },
+          },
+          required: ["file"],
+          type: "object",
         },
       },
     },
-    description,
     required: true,
   };
 }
@@ -327,24 +313,21 @@ function operation(
 
 export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApiDocument {
   const paths = {
-    "/files/{fileId}/complete": {
+    "/agents/{agentId}/files": {
       post: operation({
         description:
-          "Completes a pending single PUT Thread file upload. The file must have been created through POST /threads/{threadId}/files/uploads, uploaded through PUT /files/{fileId}/content, and belong to a public Thread visible to the Access Token caller.",
-        parameters: [fileIdParameter],
-        requestBody: jsonRequestBody(
-          { $ref: "#/components/schemas/CompleteFileUploadRequest" },
-          {},
-        ),
+          "Uploads a file into the Agent API Endpoint's App draft scope before a Thread exists. Use the returned file ID in create-thread or send-events resources.",
+        parameters: [exampleAgentIdParameter],
+        requestBody: multipartFileRequestBody(),
         security: ACCESS_TOKEN_SECURITY,
         success: {
-          "200": jsonResponse(
-            "Completed files API upload.",
-            { $ref: "#/components/schemas/CompleteFileUploadResponse" },
-            { file: EXAMPLE_FILE_ENTRY },
+          "201": jsonResponse(
+            "Uploaded file.",
+            { $ref: "#/components/schemas/PublicFileResponse" },
+            { file: EXAMPLE_PUBLIC_FILE },
           ),
         },
-        summary: "Complete Thread file upload",
+        summary: "Upload an Agent file",
       }),
     },
     "/files/{fileId}/content": {
@@ -358,16 +341,31 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
         },
         summary: "Download Thread file content",
       }),
-      put: operation({
+    },
+    "/files/{fileId}": {
+      delete: operation({
         description:
-          "Uploads raw bytes for a pending single PUT Thread file upload. The file must have been created through POST /threads/{threadId}/files/uploads and belong to a public Thread visible to the Access Token caller.",
+          "Deletes a pre-Thread uploaded file or a file attached to a public Thread visible to the Access Token caller.",
         parameters: [fileIdParameter],
-        requestBody: binaryRequestBody("Raw file bytes for the upload session."),
         security: ACCESS_TOKEN_SECURITY,
         success: {
-          "200": okResponse("Uploaded."),
+          "200": okResponse("Deleted."),
         },
-        summary: "Upload Thread file content",
+        summary: "Delete a file",
+      }),
+      get: operation({
+        description:
+          "Returns public file metadata for a pre-Thread uploaded file or a file attached to a public Thread visible to the Access Token caller.",
+        parameters: [fileIdParameter],
+        security: ACCESS_TOKEN_SECURITY,
+        success: {
+          "200": jsonResponse(
+            "File metadata.",
+            { $ref: "#/components/schemas/PublicFileResponse" },
+            { file: EXAMPLE_PUBLIC_FILE },
+          ),
+        },
+        summary: "Retrieve file metadata",
       }),
     },
     "/agents/{agentId}/threads": {
@@ -416,7 +414,6 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
               summary: "Access Token with an uploaded file",
               value: {
                 client_external_ref: "linear-ENG-123",
-                files: [{ file_id: EXAMPLE_FILE_ID }],
                 input: {
                   content: [
                     {
@@ -426,6 +423,7 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
                   ],
                   type: "user.message",
                 },
+                resources: [{ file_id: EXAMPLE_FILE_ID, type: "file" }],
               },
             },
             accessTokenBasic: {
@@ -553,55 +551,6 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
           ),
         },
         summary: "List Thread files",
-      }),
-      post: operation({
-        description:
-          "Claims a ready draft file handle into this Thread. Upload file bytes through the files data plane first, then pass the resulting fileId here.",
-        parameters: [threadIdParameter],
-        security: ACCESS_TOKEN_SECURITY,
-        requestBody: jsonRequestBody(
-          {
-            $ref: "#/components/schemas/CreateThreadFileRequest",
-          },
-          {
-            fileId: EXAMPLE_SESSION_FILE.id,
-          },
-        ),
-        success: {
-          "201": jsonResponse(
-            "Created Thread file.",
-            { $ref: "#/components/schemas/ThreadFileResponse" },
-            { file: EXAMPLE_SESSION_FILE },
-          ),
-        },
-        summary: "Add a Thread file",
-      }),
-    },
-    "/threads/{threadId}/files/uploads": {
-      post: operation({
-        description: `Creates a files API upload session scoped to this Thread. The request only supplies file metadata; Mosoo resolves the backing App and Session from the Thread and creates a session attachment upload. MVP public uploads must be ${PUBLIC_THREAD_FILE_UPLOAD_MAX_BYTES} bytes or fewer and use single PUT.`,
-        parameters: [threadIdParameter],
-        security: ACCESS_TOKEN_SECURITY,
-        requestBody: jsonRequestBody(
-          {
-            $ref: "#/components/schemas/CreateThreadFileUploadRequest",
-          },
-          {
-            file: {
-              contentType: "text/plain",
-              name: "brief.txt",
-              size: 19,
-            },
-          },
-        ),
-        success: {
-          "201": jsonResponse(
-            "Created files API upload session.",
-            { $ref: "#/components/schemas/FileUploadSummary" },
-            EXAMPLE_FILE_UPLOAD_SUMMARY,
-          ),
-        },
-        summary: "Create a Thread file upload",
       }),
     },
     "/threads/{threadId}/files/{fileId}": {

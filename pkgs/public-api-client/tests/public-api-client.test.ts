@@ -20,6 +20,7 @@ interface RecordedRequest {
 
 const THREAD_ID = "01J00000000000000000000009";
 const RUN_ID = "01J0000000000000000000000A";
+const FILE_ID = "01J0000000000000000000000J";
 
 function threadResponse(status: "RUNNING" | "IDLE" = "RUNNING") {
   return {
@@ -70,6 +71,91 @@ function jsonResponse(value: unknown, status = 200): Response {
 }
 
 describe("MosooPublicThreadClient", () => {
+  test("maps createThread fileIds to public file resources", async () => {
+    const requests: RecordedRequest[] = [];
+    const fetchMock: typeof fetch = async (input, init) => {
+      const request = new Request(input, init);
+      requests.push({
+        body: await readRequestBody(request.clone()),
+        headers: request.headers,
+        method: request.method,
+        url: request.url,
+      });
+
+      return jsonResponse(
+        {
+          links: { thread: `/api/v1/threads/${THREAD_ID}` },
+          run: null,
+          thread: threadResponse("IDLE"),
+        } satisfies PublicThreadApiCreateThreadResponse,
+        201,
+      );
+    };
+    const client = new MosooPublicThreadClient({
+      baseUrl: "https://api.example.com",
+      fetch: fetchMock,
+      token: "mst_test",
+    });
+
+    await client.createThread({
+      agentId: "agent-1",
+      fileIds: [FILE_ID],
+      input: "Summarize the file.",
+    });
+
+    expect(requests[0]?.body).toEqual({
+      input: {
+        content: [{ text: "Summarize the file.", type: "text" }],
+        type: "user.message",
+      },
+      resources: [{ file_id: FILE_ID, type: "file" }],
+    });
+  });
+
+  test("uploads Agent files through multipart/form-data", async () => {
+    const fetchMock: typeof fetch = async (input, init) => {
+      const request = new Request(input, init);
+      const formData = await request.formData();
+      const file = formData.get("file");
+
+      expect(request.method).toBe("POST");
+      expect(request.url).toBe("https://api.example.com/api/v1/agents/agent-1/files");
+      expect(request.headers.get("Authorization")).toBe("Bearer mst_test");
+      expect(request.headers.get("Content-Type")).toStartWith("multipart/form-data;");
+      expect(file).toBeInstanceOf(File);
+      expect(file).toMatchObject({
+        name: "brief.txt",
+        size: 12,
+      });
+
+      return jsonResponse(
+        {
+          file: {
+            createdAt: "2026-05-19T00:00:00.000Z",
+            id: FILE_ID,
+            mimeType: "text/plain",
+            name: "brief.txt",
+            size: 12,
+          },
+        },
+        201,
+      );
+    };
+    const client = new MosooPublicThreadClient({
+      baseUrl: "https://api.example.com",
+      fetch: fetchMock,
+      token: "mst_test",
+    });
+
+    const response = await client.uploadAgentFile({
+      agentId: "agent-1",
+      file: new Blob([new TextEncoder().encode("Hello file.\n")], { type: "text/plain" }),
+      filename: "brief.txt",
+    });
+
+    expect(response.file.id).toBe(FILE_ID);
+  });
+
   test("creates a Thread, waits for completion, and reconstructs final output by run", async () => {
     const requests: RecordedRequest[] = [];
     const fetchMock: typeof fetch = async (input, init) => {

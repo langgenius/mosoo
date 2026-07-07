@@ -1,4 +1,3 @@
-import type { CompleteFileUploadRequest } from "@mosoo/contracts/file";
 import { PUBLIC_API_VERSION_PREFIX } from "@mosoo/contracts/public-api";
 import type { PublicThreadId } from "@mosoo/id";
 import { Hono } from "hono";
@@ -7,6 +6,7 @@ import type { Context } from "hono";
 import type { PersonalAccessTokenCaller } from "../../../modules/auth/application/personal-access-token.service";
 import { parseBoundAgentCallBody } from "../../../modules/public-api/app-agent-bound-call";
 import { renderBoundAgentCallError } from "../../../modules/public-api/app-agent-bound-errors";
+import { publicInvalidRequest } from "../../../modules/public-api/public-api-errors";
 import { hashPublicApiIdempotencyBody } from "../../../modules/public-api/public-api-idempotency.service";
 import { listAgentApiEndpointThreads } from "../../../modules/public-api/public-thread-session-query.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
@@ -28,13 +28,14 @@ import {
   parseThreadEventsLimit,
   readBoundAgentCallRequestBody,
   readCreateThreadRequest,
-  readCreateThreadFileRequest,
-  readCreateThreadFileUploadRequest,
   readSendEventsRequest,
 } from "./public-thread-api-request";
 import type { ParsedCreateThreadRequest } from "./public-thread-api-request";
 
 type PublicApiRouteContext = Context<ApiGatewayEnvironment>;
+interface PublicAgentFileUploadRequest {
+  file: File;
+}
 type PublicThreadFileService = Awaited<ReturnType<typeof loadPublicThreadFileService>>;
 
 async function loadPublicThreadCommandService() {
@@ -82,6 +83,19 @@ async function hashCreateThreadIdempotencyBody(
     fileIds: body.fileIds,
     inputText: body.inputText ?? null,
   });
+}
+
+async function readPublicAgentFileUploadRequest(
+  c: PublicApiRouteContext,
+): Promise<PublicAgentFileUploadRequest> {
+  const formData = await c.req.raw.formData();
+  const file = formData.get("file");
+
+  if (!(file instanceof File)) {
+    throw publicInvalidRequest("multipart/form-data field `file` is required.");
+  }
+
+  return { file };
 }
 
 export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
@@ -133,6 +147,21 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
       status: 201,
     });
   });
+
+  v1.post("/agents/:agentId/files", async (c) =>
+    runPublicApiThreadMutation(c, {
+      agentId: () => parseAgentIdParam(c.req.param("agentId")),
+      operation: async ({ agentId, caller, prepared }) => {
+        const service = await loadPublicThreadFileService();
+        return service.createPublicAgentFile(c.env, caller, {
+          agentId,
+          file: prepared.file,
+        });
+      },
+      prepare: async () => readPublicAgentFileUploadRequest(c),
+      status: 201,
+    }),
+  );
 
   v1.get("/threads/:threadId", async (c) =>
     runPublicApiThreadReadJson(c, {
@@ -206,24 +235,22 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
     }),
   );
 
-  v1.put("/files/:fileId/content", async (c) =>
+  v1.get("/files/:fileId", async (c) =>
     runPublicApiAuthenticatedJson(c, async (caller) => {
       const service = await loadPublicThreadFileService();
-      await service.putPublicThreadFileContent(c.env, caller.viewer, {
-        body: c.req.raw.body,
-        fileId: parseFileIdParam(c.req.param("fileId")),
-      });
-      return { ok: true };
+      return service.retrievePublicFile(
+        c.env,
+        caller.viewer,
+        parseFileIdParam(c.req.param("fileId")),
+      );
     }),
   );
 
-  v1.post("/files/:fileId/complete", async (c) =>
+  v1.delete("/files/:fileId", async (c) =>
     runPublicApiAuthenticatedJson(c, async (caller) => {
       const service = await loadPublicThreadFileService();
-      return service.completePublicThreadFileUpload(c.env, caller.viewer, {
-        fileId: parseFileIdParam(c.req.param("fileId")),
-        request: await c.req.json<CompleteFileUploadRequest>(),
-      });
+      await service.deletePublicFile(c.env, caller.viewer, parseFileIdParam(c.req.param("fileId")));
+      return { ok: true };
     }),
   );
 
@@ -300,34 +327,6 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
   v1.get("/threads/:threadId/files", async (c) =>
     runPublicThreadFileRoute(c, async ({ caller, service, threadId }) =>
       service.listPublicThreadFiles(c.env, caller.viewer, threadId),
-    ),
-  );
-
-  v1.post("/threads/:threadId/files", async (c) =>
-    runPublicThreadFileRoute(
-      c,
-      async ({ caller, service, threadId }) =>
-        service.createPublicThreadFile(
-          c.env,
-          caller.viewer,
-          threadId,
-          await readCreateThreadFileRequest(c),
-        ),
-      201,
-    ),
-  );
-
-  v1.post("/threads/:threadId/files/uploads", async (c) =>
-    runPublicThreadFileRoute(
-      c,
-      async ({ caller, service, threadId }) =>
-        service.createPublicThreadFileUpload(
-          c.env,
-          caller.viewer,
-          threadId,
-          await readCreateThreadFileUploadRequest(c),
-        ),
-      201,
     ),
   );
 

@@ -11,7 +11,6 @@ import type {
 
 import type { AgentKind } from "../agent/agent.contract";
 import { SINGLE_PUT_THRESHOLD_BYTES } from "../file/file.contract";
-import type { CreateFileUploadRequest } from "../file/file.contract";
 import type { UserWarning } from "../session/session-run.contract";
 import {
   SESSION_PROCESS_EVENT_STATUSES,
@@ -111,10 +110,15 @@ export type PublicThreadEventType = "permission_decision" | "user_interrupt" | "
 
 export type PublicThreadPermissionDecision = "allow_once" | "reject_once";
 
+export interface PublicThreadFileResourceInput {
+  file_id: FileId;
+  type: "file";
+}
+
 export type PublicThreadEventInput =
   | {
-      attachmentIds?: FileId[];
       clientRequestId?: string | null;
+      resources?: PublicThreadFileResourceInput[];
       text: string;
       type: "user_message";
     }
@@ -207,12 +211,16 @@ export interface PublicThreadApiListThreadEventsResponse {
   truncated: boolean;
 }
 
-export interface CreatePublicThreadFileRequest {
-  fileId: FileId;
+export interface PublicFile {
+  createdAt: string;
+  id: FileId;
+  mimeType: string | null;
+  name: string;
+  size: number;
 }
 
-export interface CreatePublicThreadFileUploadRequest {
-  file: CreateFileUploadRequest["file"];
+export interface PublicFileResponse {
+  file: PublicFile;
 }
 
 export interface PublicThreadFile {
@@ -223,10 +231,6 @@ export interface PublicThreadFile {
   mimeType: string | null;
   name: string;
   size: number;
-}
-
-export interface PublicThreadFileResponse {
-  file: PublicThreadFile;
 }
 
 export interface PublicThreadFileListResponse {
