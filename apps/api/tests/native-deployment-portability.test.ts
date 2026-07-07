@@ -339,6 +339,15 @@ async function readAppSlug(database: SqliteD1Database): Promise<string | null> {
   return row?.slug ?? null;
 }
 
+async function readAgentIdByName(database: SqliteD1Database, name: string): Promise<string | null> {
+  const row = await database
+    .prepare("SELECT id FROM agent WHERE app_id = ? AND name = ?")
+    .bind(APP_ID, name)
+    .first<{ id: string }>();
+
+  return row?.id ?? null;
+}
+
 async function readAgentDeploymentRows(
   database: SqliteD1Database,
 ): Promise<AgentDeploymentAssertionRow[]> {
@@ -456,6 +465,15 @@ async function proveNameAddressedAgentAnswers(database: SqliteD1Database): Promi
   const run = expectRecord(createBody["run"]);
   const threadId = expectString(thread["id"]);
   const runId = expectString(run["id"]);
+
+  // Real name→agent resolution proof: the thread the name-addressed route
+  // created must be attributed to the provisioned `concierge` agent, not any
+  // other App agent. Without this the events round-trip below only proves the
+  // events endpoint echoes a hand-inserted row.
+  const conciergeAgentId = await readAgentIdByName(database, "concierge");
+
+  expect(conciergeAgentId).not.toBeNull();
+  expect(expectString(thread["agent_id"])).toBe(conciergeAgentId);
 
   await database.prepare("DELETE FROM session_event WHERE session_id = ?").bind(threadId).run();
 
