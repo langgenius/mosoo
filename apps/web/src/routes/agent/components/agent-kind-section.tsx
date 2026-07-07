@@ -9,10 +9,9 @@ import { toAgentId, toAppId } from "@/routes/typed-id";
 
 import type { Agent, AgentKind } from "../agent.types";
 import { KindForkDialog } from "../lifecycle/kind-fork-dialog";
-import { KindLockBanner } from "./kind-lock-banner";
 import { KindSelector } from "./kind-selector";
 
-// Encapsulates the Agent Type selector, comparison panel, lock banner, and Fork
+// Encapsulates the Agent Type selector, comparison panel, lock hint, and Fork
 // dialog. Mounted at the top of the Preview configuration panel.
 // Lock state starts at first publish and stays locked after unpublish because
 // the live version snapshot remains attached to the original agent.
@@ -81,10 +80,11 @@ export function AgentKindSection({
       <KindSelector
         value={agent.kind}
         locked={locked}
+        canFork={canFork}
         onChange={handleKindChange}
+        onFork={handleClickFork}
         onLockedCardClick={handleLockedCardClick}
       />
-      {locked ? <KindLockBanner canFork={canFork} onClickFork={handleClickFork} /> : null}
       {forkDialog ? (
         <KindForkDialog
           agentName={agent.name}

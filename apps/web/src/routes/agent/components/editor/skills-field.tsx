@@ -1,10 +1,9 @@
 import type { SkillSummary } from "@mosoo/contracts/skill";
-import { ChevronDown, ExternalLink } from "lucide-react";
+import { ExternalLink, Plus } from "lucide-react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
 
-import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,12 +60,12 @@ export function AgentSkillsField({
 
   return (
     <div>
-      {selectedSkills.length > 0 ? (
-        <div className="space-y-1.5">
+      {selectedSkills.length > 0 || !readOnly ? (
+        <div className="border-border divide-border-subtle divide-y overflow-hidden rounded-lg border">
           {selectedSkills.map((skill) => (
             <div
               key={skill.id}
-              className="group hover:bg-accent/30 flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors"
+              className="group hover:bg-accent/30 flex items-center gap-3 px-3 py-2.5 transition-colors"
             >
               <button
                 className="min-w-0 flex-1 cursor-pointer bg-transparent p-0 text-left"
@@ -97,42 +96,37 @@ export function AgentSkillsField({
               ) : null}
             </div>
           ))}
-        </div>
-      ) : null}
 
-      {!readOnly ? (
-        <div className="mt-2">
-          <DropdownMenu onOpenChange={setOpen} open={open}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                className="w-full justify-between"
-                disabled={model.skillsLoading}
-                type="button"
-                variant="outline"
-              >
-                <span className="text-foreground truncate text-left text-[13px] font-medium">
-                  {triggerLabel}
-                </span>
-                <ChevronDown className="text-muted-foreground size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              className="max-h-[320px] w-[var(--anchor-width)] overflow-y-auto"
-            >
-              {dropdownContent}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link
-                  className="text-muted-foreground flex w-full items-center gap-1.5 text-[12px]"
-                  to="/integrations/skills"
+          {!readOnly ? (
+            <DropdownMenu onOpenChange={setOpen} open={open}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="text-muted-foreground hover:bg-accent/30 hover:text-foreground flex w-full items-center gap-1.5 px-3 py-2.5 text-left text-[13px] font-medium transition-colors disabled:opacity-60"
+                  disabled={model.skillsLoading}
+                  type="button"
                 >
-                  <ExternalLink className="size-3" />
-                  Manage skills
-                </Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  <Plus className="size-3.5 shrink-0" />
+                  {triggerLabel}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="max-h-[320px] w-[var(--anchor-width)] overflow-y-auto"
+              >
+                {dropdownContent}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link
+                    className="text-muted-foreground flex w-full items-center gap-1.5 text-[12px]"
+                    to="/integrations/skills"
+                  >
+                    <ExternalLink className="size-3" />
+                    Manage skills
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
         </div>
       ) : null}
 

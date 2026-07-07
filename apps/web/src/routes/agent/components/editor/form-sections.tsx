@@ -118,7 +118,7 @@ export function BasicsSection({
               {agent.status === "published" ? (
                 <span
                   className="text-muted-foreground text-[11px]"
-                  title="Runtime cannot be changed in-place after publishing. Fork the Agent to switch."
+                  title="Runtime is locked after publishing. Fork the Agent to switch runtime; existing sessions, cost, logs, and agent-state stay attached here."
                 >
                   Locked · Fork Agent to switch
                 </span>
@@ -165,12 +165,6 @@ export function BasicsSection({
                 );
               })}
             </div>
-            {agent.status === "published" ? (
-              <div className="border-amber/30 bg-amber-bg text-amber-fg rounded-lg border px-3 py-2.5 text-[12px] leading-relaxed">
-                Runtime is locked after publishing. Fork the Agent to switch runtime; existing
-                sessions, cost, logs, and agent-state stay attached here.
-              </div>
-            ) : null}
           </div>
 
           <ModelPickerField model={model} appId={agent.appId} readOnly={readOnly} />

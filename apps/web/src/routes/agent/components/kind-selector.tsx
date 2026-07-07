@@ -28,12 +28,16 @@ const COMPARE_ICONS = {
 export function KindSelector({
   value,
   locked,
+  canFork = false,
   onChange,
+  onFork,
   onLockedCardClick,
 }: {
   value: AgentKind;
   locked: boolean;
+  canFork?: boolean;
   onChange: (kind: AgentKind) => void;
+  onFork?: () => void;
   onLockedCardClick?: (target: AgentKind) => void;
 }) {
   const [compareOpen, setCompareOpen] = useState(false);
@@ -44,9 +48,25 @@ export function KindSelector({
         <div className="min-w-0">
           <h2 className="text-foreground text-[13px] font-semibold">Agent type</h2>
           <p className="text-fg-3 mt-0.5 text-[12px] leading-relaxed">
-            {locked
-              ? "Locked after publishing. Fork to switch type."
-              : "Choose how this agent runs. You can change this freely until you publish."}
+            {locked ? (
+              <>
+                Agent type is locked after publishing. Fork to switch type; sessions, cost, logs,
+                and agent-state stay attached here.{" "}
+                {canFork && onFork ? (
+                  <button
+                    className="text-brand focus-visible:ring-brand-ring rounded-sm font-medium hover:underline focus-visible:ring-2 focus-visible:outline-none"
+                    onClick={onFork}
+                    type="button"
+                  >
+                    Fork agent
+                  </button>
+                ) : (
+                  "Contact owner to fork."
+                )}
+              </>
+            ) : (
+              "Choose how this agent runs. You can change this freely until you publish."
+            )}
           </p>
         </div>
 
