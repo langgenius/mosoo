@@ -117,3 +117,56 @@ describe("App overview boundary", () => {
     expect(cjk.test(installSource)).toBe(false);
   });
 });
+
+describe("Deploy console native boundary", () => {
+  test("names what detection found instead of a detecting placeholder", () => {
+    const historySource = readSource(
+      "../src/routes/app-overview/deploy/components/deployments-history.tsx",
+    );
+    const dataSource = readSource("../src/routes/app-overview/deploy/deploy-console-data.ts");
+
+    expect(historySource).not.toContain("detecting target");
+    expect(historySource).toContain("deployTargetLine");
+    expect(historySource).toContain('data-testid="deploy-run-row"');
+    expect(historySource).toContain('data-testid="deploy-run-detection"');
+    expect(historySource).toContain('data-testid="deploy-run-details"');
+    expect(historySource).toContain('data-testid="deploy-failure-row"');
+    expect(historySource).toContain('data-testid="deploy-provision-row"');
+
+    expect(dataSource).toContain("mosoo-native");
+    expect(dataSource).toContain('agent_only: "agent api"');
+    expect(dataSource).toContain('"agent-only" | "native-red" | "web" | "web-and-agents"');
+    expect(dataSource).toContain("native_validation_failed");
+    expect(dataSource).toContain("native.setup.environment_secret");
+  });
+
+  test("gives agent-only deploys an agents hero and hides the web production rows", () => {
+    const overviewSource = readSource(
+      "../src/routes/app-overview/deploy/components/deploy-overview.tsx",
+    );
+    const urlCardSource = readSource(
+      "../src/routes/app-overview/deploy/components/deploy-url-card.tsx",
+    );
+    const repoCardSource = readSource(
+      "../src/routes/app-overview/deploy/components/deploy-repo-card.tsx",
+    );
+
+    expect(overviewSource).toContain('data-testid="deploy-agents-card"');
+    expect(overviewSource).toContain("Deployed agents");
+    expect(urlCardSource).toContain("Agent API only · no production web URL");
+    expect(repoCardSource).toContain(
+      "Auto-detects static, worker or agent-only · .mosoo.toml optional override",
+    );
+    expect(repoCardSource).not.toContain("Auto-detects static or worker");
+  });
+
+  test("keeps the acceptance route covering all four exposure scenarios", () => {
+    const previewSource = readSource(
+      "../src/routes/app-overview/deploy/v0-deploy-preview.route.tsx",
+    );
+
+    expect(previewSource).toContain('"web", "agent-only", "web-and-agents", "native-red"');
+    expect(previewSource).toContain("Fixture scenario");
+    expect(previewSource).toContain("Simulate failed deploy");
+  });
+});
