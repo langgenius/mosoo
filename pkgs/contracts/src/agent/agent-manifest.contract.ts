@@ -37,6 +37,45 @@ export interface AgentResolutionIssue {
   targetType: AgentResolutionTargetType;
 }
 
+/**
+ * Issue codes minted by the shared Agent package validation surface: the
+ * package manifest checks (`collectPackageIssues`) plus the archive sidecar
+ * validators in `@mosoo/agent-package`. `AgentResolutionIssue.code` stays a
+ * plain string on the wire (other resolution surfaces mint their own codes),
+ * but every minting site of THIS dialect and every downstream mapping layer
+ * (agent package import, native deployment validate) must reference these
+ * constants instead of raw strings so the reuse boundary cannot drift.
+ */
+export const AGENT_PACKAGE_ISSUE_CODES = {
+  environmentFieldUnsupported: "package.environment.field.unsupported",
+  environmentInvalid: "package.environment.invalid",
+  environmentMissing: "package.environment.missing",
+  environmentRefUnsupported: "package.environment.ref.unsupported",
+  environmentSecretForbidden: "package.environment.secret_forbidden",
+  fieldForbidden: "package.field.forbidden",
+  fieldUnsupported: "package.field.unsupported",
+  manifestKindMissing: "manifest.kind.missing",
+  manifestModelMissing: "manifest.model.missing",
+  manifestNameMissing: "manifest.metadata.name.missing",
+  manifestPromptMissing: "manifest.prompt.missing",
+  manifestRuntimeMissing: "manifest.runtime.missing",
+  manifestVersionUnsupported: "manifest.version.unsupported",
+  mcpFieldUnsupported: "package.mcp.field.unsupported",
+  mcpMissing: "package.mcp.missing",
+  mcpNameMissing: "package.mcp.name.missing",
+  mcpRefMismatch: "package.mcp.ref.mismatch",
+  mcpRefMissing: "package.mcp.ref.missing",
+  mcpSecretForbidden: "package.mcp.secret_forbidden",
+  mcpUndeclared: "package.mcp.undeclared",
+  mcpUnsupported: "package.mcp.unsupported",
+  mcpUrlInvalid: "package.mcp.url.invalid",
+  packageSecretForbidden: "package.secret_forbidden",
+  packageVersionUnsupported: "package.version.unsupported",
+} as const;
+
+export type AgentPackageIssueCode =
+  (typeof AGENT_PACKAGE_ISSUE_CODES)[keyof typeof AGENT_PACKAGE_ISSUE_CODES];
+
 export interface AgentManifestValidationResult {
   issues: AgentResolutionIssue[];
   manifest: AgentManifest | null;

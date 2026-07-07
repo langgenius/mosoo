@@ -7,6 +7,7 @@ import {
   readString,
 } from "./agent-manifest-parser-internals.contract";
 import { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION } from "./agent-manifest-version.contract";
+import { AGENT_PACKAGE_ISSUE_CODES } from "./agent-manifest.contract";
 import type { AgentResolutionIssue } from "./agent-manifest.contract";
 import { AGENT_KIND_LIST_LABEL } from "./agent.contract";
 
@@ -123,7 +124,7 @@ export function collectPackageIssues(input: Record<string, unknown>): AgentResol
   if (input["packageVersion"] !== AGENT_PACKAGE_VERSION) {
     issues.push(
       createPackageIssue(
-        "package.version.unsupported",
+        AGENT_PACKAGE_ISSUE_CODES.packageVersionUnsupported,
         `Agent Package version must be ${AGENT_PACKAGE_VERSION}.`,
         "unsupported",
       ),
@@ -134,7 +135,7 @@ export function collectPackageIssues(input: Record<string, unknown>): AgentResol
     if (PACKAGE_MANIFEST_FORBIDDEN_FIELDS.has(field)) {
       issues.push(
         createPackageIssue(
-          "package.field.forbidden",
+          AGENT_PACKAGE_ISSUE_CODES.fieldForbidden,
           `Agent package manifest must not include ${field}.`,
           "unsupported",
         ),
@@ -145,7 +146,7 @@ export function collectPackageIssues(input: Record<string, unknown>): AgentResol
     if (!PACKAGE_MANIFEST_TOP_LEVEL_FIELDS.has(field)) {
       issues.push(
         createPackageIssue(
-          "package.field.unsupported",
+          AGENT_PACKAGE_ISSUE_CODES.fieldUnsupported,
           `Agent package manifest field ${field} is not supported in V1.`,
           "unsupported",
         ),
@@ -158,7 +159,7 @@ export function collectPackageIssues(input: Record<string, unknown>): AgentResol
   if (forbiddenSecretPath !== null) {
     issues.push(
       createPackageIssue(
-        "package.secret_forbidden",
+        AGENT_PACKAGE_ISSUE_CODES.packageSecretForbidden,
         `Agent package manifest must not include secret field ${forbiddenSecretPath}.`,
         "unsupported",
       ),
@@ -168,7 +169,7 @@ export function collectPackageIssues(input: Record<string, unknown>): AgentResol
   if (input["manifestVersion"] !== AGENT_MANIFEST_VERSION) {
     issues.push(
       createPackageIssue(
-        "manifest.version.unsupported",
+        AGENT_PACKAGE_ISSUE_CODES.manifestVersionUnsupported,
         `Agent Manifest version must be ${AGENT_MANIFEST_VERSION}.`,
         "unsupported",
       ),
@@ -181,29 +182,45 @@ export function collectPackageIssues(input: Record<string, unknown>): AgentResol
   if (kind === null) {
     issues.push(
       createPackageIssue(
-        "manifest.kind.missing",
+        AGENT_PACKAGE_ISSUE_CODES.manifestKindMissing,
         `Agent Manifest kind must be ${AGENT_KIND_LIST_LABEL}.`,
       ),
     );
   }
 
   if (!hasRequiredText(name)) {
-    issues.push(createPackageIssue("manifest.metadata.name.missing", "Manifest name is required."));
+    issues.push(
+      createPackageIssue(
+        AGENT_PACKAGE_ISSUE_CODES.manifestNameMissing,
+        "Manifest name is required.",
+      ),
+    );
   }
 
   if (!hasRequiredText(runtime)) {
-    issues.push(createPackageIssue("manifest.runtime.missing", "Manifest runtime is required."));
+    issues.push(
+      createPackageIssue(
+        AGENT_PACKAGE_ISSUE_CODES.manifestRuntimeMissing,
+        "Manifest runtime is required.",
+      ),
+    );
   }
 
   if (!hasRequiredText(provider) || !hasRequiredText(model)) {
     issues.push(
-      createPackageIssue("manifest.model.missing", "Manifest provider and model are required."),
+      createPackageIssue(
+        AGENT_PACKAGE_ISSUE_CODES.manifestModelMissing,
+        "Manifest provider and model are required.",
+      ),
     );
   }
 
   if (systemPrompt === null) {
     issues.push(
-      createPackageIssue("manifest.prompt.missing", "Manifest prompts.system is required."),
+      createPackageIssue(
+        AGENT_PACKAGE_ISSUE_CODES.manifestPromptMissing,
+        "Manifest prompts.system is required.",
+      ),
     );
   }
 
@@ -214,11 +231,11 @@ export function hasBlockingPackageIssue(issues: AgentResolutionIssue[]): boolean
   return issues.some(
     (issue) =>
       issue.status === "unsupported" ||
-      issue.code === "manifest.kind.missing" ||
-      issue.code === "manifest.metadata.name.missing" ||
-      issue.code === "manifest.runtime.missing" ||
-      issue.code === "manifest.model.missing" ||
-      issue.code === "manifest.prompt.missing",
+      issue.code === AGENT_PACKAGE_ISSUE_CODES.manifestKindMissing ||
+      issue.code === AGENT_PACKAGE_ISSUE_CODES.manifestNameMissing ||
+      issue.code === AGENT_PACKAGE_ISSUE_CODES.manifestRuntimeMissing ||
+      issue.code === AGENT_PACKAGE_ISSUE_CODES.manifestModelMissing ||
+      issue.code === AGENT_PACKAGE_ISSUE_CODES.manifestPromptMissing,
   );
 }
 
@@ -233,7 +250,7 @@ function collectEnvironmentCatalogIssues(value: unknown): AgentResolutionIssue[]
     if (!PACKAGE_ENVIRONMENT_CATALOG_FIELDS.has(field)) {
       issues.push(
         createPackageIssue(
-          "package.environment.field.unsupported",
+          AGENT_PACKAGE_ISSUE_CODES.environmentFieldUnsupported,
           `Environment catalog field ${field} is not supported in Agent packages.`,
           "unsupported",
         ),
@@ -246,7 +263,7 @@ function collectEnvironmentCatalogIssues(value: unknown): AgentResolutionIssue[]
   if (ref !== null && ref !== "environment/definition.json") {
     issues.push(
       createPackageIssue(
-        "package.environment.ref.unsupported",
+        AGENT_PACKAGE_ISSUE_CODES.environmentRefUnsupported,
         "Environment catalog ref must be environment/definition.json.",
         "unsupported",
       ),
@@ -274,7 +291,7 @@ function collectMcpCatalogIssues(value: unknown): AgentResolutionIssue[] {
     if (!hasRequiredText(name)) {
       issues.push(
         createPackageIssue(
-          "package.mcp.name.missing",
+          AGENT_PACKAGE_ISSUE_CODES.mcpNameMissing,
           "MCP server package declaration must include a name.",
           "unsupported",
         ),
@@ -284,7 +301,7 @@ function collectMcpCatalogIssues(value: unknown): AgentResolutionIssue[] {
     if (ref === null || !ref.startsWith(MCP_SIDECAR_REF_PREFIX)) {
       issues.push(
         createPackageIssue(
-          "package.mcp.ref.missing",
+          AGENT_PACKAGE_ISSUE_CODES.mcpRefMissing,
           `MCP server ${name ?? "(unknown)"} must reference .mcp.json instead of inline connection fields.`,
           "unsupported",
         ),
@@ -297,7 +314,7 @@ function collectMcpCatalogIssues(value: unknown): AgentResolutionIssue[] {
     if (hasRequiredText(name) && refName !== name) {
       issues.push(
         createPackageIssue(
-          "package.mcp.ref.mismatch",
+          AGENT_PACKAGE_ISSUE_CODES.mcpRefMismatch,
           `MCP server ${name} must use ref .mcp.json#${name}.`,
           "unsupported",
         ),
