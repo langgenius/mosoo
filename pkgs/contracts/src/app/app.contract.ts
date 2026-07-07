@@ -1,4 +1,5 @@
 import type { AgentKind, AgentStatus } from "../agent/agent.contract";
+import type { NativeDeploymentRunResult } from "../deployment/native-deployment-run.contract";
 import type {
   AccountId,
   AgentId,
@@ -33,7 +34,7 @@ export type AppDeploymentRunStatus =
   | "submitting"
   | "success";
 
-export type AppDeploymentTargetKind = "cloudflare_pages" | "cloudflare_worker";
+export type AppDeploymentTargetKind = "agent_only" | "cloudflare_pages" | "cloudflare_worker";
 
 export interface AppDeploymentRun {
   appId: AppId;
@@ -43,6 +44,8 @@ export interface AppDeploymentRun {
   errorMessage: string | null;
   id: AppDeploymentRunId;
   liveUrl: string | null;
+  /** Protocol-path run result (validate report + provisioning facts); null on legacy runs. */
+  native: NativeDeploymentRunResult | null;
   plannedUrl: string;
   sourceBranch: string;
   sourceCommitSha: string;

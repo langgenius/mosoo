@@ -19,6 +19,7 @@
     "./mcp": "./src/mcp/mcp.contract.ts",
     "./models": "./models/index.ts",
     "./native-deployment": "./src/deployment/native-deployment.contract.ts",
+    "./native-deployment-run": "./src/deployment/native-deployment-run.contract.ts",
     "./native-repo-fixtures": "./src/deployment/native-repo-fixtures.ts",
     "./operation-result": "./src/transport/operation-result.contract.ts",
     "./origin": "./src/metadata/origin.contract.ts",

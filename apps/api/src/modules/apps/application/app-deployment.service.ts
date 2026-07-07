@@ -4,6 +4,7 @@ import type {
   DeleteAppDeploymentInput,
   DeployAppInput,
 } from "@mosoo/contracts/app";
+import { parseNativeDeploymentRunResult } from "@mosoo/contracts/native-deployment-run";
 import type { ApiCommandId, AppDeploymentRunRow, AppDeploymentRow } from "@mosoo/db";
 import { apiCommandsTable, appDeploymentRunsTable, appDeploymentsTable } from "@mosoo/db";
 import type { AppDeploymentId, AppDeploymentRunId, AppId } from "@mosoo/id";
@@ -666,6 +667,7 @@ function toAppDeploymentRun(
     errorMessage: row.errorMessage,
     id: row.id,
     liveUrl: row.status === "success" && deployment.deletedAt === null ? row.url : null,
+    native: parseNativeDeploymentRunResult(row.nativeResultJson),
     plannedUrl: createPlannedUrl(deployment.mosooSubdomain, domain),
     sourceBranch: row.sourceBranch,
     sourceCommitSha: row.sourceCommitSha,

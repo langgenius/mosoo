@@ -36,6 +36,7 @@ export type DeploymentRunDisplayStatus = AppDeploymentRunStatus | "superseded";
 
 /** Short console labels for the detected deploy target. */
 export const DEPLOY_TARGET_LABELS: Record<AppDeploymentTargetKind, string> = {
+  agent_only: "agent api",
   cloudflare_pages: "static",
   cloudflare_worker: "worker",
 };

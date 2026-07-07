@@ -170,6 +170,8 @@ function toAppDeploymentRun(run: RawDeploymentRun): AppDeploymentRun {
     errorMessage: run.errorMessage,
     id: toAppDeploymentRunId(run.id),
     liveUrl: run.liveUrl,
+    // Native protocol run details are not part of the GraphQL selection yet.
+    native: null,
     plannedUrl: run.plannedUrl,
     sourceBranch: run.sourceBranch,
     sourceCommitSha: run.sourceCommitSha,
