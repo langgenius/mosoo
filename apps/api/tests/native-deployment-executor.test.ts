@@ -480,6 +480,7 @@ describe("native deployment executor", () => {
     const first = await dispatchRepo(bindings, database, files);
 
     expect(first.runRow.status).toBe("success");
+    expect(await readAppSlug(database)).toBe("default-app");
 
     const second = await dispatchRepo(bindings, database, files);
 
@@ -491,6 +492,8 @@ describe("native deployment executor", () => {
       { action: "unchanged", exposed: true, name: "quiz-master" },
     ]);
     expect(await countAppAgents(database)).toBe(2);
+    // The slug mint is idempotent across re-deploys of the same App.
+    expect(await readAppSlug(database)).toBe("default-app");
   });
 
   test("re-dispatching a modified manifest reports updated and flips the live pointer", async () => {
