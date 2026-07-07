@@ -366,5 +366,12 @@ describe("native deployment noun parity", () => {
       "/api/v1/apps/default-app/agents/concierge/threads",
       "/api/v1/apps/default-app/agents/support/threads",
     ]);
+
+    // US-17: the deploy status/list nouns carry the App OpenAPI URL, derived
+    // from the minted slug, so the CLI/console can point users at it.
+    const expectedOpenApiUrl = `https://mosoo.ai/api/v1/apps/${slug}/openapi.json`;
+
+    expect(status.appOpenApiUrl).toBe(expectedOpenApiUrl);
+    expect(latestRun.appOpenApiUrl).toBe(expectedOpenApiUrl);
   });
 });

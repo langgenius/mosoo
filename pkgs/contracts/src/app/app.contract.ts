@@ -44,6 +44,13 @@ export type AppDeploymentTargetKind = "agent_only" | "cloudflare_pages" | "cloud
 
 export interface AppDeploymentRun {
   appId: AppId;
+  /**
+   * Absolute URL of the App's per-namespace OpenAPI document
+   * (`…/api/v1/apps/{slug}/openapi.json`), derived from the minted App slug so
+   * the CLI/console can point users at it after deploy. Omitted until the App
+   * has a slug (no protocol deploy yet) or on surfaces that do not resolve it.
+   */
+  appOpenApiUrl?: string;
   createdAt: string;
   deploymentId: AppDeploymentId;
   errorCode: string | null;

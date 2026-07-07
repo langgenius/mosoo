@@ -52,8 +52,8 @@ type AppDeploymentDeleteBindings = Pick<
   Partial<Pick<ApiBindings, "Sandbox" | "runtimeSubjectHandleFactory">>;
 
 export type AppDeploymentReadBindings = Pick<
-  AppDeploymentBindings,
-  "DB" | "MOSOO_APP_DEPLOYMENT_DOMAIN"
+  ApiBindings,
+  "DB" | "MOSOO_APP_DEPLOYMENT_DOMAIN" | "WEB_ORIGIN"
 >;
 
 interface AppDeploymentServiceOptions {
@@ -97,7 +97,7 @@ export async function getAppDeploymentStatus(
   viewer: AuthenticatedViewer,
   appId: AppId,
 ): Promise<AppDeploymentRun | null> {
-  await ensureAppOwnership(bindings.DB, viewer.id, appId);
+  const app = await ensureAppOwnership(bindings.DB, viewer.id, appId);
   await recoverStaleActiveDeploymentRun(bindings.DB, appId);
 
   const run = await readLatestDeploymentRun(bindings.DB, appId);
@@ -108,7 +108,10 @@ export async function getAppDeploymentStatus(
 
   const deployment = await readDeploymentById(bindings.DB, run.deploymentId);
 
-  return toAppDeploymentRun(run, deployment, bindings.MOSOO_APP_DEPLOYMENT_DOMAIN);
+  return toAppDeploymentRun(run, deployment, bindings.MOSOO_APP_DEPLOYMENT_DOMAIN, {
+    appSlug: app.slug,
+    webOrigin: bindings.WEB_ORIGIN,
+  });
 }
 
 export async function listAppDeploymentRuns(
@@ -117,7 +120,7 @@ export async function listAppDeploymentRuns(
   appId: AppId,
   limit?: number | null,
 ): Promise<AppDeploymentRun[]> {
-  await ensureAppOwnership(bindings.DB, viewer.id, appId);
+  const app = await ensureAppOwnership(bindings.DB, viewer.id, appId);
   await recoverStaleActiveDeploymentRun(bindings.DB, appId);
 
   const runLimit = normalizeLimit(limit, "limit", RUN_LIST_LIMITS);
@@ -144,7 +147,10 @@ export async function listAppDeploymentRuns(
       throw new Error("App deployment row could not be loaded.");
     }
 
-    return toAppDeploymentRun(run, deployment, bindings.MOSOO_APP_DEPLOYMENT_DOMAIN);
+    return toAppDeploymentRun(run, deployment, bindings.MOSOO_APP_DEPLOYMENT_DOMAIN, {
+      appSlug: app.slug,
+      webOrigin: bindings.WEB_ORIGIN,
+    });
   });
 }
 
@@ -658,9 +664,16 @@ function toAppDeploymentRun(
   row: AppDeploymentRunRow,
   deployment: AppDeploymentRow,
   domain: string,
+  namespace?: { appSlug: string | null; webOrigin: string },
 ): AppDeploymentRun {
+  const appOpenApiUrl =
+    namespace === undefined || namespace.appSlug === null
+      ? undefined
+      : createAppOpenApiUrl(namespace.webOrigin, namespace.appSlug);
+
   return {
     appId: row.appId,
+    ...(appOpenApiUrl === undefined ? {} : { appOpenApiUrl }),
     createdAt: toIsoString(row.createdAt),
     deploymentId: row.deploymentId,
     errorCode: row.errorCode,
@@ -675,6 +688,21 @@ function toAppDeploymentRun(
     targetKind: row.targetKind,
     updatedAt: toIsoString(row.updatedAt),
   };
+}
+
+/**
+ * Per-App OpenAPI document URL derived from the minted namespace slug (User
+ * Story 17). Derived on read from the slug rather than persisted, so it always
+ * tracks the current slug and never becomes a stale stored column.
+ */
+function createAppOpenApiUrl(webOrigin: string, slug: string): string {
+  let end = webOrigin.length;
+
+  while (end > 0 && webOrigin.charCodeAt(end - 1) === 47 /* "/" */) {
+    end -= 1;
+  }
+
+  return `${webOrigin.slice(0, end)}/api/v1/apps/${slug}/openapi.json`;
 }
 
 function createMosooSubdomain(appId: AppId): string {
