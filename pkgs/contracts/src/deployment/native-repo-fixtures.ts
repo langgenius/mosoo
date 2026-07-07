@@ -6,10 +6,12 @@
  * and setup_required entries are allowed on green repos. `expectedCodes` is
  * the exact list of failure codes the validator must produce for the repo —
  * one entry per produced failure across all severities — sorted ascending.
- * Setup_required derivation is mechanical: whenever the primary manifest and
- * the relevant sidecar parse cleanly, one `native.setup.mcp_reconnect` per
- * declared MCP server and one `native.setup.environment_secret` per declared
- * environment secretName are produced, independent of content-level failures.
+ * Setup_required derivation is mechanical: whenever agent manifests and the
+ * relevant sidecar parse cleanly, one `native.setup.mcp_reconnect` per MCP
+ * server declared across all agent manifests and one
+ * `native.setup.environment_secret` per declared environment secretName
+ * (when any agent manifest references the definition) are produced,
+ * independent of content-level failures.
  */
 import {
   AGENT_MANIFEST_VERSION,
@@ -27,7 +29,10 @@ export interface NativeRepoFixtureCase {
 
 const NATIVE_MARKER_TOML = `spec = "${MOSOO_NATIVE_SPEC}"\n`;
 
-function createAgentManifestJson(name: string, overrides: Record<string, unknown> = {}): string {
+export function createAgentManifestJson(
+  name: string,
+  overrides: Record<string, unknown> = {},
+): string {
   const manifest: Record<string, unknown> = {
     description: `${name} fixture agent`,
     kind: "pet",
@@ -154,6 +159,30 @@ agents = []
     name: "valid-multi-agent-expose-none-warning",
   },
   {
+    expect: "green",
+    expectedCodes: ["native.setup.mcp_reconnect"],
+    files: {
+      ".agent/.mcp.json": toJsonFile({
+        mcpServers: {
+          github: {
+            type: "http",
+            url: "https://mcp.github.example/mcp",
+          },
+        },
+      }),
+      ".agent/agents/support/manifest.json": createAgentManifestJson("support", {
+        mcpServers: [{ enabled: true, name: "github", ref: ".mcp.json#github" }],
+      }),
+      ".agent/manifest.json": createAgentManifestJson("concierge"),
+      ".mosoo.toml": `spec = "${MOSOO_NATIVE_SPEC}"
+
+[expose]
+agents = ["concierge", "support"]
+`,
+    },
+    name: "valid-multi-agent-shared-mcp-sidecar",
+  },
+  {
     expect: "red",
     expectedCodes: ["native.toml.missing"],
     files: {
@@ -200,6 +229,30 @@ agents = "quiz-master"
 `,
     },
     name: "red-toml-invalid-value",
+  },
+  {
+    expect: "red",
+    expectedCodes: ["native.toml.invalid_value"],
+    files: {
+      ".agent/manifest.json": createAgentManifestJson("quiz-master"),
+      ".mosoo.toml": `spec = "${MOSOO_NATIVE_SPEC}"
+expose = 2020-01-01T00:00:00Z
+`,
+    },
+    name: "red-toml-datetime-expose",
+  },
+  {
+    expect: "red",
+    expectedCodes: ["native.toml.invalid_value"],
+    files: {
+      ".agent/manifest.json": createAgentManifestJson("quiz-master"),
+      ".mosoo.toml": `spec = "${MOSOO_NATIVE_SPEC}"
+
+[expose]
+web = 2020-01-01T00:00:00Z
+`,
+    },
+    name: "red-toml-datetime-expose-web",
   },
   {
     expect: "red",
@@ -315,6 +368,24 @@ build = "npm run build"
   },
   {
     expect: "red",
+    expectedCodes: ["native.agent.mcp_invalid", "native.agent.mcp_secret_forbidden"],
+    files: {
+      ".agent/.mcp.json": toJsonFile({
+        mcpServers: {
+          github: {
+            token: "fixture-plaintext-value",
+            type: "http",
+            url: "https://mcp.github.example/mcp",
+          },
+        },
+      }),
+      ".agent/manifest.json": createAgentManifestJson("quiz-master", { mcpServers: undefined }),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    },
+    name: "red-mcp-secret-without-catalog",
+  },
+  {
+    expect: "red",
     expectedCodes: [
       "native.agent.environment_invalid",
       "native.agent.environment_secret_forbidden",
@@ -332,6 +403,25 @@ build = "npm run build"
       ".mosoo.toml": NATIVE_MARKER_TOML,
     },
     name: "red-environment-plaintext-secret",
+  },
+  {
+    expect: "red",
+    expectedCodes: [
+      "native.agent.environment_invalid",
+      "native.agent.environment_secret_forbidden",
+    ],
+    files: {
+      ".agent/environment/definition.json": toJsonFile({
+        api_key: "fixture-plaintext-value",
+        secretNames: ["SERVICE_TOKEN"],
+        setupScript: "",
+      }),
+      ".agent/manifest.json": createAgentManifestJson("quiz-master", {
+        environment: { ref: 123 },
+      }),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    },
+    name: "red-environment-secret-without-reference",
   },
   {
     expect: "red",

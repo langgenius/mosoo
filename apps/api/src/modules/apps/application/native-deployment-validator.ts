@@ -13,14 +13,23 @@
  *   mapped into the closed `native.*` set, with specifics kept in
  *   `field` / `problem`.
  * - Shared sidecars (`.agent/.mcp.json`, `.agent/environment/definition.json`)
- *   are content-validated against the PRIMARY manifest's catalogs only, and
- *   only when the primary manifest itself has no blocking issue (the catalogs
- *   must be trustworthy before sidecar content can be judged). Named agent
- *   manifests get manifest-level validation only (Phase 0 limitation).
- * - Setup requirements are derived mechanically whenever the primary manifest
- *   and the relevant sidecar parse cleanly, independent of content-level
- *   failures. An unparseable sidecar suppresses its setup entries because the
- *   declared servers/secrets cannot be read.
+ *   are content-validated against the PRIMARY manifest's catalogs by the
+ *   reused package delegates, and only when the primary manifest itself has
+ *   no blocking issue (the catalogs must be trustworthy before sidecar
+ *   content can be judged against them). Named agent manifests get
+ *   manifest-level validation only (Phase 0 limitation), but they DO
+ *   participate in reference coverage below.
+ * - Native checks trigger on the physical presence of a sidecar file,
+ *   whatever the manifests declare: the file must parse as JSON, must not
+ *   carry forbidden plaintext-secret fields anywhere, and must be referenced
+ *   by a well-typed catalog in at least one agent manifest. Reference
+ *   coverage (orphaned sidecars, undeclared servers) is judged across the
+ *   union of primary and named manifests, because the PRD lets shared
+ *   sidecars be referenced from named agent manifests alone.
+ * - Setup requirements are derived mechanically whenever agent manifests and
+ *   the relevant sidecar parse cleanly, unioned across all agent manifests,
+ *   independent of content-level failures. An unparseable sidecar suppresses
+ *   its setup entries because the declared servers/secrets cannot be read.
  * - Sidecar helpers speak archive-relative paths, so `.agent/` is stripped
  *   before calling them and re-prefixed onto every produced failure file (the
  *   PRD demands repo-term paths).
@@ -29,6 +38,8 @@ import {
   admitAgentPackageArchiveEntries,
   collectEnvironmentSidecarIssues,
   collectMcpSidecarIssues,
+  findForbiddenEnvironmentSidecarFieldPath,
+  findForbiddenMcpSecretFieldPath,
 } from "@mosoo/agent-package";
 import type { AgentPackageArchiveEntryCandidate } from "@mosoo/agent-package";
 import type { AgentResolutionIssue } from "@mosoo/contracts/agent-manifest";
@@ -114,6 +125,11 @@ type AgentExposure =
   | { kind: "none" }
   | { kind: "primary_default" };
 
+type SidecarJsonParse =
+  | { kind: "absent" }
+  | { kind: "invalid"; message: string }
+  | { kind: "parsed"; value: unknown };
+
 export function validateNativeDeployment(
   snapshot: AppDeploymentRepositorySnapshot,
 ): NativeValidateResult {
@@ -196,8 +212,8 @@ export function validateNativeDeployment(
   const exposure = resolveAgentExposure(toml, multiAgent, definedNames, failures);
   const webAgent = resolveWebAgent(toml, multiAgent, definedNames, primaryAgent, failures);
 
-  failures.push(...collectSidecarContentFailures(primaryAgent, files));
-  failures.push(...deriveSetupFailures(primaryAgent, files));
+  failures.push(...collectSidecarContentFailures(agents, primaryAgent, files));
+  failures.push(...deriveSetupFailures(agents, files));
 
   const agentFacts: NativeValidateAgentFact[] = [];
 
@@ -684,18 +700,81 @@ function resolveWebAgent(
 }
 
 function collectSidecarContentFailures(
+  agents: readonly DiscoveredAgent[],
   primaryAgent: DiscoveredAgent | null,
   files: Readonly<Record<string, string>>,
 ): NativeValidateFailure[] {
-  if (primaryAgent === null || primaryAgent.parsed === null || primaryAgent.hasBlockingIssue) {
-    return [];
-  }
-
   const entries = toArchiveEntries(files);
   const failures: NativeValidateFailure[] = [];
 
+  collectMcpSidecarFileFailures(agents, primaryAgent, entries, files, failures);
+  collectEnvironmentSidecarFileFailures(agents, primaryAgent, entries, files, failures);
+
+  return failures;
+}
+
+function collectMcpSidecarFileFailures(
+  agents: readonly DiscoveredAgent[],
+  primaryAgent: DiscoveredAgent | null,
+  entries: Record<string, Uint8Array>,
+  files: Readonly<Record<string, string>>,
+  failures: NativeValidateFailure[],
+): void {
+  const sidecar = parseSidecarJson(files[MCP_SIDECAR_REPO_PATH]);
+
+  if (sidecar.kind === "invalid") {
+    failures.push({
+      action: `fix the JSON syntax in ${MCP_SIDECAR_REPO_PATH}`,
+      code: "native.agent.mcp_invalid",
+      file: MCP_SIDECAR_REPO_PATH,
+      problem: `${MCP_SIDECAR_REPO_PATH} is not readable as JSON: ${sidecar.message}`,
+      severity: "error",
+    });
+  } else {
+    collectPrimaryMcpDelegateFailures(primaryAgent, entries, failures);
+  }
+
+  if (sidecar.kind === "absent") {
+    return;
+  }
+
+  if (sidecar.kind === "parsed") {
+    const forbiddenPath = findForbiddenMcpSecretFieldPath(sidecar.value);
+    const reported = failures.some(
+      (failure) => failure.code === "native.agent.mcp_secret_forbidden",
+    );
+
+    if (forbiddenPath !== null && !reported) {
+      failures.push({
+        action: `remove the plaintext secret from ${MCP_SIDECAR_REPO_PATH}; credentials are connected on the target instance after deploy`,
+        code: "native.agent.mcp_secret_forbidden",
+        field: forbiddenPath,
+        file: MCP_SIDECAR_REPO_PATH,
+        problem: `${MCP_SIDECAR_REPO_PATH} must not include secret field ${forbiddenPath}`,
+        severity: "error",
+      });
+    }
+  }
+
+  collectMcpReferenceCoverageFailures(agents, sidecar, failures);
+}
+
+function collectPrimaryMcpDelegateFailures(
+  primaryAgent: DiscoveredAgent | null,
+  entries: Record<string, Uint8Array>,
+  failures: NativeValidateFailure[],
+): void {
+  if (primaryAgent === null || primaryAgent.parsed === null || primaryAgent.hasBlockingIssue) {
+    return;
+  }
+
   try {
     for (const issue of collectMcpSidecarIssues(primaryAgent.manifestJson, entries)) {
+      // Undeclared-server coverage is judged natively across all agents.
+      if (issue.code === "package.mcp.undeclared") {
+        continue;
+      }
+
       failures.push(mapMcpSidecarIssue(issue));
     }
   } catch (error) {
@@ -706,6 +785,135 @@ function collectSidecarContentFailures(
       problem: `${MCP_SIDECAR_REPO_PATH} is not readable as JSON: ${errorMessage(error)}`,
       severity: "error",
     });
+  }
+}
+
+/**
+ * Presence-triggered reference coverage for `.agent/.mcp.json`: the sidecar
+ * must be referenced by a well-typed mcpServers catalog in at least one agent
+ * manifest, and every sidecar server must be declared by some agent (the PRD
+ * blesses shared sidecars referenced only from named agent manifests).
+ * Skipped while any manifest is unreadable, because the full reference set
+ * cannot be known until every manifest parses.
+ */
+function collectMcpReferenceCoverageFailures(
+  agents: readonly DiscoveredAgent[],
+  sidecar: SidecarJsonParse,
+  failures: NativeValidateFailure[],
+): void {
+  if (!allManifestsInspectable(agents)) {
+    return;
+  }
+
+  const hasTypedCatalog = agents.some(
+    (agent) => agent.parsed !== null && Array.isArray(agent.parsed["mcpServers"]),
+  );
+
+  if (!hasTypedCatalog) {
+    failures.push({
+      action: `declare each ${MCP_SIDECAR_REPO_PATH} server in an agent manifest mcpServers catalog, or remove ${MCP_SIDECAR_REPO_PATH}`,
+      code: "native.agent.mcp_invalid",
+      file: MCP_SIDECAR_REPO_PATH,
+      problem: `${MCP_SIDECAR_REPO_PATH} exists but no agent manifest declares a mcpServers catalog`,
+      severity: "error",
+    });
+    return;
+  }
+
+  if (sidecar.kind !== "parsed" || !isRecord(sidecar.value)) {
+    return;
+  }
+
+  const sidecarServers = sidecar.value["mcpServers"];
+
+  if (!isRecord(sidecarServers)) {
+    return;
+  }
+
+  const referencedNames = new Set(
+    agents.flatMap((agent) =>
+      agent.parsed === null ? [] : readMcpCatalogReferencedNames(agent.parsed),
+    ),
+  );
+
+  for (const serverName of Object.keys(sidecarServers).toSorted()) {
+    if (referencedNames.has(serverName)) {
+      continue;
+    }
+
+    failures.push({
+      action: `declare MCP server "${serverName}" in an agent manifest mcpServers catalog, or remove it from ${MCP_SIDECAR_REPO_PATH}`,
+      code: "native.agent.mcp_invalid",
+      file: MCP_SIDECAR_REPO_PATH,
+      problem: `MCP server "${serverName}" in ${MCP_SIDECAR_REPO_PATH} is not declared by any agent manifest`,
+      severity: "error",
+    });
+  }
+}
+
+function collectEnvironmentSidecarFileFailures(
+  agents: readonly DiscoveredAgent[],
+  primaryAgent: DiscoveredAgent | null,
+  entries: Record<string, Uint8Array>,
+  files: Readonly<Record<string, string>>,
+  failures: NativeValidateFailure[],
+): void {
+  const sidecar = parseSidecarJson(files[ENVIRONMENT_DEFINITION_REPO_PATH]);
+
+  if (sidecar.kind === "invalid") {
+    failures.push({
+      action: `fix the JSON syntax in ${ENVIRONMENT_DEFINITION_REPO_PATH}`,
+      code: "native.agent.environment_invalid",
+      file: ENVIRONMENT_DEFINITION_REPO_PATH,
+      problem: `${ENVIRONMENT_DEFINITION_REPO_PATH} is not readable as JSON: ${sidecar.message}`,
+      severity: "error",
+    });
+  } else {
+    collectPrimaryEnvironmentDelegateFailures(primaryAgent, entries, failures);
+  }
+
+  if (sidecar.kind === "absent") {
+    return;
+  }
+
+  if (sidecar.kind === "parsed") {
+    const forbiddenPath = findForbiddenEnvironmentSidecarFieldPath(sidecar.value);
+    const reported = failures.some(
+      (failure) => failure.code === "native.agent.environment_secret_forbidden",
+    );
+
+    if (forbiddenPath !== null && !reported) {
+      failures.push({
+        action: `remove the plaintext secret from ${ENVIRONMENT_DEFINITION_REPO_PATH} and declare the name in secretNames instead`,
+        code: "native.agent.environment_secret_forbidden",
+        field: forbiddenPath,
+        file: ENVIRONMENT_DEFINITION_REPO_PATH,
+        problem: `${ENVIRONMENT_DEFINITION_REPO_PATH} must not include secret field ${forbiddenPath}`,
+        severity: "error",
+      });
+    }
+  }
+
+  if (!allManifestsInspectable(agents) || agents.some(hasTypedEnvironmentReference)) {
+    return;
+  }
+
+  failures.push({
+    action: `set environment.ref to "${ENVIRONMENT_DEFINITION_ARCHIVE_PATH}" in an agent manifest, or remove ${ENVIRONMENT_DEFINITION_REPO_PATH}`,
+    code: "native.agent.environment_invalid",
+    file: ENVIRONMENT_DEFINITION_REPO_PATH,
+    problem: `${ENVIRONMENT_DEFINITION_REPO_PATH} exists but no agent manifest references it via environment.ref`,
+    severity: "error",
+  });
+}
+
+function collectPrimaryEnvironmentDelegateFailures(
+  primaryAgent: DiscoveredAgent | null,
+  entries: Record<string, Uint8Array>,
+  failures: NativeValidateFailure[],
+): void {
+  if (primaryAgent === null || primaryAgent.parsed === null || primaryAgent.hasBlockingIssue) {
+    return;
   }
 
   try {
@@ -721,8 +929,25 @@ function collectSidecarContentFailures(
       severity: "error",
     });
   }
+}
 
-  return failures;
+function allManifestsInspectable(agents: readonly DiscoveredAgent[]): boolean {
+  return agents.every((agent) => agent.parsed !== null);
+}
+
+/**
+ * A manifest reference counts as well-typed when environment is a record and
+ * ref is a string; non-canonical string refs are rejected separately by the
+ * reused package validation (`package.environment.ref.unsupported`).
+ */
+function hasTypedEnvironmentReference(agent: DiscoveredAgent): boolean {
+  if (agent.parsed === null) {
+    return false;
+  }
+
+  const environment = agent.parsed["environment"];
+
+  return isRecord(environment) && typeof environment["ref"] === "string";
 }
 
 function mapMcpSidecarIssue(issue: AgentResolutionIssue): NativeValidateFailure {
@@ -774,16 +999,20 @@ function mapEnvironmentSidecarIssue(issue: AgentResolutionIssue): NativeValidate
 }
 
 function deriveSetupFailures(
-  primaryAgent: DiscoveredAgent | null,
+  agents: readonly DiscoveredAgent[],
   files: Readonly<Record<string, string>>,
 ): NativeValidateFailure[] {
-  if (primaryAgent === null || primaryAgent.parsed === null) {
+  const manifests = agents.flatMap((agent) => (agent.parsed === null ? [] : [agent.parsed]));
+
+  if (manifests.length === 0) {
     return [];
   }
 
   const failures: NativeValidateFailure[] = [];
   const mcpSource = files[MCP_SIDECAR_REPO_PATH];
-  const catalogNames = readMcpCatalogNames(primaryAgent.parsed);
+  const catalogNames = [
+    ...new Set(manifests.flatMap((manifest) => readMcpCatalogNames(manifest))),
+  ].toSorted();
 
   if (
     catalogNames.length > 0 &&
@@ -802,11 +1031,11 @@ function deriveSetupFailures(
   }
 
   const definitionSource = files[ENVIRONMENT_DEFINITION_REPO_PATH];
+  const definitionReferenced = manifests.some(
+    (manifest) => readEnvironmentRef(manifest) === ENVIRONMENT_DEFINITION_ARCHIVE_PATH,
+  );
 
-  if (
-    readEnvironmentRef(primaryAgent.parsed) !== ENVIRONMENT_DEFINITION_ARCHIVE_PATH ||
-    definitionSource === undefined
-  ) {
+  if (!definitionReferenced || definitionSource === undefined) {
     return failures;
   }
 
@@ -846,6 +1075,39 @@ function readMcpCatalogNames(manifest: Readonly<Record<string, unknown>>): strin
   }
 
   return [...names].toSorted();
+}
+
+/**
+ * Server names referenced by a manifest's mcpServers catalog via
+ * `.mcp.json#<name>` refs, mirroring the reused sidecar validator's labeling
+ * (catalog `name` wins over the ref suffix when both are present).
+ */
+function readMcpCatalogReferencedNames(manifest: Readonly<Record<string, unknown>>): string[] {
+  const catalog = manifest["mcpServers"];
+
+  if (!Array.isArray(catalog)) {
+    return [];
+  }
+
+  const refPrefix = `${MCP_SIDECAR_ARCHIVE_PATH}#`;
+  const names: string[] = [];
+
+  for (const entry of catalog) {
+    if (!isRecord(entry)) {
+      continue;
+    }
+
+    const name = typeof entry["name"] === "string" ? entry["name"] : null;
+    const ref = typeof entry["ref"] === "string" ? entry["ref"] : null;
+
+    if (ref === null || !ref.startsWith(refPrefix)) {
+      continue;
+    }
+
+    names.push(name ?? ref.slice(refPrefix.length));
+  }
+
+  return names;
 }
 
 function readEnvironmentRef(manifest: Readonly<Record<string, unknown>>): string | null {
@@ -890,6 +1152,18 @@ function toArchiveEntries(files: Readonly<Record<string, string>>): Record<strin
   return entries;
 }
 
+function parseSidecarJson(source: string | undefined): SidecarJsonParse {
+  if (source === undefined) {
+    return { kind: "absent" };
+  }
+
+  try {
+    return { kind: "parsed", value: JSON.parse(source) };
+  } catch (error) {
+    return { kind: "invalid", message: errorMessage(error) };
+  }
+}
+
 function tryParseJsonRecord(source: string): Record<string, unknown> | null {
   let value: unknown;
 
@@ -910,6 +1184,12 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === "string");
 }
 
+/**
+ * Excludes Date so TOML datetime scalars (smol-toml `TomlDate extends Date`)
+ * are rejected where tables are required instead of passing as empty records.
+ */
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return (
+    typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Date)
+  );
 }

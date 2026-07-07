@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { NativeValidateResult } from "@mosoo/contracts/native-deployment";
 import {
+  createAgentManifestJson,
   NATIVE_REPO_FIXTURE_CASES,
   NATIVE_REPO_MULTI_AGENT_FILES,
   NATIVE_REPO_SINGLE_AGENT_MINIMAL_FILES,
@@ -10,6 +11,22 @@ import {
 import type { NativeRepoFixtureCase } from "@mosoo/contracts/native-repo-fixtures";
 
 import { validateNativeDeployment } from "../src/modules/apps/application/native-deployment-validator";
+
+const NATIVE_MARKER_TOML = 'spec = "mosoo.spec.v1"\n';
+
+const SECRET_MCP_SIDECAR_JSON = `${JSON.stringify(
+  {
+    mcpServers: {
+      github: {
+        token: "test-plaintext-value",
+        type: "http",
+        url: "https://mcp.github.example/mcp",
+      },
+    },
+  },
+  null,
+  2,
+)}\n`;
 
 function validate(files: Readonly<Record<string, string>>): NativeValidateResult {
   return validateNativeDeployment({ files });
@@ -206,5 +223,137 @@ describe("native deployment validator", () => {
       result.failures.find((failure) => failure.code === "native.agent.environment_invalid")?.file,
     ).toBe(".agent/environment/definition.json");
     expect(result.valid).toBe(false);
+  });
+
+  test("rejects sidecar secrets when the manifest omits the mcpServers catalog", () => {
+    const result = validate(findFixtureCase("red-mcp-secret-without-catalog").files);
+    const secret = result.failures.find(
+      (failure) => failure.code === "native.agent.mcp_secret_forbidden",
+    );
+    const orphan = result.failures.find((failure) => failure.code === "native.agent.mcp_invalid");
+
+    expect(result.valid).toBe(false);
+    expect(secret).toMatchObject({
+      field: "mcpServers.github.token",
+      file: ".agent/.mcp.json",
+      severity: "error",
+    });
+    expect(orphan?.problem).toContain("no agent manifest declares a mcpServers catalog");
+  });
+
+  test("rejects sidecar secrets behind a mistyped mcpServers catalog", () => {
+    const result = validate({
+      ".agent/.mcp.json": SECRET_MCP_SIDECAR_JSON,
+      ".agent/manifest.json": createAgentManifestJson("quiz-master", { mcpServers: "github" }),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+
+    expect(sortedCodes(result)).toEqual([
+      "native.agent.mcp_invalid",
+      "native.agent.mcp_secret_forbidden",
+    ]);
+    expect(result.valid).toBe(false);
+  });
+
+  test("scans mcp sidecar secrets even when the primary manifest is missing", () => {
+    const result = validate({
+      ".agent/.mcp.json": '{ "github": { "token": "test-plaintext-value" } }\n',
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+    const secret = result.failures.find(
+      (failure) => failure.code === "native.agent.mcp_secret_forbidden",
+    );
+
+    expect(result.valid).toBe(false);
+    expect(secret).toMatchObject({ field: "github.token", file: ".agent/.mcp.json" });
+    expect(sortedCodes(result)).toContain("native.agent.manifest_missing");
+  });
+
+  test("reports the secret code for servers an empty catalog leaves unreferenced", () => {
+    const result = validate({
+      ".agent/.mcp.json": SECRET_MCP_SIDECAR_JSON,
+      ".agent/manifest.json": createAgentManifestJson("quiz-master"),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+
+    expect(sortedCodes(result)).toEqual([
+      "native.agent.mcp_invalid",
+      "native.agent.mcp_secret_forbidden",
+    ]);
+    expect(
+      result.failures.find((failure) => failure.code === "native.agent.mcp_invalid")?.problem,
+    ).toContain("is not declared by any agent manifest");
+  });
+
+  test("rejects environment secrets when no manifest references the definition", () => {
+    const result = validate(findFixtureCase("red-environment-secret-without-reference").files);
+    const secret = result.failures.find(
+      (failure) => failure.code === "native.agent.environment_secret_forbidden",
+    );
+    const orphan = result.failures.find(
+      (failure) => failure.code === "native.agent.environment_invalid",
+    );
+
+    expect(result.valid).toBe(false);
+    expect(secret).toMatchObject({
+      field: "api_key",
+      file: ".agent/environment/definition.json",
+      severity: "error",
+    });
+    expect(orphan?.problem).toContain("no agent manifest references it");
+  });
+
+  test("keeps the shared mcp sidecar green when only a named agent references it", () => {
+    const result = validate(findFixtureCase("valid-multi-agent-shared-mcp-sidecar").files);
+
+    expect(result.valid).toBe(true);
+    expect(sortedCodes(result)).toEqual(["native.setup.mcp_reconnect"]);
+    expect(result.failures[0]?.action).toContain("github");
+  });
+
+  test("unions reference coverage and setup across primary and named catalogs", () => {
+    const result = validate({
+      ".agent/.mcp.json": `${JSON.stringify(
+        {
+          mcpServers: {
+            github: { type: "http", url: "https://mcp.github.example/mcp" },
+            linear: { type: "http", url: "https://mcp.linear.example/mcp" },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      ".agent/agents/support/manifest.json": createAgentManifestJson("support", {
+        mcpServers: [{ enabled: true, name: "github", ref: ".mcp.json#github" }],
+      }),
+      ".agent/manifest.json": createAgentManifestJson("concierge", {
+        mcpServers: [{ enabled: true, name: "linear", ref: ".mcp.json#linear" }],
+      }),
+      ".mosoo.toml": 'spec = "mosoo.spec.v1"\n\n[expose]\nagents = ["concierge", "support"]\n',
+    });
+
+    expect(result.valid).toBe(true);
+    expect(sortedCodes(result)).toEqual([
+      "native.setup.mcp_reconnect",
+      "native.setup.mcp_reconnect",
+    ]);
+  });
+
+  test("rejects toml datetime values where tables are required", () => {
+    const base = { ".agent/manifest.json": createAgentManifestJson("quiz-master") };
+    const exposeDate = validate({
+      ...base,
+      ".mosoo.toml": 'spec = "mosoo.spec.v1"\nexpose = 2020-01-01T00:00:00Z\n',
+    });
+    const webDate = validate({
+      ...base,
+      ".mosoo.toml": 'spec = "mosoo.spec.v1"\n\n[expose]\nweb = 2020-01-01T00:00:00Z\n',
+    });
+
+    expect(sortedCodes(exposeDate)).toEqual(["native.toml.invalid_value"]);
+    expect(exposeDate.valid).toBe(false);
+    expect(sortedCodes(webDate)).toEqual(["native.toml.invalid_value"]);
+    expect(webDate.valid).toBe(false);
+    expect(webDate.failures[0]?.field).toBe("expose.web");
   });
 });
