@@ -60,6 +60,19 @@ export const e2eCases: readonly E2ECase[] = [
   },
   {
     command: {
+      ...playwrightSpec("e2e/cases/deterministic/native-deploy-storyboard.spec.ts"),
+      env: {
+        MOSOO_E2E_WEB_SERVER_COMMAND: "node_modules/.bin/vp run --filter @mosoo/web dev",
+      },
+    },
+    description:
+      "Walk the native deploy console from install guide to a green multi-agent run; the second-instance beat lives in the API portability test.",
+    id: ["deterministic", "native-deploy"],
+    layer: "deterministic",
+    setup: [bunTest(["e2e/cases/contract/harness.test.ts"])],
+  },
+  {
+    command: {
       ...playwrightSpec("e2e/cases/ui/files-page.spec.ts"),
       env: {
         MOSOO_E2E_WEB_SERVER_COMMAND: "node_modules/.bin/vp run --filter @mosoo/web dev",
