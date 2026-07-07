@@ -15,6 +15,13 @@
       "when": 1783404211148,
       "tag": "0001_native_result_json",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783415091722,
+      "tag": "0002_app_slug_agent_exposure",
+      "breakpoints": true
     }
   ]
 }

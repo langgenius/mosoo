@@ -35,10 +35,13 @@ CREATE TABLE app (
   organization_id text NOT NULL,
   owner_account_id text NOT NULL,
   name text NOT NULL,
+  slug text,
   default_environment_id text,
   created_at integer NOT NULL,
   updated_at integer NOT NULL
 );
+
+CREATE UNIQUE INDEX app_slug_idx ON app (slug) WHERE slug IS NOT NULL;
 
 CREATE TABLE agent (
   id text PRIMARY KEY NOT NULL,
@@ -47,6 +50,7 @@ CREATE TABLE agent (
   name text NOT NULL,
   description text,
   environment_id text,
+  exposed_via_api integer,
   live_deployment_version_id text,
   kind text NOT NULL,
   runtime_id text NOT NULL,

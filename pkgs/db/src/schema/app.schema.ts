@@ -23,15 +23,30 @@ export type AppDeploymentRunStatus =
   | "submitting"
   | "success";
 
-export const appsTable = sqliteTable("app", {
-  createdAt: integer("created_at").notNull(),
-  defaultEnvironmentId: platformIdColumn<EnvironmentId>("default_environment_id"),
-  id: platformIdColumn<AppId>("id").primaryKey(),
-  name: text("name").notNull(),
-  organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
-  ownerAccountId: platformIdColumn<AccountId>("owner_account_id").notNull(),
-  updatedAt: integer("updated_at").notNull(),
-});
+export const appsTable = sqliteTable(
+  "app",
+  {
+    createdAt: integer("created_at").notNull(),
+    defaultEnvironmentId: platformIdColumn<EnvironmentId>("default_environment_id"),
+    id: platformIdColumn<AppId>("id").primaryKey(),
+    name: text("name").notNull(),
+    organizationId: platformIdColumn<OrganizationId>("organization_id").notNull(),
+    ownerAccountId: platformIdColumn<AccountId>("owner_account_id").notNull(),
+    /**
+     * Instance-global API namespace slug (PRD "API Namespace & Access").
+     * Minted from the App name at the first protocol deploy and immutable
+     * afterwards; `renameApp` never touches it. NULL = the App has no
+     * protocol deploy yet and is not name-routable.
+     */
+    slug: text("slug"),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("app_slug_idx")
+      .on(table.slug)
+      .where(sql`${table.slug} IS NOT NULL`),
+  ],
+);
 
 export const appDeploymentsTable = sqliteTable(
   "app_deployment",

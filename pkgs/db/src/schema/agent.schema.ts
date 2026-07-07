@@ -31,6 +31,14 @@ export const agentsTable = sqliteTable(
     createdAt: integer("created_at").notNull(),
     description: text("description"),
     environmentId: platformIdColumn<EnvironmentId>("environment_id"),
+    /**
+     * API namespace exposure (PRD "API Namespace & Access"): 1 = exposed by
+     * the repo's expose subset, 0 = repo-defined but internal, NULL =
+     * console-created (never name-routable). Written only by the native repo
+     * upsert per deploy facts; a later deploy that drops the agent from the
+     * expose subset clears it back to 0.
+     */
+    exposedViaApi: integer("exposed_via_api"),
     id: platformIdColumn<AgentId>("id").primaryKey(),
     kind: text("kind").$type<AgentKind>().notNull().default("pet"),
     liveDeploymentVersionId: platformIdColumn<AgentDeploymentVersionId>(

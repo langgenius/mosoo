@@ -29,14 +29,18 @@ function createAgentPackageDraftDatabase(): SqliteD1Database {
       name text NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
+      slug text,
       updated_at integer NOT NULL
     );
+
+    CREATE UNIQUE INDEX app_slug_idx ON app (slug) WHERE slug IS NOT NULL;
 
     CREATE TABLE agent (
       config_json text NOT NULL,
       created_at integer NOT NULL,
       description text,
       environment_id text,
+      exposed_via_api integer,
       id text PRIMARY KEY NOT NULL,
       kind text NOT NULL,
       live_deployment_version_id text,
@@ -91,8 +95,11 @@ function createPackageResolutionDatabase(): SqliteD1Database {
       name text NOT NULL,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
+      slug text,
       updated_at integer NOT NULL
     );
+
+    CREATE UNIQUE INDEX app_slug_idx ON app (slug) WHERE slug IS NOT NULL;
 
 	    CREATE TABLE organization (
 	      id text PRIMARY KEY NOT NULL
