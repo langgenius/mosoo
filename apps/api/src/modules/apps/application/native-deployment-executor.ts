@@ -334,6 +334,11 @@ function buildNativeDeploymentPlan(
   // planJson.agentBindings stays populated for the App overview's bound-agent
   // card (dual consumer of the stored plan).
   const webAgent = facts.web.agent;
+  // A declared `[expose.web] build` owns the build step: the marker was stripped
+  // before detection, so package.json inference cannot see a non-default build
+  // script (e.g. a Worker `build:cf`). Honor the override so the right artifact
+  // is built instead of a silently wrong/absent one.
+  const webBuild = facts.web.build;
 
   return {
     kind: "plan",
@@ -343,6 +348,7 @@ function buildNativeDeploymentPlan(
         webAgent === undefined
           ? []
           : [{ env: NATIVE_WEB_AGENT_ENV, expose: "public_thread", name: webAgent }],
+      ...(webBuild === undefined ? {} : { buildCommand: webBuild }),
       mosooConfigPath: NATIVE_TOML_PATH,
     },
   };

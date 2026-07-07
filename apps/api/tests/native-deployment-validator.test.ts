@@ -88,6 +88,7 @@ describe("native deployment validator", () => {
   test("single-agent web facts default the web target to the primary agent", () => {
     expect(validate(NATIVE_REPO_SINGLE_AGENT_WEB_FILES).facts?.web).toEqual({
       agent: "quiz-master",
+      build: "npm run build",
       declared: true,
     });
   });

@@ -99,6 +99,8 @@ export interface NativeValidateFacts {
   web: {
     /** Resolved target agent name when known; the key is omitted otherwise. */
     agent?: string;
+    /** Declared [expose.web] build command override; the key is omitted otherwise. */
+    build?: string;
     declared: boolean;
   };
 }

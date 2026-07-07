@@ -130,6 +130,8 @@ interface NativeTomlShape {
   agentsDeclared: boolean;
   webAgentDeclared: boolean;
   webAgentName: string | null;
+  /** Valid `expose.web.build` override; null when absent or malformed. */
+  webBuild: string | null;
   webDeclared: boolean;
 }
 
@@ -251,6 +253,7 @@ export function validateNativeDeployment(
       spec: MOSOO_NATIVE_SPEC,
       web: {
         ...(webAgent === null ? {} : { agent: webAgent }),
+        ...(toml.webBuild === null ? {} : { build: toml.webBuild }),
         declared: toml.webDeclared,
       },
     },
@@ -279,17 +282,12 @@ function readNativeTomlShape(
     }
   }
 
-  const shape: {
-    agentNames: readonly string[] | null;
-    agentsDeclared: boolean;
-    webAgentDeclared: boolean;
-    webAgentName: string | null;
-    webDeclared: boolean;
-  } = {
+  const shape: NativeTomlShape = {
     agentNames: null,
     agentsDeclared: false,
     webAgentDeclared: false,
     webAgentName: null,
+    webBuild: null,
     webDeclared: false,
   };
   const expose = value["expose"];
@@ -365,8 +363,12 @@ function readNativeTomlShape(
 
   const webBuild = web["build"];
 
-  if (webBuild !== undefined && typeof webBuild !== "string") {
-    failures.push(invalidTomlValueFailure("expose.web.build", "a shell command string"));
+  if (webBuild !== undefined) {
+    if (typeof webBuild === "string") {
+      shape.webBuild = webBuild;
+    } else {
+      failures.push(invalidTomlValueFailure("expose.web.build", "a shell command string"));
+    }
   }
 
   return shape;

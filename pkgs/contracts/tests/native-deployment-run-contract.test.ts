@@ -94,6 +94,26 @@ describe("native deployment run contract", () => {
     expect(parseNativeDeploymentRunResult(json)).toEqual(VALIDATE_ONLY_RESULT);
   });
 
+  test("preserves the validate web build override through a round-trip", () => {
+    const withBuild: NativeDeploymentRunResult = {
+      facts: null,
+      validate: {
+        facts: {
+          agentCount: 1,
+          agents: [{ exposed: true, name: "quiz-master", source: "primary" }],
+          spec: "mosoo.spec.v1",
+          web: { agent: "quiz-master", build: "npm run build:cf", declared: true },
+        },
+        failures: [],
+        schemaVersion: 1,
+        valid: true,
+      },
+    };
+    const json = serializeNativeDeploymentRunResult(withBuild);
+
+    expect(parseNativeDeploymentRunResult(json)).toEqual(withBuild);
+  });
+
   test("round-trip preserves omitted optional keys as absent", () => {
     const json = serializeNativeDeploymentRunResult(FULL_RESULT);
     const parsed = parseNativeDeploymentRunResult(json);

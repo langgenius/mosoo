@@ -719,6 +719,33 @@ describe("native deployment executor", () => {
     expect(native?.facts?.web).toEqual({ agent: "quiz-master", declared: true });
   });
 
+  test("honors an [expose.web] build override the package.json cannot infer", async () => {
+    const { bindings, database } = await createFixture();
+    const files = {
+      ".agent/manifest.json": openaiAgentManifest("quiz-master"),
+      ".mosoo.toml": `spec = "${MOSOO_NATIVE_SPEC}"\n\n[expose.web]\nbuild = "npm run build:cf"\n`,
+      // No default `build` script: bare detection would yield buildCommand=null
+      // and deploy a Worker with no build step (broken/stale artifact) unless the
+      // declared override is threaded through.
+      "package.json": JSON.stringify({ name: "worker", scripts: { "build:cf": "wrangler deploy" } }),
+      "wrangler.toml": 'main = "worker.js"\n',
+      "worker.js": "export default { fetch: () => new Response('ok') };\n",
+    };
+
+    const { runRow, state } = await dispatchRepo(bindings, database, files);
+
+    expect(runRow).toMatchObject({
+      errorCode: null,
+      status: "success",
+      targetKind: "cloudflare_worker",
+    });
+    expect(state.buildCount).toBe(1);
+
+    const plan = parsePlanJson(runRow);
+
+    expect(plan["buildCommand"]).toBe("npm run build:cf");
+  });
+
   test("fails an [expose.web] static repo with native_web_static_unsupported", async () => {
     const { bindings, database } = await createFixture();
 

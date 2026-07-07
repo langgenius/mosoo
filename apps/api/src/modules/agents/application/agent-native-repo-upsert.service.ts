@@ -383,6 +383,14 @@ async function provisionExistingNativeAgent(
     sourceCommitSha,
   );
 
+  // A live-published update whose new version failed the readiness gate is
+  // never activated: surface it as setup_required (mirrors the new-agent path)
+  // so the working endpoint keeps serving the prior version.
+  if (updated.setupIssues !== undefined) {
+    setupFailures.push(toSetupFailureLine(normalized.name, updated.setupIssues));
+    return { action: "failed", agentId: existing.id, name: normalized.name };
+  }
+
   if (!updated.changed) {
     return { action: "unchanged", agentId: existing.id, name: normalized.name };
   }
@@ -486,6 +494,12 @@ async function createNativeRepoDraftAgent(
 interface NativeRepoAgentUpdate {
   agentRow: AgentRow;
   changed: boolean;
+  /**
+   * Error-severity readiness messages when a live-version activation was
+   * blocked on the publish-readiness gate; present means nothing was written
+   * and the existing live version stays intact.
+   */
+  setupIssues?: readonly string[];
   versionNumber?: number;
 }
 
@@ -559,11 +573,12 @@ async function updateNativeRepoAgent(
 
   const currentSkillIds = await listAgentSkillIds(database, existing.id);
   const skillIds = mergeSkillIds(currentSkillIds, skillResolution.skillIds);
+  const packageResolutionState = createPackageResolutionState("import", resolution);
   const nextConfigJson = serializeAgentStoredConfig({
     builtInTools: manifest.builtInTools,
     packageMcpServers: manifest.mcpServers,
     packageSkills: skillResolution.packageSkills,
-    packageResolution: createPackageResolutionState("import", resolution),
+    packageResolution: packageResolutionState,
     providerOptions,
   });
 
@@ -629,6 +644,34 @@ async function updateNativeRepoAgent(
   const requiresVersion =
     isLivePublished &&
     (changePlan.requiresDeploymentVersion || packageSkillsChanged || packageMcpServersChanged);
+
+  // Publish-readiness gate for the update-of-live path: activating a new live
+  // version whose provider/model/env/mcp is not set up here would report a
+  // green deploy over a broken endpoint. Mirror publishNativeRepoAgent and
+  // block instead of activating; nothing has been written yet.
+  if (requiresVersion) {
+    const readiness = await computeAgentReadiness(database, nextAgent.ownerId, {
+      agentId: nextAgent.id,
+      bindings,
+      environment: await loadAgentEnvironmentConfig(database, nextAgent.id, environmentId),
+      model: nextAgent.model,
+      packageResolution: packageResolutionState,
+      appId: nextAgent.appId,
+      provider: nextAgent.provider,
+      runtimeId: nextAgent.runtimeId,
+    });
+
+    if (!readiness.ready) {
+      return {
+        agentRow: existing,
+        changed: false,
+        setupIssues: readiness.issues
+          .filter((issue) => issue.severity === "error")
+          .map((issue) => issue.message),
+      };
+    }
+  }
+
   const version = requiresVersion
     ? await prepareNativeRepoVersion(database, viewer, {
         agent: nextAgent,

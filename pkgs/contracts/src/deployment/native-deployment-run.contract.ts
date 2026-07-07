@@ -271,7 +271,7 @@ function parseValidateFacts(value: unknown): NativeValidateFacts | null {
     agents.push({ exposed, name, source: source as NativeValidateAgentFact["source"] });
   }
 
-  const web = parseWebFact(value["web"]);
+  const web = parseValidateWebFact(value["web"]);
 
   if (web === null) {
     return null;
@@ -366,6 +366,39 @@ function parseWebFact(value: unknown): NativeDeploymentRunFacts["web"] | null {
   }
 
   return { ...(agent === undefined ? {} : { agent }), declared };
+}
+
+/**
+ * Validate facts carry the extra `[expose.web] build` override the executor
+ * uses to override the detected build command, so this preserves it while the
+ * run-level web fact (`parseWebFact`) intentionally does not.
+ */
+function parseValidateWebFact(value: unknown): NativeValidateFacts["web"] | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const agent = value["agent"];
+  const build = value["build"];
+  const declared = value["declared"];
+
+  if (typeof declared !== "boolean") {
+    return null;
+  }
+
+  if (agent !== undefined && typeof agent !== "string") {
+    return null;
+  }
+
+  if (build !== undefined && typeof build !== "string") {
+    return null;
+  }
+
+  return {
+    ...(agent === undefined ? {} : { agent }),
+    ...(build === undefined ? {} : { build }),
+    declared,
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
