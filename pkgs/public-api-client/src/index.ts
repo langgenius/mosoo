@@ -4,6 +4,7 @@ import {
 } from "@mosoo/contracts/public-api";
 import type {
   PublicApiErrorCode,
+  PublicFileResponse,
   PublicThreadApiCreateThreadResponse,
   PublicThreadApiListThreadEventsResponse,
   PublicThreadApiRetrieveThreadResponse,
@@ -21,11 +22,11 @@ type FetchFunction = typeof fetch;
 
 interface CreateThreadRequestBody {
   client_external_ref?: string;
-  files?: { file_id: string }[];
   input?: {
     content: { text: string; type: "text" }[];
     type: "user.message";
   };
+  resources?: { file_id: string; type: "file" }[];
 }
 
 interface SseMessage {
@@ -48,6 +49,13 @@ export interface MosooCreateThreadInput {
   fileIds?: string[];
   idempotencyKey?: string;
   input?: string;
+  signal?: AbortSignal | undefined;
+}
+
+export interface MosooUploadAgentFileInput {
+  agentId: string;
+  file: Blob;
+  filename?: string | undefined;
   signal?: AbortSignal | undefined;
 }
 
@@ -222,7 +230,7 @@ function createCreateThreadBody(input: MosooCreateThreadInput): CreateThreadRequ
   }
 
   if (input.fileIds !== undefined && input.fileIds.length > 0) {
-    body.files = input.fileIds.map((fileId) => ({ file_id: fileId }));
+    body.resources = input.fileIds.map((fileId) => ({ file_id: fileId, type: "file" }));
   }
 
   if (input.input !== undefined) {
@@ -500,6 +508,22 @@ export class MosooPublicThreadClient {
     });
   }
 
+  async uploadAgentFile(input: MosooUploadAgentFileInput): Promise<PublicFileResponse> {
+    const formData = new FormData();
+
+    if (input.filename === undefined) {
+      formData.append("file", input.file);
+    } else {
+      formData.append("file", input.file, input.filename);
+    }
+
+    return this.requestJson("POST", `/agents/${input.agentId}/files`, {
+      body: formData,
+      signal: input.signal,
+      status: 201,
+    });
+  }
+
   async retrieveThread(
     threadId: string,
     options: { signal?: AbortSignal | undefined } = {},
@@ -768,8 +792,12 @@ export class MosooPublicThreadClient {
     };
 
     if (options.body !== undefined) {
-      headers.set("Content-Type", "application/json");
-      init.body = JSON.stringify(options.body);
+      if (options.body instanceof FormData) {
+        init.body = options.body;
+      } else {
+        headers.set("Content-Type", "application/json");
+        init.body = JSON.stringify(options.body);
+      }
     }
 
     if (options.idempotencyKey !== undefined) {

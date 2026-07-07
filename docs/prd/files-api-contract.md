@@ -250,7 +250,9 @@ A public résumé-editing bot. End user uploads `resume.pdf` and asks the agent 
 ### Explicit non-goals for this MVP
 
 - No `MemoryStore`, `Memory`, `MemoryVersion`, or Dreams contract.
-- No generic `resources[]` union.
+- No generic `resources[]` union in the Files Library or runtime mount model. The
+  Public Thread API may expose a file-only `resources` array as request syntax
+  for draft files that are immediately claimed into a Thread.
 - No generic `Mount` contract.
 - No Claude `file_id` adapter contract.
 - No end-user save-to-library flow.

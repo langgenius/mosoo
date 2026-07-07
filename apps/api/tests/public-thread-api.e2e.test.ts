@@ -212,16 +212,22 @@ async function insertPublicThread(
     .run();
 }
 
-async function expectThreadFileClaimRejected(input: {
+async function expectCreateThreadFileClaimRejected(input: {
   fileId: string;
   message: string;
   requestThreadApi: (request: Request) => Promise<Response>;
   threadId: string;
 }): Promise<void> {
   const response = await input.requestThreadApi(
-    new Request(`https://api.example.com/api/v1/threads/${input.threadId}/files`, {
+    new Request(`https://api.example.com/api/v1/threads/${input.threadId}/events`, {
       body: JSON.stringify({
-        fileId: input.fileId,
+        events: [
+          {
+            resources: [{ file_id: input.fileId, type: "file" }],
+            text: "Read the file.",
+            type: "user_message",
+          },
+        ],
       }),
       headers: {
         Authorization: bearer(TOKENS.owner),
@@ -927,10 +933,7 @@ describe("Public Thread API e2e", () => {
       const createThreadResponse = await requestThreadApi(
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           body: JSON.stringify({
-            input: {
-              content: [{ text: "Read the attached launch note.", type: "text" }],
-              type: "user.message",
-            },
+            client_external_ref: "thread-files-lifecycle",
           }),
           headers: {
             Authorization: bearer(TOKENS.owner),
@@ -952,16 +955,42 @@ describe("Public Thread API e2e", () => {
       expect(emptyFilesResponse.status).toBe(200);
       expect(await readJson(emptyFilesResponse)).toEqual({ files: [] });
 
-      const draftFileId = await createReadyAppDraftFile({
-        body: "Launch note.\n",
-        bucket,
-        database,
-        name: "launch-note.txt",
-      });
-      const createFileResponse = await requestThreadApi(
-        new Request(`https://api.example.com/api/v1/threads/${threadId}/files`, {
+      const formData = new FormData();
+      formData.set(
+        "file",
+        new File([new TextEncoder().encode("Launch note.\n")], "launch-note.txt", {
+          type: "text/plain",
+        }),
+      );
+      const uploadFileResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/files`, {
+          body: formData,
+          headers: { Authorization: bearer(TOKENS.owner) },
+          method: "POST",
+        }),
+      );
+      expect(uploadFileResponse.status).toBe(201);
+      const fileId = expectString(
+        expectRecord(expectRecord(await readJson(uploadFileResponse))["file"])["id"],
+      );
+      const appDraftFileRow = await database
+        .prepare("SELECT object_key FROM file_record WHERE id = ?")
+        .bind(fileId)
+        .first<{ object_key: string }>();
+      if (!appDraftFileRow) {
+        throw new Error("Expected Agent draft file row.");
+      }
+
+      const sendEventResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
           body: JSON.stringify({
-            fileId: draftFileId,
+            events: [
+              {
+                resources: [{ file_id: fileId, type: "file" }],
+                text: "Read the attached launch note.",
+                type: "user_message",
+              },
+            ],
           }),
           headers: {
             Authorization: bearer(TOKENS.owner),
@@ -970,16 +999,12 @@ describe("Public Thread API e2e", () => {
           method: "POST",
         }),
       );
-      expect(createFileResponse.status).toBe(201);
-      const file = expectRecord(expectRecord(await readJson(createFileResponse))["file"]);
-      const fileId = expectString(file["id"]);
-      expect(file).toMatchObject({
-        committed: true,
-        kind: "attachment",
-        mimeType: "text/plain",
-        name: "launch-note.txt",
-        size: 13,
-      });
+      expect(sendEventResponse.status).toBe(200);
+      const sendEvent = expectRecord(
+        expectArray(expectRecord(await readJson(sendEventResponse))["events"])[0],
+      );
+      expect(sendEvent["type"]).toBe("user_message");
+      expect(["queued", "running"]).toContain(expectRecord(sendEvent["run"])["status"]);
 
       const readyFileRow = await database
         .prepare(
@@ -1016,6 +1041,7 @@ describe("Public Thread API e2e", () => {
       expectString(readyFileRow.object_key);
       expectString(readyFileRow.path);
       expect(bucket.objects.has(readyFileRow.object_key)).toBe(true);
+      expect(bucket.objects.has(appDraftFileRow.object_key)).toBe(false);
 
       const artifactObjectKey = `session/${threadId}/artifact/${PUBLIC_API_TEST_IDS.fileAlt}/summary.md`;
 
@@ -1113,7 +1139,7 @@ describe("Public Thread API e2e", () => {
       );
       expect(downloadAttachmentResponse.status).toBe(200);
       expect(downloadAttachmentResponse.headers.get("cache-control")).toBe("no-store");
-      expect(downloadAttachmentResponse.headers.get("content-type")).toBe("text/plain");
+      expect(downloadAttachmentResponse.headers.get("content-type")).toStartWith("text/plain");
       expect(downloadAttachmentResponse.headers.get("content-disposition")).toContain(
         'attachment; filename="launch-note.txt"',
       );
@@ -1220,7 +1246,7 @@ describe("Public Thread API e2e", () => {
     });
   });
 
-  test("creates a Thread file upload through the public files API contract", async () => {
+  test("uploads an Agent file and attaches it to the first Thread message", async () => {
     const database = await createPublicHttpContractDatabase();
     const app = createPublicThreadApiTestApp();
     const bucket = new PublicApiMemoryFileBucket();
@@ -1228,10 +1254,112 @@ describe("Public Thread API e2e", () => {
       requestPublicApi(app, database, request, { fileBucket: bucket as unknown as R2Bucket });
 
     await withProviderProbeMock(async () => {
+      const fileBody = "Launch note.\n";
+      const fileBytes = new TextEncoder().encode(fileBody);
+      const fileSize = fileBytes.byteLength;
+      const formData = new FormData();
+      formData.set("file", new File([fileBytes], "launch-note.txt", { type: "text/plain" }));
+
+      const uploadFileResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/files`, {
+          body: formData,
+          headers: {
+            Authorization: bearer(TOKENS.owner),
+          },
+          method: "POST",
+        }),
+      );
+      expect(uploadFileResponse.status).toBe(201);
+      const uploadedFile = expectRecord(expectRecord(await readJson(uploadFileResponse))["file"]);
+      const fileId = expectString(uploadedFile["id"]);
+      expect(uploadedFile).toMatchObject({
+        name: "launch-note.txt",
+        size: fileSize,
+      });
+      expectString(uploadedFile["createdAt"]);
+      expect(expectString(uploadedFile["mimeType"])).toStartWith("text/plain");
+      expectNoProperties(uploadedFile, [
+        "committed",
+        "createdBy",
+        "etag",
+        "objectKey",
+        "path",
+        "purpose",
+        "scope",
+        "status",
+        "version",
+      ]);
+
+      const appDraftFileRow = await database
+        .prepare(
+          `SELECT committed, object_key, owner_id, owner_kind, purpose, scope_id, scope_kind, session_kind, status
+             FROM file_record
+            WHERE id = ?`,
+        )
+        .bind(fileId)
+        .first<{
+          committed: number;
+          object_key: string;
+          owner_id: string;
+          owner_kind: string;
+          purpose: string;
+          scope_id: string;
+          scope_kind: string;
+          session_kind: string | null;
+          status: string;
+        }>();
+      expect(appDraftFileRow).toMatchObject({
+        committed: 0,
+        owner_id: PUBLIC_API_TEST_IDS.app,
+        owner_kind: "app",
+        purpose: "app_draft",
+        scope_id: PUBLIC_API_TEST_IDS.app,
+        scope_kind: "app_draft",
+        session_kind: "attachment",
+        status: "ready",
+      });
+      if (!appDraftFileRow) {
+        throw new Error("Expected ready Agent draft file row.");
+      }
+      expect(await bucket.get(appDraftFileRow.object_key).then((object) => object?.text())).toBe(
+        fileBody,
+      );
+
+      const retrieveDraftResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/files/${fileId}`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      expect(retrieveDraftResponse.status).toBe(200);
+      const retrievedDraftFile = expectRecord(
+        expectRecord(await readJson(retrieveDraftResponse))["file"],
+      );
+      expect(retrievedDraftFile).toMatchObject({
+        id: fileId,
+        name: "launch-note.txt",
+        size: fileSize,
+      });
+      expect(expectString(retrievedDraftFile["mimeType"])).toStartWith("text/plain");
+
+      const draftDownloadResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/files/${fileId}/content`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+        }),
+      );
+      expect(draftDownloadResponse.status).toBe(404);
+      expect(expectRecord(await readJson(draftDownloadResponse))["error"]).toMatchObject({
+        code: "not_found",
+      });
+
       const createThreadResponse = await requestThreadApi(
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
           body: JSON.stringify({
-            client_external_ref: "thread-upload-contract",
+            client_external_ref: "thread-upload-first-message",
+            input: {
+              content: [{ text: "Read the attached launch note.", type: "text" }],
+              type: "user.message",
+            },
+            resources: [{ file_id: fileId, type: "file" }],
           }),
           headers: {
             Authorization: bearer(TOKENS.owner),
@@ -1241,51 +1369,20 @@ describe("Public Thread API e2e", () => {
         }),
       );
       expect(createThreadResponse.status).toBe(201);
-      const threadId = expectString(
-        expectRecord(expectRecord(await readJson(createThreadResponse))["thread"])["id"],
-      );
+      const createThreadPayload = expectRecord(await readJson(createThreadResponse));
+      const threadId = expectString(expectRecord(createThreadPayload["thread"])["id"]);
+      expect(["queued", "running"]).toContain(expectRecord(createThreadPayload["run"])["status"]);
 
-      const fileBody = "Launch note.\n";
-      const fileSize = new TextEncoder().encode(fileBody).byteLength;
-      const createUploadResponse = await requestThreadApi(
-        new Request(`https://api.example.com/api/v1/threads/${threadId}/files/uploads`, {
-          body: JSON.stringify({
-            file: {
-              contentType: "text/plain",
-              name: "launch-note.txt",
-              size: fileSize,
-            },
-          }),
-          headers: {
-            Authorization: bearer(TOKENS.owner),
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-        }),
-      );
-      expect(createUploadResponse.status).toBe(201);
-
-      const upload = expectRecord(await readJson(createUploadResponse));
-      const fileId = expectString(upload["fileId"]);
-      expect(upload).toMatchObject({
-        contentType: "text/plain",
-        expectedSize: fileSize,
-        partSize: null,
-        path: `session-files/${fileId}/launch-note.txt`,
-        status: "pending",
-        strategy: "single_put",
-      });
-      expectNoProperties(upload, ["purpose", "scopeId", "scopeKind", "target", "upload"]);
-
-      const pendingFileRow = await database
+      const claimedFileRow = await database
         .prepare(
-          `SELECT mime_type, object_key, owner_id, owner_kind, path, purpose, scope_id, scope_kind, session_kind, size, status
+          `SELECT committed, expires_at, object_key, owner_id, owner_kind, path, purpose, scope_id, scope_kind, session_kind, status
              FROM file_record
             WHERE id = ?`,
         )
         .bind(fileId)
         .first<{
-          mime_type: string | null;
+          committed: number;
+          expires_at: number | null;
           object_key: string;
           owner_id: string;
           owner_kind: string;
@@ -1294,149 +1391,28 @@ describe("Public Thread API e2e", () => {
           scope_id: string;
           scope_kind: string;
           session_kind: string;
-          size: number;
           status: string;
         }>();
-      expect(pendingFileRow).toEqual({
-        mime_type: "text/plain",
-        object_key: `staging/session/${threadId}/${fileId}`,
+      expect(claimedFileRow).toMatchObject({
+        committed: 1,
+        expires_at: null,
         owner_id: threadId,
         owner_kind: "session",
-        path: `attachment/${fileId}/launch-note.txt`,
         purpose: "session_attachment",
         scope_id: threadId,
         scope_kind: "session",
         session_kind: "attachment",
-        size: fileSize,
-        status: "pending",
-      });
-
-      const uploadRow = await database
-        .prepare(
-          `SELECT expected_size, file_id, part_size, scope_id, scope_kind, status, strategy
-             FROM file_upload
-            WHERE file_id = ?`,
-        )
-        .bind(fileId)
-        .first<{
-          expected_size: number;
-          file_id: string;
-          part_size: number | null;
-          scope_id: string;
-          scope_kind: string;
-          status: string;
-          strategy: string;
-        }>();
-      expect(uploadRow).toEqual({
-        expected_size: fileSize,
-        file_id: fileId,
-        part_size: null,
-        scope_id: threadId,
-        scope_kind: "session",
-        status: "pending",
-        strategy: "single_put",
-      });
-
-      const uploadContentResponse = await requestThreadApi(
-        new Request(`https://api.example.com/api/v1/files/${fileId}/content`, {
-          body: fileBody,
-          headers: {
-            Authorization: bearer(TOKENS.owner),
-            "Content-Type": "text/plain",
-          },
-          method: "PUT",
-        }),
-      );
-      expect(uploadContentResponse.status).toBe(200);
-      expect(await readJson(uploadContentResponse)).toEqual({ ok: true });
-
-      if (!pendingFileRow) {
-        throw new Error("Expected pending public Thread file row.");
-      }
-      const stagingObject = await bucket.get(pendingFileRow.object_key);
-      expect(await stagingObject?.text()).toBe(fileBody);
-
-      const uploadedRow = await database
-        .prepare("SELECT status FROM file_upload WHERE file_id = ?")
-        .bind(fileId)
-        .first<{ status: string }>();
-      expect(uploadedRow).toEqual({ status: "uploading" });
-
-      const pendingDownloadResponse = await requestThreadApi(
-        new Request(`https://api.example.com/api/v1/files/${fileId}/content`, {
-          headers: { Authorization: bearer(TOKENS.owner) },
-        }),
-      );
-      expect(pendingDownloadResponse.status).toBe(400);
-      expect(expectRecord(await readJson(pendingDownloadResponse))["error"]).toMatchObject({
-        code: "invalid_request",
-        message: "Only a ready file can be downloaded.",
-      });
-
-      const nonOwnerUploadResponse = await requestThreadApi(
-        new Request(`https://api.example.com/api/v1/files/${fileId}/content`, {
-          body: "non-owner overwrite\n",
-          headers: {
-            Authorization: bearer(TOKENS.nonOwner),
-            "Content-Type": "text/plain",
-          },
-          method: "PUT",
-        }),
-      );
-      expect(nonOwnerUploadResponse.status).toBe(404);
-      expect(expectRecord(await readJson(nonOwnerUploadResponse))["error"]).toMatchObject({
-        code: "not_found",
-      });
-
-      const nonOwnerCompleteResponse = await requestThreadApi(
-        new Request(`https://api.example.com/api/v1/files/${fileId}/complete`, {
-          body: JSON.stringify({}),
-          headers: {
-            Authorization: bearer(TOKENS.nonOwner),
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-        }),
-      );
-      expect(nonOwnerCompleteResponse.status).toBe(404);
-      expect(expectRecord(await readJson(nonOwnerCompleteResponse))["error"]).toMatchObject({
-        code: "not_found",
-      });
-
-      const completeUploadResponse = await requestThreadApi(
-        new Request(`https://api.example.com/api/v1/files/${fileId}/complete`, {
-          body: JSON.stringify({}),
-          headers: {
-            Authorization: bearer(TOKENS.owner),
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-        }),
-      );
-      expect(completeUploadResponse.status).toBe(200);
-      const completedFile = expectRecord(
-        expectRecord(await readJson(completeUploadResponse))["file"],
-      );
-      expect(completedFile).toMatchObject({
-        createdBy: PUBLIC_API_TEST_IDS.ownerAccount,
-        expiresAt: null,
-        id: fileId,
-        mimeType: "text/plain",
-        name: "launch-note.txt",
-        path: `session-files/${fileId}/launch-note.txt`,
-        sessionKind: "attachment",
-        size: fileSize,
         status: "ready",
-        version: 1,
       });
-      expectString(completedFile["createdAt"]);
-      expectString(completedFile["etag"]);
-      expectString(completedFile["updatedAt"]);
-
-      const finalObjectKey = `session/${threadId}/attachment/${fileId}/launch-note.txt`;
-      const finalObject = await bucket.get(finalObjectKey);
-      expect(await finalObject?.text()).toBe(fileBody);
-      expect(await bucket.get(pendingFileRow.object_key)).toBeNull();
+      if (!claimedFileRow) {
+        throw new Error("Expected claimed public Thread file row.");
+      }
+      expectString(claimedFileRow.object_key);
+      expectString(claimedFileRow.path);
+      expect(bucket.objects.has(appDraftFileRow.object_key)).toBe(false);
+      expect(await bucket.get(claimedFileRow.object_key).then((object) => object?.text())).toBe(
+        fileBody,
+      );
 
       const downloadContentResponse = await requestThreadApi(
         new Request(`https://api.example.com/api/v1/files/${fileId}/content?disposition=inline`, {
@@ -1446,7 +1422,7 @@ describe("Public Thread API e2e", () => {
       expect(downloadContentResponse.status).toBe(200);
       expect(downloadContentResponse.headers.get("cache-control")).toBe("no-store");
       expect(downloadContentResponse.headers.get("content-length")).toBe(String(fileSize));
-      expect(downloadContentResponse.headers.get("content-type")).toBe("text/plain");
+      expect(downloadContentResponse.headers.get("content-type")).toStartWith("text/plain");
       expect(downloadContentResponse.headers.get("content-disposition")).toContain(
         'inline; filename="launch-note.txt"',
       );
@@ -1463,83 +1439,30 @@ describe("Public Thread API e2e", () => {
         message: "File content disposition must be attachment or inline.",
       });
 
-      const completedFileRow = await database
-        .prepare(
-          `SELECT committed, expires_at, object_key, status
-             FROM file_record
-            WHERE id = ?`,
-        )
-        .bind(fileId)
-        .first<{
-          committed: number;
-          expires_at: number | null;
-          object_key: string;
-          status: string;
-        }>();
-      expect(completedFileRow).toEqual({
-        committed: 1,
-        expires_at: null,
-        object_key: finalObjectKey,
-        status: "ready",
-      });
-
-      const completedUploadRow = await database
-        .prepare("SELECT status FROM file_upload WHERE file_id = ?")
-        .bind(fileId)
-        .first<{ status: string }>();
-      expect(completedUploadRow).toEqual({ status: "completed" });
-
-      const appDraftFileId = await createPendingAppDraftFile({
-        body: "App draft upload.\n",
-        bucket,
-        database,
-        name: "app-draft.txt",
-      });
-      const appDraftUploadResponse = await requestThreadApi(
-        new Request(`https://api.example.com/api/v1/files/${appDraftFileId}/content`, {
-          body: "blocked app draft content\n",
-          headers: {
-            Authorization: bearer(TOKENS.owner),
-            "Content-Type": "text/plain",
-          },
-          method: "PUT",
-        }),
-      );
-      expect(appDraftUploadResponse.status).toBe(404);
-      expect(expectRecord(await readJson(appDraftUploadResponse))["error"]).toMatchObject({
-        code: "not_found",
-      });
-
-      const appDraftCompleteResponse = await requestThreadApi(
-        new Request(`https://api.example.com/api/v1/files/${appDraftFileId}/complete`, {
-          body: JSON.stringify({}),
-          headers: {
-            Authorization: bearer(TOKENS.owner),
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-        }),
-      );
-      expect(appDraftCompleteResponse.status).toBe(404);
-      expect(expectRecord(await readJson(appDraftCompleteResponse))["error"]).toMatchObject({
-        code: "not_found",
-      });
-
-      const readyAppDraftFileId = await createReadyAppDraftFile({
-        body: "Ready app draft.\n",
-        bucket,
-        database,
-        name: "ready-app-draft.txt",
-      });
-      const appDraftDownloadResponse = await requestThreadApi(
-        new Request(`https://api.example.com/api/v1/files/${readyAppDraftFileId}/content`, {
+      const listedFilesResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/threads/${threadId}/files`, {
           headers: { Authorization: bearer(TOKENS.owner) },
         }),
       );
-      expect(appDraftDownloadResponse.status).toBe(404);
-      expect(expectRecord(await readJson(appDraftDownloadResponse))["error"]).toMatchObject({
-        code: "not_found",
-      });
+      expect(listedFilesResponse.status).toBe(200);
+      expect(expectArray(expectRecord(await readJson(listedFilesResponse))["files"])).toEqual([
+        expect.objectContaining({
+          id: fileId,
+          kind: "attachment",
+          name: "launch-note.txt",
+          size: fileSize,
+        }),
+      ]);
+
+      const deleteFileResponse = await requestThreadApi(
+        new Request(`https://api.example.com/api/v1/files/${fileId}`, {
+          headers: { Authorization: bearer(TOKENS.owner) },
+          method: "DELETE",
+        }),
+      );
+      expect(deleteFileResponse.status).toBe(200);
+      expect(await readJson(deleteFileResponse)).toEqual({ ok: true });
+      expect(bucket.objects.has(claimedFileRow.object_key)).toBe(false);
     });
   });
 
@@ -1567,7 +1490,7 @@ describe("Public Thread API e2e", () => {
       .prepare("UPDATE file_record SET created_by_account_id = ? WHERE id = ?")
       .bind(PUBLIC_API_TEST_IDS.nonOwnerAccount, wrongCreatorFileId)
       .run();
-    await expectThreadFileClaimRejected({
+    await expectCreateThreadFileClaimRejected({
       fileId: wrongCreatorFileId,
       message: `Attachment ${wrongCreatorFileId} was not found.`,
       requestThreadApi,
@@ -1585,7 +1508,7 @@ describe("Public Thread API e2e", () => {
       .prepare("UPDATE file_record SET owner_id = ?, scope_id = ? WHERE id = ?")
       .bind(wrongAppId, wrongAppId, wrongAppFileId)
       .run();
-    await expectThreadFileClaimRejected({
+    await expectCreateThreadFileClaimRejected({
       fileId: wrongAppFileId,
       message: `Attachment ${wrongAppFileId} is not a draft attachment.`,
       requestThreadApi,
@@ -1598,20 +1521,21 @@ describe("Public Thread API e2e", () => {
       database,
       name: "claimed-draft.txt",
     });
-    const firstClaimResponse = await requestThreadApi(
-      new Request(`https://api.example.com/api/v1/threads/${threadId}/files`, {
-        body: JSON.stringify({
-          fileId: nonDraftFileId,
-        }),
-        headers: {
-          Authorization: bearer(TOKENS.owner),
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-      }),
-    );
-    expect(firstClaimResponse.status).toBe(201);
-    await expectThreadFileClaimRejected({
+    await database
+      .prepare(
+        `UPDATE file_record
+            SET committed = 1,
+                owner_id = ?,
+                owner_kind = 'session',
+                purpose = 'session_attachment',
+                scope_id = ?,
+                scope_kind = 'session',
+                session_kind = 'attachment'
+          WHERE id = ?`,
+      )
+      .bind(threadId, threadId, nonDraftFileId)
+      .run();
+    await expectCreateThreadFileClaimRejected({
       fileId: nonDraftFileId,
       message: `Attachment ${nonDraftFileId} is not a draft attachment.`,
       requestThreadApi,
@@ -1624,7 +1548,7 @@ describe("Public Thread API e2e", () => {
       database,
       name: "pending-draft.txt",
     });
-    await expectThreadFileClaimRejected({
+    await expectCreateThreadFileClaimRejected({
       fileId: notReadyFileId,
       message: `Attachment ${notReadyFileId} is not ready.`,
       requestThreadApi,

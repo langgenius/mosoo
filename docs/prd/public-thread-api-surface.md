@@ -135,6 +135,7 @@ The current route family is:
 
 | Capability                  | Route shape                                     | Product meaning                              |
 | --------------------------- | ----------------------------------------------- | -------------------------------------------- |
+| Upload Agent file           | `POST /api/v1/agents/{agentId}/files`           | Upload a ready file before a Thread exists.  |
 | Create Thread               | `POST /api/v1/agents/{agentId}/threads`         | Create a Thread for one Agent API Endpoint.  |
 | List endpoint Threads       | `GET /api/v1/agents/{agentId}/threads`          | List Threads for that endpoint and caller.   |
 | Retrieve Thread             | `GET /api/v1/threads/{threadId}`                | Read one Thread by public Thread ID.         |
@@ -145,17 +146,18 @@ The current route family is:
 | Unarchive Thread            | `POST /api/v1/threads/{threadId}/unarchive`     | Restore an archived Thread for the caller.   |
 | Delete Thread               | `DELETE /api/v1/threads/{threadId}`             | Delete the Thread through the public API.    |
 | List Thread files           | `GET /api/v1/threads/{threadId}/files`          | List files attached to the Thread.           |
-| Create Thread file upload   | `POST /api/v1/threads/{threadId}/files/uploads` | Open a Thread-scoped upload for raw bytes.   |
-| Upload Thread file bytes    | `PUT /api/v1/files/{fileId}/content`            | Send the file bytes for a pending upload.    |
+| Retrieve file metadata      | `GET /api/v1/files/{fileId}`                    | Read public metadata for a draft or Thread file. |
 | Download Thread file bytes  | `GET /api/v1/files/{fileId}/content`            | Read the bytes of a ready Thread file.       |
-| Complete Thread file upload | `POST /api/v1/files/{fileId}/complete`          | Finalize a pending upload into a ready file. |
-| Attach Thread file          | `POST /api/v1/threads/{threadId}/files`         | Claim a ready file handle into the Thread.   |
+| Delete file                 | `DELETE /api/v1/files/{fileId}`                 | Delete a pre-Thread draft file or Thread file. |
 | Delete Thread file          | `DELETE /api/v1/threads/{threadId}/files/{id}`  | Remove a file from the Thread.               |
 | Machine-readable API schema | `GET /api/v1/openapi.json`                      | Describe the Public Thread API for tooling.  |
 
-Attaching a file is a two-stage flow: upload the bytes through the files data
-plane first (create upload → `PUT` content → complete), then claim the resulting
-`fileId` into the Thread. MVP public uploads are single `PUT` and size-capped.
+Attaching a file is a single public upload plus a later reference: upload bytes
+to the Agent endpoint with `multipart/form-data` field `file`, receive a ready
+`file_id`, then pass it as `resources: [{ type: "file", file_id }]` when creating
+the Thread or posting a `user_message` event. The API service claims the draft
+file into the Thread before queueing the run. The old public create-upload →
+`PUT` content → complete state machine is not part of this contract.
 
 The public schema should keep runtime implementation details out of responses:
 driver ids, deployment internals, trace ids, vendor resume pointers, raw event
@@ -170,8 +172,8 @@ payloads, and sandbox paths are not part of the public contract.
 - Create Thread callers must use `response.thread.id` as the Thread ID for every
   later retrieve, events, stream, file, archive, and delete request.
 - Creating a Thread may omit `input`; that creates an idle Thread with no Run.
-- Thread creation accepts only the public input fields: initial input, file
-  handles, and caller external reference.
+- Thread creation accepts only the public input fields: initial input,
+  file-only `resources`, and caller external reference.
 - Thread events accept only user messages, permission decisions, and user
   interrupts.
 - Public event reads expose the stable `ThreadEventLogEntry` projection only; raw
