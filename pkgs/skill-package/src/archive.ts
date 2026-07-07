@@ -34,12 +34,20 @@ interface ZipArchiveMetadata {
 }
 
 export function createZipArchive(entries: SkillPackageEntry[]): Uint8Array {
-  const archive: Zippable = {};
   const admission = createSkillPackagePathAdmission();
+  const admittedEntries = entries.map((entry) => ({
+    ...entry,
+    path: admission.admit(entry.path, entry.entryKind).path,
+  }));
+
+  return createAdmittedZipArchive(admittedEntries);
+}
+
+export function createAdmittedZipArchive(entries: SkillPackageEntry[]): Uint8Array {
+  const archive: Zippable = {};
 
   for (const entry of entries) {
-    const admittedPath = admission.admit(entry.path, entry.entryKind).path;
-    const archivePath = entry.entryKind === "directory" ? `${admittedPath}/` : admittedPath;
+    const archivePath = entry.entryKind === "directory" ? `${entry.path}/` : entry.path;
 
     archive[archivePath] = [entry.body, createZipEntryOptions(entry)];
   }

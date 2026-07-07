@@ -17,6 +17,7 @@ import {
 } from "../application/agent-command.service";
 import { createAgentFork } from "../application/agent-fork.service";
 import { exportAgentManifest } from "../application/agent-manifest.service";
+import { exportAgentNativeRepo } from "../application/agent-native-repo-export.service";
 import { exportAgentPackage } from "../application/agent-package-export.service";
 import { importAgentPackage } from "../application/agent-package-import.service";
 import {
@@ -32,6 +33,10 @@ interface AppIdArgs {
 interface AppAgentIdArgs {
   agentId: string;
   appId: string;
+}
+
+interface AgentIdArgs {
+  agentId: string;
 }
 
 interface CreateAgentArgs {
@@ -81,6 +86,10 @@ export const agentGraphQLModule = {
       await deleteAgent(context.bindings.DB, context.viewer, args.input);
       return { ok: true } as const;
     },
+    exportAgentNativeRepo: async (_parent, args: AgentIdArgs, context) =>
+      exportAgentNativeRepo(context.bindings, context.viewer, {
+        agentId: parseAgentId(args.agentId),
+      }),
     importAgentPackage: async (_parent, args: ImportAgentPackageArgs, context) =>
       importAgentPackage(context.bindings, context.viewer, args.input),
     publishAgent: async (_parent, args: PublishAgentArgs, context) =>

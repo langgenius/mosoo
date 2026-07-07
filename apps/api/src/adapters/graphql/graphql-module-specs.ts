@@ -50,6 +50,7 @@ export const agentGraphQLSpec = {
     "createAgentFork(input: CreateAgentForkInput!): AgentPackageImportResult!",
     "createAgent(input: CreateAgentInput!): Agent!",
     "deleteAgent(input: DeleteAgentInput!): OperationResult!",
+    "exportAgentNativeRepo(agentId: ULID!): AgentPackageExport!",
     "importAgentPackage(input: ImportAgentPackageInput!): AgentPackageImportResult!",
     "publishAgent(input: PublishAgentInput!): Agent!",
     "recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!",

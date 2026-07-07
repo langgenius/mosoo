@@ -1316,6 +1316,7 @@ type Mutation {
   deleteOwnedSkill(appId: ULID!, skillId: ULID!): OperationResult!
   deleteVendorCredential(input: DeleteVendorCredentialInput!): OperationResult!
   deployApp(input: DeployAppInput!): AppDeploymentRun!
+  exportAgentNativeRepo(agentId: ULID!): AgentPackageExport!
   importAgentPackage(input: ImportAgentPackageInput!): AgentPackageImportResult!
   onboardingBootstrap(input: BootstrapOnboardingInput!): OnboardingStatus!
   pollLarkAgentChannelRegistration(input: PollLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!

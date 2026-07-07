@@ -17,8 +17,8 @@ export interface CreatedAgentPackageFile {
   size: number;
 }
 
-function isSupportedAgentPackageFileName(fileName: string): boolean {
-  return fileName.toLowerCase().endsWith(".agent");
+function hasSupportedArchiveExtension(fileName: string, extension: string): boolean {
+  return fileName.toLowerCase().endsWith(extension);
 }
 
 function assertAgentPackageFileSize(size: number): void {
@@ -27,11 +27,15 @@ function assertAgentPackageFileSize(size: number): void {
   }
 }
 
-function assertAgentPackageFileName(fileName: string): string {
-  const normalizedFileName = normalizeFileName(fileName);
+function assertArchiveFileName(input: {
+  extension: ".agent" | ".zip";
+  fileName: string;
+  message: string;
+}): string {
+  const normalizedFileName = normalizeFileName(input.fileName);
 
-  if (!isSupportedAgentPackageFileName(normalizedFileName)) {
-    throw new Error("Agent package file must use .agent.");
+  if (!hasSupportedArchiveExtension(normalizedFileName, input.extension)) {
+    throw new Error(input.message);
   }
 
   return normalizedFileName;
@@ -61,17 +65,23 @@ async function abortPackageUploadForCompensation(input: {
     });
 }
 
-export async function createAgentPackageFile(input: {
+async function createAgentPackageScopedArchiveFile(input: {
   archiveBytes: Uint8Array;
   bindings: ApiBindings;
+  extension: ".agent" | ".zip";
   fileName: string;
+  invalidFileNameMessage: string;
   appId: AppId;
   viewer: AuthenticatedViewer;
 }): Promise<CreatedAgentPackageFile> {
   await ensureAppOwnership(input.bindings.DB, input.viewer.id, input.appId);
   assertAgentPackageFileSize(input.archiveBytes.byteLength);
 
-  const fileName = assertAgentPackageFileName(input.fileName);
+  const fileName = assertArchiveFileName({
+    extension: input.extension,
+    fileName: input.fileName,
+    message: input.invalidFileNameMessage,
+  });
   const upload = await fileStore.createUpload(input.bindings, input.viewer, {
     file: {
       contentType: AGENT_PACKAGE_CONTENT_TYPE,
@@ -116,8 +126,36 @@ export async function createAgentPackageFile(input: {
   }
 }
 
+export async function createAgentPackageFile(input: {
+  archiveBytes: Uint8Array;
+  bindings: ApiBindings;
+  fileName: string;
+  appId: AppId;
+  viewer: AuthenticatedViewer;
+}): Promise<CreatedAgentPackageFile> {
+  return createAgentPackageScopedArchiveFile({
+    ...input,
+    extension: ".agent",
+    invalidFileNameMessage: "Agent package file must use .agent.",
+  });
+}
+
+export async function createAgentNativeRepoFile(input: {
+  archiveBytes: Uint8Array;
+  bindings: ApiBindings;
+  fileName: string;
+  appId: AppId;
+  viewer: AuthenticatedViewer;
+}): Promise<CreatedAgentPackageFile> {
+  return createAgentPackageScopedArchiveFile({
+    ...input,
+    extension: ".zip",
+    invalidFileNameMessage: "Agent native repo export file must use .zip.",
+  });
+}
+
 function assertPackageFileArchiveShape(file: AdmittedAgentPackageFile): void {
-  if (!isSupportedAgentPackageFileName(file.name)) {
+  if (!hasSupportedArchiveExtension(file.name, ".agent")) {
     throw new Error("Agent package file must use .agent.");
   }
 

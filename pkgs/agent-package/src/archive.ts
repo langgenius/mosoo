@@ -8,7 +8,7 @@ import {
   parseAgentPackageJson,
 } from "@mosoo/contracts/agent-manifest-parser";
 import { serializeAgentPackageToJson } from "@mosoo/contracts/agent-manifest-serializer";
-import { createZipArchive, extractZipArchive } from "@mosoo/skill-package";
+import { createAdmittedZipArchive, extractZipArchive } from "@mosoo/skill-package";
 import type { SkillPackageEntry } from "@mosoo/skill-package";
 
 import { readPackageAssets } from "./archive-assets";
@@ -149,7 +149,7 @@ export function createAgentPackageArchiveBytes(agentPackage: AgentPackage): Uint
 
   assertArchiveEntriesAdmitted(entries);
 
-  return createZipArchive(entries);
+  return createAdmittedZipArchive(entries);
 }
 
 export function parseAgentPackageArchiveBytes(

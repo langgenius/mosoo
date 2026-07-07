@@ -18,10 +18,11 @@ import { isTruthy } from "../../../shared/truthiness";
 import { toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { readSkillPackageBytesFromSnapshot } from "../../skills/application/skill-package-snapshot.service";
-import { ensureAppAgentOwner } from "./agent-access.service";
+import { ensureAgentOwner, ensureAppAgentOwner } from "./agent-access.service";
 import { createAgentPackageFile } from "./agent-package-file.service";
 import { buildAgentSpec, toAgentManifest } from "./agent-spec.service";
 import type { AgentSpecSkill } from "./agent-spec.service";
+import type { AgentRow } from "./agent-types";
 
 export function createPortableAgentPackageManifest(
   sourceManifest: AgentPackage["manifest"],
@@ -84,16 +85,28 @@ async function appendSkillPackageAssets(input: {
   }
 }
 
-export async function exportAgentPackage(
+export async function buildPortableAgentPackage(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   input: {
     agentId: AgentId;
-    appId: AppId;
+    appId?: AppId;
   },
-): Promise<AgentPackageExport> {
-  const packageAccess = await ensureAppAgentOwner(bindings.DB, viewer.id, input);
-  const sourceSpec = await buildAgentSpec(bindings.DB, packageAccess.agent);
+): Promise<{
+  agent: AgentRow;
+  agentPackage: AgentPackage;
+  manifest: AgentPackage["manifest"];
+}> {
+  const agent =
+    input.appId === undefined
+      ? await ensureAgentOwner(bindings.DB, viewer.id, input.agentId)
+      : (
+          await ensureAppAgentOwner(bindings.DB, viewer.id, {
+            agentId: input.agentId,
+            appId: input.appId,
+          })
+        ).agent;
+  const sourceSpec = await buildAgentSpec(bindings.DB, agent);
   const sourceManifest = toAgentManifest(sourceSpec);
   const manifest = createPortableAgentPackageManifest(sourceManifest);
   const assets: AgentPackageAsset[] = [];
@@ -104,37 +117,52 @@ export async function exportAgentPackage(
     skills: sourceSpec.skills,
   });
 
-  const agentPackage: AgentPackage = {
-    author: null,
-    app: {
-      avatarAssetKey: null,
-      description: packageAccess.agent.description,
-      name: packageAccess.agent.name,
+  return {
+    agent,
+    agentPackage: {
+      author: null,
+      app: {
+        avatarAssetKey: null,
+        description: agent.description,
+        name: agent.name,
+      },
+      assets,
+      exportedAt: toIsoString(Date.now()),
+      license: null,
+      manifest,
+      packageVersion: AGENT_PACKAGE_VERSION,
+      sourceAgentId: agent.id,
+      version: null,
     },
-    assets,
-    exportedAt: toIsoString(Date.now()),
-    license: null,
     manifest,
-    packageVersion: AGENT_PACKAGE_VERSION,
-    sourceAgentId: packageAccess.agent.id,
-    version: null,
   };
-  const fileName = createAgentPackageFileName(packageAccess.agent.name);
-  const archiveBytes = createAgentPackageArchiveBytes(agentPackage);
+}
+
+export async function exportAgentPackage(
+  bindings: ApiBindings,
+  viewer: AuthenticatedViewer,
+  input: {
+    agentId: AgentId;
+    appId: AppId;
+  },
+): Promise<AgentPackageExport> {
+  const portable = await buildPortableAgentPackage(bindings, viewer, input);
+  const fileName = createAgentPackageFileName(portable.agent.name);
+  const archiveBytes = createAgentPackageArchiveBytes(portable.agentPackage);
   const packageFile = await createAgentPackageFile({
     archiveBytes,
     bindings,
     fileName,
-    appId: packageAccess.agent.appId,
+    appId: portable.agent.appId,
     viewer,
   });
 
   return {
-    agentId: packageAccess.agent.id,
+    agentId: portable.agent.id,
     contentType: packageFile.contentType,
     fileId: packageFile.fileId,
     fileName: packageFile.fileName,
-    manifestYaml: serializeAgentManifestToYaml(manifest, packageAccess.agent.id),
+    manifestYaml: serializeAgentManifestToYaml(portable.manifest, portable.agent.id),
     size: packageFile.size,
   };
 }
