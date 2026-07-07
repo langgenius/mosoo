@@ -289,6 +289,15 @@ function parsePlanJson(runRow: AppDeploymentRunRow): Record<string, unknown> {
   return JSON.parse(runRow.planJson) as Record<string, unknown>;
 }
 
+async function readAppSlug(database: SqliteD1Database): Promise<string | null> {
+  const row = await database
+    .prepare("SELECT slug FROM app WHERE id = ?")
+    .bind(APP_ID)
+    .first<{ slug: string | null }>();
+
+  return row?.slug ?? null;
+}
+
 describe("native deployment executor", () => {
   test("keeps a plain repo without the marker on the legacy path", async () => {
     const { bindings, database } = await createFixture();
@@ -428,6 +437,37 @@ describe("native deployment executor", () => {
     expect(runs[0]?.native?.facts?.agents).toEqual([
       { action: "created", exposed: true, name: "quiz-master", versionNumber: 1 },
     ]);
+  });
+
+  test("mints the app namespace slug from the app name on the first protocol deploy only", async () => {
+    const { bindings, database } = await createFixture();
+
+    expect(await readAppSlug(database)).toBeNull();
+
+    // Legacy repos never enter the protocol branch and mint no slug.
+    const legacy = await dispatchRepo(bindings, database, { "index.html": "<main>Hello</main>" });
+
+    expect(legacy.runRow.status).toBe("success");
+    expect(await readAppSlug(database)).toBeNull();
+
+    // A red protocol repo fails before the mint: the namespace is reserved
+    // only by a green-validated protocol deploy.
+    const red = await dispatchRepo(bindings, database, {
+      ".agent/manifest.json": createAgentManifestJson("quiz-master", { prompts: undefined }),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+
+    expect(red.runRow.status).toBe("failed");
+    expect(await readAppSlug(database)).toBeNull();
+
+    const green = await dispatchRepo(bindings, database, {
+      ".agent/manifest.json": openaiAgentManifest("quiz-master"),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+
+    // Fixture app name is "Default App" → kebab slug "default-app".
+    expect(green.runRow.status).toBe("success");
+    expect(await readAppSlug(database)).toBe("default-app");
   });
 
   test("re-dispatching an identical agent-only repo reports unchanged", async () => {

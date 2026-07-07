@@ -32,6 +32,7 @@ function createSkillAccessDatabase(): SqliteD1Database {
       created_at integer NOT NULL,
       default_environment_id text,
       name text NOT NULL,
+      slug text,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       updated_at integer NOT NULL

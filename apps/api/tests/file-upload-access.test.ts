@@ -107,6 +107,7 @@ function createFileUploadAccessDatabase(): SqliteD1Database {
       default_environment_id text,
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
+      slug text,
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       updated_at integer NOT NULL

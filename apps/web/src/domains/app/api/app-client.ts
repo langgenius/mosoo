@@ -14,6 +14,7 @@ const APP_LIST_QUERY = graphql(/* GraphQL */ `
       id
       name
       ownerAccountId
+      slug
     }
   }
 `);
@@ -26,6 +27,7 @@ const CREATE_APP_MUTATION = graphql(/* GraphQL */ `
       id
       name
       ownerAccountId
+      slug
     }
   }
 `);
@@ -38,6 +40,7 @@ const RENAME_APP_MUTATION = graphql(/* GraphQL */ `
       id
       name
       ownerAccountId
+      slug
     }
   }
 `);

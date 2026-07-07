@@ -55,6 +55,7 @@ function createCredentialRuntimeDatabase(): SqliteD1Database {
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       name text NOT NULL,
+      slug text,
       default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL

@@ -183,6 +183,22 @@ agents = ["concierge", "support"]
     name: "valid-multi-agent-shared-mcp-sidecar",
   },
   {
+    // Internal agents keep free-form names: only the expose subset's names
+    // become URL path segments, so "back_office" stays green while internal.
+    expect: "green",
+    expectedCodes: [],
+    files: {
+      ".agent/agents/back_office/manifest.json": createAgentManifestJson("back_office"),
+      ".agent/manifest.json": createAgentManifestJson("concierge"),
+      ".mosoo.toml": `spec = "${MOSOO_NATIVE_SPEC}"
+
+[expose]
+agents = ["concierge"]
+`,
+    },
+    name: "valid-internal-agent-name-not-kebab",
+  },
+  {
     expect: "red",
     expectedCodes: ["native.toml.missing"],
     files: {
@@ -458,6 +474,17 @@ agents = ["concierge"]
 `,
     },
     name: "red-agent-dir-name-mismatch",
+  },
+  {
+    // The primary agent of a single-agent repo is exposed by default, so its
+    // name must be a URL-safe kebab path segment.
+    expect: "red",
+    expectedCodes: ["native.agent.name_not_url_safe"],
+    files: {
+      ".agent/manifest.json": createAgentManifestJson("Quiz Master"),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    },
+    name: "red-exposed-agent-name-not-url-safe",
   },
   {
     expect: "red",

@@ -130,6 +130,19 @@ async function countRows(database: SqliteD1Database, sql: string, ...binds: stri
   return row?.count ?? 0;
 }
 
+async function readAgentExposureByName(database: SqliteD1Database, name: string) {
+  const row = await database
+    .prepare("SELECT exposed_via_api FROM agent WHERE app_id = ? AND name = ?")
+    .bind(APP_ID, name)
+    .first<{ exposed_via_api: number | null }>();
+
+  if (row === null) {
+    throw new Error(`Agent ${name} is missing.`);
+  }
+
+  return row.exposed_via_api;
+}
+
 describe("upsertNativeRepoAgents", () => {
   test("creates and auto-publishes a new repo agent", async () => {
     const { bindings, database } = await createFixture();
@@ -422,6 +435,36 @@ describe("upsertNativeRepoAgents", () => {
     expect(
       await countRows(database, "SELECT COUNT(*) AS count FROM skill WHERE app_id = ?", APP_ID),
     ).toBe(1);
+  });
+
+  test("persists exposedViaApi per facts and clears it when an agent drops out of the expose subset", async () => {
+    const { bindings, database } = await createFixture();
+    const multiAgentFiles = (exposeAgents: string): Record<string, string> => ({
+      ".agent/agents/support/manifest.json": openaiAgentManifest("support"),
+      ".agent/agents/triage/manifest.json": openaiAgentManifest("triage"),
+      ".agent/manifest.json": openaiAgentManifest("concierge"),
+      ".mosoo.toml": `spec = "${MOSOO_NATIVE_SPEC}"\n\n[expose]\nagents = [${exposeAgents}]\n`,
+    });
+
+    const first = await deployRepo(bindings, multiAgentFiles('"concierge", "support"'));
+
+    expect(first.blocking).toBeUndefined();
+    expect(await readAgentExposureByName(database, "concierge")).toBe(1);
+    expect(await readAgentExposureByName(database, "support")).toBe(1);
+    expect(await readAgentExposureByName(database, "triage")).toBe(0);
+
+    // Pinned rule: dropping an agent out of the expose subset on a later
+    // deploy of the same app clears its exposure back to 0.
+    const second = await deployRepo(bindings, multiAgentFiles('"concierge"'));
+
+    expect(second.blocking).toBeUndefined();
+    expect(await readAgentExposureByName(database, "concierge")).toBe(1);
+    expect(await readAgentExposureByName(database, "support")).toBe(0);
+    expect(await readAgentExposureByName(database, "triage")).toBe(0);
+
+    // Console-created agents are never repo-defined, so their exposure stays
+    // NULL (not name-routable) across repo deploys.
+    expect(await readAgentExposureByName(database, "Public API Agent")).toBeNull();
   });
 
   test("provisions every agent of a multi-agent repo, internal ones included", async () => {

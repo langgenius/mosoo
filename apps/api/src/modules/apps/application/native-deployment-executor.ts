@@ -54,6 +54,7 @@ import type {
   AppDeploymentDispatchContext,
   PreparedAppDeploymentRepository,
 } from "./app-deployment-run-steps";
+import { ensureAppSlug } from "./app-slug.service";
 import { validateNativeDeployment } from "./native-deployment-validator";
 
 /** Env var carrying the bound-agent capability URL into an [expose.web] host. */
@@ -148,6 +149,11 @@ async function runNativeDeploymentBranchUnsafe(
     });
     return { kind: "handled" };
   }
+
+  // First green-validated protocol deploy mints the App's namespace slug
+  // from the App name; later deploys read the immutable value back. A mint
+  // failure throws into the branch catch-all (native_provision_failed).
+  await ensureAppSlug(database, deployment.appId);
 
   const planOutcome = buildNativeDeploymentPlan(
     input.prepared.snapshot,

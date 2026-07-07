@@ -18,6 +18,7 @@ export function toAppSummary(row: AppRow): AppSummary {
     id: row.id,
     name: row.name,
     ownerAccountId: row.ownerAccountId,
+    slug: row.slug,
   };
 }
 

@@ -104,6 +104,62 @@ describe("native deployment validator", () => {
     expect(facts?.web).toEqual({ declared: false });
   });
 
+  test("rejects a non-kebab name only when the agent is exposed", () => {
+    const files = {
+      ".agent/agents/back_office/manifest.json": createAgentManifestJson("back_office"),
+      ".agent/manifest.json": createAgentManifestJson("concierge"),
+      ".mosoo.toml": `spec = "mosoo.spec.v1"\n\n[expose]\nagents = ["concierge", "back_office"]\n`,
+    };
+    const result = validate(files);
+
+    expect(result.valid).toBe(false);
+    expect(result.failures).toEqual([
+      {
+        action:
+          'rename agent "back_office" to a URL-safe kebab-case name (lowercase letters, digits, and hyphens, starting with a letter or digit), or remove it from the expose subset',
+        code: "native.agent.name_not_url_safe",
+        field: "name",
+        file: ".agent/agents/back_office/manifest.json",
+        problem:
+          'exposed agent name "back_office" is not a URL-safe path segment for the App API namespace',
+        severity: "error",
+      },
+    ]);
+
+    // Dropping the agent from the expose subset legalizes the same name.
+    const internal = validate({
+      ...files,
+      ".mosoo.toml": `spec = "mosoo.spec.v1"\n\n[expose]\nagents = ["concierge"]\n`,
+    });
+
+    expect(internal.valid).toBe(true);
+    expect(sortedCodes(internal)).toEqual([]);
+  });
+
+  test("pins the exposed-name kebab boundary cases", () => {
+    const validateSingleAgentName = (name: string) =>
+      validate({
+        ".agent/manifest.json": createAgentManifestJson(name),
+        ".mosoo.toml": NATIVE_MARKER_TOML,
+      });
+
+    for (const name of ["quiz-master", "a", "0hero", `q${"a".repeat(63)}`]) {
+      expect(sortedCodes(validateSingleAgentName(name))).toEqual([]);
+    }
+
+    for (const name of [
+      "Quiz-Master",
+      "-lead",
+      "quiz master",
+      "quiz.master",
+      `q${"a".repeat(64)}`,
+    ]) {
+      expect(sortedCodes(validateSingleAgentName(name))).toEqual([
+        "native.agent.name_not_url_safe",
+      ]);
+    }
+  });
+
   test("facts are null when the marker gate fails", () => {
     expect(validate({}).facts).toBeNull();
     expect(validate({ ".mosoo.toml": 'spec = "mosoo.spec.v1' }).facts).toBeNull();

@@ -22,6 +22,7 @@ function createAvailableModelsDatabase(): D1Database {
       organization_id TEXT NOT NULL,
       owner_account_id TEXT NOT NULL,
       name TEXT NOT NULL,
+      slug TEXT,
       default_environment_id TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL

@@ -57,11 +57,11 @@ import type {
 } from "@mosoo/contracts/native-deployment-run";
 import { agentDeploymentVersionsTable, agentSkillsTable, agentsTable } from "@mosoo/db";
 import type { AgentId, AppId, SkillId } from "@mosoo/id";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, ne, or } from "drizzle-orm";
 import { zipSync } from "fflate";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { runAppDatabaseBatch } from "../../../platform/db/drizzle";
+import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { API_ERROR_CODE, isApiError } from "../../../platform/errors";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
@@ -253,7 +253,7 @@ async function upsertNativeRepoAgentsUnsafe(
     const existing = (rowsByName.get(normalized.name) ?? [])[0] ?? null;
 
     try {
-      results.push(
+      const result =
         existing === null
           ? await provisionNewNativeAgent(bindings, viewer, input.appId, normalized, setupFailures)
           : await provisionExistingNativeAgent(
@@ -263,8 +263,13 @@ async function upsertNativeRepoAgentsUnsafe(
               existing,
               normalized,
               setupFailures,
-            ),
-      );
+            );
+
+      if (result.agentId !== null) {
+        await persistAgentApiExposure(bindings.DB, result.agentId, normalized.exposed);
+      }
+
+      results.push(result);
     } catch (error) {
       hardFailures.push(`Agent "${normalized.name}": ${errorMessage(error)}`);
       results.push({
@@ -298,6 +303,33 @@ async function upsertNativeRepoAgentsUnsafe(
   }
 
   return { results };
+}
+
+/**
+ * Projects the repo's expose subset onto the agent row (PRD "API Namespace &
+ * Access"): 1 = exposed, 0 = repo-defined but internal — including the agent
+ * that DROPPED out of the expose subset on a later deploy of the same repo.
+ * NULL (console-created) rows are only ever written here once the repo
+ * defines the name. The guarded WHERE keeps idempotent re-deploys write-free
+ * so an unchanged agent row stays byte-identical (updatedAt included).
+ */
+async function persistAgentApiExposure(
+  database: D1Database,
+  agentId: AgentId,
+  exposed: boolean,
+): Promise<void> {
+  const exposedViaApi = exposed ? 1 : 0;
+
+  await getAppDatabase(database)
+    .update(agentsTable)
+    .set({ exposedViaApi, updatedAt: currentTimestampMs() })
+    .where(
+      and(
+        eq(agentsTable.id, agentId),
+        or(isNull(agentsTable.exposedViaApi), ne(agentsTable.exposedViaApi, exposedViaApi)),
+      ),
+    )
+    .run();
 }
 
 async function provisionNewNativeAgent(

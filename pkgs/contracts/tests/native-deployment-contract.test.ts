@@ -31,6 +31,7 @@ describe("native deployment validate contract", () => {
       "native.agent.mcp_invalid",
       "native.agent.mcp_secret_forbidden",
       "native.agent.name_conflict",
+      "native.agent.name_not_url_safe",
       "native.expose.agent_unknown",
       "native.expose.agents_required",
       "native.expose.channel_unsupported",

@@ -871,21 +871,21 @@ export type AppListQueryVariables = Exact<{
 }>;
 
 
-export type AppListQuery = { appList: Array<{ createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId }> };
+export type AppListQuery = { appList: Array<{ createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId, slug: string | null }> };
 
 export type CreateAppMutationVariables = Exact<{
   input: CreateAppInput;
 }>;
 
 
-export type CreateAppMutation = { createApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId } };
+export type CreateAppMutation = { createApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId, slug: string | null } };
 
 export type RenameAppMutationVariables = Exact<{
   input: RenameAppInput;
 }>;
 
 
-export type RenameAppMutation = { renameApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId } };
+export type RenameAppMutation = { renameApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId, slug: string | null } };
 
 export type AppDeploymentRunNativeFieldsFragment = { facts: { agentCount: number, specVersion: string, agents: Array<{ action: string, exposed: boolean, name: string, versionNumber: number | null }>, web: { agent: string | null, declared: boolean } } | null, validate: { schemaVersion: number, valid: boolean, facts: { agentCount: number, spec: string, agents: Array<{ exposed: boolean, name: string, source: string }>, web: { agent: string | null, declared: boolean } } | null, failures: Array<{ action: string, code: string, field: string | null, file: string, problem: string, severity: string }> } };
 
@@ -2656,6 +2656,7 @@ export const AppListDocument = /*#__PURE__*/ new TypedDocumentString(`
     id
     name
     ownerAccountId
+    slug
   }
 }
     `) as unknown as TypedDocumentString<AppListQuery, AppListQueryVariables>;
@@ -2667,6 +2668,7 @@ export const CreateAppDocument = /*#__PURE__*/ new TypedDocumentString(`
     id
     name
     ownerAccountId
+    slug
   }
 }
     `) as unknown as TypedDocumentString<CreateAppMutation, CreateAppMutationVariables>;
@@ -2678,6 +2680,7 @@ export const RenameAppDocument = /*#__PURE__*/ new TypedDocumentString(`
     id
     name
     ownerAccountId
+    slug
   }
 }
     `) as unknown as TypedDocumentString<RenameAppMutation, RenameAppMutationVariables>;

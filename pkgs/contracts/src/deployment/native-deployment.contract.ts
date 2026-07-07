@@ -36,6 +36,10 @@ export const NATIVE_AGENT_DIR = ".agent" as const;
  * - warning: `native.expose.none`, `native.toml.unknown_key`
  * - setup_required: `native.setup.environment_secret`,
  *   `native.setup.mcp_reconnect`
+ *
+ * Scoping note: `native.agent.name_not_url_safe` is enforced ONLY for agents
+ * inside the expose subset (their names become URL path segments in the App
+ * API namespace); internal agent names are unconstrained.
  */
 export const NATIVE_VALIDATE_FAILURE_CODES = [
   "native.agent.dir_name_mismatch",
@@ -48,6 +52,7 @@ export const NATIVE_VALIDATE_FAILURE_CODES = [
   "native.agent.mcp_invalid",
   "native.agent.mcp_secret_forbidden",
   "native.agent.name_conflict",
+  "native.agent.name_not_url_safe",
   "native.expose.agent_unknown",
   "native.expose.agents_required",
   "native.expose.channel_unsupported",

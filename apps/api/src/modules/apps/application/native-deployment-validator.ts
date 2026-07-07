@@ -78,6 +78,14 @@ const NATIVE_TOML_EXPOSE_KEYS = new Set(["agents", "channel", "web"]);
 const NATIVE_TOML_EXPOSE_WEB_KEYS = new Set(["agent", "build"]);
 
 /**
+ * Exposed agent names become URL path segments of the App API namespace
+ * (`…/apps/{app-slug}/agents/{name}/threads`), so they must be URL-safe
+ * kebab-case. Enforced ONLY for agents inside the expose subset; internal
+ * agent names stay unconstrained (PRD "API Namespace & Access").
+ */
+const EXPOSED_AGENT_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+/**
  * Underlying manifest issue codes that identify a single dotted manifest
  * field; everything else keeps its specifics in `problem` only. Keyed by the
  * contracts-exported issue-code constants so the mapping cannot drift from
@@ -218,6 +226,7 @@ export function validateNativeDeployment(
   const exposure = resolveAgentExposure(toml, multiAgent, definedNames, failures);
   const webAgent = resolveWebAgent(toml, multiAgent, definedNames, primaryAgent, failures);
 
+  collectExposedAgentNameFailures(agents, exposure, failures);
   failures.push(...collectSidecarContentFailures(agents, primaryAgent, files));
   failures.push(...deriveSetupFailures(agents, files));
 
@@ -727,6 +736,36 @@ function resolveAgentExposure(
   }
 
   return { kind: "list", names: new Set(toml.agentNames) };
+}
+
+/**
+ * URL-safety gate for the expose subset only: an exposed agent's name is the
+ * public path segment addressing it, so it must match
+ * {@link EXPOSED_AGENT_NAME_PATTERN}. Internal agents deploy with any name.
+ */
+function collectExposedAgentNameFailures(
+  agents: readonly DiscoveredAgent[],
+  exposure: AgentExposure,
+  failures: NativeValidateFailure[],
+): void {
+  for (const agent of agents) {
+    if (agent.name === null || !isAgentExposed(agent, exposure)) {
+      continue;
+    }
+
+    if (EXPOSED_AGENT_NAME_PATTERN.test(agent.name)) {
+      continue;
+    }
+
+    failures.push({
+      action: `rename agent "${agent.name}" to a URL-safe kebab-case name (lowercase letters, digits, and hyphens, starting with a letter or digit), or remove it from the expose subset`,
+      code: "native.agent.name_not_url_safe",
+      field: "name",
+      file: agent.manifestPath,
+      problem: `exposed agent name "${agent.name}" is not a URL-safe path segment for the App API namespace`,
+      severity: "error",
+    });
+  }
 }
 
 function isAgentExposed(agent: DiscoveredAgent, exposure: AgentExposure): boolean {

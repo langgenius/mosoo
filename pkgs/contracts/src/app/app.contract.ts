@@ -17,6 +17,12 @@ export interface AppSummary {
   id: AppId;
   name: string;
   ownerAccountId: AccountId;
+  /**
+   * Instance-global API namespace slug, minted at the App's first protocol
+   * deploy and immutable afterwards; null = no protocol deploy yet (the App
+   * is not name-routable).
+   */
+  slug: string | null;
 }
 
 export interface RenameAppInput {

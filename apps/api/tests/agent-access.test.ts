@@ -30,6 +30,7 @@ function createAgentAccessDatabase(): SqliteD1Database {
       organization_id text NOT NULL,
       owner_account_id text NOT NULL,
       name text NOT NULL,
+      slug text,
       default_environment_id text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL
@@ -40,6 +41,7 @@ function createAgentAccessDatabase(): SqliteD1Database {
       created_at integer NOT NULL,
       description text,
       environment_id text,
+      exposed_via_api integer,
       id text PRIMARY KEY NOT NULL,
       kind text NOT NULL,
       live_deployment_version_id text,

@@ -33,6 +33,7 @@ function createMcpBindingDatabase(): D1Database {
       created_at integer NOT NULL,
       description text,
       environment_id text,
+      exposed_via_api integer,
       id text PRIMARY KEY NOT NULL,
       kind text NOT NULL DEFAULT 'pet',
       live_deployment_version_id text,
