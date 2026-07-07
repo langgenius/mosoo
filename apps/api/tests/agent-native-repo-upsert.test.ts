@@ -325,6 +325,47 @@ describe("upsertNativeRepoAgents", () => {
     expect(row?.environment_id).toBe(PUBLIC_API_TEST_IDS.environment);
   });
 
+  test("blocks an already-live update whose new version fails readiness and keeps the prior version", async () => {
+    const { bindings, database } = await createFixture();
+
+    const first = await deployRepo(bindings, minimalRepoFiles());
+
+    expect(first.results[0]?.action).toBe("created");
+
+    const live = await readAgentRowByName(database, "quiz-master");
+
+    expect(live?.status).toBe("published");
+    expect(live?.live_deployment_version_id).toBeTruthy();
+
+    // Re-deploy the SAME agent with a version-requiring prompt change AND an
+    // environment secret that is not configured on this instance. Activating
+    // the new live version would report a green deploy over a broken endpoint,
+    // so the update-path readiness gate must block it (mirrors the new-agent
+    // path) and leave the prior working version live.
+    const blocked = await deployRepo(bindings, {
+      ".agent/environment/definition.json": `${JSON.stringify(
+        { expectedName: "Default", secretNames: ["QUIZ_API_TOKEN"], setupScript: "" },
+        null,
+        2,
+      )}\n`,
+      ".agent/manifest.json": openaiAgentManifest("quiz-master", {
+        environment: { ref: "environment/definition.json" },
+        prompts: { system: "You are the upgraded quiz master." },
+      }),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+
+    expect(blocked.blocking?.code).toBe("native_setup_required");
+    expect(blocked.blocking?.message).toContain("QUIZ_API_TOKEN");
+    expect(blocked.results).toEqual([{ action: "failed", agentId: live?.id, name: "quiz-master" }]);
+
+    const after = await readAgentRowByName(database, "quiz-master");
+
+    expect(after?.status).toBe("published");
+    expect(after?.live_deployment_version_id).toBe(live?.live_deployment_version_id ?? "");
+    expect(after?.prompt).toBe("You are a helpful fixture agent.");
+  });
+
   test("re-deploy adopts a blocked draft by name and publishes once unblocked", async () => {
     const { bindings, database } = await createFixture();
 
