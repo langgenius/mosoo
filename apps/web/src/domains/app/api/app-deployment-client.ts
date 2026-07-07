@@ -281,9 +281,12 @@ function toNativeWebFact(web: RawNativeWebFact): { agent?: string; declared: boo
  * omits optional keys and plain `String` where the contract has closed unions.
  * Rebuild the canonical serialized shape and reuse the strict contract parser,
  * so the web sees exactly the closed-set semantics the API persisted (unknown
- * codes → `null`, same as a corrupted row).
+ * codes → `null`, same as a corrupted row). Exported for the web test suite;
+ * the app consumes it only through {@link toAppDeploymentRun}.
  */
-function toNativeRunResult(native: RawNativeRunResult | null): NativeDeploymentRunResult | null {
+export function toNativeRunResult(
+  native: RawNativeRunResult | null,
+): NativeDeploymentRunResult | null {
   if (native === null) {
     return null;
   }

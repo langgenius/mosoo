@@ -4,11 +4,22 @@ import { Fragment, useState } from "react";
 import { cn } from "@/shared/lib/class-names";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 
-import { DEPLOY_TARGET_LABELS } from "../deploy-console-data";
-import type { DeploymentRunVM } from "../deploy-console-data";
+import { deployTargetLine } from "../deploy-console-data";
+import type { DeploymentRunVM, NativeRunFailureVM } from "../deploy-console-data";
 import { relativeLabel } from "../deploy-console-mapping";
 import { useNowTick } from "../use-now-tick";
 import { StatusBadge } from "./deploy-status-badge";
+
+/**
+ * Severity tint of the `[severity]` tag on a failure row. `setup_required` is
+ * a neutral setup note (the repo is fine, the instance needs a value), so it
+ * must not read as red.
+ */
+const FAILURE_SEVERITY_CLASSES: Record<NativeRunFailureVM["severity"], string> = {
+  error: "text-destructive",
+  setup_required: "text-fg-2",
+  warning: "text-amber-fg",
+};
 
 const PRE_DEPLOY_HINT =
   "After your first production deploy, every build shows up here: commit · status · target · duration.";
@@ -60,7 +71,9 @@ export function ActivitySection({
 
 /**
  * Deployment runs for the App, newest first. Every deploy targets the default
- * branch HEAD; failed runs expose their error inline below the row.
+ * branch HEAD. The Details expander is data-driven: per-agent provisioning
+ * rows and repo-term validate failures for protocol (mosoo-native) runs, plus
+ * the run-level error code and message when the run failed.
  */
 export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
   const now = useNowTick();
@@ -92,10 +105,14 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
           {runs.map((run) => {
             const failedError =
               run.status === "failed" ? (run.errorMessage ?? run.errorCode) : null;
-            const expanded = expandedRunIds.has(run.id);
+            const hasNativeDetails =
+              run.native !== null &&
+              (run.native.agents.length > 0 || run.native.failures.length > 0);
+            const expandable = failedError !== null || hasNativeDetails;
+            const expanded = expandable && expandedRunIds.has(run.id);
             return (
               <Fragment key={run.id}>
-                <TableRow>
+                <TableRow data-testid="deploy-run-row">
                   <TableCell className="py-4 pl-5">
                     <div className="flex items-center gap-3">
                       <span className="bg-bg-sunken text-fg-3 flex size-8 shrink-0 items-center justify-center rounded-full">
@@ -123,16 +140,15 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                           <span className="text-fg-1 truncate font-mono">{run.commitSha}</span>
                           <span className="text-fg-3">· default branch HEAD</span>
                         </div>
-                        <div className="text-fg-3 mt-0.5 flex items-center gap-1.5 text-[12px]">
+                        <div
+                          data-testid="deploy-run-detection"
+                          className="text-fg-3 mt-0.5 flex items-center gap-1.5 text-[12px]"
+                        >
                           <GitBranch className="size-3.5" />
-                          <span className="font-mono">
-                            {run.targetKind === null
-                              ? "detecting target"
-                              : DEPLOY_TARGET_LABELS[run.targetKind]}
-                          </span>
+                          <span className="font-mono">{deployTargetLine(run)}</span>
                         </div>
                       </div>
-                      {failedError === null ? null : (
+                      {!expandable ? null : (
                         <button
                           type="button"
                           aria-expanded={expanded}
@@ -151,19 +167,82 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                     </div>
                   </TableCell>
                 </TableRow>
-                {failedError === null || !expanded ? null : (
+                {!expanded ? null : (
                   <TableRow className="hover:bg-transparent">
                     <TableCell colSpan={3} className="px-5 pt-0 pb-4">
-                      <div className="border-border bg-bg-sunken/40 rounded-md border px-3.5 py-2.5 text-[13px]">
-                        <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
-                          Failure details
-                        </div>
-                        {run.errorCode === null ? null : (
-                          <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">
-                            {run.errorCode}
-                          </span>
+                      <div
+                        data-testid="deploy-run-details"
+                        className="border-border bg-bg-sunken/40 flex flex-col gap-2.5 rounded-md border px-3.5 py-2.5 text-[13px]"
+                      >
+                        {failedError === null ? null : (
+                          <div>
+                            <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
+                              Failure details
+                            </div>
+                            {run.errorCode === null ? null : (
+                              <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">
+                                {run.errorCode}
+                              </span>
+                            )}
+                            <span className="text-fg-2">{run.errorMessage ?? ""}</span>
+                          </div>
                         )}
-                        <span className="text-fg-2">{run.errorMessage ?? ""}</span>
+                        {run.native === null || run.native.agents.length === 0 ? null : (
+                          <div className="flex flex-col gap-1">
+                            {run.native.agents.map((agent) => (
+                              <div
+                                key={agent.name}
+                                data-testid="deploy-provision-row"
+                                className="text-fg-2 flex flex-wrap items-center gap-x-1.5 text-[12.5px]"
+                              >
+                                <span className="text-fg-1 font-mono">{agent.name}</span>
+                                <span className="text-fg-3">·</span>
+                                <span
+                                  className={cn(
+                                    agent.action === "failed" && "text-destructive font-medium",
+                                  )}
+                                >
+                                  {agent.action}
+                                </span>
+                                {agent.versionNumber === undefined ? null : (
+                                  <>
+                                    <span className="text-fg-3">·</span>
+                                    <span className="font-mono">
+                                      v{String(agent.versionNumber)}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {run.native === null || run.native.failures.length === 0 ? null : (
+                          <div className="flex flex-col gap-2">
+                            {run.native.failures.map((failure) => (
+                              <div
+                                key={`${failure.code}:${failure.file}:${failure.field ?? ""}`}
+                                data-testid="deploy-failure-row"
+                              >
+                                <div className="flex flex-wrap items-baseline gap-x-1.5">
+                                  <span
+                                    className={cn(
+                                      "font-mono text-[12px] font-semibold",
+                                      FAILURE_SEVERITY_CLASSES[failure.severity],
+                                    )}
+                                  >
+                                    [{failure.severity}]
+                                  </span>
+                                  <span className="text-fg-1 font-mono text-[12.5px]">
+                                    {failure.file}
+                                    {failure.field === undefined ? "" : `:${failure.field}`}
+                                  </span>
+                                  <span className="text-fg-2">— {failure.problem}</span>
+                                </div>
+                                <div className="text-fg-3 pl-4 text-[12.5px]">{failure.action}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

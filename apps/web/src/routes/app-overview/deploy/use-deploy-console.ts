@@ -91,6 +91,7 @@ export function useDeployConsole(): DeployConsole {
           liveUrl: null,
           errorCode: null,
           errorMessage: null,
+          native: null,
         };
         // A submitted repo URL re-binds the source even when a deployment
         // already exists — mirroring the live deployApp semantics.

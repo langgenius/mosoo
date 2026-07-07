@@ -134,6 +134,8 @@ function DevelopmentPreviewRow({
  * Environment links for the deployed hero — unboxed label/value typography, no
  * card chrome. Production deploy and development preview are separate pipes: a
  * failed or preparing production deploy can still have a healthy local preview.
+ * Agent-only deploys have no production web URL at all, so the production rows
+ * (including the reserved fallback) stay hidden for them.
  */
 export function DeployUrlCard({
   deployment,
@@ -150,7 +152,10 @@ export function DeployUrlCard({
     latestRun.status !== "superseded" &&
     IN_FLIGHT_STATUSES.has(latestRun.status);
   const failed = latestRun !== undefined && latestRun.status === "failed";
-  const productionUrl = deployment.liveUrl ?? deployment.plannedUrl;
+  const agentOnly = latestRun !== undefined && latestRun.targetKind === "agent_only";
+  const productionUrl = agentOnly
+    ? deployment.liveUrl
+    : (deployment.liveUrl ?? deployment.plannedUrl);
 
   return (
     <div className="flex flex-col gap-2">
@@ -166,7 +171,7 @@ export function DeployUrlCard({
           {deployment.liveUrl === null ? null : (
             <DomainRow label="Production still serving" url={deployment.liveUrl} />
           )}
-          {deployment.liveUrl !== null || deployment.plannedUrl === null ? null : (
+          {agentOnly || deployment.liveUrl !== null || deployment.plannedUrl === null ? null : (
             <DomainRow label="Production reserved" url={deployment.plannedUrl} />
           )}
         </div>
@@ -181,7 +186,7 @@ export function DeployUrlCard({
               </p>
             </div>
           )}
-          {deployment.liveUrl !== null || deployment.plannedUrl === null ? null : (
+          {agentOnly || deployment.liveUrl !== null || deployment.plannedUrl === null ? null : (
             <DomainRow label="Production reserved" url={deployment.plannedUrl} />
           )}
         </div>
@@ -200,6 +205,16 @@ export function DeployUrlCard({
               {relativeLabel(latestRun.createdAt, now)}
             </div>
           )}
+        </div>
+      ) : latestRun !== undefined && latestRun.targetKind === "agent_only" ? (
+        <div className="flex flex-col gap-1">
+          <p className="text-fg-2 text-[13px]">Agent API only · no production web URL</p>
+          <DevelopmentPreviewRow status={localPreview.status} url={localPreview.url} />
+          <div className="text-fg-3 text-[13px]">
+            {latestRun.number === null ? null : <>Deploy #{latestRun.number} · </>}
+            <span className="font-mono">{latestRun.commitSha}</span> ·{" "}
+            {relativeLabel(latestRun.createdAt, now)}
+          </div>
         </div>
       ) : localPreview.url !== null ? (
         <DevelopmentPreviewRow status={localPreview.status} url={localPreview.url} />

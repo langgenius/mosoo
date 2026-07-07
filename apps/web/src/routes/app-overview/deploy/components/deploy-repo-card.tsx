@@ -69,7 +69,7 @@ export function RepoDeployForm({
       </div>
       {error === null ? null : <p className="text-destructive text-[12.5px]">{error}</p>}
       <p className="text-fg-3 text-[12.5px]">
-        Auto-detects static or worker · .mosoo.toml optional override
+        Auto-detects static, worker or agent-only · .mosoo.toml optional override
       </p>
     </form>
   );

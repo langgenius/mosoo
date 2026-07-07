@@ -1,4 +1,10 @@
-import type { AppDeployment, AppDeploymentRun, AppOverviewBoundAgent } from "@mosoo/contracts/app";
+import type {
+  AppDeployment,
+  AppDeploymentRun,
+  AppDeploymentTargetKind,
+  AppOverviewBoundAgent,
+} from "@mosoo/contracts/app";
+import type { NativeDeploymentRunResult } from "@mosoo/contracts/native-deployment-run";
 
 import type { AppDeploymentOverview } from "@/domains/app/api/app-deployment-client";
 
@@ -7,6 +13,7 @@ import type {
   DeployConsoleState,
   DeploymentRunVM,
   DeploymentVM,
+  NativeRunVM,
 } from "./deploy-console-data";
 
 /**
@@ -59,6 +66,67 @@ function toBoundAgentVM(agent: AppOverviewBoundAgent): BoundAgentVM {
   };
 }
 
+/**
+ * Flattens the contract's two-layer native result (validate report + optional
+ * provisioning facts) into one display shape. Provisioning facts win where
+ * both layers know a value; validate facts fill in for runs that never reached
+ * provisioning (blocked or still validating).
+ */
+function toNativeRunVM(native: NativeDeploymentRunResult): NativeRunVM {
+  const facts = native.facts;
+  const validateFacts = native.validate.facts;
+  const webAgent = facts?.web.agent ?? validateFacts?.web.agent;
+
+  return {
+    agentCount: facts?.agentCount ?? validateFacts?.agentCount ?? null,
+    agents: (facts?.agents ?? []).map((agent) => {
+      const agentVM: NativeRunVM["agents"][number] = {
+        action: agent.action,
+        exposed: agent.exposed,
+        name: agent.name,
+      };
+      if (agent.versionNumber !== undefined) {
+        agentVM.versionNumber = agent.versionNumber;
+      }
+
+      return agentVM;
+    }),
+    failures: native.validate.failures.map((failure) => {
+      const failureVM: NativeRunVM["failures"][number] = {
+        action: failure.action,
+        code: failure.code,
+        file: failure.file,
+        problem: failure.problem,
+        severity: failure.severity,
+      };
+      if (failure.field !== undefined) {
+        failureVM.field = failure.field;
+      }
+
+      return failureVM;
+    }),
+    specVersion: facts?.specVersion ?? validateFacts?.spec ?? null,
+    ...(webAgent === undefined ? {} : { webAgent }),
+    webDeclared: facts?.web.declared ?? validateFacts?.web.declared ?? false,
+  };
+}
+
+/**
+ * The server never emits "agent_only" on run rows (`targetKind` stays NULL for
+ * agent-only protocol deploys); the console derives it from the native facts —
+ * provisioning ran and the repo declared no web surface.
+ */
+function toRunTargetKind(run: AppDeploymentRun): AppDeploymentTargetKind | null {
+  if (run.targetKind !== null) {
+    return run.targetKind;
+  }
+  if (run.native !== null && run.native.facts !== null && !run.native.facts.web.declared) {
+    return "agent_only";
+  }
+
+  return null;
+}
+
 function toRunVM(run: AppDeploymentRun, number: number | null): DeploymentRunVM {
   return {
     commitSha: shortSha(run.sourceCommitSha),
@@ -67,9 +135,10 @@ function toRunVM(run: AppDeploymentRun, number: number | null): DeploymentRunVM 
     errorMessage: run.errorMessage,
     id: run.id,
     liveUrl: run.liveUrl,
+    native: run.native === null ? null : toNativeRunVM(run.native),
     number,
     status: run.status,
-    targetKind: run.targetKind,
+    targetKind: toRunTargetKind(run),
   };
 }
 

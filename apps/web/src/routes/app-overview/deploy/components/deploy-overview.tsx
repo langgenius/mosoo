@@ -1,4 +1,4 @@
-import { Code2, ExternalLink, GitBranch } from "lucide-react";
+import { Bot, Code2, ExternalLink, GitBranch } from "lucide-react";
 import { useState } from "react";
 
 import { Badge } from "@/shared/ui/badge";
@@ -6,7 +6,7 @@ import { Button } from "@/shared/ui/button";
 import { Separator } from "@/shared/ui/separator";
 
 import { DEPLOY_TARGET_LABELS } from "../deploy-console-data";
-import type { DeploymentRunVM, DeploymentVM } from "../deploy-console-data";
+import type { DeploymentRunVM, DeploymentVM, NativeRunVM } from "../deploy-console-data";
 import { hostOf } from "../deploy-console-mapping";
 import type { LocalDeploymentPreviewState } from "../local-preview-url";
 import { RepoDeployForm } from "./deploy-repo-card";
@@ -94,6 +94,57 @@ function PreviewFrame({
   );
 }
 
+/** Badge tint per provisioning action; only a failed upsert reads as red. */
+const AGENT_ACTION_BADGE_VARIANTS: Record<
+  NativeRunVM["agents"][number]["action"],
+  "danger" | "outline" | "success"
+> = {
+  created: "success",
+  failed: "danger",
+  unchanged: "outline",
+  updated: "success",
+};
+
+/**
+ * S1 hero for agent-only deploys: there is no web preview to frame, so the
+ * protagonist is the roster of deployed agents with each one's provisioning
+ * outcome from the latest run's native facts.
+ */
+function DeployedAgentsCard({ native }: { native: NativeRunVM | null }) {
+  const agents = native?.agents ?? [];
+
+  return (
+    <div
+      data-testid="deploy-agents-card"
+      className="border-border bg-bg-sunken/60 rounded-xl border p-1.5 lg:h-[var(--deploy-preview-height)]"
+    >
+      <div className="border-border/60 bg-background flex h-full min-h-0 flex-col overflow-hidden rounded-lg border px-5 py-4">
+        <div className="text-fg-3 text-[13px]">Deployed agents</div>
+        {agents.length === 0 ? (
+          <p className="text-fg-3 mt-3 text-[12.5px]">No agent facts recorded for this run.</p>
+        ) : (
+          <ul className="mt-3 flex min-h-0 flex-col gap-2 overflow-y-auto">
+            {agents.map((agent) => (
+              <li key={agent.name} className="flex min-w-0 items-center gap-2">
+                <Bot className="text-fg-3 size-3.5 shrink-0" />
+                <span className="text-fg-1 min-w-0 truncate font-mono text-[13px]">
+                  {agent.name}
+                </span>
+                <Badge variant={AGENT_ACTION_BADGE_VARIANTS[agent.action]}>{agent.action}</Badge>
+                {agent.versionNumber === undefined ? null : (
+                  <span className="text-fg-3 font-mono text-[12px]">
+                    v{String(agent.versionNumber)}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SourceGroup({
   deployment,
   latestRun,
@@ -160,9 +211,10 @@ function SourceGroup({
 }
 
 /**
- * The deployed-state hero: the preview frame is the protagonist on the left;
- * the right column is an unboxed typographic stack — Domain and Source
- * separated by hairlines, no card chrome.
+ * The deployed-state hero: the preview frame (or, for agent-only deploys, the
+ * deployed-agents roster) is the protagonist on the left; the right column is
+ * an unboxed typographic stack — Domain and Source separated by hairlines, no
+ * card chrome.
  */
 export function DeployOverview({
   deployment,
@@ -181,7 +233,11 @@ export function DeployOverview({
 }) {
   return (
     <div className="grid grid-cols-1 items-start gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(300px,0.9fr)] lg:[--deploy-preview-height:clamp(190px,22vw,300px)]">
-      <PreviewFrame deployment={deployment} latestRun={latestRun} localPreview={localPreview} />
+      {latestRun !== undefined && latestRun.targetKind === "agent_only" ? (
+        <DeployedAgentsCard native={latestRun.native} />
+      ) : (
+        <PreviewFrame deployment={deployment} latestRun={latestRun} localPreview={localPreview} />
+      )}
 
       <div className="flex min-w-0 flex-col gap-5 lg:pt-1">
         <DeployUrlCard deployment={deployment} latestRun={latestRun} localPreview={localPreview} />
