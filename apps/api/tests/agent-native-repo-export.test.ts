@@ -41,6 +41,7 @@ interface StoredObject {
 const APP_ID = PUBLIC_API_TEST_IDS.app as AppId;
 const AGENT_ID = PUBLIC_API_TEST_IDS.agent;
 const ENVIRONMENT_SECRET_VALUE = "source-secret-value";
+const ENVIRONMENT_SECRET_ID = "environment-secret-id";
 const MCP_SERVER_ID = "01J000000000000000000000E1" as McpServerId;
 const AGENT_MCP_BINDING_ID = "01J000000000000000000000E2" as AgentMcpBindingId;
 const SKILL_ID = "01J000000000000000000000E3" as SkillId;
@@ -292,7 +293,7 @@ async function createExportFixture(agentStatus: "draft" | "published"): Promise<
         {
           key: "NATIVE_SECRET",
           preview: ENVIRONMENT_SECRET_VALUE,
-          secretId: "environment-secret-id",
+          secretId: ENVIRONMENT_SECRET_ID,
         },
       ]),
       setupScript: "bun install",
@@ -407,6 +408,48 @@ function unzipTextFiles(archiveBytes: Uint8Array): Record<string, string> {
   );
 }
 
+/**
+ * Every string value carried by an archive entry: JSON entries are walked
+ * recursively (keys and values) so a secret nested anywhere is seen; non-JSON
+ * entries scan as their raw text. Lets the export test assert no seeded secret
+ * survives blanking, rather than checking one known literal is absent.
+ */
+function collectEntryStringValues(content: string): string[] {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return [content];
+  }
+
+  const strings: string[] = [];
+  const walk = (value: unknown): void => {
+    if (typeof value === "string") {
+      strings.push(value);
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        walk(entry);
+      }
+      return;
+    }
+
+    if (isRecord(value)) {
+      for (const [key, entry] of Object.entries(value)) {
+        strings.push(key);
+        walk(entry);
+      }
+    }
+  };
+
+  walk(parsed);
+
+  return strings;
+}
+
 describe("agent native repo export", () => {
   for (const agentStatus of ["draft", "published"] as const) {
     test(`exports a ${agentStatus} agent as a validating native deployable repo`, async () => {
@@ -434,7 +477,21 @@ describe("agent native repo export", () => {
       expect(hasBlockingPackageIssue(packageIssues)).toBe(false);
       expect(validate.valid).toBe(true);
       expect(validate.failures.filter((failure) => failure.severity === "error")).toEqual([]);
-      expect(Object.values(files).join("\n")).not.toContain(ENVIRONMENT_SECRET_VALUE);
+
+      // Scan every string value in every archive entry for each seeded secret
+      // (the env preview value and its internal secretId — the only credential
+      // material in this fixture), so a regression that leaks a truncated
+      // preview, the secretId, or an MCP credential under a different key is
+      // caught, not just the one known literal.
+      const seededSecrets = [ENVIRONMENT_SECRET_VALUE, ENVIRONMENT_SECRET_ID];
+
+      for (const [path, content] of Object.entries(files)) {
+        for (const value of collectEntryStringValues(content)) {
+          for (const secret of seededSecrets) {
+            expect(value.includes(secret), `${path} leaked seeded secret ${secret}`).toBe(false);
+          }
+        }
+      }
     });
   }
 });
