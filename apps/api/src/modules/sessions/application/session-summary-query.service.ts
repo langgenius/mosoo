@@ -25,11 +25,9 @@ import { toIsoString } from "../../../time";
 import { ensureAppAgentOwner } from "../../agents/application/agent-access.service";
 import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
-import {
-  getSessionRunSummariesByIds,
-  toSessionRunSummary,
-} from "../../runtime/application/session-runs/session-run-summary.service";
-import type { SessionRunRow } from "../../runtime/application/session-runs/session-run-summary.service";
+import { toSessionRunSummary } from "../../runtime/infrastructure/session-runs/session-run-row.mapper";
+import type { SessionRunRow } from "../../runtime/infrastructure/session-runs/session-run-row.mapper";
+import { getSessionRunSummariesByIds } from "../../runtime/infrastructure/session-runs/session-run-store.repository";
 import {
   sessionCreatorCondition,
   sessionCreatorFlag,

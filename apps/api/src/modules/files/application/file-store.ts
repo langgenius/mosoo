@@ -27,6 +27,7 @@ import type { SQL } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
+import { toArrayBuffer } from "../../../shared/bytes";
 import { currentTimestampMs } from "../../../time";
 import { ensureAppOwnership } from "../../apps/application/app.service";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
@@ -233,12 +234,6 @@ function readRuntimeOutputPathSegments(path: string): string[] {
   }
 
   return segments;
-}
-
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer instanceof ArrayBuffer
-    ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
-    : Uint8Array.from(bytes).buffer;
 }
 
 export function getRuntimeOutputName(path: string): string {

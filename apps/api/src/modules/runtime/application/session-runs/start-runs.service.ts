@@ -48,8 +48,10 @@ interface QueuedRunsAccumulator {
   warnings: UserWarning[];
 }
 
-function parseAttachmentIds(values: readonly string[]): FileId[] {
-  return values.map((value, index) => parsePlatformId<FileId>(value, `attachment id ${index}`));
+export function parseAttachmentIds(values: readonly string[] | null | undefined): FileId[] {
+  return (values ?? []).map((value, index) =>
+    parsePlatformId<FileId>(value, `attachment id ${index}`),
+  );
 }
 
 async function queueRunRequest(

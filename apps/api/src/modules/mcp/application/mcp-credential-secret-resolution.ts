@@ -6,7 +6,11 @@ import { eq } from "drizzle-orm";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
-import { deleteSecret, readSecretOutcome, storeSecret } from "./mcp-secret-store";
+import {
+  deleteSecret,
+  readSecretOutcome,
+  storeSecret,
+} from "../../vault/application/vault-secret-store";
 import type { CredentialRow, ServerRow } from "./mcp-types";
 
 export type McpCredentialSecretReadPurpose =

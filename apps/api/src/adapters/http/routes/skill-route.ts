@@ -15,8 +15,8 @@ import {
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { isApiError } from "../../../platform/errors";
+import { toArrayBuffer } from "../../../shared/bytes";
 import { toPlatformId } from "../../../shared/platform-id";
-import { toArrayBufferResponseBody } from "../../../shared/response-body";
 import { platformIdRouteErrorMessage } from "./platform-id-route-error";
 
 const MAX_SKILL_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB per PRD
@@ -184,7 +184,7 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
         toPlatformId<AppId>(appId, "App ID"),
         c.req.param("skillId"),
       );
-      return new Response(toArrayBufferResponseBody(bytes), {
+      return new Response(toArrayBuffer(bytes), {
         headers: {
           "Content-Disposition": `attachment; filename="${encodeURIComponent(fileName)}"`,
           "Content-Type": "application/zip",

@@ -15,13 +15,11 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import { fileStore } from "../../files/application/file-store";
-import { listLiveRuntimeDriverInstanceIdsForSession } from "../../runtime/application/runtime-driver-instance-query.service";
-import {
-  closeSandboxConversationSession,
-  deleteSandboxBackupsForDir,
-  destroyDriverInstanceDurableObject,
-  stopDriverSession,
-} from "../../runtime/application/runtime-session-lifecycle.service";
+import { destroyDriverInstanceDurableObject } from "../../runtime/infrastructure/driver-instance/client";
+import { listLiveDriverInstanceIdsForSandboxSessions } from "../../runtime/infrastructure/driver-instance/live-driver-instance.repository";
+import { stopDriverSession } from "../../runtime/infrastructure/driver-session-stop.service";
+import { deleteSandboxBackupsForDir } from "../../runtime/infrastructure/sandbox-backup.service";
+import { closeSandboxConversationSession } from "../../runtime/infrastructure/sandbox-session.service";
 import {
   SESSION_DELETE_CLEANUP_STEPS,
   completeSessionDeleteCleanupStep,
@@ -172,10 +170,9 @@ export async function deleteSessionCascade(
         .limit(1)
         .get()) ?? null;
 
-    const liveDriverInstanceIds = await listLiveRuntimeDriverInstanceIdsForSession(
-      bindings.DB,
+    const liveDriverInstanceIds = await listLiveDriverInstanceIdsForSandboxSessions(bindings.DB, [
       sessionId,
-    );
+    ]);
 
     const sessionRuns = await db
       .select({ id: sessionRunsTable.id })

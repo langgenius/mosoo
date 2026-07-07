@@ -2,29 +2,29 @@ import type { CredentialId, DriverInstanceId, McpServerId, SkillSnapshotId } fro
 import type { Context } from "hono";
 import { Hono } from "hono";
 
+import {
+  invalidateRuntimeCredential,
+  refreshRuntimeCredential,
+} from "../../../modules/mcp/application/mcp-runtime.service";
 import type { RuntimeActionTokenPayload } from "../../../modules/runtime/application/runtime-driver-access.service";
 import {
   cleanupDriverInstances,
   requireRuntimeDriverInstanceGrant,
   verifyRuntimeActionToken,
 } from "../../../modules/runtime/application/runtime-driver-access.service";
-import { getRuntimeDriverRoutePrefix } from "../../../modules/runtime/application/runtime-driver-routes.service";
-import {
-  invalidateRuntimeCredential,
-  refreshRuntimeCredential,
-} from "../../../modules/runtime/application/runtime-mcp-credential.service";
 import {
   createRuntimeMcpProxyError,
   runtimeMcpProxyErrorBody,
   toRuntimeMcpProxyPublicErrorDetails,
 } from "../../../modules/runtime/application/runtime-mcp-proxy-errors";
 import { resolveRuntimeMcpProxyTarget } from "../../../modules/runtime/application/runtime-mcp-proxy.service";
+import { getRuntimeDriverRoutePrefix } from "../../../modules/runtime/domain/runtime-driver-routes";
 import { upgradeDriverInstanceSocket } from "../../../modules/runtime/infrastructure/driver-instance/client";
 import { getDriverInstanceRecord } from "../../../modules/runtime/infrastructure/driver-instance/driver-instance-record.repository";
 import { readSkillPackageBytesFromSnapshot } from "../../../modules/skills/application/skill-package-snapshot.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
+import { toArrayBuffer } from "../../../shared/bytes";
 import { toPlatformId } from "../../../shared/platform-id";
-import { toArrayBufferResponseBody } from "../../../shared/response-body";
 import { isTruthy } from "../../../shared/truthiness";
 import { platformIdRouteErrorResponse } from "./platform-id-route-error";
 const HOP_BY_HOP_HEADERS = new Set([
@@ -257,7 +257,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
 
     const bytes = await readSkillPackageBytesFromSnapshot(c.env, snapshotId);
 
-    return new Response(toArrayBufferResponseBody(bytes), {
+    return new Response(toArrayBuffer(bytes), {
       headers: {
         "Content-Type": "application/zip",
       },

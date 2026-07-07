@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { parsePlatformId } from "@mosoo/id";
 import type { OrganizationId, PlatformId, AppId, VendorCredentialId } from "@mosoo/id";
 
-import { readSecretOutcome } from "../src/modules/mcp/application/mcp-secret-store";
+import { readSecretOutcome } from "../src/modules/vault/application/vault-secret-store";
 import {
   collectAvailableVendorIds,
   deleteVendorCredentialSecret,

@@ -9,6 +9,8 @@ import type {
 import type { DriverBootPayload, DriverRuntime, DriverRuntimeTransport } from "agent-driver/boot";
 import { DRIVER_PROTOCOL_VERSION, parseDriverBootPayload } from "agent-driver/boot";
 
+import { fromBase64Url, toArrayBuffer, toBase64Url } from "../../../shared/bytes";
+
 export interface CreateBootPayloadInput {
   bootToken: string;
   controlUrl: string;
@@ -52,47 +54,12 @@ export interface RuntimeActionTokenBindings {
   readonly RUNTIME_ACTION_TOKEN_SECRET: string;
 }
 
-function encodeBase64Url(value: Uint8Array): string {
-  let binary = "";
-
-  for (const byte of value) {
-    binary += String.fromCodePoint(byte);
-  }
-
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
-}
-
-function decodeBase64Url(value: string): Uint8Array {
-  const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
-  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    const byte = binary.codePointAt(index);
-
-    if (byte === undefined) {
-      throw new Error("Base64url payload is invalid.");
-    }
-
-    bytes[index] = byte;
-  }
-
-  return bytes;
-}
-
 function toUtf8Bytes(value: string): Uint8Array {
   return new TextEncoder().encode(value);
 }
 
 function decodeUtf8(value: Uint8Array): string {
   return new TextDecoder().decode(value);
-}
-
-function toArrayBuffer(value: Uint8Array): ArrayBuffer {
-  return value.buffer instanceof ArrayBuffer
-    ? value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength)
-    : Uint8Array.from(value).buffer;
 }
 
 async function importHmacKey(secret: string, usages: KeyUsage[]): Promise<CryptoKey> {
@@ -117,13 +84,13 @@ export async function createOpaqueBootToken(): Promise<{
   const raw = crypto.getRandomValues(new Uint8Array(32));
 
   return {
-    encoded: encodeBase64Url(raw),
+    encoded: toBase64Url(raw),
     hash: await sha256(raw),
   };
 }
 
 export async function decodeAndHashBootToken(encoded: string): Promise<Uint8Array> {
-  const raw = decodeBase64Url(encoded);
+  const raw = fromBase64Url(encoded);
 
   if (raw.byteLength !== 32) {
     throw new Error("Boot token format is invalid.");
@@ -146,7 +113,7 @@ export async function createRuntimeActionToken(
   bindings: RuntimeActionTokenBindings,
   payload: RuntimeActionTokenPayload,
 ): Promise<string> {
-  const encodedPayload = encodeBase64Url(toUtf8Bytes(JSON.stringify(payload)));
+  const encodedPayload = toBase64Url(toUtf8Bytes(JSON.stringify(payload)));
   const key = await importHmacKey(requireRuntimeActionTokenSecret(bindings), ["sign"]);
   const signature = await crypto.subtle.sign(
     "HMAC",
@@ -154,7 +121,7 @@ export async function createRuntimeActionToken(
     toArrayBuffer(toUtf8Bytes(encodedPayload)),
   );
 
-  return `${encodedPayload}.${encodeBase64Url(new Uint8Array(signature))}`;
+  return `${encodedPayload}.${toBase64Url(new Uint8Array(signature))}`;
 }
 
 function isRuntimeActionTokenAction(value: unknown): value is RuntimeActionTokenAction {
@@ -171,7 +138,7 @@ function isRuntimeActionTokenPayloadRecord(value: unknown): value is Record<stri
 }
 
 function parseRuntimeActionTokenPayload(encodedPayload: string): RuntimeActionTokenPayload {
-  const parsed: unknown = JSON.parse(decodeUtf8(decodeBase64Url(encodedPayload)));
+  const parsed: unknown = JSON.parse(decodeUtf8(fromBase64Url(encodedPayload)));
 
   if (!isRuntimeActionTokenPayloadRecord(parsed)) {
     throw new Error("Runtime action token payload is invalid.");
@@ -244,7 +211,7 @@ export async function verifyRuntimeActionToken(
   const verified = await crypto.subtle.verify(
     "HMAC",
     key,
-    toArrayBuffer(decodeBase64Url(encodedSignature)),
+    toArrayBuffer(fromBase64Url(encodedSignature)),
     toArrayBuffer(toUtf8Bytes(encodedPayload)),
   );
 

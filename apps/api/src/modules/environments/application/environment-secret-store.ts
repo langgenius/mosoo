@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { validationError } from "../../../platform/errors";
-import { readSecretOutcome, storeSecret } from "../../mcp/application/mcp-secret-store";
+import { readSecretOutcome, storeSecret } from "../../vault/application/vault-secret-store";
 
 export type EnvironmentSecretReadPurpose = "runtime_snapshot_hydration";
 

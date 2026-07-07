@@ -1,6 +1,7 @@
 import type { AgentDetail, AgentEditorState, AgentSummary } from "@mosoo/contracts/agent";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UseQueryResult } from "@tanstack/react-query";
+import { useCallback } from "react";
 
 import type { AgentChannelBindingFieldsFragment } from "@/gql/graphql";
 import { toAgentId, toAppId } from "@/routes/typed-id";
@@ -94,6 +95,18 @@ export function useAgentEditorStateQuery(
         ? [...agentKeys.editorStates(), "missing"]
         : agentKeys.editorState(appId, agentId),
   });
+}
+
+export function useInvalidateAgentChannelBindings(
+  appId: string,
+  agentId: string,
+): () => Promise<void> {
+  const queryClient = useQueryClient();
+
+  return useCallback(
+    () => queryClient.invalidateQueries({ queryKey: agentKeys.channelBindings(appId, agentId) }),
+    [agentId, appId, queryClient],
+  );
 }
 
 export function useAgentChannelBindingsQuery(

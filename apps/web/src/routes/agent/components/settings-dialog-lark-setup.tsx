@@ -1,5 +1,5 @@
 import type { AgentId, AppId } from "@mosoo/contracts/id";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useReducer } from "react";
@@ -10,7 +10,7 @@ import {
   pollLarkAgentChannelRegistration,
   startLarkAgentChannelRegistration,
 } from "@/domains/agent/api/agent-client";
-import { agentKeys } from "@/domains/agent/query/agent-queries";
+import { useInvalidateAgentChannelBindings } from "@/domains/agent/query/agent-queries";
 import type {
   LarkAgentChannelRegistrationFieldsFragment,
   LarkConnectionMode,
@@ -234,7 +234,7 @@ export function LarkChannelInlineSetup({
   agent: ChannelInlineSetupAgent;
   onSuccess?: () => void;
 }) {
-  const queryClient = useQueryClient();
+  const invalidateChannelBindings = useInvalidateAgentChannelBindings(agent.appId, agent.id);
   const [state, dispatch] = useReducer(
     larkChannelInlineSetupReducer,
     LARK_CHANNEL_INLINE_SETUP_INITIAL_STATE,
@@ -255,26 +255,20 @@ export function LarkChannelInlineSetup({
     mutationFn: startLarkAgentChannelRegistration,
     onSuccess: async (result) => {
       dispatch({ registration: result, type: "registrationStarted" });
-      await queryClient.invalidateQueries({
-        queryKey: agentKeys.channelBindings(agent.appId, agent.id),
-      });
+      await invalidateChannelBindings();
     },
   });
   const registrationPollMutation = useMutation({
     mutationFn: pollLarkAgentChannelRegistration,
     onSuccess: async (result) => {
       dispatch({ registration: result, type: "registrationPolled" });
-      await queryClient.invalidateQueries({
-        queryKey: agentKeys.channelBindings(agent.appId, agent.id),
-      });
+      await invalidateChannelBindings();
     },
   });
   const saveMutation = useMutation({
     mutationFn: createLarkAgentChannelBinding,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: agentKeys.channelBindings(agent.appId, agent.id),
-      });
+      await invalidateChannelBindings();
       onSuccess?.();
     },
   });

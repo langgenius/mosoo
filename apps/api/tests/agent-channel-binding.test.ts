@@ -13,7 +13,10 @@ import {
   readAgentChannelBindingCredentialSecret,
   storeAgentChannelBindingCredentialSecret,
 } from "../src/modules/channels/application/channel-credential-secret-resolution";
-import { readSecretOutcome, storeSecret } from "../src/modules/mcp/application/mcp-secret-store";
+import {
+  readSecretOutcome,
+  storeSecret,
+} from "../src/modules/vault/application/vault-secret-store";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { OWNER_VIEWER, withSlackAuthTestMock } from "./agent-channel-binding-fixtures";
 import {
