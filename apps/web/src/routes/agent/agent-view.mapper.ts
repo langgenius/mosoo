@@ -163,10 +163,13 @@ export function mapAgentDetailToView(
   profile: AgentDetail,
   editorDetail: AgentEditorState | null,
   currentUser: AuthUser | null,
+  appSlug: string | null = null,
 ): Agent {
   const environmentConfig = editorDetail?.environment ?? DEFAULT_ENVIRONMENT_CONFIG;
 
   return {
+    appSlug,
+    exposedViaApi: profile.exposedViaApi,
     config: {
       builtInTools: editorDetail?.builtInTools ?? createDefaultAgentBuiltInTools(),
       environmentId: environmentConfig.environmentId,

@@ -138,6 +138,14 @@ export function useDeployConsole(scenario: DeployConsoleScenario = "web"): Deplo
           prev.deployment === null
             ? {
                 appName: DEPLOY_APP_IDENTITY.appName,
+                // Slug mirrors the scenario's seeded fixture: legacy web stays
+                // null (not name-routable); protocol scenarios mint one.
+                slug:
+                  scenario === "web"
+                    ? null
+                    : scenario === "agent-only"
+                      ? "quiz-agents"
+                      : "roadmap-board",
                 repoUrl: repoUrl === null ? DEPLOY_APP_IDENTITY.repoUrl : stripProtocol(repoUrl),
                 defaultBranch: DEPLOY_APP_IDENTITY.defaultBranch,
                 plannedUrl: scenario === "agent-only" ? null : DEPLOY_APP_IDENTITY.plannedUrl,

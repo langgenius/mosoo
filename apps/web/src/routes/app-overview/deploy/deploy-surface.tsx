@@ -168,6 +168,7 @@ export function DeploySurface({
             )}
             {loadError === null ? null : <LoadErrorBanner className="mb-4" message={loadError} />}
             <DeployOverview
+              agents={agents}
               deployment={deployment}
               latestRun={latestRun}
               localPreview={localPreview}

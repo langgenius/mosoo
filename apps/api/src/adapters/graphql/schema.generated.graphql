@@ -114,6 +114,7 @@ type AgentDetail {
   appId: ULID!
   createdAt: String!
   description: String
+  exposedViaApi: Boolean!
   id: ULID!
   kind: AgentKind!
   liveVersion: AgentDeploymentVersion

@@ -86,6 +86,16 @@ export interface UserInfo {
 export interface Agent {
   id: string;
   appId: string;
+  /**
+   * API namespace slug of the owning App; `null` when the App is not
+   * name-routable. Absent on list-view agents (only the detail path loads it).
+   */
+  appSlug?: string | null;
+  /**
+   * True when a protocol deploy placed this agent in its App's API namespace
+   * subset. Absent on list-view agents. Gates the name-addressed API panel.
+   */
+  exposedViaApi?: boolean;
   kind: AgentKind;
   liveVersion: AgentDeploymentVersion | null;
   name: string;

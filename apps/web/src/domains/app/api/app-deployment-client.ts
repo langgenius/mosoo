@@ -76,6 +76,7 @@ const APP_DEPLOYMENT_OVERVIEW_QUERY = graphql(/* GraphQL */ `
       app {
         id
         name
+        slug
       }
       boundAgents {
         agentId
@@ -177,6 +178,8 @@ const DELETE_APP_DEPLOYMENT_MUTATION = graphql(/* GraphQL */ `
  */
 export interface AppDeploymentOverview {
   appName: string;
+  /** Instance-global API namespace slug; null until the App's first protocol deploy. */
+  appSlug: string | null;
   boundAgents: AppOverviewBoundAgent[];
   deployment: AppDeployment | null;
 }
@@ -386,6 +389,7 @@ export async function getAppDeploymentOverview(appId: AppId): Promise<AppDeploym
 
   return {
     appName: app.name,
+    appSlug: app.slug,
     boundAgents: boundAgents.map(toBoundAgent),
     deployment: deployment === null ? null : toAppDeployment(deployment),
   };

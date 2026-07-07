@@ -333,6 +333,12 @@ export interface Agent {
 export interface AgentDetail {
   createdAt: string;
   description: string | null;
+  /**
+   * True when a protocol deploy placed this Agent in its App's API namespace
+   * subset (`exposedViaApi = 1`); false for console-created or internal Agents.
+   * Gates the name-addressed `/apps/{slug}/agents/{name}` distribution surface.
+   */
+  exposedViaApi: boolean;
   id: AgentId;
   kind: AgentKind;
   liveVersion: AgentDeploymentVersion | null;

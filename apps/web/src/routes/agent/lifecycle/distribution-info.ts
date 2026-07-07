@@ -87,11 +87,52 @@ export function buildAgentDistribution(agent: Agent): AgentDistribution {
  */
 export function buildAgentApiCurl(agent: Agent): string {
   const { apiUrl } = buildAgentDistribution(agent);
+  return buildCreateThreadCurl(apiUrl);
+}
+
+function buildCreateThreadCurl(url: string): string {
   return [
-    `curl -X POST "${apiUrl}" \\`,
+    `curl -X POST "${url}" \\`,
     `  -H "Authorization: Bearer $MOSOO_API_TOKEN" \\`,
     `  -H "Content-Type: application/json" \\`,
     `  -H "Idempotency-Key: create-thread-$(date +%s)" \\`,
     `  -d '{"input":{"type":"user.message","content":[{"type":"text","text":"Say hello"}]},"client_external_ref":"demo-thread-001"}'`,
   ].join("\n");
+}
+
+/**
+ * Name-addressed create-thread path for an agent exposed under its App's API
+ * namespace, e.g. "POST /api/v1/apps/roadmap-board/agents/roadmap/threads".
+ * Used only for exposed agents on a slugged App — never carries the agent ULID.
+ *
+ * @param {string} appSlug App API namespace slug.
+ * @param {string} agentName URL-safe exposed agent name.
+ * @returns {string} `POST` line for the name-addressed thread endpoint.
+ */
+export function buildAgentNamespacePath(appSlug: string, agentName: string): string {
+  return `POST ${AGENT_API_ENDPOINT_BASE_PATH}/apps/${appSlug}/agents/${agentName}/threads`;
+}
+
+/**
+ * Fully-qualified name-addressed create-thread URL for an exposed agent.
+ *
+ * @param {string} appSlug App API namespace slug.
+ * @param {string} agentName URL-safe exposed agent name.
+ * @returns {string} Absolute URL for the name-addressed thread endpoint.
+ */
+export function buildAgentNamespaceUrl(appSlug: string, agentName: string): string {
+  return `${currentOrigin()}${AGENT_API_ENDPOINT_BASE_PATH}/apps/${appSlug}/agents/${agentName}/threads`;
+}
+
+/**
+ * Name-addressed create-thread curl for an exposed agent. Mirrors
+ * {@link buildAgentApiCurl} but addresses the agent by App slug + name, so the
+ * agent ULID never appears.
+ *
+ * @param {string} appSlug App API namespace slug.
+ * @param {string} agentName URL-safe exposed agent name.
+ * @returns {string} Copy-ready curl command for creating a thread.
+ */
+export function buildAgentNamespaceCurl(appSlug: string, agentName: string): string {
+  return buildCreateThreadCurl(buildAgentNamespaceUrl(appSlug, agentName));
 }

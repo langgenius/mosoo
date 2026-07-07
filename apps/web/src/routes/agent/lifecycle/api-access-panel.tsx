@@ -7,9 +7,13 @@ import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 
 import type { Agent } from "../agent.types";
-import { buildAgentDistribution } from "./distribution-info";
+import {
+  buildAgentDistribution,
+  buildAgentNamespaceCurl,
+  buildAgentNamespacePath,
+} from "./distribution-info";
 
-type ApiAccessClipboardKey = "agent" | "docs";
+type ApiAccessClipboardKey = "agent" | "curl" | "docs" | "endpoint";
 
 interface AgentApiAccessDialogProps {
   agent: Agent;
@@ -67,6 +71,13 @@ export function AgentApiAccessPanel({
   const distribution = useMemo(() => buildAgentDistribution(agent), [agent]);
   const [copiedKey, setCopiedKey] = useState<ApiAccessClipboardKey | null>(null);
 
+  // A protocol-deployed, API-exposed agent on a slugged App is addressed by
+  // App slug + agent name; console agents keep the ULID entry point.
+  const appSlug = agent.appSlug ?? null;
+  const nameAddressed = appSlug !== null && agent.exposedViaApi === true;
+  const namespacePath = nameAddressed ? buildAgentNamespacePath(appSlug, agent.name) : null;
+  const namespaceCurl = nameAddressed ? buildAgentNamespaceCurl(appSlug, agent.name) : null;
+
   async function copy(text: string, key: ApiAccessClipboardKey) {
     const didCopy = await writeClipboardText(text);
     if (!didCopy) {
@@ -89,23 +100,65 @@ export function AgentApiAccessPanel({
       ) : null}
 
       <div className="space-y-2 p-3">
-        <ApiAccessDetailRow
-          action={
-            <Button
-              className="gap-1 text-[11.5px]"
-              onClick={() => {
-                void copy(agent.id, "agent");
-              }}
-              size="xs"
-              variant="outline"
-            >
-              {copiedKey === "agent" ? <Check className="size-3" /> : <Copy className="size-3" />}
-              {copiedKey === "agent" ? "Copied" : "Copy"}
-            </Button>
-          }
-          label="Agent ID"
-          value={agent.id}
-        />
+        {namespacePath !== null && namespaceCurl !== null ? (
+          <>
+            <ApiAccessDetailRow
+              action={
+                <Button
+                  className="gap-1 text-[11.5px]"
+                  onClick={() => {
+                    void copy(namespacePath, "endpoint");
+                  }}
+                  size="xs"
+                  variant="outline"
+                >
+                  {copiedKey === "endpoint" ? (
+                    <Check className="size-3" />
+                  ) : (
+                    <Copy className="size-3" />
+                  )}
+                  {copiedKey === "endpoint" ? "Copied" : "Copy"}
+                </Button>
+              }
+              label="Endpoint"
+              value={namespacePath}
+            />
+            <div className="border-border-subtle bg-bg-1 relative rounded-md border">
+              <pre className="text-fg-2 overflow-x-auto px-3 py-2.5 font-mono text-[11.5px] leading-relaxed">
+                <code>{namespaceCurl}</code>
+              </pre>
+              <Button
+                className="absolute top-1.5 right-1.5 gap-1 text-[11.5px]"
+                onClick={() => {
+                  void copy(namespaceCurl, "curl");
+                }}
+                size="xs"
+                variant="outline"
+              >
+                {copiedKey === "curl" ? <Check className="size-3" /> : <Copy className="size-3" />}
+                {copiedKey === "curl" ? "Copied" : "Copy"}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <ApiAccessDetailRow
+            action={
+              <Button
+                className="gap-1 text-[11.5px]"
+                onClick={() => {
+                  void copy(agent.id, "agent");
+                }}
+                size="xs"
+                variant="outline"
+              >
+                {copiedKey === "agent" ? <Check className="size-3" /> : <Copy className="size-3" />}
+                {copiedKey === "agent" ? "Copied" : "Copy"}
+              </Button>
+            }
+            label="Agent ID"
+            value={agent.id}
+          />
+        )}
         <ApiAccessDetailRow
           action={
             <Button asChild className="gap-1 text-[11.5px]" size="xs" variant="outline">

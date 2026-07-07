@@ -115,6 +115,7 @@ export const GET_AGENT_QUERY = graphql(/* GraphQL */ `
     agent(agentId: $agentId, appId: $appId) {
       createdAt
       description
+      exposedViaApi
       id
       kind
       liveVersion {

@@ -1,10 +1,23 @@
 import { ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { IN_FLIGHT_STATUSES } from "@/domains/app/query/app-deployment-queries";
 import { cn } from "@/shared/lib/class-names";
 
 import type { DeploymentRunVM, DeploymentVM } from "../deploy-console-data";
 import { hostOf, relativeLabel } from "../deploy-console-mapping";
+
+/**
+ * Name-addressed API namespace coordinates for the Environments stack. `null`
+ * when the deploy exposes no agent API. Rendered in every run-status branch so
+ * the API pipe shows alongside the web/dev-preview pipes.
+ */
+export interface DeployNamespaceInfo {
+  /** Host-qualified namespace base, e.g. "mosoo.ai/api/v1/apps/roadmap-board". */
+  baseDisplay: string;
+  /** In-console playground target for the primary exposed agent (or the agents list). */
+  playgroundHref: string;
+}
 import type {
   LocalDeploymentPreviewState,
   LocalDeploymentPreviewStatus,
@@ -131,20 +144,50 @@ function DevelopmentPreviewRow({
 }
 
 /**
+ * Name-addressed API rows for the Environments stack: the namespace base plus
+ * an in-console playground pointer. Kept outside the run-status branches so the
+ * API pipe renders in every branch (in-flight, failed, live).
+ */
+function NamespaceRows({ namespace }: { namespace: DeployNamespaceInfo }) {
+  return (
+    <>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]">
+        <span className="text-fg-3">Agent API</span>
+        <span className="text-fg-2 min-w-0 truncate font-mono text-[12.5px]">
+          {namespace.baseDisplay}
+        </span>
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]">
+        <span className="text-fg-3">Playground</span>
+        <Link
+          to={namespace.playgroundHref}
+          className="text-accent-press font-medium hover:underline"
+        >
+          Open playground
+        </Link>
+      </div>
+    </>
+  );
+}
+
+/**
  * Environment links for the deployed hero — unboxed label/value typography, no
  * card chrome. Production deploy and development preview are separate pipes: a
  * failed or preparing production deploy can still have a healthy local preview.
  * Agent-only deploys have no production web URL at all, so the production rows
- * (including the reserved fallback) stay hidden for them.
+ * (including the reserved fallback) stay hidden for them; a name-addressed
+ * agent API surfaces as its own pair of rows in every branch.
  */
 export function DeployUrlCard({
   deployment,
   latestRun,
   localPreview,
+  namespace,
 }: {
   deployment: DeploymentVM;
   latestRun: DeploymentRunVM | undefined;
   localPreview: LocalDeploymentPreviewState;
+  namespace: DeployNamespaceInfo | null;
 }) {
   const now = useNowTick();
   const inFlight =
@@ -221,6 +264,8 @@ export function DeployUrlCard({
       ) : (
         <p className="text-fg-3 text-[13px]">No production or development preview URL yet.</p>
       )}
+
+      {namespace === null ? null : <NamespaceRows namespace={namespace} />}
     </div>
   );
 }

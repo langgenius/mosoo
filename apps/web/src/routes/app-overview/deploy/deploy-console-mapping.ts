@@ -5,6 +5,8 @@ import type {
   AppOverviewBoundAgent,
 } from "@mosoo/contracts/app";
 import type { NativeDeploymentRunResult } from "@mosoo/contracts/native-deployment-run";
+import { MOSOO_CONSOLE_ORIGIN } from "@mosoo/contracts/origin";
+import { PUBLIC_API_PREFIX, PUBLIC_API_VERSION_PREFIX } from "@mosoo/contracts/public-api-core";
 
 import type { AppDeploymentOverview } from "@/domains/app/api/app-deployment-client";
 
@@ -30,6 +32,40 @@ import type {
 
 export function stripProtocol(url: string): string {
   return url.replace(/^https?:\/\//, "");
+}
+
+/** Name-addressed public-API version prefix, e.g. "/api/v1". */
+const NAMESPACE_VERSION_PREFIX = `${PUBLIC_API_PREFIX}${PUBLIC_API_VERSION_PREFIX}`;
+
+/** This console's origin; falls back to the canonical origin during SSR/tests. */
+export function consoleOrigin(): string {
+  return globalThis.window !== undefined ? globalThis.location.origin : MOSOO_CONSOLE_ORIGIN;
+}
+
+/** Namespace base path for a slugged App, e.g. "/api/v1/apps/roadmap-board". */
+export function appNamespaceBasePath(slug: string): string {
+  return `${NAMESPACE_VERSION_PREFIX}/apps/${slug}`;
+}
+
+/** Per-agent name-addressed create-thread path under the App namespace. */
+export function appNamespaceAgentPath(slug: string, agentName: string): string {
+  return `${appNamespaceBasePath(slug)}/agents/${agentName}/threads`;
+}
+
+/**
+ * Copy-ready create-thread curl for an exposed agent, name-addressed under the
+ * App namespace. Mirrors `buildAgentApiCurl` but never exposes the agent ULID.
+ */
+export function appNamespaceAgentCurl(origin: string, slug: string, agentName: string): string {
+  const url = `${origin}${appNamespaceAgentPath(slug, agentName)}`;
+
+  return [
+    `curl -X POST "${url}" \\`,
+    `  -H "Authorization: Bearer $MOSOO_API_TOKEN" \\`,
+    `  -H "Content-Type: application/json" \\`,
+    `  -H "Idempotency-Key: create-thread-$(date +%s)" \\`,
+    `  -d '{"input":{"type":"user.message","content":[{"type":"text","text":"Say hello"}]},"client_external_ref":"demo-thread-001"}'`,
+  ].join("\n");
 }
 
 export function hostOf(url: string): string {
@@ -156,6 +192,7 @@ function toRunVMs(runs: AppDeploymentRun[], numbered: boolean): DeploymentRunVM[
 
 function toDeploymentVM(
   appName: string,
+  slug: string | null,
   deployment: AppDeployment,
   liveUrl: string | null,
 ): DeploymentVM {
@@ -165,6 +202,7 @@ function toDeploymentVM(
     liveUrl,
     plannedUrl: deployment.plannedUrl,
     repoUrl: stripProtocol(deployment.repoUrl),
+    slug,
   };
 }
 
@@ -192,7 +230,7 @@ export function toDeployConsoleState(
 
   return {
     agents,
-    deployment: toDeploymentVM(overview.appName, deployment, liveUrl),
+    deployment: toDeploymentVM(overview.appName, overview.appSlug, deployment, liveUrl),
     runs: toRunVMs(sourceRuns, runs.length > 0),
   };
 }

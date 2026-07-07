@@ -36,6 +36,7 @@ const agentRowColumns = {
   createdAt: agentsTable.createdAt,
   description: agentsTable.description,
   environmentId: agentsTable.environmentId,
+  exposedViaApi: agentsTable.exposedViaApi,
   id: agentsTable.id,
   kind: agentsTable.kind,
   liveDeploymentVersionId: agentsTable.liveDeploymentVersionId,
@@ -56,6 +57,7 @@ type RawAgentRow = {
   createdAt: number;
   description: string | null;
   environmentId: EnvironmentId | null;
+  exposedViaApi: number | null;
   id: AgentId;
   kind: AgentRow["kind"];
   liveDeploymentVersionId: AgentDeploymentVersionId | null;

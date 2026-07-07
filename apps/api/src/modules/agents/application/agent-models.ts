@@ -198,6 +198,7 @@ export async function toAgentDetailModel(
   return {
     createdAt: toIsoString(agent.createdAt),
     description: agent.description,
+    exposedViaApi: agent.exposedViaApi === 1,
     id: agent.id,
     kind: agent.kind,
     liveVersion: editorData.liveVersion,

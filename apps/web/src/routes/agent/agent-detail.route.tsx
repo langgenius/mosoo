@@ -158,7 +158,7 @@ export function AgentDetailPage() {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { activeAppId } = useAppSession();
+  const { activeApp, activeAppId } = useAppSession();
   const { user } = useAuth();
   const [selectedMode, setSelectedMode] = useState<DetailMode | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -174,8 +174,13 @@ export function AgentDetailPage() {
       return null;
     }
 
-    return mapAgentDetailToView(detailQuery.data, editorStateQuery.data ?? null, user);
-  }, [detailQuery.data, editorStateQuery.data, user]);
+    return mapAgentDetailToView(
+      detailQuery.data,
+      editorStateQuery.data ?? null,
+      user,
+      activeApp?.slug ?? null,
+    );
+  }, [activeApp, detailQuery.data, editorStateQuery.data, user]);
 
   const basePath = globalThis.location.pathname.startsWith("/demo") ? "/demo/agent" : "/agent";
   const runtime = useMemo(() => (agent ? getRuntimeInfo(agent.runtime) : null), [agent]);

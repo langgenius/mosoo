@@ -240,6 +240,7 @@ export const agentSchema = /* GraphQL */ `
   type AgentDetail {
     createdAt: String!
     description: String
+    exposedViaApi: Boolean!
     id: ULID!
     kind: AgentKind!
     liveVersion: AgentDeploymentVersion

@@ -6,6 +6,8 @@ export interface AgentRow {
   createdAt: number;
   description: string | null;
   environmentId: EnvironmentId | null;
+  /** Nullable API-exposure flag: 1 = in the App's API namespace subset, 0/null = not. */
+  exposedViaApi: number | null;
   id: AgentId;
   kind: Agent["kind"];
   liveDeploymentVersionId: AgentDeploymentVersionId | null;

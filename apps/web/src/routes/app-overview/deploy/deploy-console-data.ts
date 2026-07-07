@@ -151,6 +151,12 @@ export function deployTargetLine(run: DeploymentRunVM): string {
 
 export interface DeploymentVM {
   appName: string;
+  /**
+   * Instance-global API namespace slug, minted at the App's first protocol
+   * deploy; `null` for legacy/console apps that are not name-routable. Drives
+   * the name-addressed `/api/v1/apps/{slug}` Connect surface.
+   */
+  slug: string | null;
   /** Public GitHub repo (source of truth), e.g. "github.com/me/roadmap-board". */
   repoUrl: string;
   defaultBranch: string;
@@ -274,6 +280,9 @@ function webFixture(): DeployConsoleState {
   return {
     deployment: {
       appName,
+      // Legacy web-only deploy: it never took the protocol branch, so no
+      // namespace slug was minted and the app is not name-routable.
+      slug: null,
       repoUrl,
       defaultBranch,
       plannedUrl,
@@ -337,6 +346,7 @@ function agentOnlyFixture(): DeployConsoleState {
   return {
     deployment: {
       appName: DEPLOY_APP_IDENTITY.appName,
+      slug: "quiz-agents",
       repoUrl: "github.com/me/quiz-agents",
       defaultBranch: "main",
       plannedUrl: null,
@@ -377,7 +387,7 @@ function webAndAgentsFixture(): DeployConsoleState {
   const { appName, repoUrl, defaultBranch, plannedUrl, liveUrl } = DEPLOY_APP_IDENTITY;
 
   return {
-    deployment: { appName, repoUrl, defaultBranch, plannedUrl, liveUrl },
+    deployment: { appName, slug: "roadmap-board", repoUrl, defaultBranch, plannedUrl, liveUrl },
     agents: DEPLOY_CONSOLE_AGENTS,
     runs: [
       {
@@ -413,7 +423,7 @@ function nativeRedFixture(): DeployConsoleState {
 
   return {
     // The bad push never went live: production still serves the last success.
-    deployment: { appName, repoUrl, defaultBranch, plannedUrl, liveUrl },
+    deployment: { appName, slug: "roadmap-board", repoUrl, defaultBranch, plannedUrl, liveUrl },
     agents: DEPLOY_CONSOLE_AGENTS,
     runs: [
       {

@@ -24,6 +24,7 @@ const AGENT_ROW: AgentRow = {
   createdAt: 1,
   description: "Private details",
   environmentId: null,
+  exposedViaApi: null,
   id: "01J00000000000000000000009",
   kind: "pet",
   liveDeploymentVersionId: "01J0000000000000000000006A",

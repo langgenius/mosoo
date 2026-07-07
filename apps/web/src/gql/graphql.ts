@@ -783,7 +783,7 @@ export type AgentQueryVariables = Exact<{
 }>;
 
 
-export type AgentQuery = { agent: { createdAt: string, description: string | null, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, viewerRole: AgentViewerRole, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, owner: { id: PlatformId, imageUrl: string | null, name: string | null }, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }>, tools: Array<{ enabled: boolean, iconUrl: string | null, name: string, serverId: PlatformId }>, versions: Array<{ agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number }> } };
+export type AgentQuery = { agent: { createdAt: string, description: string | null, exposedViaApi: boolean, id: PlatformId, kind: AgentKind, model: string, name: string, appId: PlatformId, prompt: string, provider: string, runtimeId: string, status: AgentStatus, updatedAt: string, viewerRole: AgentViewerRole, visibility: AgentVisibility, liveVersion: { agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number } | null, owner: { id: PlatformId, imageUrl: string | null, name: string | null }, skills: Array<{ ownerName: string | null, skillId: PlatformId, skillName: string, state: AgentSkillState }>, tools: Array<{ enabled: boolean, iconUrl: string | null, name: string, serverId: PlatformId }>, versions: Array<{ agentId: PlatformId, createdAt: string, createdByAccountId: PlatformId, environmentId: PlatformId | null, id: PlatformId, isLive: boolean, kind: AgentKind, model: string, provider: string, runtimeId: string, summary: string, versionNumber: number }> } };
 
 export type AgentEditorStateQueryVariables = Exact<{
   agentId: PlatformId;
@@ -894,7 +894,7 @@ export type AppDeploymentOverviewQueryVariables = Exact<{
 }>;
 
 
-export type AppDeploymentOverviewQuery = { appOverview: { app: { id: PlatformId, name: string }, boundAgents: Array<{ agentId: PlatformId, envVar: string, expose: AppOverviewBoundAgentExposure, name: string }>, deployment: { appId: PlatformId, createdAt: string, defaultBranch: string, id: PlatformId, liveUrl: string | null, plannedUrl: string, repoName: string, repoOwner: string, repoUrl: string, updatedAt: string, latestRun: { appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string, native: { facts: { agentCount: number, specVersion: string, agents: Array<{ action: string, exposed: boolean, name: string, versionNumber: number | null }>, web: { agent: string | null, declared: boolean } } | null, validate: { schemaVersion: number, valid: boolean, facts: { agentCount: number, spec: string, agents: Array<{ exposed: boolean, name: string, source: string }>, web: { agent: string | null, declared: boolean } } | null, failures: Array<{ action: string, code: string, field: string | null, file: string, problem: string, severity: string }> } } | null } | null } | null } };
+export type AppDeploymentOverviewQuery = { appOverview: { app: { id: PlatformId, name: string, slug: string | null }, boundAgents: Array<{ agentId: PlatformId, envVar: string, expose: AppOverviewBoundAgentExposure, name: string }>, deployment: { appId: PlatformId, createdAt: string, defaultBranch: string, id: PlatformId, liveUrl: string | null, plannedUrl: string, repoName: string, repoOwner: string, repoUrl: string, updatedAt: string, latestRun: { appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string, native: { facts: { agentCount: number, specVersion: string, agents: Array<{ action: string, exposed: boolean, name: string, versionNumber: number | null }>, web: { agent: string | null, declared: boolean } } | null, validate: { schemaVersion: number, valid: boolean, facts: { agentCount: number, spec: string, agents: Array<{ exposed: boolean, name: string, source: string }>, web: { agent: string | null, declared: boolean } } | null, failures: Array<{ action: string, code: string, field: string | null, file: string, problem: string, severity: string }> } } | null } | null } | null } };
 
 export type AppDeploymentRunListQueryVariables = Exact<{
   appId: PlatformId;
@@ -2213,6 +2213,7 @@ export const AgentDocument = /*#__PURE__*/ new TypedDocumentString(`
   agent(agentId: $agentId, appId: $appId) {
     createdAt
     description
+    exposedViaApi
     id
     kind
     liveVersion {
@@ -2690,6 +2691,7 @@ export const AppDeploymentOverviewDocument = /*#__PURE__*/ new TypedDocumentStri
     app {
       id
       name
+      slug
     }
     boundAgents {
       agentId
