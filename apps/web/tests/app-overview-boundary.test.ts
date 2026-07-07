@@ -160,13 +160,23 @@ describe("Deploy console native boundary", () => {
     expect(repoCardSource).not.toContain("Auto-detects static or worker");
   });
 
-  test("keeps the acceptance route covering all four exposure scenarios", () => {
+  test("keeps the acceptance route covering every exposure scenario plus the agent instance", () => {
     const previewSource = readSource(
       "../src/routes/app-overview/deploy/v0-deploy-preview.route.tsx",
     );
 
-    expect(previewSource).toContain('"web", "agent-only", "web-and-agents", "native-red"');
+    for (const scenario of [
+      '"web"',
+      '"agent-only"',
+      '"web-and-agents"',
+      '"native-red"',
+      '"instance"',
+    ]) {
+      expect(previewSource).toContain(scenario);
+    }
     expect(previewSource).toContain("Fixture scenario");
     expect(previewSource).toContain("Simulate failed deploy");
+    // The "instance" scenario swaps in the agent-instance prototype panel.
+    expect(previewSource).toContain("AgentInstancePanel");
   });
 });
