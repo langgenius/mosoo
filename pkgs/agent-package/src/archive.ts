@@ -45,6 +45,18 @@ interface AgentPackageArchiveParseResult {
   package: AgentPackage | null;
 }
 
+/**
+ * Reserved agent package sidecar paths that skill-package path admission would
+ * otherwise reject (`.mcp.json` starts with a dot). The export side writes them
+ * verbatim via {@link createAdmittedZipArchive}, so the import extractor must
+ * exempt them from the reserved-key rule or MCP-bound agents cannot re-import.
+ */
+const AGENT_PACKAGE_ARCHIVE_RESERVED_PATHS: ReadonlySet<string> = new Set([
+  ENVIRONMENT_DEFINITION_PATH,
+  MANIFEST_PATH,
+  MCP_JSON_PATH,
+]);
+
 function buildEnvironmentDefinition(agentPackage: AgentPackage): string {
   return JSON.stringify(
     {
@@ -170,7 +182,10 @@ export function parseAgentPackageArchiveBytes(
 
   try {
     entries = toArchiveEntryRecord(
-      extractZipArchive(archiveBytes, AGENT_PACKAGE_ARCHIVE_EXTRACT_OPTIONS),
+      extractZipArchive(archiveBytes, {
+        ...AGENT_PACKAGE_ARCHIVE_EXTRACT_OPTIONS,
+        allowedReservedPaths: AGENT_PACKAGE_ARCHIVE_RESERVED_PATHS,
+      }),
     );
   } catch {
     return invalidArchiveResult(

@@ -170,12 +170,42 @@ describe("agent package archive entry admission", () => {
       "skills/demo/SKILL.md",
     ]);
   });
+
+  test("round-trips an mcp-bound package through the reserved .mcp.json sidecar", () => {
+    const agentPackage = createAgentPackageFixture({
+      mcpServers: [
+        {
+          authType: "bearer",
+          credentialMode: "runtime_resolved",
+          credentialScope: "app",
+          enabled: true,
+          iconUrl: null,
+          name: "github",
+          serverId: null,
+          source: "app",
+          url: "https://mcp.github.example/mcp",
+        },
+      ],
+    });
+
+    const archiveBytes = createAgentPackageArchiveBytes(agentPackage);
+    const parsed = parseAgentPackageArchiveBytes(archiveBytes);
+
+    // Before the extractor exempted `.mcp.json` from skill path admission this
+    // returned package=null with package.archive.invalid, so an MCP-bound agent
+    // exported as a .agent file could never be re-imported.
+    expect(parsed.issues).toEqual([]);
+    expect(parsed.package).not.toBeNull();
+    expect(parsed.package?.manifest.mcpServers.map((server) => server.name)).toEqual(["github"]);
+    expect(parsed.package?.manifest.mcpServers[0]?.url).toBe("https://mcp.github.example/mcp");
+  });
 });
 
 function createAgentPackageFixture(
   input: {
     assets?: AgentPackage["assets"];
     avatarAssetKey?: string | null;
+    mcpServers?: AgentPackage["manifest"]["mcpServers"];
     skills?: AgentPackage["manifest"]["skills"];
   } = {},
 ): AgentPackage {
@@ -199,7 +229,7 @@ function createAgentPackageFixture(
       },
       kind: "pet",
       manifestVersion: AGENT_MANIFEST_VERSION,
-      mcpServers: [],
+      mcpServers: input.mcpServers ?? [],
       metadata: {
         description: "Test package",
         name: "Test Agent",

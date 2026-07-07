@@ -24,6 +24,12 @@ export interface SkillArchiveExtractOptions {
   maxEntryCount?: number;
   maxFileBytes?: number;
   maxTotalFileBytes?: number;
+  /**
+   * Normalized paths exempt from the reserved-key admission rule. Empty for
+   * skill packages; the agent package reader passes its reserved sidecar paths
+   * (e.g. `.mcp.json`) so their exported archives round-trip on import.
+   */
+  allowedReservedPaths?: ReadonlySet<string>;
 }
 
 interface ZipArchiveMetadata {
@@ -76,7 +82,7 @@ export function extractZipArchive(
       return;
     }
 
-    const admittedEntry = readAdmittedZipArchivePath(file.name);
+    const admittedEntry = readAdmittedZipArchivePath(file.name, options.allowedReservedPaths);
 
     if (admittedEntry instanceof SkillPackageError) {
       extractionState.error = admittedEntry;
@@ -262,7 +268,7 @@ function listZipArchiveEntries(
   const centralDirectorySize = readUint32LE(bytes, endOfCentralDirectoryOffset + 12);
   const centralDirectoryOffset = readUint32LE(bytes, endOfCentralDirectoryOffset + 16);
   const metadata: ZipArchiveMetadata[] = [];
-  const admission = createSkillPackagePathAdmission();
+  const admission = createSkillPackagePathAdmission(options.allowedReservedPaths);
   let totalFileBytes = 0;
   let offset = centralDirectoryOffset;
   const endOffset = centralDirectoryOffset + centralDirectorySize;
@@ -371,9 +377,12 @@ function findEndOfCentralDirectory(bytes: Uint8Array): number {
   return -1;
 }
 
-function readAdmittedZipArchivePath(path: string): AdmittedSkillPackagePath | SkillPackageError {
+function readAdmittedZipArchivePath(
+  path: string,
+  allowedReservedPaths?: ReadonlySet<string>,
+): AdmittedSkillPackagePath | SkillPackageError {
   try {
-    return admitSkillPackagePath(path, inferZipEntryKind(path));
+    return admitSkillPackagePath(path, inferZipEntryKind(path), allowedReservedPaths);
   } catch (error) {
     return toSkillZipError(error, "Skill zip decompression failed.");
   }

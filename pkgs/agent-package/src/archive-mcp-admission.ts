@@ -113,12 +113,16 @@ export function admitMcpSidecarServer(
     };
   }
 
+  // App scope keeps the merged catalog entry readable by the portable-manifest
+  // MCP reader (`readPackageMcpServer` accepts only credentialScope/source
+  // "app"); the native upsert rescopes to app regardless, so both merge
+  // consumers agree on app-scoped, needs-reconnect servers.
   return {
     normalizedServer: {
       authType: "oauth",
-      credentialScope: "user",
+      credentialScope: "app",
       iconUrl: typeof server["iconUrl"] === "string" ? server["iconUrl"] : null,
-      source: "personal",
+      source: "app",
       url,
     },
     ok: true,

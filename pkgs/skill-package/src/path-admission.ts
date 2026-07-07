@@ -13,6 +13,8 @@ export interface SkillPackagePathAdmission {
 
 export const SKILL_PACKAGE_MANIFEST_PATH = "SKILL.md";
 
+const EMPTY_ALLOWED_RESERVED_PATHS: ReadonlySet<string> = new Set();
+
 const RESERVED_PATH_KEYS = new Set([
   "__proto__",
   "constructor",
@@ -31,12 +33,14 @@ const RESERVED_PATH_KEYS = new Set([
   "vault",
 ]);
 
-export function createSkillPackagePathAdmission(): SkillPackagePathAdmission {
+export function createSkillPackagePathAdmission(
+  allowedReservedPaths: ReadonlySet<string> = EMPTY_ALLOWED_RESERVED_PATHS,
+): SkillPackagePathAdmission {
   const entries = new Map<string, SkillPackagePathKind>();
 
   return {
     admit(path, entryKind) {
-      const admitted = admitSkillPackagePath(path, entryKind);
+      const admitted = admitSkillPackagePath(path, entryKind, allowedReservedPaths);
       rejectDuplicateOrCollision(entries, admitted.path, admitted.entryKind);
       entries.set(admitted.path, admitted.entryKind);
 
@@ -62,6 +66,7 @@ export function createSkillPackageArchivePathAdmission(): SkillPackagePathAdmiss
 export function admitSkillPackagePath(
   path: string,
   entryKind: SkillPackagePathKind = inferSkillPackagePathKind(path),
+  allowedReservedPaths: ReadonlySet<string> = EMPTY_ALLOWED_RESERVED_PATHS,
 ): AdmittedSkillPackagePath {
   if (path.length === 0) {
     throw new SkillPackageError("The skill package contains an empty path.");
@@ -77,9 +82,20 @@ export function admitSkillPackagePath(
     throw new SkillPackageError("The skill package contains an empty path.");
   }
 
+  const normalizedPath = segments.join("/");
+  // Callers that own their own path admission (the agent package export/import
+  // round trip) may exempt a fixed set of otherwise-reserved sidecar paths such
+  // as `.mcp.json` from the reserved-key rule; skill packages pass no
+  // exemptions, so the reserved-key rule still applies to every segment.
+  const reservedExempt = allowedReservedPaths.has(normalizedPath);
+
   for (const segment of segments) {
     if (segment.length === 0 || segment === "." || segment === "..") {
       throw new SkillPackageError(`The skill package contains an invalid path: ${path}`);
+    }
+
+    if (reservedExempt) {
+      continue;
     }
 
     const reservedKey = readReservedPathKey(segment);
@@ -91,7 +107,7 @@ export function admitSkillPackagePath(
 
   return {
     entryKind,
-    path: segments.join("/"),
+    path: normalizedPath,
   };
 }
 
