@@ -28,7 +28,6 @@ describe("native deployment validate contract", () => {
       "native.agent.manifest_invalid",
       "native.agent.manifest_missing",
       "native.agent.manifest_parse_error",
-      "native.agent.manifest_warning",
       "native.agent.mcp_invalid",
       "native.agent.mcp_secret_forbidden",
       "native.agent.name_conflict",

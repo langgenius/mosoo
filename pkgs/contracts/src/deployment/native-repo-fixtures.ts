@@ -330,6 +330,28 @@ build = "npm run build"
   },
   {
     expect: "red",
+    expectedCodes: ["native.agent.manifest_missing"],
+    files: {
+      ".agent/agents/support/prompts/system.md": "You are the support fixture agent.\n",
+      ".agent/manifest.json": createAgentManifestJson("concierge"),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    },
+    name: "red-agent-dir-manifest-missing",
+  },
+  {
+    // A nested manifest is misplaced (native.agent.invalid_path, pinned
+    // choice) AND leaves its agent directory without a root manifest.
+    expect: "red",
+    expectedCodes: ["native.agent.invalid_path", "native.agent.manifest_missing"],
+    files: {
+      ".agent/agents/support/nested/manifest.json": createAgentManifestJson("support"),
+      ".agent/manifest.json": createAgentManifestJson("concierge"),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    },
+    name: "red-agent-manifest-nested-too-deep",
+  },
+  {
+    expect: "red",
     expectedCodes: ["native.agent.manifest_invalid"],
     files: {
       ".agent/manifest.json": createAgentManifestJson("quiz-master", { prompts: undefined }),

@@ -37,12 +37,14 @@
 import {
   admitAgentPackageArchiveEntries,
   collectEnvironmentSidecarIssues,
+  collectMcpManifestCatalogIssues,
   collectMcpSidecarIssues,
   findForbiddenEnvironmentSidecarFieldPath,
   findForbiddenMcpSecretFieldPath,
 } from "@mosoo/agent-package";
 import type { AgentPackageArchiveEntryCandidate } from "@mosoo/agent-package";
-import type { AgentResolutionIssue } from "@mosoo/contracts/agent-manifest";
+import { AGENT_PACKAGE_ISSUE_CODES } from "@mosoo/contracts/agent-manifest";
+import type { AgentPackageIssueCode, AgentResolutionIssue } from "@mosoo/contracts/agent-manifest";
 import {
   collectPackageIssues,
   hasBlockingPackageIssue,
@@ -77,28 +79,31 @@ const NATIVE_TOML_EXPOSE_WEB_KEYS = new Set(["agent", "build"]);
 
 /**
  * Underlying manifest issue codes that identify a single dotted manifest
- * field; everything else keeps its specifics in `problem` only.
+ * field; everything else keeps its specifics in `problem` only. Keyed by the
+ * contracts-exported issue-code constants so the mapping cannot drift from
+ * the codes the reused package validation actually mints.
  */
-const MANIFEST_ISSUE_FIELDS: Readonly<Record<string, string>> = {
-  "manifest.kind.missing": "kind",
-  "manifest.metadata.name.missing": "name",
-  "manifest.model.missing": "model",
-  "manifest.prompt.missing": "prompts.system",
-  "manifest.runtime.missing": "runtime",
-  "manifest.version.unsupported": "manifestVersion",
-  "package.version.unsupported": "packageVersion",
+const MANIFEST_ISSUE_FIELDS: Readonly<Partial<Record<AgentPackageIssueCode, string>>> = {
+  [AGENT_PACKAGE_ISSUE_CODES.manifestKindMissing]: "kind",
+  [AGENT_PACKAGE_ISSUE_CODES.manifestNameMissing]: "name",
+  [AGENT_PACKAGE_ISSUE_CODES.manifestModelMissing]: "model",
+  [AGENT_PACKAGE_ISSUE_CODES.manifestPromptMissing]: "prompts.system",
+  [AGENT_PACKAGE_ISSUE_CODES.manifestRuntimeMissing]: "runtime",
+  [AGENT_PACKAGE_ISSUE_CODES.manifestVersionUnsupported]: "manifestVersion",
+  [AGENT_PACKAGE_ISSUE_CODES.packageVersionUnsupported]: "packageVersion",
 };
 
-/**
- * MCP issue codes raised against the manifest's server catalog rather than
- * the sidecar file. They are normally gated out by blocking manifest issues,
- * but the attribution is kept for safety.
- */
-const MCP_CATALOG_ISSUE_CODES = new Set([
-  "package.mcp.name.missing",
-  "package.mcp.ref.mismatch",
-  "package.mcp.ref.missing",
-]);
+const AGENT_PACKAGE_ISSUE_CODE_SET: ReadonlySet<string> = new Set(
+  Object.values(AGENT_PACKAGE_ISSUE_CODES),
+);
+
+function isAgentPackageIssueCode(code: string): code is AgentPackageIssueCode {
+  return AGENT_PACKAGE_ISSUE_CODE_SET.has(code);
+}
+
+function readManifestIssueField(code: string): string | undefined {
+  return isAgentPackageIssueCode(code) ? MANIFEST_ISSUE_FIELDS[code] : undefined;
+}
 
 const textEncoder = new TextEncoder();
 
@@ -198,6 +203,7 @@ export function validateNativeDeployment(
   const toml = readNativeTomlShape(tomlValue, failures);
 
   collectAgentPathAdmissionFailures(files, failures);
+  collectNamedAgentLayoutFailures(files, failures);
 
   const primaryAgent = discoverPrimaryAgent(files, failures);
   const namedAgents = discoverNamedAgents(files, failures);
@@ -379,6 +385,13 @@ function invalidTomlValueFailure(field: string, expected: string): NativeValidat
   };
 }
 
+/**
+ * Reports EVERY inadmissible `.agent/` path: per-path admission runs entry by
+ * entry so one bad path cannot shadow the rest, and the admissible remainder
+ * still goes through batch admission for its cross-entry rules (duplicate or
+ * nested-under-file collisions, which a repo file walk cannot normally
+ * produce).
+ */
 function collectAgentPathAdmissionFailures(
   files: Readonly<Record<string, string>>,
   failures: NativeValidateFailure[],
@@ -390,21 +403,90 @@ function collectAgentPathAdmissionFailures(
       entryKind: "file",
       originalPath: path.slice(NATIVE_AGENT_DIR_PREFIX.length),
     }));
-  const admission = admitAgentPackageArchiveEntries(candidates);
+  const admissibleCandidates: AgentPackageArchiveEntryCandidate[] = [];
 
-  if (admission.ok) {
-    return;
+  for (const candidate of candidates) {
+    const admission = admitAgentPackageArchiveEntries([candidate]);
+
+    if (admission.ok) {
+      admissibleCandidates.push(candidate);
+      continue;
+    }
+
+    failures.push(toPathAdmissionFailure(admission.failure.path, admission.failure));
   }
 
-  const failedPath = admission.failure.path;
+  const batchAdmission = admitAgentPackageArchiveEntries(admissibleCandidates);
 
-  failures.push({
+  if (!batchAdmission.ok) {
+    failures.push(toPathAdmissionFailure(batchAdmission.failure.path, batchAdmission.failure));
+  }
+}
+
+function toPathAdmissionFailure(
+  failedPath: string | null,
+  failure: { code: string; message: string },
+): NativeValidateFailure {
+  return {
     action: `rename the entry to a safe relative path inside ${NATIVE_AGENT_DIR}/`,
     code: "native.agent.invalid_path",
     file: failedPath === null ? NATIVE_AGENT_DIR : `${NATIVE_AGENT_DIR_PREFIX}${failedPath}`,
-    problem: `${NATIVE_AGENT_DIR}/ entry path is not admissible: ${admission.failure.message} (${admission.failure.code})`,
+    problem: `${NATIVE_AGENT_DIR}/ entry path is not admissible: ${failure.message} (${failure.code})`,
     severity: "error",
-  });
+  };
+}
+
+/**
+ * Misplaced named-agent manifests are layout errors, never silently dropped:
+ * every `manifest.json` under `.agent/agents/` must sit exactly at
+ * `.agent/agents/<agent-name>/manifest.json` (pinned to
+ * `native.agent.invalid_path`), and every agent directory implied by any
+ * `.agent/agents/<agent-name>/...` entry must contain a root manifest
+ * (`native.agent.manifest_missing` at the expected path). A nested manifest
+ * raises both: the misplacement and the manifest its directory still lacks.
+ */
+function collectNamedAgentLayoutFailures(
+  files: Readonly<Record<string, string>>,
+  failures: NativeValidateFailure[],
+): void {
+  const impliedAgentDirNames = new Set<string>();
+
+  for (const path of Object.keys(files).toSorted()) {
+    if (!path.startsWith(NAMED_AGENT_DIR_PREFIX)) {
+      continue;
+    }
+
+    const remainder = path.slice(NAMED_AGENT_DIR_PREFIX.length);
+    const separatorIndex = remainder.indexOf("/");
+
+    if (separatorIndex > 0) {
+      impliedAgentDirNames.add(remainder.slice(0, separatorIndex));
+    }
+
+    if (path.endsWith(NAMED_AGENT_MANIFEST_SUFFIX) && readNamedAgentDirName(path) === null) {
+      failures.push({
+        action: `move ${path} to ${NAMED_AGENT_DIR_PREFIX}<agent-name>/manifest.json for its agent`,
+        code: "native.agent.invalid_path",
+        file: path,
+        problem: `named agent manifests must sit exactly at ${NAMED_AGENT_DIR_PREFIX}<agent-name>/manifest.json`,
+        severity: "error",
+      });
+    }
+  }
+
+  for (const dirName of [...impliedAgentDirNames].toSorted()) {
+    const manifestPath = `${NAMED_AGENT_DIR_PREFIX}${dirName}/manifest.json`;
+
+    if (files[manifestPath] === undefined) {
+      failures.push({
+        action: `create ${manifestPath} describing the agent, or remove the ${NAMED_AGENT_DIR_PREFIX}${dirName}/ directory`,
+        code: "native.agent.manifest_missing",
+        file: manifestPath,
+        problem: `agent directory ${NAMED_AGENT_DIR_PREFIX}${dirName}/ has no manifest.json`,
+        severity: "error",
+      });
+    }
+  }
 }
 
 function discoverPrimaryAgent(
@@ -541,20 +623,26 @@ function discoverAgent(
   };
 }
 
+/**
+ * Every issue `collectPackageIssues` mints today is blocking (unsupported
+ * status or a required-field code), so manifest issues map fail-closed to
+ * error-severity `native.agent.manifest_invalid`. If the reused validation
+ * ever grows non-blocking issues, revisit this mapping before giving the
+ * closed code set a manifest warning story again.
+ */
 function mapManifestIssue(
   issue: AgentResolutionIssue,
   manifestPath: string,
 ): NativeValidateFailure {
-  const blocking = hasBlockingPackageIssue([issue]);
-  const field = MANIFEST_ISSUE_FIELDS[issue.code];
+  const field = readManifestIssueField(issue.code);
 
   return {
     action: `update ${manifestPath} so the agent manifest passes package validation`,
-    code: blocking ? "native.agent.manifest_invalid" : "native.agent.manifest_warning",
+    code: "native.agent.manifest_invalid",
     ...(field === undefined ? {} : { field }),
     file: manifestPath,
     problem: `${issue.message} (${issue.code})`,
-    severity: blocking ? "error" : "warning",
+    severity: "error",
   };
 }
 
@@ -759,6 +847,13 @@ function collectMcpSidecarFileFailures(
   collectMcpReferenceCoverageFailures(agents, sidecar, failures);
 }
 
+/**
+ * The reused MCP validation is split so every failure lands on the file that
+ * contains it: catalog issues (unsupported entry fields and the like) are
+ * collected per manifest and attributed to that manifest, while the sidecar
+ * pass runs with catalog issues excluded so its output is `.mcp.json`-side
+ * only.
+ */
 function collectPrimaryMcpDelegateFailures(
   primaryAgent: DiscoveredAgent | null,
   entries: Record<string, Uint8Array>,
@@ -769,9 +864,17 @@ function collectPrimaryMcpDelegateFailures(
   }
 
   try {
-    for (const issue of collectMcpSidecarIssues(primaryAgent.manifestJson, entries)) {
+    for (const issue of collectMcpManifestCatalogIssues(primaryAgent.manifestJson)) {
+      failures.push(mapMcpCatalogIssue(issue, primaryAgent.manifestPath));
+    }
+
+    const sidecarIssues = collectMcpSidecarIssues(primaryAgent.manifestJson, entries, {
+      manifestCatalogIssues: "exclude",
+    });
+
+    for (const issue of sidecarIssues) {
       // Undeclared-server coverage is judged natively across all agents.
-      if (issue.code === "package.mcp.undeclared") {
+      if (issue.code === AGENT_PACKAGE_ISSUE_CODES.mcpUndeclared) {
         continue;
       }
 
@@ -950,8 +1053,22 @@ function hasTypedEnvironmentReference(agent: DiscoveredAgent): boolean {
   return isRecord(environment) && typeof environment["ref"] === "string";
 }
 
+function mapMcpCatalogIssue(
+  issue: AgentResolutionIssue,
+  manifestPath: string,
+): NativeValidateFailure {
+  return {
+    action: `update the mcpServers catalog in ${manifestPath} so it passes package validation`,
+    code: "native.agent.mcp_invalid",
+    file: manifestPath,
+    problem: `${issue.message} (${issue.code})`,
+    severity: issue.severity === "error" ? "error" : "warning",
+  };
+}
+
+/** Maps sidecar-side issues only; catalog issues are excluded at collection. */
 function mapMcpSidecarIssue(issue: AgentResolutionIssue): NativeValidateFailure {
-  if (issue.code === "package.mcp.secret_forbidden") {
+  if (issue.code === AGENT_PACKAGE_ISSUE_CODES.mcpSecretForbidden) {
     return {
       action: `remove the plaintext secret from ${MCP_SIDECAR_REPO_PATH}; credentials are connected on the target instance after deploy`,
       code: "native.agent.mcp_secret_forbidden",
@@ -961,21 +1078,17 @@ function mapMcpSidecarIssue(issue: AgentResolutionIssue): NativeValidateFailure 
     };
   }
 
-  const file = MCP_CATALOG_ISSUE_CODES.has(issue.code)
-    ? PRIMARY_MANIFEST_PATH
-    : MCP_SIDECAR_REPO_PATH;
-
   return {
-    action: `update ${file} so the MCP catalog and sidecar pass package validation`,
+    action: `update ${MCP_SIDECAR_REPO_PATH} so the MCP sidecar passes package validation`,
     code: "native.agent.mcp_invalid",
-    file,
+    file: MCP_SIDECAR_REPO_PATH,
     problem: `${issue.message} (${issue.code})`,
     severity: issue.severity === "error" ? "error" : "warning",
   };
 }
 
 function mapEnvironmentSidecarIssue(issue: AgentResolutionIssue): NativeValidateFailure {
-  if (issue.code === "package.environment.secret_forbidden") {
+  if (issue.code === AGENT_PACKAGE_ISSUE_CODES.environmentSecretForbidden) {
     return {
       action: `remove the plaintext secret from ${ENVIRONMENT_DEFINITION_REPO_PATH} and declare the name in secretNames instead`,
       code: "native.agent.environment_secret_forbidden",
@@ -989,7 +1102,8 @@ function mapEnvironmentSidecarIssue(issue: AgentResolutionIssue): NativeValidate
   return {
     action: `update ${ENVIRONMENT_DEFINITION_REPO_PATH} to declare only expectedName, secretNames, and setupScript`,
     code: "native.agent.environment_invalid",
-    ...(issue.code === "package.environment.field.unsupported" && issue.targetLabel !== null
+    ...(issue.code === AGENT_PACKAGE_ISSUE_CODES.environmentFieldUnsupported &&
+    issue.targetLabel !== null
       ? { field: issue.targetLabel }
       : {}),
     file: ENVIRONMENT_DEFINITION_REPO_PATH,

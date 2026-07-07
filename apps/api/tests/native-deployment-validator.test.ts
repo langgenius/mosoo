@@ -356,4 +356,182 @@ describe("native deployment validator", () => {
     expect(webDate.valid).toBe(false);
     expect(webDate.failures[0]?.field).toBe("expose.web");
   });
+
+  test("flags an agent directory without a manifest instead of dropping it", () => {
+    const result = validate(findFixtureCase("red-agent-dir-manifest-missing").files);
+
+    expect(result.failures).toEqual([
+      {
+        action:
+          "create .agent/agents/support/manifest.json describing the agent, or remove the .agent/agents/support/ directory",
+        code: "native.agent.manifest_missing",
+        file: ".agent/agents/support/manifest.json",
+        problem: "agent directory .agent/agents/support/ has no manifest.json",
+        severity: "error",
+      },
+    ]);
+  });
+
+  test("flags manifests nested below the named agent directory as misplaced", () => {
+    const result = validate(findFixtureCase("red-agent-manifest-nested-too-deep").files);
+    const misplaced = result.failures.find(
+      (failure) => failure.code === "native.agent.invalid_path",
+    );
+
+    expect(sortedCodes(result)).toEqual([
+      "native.agent.invalid_path",
+      "native.agent.manifest_missing",
+    ]);
+    expect(misplaced).toMatchObject({
+      file: ".agent/agents/support/nested/manifest.json",
+      severity: "error",
+    });
+    expect(misplaced?.action).toContain(".agent/agents/<agent-name>/manifest.json");
+  });
+
+  test("flags a manifest dropped directly into .agent/agents/ as misplaced", () => {
+    const result = validate({
+      ".agent/agents/manifest.json": createAgentManifestJson("stray"),
+      ".agent/manifest.json": createAgentManifestJson("quiz-master"),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+
+    expect(sortedCodes(result)).toEqual(["native.agent.invalid_path"]);
+    expect(result.failures[0]?.file).toBe(".agent/agents/manifest.json");
+  });
+
+  test("collects every inadmissible .agent path instead of only the first", () => {
+    const result = validate({
+      ".agent/manifest.json": createAgentManifestJson("quiz-master"),
+      ".agent/skills/../../escape.txt": "must never be admitted\n",
+      ".agent/skills/./relative.txt": "must never be admitted\n",
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+    const admissionFailures = result.failures.filter(
+      (failure) => failure.code === "native.agent.invalid_path",
+    );
+
+    expect(sortedCodes(result)).toEqual(["native.agent.invalid_path", "native.agent.invalid_path"]);
+    expect(admissionFailures.map((failure) => failure.file).toSorted()).toEqual([
+      ".agent/skills/../../escape.txt",
+      ".agent/skills/./relative.txt",
+    ]);
+  });
+
+  test("attributes manifest mcp catalog issues to the containing manifest", () => {
+    const result = validate({
+      ".agent/.mcp.json": `${JSON.stringify(
+        { mcpServers: { github: { type: "http", url: "https://mcp.github.example/mcp" } } },
+        null,
+        2,
+      )}\n`,
+      ".agent/manifest.json": createAgentManifestJson("quiz-master", {
+        mcpServers: [{ enabled: true, name: "github", ref: ".mcp.json#github", transport: "http" }],
+      }),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+    const catalog = result.failures.find((failure) =>
+      failure.problem.includes("package.mcp.field.unsupported"),
+    );
+
+    expect(sortedCodes(result)).toEqual(["native.agent.mcp_invalid", "native.setup.mcp_reconnect"]);
+    expect(catalog).toMatchObject({
+      code: "native.agent.mcp_invalid",
+      file: ".agent/manifest.json",
+      severity: "error",
+    });
+    expect(catalog?.problem).toContain("transport");
+  });
+
+  test("attributes sidecar server field issues to the sidecar file", () => {
+    const result = validate({
+      ".agent/.mcp.json": `${JSON.stringify(
+        {
+          mcpServers: {
+            github: { timeout: 5, type: "http", url: "https://mcp.github.example/mcp" },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      ".agent/manifest.json": createAgentManifestJson("quiz-master", {
+        mcpServers: [{ enabled: true, name: "github", ref: ".mcp.json#github" }],
+      }),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+    const sidecar = result.failures.find((failure) =>
+      failure.problem.includes("package.mcp.field.unsupported"),
+    );
+
+    expect(sortedCodes(result)).toEqual(["native.agent.mcp_invalid", "native.setup.mcp_reconnect"]);
+    expect(sidecar).toMatchObject({
+      code: "native.agent.mcp_invalid",
+      file: ".agent/.mcp.json",
+      severity: "error",
+    });
+    expect(sidecar?.problem).toContain("timeout");
+  });
+
+  test("validate never throws on or mutates deep-frozen snapshots", () => {
+    for (const fixtureCase of NATIVE_REPO_FIXTURE_CASES) {
+      const files = structuredClone(fixtureCase.files) as Record<string, string>;
+      const serializedBefore = JSON.stringify(files);
+      const snapshot = deepFreeze({ files: deepFreeze(files) });
+      const result = validateNativeDeployment(snapshot);
+
+      expect(result.schemaVersion).toBe(1);
+      expect(JSON.stringify(files)).toBe(serializedBefore);
+    }
+  });
+
+  test("pins a UTF-8 BOM before spec as a toml parse error", () => {
+    const result = validate({
+      ".agent/manifest.json": createAgentManifestJson("quiz-master"),
+      ".mosoo.toml": `\u{feff}${NATIVE_MARKER_TOML}`,
+    });
+
+    expect(sortedCodes(result)).toEqual(["native.toml.parse_error"]);
+    expect(result.valid).toBe(false);
+    expect(result.facts).toBeNull();
+  });
+
+  test("pins CRLF line endings in .mosoo.toml as accepted", () => {
+    const result = validate({
+      ".agent/manifest.json": createAgentManifestJson("quiz-master"),
+      ".mosoo.toml": 'spec = "mosoo.spec.v1"\r\n\r\n[expose]\r\nagents = ["quiz-master"]\r\n',
+    });
+
+    expect(result.valid).toBe(true);
+    expect(sortedCodes(result)).toEqual([]);
+    expect(result.facts?.agents).toEqual([
+      { exposed: true, name: "quiz-master", source: "primary" },
+    ]);
+  });
+
+  test("pins duplicate expose.agents entries as a silent dedupe", () => {
+    const result = validate({
+      ".agent/agents/support/manifest.json": createAgentManifestJson("support"),
+      ".agent/manifest.json": createAgentManifestJson("concierge"),
+      ".mosoo.toml": 'spec = "mosoo.spec.v1"\n\n[expose]\nagents = ["support", "support"]\n',
+    });
+
+    expect(result.valid).toBe(true);
+    expect(sortedCodes(result)).toEqual([]);
+    expect(result.facts?.agents).toEqual([
+      { exposed: false, name: "concierge", source: "primary" },
+      { exposed: true, name: "support", source: "named" },
+    ]);
+  });
 });
+
+function deepFreeze<T>(value: T): T {
+  if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) {
+      deepFreeze(child);
+    }
+
+    Object.freeze(value);
+  }
+
+  return value;
+}

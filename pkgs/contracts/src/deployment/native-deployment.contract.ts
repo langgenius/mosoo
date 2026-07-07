@@ -28,10 +28,12 @@ export const NATIVE_AGENT_DIR = ".agent" as const;
 /**
  * Closed set of validate failure codes, sorted ascending. The codes are a
  * public machine-stable contract: renames or removals are breaking changes.
+ * Every code must stay reachable from the validator; unreachable codes are
+ * removed instead of documented (`native.agent.manifest_warning` was dropped
+ * because every issue the reused package validation mints is blocking).
  *
  * Severity is `error` unless noted:
- * - warning: `native.agent.manifest_warning`, `native.expose.none`,
- *   `native.toml.unknown_key`
+ * - warning: `native.expose.none`, `native.toml.unknown_key`
  * - setup_required: `native.setup.environment_secret`,
  *   `native.setup.mcp_reconnect`
  */
@@ -43,7 +45,6 @@ export const NATIVE_VALIDATE_FAILURE_CODES = [
   "native.agent.manifest_invalid",
   "native.agent.manifest_missing",
   "native.agent.manifest_parse_error",
-  "native.agent.manifest_warning",
   "native.agent.mcp_invalid",
   "native.agent.mcp_secret_forbidden",
   "native.agent.name_conflict",
