@@ -1,10 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
-import { appendSessionResourceMentionsToMessage } from "../src/features/session-chat/session-resource-mentions";
+import {
+  appendSessionResourceMentionsToMessage,
+  createSessionResourceMentionMessagePayload,
+} from "../src/features/session-chat/session-resource-mentions";
 import type { SessionResourceMention } from "../src/features/session-chat/session-resource-mentions";
 
-function mention(path: string, name = path): SessionResourceMention {
-  return { id: path, name, path };
+function mention(path: string, name = path, id = path): SessionResourceMention {
+  return { id, name, path };
 }
 
 describe("appendSessionResourceMentionsToMessage", () => {
@@ -41,5 +44,22 @@ describe("appendSessionResourceMentionsToMessage", () => {
 
   test("leaves the message untouched when there are no mentions", () => {
     expect(appendSessionResourceMentionsToMessage("hello", [])).toBe("hello");
+  });
+});
+
+describe("createSessionResourceMentionMessagePayload", () => {
+  test("keeps the readable paths and includes attachment ids for the stream event", () => {
+    const payload = createSessionResourceMentionMessagePayload({
+      mentions: [
+        mention("session-files/file-a/one.txt", "one.txt", "file-a"),
+        mention("session-files/file-b/two.txt", "two.txt", "file-b"),
+      ],
+      message: "summarize these",
+    });
+
+    expect(payload).toEqual({
+      attachmentIds: ["file-a", "file-b"],
+      text: "summarize these\n\nsession-files/file-a/one.txt\nsession-files/file-b/two.txt",
+    });
   });
 });

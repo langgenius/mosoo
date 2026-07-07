@@ -7,7 +7,7 @@ import type { KeyboardEvent } from "react";
 import { useSessionStream } from "@/domains/runtime/use-session-stream";
 import type { PermissionRequest } from "@/domains/runtime/use-session-stream";
 import { listAgentSessions } from "@/domains/session/api/agent-session";
-import { appendSessionResourceMentionsToMessage } from "@/features/session-chat/session-resource-mentions";
+import { createSessionResourceMentionMessagePayload } from "@/features/session-chat/session-resource-mentions";
 import { useSessionChatLayoutState } from "@/features/session-chat/use-session-chat-layout-state";
 import { toAgentId, toAppId, toSessionId } from "@/routes/typed-id";
 
@@ -272,10 +272,10 @@ export function useAgentSessionPanelModel(
 
   async function handleSend(options: SendOptions = {}): Promise<boolean> {
     const typedText = (options.text ?? inputValue).trim();
-    const text = appendSessionResourceMentionsToMessage(
-      typedText,
-      options.sessionResourceMentions ?? [],
-    );
+    const payload = createSessionResourceMentionMessagePayload({
+      mentions: options.sessionResourceMentions ?? [],
+      message: typedText,
+    });
 
     if (
       isComposerSendBlocked({
@@ -303,9 +303,10 @@ export function useAgentSessionPanelModel(
       const sessionId = await ensureActiveSession();
 
       await stream.sendUserMessage({
+        attachmentIds: payload.attachmentIds,
         clientRequestId: crypto.randomUUID(),
         sessionId,
-        text,
+        text: payload.text,
       });
       setInputValue("");
 
