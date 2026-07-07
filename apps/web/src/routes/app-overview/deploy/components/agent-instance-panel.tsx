@@ -1,14 +1,18 @@
 import {
   Activity,
   ArrowUp,
+  ArrowUpRight,
   Bot,
   Braces,
   Check,
   Code2,
   Copy,
   Database,
+  GitBranch,
   Globe,
   KeyRound,
+  Moon,
+  ScrollText,
   Terminal,
   Wrench,
   X,
@@ -19,17 +23,38 @@ import type { ReactElement, ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { cn } from "@/shared/lib/class-names";
+import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/ui/dialog";
 import { Separator } from "@/shared/ui/separator";
 
 import type {
+  AgentInstanceCheckpoint,
   AgentInstanceFixture,
+  AgentInstanceLifecycle,
   AgentInstanceRecentSession,
   AgentInstanceToolCall,
 } from "../agent-instance-data";
+import { stripProtocol } from "../deploy-console-mapping";
 
 /** A resolved human decision on a pending tool call. */
 type ToolDecision = "approved" | "rejected";
+
+/** Anchor ids the header op cluster scrolls to. */
+const ADDRESS_ANCHOR = "agent-instance-address";
+const RECENT_ANCHOR = "agent-instance-recent";
+
+/** Smooth-scroll a section into view; a no-op where the DOM lacks scrollIntoView. */
+function scrollToAnchor(id: string): void {
+  document.getElementById(id)?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+}
 
 function CopyButton({ label, text }: { label: string; text: string }): ReactElement {
   const [copied, setCopied] = useState(false);
@@ -59,6 +84,16 @@ function CopyButton({ label, text }: { label: string; text: string }): ReactElem
   );
 }
 
+/** A single-line mono command with an inline copy — the "shell into it" affordance. */
+function CopyRow({ command, label }: { command: string; label: string }): ReactElement {
+  return (
+    <div className="border-border bg-bg-sunken/60 flex items-center gap-2 rounded-lg border py-1.5 pr-1.5 pl-3">
+      <code className="text-fg-2 min-w-0 flex-1 truncate font-mono text-[11.5px]">{command}</code>
+      <CopyButton label={label} text={command} />
+    </div>
+  );
+}
+
 function CurlBlock({ curl, label }: { curl: string; label: string }): ReactElement {
   return (
     <div className="border-border bg-bg-sunken/60 relative rounded-lg border">
@@ -68,6 +103,37 @@ function CurlBlock({ curl, label }: { curl: string; label: string }): ReactEleme
       <div className="absolute top-1.5 right-1.5">
         <CopyButton label={label} text={curl} />
       </div>
+    </div>
+  );
+}
+
+/**
+ * The understated code-first "door" line under a block — `METHOD /path · Docs↗`
+ * in mono, so every surface reads as one client of a programmable machine.
+ */
+function ApiHint({
+  method,
+  path,
+  docsUrl,
+}: {
+  method: string;
+  path: string;
+  docsUrl: string;
+}): ReactElement {
+  return (
+    <div className="text-fg-3 flex min-w-0 items-center gap-1.5 font-mono text-[11.5px]">
+      <span className="text-fg-2 shrink-0">{method}</span>
+      <span className="min-w-0 truncate">{path}</span>
+      <span aria-hidden>·</span>
+      <a
+        href={docsUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="text-accent-press inline-flex shrink-0 items-center gap-0.5 hover:underline"
+      >
+        Docs
+        <ArrowUpRight className="size-3" />
+      </a>
     </div>
   );
 }
@@ -98,28 +164,116 @@ function BlockHeader({
   );
 }
 
-/** "Running · v4 live", the header status pill — a live green dot on success tint. */
-function StatusPill({ liveVersion }: { liveVersion: number }): ReactElement {
+/**
+ * The header lifecycle chip: awake reads as a pulsing "Live", asleep as a Moon
+ * "Idle · sleeps when quiet" — a real hibernate/wake state, not a static badge.
+ * The non-color icon cue (pulse dot / Moon) survives colorblindness.
+ */
+function LifecycleBadge({ lifecycle }: { lifecycle: AgentInstanceLifecycle }): ReactElement {
+  if (lifecycle === "idle") {
+    return (
+      <Badge variant="default">
+        <Moon aria-hidden />
+        Idle · sleeps when quiet
+      </Badge>
+    );
+  }
+
   return (
-    <span className="bg-success-bg text-success-fg inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[12px] font-medium">
+    <Badge variant="success">
       <span className="size-1.5 animate-pulse rounded-full bg-current" aria-hidden />
-      Running · v{String(liveVersion)} live
-    </span>
+      Live
+    </Badge>
+  );
+}
+
+/** One meter tile: muted label + big mono value + optional hint (or a chart slot). */
+function MeterTile({
+  label,
+  value,
+  hint,
+  chart,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  chart?: ReactNode;
+}): ReactElement {
+  return (
+    <div className="border-border bg-background rounded-lg border px-5 py-4">
+      <span className="text-fg-3 block text-[12px]">{label}</span>
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <span className="text-fg-1 block font-mono text-[22px] leading-none font-semibold tabular-nums">
+          {value}
+        </span>
+        {chart}
+      </div>
+      {hint === undefined ? null : <span className="text-fg-3 mt-2 block text-[12px]">{hint}</span>}
+    </div>
+  );
+}
+
+/** A tiny bar sparkline of relative per-hour spend — the light "meter" touch. */
+function Sparkline({ points }: { points: number[] }): ReactElement {
+  const max = Math.max(...points, 1);
+
+  return (
+    <div className="flex h-8 items-end gap-0.5" aria-hidden>
+      {points.map((value, index) => (
+        <span
+          key={index}
+          className="bg-success-fg/40 w-1 rounded-full"
+          style={{ height: `${String(Math.max(12, Math.round((value / max) * 100)))}%` }}
+        />
+      ))}
+    </div>
   );
 }
 
 /**
- * BLOCK 1 "Address" — the door for your code: the name-addressed create-thread
- * endpoint, a ready-to-run curl with a PAT bearer, a token pointer, and the App
- * OpenAPI URL. Reuses the live Connect card's typographic language.
+ * The meter strip under the header: three tiles reading "is it live, is it
+ * cheap" at a glance — sessions today, spend (with the "$0 while idle" economics
+ * and the light sparkline), and either the live version or the cold-wake time.
+ */
+function MeterStrip({ fixture }: { fixture: AgentInstanceFixture }): ReactElement {
+  const awake = fixture.lifecycle === "live";
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <MeterTile label="Sessions today" value={String(fixture.sessionsToday)} />
+      <MeterTile
+        label="Spent today"
+        value={fixture.todayCost}
+        hint="$0 while idle"
+        chart={<Sparkline points={fixture.costTrend} />}
+      />
+      {awake ? (
+        <MeterTile
+          label="Live version"
+          value={`v${String(fixture.liveVersion)}`}
+          hint="sleeps when idle"
+        />
+      ) : (
+        <MeterTile label="Wakes in" value={fixture.wakesIn} hint="state preserved" />
+      )}
+    </div>
+  );
+}
+
+/**
+ * BLOCK "Address" — the code-first door: the name-addressed create-thread
+ * endpoint, a one-line "shell into it" command, a ready-to-run curl with a PAT
+ * bearer, a token pointer, and the App OpenAPI URL. Reuses the live Connect
+ * card's typographic language.
  */
 function AddressBlock({ fixture }: { fixture: AgentInstanceFixture }): ReactElement {
   const { endpoint } = fixture;
 
   return (
     <section
+      id={ADDRESS_ANCHOR}
       data-testid="agent-instance-address"
-      className="border-border bg-background flex flex-col gap-3.5 rounded-xl border px-5 py-4"
+      className="border-border bg-background flex scroll-mt-4 flex-col gap-3.5 rounded-xl border px-5 py-4"
     >
       <BlockHeader icon={Code2} title="Address" subtitle="The door for your code" />
 
@@ -131,6 +285,11 @@ function AddressBlock({ fixture }: { fixture: AgentInstanceFixture }): ReactElem
           </code>
           <CopyButton label="Copy endpoint" text={endpoint.threadsPath} />
         </div>
+      </div>
+
+      <div className="flex min-w-0 flex-col gap-1">
+        <span className="text-fg-3 text-[12px]">Shell into it</span>
+        <CopyRow command={endpoint.shellCommand} label="Copy shell command" />
       </div>
 
       <CurlBlock curl={endpoint.curl} label="Copy create-thread curl" />
@@ -157,6 +316,183 @@ function AddressBlock({ fixture }: { fixture: AgentInstanceFixture }): ReactElem
         </code>
         <CopyButton label="Copy OpenAPI URL" text={endpoint.openapiUrl} />
       </div>
+    </section>
+  );
+}
+
+/**
+ * BLOCK "Exposed surfaces" — what callers can reach. The API is always on; the
+ * web frontend is a single optional attachment, reinforcing "web is an
+ * attachment, not the identity." Zero or one exposed frontend.
+ */
+function ExposedSurfacesBlock({ fixture }: { fixture: AgentInstanceFixture }): ReactElement {
+  const { exposed } = fixture;
+
+  return (
+    <section
+      data-testid="agent-instance-exposed"
+      className="border-border bg-background flex flex-col gap-3 rounded-xl border px-5 py-4"
+    >
+      <BlockHeader icon={Globe} title="Exposed surfaces" subtitle="What callers can reach" />
+
+      <div className="flex items-center gap-2">
+        <span className="text-fg-3 w-14 shrink-0 font-mono text-[12px]">api</span>
+        <a
+          href={exposed.apiUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="text-fg-2 min-w-0 flex-1 truncate font-mono text-[12px] hover:underline"
+        >
+          {stripProtocol(exposed.apiUrl)}
+        </a>
+        <CopyButton label="Copy API URL" text={exposed.apiUrl} />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <span className="text-fg-3 w-14 shrink-0 font-mono text-[12px]">web</span>
+        {exposed.webUrl === null ? (
+          <>
+            <span className="text-fg-3 min-w-0 flex-1 truncate text-[12.5px]">
+              No frontend attached
+            </span>
+            <Button type="button" variant="tonal" size="xs">
+              Attach one
+            </Button>
+          </>
+        ) : (
+          <>
+            <a
+              href={exposed.webUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-fg-2 min-w-0 flex-1 truncate font-mono text-[12px] hover:underline"
+            >
+              {stripProtocol(exposed.webUrl)}
+            </a>
+            <Button
+              type="button"
+              variant="tonal"
+              size="xs"
+              render={
+                <a
+                  href={exposed.webUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open web frontend"
+                />
+              }
+            >
+              Open
+              <ArrowUpRight className="size-3" />
+            </Button>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The consequence-stating confirm dialog for a rollback: it names what happens
+ * (live becomes the picked version, in-flight sessions finish on the current
+ * one) and that it is reversible, in plain words — mounted only while open.
+ */
+function RestoreDialog({
+  checkpoint,
+  liveVersion,
+  onClose,
+}: {
+  checkpoint: AgentInstanceCheckpoint | null;
+  liveVersion: number;
+  onClose: () => void;
+}): ReactElement {
+  return (
+    <Dialog
+      open={checkpoint !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          onClose();
+        }
+      }}
+    >
+      {checkpoint === null ? null : (
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Roll back to v{String(checkpoint.version)}?</DialogTitle>
+            <DialogDescription>
+              Live becomes v{String(checkpoint.version)}; in-flight sessions finish on v
+              {String(liveVersion)}. Reversible.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="button" variant="default" onClick={onClose}>
+              Roll back
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      )}
+    </Dialog>
+  );
+}
+
+/**
+ * BLOCK "Checkpoints" — versions as fork/restore points: the live version leads
+ * with a green dot, older ones each carry a Restore that opens a
+ * consequence-stating confirm. A version history you can roll back to.
+ */
+function CheckpointsBlock({ fixture }: { fixture: AgentInstanceFixture }): ReactElement {
+  const [restoring, setRestoring] = useState<AgentInstanceCheckpoint | null>(null);
+
+  return (
+    <section
+      data-testid="agent-instance-checkpoints"
+      className="border-border bg-background flex flex-col gap-3 rounded-xl border px-5 py-4"
+    >
+      <BlockHeader icon={GitBranch} title="Checkpoints" subtitle="Roll back any time" />
+
+      <ul className="flex flex-col gap-1.5">
+        {fixture.checkpoints.slice(0, 3).map((checkpoint) => (
+          <li key={checkpoint.id} className="flex items-center gap-2 text-[12.5px]">
+            <span
+              className={cn(
+                "size-1.5 shrink-0 rounded-full",
+                checkpoint.live ? "bg-success-fg" : "bg-fg-muted",
+              )}
+              aria-hidden
+            />
+            <code className="text-fg-2 shrink-0 font-mono text-[12px]">
+              v{String(checkpoint.version)}
+              {checkpoint.live ? " · live" : ""}
+            </code>
+            <span className="text-fg-3 min-w-0 flex-1 truncate font-mono text-[11.5px]">
+              {checkpoint.when}
+            </span>
+            {checkpoint.live ? null : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => {
+                  setRestoring(checkpoint);
+                }}
+              >
+                Restore
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      <RestoreDialog
+        checkpoint={restoring}
+        liveVersion={fixture.liveVersion}
+        onClose={() => {
+          setRestoring(null);
+        }}
+      />
     </section>
   );
 }
@@ -252,11 +588,13 @@ function AgentAvatar(): ReactElement {
 }
 
 /**
- * BLOCK 2 "A way in" — THE CENTERPIECE: an embedded, live-feeling session where
+ * BLOCK "A way in" — THE CENTERPIECE: an embedded, live-feeling session where
  * you both talk to the agent and watch it work. The delegation, the tool-call
  * feed (one chip pending human approval), and the answer form one thread; a
- * composer footer conveys you can send the next delegation. Approvals resolve in
- * local state so intervening feels real without any session plumbing.
+ * composer footer with the one green send action conveys you can send the next
+ * delegation, and a mono ApiHint underlines that this UI is just one client of
+ * the create-thread API. Approvals resolve in local state so intervening feels
+ * real without any session plumbing.
  */
 function WayInBlock({ fixture }: { fixture: AgentInstanceFixture }): ReactElement {
   const { messages, toolCalls } = fixture.session;
@@ -317,7 +655,7 @@ function WayInBlock({ fixture }: { fixture: AgentInstanceFixture }): ReactElemen
         </div>
       </div>
 
-      <div className="border-border/70 border-t px-4 py-3">
+      <div className="border-border/70 flex flex-col gap-2.5 border-t px-4 py-3">
         <form
           className="flex items-center gap-2"
           onSubmit={(event) => {
@@ -335,32 +673,20 @@ function WayInBlock({ fixture }: { fixture: AgentInstanceFixture }): ReactElemen
           <Button
             type="submit"
             size="icon-sm"
-            variant="default"
+            variant="accent"
             aria-label="Send delegation"
             disabled={draft.trim() === ""}
           >
             <ArrowUp className="size-4" />
           </Button>
         </form>
+        <ApiHint
+          method="POST"
+          path={fixture.endpoint.apiUrl}
+          docsUrl={fixture.endpoint.openapiUrl}
+        />
       </div>
     </section>
-  );
-}
-
-/** A tiny bar sparkline of relative per-hour spend — the light "meter" touch. */
-function Sparkline({ points }: { points: number[] }): ReactElement {
-  const max = Math.max(...points, 1);
-
-  return (
-    <div className="flex h-8 items-end gap-0.5" aria-hidden>
-      {points.map((value, index) => (
-        <span
-          key={index}
-          className="bg-success-fg/40 w-1 rounded-full"
-          style={{ height: `${String(Math.max(12, Math.round((value / max) * 100)))}%` }}
-        />
-      ))}
-    </div>
   );
 }
 
@@ -385,35 +711,18 @@ function RecentSessionRow({ session }: { session: AgentInstanceRecentSession }):
 }
 
 /**
- * BLOCK 3 "Pulse" — logs + meter: a few recent sessions (relative time · summary
- * · cost · status), the "N sessions today" count, today's spend, and a light
- * sparkline. Deliberately minimal — the centerpiece is Block 2.
+ * BLOCK "Recent" — a slim log of the last few sessions (relative time · summary
+ * · cost · status). The metric header and sparkline moved up to the meter strip,
+ * leaving this deliberately minimal; the centerpiece is "A way in".
  */
-function PulseBlock({ fixture }: { fixture: AgentInstanceFixture }): ReactElement {
+function RecentBlock({ fixture }: { fixture: AgentInstanceFixture }): ReactElement {
   return (
     <section
-      data-testid="agent-instance-pulse"
-      className="border-border bg-background flex flex-col gap-3.5 rounded-xl border px-5 py-4"
+      id={RECENT_ANCHOR}
+      data-testid="agent-instance-recent"
+      className="border-border bg-background flex scroll-mt-4 flex-col gap-3 rounded-xl border px-5 py-4"
     >
-      <BlockHeader icon={Activity} title="Pulse" subtitle="Logs + meter" />
-
-      <div className="flex items-end justify-between gap-3">
-        <div className="flex flex-col">
-          <span className="text-fg-1 text-[20px] leading-none font-semibold">
-            {String(fixture.sessionsToday)}
-          </span>
-          <span className="text-fg-3 mt-1 text-[12px]">sessions today</span>
-        </div>
-        <div className="flex flex-col items-center">
-          <span className="text-fg-1 font-mono text-[15px] leading-none font-semibold">
-            {fixture.todayCost}
-          </span>
-          <span className="text-fg-3 mt-1 text-[12px]">spent today</span>
-        </div>
-        <Sparkline points={fixture.costTrend} />
-      </div>
-
-      <Separator />
+      <BlockHeader icon={Activity} title="Recent" subtitle="Last few sessions" />
 
       <ul className="flex flex-col gap-2">
         {fixture.recentSessions.map((session) => (
@@ -424,28 +733,17 @@ function PulseBlock({ fixture }: { fixture: AgentInstanceFixture }): ReactElemen
   );
 }
 
-/** "Web is just an attachment" — a non-functional pointer, kept as a quiet footer. */
-function AttachWebFooter(): ReactElement {
-  return (
-    <div className="text-fg-3 mt-8 flex items-center justify-center gap-1.5 text-[12.5px]">
-      <span>No web frontend attached</span>
-      <span aria-hidden>·</span>
-      <button type="button" className="text-accent-press font-medium hover:underline">
-        Attach one
-      </button>
-    </div>
-  );
-}
-
 /**
- * The Overview for a published, NON-WEB agent, reframed as a remote stateful
- * compute instance: a header (name · Running·vN·live pill · today's cost), then
- * three blocks — Address (its API "IP"), A way in (the SSH-like session console,
- * the centerpiece), and Pulse (logs + meter) — closed by the "web is just an
- * attachment" footer. Pure presentation over a plain {@link AgentInstanceFixture};
- * approvals and the composer resolve in local state only (no backend seam), so
- * this renders standalone in the `/v0-deploy-preview` design prototype. Header
- * slots let the preview route keep its scenario switcher and demo badge visible.
+ * The Overview for a published, NON-WEB agent, reframed as a persistent compute
+ * instance you own and operate: a header (name · lifecycle badge · vN), a meter
+ * strip (sessions · spend · live-version/wake), then the console centerpiece
+ * "A way in" flanked by a right rail — Address (its code-first door), Exposed
+ * surfaces (web is a 0-or-1 attachment), Checkpoints (roll back any time), and
+ * Recent (the session log). Pure presentation over a plain
+ * {@link AgentInstanceFixture}; approvals, the composer, and the rollback
+ * confirm resolve in local state only (no backend seam), so this renders
+ * standalone in the `/v0-deploy-preview` design prototype. Header slots let the
+ * preview route keep its scenario switcher and demo badge visible.
  */
 export function AgentInstancePanel({
   fixture,
@@ -470,30 +768,59 @@ export function AgentInstancePanel({
             <h1 className="text-foreground min-w-0 truncate text-2xl font-semibold tracking-normal">
               {fixture.name}
             </h1>
-            <StatusPill liveVersion={fixture.liveVersion} />
-            <span className="text-fg-3 font-mono text-[13px]">{fixture.todayCost} today</span>
+            <LifecycleBadge lifecycle={fixture.lifecycle} />
+            <span className="text-fg-3 font-mono text-[13px]">v{String(fixture.liveVersion)}</span>
             {headerBadges}
           </div>
         </div>
-        {headerActions === undefined ? null : (
-          <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto">{headerActions}</div>
-        )}
+        <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              scrollToAnchor(RECENT_ANCHOR);
+            }}
+          >
+            <ScrollText className="size-3.5" />
+            Logs
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              scrollToAnchor(ADDRESS_ANCHOR);
+            }}
+          >
+            <Code2 className="size-3.5" />
+            API
+          </Button>
+          {headerActions}
+        </div>
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-        <div className="mx-auto max-w-5xl">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,1fr)]">
-            <div className="order-2 lg:order-none lg:row-span-2">
+        <div className="mx-auto flex max-w-5xl flex-col gap-6">
+          <MeterStrip fixture={fixture} />
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)]">
+            <div className="order-2 lg:order-none lg:row-span-4">
               <WayInBlock fixture={fixture} />
             </div>
             <div className="order-1 lg:order-none">
               <AddressBlock fixture={fixture} />
             </div>
             <div className="order-3 lg:order-none">
-              <PulseBlock fixture={fixture} />
+              <ExposedSurfacesBlock fixture={fixture} />
+            </div>
+            <div className="order-4 lg:order-none">
+              <CheckpointsBlock fixture={fixture} />
+            </div>
+            <div className="order-5 lg:order-none">
+              <RecentBlock fixture={fixture} />
             </div>
           </div>
-          <AttachWebFooter />
         </div>
       </main>
     </div>

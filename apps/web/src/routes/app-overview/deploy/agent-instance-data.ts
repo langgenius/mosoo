@@ -6,20 +6,34 @@ import {
 
 /**
  * Fixture view models for the "agent instance" reframing of the Overview: a
- * published, non-web agent presented as a remote, stateful compute instance —
- * an ADDRESS (Block 1), a WAY IN (Block 2, the SSH-like session console), and a
- * PULSE (Block 3, logs + meter). These live only on the unauthenticated
- * `/v0-deploy-preview` design prototype and back {@link AGENT_INSTANCE_FIXTURE};
- * they have no backend seam and are never mapped from a GraphQL payload.
+ * published, non-web agent presented as a persistent COMPUTE INSTANCE you own
+ * and operate. It has a lifecycle (awake / idle-sleeping, wakes in seconds,
+ * state preserved), an ADDRESS (the code-first door), a WAY IN (the live
+ * session console), EXPOSED SURFACES (web is a 0-or-1 attachment, not the
+ * identity), CHECKPOINTS (versions you can roll back to), and a light meter.
+ * These live only on the unauthenticated `/v0-deploy-preview` design prototype
+ * and back {@link AGENT_INSTANCE_FIXTURE}; they have no backend seam and are
+ * never mapped from a GraphQL payload.
  */
+
+/**
+ * Lifecycle of the instance, framed as hibernate/wake rather than a static
+ * "running": `live` = awake and serving; `idle` = asleep, wakes on the next
+ * call, no compute cost while it sleeps.
+ */
+export type AgentInstanceLifecycle = "idle" | "live";
 
 /** Name-addressed API surface a caller hits to drive the instance (its "IP"). */
 export interface AgentInstanceEndpoint {
   /** Full method + URL for the create-thread call, e.g. "POST https://…/threads". */
   threadsPath: string;
-  /** Copy-ready curl carrying a PAT bearer, mirroring the live Connect card. */
+  /** Bare create-thread URL (no method prefix) — the exposed "api" surface. */
+  apiUrl: string;
+  /** A one-line "shell into it" command carrying a PAT bearer (mirrors `oc shell`). */
+  shellCommand: string;
+  /** Copy-ready multi-line curl carrying a PAT bearer, mirroring the Connect card. */
   curl: string;
-  /** The App-level OpenAPI document URL. */
+  /** The App-level OpenAPI document URL — doubles as the "Docs" pointer. */
   openapiUrl: string;
   /** Where a caller mints a personal access token. */
   tokenSettingsPath: string;
@@ -51,7 +65,30 @@ export interface AgentInstanceSession {
   toolCalls: AgentInstanceToolCall[];
 }
 
-/** One recent session in the Pulse log (relative time · summary · cost · status). */
+/**
+ * The instance's exposed surfaces — what a caller can reach. The API is always
+ * on; the web frontend is a single optional attachment (`webUrl === null` when
+ * nothing is attached), reinforcing "web is an attachment, not the identity".
+ */
+export interface AgentInstanceExposed {
+  /** The always-on API surface — the create-thread URL. */
+  apiUrl: string;
+  /** The attached web frontend, or `null` when none is attached. */
+  webUrl: string | null;
+}
+
+/** One rollback point — a published version you can restore the instance to. */
+export interface AgentInstanceCheckpoint {
+  id: string;
+  /** Version number, e.g. 4 for "v4". */
+  version: number;
+  /** Relative label for when it went live, e.g. "2h ago". */
+  when: string;
+  /** True for the version currently serving traffic. */
+  live: boolean;
+}
+
+/** One recent session in the meter log (relative time · summary · cost · status). */
 export interface AgentInstanceRecentSession {
   id: string;
   /** Relative "when" label, e.g. "2m". */
@@ -62,19 +99,26 @@ export interface AgentInstanceRecentSession {
   status: "done" | "failed" | "running";
 }
 
-/** The whole fixture the panel renders — one instance, its address, session, pulse. */
+/** The whole fixture the panel renders — one instance, its lifecycle, surfaces, log. */
 export interface AgentInstanceFixture {
   name: string;
   slug: string;
   liveVersion: number;
+  /** Whether the instance is awake (`live`) or asleep (`idle`). */
+  lifecycle: AgentInstanceLifecycle;
+  /** Cold-wake latency shown when idle, e.g. "~1.2s". */
+  wakesIn: string;
   /** Aggregate spend today, formatted, e.g. "$0.42". */
   todayCost: string;
-  /** Count behind the "N sessions today" meter. */
+  /** Count behind the "Sessions today" meter. */
   sessionsToday: number;
   endpoint: AgentInstanceEndpoint;
   session: AgentInstanceSession;
+  exposed: AgentInstanceExposed;
+  /** Rollback points, newest first (the live version leads). */
+  checkpoints: AgentInstanceCheckpoint[];
   recentSessions: AgentInstanceRecentSession[];
-  /** Small per-hour spend series for the Pulse sparkline (unitless, relative). */
+  /** Small per-hour spend series for the meter-strip sparkline (unitless, relative). */
   costTrend: number[];
 }
 
@@ -84,20 +128,29 @@ const TRY_ORIGIN = "https://try.mosoo.ai";
 const INSTANCE_NAME = "quiz-master";
 const INSTANCE_SLUG = "roadmap-agents";
 
+/** The bare create-thread URL — the instance's addressable API surface. */
+const AGENT_API_URL = `${TRY_ORIGIN}${appNamespaceAgentPath(INSTANCE_SLUG, INSTANCE_NAME)}`;
+
 /**
  * A believable published-agent instance: "quiz-master" on slug "roadmap-agents",
- * v4 live, $0.42 spent today. Its session mock shows a delegation, three tool
- * chips (two done, one pending human approval), and the answer, so the panel can
- * convey talk + watch + intervene without any session plumbing.
+ * awake on v4, $0.42 spent today, $0 while it sleeps. Its session mock shows a
+ * delegation, three tool chips (two done, one pending human approval), and the
+ * answer, so the panel can convey talk + watch + intervene without any session
+ * plumbing. It exposes an API but no web frontend (web is a 0-or-1 attachment),
+ * and carries three checkpoints you can roll back to.
  */
 export const AGENT_INSTANCE_FIXTURE: AgentInstanceFixture = {
   name: INSTANCE_NAME,
   slug: INSTANCE_SLUG,
   liveVersion: 4,
+  lifecycle: "live",
+  wakesIn: "~1.2s",
   todayCost: "$0.42",
   sessionsToday: 9,
   endpoint: {
-    threadsPath: `POST ${TRY_ORIGIN}${appNamespaceAgentPath(INSTANCE_SLUG, INSTANCE_NAME)}`,
+    threadsPath: `POST ${AGENT_API_URL}`,
+    apiUrl: AGENT_API_URL,
+    shellCommand: `curl -sX POST ${AGENT_API_URL} -H "Authorization: Bearer $MOSOO_API_TOKEN"`,
     curl: appNamespaceAgentCurl(TRY_ORIGIN, INSTANCE_SLUG, INSTANCE_NAME),
     openapiUrl: `${TRY_ORIGIN}${appNamespaceBasePath(INSTANCE_SLUG)}/openapi.json`,
     tokenSettingsPath: "/settings/access-tokens",
@@ -135,6 +188,15 @@ export const AGENT_INSTANCE_FIXTURE: AgentInstanceFixture = {
       },
     ],
   },
+  exposed: {
+    apiUrl: AGENT_API_URL,
+    webUrl: null,
+  },
+  checkpoints: [
+    { id: "v4", version: 4, when: "2h ago", live: true },
+    { id: "v3", version: 3, when: "yesterday", live: false },
+    { id: "v2", version: 2, when: "5d ago", live: false },
+  ],
   recentSessions: [
     {
       id: "s1",

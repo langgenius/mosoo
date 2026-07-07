@@ -109,7 +109,7 @@ afterEach(async () => {
 });
 
 describe("Agent instance panel", () => {
-  test("renders the three blocks, the endpoint, and the human-in-the-loop control", async () => {
+  test("renders the instance blocks, the endpoint, and the human-in-the-loop control", async () => {
     await renderPanel();
 
     const panel = document.querySelector('[data-testid="agent-instance-panel"]');
@@ -117,10 +117,13 @@ describe("Agent instance panel", () => {
 
     const text = panel?.textContent ?? "";
 
-    // The three block headings — Address, A way in (centerpiece), Pulse.
-    expect(text).toContain("Address");
+    // The console centerpiece plus the right-rail blocks that frame the agent as
+    // a compute instance: its Address, Exposed surfaces, Checkpoints, and Recent.
     expect(text).toContain("A way in");
-    expect(text).toContain("Pulse");
+    expect(text).toContain("Address");
+    expect(text).toContain("Exposed surfaces");
+    expect(text).toContain("Checkpoints");
+    expect(text).toContain("Recent");
 
     // Block 1 surfaces the name-addressed create-thread endpoint and OpenAPI URL.
     expect(text).toContain("/api/v1/apps/roadmap-agents/agents/quiz-master/threads");
