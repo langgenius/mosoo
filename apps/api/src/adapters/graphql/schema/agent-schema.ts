@@ -95,6 +95,7 @@ export const agentSchema = /* GraphQL */ `
     model: String!
     provider: String!
     runtimeId: String!
+    sourceCommitSha: String
     summary: String!
     versionNumber: Int!
   }

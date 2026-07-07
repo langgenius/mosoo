@@ -41,6 +41,7 @@ export async function publishAgent(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   input: PublishAgentInput,
+  options: { sourceCommitSha?: string | null } = {},
 ): Promise<Agent> {
   const database = bindings.DB;
   const { agent } = await ensureAppAgentOwner(database, viewer.id, {
@@ -71,6 +72,7 @@ export async function publishAgent(
   const spec = await buildAgentSpec(database, agent);
   const version = await prepareAgentDeploymentVersionCandidate(database, viewer, {
     agent,
+    sourceCommitSha: options.sourceCommitSha ?? null,
     spec,
     summary: isTruthy(agent.liveDeploymentVersionId) ? "Re-publish" : "Initial publish",
     timestampMs,

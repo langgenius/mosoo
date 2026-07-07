@@ -88,6 +88,7 @@ function createAgentDetailModelDatabase(
       provider text NOT NULL,
       runtime_id text NOT NULL,
       skills_json text NOT NULL,
+      source_commit_sha text,
       summary text NOT NULL,
       version_number integer NOT NULL
     );

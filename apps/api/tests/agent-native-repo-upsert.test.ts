@@ -97,6 +97,7 @@ async function deployRepo(
       agents: facts.agents,
       appId: APP_ID,
       files,
+      sourceCommitSha: null,
     }),
   );
 }

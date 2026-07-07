@@ -78,6 +78,7 @@ CREATE TABLE agent_deployment_version (
   environment_id text,
   skills_json text NOT NULL,
   mcp_bindings_json text NOT NULL,
+  source_commit_sha text,
   created_by_account_id text NOT NULL,
   created_at integer NOT NULL
 );

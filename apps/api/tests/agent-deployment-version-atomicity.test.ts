@@ -87,6 +87,7 @@ describe("agent deployment version atomicity", () => {
                  agent.status,
                  agent.visibility,
                  version.prompt,
+                 version.source_commit_sha,
                  version.version_number
           FROM agent
           INNER JOIN agent_deployment_version version
@@ -98,6 +99,7 @@ describe("agent deployment version atomicity", () => {
       .first<{
         live_deployment_version_id: string;
         prompt: string;
+        source_commit_sha: string | null;
         status: string;
         version_number: number;
         visibility: string;
@@ -115,6 +117,7 @@ describe("agent deployment version atomicity", () => {
     });
     expect(row).toMatchObject({
       prompt: "Draft help.",
+      source_commit_sha: null,
       status: "published",
       version_number: 1,
       visibility: "private",

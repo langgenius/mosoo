@@ -210,6 +210,7 @@ async function runNativeDeploymentBranchUnsafe(
     agents: validateFacts.agents,
     appId: deployment.appId,
     files: input.prepared.snapshot.files,
+    sourceCommitSha: run.sourceCommitSha,
   });
 
   // Per-agent outcomes are persisted before any terminal transition: the

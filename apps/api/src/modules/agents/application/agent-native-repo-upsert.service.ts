@@ -131,6 +131,7 @@ export interface UpsertNativeRepoAgentsInput {
   appId: AppId;
   /** Repo snapshot file map (must include the `.agent/` subtree). */
   files: Readonly<Record<string, string>>;
+  sourceCommitSha: string | null;
 }
 
 export interface NativeRepoAgentUpsertResult {
@@ -255,7 +256,14 @@ async function upsertNativeRepoAgentsUnsafe(
     try {
       const result =
         existing === null
-          ? await provisionNewNativeAgent(bindings, viewer, input.appId, normalized, setupFailures)
+          ? await provisionNewNativeAgent(
+              bindings,
+              viewer,
+              input.appId,
+              normalized,
+              setupFailures,
+              input.sourceCommitSha,
+            )
           : await provisionExistingNativeAgent(
               bindings,
               viewer,
@@ -263,6 +271,7 @@ async function upsertNativeRepoAgentsUnsafe(
               existing,
               normalized,
               setupFailures,
+              input.sourceCommitSha,
             );
 
       if (result.agentId !== null) {
@@ -338,9 +347,10 @@ async function provisionNewNativeAgent(
   appId: AppId,
   normalized: NormalizedNativeAgent,
   setupFailures: string[],
+  sourceCommitSha: string | null,
 ): Promise<NativeRepoAgentUpsertResult> {
   const agentRow = await createNativeRepoDraftAgent(bindings, viewer, appId, normalized);
-  const publish = await publishNativeRepoAgent(bindings, viewer, agentRow);
+  const publish = await publishNativeRepoAgent(bindings, viewer, agentRow, sourceCommitSha);
 
   if (publish.kind === "setup") {
     setupFailures.push(toSetupFailureLine(normalized.name, publish.issues));
@@ -362,8 +372,16 @@ async function provisionExistingNativeAgent(
   existing: AgentRow,
   normalized: NormalizedNativeAgent,
   setupFailures: string[],
+  sourceCommitSha: string | null,
 ): Promise<NativeRepoAgentUpsertResult> {
-  const updated = await updateNativeRepoAgent(bindings, viewer, appId, existing, normalized);
+  const updated = await updateNativeRepoAgent(
+    bindings,
+    viewer,
+    appId,
+    existing,
+    normalized,
+    sourceCommitSha,
+  );
 
   if (!updated.changed) {
     return { action: "unchanged", agentId: existing.id, name: normalized.name };
@@ -383,7 +401,7 @@ async function provisionExistingNativeAgent(
 
   // Draft adoption: a prior create-then-publish crash (or blocked publish)
   // left the row unpublished; the repo re-run must finish the publish.
-  const publish = await publishNativeRepoAgent(bindings, viewer, updated.agentRow);
+  const publish = await publishNativeRepoAgent(bindings, viewer, updated.agentRow, sourceCommitSha);
 
   if (publish.kind === "setup") {
     setupFailures.push(toSetupFailureLine(normalized.name, publish.issues));
@@ -483,6 +501,7 @@ async function updateNativeRepoAgent(
   appId: AppId,
   existing: AgentRow,
   normalized: NormalizedNativeAgent,
+  sourceCommitSha: string | null,
 ): Promise<NativeRepoAgentUpdate> {
   const database = bindings.DB;
   const { manifest } = normalized.package;
@@ -615,6 +634,7 @@ async function updateNativeRepoAgent(
         agent: nextAgent,
         environmentId,
         skillIds,
+        sourceCommitSha,
         summary:
           changePlan.fieldLabels.length > 0
             ? summarizeVersionedAgentConfigChange(changePlan)
@@ -664,6 +684,7 @@ async function prepareNativeRepoVersion(
     agent: AgentRow;
     environmentId: AgentRow["environmentId"];
     skillIds: readonly SkillId[];
+    sourceCommitSha: string | null;
     summary: string;
     timestampMs: number;
   },
@@ -681,6 +702,7 @@ async function prepareNativeRepoVersion(
 
   return prepareAgentDeploymentVersionCandidate(database, viewer, {
     agent: input.agent,
+    sourceCommitSha: input.sourceCommitSha,
     spec,
     summary: input.summary,
     timestampMs: input.timestampMs,
@@ -700,6 +722,7 @@ async function publishNativeRepoAgent(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
   agentRow: AgentRow,
+  sourceCommitSha: string | null,
 ): Promise<NativeRepoPublishOutcome> {
   const database = bindings.DB;
   const environment = await loadAgentEnvironmentConfig(
@@ -729,10 +752,17 @@ async function publishNativeRepoAgent(
   }
 
   try {
-    const published = await publishAgent(bindings, viewer, {
-      agentId: agentRow.id,
-      appId: agentRow.appId,
-    });
+    const published = await publishAgent(
+      bindings,
+      viewer,
+      {
+        agentId: agentRow.id,
+        appId: agentRow.appId,
+      },
+      {
+        sourceCommitSha,
+      },
+    );
     const versionNumber = published.liveVersion?.versionNumber;
 
     return {

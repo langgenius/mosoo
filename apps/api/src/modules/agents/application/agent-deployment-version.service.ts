@@ -53,6 +53,7 @@ interface AgentDeploymentVersionRow {
   provider: string;
   runtimeId: string;
   skillsJson: string;
+  sourceCommitSha: string | null;
   summary: string;
   versionNumber: number;
 }
@@ -71,6 +72,7 @@ const deploymentVersionColumns = {
   provider: agentDeploymentVersionsTable.provider,
   runtimeId: agentDeploymentVersionsTable.runtimeId,
   skillsJson: agentDeploymentVersionsTable.skillsJson,
+  sourceCommitSha: agentDeploymentVersionsTable.sourceCommitSha,
   summary: agentDeploymentVersionsTable.summary,
   versionNumber: agentDeploymentVersionsTable.versionNumber,
 };
@@ -112,6 +114,7 @@ export interface AgentDeploymentVersionRecord {
   provider: string;
   runtimeId: string;
   skills: Omit<SessionExecutionSkillReference, "sessionId">[];
+  sourceCommitSha: string | null;
   summary: string;
   versionNumber: number;
 }
@@ -159,6 +162,7 @@ function toRecord(row: AgentDeploymentVersionRow): AgentDeploymentVersionRecord 
     provider: runtimeModel.provider,
     runtimeId: runtimeModel.runtimeId,
     skills,
+    sourceCommitSha: row.sourceCommitSha,
     summary: row.summary,
     versionNumber: row.versionNumber,
   };
@@ -206,6 +210,7 @@ export async function prepareAgentDeploymentVersionCandidate(
   viewer: AuthenticatedViewer,
   input: {
     agent: AgentRow;
+    sourceCommitSha?: string | null;
     spec: AgentSpec;
     summary: string;
     timestampMs?: number;
@@ -218,6 +223,7 @@ export async function prepareAgentDeploymentVersionCandidate(
   const versionNumber = await getNextVersionNumber(database, agent.id);
   const skills = toAgentSpecSkillReferences(spec);
   const mcpBindings = toAgentSpecMcpBindingSnapshots(spec);
+  const sourceCommitSha = input.sourceCommitSha ?? null;
   const values: typeof agentDeploymentVersionsTable.$inferInsert = {
     agentId: agent.id,
     configJson: spec.configJson,
@@ -232,6 +238,7 @@ export async function prepareAgentDeploymentVersionCandidate(
     provider: spec.provider,
     runtimeId: spec.runtimeId,
     skillsJson: JSON.stringify(skills),
+    sourceCommitSha,
     summary: input.summary,
     versionNumber,
   };
@@ -251,6 +258,7 @@ export async function prepareAgentDeploymentVersionCandidate(
       provider: spec.provider,
       runtimeId: spec.runtimeId,
       skills,
+      sourceCommitSha,
       summary: input.summary,
       versionNumber,
     },
@@ -372,6 +380,7 @@ export function toAgentDeploymentVersionModel(
     model: runtimeModel.model,
     provider: runtimeModel.provider,
     runtimeId: runtimeModel.runtimeId,
+    sourceCommitSha: version.sourceCommitSha,
     summary: version.summary,
     versionNumber: version.versionNumber,
   };

@@ -82,6 +82,7 @@ export const agentDeploymentVersionsTable = sqliteTable(
     provider: text("provider").notNull(),
     runtimeId: text("runtime_id").notNull(),
     skillsJson: text("skills_json").notNull(),
+    sourceCommitSha: text("source_commit_sha"),
     summary: text("summary").notNull(),
     versionNumber: integer("version_number").notNull(),
   },

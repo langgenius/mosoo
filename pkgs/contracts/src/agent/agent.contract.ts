@@ -292,6 +292,7 @@ export interface AgentDeploymentVersion {
   model: string;
   provider: string;
   runtimeId: string;
+  sourceCommitSha?: string | null;
   summary: string;
   versionNumber: number;
 }

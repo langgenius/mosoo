@@ -418,6 +418,18 @@ describe("native deployment executor", () => {
     expect(agent?.status).toBe("published");
     expect(agent?.live_deployment_version_id).toBeTruthy();
 
+    const liveVersion = await database
+      .prepare(
+        "SELECT source_commit_sha, version_number FROM agent_deployment_version WHERE id = ?",
+      )
+      .bind(agent?.live_deployment_version_id ?? "")
+      .first<{ source_commit_sha: string | null; version_number: number }>();
+
+    expect(liveVersion).toEqual({
+      source_commit_sha: "abc123",
+      version_number: 1,
+    });
+
     const native = parseNativeDeploymentRunResult(runRow.nativeResultJson);
 
     expect(native?.facts).toEqual({
@@ -532,11 +544,16 @@ describe("native deployment executor", () => {
     expect(after?.live_deployment_version_id).not.toBe(before?.live_deployment_version_id);
 
     const liveVersion = await database
-      .prepare("SELECT version_number FROM agent_deployment_version WHERE id = ?")
+      .prepare(
+        "SELECT source_commit_sha, version_number FROM agent_deployment_version WHERE id = ?",
+      )
       .bind(after?.live_deployment_version_id ?? "")
-      .first<{ version_number: number }>();
+      .first<{ source_commit_sha: string | null; version_number: number }>();
 
-    expect(liveVersion?.version_number).toBe(2);
+    expect(liveVersion).toEqual({
+      source_commit_sha: "abc123",
+      version_number: 2,
+    });
   });
 
   test("provisions a multi-agent repo with per-agent exposed flags in facts", async () => {
