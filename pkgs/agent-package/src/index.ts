@@ -1,4 +1,5 @@
 export * from "./archive";
+export { readPackageAssets } from "./archive-assets";
 export { MAX_AGENT_PACKAGE_ARCHIVE_BYTES } from "./archive-constants";
 export { admitAgentPackageArchiveEntries } from "./archive-entry-admission";
 export type {
@@ -9,10 +10,15 @@ export type {
   AgentPackageArchiveEntryKind,
 } from "./archive-entry-admission";
 export {
+  attachEnvironmentDefinition,
   collectEnvironmentSidecarIssues,
   findForbiddenEnvironmentSidecarFieldPath,
 } from "./archive-environment-sidecar";
 export { findForbiddenMcpSecretFieldPath } from "./archive-mcp-admission";
-export { collectMcpManifestCatalogIssues, collectMcpSidecarIssues } from "./archive-mcp-sidecar";
+export {
+  collectMcpManifestCatalogIssues,
+  collectMcpSidecarIssues,
+  mergeMcpSidecarJson,
+} from "./archive-mcp-sidecar";
 export type { CollectMcpSidecarIssuesOptions } from "./archive-mcp-sidecar";
 export * from "./report";

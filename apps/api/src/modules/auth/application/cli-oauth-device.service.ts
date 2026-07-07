@@ -7,14 +7,15 @@ import type {
   CliOAuthDeviceTokenRequest,
   CliOAuthDeviceTokenResponse,
 } from "@mosoo/contracts/auth";
-import { accountsTable, cliOAuthFlowsTable } from "@mosoo/db";
+import { cliOAuthFlowsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { AccountId, CliOAuthFlowId } from "@mosoo/id";
+import type { CliOAuthFlowId } from "@mosoo/id";
 import { and, eq, inArray } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
 import { createPersonalAccessToken } from "./personal-access-token.service";
+import { loadViewerByAccountId } from "./viewer-auth.service";
 import type { AuthenticatedViewer } from "./viewer-auth.service";
 
 const CLI_OAUTH_FLOW_TTL_MS = 10 * 60 * 1000;
@@ -124,7 +125,7 @@ export async function pollCliOAuthDeviceToken(
     throw new CliOAuthDeviceError(500, "invalid_flow", "CLI OAuth flow is missing account.");
   }
 
-  const viewer = await getViewerByAccountId(database, flow.accountId);
+  const viewer = await loadViewerByAccountId(database, flow.accountId);
   if (!viewer) {
     throw new CliOAuthDeviceError(500, "invalid_flow", "CLI OAuth account no longer exists.");
   }
@@ -323,35 +324,4 @@ async function readCliOAuthFlowStatus(
       .get()) ?? null;
 
   return row?.status ?? null;
-}
-
-async function getViewerByAccountId(
-  database: D1Database,
-  accountId: AccountId,
-): Promise<AuthenticatedViewer | null> {
-  const row =
-    (await getAppDatabase(database)
-      .select({
-        email: accountsTable.email,
-        emailVerified: accountsTable.emailVerified,
-        id: accountsTable.id,
-        imageUrl: accountsTable.image,
-        name: accountsTable.name,
-      })
-      .from(accountsTable)
-      .where(eq(accountsTable.id, accountId))
-      .limit(1)
-      .get()) ?? null;
-
-  if (!row) {
-    return null;
-  }
-
-  return {
-    email: row.email,
-    emailVerified: row.emailVerified,
-    id: row.id,
-    imageUrl: row.imageUrl,
-    name: row.name,
-  };
 }
