@@ -4,7 +4,7 @@ import { JSDOM } from "jsdom";
 import { act } from "react";
 import type { Root } from "react-dom/client";
 
-import { AGENT_INSTANCE_FIXTURE } from "../src/routes/app-overview/deploy/agent-instance-data";
+import { AGENT_INSTANCE_AGENTS } from "../src/routes/app-overview/deploy/agent-instance-data";
 
 let dom: JSDOM | null = null;
 let root: Root | null = null;
@@ -74,11 +74,11 @@ function uninstallDom(): void {
   });
 }
 
-async function renderPanel(): Promise<void> {
-  const [{ createRoot }, { MemoryRouter }, { AgentInstancePanel }] = await Promise.all([
+async function renderDashboard(): Promise<void> {
+  const [{ createRoot }, { MemoryRouter }, { AgentDashboard }] = await Promise.all([
     import("react-dom/client"),
     import("react-router-dom"),
-    import("../src/routes/app-overview/deploy/components/agent-instance-panel"),
+    import("../src/routes/app-overview/deploy/components/agent-dashboard"),
   ]);
 
   container = document.createElement("div");
@@ -88,7 +88,32 @@ async function renderPanel(): Promise<void> {
   await act(async () => {
     root?.render(
       <MemoryRouter>
-        <AgentInstancePanel fixture={AGENT_INSTANCE_FIXTURE} />
+        <AgentDashboard agents={AGENT_INSTANCE_AGENTS} onSelect={() => undefined} />
+      </MemoryRouter>,
+    );
+  });
+}
+
+async function renderDetail(): Promise<void> {
+  const [{ createRoot }, { MemoryRouter }, { AgentInstancePanel }] = await Promise.all([
+    import("react-dom/client"),
+    import("react-router-dom"),
+    import("../src/routes/app-overview/deploy/components/agent-instance-panel"),
+  ]);
+
+  const [primary] = AGENT_INSTANCE_AGENTS;
+  if (primary === undefined) {
+    throw new Error("expected at least one agent fixture");
+  }
+
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+
+  await act(async () => {
+    root?.render(
+      <MemoryRouter>
+        <AgentInstancePanel fixture={primary} onBack={() => undefined} />
       </MemoryRouter>,
     );
   });
@@ -108,34 +133,52 @@ afterEach(async () => {
   uninstallDom();
 });
 
-describe("Agent instance panel", () => {
-  test("renders the instance blocks, the endpoint, and the human-in-the-loop control", async () => {
-    await renderPanel();
+describe("Agent dashboard", () => {
+  test("renders the stat tiles and a clickable agent row", async () => {
+    await renderDashboard();
+
+    const dashboard = document.querySelector('[data-testid="agent-dashboard"]');
+    expect(dashboard).not.toBeNull();
+
+    const text = dashboard?.textContent ?? "";
+
+    // The four stat tiles that head the agent list.
+    expect(text).toContain("Live agents");
+    expect(text).toContain("Sessions today");
+    expect(text).toContain("Spend today");
+    expect(text).toContain("Deployed agents");
+
+    // The list renders one row per deployed agent, each a way into its detail.
+    const rows = document.querySelectorAll('[data-testid="agent-dashboard-row"]');
+    expect(rows.length).toBe(AGENT_INSTANCE_AGENTS.length);
+    expect(text).toContain("quiz-master");
+  });
+});
+
+describe("Agent instance detail", () => {
+  test("anchors on the Address spine and reuses the web Activity, with no chat console", async () => {
+    await renderDetail();
 
     const panel = document.querySelector('[data-testid="agent-instance-panel"]');
     expect(panel).not.toBeNull();
 
     const text = panel?.textContent ?? "";
 
-    // The console centerpiece plus the right-rail blocks that frame the agent as
-    // a compute instance: its Address, Exposed surfaces, Checkpoints, and Recent.
-    expect(text).toContain("A way in");
-    expect(text).toContain("Address");
-    expect(text).toContain("Exposed surfaces");
-    expect(text).toContain("Checkpoints");
-    expect(text).toContain("Recent");
-
-    // Block 1 surfaces the name-addressed create-thread endpoint and OpenAPI URL.
+    // The Address spine surfaces the name-addressed create-thread endpoint and
+    // the App OpenAPI URL.
     expect(text).toContain("/api/v1/apps/roadmap-agents/agents/quiz-master/threads");
     expect(text).toContain("/api/v1/apps/roadmap-agents/openapi.json");
 
-    // Block 2 conveys "intervene": a pending tool call exposes an Approve control.
-    const approve = Array.from(document.querySelectorAll("button")).find((button) =>
-      (button.textContent ?? "").includes("Approve"),
-    );
-    expect(approve).toBeDefined();
+    // Activity is literally the web console's section, fed this agent's runs.
+    expect(text).toContain("Production Activity");
+    expect(document.querySelector('[data-testid="deploy-run-row"]')).not.toBeNull();
 
-    // The composer conveys "talk": a delegation input is present.
-    expect(document.querySelector('input[aria-label="Send a delegation"]')).not.toBeNull();
+    // The secondary blocks the detail keeps around the spine.
+    expect(text).toContain("Exposed surfaces");
+    expect(text).toContain("Checkpoints");
+
+    // The borrowed chat console is gone: no "A way in", no delegation composer.
+    expect(text).not.toContain("A way in");
+    expect(document.querySelector('input[aria-label="Send a delegation"]')).toBeNull();
   });
 });

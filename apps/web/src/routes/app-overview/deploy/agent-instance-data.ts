@@ -1,3 +1,4 @@
+import type { DeploymentRunVM } from "./deploy-console-data";
 import {
   appNamespaceAgentCurl,
   appNamespaceAgentPath,
@@ -7,13 +8,16 @@ import {
 /**
  * Fixture view models for the "agent instance" reframing of the Overview: a
  * published, non-web agent presented as a persistent COMPUTE INSTANCE you own
- * and operate. It has a lifecycle (awake / idle-sleeping, wakes in seconds,
- * state preserved), an ADDRESS (the code-first door), a WAY IN (the live
- * session console), EXPOSED SURFACES (web is a 0-or-1 attachment, not the
- * identity), CHECKPOINTS (versions you can roll back to), and a light meter.
- * These live only on the unauthenticated `/v0-deploy-preview` design prototype
- * and back {@link AGENT_INSTANCE_FIXTURE}; they have no backend seam and are
- * never mapped from a GraphQL payload.
+ * and operate. The surface is a DASHBOARD → AGENT LIST → per-agent DETAIL flow.
+ *
+ * Each instance has a lifecycle (awake / idle-sleeping, wakes in seconds, state
+ * preserved), an ADDRESS (the code-first door, the spine of the detail page),
+ * an ACTIVITY log (the SAME deployment-run history the web console renders — fed
+ * as {@link DeploymentRunVM} rows), EXPOSED SURFACES (web is a 0-or-1
+ * attachment, not the identity), CHECKPOINTS (versions you can roll back to),
+ * and a light meter strip. These live only on the unauthenticated
+ * `/v0-deploy-preview` design prototype and back {@link AGENT_INSTANCE_AGENTS};
+ * they have no backend seam and are never mapped from a GraphQL payload.
  */
 
 /**
@@ -39,32 +43,6 @@ export interface AgentInstanceEndpoint {
   tokenSettingsPath: string;
 }
 
-/** One tool the agent invoked in a session turn — a chip in the "watch it work" feed. */
-export interface AgentInstanceToolCall {
-  id: string;
-  /** Tool name shown as a mono function call, e.g. "query_db". */
-  name: string;
-  /** One-line argument/summary rendered under the chip. */
-  detail: string;
-  /** Per-call cost tick, formatted, e.g. "$0.004". */
-  cost: string;
-  /** "done" chips already ran; "pending-approval" chips await a human decision. */
-  status: "done" | "pending-approval";
-}
-
-/** A single message in the session mock — the delegation or the agent's answer. */
-export interface AgentInstanceSessionMessage {
-  id: string;
-  role: "agent" | "user";
-  text: string;
-}
-
-/** The embedded live-feeling session: a delegation, the tool-call feed, the answer. */
-export interface AgentInstanceSession {
-  messages: AgentInstanceSessionMessage[];
-  toolCalls: AgentInstanceToolCall[];
-}
-
 /**
  * The instance's exposed surfaces — what a caller can reach. The API is always
  * on; the web frontend is a single optional attachment (`webUrl === null` when
@@ -88,19 +66,14 @@ export interface AgentInstanceCheckpoint {
   live: boolean;
 }
 
-/** One recent session in the meter log (relative time · summary · cost · status). */
-export interface AgentInstanceRecentSession {
-  id: string;
-  /** Relative "when" label, e.g. "2m". */
-  when: string;
-  /** One-line summary of what the session did. */
-  summary: string;
-  cost: string;
-  status: "done" | "failed" | "running";
-}
-
-/** The whole fixture the panel renders — one instance, its lifecycle, surfaces, log. */
+/**
+ * The whole fixture one instance renders — its lifecycle, address, exposed
+ * surfaces, rollback points, and the deployment-run rows its Activity section
+ * reuses from the web console.
+ */
 export interface AgentInstanceFixture {
+  /** Stable id the dashboard selects a row by. */
+  id: string;
   name: string;
   slug: string;
   liveVersion: number;
@@ -110,14 +83,22 @@ export interface AgentInstanceFixture {
   wakesIn: string;
   /** Aggregate spend today, formatted, e.g. "$0.42". */
   todayCost: string;
+  /** Numeric spend today, summed into the dashboard "Spend today" tile. */
+  todaySpend: number;
   /** Count behind the "Sessions today" meter. */
   sessionsToday: number;
+  /** Relative "last active" label for the dashboard row, e.g. "2m". */
+  lastActive: string;
   endpoint: AgentInstanceEndpoint;
-  session: AgentInstanceSession;
   exposed: AgentInstanceExposed;
   /** Rollback points, newest first (the live version leads). */
   checkpoints: AgentInstanceCheckpoint[];
-  recentSessions: AgentInstanceRecentSession[];
+  /**
+   * Deployment-run rows feeding the reused web Activity section, newest first.
+   * Shaped as {@link DeploymentRunVM} so `DeploymentsHistory` renders them
+   * verbatim (status, commit, detection line, provisioning + failure rows).
+   */
+  runs: DeploymentRunVM[];
   /** Small per-hour spend series for the meter-strip sparkline (unitless, relative). */
   costTrend: number[];
 }
@@ -125,100 +106,270 @@ export interface AgentInstanceFixture {
 /** The prototype's demo origin — the name-addressed public API host. */
 const TRY_ORIGIN = "https://try.mosoo.ai";
 
-const INSTANCE_NAME = "quiz-master";
-const INSTANCE_SLUG = "roadmap-agents";
+/** All three demo agents live under one App namespace, addressed by name. */
+const APP_SLUG = "roadmap-agents";
 
-/** The bare create-thread URL — the instance's addressable API surface. */
-const AGENT_API_URL = `${TRY_ORIGIN}${appNamespaceAgentPath(INSTANCE_SLUG, INSTANCE_NAME)}`;
+/** The App-level OpenAPI document URL — shared by every agent on the App. */
+const OPENAPI_URL = `${TRY_ORIGIN}${appNamespaceBasePath(APP_SLUG)}/openapi.json`;
+
+/** Builds the name-addressed endpoint bundle for one agent under the App namespace. */
+function buildEndpoint(agentName: string): AgentInstanceEndpoint {
+  const apiUrl = `${TRY_ORIGIN}${appNamespaceAgentPath(APP_SLUG, agentName)}`;
+
+  return {
+    apiUrl,
+    curl: appNamespaceAgentCurl(TRY_ORIGIN, APP_SLUG, agentName),
+    openapiUrl: OPENAPI_URL,
+    shellCommand: `curl -sX POST ${apiUrl} -H "Authorization: Bearer $MOSOO_API_TOKEN"`,
+    threadsPath: `POST ${apiUrl}`,
+    tokenSettingsPath: "/settings/access-tokens",
+  };
+}
+
+function isoAgo(deltaMs: number): string {
+  return new Date(Date.now() - deltaMs).toISOString();
+}
+
+const HOUR_MS = 3_600_000;
+const DAY_MS = 86_400_000;
 
 /**
- * A believable published-agent instance: "quiz-master" on slug "roadmap-agents",
- * awake on v4, $0.42 spent today, $0 while it sleeps. Its session mock shows a
- * delegation, three tool chips (two done, one pending human approval), and the
- * answer, so the panel can convey talk + watch + intervene without any session
- * plumbing. It exposes an API but no web frontend (web is a 0-or-1 attachment),
- * and carries three checkpoints you can roll back to.
+ * "quiz-master" — the live headliner on v4: $0.42 spent today, api-only (no web
+ * attached). Its Activity carries a live deploy, a failed validate (so the
+ * detail page shows the reused failure expansion), and a superseded success.
  */
-export const AGENT_INSTANCE_FIXTURE: AgentInstanceFixture = {
-  name: INSTANCE_NAME,
-  slug: INSTANCE_SLUG,
+const QUIZ_MASTER: AgentInstanceFixture = {
+  id: "quiz-master",
+  name: "quiz-master",
+  slug: APP_SLUG,
   liveVersion: 4,
   lifecycle: "live",
   wakesIn: "~1.2s",
   todayCost: "$0.42",
+  todaySpend: 0.42,
   sessionsToday: 9,
-  endpoint: {
-    threadsPath: `POST ${AGENT_API_URL}`,
-    apiUrl: AGENT_API_URL,
-    shellCommand: `curl -sX POST ${AGENT_API_URL} -H "Authorization: Bearer $MOSOO_API_TOKEN"`,
-    curl: appNamespaceAgentCurl(TRY_ORIGIN, INSTANCE_SLUG, INSTANCE_NAME),
-    openapiUrl: `${TRY_ORIGIN}${appNamespaceBasePath(INSTANCE_SLUG)}/openapi.json`,
-    tokenSettingsPath: "/settings/access-tokens",
-  },
-  session: {
-    messages: [
-      { id: "m1", role: "user", text: "Summarize today's signups." },
-      {
-        id: "m2",
-        role: "agent",
-        text: "142 new signups today, up 18% on yesterday. Top source is the /pricing page (61). 3 looked like bots — I've queued their onboarding emails to pause, pending your approval.",
-      },
-    ],
-    toolCalls: [
-      {
-        id: "t1",
-        name: "query_db",
-        detail: "select count(*) from signups where day = current_date",
-        cost: "$0.004",
-        status: "done",
-      },
-      {
-        id: "t2",
-        name: "http_get",
-        detail: "GET analytics.internal/referrers?window=24h",
-        cost: "$0.002",
-        status: "done",
-      },
-      {
-        id: "t3",
-        name: "pause_onboarding_emails",
-        detail: "3 flagged accounts · reversible",
-        cost: "$0.001",
-        status: "pending-approval",
-      },
-    ],
-  },
+  lastActive: "2m",
+  endpoint: buildEndpoint("quiz-master"),
   exposed: {
-    apiUrl: AGENT_API_URL,
+    apiUrl: `${TRY_ORIGIN}${appNamespaceAgentPath(APP_SLUG, "quiz-master")}`,
     webUrl: null,
   },
   checkpoints: [
-    { id: "v4", version: 4, when: "2h ago", live: true },
-    { id: "v3", version: 3, when: "yesterday", live: false },
-    { id: "v2", version: 2, when: "5d ago", live: false },
+    { id: "qm-v4", version: 4, when: "2h ago", live: true },
+    { id: "qm-v3", version: 3, when: "yesterday", live: false },
+    { id: "qm-v2", version: 2, when: "5d ago", live: false },
   ],
-  recentSessions: [
+  runs: [
     {
-      id: "s1",
-      when: "2m",
-      summary: "Summarize today's signups",
-      cost: "$0.007",
-      status: "running",
+      id: "qm_r4",
+      number: 4,
+      commitSha: "a3f9c1",
+      targetKind: "agent_only",
+      status: "success",
+      createdAt: isoAgo(2 * HOUR_MS),
+      liveUrl: null,
+      errorCode: null,
+      errorMessage: null,
+      native: {
+        agentCount: 1,
+        agents: [{ action: "updated", exposed: true, name: "quiz-master", versionNumber: 4 }],
+        failures: [],
+        specVersion: "mosoo.spec.v1",
+        webDeclared: false,
+      },
     },
     {
-      id: "s2",
-      when: "38m",
-      summary: "Draft the weekly retention digest",
-      cost: "$0.031",
-      status: "done",
-    },
-    {
-      id: "s3",
-      when: "3h",
-      summary: "Backfill missing UTM tags",
-      cost: "$0.019",
+      id: "qm_r3",
+      number: 3,
+      commitSha: "77b0de",
+      targetKind: null,
       status: "failed",
+      createdAt: isoAgo(26 * HOUR_MS),
+      liveUrl: null,
+      errorCode: "native_validation_failed",
+      errorMessage: "Validation failed · 1 blocking failure · nothing was deployed.",
+      native: {
+        agentCount: 1,
+        agents: [],
+        failures: [
+          {
+            action: "add .agent/agents/quiz-master/manifest.json with name, runtime and model",
+            code: "native.agent.manifest_missing",
+            file: ".agent/agents/quiz-master/manifest.json",
+            problem: "manifest file is missing",
+            severity: "error",
+          },
+        ],
+        specVersion: "mosoo.spec.v1",
+        webDeclared: false,
+      },
+    },
+    {
+      id: "qm_r2",
+      number: 2,
+      commitSha: "1c2d3e",
+      targetKind: "agent_only",
+      status: "superseded",
+      createdAt: isoAgo(5 * DAY_MS),
+      liveUrl: null,
+      errorCode: null,
+      errorMessage: null,
+      native: {
+        agentCount: 1,
+        agents: [{ action: "created", exposed: true, name: "quiz-master", versionNumber: 2 }],
+        failures: [],
+        specVersion: "mosoo.spec.v1",
+        webDeclared: false,
+      },
     },
   ],
   costTrend: [3, 2, 4, 3, 6, 5, 8, 6, 9, 7, 11, 8],
 };
+
+/**
+ * "triage-helper" — asleep on v2, cheap ($0.08 today), api-only. Two clean
+ * deploys in its Activity (a live update over a superseded create).
+ */
+const TRIAGE_HELPER: AgentInstanceFixture = {
+  id: "triage-helper",
+  name: "triage-helper",
+  slug: APP_SLUG,
+  liveVersion: 2,
+  lifecycle: "idle",
+  wakesIn: "~0.9s",
+  todayCost: "$0.08",
+  todaySpend: 0.08,
+  sessionsToday: 3,
+  lastActive: "1h",
+  endpoint: buildEndpoint("triage-helper"),
+  exposed: {
+    apiUrl: `${TRY_ORIGIN}${appNamespaceAgentPath(APP_SLUG, "triage-helper")}`,
+    webUrl: null,
+  },
+  checkpoints: [
+    { id: "th-v2", version: 2, when: "yesterday", live: true },
+    { id: "th-v1", version: 1, when: "4d ago", live: false },
+  ],
+  runs: [
+    {
+      id: "th_r2",
+      number: 2,
+      commitSha: "b7e11a",
+      targetKind: "agent_only",
+      status: "success",
+      createdAt: isoAgo(27 * HOUR_MS),
+      liveUrl: null,
+      errorCode: null,
+      errorMessage: null,
+      native: {
+        agentCount: 1,
+        agents: [{ action: "updated", exposed: true, name: "triage-helper", versionNumber: 2 }],
+        failures: [],
+        specVersion: "mosoo.spec.v1",
+        webDeclared: false,
+      },
+    },
+    {
+      id: "th_r1",
+      number: 1,
+      commitSha: "9d41c2",
+      targetKind: "agent_only",
+      status: "superseded",
+      createdAt: isoAgo(4 * DAY_MS),
+      liveUrl: null,
+      errorCode: null,
+      errorMessage: null,
+      native: {
+        agentCount: 1,
+        agents: [{ action: "created", exposed: true, name: "triage-helper", versionNumber: 1 }],
+        failures: [],
+        specVersion: "mosoo.spec.v1",
+        webDeclared: false,
+      },
+    },
+  ],
+  costTrend: [1, 0, 2, 1, 3, 2, 1, 0, 2, 1, 2, 1],
+};
+
+/** Web frontend attached to "digest-writer" — the 1-of-1 exposed-surface case. */
+const DIGEST_WEB_URL = "https://digest.apps.mosoo.ai";
+
+/**
+ * "digest-writer" — asleep on v6, idle today ($0 while it sleeps), and the one
+ * agent WITH a web frontend attached (so Exposed surfaces shows the 1-of-1
+ * case). Its Activity runs are worker deploys with a declared web surface.
+ */
+const DIGEST_WRITER: AgentInstanceFixture = {
+  id: "digest-writer",
+  name: "digest-writer",
+  slug: APP_SLUG,
+  liveVersion: 6,
+  lifecycle: "idle",
+  wakesIn: "~1.4s",
+  todayCost: "$0.00",
+  todaySpend: 0,
+  sessionsToday: 0,
+  lastActive: "3h",
+  endpoint: buildEndpoint("digest-writer"),
+  exposed: {
+    apiUrl: `${TRY_ORIGIN}${appNamespaceAgentPath(APP_SLUG, "digest-writer")}`,
+    webUrl: DIGEST_WEB_URL,
+  },
+  checkpoints: [
+    { id: "dw-v6", version: 6, when: "3h ago", live: true },
+    { id: "dw-v5", version: 5, when: "2d ago", live: false },
+    { id: "dw-v4", version: 4, when: "6d ago", live: false },
+  ],
+  runs: [
+    {
+      id: "dw_r6",
+      number: 6,
+      commitSha: "f3c2d1",
+      targetKind: "cloudflare_worker",
+      status: "success",
+      createdAt: isoAgo(3 * HOUR_MS),
+      liveUrl: DIGEST_WEB_URL,
+      errorCode: null,
+      errorMessage: null,
+      native: {
+        agentCount: 1,
+        agents: [{ action: "updated", exposed: true, name: "digest-writer", versionNumber: 6 }],
+        failures: [],
+        specVersion: "mosoo.spec.v1",
+        webAgent: "digest-writer",
+        webDeclared: true,
+      },
+    },
+    {
+      id: "dw_r5",
+      number: 5,
+      commitSha: "a91c3f",
+      targetKind: "cloudflare_worker",
+      status: "superseded",
+      createdAt: isoAgo(2 * DAY_MS),
+      liveUrl: null,
+      errorCode: null,
+      errorMessage: null,
+      native: {
+        agentCount: 1,
+        agents: [{ action: "created", exposed: true, name: "digest-writer", versionNumber: 5 }],
+        failures: [],
+        specVersion: "mosoo.spec.v1",
+        webAgent: "digest-writer",
+        webDeclared: true,
+      },
+    },
+  ],
+  costTrend: [0, 0, 1, 0, 2, 1, 0, 0, 1, 0, 0, 0],
+};
+
+/**
+ * The demo agent list backing the dashboard and the per-agent detail: one live
+ * headliner and two idle instances, one of which carries an attached web
+ * frontend. Newest/most-active first.
+ */
+export const AGENT_INSTANCE_AGENTS: AgentInstanceFixture[] = [
+  QUIZ_MASTER,
+  TRIAGE_HELPER,
+  DIGEST_WRITER,
+];

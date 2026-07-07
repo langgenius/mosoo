@@ -6,7 +6,8 @@ import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 
 import { AppOverviewInstallGuide } from "../app-overview-install";
-import { AGENT_INSTANCE_FIXTURE } from "./agent-instance-data";
+import { AGENT_INSTANCE_AGENTS } from "./agent-instance-data";
+import { AgentDashboard } from "./components/agent-dashboard";
 import { AgentInstancePanel } from "./components/agent-instance-panel";
 import { DEPLOY_APP_IDENTITY } from "./deploy-console-data";
 import type { DeployConsoleScenario } from "./deploy-console-data";
@@ -38,17 +39,27 @@ const SCENARIOS: PreviewScenario[] = [
  * or seeded data). The simulated run machine walks empty → deploying → live;
  * the scenario switcher in the header covers the four deploy exposure states
  * (web, agent-only, web-and-agents, native-red), and the demo control showcases
- * the legacy failed state. The extra "instance" scenario swaps in the
- * `AgentInstancePanel` design prototype — a published, non-web agent reframed as
- * a remote stateful compute instance — while keeping the switcher visible so the
- * two framings can be compared side by side.
+ * the legacy failed state. The extra "instance" scenario swaps in the agent
+ * DASHBOARD to per-agent DETAIL prototype: published, non-web agents reframed as
+ * remote stateful compute instances, while keeping the switcher visible so the
+ * framings can be compared side by side.
  */
 export function V0DeployPreviewPage() {
   const [scenario, setScenario] = useState<PreviewScenario>("web");
+  // The "instance" scenario is a two-level flow: the agent list (null) vs. one
+  // selected agent's detail page.
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   // `useDeployConsole` is a hook and must run every render; the "instance"
   // scenario has no deploy machine, so it borrows the "web" fixture (unused).
   const demo = useDeployConsole(scenario === "instance" ? "web" : scenario);
   const { deployment } = demo.state;
+
+  // Switching scenarios always returns the instance flow to its list, so the
+  // switcher never lands a reviewer on a stale detail page.
+  function changeScenario(next: PreviewScenario): void {
+    setScenario(next);
+    setSelectedAgentId(null);
+  }
 
   const scenarioSwitcher = (
     <div
@@ -61,7 +72,7 @@ export function V0DeployPreviewPage() {
           size="xs"
           variant={option === scenario ? "secondary" : "ghost"}
           onClick={() => {
-            setScenario(option);
+            changeScenario(option);
           }}
         >
           {option}
@@ -71,13 +82,31 @@ export function V0DeployPreviewPage() {
   );
 
   if (scenario === "instance") {
+    const selectedAgent =
+      selectedAgentId === null
+        ? null
+        : (AGENT_INSTANCE_AGENTS.find((agent) => agent.id === selectedAgentId) ?? null);
+    const demoBadge = <Badge variant="soil">Demo data</Badge>;
+
     return (
       <Layout>
-        <AgentInstancePanel
-          fixture={AGENT_INSTANCE_FIXTURE}
-          headerBadges={<Badge variant="soil">Demo data</Badge>}
-          headerActions={scenarioSwitcher}
-        />
+        {selectedAgent === null ? (
+          <AgentDashboard
+            agents={AGENT_INSTANCE_AGENTS}
+            onSelect={setSelectedAgentId}
+            headerBadges={demoBadge}
+            headerActions={scenarioSwitcher}
+          />
+        ) : (
+          <AgentInstancePanel
+            fixture={selectedAgent}
+            onBack={() => {
+              setSelectedAgentId(null);
+            }}
+            headerBadges={demoBadge}
+            headerActions={scenarioSwitcher}
+          />
+        )}
       </Layout>
     );
   }
