@@ -355,6 +355,7 @@ function createApiTestSchema(database: SqliteD1Database): void {
       generated_wrangler_config_json text,
       id text PRIMARY KEY NOT NULL,
       mosoo_config_json text,
+      native_result_json text,
       plan_json text,
       source_branch text NOT NULL,
       source_commit_sha text NOT NULL,

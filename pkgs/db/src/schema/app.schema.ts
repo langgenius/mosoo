@@ -76,6 +76,7 @@ export const appDeploymentRunsTable = sqliteTable(
     generatedWranglerConfigJson: text("generated_wrangler_config_json"),
     id: platformIdColumn<AppDeploymentRunId>("id").primaryKey(),
     mosooConfigJson: text("mosoo_config_json"),
+    nativeResultJson: text("native_result_json"),
     planJson: text("plan_json"),
     sourceBranch: text("source_branch").notNull(),
     sourceCommitSha: text("source_commit_sha").notNull(),

@@ -298,6 +298,7 @@ export async function deployApp(
     generatedWranglerConfigJson: null,
     id: runId,
     mosooConfigJson: configPath === null ? null : JSON.stringify({ configPath }),
+    nativeResultJson: null,
     planJson: null,
     sourceBranch: repository.defaultBranch,
     sourceCommitSha: repository.sourceCommitSha,
