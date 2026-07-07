@@ -1,3 +1,4 @@
+import { AGENT_PACKAGE_ISSUE_CODES } from "@mosoo/contracts/agent-manifest";
 import type { AgentResolutionIssue } from "@mosoo/contracts/agent-manifest";
 
 import { createArchiveIssue } from "./archive-issue";
@@ -57,7 +58,7 @@ export function admitMcpSidecarServer(
   if (hasCommand || type === "stdio") {
     return {
       issue: createArchiveIssue({
-        code: "package.mcp.unsupported",
+        code: AGENT_PACKAGE_ISSUE_CODES.mcpUnsupported,
         message: `Package MCP server ${name} uses stdio command config, which is not supported by V1 Agent packages.`,
         status: "unsupported",
         targetLabel: name,
@@ -70,7 +71,7 @@ export function admitMcpSidecarServer(
   if (type === null || !MCP_REMOTE_TRANSPORT_TYPES.has(type)) {
     return {
       issue: createArchiveIssue({
-        code: "package.mcp.unsupported",
+        code: AGENT_PACKAGE_ISSUE_CODES.mcpUnsupported,
         message: `Package MCP server ${name} must use type http or sse.`,
         status: "unsupported",
         targetLabel: name,
@@ -87,7 +88,7 @@ export function admitMcpSidecarServer(
 
     return {
       issue: createArchiveIssue({
-        code: "package.mcp.field.unsupported",
+        code: AGENT_PACKAGE_ISSUE_CODES.mcpFieldUnsupported,
         message: `Package MCP server ${name} field ${field} is not supported in V1.`,
         status: "unsupported",
         targetLabel: name,
@@ -102,7 +103,7 @@ export function admitMcpSidecarServer(
   if (url === null || !isHttpsUrl(url)) {
     return {
       issue: createArchiveIssue({
-        code: "package.mcp.url.invalid",
+        code: AGENT_PACKAGE_ISSUE_CODES.mcpUrlInvalid,
         message: `Package MCP server ${name} must use an https URL.`,
         status: "unsupported",
         targetLabel: name,

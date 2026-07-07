@@ -13,5 +13,6 @@ export {
   findForbiddenEnvironmentSidecarFieldPath,
 } from "./archive-environment-sidecar";
 export { findForbiddenMcpSecretFieldPath } from "./archive-mcp-admission";
-export { collectMcpSidecarIssues } from "./archive-mcp-sidecar";
+export { collectMcpManifestCatalogIssues, collectMcpSidecarIssues } from "./archive-mcp-sidecar";
+export type { CollectMcpSidecarIssuesOptions } from "./archive-mcp-sidecar";
 export * from "./report";

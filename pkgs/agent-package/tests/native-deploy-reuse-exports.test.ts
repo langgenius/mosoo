@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   admitAgentPackageArchiveEntries,
   collectEnvironmentSidecarIssues,
+  collectMcpManifestCatalogIssues,
   collectMcpSidecarIssues,
   findForbiddenEnvironmentSidecarFieldPath,
   findForbiddenMcpSecretFieldPath,
@@ -97,6 +98,28 @@ describe("native deploy sidecar validator reuse", () => {
       }),
     ).toBe("api_key");
     expect(findForbiddenEnvironmentSidecarFieldPath({ secretNames: ["SERVICE_TOKEN"] })).toBeNull();
+  });
+
+  test("manifest catalog issues split cleanly out of the sidecar collector", () => {
+    const manifestJson = JSON.stringify({
+      mcpServers: [{ enabled: true, name: "github", ref: ".mcp.json#github", transport: "http" }],
+    });
+    const entries = toArchiveEntries({
+      ".agent/.mcp.json": JSON.stringify({
+        mcpServers: { github: { type: "http", url: "https://mcp.github.example/mcp" } },
+      }),
+    });
+
+    const catalogIssues = collectMcpManifestCatalogIssues(manifestJson);
+    const mergedIssues = collectMcpSidecarIssues(manifestJson, entries);
+    const sidecarOnlyIssues = collectMcpSidecarIssues(manifestJson, entries, {
+      manifestCatalogIssues: "exclude",
+    });
+
+    expect(catalogIssues.map((issue) => issue.code)).toEqual(["package.mcp.field.unsupported"]);
+    expect(mergedIssues.map((issue) => issue.code)).toEqual(["package.mcp.field.unsupported"]);
+    expect(sidecarOnlyIssues).toEqual([]);
+    expect([...sidecarOnlyIssues, ...catalogIssues]).toEqual(mergedIssues);
   });
 
   test("unsafe .agent entry paths fail archive entry admission", () => {

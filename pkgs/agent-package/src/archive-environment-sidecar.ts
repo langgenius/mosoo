@@ -1,3 +1,4 @@
+import { AGENT_PACKAGE_ISSUE_CODES } from "@mosoo/contracts/agent-manifest";
 import type {
   AgentManifestEnvironmentReference,
   AgentPackage,
@@ -86,7 +87,7 @@ export function collectEnvironmentSidecarIssues(
   if (readArchiveBytes(entries, ENVIRONMENT_DEFINITION_PATH) === null) {
     return [
       createArchiveIssue({
-        code: "package.environment.missing",
+        code: AGENT_PACKAGE_ISSUE_CODES.environmentMissing,
         message: "Agent package environment ref requires environment/definition.json.",
         status: "unsupported",
         targetLabel: ENVIRONMENT_DEFINITION_PATH,
@@ -100,7 +101,7 @@ export function collectEnvironmentSidecarIssues(
   if (!isRecord(environmentDefinition)) {
     return [
       createArchiveIssue({
-        code: "package.environment.invalid",
+        code: AGENT_PACKAGE_ISSUE_CODES.environmentInvalid,
         message: "Agent package environment/definition.json must be a JSON object.",
         status: "unsupported",
         targetLabel: ENVIRONMENT_DEFINITION_PATH,
@@ -115,7 +116,7 @@ export function collectEnvironmentSidecarIssues(
     if (!ENVIRONMENT_SIDECAR_FIELDS.has(field)) {
       issues.push(
         createArchiveIssue({
-          code: "package.environment.field.unsupported",
+          code: AGENT_PACKAGE_ISSUE_CODES.environmentFieldUnsupported,
           message: `Environment definition field ${field} is not supported in V1 Agent packages.`,
           status: "unsupported",
           targetLabel: field,
@@ -130,7 +131,7 @@ export function collectEnvironmentSidecarIssues(
   if (forbiddenSecretField !== null) {
     issues.push(
       createArchiveIssue({
-        code: "package.environment.secret_forbidden",
+        code: AGENT_PACKAGE_ISSUE_CODES.environmentSecretForbidden,
         message: `Environment definition must not include secret field ${forbiddenSecretField}.`,
         status: "unsupported",
         targetLabel: forbiddenSecretField,

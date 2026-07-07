@@ -1,3 +1,4 @@
+import { AGENT_PACKAGE_ISSUE_CODES } from "@mosoo/contracts/agent-manifest";
 import type { AgentResolutionIssue } from "@mosoo/contracts/agent-manifest";
 
 import { readArchiveJson } from "./archive-bytes";
@@ -6,6 +7,17 @@ import { createArchiveIssue } from "./archive-issue";
 import { admitMcpSidecarServer, findForbiddenMcpSecretFieldPath } from "./archive-mcp-admission";
 
 const MCP_MANIFEST_CATALOG_FIELDS = new Set(["enabled", "name", "ref"]);
+
+export interface CollectMcpSidecarIssuesOptions {
+  /**
+   * "exclude" drops the issues that `collectMcpManifestCatalogIssues` reports
+   * for manifest.json catalog entries, so callers that validate the manifest
+   * catalog separately (native deployment validate) can attribute those
+   * issues to the manifest file instead of the sidecar. Defaults to
+   * "include", which keeps the historical merged behavior.
+   */
+  manifestCatalogIssues?: "exclude" | "include";
+}
 
 export function mergeMcpSidecarJson(
   manifestJson: string,
@@ -27,9 +39,35 @@ export function mergeMcpSidecarJson(
   return JSON.stringify(manifest);
 }
 
+/**
+ * Issues raised purely by manifest.json mcpServers catalog entries (unknown
+ * entry fields, missing names, refs that skip `.mcp.json`). Split out so
+ * callers can attribute them to the manifest file that contains them; the
+ * archive parse path keeps receiving them merged via
+ * `collectMcpSidecarIssues`.
+ */
+export function collectMcpManifestCatalogIssues(manifestJson: string): AgentResolutionIssue[] {
+  const manifest: unknown = JSON.parse(manifestJson);
+
+  if (!isRecord(manifest) || !Array.isArray(manifest["mcpServers"])) {
+    return [];
+  }
+
+  const issues: AgentResolutionIssue[] = [];
+
+  for (const server of manifest["mcpServers"]) {
+    if (isRecord(server)) {
+      issues.push(...collectMcpManifestCatalogEntryIssues(server));
+    }
+  }
+
+  return issues;
+}
+
 export function collectMcpSidecarIssues(
   manifestJson: string,
   entries: Record<string, Uint8Array>,
+  options: CollectMcpSidecarIssuesOptions = {},
 ): AgentResolutionIssue[] {
   const manifest: unknown = JSON.parse(manifestJson);
 
@@ -48,7 +86,9 @@ export function collectMcpSidecarIssues(
       continue;
     }
 
-    issues.push(...collectMcpManifestCatalogEntryIssues(server));
+    if (options.manifestCatalogIssues !== "exclude") {
+      issues.push(...collectMcpManifestCatalogEntryIssues(server));
+    }
 
     const name = typeof server["name"] === "string" ? server["name"] : null;
     const ref = typeof server["ref"] === "string" ? server["ref"] : null;
@@ -63,7 +103,7 @@ export function collectMcpSidecarIssues(
     if (sidecarServers === null) {
       issues.push(
         createArchiveIssue({
-          code: "package.mcp.missing",
+          code: AGENT_PACKAGE_ISSUE_CODES.mcpMissing,
           message: `Package MCP sidecar ${MCP_JSON_PATH} is missing or does not declare mcpServers.`,
           status: "missing",
           targetLabel,
@@ -78,7 +118,7 @@ export function collectMcpSidecarIssues(
     if (!isRecord(sidecarServer)) {
       issues.push(
         createArchiveIssue({
-          code: "package.mcp.missing",
+          code: AGENT_PACKAGE_ISSUE_CODES.mcpMissing,
           message: `Package MCP server ${targetLabel} is missing from ${MCP_JSON_PATH}.`,
           status: "missing",
           targetLabel,
@@ -93,7 +133,7 @@ export function collectMcpSidecarIssues(
     if (forbiddenPath !== null) {
       issues.push(
         createArchiveIssue({
-          code: "package.mcp.secret_forbidden",
+          code: AGENT_PACKAGE_ISSUE_CODES.mcpSecretForbidden,
           message: `Package MCP server ${targetLabel} must not include secret field ${forbiddenPath}.`,
           status: "unsupported",
           targetLabel,
@@ -115,7 +155,7 @@ export function collectMcpSidecarIssues(
       if (!referencedServerNames.has(serverName)) {
         issues.push(
           createArchiveIssue({
-            code: "package.mcp.undeclared",
+            code: AGENT_PACKAGE_ISSUE_CODES.mcpUndeclared,
             message: `Package MCP server ${serverName} is not declared by manifest.json.`,
             status: "unsupported",
             targetLabel: serverName,
@@ -185,7 +225,7 @@ function collectMcpManifestCatalogEntryIssues(
 
     issues.push(
       createArchiveIssue({
-        code: "package.mcp.field.unsupported",
+        code: AGENT_PACKAGE_ISSUE_CODES.mcpFieldUnsupported,
         message: `MCP server catalog field ${field} is not supported in manifest.json.`,
         status: "unsupported",
         targetLabel: name,
@@ -197,7 +237,7 @@ function collectMcpManifestCatalogEntryIssues(
   if (name === null || name.trim().length === 0) {
     issues.push(
       createArchiveIssue({
-        code: "package.mcp.name.missing",
+        code: AGENT_PACKAGE_ISSUE_CODES.mcpNameMissing,
         message: "MCP server package declaration must include a name.",
         status: "unsupported",
         targetLabel: null,
@@ -209,7 +249,7 @@ function collectMcpManifestCatalogEntryIssues(
   if (ref === null || !ref.startsWith(refPrefix)) {
     issues.push(
       createArchiveIssue({
-        code: "package.mcp.ref.missing",
+        code: AGENT_PACKAGE_ISSUE_CODES.mcpRefMissing,
         message: `MCP server ${name ?? "(unknown)"} must reference .mcp.json instead of inline connection fields.`,
         status: "unsupported",
         targetLabel: name,
@@ -224,7 +264,7 @@ function collectMcpManifestCatalogEntryIssues(
   if (name !== null && refName !== name) {
     issues.push(
       createArchiveIssue({
-        code: "package.mcp.ref.mismatch",
+        code: AGENT_PACKAGE_ISSUE_CODES.mcpRefMismatch,
         message: `MCP server ${name} must use ref .mcp.json#${name}.`,
         status: "unsupported",
         targetLabel: name,
