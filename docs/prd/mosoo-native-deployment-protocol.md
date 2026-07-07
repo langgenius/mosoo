@@ -320,7 +320,10 @@ Instance boundary:
 | Publish verb (state flip + version mint) | Exists agent-level | `agent-lifecycle-command.service.ts:40` |
 | Capability URL per (App, Agent) | Exists; requires published agent — resolution target becomes repo-upserted agents | `app-agent-capability.ts:27` |
 | Generated CLI + Skill (Lathe) | Exists in `mosoo-connector`; `deploy`/`validate` overlays are the additions | connector `9bc9644` |
-| `spec = "mosoo.spec.v1"` parser, validate service, upsert, namespace routes | Target protocol, not implemented | this PRD |
+| `spec = "mosoo.spec.v1"` parser + validate service | IMPLEMENTED (v1) | `pkgs/contracts/src/deployment/native-deployment.contract.ts`, `apps/api/.../native-deployment-validator.ts`, `native:demo` |
+| Deploy-time agent upsert + auto-publish + endpoint activation | IMPLEMENTED (v1) | `apps/api/.../agent-native-repo-upsert.service.ts`, `native-deployment-executor.ts` |
+| Name-addressed namespace routes + per-app OpenAPI + app slug + agent exposure | IMPLEMENTED (v1) | `apps/api/.../app-namespace-route.ts`, `app-slug.service.ts`, migrations 0002 |
+| Console→native-repo export (Path B) + version commit SHA | IMPLEMENTED (v1) | `apps/api/.../agent-native-repo-export.service.ts`, migration 0003 |
 
 ## Coding Agent Instruction
 
@@ -340,12 +343,23 @@ Create root `.mosoo.toml` with `spec = "mosoo.spec.v1"`. Add Web deploy configur
 Run `mosoo validate` before finishing. Fix every reported failure code, file, and field until green.
 ```
 
-## Open Decisions
+## Decisions (resolved in the v1 implementation, 2026-07-08)
 
-1. **App slug minting and rename policy** (owner: PM; blocks namespace GA). The slug is in every API path, so slug stability is the compatibility promise. Recommended: mint from manifest name, immutable once any agent is exposed; renames require a new App or an explicit redirect window. Needs a decision before Phase 2.
-2. **Exposure default rule** (confirm at Phase 0 entry). Recommended above: single-agent → primary exposed by default; multi-agent → explicit per-agent declaration. Plus the exact `.mosoo.toml` field shape.
-3. **Detection boundary** (confirm at Phase 0 entry). Recommended default: marker → protocol path; plain repos → existing generic detector.
-4. **Does console Publish materialize the repo in v1** (export/push to GitHub) or only guarantee shape-conformance with export on demand? Gates Phase 4 / Path B only.
+The four open decisions were resolved as recommended and are now implemented on `feat/native-deployment`:
+
+1. **App slug minting and rename policy** — RESOLVED: slug is minted (kebab) from the app name at the first protocol deploy, instance-globally unique (collision → `-2`/`-3` suffix), and immutable once set (`renameApp` never touches it). No slug-rename API in v1.
+2. **Exposure default rule** — RESOLVED: a single-agent repo exposes its primary agent by default; a multi-agent repo must declare the exposed subset explicitly (`[expose] agents = [...]`), else `native.expose.agents_required`. Exposed agents additionally must have URL-safe kebab names (`native.agent.name_not_url_safe`) since the name is a path segment; internal agents are unconstrained.
+3. **Detection boundary** — RESOLVED: a `.mosoo.toml` whose parsed TOML carries a top-level `spec` key takes the protocol path (never falls back); plain static/worker repos keep the existing generic detector. The marker sniff runs before the legacy detector.
+4. **Console Publish materializes the repo** — RESOLVED: export-on-demand. Publish surfaces an "Export deployable repo (.zip)" action (`exportAgentNativeRepo`) that emits a single-agent Mosoo Native Deployable whose bytes re-validate green through the same validator (convergence test). No automatic GitHub push in v1.
+
+## Known follow-ups (not blocking v1)
+
+- **App OpenAPI URL console surfacing.** The deploy response nouns carry the per-app `…/api/v1/apps/{slug}/openapi.json` URL (derived from the slug, asserted by the noun-parity test), but it is not yet wired through the GraphQL SDL + web query, so the console does not display it. Small scoped follow-up (SDL field + web mapper + codegen).
+- **Shared-import credential hardening.** The MCP-url/`setupScript` inline-secret scan lives in the native deploy validator (the protocol surface). The shared agent-package import path (console import) is not yet hardened against URL-embedded credentials; move the scan into the shared scanners if the same guarantee is wanted there.
+- **`setupScript` secret scan is heuristic.** It flags literal assignments to declared `secretNames` or credential-shaped variable names and skips `$VAR` references, deliberately not flagging credentials embedded in non-secret-named values (e.g. an inline `DATABASE_URL` userinfo) to avoid false positives; the MCP-URL scanner does catch userinfo/secret-query credentials.
+- **Unauthenticated per-app `openapi.json`.** Per this PRD it is unauthenticated (agent names are treated as shareable), which makes it a slug + exposed-name enumeration oracle for anyone who learns a slug. Left as designed; revisit if App-scoped keys land.
+- **MCP-declaring repos publish-block.** Publish readiness requires the MCP server to be connected on the target instance, so an MCP-declaring repo deploys to `native_setup_required` until the operator connects it — stricter than the happy-path doc's aspiration that `mcp_reconnect` is purely post-deploy setup.
+- **`mosoo deploy` / `validate` CLI + Skill.** The generated CLI lives in the separate `langgenius/mosoo-connector` repo (not in this tree). The API response shapes carry the nouns (noun-parity test), but the `deploy`/`validate` overlay shortcuts + Skill regen are cross-repo work.
 
 Video-staging questions (second-instance choice, on-screen key setup) stay in the happy-path doc; they do not affect this contract.
 
