@@ -1,10 +1,17 @@
-import type { AppDeploymentTargetKind } from "@mosoo/db";
+import type { AppDeploymentTargetKind } from "@mosoo/contracts/app";
 import type { ParseError } from "jsonc-parser";
 import { parse as parseJsonc } from "jsonc-parser";
 import { parse as parseToml, stringify } from "smol-toml";
 
 export type AppDeploymentPackageManager = "bun" | "none" | "npm" | "pnpm" | "yarn";
-export type AppDeploymentTargetMode = "static_assets" | "worker_module" | "worker_with_assets";
+// `agent_only` plans are built by the native protocol branch, never by this
+// detector; the plan target kind is the contracts union (a superset of the
+// two Cloudflare kinds the run row's target_kind column can store).
+export type AppDeploymentTargetMode =
+  | "agent_only"
+  | "static_assets"
+  | "worker_module"
+  | "worker_with_assets";
 export type AppDeploymentDetectionErrorCode =
   | "deployment_config_required"
   | "deployment_shape_unsupported";

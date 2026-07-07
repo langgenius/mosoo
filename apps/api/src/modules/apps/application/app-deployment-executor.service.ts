@@ -1,15 +1,8 @@
-import type { AppDeploymentRunStatus } from "@mosoo/contracts/app";
 import type { AppDeploymentRunRow, AppDeploymentRow } from "@mosoo/db";
-import { appDeploymentRunsTable, appDeploymentsTable } from "@mosoo/db";
 import type { AppDeploymentRunId } from "@mosoo/id";
-import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { getAppDatabase, getD1ChangeCount } from "../../../platform/db/drizzle";
-import { currentTimestampMs } from "../../../time";
-import { listAppOwnerAgentRows } from "../../agents/application/agent-repository";
-import { boundAgentUrl, mintAppAgentCapabilityToken } from "../../public-api/app-agent-capability";
 import {
   destroyRuntimeSubjectContainer,
   getRuntimeSubjectKeepAliveHandle,
@@ -18,12 +11,7 @@ import type {
   ExecutionSessionHandle,
   SandboxHandle,
 } from "../../runtime/infrastructure/sandbox-handles";
-import { ACTIVE_APP_DEPLOYMENT_RUN_STATUSES } from "../domain/app-deployment-lifecycle";
-import {
-  AppAgentBindingResolutionError,
-  resolveAppAgentBindings,
-} from "./app-agent-binding-resolution";
-import type { ResolvableAppAgent } from "./app-agent-binding-resolution";
+import { AppAgentBindingResolutionError } from "./app-agent-binding-resolution";
 import type { CloudflareDeploymentClient } from "./app-deployment-cloudflare-client";
 import { createCloudflareDeploymentClient } from "./app-deployment-cloudflare-client";
 import {
@@ -31,23 +19,19 @@ import {
   detectAppDeploymentPlan,
 } from "./app-deployment-detector";
 import type { AppDeploymentPlan, AppDeploymentRepositorySnapshot } from "./app-deployment-detector";
-
-interface AppDeploymentDispatchContext {
-  deployment: AppDeploymentRow;
-  run: AppDeploymentRunRow;
-}
-
-interface PreparedAppDeploymentRepository {
-  repoDir: string;
-  snapshot: AppDeploymentRepositorySnapshot;
-}
-
-interface AppDeploymentDeployResult {
-  externalDeploymentId: string | null;
-  externalProjectId: string | null;
-  externalVersionId: string | null;
-  url: string;
-}
+import {
+  completeDeploymentRun,
+  failDeploymentRunIfActive,
+  readCurrentDispatchContext,
+  resolveDeploymentEnvVars,
+  storeDeploymentPlan,
+  updateRunStatus,
+} from "./app-deployment-run-steps";
+import type {
+  AppDeploymentDeployResult,
+  PreparedAppDeploymentRepository,
+} from "./app-deployment-run-steps";
+import { isNativeDeploymentRepo, runNativeDeploymentBranch } from "./native-deployment-executor";
 
 export interface AppDeploymentBuildRunner {
   build(input: {
@@ -97,6 +81,13 @@ const SNAPSHOT_FILE_NAMES = new Set([
   "wrangler.toml",
   "yarn.lock",
 ]);
+const SNAPSHOT_AGENT_DIR_PREFIX = ".agent/";
+// Mirrors the agent-package archive limits (pkgs/agent-package/src/
+// archive-constants.ts): at most 512 `.agent/` entries enter the snapshot,
+// and a single `.agent/` file contributes at most 2,000,000 UTF-16 code
+// units of text (a conservative stand-in for the 2MB per-file byte limit).
+const SNAPSHOT_AGENT_DIR_MAX_ENTRY_COUNT = 512;
+const SNAPSHOT_AGENT_FILE_TEXT_LIMIT = 2_000_000;
 const WORKER_JS_ENTRY_PATTERN = /\.(?:mjs|js)$/u;
 export function appDeploymentBuildSandboxId(runId: AppDeploymentRunId): string {
   return `${runId}-build`;
@@ -116,10 +107,6 @@ function deploymentHostname(deployment: AppDeploymentRow, domain: string): strin
 
 function deploymentUrl(deployment: AppDeploymentRow, domain: string): string {
   return `https://${deploymentHostname(deployment, domain)}`;
-}
-
-function isActiveRunStatus(status: AppDeploymentRunStatus): boolean {
-  return (ACTIVE_APP_DEPLOYMENT_RUN_STATUSES as readonly AppDeploymentRunStatus[]).includes(status);
 }
 
 function commandFailureMessage(
@@ -245,165 +232,64 @@ async function destroyDeploymentSandboxBestEffort(
   }
 }
 
-async function readCurrentDispatchContext(
-  database: D1Database,
-  runId: AppDeploymentRunId,
-): Promise<AppDeploymentDispatchContext | null> {
-  const run =
-    (await getAppDatabase(database)
-      .select()
-      .from(appDeploymentRunsTable)
-      .where(eq(appDeploymentRunsTable.id, runId))
-      .limit(1)
-      .get()) ?? null;
-
-  if (run === null || !isActiveRunStatus(run.status)) {
-    return null;
-  }
-
-  const deployment =
-    (await getAppDatabase(database)
-      .select()
-      .from(appDeploymentsTable)
-      .where(
-        and(
-          eq(appDeploymentsTable.id, run.deploymentId),
-          eq(appDeploymentsTable.latestRunId, run.id),
-          isNull(appDeploymentsTable.deletedAt),
-        ),
-      )
-      .limit(1)
-      .get()) ?? null;
-
-  return deployment === null ? null : { deployment, run };
-}
-
-async function updateRunStatus(
-  database: D1Database,
-  runId: AppDeploymentRunId,
-  status: Extract<
-    AppDeploymentRunStatus,
-    "activating" | "building" | "preparing" | "submitted" | "submitting"
-  >,
-): Promise<boolean> {
-  const result = await getAppDatabase(database)
-    .update(appDeploymentRunsTable)
-    .set({ status, updatedAt: currentTimestampMs() })
-    .where(
-      and(
-        eq(appDeploymentRunsTable.id, runId),
-        inArray(appDeploymentRunsTable.status, ACTIVE_APP_DEPLOYMENT_RUN_STATUSES),
-      ),
-    )
-    .run();
-
-  return getD1ChangeCount(result) > 0;
-}
-
-async function storeDeploymentPlan(input: {
-  database: D1Database;
-  plan: AppDeploymentPlan;
-  runId: AppDeploymentRunId;
-  targetName: string;
-}): Promise<boolean> {
-  const targetKind = input.plan.targetKind;
-  const result = await getAppDatabase(input.database)
-    .update(appDeploymentRunsTable)
-    .set({
-      generatedWranglerConfigJson: JSON.stringify({ toml: input.plan.generatedWranglerConfig }),
-      planJson: JSON.stringify(input.plan),
-      targetKind,
-      targetProjectName: targetKind === "cloudflare_pages" ? input.targetName : null,
-      targetScriptName: targetKind === "cloudflare_worker" ? input.targetName : null,
-      updatedAt: currentTimestampMs(),
-    })
-    .where(
-      and(
-        eq(appDeploymentRunsTable.id, input.runId),
-        inArray(appDeploymentRunsTable.status, ACTIVE_APP_DEPLOYMENT_RUN_STATUSES),
-      ),
-    )
-    .run();
-
-  return getD1ChangeCount(result) > 0;
-}
-
-async function failDeploymentRunIfActive(input: {
-  database: D1Database;
-  errorCode: string;
-  errorMessage: string;
-  runId: AppDeploymentRunId;
-}): Promise<void> {
-  await getAppDatabase(input.database)
-    .update(appDeploymentRunsTable)
-    .set({
-      errorCode: input.errorCode,
-      errorMessage: input.errorMessage,
-      status: "failed",
-      updatedAt: currentTimestampMs(),
-    })
-    .where(
-      and(
-        eq(appDeploymentRunsTable.id, input.runId),
-        inArray(appDeploymentRunsTable.status, ACTIVE_APP_DEPLOYMENT_RUN_STATUSES),
-      ),
-    )
-    .run();
-}
-
-async function completeDeploymentRun(input: {
-  database: D1Database;
-  deployment: AppDeploymentRow;
-  result: AppDeploymentDeployResult;
-  run: AppDeploymentRunRow;
-}): Promise<boolean> {
-  const nowMs = currentTimestampMs();
-  const deploymentUpdate = await getAppDatabase(input.database)
-    .update(appDeploymentsTable)
-    .set({
-      lastSuccessfulUrl: input.result.url,
-      updatedAt: nowMs,
-    })
-    .where(
-      and(
-        eq(appDeploymentsTable.id, input.deployment.id),
-        eq(appDeploymentsTable.latestRunId, input.run.id),
-        isNull(appDeploymentsTable.deletedAt),
-      ),
-    )
-    .run();
-
-  if (getD1ChangeCount(deploymentUpdate) === 0) {
+/**
+ * Path filter for repository snapshots. Legacy detection files are matched by
+ * basename anywhere in the tree (unchanged); the native protocol widens the
+ * snapshot to the whole `.agent/` subtree. `.git` internals never qualify —
+ * the root `.git/` is already excluded from the sandbox file walk, and this
+ * guard also covers nested `.git/` directories (vendored repositories).
+ */
+export function shouldIncludeSnapshotPath(path: string): boolean {
+  if (path === ".git" || path.startsWith(".git/") || path.includes("/.git/")) {
     return false;
   }
 
-  const runUpdate = await getAppDatabase(input.database)
-    .update(appDeploymentRunsTable)
-    .set({
-      errorCode: null,
-      errorMessage: null,
-      externalDeploymentId: input.result.externalDeploymentId,
-      externalProjectId: input.result.externalProjectId,
-      externalVersionId: input.result.externalVersionId,
-      status: "success",
-      updatedAt: nowMs,
-      url: input.result.url,
-    })
-    .where(
-      and(
-        eq(appDeploymentRunsTable.id, input.run.id),
-        inArray(appDeploymentRunsTable.status, ACTIVE_APP_DEPLOYMENT_RUN_STATUSES),
-      ),
-    )
-    .run();
+  if (path.startsWith(SNAPSHOT_AGENT_DIR_PREFIX)) {
+    return true;
+  }
 
-  return getD1ChangeCount(runUpdate) > 0;
-}
-
-function shouldIncludeSnapshotPath(path: string): boolean {
   const fileName = path.split("/").at(-1) ?? path;
 
   return SNAPSHOT_FILE_NAMES.has(fileName);
+}
+
+/**
+ * Applies {@link shouldIncludeSnapshotPath} and caps the widened `.agent/`
+ * surface at {@link SNAPSHOT_AGENT_DIR_MAX_ENTRY_COUNT} entries (callers pass
+ * sorted paths, so the cap is deterministic). Exported for direct unit
+ * coverage of the snapshot-widening rules.
+ */
+export function selectRepositorySnapshotPaths(paths: readonly string[]): string[] {
+  const selected: string[] = [];
+  let agentEntryCount = 0;
+
+  for (const path of paths) {
+    if (!shouldIncludeSnapshotPath(path)) {
+      continue;
+    }
+
+    if (path.startsWith(SNAPSHOT_AGENT_DIR_PREFIX)) {
+      if (agentEntryCount >= SNAPSHOT_AGENT_DIR_MAX_ENTRY_COUNT) {
+        continue;
+      }
+
+      agentEntryCount += 1;
+    }
+
+    selected.push(path);
+  }
+
+  return selected;
+}
+
+/**
+ * Content gate for widened `.agent/` snapshot files: oversized files and
+ * content that did not survive UTF-8 decoding (binary skill support files,
+ * PR #205, surface as U+FFFD replacement output) are skipped cleanly instead
+ * of poisoning the snapshot.
+ */
+export function admitAgentSnapshotFileContent(content: string): boolean {
+  return content.length <= SNAPSHOT_AGENT_FILE_TEXT_LIMIT && !content.includes("\uFFFD");
 }
 
 async function readRepositorySnapshot(
@@ -411,19 +297,41 @@ async function readRepositorySnapshot(
   repoDir: string,
 ): Promise<AppDeploymentRepositorySnapshot> {
   const listResult = await sandbox.exec(
-    `sh -lc ${quoteShellArg(`cd ${quoteShellArg(repoDir)} && find . -type f -print | sort`)}`,
+    `sh -lc ${quoteShellArg(
+      `cd ${quoteShellArg(repoDir)} && find . -type f -not -path './.git/*' -print | sort`,
+    )}`,
   );
 
   assertSuccessfulCommand(listResult, "Repository file listing");
 
   const files: Record<string, string> = {};
-  const paths = listResult.stdout
-    .split("\n")
-    .map((line) => line.trim().replace(/^\.\//u, ""))
-    .filter((path) => path.length > 0 && shouldIncludeSnapshotPath(path));
+  const paths = selectRepositorySnapshotPaths(
+    listResult.stdout
+      .split("\n")
+      .map((line) => line.trim().replace(/^\.\//u, ""))
+      .filter((path) => path.length > 0),
+  );
 
   await Promise.all(
     paths.map(async (path) => {
+      if (path.startsWith(SNAPSHOT_AGENT_DIR_PREFIX)) {
+        let content: string;
+
+        try {
+          content = (await sandbox.readFile(`${repoDir}/${path}`, { encoding: "utf8" })).content;
+        } catch {
+          // Unreadable `.agent/` entries (binary support files) are not
+          // snapshot material; legacy detection files keep failing loudly.
+          return;
+        }
+
+        if (admitAgentSnapshotFileContent(content)) {
+          files[path] = content;
+        }
+
+        return;
+      }
+
       files[path] = (await sandbox.readFile(`${repoDir}/${path}`, { encoding: "utf8" })).content;
     }),
   );
@@ -742,49 +650,6 @@ class SandboxAppDeploymentBuildRunner implements AppDeploymentBuildRunner {
   }
 }
 
-// Long-lived: the injected URL lives with the deployed Worker and is revoked by
-// deleting the deployment (which destroys the Worker) plus the ask endpoint's
-// re-check that the agent is still published. See docs/prd/app-deployment.md.
-const APP_AGENT_CAPABILITY_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000;
-
-// Resolve `.mosoo.toml [[agents]]` bindings to published agents and mint one
-// self-authorizing capability URL per binding (fail-fast on an unpublished or
-// missing agent). Returns the env var map injected into the deployed Worker.
-async function resolveDeploymentEnvVars(
-  bindings: ApiBindings,
-  deployment: AppDeploymentRow,
-  plan: AppDeploymentPlan,
-): Promise<Record<string, string>> {
-  if (plan.agentBindings.length === 0) {
-    return {};
-  }
-
-  const agentRows = await listAppOwnerAgentRows(bindings.DB, {
-    appId: deployment.appId,
-    viewerId: deployment.ownerAccountId,
-  });
-  const resolvable: ResolvableAppAgent[] = agentRows.map((agent) => ({
-    id: agent.id,
-    name: agent.name,
-    published: agent.status === "published" && agent.liveDeploymentVersionId !== null,
-  }));
-  const resolved = resolveAppAgentBindings(plan.agentBindings, resolvable);
-  const expiresAtMs = currentTimestampMs() + APP_AGENT_CAPABILITY_TTL_MS;
-  const envVars: Record<string, string> = {};
-
-  for (const binding of resolved) {
-    const token = await mintAppAgentCapabilityToken(bindings.RUNTIME_ACTION_TOKEN_SECRET, {
-      agentId: binding.agentId,
-      appId: deployment.appId,
-      exp: expiresAtMs,
-      expose: binding.expose,
-    });
-    envVars[binding.envVar] = boundAgentUrl(bindings.WEB_ORIGIN, token);
-  }
-
-  return envVars;
-}
-
 export async function dispatchAppDeploymentRun(
   bindings: ApiBindings,
   input: { appDeploymentRunId: AppDeploymentRunId },
@@ -814,33 +679,54 @@ export async function dispatchAppDeploymentRun(
     const prepared = await runner.prepare(context);
     const targetName = context.deployment.mosooSubdomain;
     assertRequestedMosooConfigPresent(context.run, prepared.snapshot);
-    const plan = detectAppDeploymentPlan(prepared.snapshot, { resourceName: targetName });
 
-    if (
-      !(await storeDeploymentPlan({
-        database: bindings.DB,
-        plan,
-        runId: context.run.id,
-        targetName,
-      }))
-    ) {
-      return;
-    }
-
+    let plan: AppDeploymentPlan;
     let envVars: Record<string, string>;
-    try {
-      envVars = await resolveDeploymentEnvVars(bindings, context.deployment, plan);
-    } catch (error) {
-      if (error instanceof AppAgentBindingResolutionError) {
-        await failDeploymentRunIfActive({
-          database: bindings.DB,
-          errorCode: error.code,
-          errorMessage: error.message,
-          runId: context.run.id,
-        });
+
+    if (isNativeDeploymentRepo(prepared.snapshot)) {
+      // Protocol branch: validate → provision agents → capability env vars.
+      // Agent-only repos (and every native failure) reach a terminal state
+      // inside the branch; [expose.web] repos come back with a worker plan
+      // and continue through the ordinary build→deploy→complete chain below.
+      const native = await runNativeDeploymentBranch(bindings, {
+        context,
+        prepared,
+        targetName,
+      });
+
+      if (native.kind === "handled") {
         return;
       }
-      throw error;
+
+      ({ envVars, plan } = native);
+    } else {
+      plan = detectAppDeploymentPlan(prepared.snapshot, { resourceName: targetName });
+
+      if (
+        !(await storeDeploymentPlan({
+          database: bindings.DB,
+          plan,
+          runId: context.run.id,
+          targetName,
+        }))
+      ) {
+        return;
+      }
+
+      try {
+        envVars = await resolveDeploymentEnvVars(bindings, context.deployment, plan);
+      } catch (error) {
+        if (error instanceof AppAgentBindingResolutionError) {
+          await failDeploymentRunIfActive({
+            database: bindings.DB,
+            errorCode: error.code,
+            errorMessage: error.message,
+            runId: context.run.id,
+          });
+          return;
+        }
+        throw error;
+      }
     }
 
     if (!(await updateRunStatus(bindings.DB, input.appDeploymentRunId, "building"))) {
