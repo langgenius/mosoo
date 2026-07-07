@@ -887,12 +887,14 @@ export type RenameAppMutationVariables = Exact<{
 
 export type RenameAppMutation = { renameApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId } };
 
+export type AppDeploymentRunNativeFieldsFragment = { facts: { agentCount: number, specVersion: string, agents: Array<{ action: string, exposed: boolean, name: string, versionNumber: number | null }>, web: { agent: string | null, declared: boolean } } | null, validate: { schemaVersion: number, valid: boolean, facts: { agentCount: number, spec: string, agents: Array<{ exposed: boolean, name: string, source: string }>, web: { agent: string | null, declared: boolean } } | null, failures: Array<{ action: string, code: string, field: string | null, file: string, problem: string, severity: string }> } };
+
 export type AppDeploymentOverviewQueryVariables = Exact<{
   appId: PlatformId;
 }>;
 
 
-export type AppDeploymentOverviewQuery = { appOverview: { app: { id: PlatformId, name: string }, boundAgents: Array<{ agentId: PlatformId, envVar: string, expose: AppOverviewBoundAgentExposure, name: string }>, deployment: { appId: PlatformId, createdAt: string, defaultBranch: string, id: PlatformId, liveUrl: string | null, plannedUrl: string, repoName: string, repoOwner: string, repoUrl: string, updatedAt: string, latestRun: { appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string } | null } | null } };
+export type AppDeploymentOverviewQuery = { appOverview: { app: { id: PlatformId, name: string }, boundAgents: Array<{ agentId: PlatformId, envVar: string, expose: AppOverviewBoundAgentExposure, name: string }>, deployment: { appId: PlatformId, createdAt: string, defaultBranch: string, id: PlatformId, liveUrl: string | null, plannedUrl: string, repoName: string, repoOwner: string, repoUrl: string, updatedAt: string, latestRun: { appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string, native: { facts: { agentCount: number, specVersion: string, agents: Array<{ action: string, exposed: boolean, name: string, versionNumber: number | null }>, web: { agent: string | null, declared: boolean } } | null, validate: { schemaVersion: number, valid: boolean, facts: { agentCount: number, spec: string, agents: Array<{ exposed: boolean, name: string, source: string }>, web: { agent: string | null, declared: boolean } } | null, failures: Array<{ action: string, code: string, field: string | null, file: string, problem: string, severity: string }> } } | null } | null } | null } };
 
 export type AppDeploymentRunListQueryVariables = Exact<{
   appId: PlatformId;
@@ -900,14 +902,14 @@ export type AppDeploymentRunListQueryVariables = Exact<{
 }>;
 
 
-export type AppDeploymentRunListQuery = { appDeploymentRunList: Array<{ appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string }> };
+export type AppDeploymentRunListQuery = { appDeploymentRunList: Array<{ appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string, native: { facts: { agentCount: number, specVersion: string, agents: Array<{ action: string, exposed: boolean, name: string, versionNumber: number | null }>, web: { agent: string | null, declared: boolean } } | null, validate: { schemaVersion: number, valid: boolean, facts: { agentCount: number, spec: string, agents: Array<{ exposed: boolean, name: string, source: string }>, web: { agent: string | null, declared: boolean } } | null, failures: Array<{ action: string, code: string, field: string | null, file: string, problem: string, severity: string }> } } | null }> };
 
 export type DeployAppMutationVariables = Exact<{
   input: DeployAppInput;
 }>;
 
 
-export type DeployAppMutation = { deployApp: { appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string } };
+export type DeployAppMutation = { deployApp: { appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string, native: { facts: { agentCount: number, specVersion: string, agents: Array<{ action: string, exposed: boolean, name: string, versionNumber: number | null }>, web: { agent: string | null, declared: boolean } } | null, validate: { schemaVersion: number, valid: boolean, facts: { agentCount: number, spec: string, agents: Array<{ exposed: boolean, name: string, source: string }>, web: { agent: string | null, declared: boolean } } | null, failures: Array<{ action: string, code: string, field: string | null, file: string, problem: string, severity: string }> } } | null } };
 
 export type DeleteAppDeploymentMutationVariables = Exact<{
   input: DeleteAppDeploymentInput;
@@ -1470,6 +1472,49 @@ export const AgentOwnerFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString
   name
 }
     `, {"fragmentName":"AgentOwnerFields"}) as unknown as TypedDocumentString<AgentOwnerFieldsFragment, unknown>;
+export const AppDeploymentRunNativeFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
+    fragment AppDeploymentRunNativeFields on AppDeploymentRunNative {
+  facts {
+    agentCount
+    agents {
+      action
+      exposed
+      name
+      versionNumber
+    }
+    specVersion
+    web {
+      agent
+      declared
+    }
+  }
+  validate {
+    facts {
+      agentCount
+      agents {
+        exposed
+        name
+        source
+      }
+      spec
+      web {
+        agent
+        declared
+      }
+    }
+    failures {
+      action
+      code
+      field
+      file
+      problem
+      severity
+    }
+    schemaVersion
+    valid
+  }
+}
+    `, {"fragmentName":"AppDeploymentRunNativeFields"}) as unknown as TypedDocumentString<AppDeploymentRunNativeFieldsFragment, unknown>;
 export const CostAgentFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment CostAgentFields on CostAgentRow {
   activeUsers
@@ -2668,6 +2713,9 @@ export const AppDeploymentOverviewDocument = /*#__PURE__*/ new TypedDocumentStri
         errorMessage
         id
         liveUrl
+        native {
+          ...AppDeploymentRunNativeFields
+        }
         plannedUrl
         sourceBranch
         sourceCommitSha
@@ -2678,7 +2726,47 @@ export const AppDeploymentOverviewDocument = /*#__PURE__*/ new TypedDocumentStri
     }
   }
 }
-    `) as unknown as TypedDocumentString<AppDeploymentOverviewQuery, AppDeploymentOverviewQueryVariables>;
+    fragment AppDeploymentRunNativeFields on AppDeploymentRunNative {
+  facts {
+    agentCount
+    agents {
+      action
+      exposed
+      name
+      versionNumber
+    }
+    specVersion
+    web {
+      agent
+      declared
+    }
+  }
+  validate {
+    facts {
+      agentCount
+      agents {
+        exposed
+        name
+        source
+      }
+      spec
+      web {
+        agent
+        declared
+      }
+    }
+    failures {
+      action
+      code
+      field
+      file
+      problem
+      severity
+    }
+    schemaVersion
+    valid
+  }
+}`) as unknown as TypedDocumentString<AppDeploymentOverviewQuery, AppDeploymentOverviewQueryVariables>;
 export const AppDeploymentRunListDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AppDeploymentRunList($appId: ULID!, $limit: Int) {
   appDeploymentRunList(appId: $appId, limit: $limit) {
@@ -2689,6 +2777,9 @@ export const AppDeploymentRunListDocument = /*#__PURE__*/ new TypedDocumentStrin
     errorMessage
     id
     liveUrl
+    native {
+      ...AppDeploymentRunNativeFields
+    }
     plannedUrl
     sourceBranch
     sourceCommitSha
@@ -2697,7 +2788,47 @@ export const AppDeploymentRunListDocument = /*#__PURE__*/ new TypedDocumentStrin
     updatedAt
   }
 }
-    `) as unknown as TypedDocumentString<AppDeploymentRunListQuery, AppDeploymentRunListQueryVariables>;
+    fragment AppDeploymentRunNativeFields on AppDeploymentRunNative {
+  facts {
+    agentCount
+    agents {
+      action
+      exposed
+      name
+      versionNumber
+    }
+    specVersion
+    web {
+      agent
+      declared
+    }
+  }
+  validate {
+    facts {
+      agentCount
+      agents {
+        exposed
+        name
+        source
+      }
+      spec
+      web {
+        agent
+        declared
+      }
+    }
+    failures {
+      action
+      code
+      field
+      file
+      problem
+      severity
+    }
+    schemaVersion
+    valid
+  }
+}`) as unknown as TypedDocumentString<AppDeploymentRunListQuery, AppDeploymentRunListQueryVariables>;
 export const DeployAppDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation DeployApp($input: DeployAppInput!) {
   deployApp(input: $input) {
@@ -2708,6 +2839,9 @@ export const DeployAppDocument = /*#__PURE__*/ new TypedDocumentString(`
     errorMessage
     id
     liveUrl
+    native {
+      ...AppDeploymentRunNativeFields
+    }
     plannedUrl
     sourceBranch
     sourceCommitSha
@@ -2716,7 +2850,47 @@ export const DeployAppDocument = /*#__PURE__*/ new TypedDocumentString(`
     updatedAt
   }
 }
-    `) as unknown as TypedDocumentString<DeployAppMutation, DeployAppMutationVariables>;
+    fragment AppDeploymentRunNativeFields on AppDeploymentRunNative {
+  facts {
+    agentCount
+    agents {
+      action
+      exposed
+      name
+      versionNumber
+    }
+    specVersion
+    web {
+      agent
+      declared
+    }
+  }
+  validate {
+    facts {
+      agentCount
+      agents {
+        exposed
+        name
+        source
+      }
+      spec
+      web {
+        agent
+        declared
+      }
+    }
+    failures {
+      action
+      code
+      field
+      file
+      problem
+      severity
+    }
+    schemaVersion
+    valid
+  }
+}`) as unknown as TypedDocumentString<DeployAppMutation, DeployAppMutationVariables>;
 export const DeleteAppDeploymentDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation DeleteAppDeployment($input: DeleteAppDeploymentInput!) {
   deleteAppDeployment(input: $input) {

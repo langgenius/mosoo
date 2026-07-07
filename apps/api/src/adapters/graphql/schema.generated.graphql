@@ -498,12 +498,66 @@ type AppDeploymentRun {
   errorMessage: String
   id: ULID!
   liveUrl: String
+  native: AppDeploymentRunNative
   plannedUrl: String!
   sourceBranch: String!
   sourceCommitSha: String!
   status: AppDeploymentRunStatus!
   targetKind: AppDeploymentTargetKind
   updatedAt: String!
+}
+
+type AppDeploymentRunNative {
+  facts: AppDeploymentRunNativeFacts
+  validate: AppDeploymentRunNativeValidate!
+}
+
+type AppDeploymentRunNativeAgentFact {
+  action: String!
+  exposed: Boolean!
+  name: String!
+  versionNumber: Int
+}
+
+type AppDeploymentRunNativeFacts {
+  agentCount: Int!
+  agents: [AppDeploymentRunNativeAgentFact!]!
+  specVersion: String!
+  web: AppDeploymentRunNativeWebFact!
+}
+
+type AppDeploymentRunNativeValidate {
+  facts: AppDeploymentRunNativeValidateFacts
+  failures: [AppDeploymentRunNativeValidateFailure!]!
+  schemaVersion: Int!
+  valid: Boolean!
+}
+
+type AppDeploymentRunNativeValidateAgentFact {
+  exposed: Boolean!
+  name: String!
+  source: String!
+}
+
+type AppDeploymentRunNativeValidateFacts {
+  agentCount: Int!
+  agents: [AppDeploymentRunNativeValidateAgentFact!]!
+  spec: String!
+  web: AppDeploymentRunNativeWebFact!
+}
+
+type AppDeploymentRunNativeValidateFailure {
+  action: String!
+  code: String!
+  field: String
+  file: String!
+  problem: String!
+  severity: String!
+}
+
+type AppDeploymentRunNativeWebFact {
+  agent: String
+  declared: Boolean!
 }
 
 enum AppDeploymentRunStatus {

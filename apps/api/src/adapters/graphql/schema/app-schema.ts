@@ -31,6 +31,59 @@ export const appSchema = /* GraphQL */ `
     ownerAccountId: ULID!
   }
 
+  type AppDeploymentRunNativeWebFact {
+    agent: String
+    declared: Boolean!
+  }
+
+  type AppDeploymentRunNativeAgentFact {
+    action: String!
+    exposed: Boolean!
+    name: String!
+    versionNumber: Int
+  }
+
+  type AppDeploymentRunNativeFacts {
+    agentCount: Int!
+    agents: [AppDeploymentRunNativeAgentFact!]!
+    specVersion: String!
+    web: AppDeploymentRunNativeWebFact!
+  }
+
+  type AppDeploymentRunNativeValidateFailure {
+    action: String!
+    code: String!
+    field: String
+    file: String!
+    problem: String!
+    severity: String!
+  }
+
+  type AppDeploymentRunNativeValidateAgentFact {
+    exposed: Boolean!
+    name: String!
+    source: String!
+  }
+
+  type AppDeploymentRunNativeValidateFacts {
+    agentCount: Int!
+    agents: [AppDeploymentRunNativeValidateAgentFact!]!
+    spec: String!
+    web: AppDeploymentRunNativeWebFact!
+  }
+
+  type AppDeploymentRunNativeValidate {
+    facts: AppDeploymentRunNativeValidateFacts
+    failures: [AppDeploymentRunNativeValidateFailure!]!
+    schemaVersion: Int!
+    valid: Boolean!
+  }
+
+  type AppDeploymentRunNative {
+    facts: AppDeploymentRunNativeFacts
+    validate: AppDeploymentRunNativeValidate!
+  }
+
   type AppDeploymentRun {
     appId: ULID!
     createdAt: String!
@@ -39,6 +92,7 @@ export const appSchema = /* GraphQL */ `
     errorMessage: String
     id: ULID!
     liveUrl: String
+    native: AppDeploymentRunNative
     plannedUrl: String!
     sourceBranch: String!
     sourceCommitSha: String!

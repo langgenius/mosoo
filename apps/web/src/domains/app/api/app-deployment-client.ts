@@ -9,6 +9,8 @@ import type {
   DeployAppInput,
 } from "@mosoo/contracts/app";
 import type { AppId } from "@mosoo/contracts/id";
+import { parseNativeDeploymentRunResult } from "@mosoo/contracts/native-deployment-run";
+import type { NativeDeploymentRunResult } from "@mosoo/contracts/native-deployment-run";
 import type { PlatformId } from "@mosoo/id";
 
 import { graphql } from "@/gql";
@@ -21,6 +23,52 @@ import { toAgentId, toAppDeploymentId, toAppDeploymentRunId, toAppId } from "@/r
  * tagged documents drive `requestGraphQL`, and the raw payloads are mapped back
  * onto the shared `@mosoo/contracts/app` domain types.
  */
+
+const NATIVE_RUN_RESULT_FRAGMENT = graphql(/* GraphQL */ `
+  fragment AppDeploymentRunNativeFields on AppDeploymentRunNative {
+    facts {
+      agentCount
+      agents {
+        action
+        exposed
+        name
+        versionNumber
+      }
+      specVersion
+      web {
+        agent
+        declared
+      }
+    }
+    validate {
+      facts {
+        agentCount
+        agents {
+          exposed
+          name
+          source
+        }
+        spec
+        web {
+          agent
+          declared
+        }
+      }
+      failures {
+        action
+        code
+        field
+        file
+        problem
+        severity
+      }
+      schemaVersion
+      valid
+    }
+  }
+`);
+
+void NATIVE_RUN_RESULT_FRAGMENT;
 
 const APP_DEPLOYMENT_OVERVIEW_QUERY = graphql(/* GraphQL */ `
   query AppDeploymentOverview($appId: ULID!) {
@@ -54,6 +102,9 @@ const APP_DEPLOYMENT_OVERVIEW_QUERY = graphql(/* GraphQL */ `
           errorMessage
           id
           liveUrl
+          native {
+            ...AppDeploymentRunNativeFields
+          }
           plannedUrl
           sourceBranch
           sourceCommitSha
@@ -76,6 +127,9 @@ const APP_DEPLOYMENT_RUN_LIST_QUERY = graphql(/* GraphQL */ `
       errorMessage
       id
       liveUrl
+      native {
+        ...AppDeploymentRunNativeFields
+      }
       plannedUrl
       sourceBranch
       sourceCommitSha
@@ -96,6 +150,9 @@ const DEPLOY_APP_MUTATION = graphql(/* GraphQL */ `
       errorMessage
       id
       liveUrl
+      native {
+        ...AppDeploymentRunNativeFields
+      }
       plannedUrl
       sourceBranch
       sourceCommitSha
@@ -124,6 +181,59 @@ export interface AppDeploymentOverview {
   deployment: AppDeployment | null;
 }
 
+interface RawNativeWebFact {
+  agent: string | null;
+  declared: boolean;
+}
+
+interface RawNativeAgentFact {
+  action: string;
+  exposed: boolean;
+  name: string;
+  versionNumber: number | null;
+}
+
+interface RawNativeFacts {
+  agentCount: number;
+  agents: RawNativeAgentFact[];
+  specVersion: string;
+  web: RawNativeWebFact;
+}
+
+interface RawNativeValidateFailure {
+  action: string;
+  code: string;
+  field: string | null;
+  file: string;
+  problem: string;
+  severity: string;
+}
+
+interface RawNativeValidateAgentFact {
+  exposed: boolean;
+  name: string;
+  source: string;
+}
+
+interface RawNativeValidateFacts {
+  agentCount: number;
+  agents: RawNativeValidateAgentFact[];
+  spec: string;
+  web: RawNativeWebFact;
+}
+
+interface RawNativeValidate {
+  facts: RawNativeValidateFacts | null;
+  failures: RawNativeValidateFailure[];
+  schemaVersion: number;
+  valid: boolean;
+}
+
+interface RawNativeRunResult {
+  facts: RawNativeFacts | null;
+  validate: RawNativeValidate;
+}
+
 interface RawDeploymentRun {
   appId: PlatformId;
   createdAt: string;
@@ -132,6 +242,7 @@ interface RawDeploymentRun {
   errorMessage: string | null;
   id: PlatformId;
   liveUrl: string | null;
+  native: RawNativeRunResult | null;
   plannedUrl: string;
   sourceBranch: string;
   sourceCommitSha: string;
@@ -161,6 +272,67 @@ interface RawBoundAgent {
   name: string;
 }
 
+function toNativeWebFact(web: RawNativeWebFact): { agent?: string; declared: boolean } {
+  return { ...(web.agent === null ? {} : { agent: web.agent }), declared: web.declared };
+}
+
+/**
+ * GraphQL delivers the native result with explicit `null`s where the contract
+ * omits optional keys and plain `String` where the contract has closed unions.
+ * Rebuild the canonical serialized shape and reuse the strict contract parser,
+ * so the web sees exactly the closed-set semantics the API persisted (unknown
+ * codes → `null`, same as a corrupted row).
+ */
+function toNativeRunResult(native: RawNativeRunResult | null): NativeDeploymentRunResult | null {
+  if (native === null) {
+    return null;
+  }
+
+  const candidate = {
+    facts:
+      native.facts === null
+        ? null
+        : {
+            agentCount: native.facts.agentCount,
+            agents: native.facts.agents.map((agent) => ({
+              action: agent.action,
+              exposed: agent.exposed,
+              name: agent.name,
+              ...(agent.versionNumber === null ? {} : { versionNumber: agent.versionNumber }),
+            })),
+            specVersion: native.facts.specVersion,
+            web: toNativeWebFact(native.facts.web),
+          },
+    validate: {
+      facts:
+        native.validate.facts === null
+          ? null
+          : {
+              agentCount: native.validate.facts.agentCount,
+              agents: native.validate.facts.agents.map((agent) => ({
+                exposed: agent.exposed,
+                name: agent.name,
+                source: agent.source,
+              })),
+              spec: native.validate.facts.spec,
+              web: toNativeWebFact(native.validate.facts.web),
+            },
+      failures: native.validate.failures.map((failure) => ({
+        action: failure.action,
+        code: failure.code,
+        ...(failure.field === null ? {} : { field: failure.field }),
+        file: failure.file,
+        problem: failure.problem,
+        severity: failure.severity,
+      })),
+      schemaVersion: native.validate.schemaVersion,
+      valid: native.validate.valid,
+    },
+  };
+
+  return parseNativeDeploymentRunResult(JSON.stringify(candidate));
+}
+
 function toAppDeploymentRun(run: RawDeploymentRun): AppDeploymentRun {
   return {
     appId: toAppId(run.appId),
@@ -170,8 +342,7 @@ function toAppDeploymentRun(run: RawDeploymentRun): AppDeploymentRun {
     errorMessage: run.errorMessage,
     id: toAppDeploymentRunId(run.id),
     liveUrl: run.liveUrl,
-    // Native protocol run details are not part of the GraphQL selection yet.
-    native: null,
+    native: toNativeRunResult(run.native),
     plannedUrl: run.plannedUrl,
     sourceBranch: run.sourceBranch,
     sourceCommitSha: run.sourceCommitSha,
