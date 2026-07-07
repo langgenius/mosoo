@@ -8,6 +8,10 @@ export type {
   AgentPackageArchiveEntryCandidate,
   AgentPackageArchiveEntryKind,
 } from "./archive-entry-admission";
-export { collectEnvironmentSidecarIssues } from "./archive-environment-sidecar";
+export {
+  collectEnvironmentSidecarIssues,
+  findForbiddenEnvironmentSidecarFieldPath,
+} from "./archive-environment-sidecar";
+export { findForbiddenMcpSecretFieldPath } from "./archive-mcp-admission";
 export { collectMcpSidecarIssues } from "./archive-mcp-sidecar";
 export * from "./report";

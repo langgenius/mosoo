@@ -200,7 +200,7 @@ function readEnvironmentDefinitionRefFromManifest(
   return typeof ref === "string" ? ref : null;
 }
 
-function findForbiddenEnvironmentSidecarFieldPath(value: unknown, path = ""): string | null {
+export function findForbiddenEnvironmentSidecarFieldPath(value: unknown, path = ""): string | null {
   if (Array.isArray(value)) {
     for (let index = 0; index < value.length; index += 1) {
       const match = findForbiddenEnvironmentSidecarFieldPath(value[index], `${path}[${index}]`);

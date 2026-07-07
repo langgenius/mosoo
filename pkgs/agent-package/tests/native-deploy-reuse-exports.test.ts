@@ -4,6 +4,8 @@ import {
   admitAgentPackageArchiveEntries,
   collectEnvironmentSidecarIssues,
   collectMcpSidecarIssues,
+  findForbiddenEnvironmentSidecarFieldPath,
+  findForbiddenMcpSecretFieldPath,
 } from "@mosoo/agent-package";
 import type { AgentPackageArchiveEntryCandidate } from "@mosoo/agent-package";
 import { NATIVE_REPO_FIXTURE_CASES } from "@mosoo/contracts/native-repo-fixtures";
@@ -75,6 +77,26 @@ describe("native deploy sidecar validator reuse", () => {
       "package.environment.field.unsupported",
       "package.environment.secret_forbidden",
     ]);
+  });
+
+  test("forbidden-secret field scanners are exported for presence-triggered scans", () => {
+    expect(
+      findForbiddenMcpSecretFieldPath({
+        mcpServers: { github: { token: "plaintext-value", type: "http" } },
+      }),
+    ).toBe("mcpServers.github.token");
+    expect(
+      findForbiddenMcpSecretFieldPath({
+        mcpServers: { github: { type: "http", url: "https://mcp.github.example/mcp" } },
+      }),
+    ).toBeNull();
+    expect(
+      findForbiddenEnvironmentSidecarFieldPath({
+        api_key: "plaintext-value",
+        secretNames: ["SERVICE_TOKEN"],
+      }),
+    ).toBe("api_key");
+    expect(findForbiddenEnvironmentSidecarFieldPath({ secretNames: ["SERVICE_TOKEN"] })).toBeNull();
   });
 
   test("unsafe .agent entry paths fail archive entry admission", () => {
