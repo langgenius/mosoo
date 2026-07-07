@@ -868,7 +868,9 @@ function collectMcpSidecarFileFailures(
   }
 
   if (sidecar.kind === "parsed") {
-    const forbiddenPath = findForbiddenMcpSecretFieldPath(sidecar.value);
+    const forbiddenPath =
+      findForbiddenMcpSecretFieldPath(sidecar.value) ??
+      findMcpUrlCredentialFieldPath(sidecar.value);
     const reported = failures.some(
       (failure) => failure.code === "native.agent.mcp_secret_forbidden",
     );
@@ -1021,7 +1023,9 @@ function collectEnvironmentSidecarFileFailures(
   }
 
   if (sidecar.kind === "parsed") {
-    const forbiddenPath = findForbiddenEnvironmentSidecarFieldPath(sidecar.value);
+    const forbiddenPath =
+      findForbiddenEnvironmentSidecarFieldPath(sidecar.value) ??
+      findSetupScriptSecretFieldPath(sidecar.value);
     const reported = failures.some(
       (failure) => failure.code === "native.agent.environment_secret_forbidden",
     );
@@ -1049,6 +1053,176 @@ function collectEnvironmentSidecarFileFailures(
     problem: `${ENVIRONMENT_DEFINITION_REPO_PATH} exists but no agent manifest references it via environment.ref`,
     severity: "error",
   });
+}
+
+/** Query-parameter names that carry a plaintext credential inside an MCP URL. */
+const MCP_URL_SECRET_QUERY_KEYS: ReadonlySet<string> = new Set([
+  "access_token",
+  "accesstoken",
+  "api_key",
+  "apikey",
+  "auth",
+  "authorization",
+  "bearer",
+  "client_secret",
+  "clientsecret",
+  "credential",
+  "password",
+  "secret",
+  "token",
+]);
+
+/**
+ * The field-name secret scan admits any allowed `url` string, so a credential
+ * smuggled into the URL's userinfo (`https://x:token@host`) or a secret-shaped
+ * query parameter (`?api_key=...`) still ships to the repo and deploys green.
+ * Walk every string value and flag the first URL that carries such a credential
+ * so the PRD invariant ("`.mcp.json` must not contain plaintext credentials")
+ * holds for values, not just field names.
+ */
+function findMcpUrlCredentialFieldPath(value: unknown, path = ""): string | null {
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const match = findMcpUrlCredentialFieldPath(value[index], `${path}[${index}]`);
+
+      if (match !== null) {
+        return match;
+      }
+    }
+    return null;
+  }
+
+  if (typeof value === "string") {
+    return urlCarriesPlaintextCredential(value) ? path : null;
+  }
+
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  for (const [key, childValue] of Object.entries(value)) {
+    const childPath = path.length > 0 ? `${path}.${key}` : key;
+    const match = findMcpUrlCredentialFieldPath(childValue, childPath);
+
+    if (match !== null) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+function urlCarriesPlaintextCredential(value: string): boolean {
+  let url: URL;
+
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+
+  if (url.username.length > 0 || url.password.length > 0) {
+    return true;
+  }
+
+  for (const key of url.searchParams.keys()) {
+    const normalizedKey = key.toLowerCase().replaceAll("-", "_");
+
+    if (
+      MCP_URL_SECRET_QUERY_KEYS.has(normalizedKey) &&
+      (url.searchParams.get(key) ?? "").length > 0
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** Substrings that mark a shell variable as credential-shaped in a setupScript. */
+const SETUP_SCRIPT_SECRET_NAME_MARKERS: readonly string[] = [
+  "access_key",
+  "accesskey",
+  "access_token",
+  "accesstoken",
+  "api_key",
+  "apikey",
+  "credential",
+  "password",
+  "private_key",
+  "privatekey",
+  "secret",
+  "token",
+];
+
+// Matches `NAME=value` / `export NAME=value` assignments; captures the variable
+// name and its raw (possibly quoted) value so an inlined secret can be detected.
+const SETUP_SCRIPT_ASSIGNMENT =
+  /(?:^|[\s;&|(])(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=("[^"]*"|'[^']*'|\S+)/g;
+
+/**
+ * `setupScript` is an allowed free-text field, so the field-name scan never sees
+ * a credential exported inline (`export OPENAI_API_KEY=sk-live-... && bun install`).
+ * Flag an assignment to a declared secretName or a credential-shaped variable
+ * whose value is a literal (not a `$VAR` reference), so an inlined credential
+ * goes red instead of committing a plaintext secret to the repo.
+ */
+function findSetupScriptSecretFieldPath(value: unknown): string | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const setupScript = value["setupScript"];
+
+  if (typeof setupScript !== "string" || setupScript.length === 0) {
+    return null;
+  }
+
+  const declaredSecretNames = new Set(
+    (isStringArray(value["secretNames"]) ? value["secretNames"] : []).map((name) =>
+      name.toLowerCase(),
+    ),
+  );
+
+  SETUP_SCRIPT_ASSIGNMENT.lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = SETUP_SCRIPT_ASSIGNMENT.exec(setupScript)) !== null) {
+    const name = match[1];
+    const rawValue = match[2];
+
+    if (name === undefined || rawValue === undefined) {
+      continue;
+    }
+
+    const literal = unquoteSetupScriptValue(rawValue);
+
+    if (literal.length === 0 || literal.startsWith("$")) {
+      continue;
+    }
+
+    const normalizedName = name.toLowerCase();
+    const secretShaped =
+      declaredSecretNames.has(normalizedName) ||
+      SETUP_SCRIPT_SECRET_NAME_MARKERS.some((marker) => normalizedName.includes(marker));
+
+    if (secretShaped) {
+      return `setupScript.${name}`;
+    }
+  }
+
+  return null;
+}
+
+function unquoteSetupScriptValue(raw: string): string {
+  if (
+    raw.length >= 2 &&
+    ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'")))
+  ) {
+    return raw.slice(1, -1);
+  }
+
+  return raw;
 }
 
 function collectPrimaryEnvironmentDelegateFailures(

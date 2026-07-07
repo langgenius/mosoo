@@ -210,6 +210,93 @@ describe("native deployment validator", () => {
     expect(secret?.problem).toContain("package.environment.secret_forbidden");
   });
 
+  test("rejects a credential embedded in an mcp url query string", () => {
+    const result = validate({
+      ".agent/.mcp.json": `${JSON.stringify({
+        mcpServers: {
+          github: { type: "http", url: "https://mcp.example/mcp?api_key=ghp_SUPERSECRET" },
+        },
+      })}\n`,
+      ".agent/manifest.json": createAgentManifestJson("quiz-master", {
+        mcpServers: [{ enabled: true, name: "github", ref: ".mcp.json#github" }],
+      }),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+    const secret = result.failures.find(
+      (failure) => failure.code === "native.agent.mcp_secret_forbidden",
+    );
+
+    expect(result.valid).toBe(false);
+    expect(secret).toMatchObject({
+      field: "mcpServers.github.url",
+      file: ".agent/.mcp.json",
+      severity: "error",
+    });
+  });
+
+  test("rejects a credential embedded in an mcp url userinfo", () => {
+    const result = validate({
+      ".agent/.mcp.json": `${JSON.stringify({
+        mcpServers: {
+          github: { type: "http", url: "https://x-access-token:ghp_SECRET@mcp.example/mcp" },
+        },
+      })}\n`,
+      ".agent/manifest.json": createAgentManifestJson("quiz-master", {
+        mcpServers: [{ enabled: true, name: "github", ref: ".mcp.json#github" }],
+      }),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(
+      result.failures.some((failure) => failure.code === "native.agent.mcp_secret_forbidden"),
+    ).toBe(true);
+  });
+
+  test("rejects an inlined secret assignment in an environment setupScript", () => {
+    const result = validate({
+      ".agent/environment/definition.json": `${JSON.stringify({
+        expectedName: "Default",
+        secretNames: ["OPENAI_API_KEY"],
+        setupScript: "export OPENAI_API_KEY=sk-live-REALSECRET123 && bun install",
+      })}\n`,
+      ".agent/manifest.json": createAgentManifestJson("quiz-master", {
+        environment: { ref: "environment/definition.json" },
+      }),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+    const secret = result.failures.find(
+      (failure) => failure.code === "native.agent.environment_secret_forbidden",
+    );
+
+    expect(result.valid).toBe(false);
+    expect(secret).toMatchObject({
+      field: "setupScript.OPENAI_API_KEY",
+      file: ".agent/environment/definition.json",
+      severity: "error",
+    });
+  });
+
+  test("keeps a setupScript with no inlined secret green", () => {
+    const result = validate({
+      ".agent/environment/definition.json": `${JSON.stringify({
+        expectedName: "Default",
+        secretNames: ["OPENAI_API_KEY"],
+        setupScript: "export NODE_ENV=production && bun install",
+      })}\n`,
+      ".agent/manifest.json": createAgentManifestJson("quiz-master", {
+        environment: { ref: "environment/definition.json" },
+      }),
+      ".mosoo.toml": NATIVE_MARKER_TOML,
+    });
+
+    expect(
+      result.failures.some(
+        (failure) => failure.code === "native.agent.environment_secret_forbidden",
+      ),
+    ).toBe(false);
+  });
+
   test("setup_required entries carry actionable post-deploy instructions", () => {
     const result = validate(findFixtureCase("valid-single-agent-with-sidecar-setup").files);
     const setup = result.failures.filter((failure) => failure.severity === "setup_required");
