@@ -6,9 +6,9 @@ import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 
 import { AppOverviewInstallGuide } from "../app-overview-install";
-import { AGENT_INSTANCE_AGENTS } from "./agent-instance-data";
+import { AGENT_INSTANCE_AGENTS, INSTANCE_RUNS } from "./agent-instance-data";
 import { AgentDashboard } from "./components/agent-dashboard";
-import { AgentInstancePanel } from "./components/agent-instance-panel";
+import { ActivitySection } from "./components/deployments-history";
 import { DEPLOY_APP_IDENTITY } from "./deploy-console-data";
 import type { DeployConsoleScenario } from "./deploy-console-data";
 import { DeploySurface } from "./deploy-surface";
@@ -40,26 +40,17 @@ const SCENARIOS: PreviewScenario[] = [
  * the scenario switcher in the header covers the four deploy exposure states
  * (web, agent-only, web-and-agents, native-red), and the demo control showcases
  * the legacy failed state. The extra "instance" scenario swaps in the agent
- * DASHBOARD to per-agent DETAIL prototype: published, non-web agents reframed as
- * remote stateful compute instances, while keeping the switcher visible so the
- * framings can be compared side by side.
+ * LIST prototype: deployed agents you expand in place to read one agent's
+ * address (endpoint + curl, or a web URL), with the repo-level deployment
+ * activity shown once below — while keeping the switcher visible so the framings
+ * can be compared side by side.
  */
 export function V0DeployPreviewPage() {
   const [scenario, setScenario] = useState<PreviewScenario>("web");
-  // The "instance" scenario is a two-level flow: the agent list (null) vs. one
-  // selected agent's detail page.
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   // `useDeployConsole` is a hook and must run every render; the "instance"
   // scenario has no deploy machine, so it borrows the "web" fixture (unused).
   const demo = useDeployConsole(scenario === "instance" ? "web" : scenario);
   const { deployment } = demo.state;
-
-  // Switching scenarios always returns the instance flow to its list, so the
-  // switcher never lands a reviewer on a stale detail page.
-  function changeScenario(next: PreviewScenario): void {
-    setScenario(next);
-    setSelectedAgentId(null);
-  }
 
   const scenarioSwitcher = (
     <div
@@ -72,7 +63,7 @@ export function V0DeployPreviewPage() {
           size="xs"
           variant={option === scenario ? "secondary" : "ghost"}
           onClick={() => {
-            changeScenario(option);
+            setScenario(option);
           }}
         >
           {option}
@@ -82,31 +73,14 @@ export function V0DeployPreviewPage() {
   );
 
   if (scenario === "instance") {
-    const selectedAgent =
-      selectedAgentId === null
-        ? null
-        : (AGENT_INSTANCE_AGENTS.find((agent) => agent.id === selectedAgentId) ?? null);
-    const demoBadge = <Badge variant="soil">Demo data</Badge>;
-
     return (
       <Layout>
-        {selectedAgent === null ? (
-          <AgentDashboard
-            agents={AGENT_INSTANCE_AGENTS}
-            onSelect={setSelectedAgentId}
-            headerBadges={demoBadge}
-            headerActions={scenarioSwitcher}
-          />
-        ) : (
-          <AgentInstancePanel
-            fixture={selectedAgent}
-            onBack={() => {
-              setSelectedAgentId(null);
-            }}
-            headerBadges={demoBadge}
-            headerActions={scenarioSwitcher}
-          />
-        )}
+        <AgentDashboard
+          agents={AGENT_INSTANCE_AGENTS}
+          headerBadges={<Badge variant="soil">Demo data</Badge>}
+          headerActions={scenarioSwitcher}
+          activity={<ActivitySection runs={INSTANCE_RUNS} />}
+        />
       </Layout>
     );
   }

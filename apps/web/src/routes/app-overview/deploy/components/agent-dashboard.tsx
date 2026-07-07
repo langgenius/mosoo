@@ -1,23 +1,71 @@
-import { Bot, Moon } from "lucide-react";
-import type { KeyboardEvent, ReactElement, ReactNode } from "react";
+import { ArrowUpRight, Bot, Check, ChevronDown, Copy, Globe, KeyRound, Moon } from "lucide-react";
+import { useState } from "react";
+import type { ReactElement, ReactNode } from "react";
+import { Link } from "react-router-dom";
 
+import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
+import { Button } from "@/shared/ui/button";
 
-import type { AgentInstanceFixture, AgentInstanceLifecycle } from "../agent-instance-data";
-import { appNamespaceAgentPath } from "../deploy-console-mapping";
+import type {
+  AgentInstanceFixture,
+  AgentInstanceLifecycle,
+  AgentInstanceType,
+} from "../agent-instance-data";
 
-/** Formats a numeric spend as a compact USD string, e.g. 0.5 → "$0.50". */
-function formatUsd(amount: number): string {
-  return `$${amount.toFixed(2)}`;
+/** A small copy button — the only copy affordance on the address card. */
+function CopyButton({ label, text }: { label: string; text: string }): ReactElement {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <Button
+      type="button"
+      size="xs"
+      variant="outline"
+      className="gap-1 text-[11.5px]"
+      aria-label={label}
+      onClick={() => {
+        if (!navigator.clipboard) {
+          return;
+        }
+        void navigator.clipboard.writeText(text).then(() => {
+          setCopied(true);
+          globalThis.setTimeout(() => {
+            setCopied(false);
+          }, 1500);
+        });
+      }}
+    >
+      {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+      {copied ? "Copied" : "Copy"}
+    </Button>
+  );
+}
+
+/** The two-value type tag: an API-addressed "Agent" or an attached "Web" surface. */
+function TypeTag({ type }: { type: AgentInstanceType }): ReactElement {
+  if (type === "web") {
+    return (
+      <Badge variant="outline">
+        <Globe aria-hidden />
+        Web
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge variant="outline">
+      <Bot aria-hidden />
+      Agent
+    </Badge>
+  );
 }
 
 /**
- * The compact lifecycle pill for a dashboard row: awake reads as a pulsing
- * "Live", asleep as a Moon "Idle". The non-color icon cue survives
- * colorblindness; the longer "sleeps when quiet" copy lives on the detail page.
+ * The lifecycle pill: awake reads as a pulsing "Live", asleep as a Moon "Idle".
+ * The non-color icon cue survives colorblindness.
  */
-function AgentStatusBadge({ lifecycle }: { lifecycle: AgentInstanceLifecycle }): ReactElement {
+function StatusBadge({ lifecycle }: { lifecycle: AgentInstanceLifecycle }): ReactElement {
   if (lifecycle === "idle") {
     return (
       <Badge variant="default">
@@ -35,66 +83,120 @@ function AgentStatusBadge({ lifecycle }: { lifecycle: AgentInstanceLifecycle }):
   );
 }
 
-/** One stat tile: a small muted label over a big mono number. */
-function StatTile({ label, value }: { label: string; value: string }): ReactElement {
+/**
+ * The MINIMAL address card shown inline when a row expands — a developer wants
+ * one unique endpoint and one working curl, nothing else. An `agent` shows its
+ * create-thread endpoint (one copy), a ready-to-run curl (one copy), and a
+ * one-line token hint whose token phrase is a link (no copy). A `web` shows just
+ * its live URL and an Open link — no curl.
+ */
+function AgentAddressCard({ agent }: { agent: AgentInstanceFixture }): ReactElement {
+  if (agent.type === "web") {
+    const url = agent.url ?? "";
+
+    return (
+      <div
+        data-testid="agent-address-card"
+        className="border-border bg-bg-sunken/40 flex flex-col gap-2 rounded-lg border px-4 py-3.5"
+      >
+        <span className="text-fg-3 text-[12px]">Live URL</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-fg-2 min-w-0 flex-1 truncate font-mono text-[12px] hover:underline"
+          >
+            {url}
+          </a>
+          <Button
+            type="button"
+            variant="tonal"
+            size="xs"
+            render={
+              <a href={url} target="_blank" rel="noreferrer" aria-label="Open web frontend" />
+            }
+          >
+            Open
+            <ArrowUpRight className="size-3" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const { endpoint } = agent;
+  if (endpoint === undefined) {
+    return <></>;
+  }
+
   return (
-    <div className="border-border bg-background rounded-lg border px-5 py-4">
-      <span className="text-fg-3 block text-[12px]">{label}</span>
-      <span className="text-fg-1 mt-2 block font-mono text-[26px] leading-none font-semibold tabular-nums">
-        {value}
-      </span>
+    <div
+      data-testid="agent-address-card"
+      className="border-border bg-bg-sunken/40 flex flex-col gap-3 rounded-lg border px-4 py-3.5"
+    >
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <span className="text-fg-3 text-[12px]">Endpoint</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <code className="text-fg-2 min-w-0 flex-1 truncate font-mono text-[12px]">
+            {endpoint.threadsPath}
+          </code>
+          <CopyButton label="Copy endpoint" text={endpoint.threadsPath} />
+        </div>
+      </div>
+
+      <div className="border-border bg-background relative rounded-lg border">
+        <pre className="text-fg-2 overflow-x-auto px-3 py-2.5 font-mono text-[11.5px] leading-relaxed">
+          <code>{endpoint.curl}</code>
+        </pre>
+        <div className="absolute top-1.5 right-1.5">
+          <CopyButton label="Copy curl" text={endpoint.curl} />
+        </div>
+      </div>
+
+      <p className="text-fg-3 flex items-center gap-1.5 text-[12.5px]">
+        <KeyRound className="size-3.5 shrink-0" />
+        <span>
+          Authenticate with a{" "}
+          <Link
+            to={endpoint.tokenSettingsPath}
+            className="text-accent-press font-medium hover:underline"
+          >
+            personal access token
+          </Link>
+          .
+        </span>
+      </p>
     </div>
   );
 }
 
-/** The uppercase small-caps column head shared by every dashboard column. */
-function ColumnHead({
-  children,
-  className,
-}: {
-  children: string;
-  className?: string;
-}): ReactElement {
-  return (
-    <TableHead
-      className={`text-fg-3 h-10 text-[11px] font-semibold tracking-wider uppercase ${className ?? ""}`}
-    >
-      {children}
-    </TableHead>
-  );
-}
-
 /**
- * The AGENT LIST dashboard: a page title, four stat tiles reading "how many are
- * live, how busy, how much, how many deployed", and a table of every deployed
- * agent (name · Live/Idle status · version · name-addressed endpoint · last
- * active). A row is the way into that agent's detail page — clicking (or
- * Enter/Space on) a row selects it. Pure presentation over the
- * {@link AgentInstanceFixture} list; the preview route owns the selection state.
+ * The AGENT LIST for the "instance" scenario: a title, then one row per deployed
+ * agent (name · type tag · Live/Idle · version). Clicking a row expands it in
+ * place (accordion) to reveal that agent's {@link AgentAddressCard} — there is
+ * no separate detail page. Below the list, the repo-level `activity` slot renders
+ * the shared deployment feed once. Rows are native buttons, so Enter/Space toggle
+ * them for free. Pure presentation over the {@link AgentInstanceFixture} list.
  */
 export function AgentDashboard({
   agents,
-  onSelect,
+  activity,
   headerActions,
   headerBadges,
 }: {
   agents: AgentInstanceFixture[];
-  /** Selects an agent by id — the route swaps in its detail page. */
-  onSelect: (agentId: string) => void;
+  /** Repo-level Production Activity, rendered once below the list. */
+  activity?: ReactNode;
   /** Right-aligned header extras (the preview's scenario switcher). */
   headerActions?: ReactNode;
   /** Extra badges next to the title (e.g. the preview's "Demo data"). */
   headerBadges?: ReactNode;
 }): ReactElement {
-  const liveCount = agents.filter((agent) => agent.lifecycle === "live").length;
-  const sessionsToday = agents.reduce((sum, agent) => sum + agent.sessionsToday, 0);
-  const spendToday = agents.reduce((sum, agent) => sum + agent.todaySpend, 0);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  function onRowKeyDown(event: KeyboardEvent<HTMLTableRowElement>, agentId: string): void {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      onSelect(agentId);
-    }
+  function toggle(id: string): void {
+    setExpandedId((current) => (current === id ? null : id));
   }
 
   return (
@@ -115,75 +217,52 @@ export function AgentDashboard({
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-        <div className="mx-auto flex max-w-5xl flex-col gap-6">
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatTile label="Live agents" value={String(liveCount)} />
-            <StatTile label="Sessions today" value={String(sessionsToday)} />
-            <StatTile label="Spend today" value={formatUsd(spendToday)} />
-            <StatTile label="Deployed agents" value={String(agents.length)} />
-          </div>
+        <div className="mx-auto flex max-w-3xl flex-col gap-8">
+          <ul className="border-border bg-background divide-border divide-y overflow-hidden rounded-xl border">
+            {agents.map((agent) => {
+              const expanded = expandedId === agent.id;
 
-          <div className="border-border bg-background overflow-hidden rounded-xl border">
-            <div className="border-border flex items-center justify-between border-b px-5 py-3.5">
-              <h2 className="text-fg-1 text-[14px] font-semibold">All agents</h2>
-              <span className="text-fg-3 text-[12.5px]">{String(agents.length)} deployed</span>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  <ColumnHead className="pl-5">Agent</ColumnHead>
-                  <ColumnHead>Status</ColumnHead>
-                  <ColumnHead>Version</ColumnHead>
-                  <ColumnHead>Endpoint</ColumnHead>
-                  <ColumnHead className="pr-5">Last active</ColumnHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {agents.map((agent) => (
-                  <TableRow
-                    key={agent.id}
+              return (
+                <li key={agent.id}>
+                  <button
+                    type="button"
                     data-testid="agent-dashboard-row"
-                    // A table row cannot be a native <button>; it stays a
-                    // keyboard-accessible clickable row (tabIndex + Enter/Space).
-                    // eslint-disable-next-line jsx-a11y/prefer-tag-over-role
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Open ${agent.name}`}
+                    aria-expanded={expanded}
+                    aria-label={`Toggle ${agent.name}`}
                     onClick={() => {
-                      onSelect(agent.id);
+                      toggle(agent.id);
                     }}
-                    onKeyDown={(event) => {
-                      onRowKeyDown(event, agent.id);
-                    }}
-                    className="focus-visible:ring-ring cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset"
+                    className="focus-visible:ring-ring flex w-full items-center gap-2.5 px-5 py-4 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset sm:gap-3"
                   >
-                    <TableCell className="py-4 pl-5">
-                      <div className="flex items-center gap-2.5">
-                        <span className="bg-bg-sunken text-fg-3 flex size-8 shrink-0 items-center justify-center rounded-full">
-                          <Bot className="size-4" />
-                        </span>
-                        <span className="text-fg-1 text-[13.5px] font-semibold">{agent.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-4 align-middle">
-                      <AgentStatusBadge lifecycle={agent.lifecycle} />
-                    </TableCell>
-                    <TableCell className="text-fg-2 py-4 align-middle font-mono text-[12.5px]">
-                      v{String(agent.liveVersion)}
-                    </TableCell>
-                    <TableCell className="py-4 align-middle">
-                      <code className="text-fg-3 block max-w-[240px] truncate font-mono text-[12px]">
-                        {appNamespaceAgentPath(agent.slug, agent.name)}
-                      </code>
-                    </TableCell>
-                    <TableCell className="text-fg-3 py-4 pr-5 align-middle font-mono text-[12.5px]">
-                      {agent.lastActive}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                    <span className="text-fg-1 min-w-0 flex-1 truncate text-[13.5px] font-semibold">
+                      {agent.name}
+                    </span>
+                    <TypeTag type={agent.type} />
+                    <StatusBadge lifecycle={agent.lifecycle} />
+                    <span className="text-fg-3 hidden font-mono text-[12.5px] sm:inline">
+                      v{String(agent.version)}
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        "text-fg-3 size-4 shrink-0 transition-transform",
+                        expanded && "rotate-180",
+                      )}
+                      aria-hidden
+                    />
+                  </button>
+                  {expanded ? (
+                    <div className="px-5 pb-4">
+                      <AgentAddressCard agent={agent} />
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+
+          {activity === undefined ? null : (
+            <section data-testid="instance-activity">{activity}</section>
+          )}
         </div>
       </main>
     </div>

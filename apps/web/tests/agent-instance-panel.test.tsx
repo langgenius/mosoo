@@ -4,7 +4,10 @@ import { JSDOM } from "jsdom";
 import { act } from "react";
 import type { Root } from "react-dom/client";
 
-import { AGENT_INSTANCE_AGENTS } from "../src/routes/app-overview/deploy/agent-instance-data";
+import {
+  AGENT_INSTANCE_AGENTS,
+  INSTANCE_RUNS,
+} from "../src/routes/app-overview/deploy/agent-instance-data";
 
 let dom: JSDOM | null = null;
 let root: Root | null = null;
@@ -74,12 +77,14 @@ function uninstallDom(): void {
   });
 }
 
-async function renderDashboard(): Promise<void> {
-  const [{ createRoot }, { MemoryRouter }, { AgentDashboard }] = await Promise.all([
-    import("react-dom/client"),
-    import("react-router-dom"),
-    import("../src/routes/app-overview/deploy/components/agent-dashboard"),
-  ]);
+async function renderInstance(): Promise<void> {
+  const [{ createRoot }, { MemoryRouter }, { AgentDashboard }, { ActivitySection }] =
+    await Promise.all([
+      import("react-dom/client"),
+      import("react-router-dom"),
+      import("../src/routes/app-overview/deploy/components/agent-dashboard"),
+      import("../src/routes/app-overview/deploy/components/deployments-history"),
+    ]);
 
   container = document.createElement("div");
   document.body.append(container);
@@ -88,34 +93,22 @@ async function renderDashboard(): Promise<void> {
   await act(async () => {
     root?.render(
       <MemoryRouter>
-        <AgentDashboard agents={AGENT_INSTANCE_AGENTS} onSelect={() => undefined} />
+        <AgentDashboard
+          agents={AGENT_INSTANCE_AGENTS}
+          activity={<ActivitySection runs={INSTANCE_RUNS} />}
+        />
       </MemoryRouter>,
     );
   });
 }
 
-async function renderDetail(): Promise<void> {
-  const [{ createRoot }, { MemoryRouter }, { AgentInstancePanel }] = await Promise.all([
-    import("react-dom/client"),
-    import("react-router-dom"),
-    import("../src/routes/app-overview/deploy/components/agent-instance-panel"),
-  ]);
-
-  const [primary] = AGENT_INSTANCE_AGENTS;
-  if (primary === undefined) {
-    throw new Error("expected at least one agent fixture");
+async function click(element: Element | null | undefined): Promise<void> {
+  if (!(element instanceof HTMLElement)) {
+    throw new Error("Expected a clickable element.");
   }
 
-  container = document.createElement("div");
-  document.body.append(container);
-  root = createRoot(container);
-
   await act(async () => {
-    root?.render(
-      <MemoryRouter>
-        <AgentInstancePanel fixture={primary} onBack={() => undefined} />
-      </MemoryRouter>,
-    );
+    element.click();
   });
 }
 
@@ -133,52 +126,75 @@ afterEach(async () => {
   uninstallDom();
 });
 
-describe("Agent dashboard", () => {
-  test("renders the stat tiles and a clickable agent row", async () => {
-    await renderDashboard();
+describe("Agent instance list", () => {
+  test("renders one row per agent, both type tags, and the repo-level activity below", async () => {
+    await renderInstance();
 
     const dashboard = document.querySelector('[data-testid="agent-dashboard"]');
     expect(dashboard).not.toBeNull();
 
-    const text = dashboard?.textContent ?? "";
-
-    // The four stat tiles that head the agent list.
-    expect(text).toContain("Live agents");
-    expect(text).toContain("Sessions today");
-    expect(text).toContain("Spend today");
-    expect(text).toContain("Deployed agents");
-
-    // The list renders one row per deployed agent, each a way into its detail.
+    // One row per deployed agent; each is a way to expand its address in place.
     const rows = document.querySelectorAll('[data-testid="agent-dashboard-row"]');
     expect(rows.length).toBe(AGENT_INSTANCE_AGENTS.length);
+
+    const text = dashboard?.textContent ?? "";
     expect(text).toContain("quiz-master");
+    // The only two type tags that exist.
+    expect(text).toContain("Agent");
+    expect(text).toContain("Web");
+
+    // Production Activity is repo-level: rendered ONCE below the list.
+    const activity = document.querySelector('[data-testid="instance-activity"]');
+    expect(activity).not.toBeNull();
+    expect(activity?.textContent ?? "").toContain("Production Activity");
+    expect(
+      activity?.querySelectorAll('[data-testid="deploy-run-row"]').length ?? 0,
+    ).toBeGreaterThan(0);
   });
-});
 
-describe("Agent instance detail", () => {
-  test("anchors on the Address spine and reuses the web Activity, with no chat console", async () => {
-    await renderDetail();
+  test("expands an Agent row to one endpoint and one curl, with no shell command", async () => {
+    await renderInstance();
 
-    const panel = document.querySelector('[data-testid="agent-instance-panel"]');
-    expect(panel).not.toBeNull();
+    // quiz-master is the first row and an `agent`-type instance.
+    const rows = document.querySelectorAll('[data-testid="agent-dashboard-row"]');
+    await click(rows[0]);
 
-    const text = panel?.textContent ?? "";
+    const card = document.querySelector('[data-testid="agent-address-card"]');
+    expect(card).not.toBeNull();
 
-    // The Address spine surfaces the name-addressed create-thread endpoint and
-    // the App OpenAPI URL.
+    const text = card?.textContent ?? "";
+    // The one unique create-thread endpoint and the one ready-to-run curl.
+    expect(text).toContain("POST https://try.mosoo.ai");
     expect(text).toContain("/api/v1/apps/roadmap-agents/agents/quiz-master/threads");
-    expect(text).toContain("/api/v1/apps/roadmap-agents/openapi.json");
+    expect(text).toContain("curl -X POST");
 
-    // Activity is literally the web console's section, fed this agent's runs.
-    expect(text).toContain("Production Activity");
-    expect(document.querySelector('[data-testid="deploy-run-row"]')).not.toBeNull();
+    // Exactly ONE curl block, and the removed redundant "Shell into it" row.
+    expect(card?.querySelectorAll("pre").length).toBe(1);
+    expect(text).not.toContain("Shell into it");
+    expect(text).not.toContain("OpenAPI");
 
-    // The secondary blocks the detail keeps around the spine.
-    expect(text).toContain("Exposed surfaces");
-    expect(text).toContain("Checkpoints");
+    // Copy is capped at two affordances: the endpoint and the curl. The token
+    // hint is a link, not a copy button.
+    expect(card?.querySelectorAll('button[aria-label^="Copy"]').length).toBe(2);
+    expect(text).toContain("personal access token");
+  });
 
-    // The borrowed chat console is gone: no "A way in", no delegation composer.
-    expect(text).not.toContain("A way in");
-    expect(document.querySelector('input[aria-label="Send a delegation"]')).toBeNull();
+  test("expands a Web row to a URL and Open link, not a curl", async () => {
+    await renderInstance();
+
+    const webIndex = AGENT_INSTANCE_AGENTS.findIndex((agent) => agent.type === "web");
+    expect(webIndex).toBeGreaterThanOrEqual(0);
+
+    const rows = document.querySelectorAll('[data-testid="agent-dashboard-row"]');
+    await click(rows[webIndex]);
+
+    const card = document.querySelector('[data-testid="agent-address-card"]');
+    expect(card).not.toBeNull();
+
+    const text = card?.textContent ?? "";
+    // A live web URL and an Open link — never a curl for a web surface.
+    expect(text).toContain("digest.apps.mosoo.ai");
+    expect(text).toContain("Open");
+    expect(card?.querySelector("pre")).toBeNull();
   });
 });

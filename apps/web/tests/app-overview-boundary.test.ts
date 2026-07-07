@@ -176,7 +176,9 @@ describe("Deploy console native boundary", () => {
     }
     expect(previewSource).toContain("Fixture scenario");
     expect(previewSource).toContain("Simulate failed deploy");
-    // The "instance" scenario swaps in the agent-instance prototype panel.
-    expect(previewSource).toContain("AgentInstancePanel");
+    // The "instance" scenario swaps in the agent-list prototype and its
+    // repo-level activity feed.
+    expect(previewSource).toContain("AgentDashboard");
+    expect(previewSource).toContain("INSTANCE_RUNS");
   });
 });
