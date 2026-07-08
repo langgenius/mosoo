@@ -9,6 +9,7 @@ import {
   parseSkillMarkdown,
   toEntryRecord,
 } from "@mosoo/skill-package";
+import { zipSync } from "fflate";
 
 const markdown = new TextEncoder().encode(
   "---\nname: Test\ndescription: Test skill.\n---\n# Test\n",
@@ -242,6 +243,38 @@ describe("skill package path admission", () => {
     );
   });
 
+  test("ignores macOS zip metadata before path admission", () => {
+    const archive = zipSync({
+      "._dify-brand-skills": data,
+      "__MACOSX/._dify-brand-skills": data,
+      "dify-brand-skills/.DS_Store": data,
+      "dify-brand-skills/._SKILL.md": data,
+      "dify-brand-skills/SKILL.md": markdown,
+      "dify-brand-skills/references/.DS_Store": data,
+      "dify-brand-skills/references/guide.md": data,
+    });
+    const normalized = normalizeSkillEntries(toEntryRecord(extractZipArchive(archive)));
+
+    expect(normalized.skillMarkdownPath).toBe("SKILL.md");
+    expect(normalized.entries.map((entry) => entry.path).toSorted()).toEqual(
+      ["references", "references/guide.md", "SKILL.md"].toSorted(),
+    );
+  });
+
+  test("matches UTF-8 zip filenames when the archive UTF-8 flag is missing", () => {
+    const archive = clearZipUtf8Flags(
+      zipSync({
+        "dify-brand-skills/SKILL.md": markdown,
+        "dify-brand-skills/assets/Söhne.otf": data,
+      }),
+    );
+    const normalized = normalizeSkillEntries(toEntryRecord(extractZipArchive(archive)));
+
+    expect(normalized.entries.map((entry) => entry.path).toSorted()).toEqual(
+      ["assets", "assets/Söhne.otf", "SKILL.md"].toSorted(),
+    );
+  });
+
   test("admits custom roots after stripping single wrapper zip archives", () => {
     const normalized = normalizeZipEntries([
       {
@@ -329,4 +362,52 @@ function normalizeZipEntries(entries: SkillPackageEntry[]) {
   const archive = createZipArchive(entries);
 
   return normalizeSkillEntries(toEntryRecord(extractZipArchive(archive)));
+}
+
+function clearZipUtf8Flags(archive: Uint8Array): Uint8Array {
+  const patched = new Uint8Array(archive);
+  let offset = 0;
+
+  while (offset + 4 <= patched.byteLength) {
+    const signature = readUint32LE(patched, offset);
+
+    if (signature === 0x04_03_4b_50) {
+      patched[offset + 7] = (patched[offset + 7] ?? 0) & ~0x08;
+      const compressedSize = readUint32LE(patched, offset + 18);
+      const fileNameLength = readUint16LE(patched, offset + 26);
+      const extraLength = readUint16LE(patched, offset + 28);
+      offset += 30 + fileNameLength + extraLength + compressedSize;
+      continue;
+    }
+
+    if (signature === 0x02_01_4b_50) {
+      patched[offset + 9] = (patched[offset + 9] ?? 0) & ~0x08;
+      const fileNameLength = readUint16LE(patched, offset + 28);
+      const extraLength = readUint16LE(patched, offset + 30);
+      const commentLength = readUint16LE(patched, offset + 32);
+      offset += 46 + fileNameLength + extraLength + commentLength;
+      continue;
+    }
+
+    if (signature === 0x06_05_4b_50) {
+      break;
+    }
+
+    offset += 1;
+  }
+
+  return patched;
+}
+
+function readUint16LE(bytes: Uint8Array, offset: number): number {
+  return (bytes[offset] ?? 0) + (bytes[offset + 1] ?? 0) * 0x01_00;
+}
+
+function readUint32LE(bytes: Uint8Array, offset: number): number {
+  return (
+    (bytes[offset] ?? 0) +
+    (bytes[offset + 1] ?? 0) * 0x01_00 +
+    (bytes[offset + 2] ?? 0) * 0x01_00 ** 2 +
+    (bytes[offset + 3] ?? 0) * 0x01_00 ** 3
+  );
 }
