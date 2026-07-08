@@ -77,7 +77,6 @@ export function V0DeployPreviewPage() {
       <Layout>
         <AgentDashboard
           agents={AGENT_INSTANCE_AGENTS}
-          headerBadges={<Badge variant="soil">Demo data</Badge>}
           headerActions={scenarioSwitcher}
           activity={<ActivitySection runs={INSTANCE_RUNS} />}
         />

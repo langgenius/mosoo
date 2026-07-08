@@ -7,9 +7,9 @@ import { appNamespaceAgentCurl, appNamespaceAgentPath } from "./deploy-console-m
  * you expand in place to read a single agent's ADDRESS (its code-first door),
  * with the repo-level deployment ACTIVITY shown once below the list.
  *
- * Each agent is one of exactly two kinds — an `agent` (an API-addressed agent
- * with a name-addressed create-thread endpoint) or a `web` (an attached web
- * frontend, reached by URL, no curl). The ACTIVITY feed is a single shared set
+ * Each agent is reached through one of two CONSUMPTION PLANES — `api` (a
+ * name-addressed create-thread endpoint, driven by curl) or `web` (an attached
+ * web frontend, reached by URL, no curl). The ACTIVITY feed is a single shared set
  * of {@link DeploymentRunVM} rows because deployment is organized around the
  * REPO: one deploy provisions every agent, so its history belongs at repo level
  * (fed to the same web-console `ActivitySection`), not duplicated per agent.
@@ -26,15 +26,19 @@ import { appNamespaceAgentCurl, appNamespaceAgentPath } from "./deploy-console-m
 export type AgentInstanceLifecycle = "idle" | "live";
 
 /**
- * The two kinds of deployed surface: `agent` = an API-addressed agent (has an
- * {@link AgentInstanceEndpoint}); `web` = an attached web frontend (has a `url`).
+ * The two CONSUMPTION PLANES a deployed agent is reached through: `api` = the
+ * code plane, driven by an endpoint + curl (has an {@link AgentInstanceEndpoint});
+ * `web` = the browser plane, reached by a live {@link AgentInstanceFixture.url}.
  */
-export type AgentInstanceType = "agent" | "web";
+export type AgentInstancePlane = "api" | "web";
 
-/** Name-addressed API surface a caller hits to drive an `agent`-type instance. */
+/** Name-addressed API surface a caller hits to drive an `api`-plane instance. */
 export interface AgentInstanceEndpoint {
-  /** Full method + URL for the create-thread call, e.g. "POST https://…/threads". */
-  threadsPath: string;
+  /**
+   * Bare create-thread URL (no method), e.g. "https://…/threads". Shown after a
+   * "POST" tag and copied on its own by the Endpoint Copy button.
+   */
+  url: string;
   /** Copy-ready multi-line curl carrying a PAT bearer, ready to run as-is. */
   curl: string;
   /** Where a caller mints a personal access token. */
@@ -42,21 +46,23 @@ export interface AgentInstanceEndpoint {
 }
 
 /**
- * One deployed agent in the list. An `agent` carries an {@link endpoint}; a
- * `web` carries a live {@link url}. Only one of the two is ever set.
+ * One deployed agent in the list. An `api`-plane agent carries an
+ * {@link endpoint}; a `web`-plane agent carries a live {@link url}. Only one of
+ * the two is ever set.
  */
 export interface AgentInstanceFixture {
   /** Stable id the list expands a row by. */
   id: string;
   name: string;
-  type: AgentInstanceType;
+  /** Which consumption plane the agent is reached through. */
+  plane: AgentInstancePlane;
   slug: string;
   version: number;
   /** Whether the instance is awake (`live`) or asleep (`idle`). */
   lifecycle: AgentInstanceLifecycle;
-  /** The code-first door — set for `type: "agent"`. */
+  /** The code-first door — set for `plane: "api"`. */
   endpoint?: AgentInstanceEndpoint;
-  /** The live web-frontend URL — set for `type: "web"`. */
+  /** The live web-frontend URL — set for `plane: "web"`. */
   url?: string;
 }
 
@@ -71,18 +77,16 @@ const DIGEST_WEB_URL = "https://digest.apps.mosoo.ai";
 
 /** Builds the name-addressed endpoint bundle for one agent under the App namespace. */
 function buildEndpoint(agentName: string): AgentInstanceEndpoint {
-  const apiUrl = `${TRY_ORIGIN}${appNamespaceAgentPath(APP_SLUG, agentName)}`;
-
   return {
     curl: appNamespaceAgentCurl(TRY_ORIGIN, APP_SLUG, agentName),
-    threadsPath: `POST ${apiUrl}`,
     tokenSettingsPath: "/settings/access-tokens",
+    url: `${TRY_ORIGIN}${appNamespaceAgentPath(APP_SLUG, agentName)}`,
   };
 }
 
 /**
- * The demo agent list: two `agent`-type instances (one live, one idle) and one
- * `web`-type instance (live). Most-active first.
+ * The demo agent list: two `api`-plane instances (one live, one idle) and one
+ * `web`-plane instance (live). Most-active first.
  */
 export const AGENT_INSTANCE_AGENTS: AgentInstanceFixture[] = [
   {
@@ -90,8 +94,8 @@ export const AGENT_INSTANCE_AGENTS: AgentInstanceFixture[] = [
     id: "quiz-master",
     lifecycle: "live",
     name: "quiz-master",
+    plane: "api",
     slug: APP_SLUG,
-    type: "agent",
     version: 4,
   },
   {
@@ -99,16 +103,16 @@ export const AGENT_INSTANCE_AGENTS: AgentInstanceFixture[] = [
     id: "triage-helper",
     lifecycle: "idle",
     name: "triage-helper",
+    plane: "api",
     slug: APP_SLUG,
-    type: "agent",
     version: 2,
   },
   {
     id: "digest-writer",
     lifecycle: "live",
     name: "digest-writer",
+    plane: "web",
     slug: APP_SLUG,
-    type: "web",
     url: DIGEST_WEB_URL,
     version: 6,
   },

@@ -127,11 +127,19 @@ afterEach(async () => {
 });
 
 describe("Agent instance list", () => {
-  test("renders one row per agent, both type tags, and the repo-level activity below", async () => {
+  test("renders a modest Agents section (no big h1), both plane tags, and activity below", async () => {
     await renderInstance();
 
     const dashboard = document.querySelector('[data-testid="agent-dashboard"]');
     expect(dashboard).not.toBeNull();
+
+    // This content lives inside the Overview: there is NO big page title, only a
+    // modest section heading matching the "Production Activity" weight (an h2).
+    expect(document.querySelector("h1")).toBeNull();
+    const agentsHeading = [...document.querySelectorAll("h2")].find(
+      (heading) => heading.textContent === "Agents",
+    );
+    expect(agentsHeading).toBeDefined();
 
     // One row per deployed agent; each is a way to expand its address in place.
     const rows = document.querySelectorAll('[data-testid="agent-dashboard-row"]');
@@ -139,8 +147,8 @@ describe("Agent instance list", () => {
 
     const text = dashboard?.textContent ?? "";
     expect(text).toContain("quiz-master");
-    // The only two type tags that exist.
-    expect(text).toContain("Agent");
+    // The two consumption planes, tagged by plane not thing-type.
+    expect(text).toContain("API");
     expect(text).toContain("Web");
 
     // Production Activity is repo-level: rendered ONCE below the list.
@@ -152,10 +160,27 @@ describe("Agent instance list", () => {
     ).toBeGreaterThan(0);
   });
 
-  test("expands an Agent row to one endpoint and one curl, with no shell command", async () => {
+  test("expands rows independently — two can be open at once", async () => {
     await renderInstance();
 
-    // quiz-master is the first row and an `agent`-type instance.
+    // quiz-master and triage-helper are both api-plane rows, in order.
+    const rows = document.querySelectorAll('[data-testid="agent-dashboard-row"]');
+    await click(rows[0]);
+    await click(rows[1]);
+
+    // Opening the second row did NOT collapse the first: both cards are present.
+    const cards = document.querySelectorAll('[data-testid="agent-address-card"]');
+    expect(cards.length).toBe(2);
+
+    const text = document.querySelector('[data-testid="agent-dashboard"]')?.textContent ?? "";
+    expect(text).toContain("/api/v1/apps/roadmap-agents/agents/quiz-master/threads");
+    expect(text).toContain("/api/v1/apps/roadmap-agents/agents/triage-helper/threads");
+  });
+
+  test("expands an API row to Endpoint + Example request, exactly two Copy buttons", async () => {
+    await renderInstance();
+
+    // quiz-master is the first row and an `api`-plane instance.
     const rows = document.querySelectorAll('[data-testid="agent-dashboard-row"]');
     await click(rows[0]);
 
@@ -163,18 +188,20 @@ describe("Agent instance list", () => {
     expect(card).not.toBeNull();
 
     const text = card?.textContent ?? "";
-    // The one unique create-thread endpoint and the one ready-to-run curl.
+    // The two distinct, relabelled blocks: the URL endpoint and the runnable curl.
+    expect(text).toContain("Endpoint");
+    expect(text).toContain("Example request");
     expect(text).toContain("POST https://try.mosoo.ai");
     expect(text).toContain("/api/v1/apps/roadmap-agents/agents/quiz-master/threads");
     expect(text).toContain("curl -X POST");
 
-    // Exactly ONE curl block, and the removed redundant "Shell into it" row.
+    // Exactly ONE curl block, and no removed redundant affordances.
     expect(card?.querySelectorAll("pre").length).toBe(1);
     expect(text).not.toContain("Shell into it");
     expect(text).not.toContain("OpenAPI");
 
-    // Copy is capped at two affordances: the endpoint and the curl. The token
-    // hint is a link, not a copy button.
+    // Copy is capped at two affordances: the endpoint and the example request.
+    // The token hint is a link, not a copy button.
     expect(card?.querySelectorAll('button[aria-label^="Copy"]').length).toBe(2);
     expect(text).toContain("personal access token");
   });
@@ -182,7 +209,7 @@ describe("Agent instance list", () => {
   test("expands a Web row to a URL and Open link, not a curl", async () => {
     await renderInstance();
 
-    const webIndex = AGENT_INSTANCE_AGENTS.findIndex((agent) => agent.type === "web");
+    const webIndex = AGENT_INSTANCE_AGENTS.findIndex((agent) => agent.plane === "web");
     expect(webIndex).toBeGreaterThanOrEqual(0);
 
     const rows = document.querySelectorAll('[data-testid="agent-dashboard-row"]');
