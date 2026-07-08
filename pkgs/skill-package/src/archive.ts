@@ -58,13 +58,17 @@ export function extractZipArchive(
   options: SkillArchiveExtractOptions = {},
 ): SkillPackageEntry[] {
   const metadataByPath = listZipArchiveEntries(bytes, options);
-  const metadataLookup = new Map(metadataByPath.map((metadata) => [metadata.path, metadata]));
+  const metadataLookup = createZipMetadataLookup(metadataByPath);
   const extractedEntries = new Map<string, SkillPackageEntry>();
   const extractionState: { error: SkillPackageError | null } = { error: null };
   let totalExtractedBytes = 0;
   const unzip = new Unzip((file) => {
     if (extractionState.error !== null) {
       file.terminate();
+      return;
+    }
+
+    if (isIgnoredZipMetadataPath(file.name)) {
       return;
     }
 
@@ -204,6 +208,48 @@ export function extractZipArchive(
   });
 }
 
+function createZipMetadataLookup(
+  metadataByPath: ZipArchiveMetadata[],
+): Map<string, ZipArchiveMetadata> {
+  const metadataLookup = new Map<string, ZipArchiveMetadata>();
+
+  for (const metadata of metadataByPath) {
+    addZipMetadataLookupEntry(metadataLookup, metadata.path, metadata);
+
+    const byteStringPath = encodeUtf8PathAsByteString(metadata.path);
+
+    if (byteStringPath !== metadata.path) {
+      addZipMetadataLookupEntry(metadataLookup, byteStringPath, metadata);
+    }
+  }
+
+  return metadataLookup;
+}
+
+function addZipMetadataLookupEntry(
+  metadataLookup: Map<string, ZipArchiveMetadata>,
+  path: string,
+  metadata: ZipArchiveMetadata,
+): void {
+  const existing = metadataLookup.get(path);
+
+  if (existing === undefined || existing.path === metadata.path) {
+    metadataLookup.set(path, metadata);
+  }
+}
+
+function encodeUtf8PathAsByteString(path: string): string {
+  const bytes = new TextEncoder().encode(path);
+  const chunks: string[] = [];
+  const chunkSize = 0x80_00;
+
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + chunkSize)));
+  }
+
+  return chunks.join("");
+}
+
 export function looksLikeZipArchive(bytes: Uint8Array): boolean {
   if (bytes.byteLength < 4) {
     return false;
@@ -284,6 +330,17 @@ function listZipArchiveEntries(
     }
 
     const rawPath = decodeZipFileName(bytes.subarray(fileNameStart, fileNameEnd));
+    const nextOffset = fileNameEnd + extraLength + commentLength;
+
+    if (nextOffset > endOffset) {
+      throw new SkillPackageError("The skill zip archive central directory exceeds bounds.");
+    }
+
+    if (isIgnoredZipMetadataPath(rawPath)) {
+      offset = nextOffset;
+      continue;
+    }
+
     const entryKind = inferZipEntryKind(rawPath);
     const path = admission.admit(rawPath, entryKind).path;
 
@@ -317,14 +374,18 @@ function listZipArchiveEntries(
       uncompressedSize,
     });
 
-    offset = fileNameEnd + extraLength + commentLength;
-
-    if (offset > endOffset) {
-      throw new SkillPackageError("The skill zip archive central directory exceeds bounds.");
-    }
+    offset = nextOffset;
   }
 
   return metadata;
+}
+
+function isIgnoredZipMetadataPath(path: string): boolean {
+  const segments = path.replaceAll("\\", "/").split("/").filter(Boolean);
+
+  return segments.some(
+    (segment) => segment === "__MACOSX" || segment === ".DS_Store" || segment.startsWith("._"),
+  );
 }
 
 function isZipEntryExecutable(versionMadeBy: number, externalAttributes: number): boolean {
