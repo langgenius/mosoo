@@ -349,6 +349,9 @@ function createCloudflareDeleteRecorder(
     async deletePagesProject(input) {
       deleted.push(`pages:${input.projectName}`);
     },
+    async deleteWorkerDomain(input) {
+      deleted.push(`worker-domain:${input.hostname}`);
+    },
     async deleteWorkerRoute(input) {
       deleted.push(`worker-route:${input.hostname}`);
     },
@@ -363,6 +366,9 @@ function createCloudflareDeleteRecorder(
     },
     async ensurePagesDomain() {
       throw new Error("Unexpected Pages domain creation.");
+    },
+    async ensureWorkerDomain() {
+      throw new Error("Unexpected Worker domain creation.");
     },
     async ensureWorkerRoute() {
       throw new Error("Unexpected Worker route creation.");
@@ -438,6 +444,60 @@ function createTestSandboxHandle(
     writeFile: async (path) => {
       events.push(`${id}:write:${path}`);
     },
+  } as SandboxHandle;
+}
+
+function createWorkerDeploymentSandboxHandle(id: string, events: string[]): SandboxHandle {
+  const base = {
+    createBackup: unexpectedSandboxCall,
+    deleteSession: unexpectedSandboxCall,
+    getSession: unexpectedSandboxCall,
+    mkdir: unexpectedSandboxCall,
+    mountBucket: unexpectedSandboxCall,
+    restoreBackup: unexpectedSandboxCall,
+    startProcess: unexpectedSandboxCall,
+    terminal: unexpectedSandboxCall,
+    watch: unexpectedSandboxCall,
+    wsConnect: unexpectedSandboxCall,
+  };
+
+  return {
+    ...base,
+    createSession: unexpectedSandboxCall,
+    destroy: async () => {
+      events.push(`${id}:destroy`);
+    },
+    exec: async (command) => {
+      events.push(`${id}:${command}`);
+      return successfulCommandResult(
+        command.includes("find . -type f -print")
+          ? "./.mosoo.toml\n./wrangler.toml\n./src/index.js\n"
+          : "",
+      );
+    },
+    readFile: async (path, options) => {
+      let content = "export default { fetch() { return new Response('ok'); } };\n";
+
+      if (path.endsWith(".mosoo.toml")) {
+        content = [
+          "schema = 1",
+          'name = "worker-app"',
+          "",
+          "[deploy]",
+          'adapter = "cloudflare-workers"',
+          'wrangler = "wrangler.toml"',
+          "",
+        ].join("\n");
+      } else if (path.endsWith("wrangler.toml")) {
+        content = 'name = "worker-app"\nmain = "src/index.js"\n';
+      }
+
+      return { content, encoding: options?.encoding ?? "utf8" };
+    },
+    setKeepAlive: async (keepAlive) => {
+      events.push(`${id}:keep-alive:${String(keepAlive)}`);
+    },
+    writeFile: unexpectedSandboxCall,
   } as SandboxHandle;
 }
 
@@ -869,6 +929,7 @@ describe("app deployment service", () => {
     expect(runRow?.status).toBe("failed");
     expect(deleted).toContain(`pages-domain:app-${APP_ID.toLowerCase()}.apps.localhost`);
     expect(deleted).toContain(`pages:app-${APP_ID.toLowerCase()}`);
+    expect(deleted).toContain(`worker-domain:app-${APP_ID.toLowerCase()}.apps.localhost`);
     expect(deleted).toContain(`worker-route:app-${APP_ID.toLowerCase()}.apps.localhost`);
     expect(deleted).toContain(`worker:app-${APP_ID.toLowerCase()}`);
     expect(destroyed).toContain(`${run.id}-build`);
@@ -968,6 +1029,68 @@ describe("app deployment service", () => {
       url: pagesUrl,
     });
     expect(calls.some((call) => call.includes("wrangler pages deploy"))).toBe(true);
+  });
+
+  test("deploys worker modules with a Worker route and custom domain", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const calls: string[] = [];
+    const cloudflareCalls: string[] = [];
+    (bindings as ApiBindings).runtimeSubjectHandleFactory = (runtimeSubjectId) =>
+      createWorkerDeploymentSandboxHandle(runtimeSubjectId, calls);
+
+    const cloudflareClient = createCloudflareDeleteRecorder([], {
+      async deployWorkerModule(input) {
+        cloudflareCalls.push(
+          `worker:${input.scriptName}:${input.mainModuleName}:${input.scriptContent.trim()}`,
+        );
+        return { deploymentId: "worker-deployment-1", versionId: "worker-version-1" };
+      },
+      async ensureWorkerDomain(input) {
+        cloudflareCalls.push(`worker-domain:${input.hostname}:${input.scriptName}`);
+      },
+      async ensureWorkerRoute(input) {
+        cloudflareCalls.push(`worker-route:${input.hostname}:${input.scriptName}`);
+      },
+    });
+
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, configPath: ".mosoo.toml", repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      { cloudflareClient },
+    );
+
+    const targetName = `app-${APP_ID.toLowerCase()}`;
+    const hostname = `${targetName}.apps.localhost`;
+    const targetUrl = `https://${hostname}`;
+    const status = await getAppDeploymentStatus(bindings, VIEWER, APP_ID);
+    const runRow = await database.app().select().from(appDeploymentRunsTable).limit(1).get();
+
+    expect(status).toMatchObject({
+      liveUrl: targetUrl,
+      status: "success",
+    });
+    expect(runRow).toMatchObject({
+      externalDeploymentId: "worker-deployment-1",
+      externalProjectId: null,
+      externalVersionId: "worker-version-1",
+      status: "success",
+      targetKind: "cloudflare_worker",
+      targetScriptName: targetName,
+      url: targetUrl,
+    });
+    expect(cloudflareCalls).toEqual([
+      `worker:${targetName}:index.js:export default { fetch() { return new Response('ok'); } };`,
+      `worker-route:${hostname}:${targetName}`,
+      `worker-domain:${hostname}:${targetName}`,
+    ]);
   });
 
   test("dead letters active deployment runs without overwriting terminal runs", async () => {
