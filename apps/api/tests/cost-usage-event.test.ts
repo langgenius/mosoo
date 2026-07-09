@@ -240,17 +240,19 @@ describe("cost usage event", () => {
       output_tokens: 200,
       pricing_status: "priced",
       provider: "openai",
-      total_cost_usd_micros: 9_800,
+      total_cost_usd_micros: 5_400,
     });
     const priceSnapshot = JSON.parse(row?.price_snapshot_json ?? "{}") as Record<string, unknown>;
     expect(priceSnapshot).toMatchObject({
       billableInputTokens: 900,
-      cacheReadUsdPerMillion: 0.5,
-      cacheWriteUsdPerMillion: 6.25,
-      inputUsdPerMillion: 5,
+      cacheReadUsdPerMillion: 0.25,
+      cacheWriteUsdPerMillion: 3.125,
+      inputUsdPerMillion: 2.5,
+      longContextApplied: false,
       model: "gpt-5.4",
-      outputUsdPerMillion: 25,
+      outputUsdPerMillion: 15,
       provider: "openai",
+      source: "mosoo_seed_2026_07_10",
     });
   });
 

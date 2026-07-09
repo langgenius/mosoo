@@ -3,6 +3,7 @@ import type { AgentBuiltInToolConfig } from "@mosoo/contracts/agent";
 import { normalizeAgentBuiltInTools } from "@mosoo/contracts/agent";
 import { classifyAgentConfigChanges } from "@mosoo/contracts/agent-config-change-plan";
 import type { AgentConfigChangePlan } from "@mosoo/contracts/agent-config-change-plan";
+import { normalizeRuntimeAdvancedSettings } from "@mosoo/runtime-catalog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -304,6 +305,11 @@ export function useAgentEditorModel({
       updateDraft((current) => ({
         ...current,
         model,
+        providerOptions: normalizeRuntimeAdvancedSettings({
+          modelId: model,
+          runtimeId: current.runtime,
+          settings: current.providerOptions,
+        }),
       }));
     },
     setModelSelection(selection) {
@@ -311,6 +317,11 @@ export function useAgentEditorModel({
         ...current,
         model: selection.model,
         provider: selection.provider,
+        providerOptions: normalizeRuntimeAdvancedSettings({
+          modelId: selection.model,
+          runtimeId: current.runtime,
+          settings: current.providerOptions,
+        }),
       }));
     },
     setName(name) {
@@ -334,6 +345,11 @@ export function useAgentEditorModel({
     setRuntime(runtime) {
       updateDraft((current) => ({
         ...current,
+        providerOptions: normalizeRuntimeAdvancedSettings({
+          modelId: current.model,
+          runtimeId: runtime,
+          settings: current.providerOptions,
+        }),
         runtime,
       }));
     },

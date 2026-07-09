@@ -159,7 +159,11 @@ export async function updateAgentConfig(
     stableStringify(currentStoredConfig.providerOptions) ===
     stableStringify(requestedProviderOptions);
   const providerOptions = assertRuntimeAdvancedSettings({
-    allowLegacyUnsupportedSettings: providerOptionsUnchanged,
+    allowLegacyUnsupportedSettings:
+      providerOptionsUnchanged &&
+      editable.agent.model === input.model &&
+      editable.agent.runtimeId === runtimeId,
+    modelId: input.model,
     runtimeId,
     settings: requestedProviderOptions,
   });

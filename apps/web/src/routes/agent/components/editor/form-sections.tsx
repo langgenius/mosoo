@@ -170,6 +170,7 @@ export function BasicsSection({
           <ModelPickerField model={model} appId={agent.appId} readOnly={readOnly} />
           <RuntimeAdvancedSettingsField
             builtInTools={model.draft.builtInTools}
+            modelId={model.draft.model}
             readOnly={readOnly}
             runtimeId={model.draft.runtime}
             settings={model.draft.providerOptions}

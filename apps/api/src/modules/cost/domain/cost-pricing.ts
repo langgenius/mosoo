@@ -18,11 +18,48 @@ export interface CostCalculationResult {
 }
 
 export interface ModelPricingLookup {
+  atMs?: number;
   modelId: string;
   providerId: string;
 }
 
-const MODEL_PRICING: readonly ModelPricing[] = [
+interface ModelPricingScheduleEntry extends ModelPricing {
+  effectiveFromMs?: number;
+  effectiveUntilMs?: number;
+}
+
+const CLAUDE_SONNET_5_STANDARD_PRICE_START_MS = Date.UTC(2026, 8, 1);
+const OPENAI_LONG_CONTEXT_INPUT_THRESHOLD = 272_000;
+const OPENAI_LONG_CONTEXT_MODEL_IDS = new Set([
+  "gpt-5.4",
+  "gpt-5.5",
+  "gpt-5.6-luna",
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+]);
+
+const MODEL_PRICING: readonly ModelPricingScheduleEntry[] = [
+  {
+    ...anthropicPricing({
+      inputUsdPerMillion: 2,
+      model: "claude-sonnet-5",
+      outputUsdPerMillion: 10,
+    }),
+    effectiveUntilMs: CLAUDE_SONNET_5_STANDARD_PRICE_START_MS,
+  },
+  {
+    ...anthropicPricing({
+      inputUsdPerMillion: 3,
+      model: "claude-sonnet-5",
+      outputUsdPerMillion: 15,
+    }),
+    effectiveFromMs: CLAUDE_SONNET_5_STANDARD_PRICE_START_MS,
+  },
+  anthropicPricing({
+    inputUsdPerMillion: 10,
+    model: "claude-fable-5",
+    outputUsdPerMillion: 50,
+  }),
   anthropicPricing({
     inputUsdPerMillion: 15,
     model: "claude-opus-4-7",
@@ -55,18 +92,33 @@ const MODEL_PRICING: readonly ModelPricing[] = [
   }),
   openAiPricing({
     inputUsdPerMillion: 5,
+    model: "gpt-5.6-sol",
+    outputUsdPerMillion: 30,
+  }),
+  openAiPricing({
+    inputUsdPerMillion: 2.5,
+    model: "gpt-5.6-terra",
+    outputUsdPerMillion: 15,
+  }),
+  openAiPricing({
+    inputUsdPerMillion: 1,
+    model: "gpt-5.6-luna",
+    outputUsdPerMillion: 6,
+  }),
+  openAiPricing({
+    inputUsdPerMillion: 5,
     model: "gpt-5.5",
     outputUsdPerMillion: 30,
   }),
   openAiPricing({
-    inputUsdPerMillion: 5,
+    inputUsdPerMillion: 2.5,
     model: "gpt-5.4",
-    outputUsdPerMillion: 25,
+    outputUsdPerMillion: 15,
   }),
   openAiPricing({
-    inputUsdPerMillion: 0.8,
+    inputUsdPerMillion: 0.75,
     model: "gpt-5.4-mini",
-    outputUsdPerMillion: 3.2,
+    outputUsdPerMillion: 4.5,
   }),
   openAiPricing({
     inputUsdPerMillion: 1.75,
@@ -369,18 +421,52 @@ function pricingMapKey(providerId: string, modelId: string): string {
   return `${normalizeProviderId(providerId)}:${normalizeModelId(modelId)}`;
 }
 
-const PRICING_BY_PROVIDER_MODEL = new Map(
-  MODEL_PRICING.map((pricing) => [pricingMapKey(pricing.provider, pricing.model), pricing]),
-);
+function buildPricingMap(): ReadonlyMap<string, readonly ModelPricingScheduleEntry[]> {
+  const pricingMap = new Map<string, ModelPricingScheduleEntry[]>();
+
+  for (const pricing of MODEL_PRICING) {
+    const key = pricingMapKey(pricing.provider, pricing.model);
+    const entries = pricingMap.get(key) ?? [];
+
+    entries.push(pricing);
+    pricingMap.set(key, entries);
+  }
+
+  return pricingMap;
+}
+
+function isPricingEffective(pricing: ModelPricingScheduleEntry, atMs: number): boolean {
+  return (
+    (pricing.effectiveFromMs === undefined || atMs >= pricing.effectiveFromMs) &&
+    (pricing.effectiveUntilMs === undefined || atMs < pricing.effectiveUntilMs)
+  );
+}
+
+function toModelPricing(pricing: ModelPricingScheduleEntry): ModelPricing {
+  return {
+    cacheReadUsdPerMillion: pricing.cacheReadUsdPerMillion,
+    cacheWriteUsdPerMillion: pricing.cacheWriteUsdPerMillion,
+    inputUsdPerMillion: pricing.inputUsdPerMillion,
+    model: pricing.model,
+    outputUsdPerMillion: pricing.outputUsdPerMillion,
+    provider: pricing.provider,
+    vendor: pricing.vendor,
+  };
+}
+
+const PRICING_BY_PROVIDER_MODEL = buildPricingMap();
 
 export function findModelPricing(input: ModelPricingLookup): ModelPricing | null {
+  const atMs = input.atMs ?? Date.now();
   const providerId = normalizeProviderId(input.providerId);
 
   for (const modelId of modelLookupKeys(input.modelId)) {
-    const pricing = PRICING_BY_PROVIDER_MODEL.get(`${providerId}:${modelId}`);
+    const pricing = PRICING_BY_PROVIDER_MODEL.get(`${providerId}:${modelId}`)?.find((entry) =>
+      isPricingEffective(entry, atMs),
+    );
 
     if (pricing) {
-      return pricing;
+      return toModelPricing(pricing);
     }
   }
 
@@ -393,10 +479,12 @@ export function calculateUsageCost(input: {
   inputTokens: number;
   model: string;
   outputTokens: number;
+  pricedAtMs?: number;
   providedCostUsd?: number | null;
   provider: string;
 }): CostCalculationResult {
   const pricing = findModelPricing({
+    ...(input.pricedAtMs === undefined ? {} : { atMs: input.pricedAtMs }),
     modelId: input.model,
     providerId: input.provider,
   });
@@ -410,25 +498,41 @@ export function calculateUsageCost(input: {
     };
   }
 
+  const longContextApplied =
+    pricing.provider === "openai" &&
+    OPENAI_LONG_CONTEXT_MODEL_IDS.has(pricing.model) &&
+    input.inputTokens > OPENAI_LONG_CONTEXT_INPUT_THRESHOLD;
+  const inputPriceFactor = longContextApplied ? 2 : 1;
+  const outputPriceFactor = longContextApplied ? 1.5 : 1;
+  const effectivePricing: ModelPricing = {
+    ...pricing,
+    cacheReadUsdPerMillion: scalePrice(pricing.cacheReadUsdPerMillion, inputPriceFactor),
+    cacheWriteUsdPerMillion: scalePrice(pricing.cacheWriteUsdPerMillion, inputPriceFactor),
+    inputUsdPerMillion: scalePrice(pricing.inputUsdPerMillion, inputPriceFactor),
+    outputUsdPerMillion: scalePrice(pricing.outputUsdPerMillion, outputPriceFactor),
+  };
   const billableInputTokens = Math.max(0, input.inputTokens - input.cacheReadTokens);
-  const inputCost = (billableInputTokens * pricing.inputUsdPerMillion) / 1_000_000;
-  const outputCost = (input.outputTokens * pricing.outputUsdPerMillion) / 1_000_000;
-  const cacheReadCost = (input.cacheReadTokens * pricing.cacheReadUsdPerMillion) / 1_000_000;
-  const cacheWriteCost = (input.cacheCreationTokens * pricing.cacheWriteUsdPerMillion) / 1_000_000;
+  const inputCost = (billableInputTokens * effectivePricing.inputUsdPerMillion) / 1_000_000;
+  const outputCost = (input.outputTokens * effectivePricing.outputUsdPerMillion) / 1_000_000;
+  const cacheReadCost =
+    (input.cacheReadTokens * effectivePricing.cacheReadUsdPerMillion) / 1_000_000;
+  const cacheWriteCost =
+    (input.cacheCreationTokens * effectivePricing.cacheWriteUsdPerMillion) / 1_000_000;
   const totalCostUsd = inputCost + outputCost + cacheReadCost + cacheWriteCost;
 
   return {
     priceSnapshotJson: JSON.stringify({
       billableInputTokens,
-      cacheReadUsdPerMillion: pricing.cacheReadUsdPerMillion,
-      cacheWriteUsdPerMillion: pricing.cacheWriteUsdPerMillion,
-      inputUsdPerMillion: pricing.inputUsdPerMillion,
-      model: pricing.model,
-      outputUsdPerMillion: pricing.outputUsdPerMillion,
-      provider: pricing.provider,
-      source: "mosoo_seed_2026_07_01",
+      cacheReadUsdPerMillion: effectivePricing.cacheReadUsdPerMillion,
+      cacheWriteUsdPerMillion: effectivePricing.cacheWriteUsdPerMillion,
+      inputUsdPerMillion: effectivePricing.inputUsdPerMillion,
+      longContextApplied,
+      model: effectivePricing.model,
+      outputUsdPerMillion: effectivePricing.outputUsdPerMillion,
+      provider: effectivePricing.provider,
+      source: "mosoo_seed_2026_07_10",
     }),
-    pricing,
+    pricing: effectivePricing,
     pricingStatus: "priced",
     totalCostUsd,
   };

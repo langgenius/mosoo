@@ -42,6 +42,50 @@ describe("cost pricing", () => {
     ).toBeNull();
   });
 
+  test("selects Claude Sonnet 5 pricing from the usage timestamp", () => {
+    expect(
+      findModelPricing({
+        atMs: Date.UTC(2026, 7, 31, 23, 59, 59),
+        modelId: "claude-sonnet-5",
+        providerId: "anthropic",
+      }),
+    ).toMatchObject({
+      inputUsdPerMillion: 2,
+      outputUsdPerMillion: 10,
+    });
+    expect(
+      findModelPricing({
+        atMs: Date.UTC(2026, 8, 1),
+        modelId: "claude-sonnet-5",
+        providerId: "anthropic",
+      }),
+    ).toMatchObject({
+      inputUsdPerMillion: 3,
+      outputUsdPerMillion: 15,
+    });
+  });
+
+  test("uses current GPT-5.4 prices", () => {
+    expect(
+      findModelPricing({
+        modelId: "gpt-5.4",
+        providerId: "openai",
+      }),
+    ).toMatchObject({
+      inputUsdPerMillion: 2.5,
+      outputUsdPerMillion: 15,
+    });
+    expect(
+      findModelPricing({
+        modelId: "gpt-5.4-mini",
+        providerId: "openai",
+      }),
+    ).toMatchObject({
+      inputUsdPerMillion: 0.75,
+      outputUsdPerMillion: 4.5,
+    });
+  });
+
   test("normalizes model IDs emitted by OpenCode-compatible providers", () => {
     const cases = [
       {
@@ -103,5 +147,38 @@ describe("cost pricing", () => {
       outputUsdPerMillion: 4,
       provider: "kimi",
     });
+  });
+
+  test("applies GPT long-context prices only above the published threshold", () => {
+    const thresholdResult = calculateUsageCost({
+      cacheCreationTokens: 0,
+      cacheReadTokens: 0,
+      inputTokens: 272_000,
+      model: "gpt-5.6-terra",
+      outputTokens: 1_000,
+      provider: "openai",
+    });
+    const longContextResult = calculateUsageCost({
+      cacheCreationTokens: 10_000,
+      cacheReadTokens: 100_000,
+      inputTokens: 272_001,
+      model: "gpt-5.6-terra",
+      outputTokens: 1_000,
+      provider: "openai",
+    });
+
+    expect(JSON.parse(thresholdResult.priceSnapshotJson ?? "{}")).toMatchObject({
+      inputUsdPerMillion: 2.5,
+      longContextApplied: false,
+      outputUsdPerMillion: 15,
+    });
+    expect(JSON.parse(longContextResult.priceSnapshotJson ?? "{}")).toMatchObject({
+      cacheReadUsdPerMillion: 0.5,
+      cacheWriteUsdPerMillion: 6.25,
+      inputUsdPerMillion: 5,
+      longContextApplied: true,
+      outputUsdPerMillion: 22.5,
+    });
+    expect(longContextResult.totalCostUsd).toBeCloseTo(0.995005, 8);
   });
 });

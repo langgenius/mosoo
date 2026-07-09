@@ -157,6 +157,7 @@ export async function recordRuntimeUsageEvent(
     inputTokens: tokens.inputTokens,
     model,
     outputTokens: tokens.outputTokens,
+    pricedAtMs: input.run.createdAtMs,
     providedCostUsd: toProvidedUsdCost(input.usage),
     provider,
   });

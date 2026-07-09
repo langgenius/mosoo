@@ -51,6 +51,7 @@ export async function importAgentPackage(
 
   const { manifest } = parsed;
   const providerOptions = assertRuntimeAdvancedSettings({
+    modelId: manifest.runtime.model,
     runtimeId: manifest.runtime.id,
     settings: manifest.runtime.providerOptions,
   });
