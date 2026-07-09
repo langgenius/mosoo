@@ -35,6 +35,7 @@ export type CloudflareDeploymentResourceTargetKind =
   | "cloudflare_pages"
   | "cloudflare_pages_domain"
   | "cloudflare_worker"
+  | "cloudflare_worker_domain"
   | "cloudflare_worker_route";
 
 export interface CloudflareDeploymentResourceDeleteFailure {
@@ -46,11 +47,13 @@ export interface CloudflareDeploymentResourceDeleteFailure {
 export interface CloudflareDeploymentClient {
   deletePagesDomain(input: CloudflarePagesDomainInput): Promise<void>;
   deletePagesProject(input: { projectName: string }): Promise<void>;
+  deleteWorkerDomain(input: { hostname: string }): Promise<void>;
   deleteWorkerRoute(input: { hostname: string }): Promise<void>;
   deleteWorkerScript(input: { scriptName: string }): Promise<void>;
   deployWorkerModule(input: CloudflareWorkerModuleInput): Promise<CloudflareWorkerDeploymentResult>;
   ensurePagesDomain(input: CloudflarePagesDomainInput): Promise<CloudflarePagesDomainResult>;
   ensurePagesProject(input: CloudflarePagesProjectInput): Promise<{ projectId: string | null }>;
+  ensureWorkerDomain(input: { hostname: string; scriptName: string }): Promise<void>;
   ensureWorkerRoute(input: { hostname: string; scriptName: string }): Promise<void>;
   getLatestPagesDeployment(input: {
     projectName: string;
@@ -112,6 +115,15 @@ export function createCloudflareDeploymentClient(
         }
       }
     },
+    async deleteWorkerDomain(input) {
+      const domain = await findWorkerDomain(client, accountId, input.hostname);
+
+      if (domain?.id === undefined) {
+        return;
+      }
+
+      await client.workers.domains.delete(domain.id, { account_id: accountId });
+    },
     async deleteWorkerRoute(input) {
       const pattern = workerRoutePattern(input.hostname);
       const route = await findWorkerRoute(client, zoneId, pattern);
@@ -132,22 +144,28 @@ export function createCloudflareDeploymentClient(
       }
     },
     async deployWorkerModule(input) {
-      const file = new File([input.scriptContent], input.mainModuleName, {
-        type: "application/javascript+module",
-      });
-      const version = await client.workers.scripts.versions.create(input.scriptName, {
-        account_id: accountId,
-        files: [file],
-        metadata: {
-          bindings: Object.entries(input.vars).map(([name, text]) => ({
-            name,
-            text,
-            type: "plain_text" as const,
-          })),
-          compatibility_date: input.compatibilityDate,
-          main_module: input.mainModuleName,
-        },
-      });
+      const workerUpload = createWorkerModuleUpload(input);
+      let version;
+
+      try {
+        version = await client.workers.scripts.versions.create(input.scriptName, {
+          account_id: accountId,
+          ...workerUpload,
+        });
+      } catch (error) {
+        if (!toCloudflareCode(error, 10007)) {
+          throw error;
+        }
+
+        await client.workers.scripts.update(input.scriptName, {
+          account_id: accountId,
+          ...createWorkerModuleUpload(input),
+        });
+        version = await client.workers.scripts.versions.create(input.scriptName, {
+          account_id: accountId,
+          ...createWorkerModuleUpload(input),
+        });
+      }
       const versionId = version.id ?? null;
 
       if (versionId === null) {
@@ -206,6 +224,20 @@ export function createCloudflareDeploymentClient(
         return { projectId: project.id ?? null };
       }
     },
+    async ensureWorkerDomain(input) {
+      const existingDomain = await findWorkerDomain(client, accountId, input.hostname);
+
+      if (existingDomain !== null && existingDomain.service === input.scriptName) {
+        return;
+      }
+
+      await client.workers.domains.update({
+        account_id: accountId,
+        hostname: input.hostname,
+        service: input.scriptName,
+        zone_id: zoneId,
+      });
+    },
     async ensureWorkerRoute(input) {
       const pattern = workerRoutePattern(input.hostname);
       const existingRoute = await findWorkerRoute(client, zoneId, pattern);
@@ -257,6 +289,9 @@ export async function deleteCloudflareDeploymentResources(
     deleteCloudflareDeploymentResource("cloudflare_pages", input.resourceName, () =>
       cloudflareClient.deletePagesProject({ projectName: input.resourceName }),
     ),
+    deleteCloudflareDeploymentResource("cloudflare_worker_domain", input.hostname, () =>
+      cloudflareClient.deleteWorkerDomain({ hostname: input.hostname }),
+    ),
     deleteCloudflareDeploymentResource("cloudflare_worker_route", input.resourceName, () =>
       cloudflareClient.deleteWorkerRoute({ hostname: input.hostname }),
     ),
@@ -285,6 +320,66 @@ async function deleteCloudflareDeploymentResource(
 
 function workerRoutePattern(hostname: string): string {
   return `${hostname}/*`;
+}
+
+function createWorkerModuleUpload(input: CloudflareWorkerModuleInput) {
+  const file = new File([input.scriptContent], input.mainModuleName, {
+    type: "application/javascript+module",
+  });
+
+  return {
+    files: [file],
+    metadata: {
+      bindings: Object.entries(input.vars).map(([name, text]) => ({
+        name,
+        text,
+        type: "plain_text" as const,
+      })),
+      compatibility_date: input.compatibilityDate,
+      main_module: input.mainModuleName,
+    },
+  };
+}
+
+function toCloudflareCode(error: unknown, code: number): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  if ("code" in error && Reflect.get(error, "code") === code) {
+    return true;
+  }
+
+  const cause = Reflect.get(error, "error");
+
+  if (typeof cause === "object" && cause !== null && Reflect.get(cause, "code") === code) {
+    return true;
+  }
+
+  const errors = Reflect.get(error, "errors");
+
+  return (
+    Array.isArray(errors) &&
+    errors.some(
+      (entry) => typeof entry === "object" && entry !== null && Reflect.get(entry, "code") === code,
+    )
+  );
+}
+
+async function findWorkerDomain(
+  client: Cloudflare,
+  accountId: string,
+  hostname: string,
+): Promise<{ id?: string; service?: string } | null> {
+  const domains = client.workers.domains.list({ account_id: accountId });
+
+  for await (const domain of domains) {
+    if (domain.hostname === hostname) {
+      return domain;
+    }
+  }
+
+  return null;
 }
 
 async function findWorkerRoute(

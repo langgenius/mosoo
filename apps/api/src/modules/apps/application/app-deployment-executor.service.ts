@@ -692,6 +692,10 @@ class SandboxAppDeploymentBuildRunner implements AppDeploymentBuildRunner {
       hostname,
       scriptName: targetName,
     });
+    await this.#cloudflareClient.ensureWorkerDomain({
+      hostname,
+      scriptName: targetName,
+    });
 
     return {
       externalDeploymentId: worker.deploymentId,
