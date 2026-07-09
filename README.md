@@ -1,4 +1,4 @@
-# <img src="apps/web/public/brand/logo-mark.svg" alt="" width="32" height="32" /> Mosoo
+# <img src="apps/web/public/brand/logo-mark.svg" alt="" width="48" height="48" /> Mosoo
 
 Mosoo is an open-source, cloud-native platform for turning AI app ideas into live agent apps: bring your PRD, run Codex, Claude Code, OpenCode, and other agent harnesses in isolated sandboxes, manage their lifecycle, and ship to production through a coding-agent-friendly CLI.
 
