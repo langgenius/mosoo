@@ -2,6 +2,13 @@
 
 Mosoo is an open-source, cloud-native platform for turning AI app ideas into live agent apps: bring your PRD, run Codex, Claude Code, OpenCode, and other agent harnesses in isolated sandboxes, manage their lifecycle, and ship to production through a coding-agent-friendly CLI.
 
+<p align="center">
+  <a href="https://try.mosoo.ai">Try Mosoo</a> ·
+  <a href="https://mosoo.ai">Website</a> ·
+  <a href="https://mosoo.ai/docs">API Documents</a> ·
+  <a href="https://github.com/langgenius/mosoo-connector">Mosoo Connector</a>
+</p>
+
 ## Product Status
 
 Mosoo is still in alpha exploration. Product boundaries, data models, deployment methods, and management experience are all evolving quickly. During the App boundary cut, treat [SPEC.md](./docs/SPEC.md) and [App Boundary](./docs/prd/app-boundary.md) as newer than older Agent-first, Workspace, member-management, or team-governance language. This repository currently prioritizes fast validation and architectural convergence for the open-source version, with no promise of stable APIs or backward compatibility.
