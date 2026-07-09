@@ -9,7 +9,7 @@ export const GENERATED_MODEL_DEFAULT_IDS = {
   kimi: "kimi-k2.6",
   minimax: "MiniMax-M3",
   opencode: "deepseek-v4-pro",
-  openai: "gpt-5.6-terra",
+  openai: "gpt-5.5",
   qwen: "qwen3.7-plus",
   zhipu: "glm-4.7",
 } as const;
@@ -266,21 +266,21 @@ export const GENERATED_PRESET_MODEL_CATALOG = [
     vendorLabel: "Anthropic",
   },
   {
-    displayName: "GPT-5.6 Sol",
+    displayName: "GPT-5.6 Sol (Limited preview)",
     modelId: "gpt-5.6-sol",
     protocol: "openai-responses",
     vendorId: "openai",
     vendorLabel: "OpenAI",
   },
   {
-    displayName: "GPT-5.6 Terra",
+    displayName: "GPT-5.6 Terra (Limited preview)",
     modelId: "gpt-5.6-terra",
     protocol: "openai-responses",
     vendorId: "openai",
     vendorLabel: "OpenAI",
   },
   {
-    displayName: "GPT-5.6 Luna",
+    displayName: "GPT-5.6 Luna (Limited preview)",
     modelId: "gpt-5.6-luna",
     protocol: "openai-responses",
     vendorId: "openai",
@@ -528,7 +528,7 @@ export const GENERATED_RUNTIME_CATALOG = [
   {
     acceptsCustomProvider: false,
     defaultIdentity: {
-      modelId: "gpt-5.6-terra",
+      modelId: "gpt-5.5",
       providerId: "openai",
     },
     disabledReason: "System Agent is an internal configuration helper.",
@@ -556,7 +556,7 @@ export const GENERATED_RUNTIME_CATALOG = [
   {
     acceptsCustomProvider: false,
     defaultIdentity: {
-      modelId: "gpt-5.6-terra",
+      modelId: "gpt-5.5",
       providerId: "openai",
     },
     display: {
@@ -646,7 +646,7 @@ export const GENERATED_RUNTIME_CATALOG = [
   {
     acceptsCustomProvider: true,
     defaultIdentity: {
-      modelId: "gpt-5.6-terra",
+      modelId: "gpt-5.5",
       providerId: "openai",
     },
     display: {

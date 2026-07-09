@@ -4,6 +4,7 @@ import { createRuntimeModelIdentity } from "@mosoo/contracts/models";
 import {
   ANTHROPIC_DEFAULT_MODEL_ID,
   OPENAI_DEFAULT_MODEL_ID,
+  PRESET_MODEL_CATALOG,
   PUBLIC_RUNTIME_DISPLAY_CATALOG,
   RUNTIME_CATALOG,
   SYSTEM_AGENT_RUNTIME_ID,
@@ -22,6 +23,22 @@ import {
 import type { RuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 
 describe("runtime catalog identity admission", () => {
+  test("keeps the GA OpenAI default while exposing GPT-5.6 as limited preview", () => {
+    const previewModels = PRESET_MODEL_CATALOG.filter(
+      (model) => model.vendorId === VENDOR_OPENAI.vendorId && model.modelId.startsWith("gpt-5.6-"),
+    );
+
+    expect(OPENAI_DEFAULT_MODEL_ID).toBe("gpt-5.5");
+    expect(previewModels.map((model) => model.modelId)).toEqual([
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
+    ]);
+    expect(previewModels.every((model) => model.displayName.endsWith("(Limited preview)"))).toBe(
+      true,
+    );
+  });
+
   test("rejects custom and preset provider kind mismatches", () => {
     const customPresetVendor = admitRuntimeModelIdentity(
       createRuntimeModelIdentity({
@@ -90,7 +107,7 @@ describe("runtime catalog identity admission", () => {
         }),
       ],
       createRuntimeModelIdentity({
-        modelId: "gpt-5.5",
+        modelId: "gpt-5.6-terra",
         provider: {
           kind: "preset",
           providerId: VENDOR_OPENAI.vendorId,

@@ -8,7 +8,7 @@
     "kimi": "kimi-k2.6",
     "minimax": "MiniMax-M3",
     "opencode": "deepseek-v4-pro",
-    "openai": "gpt-5.6-terra",
+    "openai": "gpt-5.5",
     "qwen": "qwen3.7-plus",
     "zhipu": "glm-4.7",
   },
@@ -255,19 +255,19 @@
       "vendorId": "anthropic",
     },
     {
-      "displayName": "GPT-5.6 Sol",
+      "displayName": "GPT-5.6 Sol (Limited preview)",
       "modelId": "gpt-5.6-sol",
       "protocol": "openai-responses",
       "vendorId": "openai",
     },
     {
-      "displayName": "GPT-5.6 Terra",
+      "displayName": "GPT-5.6 Terra (Limited preview)",
       "modelId": "gpt-5.6-terra",
       "protocol": "openai-responses",
       "vendorId": "openai",
     },
     {
-      "displayName": "GPT-5.6 Luna",
+      "displayName": "GPT-5.6 Luna (Limited preview)",
       "modelId": "gpt-5.6-luna",
       "protocol": "openai-responses",
       "vendorId": "openai",
@@ -448,7 +448,7 @@
       "disabledReason": "System Agent is an internal configuration helper.",
       "defaultIdentity": {
         "providerId": "openai",
-        "modelId": "gpt-5.6-terra",
+        "modelId": "gpt-5.5",
       },
       "vendorIds": ["openai"],
       "supportedModels": {
@@ -468,7 +468,7 @@
       "capabilityProfile": "standard",
       "defaultIdentity": {
         "providerId": "openai",
-        "modelId": "gpt-5.6-terra",
+        "modelId": "gpt-5.5",
       },
       "vendorIds": ["openai"],
       "supportedModels": {
@@ -490,7 +490,7 @@
       "capabilityProfile": "standard",
       "defaultIdentity": {
         "providerId": "openai",
-        "modelId": "gpt-5.6-terra",
+        "modelId": "gpt-5.5",
       },
       "vendorIds": [
         "openai",

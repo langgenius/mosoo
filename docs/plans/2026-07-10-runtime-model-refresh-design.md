@@ -6,8 +6,8 @@ Mosoo exposes the current public OpenAI and Anthropic agent models without askin
 
 ## Model catalog
 
-- Add GPT-5.6 Sol, Terra, and Luna with their explicit model IDs.
-- Make GPT-5.6 Terra the OpenAI default because it replaces GPT-5.4 at the same base token price while balancing capability and cost.
+- Add GPT-5.6 Sol, Terra, and Luna with their explicit model IDs and label them as limited-preview models.
+- Keep GPT-5.5 as the OpenAI default until GPT-5.6 is broadly available. The supplied project credential can authenticate but does not enumerate or run any GPT-5.6 model, matching OpenAI's limited-preview policy.
 - Add Claude Sonnet 5 and Claude Fable 5. Make Sonnet 5 the Anthropic default.
 - Do not add Claude Mythos 5 because it is invitation-only. There is no official model named Claude 5.5.
 - Keep older model entries available for existing Agents and explicit selection.
@@ -38,4 +38,5 @@ Mosoo exposes the current public OpenAI and Anthropic agent models without askin
 - Add focused catalog, Advanced settings, pricing, API, and Web tests.
 - Run Driver install, typecheck, unit tests, and build after dependency changes.
 - Run affected package typechecks/tests, then `just check` when local resources permit.
+- Run the OpenAI live smoke against the generally available default and separately verify whether the supplied project can enumerate GPT-5.6. Do not treat lack of preview access as a Driver failure.
 - No GraphQL or database schema changes are planned, so GraphQL codegen and DB regeneration should remain unnecessary.
