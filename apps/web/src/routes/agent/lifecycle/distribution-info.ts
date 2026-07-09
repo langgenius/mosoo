@@ -85,8 +85,11 @@ export function buildAgentDistribution(agent: Agent): AgentDistribution {
  * @param {Agent} agent Agent whose public API endpoints should be shown.
  * @returns {string} Copy-ready curl command for creating a thread.
  */
-export function buildAgentApiCurl(agent: Agent): string {
-  const { apiUrl } = buildAgentDistribution(agent);
+export function buildAgentApiCurl(
+  agent: Agent,
+  distribution: AgentDistribution = buildAgentDistribution(agent),
+): string {
+  const { apiUrl } = distribution;
   return [
     `curl -X POST "${apiUrl}" \\`,
     `  -H "Authorization: Bearer $MOSOO_API_TOKEN" \\`,
@@ -94,4 +97,56 @@ export function buildAgentApiCurl(agent: Agent): string {
     `  -H "Idempotency-Key: create-thread-$(date +%s)" \\`,
     `  -d '{"input":{"type":"user.message","content":[{"type":"text","text":"Say hello"}]},"client_external_ref":"demo-thread-001"}'`,
   ].join("\n");
+}
+
+export function buildAgentInstructionPrompt(
+  agent: Agent,
+  distribution: AgentDistribution = buildAgentDistribution(agent),
+): string {
+  const description = agent.description.trim() || "No description provided.";
+  const kindHint =
+    agent.kind === "pet"
+      ? "Conversational chat agent designed for back-and-forth dialogue."
+      : "Job-style agent designed for one-shot calls that return a structured result.";
+
+  return `# Instruction for LLM: ${agent.name}
+
+Use this \`.md\` instruction with a coding agent that needs to control or use this Mosoo agent programmatically.
+
+## Generated variables
+
+\`\`\`text
+MOSOO_AGENT_ID=${agent.id}
+MOSOO_AGENT_NAME=${agent.name}
+MOSOO_AGENT_KIND=${agent.kind}
+MOSOO_CREATE_THREAD_URL=${distribution.apiUrl}
+MOSOO_API_DOCS_URL=${distribution.apiDocsUrl}
+MOSOO_OPENAPI_URL=${distribution.openApiUrl}
+MOSOO_THREAD_URL=${distribution.threadsUrl}
+\`\`\`
+
+Read \`MOSOO_API_TOKEN\` from the environment. Do not hard-code or print the token.
+
+## Agent
+
+${description}
+
+> ${kindHint}
+
+## Programmatic control
+
+1. Create a Mosoo API token in the console if one is not already available.
+2. Store it locally as \`MOSOO_API_TOKEN\`.
+3. Create a thread by sending a user message to \`MOSOO_CREATE_THREAD_URL\` with a bearer token.
+4. Persist the returned thread and run identifiers so follow-up calls can continue the same work.
+5. Use the API docs and OpenAPI document above for the exact response schema and continuation endpoints.
+
+## Create-thread example
+
+\`\`\`bash
+${buildAgentApiCurl(agent, distribution)}
+\`\`\`
+
+The create-thread response returns \`thread/run\`; continue the conversation through the Thread API when the task needs more turns.
+`;
 }
