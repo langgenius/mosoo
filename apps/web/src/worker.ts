@@ -4,13 +4,26 @@
 interface AssetsBinding {
   readonly fetch: (request: Request) => Promise<Response>;
 }
+interface ServiceBinding {
+  readonly fetch: (request: Request) => Promise<Response>;
+}
 export interface Env {
+  readonly API?: ServiceBinding;
   readonly ASSETS: AssetsBinding;
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
+      if (env.API === undefined) {
+        return new Response("API binding is not configured.", { status: 502 });
+      }
+
+      return env.API.fetch(request);
+    }
+
     const assetRes = await env.ASSETS.fetch(request);
 
     // Asset binding found something — let the response through.

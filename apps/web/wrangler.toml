@@ -18,3 +18,7 @@ workers_dev = false
 [[env.prod.routes]]
 pattern = "try.mosoo.ai"
 custom_domain = true
+
+[[env.prod.services]]
+binding = "API"
+service = "mosoo-api-prod"
