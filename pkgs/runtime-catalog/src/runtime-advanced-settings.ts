@@ -54,6 +54,80 @@ function option(value: string): RuntimeAdvancedSettingOption {
   };
 }
 
+interface OpenAiModelAdvancedSettingsProfile {
+  readonly defaultReasoningEffort: string;
+  readonly defaultVerbosity: string;
+  readonly reasoningEfforts: readonly string[];
+}
+
+const OPENAI_DEFAULT_ADVANCED_SETTINGS_PROFILE: OpenAiModelAdvancedSettingsProfile = {
+  defaultReasoningEffort: "medium",
+  defaultVerbosity: "medium",
+  reasoningEfforts: ["low", "medium", "high", "xhigh"],
+};
+
+const OPENAI_MODEL_ADVANCED_SETTINGS_PROFILES: Readonly<
+  Record<string, OpenAiModelAdvancedSettingsProfile>
+> = {
+  "gpt-5.4": {
+    defaultReasoningEffort: "medium",
+    defaultVerbosity: "low",
+    reasoningEfforts: ["low", "medium", "high", "xhigh"],
+  },
+  "gpt-5.4-mini": {
+    defaultReasoningEffort: "medium",
+    defaultVerbosity: "medium",
+    reasoningEfforts: ["low", "medium", "high", "xhigh"],
+  },
+  "gpt-5.5": {
+    defaultReasoningEffort: "medium",
+    defaultVerbosity: "low",
+    reasoningEfforts: ["low", "medium", "high", "xhigh"],
+  },
+  "gpt-5.6-luna": {
+    defaultReasoningEffort: "medium",
+    defaultVerbosity: "low",
+    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+  },
+  "gpt-5.6-sol": {
+    defaultReasoningEffort: "low",
+    defaultVerbosity: "low",
+    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+  },
+  "gpt-5.6-terra": {
+    defaultReasoningEffort: "medium",
+    defaultVerbosity: "low",
+    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+  },
+};
+
+function createOpenAiAdvancedSettings(
+  modelId: string | undefined,
+): readonly RuntimeAdvancedSettingDefinition[] {
+  const profile =
+    (modelId === undefined ? undefined : OPENAI_MODEL_ADVANCED_SETTINGS_PROFILES[modelId]) ??
+    OPENAI_DEFAULT_ADVANCED_SETTINGS_PROFILE;
+
+  return [
+    {
+      defaultValue: profile.defaultReasoningEffort,
+      description: "Controls Codex reasoning depth for this model.",
+      key: "model_reasoning_effort",
+      label: "Reasoning effort",
+      options: profile.reasoningEfforts.map(option),
+      type: "select",
+    },
+    {
+      defaultValue: profile.defaultVerbosity,
+      description: "Controls response length for Responses API capable Codex models.",
+      key: "model_verbosity",
+      label: "Verbosity",
+      options: ["low", "medium", "high"].map(option),
+      type: "select",
+    },
+  ];
+}
+
 export const RUNTIME_ADVANCED_SETTINGS_REGISTRY = {
   "claude-agent-sdk": [
     {
@@ -79,7 +153,7 @@ export const RUNTIME_ADVANCED_SETTINGS_REGISTRY = {
       description: "Controls Codex reasoning depth for this runtime.",
       key: "model_reasoning_effort",
       label: "Reasoning effort",
-      options: ["minimal", "low", "medium", "high", "xhigh"].map(option),
+      options: ["low", "medium", "high", "xhigh"].map(option),
       type: "select",
     },
     {
@@ -124,16 +198,24 @@ const SECURITY_BOUNDARY_SETTING_KEYS = new Set([
   "systemPrompt",
 ]);
 
-function listDefinitions(runtimeId: string): readonly RuntimeAdvancedSettingDefinition[] {
+function listDefinitions(
+  runtimeId: string,
+  modelId?: string,
+): readonly RuntimeAdvancedSettingDefinition[] {
+  if (runtimeId === "openai-runtime") {
+    return createOpenAiAdvancedSettings(modelId);
+  }
+
   return RUNTIME_ADVANCED_SETTINGS_BY_ID[runtimeId] ?? [];
 }
 
 function createDefinitionMap(
   runtimeId: string,
+  modelId?: string,
 ): ReadonlyMap<string, RuntimeAdvancedSettingDefinition> {
   const definitions = new Map<string, RuntimeAdvancedSettingDefinition>();
 
-  for (const definition of listDefinitions(runtimeId)) {
+  for (const definition of listDefinitions(runtimeId, modelId)) {
     definitions.set(definition.key, definition);
   }
 
@@ -150,25 +232,40 @@ function isDefaultValue(definition: RuntimeAdvancedSettingDefinition, value: unk
 
 export function listRuntimeAdvancedSettings(
   runtimeId: string,
+  modelId?: string,
 ): readonly RuntimeAdvancedSettingDefinition[] {
-  return listDefinitions(runtimeId);
+  return listDefinitions(runtimeId, modelId);
 }
 
-export function hasRuntimeAdvancedSettings(runtimeId: string): boolean {
-  return listDefinitions(runtimeId).length > 0;
+export function hasRuntimeAdvancedSettings(runtimeId: string, modelId?: string): boolean {
+  return listDefinitions(runtimeId, modelId).length > 0;
 }
 
 export function normalizeRuntimeAdvancedSettings(input: {
+  readonly modelId?: string;
   readonly runtimeId: string;
   readonly settings: JsonObject;
 }): JsonObject {
-  const definitions = createDefinitionMap(input.runtimeId);
+  const definitions = createDefinitionMap(input.runtimeId, input.modelId);
   const normalized: JsonObject = {};
 
   for (const [key, value] of Object.entries(input.settings)) {
     const definition = definitions.get(key);
 
     if (definition === undefined || isDefaultValue(definition, value)) {
+      continue;
+    }
+
+    if (definition.type === "select") {
+      if (typeof value !== "string" || !hasOption(definition, value)) {
+        continue;
+      }
+    } else if (
+      typeof value !== "number" ||
+      !Number.isFinite(value) ||
+      (definition.valueType === "integer" && !Number.isInteger(value)) ||
+      value < definition.min
+    ) {
       continue;
     }
 
@@ -179,10 +276,11 @@ export function normalizeRuntimeAdvancedSettings(input: {
 }
 
 export function validateRuntimeAdvancedSettings(input: {
+  readonly modelId?: string;
   readonly runtimeId: string;
   readonly settings: JsonObject;
 }): RuntimeAdvancedSettingsValidationResult {
-  const definitions = createDefinitionMap(input.runtimeId);
+  const definitions = createDefinitionMap(input.runtimeId, input.modelId);
   const issues: RuntimeAdvancedSettingsValidationIssue[] = [];
 
   for (const [key, value] of Object.entries(input.settings)) {

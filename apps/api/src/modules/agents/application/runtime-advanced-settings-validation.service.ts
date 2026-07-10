@@ -3,10 +3,12 @@ import { validateRuntimeAdvancedSettings } from "@mosoo/runtime-catalog";
 
 export function assertRuntimeAdvancedSettings(input: {
   readonly allowLegacyUnsupportedSettings?: boolean;
+  readonly modelId: string;
   readonly runtimeId: string;
   readonly settings: JsonObject;
 }): JsonObject {
   const validation = validateRuntimeAdvancedSettings({
+    modelId: input.modelId,
     runtimeId: input.runtimeId,
     settings: input.settings,
   });

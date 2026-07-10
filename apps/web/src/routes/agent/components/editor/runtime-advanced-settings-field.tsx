@@ -194,6 +194,7 @@ function NumberSettingControl({
 
 export function RuntimeAdvancedSettingsField({
   builtInTools,
+  modelId,
   readOnly,
   runtimeId,
   settings,
@@ -201,13 +202,14 @@ export function RuntimeAdvancedSettingsField({
   setSettings,
 }: {
   builtInTools?: AgentBuiltInToolConfig[];
+  modelId: string;
   readOnly: boolean;
   runtimeId: string;
   settings: JsonObject;
   setBuiltInTools?(tools: AgentBuiltInToolConfig[]): void;
   setSettings(settings: JsonObject): void;
 }): ReactElement | null {
-  const definitions = listRuntimeAdvancedSettings(runtimeId);
+  const definitions = listRuntimeAdvancedSettings(runtimeId, modelId);
   const showBuiltInTools =
     runtimeId === CLAUDE_AGENT_SDK_RUNTIME_ID &&
     builtInTools !== undefined &&

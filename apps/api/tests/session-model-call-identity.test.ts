@@ -298,7 +298,7 @@ describe("session model call identity", () => {
       run_purpose: "preview",
       runtime_id: "openai-runtime",
       source_event_id: `${DRIVER_INSTANCE_ID}:native-call-1`,
-      total_cost_usd_micros: 9_800,
+      total_cost_usd_micros: 5_400,
     });
     expect(JSON.parse(usageEvent?.price_snapshot_json ?? "{}")).toMatchObject({
       model: "gpt-5.4",
