@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createDeployConsoleFixture, DEPLOY_APP_IDENTITY } from "./deploy-console-data";
 import type { DeployConsoleState, DeploymentRunVM } from "./deploy-console-data";
 import { stripProtocol } from "./deploy-console-mapping";
+import { toDeploymentRunOutcome } from "./deployment-status";
 
 /**
  * Status steps a freshly triggered deploy walks through. This mirrors the real
@@ -86,7 +87,7 @@ export function useDeployConsole(): DeployConsole {
           number,
           commitSha,
           targetKind: null,
-          status: "queued",
+          outcome: "deploying",
           createdAt: new Date().toISOString(),
           liveUrl: null,
           errorCode: null,
@@ -115,15 +116,11 @@ export function useDeployConsole(): DeployConsole {
             setState((prev) => {
               const runs = prev.runs.map((run): DeploymentRunVM => {
                 if (run.id !== runId) {
-                  // The previous live run stays "success" (still serving) until
-                  // the new run actually goes live — then it is superseded.
-                  return status === "success" && run.status === "success"
-                    ? { ...run, status: "superseded", liveUrl: null }
-                    : run;
+                  return run;
                 }
                 return {
                   ...run,
-                  status,
+                  outcome: toDeploymentRunOutcome(status),
                   targetKind: status === "queued" ? null : "cloudflare_worker",
                   liveUrl: status === "success" ? DEPLOY_APP_IDENTITY.liveUrl : null,
                   ...(status === "failed" ? FAILURE_ERROR : null),

@@ -14,7 +14,6 @@ import { DeployUrlCard } from "./deploy-url-card";
 
 function previewUnavailableLabel(
   deployment: DeploymentVM,
-  live: boolean,
   localPreview: LocalDeploymentPreviewState,
 ): string {
   if (localPreview.status === "checking") {
@@ -23,7 +22,7 @@ function previewUnavailableLabel(
   if (localPreview.status === "offline") {
     return "Development preview offline";
   }
-  if (live && deployment.liveUrl !== null) {
+  if (deployment.liveUrl !== null) {
     return hostOf(deployment.liveUrl);
   }
   return "Preview unavailable";
@@ -31,20 +30,17 @@ function previewUnavailableLabel(
 
 function PreviewFrame({
   deployment,
-  latestRun,
   localPreview,
 }: {
   deployment: DeploymentVM;
-  latestRun: DeploymentRunVM | undefined;
   localPreview: LocalDeploymentPreviewState;
 }) {
-  const live = deployment.liveUrl !== null && latestRun?.status === "success";
   const localPreviewReady = localPreview.url !== null && localPreview.status === "online";
-  const previewLinkUrl = localPreviewReady ? localPreview.url : live ? deployment.liveUrl : null;
+  const previewLinkUrl = localPreviewReady ? localPreview.url : deployment.liveUrl;
   const previewLabel =
     localPreviewReady && localPreview.url !== null
       ? hostOf(localPreview.url)
-      : previewUnavailableLabel(deployment, live, localPreview);
+      : previewUnavailableLabel(deployment, localPreview);
 
   return (
     <div className="border-border bg-bg-sunken/60 rounded-xl border p-1.5 lg:h-[var(--deploy-preview-height)]">
@@ -181,7 +177,7 @@ export function DeployOverview({
 }) {
   return (
     <div className="grid grid-cols-1 items-start gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(300px,0.9fr)] lg:[--deploy-preview-height:clamp(190px,22vw,300px)]">
-      <PreviewFrame deployment={deployment} latestRun={latestRun} localPreview={localPreview} />
+      <PreviewFrame deployment={deployment} localPreview={localPreview} />
 
       <div className="flex min-w-0 flex-col gap-5 lg:pt-1">
         <DeployUrlCard deployment={deployment} latestRun={latestRun} localPreview={localPreview} />

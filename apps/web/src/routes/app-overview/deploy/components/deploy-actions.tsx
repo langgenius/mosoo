@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 
-import type { DeploymentRunDisplayStatus } from "../deploy-console-data";
+import type { DeploymentRunOutcome } from "../deployment-status";
 import type { LocalDeploymentPreviewStatus } from "../local-preview-url";
 
 type DeployActionScope = "development" | "production";
@@ -31,7 +31,7 @@ type DeployActionScope = "development" | "production";
 export function DeployActions({
   appName,
   agentCount,
-  latestStatus,
+  latestOutcome,
   deploying,
   canDeploy,
   onRetry,
@@ -41,7 +41,7 @@ export function DeployActions({
 }: {
   appName: string;
   agentCount: number;
-  latestStatus: DeploymentRunDisplayStatus | null;
+  latestOutcome: DeploymentRunOutcome | null;
   deploying: boolean;
   canDeploy: boolean;
   onRetry: () => void;
@@ -60,7 +60,7 @@ export function DeployActions({
           : "Retry development"
       : deploying
         ? "Refreshing production…"
-        : latestStatus === "failed"
+        : latestOutcome === "failed"
           ? "Retry production"
           : "Refresh production";
 

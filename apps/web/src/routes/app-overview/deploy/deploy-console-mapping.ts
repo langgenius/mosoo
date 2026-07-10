@@ -8,6 +8,7 @@ import type {
   DeploymentRunVM,
   DeploymentVM,
 } from "./deploy-console-data";
+import { toDeploymentRunOutcome } from "./deployment-status";
 
 /**
  * Pure mappers from the shared `@mosoo/contracts/app` deployment payloads onto
@@ -16,9 +17,9 @@ import type {
  *
  * Runs come from `appDeploymentRunList` newest-first: display numbers count
  * from the oldest fetched run (#1 = length - index, valid within the server's
- * 50-run window), and any success older than the newest success renders as
- * "superseded". Until the run list resolves, the overview's embedded latest
- * run renders WITHOUT a number — a lone run cannot know its place in history.
+ * 50-run window). Backend execution phases collapse into three user-facing
+ * outcomes. Until the run list resolves, the overview's embedded latest run
+ * renders WITHOUT a number — a lone run cannot know its place in history.
  */
 
 export function stripProtocol(url: string): string {
@@ -68,21 +69,13 @@ function toRunVM(run: AppDeploymentRun, number: number | null): DeploymentRunVM 
     id: run.id,
     liveUrl: run.liveUrl,
     number,
-    status: run.status,
+    outcome: toDeploymentRunOutcome(run.status),
     targetKind: run.targetKind,
   };
 }
 
 function toRunVMs(runs: AppDeploymentRun[], numbered: boolean): DeploymentRunVM[] {
-  let liveSeen = false;
-
-  return runs.map((run, index) => {
-    const superseded = run.status === "success" && liveSeen;
-    liveSeen = liveSeen || run.status === "success";
-    const vm = toRunVM(run, numbered ? runs.length - index : null);
-
-    return superseded ? { ...vm, liveUrl: null, status: "superseded" } : vm;
-  });
+  return runs.map((run, index) => toRunVM(run, numbered ? runs.length - index : null));
 }
 
 function toDeploymentVM(
