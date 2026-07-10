@@ -466,6 +466,58 @@ describe("runtime event persistence compactor", () => {
     ).toEqual([]);
   });
 
+  test("keeps a later final assistant message after a completed progress message replays", () => {
+    const progressStart = record({
+      id: "progress-start",
+      kind: "message.started",
+      occurredAtMs: 4_000,
+      payload: { messageId: "message-progress", role: "agent" },
+      runId: "run-1",
+    });
+    const progressDelta = record({
+      id: "progress-delta",
+      kind: "message.delta",
+      occurredAtMs: 4_010,
+      payload: { contentDelta: "进度：工具已完成。", messageId: "message-progress", role: "agent" },
+      runId: "run-1",
+    });
+    const progressEnd = record({
+      id: "progress-end",
+      kind: "message.completed",
+      occurredAtMs: 4_020,
+      payload: { messageId: "message-progress", role: "agent" },
+      runId: "run-1",
+    });
+    const finalStart = record({
+      id: "final-start",
+      kind: "message.started",
+      occurredAtMs: 4_030,
+      payload: { messageId: "message-final", role: "agent" },
+      runId: "run-1",
+    });
+    const finalDelta = record({
+      id: "final-delta",
+      kind: "message.delta",
+      occurredAtMs: 4_040,
+      payload: { contentDelta: "最终：中文表格完整。", messageId: "message-final", role: "agent" },
+      runId: "run-1",
+    });
+    const finalEnd = record({
+      id: "final-end",
+      kind: "message.completed",
+      occurredAtMs: 4_050,
+      payload: { messageId: "message-final", role: "agent" },
+      runId: "run-1",
+    });
+
+    expect(
+      filterDurablyAcceptedRuntimeStreamReplays(
+        [progressStart, progressDelta, progressEnd, finalStart, finalDelta, finalEnd].map(envelope),
+        new Set(["source-progress-end"]),
+      ).map((entry) => entry.event.id),
+    ).toEqual(["final-start", "final-delta", "final-end"]);
+  });
+
   test("drops open stream fragment replays shadowed by a durable run terminal receipt", () => {
     const messageDelta = record({
       id: "message-delta",

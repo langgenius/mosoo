@@ -50,14 +50,16 @@ export class DriverInstanceRpcController implements DriverInstanceRpcHandler {
     input: DriverCompletionInput,
     context: DriverInstanceRpcOperationContext,
   ): Promise<{ ok: true }> {
-    return this.#terminal.handleCompleteRun(input, context);
+    return this.#events.runAfterPendingEvents(() =>
+      this.#terminal.handleCompleteRun(input, context),
+    );
   }
 
   async handleFailRun(
     input: DriverFailureInput,
     context: DriverInstanceRpcOperationContext,
   ): Promise<{ ok: true }> {
-    return this.#terminal.handleFailRun(input, context);
+    return this.#events.runAfterPendingEvents(() => this.#terminal.handleFailRun(input, context));
   }
 
   async handleHeartbeat(

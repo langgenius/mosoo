@@ -8,7 +8,7 @@ import type {
   SessionMessageId,
   SessionRunId,
 } from "@mosoo/id";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { logInfo, logWarn } from "../../../../platform/cloudflare/logger";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
@@ -58,18 +58,13 @@ function toSessionMessageSegments(segments: SessionViewSegment[]): SessionMessag
   return result;
 }
 
-function findLastAssistantMessage(
+function findAssistantMessage(
   messages: SessionLiveStateMessage[],
+  messageId: string,
 ): SessionLiveStateMessage | null {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-
-    if (message?.role === "assistant") {
-      return message;
-    }
-  }
-
-  return null;
+  return (
+    messages.find((message) => message.id === messageId && message.role === "assistant") ?? null
+  );
 }
 
 export async function persistAssistantMessageProjection(
@@ -77,55 +72,63 @@ export async function persistAssistantMessageProjection(
   input: {
     createdByAccountId: PlatformId;
     driverInstanceId: DriverInstanceId;
+    messageId: string;
+    messageText: string;
     sessionId: SessionId;
     sessionRunId: SessionRunId;
     state: SessionLiveState;
   },
 ): Promise<void> {
-  const message = findLastAssistantMessage(input.state.messages);
+  const message = findAssistantMessage(input.state.messages, input.messageId);
+  const useStructuredProjection = message?.content === input.messageText;
 
-  if (message === null) {
-    logWarn("runtime.assistant.message.skipped", {
+  if (message !== null && !useStructuredProjection) {
+    logWarn("runtime.assistant.message.snapshot_mismatch", {
       driverInstanceId: input.driverInstanceId,
-      reason: "RUN_FINISHED received without assistant projection",
+      finalMessageId: input.messageId,
+      projectedTextLength: message.content.length,
+      reason: "RUN_FINISHED final assistant snapshot did not match the live projection",
       sessionId: input.sessionId,
       sessionRunId: input.sessionRunId,
+      snapshotTextLength: input.messageText.length,
     });
-    return;
   }
 
-  const segments = toSessionMessageSegments(message.segments);
-  const hasProjection =
-    message.content.length > 0 || message.plan.length > 0 || segments.length > 0;
+  const messageId = parsePlatformId<SessionMessageId>(input.messageId, "assistant message id");
+  const plan = useStructuredProjection && message !== null ? message.plan : [];
+  const segments =
+    useStructuredProjection && message !== null
+      ? toSessionMessageSegments(message.segments)
+      : [{ kind: "text" as const, text: input.messageText }];
+  const persistedMessage = await readPersistedAssistantMessage(database, input.sessionRunId);
 
-  if (!hasProjection) {
-    logWarn("runtime.assistant.message.skipped", {
-      driverInstanceId: input.driverInstanceId,
-      reason: "RUN_FINISHED received without assistant projection",
-      sessionId: input.sessionId,
-      sessionRunId: input.sessionRunId,
-    });
-    return;
-  }
+  if (persistedMessage !== null) {
+    if (persistedMessage.content !== input.messageText) {
+      throw new Error(
+        `Canonical final assistant message conflicts with the persisted projection for run ${input.sessionRunId}.`,
+      );
+    }
 
-  if (await hasPersistedAssistantMessage(database, input.sessionRunId)) {
+    // Provider reconnects can replay the same canonical snapshot after the
+    // driver process has generated a new message id. The run-level text is the
+    // durable identity here: preserve the first canonical transcript row.
     return;
   }
 
   logInfo("runtime.assistant.message.persisting", {
     driverInstanceId: input.driverInstanceId,
-    planEntries: message.plan.length,
+    planEntries: plan.length,
     segmentCount: segments.length,
     sessionId: input.sessionId,
     sessionRunId: input.sessionRunId,
-    textLength: message.content.length,
+    textLength: input.messageText.length,
   });
 
   await insertSessionMessage(database, {
-    content: message.content,
+    content: input.messageText,
     createdByAccountId: input.createdByAccountId,
-    id: parsePlatformId<SessionMessageId>(message.id, "assistant message id"),
-    plan: message.plan,
+    id: messageId,
+    plan,
     role: "assistant",
     segments,
     sessionId: input.sessionId,
@@ -133,13 +136,13 @@ export async function persistAssistantMessageProjection(
   });
 }
 
-async function hasPersistedAssistantMessage(
+async function readPersistedAssistantMessage(
   database: D1Database,
   sessionRunId: SessionRunId,
-): Promise<boolean> {
+): Promise<{ content: string; id: SessionMessageId } | null> {
   const row =
     (await getAppDatabase(database)
-      .select({ id: sessionMessagesTable.id })
+      .select({ content: sessionMessagesTable.contentText, id: sessionMessagesTable.id })
       .from(sessionMessagesTable)
       .where(
         and(
@@ -147,8 +150,9 @@ async function hasPersistedAssistantMessage(
           eq(sessionMessagesTable.role, "assistant"),
         ),
       )
+      .orderBy(desc(sessionMessagesTable.seq))
       .limit(1)
       .get()) ?? null;
 
-  return Boolean(row);
+  return row;
 }
