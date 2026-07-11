@@ -1,4 +1,5 @@
-import { createPromiseDeferred } from "@mosoo/effects";
+import { parsePlatformId } from "@mosoo/id";
+import type { SessionRunId } from "@mosoo/id";
 import type { DriverEventEnvelope } from "agent-driver/events";
 import type {
   DriverEventBatchInput,
@@ -12,6 +13,7 @@ import { createErrorLogContext, logError } from "../../../../platform/cloudflare
 import type { SessionDeliveryEvent } from "../../../sessions/application/session-live-state.service";
 import { getSessionRuntimeEventSourceReceipts } from "../../../sessions/infrastructure/session-runtime-event-store.repository";
 import { EVENT_BATCH_MAX_SIZE, LOG_BATCH_MAX_SIZE } from "./connections";
+import { DriverEventTerminalGate } from "./driver-event-terminal-gate";
 import { publishDriverLogBatch } from "./driver-log-batch-publisher";
 import { runtimeSessionLinkNeedsRefresh } from "./event-types";
 import {
@@ -22,7 +24,6 @@ import {
 import type { RuntimeSessionLink } from "./events";
 import type { DriverInstanceRpcOperationContext } from "./rpc";
 import type { DriverInstanceRpcControllerDependencies } from "./rpc-controller-dependencies";
-import { RuntimeEventPersistenceCompactor } from "./runtime-event-persistence-compactor";
 import { filterDurablyAcceptedRuntimeStreamReplays } from "./runtime-event-replay-filter";
 
 function summarizeDriverEvents(events: readonly DriverEventEnvelope[]) {
@@ -33,14 +34,37 @@ function summarizeDriverEvents(events: readonly DriverEventEnvelope[]) {
   };
 }
 
+function resolveEventSessionRunId(
+  events: readonly DriverEventEnvelope[],
+): SessionRunId | undefined {
+  let eventRunId: string | undefined;
+
+  for (const envelope of events) {
+    const candidateRunId = envelope.event.runId;
+
+    if (candidateRunId === undefined) {
+      continue;
+    }
+
+    if (eventRunId !== undefined && eventRunId !== candidateRunId) {
+      throw new Error("Event batch cannot contain events from multiple runs.");
+    }
+
+    eventRunId = candidateRunId;
+  }
+
+  return eventRunId === undefined
+    ? undefined
+    : parsePlatformId<SessionRunId>(eventRunId, "driver event run id");
+}
+
 const PRE_HELLO_LOG_BATCH_LIMIT = 16;
 
 export class DriverInstanceRpcEventIngestionController {
   readonly #dependencies: DriverInstanceRpcControllerDependencies;
-  #driverEventGate: Promise<unknown> = Promise.resolve();
+  readonly #eventTerminalGate = new DriverEventTerminalGate();
   #droppedPreHelloLogBatches = 0;
   readonly #pendingPreHelloLogBatches: DriverLogBatchInput[] = [];
-  readonly #runtimeEventPersistenceCompactor = new RuntimeEventPersistenceCompactor();
 
   public constructor(dependencies: DriverInstanceRpcControllerDependencies) {
     this.#dependencies = dependencies;
@@ -66,14 +90,19 @@ export class DriverInstanceRpcEventIngestionController {
     }
     context.assertActiveConnection();
 
-    return this.#withDriverEventGate(async () => {
+    return this.#eventTerminalGate.run(async () => {
       context.assertActiveConnection();
       const { env, viewCache, viewerEventDelivery } = this.#dependencies;
       const cachedLink = state.runtimeSessionLink;
+      const eventSessionRunId = resolveEventSessionRunId(input.events);
       const shouldRefreshLink =
         input.events.some((envelope) => envelope.event.kind === "run.started") ||
-        runtimeSessionLinkNeedsRefresh(cachedLink);
-      const link = await this.#getRuntimeSessionLink({ refresh: shouldRefreshLink });
+        runtimeSessionLinkNeedsRefresh(cachedLink) ||
+        (eventSessionRunId !== undefined && cachedLink?.sessionRunId !== eventSessionRunId);
+      const link = await this.#getRuntimeSessionLink({
+        refresh: shouldRefreshLink,
+        ...(eventSessionRunId === undefined ? {} : { sessionRunId: eventSessionRunId }),
+      });
       context.assertActiveConnection();
       const replayedReceipts = state.readProcessedDriverEventReceipts(input.events);
       const candidateEvents = state.filterUnprocessedDriverEvents(input.events);
@@ -110,9 +139,10 @@ export class DriverInstanceRpcEventIngestionController {
           throw error;
         }
       })();
-      const persistenceRuntimeEvents = this.#runtimeEventPersistenceCompactor.compact(
-        projection.runtimeEvents,
-      );
+      // An accepted source identity must already be durable. Buffering stream
+      // fragments only in this hibernatable DO would acknowledge text that a
+      // fresh instance cannot reconstruct, so persist every canonical event.
+      const persistenceRuntimeEvents = projection.runtimeEvents;
 
       const commit = await (async () => {
         try {
@@ -222,14 +252,26 @@ export class DriverInstanceRpcEventIngestionController {
     }
   }
 
-  async #getRuntimeSessionLink(options: { refresh?: boolean } = {}): Promise<RuntimeSessionLink> {
+  public async runAfterPendingEvents<T>(operation: () => Promise<T>): Promise<T> {
+    // Terminal RPCs share the event gate so a fallback completion cannot
+    // snapshot progress state while the final assistant batch is still in flight.
+    return this.#eventTerminalGate.run(operation);
+  }
+
+  async #getRuntimeSessionLink(
+    options: { refresh?: boolean; sessionRunId?: SessionRunId } = {},
+  ): Promise<RuntimeSessionLink> {
     const { env, state } = this.#dependencies;
 
     if (options.refresh !== true && state.runtimeSessionLink !== null) {
       return state.runtimeSessionLink;
     }
 
-    const link = await getRuntimeSessionLink(env.DB, state.requireDriverInstanceId());
+    const link = await getRuntimeSessionLink(
+      env.DB,
+      state.requireDriverInstanceId(),
+      options.sessionRunId === undefined ? {} : { sessionRunId: options.sessionRunId },
+    );
     state.setRuntimeSessionLink(link);
     return link;
   }
@@ -277,19 +319,6 @@ export class DriverInstanceRpcEventIngestionController {
     }
 
     return receipts;
-  }
-
-  async #withDriverEventGate<T>(operation: () => Promise<T>): Promise<T> {
-    const previous = this.#driverEventGate;
-    const nextGate = createPromiseDeferred<null>();
-    this.#driverEventGate = nextGate.promise;
-    await previous;
-
-    try {
-      return await operation();
-    } finally {
-      nextGate.resolve(null);
-    }
   }
 }
 

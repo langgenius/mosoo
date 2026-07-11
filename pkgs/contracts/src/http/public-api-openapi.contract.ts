@@ -628,7 +628,7 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
       },
       finalOutput: {
         description:
-          "Stable final answer for a completed Run. Mosoo builds this from that Run's public `agent.message.delta` events in chronological order. Null until the Run status is `completed`.",
+          "Canonical final assistant answer for a completed Run. This is the exact persisted final assistant message text, not a reconstruction of public `agent.message.delta` events. Null until that final message is persisted or when the Run has no final assistant answer.",
         oneOf: [{ $ref: "#/components/schemas/RunFinalOutput" }, { type: "null" }],
       },
       id: {
@@ -706,7 +706,7 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
     properties: {
       text: {
         description:
-          "Text reconstructed from the current Run's public `agent.message.delta` events in chronological order.",
+          "Exact text of the Run's persisted final assistant message. Public event entries are not a substitute for this value.",
         type: "string",
       },
     },

@@ -7,16 +7,11 @@ import type { DriverFailureInput } from "agent-driver/orpc";
 import { logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
-import {
-  applyRuntimeEventToSessionLiveState,
-  loadSessionViewerState,
-  appRuntimeEventToSessionDeliveryEvents,
-} from "../../../sessions/application/session-live-state.service";
+import { appRuntimeEventToSessionDeliveryEvents } from "../../../sessions/application/session-live-state.service";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
 import { recordRuntimeRunLeaseReleasedOutcome } from "../runtime-subject-lifecycle/runtime-run-lease-store";
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
 import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
-import { persistAssistantMessageProjection } from "./assistant-message-projection";
 import type { RuntimeSessionLink } from "./event-types";
 import { getRuntimeSessionLink } from "./session-link.repository";
 import {
@@ -203,12 +198,11 @@ async function synthesizeDriverRunFinished(
     throw new Error("Run completion event did not app to session delivery.");
   }
 
-  const currentLiveState = await loadSessionViewerState(database, {
-    sessionId: input.link.sessionId,
-    viewerId: input.link.callerId ?? input.link.creatorId ?? input.driverInstanceId,
-  });
-  const nextLiveState = applyRuntimeEventToSessionLiveState(currentLiveState, runCompletedEvent);
-
+  // The terminal RPC proves only that execution ended; it carries no final
+  // assistant item identity. Never guess from the session's last assistant
+  // message, which may be progress or belong to an earlier run. The canonical
+  // projection is written only by an ordered runtime run.completed event that
+  // names finalMessageId.
   const outcome = await setSessionRunStatus(database, {
     runId: input.link.sessionRunId,
     source: "driver",
@@ -218,13 +212,6 @@ async function synthesizeDriverRunFinished(
   if (isStaleTerminalRunTransition(outcome) && !isStaleTerminalRunStatus(outcome, "completed")) {
     return;
   }
-  await persistAssistantMessageProjection(database, {
-    createdByAccountId: input.link.callerId ?? input.link.creatorId ?? input.driverInstanceId,
-    driverInstanceId: input.driverInstanceId,
-    sessionId: input.link.sessionId,
-    sessionRunId: input.link.sessionRunId,
-    state: nextLiveState,
-  });
   await appendCanonicalTerminalDriverEvent({
     bindings: input.bindings,
     event: runCompletedEvent,

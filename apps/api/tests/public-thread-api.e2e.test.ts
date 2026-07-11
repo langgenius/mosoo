@@ -9,6 +9,7 @@ import {
   PUBLIC_API_RATE_LIMIT_REQUESTS_PER_MINUTE,
   enforcePublicApiRateLimit,
 } from "../src/modules/public-api/public-api-rate-limit.service";
+import { insertSessionMessage } from "../src/modules/sessions/infrastructure/session-message-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   PublicApiMemoryFileBucket,
@@ -31,6 +32,35 @@ import {
 } from "./public-thread-api-fixtures";
 
 const PUBLIC_THREAD_ID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const FINAL_OUTPUT_CANARY_LINE_COUNT = 160;
+const FINAL_OUTPUT_CANARY_LINES = Array.from(
+  { length: FINAL_OUTPUT_CANARY_LINE_COUNT },
+  (_, index) => {
+    const lineNumber = String(index + 1).padStart(3, "0");
+    return `${lineNumber}|中文长文本校验-Aa${index % 10}-表格字符|END${lineNumber}`;
+  },
+);
+const FINAL_OUTPUT_TEXT = [
+  "CANARY-FINAL-START：中文与 ASCII 最终回答必须逐字保留。",
+  "",
+  "| 校验项 | 结果 |",
+  "| --- | --- |",
+  "| 多字节 | ✅ 中文😀 |",
+  "",
+  "链接：https://example.com/final-output",
+  "",
+  "```text",
+  "CANARY-CODE-START|中文😀|END",
+  "```",
+  ...FINAL_OUTPUT_CANARY_LINES,
+  "CANARY-FINAL-END",
+].join("\n");
+const FINAL_OUTPUT_TEXT_BYTES = new TextEncoder().encode(FINAL_OUTPUT_TEXT);
+const PROGRESS_OUTPUT_TEXTS = [
+  "进度 1：正在读取上游报告，不能进入最终回答。",
+  "进度 2：已调用工具校验表格，不能进入最终回答。",
+  "进度 3：artifact 已创建，不能进入最终回答。",
+] as const;
 
 type PublicHttpTestDatabase = Awaited<ReturnType<typeof createPublicHttpContractDatabase>>;
 
@@ -357,16 +387,30 @@ describe("Public Thread API e2e", () => {
         seq: 1,
         sessionId: threadId,
       });
+      for (const [index, progressText] of PROGRESS_OUTPUT_TEXTS.entries()) {
+        await insertRuntimeEvent(database, {
+          kind: "message.added",
+          occurredAt: 1_050 + index * 10,
+          payload: {
+            content: progressText,
+            messageId: `assistant-progress-${index + 1}`,
+            role: "agent",
+          },
+          runId,
+          seq: index + 2,
+          sessionId: threadId,
+        });
+      }
       await insertRuntimeEvent(database, {
         kind: "message.added",
-        occurredAt: 1_050,
+        occurredAt: 1_085,
         payload: {
-          content: "Hello from runtime",
-          messageId: "assistant-1",
+          content: FINAL_OUTPUT_TEXT,
+          messageId: "assistant-final",
           role: "agent",
         },
         runId,
-        seq: 2,
+        seq: 5,
         sessionId: threadId,
       });
       await insertRuntimeEvent(database, {
@@ -374,7 +418,7 @@ describe("Public Thread API e2e", () => {
         occurredAt: 1_125,
         payload: { stopReason: "debug" },
         runId,
-        seq: 3,
+        seq: 6,
         sessionId: threadId,
         visibility: "owner_debug",
       });
@@ -383,7 +427,7 @@ describe("Public Thread API e2e", () => {
         occurredAt: 1_150,
         payload: { stopReason: "end_turn" },
         runId,
-        seq: 4,
+        seq: 7,
         sessionId: threadId,
       });
 
@@ -404,10 +448,29 @@ describe("Public Thread API e2e", () => {
         "run.completed",
       ]);
       expect(events.map((event) => expectRecord(event)["content"])).toEqual([
-        "Hello from runtime",
+        FINAL_OUTPUT_TEXT,
         runId,
       ]);
       expect(events.map((event) => expectRecord(event)["runId"])).toEqual([runId, runId]);
+
+      for (const progressText of PROGRESS_OUTPUT_TEXTS) {
+        await insertSessionMessage(database, {
+          content: progressText,
+          createdByAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
+          role: "assistant",
+          segments: [{ kind: "text", text: progressText }],
+          sessionId: threadId,
+          sessionRunId: runId,
+        });
+      }
+      await insertSessionMessage(database, {
+        content: FINAL_OUTPUT_TEXT,
+        createdByAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
+        role: "assistant",
+        segments: [{ kind: "text", text: FINAL_OUTPUT_TEXT }],
+        sessionId: threadId,
+        sessionRunId: runId,
+      });
 
       await database
         .app()
@@ -433,10 +496,22 @@ describe("Public Thread API e2e", () => {
       );
       expect(completedRun).toMatchObject({
         error: null,
-        finalOutput: { text: "Hello from runtime" },
+        finalOutput: { text: FINAL_OUTPUT_TEXT },
         id: runId,
         status: "completed",
       });
+      const finalOutput = expectRecord(completedRun["finalOutput"]);
+      const finalOutputText = expectString(finalOutput["text"]);
+      expect(finalOutputText).toBe(FINAL_OUTPUT_TEXT);
+      expect(new TextEncoder().encode(finalOutputText)).toEqual(FINAL_OUTPUT_TEXT_BYTES);
+      expect(finalOutputText.split("\n")).toContain(
+        `${String(FINAL_OUTPUT_CANARY_LINE_COUNT).padStart(3, "0")}|中文长文本校验-Aa9-表格字符|END${String(
+          FINAL_OUTPUT_CANARY_LINE_COUNT,
+        ).padStart(3, "0")}`,
+      );
+      for (const progressText of PROGRESS_OUTPUT_TEXTS) {
+        expect(finalOutputText).not.toContain(progressText);
+      }
 
       const repeatedRetrieveResponse = await requestPublicApi(
         app,
@@ -448,7 +523,7 @@ describe("Public Thread API e2e", () => {
       const repeatedRun = expectRecord(
         expectRecord(await readJson(repeatedRetrieveResponse))["run"],
       );
-      expect(repeatedRun["finalOutput"]).toEqual({ text: "Hello from runtime" });
+      expect(repeatedRun["finalOutput"]).toEqual({ text: FINAL_OUTPUT_TEXT });
 
       const listResponse = await requestPublicApi(
         app,

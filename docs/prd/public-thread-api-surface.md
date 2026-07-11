@@ -191,11 +191,12 @@ payloads, and sandbox paths are not part of the public contract.
 - Public Run summaries include `error` and `finalOutput`. Failed runs expose
   structured `error.code`, `error.message`, and `error.retryable`; internal
   runtime/provider/tool/debug details are not part of the public contract.
-- `run.finalOutput.text` is the stable Agent final answer for a completed run.
-  Mosoo reconstructs it from that run's public `agent.message.delta` events in
-  chronological order. If a caller needs to reconstruct it from events, filter to
-  the current `runId`, keep only `type === "agent.message.delta"` events with
-  `status === "available"`, and concatenate `content` in event order.
+- `run.finalOutput.text` is the canonical final assistant answer for a completed
+  run: it is the persisted final assistant message text, exactly as that message
+  was recorded. It is not reconstructed from public event entries.
+- Public `agent.message.delta` entries can include progress and other
+  non-final assistant text. Callers may render them as activity, but must not
+  concatenate them or substitute them for `run.finalOutput`.
 - Machine-readable error codes can preserve stable historical values, but product
   copy must describe an Agent that is not exposed as an active API endpoint.
 - Non-2xx responses use the stable error envelope

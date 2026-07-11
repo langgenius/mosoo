@@ -456,6 +456,10 @@ function assertFinalOutputResult(
   };
 }
 
+/**
+ * @deprecated Public event logs can include progress messages and cannot identify
+ * the canonical final assistant message. Read `run.finalOutput` instead.
+ */
 export function extractFinalOutput(
   events: readonly PublicThreadEventLogEntry[],
   options: ExtractFinalOutputOptions = {},
@@ -635,20 +639,10 @@ export class MosooPublicThreadClient {
           signal: input.signal,
           threadId: input.threadId,
         });
-        const finalOutput =
-          run.finalOutput ??
-          (run.status === "completed"
-            ? extractFinalOutput(eventPage.events, { runId: run.id })
-            : null);
-        const terminalRun: PublicThreadRunSummary = {
-          ...run,
-          finalOutput,
-        };
-
         return {
           events: eventPage.events,
-          finalOutput,
-          run: terminalRun,
+          finalOutput: run.finalOutput,
+          run,
           thread: retrieved.thread,
           truncated: eventPage.truncated,
         };
@@ -677,6 +671,10 @@ export class MosooPublicThreadClient {
     return assertFinalOutputResult(await this.waitForRun(input));
   }
 
+  /**
+   * @deprecated Public event logs can include progress messages and cannot identify
+   * the canonical final assistant message. Read `run.finalOutput` instead.
+   */
   extractFinalOutput(
     events: readonly PublicThreadEventLogEntry[],
     options: ExtractFinalOutputOptions = {},

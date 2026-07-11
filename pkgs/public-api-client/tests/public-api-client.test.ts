@@ -5,6 +5,7 @@ import type {
   PublicThreadApiListThreadEventsResponse,
   PublicThreadApiRetrieveThreadResponse,
   PublicThreadEventLogEntry,
+  PublicThreadFinalOutput,
 } from "@mosoo/contracts/public-api";
 import type { MosooPublicApiError } from "@mosoo/public-api-client";
 import { MosooPublicThreadClient } from "@mosoo/public-api-client";
@@ -39,7 +40,10 @@ function threadResponse(status: "RUNNING" | "IDLE" = "RUNNING") {
   } as const;
 }
 
-function runResponse(status: "completed" | "failed" | "running" = "running") {
+function runResponse(
+  status: "completed" | "failed" | "running" = "running",
+  finalOutput: PublicThreadFinalOutput | null = null,
+) {
   return {
     completedAt: status === "running" ? null : "2026-05-19T00:00:02.000Z",
     createdAt: "2026-05-19T00:00:00.000Z",
@@ -51,7 +55,7 @@ function runResponse(status: "completed" | "failed" | "running" = "running") {
             retryable: true,
           }
         : null,
-    finalOutput: null,
+    finalOutput,
     id: RUN_ID,
     startedAt: "2026-05-19T00:00:01.000Z",
     status,
@@ -156,7 +160,7 @@ describe("MosooPublicThreadClient", () => {
     expect(response.file.id).toBe(FILE_ID);
   });
 
-  test("creates a Thread, waits for completion, and reconstructs final output by run", async () => {
+  test("creates a Thread and returns the canonical final output from retrieve", async () => {
     const requests: RecordedRequest[] = [];
     const fetchMock: typeof fetch = async (input, init) => {
       const request = new Request(input, init);
@@ -181,7 +185,7 @@ describe("MosooPublicThreadClient", () => {
       if (request.method === "GET" && request.url.endsWith(`/threads/${THREAD_ID}`)) {
         return jsonResponse({
           links: { thread: `/api/v1/threads/${THREAD_ID}` },
-          run: runResponse("completed"),
+          run: runResponse("completed", { text: "最终答复：完整的中文、Markdown 和 😀。" }),
           thread: threadResponse("IDLE"),
         } satisfies PublicThreadApiRetrieveThreadResponse);
       }
@@ -200,7 +204,7 @@ describe("MosooPublicThreadClient", () => {
               type: "agent.message.delta",
             },
             {
-              content: "Hello ",
+              content: "进度：正在生成最终答复。",
               durationMs: 0,
               id: "01J00000000000000000000011",
               occurredAt: "2026-05-19T00:00:01.000Z",
@@ -210,7 +214,7 @@ describe("MosooPublicThreadClient", () => {
               type: "agent.message.delta",
             },
             {
-              content: "from Mosoo",
+              content: "不应被拼入最终答复。",
               durationMs: 0,
               id: "01J00000000000000000000012",
               occurredAt: "2026-05-19T00:00:02.000Z",
@@ -239,8 +243,8 @@ describe("MosooPublicThreadClient", () => {
       timeoutMs: 1_000,
     });
 
-    expect(result.finalOutput).toEqual({ text: "Hello from Mosoo" });
-    expect(result.run.finalOutput).toEqual({ text: "Hello from Mosoo" });
+    expect(result.finalOutput).toEqual({ text: "最终答复：完整的中文、Markdown 和 😀。" });
+    expect(result.run.finalOutput).toEqual({ text: "最终答复：完整的中文、Markdown 和 😀。" });
     expect(requests[0]?.headers.get("Authorization")).toBe("Bearer mst_test");
     expect(requests[0]?.headers.get("Idempotency-Key")).toBe("thread-create-1");
     expect(requests[0]?.body).toEqual({
@@ -376,7 +380,60 @@ describe("MosooPublicThreadClient", () => {
     });
   });
 
-  test("extracts final output from one run without duplicating other events", () => {
+  test("does not reconstruct a completed final output from progress events", async () => {
+    const fetchMock: typeof fetch = async (input, init) => {
+      const request = new Request(input, init);
+
+      if (request.method === "GET" && request.url.endsWith(`/threads/${THREAD_ID}`)) {
+        return jsonResponse({
+          links: { thread: `/api/v1/threads/${THREAD_ID}` },
+          run: runResponse("completed"),
+          thread: threadResponse("IDLE"),
+        } satisfies PublicThreadApiRetrieveThreadResponse);
+      }
+
+      if (request.method === "GET" && request.url.includes(`/threads/${THREAD_ID}/events`)) {
+        return jsonResponse({
+          events: [
+            {
+              content: "进度：读取资料。",
+              durationMs: 0,
+              id: "01J00000000000000000000010",
+              occurredAt: "2026-05-19T00:00:00.000Z",
+              runId: RUN_ID,
+              status: "available",
+              tokens: null,
+              type: "agent.message.delta",
+            },
+            {
+              content: "错误的事件拼接候选。",
+              durationMs: 0,
+              id: "01J00000000000000000000011",
+              occurredAt: "2026-05-19T00:00:01.000Z",
+              runId: RUN_ID,
+              status: "available",
+              tokens: null,
+              type: "agent.message.delta",
+            },
+          ],
+          truncated: false,
+        } satisfies PublicThreadApiListThreadEventsResponse);
+      }
+
+      return jsonResponse({ error: { code: "not_found", message: "Not found." } }, 404);
+    };
+    const client = new MosooPublicThreadClient({
+      baseUrl: "https://api.example.com",
+      fetch: fetchMock,
+      token: "mst_test",
+    });
+
+    await expect(client.waitForFinalOutput({ threadId: THREAD_ID })).rejects.toThrow(
+      `Completed Public Thread run ${RUN_ID} did not include final output.`,
+    );
+  });
+
+  test("keeps the deprecated event concatenation helper for compatibility", () => {
     expect(
       extractFinalOutput(
         [
