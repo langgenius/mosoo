@@ -418,6 +418,7 @@ export async function appRuntimeDriverEvents(
 
   let nextLiveState = currentLiveState;
   let liveStateChanged = false;
+  let finalAssistantMessage: AppRuntimeDriverEventsResult["finalAssistantMessage"] = null;
   let sessionTitle: string | null = null;
   let usage: AppRuntimeDriverEventsResult["usage"] = null;
   const runtimeEvents: ProjectedRuntimeEventRecord[] = [];
@@ -520,6 +521,13 @@ export async function appRuntimeDriverEvents(
     }
 
     if (event.kind === "run.completed") {
+      const payload = readRuntimeEventPayload(event);
+      const finalMessageId = readRuntimeEventString(payload, "finalMessageId");
+      const finalMessageText = readRuntimeEventString(payload, "finalMessageText");
+      finalAssistantMessage =
+        finalMessageId === null || finalMessageText === null
+          ? null
+          : { id: finalMessageId, text: finalMessageText };
       await recordRuntimeSessionOutputDirectory({
         bindings,
         event,
@@ -597,6 +605,7 @@ export async function appRuntimeDriverEvents(
   }
 
   return {
+    finalAssistantMessage,
     link,
     liveStateChanged,
     nextLiveState,

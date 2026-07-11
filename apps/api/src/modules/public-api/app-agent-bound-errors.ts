@@ -6,9 +6,10 @@
  * its own error responses here. Cases that already have a public-API meaning
  * (invalid capability -> 401, Agent un-published -> 409, bad request -> 400) are
  * raised with the existing `PublicApiError` helpers and rendered via
- * `toPublicApiError`. The two failures unique to a one-call blocking ask — the
+ * `toPublicApiError`. Failures unique to a one-call blocking ask — the
  * run never reaching a terminal state in time, and a terminal-but-not-completed
- * run — get the dedicated codes below.
+ * run, and a completed run whose canonical reply is missing — get the
+ * dedicated codes below.
  */
 
 import type { RunError, SessionRunStatus } from "@mosoo/contracts/session-run";
@@ -22,9 +23,13 @@ export const DEPLOYMENT_AGENT_CALL_TIMEOUT_ERROR_CODE = "deployment_agent_call_t
 export const DEPLOYMENT_AGENT_RUN_FAILED_ERROR_CODE = "deployment_agent_run_failed";
 /** Returned when the bound Agent pauses for interactive input the single-call ask cannot provide. */
 export const DEPLOYMENT_AGENT_NEEDS_INPUT_ERROR_CODE = "deployment_agent_needs_input";
+/** Returned when a completed bound Agent run has no canonical final assistant message. */
+export const DEPLOYMENT_AGENT_FINAL_OUTPUT_MISSING_ERROR_CODE =
+  "deployment_agent_final_output_missing";
 
 export type BoundAgentCallErrorCode =
   | typeof DEPLOYMENT_AGENT_CALL_TIMEOUT_ERROR_CODE
+  | typeof DEPLOYMENT_AGENT_FINAL_OUTPUT_MISSING_ERROR_CODE
   | typeof DEPLOYMENT_AGENT_RUN_FAILED_ERROR_CODE
   | typeof DEPLOYMENT_AGENT_NEEDS_INPUT_ERROR_CODE;
 
@@ -54,6 +59,14 @@ export function boundAgentNeedsInput(): BoundAgentCallError {
     message:
       "The bound Agent paused for interactive input, which a single-call bound ask cannot provide.",
     status: 422,
+  });
+}
+
+export function boundAgentFinalOutputMissing(): BoundAgentCallError {
+  return new BoundAgentCallError({
+    code: DEPLOYMENT_AGENT_FINAL_OUTPUT_MISSING_ERROR_CODE,
+    message: "The bound Agent run completed without a canonical final reply.",
+    status: 503,
   });
 }
 

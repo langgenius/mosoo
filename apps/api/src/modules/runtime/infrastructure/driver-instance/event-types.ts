@@ -53,6 +53,7 @@ export interface RuntimeDriverRunTransition {
 }
 
 export interface AppRuntimeDriverEventsResult {
+  finalAssistantMessage: { id: string; text: string } | null;
   link: RuntimeSessionLink;
   liveStateChanged: boolean;
   nextLiveState: SessionLiveState | null;

@@ -8,6 +8,7 @@ const AGENT_ID = "01J00000000000000000000009";
 const CALLER_FROM_ORIGIN_ID = "01J000000000000000000000F1";
 const CREATOR_ID = "01J000000000000000000000F2";
 const DRIVER_ID = "01J000000000000000000000F3";
+const OTHER_DRIVER_ID = "01J000000000000000000000E3";
 const EXECUTION_OWNER_FROM_ORIGIN_ID = "01J000000000000000000000F4";
 const OWNER_ID = "01J000000000000000000000F5";
 const RUN_CALLER_ID = "01J000000000000000000000F6";
@@ -136,6 +137,47 @@ describe("driver runtime session link", () => {
       sessionRunId: RUN_ID,
       sessionRunStatus: "running",
       traceId: "trace-1",
+    });
+  });
+
+  test("resolves an exact completed run for terminal event replay", async () => {
+    const database = createDriverSessionLinkDatabase();
+
+    database.execute(`
+      INSERT INTO session_run (
+        created_by_account_id,
+        driver_instance_id,
+        id,
+        session_id,
+        status,
+        trace_id
+      )
+      VALUES ('${RUN_CALLER_ID}', '${DRIVER_ID}', '${RUN_ID}', '${SESSION_ID}', 'completed', 'trace-terminal');
+
+      INSERT INTO driver_instance (id, sandbox_id, sandbox_session_id)
+      VALUES
+        ('${DRIVER_ID}', '${SANDBOX_ID}', '${SESSION_ID}'),
+        ('${OTHER_DRIVER_ID}', '${SANDBOX_ID}', '${SESSION_ID}')
+    `);
+
+    await expect(getRuntimeSessionLink(database, DRIVER_ID)).resolves.toMatchObject({
+      sessionId: SESSION_ID,
+      sessionRunId: null,
+      sessionRunStatus: null,
+    });
+    await expect(
+      getRuntimeSessionLink(database, DRIVER_ID, { sessionRunId: RUN_ID }),
+    ).resolves.toMatchObject({
+      sessionId: SESSION_ID,
+      sessionRunId: RUN_ID,
+      sessionRunStatus: "completed",
+      traceId: "trace-terminal",
+    });
+    await expect(
+      getRuntimeSessionLink(database, OTHER_DRIVER_ID, { sessionRunId: RUN_ID }),
+    ).resolves.toMatchObject({
+      sessionRunId: null,
+      sessionRunStatus: null,
     });
   });
 });

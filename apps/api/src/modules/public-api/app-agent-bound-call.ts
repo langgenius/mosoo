@@ -14,6 +14,7 @@ import type { RunError, SessionRunStatus } from "@mosoo/contracts/session-run";
 import type { AgentRow } from "../agents/application/agent-types";
 import {
   boundAgentCallTimeout,
+  boundAgentFinalOutputMissing,
   boundAgentNeedsInput,
   boundAgentRunFailed,
 } from "./app-agent-bound-errors";
@@ -166,8 +167,8 @@ export async function waitForTerminalRun<T extends { status: SessionRunStatus }>
 }
 
 /**
- * Resolve the reply for a terminal run: the joined final-output text when the
- * run completed, otherwise a failure with the run's error surfaced.
+ * Resolve the reply for a terminal run from its canonical final assistant
+ * message, otherwise surface a typed failure.
  */
 export function selectBoundAgentReply(input: {
   finalOutput: PublicThreadFinalOutput | null;
@@ -177,5 +178,9 @@ export function selectBoundAgentReply(input: {
     throw boundAgentRunFailed(input.run.status, input.run.error);
   }
 
-  return { reply: input.finalOutput?.text ?? "" };
+  if (input.finalOutput === null) {
+    throw boundAgentFinalOutputMissing();
+  }
+
+  return { reply: input.finalOutput.text };
 }
