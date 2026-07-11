@@ -12,12 +12,14 @@ import { isTerminalSessionRunStatus } from "./session-run-status";
  *   - the maintenance sweep (stale-run-reconciliation) reports retryable: false
  * for the SAME physical event. This module is the single source of truth for
  * both, so an eviction is classified identically everywhere, and it exposes the
- * pure decision — requeue vs fail-clean — that the recovery wiring consumes.
+ * pure decision — requeue vs fail-clean — for telemetry and future recovery
+ * wiring. The current caller records this decision only; it does not create or
+ * dispatch a replacement run.
  *
- * Design references (see
- * https://github.com/Yevanchen/mosoo-product-doc/blob/main/plan/runtime-session/perf-permission-work/00-findings.md):
- * OMA's `recoverInterruptedState`, agentos/opencomputer's "reclaim = lazy
- * resume, fail cleanly, never loop", OpenHands's durable-pause-then-resume.
+ * The local contract keeps retry safety separate from automatic retry policy:
+ * reclaim may be safe to retry even though current wiring does not retry it
+ * automatically. See `docs/prd/session-lifecycle.md` for the user-visible
+ * recovery boundary.
  */
 
 /** Terminal status of the driver instance behind the reclaimed run. */
@@ -43,7 +45,8 @@ export interface ClassifyReclaimInput {
 /**
  * The single reclaim classifier. An involuntary reclaim is ALWAYS retryable
  * (a fresh run is safe) — `retryable` describes "is a retry safe?", decoupled
- * from "did we auto-requeue?" (that is `decideReclaimRecovery`'s job). Distinct
+ * from "would a future policy recommend requeue?" (that is
+ * `decideReclaimRecovery`'s job). Distinct
  * error codes are preserved because they carry real context, but the flag no
  * longer contradicts across paths.
  */
@@ -55,8 +58,7 @@ export function classifyReclaim(input: ClassifyReclaimInput): RunError {
       return {
         code: "runtime.turn_interrupted",
         details,
-        message:
-          "This turn was interrupted. Your workspace and context have been preserved — please resend your last request.",
+        message: "This turn was interrupted before it completed. Please resend your last request.",
         retryable: true,
       };
     }
@@ -86,9 +88,8 @@ export function classifyReclaim(input: ClassifyReclaimInput): RunError {
 }
 
 /**
- * How many times a reclaimed run may be auto-resumed before we stop and leave
- * it to the user. Bounded to one so a run that is reclaimed, auto-resumed, then
- * reclaimed again fails cleanly instead of looping.
+ * Decision budget for future automatic recovery. The current release path logs
+ * the recommendation but does not execute it.
  */
 export const DEFAULT_MAX_RECLAIM_ATTEMPTS = 1;
 
@@ -100,7 +101,7 @@ export interface ReclaimSignal {
   /**
    * Trigger of the reclaimed run — used as the attempt-budget proxy so no
    * schema change is required: a run already triggered by `resume` has spent
-   * its one auto-resume.
+   * its one resume-decision slot.
    */
   readonly priorTrigger: SessionRunTrigger;
   readonly maxReclaimAttempts?: number;
@@ -109,23 +110,22 @@ export interface ReclaimSignal {
 export type ReclaimRecoveryAction =
   /** Run already terminal — nothing to recover. */
   | { readonly kind: "noop" }
-  /** Auto-resume: create a fresh run and re-dispatch. */
+  /** Recommend a future fresh resume run; current wiring records this only. */
   | { readonly kind: "requeue"; readonly resumeTrigger: "resume"; readonly runError: RunError }
   /** Attempt budget exhausted — fail cleanly (still retryable so the user may resend). */
   | { readonly kind: "fail_clean"; readonly runError: RunError };
 
 /**
- * Number of auto-resume attempts already spent on this run, inferred from its
- * trigger. A `resume`-triggered run is itself the product of one auto-resume.
+ * Number of resume decisions already represented by this run's trigger.
  */
 function reclaimAttemptsSpent(priorTrigger: SessionRunTrigger): number {
   return priorTrigger === "resume" ? 1 : 0;
 }
 
 /**
- * Pure recovery decision. Terminal runs are a no-op; an active run within the
- * attempt budget is requeued; an active run that has exhausted the budget fails
- * cleanly (never loops).
+ * Pure recovery recommendation. Terminal runs are a no-op; an active run within
+ * the budget recommends requeue; an exhausted run recommends fail-clean. This
+ * function does not enqueue or dispatch a run.
  */
 export function decideReclaimRecovery(signal: ReclaimSignal): ReclaimRecoveryAction {
   const runError = classifyReclaim({

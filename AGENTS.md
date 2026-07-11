@@ -35,7 +35,12 @@
 
 - Design database queries explicitly around access paths. Prefer `ORDER BY id` for list sorting, and do not default to `ORDER BY created_at`. ORM layers must not hide default filters or sorting; query conditions must be declared at the call site.
 - Do not use full `count()` queries to calculate total pages for very large tables. Prefer cursor pagination, remove useless joins, and use database estimates when necessary. ORM relations must be explicitly preloaded; N+1 queries in loops are forbidden.
-- All imports must stay at the top of the file. Inline imports are forbidden. Surface circular dependencies early through startup or build-time errors.
+- Keep static imports at the top of the file. Preserve intentional dynamic
+  `import()` boundaries used for route/code splitting, Worker lazy
+  initialization, platform isolation, or documented cycle avoidance; do not
+  replace them mechanically with eager imports. New dynamic imports require a
+  concrete loading or boundary reason, and circular dependencies should still
+  surface through startup or build-time errors.
 - Data models should carry only data and local invariants. Put complex business orchestration in verb-level services or modules instead of continuing to expand model methods.
 - Avoid low-value third-party libraries. Prefer implementing small generic logic inside the repository. For third-party service integrations, prefer lightweight handwritten API clients instead of bulky vendor dependencies.
 - Frontend API access must be generated from backend schema/codegen and stay strongly typed. Do not handwrite a parallel request layer. Avoid overusing React Context; high-frequency shared state should prefer fine-grained subscription tools such as zustand.

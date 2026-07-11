@@ -14,7 +14,7 @@ If this document conflicts with older PRDs, follow this document first, then
 
 1. App is the user-facing product boundary.
 2. App is the engineering name for the same boundary.
-3. App is an Agent and resource package, not a Web deployment unit.
+3. App is the ownership and console boundary for Agents and resources, and may own one external Web Deployment.
 4. Organization is only the account, billing, tenant, and future-governance shell.
 5. App owns concrete App-local concepts directly; V1 does not introduce a generic
    Service entity.
@@ -23,11 +23,9 @@ If this document conflicts with older PRDs, follow this document first, then
 7. Agent is the App-local unit that owns Agent runtime and delivery.
 8. Thread is the product name for an Agent Session in V1.
 9. App resources are owned at App scope; Agents bind the resources they need.
-10. Common one-Agent, one-Channel shapes should come from App Templates, not from a
-    required App or Agent type decision.
-11. V1 optimizes for delivery and reuse, not administration.
-12. Owner-only access is the default for V1.
-13. Future governance must not block the single-owner App loop.
+10. V1 optimizes for delivery and reuse, not administration.
+11. Owner-only access is the default for V1.
+12. Future governance must not block the single-owner App loop.
 
 ## Core Concepts
 
@@ -63,19 +61,19 @@ An App:
 
 - Belongs to one Organization.
 - Has one owner Account in V1.
-- Is what the user creates, opens, configures, monitors, and exports.
+- Is what the user creates, opens, configures, and monitors.
 - Is a boundary for a real-world Agent application.
 - Organizes one or more App-local Agents.
 - Owns concrete resources that those Agents can bind.
 - Is the primary database, API, and test boundary.
 - Aggregates Threads, usage, health, logs, and expose state through its Agents and
   resources.
-- Can be created blank or from an App Template that provisions a concrete resource set.
-- Can be packaged into one `Skill.md` for coding-agent reuse.
+- May own one configured Deployment for a public GitHub repository.
 - Is the default console entry after onboarding when the Organization has one App.
 
-An App is not a Supabase-style database app, a Vercel-style frontend deployment, a
-GitHub repository, a Web shell, or a runtime process.
+An App does not itself execute Agent runtime and does not become the deployed
+repository's runtime process. Its Deployment is a separately modeled,
+App-owned external Web artifact with its own Deployment Runs and public URL.
 
 ### Agent
 
@@ -86,7 +84,8 @@ An Agent:
 - Belongs to one App.
 - Has a runtime kind such as Pet or Cattle.
 - References one Environment.
-- May bind App-owned Storage, Skills, MCP servers, Provider credentials, and Channels.
+- May bind App-owned Skills, MCP servers, and Channels, and resolves App-owned
+  Provider credentials at runtime.
 - Owns runtime execution.
 - Owns API endpoint exposure when exposed.
 - Owns channel delivery when bound to a Channel.
@@ -105,7 +104,7 @@ Rules:
 
 - Do not add a unified `services` table.
 - Do not model App resources through a polymorphic `service.kind`.
-- Do not create generic Service CRUD as the primary API for Agents, Channels, Storage,
+- Do not create generic Service CRUD as the primary API for Agents, Channels, Files,
   Environments, Skills, MCP servers, or Provider credentials.
 - Console copy may group concrete resources under "Services" or "Resources" for scanning,
   but that grouping must not become a database, API, permission, or lifecycle boundary.
@@ -115,19 +114,26 @@ Rules:
 - API-layer names such as File Service or Environment Service are implementation modules
   and do not imply a generic Service domain entity.
 
-### App Template
+### Deployment
 
-An App Template is a reusable App blueprint.
+A Deployment is the App-owned external Web artifact produced from a public
+GitHub repository.
 
-An App Template:
+A Deployment:
 
-- Creates an App plus one or more preconfigured concrete resources.
-- Can represent common shapes such as one Pet Agent bound to one Channel.
-- Can represent larger shapes such as multiple Agents plus Storage, MCP, Provider, and
-  Channel resources.
-- Selects defaults and wiring, but does not create `app.type` as a runtime
-  driver.
-- Is the preferred path for simple chatbot-style Apps and other repeatable resource graphs.
+- Belongs to one App; the current product supports zero or one active
+  Deployment per App.
+- Uses Mosoo-managed Cloudflare infrastructure and produces a Mosoo-owned public
+  URL after a successful Deployment Run.
+- Is operated from the App Overview, including first deploy, redeploy, status,
+  run history, live URL, and delete.
+- May bind published Agents through deploy-time capability URLs declared in
+  `.mosoo.toml`.
+- Is not Agent runtime, an Agent Deployment Version, an App-level API endpoint,
+  or a generic Service runtime.
+
+A Deployment Run is one asynchronous attempt to build and deploy the pinned
+repository commit for a Deployment.
 
 ### Thread
 
@@ -180,22 +186,33 @@ An Environment:
 - Is frozen into a Session execution snapshot when a Session starts.
 - Can be selected by one or more Agents.
 
+Current enforcement is partial: Runtime installs declared packages through the
+generated setup script, runs the custom setup script, and injects environment
+variables. Network policy, allowed hosts, and the MCP / package-manager allow
+flags are persisted and frozen intent only; they are not currently carried into
+Runtime enforcement and must not be treated as a security boundary.
+
 Organization default environments and admin compliance overrides are migration or future
 governance concepts.
 
 ### Files
 
-Files is a file library plus session-scoped file surface. Existing Space naming is pre-launch legacy and should be removed rather than preserved as a compatibility layer.
+Files is the current App-level read surface over file records plus the shipped
+session-scoped attachment/artifact flows. Existing Space naming is pre-launch
+legacy and should be removed rather than preserved as a compatibility layer.
 
 Files:
 
 - Belongs to the current App access boundary.
-- Stores uploaded files and file metadata.
-- Supports App-scoped library files and session-scoped attachments/artifacts.
-- Must not receive runtime artifacts into the App library by default.
+- Stores file objects and metadata for shipped Session and internal flows.
+- Supports session-scoped attachments/artifacts. The schema and service contain
+  an App `library` scope and versioning primitives, but no current user-facing
+  library create/upload mutation or button; the Files page is list/download only.
+- Does not promote runtime artifacts into the dormant App library scope.
 - Is not the product model for generated application source trees, deployable projects, or App asset publishing.
 
-Generated application source trees, templates, previews, and deployment outputs need their own Project / repository / template model when Mosoo moves toward a VibeSDK-like product.
+Deployment source remains in the bound public GitHub repository. Files does not
+become a generated source tree or deployment artifact store.
 
 ### Skill
 
@@ -246,7 +263,8 @@ A Channel:
 
 - Belongs to one App.
 - Stores provider identity, credentials, connection state, and provider metadata.
-- Can be bound by one or more Agents.
+- Its current provider/tenant/bot connection binds exactly one Agent. Reassignment removes or
+  replaces that binding; one external Channel connection is not shared by multiple Agents.
 - Does not create a generic Interface entity in V1.
 
 An Agent's channel binding or delivery exposes that Agent through a Channel.
@@ -273,20 +291,9 @@ Agent Exposure:
 - May create a stable endpoint, token, channel delivery route, or published Agent version.
 - Is summarized by the App but not owned by an App runtime.
 
-There is no V1 Publish App action.
-
-### App Export
-
-App Export packages the whole App into one `Skill.md`.
-
-The exported `Skill.md`:
-
-- Describes the App's Agents and their responsibilities.
-- Describes required App-owned resources and bindings.
-- Describes Thread/API/channel usage patterns.
-- Is meant for coding-agent reuse.
-
-V1 exports the whole App, not one `Skill.md` per Agent.
+Publishing an Agent and deploying an App are separate actions. Agent publishing creates the live
+Agent version used by future Threads. App Deployment publishes an external Web artifact and does
+not create Agent runtime or an App-level API endpoint.
 
 ## Relationships
 
@@ -306,19 +313,20 @@ Account
         +-- Provider Credentials
         +-- Channels
         +-- Gateways / exposure surfaces
+        +-- Deployment
+        |   +-- Deployment Runs
+        |   +-- Mosoo-owned public URL
         +-- Operations
         |   +-- usage
-        |   +-- health
-        |   +-- logs
-        +-- Export
-            +-- Skill.md
+        |   +-- Agent logs
+        |   +-- Deployment activity
 ```
 
 Rules:
 
 - Organization owns Apps, not App resources directly.
 - App is the product, database, API, and console boundary.
-- App owns business resources, export, and operations scope.
+- App owns business resources, Deployment, and operations scope.
 - App has no runtime.
 - Agents own Agent runtime, endpoint exposure, channel delivery, and Threads/Sessions in V1.
 - Thread is a product name for Agent Session in V1.
@@ -332,19 +340,20 @@ V1 must support:
 - A personal developer signs in.
 - The system creates or selects the developer's Organization shell.
 - The system creates a default App.
-- The user can start from a blank App or an App Template.
+- The user can start from a blank App.
 - The user can create or configure one or more concrete App resources.
 - The user can create or configure one or more Agents when the App needs runtime.
 - The Agent can reference an Environment.
 - The Agent can use App-local Provider credentials.
-- The Agent can bind App-local Storage, Skills, MCP servers, and Channels when configured.
+- The Agent can bind App-local Skills, MCP servers, and Channels when configured.
 - The user can create Threads for an Agent from Mosoo WebUI.
 - The user can expose an Agent through an API endpoint.
 - The system can map channel external threads to Agent Sessions when Channel delivery is
   configured.
-- The user can inspect App-scoped Agents, resources, Threads, usage, health, logs, and
-  Agent expose state.
-- The user can export the App as one `Skill.md`.
+- The user can inspect App-scoped Agents, configuration resources, Runs / Threads, App usage,
+  Agent logs, and Agent exposure state.
+- The user can configure, run, inspect, redeploy, and delete one App-owned Deployment from App
+  Overview.
 
 ## Non Goals
 
@@ -363,7 +372,7 @@ V1 must not include:
 - Org-wide resource catalogs.
 - Cross-account resource views.
 - Agent external-access management.
-- Storage external-access management.
+- Files Library cross-account sharing or external-access management.
 - Skill external-access management.
 - Org-level MCP governance.
 - Company credential pools.
@@ -378,13 +387,8 @@ V1 must not include:
 - Generic Interface entity.
 - App runtime.
 - App router runtime.
-- Publish App.
 - App-level API endpoint.
-- App-owned Web shell.
-- Public preview URL as an App commitment.
-- Vercel-style frontend deployment.
 - Supabase-style App database tables.
-- GitHub repository binding as an App requirement.
 - Multi-channel delivery as the main path.
 - App-level multi-Agent Threads.
 
@@ -401,16 +405,14 @@ V1 must not include:
 
 ### Create App
 
-1. User chooses New App, or chooses an App Template.
+1. User chooses New App.
 2. System creates an App.
 3. Console displays it as an App.
-4. System creates or assigns default App-local resource sets for Agents, Storage,
-   Environments, Skills, MCP servers, Provider credentials, Channels, operations, and
-   export.
-5. If an App Template is selected, system provisions the template's concrete resource
-   graph, such as one Pet Agent bound to one Channel.
-6. System does not create Web shell, GitHub repository, App runtime, App API endpoint, or
-   database tables as a consequence of App creation.
+4. The App exposes scoped surfaces for Agents, Files, Environments, Skills, MCP
+   servers, Provider credentials, Channels, and operations; it does not
+   fabricate one instance of every resource.
+5. App creation alone does not bind a GitHub repository, start a Deployment, create Agent
+   runtime, create an App-level API endpoint, or create application database tables.
 
 ### Configure App Resources
 
@@ -426,10 +428,14 @@ V1 must not include:
 1. User starts a Thread for one Agent.
 2. System creates a Session for that Agent.
 3. Session inherits App through the Agent.
-4. Runtime freezes Environment revision, Provider references, Skill bindings, MCP bindings,
-   Storage mounts, and Channel metadata when applicable.
-5. Runtime events stream back to the Thread.
-6. App aggregates the Thread in App-level history and operations views.
+4. Runtime freezes Environment revision, Provider/model references, Skill
+   bindings, MCP bindings, and Channel metadata when applicable.
+5. Each user turn materializes only ready attachment ids explicitly submitted
+   with that message. Other Thread files remain linked and readable through the
+   file surfaces but are not automatically injected into every turn. Thread
+   files are not an Agent DeploymentVersion binding.
+6. Runtime events stream back to the Thread.
+7. App aggregates the Thread in App-level history and operations views.
 
 ### Expose Agent API
 
@@ -447,22 +453,28 @@ V1 must not include:
 4. Channel delivery creates or continues Threads/Sessions for that Agent.
 5. Usage and operations roll up to the App.
 
-### Export App
+### Deploy App
 
-1. User exports an App.
-2. System generates one `Skill.md` for the whole App.
-3. The `Skill.md` describes Agents, resources, bindings, and Thread/API/channel usage.
-4. Runtime does not depend on the exported file.
+1. User configures a public GitHub repository from App Overview.
+2. `deployApp` validates the source, creates or reuses the App Deployment, records a queued
+   Deployment Run, and dispatches asynchronous build/deploy work.
+3. The worker builds in an isolated Sandbox and publishes the external Web artifact with
+   Mosoo-managed Cloudflare credentials.
+4. App Overview shows deployment status, run activity, source, live URL, retry, redeploy, and
+   delete actions according to the current Deployment state. Delete confirmation includes the
+   number of bound Agents; the current Web surface does not render their names or env mappings.
+5. Deployment remains separate from Agent runtime, Agent Deployment Versions, and Agent API
+   Endpoint exposure.
 
 ### App Operations
 
 1. Runtime emits normalized model usage.
 2. Cost service writes usage events with App as the primary business dimension.
 3. Organization is retained as a billing rollup.
-4. App views show Agent detail, resource lists, Thread history, expose state, spend, request
-   count, token/cache usage, model breakdown, recent runs, logs, health, and unpriced usage
-   count.
-5. V1 does not show per-user drilldown.
+4. App Settings shows spend, request count, token/cache usage, daily spend, Agent attribution,
+   and model/pricing breakdown. Recent usage rows are available in each Agent's Cost tab.
+5. Agent detail owns Agent logs and runtime operations; App Overview owns Deployment activity.
+6. V1 does not show per-user drilldown.
 
 ### App Overview API
 
@@ -589,35 +601,35 @@ V1 console shape:
 Apps
 +-- App
     +-- Overview
+    |   +-- Deployment install / status / activity
+    +-- Runs (/threads)
     +-- Agents
-    +-- Resources
-    |   +-- Channels / Gateways
-    |   +-- Files
-    |   +-- Environments
+    +-- Config
     |   +-- Skills
     |   +-- MCP
     |   +-- Providers
-    +-- Threads
-    +-- Usage
-    +-- Logs
-    +-- Export
+    |   +-- Environments
     +-- Settings
+        +-- General
+        +-- App usage
 ```
 
 Rules:
 
 - A one-App Organization routes directly to App Overview.
 - Apps list exists for creating or switching Apps, not as a blocking first screen.
-- App Templates can create a simple one-Agent, one-Channel App without teaching the user
-  the full resource graph first.
 - Members does not appear in V1 navigation.
 - Organization settings stay thin.
 - Agents is where users inspect App-local runtime/delivery units.
-- Resources is where users inspect Channels, Storage, Environments, Skills, MCP servers,
-  Providers, and Gateways.
+- Config groups Skills, MCP servers, Providers, and Environments.
+- Channel configuration remains on the Agent surface rather than a top-level navigation item.
+- App Overview owns the current Deployment install, status, activity, live URL, and delete
+  experience; `/deployments` redirects to Overview.
+- App usage lives under App Settings; Agent logs live on Agent detail.
 - Agent detail is where runtime, endpoint exposure, channel delivery, and Thread creation
   happen.
-- WebUI Thread views operate Mosoo Sessions; they are not a user-published Web App surface.
+- The current sidebar label is Runs while the route and underlying product records remain
+  `/threads` and Thread / Session.
 
 ## Migration Rules
 
@@ -628,37 +640,30 @@ Rules:
   Agent table or a separate App boundary.
 - When older docs introduce a generic App-local Service capability/resource entity, treat that
   as historical wording. New work should model concrete resources directly.
-- When older docs say Publish App, App API, Web shell, or public preview URL, treat it as
-  old Web-app-first wording unless a later spec reopens the decision.
+- When older docs say Publish App, App API, Web shell, or public preview URL, distinguish the
+  shipped App Deployment resource from Agent runtime and App-level API semantics. Use
+  [`app-deployment.md`](./prd/app-deployment.md) for Deployment behavior.
 - When older docs say App owns delivery surface, read it as App aggregates Agent exposure and
   operations; Agent owns endpoint and channel delivery in V1.
-- When older docs ask users to choose one Agent type as the creation path, prefer an App
-  Template or an Agent setting, depending on whether the choice describes an App shape or a
-  runtime behavior.
+- When older docs ask users to choose one Agent type as the App creation path, treat the choice
+  as an Agent setting rather than an App type.
 - When older docs mention cross-account collaboration, org-wide resource catalogs,
   member role matrices, invitations, or access requests, treat it as future governance.
 - Old governance tables should be deleted once runtime dependencies no longer need them;
   new App paths must fail closed instead of deriving access from historical records.
 
-## Implementation Order
+## Implemented Baseline
 
-1. Add App ID, contract, database table, GraphQL surface, and default provisioning.
-2. Add App owner access helpers and fail closed when a resource cannot prove App ownership.
-3. Move Agent creation, reads, updates, and readiness under App without introducing a
-   generic Service table.
-4. Keep Thread as Agent Session in V1; add App inheritance through Agent and
-   App-level aggregation.
-5. Move Environment defaults and Provider credentials under App.
-6. Move MCP servers, Skills, Files, and Channels under App resource ownership.
-7. Keep Agent API endpoint exposure and Channel delivery on Agent.
-8. Add App Templates for common simple shapes such as Pet Agent plus Channel.
-9. Add App usage, health, logs, and Organization billing rollup.
-10. Make App Overview the console root.
-11. Add App export to one `Skill.md`.
-12. Remove or hide public Members, role matrices, invitations, access requests, external-access,
-    App-publish, preview-URL, and Web-shell surfaces from the V1 path.
-13. Remove internal services, contracts, tests, and database tables for old governance after
-    no runtime path depends on them; do not keep adapters for compatibility.
+1. App ID, contracts, database tables, GraphQL surface, and default provisioning are in place.
+2. Agents and concrete resources use App ownership and fail closed when App proof is missing.
+3. Thread remains the product record backed by an Agent Session and inherits App through Agent.
+4. Environment, Provider credentials, MCP servers, Skills, Files, and Channels are App-scoped.
+5. Agent API Endpoint exposure and Channel delivery remain Agent-owned.
+6. App Overview is the console root and embeds the Deployment install/status/history/delete
+   experience.
+7. App usage is available under App Settings; Agent operational detail remains on Agent pages.
+8. Public Members, role matrices, invitations, access requests, and old governance surfaces are
+   absent from the V1 path.
 
 ## Acceptance Checklist
 
@@ -669,18 +674,19 @@ An implementation is aligned with this Spec when:
 - Creating an Agent requires an App context.
 - Creating concrete resources requires an App context.
 - There is no generic `services` table, `service.kind`, or generic Service CRUD.
-- A simple one-Agent, one-Channel App can be created from an App Template instead of a
-  required App or Agent type picker.
-- App creation does not create Web shell, GitHub repository, App runtime, App API endpoint, or
-  database tables.
+- App creation alone does not start a Deployment, create Agent runtime, create an App-level API
+  endpoint, or create application database tables.
 - Thread creation targets one Agent and creates a Session.
 - App aggregates Threads from its Agents.
 - Session Run is the execution record inside a Session.
 - Provider credentials and default Environment resolve through App.
-- Storage, Skills, MCP servers, and Channels are App-owned resources that Agents bind.
+- Skills, MCP servers, and Channels are App-owned resources that Agents bind.
+  Thread files follow Session scope; the reserved App library scope is not yet a
+  shipped user-managed write surface.
 - Agent exposure owns API endpoint and channel delivery.
-- There is no Publish App action in the V1 path.
-- Export creates one `Skill.md` for the whole App.
-- Usage, health, and logs are visible at App scope.
+- App Deployment produces an external Web artifact and Mosoo-owned URL without becoming Agent
+  runtime or an App-level API endpoint.
+- App Overview exposes current Deployment state and actions; App usage and Agent logs remain on
+  their implemented settings/detail surfaces.
 - Organization remains present only as tenant, billing rollup, and future governance shell.
 - No new V1 code introduces App members, role matrices, invitations, or access requests.

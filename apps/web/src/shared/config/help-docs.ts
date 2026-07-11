@@ -25,12 +25,33 @@ export interface HelpDoc {
 
 export const HELP_DOCS: readonly HelpDoc[] = [
   // <generated:help-docs> -- do not edit by hand; see header comment.
-  { section: "Getting started", title: "Mosoo API", url: "https://mosoo.ai/docs/" },
+  { section: "Getting started", title: "Mosoo Public Thread API", url: "https://mosoo.ai/docs/" },
   { section: "Getting started", title: "Quickstart", url: "https://mosoo.ai/docs/quickstart" },
   {
     section: "Getting started",
     title: "Authentication and access",
     url: "https://mosoo.ai/docs/auth-and-access",
+  },
+  {
+    section: "Getting started",
+    title: "Agent API Endpoints",
+    url: "https://mosoo.ai/docs/agent-api-endpoints",
+  },
+  {
+    section: "Getting started",
+    title: "Threads and Runs",
+    url: "https://mosoo.ai/docs/threads-and-runs",
+  },
+  {
+    section: "Getting started",
+    title: "Events and streaming",
+    url: "https://mosoo.ai/docs/events-and-streaming",
+  },
+  { section: "Getting started", title: "Files", url: "https://mosoo.ai/docs/files" },
+  {
+    section: "Getting started",
+    title: "Errors and limits",
+    url: "https://mosoo.ai/docs/errors-and-limits",
   },
   {
     section: "Getting started",
@@ -41,18 +62,8 @@ export const HELP_DOCS: readonly HelpDoc[] = [
   { section: "API reference", title: "API Reference", url: "https://mosoo.ai/docs/api-reference" },
   {
     section: "API reference",
-    title: "Complete Thread file upload",
-    url: "https://mosoo.ai/docs/api-reference/complete-thread-file-upload",
-  },
-  {
-    section: "API reference",
-    title: "Download Thread file content",
-    url: "https://mosoo.ai/docs/api-reference/download-thread-file-content",
-  },
-  {
-    section: "API reference",
-    title: "Upload Thread file content",
-    url: "https://mosoo.ai/docs/api-reference/upload-thread-file-content",
+    title: "Create a Thread for an Agent API Endpoint",
+    url: "https://mosoo.ai/docs/api-reference/create-a-thread-for-an-agent-api-endpoint",
   },
   {
     section: "API reference",
@@ -61,18 +72,8 @@ export const HELP_DOCS: readonly HelpDoc[] = [
   },
   {
     section: "API reference",
-    title: "Create a Thread for an Agent API Endpoint",
-    url: "https://mosoo.ai/docs/api-reference/create-a-thread-for-an-agent-api-endpoint",
-  },
-  {
-    section: "API reference",
     title: "Retrieve Thread summary",
     url: "https://mosoo.ai/docs/api-reference/retrieve-thread-summary",
-  },
-  {
-    section: "API reference",
-    title: "Delete a Thread",
-    url: "https://mosoo.ai/docs/api-reference/delete-a-thread",
   },
   {
     section: "API reference",
@@ -81,8 +82,13 @@ export const HELP_DOCS: readonly HelpDoc[] = [
   },
   {
     section: "API reference",
-    title: "List Thread events",
-    url: "https://mosoo.ai/docs/api-reference/list-thread-events",
+    title: "Unarchive a Thread",
+    url: "https://mosoo.ai/docs/api-reference/unarchive-a-thread",
+  },
+  {
+    section: "API reference",
+    title: "Delete a Thread",
+    url: "https://mosoo.ai/docs/api-reference/delete-a-thread",
   },
   {
     section: "API reference",
@@ -91,8 +97,23 @@ export const HELP_DOCS: readonly HelpDoc[] = [
   },
   {
     section: "API reference",
+    title: "List Thread events",
+    url: "https://mosoo.ai/docs/api-reference/list-thread-events",
+  },
+  {
+    section: "API reference",
     title: "Stream Thread events",
     url: "https://mosoo.ai/docs/api-reference/stream-thread-events",
+  },
+  {
+    section: "API reference",
+    title: "Upload an Agent file",
+    url: "https://mosoo.ai/docs/api-reference/upload-an-agent-file",
+  },
+  {
+    section: "API reference",
+    title: "Retrieve file metadata",
+    url: "https://mosoo.ai/docs/api-reference/retrieve-file-metadata",
   },
   {
     section: "API reference",
@@ -101,23 +122,18 @@ export const HELP_DOCS: readonly HelpDoc[] = [
   },
   {
     section: "API reference",
-    title: "Add a Thread file",
-    url: "https://mosoo.ai/docs/api-reference/add-a-thread-file",
+    title: "Download Thread file content",
+    url: "https://mosoo.ai/docs/api-reference/download-thread-file-content",
   },
   {
     section: "API reference",
-    title: "Create a Thread file upload",
-    url: "https://mosoo.ai/docs/api-reference/create-a-thread-file-upload",
+    title: "Delete a file",
+    url: "https://mosoo.ai/docs/api-reference/delete-a-file",
   },
   {
     section: "API reference",
     title: "Remove a Thread file",
     url: "https://mosoo.ai/docs/api-reference/remove-a-thread-file",
-  },
-  {
-    section: "API reference",
-    title: "Unarchive a Thread",
-    url: "https://mosoo.ai/docs/api-reference/unarchive-a-thread",
   },
   // </generated:help-docs>
 ];

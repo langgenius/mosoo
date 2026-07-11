@@ -53,7 +53,7 @@ Extensibility, abstraction, future scenarios, operational flourishes — all of 
 | 55  | Working Backwards              | Write the PR + FAQ first, then reason backward                        | Driven by the customer's perspective                               |
 | 56  | Event Storming                 | Collaborative DDD modeling                                            | Complex business workflows                                         |
 | 89  | PESTLE Analysis                | Political / Economic / Social / Technological / Legal / Environmental | Strategy / long-term planning                                      |
-| 90  | SWOT Analysis                  | Four quadrants: Strengths / Weaknesses / Opportunities / Threats      | Strategy / app initiation                                      |
+| 90  | SWOT Analysis                  | Four quadrants: Strengths / Weaknesses / Opportunities / Threats      | Strategy / app initiation                                          |
 | 92  | Competitive Analysis Framework | Direct + indirect + substitutes                                       | Finding differentiation                                            |
 
 ### 2.2 PRD Type → Recommended Methods
@@ -66,7 +66,7 @@ Extensibility, abstraction, future scenarios, operational flourishes — all of 
 | Touches multiple user paths / multiple modules       | Issue Tree (MECE decomposition)                                    |
 | Redesign, user feedback says it feels "unintuitive"  | Mental Models + POV                                                |
 | Modeling a complex business workflow                 | Event Storming                                                     |
-| Strategy / app initiation / long-term planning   | PESTLE + SWOT + Competitive Analysis                               |
+| Strategy / app initiation / long-term planning       | PESTLE + SWOT + Competitive Analysis                               |
 | You don't know which category the problem falls into | Use **Cynefin** first to assess the category, then pick a tool     |
 
 > The output of this section does not need to appear in full in the PRD body, but the key pruning conclusions must leave a trace in the PRD. Sections 2.3 and 2.4 below are the two foundational mindsets that every PRD should run by default; their conclusions should ultimately land in the "Reasoning Review" section rather than staying only in the writer's head.
@@ -278,13 +278,13 @@ This section records only the architectural impact triggered by the product requ
 
 `E2E proof required?` declares only the acceptance posture; it does not ask the PM to write engineering test details. Allowed values are `none` / `deterministic-e2e` / `live-smoke` / `manual-only` / `deferred-with-trigger`.
 
-| Question                                         | This PRD's Conclusion                                                                                                                                                                                                                                   |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Question                                         | This PRD's Conclusion                                                                                                                                                                                                                              |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Which boundary did this add / change?            | For example Web/API, GraphQL, Public API, Runtime/Driver, Files, Credential/Vault, Cost, Organization/Access, etc.                                                                                                                                 |
-| Which contract is the truth source?              | For example `docs/architecture.md`, some `pkgs/contracts/*`, the GraphQL spec, the runtime protocol, the DB schema, an OpenAPI doc, or an existing PRD.                                                                                                 |
-| Which generated artifacts must run?              | For example `just graphql-codegen`, `just db-regen`, OpenAPI example validation, etc.; write "none" if there are no generated artifacts.                                                                                                                |
-| E2E proof required?                              | For example `none`, `deterministic-e2e`, `live-smoke`, `manual-only`, `deferred-with-trigger`; state clearly why this posture is sufficient.                                                                                                            |
-| Which old architectural assumptions are retired? | For example Workspace is still a product layer, the Driver actively calls back over the public internet, Session state equals Space, the Runtime defaults to a generic protocol, the API targets only the UI, etc.; write "none" if nothing is retired. |
+| Which contract is the truth source?              | For example `docs/architecture.md`, some `pkgs/contracts/*`, the GraphQL spec, the runtime protocol, the DB schema, an OpenAPI doc, or an existing PRD.                                                                                            |
+| Which generated artifacts must run?              | For example `just graphql-codegen`, `just db-generate <name>`, OpenAPI example validation, etc.; write "none" if there are no generated artifacts.                                                                                                 |
+| E2E proof required?                              | For example `none`, `deterministic-e2e`, `live-smoke`, `manual-only`, `deferred-with-trigger`; state clearly why this posture is sufficient.                                                                                                       |
+| Which old architectural assumptions are retired? | For example Workspace is still a product layer, the Driver listens on a sandbox-local control port, Session state equals Space, the Runtime defaults to a generic protocol, the API targets only the UI, etc.; write "none" if nothing is retired. |
 
 ---
 

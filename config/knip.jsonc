@@ -22,13 +22,8 @@
       "ignoreDependencies": ["cloudflare", "wrangler"],
     },
     "apps/driver": {
-      "entry": [
-        "bin/check-openai-app-server-schema.ts",
-        "bin/openai-local-runtime-probe.ts",
-        "src/index.ts",
-        "tests/**/*.test.ts",
-      ],
-      "project": ["bin/**/*.ts", "src/**/*.ts!", "tests/**/*.ts"],
+      "entry": ["src/index.ts", "tests/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "tests/**/*.ts"],
     },
     "apps/web": {
       "includeEntryExports": false,

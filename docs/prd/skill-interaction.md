@@ -1,12 +1,17 @@
 # Skill — for humans
 
-> This is the product-story version of Skill, written for non-engineering readers. The **complete engineering contract** (file/directory layout, frontmatter fields, acceptance criteria, explicit Upgrade flow, and open questions) lives in the full PRD.
+Status: active and shipped for App-owned Skill packages and explicit Agent
+bindings. Retired Default Agent/sharing material is historical only.
+
+> This is the product-story version of Skill, written for non-engineering
+> readers. Exact package admission lives in `pkgs/skill-package`; API ownership
+> and binding behavior lives in the current Skill and Agent modules.
 
 ---
 
 ## Calibrate your mental model first (drift note)
 
-The product described in §1 / §11 / §13 of the full PRD looks like this:
+The retired pre-App design looked like this:
 
 - An account-level **Default Agent** automatically picks Skills on the Work page.
 - Each user controls "does my Default Agent automatically invoke a given Skill" through a **per-user toggle**.
@@ -55,8 +60,10 @@ When this is done, an Agent owner should be able to:
 - Open an App-local Skill detail view to read `SKILL.md` or download the `.skill` archive
 - Mount App-local Skills in an Agent configuration
 - Copy or fork an App-local Skill when they want an independent package to edit
-- Delete an App-local Skill after confirmation, with no cross-user cascade; affected Agent references must show an explicit tombstone or fail closed at runtime
-- Import package Skills only after reconnecting them to the active App; legacy runtime ids from another ownership boundary are not enough
+- Delete an App-local Skill after confirmation, with no cross-user cascade;
+  affected Agents keep a visible missing-Skill tombstone, and future runs skip
+  the unavailable Skill with a warning until the binding is removed
+- Import valid embedded package Skills by materializing them inside the target App; missing/stripped Skills become explicit issues, and source ids never prove access
 
 ---
 
@@ -75,9 +82,9 @@ We deliberately do **not** reuse the old (now-removed) Space three-tier admin / 
 
 The current registry has one product group:
 
-| Group          | Who's in it                                                                                           |
-| -------------- | ----------------------------------------------------------------------------------------------------- |
-| **App Skills** | Skills whose `app_id` is the active App, including uploaded, generated, imported, and copied packages |
+| Group          | Who's in it                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| **App Skills** | Skills whose `app_id` is the active App, including uploaded, imported, and copied packages |
 
 Future multi-user governance may add additional views, but V1 should not expose them or keep dormant route/API entrypoints for them.
 
@@ -110,9 +117,11 @@ The App owner can copy or fork a Skill:
 
 When the App owner deletes a Skill:
 
-1. A confirmation dialog shows the impacted Agent bindings when they are known
+1. A confirmation dialog identifies the Skill being removed; it does not currently list impacted Agents
 2. The owner confirms and the Skill disappears from the active App registry
-3. Any mounted Agent reference becomes an explicit deleted/missing reference or fails closed at runtime
+3. Any mounted Agent reference remains visible as a missing-Skill tombstone
+4. Future runs skip that unavailable Skill and emit a `skill.tombstone` warning
+   until the owner removes the binding from the Agent
 
 The effect: nothing invents ownership for another user or App, and no compatibility layer silently recreates the deleted package.
 
@@ -139,11 +148,13 @@ A Skill's contents include at least one `SKILL.md` (with frontmatter). It can be
 
 ### 6.2 The intended primary update path (drift: depends on the Default Agent, removed by the pivot)
 
-The update mechanism locked in by §10.1 of the full PRD was: the Owner opens a Session with their own **Default Agent** on the Work page and updates the skill file "within the conversation that uses the skill" — making "editing" a byproduct of "using."
+The retired design proposed editing a Skill through a Default Agent conversation
+on the removed Work page.
 
 This path depends on the Default Agent. After the pivot, the Default Agent has been removed, so this editing flow does not exist for now. The viable way for an Owner to update a skill today is:
 
-- Edit `SKILL.md` locally and go through the `Upload Skill` flow again (per the default behavior in §15 Q1 of the full PRD, this creates a new skill; the explicit "Upgrade" entrypoint that overwrites the same UUID, §10.2, has not yet been built)
+- Edit `SKILL.md` locally and use `Upload Skill` again. This creates a new Skill;
+  an explicit same-ID Upgrade entry point has not been built.
 
 Whether to reconnect "in-conversation editing" will be decided if and when the Default Agent concept returns.
 
@@ -156,11 +167,17 @@ What's mounted in an Agent's configuration is an **App-owned Skill id reference*
 - The Agent config stores explicit references to Skills in the same App
 - At Session start, runtime resolves and freezes the configured Skill bindings through the Agent's App
 - Legacy package runtime ids or cross-App references fail closed instead of deriving ownership from snapshots or historical tenant rows
-- If a Skill is deleted or unavailable, the UI/runtime must surface a tombstone or explicit failure; no shared-owner fallback is allowed
+- If a bound Skill has been deleted, the Agent editor shows a missing-Skill
+  tombstone and Session start skips it with a `skill.tombstone` warning; no
+  shared-owner fallback is allowed
+- A non-package Skill reference whose expected snapshot has disappeared without
+  a tombstone is treated as corrupt state and fails Session start instead of
+  being silently skipped
 
 ### 8.1 User-level "toggle" vs Agent mounting (drift)
 
-What §11.1 of the full PRD intended to express: when a user toggles a skill OFF in the Skills list, it **only affects whether that user's Default Agent automatically invokes it**; it does not affect an Agent's `skills[]` ("the creator says this skill is required for it to work").
+The retired per-user toggle affected only a removed Default Agent concept. It is
+not a current binding or availability rule.
 
 | Invocation method                               | Does the per-user toggle take effect?    |
 | ----------------------------------------------- | ---------------------------------------- |
@@ -178,7 +195,7 @@ But the Default Agent has been retired, so neither of the first two rows current
 
 ```mermaid
 flowchart TD
-    OWNER(("App owner")) --> CREATE["Upload / generate / import Skill package"]
+    OWNER(("App owner")) --> CREATE["Upload / import / copy Skill package"]
     CREATE --> REGISTRY["App Skill registry<br/>app_id = active App"]
 
     REGISTRY --> BIND["Agent config binds Skill id<br/>same App"]
@@ -189,9 +206,9 @@ flowchart TD
     COPY --> REGISTRY
 
     REGISTRY --> DELETE_Q{"Delete Skill?"}
-    DELETE_Q --> CONFIRM["Confirm impacted Agent bindings"]
+    DELETE_Q --> CONFIRM["Confirm Skill removal"]
     CONFIRM --> DELETE["Remove Skill from App registry"]
-    DELETE --> TOMBSTONE["Mounted references show tombstone<br/>or fail closed at runtime"]
+    DELETE --> TOMBSTONE["Mounted references show missing-Skill tombstone<br/>future runs skip it with a warning"]
 
     style REGISTRY fill:#e3f2fd,stroke:#1976d2
     style BIND fill:#fff3e0,stroke:#ff9800
@@ -203,6 +220,7 @@ flowchart TD
 
 ## Related
 
-- **Complete engineering contract**: the full Skill PRD
+- **Exact implementation contracts**: `pkgs/skill-package`, Agent manifest
+  contracts, and the API Skill modules
 - **How a Skill is mounted in an Agent's configuration**: [`./agent-manifest.md`](./agent-manifest.md)
 - **Adjacent assets**: [Files](./files-api-contract.md) · [MCP](./mcp-interaction.md) · [Environment](./environment.md)

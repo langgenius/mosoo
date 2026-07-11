@@ -12,6 +12,7 @@ import {
 import {
   BoundAgentCallError,
   DEPLOYMENT_AGENT_CALL_TIMEOUT_ERROR_CODE,
+  DEPLOYMENT_AGENT_FINAL_OUTPUT_MISSING_ERROR_CODE,
   DEPLOYMENT_AGENT_NEEDS_INPUT_ERROR_CODE,
   DEPLOYMENT_AGENT_RUN_FAILED_ERROR_CODE,
 } from "../src/modules/public-api/app-agent-bound-errors";
@@ -203,13 +204,25 @@ describe("selectBoundAgentReply (final-output extraction)", () => {
     ).toEqual({ reply: "the answer" });
   });
 
-  test("returns an empty reply when a completed run has no output", () => {
-    expect(
+  test("rejects a completed run with no canonical final output", () => {
+    expect(() =>
       selectBoundAgentReply({
         finalOutput: null,
         run: { error: null, status: "completed" },
       }),
-    ).toEqual({ reply: "" });
+    ).toThrow(BoundAgentCallError);
+
+    try {
+      selectBoundAgentReply({
+        finalOutput: null,
+        run: { error: null, status: "completed" },
+      });
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: DEPLOYMENT_AGENT_FINAL_OUTPUT_MISSING_ERROR_CODE,
+        status: 503,
+      });
+    }
   });
 
   test("surfaces the run error on a failed run", () => {

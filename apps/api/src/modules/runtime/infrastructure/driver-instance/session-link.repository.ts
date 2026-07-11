@@ -41,6 +41,10 @@ interface RuntimeSessionLinkRow {
   trace_id: string | null;
 }
 
+export interface GetRuntimeSessionLinkOptions {
+  sessionRunId?: SessionRunId;
+}
+
 function resolveRuntimeSessionPrincipalIds(row: RuntimeSessionLinkRow | null): {
   callerId: PlatformId | null;
   executionOwnerId: AccountId | null;
@@ -70,8 +74,19 @@ function resolveRuntimeSessionPrincipalIds(row: RuntimeSessionLinkRow | null): {
 export async function getRuntimeSessionLink(
   database: D1Database,
   driverInstanceId: DriverInstanceId,
+  options: GetRuntimeSessionLinkOptions = {},
 ): Promise<RuntimeSessionLink> {
   const linkedSessionId = sql<SessionId | null>`coalesce(${sessionRunsTable.sessionId}, ${sandboxSessionsTable.sessionId})`;
+  const linkedSessionRun =
+    options.sessionRunId === undefined
+      ? and(
+          eq(sessionRunsTable.driverInstanceId, driverInstancesTable.id),
+          inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
+        )
+      : and(
+          eq(sessionRunsTable.driverInstanceId, driverInstancesTable.id),
+          eq(sessionRunsTable.id, options.sessionRunId),
+        );
   const row =
     (await getAppDatabase(database)
       .select({
@@ -89,13 +104,7 @@ export async function getRuntimeSessionLink(
         trace_id: sessionRunsTable.traceId,
       })
       .from(driverInstancesTable)
-      .leftJoin(
-        sessionRunsTable,
-        and(
-          eq(sessionRunsTable.driverInstanceId, driverInstancesTable.id),
-          inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
-        ),
-      )
+      .leftJoin(sessionRunsTable, linkedSessionRun)
       .leftJoin(
         sandboxSessionsTable,
         eq(sandboxSessionsTable.sessionId, driverInstancesTable.sandboxSessionId),

@@ -192,4 +192,32 @@ describe("session message query", () => {
 
     expect(messages.map((message) => message.id)).toEqual([MESSAGE_ID_1, MESSAGE_ID_2]);
   });
+
+  test("removes provider-private citations from stored assistant message projections", async () => {
+    const database = createSessionMessageQueryDatabase();
+    const privateCitation = "\uE200cite\uE202turn2view0\uE202turn8view0\uE201";
+    const storedText = `before${privateCitation}after`;
+
+    await database
+      .prepare("UPDATE session_message SET content_text = ?, segments_json = ? WHERE id = ?")
+      .bind(storedText, JSON.stringify([{ kind: "text", text: storedText }]), MESSAGE_ID_2)
+      .run();
+
+    const [queryMessages, snapshotMessages] = await Promise.all([
+      getThreadSessionMessages(database, VIEWER, {
+        appId: APP_ID,
+        sessionId: SESSION_ID,
+      }),
+      loadStoredSessionMessages(database, SESSION_ID),
+    ]);
+
+    expect(queryMessages[1]).toMatchObject({
+      content: "beforeafter",
+      segments: [{ kind: "text", text: "beforeafter" }],
+    });
+    expect(snapshotMessages[1]).toMatchObject({
+      content: "beforeafter",
+      segments: [{ kind: "text", text: "beforeafter" }],
+    });
+  });
 });

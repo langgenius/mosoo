@@ -9,7 +9,7 @@ import {
   PUBLIC_THREAD_EVENTS_MAX_LIMIT,
 } from "@mosoo/contracts/public-api";
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
-import { sessionEventsTable } from "@mosoo/db";
+import { sessionEventsTable, sessionMessagesTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type { RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
@@ -19,6 +19,7 @@ import { getAppDatabase } from "../../platform/db/drizzle";
 import { createSessionProcessEventsFromSessionEventRows } from "../sessions/application/session-process-events.service";
 import type { SessionEventProcessRow } from "../sessions/application/session-process-events.service";
 import { publicInternalError, publicInvalidRequest, toPublicApiError } from "./public-api-errors";
+import { sanitizePublicOutput } from "./public-output-sanitization";
 import { admitPublicThreadReader } from "./public-thread-admission";
 import { toBackingSessionId } from "./public-thread-ids";
 import { getThreadSnapshot } from "./public-thread-store";
@@ -69,7 +70,7 @@ function toPublicThreadEventLogEntry(input: {
   }
 
   return {
-    content: event.content,
+    content: sanitizePublicOutput(event.content).text,
     durationMs: event.durationMs,
     id: parsePlatformId(event.id, "Runtime event ID") as RuntimeEventId,
     occurredAt: event.occurredAt,
@@ -206,26 +207,33 @@ export async function readPublicThreadRunFinalOutput(input: {
   database: D1Database;
   runId: SessionRunId;
   sessionId: SessionId;
-}): Promise<PublicThreadFinalOutput> {
-  const rows = await getAppDatabase(input.database)
-    .select({
-      content_text: sessionEventsTable.contentText,
-    })
-    .from(sessionEventsTable)
-    .where(
-      and(
-        eq(sessionEventsTable.sessionId, input.sessionId),
-        eq(sessionEventsTable.runId, input.runId),
-        eq(sessionEventsTable.visibility, "all_consumers"),
-        eq(sessionEventsTable.processType, "agent.message.delta"),
-        eq(sessionEventsTable.processStatus, "available"),
-      ),
-    )
-    .orderBy(asc(sessionEventsTable.seq))
-    .all();
+}): Promise<PublicThreadFinalOutput | null> {
+  const message =
+    (await getAppDatabase(input.database)
+      .select({
+        content: sessionMessagesTable.contentText,
+      })
+      .from(sessionMessagesTable)
+      .where(
+        and(
+          eq(sessionMessagesTable.sessionId, input.sessionId),
+          eq(sessionMessagesTable.sessionRunId, input.runId),
+          eq(sessionMessagesTable.role, "assistant"),
+        ),
+      )
+      .orderBy(desc(sessionMessagesTable.seq))
+      .limit(1)
+      .get()) ?? null;
+
+  if (message === null) {
+    return null;
+  }
+
+  const sanitizedOutput = sanitizePublicOutput(message.content);
 
   return {
-    text: rows.map((row) => row.content_text).join(""),
+    text: sanitizedOutput.text,
+    ...(sanitizedOutput.warnings.length === 0 ? {} : { warnings: sanitizedOutput.warnings }),
   };
 }
 

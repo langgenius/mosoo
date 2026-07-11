@@ -1,188 +1,142 @@
-# Thread Files - For-Human PRD
+# Thread Files — current product and runtime contract
 
-> **Purpose**: This is the product-readable contract for files attached to Mosoo Threads. The implementation uses Session file/resource records, upload targets, runtime manifest injection, and the Public Thread file API.
->
-> **Current App boundary note**: Thread is the V1 product noun. A Thread file belongs to one backing AgentSession, and that Session inherits App from its Agent. File operations must use the admitted Session's App proof; runtime ids, package ids, channel metadata, old draft scopes, or tenant people state cannot prove access.
->
-> **Current UI status**: Web currently exposes composer paperclip upload for Thread/Session files. The old in-chat Files Panel and drag-to-panel entry points are not rendered. Public Thread API exposes list / attach / delete Thread file routes. Runtime behavior is unchanged: the Agent receives the current Session file manifest on the next user turn.
->
-> **Related docs**: [SPEC](../SPEC.md), [App Boundary](./app-boundary.md), [Agent Session Contract](./agent-session-api.md), and [Public API Surface](./public-thread-api-surface.md).
+Status: active current-state contract. Upload, link, metadata, download, and
+message-level attachment paths and writable-lifecycle enforcement are shipped.
+Automatic attachment materialization remains intentionally limited as
+documented below.
 
----
+Thread is the product noun; Session is the backing runtime record. Exact wire
+shapes are generated in `GET /api/v1/openapi.json`, and internal file DTOs live
+in `pkgs/contracts/src/file/file.contract.ts`.
 
-## 1. TL;DR
+## File contexts
 
-A Thread file is material attached to one Thread and its backing AgentSession.
+The shipped write context is **Thread files**: caller attachments and runtime
+artifacts scoped to one backing Session. The App Files page can list, filter,
+and download accessible records, but it has no current library create/upload
+path. `scope=library` is dormant contract/service plumbing and is not mounted as
+a shared runtime filesystem.
 
-- New Web Thread creation can attach local files through the composer paperclip.
-- Public Thread API callers can attach draft files to a Thread through the Thread file routes.
-- Channel delivery can normalize provider input into Session context, but it is not a public Thread file caller.
-- The runtime sees attached files only through the Session file manifest injected into a user turn.
-- The file follows the Thread/Session lifecycle; it is not a one-message attachment and not App-wide Storage.
+Internal `app_draft` records stage a Public API upload before it is claimed into
+a Thread. They are not a public draft/upload state machine.
 
-The mental model is:
+## Web flow
+
+- New Thread compose can upload selected files after Session creation and sends
+  those `attachmentIds` with the first user input.
+- An existing Agent Session composer can upload a Session resource directly.
+- Thread detail follow-up currently has no attachment picker.
+- Web `createSessionResourceUpload` rejects a 101st Session attachment.
+- The old chat Files Panel and drag-to-panel surface are not rendered.
+
+The internal Web uploader is browser-resumable. It creates an upload, uses one
+signed PUT for a small file or multipart PUTs with at most eight parts in
+flight, then completes the upload. The browser stores the original Blob and
+uploaded-part state in IndexedDB. On a later protected-page load, the same
+browser profile can choose Resume, Later, or Discard; multiple pending files
+resume one at a time. Recovery is bounded by the server-side upload state and
+expiry, and a terminal or missing (404) upload clears the local record. This is
+browser-local recovery, not a Public API workflow or a cross-device guarantee.
+
+## Public API flow
 
 ```text
-App
-  -> Agent
-    -> Thread
-      -> AgentSession
-        -> Thread files / Session files
-          -> next user turn manifest
+POST /api/v1/agents/{agentId}/files   multipart field `file`
+  -> Agent/App/caller admission
+  -> ready response.file.id in internal app_draft scope
+  -> reference as resources[].file_id in Thread create or user_message
+  -> target Thread admission + caller/App checks
+  -> claim into scope=session / kind=attachment
+  -> queue the Run with that message's attachment ids
 ```
 
----
+There is no public create-upload → `PUT` → complete workflow and no
+`POST /api/v1/threads/{threadId}/files` route.
 
-## 2. User Problem
+Public file routes support metadata, content download, Thread file listing,
+draft/Thread file deletion, and Thread-file removal. Upload responses use
+`file.id`; request resources use `file_id`.
 
-Owners and API callers often need to hand a CSV, spec, screenshot, log, or small document to the Agent for a specific Thread.
+## Runtime visibility
 
-The product must avoid three failure modes:
+Claimed attachments remain visible in Thread file-list APIs until removed, but
+the current run pipeline does **not** automatically inject every ready Thread
+file on every later turn. `queueSessionRun` passes only the `attachmentIds`
+supplied with that message; dispatch/materialization filters to those ids.
 
-- A file is treated as a one-off message attachment and silently disappears on the next turn.
-- A file uploaded in one Thread leaks into another Thread, another Agent, or App-wide Storage.
-- The public API exposes runtime mount paths or private file/resource implementation details.
+Consequences:
 
-The expected behavior is simple:
+- files referenced on the first message are available to that Run;
+- a Public API caller can reference additional files on a later `user_message`;
+- a later message with no attachment ids receives no automatic all-files
+  manifest, even though earlier files remain attached/listable on the Thread.
 
-> "This file belongs to this Thread. The Agent can use it on future turns in this Thread until I remove it or delete the Thread."
+Any story that promises persistent automatic re-injection of all ready files on
+each turn is not implemented.
 
----
+## Runtime output
 
-## 3. Goals
+Admitted `file.changed` / `file.change.updated` events for the Session output
+directory are read and recorded as `scope=session`, `kind=artifact`. The API
+then publishes `session.files.updated`. Artifacts do not enter the App Files
+library scope automatically.
 
-- Keep one file concept across Web Threads and the Public Thread API.
-- Scope every file to exactly one backing Session and therefore one App.
-- Reuse the same runtime manifest injection for Web-created and API-created Threads.
-- Keep public responses Thread-first and metadata-only.
-- Reject cross-App, wrong-Thread, wrong-caller, stale-draft, and unknown file references.
-- Keep Channel delivery outside the public file API; channel adapters normalize provider events before they touch Session input.
-- Preserve the 100-file limit per Session.
+The runtime-output path performs one bounded `max + 1` read per candidate; it
+does not call the Sandbox SDK's unbounded `readFile`. The 8 MiB per-file limit
+is a hard read bound. The 32 MiB / 100-artifact Session budgets are currently
+best-effort admission checks: concurrent event handlers can observe the same
+remaining budget and temporarily exceed the aggregate. Files seen beyond the
+observed budget are skipped and logged. Runtime output also writes R2 before
+the metadata row; a later database failure can leave an object that requires
+storage reconciliation.
 
----
+## Access boundary
 
-## 4. Concept Definitions
+- Pre-Thread upload proves the Agent, App, and caller.
+- Claim/list/read/remove proves the target Thread and its backing Session/App.
+- Cross-App, cross-caller, and cross-Thread ids fail closed.
+- Runtime paths and object keys are platform-owned and never caller-provided.
+- Channel metadata, package ids, runtime ids, and old tenant people state do not
+  prove file access.
+- Deleting a Session runs scoped file cleanup.
 
-| Term                      | Product definition                                                                                                  |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| **Thread file**           | Public/API noun for material attached to one Thread.                                                                |
-| **Session file**          | Implementation noun for the same material on the backing AgentSession.                                              |
-| **Session resource**      | Internal GraphQL/service noun for an attached Session file used by Web and runtime paths.                           |
-| **Draft file**            | Uploaded file staged before being claimed into a Thread. It has no runtime meaning until the Thread claim succeeds. |
-| **Attachment**            | Internal file kind for user-provided material. It must not reintroduce one-message-only semantics.                  |
-| **Artifact**              | Runtime-produced file. It can appear in Thread file projections, but is not uploaded by a caller as an input file.  |
-| **Runtime manifest**      | The list of currently attached Session files injected into the next user turn with read-only paths for the runtime. |
-| **Channel provider file** | File-like content received from Slack, Lark, Telegram, Discord, WeChat, or another provider. It must be normalized. |
-| **Files Library**         | App-scoped uploaded file pool. It is separate from Thread files unless a file is explicitly scoped to a Session.    |
-| **App ownership**         | The boundary inherited from Agent -> Thread -> Session. File access is checked against that boundary.               |
+## Current limits and gaps
 
----
+- Public upload accepts at most 8 MiB per file and creates an `app_draft` with a
+  24-hour expiry timestamp. OpenAPI declares the byte cap; the draft expiry is
+  still an internal lifecycle fact rather than a public response field.
+- Claim rejects an `app_draft` whose `expires_at` is in the past. Cleanup first
+  marks the record `deleting` and its upload `expired`, then deletes R2 and both
+  control rows. If R2/finalization fails, that durable row remains discoverable
+  and a later claim attempt retries cleanup before rejecting again.
+- Public draft claim enforces the shared 100-attachment aggregate limit with
+  an all-or-none compare-and-swap across the request's unique file IDs.
+- Public upload trusts the multipart `File.type` value as MIME metadata; it does
+  not content-detect MIME.
+- The route performs authentication and rate limiting before bounded multipart
+  parsing, and requires exactly one `file` field; duplicate or unrelated fields
+  are rejected.
+- Public event mutation preflights every requested action against the current
+  Session lifecycle before referenced drafts are claimed.
+- Public draft claim and file DELETE/remove share the writable-lifecycle guard:
+  archived, `RESCHEDULING`, and terminal Threads reject file mutation.
+- Draft claim copies every destination first, then commits all eligible file
+  rows in one guarded D1 batch. If the database claim fails, copied destination
+  objects are removed and no draft row changes owner.
+- After a successful database claim, deleting the old draft object is
+  best-effort. A crash or storage failure can therefore leave an unreachable
+  source object until storage reconciliation exists. If later Run creation
+  fails, already-claimed attachments remain on the Thread for explicit reuse or
+  removal; the file claim and Run creation are not one transaction.
 
-## 5. Entry Points
+These are current implementation facts. MIME detection, durable reconciliation
+of post-claim source objects, and transactional coupling between claim and Run
+creation remain follow-up hardening work rather than stronger guarantees.
 
-### 5.1 Web Threads
+## Non-goals
 
-Current Web upload behavior:
-
-1. The active App supplies `appId`.
-2. New Thread creation may include selected files; after the Thread is created, Web uploads those files as Session resources and sends their `attachmentIds` with the first input.
-3. The Agent Session panel can upload through its composer paperclip after an active Session exists.
-4. Existing Thread replies do not currently attach more files from the Thread detail composer.
-5. Follow-up user input sends normal Session events; the runtime manifest includes the ready files.
-
-Current Web caveat:
-
-- There is no rendered Files Panel in the chat header.
-- Pending and failed upload state may be shown near the composer.
-- The product target can reintroduce a list/management panel later, but the current contract must not pretend it is already the active source of truth in Web UI.
-
-### 5.2 Public Thread API
-
-Public API behavior:
-
-1. The caller authenticates with an Access Token.
-2. The target Thread is admitted through Public Thread API access checks.
-3. File operations use the admitted Thread's backing Session App.
-4. `GET /api/v1/threads/{threadId}/files` returns public Thread file metadata.
-5. `POST /api/v1/threads/{threadId}/files` claims a staged file into the Thread.
-6. `DELETE /api/v1/threads/{threadId}/files/{fileId}` removes a file from the Thread.
-
-Public responses do not expose runtime mount paths, private object keys, trace ids, or native runtime pointers.
-
-### 5.3 Channel Delivery
-
-Channel delivery is not a public file caller:
-
-- The App owns Channel setup and provider credentials.
-- One Agent owns the Channel binding and delivery behavior.
-- Provider events and provider file-like payloads are verified and normalized by the adapter path.
-- The adapter may create or continue the AgentSession for the bound Agent.
-- It must not bypass Thread/Session App proof or call the public HTTPS Thread file routes as a substitute for adapter admission.
-
----
-
-## 6. Lifecycle
-
-| State                 | Meaning                                                                    |
-| --------------------- | -------------------------------------------------------------------------- |
-| **Draft**             | Uploaded or staged, but not yet attached to a Thread.                      |
-| **Ready attachment**  | Attached to one Thread/Session and available for the next manifest.        |
-| **Referenced in Run** | Included in the manifest for a user turn; the runtime can read the paths.  |
-| **Removed**           | Deleted from the Thread file set; future turns no longer include it.       |
-| **Archived Thread**   | Thread is read-only; files remain part of the Thread record.               |
-| **Deleted Thread**    | Thread cleanup deletes Session files and associated runtime file material. |
-
-Lifecycle rules:
-
-- Uploading a file does not interrupt a currently running Run.
-- Deleting a file does not rewrite historical messages.
-- A file added or removed during a Run affects the next user turn, not the active Run.
-- Existing Sessions keep their own file set when Agent config changes.
-- A file cannot migrate to another Thread by carrying a file id across boundaries.
-
----
-
-## 7. Runtime Manifest Behavior
-
-The Agent does not watch the file set.
-
-On each user message, Mosoo lists the current ready Session files for that backing Session and injects a manifest into the runtime prompt/context. The manifest is an execution aid, not a public API contract.
-
-Observable behavior:
-
-- Upload, then close the Thread without another message: the file is attached, but the Agent has not seen it yet.
-- Upload, then send a message: the Agent sees the file in that turn's manifest.
-- Delete, then send a message: the deleted file is absent from the manifest.
-- Public API file metadata can be stable while runtime mount paths remain private.
-
-Runtime adapters receive ordinary input plus the manifest. They should not need provider-specific Session file logic.
-
----
-
-## 8. Fail-closed Invariants
-
-- Web file upload requires an active App and an admitted Session.
-- Public file routes require Public Thread admission before listing, claiming, or deleting files.
-- The admitted Thread's Session App is the only file access boundary.
-- Draft files must be claimed by the same admitted caller path before they become Thread files.
-- A file id from another Session, another App, a stale draft, or a legacy package cannot be reused as ownership proof.
-- Runtime mount paths are derived by the platform and are never caller-provided.
-- Channel provider metadata cannot prove Mosoo file access.
-- Unknown public file request fields are rejected.
-- The 100-file Session limit is enforced before accepting another upload.
-
----
-
-## 9. Out Of Scope
-
-- App-wide file libraries.
-- Cross-Thread file reuse.
-- Cross-Agent file sharing.
-- Files that grant access through tenant people state.
-- A public mount-path API.
-- A Channel provider file API that bypasses adapter admission.
-- A user-visible Files Panel until the Web surface is rebuilt.
-
----
-
-> This PRD defines Thread/Session file semantics. Public docs should lead with Thread files. Implementation docs may use Session files or Session resources when explaining code, storage, and runtime manifest behavior.
+- a whole-App package, App template, or App source tree;
+- a runtime-writable shared Files Library mount;
+- cross-App or cross-Thread sharing by carrying a file id;
+- caller-supplied runtime mount paths;
+- secrets, native runtime state, or Session history as file content contracts.

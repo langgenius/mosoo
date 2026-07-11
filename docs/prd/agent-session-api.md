@@ -1,8 +1,10 @@
 # Agent Session Contract - For-Human PRD
 
+Status: active current-state implementation contract behind Threads.
+
 > **Purpose**: This is the human-readable version for PMs, designers, GTM, and reviewers. It explains the implementation-layer AgentSession contract behind Mosoo Threads.
 >
-> **Current App boundary note**: Thread is the V1 product name. AgentSession is the implementation/runtime record. An AgentSession always belongs to one Agent, inherits App through that Agent, freezes the Agent execution snapshot when it is created, and rolls history/usage/operations back to the App. Public developer docs should say Thread and Agent API Endpoint, not Session-first product language.
+> **Current App boundary note**: Thread is the V1 product name for the same backing AgentSession record; there is no separate Thread table or id. An AgentSession always belongs to one Agent, inherits App through that Agent, and freezes the Agent execution snapshot when it is created. App Usage rolls up cost; Thread/Agent surfaces own history and diagnostics. Public developer docs should say Thread and Agent API Endpoint, not Session-first product language.
 >
 > **Related docs**: [SPEC](../SPEC.md), [App Boundary](./app-boundary.md), [Agent Exposure Identity](./agent-service-identity.md), [Public API Surface](./public-thread-api-surface.md), [Session Files](./session-files.md), and [Runtime State Operations](./runtime-state-operations.md).
 
@@ -23,10 +25,9 @@ The contract is:
 ```text
 App
   -> Agent
-    -> Thread product record
-      -> AgentSession implementation record
-        -> Run
-          -> runtime projection
+    -> AgentSession record (product name: Thread)
+      -> Run
+        -> runtime projection
 ```
 
 The AgentSession contract answers only **how one Agent execution is tracked**. It does not decide API endpoint exposure, Channel installation, provider signing, or external delivery. Those entry points normalize their caller context, then create or continue the Session with explicit App proof.
@@ -40,7 +41,10 @@ The owner needs one reliable Agent execution model across Web Threads, Agent API
 - A Web Thread should behave like the same kind of Agent work as an API-created Thread.
 - A public API caller should receive Thread responses without learning Mosoo runtime internals.
 - A Channel event should map to the correct Agent and external thread without becoming a public API caller.
-- A running Session must keep the DeploymentVersion, Environment revision, provider/model references, Skill/MCP/Storage bindings, and channel metadata selected at creation time.
+- A running Session must keep the DeploymentVersion, Environment revision,
+  provider/model references, Skill/MCP snapshots, and channel metadata selected
+  at creation time. Thread files follow the Session file contract instead of an
+  Agent version binding.
 - App Usage must show App-level rollups while preserving Agent, DeploymentVersion, Session, Run, model, provider, and trigger attribution.
 
 The failure modes to avoid:
@@ -65,29 +69,30 @@ After this round, Mosoo should be able to clearly articulate:
 - Channel delivery owns provider signing, external thread mapping, and reply writeback outside the Public Thread API.
 - Caller attribution is distinct from execution owner: the caller explains who triggered input; the Agent owner controls runtime identity and App-owned credential/resource resolution.
 - Native runtime pointers exist only as internal recovery or diagnostics records.
-- Usage and process output are projected into App operations, not into a separate Session product surface.
+- Usage rolls up to App Usage; process events and diagnostics remain on the
+  admitted Thread/Agent surfaces rather than a generic App operations console.
 
 ---
 
 ## 4. Concept Definitions
 
-| Term                           | Product definition                                                                                                                                      |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **App**              | The V1 product, resource, operations, export, and usage/cost boundary.                                                                                  |
-| **Agent**                      | The App-local runtime and delivery subject. It owns runtime execution, endpoint exposure, channel delivery, DeploymentVersions, and Sessions.           |
-| **Thread**                     | The V1 product name for an Agent interaction. Web and public API surfaces should center this noun.                                                      |
-| **AgentSession**               | The implementation/runtime record behind a Thread. Code, database, and contracts may use this name.                                                     |
-| **Session Execution Snapshot** | The frozen execution context selected when a Session starts: Agent id, App id, DeploymentVersion, Environment revision, bindings, and metadata. |
-| **Run**                        | One execution attempt inside a Session, triggered by a user message, permission decision, interrupt, channel event, resume, retry, or system event.     |
-| **SessionMessage**             | Durable transcript projection for a Session. It is not a transient runtime delta.                                                                       |
-| **SessionFile**                | User-provided material attached to one Session/Thread. The Agent is told about the available files on each user turn.                                   |
-| **Agent API Endpoint**         | The Agent-owned public HTTPS endpoint. It creates or continues Threads through the Public Thread API.                                                   |
-| **Public Thread API**          | The external developer contract for creating, reading, continuing, archiving, deleting, streaming, and attaching files to Threads.                      |
-| **Channel delivery path**      | An App-owned Channel plus Agent binding that converts provider events into Agent Sessions and writes output back to the provider.                       |
-| **Caller**                     | The account, Access Token, Web user, or external provider user context that triggered input.                                                            |
-| **Execution owner**            | The Agent owner whose App-local credentials, Environment, Skills, Storage, MCP, and runtime identity are used.                                          |
-| **Native resume pointer**      | The vendor runtime's own resume handle, such as a runtime thread or vendor session id. It is internal recovery data, not a public id.                   |
-| **Runtime output projection**  | The normalization layer that turns runtime output into text, tools, permissions, files, usage, status, process events, and diagnostics.                 |
+| Term                           | Product definition                                                                                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **App**                        | The V1 product, resource, configuration, deployment, and usage/cost boundary.                                                                                                  |
+| **Agent**                      | The App-local runtime and delivery subject. It owns runtime execution, endpoint exposure, channel delivery, DeploymentVersions, and Sessions.                                  |
+| **Thread**                     | The V1 product name for an Agent interaction. Web and public API surfaces should center this noun.                                                                             |
+| **AgentSession**               | The implementation/runtime record behind a Thread. Code, database, and contracts may use this name.                                                                            |
+| **Session Execution Snapshot** | The frozen execution context selected when a Session starts: Agent id, App id, DeploymentVersion, Environment revision, bindings, and metadata.                                |
+| **Run**                        | One execution attempt inside a Session. Current trigger values are `user_prompt`, `retry`, `resume`, and `system`; permission decisions and interrupts act on an existing Run. |
+| **SessionMessage**             | Durable transcript projection for a Session. It is not a transient runtime delta.                                                                                              |
+| **SessionFile**                | User-provided material linked to one Session/Thread. A turn receives only ready attachment ids explicitly included with that message.                                          |
+| **Agent API Endpoint**         | The Agent-owned public HTTPS endpoint. It creates or continues Threads through the Public Thread API.                                                                          |
+| **Public Thread API**          | The external developer contract for creating, reading, continuing, archiving, deleting, streaming, and attaching files to Threads.                                             |
+| **Channel delivery path**      | An App-owned Channel plus Agent binding that converts provider events into Agent Sessions and writes output back to the provider.                                              |
+| **Caller**                     | The account, Access Token, Web user, or external provider user context that triggered input.                                                                                   |
+| **Execution owner**            | The Agent owner whose App-local credentials, Environment, Skills, MCP, and runtime identity are used.                                                                          |
+| **Native resume pointer**      | The vendor runtime's own resume handle, such as a runtime thread or vendor session id. It is internal recovery data, not a public id.                                          |
+| **Runtime output projection**  | The normalization layer that turns runtime output into text, tools, permissions, files, usage, status, process events, and diagnostics.                                        |
 
 ---
 
@@ -107,7 +112,8 @@ flowchart TD
   Session --> Run["Run"]
   Run --> Projection["Runtime output projection"]
   Projection --> History["Thread history"]
-  Projection --> Usage["App usage / operations"]
+  Projection --> Diagnostics["Thread / Agent diagnostics"]
+  Projection --> Usage["App Usage"]
 ```
 
 Decisions:
@@ -124,12 +130,12 @@ Decisions:
 
 ### 6.1 Product and public resources
 
-| Resource         | Created by                                          | Lifecycle                                            | Invariants                                                       |
-| ---------------- | --------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------- |
-| **Thread**       | Web Threads, Public Thread API, or Channel delivery | create -> continue -> archive/unarchive/delete       | User-facing product record. In V1 it targets one Agent.          |
-| **Run**          | Session event handling                              | started -> completed/failed/canceled                 | Interrupt cancels the active Run but does not delete the Thread. |
-| **Thread event** | Public Thread API or Web/Channel event path         | accepted -> projected                                | Unknown event types are rejected by default.                     |
-| **Thread file**  | Web or Public Thread API                            | add -> available -> remove; follows Thread lifecycle | File operations use the admitted Session's App.          |
+| Resource         | Created by                                          | Lifecycle                                                  | Invariants                                                                                               |
+| ---------------- | --------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Thread**       | Web Threads, Public Thread API, or Channel delivery | create -> continue -> archive/unarchive/delete             | User-facing product record. In V1 it targets one Agent.                                                  |
+| **Run**          | Session event handling                              | started -> completed/failed/canceled                       | Interrupt cancels the active Run but does not delete the Thread.                                         |
+| **Thread event** | Public Thread API or Web/Channel event path         | accepted -> projected                                      | Unknown event types are rejected by default.                                                             |
+| **Thread file**  | Web or Public Thread API                            | add -> available -> remove under Thread writable lifecycle | Add/claim uses the admitted Session's App; archived, rescheduling, and terminal Threads reject mutation. |
 
 ### 6.2 Implementation-only resources
 
@@ -147,12 +153,12 @@ Decisions:
 
 The public lifecycle still uses the four Session states from the Runtime Session Kernel:
 
-| Status         | Meaning                                                                  | API behavior                                                                        |
-| -------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| `IDLE`         | The Session can accept new input; runtime may be warm or cold            | Sending events can start a new Run.                                                 |
-| `RUNNING`      | At least one Run is executing                                            | Live viewers receive projection updates; an interrupt cancels only the current Run. |
-| `RESCHEDULING` | Runtime connection is temporarily unavailable and platform recovery runs | Input can enter the reconnect queue; timeout transitions to `TERMINATED`.           |
-| `TERMINATED`   | Unrecoverable error or explicit end                                      | Transcript/process/diagnostics can be read; continuing work requires a new Session. |
+| Status         | Meaning                                                                       | API behavior                                                                                                                                  |
+| -------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IDLE`         | The Session can accept new input; runtime may be warm or cold                 | Sending events can start a new Run.                                                                                                           |
+| `RUNNING`      | At least one Run is executing                                                 | Another user message is rejected; pending permission decisions remain available, and an interrupt cancels only the current Run.               |
+| `RESCHEDULING` | A restart/recreate/reset runtime-state operation temporarily owns the Session | New input is rejected; completion returns to `IDLE`, failure restores the previous status, and operation timeout transitions to `TERMINATED`. |
+| `TERMINATED`   | Unrecoverable runtime/lifecycle failure                                       | Transcript/process/diagnostics can be read; continuing work requires a new Session.                                                           |
 
 Non-status expressions:
 
@@ -168,11 +174,12 @@ stateDiagram-v2
   [*] --> IDLE: create Thread / Session
   IDLE --> RUNNING: send user_message
   RUNNING --> IDLE: run completed / refusal / interrupt handled
-  RUNNING --> RESCHEDULING: recoverable runtime disconnect
-  RESCHEDULING --> RUNNING: driver reattached
-  RESCHEDULING --> TERMINATED: recovery timeout
-  RUNNING --> TERMINATED: unrecoverable runtime failure
-  IDLE --> TERMINATED: explicit terminate
+  IDLE --> RESCHEDULING: runtime-state operation starts
+  RUNNING --> RESCHEDULING: runtime-state operation starts
+  RESCHEDULING --> IDLE: operation completes / restores prior IDLE
+  RESCHEDULING --> RUNNING: failed operation restores prior RUNNING
+  RESCHEDULING --> TERMINATED: operation timeout
+  RUNNING --> IDLE: driver disconnect fails current Run as retryable
   TERMINATED --> [*]: delete
 ```
 
@@ -180,56 +187,61 @@ stateDiagram-v2
 
 ## 8. Input Categories
 
-| Input category      | Entry points                                 | Product semantics                                                                       |
-| ------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------- |
-| User message        | Web Threads, Public Thread API, Channel path | Natural-language or structured work for the Agent.                                      |
-| Permission decision | Web Threads, Public Thread API, Channel path | Allow/reject/scoped decision for a specific permission request.                         |
-| User interrupt      | Web Threads, Public Thread API, Channel path | Cancels the current Run while keeping the Thread resumable.                             |
-| Appended context    | Public Thread API or Channel path            | Normalized external context such as issue summary, thread excerpt, or artifact pointer. |
-| Platform resume     | Platform-generated only                      | Internal resume signal for cold-start/reconnect; callers cannot send it manually.       |
+| Input category          | Entry points                                 | Product semantics                                                                                                     |
+| ----------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| User message            | Web Threads, Public Thread API, Channel path | Natural-language or structured work; when admitted on an idle Session it creates a `user_prompt` Run.                 |
+| Permission decision     | Web runtime UI, Public Thread API            | Allow once or reject once for a pending request in the current Run.                                                   |
+| User interrupt          | Web runtime UI, Public Thread API            | Cancels the current Run while keeping the Thread resumable.                                                           |
+| Reserved resume trigger | No shipped caller entry point                | The run-trigger type reserves `resume`, but the current driver-reclaim path does not enqueue an automatic resume Run. |
 
 Input event rules:
 
-- Every input enters the same Session processing pipeline: admit caller, prove App, append normalized input, start or continue a Run, then app runtime output.
+- Every input is admitted against the Session/App boundary. A user message may start a Run only from `IDLE`; permission decisions and interrupts target the current `RUNNING` Run and do not create a new one.
+- Public send-events preflights the complete request against that state contract
+  before claiming draft files. Referenced drafts are then claimed in request
+  order before runtime event execution. Claims and events are not one
+  transaction; a later failure does not roll back an earlier claim or event.
 - Every input carries caller attribution, but credential/resource resolution follows the execution owner and the Agent's App.
 - Permission decisions must reference the original permission request.
 - Provider-native payloads must be normalized before they enter the Session.
 - Unknown consumer events are rejected by default.
-- On each user message, the platform attaches a manifest of current SessionFiles to the context handed to the Agent. The caller does not handwrite runtime paths, and the Agent does not rely on polling the file area.
+- On each user message, the platform materializes only the ready SessionFile ids
+  carried by that message's `attachmentIds`. Other linked files are not
+  automatically injected into the turn. The caller does not handwrite runtime
+  paths for the accepted ids.
 
 ---
 
 ## 9. Runtime Output Projection
 
-Runtime output projection is an internal normalization layer. Output from the Driver, file service, and diagnostics path is projected onto three product records:
+Runtime output projection is an internal normalization layer. Output from the Driver, file service, and diagnostics path is projected onto four product surfaces:
 
 - Thread history: durable transcript, message, Run, and file facts.
 - Live viewer state: frames needed by the current Web/stream view.
-- App operations: process events, usage, health, and redacted diagnostics.
+- Thread/Agent diagnostics: process events, health signals, and redacted diagnostics.
+- App Usage: cost and usage rollups.
 
-| Projection family            | Default visibility                     | Purpose                                                                               |
-| ---------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------- |
-| `session.status`             | Admitted viewers/callers               | Synchronizes `IDLE`, `RUNNING`, `RESCHEDULING`, and `TERMINATED`.                     |
-| `run.started`                | Admitted viewers/callers               | Creates one unit of work.                                                             |
-| `run.completed`              | Admitted viewers/callers               | Wraps final output, usage, and artifact pointers.                                     |
-| `run.failed`                 | Admitted viewers/callers               | Displays errors and the retry/new-thread decision.                                    |
-| `agent.message.delta`        | Admitted viewers/callers               | Streaming assistant text output.                                                      |
-| `agent.thinking.delta`       | Product-controlled                     | Optional thinking/planning output, gated by product policy.                           |
-| `tool.use.started`           | Admitted viewers/callers               | Tool-call cards and host activity.                                                    |
-| `tool.use.completed`         | Admitted viewers/callers               | Tool results and failure explanations.                                                |
-| `tool.confirmation.required` | Entrypoints with permission surface    | Triggers Needs approval.                                                              |
-| `file.changed`               | Admitted viewers/callers if subscribed | Updates runtime-written file activity.                                                |
-| `session_files.updated`      | Admitted viewers/callers if subscribed | The SessionFile list changed; file panels or public file reads refresh from the list. |
-| `usage.updated`              | App operations and allowed callers     | Cost and usage projection.                                                            |
-| `native.event`               | Internal diagnostics                   | Redacted vendor-native facts, not ordinary caller output.                             |
-| `machine.drift.detected`     | Internal diagnostics                   | Machine-observed state disagrees with compiled Agent config.                          |
+| Projection family                                  | Default visibility                     | Purpose                                                                                                                         |
+| -------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `session.status`                                   | Admitted viewers/callers               | Synchronizes `IDLE`, `RUNNING`, `RESCHEDULING`, and `TERMINATED`.                                                               |
+| `run.started`                                      | Admitted viewers/callers               | Creates one unit of work.                                                                                                       |
+| `run.completed`                                    | Admitted viewers/callers               | Wraps final output, usage, and artifact pointers.                                                                               |
+| `run.failed`                                       | Admitted viewers/callers               | Displays errors and the retry/new-thread decision.                                                                              |
+| `agent.message.delta`                              | Admitted viewers/callers               | Streaming assistant text output.                                                                                                |
+| `agent.thinking.delta`                             | Product-controlled                     | Optional thinking/planning output, gated by product policy.                                                                     |
+| `tool.use.started`                                 | Admitted viewers/callers               | Tool-call cards and host activity.                                                                                              |
+| `tool.use.completed`                               | Admitted viewers/callers               | Bounded tool-name completion/failure summary; raw result/output stays private.                                                  |
+| `tool.confirmation.required`                       | Supervised permission profile only     | Projects Needs approval when supervised mode is enabled; current production `full_access` profiles do not emit it.              |
+| `file.changed`                                     | Admitted viewers/callers if subscribed | Updates runtime-written file activity.                                                                                          |
+| `session.files.updated` -> `session_files.updated` | Admitted viewers/callers if subscribed | The runtime fact projects to the stable process-event type; file panels or public file reads refresh from the SessionFile list. |
+| `usage.updated`                                    | App Usage and allowed callers          | Cost and usage projection.                                                                                                      |
 
 Projection contract:
 
 - Within one driver ingestion, projection order follows received order.
 - Public callers read stable event projection, Thread summary, files, and stream output; they do not depend on raw runtime event grammar.
 - Diagnostics may retain redacted native summaries, but must not expose secrets or raw NativeRuntimeRef values to ordinary callers.
-- Native events that cannot be normalized may appear only as redacted diagnostics.
+- Vendor-native facts may be retained in dedicated redacted diagnostics, but they are not Session process-event types.
 
 ---
 
@@ -294,4 +306,4 @@ Channel delivery is not a public API caller:
 
 ---
 
-> This PRD defines the backing Session contract. Public docs and UI should lead with Threads, Agent API Endpoints, and App operations unless they are explicitly explaining implementation details.
+> This PRD defines the backing Session contract. Public docs and UI should lead with Threads, Agent API Endpoints, Agent diagnostics, and App Usage unless they are explicitly explaining implementation details.

@@ -132,6 +132,7 @@ export async function persistProjectedRuntimeDriverEvents(
   };
   const transitions = compactRuntimeDriverRunTransitions(projection.transitions);
   const [runTransition] = transitions;
+  const deferCompletedRunTransition = runTransition?.status === "completed";
   let runTransitionOutcome: SessionRunTransitionOutcome | null = null;
 
   if (link.sessionId === null) {
@@ -141,14 +142,8 @@ export async function persistProjectedRuntimeDriverEvents(
     };
   }
 
-  if (runTransition !== undefined && link.sessionRunId !== null) {
-    if (runTransition.status === "completed") {
-      runTransitionOutcome = await setDriverProjectedSessionRunStatus(database, {
-        runId: link.sessionRunId,
-        source: "driver",
-        status: "completed",
-      });
-    } else if (runTransition.status === "running") {
+  if (runTransition !== undefined && link.sessionRunId !== null && !deferCompletedRunTransition) {
+    if (runTransition.status === "running") {
       runTransitionOutcome = await setDriverProjectedSessionRunStatus(database, {
         runId: link.sessionRunId,
         source: "driver",
@@ -171,7 +166,7 @@ export async function persistProjectedRuntimeDriverEvents(
   }
 
   const shouldReleaseDriverRun = hasTerminalRuntimeDriverRunTransition(transitions);
-  const staleTerminalRunTransition = isStaleTerminalRunTransition(runTransitionOutcome);
+  let staleTerminalRunTransition = isStaleTerminalRunTransition(runTransitionOutcome);
 
   if (
     staleTerminalRunTransition &&
@@ -198,11 +193,6 @@ export async function persistProjectedRuntimeDriverEvents(
     await autoTitleRuntimeSession(database, link, projection.sessionTitle);
   }
 
-  const persistedEvents = await persistSessionRuntimeEvents(database, {
-    records: projection.runtimeEvents,
-    sessionId: link.sessionId,
-  });
-
   const traceId = link.traceId ?? link.sessionRunId ?? link.sessionId;
 
   if (projection.usage && link.sessionRunId !== null) {
@@ -217,16 +207,82 @@ export async function persistProjectedRuntimeDriverEvents(
   }
 
   const completedTransition = transitions.find((transition) => transition.status === "completed");
+  const preCompletionRuntimeEvents =
+    completedTransition === undefined
+      ? []
+      : projection.runtimeEvents.filter((record) => record.event.kind !== "run.completed");
+  const terminalRuntimeEvents =
+    completedTransition === undefined
+      ? projection.runtimeEvents
+      : projection.runtimeEvents.filter((record) => record.event.kind === "run.completed");
+  const persistedSourceEventIds: string[] = [];
 
-  if (completedTransition !== undefined && nextLiveState !== null && link.sessionRunId !== null) {
+  if (preCompletionRuntimeEvents.length > 0) {
+    const persisted = await persistSessionRuntimeEvents(database, {
+      records: preCompletionRuntimeEvents,
+      sessionId: link.sessionId,
+    });
+    persistedSourceEventIds.push(...persisted.persistedSourceEventIds);
+  }
+
+  // Completion is a retry boundary. Arbitrate the terminal Run status before
+  // writing canonical output, so a concurrent failure/cancellation cannot
+  // leave a final assistant row on a non-completed Run. The terminal receipt
+  // remains last: a crash after the CAS is repaired by replay against the exact
+  // completed Run link.
+  if (deferCompletedRunTransition && link.sessionRunId !== null) {
+    runTransitionOutcome = await setDriverProjectedSessionRunStatus(database, {
+      runId: link.sessionRunId,
+      source: "driver",
+      status: "completed",
+    });
+    staleTerminalRunTransition = isStaleTerminalRunTransition(runTransitionOutcome);
+
+    if (
+      staleTerminalRunTransition &&
+      !isMatchingStaleTerminalRunTransition({
+        outcome: runTransitionOutcome,
+        transition: runTransition,
+      })
+    ) {
+      if (shouldReleaseDriverRun) {
+        const { releaseTerminalDriverInstanceSessionRun } = await loadTerminalRunRelease();
+        await releaseTerminalDriverInstanceSessionRun(bindings, {
+          driverInstanceId: input.driverInstanceId,
+          sessionRunId: link.sessionRunId,
+        });
+      }
+
+      return {
+        liveState: null,
+        persistedSourceEventIds: [],
+      };
+    }
+  }
+
+  if (
+    completedTransition !== undefined &&
+    projection.finalAssistantMessage !== null &&
+    nextLiveState !== null &&
+    link.sessionRunId !== null &&
+    nextLiveState.run.id === link.sessionRunId
+  ) {
     await persistAssistantMessageProjection(database, {
       createdByAccountId: link.callerId ?? link.creatorId ?? input.driverInstanceId,
       driverInstanceId: input.driverInstanceId,
+      messageId: projection.finalAssistantMessage.id,
+      messageText: projection.finalAssistantMessage.text,
       sessionId: link.sessionId,
       sessionRunId: link.sessionRunId,
       state: nextLiveState,
     });
   }
+
+  const persistedTerminalEvents = await persistSessionRuntimeEvents(database, {
+    records: terminalRuntimeEvents,
+    sessionId: link.sessionId,
+  });
+  persistedSourceEventIds.push(...persistedTerminalEvents.persistedSourceEventIds);
 
   let committedLiveState: SessionLiveState | null = null;
 
@@ -260,6 +316,6 @@ export async function persistProjectedRuntimeDriverEvents(
 
   return {
     liveState: committedLiveState,
-    persistedSourceEventIds: persistedEvents.persistedSourceEventIds,
+    persistedSourceEventIds,
   };
 }

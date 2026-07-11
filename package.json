@@ -18,7 +18,6 @@
     "deploy:web": "vp run --filter @mosoo/web deploy",
     "dev": "vp run --filter @mosoo/api --filter @mosoo/web --parallel dev",
     "docs:check": "vp exec bun scripts/check-doc-links.ts",
-    "driver:repo:export": "vp exec bun scripts/export-driver-standalone-repo.ts",
     "driver:submodule:smoke": "vp exec bun scripts/check-driver-submodule-cutover.ts",
     "e2e": "bun e2e/cli.ts",
     "env:init": "vp run --filter @mosoo/api env:init",

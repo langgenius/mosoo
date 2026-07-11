@@ -1,4 +1,4 @@
-export type E2ELayer = "api" | "contract" | "deterministic" | "public-api" | "ui";
+export type E2ELayer = "contract" | "deterministic" | "public-api" | "ui";
 
 export interface E2ECommand {
   readonly args: readonly string[];

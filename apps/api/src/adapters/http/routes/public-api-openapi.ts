@@ -11,6 +11,7 @@ import {
 import { createPublicApiOpenApiComponents } from "./public-api-openapi-components";
 
 type HttpMethod = "delete" | "get" | "post" | "put";
+type AccessTokenSecurity = { accessToken: [] };
 
 interface OpenApiParameter {
   description?: string;
@@ -26,7 +27,7 @@ interface OpenApiOperation {
   parameters?: OpenApiParameter[];
   requestBody?: Record<string, unknown>;
   responses: Record<string, unknown>;
-  security?: Array<Record<string, []>>;
+  security?: AccessTokenSecurity[];
   summary: string;
 }
 
@@ -41,14 +42,14 @@ interface PublicApiOpenApiDocument {
   };
   openapi: "3.1.0";
   paths: OpenApiPaths;
-  security: { publicApiBearer: [] }[];
+  security: AccessTokenSecurity[];
   servers: { url: string }[];
 }
 
 const EXAMPLE_AGENT_ID = "01J00000000000000000000001";
 const EXAMPLE_THREAD_ID = "01J00000000000000000000009";
 const EXAMPLE_FILE_ID = "01J0000000000000000000000J";
-const ACCESS_TOKEN_SECURITY: Array<Record<string, []>> = [{ accessToken: [] }];
+const ACCESS_TOKEN_SECURITY: AccessTokenSecurity[] = [{ accessToken: [] }];
 
 const EXAMPLE_SESSION_FILE = {
   committed: true,
@@ -587,7 +588,7 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
     },
     openapi: "3.1.0",
     paths,
-    security: [{ publicApiBearer: [] }],
+    security: ACCESS_TOKEN_SECURITY,
     servers: [{ url: `${origin}${PUBLIC_API_PREFIX}${PUBLIC_API_VERSION_PREFIX}` }],
   };
 }

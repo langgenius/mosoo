@@ -4,13 +4,13 @@
 
 Mosoo provides a deliberately simple web experience for orchestrating App-local Agents and concrete resources backed by CLI tools and SDK-based runtimes.
 
-The current priority is OPCs, personal developers, and small self-hosted deployments. A user should be able to bring `PRD.md`, invoke `@mosoo`, and get a running Agent App in their own Cloudflare account with low operational overhead. In the current construction phase, assume one human owns one Organization: Organization is the account / billing / tenant shell, and App is the code, data, product, and console boundary. App owns concrete resources directly; it does not introduce a generic Service entity, `services` table, or polymorphic `service.kind`. Additional operational controls are extension paths for the same architecture, not default complexity for the current community edition.
+The current priority is OPCs, personal developers, and small self-hosted deployments. A user should be able to bring `PRD.md`, invoke `@mosoo`, and get a running Agent App with low operational overhead. In the hosted product, App Deployment publishes an App-owned external Web artifact into Mosoo's Cloudflare account; users do not provide their own Cloudflare credentials for that flow. The deployed artifact remains separate from Agent runtime. In the current construction phase, assume one human owns one Organization: Organization is the account / billing / tenant shell, and App is the code, data, product, and console boundary. App owns concrete resources directly; it does not introduce a generic Service entity, `services` table, or polymorphic `service.kind`. Additional operational controls are extension paths for the same architecture, not default complexity for the current community edition.
 
 To support lightweight deployment, fast iteration, and future governance expansion, the architecture embraces Serverless and edge computing and follows these baseline principles:
 
 - **Vectorized API design**: Core business APIs, especially northbound GraphQL, internal Worker RPC, and data mutation surfaces, should accept arrays of target entity IDs by default where it is natural. This reduces network round trips and gives the data layer room for batch writes and deletes.
 - **Single ULID business identifier system**: The control plane, execution plane, internal RPC, and public APIs use server-generated ULIDs as canonical business and protocol identifiers. At persistence boundaries, ULIDs are stored and indexed as strings to preserve distributed generation performance and time-sortability.
-- **Observability native**: OpenTelemetry is a first-class concern during service initialization. Requests, Worker-to-Worker calls, database queries, and queue consumers must carry trace context. Metrics and structured logs should remain correlated with traces.
+- **Observability native**: Mosoo emits Vestig structured logs and wide events, propagates W3C `traceparent` context across supported HTTP and Driver control boundaries, and enables Cloudflare Workers native logs and traces. Correlation is explicit at implemented boundaries; the architecture does not claim blanket OpenTelemetry instrumentation for database, queue, or Worker RPC calls.
 - **Minimal Web / API / Driver topology**: The system is split by build and deployment boundary into three top-level planes: Web, API, and Driver.
 
 ---
@@ -22,9 +22,14 @@ The architecture is built on the Cloudflare platform and uses a Serverless shape
 - **Frontend and ingress: Cloudflare Workers**. The Web Worker serves Vite-built console assets. The API Worker handles stateless GraphQL / Web API requests and WebSocket handshakes, then hands upgraded session connections to the corresponding Session Durable Object. `mosoo.ai` is the marketing / landing / blog origin owned by `langgenius/mosoo-website`. Authenticated console traffic uses `try.mosoo.ai`, with Cloudflare routing `try.mosoo.ai/api/*` to the API Worker and console paths to the Web Worker.
 - **State and connection management: Cloudflare Durable Objects**. Durable Objects hold upgraded WebSocket connections, high-frequency Session state, and distributed coordination points that need single-instance concurrency.
 - **Primary database: Cloudflare D1**. D1 stores Account records, Organization shell records, App records, core entity configuration, and metadata.
-- **Message queues: Cloudflare Queues**. Queues decouple the control plane from offline tasks. They provide consumer groups, ACK semantics, dead-letter queues, and at-least-once delivery for asynchronous work and cost log ingestion.
-- **Object storage: Cloudflare R2**. R2 stores Files Library objects, session-level file objects, sandbox state backups, and configuration attachments. Runtime-produced files are recorded as session artifacts in the MVP. Sandbox private state backups use a separate backup bucket and must not be mixed with user-visible file prefixes.
+- **Message queues: Cloudflare Queues**. Queues decouple the control plane from offline tasks. They provide ACK semantics, dead-letter queues, and at-least-once delivery for API commands (including deployment and scheduled maintenance) and Channel final delivery. Cost usage is written from normalized runtime events, not ingested through a queue.
+- **Object storage: Cloudflare R2**. R2 stores session-level file objects,
+  internal configuration/package uploads, any records using the reserved
+  library scope, and sandbox state backups. Runtime-produced files are recorded
+  as session artifacts. Sandbox private state backups use a separate backup
+  bucket and must not be mixed with user-visible file prefixes.
 - **Execution sandbox: Cloudflare Sandbox / Containers**. Heterogeneous Agents run in container-image-backed isolated environments, with Sandbox APIs and Durable Object boundaries controlling runtime lifecycle.
+- **App deployment: Mosoo-managed Cloudflare Pages / Workers**. App Deployment clones and builds a public GitHub repository in an isolated Sandbox, then publishes the resulting Web artifact with Mosoo platform credentials. D1 stores the App-owned Deployment and DeploymentRun records, while the successful artifact receives a Mosoo-owned URL. This is not App runtime and does not change Agent runtime ownership.
 - **Configuration editing**. Owner-side Agent configuration is currently edited through Preview, which combines the writable configuration form with in-context test chat. There is no dedicated `AgentBuilderSystemAgent` topology in the current codebase. Future configuration assistance must remain a control-plane feature and must not enter the full Sandbox / Driver runtime path.
 
 ---
@@ -47,10 +52,12 @@ graph TD
         Auth[Auth Service]
         App[App Domain<br/>Resource Boundary]
         Session[Session Service / Event Bus<br/>Durable Objects]
+        DriverConnection[DriverConnection Binding<br/>DriverInstance Durable Object]
         Vault[Credential / Secret Vault Service]
-        File[File Service<br/>Files Library & Session Artifacts]
+        File[File Service<br/>File records & Session artifacts]
         Env[Environment Service<br/>Runtime Templates & Revisions]
         Cost[Cost / Billing Service]
+        Deployment[App Deployment<br/>Build / Publish]
 
         subgraph Agent_Plane [Agent Plane]
             Profile[Profile Management]
@@ -58,9 +65,12 @@ graph TD
             Runtime[Runtime Scheduler]
         end
 
-        Ingress --> |GraphQL Resolver / In-Process Calls| Identity & Auth & App & Vault & File & Env & Agent_Plane & Cost
-        Ingress --> |WS Upgrade Handoff| Session
-        App --> |Owns App-local resources| Agent_Plane & Vault & File & Env & Cost
+        Ingress --> |GraphQL Resolver / In-Process Calls| Identity & Auth & App & Vault & File & Env & Agent_Plane & Cost & Deployment
+        Ingress --> |Client WS Upgrade Handoff| Session
+        Ingress --> |Driver WS Upgrade Handoff| DriverConnection
+        Runtime <--> |Commands / Readiness / Lifecycle| DriverConnection
+        DriverConnection --> |Persist / Publish Driver Events| Session
+        App --> |Owns App-local resources| Agent_Plane & Vault & File & Env & Cost & Deployment
         File & Agent_Plane --> |Push Events / Session RPC| Session
         Env --> |Resolve frozen EnvironmentRevision| Runtime
         Agent_Plane --> |Usage / Runtime Metrics| Cost
@@ -79,18 +89,19 @@ graph TD
         CF_Sandbox --> |Execute| Isolated_Process
     end
 
-    FileBucket[(R2 FILE_BUCKET<br/>Files Library & Session File Objects)]
+    FileBucket[(R2 FILE_BUCKET<br/>Session & internal file objects)]
     SandboxStateBucket[(R2 SANDBOX_STATE_BUCKET<br/>Sandbox State Objects)]
+    DeployedApp[Cloudflare Pages / Workers<br/>Mosoo-owned App URL]
 
     Client <==> |HTTPS: App Shell / Assets| WebWorker
     Client <==> |HTTPS: Same-Origin /api/*| Ingress
     Client <==> |AG-UI WebSocket Session<br/>after Worker handoff| Session
     Runtime --> |Provision & Lifecycle| CF_Sandbox
-    Runtime <==> |Sandbox wsConnect<br/>to driver-local interface| AgentDriver
-    Runtime -.-> |sandbox.watch SSE| CF_Sandbox
-    Runtime --> |Backup / Restore Sandbox State| SandboxStateBucket
-    Isolated_Process --> |Read Session Attachments<br/>Write Session Artifacts| FileBucket
+    AgentDriver --> |Outbound ORPC WebSocket<br/>/api/driver/socket| Ingress
+    Runtime --> |Checkpoint / Restore selected Pet paths| SandboxStateBucket
     File --> |Session Snapshots / File Objects| FileBucket
+    Deployment --> |Build public repository| CF_Sandbox
+    Deployment --> |Publish with Mosoo credentials| DeployedApp
 
     classDef web fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
     classDef api fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px;
@@ -117,35 +128,35 @@ The Web layer provides the interactive client experience.
 
 The API layer contains business logic, state management, and Agent scheduling. It is the system control plane.
 
-Except for runtime boundaries such as Session Durable Objects and Sandbox instances, the API-layer `* Service` terms below refer to domain modules inside the same API Worker codebase, not independently deployed microservices. Product-level App resources are concrete nouns such as Agent, Channel, Environment, Skill, MCP server, Files Library record, and Provider credential. V1 does not add a generic Service entity, `services` table, or polymorphic `service.kind`.
+Except for runtime boundaries such as Session Durable Objects and Sandbox instances, the API-layer `* Service` terms below refer to domain modules inside the same API Worker codebase, not independently deployed microservices. Product-level App resources are concrete nouns such as Agent, Channel, Environment, Skill, MCP server, file record, and Provider credential. V1 does not add a generic Service entity, `services` table, or polymorphic `service.kind`.
 
 1. **API / WS Gateway**
    - Stateless Workers provide the shared HTTP and WebSocket ingress layer. They handle authentication, routing, GraphQL queries and mutations, and WebSocket handshakes.
-   - WebSocket requests always enter the Worker first. The Worker resolves the Session key and App context, then hands the upgraded connection to the corresponding Session Durable Object.
+   - WebSocket requests always enter the Worker first. Client session upgrades are handed to the corresponding Session Durable Object. An Agent Driver dials `/api/driver/socket` with its Driver instance id, one-time boot token, and trace context; the Worker validates and hands that upgrade to the `DriverConnection` binding backed by the matching `DriverInstance` Durable Object.
 
 2. **App Domain**
-   App Domain owns the business, resource, operations, and export boundary for the current pivot. App is the canonical product and engineering noun. An App belongs to an Organization and is owned by the Organization owner during the single-owner phase. App has no runtime; Agents own Agent runtime, API endpoint exposure, channel delivery, and Threads / Sessions.
+   App Domain owns the business, resource, operations, and deployment boundary for the current pivot. App is the canonical product and engineering noun. An App belongs to an Organization and is owned by the Organization owner during the single-owner phase. App has no runtime; Agents own Agent runtime, API endpoint exposure, channel delivery, and Threads / Sessions. App Deployment owns an external Web artifact rather than an App runtime.
    - **Default App provisioning**: Onboarding / Organization provisioning creates a default App. If the Organization has exactly one App, the console routes directly into that App instead of forcing an App picker.
-   - **Agent and resource ownership**: Agents, Threads / Sessions, Environments, Skills, MCP servers, Provider credentials, Channels, Files Library records, Agent exposure state, App export, app health, logs, and app-scoped cost are App-owned resources.
+   - **Agent and resource ownership**: Agents, Threads / Sessions, Environments, Skills, MCP servers, Provider credentials, Channels, file records, Agent exposure state, App Deployments and DeploymentRuns, Agent runtime logs/state, and app-scoped cost are App-owned resources. The current UI keeps Agent logs/runtime operations on Agent detail and App Usage under App Settings; it does not expose a generic App health/log console.
    - **No generic Service entity**: Do not add a unified `services` table, polymorphic `service.kind`, or generic Service CRUD for concrete App resources. If a future Web/API runtime, database service, worker process, or scheduled job is needed, model it with an explicit noun and lifecycle.
-   - **App Templates**: Common one-Agent, one-Channel Apps should be created from App Templates that provision a resource graph, not from a required global App type or single Agent type picker.
+   - **App Deployment**: One active Deployment per App records the public GitHub source and its DeploymentRuns. Build and publish work is asynchronous. Successful runs expose a Mosoo-owned Cloudflare Pages or Workers URL under the configured App deployment domain. Users do not bring their own Cloudflare account in the current flow.
    - **Access boundary**: App access maps to the single Organization owner for this phase. No secondary principal model is part of the first cut.
 
 3. **Agent Plane**
    The Agent Plane unifies configuration management, Preview configuration editing, and runtime scheduling. The public data entity is the bare `Agent`. Historical terms such as `AgentService` and `PublishedAgent` have been collapsed into `Agent`, and the module name `Agent Plane` avoids a naming collision with the entity itself.
    - **Profile management**: Agent definitions are stored under App in D1 and support CRUD plus import/export flows. The Profile manages Skill availability, MCP bindings, Runtime references, and Provider references for an App-local Agent. Runtime plaintext credentials are not stored in the Profile. New flows resolve them through Credential / Vault by `(execution_actor, app, provider)` and fail closed when App ownership cannot be proven. In the Runtime Session Kernel, the execution actor is the Agent owner; the caller is used only for ingress context and permission response attribution.
    - **Preview configuration editing**: Owner-side editing currently happens in Preview. The surface writes through Agent profile/configuration services, auto-saves eligible form fields, keeps pending changes explicit, and tests the saved or draft configuration through Preview chat. It is a user-facing edit/test surface, not a separate publishable Agent or system-assistant topology.
-   - **Runtime**: The Runtime validates execution rights and orchestrates Cloudflare Sandbox instances. It does not wait for an in-sandbox Driver to call back to a public endpoint. Instead, it uses Sandbox SDK `wsConnect()` to reach the Driver's local WebSocket / JSON-RPC interface inside the container. It also applies Agent `kind` to choose Pet Sandbox or Cattle Session Sandbox behavior, restores platform conversation history, materializes Session attachments, records Session artifacts, manages Sandbox Backup/Restore and destruction policy, and consumes file events on the Worker side.
-     - **Pet Runtime path**: A Pet Agent is bound to a stable Agent Sandbox with subject `agent:{agentId}`. Multiple Sessions for the same Pet happen inside the same Sandbox. The default initial working directory is shared, and Session-to-Session isolation is not guaranteed. Backup/Restore preserves user-visible continuity across Sandbox startup and teardown. Reset agent-state clears only this stable Sandbox state and does not delete Agent config, Session history, Cost, logs, or Files Library records.
-     - **Cattle Runtime path**: Each Cattle Agent Session is bound to an isolated Session Sandbox with subject `session:{sessionId}`. The Sandbox is the Session boundary. It is destroyed when the run ends or the lifecycle policy triggers. Temporary files, caches, login state, and native runtime state that are not explicitly captured as Session artifacts or by a restore policy disappear with the Sandbox.
-     - **Cattle continuation**: The product still allows continuing the same Cattle Session. If the old Session Sandbox has been destroyed, the next `send events` call creates a new Session Sandbox and restores only platform-persisted conversation history, metadata, Session attachments/artifacts, and Backup content. This is not Sandbox reuse and not cross-Session memory.
+   - **Runtime**: The Runtime validates execution rights and orchestrates Cloudflare Sandbox instances. It writes a private Driver boot payload file, passes its path through `MOSOO_DRIVER_BOOT_PAYLOAD_FILE`, and starts `agent-driver`. The payload contains the API control URL, one-time boot token, trace context, Driver identity, and frozen execution spec. The Driver reads and removes that file, then actively dials the API control URL. The API's `DriverConnection` / `DriverInstance` Durable Object owns the authenticated ORPC WebSocket, command delivery, readiness, heartbeats, and Driver event ingestion. Runtime also applies Agent `kind` to choose Pet Sandbox or Cattle Session Sandbox behavior, restores platform conversation history, materializes ready attachment ids explicitly submitted with the current message, records Session artifacts, and applies the limited checkpoint/restore and destruction policy below.
+     - **Pet Runtime path**: A Pet Agent is bound to a stable Agent Sandbox with subject `agent:{agentId}`. Multiple Sessions for the same Pet happen inside the same Sandbox. The default initial working directory is shared, and Session-to-Session isolation is not guaranteed. Restart keeps the current container. Recreate/hibernate checkpoints only `/workspace/memory` plus eligible Session workspaces; login state, caches, vendor-native state, and other container-local files are not promised across rebuild. Reset agent-state destroys the current Pet container state but does not delete Agent config, Session history, Cost, logs, or control-plane file records.
+     - **Cattle Runtime path**: Each Cattle Agent Session uses the isolated runtime subject `session:{sessionId}`. Each Run provisions a fresh Session Sandbox. The current policy closes the runtime conversation and immediately recycles that Sandbox when the Run becomes terminal; lifecycle cleanup can also destroy it. Temporary files, caches, login state, and native runtime state that are not explicitly captured as Session artifacts disappear with the Sandbox.
+     - **Cattle continuation**: The product still allows continuing the same Cattle Session. The next `send events` Run creates a fresh Session Sandbox with the new input and only ready attachment ids explicitly referenced by that message. Platform history stays readable in the UI/DB, but the current Driver is not given a transcript replay or prior native state. Existing artifacts remain control-plane records and are not automatically restored; Cattle has no Backup/Restore target.
      - **Scaling extension point**: Runtime, Session Durable Object, and Driver contracts must not hard-code "single sandbox" as a permanent product fact. Pet may later add more stable Sandbox strategies under consistency constraints, and Cattle may later add standby pools or batch scheduling. The external API semantics remain governed by `kind`.
 
 4. **File Service**
-   The File Service is the storage boundary for an App-scoped Files Library plus Session attachments/artifacts:
-   - **Abstraction and permission control**: Files Library records belong to the App boundary and are not an App source tree. App package and draft files remain scoped implementation records for Agent import/export and builder workflows.
-   - **Upload/download data plane**: Browser-side large uploads and downloads may use presigned URLs to avoid API memory pressure. Runtime execution does not get a shared writable library mount in the MVP.
-   - **Library version safety net**: Cloudflare R2 currently does not expose usable bucket-level Object Versioning controls. Before destructive Files Library writes such as overwrite or move-overwrite, the File Service performs copy-on-write. It copies the previous object into a non-mounted `file_versions/{scopeKind}/{scopeId}/...` prefix in `FILE_BUCKET`, then writes version metadata into `file_version` in D1. The version ledger is for operational recovery and future recovery UI.
+   The File Service is the storage boundary for shipped Session attachments/artifacts and internal file scopes. `library` exists as an App-scoped record type, but no current user-facing create/upload path makes it a shipped Files Library product:
+   - **Abstraction and permission control**: Session, account, Agent-package, and Public API draft records are scoped implementation records. The reserved library scope is not an App source tree and does not revive the retired App Builder concept.
+   - **Upload/download data plane**: Browser-side large uploads and downloads may use presigned URLs to avoid API memory pressure. Current user upload targets reject `library`; the Files page lists/downloads accessible records and runtime gets no shared writable library mount.
+   - **Dormant library versioning**: Copy-on-write and `file_version` primitives exist for a future library write path, but no production UI/API currently reaches destructive library overwrite or move-overwrite. They are plumbing, not a shipped recovery guarantee.
    - **Session file resources**: Session File / Session Resource is the explicit attachment layer for files uploaded by a user or added through the Public API. The File Service stores them as `file_record(scope_kind=session, session_kind=attachment)` plus an R2 object, then injects a readable path manifest into the next Agent input. Session Files are not an automatic snapshot of the entire Session working directory, and Sandbox temporary files are not promoted into long-lived assets by default.
    - **Event flow**: Runtime-produced files are recorded as `file_record(scope_kind=session, session_kind=artifact)`. Frontend file events come from explicit Session file upload/delete actions and artifact updates, not from whole-working-directory snapshots.
 
@@ -154,8 +165,8 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
    - **Data model**: `environment` stores environment asset metadata, owner, fork source, App scope, and `current_revision_id`. `environment_revision` stores immutable configuration versions, including `network_policy`, `allowed_hosts_json`, `packages_json`, `setup_script`, `env_vars_json`, `allow_package_managers`, and `allow_mcp_servers`. App points to its default environment; Organization does not provide a current runtime default.
    - **Defaults and reuse**: Each App has a system default environment. Users can create App-local Environments. Cross-App reuse is not part of the current control plane. Forking creates a new Environment identity and a new revision without mutating the source Environment.
    - **Runtime freeze**: An Agent references an `environment_id`. When a Session is created, Runtime resolves the current EnvironmentRevision and writes it into `session_execution_snapshot.plan_json`. The Session then always uses the environment id/name/revision/network/packages/setup/env vars snapshot captured there. Editing an Environment affects only future Sessions.
-   - **Responsibility boundary**: Environment describes rebuildable runtime templates and startup constraints. It does not contain Files Library records, Skill package content, MCP server definitions, or Session history. Setup scripts, packages, and package manager caches are rebuildable and are not user-visible state.
-   - **Execution constraints**: Runtime provisioning installs packages, runs the setup script, injects env vars, and applies network constraints from `network_policy` and `allowed_hosts` according to the frozen snapshot. Missing required environment configuration or setup failure must fail Session startup and enter Runtime diagnostics.
+   - **Responsibility boundary**: Environment describes rebuildable runtime templates and startup constraints. It does not contain file records, Skill package content, MCP server definitions, or Session history. Setup scripts, packages, and package manager caches are rebuildable and are not user-visible state.
+   - **Execution constraints (partial)**: Runtime provisioning turns package declarations into setup commands, runs the combined package/custom setup script, and injects env vars. `network_policy`, `allowed_hosts_json`, `allow_package_managers`, and `allow_mcp_servers` are persisted in the frozen snapshot but are not carried into `DriverProfileConfig` or enforced by Runtime. The Web labels these controls as saved intent/not enforced; they are not a security boundary. Setup failure must fail Session startup and enter Runtime diagnostics.
 
 6. **Account & Organization Shell Service**
    - The current construction model is `Account -> Organization owner -> App`. Workspace and Team are not architecture concepts. For this phase, one human owns one Organization and App access maps to that owner.
@@ -163,7 +174,7 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
    - Login selects the account's Organization shell, then routes to the default App when the Organization has exactly one App. The system no longer maintains `account.origin_organization_id` or an "Origin Org for life" concept.
 
 7. **Auth Service**
-   - Authentication is built on Better Auth. Supported authentication methods are **Google OAuth** and **Email OTP**. Both support registration, recovery, and cross-device fallback. Passkey (WebAuthn) is a planned future option but is not enabled in the current build.
+   - Authentication is built on Better Auth. Supported authentication methods are **Google OAuth** and **Email OTP**. Both can create or sign in to the same email-backed Account; Email OTP is the fallback when Google is unavailable. Mosoo has no password or password-recovery flow. Passkey (WebAuthn) is a planned future option but is not enabled in the current build.
    - The same verified email across providers maps to the same Account.
    - CLI and other programmatic clients authenticate through a device authorization flow, not a separate login method. `POST /api/auth/cli/start` returns a `device_code`, a short `user_code`, and a `/cli-auth` verification URI; the user confirms inside an authenticated web session via `POST /api/auth/cli/confirm`, and the client polls `POST /api/auth/cli/token` until it receives a one-time `Bearer` token. The issued token is a Personal Access Token, so CLI access reuses the Account identity already established by Google OAuth or Email OTP rather than introducing a new credential type.
    - The current version does not support passwords, magic links, federated identity, directory sync, domain-based routing, or invite/request flows. Post-auth resolver logic outside the single-owner App path is not part of V1.
@@ -190,10 +201,14 @@ The **Agent Driver** is a top-level independently built execution component beca
 
 1. **Agent Driver**
    - The Driver is a minimal independently built binary or script entry point. Runtime starts it explicitly inside the Sandbox and treats it as the long-lived control process.
-   - **Current public Driver types**: Runtime Catalog exposes `openai-runtime`, `claude-agent-sdk`, and the `acp-fallback` transport (labeled `OpenCode`) to users. The OpenAI runtime path uses an app-server / SDK backend. The Claude path uses the native Claude Agent SDK interface. The `acp-fallback` path serves OpenCode Zen models alongside OpenAI and Anthropic providers.
-   - **Current internal Driver transport**: `system-agent` exists in catalog / protocol surfaces but is internal / disabled and is not exposed as a user-selectable runtime. New provider integrations must add vendor-specific backends and declare capabilities and gaps in Runtime Catalog.
-   - **Credential and configuration injection**: Runtime injects critical configuration and one-time access credentials through standard input when starting the process.
-   - **Control flow establishment**: The Driver listens on a sandbox-local port or stdio bridge. API Worker / Runtime uses Cloudflare Sandbox WebSocket connection support to route requests to that local interface. The Driver no longer owns a public API endpoint or calls back to the control plane over the public internet. Authentication, routing, App access checks, and asset boundaries stay in Worker / Runtime.
+   - **Current public Driver types**: The API/Web Runtime Catalog exposes `openai-runtime`, `claude-agent-sdk`, and the `acp-fallback` transport (labeled `OpenCode`) to users. The standalone Driver registry independently maps those runtime/transport pairs to executable backends and advertised capabilities; the main repository's cross-submodule test requires both registries to match. The OpenAI runtime path uses an app-server / SDK backend. The Claude path uses the native Claude Agent SDK interface. The `acp-fallback` path serves OpenCode and DeepSeek configurations through ACP.
+   - **Current internal catalog placeholder**: `system-agent` exists only as an
+     internal/disabled Runtime Catalog entry. It is not Driver-admitted, not a
+     Driver protocol runtime, and not user-selectable. New provider integrations
+     must add a real Driver backend and declare capabilities and gaps in Runtime
+     Catalog before admission.
+   - **Boot configuration injection**: Runtime writes the complete boot payload to a private Sandbox file and passes the file path through `MOSOO_DRIVER_BOOT_PAYLOAD_FILE`. The payload carries `controlUrl`, a one-time boot token, `traceparent`, Driver identity, and the frozen execution spec. The Driver removes the file after reading it. Mosoo's runtime path does not send this configuration through standard input.
+   - **Control flow establishment**: The Driver does not listen on a sandbox-local control port. It actively opens an authenticated WebSocket to the payload's `controlUrl`, currently `/api/driver/socket`. The API Worker hands the upgrade to the `DriverConnection` binding, whose `DriverInstance` Durable Object owns the socket and ORPC command/event lifecycle. Runtime talks to that Durable Object for readiness, commands, status, and cleanup. Protocol v1 still carries a required `driverControlPort` field for legacy diagnostics, but neither side binds that port and new integrations must not depend on it; removal needs a versioned API/Driver rollout. Authentication, routing, App access checks, and asset boundaries remain in Worker / Runtime.
    - **Multi-Session isolation**: `AgentSession` is the product-level conversation boundary. Cloudflare Sandbox and container processes are execution resource boundaries. If multiple long-lived Driver / Agent processes in one Sandbox need stronger process, filesystem, or environment isolation, evaluate user-space container tooling such as `bubblewrap` inside the container for narrower per-session namespaces.
 
 2. **Agent Process**
@@ -220,26 +235,30 @@ Design constraints for any future assistant:
 
 ### 4.5 Agent Sandbox And Persistence Layers
 
-An Agent's runtime filesystem must not be treated as a generic workspace. The architecture first separates Sandbox lifecycle by Agent `kind`, then separates Files Library records, platform Session history, Session artifacts, and disposable cache. The principle is: **Files Library records are user-managed durable files; Sandbox is an execution environment; Session history/artifacts are session data; they must not impersonate each other**.
+An Agent's runtime filesystem must not be treated as a generic workspace. The architecture first separates Sandbox lifecycle by Agent `kind`, then separates the reserved App library scope, platform Session history, Session artifacts, and disposable cache. The principle is: **file records are control-plane data; Sandbox is an execution environment; Session history/artifacts are session data; they must not impersonate each other**.
 
-| Layer                        | Applies To   | Lifecycle                                                                                                                                                                                                             | Typical Content                                                                                    | Canonical Owner                                                          |
-| ---------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **Pet Sandbox**              | Pet          | Stable Agent-level Sandbox, subject `agent:{agentId}`. Multiple Sessions share one Sandbox by default. Startup and teardown use Backup/Restore to preserve continuity.                                                | Pet local state, login state, tool cache, vendor-native state, local files not explicitly exported | Sandbox state bucket + runtime metadata                                  |
-| **Cattle Session Sandbox**   | Cattle       | Isolated Session-level Sandbox, subject `session:{sessionId}`. The Sandbox is the Session boundary and is destroyed by lifecycle policy.                                                                              | Temporary files, build artifacts, caches, login state, vendor-native state for one Session         | Runtime temporary resource; not persistent by default                    |
-| **Files Library**            | Pet / Cattle | Explicit long-lived App-scoped user-managed file library. It is not runtime-writable by default in the MVP.                                                                                                           | User uploads, shared knowledge files, reusable input files                                         | FILE_BUCKET + `file_record(scope_kind=library, scope_id=appId)`          |
-| **Session File / Resource**  | Pet / Cattle | Explicit attachment set for a product Session. Upload or Public API file creation keeps it on the Session. Archive makes the Session read-only. Session deletion hard-deletes file objects and control-plane records. | Files uploaded for the current Session, Public API thread attachments                              | FILE_BUCKET + `file_record(scope_kind=session, session_kind=attachment)` |
-| **Platform Session History** | Pet / Cattle | Product Session data persisted by Session Durable Object / API. Used for continuation and UI replay. It is not the Sandbox filesystem.                                                                                | Transcript, event metadata, run state, ingress context                                             | D1 / Session storage / Runtime metadata                                  |
-| **Sandbox Cache**            | Pet / Cattle | Disposable and rebuildable. Environment changes or Sandbox rebuilds rematerialize it from EnvironmentRevision.                                                                                                        | Package cache, setup script artifacts, rebuildable tool cache                                      | Environment / Runtime provisioning cache                                 |
+| Layer                        | Applies To   | Lifecycle                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Typical Content                                                                                 | Canonical Owner                                                          |
+| ---------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **Pet Sandbox**              | Pet          | Stable Agent-level Sandbox, subject `agent:{agentId}`. Multiple Sessions share one Sandbox by default. Restart retains the container; recreate/hibernate checkpoints only `/workspace/memory` and eligible Session workspaces.                                                                                                                                                                                                                                | Container-local login/cache/native/files; only selected memory/workspace paths are checkpointed | Live Sandbox container + selected backup paths + runtime metadata        |
+| **Cattle Session Sandbox**   | Cattle       | Isolated Sandbox addressed by the Session-level subject `session:{sessionId}`. A fresh Sandbox is provisioned for each Run and immediately recycled after terminal Run release.                                                                                                                                                                                                                                                                               | Temporary files, build artifacts, caches, login state, vendor-native state for one Run          | Runtime temporary resource; not persistent between Runs                  |
+| **Reserved library scope**   | Pet / Cattle | App-scoped `library` record/versioning plumbing. The current HTTP API rejects library upload and the Files page has no create/upload action, so it is not yet a user-managed product surface or runtime input.                                                                                                                                                                                                                                                | No shipped user-created content path                                                            | Reserved `file_record(scope_kind=library, scope_id=appId)` + FILE_BUCKET |
+| **Session File / Resource**  | Pet / Cattle | Explicit attachment set for a product Session. Web Session upload creates it directly; Public API Agent upload first creates an internal App draft, then a Thread resource reference claims it into the Session. Public claim and delete/remove enforce the same writable-lifecycle projection: archived, rescheduling, and terminal Sessions remain readable but reject file mutation. Session deletion hard-deletes file objects and control-plane records. | Files uploaded for the current Session, Public API Thread attachments                           | FILE_BUCKET + `file_record(scope_kind=session, session_kind=attachment)` |
+| **Platform Session History** | Pet / Cattle | Product Session data persisted by Session Durable Object / API for control records and UI replay. It is not the Sandbox filesystem and is not injected as transcript replay into a fresh Cattle Driver.                                                                                                                                                                                                                                                       | Transcript, event metadata, run state, ingress context                                          | D1 / Session storage / Runtime metadata                                  |
+| **Sandbox Cache**            | Pet / Cattle | Disposable and rebuildable. Environment changes or Sandbox rebuilds rematerialize it from EnvironmentRevision.                                                                                                                                                                                                                                                                                                                                                | Package cache, setup script artifacts, rebuildable tool cache                                   | Environment / Runtime provisioning cache                                 |
 
 Invariants:
 
-- **Pet continuity comes from stable Sandbox + Backup/Restore + platform Session history**. Reset agent-state clears only the stable Sandbox state and its Backup/Restore continuity. It does not delete Agent config, Files Library records, Session history, Cost, or logs.
-- **Cattle isolation comes from one Sandbox per Session**. Cattle has no Agent-level stable Sandbox state. When the Sandbox is destroyed, temporary files, caches, login state, and native state disappear unless they were recorded as Session artifacts or explicitly captured by policy.
-- **Cattle continuation is not old-Sandbox reuse**. Continuing a product Session may create a fresh Sandbox and restore only platform-persisted conversation/history/metadata plus explicit Session file and Backup content.
-- **Files Library is not runtime writable by default**. Runtime output becomes a Session artifact. Library writes happen through explicit control-plane upload/update flows.
-- **Session File is the explicit Session attachment layer**. It exposes user-uploaded or API-added files to the Agent through the next input context. It does not promise to restore the whole Sandbox working directory.
-- **Session history is not Files Library and not Sandbox backup**. Transcript and metadata are used for interaction context and UI replay. They do not automatically make Sandbox-local files long-lived assets.
-- **Environment cache is not state**. It contains rebuildable packages and setup artifacts. It does not enter Files Library and is not a user-visible asset promise.
+- **Pet continuity is bounded**. The live container survives restart, while
+  recreate/hibernate restores only `/workspace/memory` and eligible Session
+  workspaces. Reset destroys container state. Agent config, control-plane file
+  records, Session history, Cost, and logs remain control-plane data.
+- **Cattle isolation comes from a fresh Sandbox per Run under a Session-scoped subject**. Cattle has no Agent-level stable Sandbox state. Terminal Run release immediately recycles the Sandbox; temporary files, caches, login state, and native state disappear unless they were recorded as Session artifacts.
+- **Cattle continuation is not old-Sandbox reuse**. Continuing a product Session creates a fresh Sandbox with platform conversation history. Only current-message attachment references are materialized; Cattle does not restore Backup content or every linked file/artifact.
+- **The library scope is not shipped as a write surface**. Current user uploads
+  cannot target it, and runtime output becomes a Session artifact instead.
+- **Session File is the explicit Session attachment layer**. A ready file is exposed to the Agent only when its id is included with the current input. It does not promise automatic injection of all linked files or restoration of the whole Sandbox working directory.
+- **Session history is not file storage or Sandbox backup**. Transcript and metadata are used for interaction context and UI replay. They do not automatically make Sandbox-local files long-lived assets.
+- **Environment cache is not state**. It contains rebuildable packages and setup artifacts. It does not create durable file records and is not a user-visible asset promise.
 - **Permission checks happen on both control-plane and Driver-guard sides**. Session creation freezes runtime profile inputs, and recovery/continuation paths must not bypass current permissions.
 
 ---
@@ -253,6 +272,7 @@ sequenceDiagram
     participant Ingress as API: HTTP / WS Ingress Worker
     participant Session as API: Session DO / Event Bus
     participant AS as API: Agent Plane (Runtime)
+    participant DriverDO as API: DriverConnection / DriverInstance DO
     participant FS as API: File Service
     participant Sandbox as Cloudflare Sandbox
     participant Driver as Driver: Agent Driver
@@ -277,45 +297,52 @@ sequenceDiagram
 
     AS->>Sandbox: Determine kind and sandbox subject (agent:{agentId} or session:{sessionId})
     alt Pet
-        AS->>Sandbox: Provision or restore stable Agent Sandbox via Backup/Restore
+        AS->>Sandbox: Provision stable Agent Sandbox<br/>restore selected checkpoint paths when present
     else Cattle
-        AS->>Sandbox: Provision fresh Session Sandbox or declared restore policy
+        AS->>Sandbox: Provision fresh Session-scoped Sandbox for this Run
     end
-    AS->>Sandbox: Install frozen EnvironmentRevision<br/>(packages + setup + env vars + network policy)
-    AS->>Sandbox: Materialize Session attachments read-only
+    AS->>Sandbox: Apply frozen EnvironmentRevision<br/>(packages + setup script + env vars; network policy is stored intent)
+    AS->>Sandbox: Materialize current-message ready attachment ids read-only
     AS->>Session: Load platform conversation history / metadata
-    AS->>Sandbox: startProcess(agent-driver, stdin=config+credentials)
+    AS->>Sandbox: Write private boot payload JSON<br/>(controlUrl + token + traceparent + execution spec)
+    AS->>Sandbox: startProcess(agent-driver,<br/>MOSOO_DRIVER_BOOT_PAYLOAD_FILE=path)
     Sandbox-->>Driver: Spawn agent-driver process
-    Driver->>Driver: Listen on sandbox-local control port / stdio bridge
-    AS->>Sandbox: WebSocket upgrade via sandbox.wsConnect(driverPort)
-    Sandbox-->>Driver: Route Worker connection to local Driver interface
-    AS->>Sandbox: watch(kind-specific sandbox paths)
+    Driver->>Ingress: Outbound WebSocket upgrade<br/>/api/driver/socket?driverInstanceId&token&traceparent
+    Ingress->>DriverDO: Hand off authenticated upgrade
+    DriverDO-->>Driver: Accept ORPC WebSocket
+    Driver->>DriverDO: hello
+    Driver->>AgentProc: Load/start selected provider backend
+    Driver->>DriverDO: ready
+    AS->>DriverDO: Wait for Driver ready
 
-    AS-->>Driver: create_session(session_id, initial_context, native_resume_ref?)
+    AS->>DriverDO: Enqueue input.start command
+    DriverDO-->>Driver: ORPC nextCommand polling
 
-    Driver->>AgentProc: Launch OpenAI runtime app-server / Claude Agent SDK bridge
+    Driver->>AgentProc: Dispatch input to the started backend
 
-    par Streaming text return
+    par Driver event return
         AgentProc-->>Driver: Output chunk
-        Driver-->>AS: AG-UI / platform events over wsConnect
-        AS->>Session: Append and publish event(runId, event)
+        Driver->>DriverDO: Driver event batch over ORPC WebSocket
+        DriverDO->>Session: Persist and publish projected session events
         Session-->>Client: WebSocket: AG-UI / platform event
-    and File write monitoring
+    and File artifact handling
         AgentProc->>Sandbox: Read Session attachments / write Sandbox-local files
-        Sandbox-->>AS: SSE file events from sandbox.watch()
-        AS->>FS: In-process call: classify path and prepare snapshot(path, sessionId, runId)
-        FS->>Session: Publish file_change_event(snapshotRef, storageTier)
-        Session-->>Client: WebSocket: sync file tree
+        AgentProc-->>Driver: Native file change event
+        Driver->>DriverDO: file.changed / file.change.updated
+        DriverDO->>FS: Read declared output and record Session artifact
+        FS->>Session: Publish session.files.updated
+        Session-->>Client: WebSocket: refresh Thread files
     end
 
     Client->>Ingress: GraphQL: sendAgentSessionEvents(sessionId, [interrupt])
     Ingress->>AS: In-process call: interrupt current run
-    AS->>Driver: Driver control command over wsConnect
+    AS->>DriverDO: Enqueue turn.cancel / session.stop command
+    DriverDO-->>Driver: ORPC nextCommand polling
     Driver->>AgentProc: Graceful shutdown / kill
     alt Pet
-        AS->>Sandbox: If Agent Sandbox is idle, back up stable Sandbox state before release
+        AS->>Sandbox: If policy requires, checkpoint selected memory/workspace paths
     else Cattle
-        AS->>Sandbox: Destroy Session Sandbox and keep only platform history plus explicit Session file / Backup content
+        AS->>Sandbox: Terminal Run release recycles Session Sandbox<br/>retain history/file records in control plane only
     end
 ```
 
@@ -327,6 +354,8 @@ sequenceDiagram
 
 - `Credentials PRD`: [`credentials.md`](./prd/credentials.md)
 - `Files API PRD`: [`files-api-contract.md`](./prd/files-api-contract.md)
+- `Public Thread API`: [`public-thread-api-surface.md`](./prd/public-thread-api-surface.md)
+- `Thread Files`: [`session-files.md`](./prd/session-files.md)
 - `Session Lifecycle PRD`: [`session-lifecycle.md`](./prd/session-lifecycle.md)
 - `Runtime Session Kernel PRD`: [`runtime-session-kernel.md`](./prd/runtime-session-kernel.md)
 - `Environment PRD`: [`environment.md`](./prd/environment.md)
@@ -336,10 +365,8 @@ sequenceDiagram
 - `ULID`: <https://github.com/ulid/spec>
 - `GraphQL`: <https://github.com/graphql/graphql-spec>
 - `AG-UI`: <https://github.com/ag-ui-protocol/ag-ui>
-- `OpenTelemetry`: <https://github.com/open-telemetry/opentelemetry-specification>
 - `OpenAI runtime App Server`: <https://developers.openai.com/>
 - `Skill`: <https://github.com/anthropics/skills>
 - `MCP`: <https://github.com/modelcontextprotocol/modelcontextprotocol>
 - `Cloudflare Sandbox`: <https://developers.cloudflare.com/sandbox/llms.txt>
-- `Cloudflare Sandbox WebSocket Connections`: <https://developers.cloudflare.com/sandbox/guides/websocket-connections/>
 - `bubblewrap`: <https://github.com/containers/bubblewrap>

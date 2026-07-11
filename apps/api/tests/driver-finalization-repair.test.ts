@@ -21,7 +21,7 @@ const FINALIZE_RUN_ID = "01J0000000000000000000000T" as SessionRunId;
 const FINALIZE_COMMAND_ID = "01J0000000000000000000000V" as DriverCommandId;
 const FINALIZE_CLOUDFLARE_SESSION_ID = "01J0000000000000000000000W";
 const TURN_INTERRUPTED_MESSAGE =
-  "This turn was interrupted. Your workspace and context have been preserved — please resend your last request.";
+  "This turn was interrupted before it completed. Please resend your last request.";
 
 interface TerminalEventRow {
   content_text: string;

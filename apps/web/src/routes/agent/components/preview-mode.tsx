@@ -281,7 +281,7 @@ function appliedToastText(kind: AppliedToastKind): string {
       return "Native config patched + Agent process restarted";
     }
     case "recreate-preserving-state": {
-      return "Sandbox recreated · agent-state restored from backup";
+      return "Sandbox recreated · checkpointed memory/workspaces restored";
     }
     case "fork-agent": {
       return "New Agent forked with the new runtime";

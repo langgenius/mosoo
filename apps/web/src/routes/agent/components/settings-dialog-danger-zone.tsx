@@ -150,7 +150,7 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
               <div className="min-w-0">
                 <div className="text-foreground text-sm font-medium">Reset agent-state</div>
                 <p className="text-muted-foreground mt-0.5 text-xs">
-                  Clears login, cache, memory, and native session state.
+                  Clears the current Sandbox, memory, and Session runtime directories.
                 </p>
               </div>
               <Button
@@ -243,8 +243,11 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                     <li>Login state</li>
                     <li>Cache</li>
                     <li>Long-term memory</li>
-                    <li>Native session state</li>
+                    <li>Session runtime directories</li>
                   </ul>
+                  <p className="mt-2">
+                    Stored native resume references are not currently removed by this operation.
+                  </p>
                 </div>
                 <div>
                   <div className="text-foreground font-medium">What will be preserved</div>

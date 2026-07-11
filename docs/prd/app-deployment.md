@@ -1,11 +1,10 @@
 # App Deployment
 
-Status: proposal.
+Status: active and shipped.
 
-This document reopens the Web deployment/public URL decision that `App Boundary`
-kept out of the V1 path. The reopened shape is explicit: deployment is an
-App-owned resource named `Deployment`. It is not App runtime, not `Publish App`,
-and not an Agent `DeploymentVersion`.
+This document defines the shipped App-owned `Deployment` resource. Deployment publishes an
+external Web artifact and public URL from a public GitHub repository. It is not Agent runtime, an
+App-level API endpoint, or an Agent `DeploymentVersion`.
 
 ## Product Contract
 
@@ -21,17 +20,17 @@ The user-facing loop is:
    creates a Cloudflare deployment plan.
 6. Mosoo deploys to Mosoo's Cloudflare platform account, using Cloudflare Pages
    or Cloudflare Workers.
-7. Mosoo stores the successful Mosoo-owned URL and shows it whenever the user
-   views the App.
+7. Mosoo stores the URL returned by the successful deploy. Workers use the
+   planned Mosoo-owned host; Pages may temporarily expose its `pages.dev` URL
+   while custom-domain activation is still pending.
 
-The first cut should support one active Deployment per App. Multiple deployment
-targets, custom domains, branch previews, and automatic redeploys are later.
+The current product supports one active Deployment per App and a Mosoo-managed
+domain/URL. Multiple deployment targets, user-supplied custom domains, branch
+previews, and automatic redeploys are later.
 
-## Existing Boundary Conflict
+## Current Boundary
 
-Current App docs explicitly say App has no runtime, no App-level API endpoint,
-no Web shell, and no public preview URL. This feature is therefore a product
-decision change. Keep the change narrow:
+Deployment is part of the current App boundary while remaining separate from Agent runtime:
 
 - `App` remains the business/resource boundary.
 - `Deployment` is the App-owned external Web artifact.
@@ -41,27 +40,28 @@ decision change. Keep the change narrow:
 
 Do not reuse `agent_deployment_version` for Cloudflare deployments.
 
-## Required Product Decision
+## Cloudflare Account Boundary
 
 Production deploys target Mosoo's Cloudflare account. This is a paid platform
 capability because Mosoo owns the Cloudflare resources, billing, quotas, abuse
 controls, and final customer-facing subdomain.
 
-The default public URL shape should be Mosoo-owned, for example:
+The planned public URL is Mosoo-owned and derived from the App ID:
 
 ```text
-https://<app-slug>.apps.mosoo.ai
+https://app-<lowercase-app-id>.<MOSOO_APP_DEPLOYMENT_DOMAIN>
 ```
 
-The exact subdomain policy can change, but the invariant does not: users do not
-bring their own Cloudflare account in the first cut.
+The exact subdomain policy can change, but the account boundary does not: users
+do not bring their own Cloudflare account in the current product. Until a Pages
+custom domain becomes active, `liveUrl` can be that Mosoo account's Cloudflare
+`pages.dev` deployment URL while `plannedUrl` remains the App-derived host.
 
 ## Technology Stack
 
 Use the existing Mosoo stack:
 
 - D1 for Deployment and DeploymentRun metadata.
-- R2 for build logs and optional packed artifacts.
 - Queues for asynchronous deployment work.
 - Existing App ownership checks for access control.
 - Mosoo platform Cloudflare credentials stored outside user-controlled App
@@ -70,16 +70,18 @@ Use the existing Mosoo stack:
   GitHub repositories.
 - Official Cloudflare TypeScript SDK package `cloudflare` for Cloudflare
   management APIs.
-- Wrangler for Mosoo's own local development, type generation, and generated
-  config validation. Do not use authenticated Wrangler inside untrusted user
-  repositories.
+- Wrangler for Mosoo's own local development, type generation, generated config
+  validation, and controlled Pages artifact upload. The authenticated Pages
+  command runs in a separate deploy sandbox after repository-owned build code
+  has finished; it does not execute inside the untrusted repository build.
 
 External surfaces:
 
-- GitHub REST API for repository identity, default branch, language bytes, root
-  contents, and tree scans.
-- Cloudflare TypeScript SDK for Pages project/deployment and Workers
-  script/version/deployment APIs.
+- GitHub REST API for repository identity/default branch and pinned commit
+  resolution; the isolated builder clones that commit and scans its local snapshot.
+- Cloudflare TypeScript SDK for Pages project/domain/read/delete operations and
+  Workers script/version/deployment APIs; controlled Wrangler for the Pages
+  artifact upload itself.
 - Optional root `.mosoo.toml` as the user override contract.
 - Generated Wrangler config as an internal deployment artifact.
 
@@ -93,9 +95,8 @@ GitHub facts:
 
 - `owner`, `repo`, visibility, default branch, clone URL.
 - default branch commit SHA.
-- language byte map.
-- root files from Contents API.
-- recursive tree listing when small enough.
+- a pinned default-branch commit cloned into the isolated build Sandbox;
+- root files and tree shape read from that local snapshot.
 
 Rule precedence:
 
@@ -115,6 +116,7 @@ The detection result is a `DeploymentPlan`:
 
 ```ts
 interface DeploymentPlan {
+  agentBindings: Array<{ env: string; expose: "public_thread"; name: string }>;
   rootDir: string;
   packageManager: "pnpm" | "npm" | "yarn" | "bun" | "none";
   installCommand: string | null;
@@ -124,16 +126,21 @@ interface DeploymentPlan {
   targetMode: "static_assets" | "worker_module" | "worker_with_assets";
   mosooConfigPath: ".mosoo.toml" | null;
   generatedWranglerConfig: string;
+  routesFallback: string | null;
+  workerEntry: string | null;
   warnings: string[];
 }
 ```
 
-Do not infer D1, R2, KV, Queues, Durable Objects, custom domains, or secrets from
-package dependencies. Those require explicit user configuration.
+`worker_with_assets` remains a reserved type value; the current detector emits
+`static_assets` for Pages and `worker_module` for Workers.
 
-## Cloudflare Support And Detector MVP
+Do not infer D1, R2, KV, Queues, Durable Objects, user-supplied custom domains,
+or secrets from package dependencies. Those require explicit user configuration.
 
-Cloudflare can run more shapes than Mosoo should detect in the first cut:
+## Cloudflare Support And Detector Baseline
+
+Cloudflare can run more shapes than Mosoo currently detects:
 
 - Pages handles static sites and static framework output.
 - Workers handles request-time logic and can also serve static assets.
@@ -144,7 +151,7 @@ The detector is a whitelist, not a full Cloudflare framework adapter. If a
 repository needs migration, adapter installation, framework-specific SSR
 configuration, bindings, or secrets, return `deployment_config_required`.
 
-First-cut detector table:
+Current detector table:
 
 | Repository signal                                                 | Target  | Plan                                               |
 | ----------------------------------------------------------------- | ------- | -------------------------------------------------- |
@@ -171,7 +178,7 @@ Unsupported in the MVP:
 ## Override Config Contract
 
 `.mosoo.toml` is optional. It is the only user-authored deployment override file
-in the first cut. It describes application intent, not raw Cloudflare
+in the current contract. It describes application intent, not raw Cloudflare
 infrastructure. If it is absent, Mosoo detects the app type and commands from the
 repository.
 
@@ -191,9 +198,10 @@ output = "dist"
 fallback = "index.html"
 ```
 
-Allowed first-cut fields:
+Allowed current fields:
 
 - `name`
+- `schema`: when present, must be integer `1`
 - `type`: `static` or `worker`
 - `root`
 - `build.install`
@@ -201,6 +209,12 @@ Allowed first-cut fields:
 - `build.output`
 - `worker.entry`
 - `routes.fallback`
+- `deploy.adapter`: currently only `cloudflare-workers`
+- `deploy.wrangler`: relative Wrangler config path used to read the Worker entry
+- `[[agents]]`: repeated `name`, `expose = "public_thread"`, and `env` tables
+
+The top-level `name` is parsed today but is not used in the resulting deployment
+plan or resource naming; Mosoo derives the target from the App id/subdomain.
 
 Mosoo owns and generates:
 
@@ -211,7 +225,7 @@ Mosoo owns and generates:
 - Asset binding shape.
 - Observability/logging defaults.
 - Any platform secrets or environment variables.
-- D1, R2, KV, Queues, Durable Objects, custom domains, and paid-resource
+- D1, R2, KV, Queues, Durable Objects, user-supplied custom domains, and paid-resource
   bindings.
 
 If users need a Cloudflare field not represented in `.mosoo.toml`, add it to the
@@ -221,20 +235,20 @@ Mosoo config schema first. Do not pass through arbitrary Wrangler config.
 
 The control plane does not run arbitrary repository code inline.
 
-1. `setDeploymentSource` stores the GitHub source URL, owner, repo, default
-   branch, and normalized source kind.
-2. `analyzeDeployment` creates or refreshes a `DeploymentPlan`.
-3. `startDeployment` creates a `DeploymentRun` and enqueues it.
-4. The worker clones the exact commit in an isolated build sandbox.
-5. Install and build run without Cloudflare credentials.
-6. The build emits a static artifact directory, Worker bundle, or both.
-7. Mosoo generates a sanitized Wrangler configuration from the detected plan plus
+1. `deployApp` validates the GitHub source, creates or reuses the App Deployment, creates a queued
+   Deployment Run, and enqueues the dispatch command.
+2. The asynchronous executor resolves the repository's default branch and exact commit, then
+   detects or validates the `DeploymentPlan`.
+3. The worker clones the exact commit in an isolated build sandbox.
+4. Install and build run without Cloudflare credentials.
+5. The build emits a static artifact directory, Worker bundle, or both.
+6. Mosoo generates a sanitized Wrangler configuration from the detected plan plus
    optional `.mosoo.toml` overrides.
-8. The authenticated deploy step runs after build through
-   `CloudflareDeploymentClient`, backed by the official Cloudflare TypeScript
-   SDK and Mosoo platform credentials.
-9. The run stores Cloudflare project/script IDs, external deployment/version IDs,
-   status, internal logs, and the final URL.
+7. The authenticated deploy step runs only after build. Pages uses controlled
+   Wrangler in a separate deploy sandbox; Workers uses
+   `CloudflareDeploymentClient` backed by the official Cloudflare TypeScript SDK.
+8. The run stores Cloudflare project/script IDs, external deployment/version IDs,
+   status, failure summary, and the final URL.
 
 Do not put `CLOUDFLARE_API_TOKEN` in the environment for `npm install`,
 `pnpm install`, `bun install`, `npm run build`, or any repository-owned script.
@@ -248,40 +262,46 @@ to the deploy step, after repository-owned code has finished running.
 Use Cloudflare Pages for static output when the repository builds to a directory
 and has no required Worker runtime.
 
-First implementation path:
+Current implementation path:
 
 - Build in sandbox with no Cloudflare credential.
-- Upload the output directory through the Cloudflare TypeScript SDK.
-- Use Mosoo-generated config and platform credentials only from the artifact
-  deploy step.
+- Pack the output, destroy the untrusted build sandbox, and unpack it in a
+  controlled deploy sandbox.
+- Run authenticated `wrangler pages deploy` only in that controlled sandbox.
+- Use the Cloudflare SDK to manage/read the Pages project and domain around that
+  upload.
 
-Store the primary URL from the resulting Pages deployment aliases or project
-subdomain, then map or expose the Mosoo-owned subdomain.
+Mosoo requests the planned Mosoo-managed domain, but the current success path stores
+the Pages deployment URL when that domain is still initializing. Therefore
+`liveUrl` can be a `pages.dev` address while `plannedUrl` remains the reserved
+Mosoo-owned host.
 
 ### Dynamic Workers
 
-Use Cloudflare Workers when the repository has Worker code, needs request-time
-logic, or combines static assets with API routes.
+Use Cloudflare Workers when the repository has a self-contained JavaScript
+Worker module and needs request-time logic.
 
-First implementation path:
+Current implementation path:
 
 - Package Worker code without Cloudflare credentials.
 - Generate Wrangler config from the detected plan plus optional `.mosoo.toml`.
 - Upload a Worker module/version through the Cloudflare TypeScript SDK.
 - Create a deployment that sends 100% traffic to the new version.
-- For static assets plus Worker code, use Workers Static Assets and keep the
-  assets directory explicit in generated Wrangler config.
 
 Use the SDK for the final authenticated step instead of running authenticated
 Wrangler inside untrusted source.
 
 ### Pages Functions
 
-Treat Pages Functions as a later cut unless a repository already has a clean,
-supported Pages project shape. Workers with Static Assets covers the same
-dynamic-site need with fewer product branches.
+Pages Functions and Workers-with-assets are not emitted by the current detector.
+They require a later explicit contract and executor path.
 
-## Data Model Sketch
+Switching one App between Pages and Worker targets has no explicit cleanup step
+for the previous target kind in the current executor. Delete attempts cleanup of
+both kinds, but whether a target switch leaves an external orphan needs an
+integration test; no cleanup guarantee is claimed here.
+
+## Current Data Model
 
 `app_deployment`:
 
@@ -296,6 +316,8 @@ dynamic-site need with fewer product branches.
 - `mosoo_subdomain`
 - `latest_run_id`
 - `last_successful_url`
+- `deleting_at`
+- `deleted_at`
 - `created_at`
 - `updated_at`
 
@@ -327,17 +349,18 @@ Index by `(app_id, id)` and order run lists by `id`.
 
 ## API Shape
 
-GraphQL should follow the existing Console API style: App-scoped fields,
+GraphQL follows the existing Console API style: App-scoped fields,
 camelCase names, and mutation inputs with explicit `appId`.
 
-First-cut fields:
+Current fields:
 
 - `appOverview(appId: ULID!): AppOverview!` exposes `deployment: AppDeployment` (the App's configured Deployment, or null).
 - `deployApp(input: DeployAppInput!): AppDeploymentRun!`
+- `appDeploymentRunList(appId: ULID!, limit: Int): [AppDeploymentRun!]!`
 - `appDeploymentStatus(appId: ULID!): AppDeploymentRun`
 - `deleteAppDeployment(input: DeleteAppDeploymentInput!): OperationResult!`
 
-First-cut input:
+Current input:
 
 ```graphql
 input DeployAppInput {
@@ -352,15 +375,21 @@ input DeleteAppDeploymentInput {
 ```
 
 `appId` is required. Do not infer the App from the current account or repository.
-First-cut status always targets the latest DeploymentRun for the App. `configPath`
-is optional and must be absent or `.mosoo.toml` in the first cut.
+Status always targets the latest DeploymentRun for the App. `configPath` is
+optional and must be absent or `.mosoo.toml` in the current contract.
 `AppOverview.deployment` returns null when the App has no configured Deployment.
 `appDeploymentStatus` returns null when the App has no DeploymentRun.
 Deployment always uses the GitHub repository's current default branch; explicit
-branch selection is not part of the first cut.
+branch selection is not part of the current contract.
 
-CLI is out of scope for this API PRD. A future CLI wrapper should call these
-GraphQL fields and must not accept Cloudflare credential flags.
+The shipped `mosoo console apps deploy-app` CLI is a wrapper around this
+Mosoo-owned deployment flow. It accepts the App id, public repository URL,
+and optional `.mosoo.toml` config path. Pass `--wait` to poll the long-running
+operation in the command, or omit it and later call `mosoo console apps
+app-deployment-status --app-id <app-id> -o json`. The command does not accept
+Cloudflare credential flags. The CLI implementation lives in
+`langgenius/mosoo-connector`, while these GraphQL fields and this PRD remain the
+deployment contract.
 
 ## Async Status Model
 
@@ -392,8 +421,8 @@ successful runs remain `Successful`; do not relabel them as `Superseded`. Detail
 executor phases belong in a future expanded deployment log rather than the
 Activity status column.
 
-First-cut product clients should show the projected outcome and URL, but should
-not require users to copy or pass a run ID.
+The console and product clients should show the projected outcome and URL
+without requiring users to copy or pass a run ID.
 
 Statuses:
 
@@ -407,50 +436,56 @@ Statuses:
 - `failed`
 
 `submitted` means Mosoo has handed work to Cloudflare or the deployment queue.
-Only `success` may establish or update `liveUrl`. A later active or failed run
-does not take the last successful deployment offline.
+Only `success` may establish or update `liveUrl`: it means Mosoo completed its
+activation checks and recorded a live URL. It is not a traffic-atomic guarantee:
+the current Worker path creates a 100% deployment, and Pages uploads an
+artifact, before the final activation/status write. A later active or failed run
+does not take the last successful deployment offline; a later failure has no
+automatic rollback and the external target may already be reachable.
 
-Delete removes the App's current deployment. It should remove or disable the
-Mosoo-owned route/subdomain and delete the corresponding Mosoo-managed
-Cloudflare Pages project or Worker script when possible. If a run is in progress,
-delete should stop local work first and then tear down the external deployment
-resource. Historical DeploymentRun rows remain for status/audit, but the App no
-longer has a live deployment URL after delete succeeds.
+Delete first writes `deleting_at`, which hides the live URL, revokes bound
+capabilities, blocks redeploy, fails active runs, and cancels queued/expired
+dispatch claims. A live dispatch claim must finish before cleanup can continue.
+Cloudflare Pages/Worker deletion is idempotent and all target kinds must report
+success before Mosoo writes `deleted_at`; otherwise the mutation returns a
+retryable error and keeps the deletion ledger. A later Delete retries from that
+state. Historical DeploymentRun rows remain. `{ ok: true }` therefore means the
+known external resources were deleted and the tombstone was committed, while a
+crash/failure remains visible as an unfinished deletion rather than false
+success.
 
 ## Failure Model
 
-Use explicit error codes:
-
-- `github_url_invalid`
-- `github_repo_not_found`
-- `github_repo_not_public`
-- `deployment_shape_unsupported`
-- `deployment_config_required`
-- `deployment_build_failed`
-- `deployment_artifact_too_large`
-- `mosoo_cloudflare_unavailable`
-- `cloudflare_deploy_failed`
-- `deployment_url_unavailable`
-- `deployment_delete_failed`
-
-Store user-readable failure summaries on `DeploymentRun`. First cut does not
-expose deployment logs through API or CLI.
+Current failures do not implement a stable versioned error-code catalog.
+Binding failures persist explicit `deployment_agent_not_found` or
+`deployment_agent_not_published`; lifecycle races use codes such as
+`deployment_context_lost`, and queue retry exhaustion has its own code. Detector
+and non-retryable executor failures are otherwise persisted from JavaScript
+error names (for example `AppDeploymentDetectionError`) rather than their more
+specific `.code`. GitHub validation can fail before a DeploymentRun is created.
+The API/console surface stored summaries; deployment logs are not exposed.
 
 ## Security Rules
 
-- Only `https://github.com/<owner>/<repo>` public repositories in the first cut.
+- Only `https://github.com/<owner>/<repo>` public repositories in the current contract.
 - Clone by resolved commit SHA, not floating branch name.
 - Build in a sandbox with no Mosoo internal secrets and no Cloudflare token.
-- Redact token-like strings in logs before persistence.
-- Enforce CPU, memory, file count, artifact size, and wall-clock limits.
+- Redact exact known platform secret-binding values plus Authorization/Cookie
+  headers, sensitive credential key/value lines, bound capability URLs, and
+  known provider token prefixes before log/error persistence. Pattern-based
+  detection remains defense in depth for secrets not present in the bindings.
+- The Sandbox boundary exists, but explicit whole-build CPU, memory, file-count,
+  artifact-size, and wall-clock limits are not currently enforced by this
+  executor. Pages packaging and Worker entry reads can buffer artifacts in API
+  memory; this is an implementation gap, not a shipped quota contract.
 - Do not run user-provided deploy commands with Cloudflare credentials.
 - Mosoo platform Cloudflare token permissions must be minimal for Pages/Workers
   deploys.
 - Never pass through arbitrary user Wrangler config.
 
-## MVP Cut
+## Implemented Baseline
 
-Build this first:
+The shipped path includes:
 
 - One App has zero or one configured Deployment.
 - Public GitHub repository source only.
@@ -459,19 +494,19 @@ Build this first:
 - GitHub default branch only.
 - Static Pages deploy for known static output.
 - Worker deploy for detected or configured Worker projects.
-- Cloudflare TypeScript SDK adapter for Pages and Workers deploy/delete.
-- GraphQL deploy, latest-status, and delete fields.
+- Cloudflare TypeScript SDK adapter for Pages management/delete and Workers
+  deploy/delete, plus controlled Wrangler for Pages artifact upload.
+- GraphQL deploy, run-list, latest-status, and delete fields.
 - Store and show last successful URL on App Overview.
 - Mosoo-owned public URL.
 
 Skip for now:
 
-- CLI implementation.
 - Deployment logs API and CLI.
 - Private GitHub repositories.
 - Explicit branch selection.
 - GitHub webhooks and automatic redeploy.
-- Custom domains.
+- User-supplied custom domains (Mosoo-managed Pages/Worker domains are current).
 - Preview branches.
 - Rollback UI.
 - Cloudflare resource provisioning for D1/R2/KV/Queues/DO.
@@ -479,31 +514,36 @@ Skip for now:
 - Pages Functions as a first-class branch.
 - User-owned Cloudflare account deployment.
 
-## Agent Binding Wedge (v0 Addendum)
+## Agent Binding Baseline
 
 The base PRD deploys a public repo to a Mosoo-owned URL. This addendum adds the
 v0 differentiator: a deployed app can call the App's own Mosoo Agents through
 values injected at deploy time, with no secret in app code. Aligned with the PM
-on 2026-06-30 via `pm-reverse-interview.md`; the four decisions below are
+on 2026-06-30 via [`pm-reverse-interview.md`](../pm-reverse-interview.md); the four decisions below are
 product-level (user-visible), the rest is engineering freedom.
 
 ### Product Decisions (PM-aligned)
 
 1. **Zero secrets in app code.** When a deployed app calls a bound Agent, it
    reads exactly one "just works" value per agent and nothing else. Implemented
-   as a self-authorizing capability URL scoped to (App, Agent); no token, PAT, or
-   rotation is exposed to the app.
-2. **One call returns the reply.** The deployed app sends the user's message to
-   the injected URL in a single request and gets the Agent's final answer back in
-   the response. Mosoo runs the create-thread → run → wait → final-output behind
-   the URL (bounded by a timeout). Streaming and long-running runs are Next.
-3. **Deploy aborts on an unpublished binding.** If `.mosoo.toml` binds an Agent
-   that is not published/live, deploy fails fast with an actionable error and
-   ships nothing — consistent with the private-repo rejection. No partial-bind
-   state, no auto-publish.
-4. **Deployments is its own console section.** An App that has never deployed
-   shows a deploy guide (the `npx mosoo deploy` golden path + the two-file
-   contract) as the empty state. It does not merge into the Install page.
+   as a self-authorizing capability URL scoped to (App, Agent, Deployment,
+   successful Deployment Run, expose mode); no token, PAT, or manual rotation
+   control is exposed to the app.
+2. **One call returns a bounded reply.** The deployed app sends the user's
+   message to the injected URL in a single request and gets
+   `{ reply, runId, truncated }`. Mosoo runs create-thread → run → wait →
+   final-output behind the URL, bounded by both a timeout and the 1 MiB / 4,096
+   final-output reconstruction budget. Streaming, continuation, and long-running
+   runs are Next.
+3. **Worker deploy aborts on an unpublished binding.** If a Worker
+   `.mosoo.toml` binds an Agent that is not published/live, deploy fails before
+   build/deploy. Static Pages plans reject Agent bindings entirely. No
+   auto-publish occurs.
+4. **Deployment lives in App Overview.** An App that has never deployed shows the install guide,
+   repository input, and initial activity state in Overview. Once configured, the same surface
+   shows status, live URL, source, run history, retry/redeploy, and delete; delete confirmation
+   shows the bound-Agent count, not a binding detail list. The old
+   `/deployments` route redirects to `/`.
 
 ### `.mosoo.toml` Binding Contract
 
@@ -516,8 +556,11 @@ expose = "public_thread"      # only supported mode in v0
 env    = "ROADMAP_THREAD_URL" # env var the deployed app reads
 ```
 
-- `name` resolves an Agent within the deploying App. `id` is optional for
-  disambiguation only (default: reference by name — PM may veto in review).
+- `name` resolves an Agent within the deploying App. The current parser accepts
+  only `name`, `expose`, and `env`; an `id` field is rejected. Agent names are
+  not unique, and the current name map silently chooses one duplicate. The
+  stored plan retains names rather than immutable resolved Agent ids, so rename
+  and duplicate-name drift are known limitations.
 - `expose` must be `public_thread` in v0.
 - `env` is the exact environment variable name the deployed app reads. Mosoo does
   not auto-derive it; the app code and the manifest must agree.
@@ -530,29 +573,50 @@ For each `[[agents]]` entry, the deploy step injects one environment variable
 (`env`) whose value is a self-authorizing URL. The deployed app does:
 
 ```
-POST <injected_url>   body: { "message": "…" }   → { final agent output }
+POST <injected_url>   body: { "message": "…" }
+  → { "reply": "…", "runId": "…", "truncated": false }
 ```
 
-The URL is a capability scoped to (App, Agent, `public_thread`), minted at the
-deploy injection step (after untrusted build, alongside the authenticated deploy
-— never exposed to repo-owned scripts). It is revoked when the App deployment or
-binding is deleted. Behind it, Mosoo creates a thread, sends the message, waits
-for the run to complete within a bounded timeout, and returns the final output.
+The URL is a capability scoped to (App, Agent, Deployment, successful
+Deployment Run, `public_thread`). The current
+executor resolves bindings and mints it before the untrusted build, but keeps it
+in API memory and passes it only to the authenticated deploy step, not to
+repo-owned build scripts. Behind it, Mosoo creates a Thread, sends
+the message, waits for the Run to complete within a bounded timeout, and returns
+the bounded final-output prefix plus an explicit truncation flag.
+
+There is no separate token row or per-binding rotation epoch. The ten-year
+expiry is only an upper bound: every call rechecks that the Deployment is active
+and that the token names its newest successful Deployment Run. Deleting the
+Deployment or completing a newer deploy revokes copied older URLs;
+unpublishing/moving the Agent also fails closed. Global signing-secret rotation
+remains the emergency path for historical leaks. Treat every URL as a secret.
+
+Bound-call dispatch now derives and persists only the public API origin; the
+capability path, query, and bearer-like token are stripped before enqueue. A
+unit contract guards that boundary. Rows written before this fix may still
+contain the full URL, so historical cleanup and signing-secret rotation remain
+a separately authorized production operation.
+
+The blocking call waits up to 25 seconds. Timeout returns no run handle, does not
+cancel the background Run, and a caller retry is not idempotent; it can duplicate
+execution and cost.
 
 ### Deploy-Time Resolution
 
-Between build and the authenticated deploy: parse `[[agents]]`; resolve each
-`name` to a published Agent in the App; if any binding is unpublished/missing,
-abort the run with `deployment_agent_not_published` and inject nothing. On
-success, mint one capability URL per binding and inject the declared `env` vars
-into the deployed Worker/Pages environment.
+Before build: parse `[[agents]]`, resolve each `name` to a published Agent in the
+App, and mint one capability URL per binding. Missing/unpublished bindings abort
+before build. The values are withheld from repo-owned commands and injected only
+when deploying a Worker. Static Pages plans reject non-empty Agent bindings and
+have no Agent environment injection path.
 
 ### Console Surface
 
-Deployments section shows, per the new pages: the live URL + ledger, the bound
-Agents with their `public_thread` exposure and injected `env` names, and the
-runs history with retry/delete. Empty state is the deploy guide (decision 4).
-Injected URLs are capabilities — show the env var name, not the URL value.
+App Overview shows the live URL and activity ledger plus retry/redeploy/delete.
+The overview API returns bound-Agent name/exposure/env metadata, but the current
+Web surface uses only the binding count in its delete confirmation; it does not
+render the promised Agent/env list. Before the first deploy, Overview shows the
+install guide and repository input. Injected URLs are never returned to Web.
 
 ### Failure Model Additions
 
@@ -561,21 +625,23 @@ Injected URLs are capabilities — show the env var name, not the URL value.
 - `deployment_agent_call_timeout` — the one-call "ask" exceeded its bounded wait
   (surfaced to the deployed app, not the deploy run).
 
-### MVP Cut Additions
+### Implemented Agent Binding Baseline
 
-Build with the base cut:
+The shipped path includes:
 
 - Parse `[[agents]]` (`name`, `expose=public_thread`, `env`).
 - Resolve bindings to published Agents; fail fast on unpublished.
-- Mint one self-authorizing capability URL per binding; inject as the declared
-  `env`.
+- Mint one self-authorizing capability URL per Worker binding; inject as the
+  declared `env`. Static Pages plans reject Agent bindings.
 - One blocking "ask" endpoint behind the capability URL (reuse the public-thread
   `createThreadAndWait` path) with a bounded timeout.
-- Console shows bound Agents + injected env names; deploy-guide empty state.
+- Overview API exposes bound Agent/env metadata; Web currently shows only the
+  count in delete confirmation plus the deploy-guide empty state.
 
 Skip for now (Next): streaming / long-running ask, expose modes other than
 `public_thread`, binding Agents from other Apps, user-supplied tokens, and
-binding-name-collision UI.
+binding-name-collision UI, independent/manual capability rotation without a new
+successful Deployment Run, and a shorter capability lifetime.
 
 ### Engineering Decisions (owned, not PM — record in `architecture.md`)
 
@@ -600,6 +666,5 @@ Checked on 2026-06-26:
 - [Cloudflare Workers upload module API](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/methods/update/)
 - [Cloudflare Workers upload version API](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/versions/methods/create/)
 - [Cloudflare Workers create deployment API](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/deployments/methods/create/)
-- [GitHub repository languages API](https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-repository-languages)
-- [GitHub repository contents API](https://docs.github.com/en/rest/repos/contents?apiVersion=2022-11-28#get-repository-content)
-- [GitHub Git tree API](https://docs.github.com/en/rest/git/trees?apiVersion=2022-11-28#get-a-tree)
+- [GitHub Get a repository API](https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#get-a-repository)
+- [GitHub Get a branch API](https://docs.github.com/en/rest/branches/branches?apiVersion=2022-11-28#get-a-branch)
