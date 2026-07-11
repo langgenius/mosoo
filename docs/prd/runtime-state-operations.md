@@ -1,8 +1,10 @@
 # Runtime State Operations - For-Human PRD
 
+Status: active and shipped for current save/restart/recreate/reset operations.
+
 > **Purpose**: This document explains what happens when an App owner saves Agent config, restarts runtime execution, recreates a sandbox, resets Pet agent-state, or hits the fork boundary.
 >
-> **Current App boundary note**: App is the V1 boundary. The App owns product navigation, resources, operations visibility, export, and usage/cost rollups. An App-local Agent owns runtime execution, Agent API Endpoint exposure, Channel delivery, DeploymentVersions, and Threads/Sessions. Runtime state operations run on that Agent inside the admitted App; the App summarizes the operation but does not become a runtime subject.
+> **Current App boundary note**: App is the V1 boundary. The App owns product navigation, resources, App Deployment, operations visibility, and usage/cost rollups. An App-local Agent owns runtime execution, Agent API Endpoint exposure, Channel delivery, DeploymentVersions, and Threads/Sessions. Runtime state operations run on that Agent inside the admitted App; the App summarizes the operation but does not become a runtime subject.
 >
 > **Related docs**: [SPEC](../SPEC.md), [App Boundary](./app-boundary.md), [Agent Exposure Identity](./agent-service-identity.md), [Agent Session Contract](./agent-session-api.md), and [Session Lifecycle](./session-lifecycle.md).
 
@@ -18,9 +20,9 @@ The answer is:
 
 - The Agent remains the runtime subject.
 - App proof is required before any operation starts.
-- Versioned config saves create a DeploymentVersion for future Sessions.
+- Versioned config saves on a live/published Agent create a DeploymentVersion for future Sessions; draft saves update the draft only.
 - Existing Sessions keep their own execution snapshot.
-- Restart, patch, and recreate operations preserve Pet agent-state by default.
+- Restart/patch keep the existing Pet container. Recreate checkpoints only `/workspace/memory` plus eligible Session workspaces; login/cache/native state outside those paths is not promised.
 - Reset agent-state is a separate Pet-only danger action.
 - Runtime/type changes after exposure or live-version lock are not applied in place; they go through Fork Agent.
 
@@ -50,7 +52,7 @@ An App owner editing an App-local Agent needs concrete answers before pressing A
 - Will it affect current Threads, or only future Threads?
 - Will it restart the Agent driver?
 - Will it rebuild the sandbox?
-- Will Pet login state, cache, memory, or native sessions survive?
+- Which exact Pet filesystem paths survive a restart or recreate?
 - Is this actually a runtime/type identity change that must fork the Agent?
 
 The dangerous failure modes are:
@@ -69,7 +71,8 @@ The dangerous failure modes are:
 - Keep Agent as the only runtime subject.
 - Separate config-change planning from destructive reset.
 - Separate runtime/type Fork from restart, patch, recreate, and reset.
-- Preserve agent-state for restart, patch, and recreate operations.
+- State the exact preservation boundary: restart/patch retain the container;
+  recreate backs up subject memory and eligible Session workspaces only.
 - Require strong confirmation before reset agent-state.
 - Keep App Usage attribution tied to App, Agent, DeploymentVersion, Session, and Run proof.
 - Keep current Threads on their frozen execution snapshot.
@@ -80,31 +83,31 @@ The dangerous failure modes are:
 
 | Term                          | Product definition                                                                                                                     |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **App**             | The V1 product, resource, operation, export, and usage boundary. App is user-facing; App is the engineering name.                  |
+| **App**                       | The V1 product, resource, operation, Deployment, and usage boundary.                                                                   |
 | **Agent**                     | The App-local runtime subject. It owns execution, DeploymentVersions, endpoint exposure, Channel delivery, and V1 Threads/Sessions.    |
 | **Thread**                    | User-facing conversation record. It is backed by one AgentSession in V1.                                                               |
 | **AgentSession / Session**    | Runtime record behind a Thread. It freezes the Agent execution snapshot when created.                                                  |
 | **DeploymentVersion**         | Immutable runnable Agent config snapshot for future Sessions.                                                                          |
-| **agent-state**               | Pet runtime-local state: login tokens, cache, long-term local memory, and native session state. It is not Files.               |
+| **checkpointed Pet state**    | `/workspace/memory` plus eligible Session workspaces selected by runtime policy. This does not mean every login/cache/native file.     |
 | **direct-update**             | Metadata-only save with no DeploymentVersion and no runtime operation.                                                                 |
-| **restart-process**           | Runtime operation that restarts the Agent process and preserves agent-state.                                                           |
-| **patch-and-restart**         | Runtime operation that writes native runtime config, then restarts while preserving agent-state.                                       |
-| **recreate-preserving-state** | Runtime operation that rebuilds the sandbox while backing up and restoring agent-state.                                                |
-| **reset-agent-state**         | Pet-only danger action that clears agent-state. It is not config-triggered.                                                            |
+| **restart-process**           | Runtime operation that restarts the Agent process without replacing the current container.                                             |
+| **patch-and-restart**         | Runtime operation that writes platform-rendered config, then restarts in the current container.                                        |
+| **recreate-preserving-state** | Runtime operation that rebuilds the Sandbox after checkpointing `/workspace/memory` and eligible Session workspaces.                   |
+| **reset-agent-state**         | Pet-only danger action that clears admitted state targets and destroys the Pet runtime container. It is not config-triggered.          |
 | **Fork Agent**                | New Agent identity path for runtime/type changes after lock. The source Agent keeps Threads, logs, usage, endpoint history, and state. |
 
 ---
 
 ## 6. Operation Decision Matrix
 
-| Owner intent                                   | Current operation path                         | DeploymentVersion impact              | Runtime impact                     | agent-state |
-| ---------------------------------------------- | ---------------------------------------------- | ------------------------------------- | ---------------------------------- | ----------- |
-| Rename Agent or edit description               | `direct-update`                                | None                                  | None                               | Unchanged   |
-| Edit prompt                                    | `restart-process` when live runtime must apply | New live version for future Sessions  | Restart Agent process              | Preserved   |
-| Edit model, provider, Skills, MCP, or options  | `patch-and-restart`                            | New live version for future Sessions  | Patch native config and restart    | Preserved   |
-| Edit Environment binding                       | `recreate-preserving-state`                    | New live version for future Sessions  | Recreate sandbox and restore state | Preserved   |
-| Clear Pet runtime-local state                  | `reset-agent-state`                            | None                                  | Reset Pet runtime subject          | Cleared     |
-| Change runtime driver or Agent type after lock | Fork Agent                                     | New Agent identity, not in-place save | No operation on the source Agent   | Source kept |
+| Owner intent                                   | Current operation path                         | DeploymentVersion impact              | Runtime impact                                         | State boundary                                                                              |
+| ---------------------------------------------- | ---------------------------------------------- | ------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| Rename Agent or edit description               | `direct-update`                                | None                                  | None                                                   | Container unchanged                                                                         |
+| Edit prompt                                    | `restart-process` when live runtime must apply | New live version for future Sessions  | Restart Agent process                                  | Existing container retained                                                                 |
+| Edit model, provider, Skills, MCP, or options  | `patch-and-restart`                            | New live version for future Sessions  | Patch rendered config and restart                      | Existing container retained                                                                 |
+| Edit Environment binding                       | `recreate-preserving-state`                    | New live version for future Sessions  | Recreate Sandbox                                       | Subject memory + eligible Session workspaces checkpointed                                   |
+| Clear Pet runtime-local state                  | `reset-agent-state`                            | None                                  | Stop Drivers, clear targets, destroy the Pet container | Login/cache/native/container-local state is lost; control-plane records listed below remain |
+| Change runtime choice or Agent type after lock | Fork Agent                                     | New Agent identity, not in-place save | No operation on the source Agent                       | Source container unaffected                                                                 |
 
 `fork-agent` is part of config-change planning so the UI can block the in-place save. It is not one of the restart / recreate / reset backend operations.
 
@@ -133,7 +136,7 @@ Draft Agents can save many changes without runtime operation because they have n
 
 Use this when the Agent process needs to reload without changing the native sandbox shape.
 
-- Preserves Pet agent-state.
+- Keeps the existing Pet container; it does not exercise backup/restore.
 - May briefly interrupt active Sessions.
 - Does not change existing Session snapshots.
 - Writes runtime operation events for connected viewers.
@@ -143,16 +146,19 @@ Use this when the Agent process needs to reload without changing the native sand
 Use this when native runtime config must be written before restart.
 
 - Applies runtime-native config derived from the new DeploymentVersion.
-- Preserves Pet agent-state.
+- Keeps the existing Pet container; it does not exercise backup/restore.
 - Does not change existing Session snapshots.
 - Future Sessions use the new live DeploymentVersion.
 
 ### Recreate Preserving State
 
-Use this when the sandbox image, Environment, network shape, setup output, or mounted Storage set requires a clean rebuild.
+Use this when the Sandbox image, Environment, network shape, setup output, or
+materialized Session file/runtime state requires a clean rebuild.
 
-- Backs up Pet agent-state before rebuild when the runtime kind supports it.
-- Restores Pet agent-state after rebuild.
+- Backs up `/workspace/memory` and eligible Session workspaces before a Pet rebuild.
+- Restores those checkpointed targets according to runtime policy.
+- Does not promise to retain login files, caches, installed packages, arbitrary
+  native state, or files outside the checkpoint targets.
 - Explains expected downtime.
 - Does not include Files in agent-state deletion scope.
 
@@ -164,7 +170,11 @@ Reset agent-state is separate from Apply Changes.
 
 - It appears only where the Agent kind supports stable agent-state.
 - It requires strong confirmation.
-- It clears login tokens, cache, long-term runtime-local memory, and native session state.
+- It clears the policy-selected memory/Session targets, destroys the Pet runtime
+  container, closes its runtime Sessions for recycle, and therefore loses
+  container-local login, cache, installed packages, and arbitrary native state.
+- It does not currently delete persisted `native_resume_ref` rows, so it does
+  not guarantee erasure of every stored vendor resume handle.
 - It does not delete Agent profile, prompt, Skills, MCP references, Provider credentials, Files, Threads, Session history, logs, or App Usage.
 - It cannot be used as a softer name for restart or recreate.
 
@@ -174,11 +184,11 @@ Cattle Agents have no Agent-level stable state to reset. Their Session sandboxes
 
 ## 10. Fork Boundary For Runtime / Type Changes
 
-Runtime driver and Agent type are identity-level choices once the Agent is live.
+Agent Driver runtime and Agent type are identity-level choices once the Agent is live.
 
 After exposure or live-version lock:
 
-- Runtime driver changes are rejected in place.
+- Agent Driver runtime changes are rejected in place.
 - Agent type changes are rejected in place.
 - The owner must Fork Agent to create a new Agent identity.
 - The source Agent keeps its Threads, logs, usage attribution, endpoint history, channel history, and agent-state.
@@ -223,7 +233,8 @@ This is why current callers can keep trusting their Thread history while owners 
 - Say **Session** only for runtime implementation, snapshots, events, and tests.
 - Say **recreate preserving state** when state is restored.
 - Say **reset agent-state** only for destructive Pet runtime-local state clearing.
-- Do not claim current V1 has runtime subjects, top-level public endpoints, browser deployment shells, or public preview links owned by the App.
+- Do not describe App Deployment as an App runtime subject or App-level API endpoint. It is an
+  external Web artifact with its own Deployment lifecycle.
 
 ---
 

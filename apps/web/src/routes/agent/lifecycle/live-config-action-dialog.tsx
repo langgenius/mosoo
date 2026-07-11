@@ -31,6 +31,7 @@ interface ActionMeta {
   body: string;
   primary: string;
   preservesState: boolean;
+  stateNotice: string;
   danger: "low" | "medium" | "high";
 }
 
@@ -40,27 +41,33 @@ const META: Record<LifecycleActionKind, ActionMeta> = {
     danger: "low",
     preservesState: true,
     primary: "Apply now",
+    stateNotice: "The current Sandbox is reused, so its runtime-local state remains in place.",
     title: "Apply changes · patch native config + restart",
   },
   "recreate-preserving-state": {
-    body: "Network policy or setup script changed. The container will be rebuilt from a clean image, then your Agent home is restored from the latest backup. Expect ~10-30s of downtime; in-flight sessions reconnect.",
+    body: "The setup output or saved network-policy intent changed. The container will be rebuilt from a clean image. Only checkpoint-covered memory and eligible Session workspaces are restored; saved network policy is not currently enforced. Expect ~10-30s of downtime.",
     danger: "medium",
     preservesState: true,
     primary: "Recreate now",
-    title: "Apply changes · recreate sandbox (state preserved)",
+    stateNotice:
+      "Checkpoint-covered memory and eligible Session workspaces are restored. Login, cache, and other home paths are not guaranteed.",
+    title: "Apply changes · recreate sandbox (checkpointed paths restored)",
   },
   "fork-agent": {
     body: "Runtime changes are not allowed in-place after publishing. Fork this Agent with the new runtime; sessions, cost, and agent-state stay attached to the original.",
     danger: "medium",
     preservesState: true,
     primary: "Fork with new runtime",
+    stateNotice: "Sessions, cost, and runtime state remain attached to the original Agent.",
     title: "Switching runtime forks a new agent",
   },
   "reset-agent-state": {
-    body: "This clears the Agent's runtime home: login tokens, cache, long-term memory, and native session state. Your Agent profile (prompt, skills, MCP refs) is untouched. Cannot be undone.",
+    body: "This destroys the current Pet Sandbox after clearing long-term memory and Session runtime directories; login and cache disappear with the container. Stored native resume references are not currently removed. Your Agent profile is untouched. Cannot be undone.",
     danger: "high",
     preservesState: false,
     primary: "Reset agent-state",
+    stateNotice:
+      "Sandbox-local login/cache, checkpointed memory, and Session runtime directories are cleared. Stored native resume references may remain.",
     title: "Reset agent-state · destructive",
   },
   "restart-process": {
@@ -68,6 +75,7 @@ const META: Record<LifecycleActionKind, ActionMeta> = {
     danger: "low",
     preservesState: true,
     primary: "Apply now",
+    stateNotice: "The current Sandbox is reused, so its runtime-local state remains in place.",
     title: "Apply changes · restart Agent process",
   },
 };
@@ -118,7 +126,7 @@ export function LiveConfigActionDialog({
         </DialogHeader>
 
         <div className="space-y-3">
-          <StatePreservationBadge preserves={meta.preservesState} />
+          <StatePreservationBadge message={meta.stateNotice} preserves={meta.preservesState} />
 
           {affectedFields.length > 0 ? (
             <div className="border-border-subtle bg-bg-1 rounded-md border px-3 py-2">
@@ -189,25 +197,19 @@ export function LiveConfigActionDialog({
   );
 }
 
-function StatePreservationBadge({ preserves }: { preserves: boolean }) {
+function StatePreservationBadge({ message, preserves }: { message: string; preserves: boolean }) {
   if (preserves) {
     return (
       <div className="bg-success-bg/60 text-success-fg flex items-start gap-2 rounded-md px-3 py-2 text-[12.5px]">
         <ShieldCheck className="mt-0.5 size-3.5" />
-        <span>
-          Your <span className="font-mono">agent-state</span> is preserved: login, cache, memory,
-          and native sessions stay.
-        </span>
+        <span>{message}</span>
       </div>
     );
   }
   return (
     <div className="bg-ember-bg text-ember-fg flex items-start gap-2 rounded-md px-3 py-2 text-[12.5px]">
       <Lock className="mt-0.5 size-3.5" />
-      <span>
-        This action will clear <span className="font-mono">agent-state</span>: login, cache, memory,
-        and native sessions will be lost.
-      </span>
+      <span>{message}</span>
     </div>
   );
 }

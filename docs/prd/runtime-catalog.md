@@ -1,15 +1,16 @@
 # Runtime Catalog Extension PRD
 
-> Status: implementation guide for runtime expansion
+Status: implementation guide for runtime expansion.
+
 > Adjacent docs: [Architecture](../architecture.md), [Runtime Session Kernel](./runtime-session-kernel.md), [Credentials](./credentials.md)
 
 ## One-Line Positioning
 
-Add or change an Agent runtime, Provider, model source, or display surface by editing one catalog source, regenerating the typed catalog, and letting API, Web, and Driver release checks consume the same runtime and provider identity.
+Add or change an Agent runtime, Provider, model source, or display surface by updating the product runtime catalog and, for launchable runtimes, the independent Driver provider registry. A cross-submodule conformance test keeps their shared runtime, transport, and capability contract aligned.
 
 ## 1. User Problem
 
-Mosoo users see runtime and Provider availability in several places: Agent creation, model selection, Provider setup, and the landing page. Before this catalog boundary, those surfaces could drift because runtime/model allowlists, display names, icon mapping, Provider cards, custom model entry points, and "coming soon" rows lived in separate handwritten code paths.
+Mosoo users see runtime and Provider availability in Agent creation, model selection, and Provider setup. Before this catalog boundary, those surfaces could drift because runtime/model allowlists, display names, icon mapping, Provider cards, and custom model entry points lived in separate handwritten code paths.
 
 The person extending Mosoo needs a predictable answer to one question:
 
@@ -23,17 +24,20 @@ When a maintainer adds a runtime, they should be able to:
 - Declare first-class Provider identity, credential environment, default endpoint, auth shape, icon key, model source, and runtime adapter profile in the same source.
 - Keep Mosoo product-facing Provider ids under Mosoo control, even when upstream model metadata comes from another registry name such as `models.dev`.
 - Generate a typed catalog artifact consumed by API and Web code.
+- Keep executable Driver backend registration owned by the standalone Driver repository.
 - Keep planned display-only runtimes separate from public runtime release gates.
-- Validate that runtime admission, available model calculation, Provider card rendering, icon rendering, custom model entry points, and coming-soon display do not drift.
+- Validate that runtime admission, available model calculation, Provider card rendering, icon rendering, custom model entry points, coming-soon display, and the Driver's executable runtime contract do not drift.
 
 ## 3. In Scope
 
-- One canonical runtime catalog source for runtime, Provider, model, model-source, adapter, and display metadata.
+- One canonical product catalog source for runtime admission, Provider, model, model-source, adapter, and display metadata used by API and Web.
+- One Driver-owned provider registry for executable backends and the capabilities each backend actually advertises.
+- A checked cross-submodule contract requiring every public product runtime to match one Driver registry entry by runtime id, transport, and capability status/version.
 - Generated TypeScript constants committed with the repository.
 - API model availability uses the generated Provider model catalog plus runtime allowlists and App-level Provider credentials.
-- Web runtime options, default runtime selection, brand icon lookup, Provider cards, custom OpenAI-compatible entry point, landing showcase, and Provider coming-soon rows consume runtime catalog exports.
+- Web runtime options, default runtime selection, brand icon lookup, Provider cards, and the custom OpenAI-compatible entry point consume runtime catalog exports.
 - OpenCode model availability is the union of compatible models from configured first-class Providers, OpenCode Zen, and App-defined OpenAI-compatible custom credentials.
-- Planned runtimes may appear in display surfaces without becoming launchable runtimes.
+- Planned runtime metadata may exist in the catalog without becoming launchable. No current landing/App Overview showcase is wired to that metadata.
 - A repeatable extension checklist for adding a new runtime.
 
 ## 4. Out Of Scope
@@ -55,9 +59,9 @@ When a maintainer adds a runtime, they should be able to:
 | Provider model source    | Metadata describing where Mosoo can import or refresh a Provider's model list, such as a `models.dev` provider id or a Provider `/models` endpoint.  |
 | Provider model           | A known model option shipped by Mosoo for a first-class Provider.                                                                                    |
 | Custom OpenAI-compatible | App-defined credentials with user-provided Base URL and Model IDs. It is an action entry point, not a fixed Provider card.                           |
-| Public runtime           | A runtime visible and selectable in Agent creation.                                                                                                  |
+| Public runtime           | A runtime visible and selectable in Agent creation whose shared identity, transport, and capabilities match an executable Driver registry entry.     |
 | Internal runtime         | A cataloged runtime that is not user-selectable.                                                                                                     |
-| Planned runtime          | Display-only roadmap metadata. It must not affect runtime admission or launchability.                                                                |
+| Planned runtime          | Non-launchable roadmap metadata. The current Web landing/App Overview showcase does not consume it.                                                  |
 | Icon key                 | A catalog-owned symbolic key that Web maps to an imported brand asset.                                                                               |
 
 ## 6. Relationship Lock
@@ -69,12 +73,16 @@ flowchart LR
   TS --> RuntimeCatalog["runtime-catalog package<br/>provider + runtime admission + display exports"]
   RuntimeCatalog --> API["API<br/>available models + credential hydration"]
   RuntimeCatalog --> Web["Web<br/>provider cards + runtime options + display"]
-  RuntimeCatalog --> DriverGate["Driver release gate<br/>transport readiness + adapter coverage"]
+  DriverSource["Driver provider-registry.ts<br/>executable backends + capabilities"] --> Driver["standalone Agent Driver"]
+  RuntimeCatalog --> Conformance["cross-submodule conformance test"]
+  DriverSource --> Conformance
+  Conformance --> ReleaseGate["public runtime release gate"]
 ```
 
 Key decisions:
 
 - Display-only planned runtimes sit beside public runtime display entries, but they do not enter runtime admission.
+- The product catalog and Driver registry are deliberately separate ownership surfaces. Neither is described as a generated copy of the other; the pinned Driver gitlink plus the conformance test is the release boundary.
 - Mosoo Provider ids are product identities. For example, Mosoo may use `gemini`, `qwen`, `kimi`, `zhipu`, and `minimax` even when an upstream registry uses `google`, `alibaba`, `moonshotai`, `zai`, or regional variants as source ids.
 - Upstream source names belong in catalog metadata such as `modelSource`, not in API/Web/Driver branching logic.
 
@@ -85,9 +93,10 @@ Key decisions:
 3. If the runtime is launchable, set `visibility` to `public`, choose a supported `transport`, declare `vendorIds`, `defaultIdentity`, `supportedModels`, and whether App-defined OpenAI-compatible custom credentials are admitted.
 4. If the runtime is only roadmap display, add it to `plannedRuntimes` with explicit `surfaces`.
 5. Add an icon asset only if the catalog `iconKey` is new. Prefer existing `@lobehub/icons-static-svg` assets before adding local SVGs.
-6. Run `vp run --filter @mosoo/runtime-catalog catalog:generate`.
-7. Run `vp run --filter @mosoo/runtime-catalog test` and the affected API/Web type checks.
-8. Confirm the Driver transport and adapter profile path exists before making a runtime/provider combination public.
+6. For a launchable runtime, add or update the executable backend descriptor in `apps/driver/src/runtimes/provider-registry.ts`, including the runtime id, transport, and capability statuses. Commit that change in the standalone Driver repository and update the main repository's Driver gitlink.
+7. Run `vp run --filter @mosoo/runtime-catalog catalog:generate`.
+8. Run `vp run --filter @mosoo/runtime-catalog test` and the affected API/Web type checks. The package test compares every public catalog runtime with the pinned Driver registry and fails on missing, extra, or mismatched entries.
+9. Do not make a runtime public until the Driver backend exists and the cross-submodule contract passes.
 
 ## 7.1 Provider Identity And Model Source Rule
 
@@ -135,7 +144,7 @@ For OpenCode (`acp-fallback`), the model list should be the union of:
 
 OpenCode must therefore declare `acceptsCustomProvider: true` only when API hydration can render custom OpenAI-compatible credentials into a valid OpenCode provider config, including package and Base URL settings such as `@ai-sdk/openai-compatible` and `baseURL`.
 
-## 7.1 Provider And Adapter Decision Rule
+## 7.4 Provider And Adapter Decision Rule
 
 When adding a model source, first decide the identity boundary:
 
@@ -148,14 +157,19 @@ When adding a model source, first decide the identity boundary:
 ## 8. Acceptance Criteria
 
 - Changing a runtime label, Provider card label, icon key, planned surface, default model, Provider model source, adapter profile, or supported model list requires one source edit plus regeneration.
-- A planned runtime can appear on landing or Provider settings without becoming selectable in Agent creation.
+- A planned runtime remains non-launchable; displaying it anywhere requires an explicit consumer and test.
 - A public runtime appears in Agent runtime options and API available-model calculations from the same catalog entry.
+- Every public runtime matches exactly one pinned Driver provider descriptor by runtime id, transport, and capability id/status/version; internal or planned catalog entries are not Driver-admitted.
 - First-class Provider cards render from catalog metadata, with icons, without Web-only hard-coded Provider lists.
 - The fixed `openai-compatible` Provider card is absent; custom OpenAI-compatible credentials are reachable from a top-level custom model/provider action.
 - OpenCode availability reflects all configured compatible Provider credentials, not only the first Provider listed on the runtime.
 - OpenCode model picker entries include the union of compatible first-class Provider models, OpenCode Zen models, and custom OpenAI-compatible model IDs.
 - OpenCode is represented as the public runtime `acp-fallback`, not as a separate planned `opencode` runtime id.
-- Generated catalog checks fail when the committed artifact is stale.
+- Generated catalog checks fail when the committed artifact is stale; the Driver conformance test fails when either registry advances without the matching pinned contract update.
+
+The App Overview installer is a Codex-specific skill setup plus a shell-usable
+Mosoo CLI. It is not a runtime-catalog surface and must not be expanded into a
+coding-harness compatibility list without per-harness install and smoke tests.
 
 ## 9. Reasoning Review
 

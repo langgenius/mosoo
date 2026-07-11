@@ -1,10 +1,14 @@
-### Agent Manifest — for humans
+# Agent Manifest — for humans
+
+Status: active for the field/ownership contract. Native-config drift detection,
+Re-render / Keep runtime state, and Import / Adopt UX are not implemented and are
+not product promises.
 
 > This is the product-narrative version written for non-engineer readers. For the field-level types, see `pkgs/contracts/src/agent/agent-manifest.contract.ts` — the manifest contract source is the de-facto engineering reference.
 >
 > **Contract status (2026-06-24, Advanced runtime settings)**: the product surface exposes a small runtime-scoped allowlist as `Advanced runtime settings`. OpenAI exposes `model_reasoning_effort` / `model_verbosity`; Claude Agent SDK exposes its own `effort` / `maxTurns` fields without cross-runtime translation. Exported agent YAML and package `manifest.json` use `runtime.settings` / `settings`; legacy `providerOptions` remains readable for compatibility. The TypeScript contract and stored config still keep the internal field as `runtime.providerOptions: JsonObject` so existing driver plumbing can materialize runtime-native config, but the Console and public artifacts must not call this layer `providerOptions`. Settings are validated against the selected runtime allowlist before new values are stored; platform security, sandbox, credential, MCP, env, and provider/base-url boundaries cannot be overridden here.
 >
-> **Built-in tools status (2026-06-24)**: built-in runtime-neutral tool toggles are a separate Agent capability section, not Advanced runtime settings. The current curated set is `bash`, `read`, `write`, `edit`, `glob`, `grep`, `web_fetch`, and `web_search`. These toggles declare Agent capabilities only; they do not expose permission policy, approval mode, sandbox mode, or raw vendor tool configuration.
+> **Built-in tools status (2026-06-24)**: the tool names/contracts are runtime-neutral and live in a separate Agent capability section, not Advanced runtime settings. The current curated set is `bash`, `read`, `write`, `edit`, `glob`, `grep`, `web_fetch`, and `web_search`. The Web editor and Driver currently enforce these toggles only for the Claude Agent SDK backend; OpenAI and ACP do not apply them. They do not expose permission policy, approval mode, sandbox mode, or raw vendor tool configuration.
 >
 > **Current App boundary note**: Agent Manifest is still the App-local Agent runtime/config contract. It should not absorb App metadata, Provider key ownership, deployment health, App Overview state, or app-scoped cost. App owns those boundaries and references Agent Manifests as resources. See [App Boundary](./app-boundary.md).
 
@@ -16,7 +20,10 @@ The Agent Manifest is the **declarative product configuration** of a Mosoo Agent
 
 - It uses **a small set of stable fields** to spell out who an Agent is, which runtime it runs on, which model it uses, which system prompt it follows, and which Skills / MCP / Environment it has installed.
 - Upstream: the Agent owner edits it through the Agent editor / Preview form. (A natural-language configuration assistant — the former **Agent Builder** — is not part of the current product; see [architecture.md §4.4 Configuration Assistance Boundary](../architecture.md).)
-- Downstream: any tool — the CLI, CI, a future IDE plugin — can read the same Manifest and package it into a **`.agent` file** to distribute, fork, and import across Apps, instances, and the community.
+- Downstream: export/import use the `.agent` archive format. Same-App Fork
+  reuses the Manifest schema through a direct draft service without transporting
+  an `.agent` archive. This does not promise a current IDE plugin or lossless
+  cross-instance dependency restoration.
 
 It is **not** a "super `agent.yaml`" that unifies the vendor configuration files of OpenAI runtime, Claude Agent SDK, OpenCode, Cursor, and so on. Those vendors have their own full-featured configuration formats, and we do not try to swallow them.
 
@@ -31,17 +38,28 @@ It is **not** a "super `agent.yaml`" that unifies the vendor configuration files
 
 The core points it solves are:
 
-1. **Consumable by downstream tools** — whether it is our own tooling, other automation tools, or future third-party platforms, all of them can read the same Manifest to understand "who this Agent is and what it needs."
-2. **Making `.agent` files easy to distribute** — a `.zip` that contains `manifest.json` plus asset files (skills / environment definition / etc.) can be attached to a GitHub, Notion, or Slack file and handed to another developer, and can also be imported into any Mosoo App.
+1. **Shared by current Mosoo flows** — the editor, export/import, and same-App
+   Fork use the same Manifest schema to understand who the Agent is and what it
+   needs. Third-party compatibility requires a separately published, versioned
+   contract plus conformance tests; this document does not promise it.
+2. **Making `.agent` files portable within their implemented boundary** — a
+   `.zip` contains `manifest.json`, valid embedded Skill files, MCP intent, and
+   partial Environment sidecar metadata. Import materializes valid embedded
+   Skills; other dependencies follow the resolution report and may remain
+   unbound.
 3. **Declarative** — the user expresses "what I want," and the platform renders it into something a concrete runtime can run. The user does **not** write startup commands, does not maintain a vendor `.toml`, and does not toggle dozens of advanced switches in a UI form.
 
 ---
 
 ## 1. The user problem
 
-Mosoo simultaneously supports a host of heterogeneous Agent runtimes: OpenAI runtime, Claude Agent SDK, OpenCode, OpenClaw, Gemini, Hermes, Pi, Cursor Agent, and more. Each of them has its own:
+Mosoo currently supports three runtime paths: `openai-runtime`,
+`claude-agent-sdk`, and `acp-fallback` (the current OpenCode path). The
+architecture is designed to admit more heterogeneous runtimes only after they
+join Runtime Catalog and Driver checks. Each supported path has its own:
 
-- Configuration files (`config.toml` / `settings.json` / `.cursorrules` / …)
+- Vendor-native configuration files (for example OpenAI `config.toml` and the
+  supported Claude/OpenCode configuration surfaces)
 - Startup parameters, login state, and cache directories
 - Way of wiring up MCP
 - Prompting conventions
@@ -54,14 +72,19 @@ If we stuffed all of this into one big, all-encompassing `agent.yaml`:
 
 If we built only the lowest common denominator:
 
-- The Agent would become an "anemic wrapper" — unable to retain the full capabilities of OpenAI runtime or OpenClaw.
+- The Agent would become an "anemic wrapper" that cannot retain the supported
+  runtime-native capabilities of its selected backend.
 - Advanced users would go into the Terminal to change the vendor config, only to have the UI silently overwrite it again.
 
 The real problem is not "how do we merge every vendor's fields into one," but rather:
 
 - **Agent authors need a readable, editable, publishable entry point for product configuration.**
-- **The platform needs a stable contract** that can create, start, diagnose, and recover Agents, and that can also be consumed by downstream tools.
-- **Each Agent's runtime environment** must still retain the vendor's full capabilities.
+- **The platform needs a stable contract** that current Mosoo editor,
+  export/import, and Fork flows reuse to create, start, diagnose, and recover
+  Agents. Third-party consumption still requires a separately published,
+  versioned contract and conformance suite.
+- **Each Agent's runtime environment** must retain its supported runtime-native
+  capabilities within Mosoo's policy and Sandbox boundaries.
 - **When the UI, the Sandbox, and the vendor-native config disagree**, the user must clearly understand who is the source of truth and what to do next.
 
 ---
@@ -72,19 +95,29 @@ The real problem is not "how do we merge every vendor's fields into one," but ra
 
 - Define a long-lived Agent with a small set of stable fields: `kind`, runtime, model, system prompt, Skills, MCP, Environment.
 - Edit the Manifest directly through the Agent editor / Preview form. (A natural-language authoring assistant that turns "give me an agent that can read Linear tickets" into a Manifest patch — the former Agent Builder — is **not** part of the current product; any future configuration assistance is constrained by [architecture.md §4.4 Configuration Assistance Boundary](../architecture.md).)
-- Export the Agent as a **`.agent` package** to send to another developer, upload to the community, or fork into another App.
-- Import someone else's `.agent` package: the Manifest lands, assets are reused, and **credentials / tokens are not carried along with it**.
+- Export the Agent as a **`.agent` package** to send to another developer or import into another App. Fork itself creates a draft in the same App.
+- Import a `.agent` package: the portable Manifest intent lands, valid embedded
+  Skills can be materialized, MCP remains reconnect intent, Environment remains
+  unbound today and may resolve to the target App default at Session start; only
+  Environment secret names produce repair issues. **Credentials / tokens are
+  not carried along with it.**
 
 ### What the UI makes clear
 
-- Whether this Agent **renders successfully right now** — whether the config is in effect and whether it is still running the way you last saved it.
-- When any one of model / runtime / credential / MCP / Environment is unavailable, the UI **shows a clear grayed-out state** with a fix-it entry point, instead of silently swapping in a substitute for you.
-- When the actual state inside the Sandbox disagrees with the Manifest, there is a **clear drift indicator** — and the UI will not reverse-write over it.
+- Whether saved config passes current readiness and whether a platform-managed apply/recreate operation succeeded. This is not proof that arbitrary native Sandbox state still matches the saved Manifest.
+- Preview/Publish readiness blocks unavailable required dependencies and explains
+  the reason. Runtime/model selectors expose explicit unavailable states; only
+  implemented blocker types provide a direct repair/navigation action.
+- The current UI does not detect or display native Sandbox config drift. Saved
+  Agent config remains authoritative for platform-managed apply/recreate flows.
 
 ### What advanced users can do
 
-- Open the Terminal / Advanced Sandbox Mode and directly edit the vendor-native config: change it however the vendor CLI lets you change it.
-- Know that these changes **will not** be automatically reverse-written back into the Manifest — unless you explicitly choose "Import / Adopt."
+- A Pet owner can open the owner-debug Terminal and inspect or edit files that
+  actually exist in that Sandbox. Cattle has no Terminal entry.
+- Know that Sandbox-local changes are not reverse-written into the Manifest,
+  are not a supported replacement for the Agent editor, and are not guaranteed
+  across Sandbox recreation. There is no current Import / Adopt action.
 - Fork the Agent to get a clean copy: the Manifest is copied over, while runtime state / login state / historical sessions are left behind.
 
 ---
@@ -95,51 +128,56 @@ The key to understanding the Manifest is not to confuse these three layers:
 
 ```mermaid
 flowchart LR
-  PM["Product Manifest<br/>(Desired State)<br/>The product intent the user expresses in the UI / Builder"]
+  PM["Product Manifest<br/>(Desired State)<br/>The product intent saved by the Agent editor"]
     --> RC["Rendered Native Config<br/>The Agent Driver materializes it into config a vendor can run"]
     --> OS["Observed State<br/>What actually ends up running inside the Sandbox"]
 
-  PM -. "Drift signal" .- OS
+  PM -. "no current automatic reverse sync" .- OS
 ```
 
-| Layer                      | What it is                                                                                                                  | Is it the source of truth?                             |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| **Product Manifest**       | The user form / Builder / advanced YAML view / the state the platform saves                                                 | ✅ Yes. This is what the UI displays.                  |
-| **Rendered Native Config** | The vendor config file / startup parameters the Agent Driver renders from the Manifest                                      | ❌ No. It is a materialized result.                    |
-| **Observed State**         | The facts Diagnostics reads out of the Sandbox — the actually-running runtime, the native config hash, startup errors, etc. | ❌ No. Used only for diagnostics and drift comparison. |
+| Layer                      | What it is                                                                                                                                    | Is it the source of truth?                    |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| **Product Manifest**       | Agent-editor input and the persisted manifest; users can export its YAML projection, but there is no current advanced YAML editor             | ✅ Yes. This is what the UI displays.         |
+| **Rendered Native Config** | The vendor config file / startup parameters the Agent Driver renders from the Manifest                                                        | ❌ No. It is a materialized result.           |
+| **Observed State**         | Runtime and diagnostic facts that the current implementation records. It does not expose a general native-config drift hash or adoption flow. | ❌ No. Used for implemented diagnostics only. |
 
 **Rules**:
 
-- Editing the Manifest in the UI → triggers a re-render → changes the Sandbox.
-- Editing the Sandbox in the Terminal → **does not** change the Manifest; it only produces a drift signal.
-- The user can choose "Re-render" (re-render the Manifest into the Sandbox), "Keep runtime state" (keep the current Sandbox state and keep running), or explicitly "Import / Adopt" (absorb the Sandbox's current state back into the Manifest).
+- Editing saved Agent config in the UI uses the current change-plan flow to save,
+  restart the Driver, or recreate the Sandbox according to the changed fields.
+- Editing the Sandbox in the Terminal does **not** change the Manifest.
+- The current product has no general native-config drift indicator and no
+  Re-render / Keep runtime state / Import / Adopt actions.
 
 ---
 
-## 4. The minimal common set + the "full-power VPS" mental model
+## 4. The minimal common set and Sandbox-local state
 
 What we are building is the **overall unification of heterogeneous vendors** — so at the product layer the Manifest only ever appears as a **"minimal common set"**: runtime / model / system prompt / Skills / MCP / Environment.
 
-For configuration that is **not on the user's side** (vendor-private parameters, native CLI settings, login caches, reasoning_effort, performance tuning, and so on), our principles are:
+For runtime-specific configuration outside the common product fields, the
+current boundary is:
 
-### Principle 1 · The runtime environment should be "full-power"
+### Principle 1 · Support is bounded by the current runtime and Sandbox
 
-Running an Agent inside a Container should feel **close to deploying a fully uncrippled Agent on a VPS**.
-
-- If you were using OpenClaw / Harness Agent / Claude Code on your own computer, how would you configure it? — Most likely `cd ~/.config/<tool> && vim config.toml`.
-- It is the same inside Mosoo: open the Terminal, edit the vendor's own config file, and restart the process.
-
-Whatever can be done inside the Sandbox, **we do not re-cripple it for you in a UI form**.
+The Driver renders the supported native configuration and starts the supported
+backend. A Pet owner-debug Terminal exposes the actual Sandbox shell, but Mosoo
+does not promise a particular config path, resident service command, package
+manager, source checkout, or every capability of a self-managed VPS.
 
 ### Principle 2 · Balance "presentation" against "parameterized configuration"
 
 Not every piece of configuration should surface in front of the user.
 
 - **What belongs to product semantics** — long-term stable, common across runtimes, the user's responsibility — goes into the Manifest form.
-- **What belongs to vendor-private parameters** — things like reasoning effort / thinking level / fallback strategy / native cache size / startup flags — stays out of the primary Manifest. A small runtime-owned allowlist can appear in **Advanced runtime settings**; everything else is left inside the Sandbox, to be changed by the **Terminal / vendor CLI / a future System Agent**.
+- **What belongs to vendor-private parameters** — things like reasoning effort /
+  thinking level / fallback strategy / startup flags — stays out of the primary
+  Manifest unless it is in the runtime-owned Advanced settings allowlist.
+  Unsupported private parameters are not implicitly promised through Terminal.
 
 > In one sentence:
-> Anything you would solve on your own computer "by changing `~/.config/<tool>` from the command line" goes through the Terminal / Sandbox / System Agent in Mosoo too; we do not reinvent a separate form for it in the UI.
+> Runtime-specific behavior is available only where the current Driver backend,
+> policy, credentials, network, and Sandbox actually support it.
 
 ### Principle 3 · No promise of lossless cross-vendor migration
 
@@ -149,38 +187,36 @@ The Manifest is a minimal common set → it is impossible to move all of the Ope
 
 ## 5. Concept definitions
 
-| Term                             | Plain-language definition                                                                                                                                                                                                                           |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Agent Manifest**               | An Agent's declarative product configuration. The **minimal common set** + user intent + platform governance fields. Downstream tools only need to read this.                                                                                       |
-| **`.agent` package**             | A distributable zip: `manifest.json` + assets (skills / environment / avatar / …). Can be exported / imported / forked. **Does not carry credentials.**                                                                                             |
-| **`kind: pet \| cattle`**        | Pet = a Sandbox that follows the Agent long-term (your VPS / colleague). Cattle = an independent Sandbox per session (one instance per task). Locked after the first Publish; switching requires a Fork.                                            |
-| **Sandbox**                      | The execution environment in which the Agent actually runs. Pet uses an "Agent Sandbox"; Cattle uses a "Session Sandbox." All of the vendor's full capabilities are preserved here.                                                                 |
-| **Rendered Native Config**       | The vendor config file / startup parameters the Agent Driver renders from the Manifest. **A materialized result, not the truth.**                                                                                                                   |
-| **Drift**                        | The intent expressed by the Manifest vs. the actual state running inside the Sandbox disagree. Possible sources: you changed it in the Terminal / the vendor runtime changed it on its own / the platform failed to sync.                           |
-| **Advanced Sandbox Mode**        | The Terminal / advanced entry point that operates the Sandbox directly. It can change native state, but **cannot break through** the Files / Credential / Network boundaries.                                                                       |
-| **Import / Adopt**               | Explicitly absorb certain observed config from the Sandbox back into the Manifest. **By default this never happens automatically.**                                                                                                                 |
-| **Fork Agent**                   | Take a clean copy: the Manifest + asset bindings are copied over, while runtime state / login state / session history / cost are left behind.                                                                                                       |
-| **Readiness (grayed-out state)** | When any one of runtime / model / credential / MCP / Environment is unavailable, the Manifest is **kept**, but the frontend shows a clear grayed-out state + a fix-it path; it does **not** auto-swap the runtime and does not auto-swap the model. |
-| **Unavailable Model**            | A model that was selected before but is no longer in the dynamic model list. The Manifest still keeps it, the UI marks it Unavailable, and the user switches it manually.                                                                           |
+| Term                       | Plain-language definition                                                                                                                                                                                                                     |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Agent Manifest**         | An Agent's declarative product configuration: the **minimal common set** + user intent + platform governance fields used by current Mosoo editor, export/import, and Fork flows. It is not an unversioned third-party compatibility contract. |
+| **`.agent` package**       | A distributable zip containing `manifest.json`, embedded Skill files, MCP intent, and partial Environment sidecar metadata. MCP/Environment are not automatically recreated; avatar packaging is not wired; credentials never travel.         |
+| **`kind: pet \| cattle`**  | Pet = a stable Sandbox scoped to the Agent. Cattle = an independent Sandbox per Session. Kind is locked after first Publish; switching requires a same-App Fork.                                                                              |
+| **Sandbox**                | The execution environment in which the Agent runs. Pet uses an Agent Sandbox; Cattle uses a Session Sandbox. Supported runtime-native behavior remains constrained by Mosoo policy, credentials, network, file, and Driver capabilities.      |
+| **Rendered Native Config** | The vendor config file / startup parameters the Agent Driver renders from the Manifest. **A materialized result, not the truth.**                                                                                                             |
+| **Owner-debug Terminal**   | Pet-only shell access to the current Sandbox for diagnosis. It is not an advanced Manifest editor, persistence guarantee, or general VPS compatibility promise.                                                                               |
+| **Fork Agent**             | Take a same-App draft copy of the portable Manifest. Accessible Skill references can be reused; other dependencies follow the resolution report. Runtime/login state, Session history, and cost stay behind.                                  |
+| **Readiness**              | Missing required dependencies block Preview/Publish with a reason. Runtime/model can show explicit unavailable states; some blocker types provide direct repair actions. The platform does not silently swap runtime or model.                |
+| **Unavailable Model**      | A model that was selected before but is no longer in the dynamic model list. The Manifest still keeps it, the UI marks it Unavailable, and the user switches it manually.                                                                     |
 
 ---
 
 ## 6. What is and isn't in the Manifest
 
-| Section                                                    | User mental model                                 |                                                                                                 In the Manifest? |
-| ---------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------: |
-| Name / Description                                         | Who this Agent is                                 |                                                                                                               ✅ |
-| Runtime                                                    | Which Agent runtime it runs on                    |                                                                              ✅ (switching after publish = Fork) |
-| Model                                                      | Which provider / model is the default             |                                                                                           ✅ (can be grayed out) |
-| System Prompt                                              | The Agent's role, boundaries, and answering style |                                                                                                               ✅ |
-| Skills                                                     | Reusable skill packages                           |                                                                                                               ✅ |
-| Built-in tools                                             | Runtime-neutral Agent capability toggles          |                                                                                                               ✅ |
-| MCP Servers                                                | External tool / connector bindings                |                                                                                                               ✅ |
-| Environment                                                | Reference to a runtime container template         |                                                                                                               ✅ |
-| Files (uploads / session attachments / artifacts)          | Files an Agent reads or produces at run time      | ❌ → scoped at upload / session time, not a Manifest binding (see [Files API contract](./files-api-contract.md)) |
-| Vendor native config (`config.toml` / `settings.json` / …) | Vendor-private                                    |                                                                                          ❌ → Sandbox / Terminal |
-| Login state / CLI cache / vendor session state             | Runtime-internal state                            |                                                            ❌ → Pet Sandbox state / Cattle Session Sandbox state |
-| Performance / auto-switching / reasoning effort            | Runtime-specific preferences                      |                                                                Small typed allowlist → Advanced runtime settings |
+| Section                                                    | User mental model                                                  |                                                                                                 In the Manifest? |
+| ---------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------: |
+| Name / Description                                         | Who this Agent is                                                  |                                                                                                               ✅ |
+| Runtime                                                    | Which Agent runtime it runs on                                     |                                                                              ✅ (switching after publish = Fork) |
+| Model                                                      | Which provider / model is the default                              |                                                                                           ✅ (can be grayed out) |
+| System Prompt                                              | The Agent's role, boundaries, and answering style                  |                                                                                                               ✅ |
+| Skills                                                     | Reusable skill packages                                            |                                                                                                               ✅ |
+| Built-in tools                                             | Runtime-neutral names; currently enforced by Claude Agent SDK only |                                                                                                               ✅ |
+| MCP Servers                                                | External tool / connector bindings                                 |                                                                                                               ✅ |
+| Environment                                                | Reference to a runtime container template                          |                                                                                                               ✅ |
+| Files (uploads / session attachments / artifacts)          | Files an Agent reads or produces at run time                       | ❌ → scoped at upload / session time, not a Manifest binding (see [Files API contract](./files-api-contract.md)) |
+| Vendor native config (`config.toml` / `settings.json` / …) | Vendor-private                                                     |                                                 ❌ → Sandbox-local; Pet owner may inspect through debug Terminal |
+| Login state / CLI cache / vendor session state             | Runtime-internal state                                             |                                                            ❌ → Pet Sandbox state / Cattle Session Sandbox state |
+| Performance / auto-switching / reasoning effort            | Runtime-specific preferences                                       |                                                                Small typed allowlist → Advanced runtime settings |
 
 ---
 
@@ -188,14 +224,14 @@ The Manifest is a minimal common set → it is impossible to move all of the Ope
 
 ### Owner creates an Agent (through the Agent editor)
 
-| Stage                     | Action                                            | Experience                                                         |
-| ------------------------- | ------------------------------------------------- | ------------------------------------------------------------------ |
-| 1. Getting started        | Fill in name, description                         | The form shows only stable product semantics                       |
-| 2. Choose runtime / model | Pick from dropdowns                               | See the list of runtimes + models available to the current App     |
-| 3. Write the prompt       | Fill in the system prompt                         | The platform stores the prompt as part of the Manifest             |
-| 4. Attach capabilities    | Skills / MCP / Environment, each in its own group | Clear section boundaries, no nesting into each other               |
-| 5. Check readiness        | The UI validates automatically                    | Any unavailable item is grayed out with its reason + a fix-it path |
-| 6. Save / Publish         | One click                                         | Enters the Manifest state machine: draft / preview / live          |
+| Stage                     | Action                                            | Experience                                                                    |
+| ------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 1. Getting started        | Fill in name, description                         | The form shows only stable product semantics                                  |
+| 2. Choose runtime / model | Pick from dropdowns                               | See the list of runtimes + models available to the current App                |
+| 3. Write the prompt       | Fill in the system prompt                         | The platform stores the prompt as part of the Manifest                        |
+| 4. Attach capabilities    | Skills / MCP / Environment, each in its own group | Clear section boundaries, no nesting into each other                          |
+| 5. Check readiness        | The UI validates automatically                    | Blocking dependencies show a reason; supported blockers offer a repair action |
+| 6. Save / Publish         | One click                                         | Enters the Manifest state machine: draft / preview / live                     |
 
 ### Owner distributes the Agent
 
@@ -204,30 +240,26 @@ flowchart LR
   A["UI: Export Agent"] --> B["Generate the .agent zip<br/>(manifest.json + skills + ...)"]
   B --> C["Send to another developer / upload to the community / submit a PR"]
   C --> D["The recipient Imports it"]
-  D --> E["Manifest lands<br/>Assets are reused<br/>The recipient supplies credentials in their own environment"]
+  D --> E["Manifest intent lands<br/>Embedded Skills may materialize<br/>Other dependencies show resolution gaps"]
 ```
 
-### A user enters the Terminal to edit the vendor-native config
+### A user enters the Terminal to edit vendor-native state
 
-```mermaid
-flowchart TD
-  T1["Open Advanced Sandbox Mode / Terminal"] --> T2["vim the vendor's config file / run the vendor CLI"]
-  T2 --> T3["The Driver detects the native config change<br/>The UI shows a drift signal"]
-  T3 --> T4{"Owner decides"}
-  T4 -->|Re-render| T5["Re-render per the Manifest; the Terminal changes are discarded"]
-  T4 -->|Keep runtime state| T6["The current Sandbox state keeps running; the Manifest is unchanged"]
-  T4 -->|Import / Adopt| T7["Explicitly absorb the observed config back into the Manifest"]
-```
+The Pet owner can edit Sandbox-local native state through Terminal. Those edits
+do not update the saved Agent Manifest, and the current UI does not offer a
+general drift comparison or Adopt flow. A later platform-managed config apply or
+Sandbox recreate follows the saved Agent config and its runtime-state operation
+contract.
 
 ### Session startup
 
 ```mermaid
 flowchart TD
-  S1["The user creates a session from the Agent"] --> S2["The platform prepares Environment / Files / Credential"]
+  S1["The user creates a session from the Agent"] --> S2["The platform resolves Environment + Credential<br/>and current-message attachment ids"]
   S2 --> S3["The Agent Driver renders the Manifest into the current runtime's native config"]
   S3 --> S4{"Render succeeded?"}
   S4 -->|Yes| S5["The Sandbox enters a runnable state<br/>The session starts running"]
-  S4 -->|No| S6["Sync Failed state<br/>Diagnostics shows the root cause<br/>No partial success is written"]
+  S4 -->|No| S6["Render failure diagnostic<br/>Session does not start"]
 ```
 
 ---

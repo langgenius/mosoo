@@ -4,6 +4,5 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "types": ["bun", "node"]
   },
-  "exclude": ["cases/api/**/*.ts"],
   "include": ["**/*.ts"]
 }

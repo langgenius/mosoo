@@ -1,12 +1,11 @@
 /**
  * Fail-fast guard against the DEPLOY-D1-001 hazard.
  *
- * `wrangler d1 migrations apply` records applied migrations by FILENAME, so a
- * rewritten `0000_baseline.sql` (this repo's alpha workflow) is treated as
- * already-applied on a database that recorded the previous baseline. A new
- * `CREATE TABLE` in the rewritten baseline then never reaches prod, yet the
- * Worker deploys referencing it. We keep the fast rewrite-the-baseline flow but
- * refuse to ship a Worker whose expected tables are missing from live prod.
+ * `wrangler d1 migrations apply` records applied migrations by filename. This
+ * guard detects damage from the repository's former rewritten-baseline alpha
+ * workflow: a database may have recorded an older file with the same name and
+ * therefore miss tables. Applied migrations are immutable now; every production
+ * schema change must use a new migration file.
  *
  * These functions are pure (no I/O) so the deploy script can stay thin and the
  * detection logic stays unit-testable. Table-level only: this catches a missing

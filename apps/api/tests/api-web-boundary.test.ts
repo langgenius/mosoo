@@ -277,6 +277,15 @@ describe("API to web boundary", () => {
 
     expect(document.openapi).toBe("3.1.0");
     expect(document.servers).toEqual([{ url: "https://api.example.com/api/v1" }]);
+    expect(Object.keys(document.components.securitySchemes)).toEqual(["accessToken"]);
+    expect(document.security).toEqual([{ accessToken: [] }]);
+    for (const pathItem of Object.values(document.paths)) {
+      for (const operation of Object.values(pathItem)) {
+        if (operation?.security !== undefined) {
+          expect(operation.security).toEqual([{ accessToken: [] }]);
+        }
+      }
+    }
     expectProperties(document.paths, [
       "/agents/{agentId}/files",
       "/files/{fileId}/content",

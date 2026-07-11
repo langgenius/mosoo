@@ -23,10 +23,10 @@ export interface EnvironmentListTableProps {
 
 function networkLabel({ allowedHosts, networkPolicy }: EnvironmentSummary): string {
   if (networkPolicy === "full") {
-    return "Full network";
+    return "Full intent · not enforced";
   }
 
-  return `Limited · ${allowedHosts.length} hosts`;
+  return `Limited intent · ${allowedHosts.length} hosts · not enforced`;
 }
 
 export function EnvironmentListTable({

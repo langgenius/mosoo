@@ -81,7 +81,13 @@ export function PendingChangesBanner({
               {fieldCount} field{fieldCount === 1 ? "" : "s"} edited ·{" "}
               <span className="font-medium">{model.changePlan.actionLabel}</span>
               {model.changePlan.agentStatePreserved && action !== "direct-update" ? (
-                <span className="text-amber-fg/70"> · agent-state preserved</span>
+                <span className="text-amber-fg/70">
+                  {action === "recreate-preserving-state"
+                    ? " · checkpointed paths restored"
+                    : action === "fork-agent"
+                      ? " · original Agent state unchanged"
+                      : " · current Sandbox retained"}
+                </span>
               ) : null}
             </span>
           </div>
