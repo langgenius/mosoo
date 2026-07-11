@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import type { Server, ServerWebSocket } from "bun";
+import type { Server } from "bun";
 
 import type {
   VibesdkGateway,
@@ -51,7 +51,7 @@ function startFakeVibesdk(options: FakeVibesdkOptions = {}): FakeVibesdk {
   const ticketQueries: string[] = [];
   const wsMode = options.wsMode ?? "ack";
 
-  const server = Bun.serve<{ agentId: string }, object>({
+  const server = Bun.serve({
     fetch(request, srv) {
       const url = new URL(request.url);
       const { method } = request;
@@ -155,7 +155,7 @@ function startFakeVibesdk(options: FakeVibesdkOptions = {}): FakeVibesdk {
       if (wsMatch) {
         ticketQueries.push(url.searchParams.get("ticket") ?? "");
 
-        if (srv.upgrade(request, { data: { agentId: wsMatch[1] ?? "" } })) {
+        if (srv.upgrade(request)) {
           return undefined as unknown as Response;
         }
 
@@ -166,7 +166,7 @@ function startFakeVibesdk(options: FakeVibesdkOptions = {}): FakeVibesdk {
     },
     port: 0,
     websocket: {
-      message(ws: ServerWebSocket<{ agentId: string }>, raw) {
+      message(ws, raw) {
         const message = JSON.parse(String(raw)) as { type: string };
         received.push(message);
 
