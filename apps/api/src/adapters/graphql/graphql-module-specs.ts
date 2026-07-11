@@ -125,6 +125,7 @@ export const appGraphQLSpec = {
   queryFields: [
     "appList(organizationId: ULID!): [App!]!",
     "appVibeApp(appId: ULID!): AppVibeApp",
+    "appVibeAppEnabled: Boolean!",
     "appOverview(appId: ULID!, agentLimit: Int, credentialLimit: Int): AppOverview!",
     "controlPlaneOverview(appLimit: Int, agentLimit: Int, credentialLimit: Int): ControlPlaneOverview!",
   ],

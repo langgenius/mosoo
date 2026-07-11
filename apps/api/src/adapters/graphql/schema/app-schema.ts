@@ -20,6 +20,7 @@ export const appSchema = /* GraphQL */ `
     appId: ULID!
     createdAt: String!
     id: ULID!
+    lastPublishedAt: String
     previewUrl: String
     productionUrl: String
     status: AppVibeAppStatus!

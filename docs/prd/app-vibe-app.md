@@ -22,7 +22,9 @@ The user-facing loop is:
 5. The owner publishes. The app deploys to Workers for Platforms on the
    VibeSDK instance's account and gets its stable **production URL**.
 6. The owner can mint a short-lived **git clone URL** to export the source.
-7. Delete removes the VibeSDK app and the Mosoo binding.
+7. Delete removes the VibeSDK app and the Mosoo binding. The VibeSDK
+   instance does not tear down already-published deployments; they may keep
+   serving until platform-side cleanup.
 
 One App owns zero or one Vibe App. Access is App-owner-only, using the same
 ownership checks as every other App resource.
@@ -71,7 +73,6 @@ Web console ── GraphQL ──> API Worker ── @cf-vibesdk/sdk ──> Vib
 - `app_id` (unique)
 - `vibe_app_id` — the app/agent id on the VibeSDK instance
 - `created_at`
-- `updated_at`
 
 All lifecycle state (generation phase, preview URL, production URL, title) is
 read live from the VibeSDK instance and never persisted.
@@ -81,7 +82,7 @@ read live from the VibeSDK instance and never persisted.
 GraphQL, App-scoped, owner-only:
 
 - `createAppVibeApp(input: { appId, prompt }): AppVibeApp!` — one per App;
-  fails with `vibe_app_exists` when a binding already exists.
+  fails with `VIBE_APP_EXISTS` when a binding already exists.
 - `sendAppVibeAppPrompt(input: { appId, prompt }): OperationResult!`
 - `publishAppVibeApp(input: { appId }): OperationResult!`
 - `refreshAppVibeAppPreview(input: { appId }): OperationResult!`
@@ -91,6 +92,10 @@ GraphQL, App-scoped, owner-only:
   VibeSDK app first; the binding row is removed only after remote deletion
   succeeds (a missing remote app counts as deleted).
 - `appVibeApp(appId: ULID!): AppVibeApp` — null when the App has no Vibe App.
+  Reads tolerate a broken VibeSDK configuration: with no binding they stay
+  null; with a binding they fail with `VIBE_APP_UNCONFIGURED`.
+- `appVibeAppEnabled: Boolean!` — whether this deployment has a usable VibeSDK
+  configuration; the console hides the create surface when false.
 
 `AppVibeApp`:
 
@@ -99,25 +104,30 @@ GraphQL, App-scoped, owner-only:
 - `title`: VibeSDK app title, null until known
 - `previewUrl`: sandbox preview, null until first preview deploy
 - `productionUrl`: Workers-for-Platforms URL, null until first publish
+- `lastPublishedAt`: when the last publish completed, null before the first —
+  the console uses its change to show publish completion
 - `createdAt`, `updatedAt`
 
 ## Configuration
 
 API Worker bindings:
 
-- `VIBESDK_BASE_URL` — the VibeSDK instance origin.
+- `VIBESDK_BASE_URL` (secret-provisioned) — the VibeSDK instance origin.
 - `VIBESDK_API_KEY` (secret) — platform API key, exchanged by the SDK for
   short-lived JWTs.
 
-Missing configuration fails the Vibe App surfaces loudly with
-`vibe_app_unconfigured`; nothing else in the product depends on it.
+Both are operator-supplied through the worker secrets contract.
+
+Missing configuration fails the Vibe App command surfaces loudly with
+`VIBE_APP_UNCONFIGURED`; nothing else in the product depends on it.
 
 ## Failure Model
 
 - `VIBE_APP_UNCONFIGURED` — VibeSDK bindings missing or partial. The status
   query stays null (feature dormant) only while the App also has no binding.
 - `VIBE_APP_EXISTS` — create called while a binding exists.
-- `NOT_FOUND` — command called with no binding.
+- `NOT_FOUND` — command called with no binding. Delete is the exception: it
+  is idempotent and returns ok with no binding.
 - `VIBE_APP_UNAVAILABLE` — the VibeSDK instance rejected or failed a call; the
   message carries the upstream detail. Command mutations are safe to retry.
 

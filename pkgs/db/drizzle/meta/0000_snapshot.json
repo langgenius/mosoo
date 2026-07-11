@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "1e30e5fc-506d-5911-8797-f389ca1ed717",
+  "id": "a69f8563-e9c7-5ae5-848a-18a34cc0a7b0",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_deployment_version": {
@@ -3471,13 +3471,6 @@
           "name": "id",
           "type": "text CHECK (\"id\" = upper(\"id\") AND length(\"id\") = 26 AND substr(\"id\", 1, 1) GLOB '[0-7]' AND \"id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },

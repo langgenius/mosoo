@@ -540,6 +540,7 @@ type AppVibeApp {
   appId: ULID!
   createdAt: String!
   id: ULID!
+  lastPublishedAt: String
   previewUrl: String
   productionUrl: String
   status: AppVibeAppStatus!
@@ -1328,6 +1329,7 @@ type Query {
   appOverview(agentLimit: Int, appId: ULID!, credentialLimit: Int): AppOverview!
   appSkillList(appId: ULID!): [SkillSummary!]!
   appVibeApp(appId: ULID!): AppVibeApp
+  appVibeAppEnabled: Boolean!
   availableAgentModels(appId: ULID!, currentModelId: String, currentVendorId: String, runtimeId: String!): [ResolvedModelEntry!]!
   controlPlaneOverview(agentLimit: Int, appLimit: Int, credentialLimit: Int): ControlPlaneOverview!
   environment(appId: ULID!, environmentId: ULID!): EnvironmentDetail!

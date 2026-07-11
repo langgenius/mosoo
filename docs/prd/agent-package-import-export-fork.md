@@ -11,7 +11,7 @@ package services under `apps/api/src/modules/agents/application/`.
 ## Product boundary
 
 A `.agent` file is the portable Agent definition. It is not a whole App export
-and does not contain source App identity, App Deployment state, credentials,
+and does not contain source App identity, Vibe App state, credentials,
 Sessions, logs, cost, or Sandbox/runtime state.
 
 The package's legacy `app` object contains only Agent display metadata (name,

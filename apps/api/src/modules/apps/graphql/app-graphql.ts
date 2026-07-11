@@ -17,7 +17,7 @@ import {
   refreshAppVibeAppPreview,
   sendAppVibeAppPrompt,
 } from "../application/vibe-app.service";
-import { createVibesdkGateway } from "../application/vibesdk-gateway";
+import { createVibesdkGateway, createVibesdkGatewayForRead } from "../application/vibesdk-gateway";
 import type { VibesdkGateway } from "../application/vibesdk-gateway";
 
 interface OrganizationIdArgs {
@@ -96,10 +96,12 @@ export const appGraphQLModule = {
     appVibeApp: async (_parent, args: { appId: string }, context) =>
       getAppVibeApp(
         context.bindings.DB,
-        createVibesdkGateway(context.bindings),
+        createVibesdkGatewayForRead(context.bindings),
         context.viewer,
         parseAppId(args.appId),
       ),
+    appVibeAppEnabled: async (_parent, _args, context) =>
+      createVibesdkGatewayForRead(context.bindings) !== null,
     controlPlaneOverview: async (_parent, args: ControlPlaneOverviewArgs, context) =>
       getControlPlaneOverview(context.bindings.DB, context.viewer, {
         ...(args.agentLimit === undefined ? {} : { agentLimit: args.agentLimit }),

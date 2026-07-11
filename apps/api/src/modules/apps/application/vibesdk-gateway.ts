@@ -1,9 +1,11 @@
 import type { BuildSession } from "@cf-vibesdk/sdk";
 import { VibeClient, withTimeout } from "@cf-vibesdk/sdk";
+import type { AppVibeAppCloneUrl } from "@mosoo/contracts/app";
 
 import { API_ERROR_CODE, createApiError } from "../../../platform/errors";
 
 export interface VibeAppSnapshot {
+  lastPublishedAt: string | null;
   previewUrl: string | null;
   productionUrl: string | null;
   status: "generating" | "ready";
@@ -11,14 +13,9 @@ export interface VibeAppSnapshot {
   updatedAt: string | null;
 }
 
-export interface VibeAppCloneUrl {
-  cloneUrl: string;
-  expiresAt: string;
-}
-
 export interface VibesdkGateway {
   createApp(prompt: string): Promise<string>;
-  createCloneUrl(vibeAppId: string): Promise<VibeAppCloneUrl>;
+  createCloneUrl(vibeAppId: string): Promise<AppVibeAppCloneUrl>;
   deleteApp(vibeAppId: string): Promise<void>;
   getApp(vibeAppId: string): Promise<VibeAppSnapshot>;
   publish(vibeAppId: string): Promise<void>;
@@ -82,6 +79,7 @@ function parseSnapshot(data: unknown): VibeAppSnapshot {
   }
 
   return {
+    lastPublishedAt: readNullableString(record, "lastDeployedAt"),
     previewUrl: readNullableString(record, "previewUrl"),
     productionUrl: readNullableString(record, "cloudflareUrl"),
     status: status === "completed" ? "ready" : "generating",
@@ -175,7 +173,7 @@ class SdkVibesdkGateway implements VibesdkGateway {
     }
   }
 
-  async createCloneUrl(vibeAppId: string): Promise<VibeAppCloneUrl> {
+  async createCloneUrl(vibeAppId: string): Promise<AppVibeAppCloneUrl> {
     try {
       const response = await this.client.apps.getGitCloneToken(vibeAppId);
 
@@ -264,6 +262,19 @@ export function createVibesdkGateway(
   const gateway = new SdkVibesdkGateway(baseUrl, apiKey, timeouts);
   gatewayCache.set(cacheKey, gateway);
   return gateway;
+}
+
+// Read paths tolerate misconfiguration: a broken/partial config reads as "no
+// gateway" so dormant Apps keep rendering, while command paths still fail loud
+// through the strict factory.
+export function createVibesdkGatewayForRead(
+  bindings: VibesdkGatewayBindings,
+): VibesdkGateway | null {
+  try {
+    return createVibesdkGateway(bindings);
+  } catch {
+    return null;
+  }
 }
 
 export function requireVibesdkGateway(gateway: VibesdkGateway | null): VibesdkGateway {

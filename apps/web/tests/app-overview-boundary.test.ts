@@ -6,12 +6,10 @@ function readSource(path: string): string {
 }
 
 describe("App overview boundary", () => {
-  test("keeps the console root as the App install page without dashboard fetches", () => {
+  test("keeps the console root thin without dashboard fetches", () => {
     const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
 
-    expect(routeSource).toContain("AppOverviewInstallGuide");
-    expect(routeSource).toContain("Provider keys");
-    expect(routeSource).toContain("New agent");
+    expect(routeSource).toContain("VibeSurface");
 
     // The overview dashboard and its per-resource queries were removed; the root
     // no longer aggregates loads (which surfaced "data failed to load").
@@ -30,15 +28,15 @@ describe("App overview boundary", () => {
   });
 
   test("hands the App to a coding agent with the installer command on the console root", () => {
-    const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
-    // The header/body composition lives in the VibeSurface rendered by "/".
     const surfaceSource = readSource("../src/routes/app-overview/vibe/vibe-surface.tsx");
     const installSource = readSource("../src/routes/app-overview/app-overview-install.tsx");
     const appIdBadgeSource = readSource("../src/shared/ui/app-id-badge.tsx");
     const runtimeIconSource = readSource("../src/shared/ui/brand-icons/runtime-icon-data.ts");
 
-    expect(routeSource).toContain("AppOverviewInstallGuide");
+    expect(surfaceSource).toContain("AppOverviewInstallGuide");
     expect(surfaceSource).toContain("AppIdBadge");
+    expect(surfaceSource).toContain("Provider keys");
+    expect(surfaceSource).toContain("New agent");
     expect(installSource).toContain("Build agent app with");
     expect(installSource).toContain("coding");
     expect(installSource).toContain("text-[rgb(111_211_4)]");
@@ -107,12 +105,19 @@ describe("App overview boundary", () => {
     expect(installSource).not.toContain(" · ");
   });
 
-  test("keeps the App console root free of Chinese copy", () => {
-    const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
-    const installSource = readSource("../src/routes/app-overview/app-overview-install.tsx");
-
+  test("keeps the App console surfaces free of Chinese copy", () => {
+    const sources = [
+      "../src/routes/app-overview/app-overview.route.tsx",
+      "../src/routes/app-overview/app-overview-install.tsx",
+      "../src/routes/app-overview/vibe/vibe-surface.tsx",
+      "../src/routes/app-overview/vibe/vibe-app-status.ts",
+      "../src/domains/app/api/vibe-app-client.ts",
+      "../src/domains/app/query/vibe-app-queries.ts",
+    ];
     const cjk = /[一-鿿]/u;
-    expect(cjk.test(routeSource)).toBe(false);
-    expect(cjk.test(installSource)).toBe(false);
+
+    for (const path of sources) {
+      expect(cjk.test(readSource(path))).toBe(false);
+    }
   });
 });

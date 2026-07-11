@@ -8,7 +8,6 @@ import type {
 } from "../src/modules/apps/application/vibesdk-gateway";
 import { createVibesdkGateway } from "../src/modules/apps/application/vibesdk-gateway";
 import { API_ERROR_CODE } from "../src/platform/errors";
-import { expectApiErrorCode } from "./helpers/api-error-assert";
 
 const TEST_API_KEY = "vibe_test_key";
 const TEST_AGENT_ID = "vibe-agent-1";
@@ -33,7 +32,6 @@ interface FakeVibesdk {
   baseUrl: string;
   deleted: string[];
   received: { type: string }[];
-  stop(): void;
   ticketQueries: string[];
 }
 
@@ -136,6 +134,7 @@ function startFakeVibesdk(options: FakeVibesdkOptions = {}): FakeVibesdk {
           data: {
             cloudflareUrl: null,
             id: appMatch[1],
+            lastDeployedAt: null,
             previewUrl: null,
             status: "generating",
             title: null,
@@ -199,7 +198,6 @@ function startFakeVibesdk(options: FakeVibesdkOptions = {}): FakeVibesdk {
     baseUrl: `http://localhost:${server.port}`,
     deleted,
     received,
-    stop: () => server.stop(true),
     ticketQueries,
   };
 }
@@ -262,10 +260,9 @@ describe("vibesdk gateway createApp", () => {
     const fake = startFakeVibesdk({ wsMode: "silent" });
     const gateway = createGateway(fake);
 
-    await expectApiErrorCode(
-      gateway.createApp("Build a todo app"),
-      API_ERROR_CODE.vibeAppUnavailable,
-    );
+    await expect(gateway.createApp("Build a todo app")).rejects.toMatchObject({
+      code: API_ERROR_CODE.vibeAppUnavailable,
+    });
     expect(fake.deleted).toEqual([TEST_AGENT_ID]);
   });
 
@@ -273,10 +270,9 @@ describe("vibesdk gateway createApp", () => {
     const fake = startFakeVibesdk({ buildStatus: 400 });
     const gateway = createGateway(fake);
 
-    await expectApiErrorCode(
-      gateway.createApp("Build a todo app"),
-      API_ERROR_CODE.vibeAppUnavailable,
-    );
+    await expect(gateway.createApp("Build a todo app")).rejects.toMatchObject({
+      code: API_ERROR_CODE.vibeAppUnavailable,
+    });
     expect(fake.deleted).toEqual([]);
     expect(fake.attempts["build"]).toBe(1);
   });
@@ -285,10 +281,9 @@ describe("vibesdk gateway createApp", () => {
     const fake = startFakeVibesdk({ buildStatus: 500 });
     const gateway = createGateway(fake);
 
-    await expectApiErrorCode(
-      gateway.createApp("Build a todo app"),
-      API_ERROR_CODE.vibeAppUnavailable,
-    );
+    await expect(gateway.createApp("Build a todo app")).rejects.toMatchObject({
+      code: API_ERROR_CODE.vibeAppUnavailable,
+    });
     expect(fake.attempts["build"]).toBe(1);
   });
 
@@ -296,10 +291,9 @@ describe("vibesdk gateway createApp", () => {
     const fake = startFakeVibesdk();
     const gateway = createGateway(fake, "vibe_wrong_key");
 
-    await expectApiErrorCode(
-      gateway.createApp("Build a todo app"),
-      API_ERROR_CODE.vibeAppUnavailable,
-    );
+    await expect(gateway.createApp("Build a todo app")).rejects.toMatchObject({
+      code: API_ERROR_CODE.vibeAppUnavailable,
+    });
   });
 });
 
@@ -331,6 +325,7 @@ describe("vibesdk gateway status reads", () => {
       const fake = startFakeVibesdk({
         appData: {
           cloudflareUrl: testCase.cloudflareUrl,
+          lastDeployedAt: testCase.cloudflareUrl === null ? null : "2026-07-11T23:00:00.000Z",
           previewUrl: testCase.previewUrl,
           status: testCase.status,
           title: "Todo App",
@@ -342,6 +337,7 @@ describe("vibesdk gateway status reads", () => {
       const snapshot = await gateway.getApp(TEST_AGENT_ID);
 
       expect(snapshot).toEqual({
+        lastPublishedAt: testCase.cloudflareUrl === null ? null : "2026-07-11T23:00:00.000Z",
         previewUrl: testCase.previewUrl,
         productionUrl: testCase.cloudflareUrl,
         status: testCase.expectedStatus,
@@ -355,7 +351,9 @@ describe("vibesdk gateway status reads", () => {
     const fake = startFakeVibesdk({ appData: { status: "archived" } });
     const gateway = createGateway(fake);
 
-    await expectApiErrorCode(gateway.getApp(TEST_AGENT_ID), API_ERROR_CODE.vibeAppUnavailable);
+    await expect(gateway.getApp(TEST_AGENT_ID)).rejects.toMatchObject({
+      code: API_ERROR_CODE.vibeAppUnavailable,
+    });
   });
 
   test("surfaces an unsuccessful app read", async () => {
@@ -364,7 +362,9 @@ describe("vibesdk gateway status reads", () => {
     });
     const gateway = createGateway(fake);
 
-    await expectApiErrorCode(gateway.getApp(TEST_AGENT_ID), API_ERROR_CODE.vibeAppUnavailable);
+    await expect(gateway.getApp(TEST_AGENT_ID)).rejects.toMatchObject({
+      code: API_ERROR_CODE.vibeAppUnavailable,
+    });
   });
 });
 
@@ -402,7 +402,7 @@ describe("vibesdk gateway commands", () => {
       const fake = startFakeVibesdk({ wsMode: "silent" });
       const gateway = createGateway(fake);
 
-      await expectApiErrorCode(run(gateway), API_ERROR_CODE.vibeAppUnavailable);
+      await expect(run(gateway)).rejects.toMatchObject({ code: API_ERROR_CODE.vibeAppUnavailable });
     });
   }
 });
@@ -430,7 +430,9 @@ describe("vibesdk gateway app management", () => {
     const fake = startFakeVibesdk({ deleteStatus: 503 });
     const gateway = createGateway(fake);
 
-    await expectApiErrorCode(gateway.deleteApp(TEST_AGENT_ID), API_ERROR_CODE.vibeAppUnavailable);
+    await expect(gateway.deleteApp(TEST_AGENT_ID)).rejects.toMatchObject({
+      code: API_ERROR_CODE.vibeAppUnavailable,
+    });
   });
 
   test("clone url returns the minted token", async () => {

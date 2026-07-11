@@ -320,7 +320,7 @@ Account
         +-- Operations
         |   +-- usage
         |   +-- Agent logs
-        |   +-- Vibe App activity
+        |   +-- Vibe App state
 ```
 
 Rules:
@@ -459,7 +459,7 @@ V1 must not include:
 1. User submits a natural-language prompt from App Overview.
 2. `createAppVibeApp` creates one VibeSDK app bound to the App and generation starts
    immediately on the VibeSDK instance.
-3. App Overview polls live status: generation phase, sandbox preview URL, and production URL.
+3. App Overview polls live status: generation status, sandbox preview URL, and production URL.
    The user iterates with follow-up prompts and can refresh a stale preview.
 4. `publishAppVibeApp` deploys the built app to Mosoo-managed Workers for Platforms; the
    production URL appears on App Overview when live. The user can mint a short-lived git clone
@@ -474,7 +474,7 @@ V1 must not include:
 3. Organization is retained as a billing rollup.
 4. App Settings shows spend, request count, token/cache usage, daily spend, Agent attribution,
    and model/pricing breakdown. Recent usage rows are available in each Agent's Cost tab.
-5. Agent detail owns Agent logs and runtime operations; App Overview owns Vibe App activity.
+5. Agent detail owns Agent logs and runtime operations; App Overview owns Vibe App state and actions.
 6. V1 does not show per-user drilldown.
 
 ### App Overview API

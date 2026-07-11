@@ -1,17 +1,22 @@
 import type { AppVibeApp, AppVibeAppCloneUrl } from "@mosoo/contracts/app";
 import {
+  Bot,
+  Check,
+  Copy,
   ExternalLink,
   GitBranch,
+  KeyRound,
   Loader2,
   RefreshCw,
   Rocket,
   Sparkles,
   Trash2,
 } from "lucide-react";
-import type { ReactNode } from "react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import {
+  useAppVibeAppEnabledQuery,
   useAppVibeAppQuery,
   useCreateAppVibeAppCloneUrlMutation,
   useCreateAppVibeAppMutation,
@@ -25,6 +30,7 @@ import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Textarea } from "@/shared/ui/textarea";
 
+import { AppOverviewInstallGuide } from "../app-overview-install";
 import { toVibeAppStatusView } from "./vibe-app-status";
 
 // Publish and preview refresh complete on the VibeSDK side without a status
@@ -32,13 +38,23 @@ import { toVibeAppStatusView } from "./vibe-app-status";
 const PUBLISH_WATCH_MS = 180_000;
 const COMMAND_WATCH_MS = 90_000;
 
+function watchStorageKey(appId: string): string {
+  return `vibe-app-watch:${appId}`;
+}
+
+function readStoredWatchDeadline(appId: string): number {
+  const raw = sessionStorage.getItem(watchStorageKey(appId));
+  const parsed = raw === null ? Number.NaN : Number(raw);
+  return Number.isFinite(parsed) && parsed > Date.now() ? parsed : 0;
+}
+
 function ErrorLine({ message }: { message: string | null }) {
   if (message === null) {
     return null;
   }
 
   return (
-    <div className="bg-destructive/8 rounded-md px-3 py-2 text-[12.5px]">
+    <div role="alert" className="bg-destructive/8 rounded-md px-3 py-2 text-[12.5px]">
       <span className="text-destructive font-semibold">Something went wrong: </span>
       <span className="text-fg-2">{message}</span>
     </div>
@@ -65,23 +81,39 @@ function StatusBadge({ vibeApp }: { vibeApp: AppVibeApp }) {
   );
 }
 
-function UrlRow({ href, label }: { href: string | null; label: string }) {
+function UrlRow({
+  href,
+  label,
+  trailing,
+}: {
+  href: string | null;
+  label: string;
+  trailing?: string | null;
+}) {
   return (
     <div className="flex items-center justify-between gap-3 text-sm">
       <span className="text-muted-foreground shrink-0">{label}</span>
-      {href === null ? (
-        <span className="text-muted-foreground/70">Not available yet</span>
-      ) : (
-        <a
-          href={href}
-          target="_blank"
-          rel="noreferrer"
-          className="text-primary inline-flex min-w-0 items-center gap-1 font-medium hover:underline"
-        >
-          <span className="truncate">{href.replace(/^https?:\/\//, "")}</span>
-          <ExternalLink className="size-3.5 shrink-0" />
-        </a>
-      )}
+      <span className="flex min-w-0 items-center gap-2">
+        {trailing ? (
+          <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1 text-xs">
+            <Loader2 className="size-3 animate-spin" />
+            {trailing}
+          </span>
+        ) : null}
+        {href === null ? (
+          <span className="text-muted-foreground/70">Not available yet</span>
+        ) : (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary inline-flex min-w-0 items-center gap-1 font-medium hover:underline"
+          >
+            <span className="truncate">{href.replace(/^https?:\/\//, "")}</span>
+            <ExternalLink className="size-3.5 shrink-0" />
+          </a>
+        )}
+      </span>
     </div>
   );
 }
@@ -104,6 +136,7 @@ function CreateVibeAppCard({ appId }: { appId: string }) {
       <Textarea
         value={prompt}
         onChange={(event) => setPrompt(event.target.value)}
+        aria-label="Describe the app to build"
         placeholder="Build a kanban board with drag and drop, dark mode, and local persistence"
         rows={3}
         disabled={create.isPending}
@@ -134,17 +167,21 @@ function FollowUpCard({
   vibeApp: AppVibeApp;
 }) {
   const [prompt, setPrompt] = useState("");
+  const [sentAtMs, setSentAtMs] = useState<number | null>(null);
   const sendPrompt = useSendAppVibeAppPromptMutation(appId);
   const canSubmit = prompt.trim().length > 0 && !sendPrompt.isPending;
+  const showSentNote =
+    sentAtMs !== null && vibeApp.status === "ready" && Date.now() - sentAtMs < COMMAND_WATCH_MS;
 
   return (
     <div className="flex flex-col gap-2">
       <Textarea
         value={prompt}
         onChange={(event) => setPrompt(event.target.value)}
+        aria-label="Send a change request to the builder"
         placeholder={
           vibeApp.status === "generating"
-            ? "Queue a change while the build runs, e.g. use a green color scheme"
+            ? "Request a change for the current build, e.g. use a green color scheme"
             : "Iterate on the app, e.g. fix the empty state or add CSV export"
         }
         rows={2}
@@ -159,6 +196,7 @@ function FollowUpCard({
             sendPrompt.mutate(prompt.trim(), {
               onSuccess: () => {
                 setPrompt("");
+                setSentAtMs(Date.now());
                 onCommandAccepted(COMMAND_WATCH_MS);
               },
             });
@@ -167,10 +205,58 @@ function FollowUpCard({
           {sendPrompt.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
           Send to builder
         </Button>
+        {showSentNote ? (
+          <span className="text-muted-foreground text-xs">
+            Change sent — the builder picks it up shortly.
+          </span>
+        ) : null}
       </div>
       <ErrorLine message={sendPrompt.error?.message ?? null} />
     </div>
   );
+}
+
+function CloneUrlPanel({ cloneResult }: { cloneResult: AppVibeAppCloneUrl }) {
+  const [copied, setCopied] = useState(false);
+  const expiresAtMs = Date.parse(cloneResult.expiresAt);
+
+  if (Number.isFinite(expiresAtMs) && expiresAtMs < Date.now()) {
+    return null;
+  }
+
+  const command = `git clone ${cloneResult.cloneUrl}`;
+
+  return (
+    <div className="bg-muted/60 flex flex-col gap-1 rounded-md px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <code className="text-fg-2 text-xs break-all select-all">{command}</code>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Copy clone command"
+          onClick={() => {
+            void navigator.clipboard?.writeText(command).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2_000);
+            });
+          }}
+        >
+          {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+        </Button>
+      </div>
+      <span className="text-muted-foreground text-[11px]">
+        This URL embeds a temporary access token — treat it as a secret.
+        {Number.isFinite(expiresAtMs)
+          ? ` Expires ${new Date(expiresAtMs).toLocaleString()}.`
+          : null}
+      </span>
+    </div>
+  );
+}
+
+interface PublishWatch {
+  baselinePublishedAt: string | null;
+  sinceMs: number;
 }
 
 function VibeAppCard({
@@ -189,6 +275,22 @@ function VibeAppCard({
   const cloneUrl = useCreateAppVibeAppCloneUrlMutation(appId);
   const deleteVibeApp = useDeleteAppVibeAppMutation(appId);
   const [cloneResult, setCloneResult] = useState<AppVibeAppCloneUrl | null>(null);
+  const [publishWatch, setPublishWatch] = useState<PublishWatch | null>(null);
+
+  const resetActionErrors = () => {
+    publish.reset();
+    refreshPreview.reset();
+    cloneUrl.reset();
+    deleteVibeApp.reset();
+  };
+
+  const publishOutcomePending =
+    publishWatch !== null && vibeApp.lastPublishedAt === publishWatch.baselinePublishedAt;
+  const publishInFlight =
+    publishOutcomePending && Date.now() - publishWatch.sinceMs < PUBLISH_WATCH_MS;
+  const publishStalled =
+    publishOutcomePending && Date.now() - publishWatch.sinceMs >= PUBLISH_WATCH_MS;
+  const busy = deleteVibeApp.isPending;
 
   const actionError =
     publish.error?.message ??
@@ -203,13 +305,21 @@ function VibeAppCard({
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="truncate text-sm font-semibold">{vibeApp.title ?? "Untitled app"}</h2>
           <StatusBadge vibeApp={vibeApp} />
+          <span className="text-muted-foreground text-xs">
+            Updated {new Date(vibeApp.updatedAt).toLocaleTimeString()}
+          </span>
         </div>
         <Button
           variant="ghost"
           size="sm"
           disabled={deleteVibeApp.isPending}
           onClick={() => {
-            if (window.confirm("Delete this app and its preview/production deployments?")) {
+            if (
+              window.confirm(
+                "Delete this app? Anything already published may keep serving until platform cleanup.",
+              )
+            ) {
+              resetActionErrors();
               deleteVibeApp.mutate();
             }
           }}
@@ -221,25 +331,43 @@ function VibeAppCard({
 
       <div className="flex flex-col gap-2">
         <UrlRow label="Preview" href={vibeApp.previewUrl} />
-        <UrlRow label="Production" href={vibeApp.productionUrl} />
+        <UrlRow
+          label="Production"
+          href={vibeApp.productionUrl}
+          trailing={publishInFlight ? "Publishing…" : null}
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
-          disabled={!view.canPublish || publish.isPending}
+          disabled={!view.canPublish || publish.isPending || publishInFlight || busy}
           onClick={() => {
-            publish.mutate(undefined, { onSuccess: () => onCommandAccepted(PUBLISH_WATCH_MS) });
+            resetActionErrors();
+            publish.mutate(undefined, {
+              onSuccess: () => {
+                setPublishWatch({
+                  baselinePublishedAt: vibeApp.lastPublishedAt,
+                  sinceMs: Date.now(),
+                });
+                onCommandAccepted(PUBLISH_WATCH_MS);
+              },
+            });
           }}
         >
-          {publish.isPending ? <Loader2 className="size-4 animate-spin" /> : <Rocket />}
+          {publish.isPending || publishInFlight ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Rocket />
+          )}
           {view.productionState === "live" ? "Publish update" : "Publish"}
         </Button>
         <Button
           variant="outline"
           size="sm"
-          disabled={refreshPreview.isPending}
+          disabled={refreshPreview.isPending || busy}
           onClick={() => {
+            resetActionErrors();
             refreshPreview.mutate(undefined, {
               onSuccess: () => onCommandAccepted(COMMAND_WATCH_MS),
             });
@@ -251,8 +379,9 @@ function VibeAppCard({
         <Button
           variant="outline"
           size="sm"
-          disabled={cloneUrl.isPending}
+          disabled={cloneUrl.isPending || busy}
           onClick={() => {
+            resetActionErrors();
             cloneUrl.mutate(undefined, { onSuccess: setCloneResult });
           }}
         >
@@ -261,17 +390,14 @@ function VibeAppCard({
         </Button>
       </div>
 
-      {cloneResult !== null ? (
-        <div className="bg-muted/60 flex flex-col gap-1 rounded-md px-3 py-2">
-          <code className="text-fg-2 text-xs break-all select-all">
-            git clone {cloneResult.cloneUrl}
-          </code>
-          <span className="text-muted-foreground text-[11px]">
-            This URL embeds a temporary access token — treat it as a secret. Expires{" "}
-            {new Date(cloneResult.expiresAt).toLocaleString()}.
-          </span>
-        </div>
+      {publishStalled ? (
+        <p className="text-muted-foreground text-xs">
+          The publish has not reported back yet — the production URL updates here once it completes,
+          or you can publish again.
+        </p>
       ) : null}
+
+      {cloneResult !== null ? <CloneUrlPanel cloneResult={cloneResult} /> : null}
 
       {view.canPublish ? null : (
         <p className="text-muted-foreground text-xs">
@@ -286,33 +412,44 @@ function VibeAppCard({
   );
 }
 
-/**
- * The App Overview vibe surface: create the App's web app from a prompt,
- * watch the live preview while the VibeSDK builder works, iterate with
- * follow-up prompts, and publish to the production URL.
- */
-function StatusErrorRecovery({ appId, message }: { appId: string; message: string }) {
+function StatusErrorRecovery({
+  appId,
+  message,
+  onRetry,
+}: {
+  appId: string;
+  message: string;
+  onRetry: () => void;
+}) {
   const deleteVibeApp = useDeleteAppVibeAppMutation(appId);
 
   return (
     <div className="flex flex-col gap-3">
       <ErrorLine message={message} />
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <Button size="sm" onClick={onRetry}>
+          <RefreshCw />
+          Retry
+        </Button>
         <Button
           variant="outline"
           size="sm"
           disabled={deleteVibeApp.isPending}
           onClick={() => {
-            if (window.confirm("Remove this app binding? You can build a new app afterwards.")) {
+            if (
+              window.confirm(
+                "Delete this app? If it still exists on the backend it is deleted there too, and anything already published may keep serving until platform cleanup.",
+              )
+            ) {
               deleteVibeApp.mutate();
             }
           }}
         >
           {deleteVibeApp.isPending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 />}
-          Remove app binding
+          Delete app
         </Button>
         <span className="text-muted-foreground text-xs">
-          Use this if the app was removed on the backend and the status can no longer load.
+          Delete only if the app is gone on the backend and the status can no longer load.
         </span>
       </div>
       <ErrorLine message={deleteVibeApp.error?.message ?? null} />
@@ -320,23 +457,35 @@ function StatusErrorRecovery({ appId, message }: { appId: string; message: strin
   );
 }
 
-export function VibeSurface({
-  appId,
-  appName,
-  emptyHero,
-  headerActions,
-}: {
-  appId: string;
-  appName: string;
-  /** Content rendered below the create card before the first build. */
-  emptyHero?: ReactNode;
-  /** Right-aligned header extras. */
-  headerActions?: ReactNode;
-}) {
-  const [activityDeadlineMs, setActivityDeadlineMs] = useState(0);
+function UnavailableNote() {
+  return (
+    <section className="border-border bg-card flex flex-col gap-2 rounded-lg border p-4">
+      <h2 className="text-sm font-semibold">Web app building is not available here</h2>
+      <p className="text-muted-foreground text-sm">
+        This deployment has no VibeSDK backend configured. Set VIBESDK_BASE_URL and VIBESDK_API_KEY
+        on the API worker to enable it.
+      </p>
+    </section>
+  );
+}
+
+/**
+ * The App Overview vibe surface: create the App's web app from a prompt,
+ * watch the live preview while the VibeSDK builder works, iterate with
+ * follow-up prompts, and publish to the production URL.
+ */
+export function VibeSurface({ appId, appName }: { appId: string; appName: string }) {
+  const [activityDeadlineMs, setActivityDeadlineMs] = useState(() =>
+    readStoredWatchDeadline(appId),
+  );
+  const enabledQuery = useAppVibeAppEnabledQuery();
   const vibeAppQuery = useAppVibeAppQuery(appId, activityDeadlineMs);
   const vibeApp = vibeAppQuery.data ?? null;
-  const watchFor = (watchMs: number) => setActivityDeadlineMs(Date.now() + watchMs);
+  const watchFor = (watchMs: number) => {
+    const deadline = Date.now() + watchMs;
+    sessionStorage.setItem(watchStorageKey(appId), String(deadline));
+    setActivityDeadlineMs(deadline);
+  };
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
@@ -345,23 +494,53 @@ export function VibeSurface({
           <h1 className="truncate text-lg font-semibold">{appName}</h1>
           <AppIdBadge appId={appId} />
         </div>
-        <div className="flex gap-2">{headerActions}</div>
+        <div className="flex gap-2">
+          <Link
+            to="/providers"
+            className="border-border hover:bg-muted inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-md border px-3 text-sm font-semibold transition-colors sm:flex-none"
+          >
+            <KeyRound className="size-4" />
+            Provider keys
+          </Link>
+          <Link
+            to="/agent?create=1"
+            className="bg-primary text-primary-foreground hover:bg-primary-hover inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold shadow-xs transition-colors sm:flex-none"
+          >
+            <Bot className="size-4" />
+            New agent
+          </Link>
+        </div>
       </div>
 
-      {vibeAppQuery.isError ? (
-        <StatusErrorRecovery appId={appId} message={vibeAppQuery.error.message} />
+      {vibeAppQuery.isError && vibeApp === null ? (
+        <StatusErrorRecovery
+          appId={appId}
+          message={vibeAppQuery.error.message}
+          onRetry={() => {
+            void vibeAppQuery.refetch();
+          }}
+        />
       ) : vibeAppQuery.isPending ? (
         <div className="text-muted-foreground flex items-center gap-2 text-sm">
           <Loader2 className="size-4 animate-spin" />
           Loading app status…
         </div>
       ) : vibeApp === null ? (
-        <>
-          <CreateVibeAppCard appId={appId} />
-          {emptyHero}
-        </>
+        enabledQuery.data === false ? (
+          <UnavailableNote />
+        ) : (
+          <>
+            <CreateVibeAppCard appId={appId} />
+            <AppOverviewInstallGuide />
+          </>
+        )
       ) : (
-        <VibeAppCard appId={appId} onCommandAccepted={watchFor} vibeApp={vibeApp} />
+        <>
+          {vibeAppQuery.isError ? (
+            <ErrorLine message="Live status is temporarily unavailable — retrying." />
+          ) : null}
+          <VibeAppCard appId={appId} onCommandAccepted={watchFor} vibeApp={vibeApp} />
+        </>
       )}
     </div>
   );

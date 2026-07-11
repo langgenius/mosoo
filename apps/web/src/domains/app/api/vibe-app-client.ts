@@ -18,6 +18,7 @@ const APP_VIBE_APP_QUERY = graphql(/* GraphQL */ `
       appId
       createdAt
       id
+      lastPublishedAt
       previewUrl
       productionUrl
       status
@@ -28,12 +29,19 @@ const APP_VIBE_APP_QUERY = graphql(/* GraphQL */ `
   }
 `);
 
+const APP_VIBE_APP_ENABLED_QUERY = graphql(/* GraphQL */ `
+  query AppVibeAppEnabled {
+    appVibeAppEnabled
+  }
+`);
+
 const CREATE_APP_VIBE_APP_MUTATION = graphql(/* GraphQL */ `
   mutation CreateAppVibeApp($input: CreateAppVibeAppInput!) {
     createAppVibeApp(input: $input) {
       appId
       createdAt
       id
+      lastPublishedAt
       previewUrl
       productionUrl
       status
@@ -93,9 +101,12 @@ function toVibeApp(raw: RawVibeApp): AppVibeApp {
 
 export async function getAppVibeApp(appId: AppId): Promise<AppVibeApp | null> {
   const data = await requestGraphQL(APP_VIBE_APP_QUERY, { appId });
-  return data.appVibeApp === null || data.appVibeApp === undefined
-    ? null
-    : toVibeApp(data.appVibeApp);
+  return data.appVibeApp ? toVibeApp(data.appVibeApp) : null;
+}
+
+export async function getAppVibeAppEnabled(): Promise<boolean> {
+  const data = await requestGraphQL(APP_VIBE_APP_ENABLED_QUERY);
+  return data.appVibeAppEnabled;
 }
 
 export async function createAppVibeApp(appId: AppId, prompt: string): Promise<AppVibeApp> {

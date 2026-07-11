@@ -28,6 +28,7 @@ export interface AppVibeApp {
   appId: AppId;
   createdAt: string;
   id: AppVibeAppId;
+  lastPublishedAt: string | null;
   previewUrl: string | null;
   productionUrl: string | null;
   status: AppVibeAppStatus;

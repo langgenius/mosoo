@@ -895,14 +895,19 @@ export type AppVibeAppQueryVariables = Exact<{
 }>;
 
 
-export type AppVibeAppQuery = { appVibeApp: { appId: PlatformId, createdAt: string, id: PlatformId, previewUrl: string | null, productionUrl: string | null, status: AppVibeAppStatus, title: string | null, updatedAt: string, vibeAppId: string } | null };
+export type AppVibeAppQuery = { appVibeApp: { appId: PlatformId, createdAt: string, id: PlatformId, lastPublishedAt: string | null, previewUrl: string | null, productionUrl: string | null, status: AppVibeAppStatus, title: string | null, updatedAt: string, vibeAppId: string } | null };
+
+export type AppVibeAppEnabledQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type AppVibeAppEnabledQuery = { appVibeAppEnabled: boolean };
 
 export type CreateAppVibeAppMutationVariables = Exact<{
   input: CreateAppVibeAppInput;
 }>;
 
 
-export type CreateAppVibeAppMutation = { createAppVibeApp: { appId: PlatformId, createdAt: string, id: PlatformId, previewUrl: string | null, productionUrl: string | null, status: AppVibeAppStatus, title: string | null, updatedAt: string, vibeAppId: string } };
+export type CreateAppVibeAppMutation = { createAppVibeApp: { appId: PlatformId, createdAt: string, id: PlatformId, lastPublishedAt: string | null, previewUrl: string | null, productionUrl: string | null, status: AppVibeAppStatus, title: string | null, updatedAt: string, vibeAppId: string } };
 
 export type SendAppVibeAppPromptMutationVariables = Exact<{
   input: SendAppVibeAppPromptInput;
@@ -2665,6 +2670,7 @@ export const AppVibeAppDocument = /*#__PURE__*/ new TypedDocumentString(`
     appId
     createdAt
     id
+    lastPublishedAt
     previewUrl
     productionUrl
     status
@@ -2674,12 +2680,18 @@ export const AppVibeAppDocument = /*#__PURE__*/ new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<AppVibeAppQuery, AppVibeAppQueryVariables>;
+export const AppVibeAppEnabledDocument = /*#__PURE__*/ new TypedDocumentString(`
+    query AppVibeAppEnabled {
+  appVibeAppEnabled
+}
+    `) as unknown as TypedDocumentString<AppVibeAppEnabledQuery, AppVibeAppEnabledQueryVariables>;
 export const CreateAppVibeAppDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateAppVibeApp($input: CreateAppVibeAppInput!) {
   createAppVibeApp(input: $input) {
     appId
     createdAt
     id
+    lastPublishedAt
     previewUrl
     productionUrl
     status

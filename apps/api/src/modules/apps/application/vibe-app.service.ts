@@ -27,6 +27,7 @@ import type { VibeAppSnapshot, VibesdkGateway } from "./vibesdk-gateway";
 import { requireVibesdkGateway } from "./vibesdk-gateway";
 
 const INITIAL_SNAPSHOT: VibeAppSnapshot = {
+  lastPublishedAt: null,
   previewUrl: null,
   productionUrl: null,
   status: "generating",
@@ -39,11 +40,12 @@ function toAppVibeApp(row: AppVibeAppRow, snapshot: VibeAppSnapshot): AppVibeApp
     appId: row.appId,
     createdAt: toIsoString(row.createdAt),
     id: row.id,
+    lastPublishedAt: snapshot.lastPublishedAt,
     previewUrl: snapshot.previewUrl,
     productionUrl: snapshot.productionUrl,
     status: snapshot.status,
     title: snapshot.title,
-    updatedAt: snapshot.updatedAt ?? toIsoString(row.updatedAt),
+    updatedAt: snapshot.updatedAt ?? toIsoString(row.createdAt),
     vibeAppId: row.vibeAppId,
   };
 }
@@ -94,12 +96,10 @@ export async function createAppVibeApp(
   }
 
   const vibeAppId = await vibe.createApp(prompt);
-  const nowMs = currentTimestampMs();
   const row: AppVibeAppRow = {
     appId: input.appId,
-    createdAt: nowMs,
+    createdAt: currentTimestampMs(),
     id: createPlatformId<AppVibeAppId>(),
-    updatedAt: nowMs,
     vibeAppId,
   };
 

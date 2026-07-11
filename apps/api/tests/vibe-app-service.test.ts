@@ -15,12 +15,12 @@ import type {
 } from "../src/modules/apps/application/vibesdk-gateway";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { createApiError, API_ERROR_CODE } from "../src/platform/errors";
-import { expectApiErrorCode } from "./helpers/api-error-assert";
 import { createApiTestFixture } from "./helpers/api-test-fixture";
 
 type Fixture = Awaited<ReturnType<typeof createApiTestFixture>>;
 
 const SNAPSHOT: VibeAppSnapshot = {
+  lastPublishedAt: null,
   previewUrl: "https://preview.test",
   productionUrl: null,
   status: "generating",
@@ -125,13 +125,12 @@ describe("vibe app service", () => {
     await createVibeAppFixture(fixture);
     const { calls, gateway } = createFakeGateway();
 
-    await expectApiErrorCode(
+    await expect(
       createAppVibeApp(fixture.bindings.DB, gateway, fixture.viewer, {
         appId: fixture.ids.appId,
         prompt: "Another app",
       }),
-      API_ERROR_CODE.vibeAppExists,
-    );
+    ).rejects.toMatchObject({ code: API_ERROR_CODE.vibeAppExists });
     expect(calls).toEqual([]);
   });
 
@@ -145,13 +144,12 @@ describe("vibe app service", () => {
       },
     });
 
-    await expectApiErrorCode(
+    await expect(
       createAppVibeApp(fixture.bindings.DB, gateway, fixture.viewer, {
         appId: fixture.ids.appId,
         prompt: "Race entry",
       }),
-      API_ERROR_CODE.vibeAppExists,
-    );
+    ).rejects.toMatchObject({ code: API_ERROR_CODE.vibeAppExists });
     expect(calls).toContainEqual({ args: ["vibe-loser"], method: "deleteApp" });
 
     const survivor = await getAppVibeApp(
@@ -173,13 +171,12 @@ describe("vibe app service", () => {
       const fixture = await createApiTestFixture();
       const { calls, gateway } = createFakeGateway();
 
-      await expectApiErrorCode(
+      await expect(
         createAppVibeApp(fixture.bindings.DB, gateway, fixture.viewer, {
           appId: fixture.ids.appId,
           prompt,
         }),
-        API_ERROR_CODE.validationFailed,
-      );
+      ).rejects.toMatchObject({ code: API_ERROR_CODE.validationFailed });
       expect(calls).toEqual([]);
     });
   }
@@ -187,13 +184,12 @@ describe("vibe app service", () => {
   test("create fails closed when the gateway is unconfigured", async () => {
     const fixture = await createApiTestFixture();
 
-    await expectApiErrorCode(
+    await expect(
       createAppVibeApp(fixture.bindings.DB, null, fixture.viewer, {
         appId: fixture.ids.appId,
         prompt: "Build a todo app",
       }),
-      API_ERROR_CODE.vibeAppUnconfigured,
-    );
+    ).rejects.toMatchObject({ code: API_ERROR_CODE.vibeAppUnconfigured });
   });
 
   test("create fails closed for viewers that do not own the App", async () => {
@@ -230,6 +226,7 @@ describe("vibe app service", () => {
         snapshotCases.push({
           name: `${status} preview=${previewUrl !== null} production=${productionUrl !== null}`,
           snapshot: {
+            lastPublishedAt: productionUrl === null ? null : "2026-07-11T23:00:00.000Z",
             previewUrl,
             productionUrl,
             status,
@@ -255,6 +252,7 @@ describe("vibe app service", () => {
       );
 
       expect(result).toMatchObject({
+        lastPublishedAt: snapshot.lastPublishedAt,
         previewUrl: snapshot.previewUrl,
         productionUrl: snapshot.productionUrl,
         status: snapshot.status,
@@ -284,10 +282,9 @@ describe("vibe app service", () => {
     const fixture = await createApiTestFixture();
     await createVibeAppFixture(fixture);
 
-    await expectApiErrorCode(
+    await expect(
       getAppVibeApp(fixture.bindings.DB, null, fixture.viewer, fixture.ids.appId),
-      API_ERROR_CODE.vibeAppUnconfigured,
-    );
+    ).rejects.toMatchObject({ code: API_ERROR_CODE.vibeAppUnconfigured });
   });
 
   const commandCases = [
@@ -334,7 +331,9 @@ describe("vibe app service", () => {
       const fixture = await createApiTestFixture();
       const { calls, gateway } = createFakeGateway();
 
-      await expectApiErrorCode(command.run(fixture, gateway), API_ERROR_CODE.notFound);
+      await expect(command.run(fixture, gateway)).rejects.toMatchObject({
+        code: API_ERROR_CODE.notFound,
+      });
       expect(calls).toEqual([]);
     });
 
@@ -342,7 +341,9 @@ describe("vibe app service", () => {
       const fixture = await createApiTestFixture();
       await createVibeAppFixture(fixture);
 
-      await expectApiErrorCode(command.run(fixture, null), API_ERROR_CODE.vibeAppUnconfigured);
+      await expect(command.run(fixture, null)).rejects.toMatchObject({
+        code: API_ERROR_CODE.vibeAppUnconfigured,
+      });
     });
   }
 
@@ -350,13 +351,12 @@ describe("vibe app service", () => {
     const fixture = await createApiTestFixture();
     const { calls, gateway } = createFakeGateway();
 
-    await expectApiErrorCode(
+    await expect(
       sendAppVibeAppPrompt(fixture.bindings.DB, gateway, fixture.viewer, {
         appId: fixture.ids.appId,
         prompt: "  ",
       }),
-      API_ERROR_CODE.validationFailed,
-    );
+    ).rejects.toMatchObject({ code: API_ERROR_CODE.validationFailed });
     expect(calls).toEqual([]);
   });
 
@@ -412,12 +412,11 @@ describe("vibe app service", () => {
       },
     });
 
-    await expectApiErrorCode(
+    await expect(
       deleteAppVibeApp(fixture.bindings.DB, gateway, fixture.viewer, {
         appId: fixture.ids.appId,
       }),
-      API_ERROR_CODE.vibeAppUnavailable,
-    );
+    ).rejects.toMatchObject({ code: API_ERROR_CODE.vibeAppUnavailable });
 
     const remaining = await getAppVibeApp(
       fixture.bindings.DB,

@@ -3,7 +3,7 @@
 Mosoo is an open-source, cloud-native platform for turning AI app ideas into
 live agent apps: bring your PRD, use the Mosoo CLI and Codex skill, run OpenAI
 runtime, Claude Agent SDK, or OpenCode/DeepSeek via ACP in isolated sandboxes,
-manage their lifecycle, and deploy through the Mosoo Web console.
+manage their lifecycle, and build and publish a Vibe App through the Mosoo Web console.
 
 <p align="center">
   <a href="https://try.mosoo.ai">Try Mosoo</a> ·

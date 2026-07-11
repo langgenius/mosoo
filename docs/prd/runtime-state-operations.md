@@ -4,7 +4,7 @@ Status: active and shipped for current save/restart/recreate/reset operations.
 
 > **Purpose**: This document explains what happens when an App owner saves Agent config, restarts runtime execution, recreates a sandbox, resets Pet agent-state, or hits the fork boundary.
 >
-> **Current App boundary note**: App is the V1 boundary. The App owns product navigation, resources, App Deployment, operations visibility, and usage/cost rollups. An App-local Agent owns runtime execution, Agent API Endpoint exposure, Channel delivery, DeploymentVersions, and Threads/Sessions. Runtime state operations run on that Agent inside the admitted App; the App summarizes the operation but does not become a runtime subject.
+> **Current App boundary note**: App is the V1 boundary. The App owns product navigation, resources, the Vibe App, operations visibility, and usage/cost rollups. An App-local Agent owns runtime execution, Agent API Endpoint exposure, Channel delivery, DeploymentVersions, and Threads/Sessions. Runtime state operations run on that Agent inside the admitted App; the App summarizes the operation but does not become a runtime subject.
 >
 > **Related docs**: [SPEC](../SPEC.md), [App Boundary](./app-boundary.md), [Agent Exposure Identity](./agent-service-identity.md), [Agent Session Contract](./agent-session-api.md), and [Session Lifecycle](./session-lifecycle.md).
 

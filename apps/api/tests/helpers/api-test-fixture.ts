@@ -330,7 +330,6 @@ function createApiTestSchema(database: SqliteD1Database): void {
       app_id text NOT NULL,
       created_at integer NOT NULL,
       id text PRIMARY KEY NOT NULL,
-      updated_at integer NOT NULL,
       vibe_app_id text NOT NULL
     );
     CREATE UNIQUE INDEX app_vibe_app_app_idx ON app_vibe_app (app_id);

@@ -139,6 +139,7 @@ const appRoutes = [
   { element: protectedRoute(<Navigate to="/integrations/mcp" replace />), path: "/mcp" },
   { element: protectedRoute(<SkillsTabRoute />), path: "/integrations/skills" },
   { element: protectedRoute(<McpTabRoute />), path: "/integrations/mcp" },
+  { element: protectedRoute(<Navigate to="/" replace />), path: "/deployments" },
   { element: protectedRoute(<AgentList />), path: "/agent" },
   { element: protectedRoute(<AgentDetail />), path: "/agent/:agentId" },
   { element: protectedRoute(<Threads />), path: "/threads" },

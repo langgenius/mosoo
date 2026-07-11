@@ -19,7 +19,6 @@ export const appVibeAppsTable = sqliteTable(
     appId: platformIdColumn<AppId>("app_id").notNull(),
     createdAt: integer("created_at").notNull(),
     id: platformIdColumn<AppVibeAppId>("id").primaryKey(),
-    updatedAt: integer("updated_at").notNull(),
     vibeAppId: text("vibe_app_id").notNull(),
   },
   (table) => [uniqueIndex("app_vibe_app_app_idx").on(table.appId)],

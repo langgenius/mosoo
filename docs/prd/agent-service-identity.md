@@ -8,7 +8,7 @@ Status: active and shipped for Agent exposure identity and version snapshots.
 >
 > This document covers two boundaries: **App-scoped operations identity** and **Agent-owned exposure/versioning**. How Apply Changes works, how the driver restarts, and how agent-state resets live in [`./runtime-state-operations.md`](./runtime-state-operations.md).
 >
-> **Current App boundary note**: App is the V1 boundary. The App owns product navigation, resources, App Deployment, operations visibility, and usage/cost rollups. An App-local Agent owns runtime execution, Agent API Endpoint exposure, channel delivery, DeploymentVersions, and Sessions. See [App Boundary](./app-boundary.md) and [`../SPEC.md`](../SPEC.md).
+> **Current App boundary note**: App is the V1 boundary. The App owns product navigation, resources, the Vibe App, operations visibility, and usage/cost rollups. An App-local Agent owns runtime execution, Agent API Endpoint exposure, channel delivery, DeploymentVersions, and Sessions. See [App Boundary](./app-boundary.md) and [`../SPEC.md`](../SPEC.md).
 
 ---
 
@@ -18,7 +18,7 @@ An owner creates an App, runs an App-local Agent, and can expose that Agent thro
 
 The product promise is:
 
-> The App is the ownership and rollup boundary. App Usage shows spend; Agent detail owns Logs/Cost/runtime operations; App Overview owns Deployment activity. An exposed Agent is the callable unit inside that App. Changing prompt/model/tool bindings creates a new runnable snapshot for future Sessions; it does not rewrite running or historical Sessions. Changing runtime identity creates a new Agent.
+> The App is the ownership and rollup boundary. App Usage shows spend; Agent detail owns Logs/Cost/runtime operations; App Overview owns the Vibe App surface. An exposed Agent is the callable unit inside that App. Changing prompt/model/tool bindings creates a new runnable snapshot for future Sessions; it does not rewrite running or historical Sessions. Changing runtime identity creates a new Agent.
 
 ---
 
@@ -47,7 +47,7 @@ What the owner actually wants to do:
 When this is done, the owner should be able to:
 
 - Understand that App is the product and operations boundary, while Agent exposure is the callable delivery promise inside that App.
-- See the current live DeploymentVersion and historical DeploymentVersions from the Agent detail surface. App Overview owns App Deployment status/source/activity and shows only a bound-Agent count in delete confirmation; it does not replace Agent logs, health, or per-binding detail.
+- See the current live DeploymentVersion and historical DeploymentVersions from the Agent detail surface. App Overview owns the Vibe App build/preview/publish surface; it does not replace Agent logs, health, or per-binding detail.
 - Save prompt/model/Skill/MCP/Environment and other versioned Agent config
   changes, and understand that future Sessions use the new snapshot while
   existing Sessions keep the snapshot they started with.
@@ -86,7 +86,7 @@ What external callers experience:
 flowchart TD
   App["App<br/>resources, operations, usage rollup"] --> Agents["App-local Agents"]
   App --> Usage["App Usage<br/>App / Agent / model + Agent recent usage"]
-  App --> Ops["App Usage + Deployment activity<br/>Agent detail owns Logs/Cost/runtime ops"]
+  App --> Ops["App Usage + Vibe App surface<br/>Agent detail owns Logs/Cost/runtime ops"]
 
   Agents --> Exposure["Agent Exposure<br/>endpoint or channel route"]
   Agents --> Live["Live DeploymentVersion"]
@@ -105,7 +105,7 @@ flowchart TD
 
 **Three rules for the relationship:**
 
-- **The App is the business boundary** - resources, App Deployment, operations visibility, and usage/cost roll up there.
+- **The App is the business boundary** - resources, the Vibe App, operations visibility, and usage/cost roll up there.
 - **The Agent is the delivery/runtime subject** - its endpoint or channel route stays stable while DeploymentVersions change for new Sessions.
 - **Runtime/type changes require Fork** - Fork creates a new Agent identity; the original Agent keeps its Sessions, logs, usage attribution, endpoint history, and agent-state.
 
