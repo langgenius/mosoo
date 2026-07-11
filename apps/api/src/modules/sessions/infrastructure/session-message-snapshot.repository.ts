@@ -4,6 +4,10 @@ import { asc, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { toIsoString } from "../../../time";
+import {
+  sanitizeAssistantMessageSegments,
+  sanitizeProviderPrivateMarkup,
+} from "../domain/provider-private-markup";
 import { parseStoredSessionMessageProjection } from "../domain/session-message-projection-parser";
 import type { SessionLiveStateMessage } from "./session-live-state.types";
 
@@ -29,14 +33,17 @@ function toLiveStateMessage(row: StoredSessionMessageRow): SessionLiveStateMessa
     planJson: row.plan_json,
     segmentsJson: row.segments_json,
   });
+  const assistantMessage = row.role === "assistant";
 
   return {
-    content: row.content_text,
+    content: assistantMessage
+      ? sanitizeProviderPrivateMarkup(row.content_text).text
+      : row.content_text,
     createdAt: toIsoString(row.created_at),
     id: row.id,
     plan,
     role: row.role,
-    segments,
+    segments: assistantMessage ? sanitizeAssistantMessageSegments(segments) : segments,
   };
 }
 

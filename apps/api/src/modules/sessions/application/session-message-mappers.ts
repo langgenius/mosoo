@@ -3,6 +3,10 @@ import { parsePlatformId } from "@mosoo/id";
 import type { PlatformId, SessionMessageId } from "@mosoo/id";
 
 import { toIsoString } from "../../../time";
+import {
+  sanitizeAssistantMessageSegments,
+  sanitizeProviderPrivateMarkup,
+} from "../domain/provider-private-markup";
 import { parseStoredSessionMessageProjection } from "../domain/session-message-projection-parser";
 
 export interface SessionMessageRow {
@@ -22,12 +26,15 @@ export function toSessionMessage(row: SessionMessageRow): SessionMessage {
   });
 
   return {
-    content: row.content_text,
+    content:
+      row.role === "assistant"
+        ? sanitizeProviderPrivateMarkup(row.content_text).text
+        : row.content_text,
     createdAt: toIsoString(row.created_at),
     createdBy: parsePlatformId(row.created_by_account_id, "Session message creator ID"),
     id: parsePlatformId<SessionMessageId>(row.id, "Session message ID"),
     plan,
     role: row.role,
-    segments,
+    segments: row.role === "assistant" ? sanitizeAssistantMessageSegments(segments) : segments,
   };
 }

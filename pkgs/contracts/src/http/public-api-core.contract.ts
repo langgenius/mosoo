@@ -86,6 +86,12 @@ export type PublicThreadRunTerminalStatus = (typeof PUBLIC_THREAD_RUN_TERMINAL_S
 
 export interface PublicThreadFinalOutput {
   text: string;
+  warnings?: PublicThreadFinalOutputWarning[];
+}
+
+export interface PublicThreadFinalOutputWarning {
+  code: "unresolved_provider_citation";
+  count: number;
 }
 
 export interface PublicThreadRunError {
