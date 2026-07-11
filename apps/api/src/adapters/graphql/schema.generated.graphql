@@ -476,52 +476,6 @@ type AppCostCard {
   totals: CostTotals!
 }
 
-type AppDeployment {
-  appId: ULID!
-  createdAt: String!
-  defaultBranch: String!
-  id: ULID!
-  latestRun: AppDeploymentRun
-  liveUrl: String
-  plannedUrl: String!
-  repoName: String!
-  repoOwner: String!
-  repoUrl: String!
-  updatedAt: String!
-}
-
-type AppDeploymentRun {
-  appId: ULID!
-  createdAt: String!
-  deploymentId: ULID!
-  errorCode: String
-  errorMessage: String
-  id: ULID!
-  liveUrl: String
-  plannedUrl: String!
-  sourceBranch: String!
-  sourceCommitSha: String!
-  status: AppDeploymentRunStatus!
-  targetKind: AppDeploymentTargetKind
-  updatedAt: String!
-}
-
-enum AppDeploymentRunStatus {
-  activating
-  building
-  failed
-  preparing
-  queued
-  submitted
-  submitting
-  success
-}
-
-enum AppDeploymentTargetKind {
-  cloudflare_pages
-  cloudflare_worker
-}
-
 type AppInfo {
   api: String!
   name: String!
@@ -531,8 +485,6 @@ type AppInfo {
 type AppOverview {
   agents: AppOverviewAgentList!
   app: App!
-  boundAgents: [AppOverviewBoundAgent!]!
-  deployment: AppDeployment
   providerCredentials: AppOverviewProviderCredentialList!
 }
 
@@ -553,17 +505,6 @@ type AppOverviewAgentList {
   hasMore: Boolean!
   items: [AppOverviewAgent!]!
   limit: Int!
-}
-
-type AppOverviewBoundAgent {
-  agentId: ULID!
-  envVar: String!
-  expose: AppOverviewBoundAgentExposure!
-  name: String!
-}
-
-enum AppOverviewBoundAgentExposure {
-  public_thread
 }
 
 type AppOverviewProviderCredential {
@@ -593,6 +534,28 @@ type AppOverviewProviderCredentialVendorCount {
   count: Int!
   defaultCredentialId: ULID
   vendorId: String!
+}
+
+type AppVibeApp {
+  appId: ULID!
+  createdAt: String!
+  id: ULID!
+  previewUrl: String
+  productionUrl: String
+  status: AppVibeAppStatus!
+  title: String
+  updatedAt: String!
+  vibeAppId: String!
+}
+
+type AppVibeAppCloneUrl {
+  cloneUrl: String!
+  expiresAt: String!
+}
+
+enum AppVibeAppStatus {
+  generating
+  ready
 }
 
 enum AuthMethod {
@@ -790,6 +753,15 @@ input CreateAppMcpServerInput {
   url: String!
 }
 
+input CreateAppVibeAppCloneUrlInput {
+  appId: ULID!
+}
+
+input CreateAppVibeAppInput {
+  appId: ULID!
+  prompt: String!
+}
+
 input CreateDiscordAgentChannelBindingInput {
   agentId: ULID!
   appId: ULID!
@@ -867,7 +839,7 @@ input DeleteAgentInput {
   appId: ULID!
 }
 
-input DeleteAppDeploymentInput {
+input DeleteAppVibeAppInput {
   appId: ULID!
 }
 
@@ -879,12 +851,6 @@ input DeleteEnvironmentInput {
 input DeleteVendorCredentialInput {
   appId: ULID!
   id: ULID!
-}
-
-input DeployAppInput {
-  appId: ULID!
-  configPath: String
-  repoUrl: String!
 }
 
 type EnvironmentDetail {
@@ -1243,6 +1209,8 @@ type Mutation {
   createAgentSession(input: CreateAgentSessionInput!): Session!
   createApp(input: CreateAppInput!): App!
   createAppMcpServer(input: CreateAppMcpServerInput!): McpServerWithCredential!
+  createAppVibeApp(input: CreateAppVibeAppInput!): AppVibeApp!
+  createAppVibeAppCloneUrl(input: CreateAppVibeAppCloneUrlInput!): AppVibeAppCloneUrl!
   createDiscordAgentChannelBinding(input: CreateDiscordAgentChannelBindingInput!): AgentChannelBinding!
   createEnvironment(input: CreateEnvironmentInput!): EnvironmentSummary!
   createEnvironmentFork(input: CreateEnvironmentForkInput!): EnvironmentSummary!
@@ -1254,19 +1222,20 @@ type Mutation {
   deleteAgent(input: DeleteAgentInput!): OperationResult!
   deleteAgentChannelBinding(input: DeleteAgentChannelBindingInput!): OperationResult!
   deleteAgentSession(appId: ULID!, sessionId: ULID!): OperationResult!
-  deleteAppDeployment(input: DeleteAppDeploymentInput!): OperationResult!
+  deleteAppVibeApp(input: DeleteAppVibeAppInput!): OperationResult!
   deleteEnvironment(input: DeleteEnvironmentInput!): OperationResult!
   deleteMcpServer(appId: ULID!, serverId: ULID!): OperationResult!
   deleteOwnedSkill(appId: ULID!, skillId: ULID!): OperationResult!
   deleteVendorCredential(input: DeleteVendorCredentialInput!): OperationResult!
-  deployApp(input: DeployAppInput!): AppDeploymentRun!
   importAgentPackage(input: ImportAgentPackageInput!): AgentPackageImportResult!
   onboardingBootstrap(input: BootstrapOnboardingInput!): OnboardingStatus!
   pollLarkAgentChannelRegistration(input: PollLarkAgentChannelRegistrationInput!): LarkAgentChannelRegistration!
   pollWeChatAgentChannelPairing(input: PollWeChatAgentChannelPairingInput!): WeChatAgentChannelPairing!
   prewarmAgentSession(appId: ULID!, sessionId: ULID!): SessionRuntimePrewarmAck!
   publishAgent(input: PublishAgentInput!): Agent!
+  publishAppVibeApp(input: PublishAppVibeAppInput!): OperationResult!
   recreateSandbox(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
+  refreshAppVibeAppPreview(input: RefreshAppVibeAppPreviewInput!): OperationResult!
   removeSessionResource(input: RemoveSessionResourceInput!): OperationResult!
   renameApp(input: RenameAppInput!): App!
   renameOrganization(input: RenameOrganizationInput!): Organization!
@@ -1275,6 +1244,7 @@ type Mutation {
   restartDriver(input: RuntimeStateOperationInput!): RuntimeStateOperationResult!
   revokeMcpCredential(appId: ULID!, serverId: ULID!): McpServerWithCredential!
   sendAgentSessionEvents(appId: ULID!, events: [AgentSessionEventInput!]!, sessionId: ULID!): AgentSessionEventBatch!
+  sendAppVibeAppPrompt(input: SendAppVibeAppPromptInput!): OperationResult!
   setAppDefaultEnvironment(input: SetAppDefaultEnvironmentInput!): EnvironmentSummary!
   setDefaultVendorCredential(input: SetDefaultVendorCredentialInput!): VendorCredential!
   setEnvironmentVariableValue(input: SetEnvironmentVariableValueInput!): EnvironmentDetail!
@@ -1337,6 +1307,10 @@ input PublishAgentInput {
   appId: ULID!
 }
 
+input PublishAppVibeAppInput {
+  appId: ULID!
+}
+
 type Query {
   accessibleAgentList(appId: ULID!): [AgentSummary!]!
   agent(agentId: ULID!, appId: ULID!): AgentDetail!
@@ -1348,13 +1322,12 @@ type Query {
   agentSessionList(agentId: ULID!, appId: ULID!, archived: Boolean, beforeCursor: String, limit: Int, participantOnly: Boolean, type: SessionType): SessionConnection!
   agentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!
   appCostCard(appId: ULID!, range: CostRange!, runPurposes: [CostRunPurpose!]): AppCostCard!
-  appDeploymentRunList(appId: ULID!, limit: Int): [AppDeploymentRun!]!
-  appDeploymentStatus(appId: ULID!): AppDeploymentRun
   appEnvironmentList(appId: ULID!): [EnvironmentSummary!]!
   appInfo: AppInfo!
   appList(organizationId: ULID!): [App!]!
   appOverview(agentLimit: Int, appId: ULID!, credentialLimit: Int): AppOverview!
   appSkillList(appId: ULID!): [SkillSummary!]!
+  appVibeApp(appId: ULID!): AppVibeApp
   availableAgentModels(appId: ULID!, currentModelId: String, currentVendorId: String, runtimeId: String!): [ResolvedModelEntry!]!
   controlPlaneOverview(agentLimit: Int, appLimit: Int, credentialLimit: Int): ControlPlaneOverview!
   environment(appId: ULID!, environmentId: ULID!): EnvironmentDetail!
@@ -1375,6 +1348,10 @@ type Query {
   threadSessionProcessEvents(appId: ULID!, limit: Int, sessionId: ULID!): [SessionProcessEvent!]!
   vendorCredentialList(appId: ULID!): [VendorCredential!]!
   viewer: Viewer!
+}
+
+input RefreshAppVibeAppPreviewInput {
+  appId: ULID!
 }
 
 input RemoveSessionResourceInput {
@@ -1453,6 +1430,11 @@ type RuntimeStateOperationResult {
 input RuntimeStateTargetVersionInput {
   id: ULID!
   versionNumber: Int!
+}
+
+input SendAppVibeAppPromptInput {
+  appId: ULID!
+  prompt: String!
 }
 
 type Session {

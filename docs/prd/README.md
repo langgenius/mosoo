@@ -44,7 +44,7 @@ first.
 
 - [Default Consumption Surface (Threads)](./default-consumption-surface.md) — active shipped Runs/Thread UX.
 - [Channels](./channels.md) — partial implementation; no top-level App Channels console.
-- [App Deployment](./app-deployment.md) — active and shipped App-owned Cloudflare Pages / Workers deployment resource, embedded in App Overview and scoped separately from Agent versions and App runtime.
+- [App Vibe App](./app-vibe-app.md) — active App-owned web app built, previewed, and published through the platform's VibeSDK backend, embedded in App Overview and scoped separately from Agent versions and App runtime.
 - [Public Thread API Surface](./public-thread-api-surface.md) — canonical product contract; checked-in OpenAPI owns the exact HTTP schema.
 - [Public Thread API legacy link](./public-task-api.md) — superseded link stub.
 - [MCP (Connector)](./mcp-interaction.md)

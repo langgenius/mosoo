@@ -2,8 +2,7 @@ import type { AgentKind, AgentStatus } from "../agent/agent.contract";
 import type {
   AccountId,
   AgentId,
-  AppDeploymentId,
-  AppDeploymentRunId,
+  AppVibeAppId,
   EnvironmentId,
   AppId,
   VendorCredentialId,
@@ -23,65 +22,37 @@ export interface RenameAppInput {
   name: string;
 }
 
-export type AppDeploymentRunStatus =
-  | "activating"
-  | "building"
-  | "failed"
-  | "preparing"
-  | "queued"
-  | "submitted"
-  | "submitting"
-  | "success";
+export type AppVibeAppStatus = "generating" | "ready";
 
-export type AppDeploymentTargetKind = "cloudflare_pages" | "cloudflare_worker";
-
-export interface AppDeploymentRun {
+export interface AppVibeApp {
   appId: AppId;
   createdAt: string;
-  deploymentId: AppDeploymentId;
-  errorCode: string | null;
-  errorMessage: string | null;
-  id: AppDeploymentRunId;
-  liveUrl: string | null;
-  plannedUrl: string;
-  sourceBranch: string;
-  sourceCommitSha: string;
-  status: AppDeploymentRunStatus;
-  targetKind: AppDeploymentTargetKind | null;
+  id: AppVibeAppId;
+  previewUrl: string | null;
+  productionUrl: string | null;
+  status: AppVibeAppStatus;
+  title: string | null;
   updatedAt: string;
+  vibeAppId: string;
 }
 
-export interface AppDeployment {
+export interface AppVibeAppCloneUrl {
+  cloneUrl: string;
+  expiresAt: string;
+}
+
+export interface CreateAppVibeAppInput {
   appId: AppId;
-  createdAt: string;
-  defaultBranch: string;
-  id: AppDeploymentId;
-  latestRun: AppDeploymentRun | null;
-  liveUrl: string | null;
-  plannedUrl: string;
-  repoName: string;
-  repoOwner: string;
-  repoUrl: string;
-  updatedAt: string;
+  prompt: string;
 }
 
-export interface DeployAppInput {
+export interface SendAppVibeAppPromptInput {
   appId: AppId;
-  configPath?: string | null;
-  repoUrl: string;
+  prompt: string;
 }
 
-export interface DeleteAppDeploymentInput {
+export interface AppVibeAppTargetInput {
   appId: AppId;
-}
-
-export type AppOverviewBoundAgentExposure = "public_thread";
-
-export interface AppOverviewBoundAgent {
-  agentId: AgentId;
-  envVar: string;
-  expose: AppOverviewBoundAgentExposure;
-  name: string;
 }
 
 export type AppOverviewProviderCredentialStatus = "configured";
@@ -133,8 +104,6 @@ export interface AppOverviewProviderCredentialList {
 export interface AppOverview {
   agents: AppOverviewAgentList;
   app: AppSummary;
-  boundAgents: AppOverviewBoundAgent[];
-  deployment: AppDeployment | null;
   providerCredentials: AppOverviewProviderCredentialList;
 }
 

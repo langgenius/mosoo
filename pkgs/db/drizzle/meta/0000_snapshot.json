@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "38a2c3cf-7781-52b6-82e8-53906d6b66ac",
+  "id": "8723b34d-054d-5ff9-8da6-18ea23905264",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agent_deployment_version": {
@@ -3450,8 +3450,8 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "app_deployment_run": {
-      "name": "app_deployment_run",
+    "app_vibe_app": {
+      "name": "app_vibe_app",
       "columns": {
         "app_id": {
           "name": "app_id",
@@ -3467,221 +3467,10 @@
           "notNull": true,
           "autoincrement": false
         },
-        "deployment_id": {
-          "name": "deployment_id",
-          "type": "text CHECK (\"deployment_id\" = upper(\"deployment_id\") AND length(\"deployment_id\") = 26 AND substr(\"deployment_id\", 1, 1) GLOB '[0-7]' AND \"deployment_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "error_code": {
-          "name": "error_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "error_message": {
-          "name": "error_message",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "external_deployment_id": {
-          "name": "external_deployment_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "external_project_id": {
-          "name": "external_project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "external_version_id": {
-          "name": "external_version_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "generated_wrangler_config_json": {
-          "name": "generated_wrangler_config_json",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "id": {
           "name": "id",
           "type": "text CHECK (\"id\" = upper(\"id\") AND length(\"id\") = 26 AND substr(\"id\", 1, 1) GLOB '[0-7]' AND \"id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "mosoo_config_json": {
-          "name": "mosoo_config_json",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "plan_json": {
-          "name": "plan_json",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "source_branch": {
-          "name": "source_branch",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "source_commit_sha": {
-          "name": "source_commit_sha",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "target_kind": {
-          "name": "target_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "target_project_name": {
-          "name": "target_project_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "target_script_name": {
-          "name": "target_script_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "url": {
-          "name": "url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "app_deployment_run_app_id_idx": {
-          "name": "app_deployment_run_app_id_idx",
-          "columns": ["app_id", "id"],
-          "isUnique": false
-        },
-        "app_deployment_run_deployment_id_idx": {
-          "name": "app_deployment_run_deployment_id_idx",
-          "columns": ["deployment_id", "id"],
-          "isUnique": false
-        },
-        "app_deployment_run_active_app_idx": {
-          "name": "app_deployment_run_active_app_idx",
-          "columns": ["app_id"],
-          "isUnique": true,
-          "where": "\"app_deployment_run\".\"status\" IN ('queued', 'preparing', 'building', 'submitting', 'submitted', 'activating')"
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "app_deployment_run_status_check": {
-          "name": "app_deployment_run_status_check",
-          "value": "\"app_deployment_run\".\"status\" IN ('queued', 'preparing', 'building', 'submitting', 'submitted', 'activating', 'success', 'failed')"
-        },
-        "app_deployment_run_target_kind_check": {
-          "name": "app_deployment_run_target_kind_check",
-          "value": "\"app_deployment_run\".\"target_kind\" IS NULL OR \"app_deployment_run\".\"target_kind\" IN ('cloudflare_pages', 'cloudflare_worker')"
-        }
-      }
-    },
-    "app_deployment": {
-      "name": "app_deployment",
-      "columns": {
-        "app_id": {
-          "name": "app_id",
-          "type": "text CHECK (\"app_id\" = upper(\"app_id\") AND length(\"app_id\") = 26 AND substr(\"app_id\", 1, 1) GLOB '[0-7]' AND \"app_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "default_branch": {
-          "name": "default_branch",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "id": {
-          "name": "id",
-          "type": "text CHECK (\"id\" = upper(\"id\") AND length(\"id\") = 26 AND substr(\"id\", 1, 1) GLOB '[0-7]' AND \"id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "last_successful_url": {
-          "name": "last_successful_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "latest_run_id": {
-          "name": "latest_run_id",
-          "type": "text CHECK (\"latest_run_id\" = upper(\"latest_run_id\") AND length(\"latest_run_id\") = 26 AND substr(\"latest_run_id\", 1, 1) GLOB '[0-7]' AND \"latest_run_id\" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*')",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "mosoo_subdomain": {
-          "name": "mosoo_subdomain",
-          "type": "text",
-          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -3692,65 +3481,32 @@
           "notNull": true,
           "autoincrement": false
         },
-        "repo_name": {
-          "name": "repo_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "repo_owner": {
-          "name": "repo_owner",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "repo_url": {
-          "name": "repo_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "source_kind": {
-          "name": "source_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "updated_at": {
           "name": "updated_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "vibe_app_id": {
+          "name": "vibe_app_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         }
       },
       "indexes": {
-        "app_deployment_active_app_idx": {
-          "name": "app_deployment_active_app_idx",
+        "app_vibe_app_app_idx": {
+          "name": "app_vibe_app_app_idx",
           "columns": ["app_id"],
-          "isUnique": true,
-          "where": "\"app_deployment\".\"deleted_at\" IS NULL"
-        },
-        "app_deployment_active_subdomain_idx": {
-          "name": "app_deployment_active_subdomain_idx",
-          "columns": ["mosoo_subdomain"],
-          "isUnique": true,
-          "where": "\"app_deployment\".\"deleted_at\" IS NULL"
+          "isUnique": true
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {
-        "app_deployment_source_kind_check": {
-          "name": "app_deployment_source_kind_check",
-          "value": "\"app_deployment\".\"source_kind\" IN ('github_public')"
-        }
-      }
+      "checkConstraints": {}
     },
     "app": {
       "name": "app",

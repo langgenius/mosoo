@@ -113,10 +113,6 @@ async function readRequestTextWithLimit(request: Request, maxBytes: number): Pro
   }
 }
 
-async function readJsonBodyWithLimit(c: RawJsonRequestContext, maxBytes: number): Promise<unknown> {
-  return JSON.parse(await readRequestTextWithLimit(c.req.raw, maxBytes));
-}
-
 async function readOptionalJsonBodyWithLimit(
   c: RawJsonRequestContext,
   maxBytes: number,
@@ -472,16 +468,6 @@ export async function readSendEventsRequest(
   return {
     events: parsedEvents,
   };
-}
-
-/**
- * Read and JSON-parse the bound-agent call body under the shared public-API
- * body-size cap. The bound endpoint is keyless and internet-facing, so it must
- * refuse oversized bodies the same way every PAT thread route does instead of
- * buffering an unbounded request into the isolate.
- */
-export async function readBoundAgentCallRequestBody(c: RawJsonRequestContext): Promise<unknown> {
-  return readJsonBodyWithLimit(c, PUBLIC_THREAD_JSON_BODY_MAX_BYTES);
 }
 
 export async function readCreateThreadRequest(

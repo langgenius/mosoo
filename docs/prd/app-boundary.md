@@ -13,8 +13,8 @@ The near-term Mosoo wedge is no longer an Agent-first console. The product loop 
 3. Mosoo creates or selects an App.
 4. Mosoo provisions Agents and app-local resources.
 5. Mosoo exposes an Agent through API or channel when needed.
-6. From App Overview, Mosoo can deploy a public GitHub repository as an App-owned external Web
-   artifact with a Mosoo-owned URL.
+6. From App Overview, Mosoo can build and publish an App-owned Vibe App — an external Web
+   artifact with a Mosoo-owned URL — through the platform's VibeSDK backend.
 
 The current phase deliberately assumes one human owns one Organization. Organization remains the
 account, billing, tenant, and future governance shell. App is the business, resource, operations,
@@ -57,11 +57,11 @@ The following resources should belong to App before they belong to a broad Organ
 - MCP servers, MCP bindings, and MCP credentials.
 - Channels and Agent channel bindings.
 - Provider keys / credentials used by the App.
-- Agent exposure state, Agent logs, App Deployment, and Deployment Runs.
+- Agent exposure state, Agent logs, and the Vibe App.
 - App-scoped usage and cost, with Organization rollups preserved for billing and future admin views.
 
-App may own one active Deployment sourced from a public GitHub repository. Deployment is a
-separately modeled external Web artifact with Deployment Runs and a Mosoo-owned public URL; it is
+App may own one Vibe App built through the platform's VibeSDK backend. The Vibe App is a
+separately modeled external Web artifact with preview and production URLs; it is
 not Agent runtime, an Agent Deployment Version, or an App-level API endpoint. Agents continue to
 own Agent runtime, API endpoint exposure, channel delivery, and Threads / Sessions. Any future
 database service, scheduled job, or worker runtime needs its own explicit noun and lifecycle rather
@@ -75,7 +75,7 @@ The console has two layers:
 
 - **Organization layer**: Apps and thin Organization settings. Usage/Billing entries are currently visible as `Soon`, not shipped rollup pages.
 - **App layer**: Overview, Runs, Agents, Config, and Settings.
-  - Overview embeds Deployment install, status, activity, live URL, retry/redeploy, and delete.
+  - Overview embeds the Vibe App build, preview, publish, and delete experience.
   - Runs uses the current `/threads` route and Thread / Session records.
   - Config groups Skills, MCP servers, Providers, and Environments.
   - Settings contains General and App usage.
@@ -88,7 +88,7 @@ Onboarding should create a default App. If an Organization has exactly one App, 
 1. App data model, contracts, GraphQL surface, default provisioning, and owner checks are in place.
 2. Agent, Thread / Session, Environment, Provider, MCP, Skill, File, and Channel paths are App-scoped.
 3. Agent API Endpoint exposure and Channel delivery remain Agent-owned.
-4. App Overview is the console root and embeds the current Deployment workflow.
+4. App Overview is the console root and embeds the current Vibe App workflow.
 5. App-scoped usage is under App Settings, while Agent logs and runtime operations remain on Agent
    detail.
 6. App members, org-wide catalogs, role matrices, ownership transfer, and enterprise governance
@@ -100,7 +100,7 @@ Onboarding should create a default App. If an Organization has exactly one App, 
 - Org-wide resource catalogs, pin / link semantics, and cross-app asset catalogs.
 - Multi-user ownership transfer or asset takeover.
 - Enterprise domain discovery expansion, SAML / SCIM, or rich member lifecycle administration.
-- Treating App Deployment as Agent runtime, a generic App runtime, or an App-level API endpoint.
+- Treating the Vibe App as Agent runtime, a generic App runtime, or an App-level API endpoint.
 - App type, a required single Agent type picker as the App creation path,
   persistence-layer limits driven by App type or Agent type, or generic Interface entity.
 - Generic `services` table, polymorphic `service.kind`, or generic Service CRUD for concrete
@@ -120,7 +120,7 @@ Onboarding should create a default App. If an Organization has exactly one App, 
 - If a PRD says Agent is the stable service identity, read it as Agent owning runtime and exposure while App aggregates Agent operations.
 - If a PRD asks users to choose one Agent type as the App creation path, treat the choice as an
   Agent setting rather than an App type.
-- If a PRD says Publish App, App API, Web shell, or public preview URL, distinguish the shipped
-  App Deployment resource from Agent runtime and App-level API semantics. Use
-  [`app-deployment.md`](./app-deployment.md) for Deployment behavior.
+- If a PRD says Publish App, App API, Web shell, public preview URL, or the GitHub-backed App
+  Deployment, distinguish the shipped Vibe App resource from Agent runtime and App-level API
+  semantics. Use [`app-vibe-app.md`](./app-vibe-app.md) for Vibe App behavior.
 - If implementation work needs a new noun or access boundary, update this document, README, architecture, and the PRD index before changing code.

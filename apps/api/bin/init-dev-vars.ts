@@ -28,8 +28,8 @@ const devVarSpecs: readonly DevVarSpec[] = [
   { key: "R2_ACCESS_KEY_ID", required: false },
   { key: "R2_SECRET_ACCESS_KEY", required: false },
   { key: "CLOUDFLARE_ACCOUNT_ID", required: false },
-  { key: "CLOUDFLARE_API_TOKEN", required: false },
-  { key: "CLOUDFLARE_ZONE_ID", required: false },
+  { key: "VIBESDK_BASE_URL", required: false },
+  { key: "VIBESDK_API_KEY", required: false },
 ];
 
 function createSecret(): string {

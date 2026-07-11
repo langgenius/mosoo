@@ -114,14 +114,17 @@ export const onboardingGraphQLSpec = {
 export const appGraphQLSpec = {
   mutationFields: [
     "createApp(input: CreateAppInput!): App!",
-    "deleteAppDeployment(input: DeleteAppDeploymentInput!): OperationResult!",
-    "deployApp(input: DeployAppInput!): AppDeploymentRun!",
+    "createAppVibeApp(input: CreateAppVibeAppInput!): AppVibeApp!",
+    "createAppVibeAppCloneUrl(input: CreateAppVibeAppCloneUrlInput!): AppVibeAppCloneUrl!",
+    "deleteAppVibeApp(input: DeleteAppVibeAppInput!): OperationResult!",
+    "publishAppVibeApp(input: PublishAppVibeAppInput!): OperationResult!",
+    "refreshAppVibeAppPreview(input: RefreshAppVibeAppPreviewInput!): OperationResult!",
     "renameApp(input: RenameAppInput!): App!",
+    "sendAppVibeAppPrompt(input: SendAppVibeAppPromptInput!): OperationResult!",
   ],
   queryFields: [
-    "appDeploymentRunList(appId: ULID!, limit: Int): [AppDeploymentRun!]!",
-    "appDeploymentStatus(appId: ULID!): AppDeploymentRun",
     "appList(organizationId: ULID!): [App!]!",
+    "appVibeApp(appId: ULID!): AppVibeApp",
     "appOverview(appId: ULID!, agentLimit: Int, credentialLimit: Int): AppOverview!",
     "controlPlaneOverview(appLimit: Int, agentLimit: Int, credentialLimit: Int): ControlPlaneOverview!",
   ],

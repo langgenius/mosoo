@@ -29,7 +29,7 @@ The architecture is built on the Cloudflare platform and uses a Serverless shape
   as session artifacts. Sandbox private state backups use a separate backup
   bucket and must not be mixed with user-visible file prefixes.
 - **Execution sandbox: Cloudflare Sandbox / Containers**. Heterogeneous Agents run in container-image-backed isolated environments, with Sandbox APIs and Durable Object boundaries controlling runtime lifecycle.
-- **App deployment: Mosoo-managed Cloudflare Pages / Workers**. App Deployment clones and builds a public GitHub repository in an isolated Sandbox, then publishes the resulting Web artifact with Mosoo platform credentials. D1 stores the App-owned Deployment and DeploymentRun records, while the successful artifact receives a Mosoo-owned URL. This is not App runtime and does not change Agent runtime ownership.
+- **Vibe App: Mosoo-operated VibeSDK instance**. The App-owned Vibe App is built, previewed, and published by a separate [Cloudflare VibeSDK](https://github.com/cloudflare/vibesdk) deployment that the API Worker drives through `@cf-vibesdk/sdk` (HTTP status reads plus short-lived WebSocket commands). The VibeSDK instance owns generation, sandbox previews, and Workers-for-Platforms publishing on Mosoo's account; D1 stores only the App-to-Vibe-App binding. This is not App runtime and does not change Agent runtime ownership.
 - **Configuration editing**. Owner-side Agent configuration is currently edited through Preview, which combines the writable configuration form with in-context test chat. There is no dedicated `AgentBuilderSystemAgent` topology in the current codebase. Future configuration assistance must remain a control-plane feature and must not enter the full Sandbox / Driver runtime path.
 
 ---
@@ -57,7 +57,7 @@ graph TD
         File[File Service<br/>File records & Session artifacts]
         Env[Environment Service<br/>Runtime Templates & Revisions]
         Cost[Cost / Billing Service]
-        Deployment[App Deployment<br/>Build / Publish]
+        VibeApp[Vibe App Service<br/>vibesdk client]
 
         subgraph Agent_Plane [Agent Plane]
             Profile[Profile Management]
@@ -65,12 +65,12 @@ graph TD
             Runtime[Runtime Scheduler]
         end
 
-        Ingress --> |GraphQL Resolver / In-Process Calls| Identity & Auth & App & Vault & File & Env & Agent_Plane & Cost & Deployment
+        Ingress --> |GraphQL Resolver / In-Process Calls| Identity & Auth & App & Vault & File & Env & Agent_Plane & Cost & VibeApp
         Ingress --> |Client WS Upgrade Handoff| Session
         Ingress --> |Driver WS Upgrade Handoff| DriverConnection
         Runtime <--> |Commands / Readiness / Lifecycle| DriverConnection
         DriverConnection --> |Persist / Publish Driver Events| Session
-        App --> |Owns App-local resources| Agent_Plane & Vault & File & Env & Cost & Deployment
+        App --> |Owns App-local resources| Agent_Plane & Vault & File & Env & Cost & VibeApp
         File & Agent_Plane --> |Push Events / Session RPC| Session
         Env --> |Resolve frozen EnvironmentRevision| Runtime
         Agent_Plane --> |Usage / Runtime Metrics| Cost
@@ -91,7 +91,7 @@ graph TD
 
     FileBucket[(R2 FILE_BUCKET<br/>Session & internal file objects)]
     SandboxStateBucket[(R2 SANDBOX_STATE_BUCKET<br/>Sandbox State Objects)]
-    DeployedApp[Cloudflare Pages / Workers<br/>Mosoo-owned App URL]
+    VibesdkInstance[VibeSDK Instance<br/>build / preview / publish<br/>Mosoo-owned URLs]
 
     Client <==> |HTTPS: App Shell / Assets| WebWorker
     Client <==> |HTTPS: Same-Origin /api/*| Ingress
@@ -100,8 +100,7 @@ graph TD
     AgentDriver --> |Outbound ORPC WebSocket<br/>/api/driver/socket| Ingress
     Runtime --> |Checkpoint / Restore selected Pet paths| SandboxStateBucket
     File --> |Session Snapshots / File Objects| FileBucket
-    Deployment --> |Build public repository| CF_Sandbox
-    Deployment --> |Publish with Mosoo credentials| DeployedApp
+    VibeApp --> |@cf-vibesdk/sdk HTTP + WS| VibesdkInstance
 
     classDef web fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
     classDef api fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px;
@@ -137,9 +136,9 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
 2. **App Domain**
    App Domain owns the business, resource, operations, and deployment boundary for the current pivot. App is the canonical product and engineering noun. An App belongs to an Organization and is owned by the Organization owner during the single-owner phase. App has no runtime; Agents own Agent runtime, API endpoint exposure, channel delivery, and Threads / Sessions. App Deployment owns an external Web artifact rather than an App runtime.
    - **Default App provisioning**: Onboarding / Organization provisioning creates a default App. If the Organization has exactly one App, the console routes directly into that App instead of forcing an App picker.
-   - **Agent and resource ownership**: Agents, Threads / Sessions, Environments, Skills, MCP servers, Provider credentials, Channels, file records, Agent exposure state, App Deployments and DeploymentRuns, Agent runtime logs/state, and app-scoped cost are App-owned resources. The current UI keeps Agent logs/runtime operations on Agent detail and App Usage under App Settings; it does not expose a generic App health/log console.
+   - **Agent and resource ownership**: Agents, Threads / Sessions, Environments, Skills, MCP servers, Provider credentials, Channels, file records, Agent exposure state, the Vibe App binding, Agent runtime logs/state, and app-scoped cost are App-owned resources. The current UI keeps Agent logs/runtime operations on Agent detail and App Usage under App Settings; it does not expose a generic App health/log console.
    - **No generic Service entity**: Do not add a unified `services` table, polymorphic `service.kind`, or generic Service CRUD for concrete App resources. If a future Web/API runtime, database service, worker process, or scheduled job is needed, model it with an explicit noun and lifecycle.
-   - **App Deployment**: One active Deployment per App records the public GitHub source and its DeploymentRuns. Build and publish work is asynchronous. Successful runs expose a Mosoo-owned Cloudflare Pages or Workers URL under the configured App deployment domain. Users do not bring their own Cloudflare account in the current flow.
+   - **Vibe App**: One Vibe App per App binds to an app on the Mosoo-operated VibeSDK instance, which owns generation, sandbox previews, and Workers-for-Platforms publishing. Mosoo persists only the binding and reads lifecycle state live through `@cf-vibesdk/sdk`. Users do not bring their own Cloudflare account or VibeSDK credentials in the current flow.
    - **Access boundary**: App access maps to the single Organization owner for this phase. No secondary principal model is part of the first cut.
 
 3. **Agent Plane**

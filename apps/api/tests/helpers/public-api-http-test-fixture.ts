@@ -281,7 +281,6 @@ export function createPublicHttpTestBindings(
     DB: database,
     FILE_BUCKET: options.fileBucket ?? unavailableBinding<R2Bucket>("FILE_BUCKET"),
     FILE_BUCKET_NAME: "mosoo-file",
-    MOSOO_APP_DEPLOYMENT_DOMAIN: "apps.localhost",
     R2_ACCESS_KEY_ID: "test-access-key",
     R2_SECRET_ACCESS_KEY: "test-secret-key",
     RUNTIME_ACTION_TOKEN_SECRET: "test-runtime-action-token",

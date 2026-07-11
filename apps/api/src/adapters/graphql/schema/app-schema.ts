@@ -1,26 +1,11 @@
 export const appSchema = /* GraphQL */ `
-  enum AppOverviewBoundAgentExposure {
-    public_thread
-  }
-
   enum AppOverviewProviderCredentialStatus {
     configured
   }
 
-  enum AppDeploymentRunStatus {
-    activating
-    building
-    failed
-    preparing
-    queued
-    submitted
-    submitting
-    success
-  }
-
-  enum AppDeploymentTargetKind {
-    cloudflare_pages
-    cloudflare_worker
+  enum AppVibeAppStatus {
+    generating
+    ready
   }
 
   type App {
@@ -31,34 +16,21 @@ export const appSchema = /* GraphQL */ `
     ownerAccountId: ULID!
   }
 
-  type AppDeploymentRun {
+  type AppVibeApp {
     appId: ULID!
     createdAt: String!
-    deploymentId: ULID!
-    errorCode: String
-    errorMessage: String
     id: ULID!
-    liveUrl: String
-    plannedUrl: String!
-    sourceBranch: String!
-    sourceCommitSha: String!
-    status: AppDeploymentRunStatus!
-    targetKind: AppDeploymentTargetKind
+    previewUrl: String
+    productionUrl: String
+    status: AppVibeAppStatus!
+    title: String
     updatedAt: String!
+    vibeAppId: String!
   }
 
-  type AppDeployment {
-    appId: ULID!
-    createdAt: String!
-    defaultBranch: String!
-    id: ULID!
-    latestRun: AppDeploymentRun
-    liveUrl: String
-    plannedUrl: String!
-    repoName: String!
-    repoOwner: String!
-    repoUrl: String!
-    updatedAt: String!
+  type AppVibeAppCloneUrl {
+    cloneUrl: String!
+    expiresAt: String!
   }
 
   type AppOverviewAgent {
@@ -78,13 +50,6 @@ export const appSchema = /* GraphQL */ `
     hasMore: Boolean!
     items: [AppOverviewAgent!]!
     limit: Int!
-  }
-
-  type AppOverviewBoundAgent {
-    agentId: ULID!
-    envVar: String!
-    expose: AppOverviewBoundAgentExposure!
-    name: String!
   }
 
   type AppOverviewProviderCredential {
@@ -115,8 +80,6 @@ export const appSchema = /* GraphQL */ `
   type AppOverview {
     agents: AppOverviewAgentList!
     app: App!
-    boundAgents: [AppOverviewBoundAgent!]!
-    deployment: AppDeployment
     providerCredentials: AppOverviewProviderCredentialList!
   }
 
@@ -136,18 +99,34 @@ export const appSchema = /* GraphQL */ `
     organizationId: ULID!
   }
 
-  input DeployAppInput {
-    appId: ULID!
-    configPath: String
-    repoUrl: String!
-  }
-
-  input DeleteAppDeploymentInput {
-    appId: ULID!
-  }
-
   input RenameAppInput {
     appId: ULID!
     name: String!
+  }
+
+  input CreateAppVibeAppInput {
+    appId: ULID!
+    prompt: String!
+  }
+
+  input SendAppVibeAppPromptInput {
+    appId: ULID!
+    prompt: String!
+  }
+
+  input PublishAppVibeAppInput {
+    appId: ULID!
+  }
+
+  input RefreshAppVibeAppPreviewInput {
+    appId: ULID!
+  }
+
+  input CreateAppVibeAppCloneUrlInput {
+    appId: ULID!
+  }
+
+  input DeleteAppVibeAppInput {
+    appId: ULID!
   }
 `;

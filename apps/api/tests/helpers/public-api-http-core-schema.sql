@@ -40,6 +40,17 @@ CREATE TABLE app (
   updated_at integer NOT NULL
 );
 
+CREATE TABLE app_vibe_app (
+  id text PRIMARY KEY NOT NULL,
+  app_id text NOT NULL,
+  owner_account_id text NOT NULL,
+  vibe_app_id text NOT NULL,
+  created_at integer NOT NULL,
+  updated_at integer NOT NULL
+);
+
+CREATE UNIQUE INDEX app_vibe_app_app_idx ON app_vibe_app (app_id);
+
 CREATE TABLE agent (
   id text PRIMARY KEY NOT NULL,
   app_id text NOT NULL,

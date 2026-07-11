@@ -14,7 +14,7 @@ If this document conflicts with older PRDs, follow this document first, then
 
 1. App is the user-facing product boundary.
 2. App is the engineering name for the same boundary.
-3. App is the ownership and console boundary for Agents and resources, and may own one external Web Deployment.
+3. App is the ownership and console boundary for Agents and resources, and may own one external Vibe App.
 4. Organization is only the account, billing, tenant, and future-governance shell.
 5. App owns concrete App-local concepts directly; V1 does not introduce a generic
    Service entity.
@@ -68,12 +68,12 @@ An App:
 - Is the primary database, API, and test boundary.
 - Aggregates Threads, usage, health, logs, and expose state through its Agents and
   resources.
-- May own one configured Deployment for a public GitHub repository.
+- May own one Vibe App built through the platform's VibeSDK backend.
 - Is the default console entry after onboarding when the Organization has one App.
 
-An App does not itself execute Agent runtime and does not become the deployed
-repository's runtime process. Its Deployment is a separately modeled,
-App-owned external Web artifact with its own Deployment Runs and public URL.
+An App does not itself execute Agent runtime and does not become the published
+Vibe App's runtime process. Its Vibe App is a separately modeled, App-owned
+external Web artifact with its own preview and production URLs.
 
 ### Agent
 
@@ -114,26 +114,26 @@ Rules:
 - API-layer names such as File Service or Environment Service are implementation modules
   and do not imply a generic Service domain entity.
 
-### Deployment
+### Vibe App
 
-A Deployment is the App-owned external Web artifact produced from a public
-GitHub repository.
+A Vibe App is the App-owned external web application built, previewed, and
+published through a Mosoo-operated VibeSDK instance.
 
-A Deployment:
+A Vibe App:
 
-- Belongs to one App; the current product supports zero or one active
-  Deployment per App.
-- Uses Mosoo-managed Cloudflare infrastructure and produces a Mosoo-owned public
-  URL after a successful Deployment Run.
-- Is operated from the App Overview, including first deploy, redeploy, status,
-  run history, live URL, and delete.
-- May bind published Agents through deploy-time capability URLs declared in
-  `.mosoo.toml`.
+- Belongs to one App; the current product supports zero or one Vibe App per
+  App.
+- Is created from a natural-language prompt and iterated with follow-up
+  prompts; the VibeSDK builder owns generation, validation, and repair.
+- Runs a live sandbox preview during development and publishes to
+  Mosoo-managed Workers for Platforms for its production URL.
+- Is operated from App Overview, including create, prompt, preview, publish,
+  source export, and delete.
 - Is not Agent runtime, an Agent Deployment Version, an App-level API endpoint,
   or a generic Service runtime.
 
-A Deployment Run is one asynchronous attempt to build and deploy the pinned
-repository commit for a Deployment.
+Build and publish state lives on the VibeSDK instance; Mosoo stores only the
+App-to-Vibe-App binding and reads status live.
 
 ### Thread
 
@@ -211,8 +211,9 @@ Files:
 - Does not promote runtime artifacts into the dormant App library scope.
 - Is not the product model for generated application source trees, deployable projects, or App asset publishing.
 
-Deployment source remains in the bound public GitHub repository. Files does not
-become a generated source tree or deployment artifact store.
+Vibe App source lives on the VibeSDK instance and exports over its git clone
+URL. Files does not become a generated source tree or deployment artifact
+store.
 
 ### Skill
 
@@ -291,9 +292,9 @@ Agent Exposure:
 - May create a stable endpoint, token, channel delivery route, or published Agent version.
 - Is summarized by the App but not owned by an App runtime.
 
-Publishing an Agent and deploying an App are separate actions. Agent publishing creates the live
-Agent version used by future Threads. App Deployment publishes an external Web artifact and does
-not create Agent runtime or an App-level API endpoint.
+Publishing an Agent and publishing a Vibe App are separate actions. Agent publishing creates the
+live Agent version used by future Threads. Publishing a Vibe App ships an external Web artifact
+and does not create Agent runtime or an App-level API endpoint.
 
 ## Relationships
 
@@ -313,20 +314,20 @@ Account
         +-- Provider Credentials
         +-- Channels
         +-- Gateways / exposure surfaces
-        +-- Deployment
-        |   +-- Deployment Runs
-        |   +-- Mosoo-owned public URL
+        +-- Vibe App
+        |   +-- preview URL
+        |   +-- Mosoo-owned production URL
         +-- Operations
         |   +-- usage
         |   +-- Agent logs
-        |   +-- Deployment activity
+        |   +-- Vibe App activity
 ```
 
 Rules:
 
 - Organization owns Apps, not App resources directly.
 - App is the product, database, API, and console boundary.
-- App owns business resources, Deployment, and operations scope.
+- App owns business resources, the Vibe App, and operations scope.
 - App has no runtime.
 - Agents own Agent runtime, endpoint exposure, channel delivery, and Threads/Sessions in V1.
 - Thread is a product name for Agent Session in V1.
@@ -352,7 +353,7 @@ V1 must support:
   configured.
 - The user can inspect App-scoped Agents, configuration resources, Runs / Threads, App usage,
   Agent logs, and Agent exposure state.
-- The user can configure, run, inspect, redeploy, and delete one App-owned Deployment from App
+- The user can create, prompt, preview, publish, and delete one App-owned Vibe App from App
   Overview.
 
 ## Non Goals
@@ -411,8 +412,8 @@ V1 must not include:
 4. The App exposes scoped surfaces for Agents, Files, Environments, Skills, MCP
    servers, Provider credentials, Channels, and operations; it does not
    fabricate one instance of every resource.
-5. App creation alone does not bind a GitHub repository, start a Deployment, create Agent
-   runtime, create an App-level API endpoint, or create application database tables.
+5. App creation alone does not create a Vibe App, create Agent runtime, create an App-level API
+   endpoint, or create application database tables.
 
 ### Configure App Resources
 
@@ -453,17 +454,17 @@ V1 must not include:
 4. Channel delivery creates or continues Threads/Sessions for that Agent.
 5. Usage and operations roll up to the App.
 
-### Deploy App
+### Build And Publish Vibe App
 
-1. User configures a public GitHub repository from App Overview.
-2. `deployApp` validates the source, creates or reuses the App Deployment, records a queued
-   Deployment Run, and dispatches asynchronous build/deploy work.
-3. The worker builds in an isolated Sandbox and publishes the external Web artifact with
-   Mosoo-managed Cloudflare credentials.
-4. App Overview shows deployment status, run activity, source, live URL, retry, redeploy, and
-   delete actions according to the current Deployment state. Delete confirmation includes the
-   number of bound Agents; the current Web surface does not render their names or env mappings.
-5. Deployment remains separate from Agent runtime, Agent Deployment Versions, and Agent API
+1. User submits a natural-language prompt from App Overview.
+2. `createAppVibeApp` creates one VibeSDK app bound to the App and generation starts
+   immediately on the VibeSDK instance.
+3. App Overview polls live status: generation phase, sandbox preview URL, and production URL.
+   The user iterates with follow-up prompts and can refresh a stale preview.
+4. `publishAppVibeApp` deploys the built app to Mosoo-managed Workers for Platforms; the
+   production URL appears on App Overview when live. The user can mint a short-lived git clone
+   URL to export the source, and delete removes the VibeSDK app plus the binding.
+5. The Vibe App remains separate from Agent runtime, Agent Deployment Versions, and Agent API
    Endpoint exposure.
 
 ### App Operations
@@ -473,7 +474,7 @@ V1 must not include:
 3. Organization is retained as a billing rollup.
 4. App Settings shows spend, request count, token/cache usage, daily spend, Agent attribution,
    and model/pricing breakdown. Recent usage rows are available in each Agent's Cost tab.
-5. Agent detail owns Agent logs and runtime operations; App Overview owns Deployment activity.
+5. Agent detail owns Agent logs and runtime operations; App Overview owns Vibe App activity.
 6. V1 does not show per-user drilldown.
 
 ### App Overview API
@@ -601,7 +602,7 @@ V1 console shape:
 Apps
 +-- App
     +-- Overview
-    |   +-- Deployment install / status / activity
+    |   +-- Vibe App build / preview / publish
     +-- Runs (/threads)
     +-- Agents
     +-- Config
@@ -623,8 +624,7 @@ Rules:
 - Agents is where users inspect App-local runtime/delivery units.
 - Config groups Skills, MCP servers, Providers, and Environments.
 - Channel configuration remains on the Agent surface rather than a top-level navigation item.
-- App Overview owns the current Deployment install, status, activity, live URL, and delete
-  experience; `/deployments` redirects to Overview.
+- App Overview owns the Vibe App build, preview, publish, and delete experience.
 - App usage lives under App Settings; Agent logs live on Agent detail.
 - Agent detail is where runtime, endpoint exposure, channel delivery, and Thread creation
   happen.
@@ -640,9 +640,9 @@ Rules:
   Agent table or a separate App boundary.
 - When older docs introduce a generic App-local Service capability/resource entity, treat that
   as historical wording. New work should model concrete resources directly.
-- When older docs say Publish App, App API, Web shell, or public preview URL, distinguish the
-  shipped App Deployment resource from Agent runtime and App-level API semantics. Use
-  [`app-deployment.md`](./prd/app-deployment.md) for Deployment behavior.
+- When older docs say Publish App, App API, Web shell, public preview URL, or the GitHub-backed
+  Deployment, distinguish the shipped Vibe App resource from Agent runtime and App-level API
+  semantics. Use [`app-vibe-app.md`](./prd/app-vibe-app.md) for Vibe App behavior.
 - When older docs say App owns delivery surface, read it as App aggregates Agent exposure and
   operations; Agent owns endpoint and channel delivery in V1.
 - When older docs ask users to choose one Agent type as the App creation path, treat the choice
@@ -659,7 +659,7 @@ Rules:
 3. Thread remains the product record backed by an Agent Session and inherits App through Agent.
 4. Environment, Provider credentials, MCP servers, Skills, Files, and Channels are App-scoped.
 5. Agent API Endpoint exposure and Channel delivery remain Agent-owned.
-6. App Overview is the console root and embeds the Deployment install/status/history/delete
+6. App Overview is the console root and embeds the Vibe App build/preview/publish/delete
    experience.
 7. App usage is available under App Settings; Agent operational detail remains on Agent pages.
 8. Public Members, role matrices, invitations, access requests, and old governance surfaces are
@@ -674,7 +674,7 @@ An implementation is aligned with this Spec when:
 - Creating an Agent requires an App context.
 - Creating concrete resources requires an App context.
 - There is no generic `services` table, `service.kind`, or generic Service CRUD.
-- App creation alone does not start a Deployment, create Agent runtime, create an App-level API
+- App creation alone does not create a Vibe App, create Agent runtime, create an App-level API
   endpoint, or create application database tables.
 - Thread creation targets one Agent and creates a Session.
 - App aggregates Threads from its Agents.
@@ -684,9 +684,9 @@ An implementation is aligned with this Spec when:
   Thread files follow Session scope; the reserved App library scope is not yet a
   shipped user-managed write surface.
 - Agent exposure owns API endpoint and channel delivery.
-- App Deployment produces an external Web artifact and Mosoo-owned URL without becoming Agent
+- The Vibe App produces an external Web artifact and Mosoo-owned URL without becoming Agent
   runtime or an App-level API endpoint.
-- App Overview exposes current Deployment state and actions; App usage and Agent logs remain on
+- App Overview exposes current Vibe App state and actions; App usage and Agent logs remain on
   their implemented settings/detail surfaces.
 - Organization remains present only as tenant, billing rollup, and future governance shell.
 - No new V1 code introduces App members, role matrices, invitations, or access requests.

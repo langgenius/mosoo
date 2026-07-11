@@ -1,15 +1,8 @@
-import { apiCommandsTable, appDeploymentRunsTable } from "@mosoo/db";
 import type { ApiCommandId } from "@mosoo/db";
-import type { AppDeploymentRunId } from "@mosoo/id";
-import { parsePlatformId } from "@mosoo/id";
-import { and, eq, inArray } from "drizzle-orm";
 
 import { createErrorLogContext, logError, logInfo } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
-import { dispatchAppDeploymentRun } from "../../apps/application/app-deployment-executor.service";
-import { ACTIVE_APP_DEPLOYMENT_RUN_STATUSES } from "../../apps/domain/app-deployment-lifecycle";
 import { cleanupOrphanChannelBindingCredentialSecrets } from "../../channels/application/agent-channel-binding-maintenance.service";
 import { resolveAgentChannelBindingContextById } from "../../channels/application/channel-binding-context";
 import { createChannelFinalDeliveryScheduler } from "../../channels/application/channel-final-delivery.service";
@@ -32,7 +25,6 @@ import { processTelegramWorkTrigger } from "../../channels/telegram/telegram-fir
 import { runUsageDailyRollup } from "../../cost/application/cost-rollup.service";
 import { dispatchQueuedSessionRun } from "../../runtime/application/session-runs/dispatch-queued-run.service";
 import { runSandboxMaintenance } from "../../runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-maintenance.service";
-import { APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX } from "./api-command-enqueue";
 import {
   API_COMMAND_LEASE_RENEWAL_INTERVAL_MS,
   claimApiCommand,
@@ -47,16 +39,10 @@ import { parseApiCommandMessage } from "./api-command-message";
 import type { ApiCommandMessage } from "./api-command-message";
 import { ApiCommandPayloadError, parseApiCommandPayload } from "./api-command-payload";
 import type {
-  AppDeploymentRunDispatchCommandPayload,
   ChannelWorkTriggerCommandPayload,
   ScheduledMaintenanceCommandPayload,
   SessionRunDispatchCommandPayload,
 } from "./api-command-payload";
-import {
-  APP_DEPLOYMENT_RUN_DISPATCH_MAX_ATTEMPTS,
-  APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE,
-  createAppDeploymentDispatchRetryExhaustedMessage,
-} from "./api-command-policy";
 
 const API_COMMAND_RETRY_DELAY_SECONDS = 30;
 
@@ -340,99 +326,6 @@ async function processSessionRunDispatchCommand(
   });
 }
 
-async function failActiveAppDeploymentRun(
-  bindings: ApiBindings,
-  runId: AppDeploymentRunId,
-  input: { errorCode: string; errorMessage: string; nowMs: number },
-): Promise<void> {
-  await getAppDatabase(bindings.DB)
-    .update(appDeploymentRunsTable)
-    .set({
-      errorCode: input.errorCode,
-      errorMessage: input.errorMessage,
-      status: "failed",
-      updatedAt: input.nowMs,
-    })
-    .where(
-      and(
-        eq(appDeploymentRunsTable.id, runId),
-        inArray(appDeploymentRunsTable.status, ACTIVE_APP_DEPLOYMENT_RUN_STATUSES),
-      ),
-    )
-    .run();
-}
-
-async function failAppDeploymentRunFromPayloadJson(
-  bindings: ApiBindings,
-  input: {
-    errorCode: string;
-    errorMessage: string;
-    fallbackDedupeKey?: string;
-    nowMs: number;
-    payloadJson: string;
-  },
-  logEventName?: string,
-): Promise<void> {
-  try {
-    const runId = readAppDeploymentRunIdFromPayload(input);
-
-    if (runId === null) {
-      return;
-    }
-
-    await failActiveAppDeploymentRun(bindings, runId, input);
-  } catch (error) {
-    if (logEventName === undefined) {
-      throw error;
-    }
-
-    logError(logEventName, {
-      ...createErrorLogContext(error),
-      errorCode: getErrorCode(error),
-    });
-  }
-}
-
-function readAppDeploymentRunIdFromPayload(input: {
-  fallbackDedupeKey?: string;
-  payloadJson: string;
-}): AppDeploymentRunId | null {
-  try {
-    return (
-      parseApiCommandPayload(
-        "app_deployment_run_dispatch",
-        input.payloadJson,
-      ) as AppDeploymentRunDispatchCommandPayload
-    ).appDeploymentRunId;
-  } catch (error) {
-    logError("api-command.app_deployment_run_payload_invalid", {
-      ...createErrorLogContext(error),
-      errorCode: getErrorCode(error),
-    });
-  }
-
-  if (input.fallbackDedupeKey === undefined) {
-    return null;
-  }
-
-  if (!input.fallbackDedupeKey.startsWith(APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX)) {
-    return null;
-  }
-
-  try {
-    return parsePlatformId<AppDeploymentRunId>(
-      input.fallbackDedupeKey.slice(APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX.length),
-      "app deployment run dispatch dedupe key",
-    );
-  } catch (error) {
-    logError("api-command.app_deployment_run_dedupe_invalid", {
-      ...createErrorLogContext(error),
-      errorCode: getErrorCode(error),
-    });
-    return null;
-  }
-}
-
 async function processClaimedApiCommand(
   bindings: ApiBindings,
   claim: ApiCommandClaim,
@@ -440,10 +333,6 @@ async function processClaimedApiCommand(
   const payload = parseApiCommandPayload(claim.kind, claim.payloadJson);
 
   switch (claim.kind) {
-    case "app_deployment_run_dispatch": {
-      await dispatchAppDeploymentRun(bindings, payload as AppDeploymentRunDispatchCommandPayload);
-      return;
-    }
     case "channel_work_trigger": {
       await processChannelWorkTriggerCommand(bindings, payload as ChannelWorkTriggerCommandPayload);
       return;
@@ -565,55 +454,6 @@ export async function processApiCommandMessage(
       kind: claim.kind,
     });
 
-    const appDeploymentRunHasTerminalError =
-      claim.kind === "app_deployment_run_dispatch" &&
-      (error instanceof ApiCommandPayloadError ||
-        (error instanceof Error &&
-          (error.name === "AppDeploymentDetectionError" ||
-            error.name === "AppDeploymentNonRetryableError")));
-    const appDeploymentRunRetryExhausted =
-      claim.kind === "app_deployment_run_dispatch" &&
-      !appDeploymentRunHasTerminalError &&
-      claim.attemptCount >= APP_DEPLOYMENT_RUN_DISPATCH_MAX_ATTEMPTS;
-    const shouldFailAppDeploymentRun =
-      appDeploymentRunHasTerminalError || appDeploymentRunRetryExhausted;
-
-    if (shouldFailAppDeploymentRun) {
-      const failedAtMs = nowMs();
-      const failureCode = appDeploymentRunRetryExhausted
-        ? APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE
-        : errorCode;
-      const failureMessage = appDeploymentRunRetryExhausted
-        ? createAppDeploymentDispatchRetryExhaustedMessage({
-            attemptCount: claim.attemptCount,
-            lastErrorMessage: errorMessage,
-          })
-        : errorMessage;
-
-      await failAppDeploymentRunFromPayloadJson(
-        bindings,
-        {
-          errorCode: failureCode,
-          errorMessage: failureMessage,
-          fallbackDedupeKey: claim.dedupeKey,
-          nowMs: failedAtMs,
-          payloadJson: claim.payloadJson,
-        },
-        "api-command.app_deployment_run_fail_failed",
-      );
-
-      await markApiCommandFailed({
-        commandId,
-        database: bindings.DB,
-        errorCode: failureCode,
-        errorMessage: failureMessage,
-        nowMs: failedAtMs,
-        ownerId,
-      });
-      message.ack();
-      return;
-    }
-
     if (error instanceof ApiCommandPayloadError) {
       await markApiCommandFailed({
         commandId,
@@ -646,39 +486,13 @@ export async function processApiCommandDeadLetterMessage(
 ): Promise<void> {
   try {
     const { commandId } = parseApiCommandMessage(message.body);
-    const deadLetteredAtMs = nowMs();
-    const command =
-      (await getAppDatabase(bindings.DB)
-        .select({
-          dedupeKey: apiCommandsTable.dedupeKey,
-          kind: apiCommandsTable.kind,
-          payloadJson: apiCommandsTable.payloadJson,
-        })
-        .from(apiCommandsTable)
-        .where(eq(apiCommandsTable.id, commandId))
-        .limit(1)
-        .get()) ?? null;
-
-    if (command?.kind === "app_deployment_run_dispatch") {
-      await failAppDeploymentRunFromPayloadJson(
-        bindings,
-        {
-          errorCode: "queue_dead_lettered",
-          errorMessage: "Deployment dispatch reached the queue dead-letter consumer.",
-          fallbackDedupeKey: command.dedupeKey,
-          nowMs: deadLetteredAtMs,
-          payloadJson: command.payloadJson,
-        },
-        "api-command.app_deployment_run_dead_letter_fail_failed",
-      );
-    }
 
     await markApiCommandDeadLettered({
       commandId,
       database: bindings.DB,
       errorCode: "queue_dead_lettered",
       errorMessage: "API command reached the queue dead-letter consumer.",
-      nowMs: deadLetteredAtMs,
+      nowMs: nowMs(),
     });
   } catch (error) {
     logError("api-command.dead_letter_invalid", {
