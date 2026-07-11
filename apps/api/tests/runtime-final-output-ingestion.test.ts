@@ -476,6 +476,51 @@ describe("runtime final output ingestion", () => {
     expect(FINAL_TEXT.split("\n")).toContain("160|中文长文本校验-Aa9-表格字符|END160");
   });
 
+  test("removes provider-private citations at the public final-output boundary", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertRuntimeFixture(database);
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const finalMessageId = createPlatformId<SessionMessageId>();
+    const privateCitation = "\uE200cite\uE202turn2view0\uE202turn8view0\uE201";
+    const providerText = `before${privateCitation}after`;
+    const events = [
+      ...messageEvents({
+        messageId: finalMessageId,
+        sourcePrefix: "private-citation:final",
+        text: providerText,
+      }),
+      runtimeEvent({
+        kind: "run.completed",
+        payload: {
+          finalMessageId,
+          finalMessageText: providerText,
+          stopReason: "end_turn",
+        },
+        sourceEventId: "private-citation:run-completed",
+      }),
+    ];
+
+    await pushFreshController(bindings, events);
+
+    const persistedMessage = await database
+      .prepare("SELECT content_text FROM session_message WHERE id = ?")
+      .bind(finalMessageId)
+      .first<{ content_text: string }>();
+
+    expect(persistedMessage?.content_text).toBe(providerText);
+    await expect(
+      readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
+    ).resolves.toEqual({
+      text: "beforeafter",
+      warnings: [
+        {
+          code: "unresolved_provider_citation",
+          count: 1,
+        },
+      ],
+    });
+  });
+
   test("fails closed when a cross-boot replay conflicts with the persisted final snapshot", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertRuntimeFixture(database);

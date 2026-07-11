@@ -19,6 +19,7 @@ import { getAppDatabase } from "../../platform/db/drizzle";
 import { createSessionProcessEventsFromSessionEventRows } from "../sessions/application/session-process-events.service";
 import type { SessionEventProcessRow } from "../sessions/application/session-process-events.service";
 import { publicInternalError, publicInvalidRequest, toPublicApiError } from "./public-api-errors";
+import { sanitizePublicOutput } from "./public-output-sanitization";
 import { admitPublicThreadReader } from "./public-thread-admission";
 import { toBackingSessionId } from "./public-thread-ids";
 import { getThreadSnapshot } from "./public-thread-store";
@@ -69,7 +70,7 @@ function toPublicThreadEventLogEntry(input: {
   }
 
   return {
-    content: event.content,
+    content: sanitizePublicOutput(event.content).text,
     durationMs: event.durationMs,
     id: parsePlatformId(event.id, "Runtime event ID") as RuntimeEventId,
     occurredAt: event.occurredAt,
@@ -228,8 +229,11 @@ export async function readPublicThreadRunFinalOutput(input: {
     return null;
   }
 
+  const sanitizedOutput = sanitizePublicOutput(message.content);
+
   return {
-    text: message.content,
+    text: sanitizedOutput.text,
+    ...(sanitizedOutput.warnings.length === 0 ? {} : { warnings: sanitizedOutput.warnings }),
   };
 }
 

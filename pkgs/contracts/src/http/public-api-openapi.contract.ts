@@ -628,7 +628,7 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
       },
       finalOutput: {
         description:
-          "Canonical final assistant answer for a completed Run. This is the exact persisted final assistant message text, not a reconstruction of public `agent.message.delta` events. Null until that final message is persisted or when the Run has no final assistant answer.",
+          "Public-safe canonical final assistant answer for a completed Run. It is derived from the persisted final assistant message, not reconstructed from public `agent.message.delta` events. Null until that final message is persisted or when the Run has no final assistant answer.",
         oneOf: [{ $ref: "#/components/schemas/RunFinalOutput" }, { type: "null" }],
       },
       id: {
@@ -706,11 +706,34 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
     properties: {
       text: {
         description:
-          "Exact text of the Run's persisted final assistant message. Public event entries are not a substitute for this value.",
+          "Public-safe text derived from the Run's persisted final assistant message. Provider-private control markup is omitted and reported through warnings.",
         type: "string",
+      },
+      warnings: {
+        description:
+          "Non-fatal warnings raised while making provider output safe for public consumption.",
+        items: { $ref: "#/components/schemas/RunFinalOutputWarning" },
+        type: "array",
       },
     },
     required: ["text"],
+    type: "object",
+  },
+  RunFinalOutputWarning: {
+    additionalProperties: false,
+    description: "A non-fatal warning attached to canonical final output.",
+    properties: {
+      code: {
+        const: "unresolved_provider_citation",
+        description: "Stable code identifying provider citation markup that could not be resolved.",
+      },
+      count: {
+        description: "Number of private citation envelopes removed from the public text.",
+        minimum: 1,
+        type: "integer",
+      },
+    },
+    required: ["code", "count"],
     type: "object",
   },
   UserWarning: {
