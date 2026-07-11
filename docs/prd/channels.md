@@ -1,5 +1,8 @@
 # Channels - for human
 
+Status: partial implementation. Provider adapters and gated Agent settings exist;
+the App-level Channels console surface is not shipped in the main IA.
+
 > The Channels product story for non-engineers. This document follows
 > [SPEC](../SPEC.md) and [App Boundary](./app-boundary.md).
 >
@@ -104,7 +107,9 @@ Relationship locks:
 - Channel belongs to one App.
 - Agent belongs to the same App before it can bind the Channel.
 - Agent owns runtime execution and channel delivery.
-- App aggregates Channel health, Threads, usage, and logs from its Agents.
+- Channel records, resulting Threads, usage, and Agent logs stay scoped through
+  the owning App. The current main IA does not ship an aggregate App Channels
+  health/log dashboard.
 - Organization remains a tenant and billing shell, not a V1 channel product
   surface.
 

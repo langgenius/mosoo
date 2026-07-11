@@ -14,9 +14,14 @@ When a PM writes a PRD, they are using **product language** to express "what the
 Once engineers pick it up, they think harder and deeper — which is a good thing. **The problem is that you are still using engineering language when you come back to align.**
 A PM handed an engineering-language question cannot make a product judgment; all they can say is "I don't quite follow," and the alignment deadlocks.
 
-### 1.1 A Real Case: Q12
+### 1.1 A Historical Anti-pattern: Q12
 
-> **Q12 (the only open item)**: For the list of env var keys that affect PATH / auth (e.g. `OPENAI_API_KEY`), are they hard-coded by the platform or self-reported by the Driver? This determines the source-of-truth for deciding when a maintenance restart is triggered. The `vendor state dir` / `CLAUDE_CONFIG_DIR` class of runtime state roots has already been resolved: the Runtime / Driver sets them uniformly into the session's `.state/{runtimeId}`, and Environment does not override them. The scope of this item is the "field name → restart kind" mapping table in the Driver protocol layer — this PRD (the product layer) does not need to resolve it. The Runtime Session Kernel only needs to make the user-visible impact and front-end boundary clear; the specific source-of-truth is left to be aligned between the runtime contract and the Driver registry implementation.
+> **Historical Q12 phrasing (not a current Mosoo contract)**: For the list of env var keys that affect PATH / auth (e.g. `OPENAI_API_KEY`), are they hard-coded by the platform or self-reported by the Driver? This determines the source of truth for deciding when a maintenance restart is triggered. The scope is a "field name → restart kind" mapping table in the Driver protocol layer, so the PRD does not need to choose the implementation owner. The product layer only needs to define which configuration changes interrupt the user's active work and what recovery they see.
+
+This example preserves the questioning mistake, not its old implementation
+details. Do not infer a runtime state-directory layout or a currently open Mosoo
+decision from it; those contracts must come from the current architecture and
+code.
 
 **The PM's reaction**: "I don't quite follow — can you align with me at the product level?"
 

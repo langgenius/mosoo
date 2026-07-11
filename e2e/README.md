@@ -7,7 +7,6 @@ Run from the repo root:
 
 ```bash
 just e2e --help
-just e2e api
 just e2e contract
 just e2e public-api
 just e2e contract harness
@@ -25,21 +24,15 @@ The harness is grouped by layer. `just e2e <layer>` runs every case in that laye
 - `cases/deterministic`: no-provider acceptance paths with fixture-backed data.
 - `cases/ui`: browser journeys.
 - `cases/public-api`: Public API-triggered live runtime checks.
-- `cases/api`: API-level live provider checks.
 - `lib`: shared E2E clients, auth helpers, setup helpers, env preflight, and runtime progress.
-
-- `contract`: local harness and signal contracts.
-- `deterministic`: no-provider acceptance paths with fixture-backed data.
-- `ui`: browser journeys.
-- `public-api`: Public API-triggered live runtime checks.
-- `api`: API-level live provider checks.
 
 `deterministic session-log` runs the real Web route with explicit GraphQL
 projection fixtures, so it is safe for local PR evidence and does not require
 provider keys or Worker runtime bindings. It starts only `@mosoo/web` by default;
 set `MOSOO_E2E_WEB_SERVER_COMMAND` to override the server command.
 
-Live provider cases require one of:
+Each live case requires a key matching `MOSOO_E2E_PROVIDER` (or the generic
+`MOSOO_E2E_PROVIDER_API_KEY`):
 
 ```bash
 MOSOO_E2E_PROVIDER_API_KEY=...
@@ -49,7 +42,10 @@ MOSOO_E2E_OPENCODE_API_KEY=...
 MOSOO_E2E_DEEPSEEK_API_KEY=...
 ```
 
-Use `MOSOO_E2E_PROVIDER=openai|anthropic|opencode|deepseek` to choose the runtime provider.
+`ui preview` and `public-api latency` support `openai|anthropic`.
+`public-api runtime` supports `openai|anthropic|opencode|deepseek`. Omitting
+`MOSOO_E2E_PROVIDER` selects `openai`, so an unrelated DeepSeek/OpenCode key does
+not satisfy preflight.
 Optional environment can live in `.env`, `MOSOO_ENV_FILE`, or
 `MOSOO_E2E_ENV_FILE`.
 

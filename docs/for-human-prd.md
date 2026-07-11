@@ -84,8 +84,9 @@ Run broader repo checks only when code, generated files, schemas, or contracts c
 
 ## Example Intent To Preserve
 
-For Public Task API, keep phrases like:
+For the Public Thread API, keep phrases like:
 
 - "Help me get this Agent to do one thing."
-- "Linear ENG-123 should map to a specific Task in Mosoo."
+- "Preserve Linear ENG-123 as non-unique `client_external_ref` correlation
+  metadata; use the returned Thread id to continue that specific Thread."
 - "A background API call should show up only in the Access Token owner's private Threads."

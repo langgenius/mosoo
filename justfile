@@ -87,11 +87,11 @@ graphql-codegen-check:
 db-regen:
     bun run db:regen
 
-# Apply the local database baseline.
+# Apply pending migrations to the existing local D1 state.
 db-migrate:
     bun run db:migrate:local
 
-# Reset the local API D1 state and apply the current baseline.
+# Explicitly destroy local API D1 state, then apply the migration chain.
 db-reset-local:
     rm -rf apps/api/.wrangler/state/v3/d1
     just db-migrate
@@ -124,10 +124,6 @@ help-docs-index:
 e2e *args:
     bun run e2e -- {{args}}
 
-# Export the standalone Agent Driver repository.
-driver-repo-export:
-    bun run driver:repo:export
-
 # Verify the Agent Driver submodule cutover.
 driver-submodule-smoke:
     bun run driver:submodule:smoke
@@ -154,4 +150,3 @@ clean:
     fd -u -t d -F dist . -X rm -rf
     fd -u -t d -F .tmp . -X rm -rf
     fd -u -t d -F .angular . -X rm -rf
-    fd -u -t d -F .wrangler . -X rm -rf

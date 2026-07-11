@@ -312,7 +312,7 @@ export function EnvironmentForm({
       </EnvironmentFormSection>
 
       <EnvironmentFormSection
-        description="Configure network access policies for this environment."
+        description="Save network-policy intent for this Environment. The current Sandbox runtime does not enforce these controls yet."
         title="Networking"
       >
         <div className="space-y-3">
@@ -336,7 +336,7 @@ export function EnvironmentForm({
                 className="text-fg-1 flex items-center justify-between gap-3 text-[13px] font-medium"
                 htmlFor="environment-form-allow-mcp-servers"
               >
-                Allow MCP endpoints
+                Allow MCP endpoints (saved only)
                 <Switch
                   checked={draft.allowMcpServers}
                   disabled={disabled}
@@ -353,7 +353,7 @@ export function EnvironmentForm({
                 className="text-fg-1 flex items-center justify-between gap-3 text-[13px] font-medium"
                 htmlFor="environment-form-allow-package-registries"
               >
-                Allow package registries
+                Allow package registries (saved only)
                 <Switch
                   checked={draft.allowPackageManagers}
                   disabled={disabled}
@@ -367,7 +367,7 @@ export function EnvironmentForm({
                 />
               </label>
               <div className="space-y-1.5">
-                <Label>Allowed hosts</Label>
+                <Label>Allowed hosts (saved only)</Label>
                 <Textarea
                   className="min-h-[96px] font-mono text-[12px]"
                   disabled={disabled}

@@ -6,7 +6,7 @@ product
 
 ## Users
 
-Personal / OPC developers and small teams running a self-hostable, Cloudflare-native
+Personal / OPC developers and small self-hosted deployments running a Cloudflare-native
 Agent Cloud. They are technical: they configure runtimes, providers, MCP servers, and
 skills, dispatch agents into sandboxes, and watch cost and runtime state. On any given
 screen they are in a configuration or monitoring task, not browsing. Familiarity with
@@ -14,12 +14,13 @@ tools like GitHub, Linear, and Vercel is assumed; the UI should feel native to t
 
 ## Product Purpose
 
-Mosoo (formerly Dify-Lite) is an open-source Agent Cloud. It lets developers deploy,
-configure, run, and debug agents (Claude Code, OpenAI, and more) as cloud workers in
-isolated sandboxes, then ship them to users. The web app is the production + governance
-console: Agents, Apps, Environments, Integrations (Skills, MCP), Providers, Threads,
-and Cost. Success is a developer closing the full loop (configure → launch → debug →
-govern) without operational overhead. Public landing and blog content live in
+Mosoo is an open-source Agent Cloud. It lets developers deploy, configure, run,
+and debug agents through OpenAI runtime, Claude Agent SDK, and OpenCode/DeepSeek
+via ACP in isolated sandboxes, then ship them to users. The current Web console is organized as
+App Overview / Runs / Agents / Config, plus account Settings; App Usage lives in App
+Settings. Environment, Skills, MCP, Channels, and Providers are configuration
+surfaces. Organization Usage/Billing governance remains a visible `Soon` surface,
+not a shipped console capability. Public landing and blog content live in
 `langgenius/mosoo-website`.
 
 ## Brand Personality
@@ -53,4 +54,5 @@ Confidence through clarity, not decoration.
 
 Target WCAG AA. Body text ≥4.5:1, large/UI text ≥3:1, including placeholders and muted
 copy on tinted surfaces. Visible focus rings on every interactive element. Honor
-`prefers-reduced-motion`. Dark theme is supported and must hold the same contrast bar.
+`prefers-reduced-motion` for new motion work. A dark token palette exists, but a
+user-selectable/activated dark theme is not currently shipped.

@@ -1,6 +1,9 @@
 # <img src="apps/web/public/brand/logo-mark.svg" alt="" width="48" height="48" /> Mosoo
 
-Mosoo is an open-source, cloud-native platform for turning AI app ideas into live agent apps: bring your PRD, run Codex, Claude Code, OpenCode, and other agent harnesses in isolated sandboxes, manage their lifecycle, and ship to production through a coding-agent-friendly CLI.
+Mosoo is an open-source, cloud-native platform for turning AI app ideas into
+live agent apps: bring your PRD, use the Mosoo CLI and Codex skill, run OpenAI
+runtime, Claude Agent SDK, or OpenCode/DeepSeek via ACP in isolated sandboxes,
+manage their lifecycle, and deploy through the Mosoo Web console.
 
 <p align="center">
   <a href="https://try.mosoo.ai">Try Mosoo</a> ·
@@ -26,7 +29,7 @@ Prerequisites:
 
 - `bun >= 1.4.0-canary.1`
 - `just >= 1.51`
-- Agent runtime / sandbox flows also need Docker Desktop; see the contribution guide before validating those paths.
+- Agent runtime / sandbox flows also need Docker Desktop.
 
 From a clean clone:
 
@@ -37,7 +40,10 @@ just setup
 just dev
 ```
 
-`just setup` installs dependencies, initializes submodules, creates or completes `apps/api/.dev.vars`, installs Git hooks, and applies the local D1 baseline. `just dev` reapplies the local D1 migration before starting the web and API dev servers.
+`just setup` installs dependencies, initializes submodules, creates or completes
+`apps/api/.dev.vars`, installs Git hooks, and applies the pending local D1
+migration chain. `just dev` reapplies pending local migrations before starting
+the web and API dev servers.
 
 Local URLs:
 

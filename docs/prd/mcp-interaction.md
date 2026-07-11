@@ -1,6 +1,8 @@
 # MCP (Connector) - for humans
 
-> This is the product-story version for non-engineering readers. For the complete protocol and security details, use the shipped MCP engineering PRD and the implementation contracts.
+Status: active and shipped for App-owned remote MCP servers and Agent bindings.
+
+> This checked-in file is the current MCP product contract. Protocol and security details are anchored in the MCP contracts and implementation; there is no separate MCP engineering PRD in this repository.
 >
 > Adjacent PRDs: [`credentials`](./credentials.md), [`agent-manifest`](./agent-manifest.md), [`skill-interaction`](./skill-interaction.md), [`app-boundary`](./app-boundary.md).
 >
@@ -37,11 +39,11 @@ The current product path is intentionally narrow: one App owner configures MCP f
 
 MCP is split into three independent concepts. Do not collapse them.
 
-| Concept               | Plain-language definition                                                                   | Boundary                                                                                              |
-| --------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| **MCP Server**        | Name, HTTPS URL, auth type, display metadata, and connection policy. It contains no secret. | Belongs to exactly one App.                                                                 |
+| Concept               | Plain-language definition                                                                   | Boundary                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **MCP Server**        | Name, HTTPS URL, auth type, display metadata, and connection policy. It contains no secret. | Belongs to exactly one App.                                                             |
 | **MCP Credential**    | Vault-backed Bearer or OAuth material for one MCP server. The UI never echoes the secret.   | Belongs to the same App as the server. It can be app-scoped or explicitly agent-scoped. |
-| **Agent MCP Binding** | The Agent config edge saying "this Agent may use this App MCP server."                      | Belongs to one Agent in the same App.                                                       |
+| **Agent MCP Binding** | The Agent config edge saying "this Agent may use this App MCP server."                      | Belongs to one Agent in the same App.                                                   |
 
 This split keeps the invariant simple:
 
@@ -56,16 +58,20 @@ Deleting or exporting an Agent does not move the MCP credential. Importing a pac
 
 ---
 
-## 3. V1 Credential Model
+## 3. Credential Model
 
-V1 has two runtime credential shapes:
+The runtime/API contract supports two credential shapes:
 
-| Shape                  | Meaning                                                   | Runtime behavior                                                                                  |
-| ---------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| **App credential** | Default App credential for one MCP server.                | A `runtime_resolved` Agent binding resolves this credential for the App.                          |
-| **Agent credential**   | Explicit credential row for one Agent and one MCP server. | An `agent_bound` binding resolves only when the credential, Agent, server, and App all match. |
+| Shape                | Meaning                                                   | Runtime behavior                                                                              |
+| -------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| **App credential**   | Default App credential for one MCP server.                | A `runtime_resolved` Agent binding resolves this credential for the App.                      |
+| **Agent credential** | Explicit credential row for one Agent and one MCP server. | An `agent_bound` binding resolves only when the credential, Agent, server, and App all match. |
 
 Anything else fails closed. A credential from a different App, a different server, a different Agent, or the wrong secret purpose is denied or resolves to no credential.
+
+The current Web editor creates `runtime_resolved` bindings only. `agent_bound`
+remains a supported internal/API read and resolution contract, but there is no
+current Web control for selecting or configuring that mode.
 
 ---
 
@@ -80,21 +86,32 @@ App
       Name
       HTTPS URL
       Auth type
-    Connect credential
+    Save
+    Authorize or connect credential
       Bearer token or OAuth
-    Test and save
 ```
 
 Visible states:
 
-| State                          | What it means                                                                   |
-| ------------------------------ | ------------------------------------------------------------------------------- |
-| **Not connected**              | The server metadata exists, but runtime cannot resolve a usable credential yet. |
-| **Connected**                  | A valid App credential is available for runtime resolution.                     |
-| **Credential needs attention** | The credential was revoked, expired without refresh, or failed a secret check.  |
-| **Disabled**                   | The server remains in the App but runtime calls should not use it.              |
+| Visible state/action | What it means                                                                                                                 |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Connected**        | The current credential row is active. This does not prove the remote server is reachable.                                     |
+| **Connect**          | No active stored credential is available; the list presents this action rather than a separate “Not connected” durable badge. |
+| **Disabled**         | The server is disabled and is excluded from runtime use; this label may appear alongside its credential state.                |
 
-The App owner can update metadata, reconnect, revoke, disable, enable, or delete the server. Delete removes the server and its credential rows.
+Other connection failures surface when runtime connects rather than as durable
+list states.
+
+The App owner can edit the server name, HTTPS URL, description, and icon;
+reconnect or revoke its credential; disable or enable it; or delete it. Auth type
+cannot be changed in the edit flow. Changing the URL revokes the credential
+bound to the previous endpoint and clears cached OAuth discovery metadata, so
+the owner must connect again. Delete removes the server and its credential
+rows.
+
+The current Add/connect flow validates configuration shape and stores secret
+material, but it does not probe the MCP server or list tools. Remote
+availability is established when runtime actually connects.
 
 ---
 
@@ -107,14 +124,14 @@ Agent editor
   Capabilities
     MCP
       Pick App MCP server
-      Choose runtime resolution mode
       Save Agent config
 ```
 
 Rules:
 
 - The picker only shows MCP servers from the active App.
-- The binding stores the server reference and resolution mode, not a raw secret.
+- New Web bindings store the server reference with `runtime_resolved`; they do not store a raw secret.
+- The disabled Switch control is not a credential-mode selector.
 - A Session freezes the MCP binding reference as part of its runtime snapshot.
 - Runtime resolution checks App ownership, Agent ownership, server ownership, server App, binding App, and credential shape before reading secret material.
 - If resolution fails, the Agent call fails with a reconnect or unavailable-capability state instead of falling back to another owner path.
@@ -125,12 +142,12 @@ Rules:
 
 MCP package behavior follows the same security rule as Provider credentials and other runtime secrets:
 
-| Operation                           | Current behavior                                                                        |
-| ----------------------------------- | --------------------------------------------------------------------------------------- |
-| Export Agent package                | Include MCP binding intent and reconnect metadata, not credential material.             |
-| Fork inside an App                  | Preserve the binding shape only when it can still resolve inside the same App boundary. |
-| Import into another App             | Create reconnect intent; server id and credential id from the package are not trusted.  |
-| Run imported Agent before reconnect | Fail closed because no App-local credential proof exists.                               |
+| Operation                           | Current behavior                                                                           |
+| ----------------------------------- | ------------------------------------------------------------------------------------------ |
+| Export Agent package                | Include MCP binding intent and reconnect metadata, not credential material.                |
+| Fork inside an App                  | Preserve MCP intent with `serverId: null`; reconnect is required even inside the same App. |
+| Import into another App             | Create reconnect intent; server id and credential id from the package are not trusted.     |
+| Run imported Agent before reconnect | Fail closed because no App-local credential proof exists.                                  |
 
 Legacy runtime ids such as package-scoped MCP server or credential ids are not ownership proof. They must not be used to derive access from package snapshots.
 
@@ -140,14 +157,14 @@ Legacy runtime ids such as package-scoped MCP server or credential ids are not o
 
 The product and implementation should keep these invariants aligned:
 
-| Invariant                 | Required behavior                                                                                                     |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| App id required       | MCP create, list, connect, update, delete, OAuth, registry, binding, and runtime APIs require explicit App proof. |
-| Owner proof required      | The caller must own the App. A tenant people record is not enough.                                          |
+| Invariant                 | Required behavior                                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| App id required           | MCP create, list, connect, update, delete, OAuth, registry, binding, and runtime APIs require explicit App proof. |
+| Owner proof required      | The caller must own the App. A tenant people record is not enough.                                                |
 | Server proof required     | The MCP server must belong to the requested App and to the current owner.                                         |
 | Credential proof required | Secret reads require the credential row, server id, App id, scope, owner, auth type, and purpose to match.        |
-| Runtime proof required    | Agent App, Session App, binding App, server App, and execution owner must match.                      |
-| Package proof rejected    | Exported package snapshots and runtime ids are descriptive metadata, not authority.                                   |
+| Runtime proof required    | Agent App, Session App, binding App, server App, and execution owner must match.                                  |
+| Package proof rejected    | Exported package snapshots and runtime ids are descriptive metadata, not authority.                               |
 
 When the system cannot prove one of these facts, it rejects the action instead of trying to infer a compatible path.
 

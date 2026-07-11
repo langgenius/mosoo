@@ -1,5 +1,7 @@
 # Credentials - for humans
 
+Status: active and shipped for App-owned Provider and MCP credentials.
+
 > The Credentials product story for non-engineering readers. For interface details, schema names, and implementation checks, use the shipped Credentials contract and current Provider/MCP implementation.
 >
 > Adjacent PRDs: [`app-boundary`](./app-boundary.md), [`environment`](./environment.md), [`mcp-interaction`](./mcp-interaction.md), [`agent-type`](./agent-type.md).
@@ -37,8 +39,8 @@ The owner should never need to choose a tenant pool, a caller key, or a person-s
 
 | Concept                 | Plain-language definition                                                                         | Boundary                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **Provider Credential** | A named API key for one model provider, optionally with a custom endpoint and declared model ids. | Belongs to exactly one App.                                    |
-| **MCP Credential**      | Bearer or OAuth material for one App-local MCP server.                                            | Belongs to the same App as the MCP server.                     |
+| **Provider Credential** | A named API key for one model provider, optionally with a custom endpoint and declared model ids. | Belongs to exactly one App.                                              |
+| **MCP Credential**      | Bearer or OAuth material for one App-local MCP server.                                            | Belongs to the same App as the MCP server.                               |
 | **Vault Secret**        | Encrypted secret payload referenced by a credential row.                                          | Read only through the owning credential row and purpose-specific checks. |
 | **Agent Reference**     | An Agent's selected model/provider or MCP binding.                                                | References App-owned resources; it does not contain plaintext secrets.   |
 
@@ -59,20 +61,32 @@ App
       API key
       Optional base URL
       Optional model ids for OpenAI-compatible providers
-    Test
     Save
+    Test (separate action)
 ```
 
 Visible behavior:
 
-| State                 | Meaning                                                                 |
-| --------------------- | ----------------------------------------------------------------------- |
-| **No key configured** | Agents that require this Provider cannot run that model yet.            |
-| **Key saved**         | The App can resolve that Provider for Agents in the same App.           |
-| **Test failed**       | The typed endpoint/key/model probe failed before or during save.        |
-| **Needs reconnect**   | The stored key no longer unlocks or the provider rejects it at runtime. |
+| State                 | Meaning                                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **No key configured** | Agents that require this Provider cannot run that model yet.                                                              |
+| **Key saved**         | The App can resolve that Provider for Agents in the same App.                                                             |
+| **Test failed**       | Transient feedback from the explicit Test action; it is not a persisted credential status and Save does not require Test. |
+| **Runtime rejected**  | A later provider rejection appears on the run/readiness path; the credential row has no durable `needs_reconnect` state.  |
 
-The App owner can create, edit, test, and delete keys. Delete destroys the credential row and its vault secret. There is no separate App default selector in V1; when multiple App credentials match a Provider, the current implementation resolves deterministically by the App's stored credential ordering.
+The App owner can create, edit, test, delete, and explicitly set the default key.
+The first key for a Provider becomes default automatically. When the default is
+deleted, the next eligible key is promoted. Runtime resolution prefers the
+explicit default; name/id ordering is only a defensive fallback for inconsistent
+legacy state.
+
+Those first/default/promotion rules are enforced for sequential writes, not as
+a database-level concurrency invariant. The current schema has no partial unique
+constraint for one default per `(App, Provider)`, and Provider create/update/
+delete does not use a versioned compare-and-swap. Concurrent writers can leave
+zero or multiple defaults, and a failed/concurrent secret replacement can leave
+an orphaned vault secret. Runtime's name/id ordering is a repair fallback for
+that inconsistent state, not proof that the write was atomic.
 
 ---
 
@@ -99,15 +113,15 @@ If no matching App credential exists, runtime returns no credential and the Agen
 
 Credentials are security-sensitive even in the single-owner V1 path.
 
-| Rule                 | Required behavior                                                                                    |
-| -------------------- | ---------------------------------------------------------------------------------------------------- |
-| Plaintext scope      | Plaintext exists only during create/update/test/runtime read paths.                                  |
-| UI display           | The UI may show a masked key, not the raw stored secret.                                             |
-| Agent profile        | Agent config stores Provider/MCP references, not secret material.                                    |
-| Package export       | Exported packages carry reconnect metadata, not secret rows or vault payloads.                       |
-| Logs and diagnostics | Logs, runtime events, and readiness messages must not print raw keys.                                |
+| Rule                 | Required behavior                                                                            |
+| -------------------- | -------------------------------------------------------------------------------------------- |
+| Plaintext scope      | Plaintext exists only during create/update/test/runtime read paths.                          |
+| UI display           | The UI may show a masked key, not the raw stored secret.                                     |
+| Agent profile        | Agent config stores Provider/MCP references, not secret material.                            |
+| Package export       | Exported packages carry reconnect metadata, not secret rows or vault payloads.               |
+| Logs and diagnostics | Logs, runtime events, and readiness messages must not print raw keys.                        |
 | Secret reads         | Reads require matching App, provider or MCP server, credential id, secret kind, and purpose. |
-| Secret deletes       | Deletes require the same scoped owner tuple as the stored vault secret.                              |
+| Secret deletes       | Deletes require the same scoped owner tuple as the stored vault secret.                      |
 
 When any proof is missing or mismatched, deny the read/delete or resolve no credential.
 
@@ -115,15 +129,15 @@ When any proof is missing or mismatched, deny the read/delete or resolve no cred
 
 ## 6. Fail-Closed Invariants
 
-| Invariant               | Required behavior                                                                              |
-| ----------------------- | ---------------------------------------------------------------------------------------------- |
-| App id required     | Provider list/create/test and MCP connect/list flows require explicit App proof.           |
-| Owner proof required    | The caller must own the App. A tenant people record is not enough.                     |
+| Invariant               | Required behavior                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------ |
+| App id required         | Provider list/create/test and MCP connect/list flows require explicit App proof.           |
+| Owner proof required    | The caller must own the App. A tenant people record is not enough.                         |
 | Provider proof required | A Provider credential must match the requested App and provider.                           |
 | MCP proof required      | An MCP credential must match the requested App, server, binding shape, and secret purpose. |
-| Runtime proof required  | Agent App, Session App, selected Provider/MCP, and credential App must match.      |
-| Package proof rejected  | Runtime ids from packages are metadata only; they never grant credential access.               |
-| Missing credential      | No App credential means no runtime secret. Do not fall back to another boundary.               |
+| Runtime proof required  | Agent App, Session App, selected Provider/MCP, and credential App must match.              |
+| Package proof rejected  | Runtime ids from packages are metadata only; they never grant credential access.           |
+| Missing credential      | No App credential means no runtime secret. Do not fall back to another boundary.           |
 
 These checks should be direct. Do not add compatibility adapters that derive credential authority from old tenant ownership, package snapshots, or access state.
 
@@ -135,7 +149,7 @@ Usage and cost attribution belong to the App first.
 
 | Dimension    | V1 behavior                                                                    |
 | ------------ | ------------------------------------------------------------------------------ |
-| App  | Primary business dimension for usage and cost.                                 |
+| App          | Primary business dimension for usage and cost.                                 |
 | Agent        | Runtime and delivery unit that incurred the usage.                             |
 | Session Run  | Execution record for retries, failures, interrupts, and run-level attribution. |
 | Organization | Billing rollup only.                                                           |

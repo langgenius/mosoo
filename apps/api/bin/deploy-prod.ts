@@ -94,8 +94,8 @@ async function assertProdSchemaMatchesBaseline(): Promise<void> {
         `  Missing: ${missingTables.join(", ")}`,
         "  Cause: wrangler records applied migrations by FILENAME, so a rewritten",
         "  0000_baseline.sql is skipped on a database that already recorded it (DEPLOY-D1-001).",
-        "  Fix: add the change as a NEW migration file instead of rewriting the applied",
-        "  baseline (or apply it manually), then re-run the deploy.",
+        "  Fix: add and review a NEW migration file instead of rewriting the applied",
+        "  baseline, then re-run the deploy.",
       ].join("\n"),
     );
   }
