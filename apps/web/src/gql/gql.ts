@@ -50,9 +50,10 @@ type Documents = {
     "\n  query AppList($organizationId: ULID!) {\n    appList(organizationId: $organizationId) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": typeof types.AppListDocument,
     "\n  mutation CreateApp($input: CreateAppInput!) {\n    createApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": typeof types.CreateAppDocument,
     "\n  mutation RenameApp($input: RenameAppInput!) {\n    renameApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": typeof types.RenameAppDocument,
-    "\n  query AppVibeApp($appId: ULID!) {\n    appVibeApp(appId: $appId) {\n      appId\n      createdAt\n      id\n      lastPublishedAt\n      previewUrl\n      productionUrl\n      status\n      title\n      updatedAt\n      vibeAppId\n    }\n  }\n": typeof types.AppVibeAppDocument,
+    "\n  fragment VibeAppFields on AppVibeApp {\n    appId\n    createdAt\n    id\n    lastPublishedAt\n    previewUrl\n    productionUrl\n    status\n    title\n    updatedAt\n    vibeAppId\n  }\n": typeof types.VibeAppFieldsFragmentDoc,
+    "\n  query AppVibeApp($appId: ULID!) {\n    appVibeApp(appId: $appId) {\n      ...VibeAppFields\n    }\n  }\n": typeof types.AppVibeAppDocument,
     "\n  query AppVibeAppEnabled {\n    appVibeAppEnabled\n  }\n": typeof types.AppVibeAppEnabledDocument,
-    "\n  mutation CreateAppVibeApp($input: CreateAppVibeAppInput!) {\n    createAppVibeApp(input: $input) {\n      appId\n      createdAt\n      id\n      lastPublishedAt\n      previewUrl\n      productionUrl\n      status\n      title\n      updatedAt\n      vibeAppId\n    }\n  }\n": typeof types.CreateAppVibeAppDocument,
+    "\n  mutation CreateAppVibeApp($input: CreateAppVibeAppInput!) {\n    createAppVibeApp(input: $input) {\n      ...VibeAppFields\n    }\n  }\n": typeof types.CreateAppVibeAppDocument,
     "\n  mutation SendAppVibeAppPrompt($input: SendAppVibeAppPromptInput!) {\n    sendAppVibeAppPrompt(input: $input) {\n      ok\n    }\n  }\n": typeof types.SendAppVibeAppPromptDocument,
     "\n  mutation PublishAppVibeApp($input: PublishAppVibeAppInput!) {\n    publishAppVibeApp(input: $input) {\n      ok\n    }\n  }\n": typeof types.PublishAppVibeAppDocument,
     "\n  mutation RefreshAppVibeAppPreview($input: RefreshAppVibeAppPreviewInput!) {\n    refreshAppVibeAppPreview(input: $input) {\n      ok\n    }\n  }\n": typeof types.RefreshAppVibeAppPreviewDocument,
@@ -158,9 +159,10 @@ const documents: Documents = {
     "\n  query AppList($organizationId: ULID!) {\n    appList(organizationId: $organizationId) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": types.AppListDocument,
     "\n  mutation CreateApp($input: CreateAppInput!) {\n    createApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": types.CreateAppDocument,
     "\n  mutation RenameApp($input: RenameAppInput!) {\n    renameApp(input: $input) {\n      createdAt\n      defaultEnvironmentId\n      id\n      name\n      ownerAccountId\n    }\n  }\n": types.RenameAppDocument,
-    "\n  query AppVibeApp($appId: ULID!) {\n    appVibeApp(appId: $appId) {\n      appId\n      createdAt\n      id\n      lastPublishedAt\n      previewUrl\n      productionUrl\n      status\n      title\n      updatedAt\n      vibeAppId\n    }\n  }\n": types.AppVibeAppDocument,
+    "\n  fragment VibeAppFields on AppVibeApp {\n    appId\n    createdAt\n    id\n    lastPublishedAt\n    previewUrl\n    productionUrl\n    status\n    title\n    updatedAt\n    vibeAppId\n  }\n": types.VibeAppFieldsFragmentDoc,
+    "\n  query AppVibeApp($appId: ULID!) {\n    appVibeApp(appId: $appId) {\n      ...VibeAppFields\n    }\n  }\n": types.AppVibeAppDocument,
     "\n  query AppVibeAppEnabled {\n    appVibeAppEnabled\n  }\n": types.AppVibeAppEnabledDocument,
-    "\n  mutation CreateAppVibeApp($input: CreateAppVibeAppInput!) {\n    createAppVibeApp(input: $input) {\n      appId\n      createdAt\n      id\n      lastPublishedAt\n      previewUrl\n      productionUrl\n      status\n      title\n      updatedAt\n      vibeAppId\n    }\n  }\n": types.CreateAppVibeAppDocument,
+    "\n  mutation CreateAppVibeApp($input: CreateAppVibeAppInput!) {\n    createAppVibeApp(input: $input) {\n      ...VibeAppFields\n    }\n  }\n": types.CreateAppVibeAppDocument,
     "\n  mutation SendAppVibeAppPrompt($input: SendAppVibeAppPromptInput!) {\n    sendAppVibeAppPrompt(input: $input) {\n      ok\n    }\n  }\n": types.SendAppVibeAppPromptDocument,
     "\n  mutation PublishAppVibeApp($input: PublishAppVibeAppInput!) {\n    publishAppVibeApp(input: $input) {\n      ok\n    }\n  }\n": types.PublishAppVibeAppDocument,
     "\n  mutation RefreshAppVibeAppPreview($input: RefreshAppVibeAppPreviewInput!) {\n    refreshAppVibeAppPreview(input: $input) {\n      ok\n    }\n  }\n": types.RefreshAppVibeAppPreviewDocument,
@@ -374,7 +376,11 @@ export function graphql(source: "\n  mutation RenameApp($input: RenameAppInput!)
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query AppVibeApp($appId: ULID!) {\n    appVibeApp(appId: $appId) {\n      appId\n      createdAt\n      id\n      lastPublishedAt\n      previewUrl\n      productionUrl\n      status\n      title\n      updatedAt\n      vibeAppId\n    }\n  }\n"): typeof import('./graphql').AppVibeAppDocument;
+export function graphql(source: "\n  fragment VibeAppFields on AppVibeApp {\n    appId\n    createdAt\n    id\n    lastPublishedAt\n    previewUrl\n    productionUrl\n    status\n    title\n    updatedAt\n    vibeAppId\n  }\n"): typeof import('./graphql').VibeAppFieldsFragmentDoc;
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query AppVibeApp($appId: ULID!) {\n    appVibeApp(appId: $appId) {\n      ...VibeAppFields\n    }\n  }\n"): typeof import('./graphql').AppVibeAppDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -382,7 +388,7 @@ export function graphql(source: "\n  query AppVibeAppEnabled {\n    appVibeAppEn
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  mutation CreateAppVibeApp($input: CreateAppVibeAppInput!) {\n    createAppVibeApp(input: $input) {\n      appId\n      createdAt\n      id\n      lastPublishedAt\n      previewUrl\n      productionUrl\n      status\n      title\n      updatedAt\n      vibeAppId\n    }\n  }\n"): typeof import('./graphql').CreateAppVibeAppDocument;
+export function graphql(source: "\n  mutation CreateAppVibeApp($input: CreateAppVibeAppInput!) {\n    createAppVibeApp(input: $input) {\n      ...VibeAppFields\n    }\n  }\n"): typeof import('./graphql').CreateAppVibeAppDocument;
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

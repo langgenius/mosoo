@@ -1,26 +1,22 @@
 import type { AppVibeApp } from "@mosoo/contracts/app";
 
 /**
- * Pure projection of a vibe app's live state onto the console's badge and
- * action affordances. Keeping it data-in/data-out lets the status matrix be
- * tested without rendering.
+ * Pure projection of a vibe app's live state onto the console's affordances.
+ * Keeping it data-in/data-out lets the status matrix be tested without
+ * rendering.
  */
 export interface VibeAppStatusView {
-  badgeLabel: "Building" | "Ready";
-  badgeTone: "progress" | "success";
-  canPublish: boolean;
-  productionState: "live" | "unpublished";
+  /** Production URL is live. */
+  live: boolean;
+  /** Generation finished; publish and iteration are unlocked. */
+  ready: boolean;
 }
 
 export function toVibeAppStatusView(
   vibeApp: Pick<AppVibeApp, "productionUrl" | "status">,
 ): VibeAppStatusView {
-  const ready = vibeApp.status === "ready";
-
   return {
-    badgeLabel: ready ? "Ready" : "Building",
-    badgeTone: ready ? "success" : "progress",
-    canPublish: ready,
-    productionState: vibeApp.productionUrl !== null ? "live" : "unpublished",
+    live: vibeApp.productionUrl !== null,
+    ready: vibeApp.status === "ready",
   };
 }

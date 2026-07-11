@@ -2,7 +2,7 @@ import type { AppVibeApp, AppVibeAppCloneUrl } from "@mosoo/contracts/app";
 import type { AppId } from "@mosoo/contracts/id";
 
 import { graphql } from "@/gql";
-import type { AppVibeAppQuery } from "@/gql/graphql";
+import type { VibeAppFieldsFragment } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
 import { toAppId, toAppVibeAppId } from "@/routes/typed-id";
 
@@ -12,19 +12,26 @@ import { toAppId, toAppVibeAppId } from "@/routes/typed-id";
  * are mapped back onto the shared `@mosoo/contracts/app` domain types.
  */
 
+const VIBE_APP_FIELDS = graphql(/* GraphQL */ `
+  fragment VibeAppFields on AppVibeApp {
+    appId
+    createdAt
+    id
+    lastPublishedAt
+    previewUrl
+    productionUrl
+    status
+    title
+    updatedAt
+    vibeAppId
+  }
+`);
+void VIBE_APP_FIELDS;
+
 const APP_VIBE_APP_QUERY = graphql(/* GraphQL */ `
   query AppVibeApp($appId: ULID!) {
     appVibeApp(appId: $appId) {
-      appId
-      createdAt
-      id
-      lastPublishedAt
-      previewUrl
-      productionUrl
-      status
-      title
-      updatedAt
-      vibeAppId
+      ...VibeAppFields
     }
   }
 `);
@@ -38,16 +45,7 @@ const APP_VIBE_APP_ENABLED_QUERY = graphql(/* GraphQL */ `
 const CREATE_APP_VIBE_APP_MUTATION = graphql(/* GraphQL */ `
   mutation CreateAppVibeApp($input: CreateAppVibeAppInput!) {
     createAppVibeApp(input: $input) {
-      appId
-      createdAt
-      id
-      lastPublishedAt
-      previewUrl
-      productionUrl
-      status
-      title
-      updatedAt
-      vibeAppId
+      ...VibeAppFields
     }
   }
 `);
@@ -93,9 +91,7 @@ const DELETE_APP_VIBE_APP_MUTATION = graphql(/* GraphQL */ `
   }
 `);
 
-type RawVibeApp = NonNullable<AppVibeAppQuery["appVibeApp"]>;
-
-function toVibeApp(raw: RawVibeApp): AppVibeApp {
+function toVibeApp(raw: VibeAppFieldsFragment): AppVibeApp {
   return { ...raw, appId: toAppId(raw.appId), id: toAppVibeAppId(raw.id) };
 }
 

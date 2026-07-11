@@ -62,13 +62,11 @@ function ErrorLine({ message }: { message: string | null }) {
 }
 
 function StatusBadge({ vibeApp }: { vibeApp: AppVibeApp }) {
-  const view = toVibeAppStatusView(vibeApp);
-
-  if (view.badgeTone === "progress") {
+  if (!toVibeAppStatusView(vibeApp).ready) {
     return (
       <Badge variant="warning">
         <Loader2 className="size-3 animate-spin" />
-        {view.badgeLabel}
+        Building
       </Badge>
     );
   }
@@ -76,7 +74,7 @@ function StatusBadge({ vibeApp }: { vibeApp: AppVibeApp }) {
   return (
     <Badge variant="success">
       <span className="size-1.5 rounded-full bg-current" aria-hidden />
-      {view.badgeLabel}
+      Ready
     </Badge>
   );
 }
@@ -288,8 +286,7 @@ function VibeAppCard({
     publishWatch !== null && vibeApp.lastPublishedAt === publishWatch.baselinePublishedAt;
   const publishInFlight =
     publishOutcomePending && Date.now() - publishWatch.sinceMs < PUBLISH_WATCH_MS;
-  const publishStalled =
-    publishOutcomePending && Date.now() - publishWatch.sinceMs >= PUBLISH_WATCH_MS;
+  const publishStalled = publishOutcomePending && !publishInFlight;
   const busy = deleteVibeApp.isPending;
 
   const actionError =
@@ -341,7 +338,7 @@ function VibeAppCard({
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
-          disabled={!view.canPublish || publish.isPending || publishInFlight || busy}
+          disabled={!view.ready || publish.isPending || publishInFlight || busy}
           onClick={() => {
             resetActionErrors();
             publish.mutate(undefined, {
@@ -360,7 +357,7 @@ function VibeAppCard({
           ) : (
             <Rocket />
           )}
-          {view.productionState === "live" ? "Publish update" : "Publish"}
+          {view.live ? "Publish update" : "Publish"}
         </Button>
         <Button
           variant="outline"
@@ -399,7 +396,7 @@ function VibeAppCard({
 
       {cloneResult !== null ? <CloneUrlPanel cloneResult={cloneResult} /> : null}
 
-      {view.canPublish ? null : (
+      {view.ready ? null : (
         <p className="text-muted-foreground text-xs">
           Publish unlocks once the build is ready. The preview updates while the builder works.
         </p>
@@ -495,20 +492,18 @@ export function VibeSurface({ appId, appName }: { appId: string; appName: string
           <AppIdBadge appId={appId} />
         </div>
         <div className="flex gap-2">
-          <Link
-            to="/providers"
-            className="border-border hover:bg-muted inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-md border px-3 text-sm font-semibold transition-colors sm:flex-none"
-          >
-            <KeyRound className="size-4" />
-            Provider keys
-          </Link>
-          <Link
-            to="/agent?create=1"
-            className="bg-primary text-primary-foreground hover:bg-primary-hover inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold shadow-xs transition-colors sm:flex-none"
-          >
-            <Bot className="size-4" />
-            New agent
-          </Link>
+          <Button asChild variant="outline">
+            <Link to="/providers">
+              <KeyRound />
+              Provider keys
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link to="/agent?create=1">
+              <Bot />
+              New agent
+            </Link>
+          </Button>
         </div>
       </div>
 

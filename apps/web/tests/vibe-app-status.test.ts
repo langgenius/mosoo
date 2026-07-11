@@ -20,10 +20,8 @@ for (const status of ["generating", "ready"] as const) {
   for (const productionUrl of [null, PRODUCTION_URL]) {
     cases.push({
       expected: {
-        badgeLabel: status === "ready" ? "Ready" : "Building",
-        badgeTone: status === "ready" ? "success" : "progress",
-        canPublish: status === "ready",
-        productionState: productionUrl !== null ? "live" : "unpublished",
+        live: productionUrl !== null,
+        ready: status === "ready",
       },
       input: { productionUrl, status },
       name: `${status} production=${productionUrl !== null}`,

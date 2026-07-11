@@ -890,6 +890,8 @@ export type RenameAppMutationVariables = Exact<{
 
 export type RenameAppMutation = { renameApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId } };
 
+export type VibeAppFieldsFragment = { appId: PlatformId, createdAt: string, id: PlatformId, lastPublishedAt: string | null, previewUrl: string | null, productionUrl: string | null, status: AppVibeAppStatus, title: string | null, updatedAt: string, vibeAppId: string };
+
 export type AppVibeAppQueryVariables = Exact<{
   appId: PlatformId;
 }>;
@@ -1498,6 +1500,20 @@ export const AgentOwnerFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString
   name
 }
     `, {"fragmentName":"AgentOwnerFields"}) as unknown as TypedDocumentString<AgentOwnerFieldsFragment, unknown>;
+export const VibeAppFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
+    fragment VibeAppFields on AppVibeApp {
+  appId
+  createdAt
+  id
+  lastPublishedAt
+  previewUrl
+  productionUrl
+  status
+  title
+  updatedAt
+  vibeAppId
+}
+    `, {"fragmentName":"VibeAppFields"}) as unknown as TypedDocumentString<VibeAppFieldsFragment, unknown>;
 export const CostAgentFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentString(`
     fragment CostAgentFields on CostAgentRow {
   activeUsers
@@ -2667,19 +2683,21 @@ export const RenameAppDocument = /*#__PURE__*/ new TypedDocumentString(`
 export const AppVibeAppDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AppVibeApp($appId: ULID!) {
   appVibeApp(appId: $appId) {
-    appId
-    createdAt
-    id
-    lastPublishedAt
-    previewUrl
-    productionUrl
-    status
-    title
-    updatedAt
-    vibeAppId
+    ...VibeAppFields
   }
 }
-    `) as unknown as TypedDocumentString<AppVibeAppQuery, AppVibeAppQueryVariables>;
+    fragment VibeAppFields on AppVibeApp {
+  appId
+  createdAt
+  id
+  lastPublishedAt
+  previewUrl
+  productionUrl
+  status
+  title
+  updatedAt
+  vibeAppId
+}`) as unknown as TypedDocumentString<AppVibeAppQuery, AppVibeAppQueryVariables>;
 export const AppVibeAppEnabledDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AppVibeAppEnabled {
   appVibeAppEnabled
@@ -2688,19 +2706,21 @@ export const AppVibeAppEnabledDocument = /*#__PURE__*/ new TypedDocumentString(`
 export const CreateAppVibeAppDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation CreateAppVibeApp($input: CreateAppVibeAppInput!) {
   createAppVibeApp(input: $input) {
-    appId
-    createdAt
-    id
-    lastPublishedAt
-    previewUrl
-    productionUrl
-    status
-    title
-    updatedAt
-    vibeAppId
+    ...VibeAppFields
   }
 }
-    `) as unknown as TypedDocumentString<CreateAppVibeAppMutation, CreateAppVibeAppMutationVariables>;
+    fragment VibeAppFields on AppVibeApp {
+  appId
+  createdAt
+  id
+  lastPublishedAt
+  previewUrl
+  productionUrl
+  status
+  title
+  updatedAt
+  vibeAppId
+}`) as unknown as TypedDocumentString<CreateAppVibeAppMutation, CreateAppVibeAppMutationVariables>;
 export const SendAppVibeAppPromptDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation SendAppVibeAppPrompt($input: SendAppVibeAppPromptInput!) {
   sendAppVibeAppPrompt(input: $input) {

@@ -28,8 +28,8 @@ interface FakeVibesdkOptions {
 }
 
 interface FakeVibesdk {
-  attempts: Record<string, number>;
   baseUrl: string;
+  buildAttempts: () => number;
   deleted: string[];
   received: { type: string }[];
   ticketQueries: string[];
@@ -45,15 +45,11 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 function startFakeVibesdk(options: FakeVibesdkOptions = {}): FakeVibesdk {
-  const attempts: Record<string, number> = {};
+  let buildAttempts = 0;
   const deleted: string[] = [];
   const received: { type: string }[] = [];
   const ticketQueries: string[] = [];
   const wsMode = options.wsMode ?? "ack";
-
-  const countAttempt = (key: string) => {
-    attempts[key] = (attempts[key] ?? 0) + 1;
-  };
 
   const server = Bun.serve<{ agentId: string }, object>({
     fetch(request, srv) {
@@ -75,7 +71,7 @@ function startFakeVibesdk(options: FakeVibesdkOptions = {}): FakeVibesdk {
       }
 
       if (url.pathname === "/api/agent" && method === "POST") {
-        countAttempt("build");
+        buildAttempts += 1;
 
         if (options.buildStatus !== undefined) {
           return new Response("build rejected", { status: options.buildStatus });
@@ -194,8 +190,8 @@ function startFakeVibesdk(options: FakeVibesdkOptions = {}): FakeVibesdk {
   runningServers.push(server);
 
   return {
-    attempts,
     baseUrl: `http://localhost:${server.port}`,
+    buildAttempts: () => buildAttempts,
     deleted,
     received,
     ticketQueries,
@@ -274,7 +270,7 @@ describe("vibesdk gateway createApp", () => {
       code: API_ERROR_CODE.vibeAppUnavailable,
     });
     expect(fake.deleted).toEqual([]);
-    expect(fake.attempts["build"]).toBe(1);
+    expect(fake.buildAttempts()).toBe(1);
   });
 
   test("does not retry the non-idempotent build request on a server error", async () => {
@@ -284,7 +280,7 @@ describe("vibesdk gateway createApp", () => {
     await expect(gateway.createApp("Build a todo app")).rejects.toMatchObject({
       code: API_ERROR_CODE.vibeAppUnavailable,
     });
-    expect(fake.attempts["build"]).toBe(1);
+    expect(fake.buildAttempts()).toBe(1);
   });
 
   test("surfaces an invalid platform api key", async () => {
