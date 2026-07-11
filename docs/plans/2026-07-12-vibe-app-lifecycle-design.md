@@ -65,7 +65,7 @@ Key decisions, in force-ranked order:
    `client.apps.get(id)` for `generating|completed`, `previewUrl`, and
    `cloudflareUrl`.
 2. **D1 stores only the binding**: `app_vibe_app(id, app_id UNIQUE,
-   owner_account_id, vibe_app_id, created_at, updated_at)`.
+   vibe_app_id, created_at)`.
 3. **Commands are short-lived**: create uses the SDK build call; iterate /
    publish / preview-refresh open the session WebSocket, send one command, and
    close. Every mutation completes in seconds; completion is observed by
@@ -101,8 +101,7 @@ Key decisions, in force-ranked order:
   Empty state = prompt box; active state = status badge, preview link,
   follow-up prompt box, publish button, production URL, clone URL, delete.
   Poll while `GENERATING` (2.5s, same cadence the deploy console used).
-- Behavior type is `phasic` (the current tagged VibeSDK release lane), with
-  `VIBESDK_BEHAVIOR_TYPE` as the operator override.
+- Behavior type is `phasic` (the current tagged VibeSDK release lane).
 
 ## Deletion Scope (the other half of this change)
 
