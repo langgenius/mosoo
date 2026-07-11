@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@cloudflare/sandbox": "0.12.3",
-    "@larksuiteoapi/node-sdk": "^1.66.0",
+    "@larksuiteoapi/node-sdk": "^1.70.0",
     "@mosoo/ag-ui-session": "workspace:*",
     "@mosoo/agent-package": "workspace:*",
     "@mosoo/contracts": "workspace:*",
@@ -27,16 +27,16 @@
     "@mosoo/runtime-events": "workspace:*",
     "@mosoo/session-policy": "workspace:*",
     "@mosoo/skill-package": "workspace:*",
-    "@orpc/server": "^1.14.3",
+    "@orpc/server": "^1.14.7",
     "agent-driver": "workspace:*",
-    "arktype": "^2.2.0",
+    "arktype": "^2.2.3",
     "better-auth": "1.6.23",
     "cloudflare": "6.5.0",
     "drizzle-orm": "^0.45.2",
     "fflate": "^0.8.3",
     "graphql": "^17.0.2",
     "graphql-yoga": "^5.21.0",
-    "hono": "^4.12.19",
+    "hono": "^4.12.29",
     "jsonc-parser": "3.3.1",
     "smol-toml": "1.7.0",
     "xstate": "^5.32.0"
@@ -45,6 +45,6 @@
     "@types/node": "^25.8.0",
     "typescript": "^6.0.3",
     "vite-plus": "^0.1.23",
-    "wrangler": "^4.92.0"
+    "wrangler": "^4.110.0"
   }
 }

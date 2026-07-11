@@ -32,7 +32,7 @@
     "boring-avatars": "^2.0.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^1.16.0",
+    "lucide-react": "^1.24.0",
     "motion": "^12.40.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.6",
@@ -54,8 +54,8 @@
     "@vitejs/plugin-react": "^6.0.2",
     "jsdom": "^29.1.1",
     "typescript": "^6.0.3",
-    "vite": "^8.0.14",
+    "vite": "^8.1.4",
     "vite-plus": "^0.1.24",
-    "wrangler": "^4.92.0"
+    "wrangler": "^4.110.0"
   }
 }

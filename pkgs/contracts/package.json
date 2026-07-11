@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "@mosoo/id": "workspace:*",
-    "arktype": "^2.2.0"
+    "arktype": "^2.2.3"
   },
   "devDependencies": {
     "typescript": "^6.0.3",
