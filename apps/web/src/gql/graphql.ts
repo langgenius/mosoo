@@ -139,22 +139,9 @@ export type AgentViewerRole =
 export type AgentVisibility =
   | 'private';
 
-export type AppDeploymentRunStatus =
-  | 'activating'
-  | 'building'
-  | 'failed'
-  | 'preparing'
-  | 'queued'
-  | 'submitted'
-  | 'submitting'
-  | 'success';
-
-export type AppDeploymentTargetKind =
-  | 'cloudflare_pages'
-  | 'cloudflare_worker';
-
-export type AppOverviewBoundAgentExposure =
-  | 'public_thread';
+export type AppVibeAppStatus =
+  | 'generating'
+  | 'ready';
 
 export type AuthMethod =
   | 'email_otp'
@@ -237,6 +224,15 @@ export type CreateAppMcpServerInput = {
   url: string;
 };
 
+export type CreateAppVibeAppCloneUrlInput = {
+  appId: PlatformId;
+};
+
+export type CreateAppVibeAppInput = {
+  appId: PlatformId;
+  prompt: string;
+};
+
 export type CreateDiscordAgentChannelBindingInput = {
   agentId: PlatformId;
   appId: PlatformId;
@@ -309,7 +305,7 @@ export type DeleteAgentInput = {
   appId: PlatformId;
 };
 
-export type DeleteAppDeploymentInput = {
+export type DeleteAppVibeAppInput = {
   appId: PlatformId;
 };
 
@@ -321,12 +317,6 @@ export type DeleteEnvironmentInput = {
 export type DeleteVendorCredentialInput = {
   appId: PlatformId;
   id: PlatformId;
-};
-
-export type DeployAppInput = {
-  appId: PlatformId;
-  configPath?: string | null | undefined;
-  repoUrl: string;
 };
 
 export type EnvironmentNetworkPolicy =
@@ -466,6 +456,14 @@ export type PublishAgentInput = {
   appId: PlatformId;
 };
 
+export type PublishAppVibeAppInput = {
+  appId: PlatformId;
+};
+
+export type RefreshAppVibeAppPreviewInput = {
+  appId: PlatformId;
+};
+
 export type RenameAppInput = {
   appId: PlatformId;
   name: string;
@@ -508,6 +506,11 @@ export type RuntimeStateOperationInput = {
 export type RuntimeStateTargetVersionInput = {
   id: PlatformId;
   versionNumber: number;
+};
+
+export type SendAppVibeAppPromptInput = {
+  appId: PlatformId;
+  prompt: string;
 };
 
 export type SessionMessagePlanPriority =
@@ -887,34 +890,54 @@ export type RenameAppMutationVariables = Exact<{
 
 export type RenameAppMutation = { renameApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId } };
 
-export type AppDeploymentOverviewQueryVariables = Exact<{
+export type AppVibeAppQueryVariables = Exact<{
   appId: PlatformId;
 }>;
 
 
-export type AppDeploymentOverviewQuery = { appOverview: { app: { id: PlatformId, name: string }, boundAgents: Array<{ agentId: PlatformId, envVar: string, expose: AppOverviewBoundAgentExposure, name: string }>, deployment: { appId: PlatformId, createdAt: string, defaultBranch: string, id: PlatformId, liveUrl: string | null, plannedUrl: string, repoName: string, repoOwner: string, repoUrl: string, updatedAt: string, latestRun: { appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string } | null } | null } };
+export type AppVibeAppQuery = { appVibeApp: { appId: PlatformId, createdAt: string, id: PlatformId, previewUrl: string | null, productionUrl: string | null, status: AppVibeAppStatus, title: string | null, updatedAt: string, vibeAppId: string } | null };
 
-export type AppDeploymentRunListQueryVariables = Exact<{
-  appId: PlatformId;
-  limit?: number | null | undefined;
+export type CreateAppVibeAppMutationVariables = Exact<{
+  input: CreateAppVibeAppInput;
 }>;
 
 
-export type AppDeploymentRunListQuery = { appDeploymentRunList: Array<{ appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string }> };
+export type CreateAppVibeAppMutation = { createAppVibeApp: { appId: PlatformId, createdAt: string, id: PlatformId, previewUrl: string | null, productionUrl: string | null, status: AppVibeAppStatus, title: string | null, updatedAt: string, vibeAppId: string } };
 
-export type DeployAppMutationVariables = Exact<{
-  input: DeployAppInput;
+export type SendAppVibeAppPromptMutationVariables = Exact<{
+  input: SendAppVibeAppPromptInput;
 }>;
 
 
-export type DeployAppMutation = { deployApp: { appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string } };
+export type SendAppVibeAppPromptMutation = { sendAppVibeAppPrompt: { ok: boolean } };
 
-export type DeleteAppDeploymentMutationVariables = Exact<{
-  input: DeleteAppDeploymentInput;
+export type PublishAppVibeAppMutationVariables = Exact<{
+  input: PublishAppVibeAppInput;
 }>;
 
 
-export type DeleteAppDeploymentMutation = { deleteAppDeployment: { ok: boolean } };
+export type PublishAppVibeAppMutation = { publishAppVibeApp: { ok: boolean } };
+
+export type RefreshAppVibeAppPreviewMutationVariables = Exact<{
+  input: RefreshAppVibeAppPreviewInput;
+}>;
+
+
+export type RefreshAppVibeAppPreviewMutation = { refreshAppVibeAppPreview: { ok: boolean } };
+
+export type CreateAppVibeAppCloneUrlMutationVariables = Exact<{
+  input: CreateAppVibeAppCloneUrlInput;
+}>;
+
+
+export type CreateAppVibeAppCloneUrlMutation = { createAppVibeAppCloneUrl: { cloneUrl: string, expiresAt: string } };
+
+export type DeleteAppVibeAppMutationVariables = Exact<{
+  input: DeleteAppVibeAppInput;
+}>;
+
+
+export type DeleteAppVibeAppMutation = { deleteAppVibeApp: { ok: boolean } };
 
 type CostTotalsFields_CostAgentRow_Fragment = { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number };
 
@@ -2636,94 +2659,72 @@ export const RenameAppDocument = /*#__PURE__*/ new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<RenameAppMutation, RenameAppMutationVariables>;
-export const AppDeploymentOverviewDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AppDeploymentOverview($appId: ULID!) {
-  appOverview(appId: $appId) {
-    app {
-      id
-      name
-    }
-    boundAgents {
-      agentId
-      envVar
-      expose
-      name
-    }
-    deployment {
-      appId
-      createdAt
-      defaultBranch
-      id
-      liveUrl
-      plannedUrl
-      repoName
-      repoOwner
-      repoUrl
-      updatedAt
-      latestRun {
-        appId
-        createdAt
-        deploymentId
-        errorCode
-        errorMessage
-        id
-        liveUrl
-        plannedUrl
-        sourceBranch
-        sourceCommitSha
-        status
-        targetKind
-        updatedAt
-      }
-    }
-  }
-}
-    `) as unknown as TypedDocumentString<AppDeploymentOverviewQuery, AppDeploymentOverviewQueryVariables>;
-export const AppDeploymentRunListDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query AppDeploymentRunList($appId: ULID!, $limit: Int) {
-  appDeploymentRunList(appId: $appId, limit: $limit) {
+export const AppVibeAppDocument = /*#__PURE__*/ new TypedDocumentString(`
+    query AppVibeApp($appId: ULID!) {
+  appVibeApp(appId: $appId) {
     appId
     createdAt
-    deploymentId
-    errorCode
-    errorMessage
     id
-    liveUrl
-    plannedUrl
-    sourceBranch
-    sourceCommitSha
+    previewUrl
+    productionUrl
     status
-    targetKind
+    title
     updatedAt
+    vibeAppId
   }
 }
-    `) as unknown as TypedDocumentString<AppDeploymentRunListQuery, AppDeploymentRunListQueryVariables>;
-export const DeployAppDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation DeployApp($input: DeployAppInput!) {
-  deployApp(input: $input) {
+    `) as unknown as TypedDocumentString<AppVibeAppQuery, AppVibeAppQueryVariables>;
+export const CreateAppVibeAppDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation CreateAppVibeApp($input: CreateAppVibeAppInput!) {
+  createAppVibeApp(input: $input) {
     appId
     createdAt
-    deploymentId
-    errorCode
-    errorMessage
     id
-    liveUrl
-    plannedUrl
-    sourceBranch
-    sourceCommitSha
+    previewUrl
+    productionUrl
     status
-    targetKind
+    title
     updatedAt
+    vibeAppId
   }
 }
-    `) as unknown as TypedDocumentString<DeployAppMutation, DeployAppMutationVariables>;
-export const DeleteAppDeploymentDocument = /*#__PURE__*/ new TypedDocumentString(`
-    mutation DeleteAppDeployment($input: DeleteAppDeploymentInput!) {
-  deleteAppDeployment(input: $input) {
+    `) as unknown as TypedDocumentString<CreateAppVibeAppMutation, CreateAppVibeAppMutationVariables>;
+export const SendAppVibeAppPromptDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation SendAppVibeAppPrompt($input: SendAppVibeAppPromptInput!) {
+  sendAppVibeAppPrompt(input: $input) {
     ok
   }
 }
-    `) as unknown as TypedDocumentString<DeleteAppDeploymentMutation, DeleteAppDeploymentMutationVariables>;
+    `) as unknown as TypedDocumentString<SendAppVibeAppPromptMutation, SendAppVibeAppPromptMutationVariables>;
+export const PublishAppVibeAppDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation PublishAppVibeApp($input: PublishAppVibeAppInput!) {
+  publishAppVibeApp(input: $input) {
+    ok
+  }
+}
+    `) as unknown as TypedDocumentString<PublishAppVibeAppMutation, PublishAppVibeAppMutationVariables>;
+export const RefreshAppVibeAppPreviewDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation RefreshAppVibeAppPreview($input: RefreshAppVibeAppPreviewInput!) {
+  refreshAppVibeAppPreview(input: $input) {
+    ok
+  }
+}
+    `) as unknown as TypedDocumentString<RefreshAppVibeAppPreviewMutation, RefreshAppVibeAppPreviewMutationVariables>;
+export const CreateAppVibeAppCloneUrlDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation CreateAppVibeAppCloneUrl($input: CreateAppVibeAppCloneUrlInput!) {
+  createAppVibeAppCloneUrl(input: $input) {
+    cloneUrl
+    expiresAt
+  }
+}
+    `) as unknown as TypedDocumentString<CreateAppVibeAppCloneUrlMutation, CreateAppVibeAppCloneUrlMutationVariables>;
+export const DeleteAppVibeAppDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation DeleteAppVibeApp($input: DeleteAppVibeAppInput!) {
+  deleteAppVibeApp(input: $input) {
+    ok
+  }
+}
+    `) as unknown as TypedDocumentString<DeleteAppVibeAppMutation, DeleteAppVibeAppMutationVariables>;
 export const AppCostCardDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AppCostCard($appId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
   appCostCard(appId: $appId, range: $range, runPurposes: $runPurposes) {

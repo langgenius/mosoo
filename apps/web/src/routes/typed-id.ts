@@ -3,8 +3,7 @@ import type {
   AgentDeploymentVersionId,
   AgentId,
   AgentMcpBindingId,
-  AppDeploymentId,
-  AppDeploymentRunId,
+  AppVibeAppId,
   ChannelBindingId,
   CredentialId,
   EnvironmentId,
@@ -38,12 +37,8 @@ export function toAgentMcpBindingId(id: string): AgentMcpBindingId {
   return parsePlatformId(id, "Agent MCP binding ID") as AgentMcpBindingId;
 }
 
-export function toAppDeploymentId(id: string): AppDeploymentId {
-  return parsePlatformId(id, "App deployment ID") as AppDeploymentId;
-}
-
-export function toAppDeploymentRunId(id: string): AppDeploymentRunId {
-  return parsePlatformId(id, "App deployment run ID") as AppDeploymentRunId;
+export function toAppVibeAppId(id: string): AppVibeAppId {
+  return parsePlatformId(id, "App vibe app ID") as AppVibeAppId;
 }
 
 export function toChannelBindingId(id: string): ChannelBindingId {

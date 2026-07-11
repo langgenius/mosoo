@@ -31,9 +31,8 @@ describe("App overview boundary", () => {
 
   test("hands the App to a coding agent with the installer command on the console root", () => {
     const routeSource = readSource("../src/routes/app-overview/app-overview.route.tsx");
-    // The header/body composition lives in the shared DeploySurface, rendered
-    // verbatim by both "/" and the /v0-deploy-preview acceptance route.
-    const surfaceSource = readSource("../src/routes/app-overview/deploy/deploy-surface.tsx");
+    // The header/body composition lives in the VibeSurface rendered by "/".
+    const surfaceSource = readSource("../src/routes/app-overview/vibe/vibe-surface.tsx");
     const installSource = readSource("../src/routes/app-overview/app-overview-install.tsx");
     const appIdBadgeSource = readSource("../src/shared/ui/app-id-badge.tsx");
     const runtimeIconSource = readSource("../src/shared/ui/brand-icons/runtime-icon-data.ts");
@@ -90,11 +89,11 @@ describe("App overview boundary", () => {
   });
 
   test("keeps the install guide responsive and accessible", () => {
-    const surfaceSource = readSource("../src/routes/app-overview/deploy/deploy-surface.tsx");
+    const surfaceSource = readSource("../src/routes/app-overview/vibe/vibe-surface.tsx");
     const installSource = readSource("../src/routes/app-overview/app-overview-install.tsx");
 
     expect(surfaceSource).toContain("max-w-4xl");
-    expect(surfaceSource).toContain("lg:flex-row");
+    expect(surfaceSource).toContain("sm:flex-row");
     expect(installSource).toContain("max-w-3xl");
     expect(installSource).toContain("sm:flex-row");
     expect(installSource).toContain("text-sm leading-6");

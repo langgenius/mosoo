@@ -4,18 +4,15 @@ import { Link } from "react-router-dom";
 import { useAppSession } from "@/app/session-provider";
 
 import { AppOverviewInstallGuide } from "./app-overview-install";
-import { DeploySurface } from "./deploy/deploy-surface";
-import { useLiveDeployConsole } from "./deploy/use-live-deploy-console";
+import { VibeSurface } from "./vibe/vibe-surface";
 
 /**
- * The App Overview at "/": before the first deploy it is the install guide
- * plus the deploy-from-repo card; once a deployment exists it becomes the
- * deploy console — status, live URL, source, bound agents, and run activity.
+ * The App Overview at "/": before the first build it is the vibe-app prompt
+ * plus the CLI install guide; once the App's web app exists it becomes the
+ * vibe console — build status, live preview, publish, source export.
  */
 export function AppOverviewPage() {
   const { activeApp, appsLoading } = useAppSession();
-  const appId = activeApp?.id ?? null;
-  const live = useLiveDeployConsole(appId, activeApp?.name ?? "");
 
   if (activeApp === null) {
     return (
@@ -26,15 +23,9 @@ export function AppOverviewPage() {
   }
 
   return (
-    <DeploySurface
+    <VibeSurface
       appId={activeApp.id}
-      appName={live.appName}
-      deploy={live}
-      loading={live.loading}
-      loadError={live.loadError}
-      runsError={live.runsError}
-      deployError={live.deployError}
-      deleteError={live.deleteError}
+      appName={activeApp.name}
       emptyHero={<AppOverviewInstallGuide />}
       headerActions={
         <>
