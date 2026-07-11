@@ -97,8 +97,9 @@ export function createCloudflareDeploymentClient(
   return {
     async deletePagesDomain(input) {
       try {
-        await client.pages.projects.domains.delete(input.projectName, input.hostname, {
+        await client.pages.projects.domains.delete(input.hostname, {
           account_id: accountId,
+          project_name: input.projectName,
         });
       } catch (error) {
         if (!toStatus(error, 404)) {
@@ -196,8 +197,9 @@ export function createCloudflareDeploymentClient(
           throw error;
         }
 
-        const domain = await client.pages.projects.domains.get(input.projectName, input.hostname, {
+        const domain = await client.pages.projects.domains.get(input.hostname, {
           account_id: accountId,
+          project_name: input.projectName,
         });
 
         return { status: domain.status ?? null };
