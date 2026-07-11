@@ -43,7 +43,6 @@ CREATE TABLE app (
 CREATE TABLE app_vibe_app (
   id text PRIMARY KEY NOT NULL,
   app_id text NOT NULL,
-  owner_account_id text NOT NULL,
   vibe_app_id text NOT NULL,
   created_at integer NOT NULL,
   updated_at integer NOT NULL

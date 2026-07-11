@@ -99,7 +99,6 @@ export async function createAppVibeApp(
     appId: input.appId,
     createdAt: nowMs,
     id: createPlatformId<AppVibeAppId>(),
-    ownerAccountId: viewer.id,
     updatedAt: nowMs,
     vibeAppId,
   };
@@ -107,8 +106,11 @@ export async function createAppVibeApp(
   try {
     await getAppDatabase(database).insert(appVibeAppsTable).values(row).run();
   } catch (error) {
+    // Nothing references the remote app when the insert fails, whatever the
+    // cause — delete it best-effort before surfacing the failure.
+    await vibe.deleteApp(vibeAppId).catch(() => undefined);
+
     if (errorMessageChainIncludes(error, ["UNIQUE constraint failed"])) {
-      await vibe.deleteApp(vibeAppId).catch(() => undefined);
       throw createApiError(API_ERROR_CODE.vibeAppExists, "This App already has a Vibe App.");
     }
 

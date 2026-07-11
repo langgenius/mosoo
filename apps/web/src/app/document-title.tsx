@@ -32,7 +32,6 @@ const DOCUMENT_TITLE_RULES: DocumentTitleRule[] = [
   { path: "/agent", scope: "app", title: "Agents" },
   { path: "/files", scope: "app", title: "Files" },
   { path: "/cli-auth", scope: "global", title: "CLI authorization" },
-  { path: "/v0-deploy-preview", scope: "global", title: "Deployment preview" },
   { path: "/onboarding", scope: "global", title: "Onboarding" },
   { path: "/login", scope: "global", title: "Sign in" },
   { path: "/org/settings", scope: "org", title: "Org settings" },

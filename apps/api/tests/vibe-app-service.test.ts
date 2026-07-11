@@ -14,7 +14,8 @@ import type {
   VibesdkGateway,
 } from "../src/modules/apps/application/vibesdk-gateway";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import { createApiError, API_ERROR_CODE, isApiError } from "../src/platform/errors";
+import { createApiError, API_ERROR_CODE } from "../src/platform/errors";
+import { expectApiErrorCode } from "./helpers/api-error-assert";
 import { createApiTestFixture } from "./helpers/api-test-fixture";
 
 type Fixture = Awaited<ReturnType<typeof createApiTestFixture>>;
@@ -88,21 +89,6 @@ async function createVibeAppFixture(fixture: Fixture, vibeAppId = "vibe-1") {
     appId: fixture.ids.appId,
     prompt: "Build a todo app",
   });
-}
-
-async function expectApiErrorCode(promise: Promise<unknown>, code: string): Promise<void> {
-  try {
-    await promise;
-  } catch (error) {
-    if (!isApiError(error)) {
-      throw error;
-    }
-
-    expect(error.code).toBe(code);
-    return;
-  }
-
-  throw new Error(`Expected ApiError ${code} but the call succeeded.`);
 }
 
 describe("vibe app service", () => {

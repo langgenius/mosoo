@@ -1,8 +1,10 @@
 import { parsePlatformId } from "@mosoo/id";
 import type { OrganizationId, AppId } from "@mosoo/id";
 
+import type { AuthenticatedGraphQLContext } from "../../../adapters/graphql/graphql-context";
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { appGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
+import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { getAppOverview, getControlPlaneOverview } from "../application/app-overview.service";
 import { createApp } from "../application/app-provisioning.service";
 import { listOrganizationApps, renameApp } from "../application/app.service";
@@ -16,6 +18,7 @@ import {
   sendAppVibeAppPrompt,
 } from "../application/vibe-app.service";
 import { createVibesdkGateway } from "../application/vibesdk-gateway";
+import type { VibesdkGateway } from "../application/vibesdk-gateway";
 
 interface OrganizationIdArgs {
   organizationId: OrganizationId;
@@ -44,20 +47,27 @@ interface RenameAppArgs {
   input: Parameters<typeof renameApp>[2];
 }
 
-interface CreateAppVibeAppArgs {
-  input: Parameters<typeof createAppVibeApp>[3];
-}
-
-interface SendAppVibeAppPromptArgs {
-  input: Parameters<typeof sendAppVibeAppPrompt>[3];
-}
-
-interface AppVibeAppTargetArgs {
-  input: Parameters<typeof publishAppVibeApp>[3];
-}
-
 function parseAppId(value: string): AppId {
   return parsePlatformId<AppId>(value, "App ID");
+}
+
+// Every vibe app resolver has the same shape: App ownership plus the shared
+// VibeSDK gateway, keyed by the mutation input.
+function vibeAppResolver<TInput, TResult>(
+  handler: (
+    database: D1Database,
+    gateway: VibesdkGateway | null,
+    viewer: AuthenticatedViewer,
+    input: TInput,
+  ) => Promise<TResult>,
+) {
+  return async (_parent: unknown, args: { input: TInput }, context: AuthenticatedGraphQLContext) =>
+    handler(
+      context.bindings.DB,
+      createVibesdkGateway(context.bindings),
+      context.viewer,
+      args.input,
+    );
 }
 
 export const appGraphQLModule = {
@@ -65,50 +75,14 @@ export const appGraphQLModule = {
   authenticatedMutationResolvers: {
     createApp: async (_parent, args: CreateAppArgs, context) =>
       createApp(context.bindings.DB, context.viewer, args.input),
-    createAppVibeApp: async (_parent, args: CreateAppVibeAppArgs, context) =>
-      createAppVibeApp(
-        context.bindings.DB,
-        createVibesdkGateway(context.bindings),
-        context.viewer,
-        args.input,
-      ),
-    createAppVibeAppCloneUrl: async (_parent, args: AppVibeAppTargetArgs, context) =>
-      createAppVibeAppCloneUrl(
-        context.bindings.DB,
-        createVibesdkGateway(context.bindings),
-        context.viewer,
-        args.input,
-      ),
-    deleteAppVibeApp: async (_parent, args: AppVibeAppTargetArgs, context) =>
-      deleteAppVibeApp(
-        context.bindings.DB,
-        createVibesdkGateway(context.bindings),
-        context.viewer,
-        args.input,
-      ),
-    publishAppVibeApp: async (_parent, args: AppVibeAppTargetArgs, context) =>
-      publishAppVibeApp(
-        context.bindings.DB,
-        createVibesdkGateway(context.bindings),
-        context.viewer,
-        args.input,
-      ),
-    refreshAppVibeAppPreview: async (_parent, args: AppVibeAppTargetArgs, context) =>
-      refreshAppVibeAppPreview(
-        context.bindings.DB,
-        createVibesdkGateway(context.bindings),
-        context.viewer,
-        args.input,
-      ),
+    createAppVibeApp: vibeAppResolver(createAppVibeApp),
+    createAppVibeAppCloneUrl: vibeAppResolver(createAppVibeAppCloneUrl),
+    deleteAppVibeApp: vibeAppResolver(deleteAppVibeApp),
+    publishAppVibeApp: vibeAppResolver(publishAppVibeApp),
+    refreshAppVibeAppPreview: vibeAppResolver(refreshAppVibeAppPreview),
     renameApp: async (_parent, args: RenameAppArgs, context) =>
       renameApp(context.bindings.DB, context.viewer, args.input),
-    sendAppVibeAppPrompt: async (_parent, args: SendAppVibeAppPromptArgs, context) =>
-      sendAppVibeAppPrompt(
-        context.bindings.DB,
-        createVibesdkGateway(context.bindings),
-        context.viewer,
-        args.input,
-      ),
+    sendAppVibeAppPrompt: vibeAppResolver(sendAppVibeAppPrompt),
   },
   authenticatedQueryResolvers: {
     appList: async (_parent, args: OrganizationIdArgs, context) =>

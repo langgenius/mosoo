@@ -27,6 +27,11 @@ import { Textarea } from "@/shared/ui/textarea";
 
 import { toVibeAppStatusView } from "./vibe-app-status";
 
+// Publish and preview refresh complete on the VibeSDK side without a status
+// change, so the console keeps polling for their outcome within these windows.
+const PUBLISH_WATCH_MS = 180_000;
+const COMMAND_WATCH_MS = 90_000;
+
 function ErrorLine({ message }: { message: string | null }) {
   if (message === null) {
     return null;
@@ -119,7 +124,15 @@ function CreateVibeAppCard({ appId }: { appId: string }) {
   );
 }
 
-function FollowUpCard({ appId, vibeApp }: { appId: string; vibeApp: AppVibeApp }) {
+function FollowUpCard({
+  appId,
+  onCommandAccepted,
+  vibeApp,
+}: {
+  appId: string;
+  onCommandAccepted: (watchMs: number) => void;
+  vibeApp: AppVibeApp;
+}) {
   const [prompt, setPrompt] = useState("");
   const sendPrompt = useSendAppVibeAppPromptMutation(appId);
   const canSubmit = prompt.trim().length > 0 && !sendPrompt.isPending;
@@ -143,7 +156,12 @@ function FollowUpCard({ appId, vibeApp }: { appId: string; vibeApp: AppVibeApp }
           size="sm"
           disabled={!canSubmit}
           onClick={() => {
-            sendPrompt.mutate(prompt.trim(), { onSuccess: () => setPrompt("") });
+            sendPrompt.mutate(prompt.trim(), {
+              onSuccess: () => {
+                setPrompt("");
+                onCommandAccepted(COMMAND_WATCH_MS);
+              },
+            });
           }}
         >
           {sendPrompt.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
@@ -155,7 +173,16 @@ function FollowUpCard({ appId, vibeApp }: { appId: string; vibeApp: AppVibeApp }
   );
 }
 
-function VibeAppCard({ appId, vibeApp }: { appId: string; vibeApp: AppVibeApp }) {
+function VibeAppCard({
+  appId,
+  onCommandAccepted,
+  vibeApp,
+}: {
+  appId: string;
+  /** Called when a fire-and-forget command is accepted, to keep polling. */
+  onCommandAccepted: (watchMs: number) => void;
+  vibeApp: AppVibeApp;
+}) {
   const view = toVibeAppStatusView(vibeApp);
   const publish = usePublishAppVibeAppMutation(appId);
   const refreshPreview = useRefreshAppVibeAppPreviewMutation(appId);
@@ -201,7 +228,9 @@ function VibeAppCard({ appId, vibeApp }: { appId: string; vibeApp: AppVibeApp })
         <Button
           size="sm"
           disabled={!view.canPublish || publish.isPending}
-          onClick={() => publish.mutate()}
+          onClick={() => {
+            publish.mutate(undefined, { onSuccess: () => onCommandAccepted(PUBLISH_WATCH_MS) });
+          }}
         >
           {publish.isPending ? <Loader2 className="size-4 animate-spin" /> : <Rocket />}
           {view.productionState === "live" ? "Publish update" : "Publish"}
@@ -210,7 +239,11 @@ function VibeAppCard({ appId, vibeApp }: { appId: string; vibeApp: AppVibeApp })
           variant="outline"
           size="sm"
           disabled={refreshPreview.isPending}
-          onClick={() => refreshPreview.mutate()}
+          onClick={() => {
+            refreshPreview.mutate(undefined, {
+              onSuccess: () => onCommandAccepted(COMMAND_WATCH_MS),
+            });
+          }}
         >
           {refreshPreview.isPending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw />}
           Refresh preview
@@ -248,7 +281,7 @@ function VibeAppCard({ appId, vibeApp }: { appId: string; vibeApp: AppVibeApp })
 
       <ErrorLine message={actionError} />
 
-      <FollowUpCard appId={appId} vibeApp={vibeApp} />
+      <FollowUpCard appId={appId} onCommandAccepted={onCommandAccepted} vibeApp={vibeApp} />
     </section>
   );
 }
@@ -258,6 +291,35 @@ function VibeAppCard({ appId, vibeApp }: { appId: string; vibeApp: AppVibeApp })
  * watch the live preview while the VibeSDK builder works, iterate with
  * follow-up prompts, and publish to the production URL.
  */
+function StatusErrorRecovery({ appId, message }: { appId: string; message: string }) {
+  const deleteVibeApp = useDeleteAppVibeAppMutation(appId);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <ErrorLine message={message} />
+      <div className="flex items-center gap-3">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={deleteVibeApp.isPending}
+          onClick={() => {
+            if (window.confirm("Remove this app binding? You can build a new app afterwards.")) {
+              deleteVibeApp.mutate();
+            }
+          }}
+        >
+          {deleteVibeApp.isPending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 />}
+          Remove app binding
+        </Button>
+        <span className="text-muted-foreground text-xs">
+          Use this if the app was removed on the backend and the status can no longer load.
+        </span>
+      </div>
+      <ErrorLine message={deleteVibeApp.error?.message ?? null} />
+    </div>
+  );
+}
+
 export function VibeSurface({
   appId,
   appName,
@@ -271,8 +333,10 @@ export function VibeSurface({
   /** Right-aligned header extras. */
   headerActions?: ReactNode;
 }) {
-  const vibeAppQuery = useAppVibeAppQuery(appId);
+  const [activityDeadlineMs, setActivityDeadlineMs] = useState(0);
+  const vibeAppQuery = useAppVibeAppQuery(appId, activityDeadlineMs);
   const vibeApp = vibeAppQuery.data ?? null;
+  const watchFor = (watchMs: number) => setActivityDeadlineMs(Date.now() + watchMs);
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
@@ -285,7 +349,7 @@ export function VibeSurface({
       </div>
 
       {vibeAppQuery.isError ? (
-        <ErrorLine message={vibeAppQuery.error.message} />
+        <StatusErrorRecovery appId={appId} message={vibeAppQuery.error.message} />
       ) : vibeAppQuery.isPending ? (
         <div className="text-muted-foreground flex items-center gap-2 text-sm">
           <Loader2 className="size-4 animate-spin" />
@@ -297,7 +361,7 @@ export function VibeSurface({
           {emptyHero}
         </>
       ) : (
-        <VibeAppCard appId={appId} vibeApp={vibeApp} />
+        <VibeAppCard appId={appId} onCommandAccepted={watchFor} vibeApp={vibeApp} />
       )}
     </div>
   );

@@ -330,7 +330,6 @@ function createApiTestSchema(database: SqliteD1Database): void {
       app_id text NOT NULL,
       created_at integer NOT NULL,
       id text PRIMARY KEY NOT NULL,
-      owner_account_id text NOT NULL,
       updated_at integer NOT NULL,
       vibe_app_id text NOT NULL
     );

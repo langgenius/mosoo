@@ -1,7 +1,8 @@
-import type { AppVibeApp, AppVibeAppCloneUrl, AppVibeAppStatus } from "@mosoo/contracts/app";
+import type { AppVibeApp, AppVibeAppCloneUrl } from "@mosoo/contracts/app";
 import type { AppId } from "@mosoo/contracts/id";
 
 import { graphql } from "@/gql";
+import type { AppVibeAppQuery } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
 import { toAppId, toAppVibeAppId } from "@/routes/typed-id";
 
@@ -84,38 +85,10 @@ const DELETE_APP_VIBE_APP_MUTATION = graphql(/* GraphQL */ `
   }
 `);
 
-interface RawVibeApp {
-  appId: string;
-  createdAt: string;
-  id: string;
-  previewUrl: string | null;
-  productionUrl: string | null;
-  status: string;
-  title: string | null;
-  updatedAt: string;
-  vibeAppId: string;
-}
-
-function toVibeAppStatus(value: string): AppVibeAppStatus {
-  if (value !== "generating" && value !== "ready") {
-    throw new Error(`Unknown vibe app status: ${value}`);
-  }
-
-  return value;
-}
+type RawVibeApp = NonNullable<AppVibeAppQuery["appVibeApp"]>;
 
 function toVibeApp(raw: RawVibeApp): AppVibeApp {
-  return {
-    appId: toAppId(raw.appId),
-    createdAt: raw.createdAt,
-    id: toAppVibeAppId(raw.id),
-    previewUrl: raw.previewUrl,
-    productionUrl: raw.productionUrl,
-    status: toVibeAppStatus(raw.status),
-    title: raw.title,
-    updatedAt: raw.updatedAt,
-    vibeAppId: raw.vibeAppId,
-  };
+  return { ...raw, appId: toAppId(raw.appId), id: toAppVibeAppId(raw.id) };
 }
 
 export async function getAppVibeApp(appId: AppId): Promise<AppVibeApp | null> {

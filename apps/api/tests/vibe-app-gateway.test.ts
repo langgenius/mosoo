@@ -7,7 +7,8 @@ import type {
   VibesdkGatewayTimeouts,
 } from "../src/modules/apps/application/vibesdk-gateway";
 import { createVibesdkGateway } from "../src/modules/apps/application/vibesdk-gateway";
-import { API_ERROR_CODE, isApiError } from "../src/platform/errors";
+import { API_ERROR_CODE } from "../src/platform/errors";
+import { expectApiErrorCode } from "./helpers/api-error-assert";
 
 const TEST_API_KEY = "vibe_test_key";
 const TEST_AGENT_ID = "vibe-agent-1";
@@ -24,7 +25,6 @@ interface FakeVibesdkOptions {
   appGetBody?: { error?: { message: string }; success: boolean };
   buildStatus?: number;
   deleteStatus?: number;
-  exchangeStatus?: number;
   wsMode?: WsMode;
 }
 
@@ -63,12 +63,6 @@ function startFakeVibesdk(options: FakeVibesdkOptions = {}): FakeVibesdk {
       const { method } = request;
 
       if (url.pathname === "/api/auth/exchange-api-key" && method === "POST") {
-        countAttempt("exchange");
-
-        if (options.exchangeStatus !== undefined) {
-          return new Response("denied", { status: options.exchangeStatus });
-        }
-
         if (request.headers.get("Authorization") !== `Bearer ${TEST_API_KEY}`) {
           return new Response("bad key", { status: 401 });
         }
@@ -134,8 +128,6 @@ function startFakeVibesdk(options: FakeVibesdkOptions = {}): FakeVibesdk {
       const appMatch = /^\/api\/apps\/([^/]+)$/.exec(url.pathname);
 
       if (appMatch && method === "GET") {
-        countAttempt("appGet");
-
         if (options.appGetBody !== undefined) {
           return jsonResponse(options.appGetBody);
         }
@@ -155,8 +147,6 @@ function startFakeVibesdk(options: FakeVibesdkOptions = {}): FakeVibesdk {
       }
 
       if (appMatch && method === "DELETE") {
-        countAttempt("appDelete");
-
         if (options.deleteStatus !== undefined && options.deleteStatus !== 200) {
           return new Response("delete rejected", { status: options.deleteStatus });
         }
@@ -227,21 +217,6 @@ function createGateway(fake: FakeVibesdk, apiKey = TEST_API_KEY): VibesdkGateway
   return gateway;
 }
 
-async function expectApiErrorCode(promise: Promise<unknown>, code: string): Promise<void> {
-  try {
-    await promise;
-  } catch (error) {
-    if (!isApiError(error)) {
-      throw error;
-    }
-
-    expect(error.code).toBe(code);
-    return;
-  }
-
-  throw new Error(`Expected ApiError ${code} but the call succeeded.`);
-}
-
 afterEach(() => {
   for (const server of runningServers.splice(0)) {
     server.stop(true);
@@ -268,16 +243,6 @@ describe("vibesdk gateway configuration", () => {
       }
     });
   }
-
-  test("factory rejects an unknown behavior type", () => {
-    expect(() =>
-      createVibesdkGateway({
-        VIBESDK_API_KEY: "vibe_x",
-        VIBESDK_BASE_URL: "https://vibe.test",
-        VIBESDK_BEHAVIOR_TYPE: "chaotic",
-      }),
-    ).toThrow("VIBESDK_BEHAVIOR_TYPE");
-  });
 });
 
 describe("vibesdk gateway createApp", () => {
@@ -316,7 +281,7 @@ describe("vibesdk gateway createApp", () => {
     expect(fake.attempts["build"]).toBe(1);
   });
 
-  test("retries a server error once before failing", async () => {
+  test("does not retry the non-idempotent build request on a server error", async () => {
     const fake = startFakeVibesdk({ buildStatus: 500 });
     const gateway = createGateway(fake);
 
@@ -324,7 +289,7 @@ describe("vibesdk gateway createApp", () => {
       gateway.createApp("Build a todo app"),
       API_ERROR_CODE.vibeAppUnavailable,
     );
-    expect(fake.attempts["build"]).toBe(2);
+    expect(fake.attempts["build"]).toBe(1);
   });
 
   test("surfaces an invalid platform api key", async () => {

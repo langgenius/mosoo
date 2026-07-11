@@ -29,7 +29,6 @@ export interface VibesdkGateway {
 export interface VibesdkGatewayBindings {
   VIBESDK_API_KEY?: string;
   VIBESDK_BASE_URL?: string;
-  VIBESDK_BEHAVIOR_TYPE?: string;
 }
 
 export interface VibesdkGatewayTimeouts {
@@ -45,14 +44,16 @@ const DEFAULT_TIMEOUTS: VibesdkGatewayTimeouts = {
   createMs: 75_000,
   generationStartedMs: 15_000,
 };
-const HTTP_RETRY = { enabled: true, initialDelayMs: 250, maxDelayMs: 1_000, maxRetries: 1 };
+// No SDK-level HTTP retry: POST /api/agent is not idempotent (a retry can
+// double-create), and reads are naturally retried by the console's poll.
+const HTTP_RETRY = { enabled: false };
 const WS_CONNECT_OPTIONS = {
   autoRequestConversationState: false,
   retry: { enabled: false },
 } as const;
 
-const VIBE_BEHAVIOR_TYPES = ["phasic", "agentic"] as const;
-type VibeBehaviorType = (typeof VIBE_BEHAVIOR_TYPES)[number];
+// The stable released VibeSDK generation mode.
+const VIBE_BEHAVIOR_TYPE = "phasic";
 
 function unavailableError(action: string, cause: unknown): Error {
   const detail = cause instanceof Error ? cause.message : String(cause);
@@ -89,53 +90,35 @@ function parseSnapshot(data: unknown): VibeAppSnapshot {
   };
 }
 
-function parseBehaviorType(value: string | undefined): VibeBehaviorType {
-  if (value === undefined || value.trim().length === 0) {
-    return "phasic";
-  }
-
-  if ((VIBE_BEHAVIOR_TYPES as readonly string[]).includes(value)) {
-    return value as VibeBehaviorType;
-  }
-
-  throw createApiError(
-    API_ERROR_CODE.vibeAppUnconfigured,
-    `VIBESDK_BEHAVIOR_TYPE must be one of ${VIBE_BEHAVIOR_TYPES.join(", ")}.`,
-  );
-}
-
 class SdkVibesdkGateway implements VibesdkGateway {
   private readonly client: VibeClient;
-  private readonly behaviorType: VibeBehaviorType;
   private readonly timeouts: VibesdkGatewayTimeouts;
 
-  constructor(
-    baseUrl: string,
-    apiKey: string,
-    behaviorType: VibeBehaviorType,
-    timeouts: VibesdkGatewayTimeouts,
-  ) {
-    this.behaviorType = behaviorType;
+  constructor(baseUrl: string, apiKey: string, timeouts: VibesdkGatewayTimeouts) {
     this.client = new VibeClient({ apiKey, baseUrl, retry: HTTP_RETRY });
     this.timeouts = timeouts;
   }
 
   async createApp(prompt: string): Promise<string> {
+    // A ref object, not a plain `let`: the assignment happens inside the
+    // withTimeout closure, and TypeScript narrows a captured `let` back to
+    // null in the catch block.
     const sessionRef: { current: BuildSession | null } = { current: null };
+    const buildPromise = (async () => {
+      const session = await this.client.build(prompt, {
+        autoConnect: false,
+        behaviorType: VIBE_BEHAVIOR_TYPE,
+      });
+      sessionRef.current = session;
+      await session.connect(WS_CONNECT_OPTIONS);
+      session.startGeneration();
+      await session.wait.generationStarted({ timeoutMs: this.timeouts.generationStartedMs });
+      return session.agentId;
+    })();
 
     try {
       return await withTimeout(
-        (async () => {
-          const session = await this.client.build(prompt, {
-            autoConnect: false,
-            behaviorType: this.behaviorType,
-          });
-          sessionRef.current = session;
-          await session.connect(WS_CONNECT_OPTIONS);
-          session.startGeneration();
-          await session.wait.generationStarted({ timeoutMs: this.timeouts.generationStartedMs });
-          return session.agentId;
-        })(),
+        buildPromise,
         this.timeouts.createMs,
         "VibeSDK build timed out before generation started.",
       );
@@ -144,6 +127,16 @@ class SdkVibesdkGateway implements VibesdkGateway {
 
       if (created !== null) {
         await this.client.apps.delete(created.agentId).catch(() => undefined);
+      } else {
+        // The blueprint drain has not returned yet, so the remote app id is
+        // unknown. Compensate when (if) the detached build resolves; if the
+        // isolate dies first the orphan is left for platform-side cleanup.
+        void buildPromise
+          .then(async (agentId) => {
+            sessionRef.current?.close();
+            await this.client.apps.delete(agentId);
+          })
+          .catch(() => undefined);
       }
 
       throw unavailableError("create", error);
@@ -239,6 +232,10 @@ class SdkVibesdkGateway implements VibesdkGateway {
   }
 }
 
+// Isolate-lifetime cache so repeated resolver calls reuse one SDK client and
+// its short-lived access token instead of re-exchanging the API key per poll.
+const gatewayCache = new Map<string, VibesdkGateway>();
+
 export function createVibesdkGateway(
   bindings: VibesdkGatewayBindings,
   timeouts: VibesdkGatewayTimeouts = DEFAULT_TIMEOUTS,
@@ -257,12 +254,16 @@ export function createVibesdkGateway(
     );
   }
 
-  return new SdkVibesdkGateway(
-    baseUrl,
-    apiKey,
-    parseBehaviorType(bindings.VIBESDK_BEHAVIOR_TYPE),
-    timeouts,
-  );
+  const cacheKey = `${baseUrl}\n${apiKey}\n${timeouts.commandAckMs}\n${timeouts.createMs}\n${timeouts.generationStartedMs}`;
+  const cached = gatewayCache.get(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
+  const gateway = new SdkVibesdkGateway(baseUrl, apiKey, timeouts);
+  gatewayCache.set(cacheKey, gateway);
+  return gateway;
 }
 
 export function requireVibesdkGateway(gateway: VibesdkGateway | null): VibesdkGateway {

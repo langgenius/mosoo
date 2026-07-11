@@ -572,7 +572,6 @@ CREATE TABLE `app_vibe_app` (
 	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
-	`owner_account_id` text CHECK ("owner_account_id" = upper("owner_account_id") AND length("owner_account_id") = 26 AND substr("owner_account_id", 1, 1) GLOB '[0-7]' AND "owner_account_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`updated_at` integer NOT NULL,
 	`vibe_app_id` text NOT NULL
 );

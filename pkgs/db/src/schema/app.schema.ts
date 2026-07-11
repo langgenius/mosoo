@@ -19,7 +19,6 @@ export const appVibeAppsTable = sqliteTable(
     appId: platformIdColumn<AppId>("app_id").notNull(),
     createdAt: integer("created_at").notNull(),
     id: platformIdColumn<AppVibeAppId>("id").primaryKey(),
-    ownerAccountId: platformIdColumn<AccountId>("owner_account_id").notNull(),
     updatedAt: integer("updated_at").notNull(),
     vibeAppId: text("vibe_app_id").notNull(),
   },

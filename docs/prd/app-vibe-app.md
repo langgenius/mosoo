@@ -69,7 +69,6 @@ Web console ── GraphQL ──> API Worker ── @cf-vibesdk/sdk ──> Vib
 
 - `id`
 - `app_id` (unique)
-- `owner_account_id`
 - `vibe_app_id` — the app/agent id on the VibeSDK instance
 - `created_at`
 - `updated_at`
@@ -109,7 +108,6 @@ API Worker bindings:
 - `VIBESDK_BASE_URL` — the VibeSDK instance origin.
 - `VIBESDK_API_KEY` (secret) — platform API key, exchanged by the SDK for
   short-lived JWTs.
-- `VIBESDK_BEHAVIOR_TYPE` (optional) — `phasic` (default) or `agentic`.
 
 Missing configuration fails the Vibe App surfaces loudly with
 `vibe_app_unconfigured`; nothing else in the product depends on it.
@@ -122,6 +120,12 @@ Missing configuration fails the Vibe App surfaces loudly with
 - `NOT_FOUND` — command called with no binding.
 - `VIBE_APP_UNAVAILABLE` — the VibeSDK instance rejected or failed a call; the
   message carries the upstream detail. Command mutations are safe to retry.
+
+Known bounded gaps: a create that fails before the blueprint stream returns
+compensates asynchronously (and can leave an orphan remote app if the isolate
+dies first), and the SDK can leak one WebSocket when a session closes during
+its ticket fetch — both are invisible to users and cleaned up by
+platform-side maintenance, not product state.
 
 ## Skip For Now
 
