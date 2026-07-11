@@ -1,692 +1,483 @@
 # Mosoo Spec
 
-Status: active product and engineering spec for the current MVP.
+Status: canonical target product contract for the next Mosoo launch. Implementation migration is in progress.
 
-This document defines the nouns, relationships, boundaries, and required behavior for the
-current Mosoo App pivot. It is not a vision, pitch, or strategy document. It should
-let a new engineer understand what to build without inferring product meaning from older
-Agent-first, Web-app-first, or Organization-governance language.
+This document defines what Mosoo is building, the boundaries it guarantees, and the launch acceptance contract. It supersedes older Agent-first, Thread-first, external-Web-artifact, Workspace, and Organization-governance language whenever they disagree. Existing code and older PRDs are evidence about the migration baseline, not authority over this product model.
 
-If this document conflicts with older PRDs, follow this document first, then
-`docs/prd/app-boundary.md`, then `docs/architecture.md`.
+This Spec is deliberately narrower than a general-purpose application platform. Exact API schemas, manifest fields, quotas, and internal topology belong in implementation contracts once the engineering proof obligations in this document have passed.
 
-## Design Principles
+## 1. Product Thesis
 
-1. App is the user-facing product boundary.
-2. App is the engineering name for the same boundary.
-3. App is the ownership and console boundary for Agents and resources, and may own one external Web Deployment.
-4. Organization is only the account, billing, tenant, and future-governance shell.
-5. App owns concrete App-local concepts directly; V1 does not introduce a generic
-   Service entity.
-6. App has no runtime. Runtime belongs to Agents or future explicitly named runtime
-   resources.
-7. Agent is the App-local unit that owns Agent runtime and delivery.
-8. Thread is the product name for an Agent Session in V1.
-9. App resources are owned at App scope; Agents bind the resources they need.
-10. V1 optimizes for delivery and reuse, not administration.
-11. Owner-only access is the default for V1.
-12. Future governance must not block the single-owner App loop.
+People can use local coding agents to create a runnable frontend quickly. The difficulty rises sharply when the App needs a backend, durable state, file storage, authentication, scheduled work, long-running agent execution, secrets, safe side effects, deployment, and recovery.
 
-## Core Concepts
+Mosoo serves Builders who have a runnable agentic-app prototype but do not want to become its DevOps, backend, and security team. The Builder continues authoring locally with Codex, Claude Code, OpenCode, or another compatible coding agent. Mosoo converts a repository that satisfies a strict contract into a hosted App that App Users can sign in to and use.
 
-### Account
+The product loop is:
 
-An Account is a human login identity.
+```text
+local coding agent + Mosoo Build Skill
+  -> Deployable Repo
+  -> local contract validation
+  -> Mosoo-managed build and Release
+  -> authenticated App Users
+  -> durable business state and Agent Workload Runs
+```
 
-An Account:
+Mosoo's wedge is not “Agent Cloud,” generic AI integration, cloud code generation, or arbitrary application hosting. It is the production path for a supported class of agentic Apps.
 
-- Authenticates with supported login methods.
-- Owns exactly one Organization during the V1 single-owner phase.
-- Is the execution owner for App resources created in that Organization.
+### Evidence status
 
-### Organization
+- Founder-built prototypes demonstrate that agentic business workflows and full-stack deployment create repeated operational work.
+- Existing hosting and coding-agent products solve parts of that path but leave the Builder responsible for integration, security, and lifecycle correctness.
+- Mosoo has not yet proved external adoption or willingness to pay. Production Alpha validates the product hypothesis; it is not evidence of product-market fit.
 
-An Organization is the tenant shell.
+## 2. Target User And Job
 
-An Organization:
+### Builder
 
-- Contains Apps.
-- Has one human owner in V1.
-- Owns billing rollups and future governance settings.
-- Must not be used as the default bucket for business resources.
+A Builder uses a local coding agent and Mosoo to create, own, and operate an App. The Builder may be an independent developer, operator, or small internal-tools team, but is not expected to be an infrastructure specialist.
 
-An Organization does not have V1 members, roles, invitations, access requests, ownership
-transfer, SAML, SCIM, domain discovery, or Organization-owned runtime resource pools.
+The Builder's job is:
+
+> Turn business-specific code that runs locally into a hosted agentic App without owning a custom deployment platform, agent runtime, auth service, durable job system, or security control plane.
+
+### App Owner
+
+The App Owner is the Builder responsible for the product offered to App Users. In the launch phase, one Mosoo Account owns an App. Team ownership, roles, invitations, and transfer are later extensions.
+
+### App User
+
+An App User uses the deployed App. App Users authenticate to that App, not to Mosoo, and should not need to know which agent runtime, model provider, or cloud service powers it.
+
+### Mosoo Account
+
+A Mosoo Account authenticates the Builder to the Mosoo control plane. It is never reused as an App User identity. An Organization may remain an internal billing or tenancy shell, but it is not the business-user model of deployed Apps.
+
+## 3. Design Principles
+
+1. **Local agents own authoring.** Mosoo does not compete for the programming conversation.
+2. **The repository owns the product.** Business logic, schema, Skills, and domain semantics live in the App repository.
+3. **The contract is strict.** Mosoo guarantees a narrow production profile, not best-effort deployment of arbitrary repositories or containers.
+4. **The App is the product boundary.** Web, backend, auth integration, state, the Agent Workload, and Releases belong to one App.
+5. **Agent execution is a capability, not an identity hierarchy.** An Agent Workload is part of an App; users do not first construct a separate cloud Agent resource.
+6. **One action has one path.** Buttons and schedules use the same Dispatch operation and produce the same Run record.
+7. **Durable state is explicit.** Database records and files outlive Sandboxes, processes, Runs, and Releases.
+8. **High-impact side effects are mediated.** Prompts and UI warnings are defense in depth, not the authorization boundary.
+9. **Production claims require recovery.** A runnable demo without isolation, backup, export, and rollback is not Production Alpha.
+10. **Delete before generalizing.** Launch excludes broad SaaS templates, provider matrices, infrastructure choices, and governance that do not prove the wedge.
+
+## 4. Canonical Product Model
+
+```text
+Builder / Mosoo Account
+└── App
+    ├── Deployable Repo
+    ├── App Auth Realm
+    ├── App-Owned State
+    │   ├── Database records
+    │   └── Durable files
+    ├── Agent Workload
+    │   ├── Trigger(s)
+    │   ├── Dispatch
+    │   ├── Workload Scope(s)
+    │   └── Run(s)
+    │       ├── Events
+    │       ├── Artifacts
+    │       └── Confirmation Gate(s)
+    └── Release(s)
+```
 
 ### App
 
-An App is the canonical product and engineering boundary.
+An App is the complete hosted software product used by App Users. It combines conventional web SaaS behavior with one agentic business workflow in Launch.
 
-An App:
+An App includes:
 
-- Belongs to one Organization.
-- Has one owner Account in V1.
-- Is what the user creates, opens, configures, and monitors.
-- Is a boundary for a real-world Agent application.
-- Organizes one or more App-local Agents.
-- Owns concrete resources that those Agents can bind.
-- Is the primary database, API, and test boundary.
-- Aggregates Threads, usage, health, logs, and expose state through its Agents and
-  resources.
-- May own one configured Deployment for a public GitHub repository.
-- Is the default console entry after onboarding when the Organization has one App.
+- frontend assets and backend request handling;
+- an isolated App Auth Realm;
+- App-Owned State in a durable database and file store;
+- App-scoped secrets and runtime bindings;
+- one Agent Workload declaration and its Skills;
+- immutable Releases and operational history.
 
-An App does not itself execute Agent runtime and does not become the deployed
-repository's runtime process. Its Deployment is a separately modeled,
-App-owned external Web artifact with its own Deployment Runs and public URL.
+An App is not a Mosoo resource folder, an external static artifact, a chat Agent, or a generic Service graph.
 
-### Agent
+### App-Owned State
 
-An Agent is an App-local execution and delivery unit.
+App-Owned State is the canonical end-user and business data whose schema and meaning belong to the App repository.
 
-An Agent:
+Mosoo provisions, protects, backs up, restores, and exports the storage. Mosoo does not promote the App's `Profile`, `Customer`, `Subscription`, `Role`, `Membership`, `Invoice`, or other business tables into shared control-plane entities.
 
-- Belongs to one App.
-- Has a runtime kind such as Pet or Cattle.
-- References one Environment.
-- May bind App-owned Skills, MCP servers, and Channels, and resolves App-owned
-  Provider credentials at runtime.
-- Owns runtime execution.
-- Owns API endpoint exposure when exposed.
-- Owns channel delivery when bound to a Channel.
-- Owns Threads/Sessions in V1.
+### Agent Workload
 
-"Agent Service" is discussion language for this same entity. It is not a separate V1
-entity, table, service layer, or product container.
+An Agent Workload is an App-defined business workflow that delegates open-ended work to Mosoo's managed production agent runtime. Launch supports exactly one Agent Workload per App; that Workload may compose multiple named Skills and accept multiple manual or scheduled Triggers through one Dispatch operation.
 
-An App can contain many Agents, but one Agent per App is expected to be common.
+An Agent Workload:
 
-### Generic Service Entity
+- is declared by the Deployable Repo;
+- uses a versioned Skill contract and explicit inputs;
+- may call deterministic App code and Mosoo-mediated capabilities;
+- has Triggers but only one Dispatch path;
+- records every execution as a durable Run;
+- does not require the Builder to implement a custom agent loop.
 
-V1 does not have a generic Service domain entity.
+A chat experience may be built by an App, but Thread or chat is not Mosoo's universal workload model.
 
-Rules:
+### Trigger And Dispatch
 
-- Do not add a unified `services` table.
-- Do not model App resources through a polymorphic `service.kind`.
-- Do not create generic Service CRUD as the primary API for Agents, Channels, Files,
-  Environments, Skills, MCP servers, or Provider credentials.
-- Console copy may group concrete resources under "Services" or "Resources" for scanning,
-  but that grouping must not become a database, API, permission, or lifecycle boundary.
-- If a future resource shares a deployment/runtime lifecycle, such as Web/API runtime,
-  database service, scheduled job, or worker process, model it with an explicit noun and
-  add a dedicated contract for its lifecycle.
-- API-layer names such as File Service or Environment Service are implementation modules
-  and do not imply a generic Service domain entity.
+A Trigger is an App-defined reason to request an Agent Workload execution. Launch supports manual and scheduled Triggers.
 
-### Deployment
+Dispatch is the single operation through which every Trigger starts the Workload. A button may supply prompt-like input and a schedule may supply generated input, but they must not call separate business implementations.
 
-A Deployment is the App-owned external Web artifact produced from a public
-GitHub repository.
+Dispatch:
 
-A Deployment:
+- validates App identity, Workload, input, Workload Scope, and idempotency key;
+- returns a `runId` without holding the request open for completion;
+- creates exactly one canonical Run for an accepted request;
+- records the Trigger source without changing execution semantics.
 
-- Belongs to one App; the current product supports zero or one active
-  Deployment per App.
-- Uses Mosoo-managed Cloudflare infrastructure and produces a Mosoo-owned public
-  URL after a successful Deployment Run.
-- Is operated from the App Overview, including first deploy, redeploy, status,
-  run history, live URL, and delete.
-- May bind published Agents through deploy-time capability URLs declared in
-  `.mosoo.toml`.
-- Is not Agent runtime, an Agent Deployment Version, an App-level API endpoint,
-  or a generic Service runtime.
+The idempotency key is scoped to the App and Workload. Repeating a key with identical normalized input returns the original `runId`; reusing it with different input fails as a conflict. A scheduled occurrence has one stable key so delivery retries cannot create duplicate Runs.
 
-A Deployment Run is one asynchronous attempt to build and deploy the pinned
-repository commit for a Deployment.
+### Run
 
-### Thread
+A Run is the durable record of one Dispatch execution. It is not an HTTP request, process, chat Thread, or transient Sandbox.
 
-A Thread is the user-facing name for an Agent Session.
+A Run records:
 
-A Thread:
+- lifecycle state and timestamps;
+- immutable input references and Workload version;
+- an append-only, monotonically ordered event stream;
+- logs suitable for App User progress and Builder diagnosis;
+- artifacts and staged state changes;
+- cancellation, failure, retry, confirmation, and final outcome;
+- model usage and resource usage for App-level metering.
 
-- Is created against one Agent in V1.
-- Is shown in the App console as part of the App's aggregated interaction history.
-- Can be created from Mosoo WebUI, Public Thread API, or channel delivery.
-- Is the replayable product record of an Agent interaction.
+SSE clients can disconnect and reconnect from a cursor without cancelling the Run. Cancellation is explicit and durable. Retries preserve the original Run's causal history rather than fabricating an unrelated chat session.
 
-V1 does not have an App-level multi-Agent Thread entity. A future orchestration layer may
-allow one Thread to target multiple Agents, but that is not the current model.
+### Workload Scope
 
-### Session
+A Workload Scope is an App-defined identity boundary for durable file state shared by related Runs. The repository derives a stable `scopeKey` from business identity such as an App User, customer, engagement, or another domain record.
 
-A Session is the implementation and runtime boundary behind a Thread.
+Mosoo treats `scopeKey` as opaque:
 
-A Session:
+- state cannot cross Workload Scopes;
+- state commits for the same Workload Scope are serialized;
+- every commit compares the Run's recorded base version with the current scope version;
+- a stale commit retries from current state or fails visibly and never overwrites newer state;
+- business meaning remains in the App repository;
+- a global App workspace and a platform-mandated per-user tree are both invalid defaults.
 
-- Belongs to one Agent in V1.
-- Inherits App through that Agent.
-- Stores conversation history, runtime events, files attached to the Session, and run
-  state.
-- Freezes the Agent execution snapshot when it is created.
+### Protected Action And Confirmation Gate
 
-When product copy says Thread, code and database may still say Session.
+A Protected Action is a declared high-impact side effect, such as sending messages, transferring value, deleting durable data, or publishing externally.
 
-### Session Run
+A Confirmation Gate is Mosoo-enforced authorization for a Protected Action. The Run must first persist the exact action, normalized input, and digest. An authorized App User may then grant a one-time confirmation bound to that Run and intent.
 
-A Session Run is one execution attempt inside a Session.
+Mosoo executes the capability only after confirmation and records the outcome. Retries must use downstream idempotency where available; ambiguous external outcomes fail closed for reconciliation rather than blindly repeating the action.
 
-A Session Run:
+This guarantee applies only to Mosoo-mediated capabilities. The Mosoo Contract rejects a high-impact credential or capability unless it is classified as a Protected Action and bound to a mediated executor. Credentials capable of performing a Protected Action must not be exposed to arbitrary shell commands or unrestricted network access that could bypass the Gate. Prompt refusal clauses and confirmation dialogs remain defense in depth only.
 
-- Belongs to one Session.
-- Records the Agent, deployment version, runtime, provider, model, trigger, status,
-  events, and usage for that execution.
-- Is the right place to track retries, failures, interrupts, and run-level attribution.
+### Release
 
-### Environment
+A Release is an immutable, content-addressed version of the complete App. It includes code, frontend assets, declared runtime bindings, the Workload contract, and the migration intent required to activate that version.
 
-An Environment is an App-local runtime template.
+A Release is not a source commit alone, a mutable deployment, or an external frontend artifact detached from the App backend and Agent Workload.
 
-An Environment:
+## 5. Mosoo Contract And Deployable Repo
 
-- Belongs to one App.
-- Defines packages, setup script, environment variables, network policy, and allowed hosts.
-- Has immutable revisions.
-- Is frozen into a Session execution snapshot when a Session starts.
-- Can be selected by one or more Agents.
+### Supported launch profile
 
-Current enforcement is partial: Runtime installs declared packages through the
-generated setup script, runs the custom setup script, and injects environment
-variables. Network policy, allowed hosts, and the MCP / package-manager allow
-flags are persisted and frozen intent only; they are not currently carried into
-Runtime enforcement and must not be treated as a security boundary.
+Launch accepts one Mosoo-supported Cloudflare application profile:
 
-Organization default environments and admin compliance overrides are migration or future
-governance concepts.
+- TypeScript application code;
+- static frontend assets plus a Worker-compatible backend;
+- Mosoo-provisioned application database and object storage;
+- Mosoo Auth integration;
+- declared secrets and resource bindings;
+- one declared Agent Workload with its Skills, Triggers, Workload Scope rules, and Protected Actions;
+- deterministic dependency installation, validation, build, and migration commands.
 
-### Files
+The exact manifest and schema are versioned implementation contracts. Unknown fields fail explicitly or follow a documented forward-compatibility rule; they must not silently change production behavior.
 
-Files is the current App-level read surface over file records plus the shipped
-session-scoped attachment/artifact flows. Existing Space naming is pre-launch
-legacy and should be removed rather than preserved as a compatibility layer.
+Launch does not promise arbitrary Node servers, Dockerfiles, operating-system packages, cloud resources, runtime frameworks, or repositories that have not been adapted to the Mosoo Contract. The local coding agent is expected to perform that adaptation before deployment.
 
-Files:
+### Repository ownership
 
-- Belongs to the current App access boundary.
-- Stores file objects and metadata for shipped Session and internal flows.
-- Supports session-scoped attachments/artifacts. The schema and service contain
-  an App `library` scope and versioning primitives, but no current user-facing
-  library create/upload mutation or button; the Files page is list/download only.
-- Does not promote runtime artifacts into the dormant App library scope.
-- Is not the product model for generated application source trees, deployable projects, or App asset publishing.
+The Deployable Repo is the source of truth for:
 
-Deployment source remains in the bound public GitHub repository. Files does not
-become a generated source tree or deployment artifact store.
+- frontend and backend business behavior;
+- database schema and forward-compatible migrations;
+- business authorization and Profile semantics;
+- Skills and deterministic helper code;
+- Workload inputs, outputs, Triggers, and scope derivation;
+- Protected Action declarations;
+- required secret names and external integrations;
+- health and acceptance behavior.
 
-### Skill
+Secrets, production data, runtime tokens, and environment-specific resource identifiers must not be committed to the repository.
 
-A Skill is an App-local capability package that can be attached to an Agent.
+### Local authoring flow
 
-A Skill:
+1. The Builder describes the business and current code to a local coding agent.
+2. The agent uses the Mosoo Build Skill and CLI contract to create or adapt the repository.
+3. Local validation reports deterministic, actionable contract failures.
+4. The Builder supplies App-scoped secrets through Mosoo, not source control.
+5. Deployment submits a content-addressed source bundle; a public GitHub repository is optional provenance, not a prerequisite.
 
-- Belongs to one App.
-- Has metadata and package content.
-- Can be selected by one or more Agents.
-- Is resolved at Agent or Session execution time according to Agent bindings.
+Mosoo does not host the coding conversation, pay for local coding-agent usage, or mutate the repository through an opaque cloud builder.
 
-Org-wide skill libraries, coworker sharing, and per-user skill toggles are not V1 concepts.
+## 6. Hosted Infrastructure Boundary
 
-### MCP Server
+Mosoo owns and operates the first production infrastructure profile on Cloudflare. Bring-your-own-cloud is not a launch option.
 
-An MCP Server is an App-local tool connector definition.
+The App Owner retains ownership and migration rights over:
 
-An MCP Server:
+- source code;
+- App authentication-identity export;
+- database records and schema;
+- durable files;
+- Workload and Skill definitions.
 
-- Belongs to one App.
-- Has a URL, auth shape, metadata, and credential policy.
-- Can be bound to one or more Agents.
-- Resolves credentials at runtime from App-owned secrets.
+Mosoo must provide raw, documented exports rather than a platform-only backup format. Hosted infrastructure is an operating model, not ownership of the App's business data.
 
-Organization-shared MCP servers and service-account governance are future concepts.
+### Deployment Kernel
 
-### Provider Credential
+The Deployment Kernel:
 
-A Provider Credential is an App-owned model or runtime provider secret.
+1. validates the Mosoo Contract;
+2. installs and builds in an isolated Sandbox;
+3. produces Worker modules and frontend assets;
+4. provisions or binds the declared App resources;
+5. applies only reviewed, expand-only migrations that remain compatible with both the active and candidate Releases;
+6. runs candidate health and contract checks while verifying that the active Release remains compatible;
+7. publishes into Mosoo's Workers for Platforms data plane;
+8. activates the new Release only after all activation gates pass.
 
-A Provider Credential:
+The Deployment Kernel takes only the deployment-layer scope demonstrated by VibeSDK: isolated builds, Worker bundling, asset publication, and Workers for Platforms dispatch. VibeSDK's prompt-to-app experience, hosted coding agent, template catalog, Think/Space product model, and single-Durable-Object application model are not Mosoo product dependencies.
 
-- Belongs to one App.
-- Is stored through the secret vault.
-- Can be referenced by one or more Agents.
-- Is resolved for the Agent execution owner.
+### Release And Rollback
 
-Company credential pools, per-member BYOK, and org-wide provider administration are not V1
-concepts.
+- Releases are immutable and addressed by content hash.
+- A failed build, migration, or health gate never replaces the active Release. Any migration already applied before failure remains safe for the active Release because pre-activation migrations are expand-only and backward-compatible.
+- Code rollback activates the most recent compatible Release without deleting App-Owned State.
+- Applied production migrations are append-only and are not reversed automatically.
+- A Release that cannot run against the current data schema is not rollback-compatible.
+- Contract or destructive schema cleanup is outside the Launch deployment lane and cannot occur while an older Release may be activated.
+- Code rollback does not reverse external business side effects already completed by a Run.
 
-### Channel
+## 7. App Authentication
 
-A Channel is an App-owned external delivery resource, such as Slack, Lark, Discord,
-Telegram, WeChat, or another messaging surface.
+Every App has an isolated, App-branded Auth Realm operated by Mosoo. App Users authenticate to the App and do not see or receive a Mosoo Account.
 
-A Channel:
+Mosoo follows a Supabase-style responsibility boundary:
 
-- Belongs to one App.
-- Stores provider identity, credentials, connection state, and provider metadata.
-- Its current provider/tenant/bot connection binds exactly one Agent. Reassignment removes or
-  replaces that binding; one external Channel connection is not shared by multiple Agents.
-- Does not create a generic Interface entity in V1.
+- Mosoo provides Auth APIs and an SDK;
+- Mosoo stores authentication identities and verification state;
+- Mosoo issues, verifies, refreshes, and revokes sessions;
+- the App renders its own login and account experience;
+- the App repository owns Profile, tenant, role, membership, entitlement, and business authorization records.
 
-An Agent's channel binding or delivery exposes that Agent through a Channel.
+Launch supports email OTP only. Password auth, social login, App User OAuth connections, enterprise SSO, SAML, SCIM, MFA, and shared cross-App identity are later extensions.
 
-### Agent API Endpoint
+Authentication identities are isolated per App and included in the App Owner's migration/export path. Identity export includes stable subject identifiers, verified contact identifiers, and lifecycle timestamps; it excludes active sessions, refresh tokens, OTP values, verification challenges, signing keys, and other authentication secrets.
 
-An Agent API Endpoint is an Agent-owned public access surface.
+## 8. Agent Runtime And Credentials
 
-An Agent API Endpoint:
+Local authoring may use Codex, Claude Code, OpenCode, or another coding agent. Production execution is a separate concern.
 
-- Belongs to one Agent.
-- Creates or continues Threads/Sessions for that Agent.
-- Uses App-owned credentials, usage rollups, and operations visibility.
+Launch supports one pinned, Mosoo-managed production agent runtime profile backed by an existing agent SDK or CLI contract. Mosoo manages:
 
-There is no V1 App-level API endpoint.
-
-### Agent Exposure
-
-Agent Exposure is the act of making an Agent callable through an API endpoint or Channel.
-
-Agent Exposure:
-
-- Belongs to one Agent.
-- May create a stable endpoint, token, channel delivery route, or published Agent version.
-- Is summarized by the App but not owned by an App runtime.
-
-Publishing an Agent and deploying an App are separate actions. Agent publishing creates the live
-Agent version used by future Threads. App Deployment publishes an external Web artifact and does
-not create Agent runtime or an App-level API endpoint.
-
-## Relationships
-
-```text
-Account
-+-- Organization
-    +-- App
-        +-- Agents
-        |   +-- Threads / Sessions
-        |   |   +-- Session Runs
-        |   +-- Agent API Endpoint exposure
-        |   +-- Channel delivery bindings
-        +-- Files
-        +-- Environments
-        +-- Skills
-        +-- MCP Servers
-        +-- Provider Credentials
-        +-- Channels
-        +-- Gateways / exposure surfaces
-        +-- Deployment
-        |   +-- Deployment Runs
-        |   +-- Mosoo-owned public URL
-        +-- Operations
-        |   +-- usage
-        |   +-- Agent logs
-        |   +-- Deployment activity
-```
-
-Rules:
-
-- Organization owns Apps, not App resources directly.
-- App is the product, database, API, and console boundary.
-- App owns business resources, Deployment, and operations scope.
-- App has no runtime.
-- Agents own Agent runtime, endpoint exposure, channel delivery, and Threads/Sessions in V1.
-- Thread is a product name for Agent Session in V1.
-- Usage has App as the business dimension and Organization as the billing rollup.
-- V1 has no unified `services` table or generic Service lifecycle.
-
-## V1 Goals
-
-V1 must support:
-
-- A personal developer signs in.
-- The system creates or selects the developer's Organization shell.
-- The system creates a default App.
-- The user can start from a blank App.
-- The user can create or configure one or more concrete App resources.
-- The user can create or configure one or more Agents when the App needs runtime.
-- The Agent can reference an Environment.
-- The Agent can use App-local Provider credentials.
-- The Agent can bind App-local Skills, MCP servers, and Channels when configured.
-- The user can create Threads for an Agent from Mosoo WebUI.
-- The user can expose an Agent through an API endpoint.
-- The system can map channel external threads to Agent Sessions when Channel delivery is
-  configured.
-- The user can inspect App-scoped Agents, configuration resources, Runs / Threads, App usage,
-  Agent logs, and Agent exposure state.
-- The user can configure, run, inspect, redeploy, and delete one App-owned Deployment from App
-  Overview.
-
-## Non Goals
-
-V1 must not include:
-
-- App members.
-- App roles.
-- Organization member management.
-- Role matrices.
-- Member invitations.
-- Access requests.
-- Enterprise domain discovery.
-- SAML, SCIM, or enterprise SSO.
-- Ownership transfer.
-- Asset takeover.
-- Org-wide resource catalogs.
-- Cross-account resource views.
-- Agent external-access management.
-- Files Library cross-account sharing or external-access management.
-- Skill external-access management.
-- Org-level MCP governance.
-- Company credential pools.
-- Per-member BYOK.
-- Cross-member cost reporting.
-- Audit logs.
-- `app.type` as runtime, access, or ownership driver.
-- A required single Agent type picker as the App creation path.
-- Persistence-layer limits driven by App type or Agent type.
-- Generic `services` table, polymorphic `service.kind`, or generic Service CRUD.
-- Multi-resource graphs as the default burden for simple Apps.
-- Generic Interface entity.
-- App runtime.
-- App router runtime.
-- App-level API endpoint.
-- Supabase-style App database tables.
-- Multi-channel delivery as the main path.
-- App-level multi-Agent Threads.
-
-## Required Behaviors
-
-### Onboarding
-
-1. User signs in.
-2. If the Account has no Organization, create one Organization shell.
-3. If the Organization has no App, create one default App.
-4. If the Organization has exactly one App, route directly to that App.
-5. Do not show join organization, invite acceptance, request access, or domain discovery in
-   the V1 path.
-
-### Create App
-
-1. User chooses New App.
-2. System creates an App.
-3. Console displays it as an App.
-4. The App exposes scoped surfaces for Agents, Files, Environments, Skills, MCP
-   servers, Provider credentials, Channels, and operations; it does not
-   fabricate one instance of every resource.
-5. App creation alone does not bind a GitHub repository, start a Deployment, create Agent
-   runtime, create an App-level API endpoint, or create application database tables.
-
-### Configure App Resources
-
-1. User creates or edits a concrete resource inside an App.
-2. The resource type determines which configuration is relevant.
-3. Agents choose runtime kind, model/provider, prompt/config, Environment, and
-   optional resource bindings.
-4. System validates required Provider credentials and Environment readiness for Agents.
-5. Non-runtime resources do not gain runtime because they are listed beside Agents.
-
-### Run Thread
-
-1. User starts a Thread for one Agent.
-2. System creates a Session for that Agent.
-3. Session inherits App through the Agent.
-4. Runtime freezes Environment revision, Provider/model references, Skill
-   bindings, MCP bindings, and Channel metadata when applicable.
-5. Each user turn materializes only ready attachment ids explicitly submitted
-   with that message. Other Thread files remain linked and readable through the
-   file surfaces but are not automatically injected into every turn. Thread
-   files are not an Agent DeploymentVersion binding.
-6. Runtime events stream back to the Thread.
-7. App aggregates the Thread in App-level history and operations views.
-
-### Expose Agent API
-
-1. User exposes one Agent through an API endpoint.
-2. System validates Agent readiness, required credentials, Environment readiness, and endpoint
-   access settings.
-3. External API calls create or continue Threads/Sessions for that Agent.
-4. Usage and operations roll up to the App.
-
-### Deliver Agent Through Channel
-
-1. User configures a Channel at App scope.
-2. User binds one Agent to that Channel.
-3. External channel thread IDs map to Agent Sessions.
-4. Channel delivery creates or continues Threads/Sessions for that Agent.
-5. Usage and operations roll up to the App.
-
-### Deploy App
-
-1. User configures a public GitHub repository from App Overview.
-2. `deployApp` validates the source, creates or reuses the App Deployment, records a queued
-   Deployment Run, and dispatches asynchronous build/deploy work.
-3. The worker builds in an isolated Sandbox and publishes the external Web artifact with
-   Mosoo-managed Cloudflare credentials.
-4. App Overview shows deployment status, run activity, source, live URL, retry, redeploy, and
-   delete actions according to the current Deployment state. Delete confirmation includes the
-   number of bound Agents; the current Web surface does not render their names or env mappings.
-5. Deployment remains separate from Agent runtime, Agent Deployment Versions, and Agent API
-   Endpoint exposure.
-
-### App Operations
-
-1. Runtime emits normalized model usage.
-2. Cost service writes usage events with App as the primary business dimension.
-3. Organization is retained as a billing rollup.
-4. App Settings shows spend, request count, token/cache usage, daily spend, Agent attribution,
-   and model/pricing breakdown. Recent usage rows are available in each Agent's Cost tab.
-5. Agent detail owns Agent logs and runtime operations; App Overview owns Deployment activity.
-6. V1 does not show per-user drilldown.
-
-### App Overview API
-
-The App Overview API is the shared upstream surface for Web UI and generated CLI control-plane
-summaries. It must not be a CLI-only facade. `appOverview` serves one App's console overview;
-`controlPlaneOverview` serves current-user list flows such as generated CLI `ls` by returning
-limited Apps with nested App overview summaries.
-
-Rules:
-
-- App-scoped overview requires App owner proof; current-user control-plane overview resolves the
-  viewer's active Organization and applies the same App owner checks to each returned App.
-- The first cut returns App identity, a limited Agent summary page, and a limited Provider
-  credential metadata summary.
-- Agent summary fields include stable runtime selection fields (`runtimeId`, `provider`, `model`)
-  plus status and update time.
-- Provider credential overview returns metadata and counts only. It does not expose plaintext
-  secrets, masked keys, or custom endpoint URLs.
-- Limit arguments are bounded so generated clients can use one stable selection set without
-  accidentally expanding into an unbounded dashboard export.
-- Future Overview expansion should add explicit subobjects for usage, health, logs, exposure, and
-  resources rather than introducing a generic Service entity.
-
-### Agent Run Workflow API
-
-The Agent Run Workflow API is the shared upstream surface for Web UI and generated CLI run flows.
-It must not be implemented as a CLI-only facade over lower-level Thread commands. `startAgentRun`
-starts the shortest first-party workflow: create a Thread when needed, append one user prompt, and
-queue the resulting Run.
-
-GraphQL contract:
-
-```graphql
-mutation StartAgentRun($input: StartAgentRunInput!) {
-  startAgentRun(input: $input) {
-    acceptedAt
-    createdSession
-    session {
-      id
-      appId
-      agentId
-      status
-      title
-      lastRun {
-        id
-        status
-        trigger
-      }
-    }
-    run {
-      id
-      status
-      trigger
-    }
-    eventSurface {
-      appId
-      sessionId
-      graphqlUrl
-      retrieveOperation
-      processEventsOperation
-      messagesOperation
-      streamUrl
-      suggestedPollIntervalMs
-    }
-    eventBatch {
-      acceptedAt
-      events {
-        type
-        clientRequestId
-        run {
-          id
-          status
-        }
-      }
-      warnings {
-        code
-        message
-      }
-    }
-  }
-}
-```
-
-Input rules:
-
-- `appId` and `prompt` are required.
-- `agentId` is required when `sessionId` is omitted. This creates a new Thread with session type
-  `ui` by default, then queues a user-message Run.
-- `sessionId` continues an existing Thread. If `agentId` is also supplied, it must match the
-  Thread's bound Agent before any Run is queued.
-- `clientRequestId` is passed to the queued user-message event for generated client correlation.
-- `type` and `waitForRuntimeReady` intentionally mirror `createAgentSession`; readiness wait remains
-  limited by the existing Session creation rules.
-
-Rules:
-
-- The mutation reuses existing GraphQL authenticated Session services for App ownership, participant
-  access, action capabilities, audit attribution, runtime queueing, warnings, and GraphQL error
-  envelopes.
-- The response returns the canonical `Session`, `SessionRun`, and `AgentSessionEventBatch` shapes
-  instead of a private CLI DTO.
-- `eventSurface` gives generated clients stable identifiers and operation names for follow-up reads:
-  `threadAgentSessionRetrieve`, `threadSessionProcessEvents`, and `threadSessionMessages`.
-- `streamUrl` is nullable in V1 because the only current stream URL is the Personal Access Token
-  Public Thread API. First-party streaming can be added later by filling this field without changing
-  the mutation input.
-- The mutation returns after the Run is queued. It does not hold the GraphQL request open for model
-  output; generated clients should poll `threadSessionProcessEvents` using the returned `appId` and
-  `sessionId` unless a first-party stream URL is later provided.
-
-## Access Rules
-
-- The Organization owner can access all Apps in that Organization.
-- The App owner is the Organization owner in V1.
-- Access checks are App owner checks.
-- Legacy tenant/account rows must not be used to infer product-resource access.
-- Code must not add admin/member branches for V1 behavior.
-
-## Console IA
-
-V1 console shape:
-
-```text
-Apps
-+-- App
-    +-- Overview
-    |   +-- Deployment install / status / activity
-    +-- Runs (/threads)
-    +-- Agents
-    +-- Config
-    |   +-- Skills
-    |   +-- MCP
-    |   +-- Providers
-    |   +-- Environments
-    +-- Settings
-        +-- General
-        +-- App usage
-```
-
-Rules:
-
-- A one-App Organization routes directly to App Overview.
-- Apps list exists for creating or switching Apps, not as a blocking first screen.
-- Members does not appear in V1 navigation.
-- Organization settings stay thin.
-- Agents is where users inspect App-local runtime/delivery units.
-- Config groups Skills, MCP servers, Providers, and Environments.
-- Channel configuration remains on the Agent surface rather than a top-level navigation item.
-- App Overview owns the current Deployment install, status, activity, live URL, and delete
-  experience; `/deployments` redirects to Overview.
-- App usage lives under App Settings; Agent logs live on Agent detail.
-- Agent detail is where runtime, endpoint exposure, channel delivery, and Thread creation
-  happen.
-- The current sidebar label is Runs while the route and underlying product records remain
-  `/threads` and Thread / Session.
-
-## Migration Rules
-
-- When older docs say Organization-owned resource, read it as App-owned unless it is
-  explicitly about billing or future governance.
-- When older docs say Workspace or Team, do not introduce those nouns.
-- When older docs say Agent Service, read it as the existing Agent identity, not as a second
-  Agent table or a separate App boundary.
-- When older docs introduce a generic App-local Service capability/resource entity, treat that
-  as historical wording. New work should model concrete resources directly.
-- When older docs say Publish App, App API, Web shell, or public preview URL, distinguish the
-  shipped App Deployment resource from Agent runtime and App-level API semantics. Use
-  [`app-deployment.md`](./prd/app-deployment.md) for Deployment behavior.
-- When older docs say App owns delivery surface, read it as App aggregates Agent exposure and
-  operations; Agent owns endpoint and channel delivery in V1.
-- When older docs ask users to choose one Agent type as the App creation path, treat the choice
-  as an Agent setting rather than an App type.
-- When older docs mention cross-account collaboration, org-wide resource catalogs,
-  member role matrices, invitations, or access requests, treat it as future governance.
-- Old governance tables should be deleted once runtime dependencies no longer need them;
-  new App paths must fail closed instead of deriving access from historical records.
-
-## Implemented Baseline
-
-1. App ID, contracts, database tables, GraphQL surface, and default provisioning are in place.
-2. Agents and concrete resources use App ownership and fail closed when App proof is missing.
-3. Thread remains the product record backed by an Agent Session and inherits App through Agent.
-4. Environment, Provider credentials, MCP servers, Skills, Files, and Channels are App-scoped.
-5. Agent API Endpoint exposure and Channel delivery remain Agent-owned.
-6. App Overview is the console root and embeds the Deployment install/status/history/delete
-   experience.
-7. App usage is available under App Settings; Agent operational detail remains on Agent pages.
-8. Public Members, role matrices, invitations, access requests, and old governance surfaces are
-   absent from the V1 path.
-
-## Acceptance Checklist
-
-An implementation is aligned with this Spec when:
-
-- A new user reaches a default App without seeing team or member flows.
-- App Overview is the first screen for a one-App Organization.
-- Creating an Agent requires an App context.
-- Creating concrete resources requires an App context.
-- There is no generic `services` table, `service.kind`, or generic Service CRUD.
-- App creation alone does not start a Deployment, create Agent runtime, create an App-level API
-  endpoint, or create application database tables.
-- Thread creation targets one Agent and creates a Session.
-- App aggregates Threads from its Agents.
-- Session Run is the execution record inside a Session.
-- Provider credentials and default Environment resolve through App.
-- Skills, MCP servers, and Channels are App-owned resources that Agents bind.
-  Thread files follow Session scope; the reserved App library scope is not yet a
-  shipped user-managed write surface.
-- Agent exposure owns API endpoint and channel delivery.
-- App Deployment produces an external Web artifact and Mosoo-owned URL without becoming Agent
-  runtime or an App-level API endpoint.
-- App Overview exposes current Deployment state and actions; App usage and Agent logs remain on
-  their implemented settings/detail surfaces.
-- Organization remains present only as tenant, billing rollup, and future governance shell.
-- No new V1 code introduces App members, role matrices, invitations, or access requests.
+- runtime provisioning and isolation;
+- Dispatch and Run lifecycle;
+- Skill and capability injection;
+- cancellation, timeouts, and hard budgets;
+- usage metering and operational diagnostics.
+
+When configuring production deployment through the Mosoo Build Skill and CLI, the Builder binds bring-your-own model credentials to Mosoo as App-scoped secrets. Those credentials are supplied by the Builder, never by App Users. Credentials and costs for the Builder's local coding agent remain outside Mosoo, and Mosoo does not fund or resell production model tokens in Launch.
+
+There is no production runtime chooser or multi-provider compatibility promise in Launch.
+
+## 9. Durable State And Files
+
+App database state, durable files, Run history, and Sandbox files are different layers.
+
+- **Application database** stores canonical structured business records.
+- **Durable file storage** stores canonical App files and versioned Workload Scope state.
+- **Run ledger** stores Run lifecycle, events, artifacts, and confirmation records.
+- **Sandbox filesystem** is temporary execution state and must never be the only copy of business data.
+
+Agent output enters a staging area. It becomes canonical state only through an explicit, atomic compare-and-swap commit against the Workload Scope's recorded base version. A crash before commit must leave the previous canonical state readable; a stale base version must retry from current state or fail visibly instead of overwriting it.
+
+Restarting a Worker, Sandbox, or runtime process must not erase App-Owned State or make a completed Run disappear.
+
+## 10. Required Product Flows
+
+### Build And deploy
+
+1. Builder opens an existing repository with a local coding agent.
+2. The Mosoo Build Skill makes the contract and validation failures available to the agent.
+3. The repository passes local validation.
+4. Builder binds required App secrets and requests deployment.
+5. Mosoo builds, provisions, migrates, validates, and creates an immutable Release.
+6. Mosoo activates the Release at a Mosoo-managed URL.
+7. A failed step shows a concrete failure and leaves the previous Release active.
+
+### App User login
+
+1. App User visits the App URL.
+2. The App presents its own email OTP experience.
+3. Mosoo Auth verifies the identity and supplies a trusted App-scoped subject.
+4. The App resolves its own Profile and business authorization.
+5. The App User never enters the Mosoo control plane.
+
+### Manual And scheduled execution
+
+1. A button or schedule creates a Trigger with Workload input and `scopeKey`.
+2. Both call the same Dispatch operation.
+3. Dispatch returns a `runId` and persists the Run.
+4. The Run emits replayable events and artifacts.
+5. The App can reconnect to SSE by cursor until the Run reaches a terminal or waiting state.
+
+### Protected Action
+
+1. A Run prepares a declared Protected Action.
+2. Mosoo persists the exact intent and pauses the action.
+3. The App shows the action to an authorized App User.
+4. The App User confirms that exact intent once.
+5. Mosoo executes through the mediated capability and records a receipt or ambiguous outcome.
+6. A retry cannot silently perform the side effect again.
+
+### Recovery
+
+1. A Release or runtime failure does not delete App-Owned State.
+2. Builder can inspect the failed Release and Run history.
+3. Builder can reactivate a compatible prior Release.
+4. Mosoo can restore App authentication identities, database state, and durable files from backup in a tested procedure.
+5. App Owner can export the same categories in documented raw formats.
+
+## 11. Security And Isolation Invariants
+
+- Mosoo Account identity, App User identity, and model-provider credentials are separate domains.
+- Every data access proves App identity before applying business scope.
+- Auth subjects and sessions cannot cross Apps automatically.
+- App database and file resources are isolated from other Apps.
+- Workload Scope state cannot cross `scopeKey` boundaries.
+- Same-scope state commits use version preconditions and cannot overwrite a newer commit.
+- Secrets are encrypted at rest, excluded from logs and artifacts, and injected with least privilege.
+- Protected Action credentials are available only to the mediated capability that enforces its Confirmation Gate.
+- Arbitrary network and shell access cannot be treated as compatible with a Protected Action guarantee.
+- Dispatch, confirmation, cancellation, retry, and Release activation are auditable state changes.
+- Unsupported configuration fails closed; saved-but-unenforced security intent is not a production boundary.
+- Resource, concurrency, duration, storage, model-usage, and egress limits are hard and visible to the Builder.
+
+## 12. Production Alpha Contract
+
+Mosoo may call an App **Production Alpha** only when all required gates pass.
+
+### Required gates
+
+- strict Mosoo Contract validation;
+- isolated, reproducible build;
+- App-scoped email OTP authentication;
+- durable database records and files across restarts;
+- encrypted, least-privilege secret injection;
+- manual and scheduled Triggers sharing one Dispatch path;
+- durable Run records, replayable events, SSE reconnection, and cancellation;
+- serialized, version-checked Workload Scope commits;
+- Mosoo-enforced Confirmation Gates for declared Protected Actions;
+- immutable Release activation and compatible code rollback;
+- encrypted automatic backups on a published schedule and an additional restore point immediately before each production migration, with retention derived from recovery proof rather than guessed;
+- a restore drill completed before the first Production Alpha Release and after any change to the Auth, database, file, backup, or restore path, with measured recovery-point and recovery-time objectives published as product limits;
+- raw export of App authentication identities, database data, and files in documented non-proprietary formats, with a manifest and checksums; authentication secrets, OTPs, and live sessions are excluded;
+- explicit hard resource and cost limits;
+- actionable failure states rather than silent fallback.
+
+### Explicitly not promised
+
+- uptime or support SLA;
+- compliance certification;
+- zero-downtime for every migration;
+- automatic reversal of completed business side effects;
+- arbitrary repository compatibility;
+- custom cloud infrastructure or bring-your-own-cloud;
+- stable APIs or backward compatibility during the product migration.
+
+If the required gates do not pass, the App may be described as a preview or runnable prototype, not Production Alpha.
+
+## 13. Launch Non-Goals
+
+The launch contract does not include:
+
+- a cloud prompt-to-app editor or hosted coding-agent workspace;
+- a custom Mosoo agent loop;
+- arbitrary Docker, Node server, framework, or cloud deployment;
+- multiple production agent runtimes or a provider chooser;
+- Mosoo-funded model usage, token credits, or token resale;
+- public template marketplace or public use-case gallery;
+- App billing, subscriptions, plans, products, prices, invoices, or payment processing;
+- App teams, memberships, invitations, RBAC, ownership transfer, SAML, or SCIM;
+- general-purpose transactional email or notification templates beyond Auth OTP;
+- multiple production Agent Workloads in one App;
+- custom domains or bring-your-own-cloud;
+- generic CMS, analytics, backup administration, or localization modules;
+- generic `Service`, `Agent Service`, `Workspace`, or polymorphic resource graphs;
+- treating App business entities as Mosoo control-plane entities.
+
+An App repository may implement business concepts such as customers, roles, or subscriptions when its product needs them. Their absence from Mosoo's launch primitives is not a ban on App behavior.
+
+## 14. Migration From The Current Repository
+
+The current repository contains shipped implementation that predates this Spec. The migration must preserve useful infrastructure while replacing the product model.
+
+| Existing model                                                  | Canonical direction                                                                         |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| App as a resource and console bucket with no runtime            | App as the complete hosted product boundary                                                 |
+| Agent as the primary user-created runtime identity              | Agent Workload declared by the Deployable Repo                                              |
+| Thread / Session as the universal execution model               | Dispatch and Run as the universal workload protocol; chat is optional App UX                |
+| Public GitHub repository deployed as an external Web artifact   | Local or private Deployable Repo released as Web, backend, state bindings, and one Workload |
+| Agent Deployment and App Deployment as separate product actions | One immutable App Release with explicit Workload runtime bindings                           |
+| Session files and Sandbox persistence as the main file concepts | Durable App files and Workload Scope state separate from ephemeral Sandboxes                |
+| Mosoo control-plane login as the only identity system           | Separate Mosoo Account and per-App Auth Realm                                               |
+| Multiple exposed runtime/provider choices                       | One pinned production runtime profile for Launch                                            |
+
+Migration rules:
+
+- Existing Agent, Thread, Session, and Deployment tables may be reused internally, but their old semantics must not dictate new public APIs or console information architecture.
+- Do not preserve conflicting product nouns merely for documentation compatibility.
+- Do not claim a target capability is shipped until the corresponding Production Alpha gate has evidence.
+- Older PRDs and architecture sections that conflict with this Spec are historical until rewritten.
+- Generated schemas and clients follow implementation changes; they are not edited to simulate product alignment.
+
+## 15. Engineering Proof Obligations
+
+These are implementation investigations, not open PM decisions. Failure blocks or narrows Launch; it does not silently reopen the product boundary.
+
+1. Prove a Worker plus assets can be published through Workers for Platforms with isolated App database, file, Auth, and secret bindings.
+2. Prove Dispatch returns a durable `runId` and supports SSE replay, cancellation, retries, and confirmation without relying on one long HTTP request.
+3. Prove canonical database/file state survives process loss, serializes same-scope writes, and promotes staged output atomically.
+4. Prove Release activation, expand-only migration compatibility, code rollback, backup cadence and retention, measured recovery objectives, and checksum-verified raw export as one repeatable lifecycle.
+5. Prove contract validation and hard limits prevent unsupported repositories, uncontrolled egress, runaway schedules, and unbounded runtime or model cost.
+
+Limit values, concurrency, timeouts, and recovery objectives must be measured through these proofs and published as explicit product limits. They must not be guessed into the product model.
+
+## 16. Acceptance Checklist
+
+The product direction is aligned with this Spec when all of the following are true:
+
+- README and active product surfaces describe Mosoo as the production path for locally authored agentic Apps, not “Agent Cloud” or prompt-to-app.
+- A local coding agent can adapt an existing repository using a deterministic Mosoo Contract.
+- Deployment accepts a local content-addressed bundle and does not require a public GitHub repository.
+- One Release delivers frontend, backend, App bindings, and the App's single Agent Workload as one product.
+- App Users authenticate to an isolated App Auth Realm through email OTP and never become Mosoo Accounts.
+- The App repository owns Profile, authorization, schema, and business entities.
+- Manual and scheduled Triggers call one Dispatch path and receive durable Run records.
+- Run events reconnect by cursor and survive client, Worker, and Sandbox disconnects.
+- Durable files and database records survive runtime replacement and Release changes.
+- Repo-defined Workload Scopes isolate business file state; same-scope commits use base versions and cannot overwrite newer state.
+- Protected Actions cannot execute before the exact intent is confirmed through a Mosoo-enforced Gate.
+- Protected credentials cannot bypass the Gate through arbitrary shell or network access.
+- Failed Releases do not replace the active Release or delete App-Owned State.
+- Compatible code rollback, a published evidence-backed backup and recovery policy, a restore drill required by that policy, and checksum-verified raw export all have evidence.
+- Hard limits fail explicitly before one App can create unbounded platform or model cost.
+- No launch dependency requires App billing, teams, RBAC, custom domains, BYOC, public galleries, or multi-runtime support.
+- Current implementation gaps remain visible as migration work instead of being described as shipped behavior.
