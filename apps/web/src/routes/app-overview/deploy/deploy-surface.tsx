@@ -8,9 +8,10 @@ import { Badge } from "@/shared/ui/badge";
 import { DeployActions } from "./components/deploy-actions";
 import { DeployOverview } from "./components/deploy-overview";
 import { DeployRepoCard } from "./components/deploy-repo-card";
-import { StatusBadge } from "./components/deploy-status-badge";
 import { ActivitySection } from "./components/deployments-history";
 import type { DeployConsoleState } from "./deploy-console-data";
+import type { ProductionEnvironmentStatus } from "./deployment-status";
+import { toProductionEnvironmentStatus } from "./deployment-status";
 import type { LocalDeploymentPreviewState } from "./local-preview-url";
 import { useLocalDeploymentPreview } from "./local-preview-url";
 
@@ -59,6 +60,28 @@ function DevelopmentPreviewBadge({ localPreview }: { localPreview: LocalDeployme
   return <Badge variant="outline">Development offline</Badge>;
 }
 
+function ProductionEnvironmentBadge({ status }: { status: ProductionEnvironmentStatus }) {
+  if (status === "live") {
+    return (
+      <Badge variant="success">
+        <span className="size-1.5 rounded-full bg-current" aria-hidden />
+        Production live
+      </Badge>
+    );
+  }
+
+  if (status === "deploying") {
+    return (
+      <Badge variant="warning">
+        <Loader2 className="size-3 animate-spin" />
+        Production deploying
+      </Badge>
+    );
+  }
+
+  return <Badge variant="danger">Production unavailable</Badge>;
+}
+
 /**
  * The Overview deploy surface shared verbatim by the live "/" route and the
  * fixture-backed /v0-deploy-preview acceptance route — one composition, two
@@ -105,6 +128,10 @@ export function DeploySurface({
   const latestRun = runs[0];
   const localPreview = useLocalDeploymentPreview();
   const developmentMode = deployment !== null && localPreview.url !== null;
+  const productionStatus =
+    deployment === null
+      ? null
+      : toProductionEnvironmentStatus(deployment.liveUrl, latestRun?.outcome);
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -119,10 +146,10 @@ export function DeploySurface({
               {appName}
             </h1>
             <AppIdBadge appId={appId} />
+            {productionStatus === null ? null : (
+              <ProductionEnvironmentBadge status={productionStatus} />
+            )}
             {deployment !== null ? <DevelopmentPreviewBadge localPreview={localPreview} /> : null}
-            {deployment !== null && !developmentMode && latestRun !== undefined ? (
-              <StatusBadge scopeLabel="Production" status={latestRun.status} />
-            ) : null}
             {headerBadges}
           </div>
         </div>
@@ -131,7 +158,7 @@ export function DeploySurface({
             <DeployActions
               appName={appName}
               agentCount={agents.length}
-              latestStatus={developmentMode ? null : (latestRun?.status ?? null)}
+              latestOutcome={developmentMode ? null : (latestRun?.outcome ?? null)}
               deploying={developmentMode ? localPreview.status === "checking" : deploy.deploying}
               canDeploy={developmentMode ? true : deploy.canDeploy}
               onRetry={developmentMode ? localPreview.refresh : deploy.retryDeploy}

@@ -1,6 +1,5 @@
 import { ExternalLink } from "lucide-react";
 
-import { IN_FLIGHT_STATUSES } from "@/domains/app/query/app-deployment-queries";
 import { cn } from "@/shared/lib/class-names";
 
 import type { DeploymentRunVM, DeploymentVM } from "../deploy-console-data";
@@ -10,54 +9,7 @@ import type {
   LocalDeploymentPreviewStatus,
 } from "../local-preview-url";
 import { useNowTick } from "../use-now-tick";
-
-/**
- * The 8 backend run statuses collapsed into the 5 phases a user actually
- * watches: Queued → Build → Submit → Activate → Live.
- */
-const DEPLOY_PHASES = [
-  { label: "Queued", statuses: ["queued"] },
-  { label: "Build", statuses: ["preparing", "building"] },
-  { label: "Submit", statuses: ["submitting", "submitted"] },
-  { label: "Activate", statuses: ["activating"] },
-  { label: "Live", statuses: ["success"] },
-] as const;
-
-function PhaseStrip({ status }: { status: string }) {
-  const activeIndex = DEPLOY_PHASES.findIndex((phase) =>
-    (phase.statuses as readonly string[]).includes(status),
-  );
-
-  return (
-    <div aria-label="Deploy progress" className="flex items-center gap-0.5">
-      {DEPLOY_PHASES.map((phase, index) => {
-        const done = index < activeIndex;
-        const active = index === activeIndex;
-        return (
-          <span key={phase.label} className="flex items-center gap-0.5">
-            {index > 0 ? (
-              <span
-                aria-hidden
-                className={cn("h-px w-3", done || active ? "bg-amber-fg/50" : "bg-border")}
-              />
-            ) : null}
-            <span
-              className={cn(
-                "text-[12px] font-medium",
-                done && "text-fg-2",
-                active && "text-amber-fg animate-pulse font-semibold",
-                !done && !active && "text-fg-3/60",
-              )}
-            >
-              {done ? "✓ " : ""}
-              {phase.label}
-            </span>
-          </span>
-        );
-      })}
-    </div>
-  );
-}
+import { StatusBadge } from "./deploy-status-badge";
 
 function DomainLink({ url, large }: { url: string; large?: boolean | undefined }) {
   return (
@@ -145,11 +97,8 @@ export function DeployUrlCard({
   localPreview: LocalDeploymentPreviewState;
 }) {
   const now = useNowTick();
-  const inFlight =
-    latestRun !== undefined &&
-    latestRun.status !== "superseded" &&
-    IN_FLIGHT_STATUSES.has(latestRun.status);
-  const failed = latestRun !== undefined && latestRun.status === "failed";
+  const inFlight = latestRun?.outcome === "deploying";
+  const failed = latestRun?.outcome === "failed";
   const productionUrl = deployment.liveUrl ?? deployment.plannedUrl;
 
   return (
@@ -159,10 +108,7 @@ export function DeployUrlCard({
       {inFlight && latestRun !== undefined ? (
         <div className="flex flex-col gap-2.5">
           <DevelopmentPreviewRow status={localPreview.status} url={localPreview.url} />
-          <div className="flex min-w-0 flex-col gap-1">
-            <span className="text-fg-3 text-[13px]">Production deploy</span>
-            <PhaseStrip status={latestRun.status} />
-          </div>
+          <StatusBadge outcome={latestRun.outcome} scopeLabel="Production" />
           {deployment.liveUrl === null ? null : (
             <DomainRow label="Production still serving" url={deployment.liveUrl} />
           )}

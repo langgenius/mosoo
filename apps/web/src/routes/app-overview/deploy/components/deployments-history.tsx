@@ -91,7 +91,7 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
         <TableBody>
           {runs.map((run) => {
             const failedError =
-              run.status === "failed" ? (run.errorMessage ?? run.errorCode) : null;
+              run.outcome === "failed" ? (run.errorMessage ?? run.errorCode) : null;
             const expanded = expandedRunIds.has(run.id);
             return (
               <Fragment key={run.id}>
@@ -112,7 +112,7 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                     </div>
                   </TableCell>
                   <TableCell className="py-4 align-middle">
-                    <StatusBadge status={run.status} />
+                    <StatusBadge outcome={run.outcome} />
                   </TableCell>
                   <TableCell className="py-4 pr-5 align-middle">
                     <div className="flex min-w-0 items-start justify-between gap-3">

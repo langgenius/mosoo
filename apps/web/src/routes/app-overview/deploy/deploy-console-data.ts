@@ -1,4 +1,6 @@
-import type { AppDeploymentRunStatus, AppDeploymentTargetKind } from "@mosoo/contracts/app";
+import type { AppDeploymentTargetKind } from "@mosoo/contracts/app";
+
+import type { DeploymentRunOutcome } from "./deployment-status";
 
 /**
  * View models for the Deploy surface of the App Overview ("/") and its
@@ -31,9 +33,6 @@ export interface BoundAgentVM {
   envVar: string;
 }
 
-/** Run status plus the console-only "superseded" display state for old runs. */
-export type DeploymentRunDisplayStatus = AppDeploymentRunStatus | "superseded";
-
 /** Short console labels for the detected deploy target. */
 export const DEPLOY_TARGET_LABELS: Record<AppDeploymentTargetKind, string> = {
   cloudflare_pages: "static",
@@ -53,7 +52,7 @@ export interface DeploymentRunVM {
   commitSha: string;
   /** Detected deploy target; `null` while detection has not run yet. */
   targetKind: AppDeploymentTargetKind | null;
-  status: DeploymentRunDisplayStatus;
+  outcome: DeploymentRunOutcome;
   /** ISO timestamp the run was created — formatted relative at render time. */
   createdAt: string;
   liveUrl: string | null;
@@ -123,7 +122,7 @@ export function createDeployConsoleFixture(): DeployConsoleState {
         number: 4,
         commitSha: "a91c3f",
         targetKind: "cloudflare_worker",
-        status: "success",
+        outcome: "successful",
         createdAt: isoAgo(30_000),
         liveUrl,
         errorCode: null,
@@ -134,7 +133,7 @@ export function createDeployConsoleFixture(): DeployConsoleState {
         number: 3,
         commitSha: "7d20ab",
         targetKind: "cloudflare_worker",
-        status: "superseded",
+        outcome: "successful",
         createdAt: isoAgo(3 * 3_600_000),
         liveUrl: null,
         errorCode: null,
@@ -145,7 +144,7 @@ export function createDeployConsoleFixture(): DeployConsoleState {
         number: 2,
         commitSha: "1188ee",
         targetKind: "cloudflare_worker",
-        status: "superseded",
+        outcome: "successful",
         createdAt: isoAgo(26 * 3_600_000),
         liveUrl: null,
         errorCode: null,
@@ -156,7 +155,7 @@ export function createDeployConsoleFixture(): DeployConsoleState {
         number: 1,
         commitSha: "c0ffee",
         targetKind: "cloudflare_worker",
-        status: "superseded",
+        outcome: "successful",
         createdAt: isoAgo(50 * 3_600_000),
         liveUrl: null,
         errorCode: null,

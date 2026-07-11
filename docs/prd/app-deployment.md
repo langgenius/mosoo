@@ -402,10 +402,27 @@ The initial response can include:
 - `runId`, for API callers only.
 - `status`.
 - `plannedUrl`, the Mosoo-owned URL reserved for this App.
-- `liveUrl`, null until the latest run succeeds.
+- `liveUrl`, null until the first run succeeds; later deploy attempts do not
+  clear the last successful URL.
 
-The console shows status and URL without requiring users to copy or pass a run
-ID.
+The API keeps detailed executor status for retries, diagnostics, and future
+deployment logs. Product clients should not expose those implementation phases
+as separate top-level states. Collapse them into the outcomes users can
+understand and act on:
+
+- `Deploying`: `queued`, `preparing`, `building`, `submitting`, `submitted`, or
+  `activating`
+- `Successful`: `success`
+- `Failed`: `failed`
+
+Production availability is a separate state. A non-null Deployment `liveUrl`
+means `Production live`, even when a newer run is deploying or failed. Historical
+successful runs remain `Successful`; do not relabel them as `Superseded`. Detailed
+executor phases belong in a future expanded deployment log rather than the
+Activity status column.
+
+The console and product clients should show the projected outcome and URL
+without requiring users to copy or pass a run ID.
 
 Statuses:
 
@@ -419,11 +436,12 @@ Statuses:
 - `failed`
 
 `submitted` means Mosoo has handed work to Cloudflare or the deployment queue.
-`success` means Mosoo completed its activation checks and recorded a live URL.
-It is not a traffic-atomic guarantee: the current Worker path creates a 100%
-deployment, and Pages uploads an artifact, before the final activation/status
-write. A later failure has no automatic rollback and the external target may
-already be reachable.
+Only `success` may establish or update `liveUrl`: it means Mosoo completed its
+activation checks and recorded a live URL. It is not a traffic-atomic guarantee:
+the current Worker path creates a 100% deployment, and Pages uploads an
+artifact, before the final activation/status write. A later active or failed run
+does not take the last successful deployment offline; a later failure has no
+automatic rollback and the external target may already be reachable.
 
 Delete first writes `deleting_at`, which hides the live URL, revokes bound
 capabilities, blocks redeploy, fails active runs, and cancels queued/expired
