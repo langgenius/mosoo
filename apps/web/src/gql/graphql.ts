@@ -140,6 +140,7 @@ export type AgentVisibility =
   | 'private';
 
 export type AppVibeAppStatus =
+  | 'creating'
   | 'generating'
   | 'ready';
 
@@ -890,14 +891,14 @@ export type RenameAppMutationVariables = Exact<{
 
 export type RenameAppMutation = { renameApp: { createdAt: string, defaultEnvironmentId: PlatformId | null, id: PlatformId, name: string, ownerAccountId: PlatformId } };
 
-export type VibeAppFieldsFragment = { appId: PlatformId, createdAt: string, id: PlatformId, lastPublishedAt: string | null, previewUrl: string | null, productionUrl: string | null, status: AppVibeAppStatus, title: string | null, updatedAt: string, vibeAppId: string };
+export type VibeAppFieldsFragment = { appId: PlatformId, createdAt: string, id: PlatformId, lastPublishedAt: string | null, previewUrl: string | null, productionUrl: string | null, status: AppVibeAppStatus, title: string | null, updatedAt: string, vibeAppId: string | null };
 
 export type AppVibeAppQueryVariables = Exact<{
   appId: PlatformId;
 }>;
 
 
-export type AppVibeAppQuery = { appVibeApp: { appId: PlatformId, createdAt: string, id: PlatformId, lastPublishedAt: string | null, previewUrl: string | null, productionUrl: string | null, status: AppVibeAppStatus, title: string | null, updatedAt: string, vibeAppId: string } | null };
+export type AppVibeAppQuery = { appVibeApp: { appId: PlatformId, createdAt: string, id: PlatformId, lastPublishedAt: string | null, previewUrl: string | null, productionUrl: string | null, status: AppVibeAppStatus, title: string | null, updatedAt: string, vibeAppId: string | null } | null };
 
 export type AppVibeAppEnabledQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -909,7 +910,7 @@ export type CreateAppVibeAppMutationVariables = Exact<{
 }>;
 
 
-export type CreateAppVibeAppMutation = { createAppVibeApp: { appId: PlatformId, createdAt: string, id: PlatformId, lastPublishedAt: string | null, previewUrl: string | null, productionUrl: string | null, status: AppVibeAppStatus, title: string | null, updatedAt: string, vibeAppId: string } };
+export type CreateAppVibeAppMutation = { createAppVibeApp: { appId: PlatformId, createdAt: string, id: PlatformId, lastPublishedAt: string | null, previewUrl: string | null, productionUrl: string | null, status: AppVibeAppStatus, title: string | null, updatedAt: string, vibeAppId: string | null } };
 
 export type SendAppVibeAppPromptMutationVariables = Exact<{
   input: SendAppVibeAppPromptInput;

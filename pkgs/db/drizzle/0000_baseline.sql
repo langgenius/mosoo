@@ -572,7 +572,7 @@ CREATE TABLE `app_vibe_app` (
 	`app_id` text CHECK ("app_id" = upper("app_id") AND length("app_id") = 26 AND substr("app_id", 1, 1) GLOB '[0-7]' AND "app_id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') NOT NULL,
 	`created_at` integer NOT NULL,
 	`id` text CHECK ("id" = upper("id") AND length("id") = 26 AND substr("id", 1, 1) GLOB '[0-7]' AND "id" NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*') PRIMARY KEY NOT NULL,
-	`vibe_app_id` text NOT NULL
+	`vibe_app_id` text
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `app_vibe_app_app_idx` ON `app_vibe_app` (`app_id`);--> statement-breakpoint

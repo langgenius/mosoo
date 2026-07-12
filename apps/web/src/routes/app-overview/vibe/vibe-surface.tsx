@@ -62,11 +62,11 @@ function ErrorLine({ message }: { message: string | null }) {
 }
 
 function StatusBadge({ vibeApp }: { vibeApp: AppVibeApp }) {
-  if (!toVibeAppStatusView(vibeApp).ready) {
+  if (vibeApp.status !== "ready") {
     return (
       <Badge variant="warning">
         <Loader2 className="size-3 animate-spin" />
-        Building
+        {vibeApp.status === "creating" ? "Planning" : "Building"}
       </Badge>
     );
   }
@@ -142,13 +142,8 @@ function CreateVibeAppCard({ appId }: { appId: string }) {
       <div className="flex items-center gap-3">
         <Button onClick={() => create.mutate(prompt.trim())} disabled={!canSubmit}>
           {create.isPending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles />}
-          {create.isPending ? "Planning your app…" : "Build app"}
+          Build app
         </Button>
-        {create.isPending ? (
-          <span className="text-muted-foreground text-xs">
-            Drafting the blueprint usually takes under a minute.
-          </span>
-        ) : null}
       </div>
       <ErrorLine message={create.error?.message ?? null} />
     </section>
@@ -249,6 +244,47 @@ function CloneUrlPanel({ cloneResult }: { cloneResult: AppVibeAppCloneUrl }) {
           : null}
       </span>
     </div>
+  );
+}
+
+const CREATE_STALL_HINT_MS = 5 * 60_000;
+
+function CreatingCard({ appId, vibeApp }: { appId: string; vibeApp: AppVibeApp }) {
+  const deleteVibeApp = useDeleteAppVibeAppMutation(appId);
+  const elapsedMs = Date.now() - Date.parse(vibeApp.createdAt);
+
+  return (
+    <section className="border-border bg-card flex flex-col gap-3 rounded-lg border p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className="truncate text-sm font-semibold">Planning your app</h2>
+          <StatusBadge vibeApp={vibeApp} />
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={deleteVibeApp.isPending}
+          onClick={() => {
+            if (window.confirm("Cancel this build and remove the app?")) {
+              deleteVibeApp.mutate();
+            }
+          }}
+        >
+          {deleteVibeApp.isPending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 />}
+          Cancel
+        </Button>
+      </div>
+      <p className="text-muted-foreground text-sm">
+        The builder is drafting the blueprint for your app. This usually takes a minute or two; the
+        console updates by itself.
+      </p>
+      {elapsedMs > CREATE_STALL_HINT_MS ? (
+        <p className="text-muted-foreground text-xs">
+          This is taking unusually long. You can cancel and try again.
+        </p>
+      ) : null}
+      <ErrorLine message={deleteVibeApp.error?.message ?? null} />
+    </section>
   );
 }
 
@@ -529,6 +565,8 @@ export function VibeSurface({ appId, appName }: { appId: string; appName: string
             <AppOverviewInstallGuide />
           </>
         )
+      ) : vibeApp.status === "creating" ? (
+        <CreatingCard appId={appId} vibeApp={vibeApp} />
       ) : (
         <>
           {vibeAppQuery.isError ? (

@@ -22,7 +22,7 @@ export interface RenameAppInput {
   name: string;
 }
 
-export type AppVibeAppStatus = "generating" | "ready";
+export type AppVibeAppStatus = "creating" | "generating" | "ready";
 
 export interface AppVibeApp {
   appId: AppId;
@@ -34,7 +34,7 @@ export interface AppVibeApp {
   status: AppVibeAppStatus;
   title: string | null;
   updatedAt: string;
-  vibeAppId: string;
+  vibeAppId: string | null;
 }
 
 export interface AppVibeAppCloneUrl {

@@ -546,7 +546,7 @@ type AppVibeApp {
   status: AppVibeAppStatus!
   title: String
   updatedAt: String!
-  vibeAppId: String!
+  vibeAppId: String
 }
 
 type AppVibeAppCloneUrl {
@@ -555,6 +555,7 @@ type AppVibeAppCloneUrl {
 }
 
 enum AppVibeAppStatus {
+  creating
   generating
   ready
 }

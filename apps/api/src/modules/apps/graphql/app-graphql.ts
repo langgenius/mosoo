@@ -47,6 +47,10 @@ interface RenameAppArgs {
   input: Parameters<typeof renameApp>[2];
 }
 
+interface CreateAppVibeAppArgs {
+  input: Parameters<typeof createAppVibeApp>[3];
+}
+
 function parseAppId(value: string): AppId {
   return parsePlatformId<AppId>(value, "App ID");
 }
@@ -75,7 +79,14 @@ export const appGraphQLModule = {
   authenticatedMutationResolvers: {
     createApp: async (_parent, args: CreateAppArgs, context) =>
       createApp(context.bindings.DB, context.viewer, args.input),
-    createAppVibeApp: vibeAppResolver(createAppVibeApp),
+    // Create also enqueues the slow build, so it takes the queue binding.
+    createAppVibeApp: async (_parent, args: CreateAppVibeAppArgs, context) =>
+      createAppVibeApp(
+        context.bindings,
+        createVibesdkGateway(context.bindings),
+        context.viewer,
+        args.input,
+      ),
     createAppVibeAppCloneUrl: vibeAppResolver(createAppVibeAppCloneUrl),
     deleteAppVibeApp: vibeAppResolver(deleteAppVibeApp),
     publishAppVibeApp: vibeAppResolver(publishAppVibeApp),

@@ -2,6 +2,7 @@ import type { ApiCommandKind } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type {
   AccountId,
+  AppVibeAppId,
   ChannelBindingId,
   FileId,
   AppId,
@@ -18,7 +19,8 @@ import type { TelegramWorkTrigger } from "../../channels/telegram/telegram-event
 type ApiCommandPayload =
   | ChannelWorkTriggerCommandPayload
   | ScheduledMaintenanceCommandPayload
-  | SessionRunDispatchCommandPayload;
+  | SessionRunDispatchCommandPayload
+  | VibeAppCreateCommandPayload;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -52,6 +54,11 @@ export type ChannelWorkTriggerCommandPayload =
 
 export interface ScheduledMaintenanceCommandPayload {
   scheduledTime: number;
+}
+
+export interface VibeAppCreateCommandPayload {
+  bindingId: AppVibeAppId;
+  prompt: string;
 }
 
 export interface SessionRunDispatchCommandPayload {
@@ -430,6 +437,18 @@ function parseScheduledMaintenancePayload(value: unknown): ScheduledMaintenanceC
   };
 }
 
+function parseVibeAppCreatePayload(value: unknown): VibeAppCreateCommandPayload {
+  const record = requireRecord(value, "vibe_app_create payload");
+
+  return {
+    bindingId: parsePlatformId<AppVibeAppId>(
+      record["bindingId"],
+      "vibe_app_create payload.bindingId",
+    ),
+    prompt: readNonEmptyString(record, "prompt", "vibe_app_create payload"),
+  };
+}
+
 function parsePayloadJson(payloadJson: string): unknown {
   try {
     return JSON.parse(payloadJson) as unknown;
@@ -453,6 +472,9 @@ export function parseApiCommandPayload(
     }
     case "session_run_dispatch": {
       return parseSessionRunDispatchPayload(parsed);
+    }
+    case "vibe_app_create": {
+      return parseVibeAppCreatePayload(parsed);
     }
   }
 }

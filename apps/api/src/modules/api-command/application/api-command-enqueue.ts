@@ -4,6 +4,7 @@ import type {
   ChannelWorkTriggerCommandPayload,
   ScheduledMaintenanceCommandPayload,
   SessionRunDispatchCommandPayload,
+  VibeAppCreateCommandPayload,
 } from "./api-command-payload";
 
 function createChannelWorkTriggerDedupeKey(input: ChannelWorkTriggerCommandPayload): string {
@@ -39,6 +40,17 @@ export async function enqueueSessionRunDispatchCommand(
   await enqueueApiCommand(bindings, {
     dedupeKey: `session_run_dispatch:${payload.sessionRunId}`,
     kind: "session_run_dispatch",
+    payload,
+  });
+}
+
+export async function enqueueVibeAppCreateCommand(
+  bindings: Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB">,
+  payload: VibeAppCreateCommandPayload,
+): Promise<void> {
+  await enqueueApiCommand(bindings, {
+    dedupeKey: `vibe_app_create:${payload.bindingId}`,
+    kind: "vibe_app_create",
     payload,
   });
 }

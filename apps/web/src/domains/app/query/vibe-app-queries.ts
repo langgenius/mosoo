@@ -47,10 +47,12 @@ export function useAppVibeAppQuery(
   return useQuery<AppVibeApp | null>({
     queryFn: async () => getAppVibeApp(toAppId(appId)),
     queryKey: vibeAppKeys.detail(appId),
-    refetchInterval: (query) =>
-      query.state.data?.status === "generating" || Date.now() < activityDeadlineMs
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "creating" || status === "generating" || Date.now() < activityDeadlineMs
         ? POLL_INTERVAL_MS
-        : false,
+        : false;
+    },
   });
 }
 

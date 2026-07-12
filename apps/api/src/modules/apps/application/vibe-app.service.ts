@@ -10,8 +10,10 @@ import type { AppVibeAppRow } from "@mosoo/db";
 import { appVibeAppsTable } from "@mosoo/db";
 import type { AppId, AppVibeAppId } from "@mosoo/id";
 import { createPlatformId } from "@mosoo/id";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
+import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
+import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import {
   API_ERROR_CODE,
@@ -21,21 +23,40 @@ import {
   validationError,
 } from "../../../platform/errors";
 import { currentTimestampMs, toIsoString } from "../../../time";
+import { enqueueVibeAppCreateCommand } from "../../api-command/application/api-command-enqueue";
+import type { VibeAppCreateCommandPayload } from "../../api-command/application/api-command-payload";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { ensureAppOwnership } from "./app.service";
-import type { VibeAppSnapshot, VibesdkGateway } from "./vibesdk-gateway";
-import { requireVibesdkGateway } from "./vibesdk-gateway";
+import type { VibeAppSnapshot, VibesdkGateway, VibesdkGatewayTimeouts } from "./vibesdk-gateway";
+import { createVibesdkGateway, requireVibesdkGateway } from "./vibesdk-gateway";
 
-const INITIAL_SNAPSHOT: VibeAppSnapshot = {
-  lastPublishedAt: null,
-  previewUrl: null,
-  productionUrl: null,
-  status: "generating",
-  title: null,
-  updatedAt: null,
+// The queue consumer holds no user request open, so the create budget only
+// has to stay inside the consumer's generous wall clock. Blueprint streaming
+// on a real VibeSDK instance measures 60s+ for even trivial prompts.
+const CREATE_CONSUMER_TIMEOUTS: VibesdkGatewayTimeouts = {
+  commandAckMs: 10_000,
+  createMs: 240_000,
+  generationStartedMs: 30_000,
 };
 
-function toAppVibeApp(row: AppVibeAppRow, snapshot: VibeAppSnapshot): AppVibeApp {
+type AttachedVibeAppRow = AppVibeAppRow & { vibeAppId: string };
+
+function toCreatingAppVibeApp(row: AppVibeAppRow): AppVibeApp {
+  return {
+    appId: row.appId,
+    createdAt: toIsoString(row.createdAt),
+    id: row.id,
+    lastPublishedAt: null,
+    previewUrl: null,
+    productionUrl: null,
+    status: "creating",
+    title: null,
+    updatedAt: toIsoString(row.createdAt),
+    vibeAppId: null,
+  };
+}
+
+function toAppVibeApp(row: AttachedVibeAppRow, snapshot: VibeAppSnapshot): AppVibeApp {
   return {
     appId: row.appId,
     createdAt: toIsoString(row.createdAt),
@@ -61,14 +82,21 @@ async function readVibeAppRow(database: D1Database, appId: AppId): Promise<AppVi
   );
 }
 
-async function requireVibeAppRow(database: D1Database, appId: AppId): Promise<AppVibeAppRow> {
+async function requireAttachedVibeAppRow(
+  database: D1Database,
+  appId: AppId,
+): Promise<AttachedVibeAppRow> {
   const row = await readVibeAppRow(database, appId);
 
   if (row === null) {
     throw notFoundError("This App has no Vibe App.");
   }
 
-  return row;
+  if (row.vibeAppId === null) {
+    throw validationError("The app is still being created — try again in a moment.");
+  }
+
+  return row as AttachedVibeAppRow;
 }
 
 function requirePrompt(prompt: string): string {
@@ -82,34 +110,29 @@ function requirePrompt(prompt: string): string {
 }
 
 export async function createAppVibeApp(
-  database: D1Database,
+  bindings: Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB">,
   gateway: VibesdkGateway | null,
   viewer: AuthenticatedViewer,
   input: CreateAppVibeAppInput,
 ): Promise<AppVibeApp> {
-  await ensureAppOwnership(database, viewer.id, input.appId);
-  const vibe = requireVibesdkGateway(gateway);
+  await ensureAppOwnership(bindings.DB, viewer.id, input.appId);
+  requireVibesdkGateway(gateway);
   const prompt = requirePrompt(input.prompt);
 
-  if ((await readVibeAppRow(database, input.appId)) !== null) {
+  if ((await readVibeAppRow(bindings.DB, input.appId)) !== null) {
     throw createApiError(API_ERROR_CODE.vibeAppExists, "This App already has a Vibe App.");
   }
 
-  const vibeAppId = await vibe.createApp(prompt);
   const row: AppVibeAppRow = {
     appId: input.appId,
     createdAt: currentTimestampMs(),
     id: createPlatformId<AppVibeAppId>(),
-    vibeAppId,
+    vibeAppId: null,
   };
 
   try {
-    await getAppDatabase(database).insert(appVibeAppsTable).values(row).run();
+    await getAppDatabase(bindings.DB).insert(appVibeAppsTable).values(row).run();
   } catch (error) {
-    // Nothing references the remote app when the insert fails, whatever the
-    // cause — delete it best-effort before surfacing the failure.
-    await vibe.deleteApp(vibeAppId).catch(() => undefined);
-
     if (errorMessageChainIncludes(error, ["UNIQUE constraint failed"])) {
       throw createApiError(API_ERROR_CODE.vibeAppExists, "This App already has a Vibe App.");
     }
@@ -117,7 +140,59 @@ export async function createAppVibeApp(
     throw error;
   }
 
-  return toAppVibeApp(row, INITIAL_SNAPSHOT);
+  await enqueueVibeAppCreateCommand(bindings, { bindingId: row.id, prompt });
+  return toCreatingAppVibeApp(row);
+}
+
+/**
+ * Queue-consumer side of create: run the slow VibeSDK build (blueprint
+ * streaming takes minutes) and attach the resulting remote app to the
+ * binding. Cleans up after itself instead of throwing — the build is not
+ * idempotent, so a queue retry would double-create.
+ */
+export async function runVibeAppCreate(
+  bindings: Pick<ApiBindings, "DB" | "VIBESDK_API_KEY" | "VIBESDK_BASE_URL">,
+  payload: VibeAppCreateCommandPayload,
+  injectedGateway?: VibesdkGateway | null,
+): Promise<void> {
+  const database = getAppDatabase(bindings.DB);
+  const row =
+    (await database
+      .select()
+      .from(appVibeAppsTable)
+      .where(eq(appVibeAppsTable.id, payload.bindingId))
+      .limit(1)
+      .get()) ?? null;
+
+  if (row === null || row.vibeAppId !== null) {
+    return;
+  }
+
+  try {
+    const gateway = requireVibesdkGateway(
+      injectedGateway ?? createVibesdkGateway(bindings, CREATE_CONSUMER_TIMEOUTS),
+    );
+    const vibeAppId = await gateway.createApp(payload.prompt);
+    const update = await database
+      .update(appVibeAppsTable)
+      .set({ vibeAppId })
+      .where(and(eq(appVibeAppsTable.id, payload.bindingId), isNull(appVibeAppsTable.vibeAppId)))
+      .run();
+
+    if (update.meta.changes === 0) {
+      // The owner deleted the binding while the build ran.
+      await gateway.deleteApp(vibeAppId).catch(() => undefined);
+    }
+  } catch (error) {
+    logError("vibe-app.create.failed", {
+      ...createErrorLogContext(error),
+      bindingId: payload.bindingId,
+    });
+    await database
+      .delete(appVibeAppsTable)
+      .where(and(eq(appVibeAppsTable.id, payload.bindingId), isNull(appVibeAppsTable.vibeAppId)))
+      .run();
+  }
 }
 
 export async function getAppVibeApp(
@@ -133,8 +208,12 @@ export async function getAppVibeApp(
     return null;
   }
 
+  if (row.vibeAppId === null) {
+    return toCreatingAppVibeApp(row);
+  }
+
   const snapshot = await requireVibesdkGateway(gateway).getApp(row.vibeAppId);
-  return toAppVibeApp(row, snapshot);
+  return toAppVibeApp(row as AttachedVibeAppRow, snapshot);
 }
 
 export async function sendAppVibeAppPrompt(
@@ -145,7 +224,7 @@ export async function sendAppVibeAppPrompt(
 ): Promise<OperationResult> {
   await ensureAppOwnership(database, viewer.id, input.appId);
   const prompt = requirePrompt(input.prompt);
-  const row = await requireVibeAppRow(database, input.appId);
+  const row = await requireAttachedVibeAppRow(database, input.appId);
   await requireVibesdkGateway(gateway).sendPrompt(row.vibeAppId, prompt);
   return { ok: true };
 }
@@ -157,7 +236,7 @@ export async function publishAppVibeApp(
   input: AppVibeAppTargetInput,
 ): Promise<OperationResult> {
   await ensureAppOwnership(database, viewer.id, input.appId);
-  const row = await requireVibeAppRow(database, input.appId);
+  const row = await requireAttachedVibeAppRow(database, input.appId);
   await requireVibesdkGateway(gateway).publish(row.vibeAppId);
   return { ok: true };
 }
@@ -169,7 +248,7 @@ export async function refreshAppVibeAppPreview(
   input: AppVibeAppTargetInput,
 ): Promise<OperationResult> {
   await ensureAppOwnership(database, viewer.id, input.appId);
-  const row = await requireVibeAppRow(database, input.appId);
+  const row = await requireAttachedVibeAppRow(database, input.appId);
   await requireVibesdkGateway(gateway).refreshPreview(row.vibeAppId);
   return { ok: true };
 }
@@ -181,7 +260,7 @@ export async function createAppVibeAppCloneUrl(
   input: AppVibeAppTargetInput,
 ): Promise<AppVibeAppCloneUrl> {
   await ensureAppOwnership(database, viewer.id, input.appId);
-  const row = await requireVibeAppRow(database, input.appId);
+  const row = await requireAttachedVibeAppRow(database, input.appId);
   return requireVibesdkGateway(gateway).createCloneUrl(row.vibeAppId);
 }
 
@@ -198,7 +277,12 @@ export async function deleteAppVibeApp(
     return { ok: true };
   }
 
-  await requireVibesdkGateway(gateway).deleteApp(row.vibeAppId);
+  // A still-creating binding has no known remote app; the create consumer
+  // deletes the remote side itself when it finds the row gone.
+  if (row.vibeAppId !== null) {
+    await requireVibesdkGateway(gateway).deleteApp(row.vibeAppId);
+  }
+
   await getAppDatabase(database)
     .delete(appVibeAppsTable)
     .where(eq(appVibeAppsTable.id, row.id))

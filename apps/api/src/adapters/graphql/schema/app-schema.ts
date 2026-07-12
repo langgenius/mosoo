@@ -4,6 +4,7 @@ export const appSchema = /* GraphQL */ `
   }
 
   enum AppVibeAppStatus {
+    creating
     generating
     ready
   }
@@ -26,7 +27,7 @@ export const appSchema = /* GraphQL */ `
     status: AppVibeAppStatus!
     title: String
     updatedAt: String!
-    vibeAppId: String!
+    vibeAppId: String
   }
 
   type AppVibeAppCloneUrl {

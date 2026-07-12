@@ -8,7 +8,8 @@ export type ApiCommandId = SemanticPlatformId<"ApiCommandId">;
 export type ApiCommandKind =
   | "channel_work_trigger"
   | "scheduled_maintenance"
-  | "session_run_dispatch";
+  | "session_run_dispatch"
+  | "vibe_app_create";
 export type ApiCommandStatus = "dead_lettered" | "failed" | "queued" | "running" | "succeeded";
 
 export const apiCommandsTable = sqliteTable(

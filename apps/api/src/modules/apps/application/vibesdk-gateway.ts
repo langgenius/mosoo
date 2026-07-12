@@ -34,12 +34,13 @@ export interface VibesdkGatewayTimeouts {
   generationStartedMs: number;
 }
 
-// The create budget must stay under Cloudflare's ~100s request ceiling: the
-// SDK's build() drains the blueprint stream before returning.
+// createApp runs from the queue consumer (never inside a held user request):
+// the SDK's build() drains the blueprint stream before returning, which
+// measures 60s+ on a real VibeSDK instance even for trivial prompts.
 const DEFAULT_TIMEOUTS: VibesdkGatewayTimeouts = {
   commandAckMs: 10_000,
-  createMs: 75_000,
-  generationStartedMs: 15_000,
+  createMs: 240_000,
+  generationStartedMs: 30_000,
 };
 // No SDK-level HTTP retry: POST /api/agent is not idempotent (a retry can
 // double-create), and reads are naturally retried by the console's poll.

@@ -6,7 +6,7 @@ import type { VibeAppStatusView } from "../src/routes/app-overview/vibe/vibe-app
 interface StatusCase {
   input: {
     productionUrl: string | null;
-    status: "generating" | "ready";
+    status: "creating" | "generating" | "ready";
   };
   name: string;
   expected: VibeAppStatusView;
@@ -16,7 +16,7 @@ const PRODUCTION_URL = "https://live.vibesdk.test";
 
 const cases: StatusCase[] = [];
 
-for (const status of ["generating", "ready"] as const) {
+for (const status of ["creating", "generating", "ready"] as const) {
   for (const productionUrl of [null, PRODUCTION_URL]) {
     cases.push({
       expected: {
@@ -37,6 +37,6 @@ describe("vibe app status projection", () => {
   }
 
   test("covers the full status matrix", () => {
-    expect(cases).toHaveLength(4);
+    expect(cases).toHaveLength(6);
   });
 });

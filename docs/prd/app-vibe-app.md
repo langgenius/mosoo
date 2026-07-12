@@ -56,14 +56,19 @@ Web console ── GraphQL ──> API Worker ── @cf-vibesdk/sdk ──> Vib
   module. Commands (follow-up prompt, publish, refresh preview) connect the
   session WebSocket, send one message, confirm delivery with a
   `get_conversation_state` barrier, and close. State reads use the SDK's HTTP
-  app endpoint. No queue and no run ledger.
+  app endpoint. No run ledger and no persisted status machine.
 - The VibeSDK per-app agent keeps working autonomously after Mosoo
   disconnects, so command mutations return in seconds and the console polls
-  the status query while work is in flight. Create is the one slower call: the
-  SDK streams the build blueprint before returning, so `createAppVibeApp`
-  holds the request until generation starts (bounded well under the platform
-  request ceiling) and compensates by deleting the remote app when that
-  confirmation never arrives.
+  the status query while work is in flight.
+- Create is the exception: the SDK's build call streams the whole blueprint
+  before returning, which measures 60s+ on a real instance — past any held
+  request budget. `createAppVibeApp` therefore persists the binding with a
+  null `vibe_app_id`, enqueues one `vibe_app_create` command, and returns a
+  `creating` status immediately. The queue consumer runs the build with a
+  generous budget, attaches the remote app id, and on any failure deletes the
+  binding so the owner can retry cleanly; if the owner deletes the binding
+  mid-build, the consumer deletes the freshly built remote app instead. The
+  build is not idempotent, so the command never retries.
 
 ## Data Model
 
@@ -71,7 +76,8 @@ Web console ── GraphQL ──> API Worker ── @cf-vibesdk/sdk ──> Vib
 
 - `id`
 - `app_id` (unique)
-- `vibe_app_id` — the app/agent id on the VibeSDK instance
+- `vibe_app_id` — the app/agent id on the VibeSDK instance; null while the
+  queued create is still building
 - `created_at`
 
 All lifecycle state (generation phase, preview URL, production URL, title) is
@@ -82,7 +88,8 @@ read live from the VibeSDK instance and never persisted.
 GraphQL, App-scoped, owner-only:
 
 - `createAppVibeApp(input: { appId, prompt }): AppVibeApp!` — one per App;
-  fails with `VIBE_APP_EXISTS` when a binding already exists.
+  returns `status: creating` immediately and queues the build; fails with
+  `VIBE_APP_EXISTS` when a binding already exists.
 - `sendAppVibeAppPrompt(input: { appId, prompt }): OperationResult!`
 - `publishAppVibeApp(input: { appId }): OperationResult!`
 - `refreshAppVibeAppPreview(input: { appId }): OperationResult!`
@@ -99,8 +106,9 @@ GraphQL, App-scoped, owner-only:
 
 `AppVibeApp`:
 
-- `id`, `appId`, `vibeAppId`
-- `status`: `generating` | `ready` (VibeSDK `generating`/`completed`)
+- `id`, `appId`, `vibeAppId` (null while `creating`)
+- `status`: `creating` (queued build not yet attached) | `generating` |
+  `ready` (VibeSDK `generating`/`completed`)
 - `title`: VibeSDK app title, null until known
 - `previewUrl`: sandbox preview, null until first preview deploy
 - `productionUrl`: Workers-for-Platforms URL, null until first publish
@@ -128,6 +136,8 @@ Missing configuration fails the Vibe App command surfaces loudly with
 - `VIBE_APP_EXISTS` — create called while a binding exists.
 - `NOT_FOUND` — command called with no binding. Delete is the exception: it
   is idempotent and returns ok with no binding.
+- `VALIDATION_FAILED` — command called while the binding is still `creating`
+  (and empty prompts).
 - `VIBE_APP_UNAVAILABLE` — the VibeSDK instance rejected or failed a call; the
   message carries the upstream detail. Command mutations are safe to retry.
 

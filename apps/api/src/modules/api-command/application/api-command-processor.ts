@@ -3,6 +3,7 @@ import type { ApiCommandId } from "@mosoo/db";
 import { createErrorLogContext, logError, logInfo } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { currentTimestampMs } from "../../../time";
+import { runVibeAppCreate } from "../../apps/application/vibe-app.service";
 import { cleanupOrphanChannelBindingCredentialSecrets } from "../../channels/application/agent-channel-binding-maintenance.service";
 import { resolveAgentChannelBindingContextById } from "../../channels/application/channel-binding-context";
 import { createChannelFinalDeliveryScheduler } from "../../channels/application/channel-final-delivery.service";
@@ -42,6 +43,7 @@ import type {
   ChannelWorkTriggerCommandPayload,
   ScheduledMaintenanceCommandPayload,
   SessionRunDispatchCommandPayload,
+  VibeAppCreateCommandPayload,
 } from "./api-command-payload";
 
 const API_COMMAND_RETRY_DELAY_SECONDS = 30;
@@ -346,6 +348,12 @@ async function processClaimedApiCommand(
     }
     case "session_run_dispatch": {
       await processSessionRunDispatchCommand(bindings, payload as SessionRunDispatchCommandPayload);
+      return;
+    }
+    case "vibe_app_create": {
+      // Never throws: the remote build is not idempotent, so failures clean
+      // up their binding row instead of retrying through the queue.
+      await runVibeAppCreate(bindings, payload as VibeAppCreateCommandPayload);
       return;
     }
   }

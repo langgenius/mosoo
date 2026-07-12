@@ -19,7 +19,8 @@ export const appVibeAppsTable = sqliteTable(
     appId: platformIdColumn<AppId>("app_id").notNull(),
     createdAt: integer("created_at").notNull(),
     id: platformIdColumn<AppVibeAppId>("id").primaryKey(),
-    vibeAppId: text("vibe_app_id").notNull(),
+    // Null while the queued create is still building the remote app.
+    vibeAppId: text("vibe_app_id"),
   },
   (table) => [uniqueIndex("app_vibe_app_app_idx").on(table.appId)],
 );
