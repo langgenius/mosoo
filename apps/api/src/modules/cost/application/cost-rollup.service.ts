@@ -6,6 +6,8 @@ import { runAppDatabaseBatch } from "../../../platform/db/drizzle";
 
 const DETAIL_RETENTION_DAYS = 7;
 
+export const DAILY_ROLLUP_RETENTION_DAYS = 180;
+
 function startOfUtcDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
@@ -14,10 +16,19 @@ function toUtcDate(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
+export function getDailyRollupRetentionCutoffDate(now: Date): string {
+  const cutoff = startOfUtcDay(now);
+  cutoff.setUTCDate(cutoff.getUTCDate() - DAILY_ROLLUP_RETENTION_DAYS);
+  return toUtcDate(cutoff);
+}
+
+export function createDailyRollupRetentionPredicate(now: Date) {
+  return lt(usageDailyRollupsTable.date, getDailyRollupRetentionCutoffDate(now));
+}
+
 export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): Promise<void> {
   const cutoff = startOfUtcDay(now);
   cutoff.setUTCDate(cutoff.getUTCDate() - DETAIL_RETENTION_DAYS);
-  const cutoffDate = toUtcDate(cutoff);
   const cutoffMs = cutoff.getTime();
 
   await runAppDatabaseBatch(env.DB, (db) => [
@@ -98,8 +109,6 @@ export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): P
             usage_daily_rollup.unpriced_request_count + excluded.unpriced_request_count
       `),
     db.delete(usageEventsTable).where(lt(usageEventsTable.createdAt, cutoffMs)),
-    db
-      .delete(usageDailyRollupsTable)
-      .where(sql`${usageDailyRollupsTable.date} < date(${cutoffDate}, '-90 days')`),
+    db.delete(usageDailyRollupsTable).where(createDailyRollupRetentionPredicate(now)),
   ]);
 }
