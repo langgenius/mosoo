@@ -1,35 +1,67 @@
 # <img src="apps/web/public/brand/logo-mark.svg" alt="" width="48" height="48" /> Mosoo
 
-Mosoo is an open-source, cloud-native platform for turning AI app ideas into
-live agent apps: bring your PRD, use the Mosoo CLI and Codex skill, run OpenAI
-runtime, Claude Agent SDK, or OpenCode/DeepSeek via ACP in isolated sandboxes,
-manage their lifecycle, and deploy through the Mosoo Web console.
+Mosoo is building the production path from runnable agentic-app prototypes to hosted web products that real users can sign in to and use.
+
+Builders keep authoring with a local coding agent. The Mosoo Production Alpha target handles a strict repository contract, deterministic validation, isolated builds, App authentication, durable data and files, managed agent execution, observable Runs, enforceable confirmation gates, immutable Releases, and recovery.
+
+```text
+describe the business to Codex / Claude Code / OpenCode
+  + use the Mosoo Build Skill and CLI
+  -> produce a Deployable Repo that passes the Mosoo Contract
+  -> deploy through Mosoo
+  -> App Users sign in to the hosted App
+```
 
 <p align="center">
   <a href="https://try.mosoo.ai">Try Mosoo</a> ·
   <a href="https://mosoo.ai">Website</a> ·
-  <a href="https://mosoo.ai/docs">API Documents</a> ·
+  <a href="https://mosoo.ai/docs">API Documentation</a> ·
   <a href="https://github.com/langgenius/mosoo-connector">Mosoo Connector</a>
 </p>
 
+## Who It Is For
+
+Mosoo is for independent builders and small teams that already use local coding agents to make working software but do not want to become the DevOps, backend, and security team for every App.
+
+The narrow first use case is an existing runnable App that combines ordinary web behavior with one agentic business workflow. The Builder keeps using their preferred local coding agent; Mosoo starts where local authoring ends.
+
+## Product Boundary
+
+Mosoo is not another cloud prompt-to-app editor and does not replace Codex, Claude Code, or OpenCode. It does not invent a new agent loop or pay for the Builder's local coding sessions.
+
+The Production Alpha target includes:
+
+- a Build Skill, CLI, and strict contract for producing a supported repository;
+- Mosoo-managed Cloudflare infrastructure for the first production profile;
+- an App-scoped Auth Realm, durable application data, file storage, and secrets;
+- one Agent Workload per App on one managed production runtime profile using Builder-provided model credentials;
+- one Dispatch path shared by manual and scheduled Triggers;
+- durable Run state, replayable events, SSE, cancellation, and artifacts;
+- Mosoo-enforced Confirmation Gates for declared high-impact actions;
+- immutable Releases, code rollback, backups, tested recovery, and raw data export.
+
+The App repository owns the product: frontend, backend business logic, database schema, business profiles and authorization, Skills, the Workload definition, and the meaning of its data. Mosoo operates the infrastructure without turning application entities such as Subscription, Plan, Role, Membership, or Invoice into Mosoo control-plane entities.
+
 ## Product Status
 
-Mosoo is still in alpha exploration. Product boundaries, data models, deployment methods, and management experience are all evolving quickly. During the App boundary cut, treat [SPEC.md](./docs/SPEC.md) and [App Boundary](./docs/prd/app-boundary.md) as newer than older Agent-first, Workspace, member-management, or team-governance language. This repository currently prioritizes fast validation and architectural convergence for the open-source version, with no promise of stable APIs or backward compatibility.
+Mosoo is being reset around this production path. The canonical target contract is [docs/SPEC.md](./docs/SPEC.md). Existing Agent-first, Thread-first, and public-GitHub-Web-artifact behavior in the repository is migration input, not the desired product model when it conflicts with that Spec.
 
-- PRDs and product design: [docs/prd/README.md](./docs/prd/README.md).
-- Current product spec: [SPEC.md](./docs/SPEC.md).
-- Architecture design: [docs/architecture.md](./docs/architecture.md).
-- Development and contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md).
+The launch standard is **Production Alpha**: isolation, durable state, recoverability, and portability are hard requirements; SLA, compliance certification, custom infrastructure, and reversal of already-completed business side effects are not promised yet. This repository does not claim stable APIs or backward compatibility while the migration is in progress.
+
+Product and engineering references:
+
+- Canonical product contract: [docs/SPEC.md](./docs/SPEC.md)
+- PRD index and historical implementation contracts: [docs/prd/README.md](./docs/prd/README.md)
+- Current implementation architecture: [docs/architecture.md](./docs/architecture.md)
+- Development and contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 ## Local Development
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full development flow.
 
 Prerequisites:
 
 - `bun >= 1.4.0-canary.1`
 - `just >= 1.51`
-- Agent runtime / sandbox flows also need Docker Desktop.
+- Docker Desktop for Agent runtime and Sandbox flows
 
 From a clean clone:
 
@@ -40,17 +72,12 @@ just setup
 just dev
 ```
 
-`just setup` installs dependencies, initializes submodules, creates or completes
-`apps/api/.dev.vars`, installs Git hooks, and applies the pending local D1
-migration chain. `just dev` reapplies pending local migrations before starting
-the web and API dev servers.
+`just setup` installs dependencies, initializes submodules, creates or completes `apps/api/.dev.vars`, installs Git hooks, and applies pending local D1 migrations. `just dev` reapplies pending migrations before starting the web and API development servers.
 
 Local URLs:
 
 - Web: `http://localhost:5173`
 - API: `http://localhost:8787`
-
-The public landing page and blog live in the private `langgenius/mosoo-website` repository and are deployed on `mosoo.ai`.
 
 Minimum smoke:
 
@@ -59,6 +86,8 @@ curl http://localhost:5173/api/health
 curl http://localhost:8787/api/health
 ```
 
-API health is `/api/health`, not `/health`. Regular email login uses OTP; under local loopback origins, addresses ending with `@mosoo.ai` skip OTP and log in directly.
+API health is `/api/health`, not `/health`. The current Mosoo control-plane development login uses OTP; under local loopback origins, addresses ending with `@mosoo.ai` skip that OTP and log in directly. This is separate from the target per-App Auth Realm.
 
-If setup fails, start with the focused recipe: submodule issues use `git submodule update --init`, missing local secrets use `just env-init`, and D1 schema errors use `just db-migrate`. For details and verification expectations, read [CONTRIBUTING.md](./CONTRIBUTING.md).
+If setup fails, start with the focused recipe: submodule issues use `git submodule update --init`, missing local secrets use `just env-init`, and D1 schema errors use `just db-migrate`. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow and verification expectations.
+
+The public landing page and blog live in the private `langgenius/mosoo-website` repository and are deployed separately on `mosoo.ai`.
