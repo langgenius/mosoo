@@ -5,8 +5,10 @@ import { eq } from "drizzle-orm";
 
 import {
   API_COMMAND_LEASE_MS,
+  API_COMMAND_QUEUE_SEND_FAILED_CODE,
   claimApiCommand,
   enqueueApiCommand,
+  redriveFailedApiCommandEnqueues,
   renewApiCommandClaim,
 } from "../src/modules/api-command/application/api-command-ledger";
 import type { ApiCommandMessage } from "../src/modules/api-command/application/api-command-message";
@@ -94,6 +96,102 @@ describe("API command queue", () => {
       status: "failed",
     });
     expect(recorded.recorded).toEqual([{ type: "ack" }]);
+  });
+
+  test("keeps a command claimable when Queue accepts it but send reports a timeout", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const retainedMessages: ApiCommandMessage[] = [];
+    const queue = {
+      sent: [],
+      async send(body: ApiCommandMessage): Promise<void> {
+        retainedMessages.push(body);
+        throw new Error("Queue response timed out.");
+      },
+    };
+    const bindings = createPublicHttpTestBindings(database, {
+      apiCommandQueue: queue,
+    }) as ApiBindings;
+
+    await expect(
+      enqueueApiCommand(bindings, {
+        dedupeKey: "scheduled:ambiguous-send",
+        kind: "scheduled_maintenance",
+        payload: { scheduledTime: nowMsForTest() },
+      }),
+    ).rejects.toThrow("Queue response timed out.");
+
+    const retained = retainedMessages[0];
+    if (retained === undefined) {
+      throw new Error("Expected Queue to retain the command message.");
+    }
+
+    const row = await database
+      .app()
+      .select({
+        lastErrorCode: apiCommandsTable.lastErrorCode,
+        status: apiCommandsTable.status,
+      })
+      .from(apiCommandsTable)
+      .get();
+
+    expect(row).toEqual({
+      lastErrorCode: API_COMMAND_QUEUE_SEND_FAILED_CODE,
+      status: "queued",
+    });
+    await expect(
+      claimApiCommand({
+        commandId: retained.commandId,
+        database,
+        nowMs: nowMsForTest(),
+        ownerId: "consumer-after-timeout",
+      }),
+    ).resolves.toMatchObject({ commandId: retained.commandId });
+  });
+
+  test("redrives a durable command after a definite Queue send failure", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const sent: ApiCommandMessage[] = [];
+    let attempts = 0;
+    const queue = {
+      sent,
+      async send(body: ApiCommandMessage): Promise<void> {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new Error("Queue is unavailable.");
+        }
+        sent.push(body);
+      },
+    };
+    const bindings = createPublicHttpTestBindings(database, {
+      apiCommandQueue: queue,
+    }) as ApiBindings;
+
+    await expect(
+      enqueueApiCommand(bindings, {
+        dedupeKey: "scheduled:redrive",
+        kind: "scheduled_maintenance",
+        payload: { scheduledTime: nowMsForTest() },
+      }),
+    ).rejects.toThrow("Queue is unavailable.");
+
+    await redriveFailedApiCommandEnqueues(bindings);
+
+    expect(sent).toHaveLength(1);
+    const row = await database
+      .app()
+      .select({
+        lastErrorCode: apiCommandsTable.lastErrorCode,
+        lastErrorMessage: apiCommandsTable.lastErrorMessage,
+        status: apiCommandsTable.status,
+      })
+      .from(apiCommandsTable)
+      .get();
+
+    expect(row).toEqual({
+      lastErrorCode: null,
+      lastErrorMessage: null,
+      status: "queued",
+    });
   });
 
   test("renews a running command claim for the current owner", async () => {

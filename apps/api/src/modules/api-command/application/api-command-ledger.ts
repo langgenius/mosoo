@@ -1,8 +1,9 @@
 import { apiCommandsTable } from "@mosoo/db";
 import type { ApiCommandId, ApiCommandKind, ApiCommandRow } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import { and, eq, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, lt, or, sql } from "drizzle-orm";
 
+import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, getD1ChangeCount } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
@@ -11,6 +12,12 @@ import type { ApiCommandMessage } from "./api-command-message";
 export const API_COMMAND_LEASE_MS = 5 * 60 * 1000;
 
 export const API_COMMAND_LEASE_RENEWAL_INTERVAL_MS = API_COMMAND_LEASE_MS / 5;
+
+export const API_COMMAND_QUEUE_SEND_FAILED_CODE = "queue_send_failed";
+
+const API_COMMAND_QUEUE_SEND_FAILED_MESSAGE = "API command queue send failed.";
+
+const API_COMMAND_QUEUE_REDRIVE_LIMIT = 100;
 
 export interface EnqueueApiCommandInput {
   dedupeKey: string;
@@ -43,10 +50,14 @@ function toQueueMessage(commandId: ApiCommandId): ApiCommandMessage {
 async function readApiCommandByDedupeKey(
   database: D1Database,
   dedupeKey: string,
-): Promise<Pick<ApiCommandRow, "id"> | null> {
+): Promise<Pick<ApiCommandRow, "id" | "lastErrorCode" | "status"> | null> {
   return (
     (await getAppDatabase(database)
-      .select({ id: apiCommandsTable.id })
+      .select({
+        id: apiCommandsTable.id,
+        lastErrorCode: apiCommandsTable.lastErrorCode,
+        status: apiCommandsTable.status,
+      })
       .from(apiCommandsTable)
       .where(eq(apiCommandsTable.dedupeKey, dedupeKey))
       .limit(1)
@@ -54,14 +65,84 @@ async function readApiCommandByDedupeKey(
   );
 }
 
-async function deleteApiCommand(input: {
+async function markApiCommandQueueSendFailed(input: {
   commandId: ApiCommandId;
   database: D1Database;
 }): Promise<void> {
   await getAppDatabase(input.database)
-    .delete(apiCommandsTable)
-    .where(eq(apiCommandsTable.id, input.commandId))
+    .update(apiCommandsTable)
+    .set({
+      lastErrorCode: API_COMMAND_QUEUE_SEND_FAILED_CODE,
+      lastErrorMessage: API_COMMAND_QUEUE_SEND_FAILED_MESSAGE,
+      updatedAt: currentTimestampMs(),
+    })
+    .where(and(eq(apiCommandsTable.id, input.commandId), eq(apiCommandsTable.status, "queued")))
     .run();
+}
+
+async function clearApiCommandQueueSendFailure(input: {
+  commandId: ApiCommandId;
+  database: D1Database;
+}): Promise<void> {
+  await getAppDatabase(input.database)
+    .update(apiCommandsTable)
+    .set({
+      lastErrorCode: null,
+      lastErrorMessage: null,
+      updatedAt: currentTimestampMs(),
+    })
+    .where(
+      and(
+        eq(apiCommandsTable.id, input.commandId),
+        eq(apiCommandsTable.status, "queued"),
+        eq(apiCommandsTable.lastErrorCode, API_COMMAND_QUEUE_SEND_FAILED_CODE),
+      ),
+    )
+    .run();
+}
+
+async function sendApiCommandMessage(
+  bindings: Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB">,
+  commandId: ApiCommandId,
+): Promise<void> {
+  try {
+    await bindings.API_COMMAND_QUEUE.send(toQueueMessage(commandId));
+  } catch (error) {
+    // A rejected producer response does not prove that Queue discarded the message.
+    // Keep the outbox row so a delivered duplicate can still be claimed safely.
+    await markApiCommandQueueSendFailed({ commandId, database: bindings.DB });
+    throw error;
+  }
+
+  await clearApiCommandQueueSendFailure({ commandId, database: bindings.DB });
+}
+
+export async function redriveFailedApiCommandEnqueues(
+  bindings: Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB">,
+): Promise<void> {
+  const commands = await getAppDatabase(bindings.DB)
+    .select({ id: apiCommandsTable.id })
+    .from(apiCommandsTable)
+    .where(
+      and(
+        eq(apiCommandsTable.status, "queued"),
+        eq(apiCommandsTable.lastErrorCode, API_COMMAND_QUEUE_SEND_FAILED_CODE),
+      ),
+    )
+    .orderBy(asc(apiCommandsTable.id))
+    .limit(API_COMMAND_QUEUE_REDRIVE_LIMIT)
+    .all();
+
+  for (const command of commands) {
+    try {
+      await sendApiCommandMessage(bindings, command.id);
+    } catch (error) {
+      logError("api-command.enqueue_redrive_failed", {
+        ...createErrorLogContext(error),
+        commandId: command.id,
+      });
+    }
+  }
 }
 
 export async function enqueueApiCommand(
@@ -93,12 +174,7 @@ export async function enqueueApiCommand(
     .run();
 
   if (getD1ChangeCount(insertResult) > 0) {
-    try {
-      await bindings.API_COMMAND_QUEUE.send(toQueueMessage(commandId));
-    } catch (error) {
-      await deleteApiCommand({ commandId, database: bindings.DB });
-      throw error;
-    }
+    await sendApiCommandMessage(bindings, commandId);
 
     return commandId;
   }
@@ -107,6 +183,10 @@ export async function enqueueApiCommand(
 
   if (current === null) {
     throw new Error("API command enqueue could not confirm the ledger row.");
+  }
+
+  if (current.status === "queued" && current.lastErrorCode === API_COMMAND_QUEUE_SEND_FAILED_CODE) {
+    await sendApiCommandMessage(bindings, current.id);
   }
 
   return current.id;
