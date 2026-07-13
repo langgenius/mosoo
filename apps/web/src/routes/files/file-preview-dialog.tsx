@@ -20,6 +20,7 @@ import {
   getTableDelimiter,
   MAX_TEXT_PREVIEW_BYTES,
   parseDelimitedText,
+  UNSUPPORTED_FILE_PREVIEW_MESSAGE,
 } from "./file-preview";
 import type { FilePreviewKind } from "./file-preview";
 
@@ -179,12 +180,7 @@ function FilePreviewContent({
   }
 
   if (kind === "unsupported") {
-    return (
-      <PreviewUnavailable
-        file={file}
-        message="This file format does not support in-page preview."
-      />
-    );
+    return <PreviewUnavailable file={file} message={UNSUPPORTED_FILE_PREVIEW_MESSAGE} />;
   }
 
   if (!canLoadText) {

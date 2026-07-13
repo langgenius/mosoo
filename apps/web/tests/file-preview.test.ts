@@ -4,6 +4,7 @@ import {
   getFilePreviewKind,
   getTableDelimiter,
   parseDelimitedText,
+  UNSUPPORTED_FILE_PREVIEW_MESSAGE,
 } from "../src/routes/files/file-preview";
 
 describe("file preview", () => {
@@ -14,6 +15,12 @@ describe("file preview", () => {
     expect(getFilePreviewKind("report.pdf", null)).toBe("pdf");
     expect(getFilePreviewKind("chart", "image/png")).toBe("image");
     expect(getFilePreviewKind("archive.zip", "application/zip")).toBe("unsupported");
+  });
+
+  test("offers a clear download action for unsupported file formats", () => {
+    expect(UNSUPPORTED_FILE_PREVIEW_MESSAGE).toBe(
+      "Preview isn't available for this file type. Download the file to view it.",
+    );
   });
 
   test("parses quoted CSV cells and line breaks", () => {
