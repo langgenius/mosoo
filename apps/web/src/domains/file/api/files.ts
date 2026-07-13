@@ -1,15 +1,15 @@
 import { FILE_STATUSES } from "@mosoo/contracts/file";
 import type {
   FileEntry,
-  FileEntryListing,
   FileListQuery as FileListRequest,
   FileStatus,
 } from "@mosoo/contracts/file";
+import type { SessionId } from "@mosoo/contracts/id";
 
 import { graphql } from "@/gql";
 import type { FileListQuery as FileListGraphQLQuery } from "@/gql/graphql";
 import { requestGraphQL } from "@/platform/http/graphql-client";
-import { toAccountId, toFileId } from "@/routes/typed-id";
+import { toAccountId, toFileId, toSessionId } from "@/routes/typed-id";
 
 const FILE_LIST_QUERY = graphql(/* GraphQL */ `
   query FileList($input: FileListInput!) {
@@ -25,6 +25,10 @@ const FILE_LIST_QUERY = graphql(/* GraphQL */ `
         path
         sessionKind
         size
+        scope {
+          id
+          kind
+        }
         status
         updatedAt
         version
@@ -34,6 +38,14 @@ const FILE_LIST_QUERY = graphql(/* GraphQL */ `
 `);
 
 type FileRecordNode = FileListGraphQLQuery["fileList"]["files"][number];
+
+export interface ListedFileEntry extends FileEntry {
+  sessionId: SessionId | null;
+}
+
+export interface ListedFileEntryListing {
+  files: ListedFileEntry[];
+}
 
 export const fileKeys = {
   all: ["files"] as const,
@@ -49,7 +61,19 @@ function toFileStatus(status: string): FileStatus {
   throw new Error(`Unknown file status: ${status}`);
 }
 
-function toFileEntry(file: FileRecordNode): FileEntry {
+function toFileSessionId(file: FileRecordNode): SessionId | null {
+  if (file.scope.kind !== "session") {
+    return null;
+  }
+
+  if (file.scope.id === null) {
+    throw new Error("Session-scoped file is missing its Session id.");
+  }
+
+  return toSessionId(file.scope.id);
+}
+
+function toFileEntry(file: FileRecordNode): ListedFileEntry {
   return {
     createdAt: file.createdAt,
     createdBy: toAccountId(file.createdBy),
@@ -59,6 +83,7 @@ function toFileEntry(file: FileRecordNode): FileEntry {
     mimeType: file.mimeType,
     name: file.name,
     path: file.path,
+    sessionId: toFileSessionId(file),
     sessionKind: file.sessionKind,
     size: file.size,
     status: toFileStatus(file.status),
@@ -67,7 +92,7 @@ function toFileEntry(file: FileRecordNode): FileEntry {
   };
 }
 
-export async function listFiles(input: FileListRequest): Promise<FileEntryListing> {
+export async function listFiles(input: FileListRequest): Promise<ListedFileEntryListing> {
   const payload = await requestGraphQL(FILE_LIST_QUERY, { input });
 
   return {

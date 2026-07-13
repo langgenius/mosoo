@@ -1,19 +1,19 @@
-import type { FileEntry, FileListQuery, FileSessionKind } from "@mosoo/contracts/file";
 import { useQuery } from "@tanstack/react-query";
 import { Download, FileStack, RefreshCw } from "lucide-react";
 import type { ReactElement } from "react";
 import { useMemo, useState } from "react";
 
 import { useAppSession } from "@/app/session-provider";
+import { useVisibleAgentsQuery } from "@/domains/agent/query/agent-queries";
 import { createFileDownload } from "@/domains/file/api/file-download-client";
 import { fileKeys, listFiles } from "@/domains/file/api/files";
-import { threadSessions } from "@/domains/session/api/list";
-import { toAppId, toSessionId } from "@/routes/typed-id";
+import type { ListedFileEntry } from "@/domains/file/api/files";
+import { allThreadSessions } from "@/domains/session/api/list";
+import { toAppId } from "@/routes/typed-id";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
-import { Input } from "@/shared/ui/input";
 import {
   ListPageContent,
   ListPageSearch,
@@ -23,14 +23,16 @@ import {
 import { PageHeader } from "@/shared/ui/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 
-type SessionKindFilter = "all" | FileSessionKind;
+import { FilePreviewDialog } from "./file-preview-dialog";
+import { createFilesViewModel } from "./files-list-model";
+import type { FilesTableEntry, SessionKindFilter } from "./files-list-model";
 
 const SESSION_KIND_OPTIONS: { label: string; value: SessionKindFilter }[] = [
   { label: "All", value: "all" },
   { label: "Attachments", value: "attachment" },
   { label: "Artifacts", value: "artifact" },
 ];
-const EMPTY_FILES: FileEntry[] = [];
+const EMPTY_FILES: ListedFileEntry[] = [];
 const FILE_UPDATED_AT_FORMATTER = new Intl.DateTimeFormat("en-US", {
   day: "2-digit",
   hour: "2-digit",
@@ -77,31 +79,6 @@ function SegmentedButtonGroup<T extends string>({
   );
 }
 
-function createFilesQueryInput(
-  appId: string,
-  sessionId: string,
-  sessionKind: SessionKindFilter,
-): FileListQuery {
-  const input: FileListQuery =
-    sessionKind === "all"
-      ? {
-          appId: toAppId(appId),
-        }
-      : {
-          appId: toAppId(appId),
-          sessionKind,
-        };
-
-  if (!sessionId) {
-    return input;
-  }
-
-  return {
-    ...input,
-    sessionId: toSessionId(sessionId),
-  };
-}
-
 function formatBytes(size: number): string {
   if (size < 1024) {
     return `${size} B`;
@@ -123,7 +100,7 @@ function formatDateTime(value: string): string {
   return FILE_UPDATED_AT_FORMATTER.format(new Date(value));
 }
 
-function formatFileCategory(file: FileEntry): string {
+function formatFileCategory(file: ListedFileEntry): string {
   if (file.sessionKind === "artifact") {
     return "Artifact";
   }
@@ -135,23 +112,17 @@ function formatFileCategory(file: FileEntry): string {
   return "Attachment";
 }
 
-function fileCategoryVariant(file: FileEntry): "default" | "soil" {
+function fileCategoryVariant(file: ListedFileEntry): "default" | "soil" {
   return file.sessionKind === "artifact" ? "soil" : "default";
 }
 
-function matchesSearch(file: FileEntry, search: string): boolean {
-  const normalized = search.trim().toLowerCase();
-
-  if (!normalized) {
-    return true;
-  }
-
-  return [file.name, file.path, file.id, file.mimeType ?? ""].some((value) =>
-    value.toLowerCase().includes(normalized),
-  );
-}
-
-function FileTable({ files }: { files: FileEntry[] }): ReactElement {
+function FileTable({
+  files,
+  onPreview,
+}: {
+  files: FilesTableEntry[];
+  onPreview: (file: ListedFileEntry) => void;
+}): ReactElement {
   return (
     <div className="bg-card border-border-strong overflow-hidden rounded-md border">
       <Table>
@@ -159,6 +130,7 @@ function FileTable({ files }: { files: FileEntry[] }): ReactElement {
           <TableRow className="bg-paper-100 hover:bg-paper-100">
             <TableHead>Name</TableHead>
             <TableHead className="hidden md:table-cell">Category</TableHead>
+            <TableHead className="hidden lg:table-cell">Agent</TableHead>
             <TableHead className="hidden text-right md:table-cell">Size</TableHead>
             <TableHead className="hidden lg:table-cell">Updated</TableHead>
             <TableHead className="w-10 text-right"> </TableHead>
@@ -171,17 +143,38 @@ function FileTable({ files }: { files: FileEntry[] }): ReactElement {
             return (
               <TableRow key={file.id}>
                 <TableCell className="min-w-[220px]">
-                  <div className="flex min-w-0 flex-col gap-1">
+                  <button
+                    aria-label={`Preview ${file.name}`}
+                    className="flex max-w-full min-w-0 cursor-pointer flex-col gap-1 text-left"
+                    onClick={() => {
+                      onPreview(file);
+                    }}
+                    type="button"
+                  >
                     <span className="text-fg-1 max-w-[360px] truncate text-[13px] font-semibold">
                       {file.name}
                     </span>
                     <span className="text-fg-3 max-w-[420px] truncate text-[12px]">
                       {file.path}
                     </span>
-                  </div>
+                  </button>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   <Badge variant={fileCategoryVariant(file)}>{formatFileCategory(file)}</Badge>
+                </TableCell>
+                <TableCell className="hidden lg:table-cell">
+                  {file.agent === null ? (
+                    <span className="text-fg-3 text-[12px]">—</span>
+                  ) : (
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <span className="text-fg-1 max-w-[180px] truncate text-[12px] font-medium">
+                        {file.agent.name}
+                      </span>
+                      <span className="text-fg-3 text-[11px]">
+                        {file.agent.relation === "created" ? "Created" : "Reads"}
+                      </span>
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell className="text-fg-2 hidden text-right text-[12px] tabular-nums md:table-cell">
                   {formatBytes(file.size)}
@@ -207,14 +200,22 @@ function FileTable({ files }: { files: FileEntry[] }): ReactElement {
 
 export function FilesPage(): ReactElement {
   const { activeAppId } = useAppSession();
+  const [agentId, setAgentId] = useState("");
   const [sessionId, setSessionId] = useState("");
   const [sessionKind, setSessionKind] = useState<SessionKindFilter>("all");
   const [search, setSearch] = useState("");
-  const normalizedSessionId = sessionId.trim();
+  const [previewFile, setPreviewFile] = useState<ListedFileEntry | null>(null);
+  const {
+    data: agents = [],
+    isFetching: agentsFetching,
+    refetch: refetchAgents,
+  } = useVisibleAgentsQuery(activeAppId);
   const {
     data: sessionOptions = [],
     error: sessionOptionsError,
+    isFetching: sessionOptionsFetching,
     isLoading: sessionOptionsLoading,
+    refetch: refetchSessionOptions,
   } = useQuery({
     enabled: activeAppId !== null,
     queryFn: async () => {
@@ -222,7 +223,7 @@ export function FilesPage(): ReactElement {
         throw new Error("App id is required to list sessions.");
       }
 
-      return threadSessions(toAppId(activeAppId), "ui");
+      return allThreadSessions(toAppId(activeAppId));
     },
     queryKey: [...fileKeys.all, "session-options", activeAppId],
   });
@@ -239,58 +240,85 @@ export function FilesPage(): ReactElement {
         throw new Error("App id is required to list files.");
       }
 
-      return listFiles(createFilesQueryInput(activeAppId, normalizedSessionId, sessionKind));
+      return listFiles({ appId: toAppId(activeAppId) });
     },
-    queryKey: [...fileKeys.lists(), activeAppId, normalizedSessionId, sessionKind],
+    queryKey:
+      activeAppId === null
+        ? [...fileKeys.lists(), "missing"]
+        : fileKeys.list({ appId: toAppId(activeAppId) }),
   });
   const files = fileList?.files ?? EMPTY_FILES;
-  const filteredFiles = useMemo(
-    () => files.filter((file) => matchesSearch(file, search)),
-    [files, search],
+  const filesView = useMemo(
+    () =>
+      createFilesViewModel(
+        files,
+        sessionOptions.map((entry) => ({
+          agentId: entry.session.agentId,
+          id: entry.session.id,
+          title: entry.session.title,
+        })),
+        agents.map((agent) => ({ id: agent.id, name: agent.name })),
+        { agentId, search, sessionId, sessionKind },
+      ),
+    [agentId, agents, files, search, sessionId, sessionKind, sessionOptions],
   );
+  const filtersActive =
+    filesView.agentId !== "" ||
+    filesView.sessionId !== "" ||
+    sessionKind !== "all" ||
+    search.trim() !== "";
+  const refreshing = filesFetching || sessionOptionsFetching || agentsFetching;
 
   return (
     <div className="bg-background flex h-full flex-1 flex-col overflow-hidden">
       <PageHeader title="Files" description="App files, Thread attachments, and runtime artifacts.">
         <Button
-          disabled={filesFetching}
+          disabled={refreshing}
           onClick={() => {
-            void refetchFiles();
+            void Promise.all([refetchFiles(), refetchSessionOptions(), refetchAgents()]);
           }}
           size="sm"
           variant="outline"
         >
-          <RefreshCw className={cn("size-3.5", filesFetching && "animate-spin")} />
+          <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
           Refresh
         </Button>
       </PageHeader>
 
       <ListPageToolbar className="flex-wrap">
         <select
-          aria-label="Thread filter"
+          aria-label="Agent filter"
           className="bg-card border-border-strong text-fg-2 focus:border-ring h-8 min-w-[220px] rounded-md border px-2 text-[12.5px] transition-colors outline-none"
+          disabled={sessionOptionsLoading || sessionOptionsError !== null}
+          onChange={(event) => {
+            setAgentId(event.target.value);
+            setSessionId("");
+          }}
+          value={filesView.agentId}
+        >
+          <option value="">All agents</option>
+          {filesView.agentOptions.map((agent) => (
+            <option key={agent.id} value={agent.id}>
+              {agent.name}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Thread filter"
+          className="bg-card border-border-strong text-fg-2 focus:border-ring h-8 min-w-[300px] rounded-md border px-2 text-[12.5px] transition-colors outline-none"
           disabled={sessionOptionsLoading || sessionOptionsError !== null}
           onChange={(event) => {
             setSessionId(event.target.value);
           }}
-          value={sessionOptions.some((entry) => entry.session.id === sessionId) ? sessionId : ""}
+          value={filesView.sessionId}
         >
-          <option value="">All files</option>
-          {sessionOptions.map((entry) => (
-            <option key={entry.session.id} value={entry.session.id}>
-              {entry.session.title ?? entry.session.id}
+          <option value="">All Threads</option>
+          {filesView.sessionOptions.map((session) => (
+            <option key={session.id} value={session.id}>
+              {session.title === null ? session.id : `${session.title} — ${session.id}`}
             </option>
           ))}
         </select>
-        <Input
-          aria-label="Thread ID"
-          className="h-8 w-[280px] text-[12.5px]"
-          onChange={(event) => {
-            setSessionId(event.target.value);
-          }}
-          placeholder="Filter by Thread ID"
-          value={sessionId}
-        />
         <SegmentedButtonGroup<SessionKindFilter>
           label="Thread file category"
           onChange={setSessionKind}
@@ -313,16 +341,25 @@ export function FilesPage(): ReactElement {
           </div>
         ) : filesLoading ? (
           <div className="text-fg-3 py-12 text-center text-[13px]">Loading files...</div>
-        ) : filteredFiles.length === 0 ? (
+        ) : filesView.files.length === 0 ? (
           <EmptyState
             icon={FileStack}
-            title={search.trim() ? "No matching files" : "No files"}
+            title={filtersActive ? "No matching files" : "No files"}
             description="App files, Thread attachments, and runtime artifacts will appear here."
           />
         ) : (
-          <FileTable files={filteredFiles} />
+          <FileTable files={filesView.files} onPreview={setPreviewFile} />
         )}
       </ListPageContent>
+      {previewFile === null ? null : (
+        <FilePreviewDialog
+          key={previewFile.id}
+          file={previewFile}
+          onClose={() => {
+            setPreviewFile(null);
+          }}
+        />
+      )}
     </div>
   );
 }

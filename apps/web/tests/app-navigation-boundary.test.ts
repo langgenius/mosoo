@@ -11,16 +11,19 @@ describe("App navigation boundary", () => {
     const overviewIndex = source.indexOf('label: "Overview"');
     const runsIndex = source.indexOf('label: "Runs"');
     const agentsIndex = source.indexOf('label: "Agents"');
+    const filesIndex = source.indexOf('label: "Files"');
 
     expect(overviewIndex).toBeGreaterThan(-1);
     expect(runsIndex).toBeGreaterThan(-1);
+    expect(agentsIndex).toBeGreaterThan(-1);
+    expect(filesIndex).toBeGreaterThan(agentsIndex);
     expect(overviewIndex).toBeLessThan(runsIndex);
     expect(overviewIndex).toBeLessThan(agentsIndex);
     expect(source).toContain('path: "/"');
     expect(source).not.toContain('label: "Members"');
     expect(source).not.toContain('label: "Install"');
     expect(source).not.toContain('label: "Deployments"');
-    expect(source).not.toContain('label: "Files"');
+    expect(source).toContain('path: "/files"');
   });
 
   test("drops the standalone Channels tab from the primary nav", () => {
