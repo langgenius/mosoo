@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
 import type { DriverCommandId, DriverInstanceId, SessionRunId } from "@mosoo/id";
 
+import { recordCanonicalSessionRunFailure } from "../src/modules/runtime/application/session-runs/session-run-terminal-failure.service";
 import { repairFinalizedTerminalDriverRunState } from "../src/modules/runtime/infrastructure/driver-instance/terminal-run-release";
 import {
   createRuntimeCommandRecord,
@@ -22,6 +23,12 @@ const FINALIZE_COMMAND_ID = "01J0000000000000000000000V" as DriverCommandId;
 const FINALIZE_CLOUDFLARE_SESSION_ID = "01J0000000000000000000000W";
 const TURN_INTERRUPTED_MESSAGE =
   "This turn was interrupted before it completed. Please resend your last request.";
+const PROVISION_ERROR = {
+  code: "runtime.provision_failed",
+  details: {},
+  message: "Driver command dispatch failed.",
+  retryable: false,
+} as const;
 
 interface TerminalEventRow {
   content_text: string;
@@ -382,11 +389,36 @@ describe("driver finalization repair", () => {
         run_id: FINALIZE_RUN_ID,
         seq: 1,
         source: "api",
-        source_event_id: `driver-terminal:${PUBLIC_API_TEST_IDS.driverOwner}:${FINALIZE_RUN_ID}:turn-interrupted`,
+        source_event_id: `session-run-terminal:${FINALIZE_RUN_ID}:run.failed`,
         trace_id: "trace-finalize",
         visibility: "all_consumers",
       },
     ]);
+  });
+
+  test("deduplicates dispatch repair after driver finalization", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertFinalizedDriverLeaseFixture(database);
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+
+    await repairFinalizedTerminalDriverRunState(bindings, {
+      driverInstanceId: PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId,
+      status: "failed",
+    });
+    await recordCanonicalSessionRunFailure(bindings, {
+      error: PROVISION_ERROR,
+      runId: FINALIZE_RUN_ID,
+      sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+      source: "api",
+    });
+
+    const failureEvents = (await readTerminalEvents(database)).filter(
+      (event) => event.event_type === "run.failed",
+    );
+    expect(failureEvents).toHaveLength(1);
+    expect(failureEvents[0]?.source_event_id).toBe(
+      `session-run-terminal:${FINALIZE_RUN_ID}:run.failed`,
+    );
   });
 
   test("benchmarks driver interruption finalization over 20 fault injections", async () => {

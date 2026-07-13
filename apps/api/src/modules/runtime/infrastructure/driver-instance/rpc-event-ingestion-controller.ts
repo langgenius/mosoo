@@ -12,6 +12,7 @@ import type {
 import { createErrorLogContext, logError } from "../../../../platform/cloudflare/logger";
 import type { SessionDeliveryEvent } from "../../../sessions/application/session-live-state.service";
 import { getSessionRuntimeEventSourceReceipts } from "../../../sessions/infrastructure/session-runtime-event-store.repository";
+import { createSessionRunTerminalFailureSourceId } from "../../domain/session-run-terminal-event-id";
 import { EVENT_BATCH_MAX_SIZE, LOG_BATCH_MAX_SIZE } from "./connections";
 import { DriverEventTerminalGate } from "./driver-event-terminal-gate";
 import { publishDriverLogBatch } from "./driver-log-batch-publisher";
@@ -56,6 +57,16 @@ function resolveEventSessionRunId(
   return eventRunId === undefined
     ? undefined
     : parsePlatformId<SessionRunId>(eventRunId, "driver event run id");
+}
+
+function resolveDriverEventPersistenceSourceId(event: DriverEventEnvelope): string {
+  if (event.event.kind === "run.failed" && event.event.runId !== undefined) {
+    return createSessionRunTerminalFailureSourceId(
+      parsePlatformId<SessionRunId>(event.event.runId, "driver failed event run id"),
+    );
+  }
+
+  return event.eventId;
 }
 
 const PRE_HELLO_LOG_BATCH_LIMIT = 16;
@@ -285,7 +296,7 @@ export class DriverInstanceRpcEventIngestionController {
     }
 
     const sourceEventIds = events
-      .map((event) => event.eventId)
+      .map(resolveDriverEventPersistenceSourceId)
       .filter((eventId) => eventId.length > 0);
 
     if (sourceEventIds.length === 0) {
@@ -309,13 +320,13 @@ export class DriverInstanceRpcEventIngestionController {
 
       seenEventIds.add(event.eventId);
 
-      const receipt = receiptsByEventId.get(event.eventId);
+      const receipt = receiptsByEventId.get(resolveDriverEventPersistenceSourceId(event));
 
       if (receipt === undefined) {
         continue;
       }
 
-      receipts.push(receipt);
+      receipts.push({ ...receipt, eventId: event.eventId });
     }
 
     return receipts;

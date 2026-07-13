@@ -10,6 +10,7 @@ import { appendSessionRuntimeEvents } from "../../../sessions/application/sessio
 import { createFailedSessionRunRuntimeEvent } from "../../application/session-runs/session-run-view-events.service";
 import { classifyReclaim, decideReclaimRecovery } from "../../domain/session-run-reclaim-recovery";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
+import { createSessionRunTerminalFailureSourceId } from "../../domain/session-run-terminal-event-id";
 import { recordRuntimeRunLeaseReleasedOutcome } from "../runtime-subject-lifecycle/runtime-run-lease-store";
 import { failAcceptedRuntimeCommandsForTerminalDriver } from "../session-runs/runtime-command-store.repository";
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
@@ -51,17 +52,9 @@ function toFinalizedDriverRunTransitionRun(
   }
 }
 
-function finalizedDriverRunSourceEventId(input: {
-  readonly driverInstanceId: DriverInstanceId;
-  readonly sessionRunId: SessionRunId;
-}): string {
-  return `driver-terminal:${input.driverInstanceId}:${input.sessionRunId}:turn-interrupted`;
-}
-
 async function appendFinalizedDriverRunEvent(
   bindings: ApiBindings,
   input: {
-    readonly driverInstanceId: DriverInstanceId;
     readonly run: SessionRunSummary;
     readonly runError: RunError;
     readonly sessionId: SessionId;
@@ -74,10 +67,7 @@ async function appendFinalizedDriverRunEvent(
         run: input.run,
         runError: input.runError,
         sessionId: input.sessionId,
-        sourceEventId: finalizedDriverRunSourceEventId({
-          driverInstanceId: input.driverInstanceId,
-          sessionRunId: input.run.id,
-        }),
+        sourceEventId: createSessionRunTerminalFailureSourceId(input.run.id),
       }),
     ],
     sessionId: input.sessionId,
@@ -146,7 +136,6 @@ export async function repairFinalizedTerminalDriverRunState(
 
     if (link.sessionId !== null && run !== null) {
       await appendFinalizedDriverRunEvent(bindings, {
-        driverInstanceId: input.driverInstanceId,
         run,
         runError,
         sessionId: link.sessionId,

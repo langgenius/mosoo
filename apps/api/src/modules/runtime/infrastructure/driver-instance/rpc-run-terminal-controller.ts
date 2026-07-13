@@ -96,9 +96,13 @@ export class DriverInstanceRpcRunTerminalController {
 
     await viewerEventDelivery.flushSafely();
     context.assertActiveConnection();
+    const link = await this.#getRuntimeSessionLink({
+      refresh: runtimeSessionLinkNeedsRefresh(state.runtimeSessionLink),
+    });
     await recordDriverInstanceFailure(env, {
       driverInstanceId,
       error: input.error,
+      link,
     });
     context.assertActiveConnection();
 
@@ -123,9 +127,6 @@ export class DriverInstanceRpcRunTerminalController {
       await finalizeTerminalState();
     }
 
-    const link = await this.#getRuntimeSessionLink({
-      refresh: runtimeSessionLinkNeedsRefresh(state.runtimeSessionLink),
-    });
     await syncSessionViewerState(env, link.sessionId);
 
     return { ok: true };
