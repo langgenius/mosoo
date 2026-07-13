@@ -1,8 +1,8 @@
 # App Boundary
 
-Status: active and shipped.
+Status: historical baseline (shipped); superseded by [docs/SPEC.md](../SPEC.md) where they conflict.
 
-This document is the source of truth for the current App pivot. It supersedes older Agent-first, Workspace, team-member, org-wide sharing, and enterprise-governance language when deciding the next implementation sequence.
+This document recorded the App pivot as it shipped. It still decodes older Agent-first, Workspace, team-member, org-wide sharing, and enterprise-governance language, but the canonical product contract — including deployment source, Release, and execution model — is now [docs/SPEC.md](../SPEC.md); do not use this file to decide new implementation sequence.
 
 ## Summary
 

@@ -8,8 +8,8 @@ Product contracts and the standards used to write them.
 
 ## Current direction
 
-- [Mosoo Spec](../SPEC.md): canonical V1 nouns, relationships, non-goals, behavior, and implemented baseline.
-- [App Boundary](./app-boundary.md): active shipped ownership and IA boundary. Read this before changing data model, IA, Agent ownership, resource ownership, access, or deployment behavior.
+- [Mosoo Spec](../SPEC.md): the canonical target product contract — nouns, relationships, non-goals, and behavior. Migration is in progress; where current code or older PRDs disagree, the Spec wins.
+- [App Boundary](./app-boundary.md): historical baseline of the shipped App pivot, superseded by the Spec where they conflict. Useful for decoding older ownership and IA wording, not for deciding new behavior.
 
 ## PRDs
 
@@ -17,8 +17,8 @@ This directory contains active contracts, shipped behavior, semantic companions,
 and superseded link stubs. Presence in this index does not mean a capability is shipped. Each
 document must state its own status near the top; if it does not, verify it against the current
 implementation before treating it as authoritative. When older PRDs mention Organization-owned
-business assets, Workspace, or Agent-first service identity, apply the App Boundary drift rules
-first.
+business assets, Workspace, or Agent-first service identity, resolve against the Spec first;
+App Boundary documents how that older wording was originally cut.
 
 ### Agents & packaging
 

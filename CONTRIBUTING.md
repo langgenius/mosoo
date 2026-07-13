@@ -11,7 +11,7 @@ Before changing code, read the relevant product and architecture documents:
 
 These documents define system boundaries, module relationships, and design intent. If the PRD, architecture, and implementation disagree, fix the source of truth instead of hiding the mismatch in generated files, local adapters, or temporary branches.
 
-When a change pivots a core noun or ownership boundary, update the documentation anchors first: README, architecture, PRD index, and the active boundary PRD. For the current App boundary cut, [App Boundary](./docs/prd/app-boundary.md) resolves older Organization-owned, member-governance, Workspace, and Agent-first wording.
+When a change pivots a core noun or ownership boundary, update the documentation anchors first: README, architecture, PRD index, and the active boundary PRD. The canonical product contract is [docs/SPEC.md](./docs/SPEC.md); [App Boundary](./docs/prd/app-boundary.md) is the historical App-pivot baseline that decodes older Organization-owned, member-governance, Workspace, and Agent-first wording, and yields to the Spec where they conflict.
 
 ## Repository Structure
 
@@ -23,7 +23,7 @@ This repository is a monorepo:
 | `apps/web`             | React console app built with Vite Plus and deployed as Cloudflare Worker assets on `try.mosoo.ai`.                              |
 | `apps/driver`          | Agent Driver bundle used by API Worker / Sandbox paths.                                                                         |
 | `pkgs/contracts`       | Cross-boundary TypeScript contracts and parser surfaces; cross app / package DTOs should go here first.                         |
-| `pkgs/db`              | Drizzle schema and the append-only D1 migration chain.                                                                          |
+| `pkgs/db`              | Drizzle schema and generated D1 migrations (currently one squashed baseline).                                                   |
 | `pkgs/*`               | Runtime-neutral shared packages for events, policy, package format, observability, dev auth, effects, and related capabilities. |
 | `e2e`                  | Playwright local acceptance scripts and runtime signal contract checks.                                                         |
 | `config`               | Shared repository tooling config (prek, GraphQL codegen, TypeScript bases, lint).                                               |
@@ -43,7 +43,7 @@ If generated output is wrong, fix the schema, contract, resolver, or PRD source 
 Minimum generated-file rules:
 
 - GraphQL schema, scalar mapping, query, mutation, or fragment changes require `just graphql-codegen`.
-- DB schema changes require a new `just db-generate <name>` migration; applied migration history is immutable. See [Database And Migrations](#database-and-migrations).
+- DB schema changes require regenerating migrations with `just db-regen`; production constraints on the recorded baseline are described in [Database And Migrations](#database-and-migrations).
 - Dependency changes require committing the resulting `bun.lock`; install-only lockfile churn should stay out of the PR.
 
 ## Toolchain
@@ -115,8 +115,8 @@ Local development notes:
 
 - D1 migration is not applied automatically on the first request. Run
   `just db-migrate` before starting services. After a DB schema change, run
-  `just db-generate <name>`, review the new SQL, then run `just db-reset-local`
-  to prove the full migration chain against a fresh local database.
+  `just db-regen`, review the regenerated SQL, then run `just db-reset-local`
+  to prove the migration chain against a fresh local database.
 - External MCP services used during Preview choose their own documented local
   port; Mosoo does not reserve a `5180+` range for them.
 - Before asserting port conflicts or performance problems, measure with `lsof`, `curl`, timing, or another reproducible command.
@@ -137,10 +137,10 @@ just fmt-check         # check formatting
 just lint              # generate Cloudflare types, then run lint
 just tc                # run workspace typecheck
 just test              # run regular unit tests
-just check             # DB migration safety + fmt/docs/lint/tc/test + GraphQL freshness
+just check             # fmt + doc links + lint + tc + tests + GraphQL freshness
 just graphql-codegen   # regenerate GraphQL schema and web gql output
-just db-generate NAME  # append one reviewed Drizzle migration
-just db-migrations-check # verify history, SQL safety, and schema snapshot
+just db-regen          # regenerate the Drizzle baseline from the schema
+just db-reset-local    # destroy local D1 state and reapply migrations
 ```
 
 During development, prefer focused commands for faster feedback:
@@ -153,42 +153,43 @@ just test-file apps/api/tests/session-run-cancel.test.ts
 
 ## Database And Migrations
 
-Mosoo uses one append-only migration history for local and production D1:
+Mosoo uses generated Drizzle migrations for local and production D1:
 
 - The schema source of truth is `pkgs/db/src/schema/**`.
-- `pkgs/db/drizzle/0000_baseline.sql` is frozen because production has recorded it.
-- Every schema change appends a named `0001+` SQL file, journal entry, and snapshot.
-- Never modify, delete, rename, or regenerate an existing migration or snapshot.
-- The normal release lane accepts additive SQL only. Destructive or data-rewrite
-  migrations require explicit approval plus a separate backup and rollback plan.
+- The generated chain currently consists of one squashed baseline,
+  `pkgs/db/drizzle/0000_baseline.sql`, which production has recorded.
+- `just db-regen` deletes and regenerates that baseline from the schema.
+  Wrangler records applied migrations by filename, so a regenerated baseline is
+  silently skipped by any database that already recorded it — production will
+  never re-run it. Once the baseline has shipped, schema changes must land as a
+  new appended migration file instead. There is no `just` recipe for appending
+  yet; it is a manual `drizzle-kit generate --name <name>` step in `pkgs/db`,
+  reviewed like any other SQL change.
+- Destructive or data-rewrite migrations require explicit approval plus a
+  separate backup and rollback plan.
 
 Common commands:
 
 ```bash
-just db-generate add_session_archive_reason
-just db-migrations-check
-just db-reset-local
-just db-migrate
+just db-regen        # regenerate the squashed baseline from the schema
+just db-reset-local  # destroy local D1 state, then reapply the chain
+just db-migrate      # apply pending migrations to existing local state
 ```
 
-`just db-generate <name>` never deletes migration history. The migration name must
-use lowercase words separated by underscores. Review the generated SQL before
-continuing; the repository guard rejects destructive statements, table rebuilds,
-and a required column without a default in the normal deploy lane.
-
 If local state is dirty, use `just db-reset-local`; it deletes only local Wrangler
-D1 state and reapplies the full chain. Do not delete `pkgs/db/drizzle`.
+D1 state and reapplies the chain. Do not hand-edit `pkgs/db/drizzle`.
 
-Production D1 is not reset during deploy. `just deploy-api` first runs the full
-repository gate and a clean, append-only migration check against an explicit
-trusted Git range, then applies only pending remote D1 migrations before deploying
-the API Worker. CI compares the PR base and head to reject mutations of existing
-SQL, snapshots, or journal entries. A production API deploy fails before any
-remote mutation unless both `DB_MIGRATION_BASE_SHA` and
-`DB_MIGRATION_HEAD_SHA` are set. The base must be the approved commit behind the
-current production migration history; it must be an ancestor of the head. The
-head must resolve to the exact checked-out release commit, and the complete
-worktree (including submodules) must be clean.
+Production D1 is not reset during deploy. `just deploy-api` runs
+`apps/api/bin/deploy-prod.ts`, whose first remote action is applying pending D1
+migrations. It then verifies that every baseline table exists in production —
+the DEPLOY-D1-001 guard that refuses to deploy a Worker whose schema references
+tables a rewritten, silently-skipped baseline never created — ensures the
+channel-final-delivery queues, builds the Driver, and deploys the API Worker.
+No other automated migration gate exists today: there is no trusted-Git-range
+check, no clean-worktree check, and no dry-run inside the deploy script. Run
+`just check` and the
+[Production Deploy Verification](./docs/production-deploy-verification.md)
+runbook before deploying.
 
 ## GraphQL Codegen
 
@@ -220,7 +221,7 @@ Recommended baseline:
 - API behavior changes: focused `just test-file <path>`; add `just tc-package @mosoo/api` when types or bindings are involved.
 - Web behavior changes: focused `just test-file <path>` and `just tc-package @mosoo/web`; user-visible flows need browser or manual checks.
 - GraphQL changes: `just graphql-codegen`.
-- DB schema changes: `just db-generate <name>`, `just db-reset-local`, relevant API tests, and `just db-migrations-check`.
+- DB schema changes: `just db-regen`, `just db-reset-local`, and relevant API tests.
 
 E2E entry points:
 
@@ -377,16 +378,15 @@ just commit-check
 Production deployment scripts exist, but they are not part of the daily contribution flow:
 
 ```bash
-export DB_MIGRATION_BASE_SHA="<last-approved-production-commit>"
-export DB_MIGRATION_HEAD_SHA="$(git rev-parse HEAD)"
-just deploy-api
-just deploy-web
-just deploy
+just deploy       # full repository gate, then API deploy, then Web deploy
+just deploy-api   # API only — runs no gate; run `just check` first yourself
+just deploy-web   # Web only — runs no gate; does not touch D1
 ```
 
-The migration comparison variables are required by `just deploy-api` and
-`just deploy`; `just deploy-web` does not mutate D1. All three commands run the
-full repository gate before publishing.
+Only `just deploy` runs the repository gate before publishing; `just deploy-api`
+and `just deploy-web` publish directly. The API deploy applies pending remote D1
+migrations as its first remote action (see
+[Database And Migrations](#database-and-migrations)).
 
 API production config lives in `apps/api/wrangler.toml`; web production config lives in `apps/web/wrangler.toml`. Cloudflare routes send `try.mosoo.ai/api/*` to the API Worker and `try.mosoo.ai/*` to the console Web Worker. The public landing page and blog on `mosoo.ai/*` are owned by `langgenius/mosoo-website`.
 
