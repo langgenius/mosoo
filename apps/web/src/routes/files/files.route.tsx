@@ -26,6 +26,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { FilePreviewDialog } from "./file-preview-dialog";
 import { createFilesViewModel } from "./files-list-model";
 import type { FilesTableEntry, SessionKindFilter } from "./files-list-model";
+import { ThreadFilter } from "./thread-filter";
 
 const SESSION_KIND_OPTIONS: { label: string; value: SessionKindFilter }[] = [
   { label: "All", value: "all" },
@@ -164,7 +165,7 @@ function FileTable({
                 </TableCell>
                 <TableCell className="hidden lg:table-cell">
                   {file.agent === null ? (
-                    <span className="text-fg-3 text-[12px]">—</span>
+                    <span className="text-fg-3 text-[12px]">Not linked</span>
                   ) : (
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <span className="text-fg-1 max-w-[180px] truncate text-[12px] font-medium">
@@ -285,40 +286,37 @@ export function FilesPage(): ReactElement {
         </Button>
       </PageHeader>
 
-      <ListPageToolbar className="flex-wrap">
-        <select
-          aria-label="Agent filter"
-          className="bg-card border-border-strong text-fg-2 focus:border-ring h-8 min-w-[220px] rounded-md border px-2 text-[12.5px] transition-colors outline-none"
+      <ListPageToolbar className="flex-wrap items-end">
+        <div className="flex min-w-[180px] flex-col gap-1 sm:w-[220px]">
+          <label className="text-fg-3 text-[11px] font-semibold" htmlFor="files-agent-filter">
+            Agent
+          </label>
+          <select
+            aria-label="Agent filter"
+            className="bg-card border-border-strong text-fg-2 focus:border-ring h-8 w-full rounded-md border px-2 text-[12.5px] transition-colors outline-none"
+            disabled={sessionOptionsLoading || sessionOptionsError !== null}
+            id="files-agent-filter"
+            onChange={(event) => {
+              setAgentId(event.target.value);
+              setSessionId("");
+            }}
+            value={filesView.agentId}
+          >
+            <option value="">All agents</option>
+            {filesView.agentOptions.map((agent) => (
+              <option key={agent.id} value={agent.id}>
+                {agent.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <ThreadFilter
+          agents={filesView.agentOptions}
           disabled={sessionOptionsLoading || sessionOptionsError !== null}
-          onChange={(event) => {
-            setAgentId(event.target.value);
-            setSessionId("");
-          }}
-          value={filesView.agentId}
-        >
-          <option value="">All agents</option>
-          {filesView.agentOptions.map((agent) => (
-            <option key={agent.id} value={agent.id}>
-              {agent.name}
-            </option>
-          ))}
-        </select>
-        <select
-          aria-label="Thread filter"
-          className="bg-card border-border-strong text-fg-2 focus:border-ring h-8 min-w-[300px] rounded-md border px-2 text-[12.5px] transition-colors outline-none"
-          disabled={sessionOptionsLoading || sessionOptionsError !== null}
-          onChange={(event) => {
-            setSessionId(event.target.value);
-          }}
+          onChange={setSessionId}
+          sessions={filesView.sessionOptions}
           value={filesView.sessionId}
-        >
-          <option value="">All Threads</option>
-          {filesView.sessionOptions.map((session) => (
-            <option key={session.id} value={session.id}>
-              {session.title === null ? session.id : `${session.title} — ${session.id}`}
-            </option>
-          ))}
-        </select>
+        />
         <SegmentedButtonGroup<SessionKindFilter>
           label="Thread file category"
           onChange={setSessionKind}
