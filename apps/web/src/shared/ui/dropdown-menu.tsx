@@ -4,8 +4,11 @@ import type { ComponentProps, ReactElement } from "react";
 import { cn } from "@/shared/lib/class-names";
 import { asChildRender } from "@/shared/ui/render-prop";
 
-function DropdownMenu({ ...props }: ComponentProps<typeof MenuPrimitive.Root>): ReactElement {
-  return <MenuPrimitive.Root {...props} />;
+function DropdownMenu({
+  modal = false,
+  ...props
+}: ComponentProps<typeof MenuPrimitive.Root>): ReactElement {
+  return <MenuPrimitive.Root modal={modal} {...props} />;
 }
 
 function DropdownMenuTrigger({
