@@ -1,3 +1,4 @@
+import { Popover } from "@base-ui/react/popover";
 import type { EnvironmentSummary } from "@mosoo/contracts/environment";
 import { Box, Check, ExternalLink, Plus, Star } from "lucide-react";
 import { useState } from "react";
@@ -78,17 +79,14 @@ export function EnvironmentPicker({
   return (
     <div className="space-y-2">
       <Label className="text-muted-foreground text-[12px]">Runtime Environment</Label>
-      <div className="relative">
-        <button
+      <Popover.Root modal={false} onOpenChange={setOpen} open={open}>
+        <Popover.Trigger
           className={cn(
             "flex min-h-[52px] w-full items-center justify-between gap-3 rounded-lg border border-border bg-white px-3 py-2 text-left transition-colors",
             readOnly ? "cursor-default opacity-80" : "cursor-pointer hover:border-brand/30",
             open ? "border-brand/30 ring-2 ring-brand-ring" : null,
           )}
           disabled={readOnly || activeAppId === null}
-          onClick={() => {
-            setOpen((current) => !current);
-          }}
           type="button"
         >
           <div className="flex min-w-0 items-center gap-2.5">
@@ -116,20 +114,12 @@ export function EnvironmentPicker({
             </div>
           </div>
           {readOnly ? null : <span className="text-muted-foreground">▾</span>}
-        </button>
+        </Popover.Trigger>
 
-        {open ? (
-          <>
-            <button
-              aria-label="Close environment menu"
-              className="fixed inset-0 z-40"
-              onClick={() => {
-                setOpen(false);
-              }}
-              type="button"
-            />
-            <div className="border-border absolute top-full right-0 left-0 z-50 mt-1 rounded-lg border bg-white p-1.5 shadow-lg">
-              <div className="max-h-[260px] overflow-y-auto">
+        <Popover.Portal>
+          <Popover.Positioner align="start" className="z-50 w-[var(--anchor-width)]" sideOffset={4}>
+            <Popover.Popup className="border-border flex max-h-[var(--available-height)] flex-col overflow-hidden rounded-lg border bg-white p-1.5 shadow-lg outline-none">
+              <div className="min-h-0 flex-1 overflow-y-auto">
                 <EnvironmentMenuContent
                   environments={environments}
                   error={environmentsQuery.error}
@@ -141,7 +131,7 @@ export function EnvironmentPicker({
                   selectedEnvironment={selectedEnvironment}
                 />
               </div>
-              <div className="border-border-subtle mt-1 grid gap-1 border-t pt-1">
+              <div className="border-border-subtle mt-1 grid shrink-0 gap-1 border-t pt-1">
                 <button
                   className="text-brand hover:bg-brand-light/60 flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={activeAppId === null}
@@ -167,10 +157,10 @@ export function EnvironmentPicker({
                   </Link>
                 ) : null}
               </div>
-            </div>
-          </>
-        ) : null}
-      </div>
+            </Popover.Popup>
+          </Popover.Positioner>
+        </Popover.Portal>
+      </Popover.Root>
 
       {activeAppId !== null ? (
         <CreateEnvironmentDialog
