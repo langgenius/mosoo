@@ -25,23 +25,6 @@ Mosoo is for independent builders and small teams that already use local coding 
 
 The narrow first use case is an existing runnable App that combines ordinary web behavior with one agentic business workflow. The Builder keeps using their preferred local coding agent; Mosoo starts where local authoring ends.
 
-## Product Boundary
-
-Mosoo is not another cloud prompt-to-app editor and does not replace Codex, Claude Code, or OpenCode. It does not invent a new agent loop or pay for the Builder's local coding sessions.
-
-The Production Alpha target includes:
-
-- a Build Skill, CLI, and strict contract for producing a supported repository;
-- Mosoo-managed Cloudflare infrastructure for the first production profile;
-- an App-scoped Auth Realm, durable application data, file storage, and secrets;
-- one Agent Workload per App on one managed production runtime profile using Builder-provided model credentials;
-- one Dispatch path shared by manual and scheduled Triggers;
-- durable Run state, replayable events, SSE, cancellation, and artifacts;
-- Mosoo-enforced Confirmation Gates for declared high-impact actions;
-- immutable Releases, code rollback, backups, tested recovery, and raw data export.
-
-The App repository owns the product: frontend, backend business logic, database schema, business profiles and authorization, Skills, the Workload definition, and the meaning of its data. Mosoo operates the infrastructure without turning application entities such as Subscription, Plan, Role, Membership, or Invoice into Mosoo control-plane entities.
-
 ## Product Status
 
 Mosoo is being reset around this production path. The canonical target contract is [docs/SPEC.md](./docs/SPEC.md). Existing Agent-first, Thread-first, and public-GitHub-Web-artifact behavior in the repository is migration input, not the desired product model when it conflicts with that Spec.
