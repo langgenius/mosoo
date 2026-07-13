@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 
 import {
   API_COMMAND_LEASE_MS,
+  API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
   API_COMMAND_QUEUE_SEND_FAILED_CODE,
   claimApiCommand,
   enqueueApiCommand,
@@ -112,13 +113,11 @@ describe("API command queue", () => {
       apiCommandQueue: queue,
     }) as ApiBindings;
 
-    await expect(
-      enqueueApiCommand(bindings, {
-        dedupeKey: "scheduled:ambiguous-send",
-        kind: "scheduled_maintenance",
-        payload: { scheduledTime: nowMsForTest() },
-      }),
-    ).rejects.toThrow("Queue response timed out.");
+    const commandId = await enqueueApiCommand(bindings, {
+      dedupeKey: "scheduled:ambiguous-send",
+      kind: "scheduled_maintenance",
+      payload: { scheduledTime: nowMsForTest() },
+    });
 
     const retained = retainedMessages[0];
     if (retained === undefined) {
@@ -138,6 +137,7 @@ describe("API command queue", () => {
       lastErrorCode: API_COMMAND_QUEUE_SEND_FAILED_CODE,
       status: "queued",
     });
+    expect(commandId).toBe(retained.commandId);
     await expect(
       claimApiCommand({
         commandId: retained.commandId,
@@ -166,13 +166,11 @@ describe("API command queue", () => {
       apiCommandQueue: queue,
     }) as ApiBindings;
 
-    await expect(
-      enqueueApiCommand(bindings, {
-        dedupeKey: "scheduled:redrive",
-        kind: "scheduled_maintenance",
-        payload: { scheduledTime: nowMsForTest() },
-      }),
-    ).rejects.toThrow("Queue is unavailable.");
+    await enqueueApiCommand(bindings, {
+      dedupeKey: "scheduled:redrive",
+      kind: "scheduled_maintenance",
+      payload: { scheduledTime: nowMsForTest() },
+    });
 
     await redriveFailedApiCommandEnqueues(bindings);
 
@@ -192,6 +190,51 @@ describe("API command queue", () => {
       lastErrorMessage: null,
       status: "queued",
     });
+  });
+
+  test("redrives a command left pending before its first Queue send", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const queue = createApiCommandQueueStub();
+    const bindings = createPublicHttpTestBindings(database, {
+      apiCommandQueue: queue,
+    }) as ApiBindings;
+    const commandId = "01J0000000000000000000000C";
+
+    await database
+      .app()
+      .insert(apiCommandsTable)
+      .values({
+        attemptCount: 0,
+        claimExpiresAt: null,
+        claimOwner: null,
+        completedAt: null,
+        createdAt: nowMsForTest(),
+        dedupeKey: "scheduled:pending-before-send",
+        id: commandId,
+        kind: "scheduled_maintenance",
+        lastErrorCode: API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
+        lastErrorMessage: "API command is awaiting queue delivery.",
+        payloadJson: JSON.stringify({ scheduledTime: nowMsForTest() }),
+        status: "queued",
+        updatedAt: nowMsForTest(),
+      })
+      .run();
+
+    await redriveFailedApiCommandEnqueues(bindings);
+
+    const row = await database
+      .app()
+      .select({
+        lastErrorCode: apiCommandsTable.lastErrorCode,
+        lastErrorMessage: apiCommandsTable.lastErrorMessage,
+      })
+      .from(apiCommandsTable)
+      .where(eq(apiCommandsTable.id, commandId))
+      .get();
+
+    expect(queue.sent).toHaveLength(1);
+    expect(queue.sent[0]?.body).toEqual({ commandId });
+    expect(row).toEqual({ lastErrorCode: null, lastErrorMessage: null });
   });
 
   test("renews a running command claim for the current owner", async () => {

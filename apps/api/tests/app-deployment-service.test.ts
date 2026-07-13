@@ -4,6 +4,7 @@ import { apiCommandsTable, appDeploymentRunsTable, appDeploymentsTable } from "@
 import { eq } from "drizzle-orm";
 
 import { createAppDeploymentRunDispatchDedupeKey } from "../src/modules/api-command/application/api-command-enqueue";
+import { API_COMMAND_QUEUE_SEND_FAILED_CODE } from "../src/modules/api-command/application/api-command-ledger";
 import {
   APP_DEPLOYMENT_RUN_DISPATCH_MAX_ATTEMPTS,
   APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE,
@@ -543,6 +544,50 @@ describe("app deployment service", () => {
 
     const deploymentAfterPointerDrift = await getAppDeployment(bindings, VIEWER, APP_ID);
     expect(deploymentAfterPointerDrift?.latestRun?.id).toBe(run.id);
+  });
+
+  test("keeps a deployment run queued when Queue delivery is deferred", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const deferredBindings = {
+      ...bindings,
+      API_COMMAND_QUEUE: {
+        async send(): Promise<void> {
+          throw new Error("Queue response timed out.");
+        },
+      },
+    };
+
+    const run = await deployApp(
+      deferredBindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+
+    const command = await database
+      .app()
+      .select({
+        lastErrorCode: apiCommandsTable.lastErrorCode,
+        status: apiCommandsTable.status,
+      })
+      .from(apiCommandsTable)
+      .get();
+    const runRow = await database
+      .app()
+      .select({
+        errorCode: appDeploymentRunsTable.errorCode,
+        status: appDeploymentRunsTable.status,
+      })
+      .from(appDeploymentRunsTable)
+      .where(eq(appDeploymentRunsTable.id, run.id))
+      .get();
+
+    expect(command).toEqual({
+      lastErrorCode: API_COMMAND_QUEUE_SEND_FAILED_CODE,
+      status: "queued",
+    });
+    expect(runRow).toEqual({ errorCode: null, status: "queued" });
   });
 
   test("rejects a second deploy while a run is active", async () => {

@@ -1,7 +1,7 @@
 import { apiCommandsTable } from "@mosoo/db";
 import type { ApiCommandId, ApiCommandKind, ApiCommandRow } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import { and, asc, eq, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, lt, or, sql } from "drizzle-orm";
 
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -14,6 +14,10 @@ export const API_COMMAND_LEASE_MS = 5 * 60 * 1000;
 export const API_COMMAND_LEASE_RENEWAL_INTERVAL_MS = API_COMMAND_LEASE_MS / 5;
 
 export const API_COMMAND_QUEUE_SEND_FAILED_CODE = "queue_send_failed";
+
+export const API_COMMAND_QUEUE_DELIVERY_PENDING_CODE = "queue_delivery_pending";
+
+const API_COMMAND_QUEUE_DELIVERY_PENDING_MESSAGE = "API command is awaiting queue delivery.";
 
 const API_COMMAND_QUEUE_SEND_FAILED_MESSAGE = "API command queue send failed.";
 
@@ -95,7 +99,10 @@ async function clearApiCommandQueueSendFailure(input: {
       and(
         eq(apiCommandsTable.id, input.commandId),
         eq(apiCommandsTable.status, "queued"),
-        eq(apiCommandsTable.lastErrorCode, API_COMMAND_QUEUE_SEND_FAILED_CODE),
+        inArray(apiCommandsTable.lastErrorCode, [
+          API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
+          API_COMMAND_QUEUE_SEND_FAILED_CODE,
+        ]),
       ),
     )
     .run();
@@ -109,12 +116,33 @@ async function sendApiCommandMessage(
     await bindings.API_COMMAND_QUEUE.send(toQueueMessage(commandId));
   } catch (error) {
     // A rejected producer response does not prove that Queue discarded the message.
-    // Keep the outbox row so a delivered duplicate can still be claimed safely.
-    await markApiCommandQueueSendFailed({ commandId, database: bindings.DB });
-    throw error;
+    // The durable outbox record remains eligible for scheduled redrive either way.
+    try {
+      await markApiCommandQueueSendFailed({ commandId, database: bindings.DB });
+    } catch (markError) {
+      logError("api-command.enqueue_failure_mark_failed", {
+        ...createErrorLogContext(markError),
+        commandId,
+      });
+    }
+
+    logError("api-command.enqueue_deferred", {
+      ...createErrorLogContext(error),
+      commandId,
+    });
+    return;
   }
 
-  await clearApiCommandQueueSendFailure({ commandId, database: bindings.DB });
+  try {
+    await clearApiCommandQueueSendFailure({ commandId, database: bindings.DB });
+  } catch (error) {
+    // Queue accepted the command. Leaving its delivery marker intact is safe:
+    // a later redrive may send a duplicate, and consumer claiming is idempotent.
+    logError("api-command.enqueue_success_clear_failed", {
+      ...createErrorLogContext(error),
+      commandId,
+    });
+  }
 }
 
 export async function redriveFailedApiCommandEnqueues(
@@ -126,7 +154,10 @@ export async function redriveFailedApiCommandEnqueues(
     .where(
       and(
         eq(apiCommandsTable.status, "queued"),
-        eq(apiCommandsTable.lastErrorCode, API_COMMAND_QUEUE_SEND_FAILED_CODE),
+        inArray(apiCommandsTable.lastErrorCode, [
+          API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
+          API_COMMAND_QUEUE_SEND_FAILED_CODE,
+        ]),
       ),
     )
     .orderBy(asc(apiCommandsTable.id))
@@ -134,14 +165,7 @@ export async function redriveFailedApiCommandEnqueues(
     .all();
 
   for (const command of commands) {
-    try {
-      await sendApiCommandMessage(bindings, command.id);
-    } catch (error) {
-      logError("api-command.enqueue_redrive_failed", {
-        ...createErrorLogContext(error),
-        commandId: command.id,
-      });
-    }
+    await sendApiCommandMessage(bindings, command.id);
   }
 }
 
@@ -164,8 +188,8 @@ export async function enqueueApiCommand(
       dedupeKey,
       id: commandId,
       kind: input.kind,
-      lastErrorCode: null,
-      lastErrorMessage: null,
+      lastErrorCode: API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
+      lastErrorMessage: API_COMMAND_QUEUE_DELIVERY_PENDING_MESSAGE,
       payloadJson: JSON.stringify(input.payload),
       status: "queued",
       updatedAt: nowMs,
@@ -185,7 +209,11 @@ export async function enqueueApiCommand(
     throw new Error("API command enqueue could not confirm the ledger row.");
   }
 
-  if (current.status === "queued" && current.lastErrorCode === API_COMMAND_QUEUE_SEND_FAILED_CODE) {
+  if (
+    current.status === "queued" &&
+    (current.lastErrorCode === API_COMMAND_QUEUE_DELIVERY_PENDING_CODE ||
+      current.lastErrorCode === API_COMMAND_QUEUE_SEND_FAILED_CODE)
+  ) {
     await sendApiCommandMessage(bindings, current.id);
   }
 
