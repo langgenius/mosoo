@@ -85,9 +85,11 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
       id text PRIMARY KEY NOT NULL,
       content_text text NOT NULL,
       ended_at integer NOT NULL,
+      event_type text NOT NULL,
       occurred_at integer NOT NULL,
       process_status text NOT NULL,
       process_type text NOT NULL,
+      run_id text,
       seq integer NOT NULL,
       session_id text NOT NULL,
       tokens integer,
@@ -186,10 +188,12 @@ async function insertSessionProcessEvent(
   input: {
     content?: string;
     endedAt?: number;
+    eventType?: string;
     id: string;
     occurredAt?: number;
     processStatus?: SessionProcessEventStatus;
     processType?: SessionProcessEventType;
+    runId?: string | null;
     seq: number;
     sessionId?: string;
     tokens?: number | null;
@@ -197,6 +201,7 @@ async function insertSessionProcessEvent(
   },
 ): Promise<void> {
   const occurredAt = input.occurredAt ?? input.seq * 1000;
+  const processType = input.processType ?? "run.started";
 
   await database
     .prepare(
@@ -205,23 +210,27 @@ async function insertSessionProcessEvent(
           id,
           content_text,
           ended_at,
+          event_type,
           occurred_at,
           process_status,
           process_type,
+          run_id,
           seq,
           session_id,
           tokens,
           visibility
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
     )
     .bind(
       input.id,
       input.content ?? `run-${input.seq}`,
       input.endedAt ?? occurredAt,
+      input.eventType ?? processType,
       occurredAt,
       input.processStatus ?? "available",
-      input.processType ?? "run.started",
+      processType,
+      input.runId ?? null,
       input.seq,
       input.sessionId ?? SESSION_ID,
       input.tokens ?? null,
@@ -269,6 +278,125 @@ describe("session process event projection", () => {
     );
 
     expect(events.map((event) => event.type)).toEqual(["run.started"]);
+  });
+
+  test("folds persisted assistant message fragments into one process event", async () => {
+    const database = createProcessEventQueryDatabase();
+    await insertSessionProcessEvent(database, {
+      content: "run-1",
+      eventType: "run.started",
+      id: "event-run-started",
+      runId: "run-1",
+      seq: 1,
+    });
+    await insertSessionProcessEvent(database, {
+      content: "Message updated.",
+      eventType: "message.started",
+      id: "event-message-started",
+      processType: "agent.message.delta",
+      runId: "run-1",
+      seq: 2,
+    });
+    await insertSessionProcessEvent(database, {
+      content: "你",
+      eventType: "message.delta",
+      id: "event-delta-1",
+      processType: "agent.message.delta",
+      runId: "run-1",
+      seq: 3,
+    });
+    await insertSessionProcessEvent(database, {
+      content: "好",
+      eventType: "message.delta",
+      id: "event-delta-2",
+      processType: "agent.message.delta",
+      runId: "run-1",
+      seq: 4,
+    });
+    await insertSessionProcessEvent(database, {
+      content: "，世界。",
+      eventType: "message.delta",
+      id: "event-delta-3",
+      processType: "agent.message.delta",
+      runId: "run-1",
+      seq: 5,
+    });
+    await insertSessionProcessEvent(database, {
+      content: "Message updated.",
+      eventType: "message.completed",
+      id: "event-message-completed",
+      processType: "agent.message.delta",
+      runId: "run-1",
+      seq: 6,
+    });
+    await insertSessionProcessEvent(database, {
+      content: "run-1",
+      eventType: "run.completed",
+      id: "event-run-completed",
+      processType: "run.completed",
+      runId: "run-1",
+      seq: 7,
+    });
+
+    const events = await getThreadSessionProcessEvents(
+      database,
+      VIEWER,
+      {
+        appId: APP_ID,
+        sessionId: SESSION_ID,
+      },
+      {
+        limit: 100,
+      },
+    );
+
+    expect(events.map((event) => event.type)).toEqual([
+      "run.started",
+      "agent.message.delta",
+      "run.completed",
+    ]);
+    expect(events[1]).toMatchObject({
+      content: "你好，世界。",
+      id: "event-message-completed",
+    });
+  });
+
+  test("shows an in-flight streamed message as a single folded process event", async () => {
+    const database = createProcessEventQueryDatabase();
+    await insertSessionProcessEvent(database, {
+      content: "写到一",
+      eventType: "message.delta",
+      id: "event-delta-1",
+      processType: "agent.message.delta",
+      runId: "run-1",
+      seq: 1,
+    });
+    await insertSessionProcessEvent(database, {
+      content: "半",
+      eventType: "message.delta",
+      id: "event-delta-2",
+      processType: "agent.message.delta",
+      runId: "run-1",
+      seq: 2,
+    });
+
+    const events = await getThreadSessionProcessEvents(
+      database,
+      VIEWER,
+      {
+        appId: APP_ID,
+        sessionId: SESSION_ID,
+      },
+      {
+        limit: 100,
+      },
+    );
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      content: "写到一半",
+      type: "agent.message.delta",
+    });
   });
 
   test("hides owner-debug session events from participant process feeds", async () => {
