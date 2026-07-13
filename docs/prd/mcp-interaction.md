@@ -1,211 +1,27 @@
-# MCP (Connector) - for humans
+# MCP Connections
 
-Status: active and shipped for App-owned remote MCP servers and Agent bindings.
+Status: available in the console for App-owned remote MCP servers and Agent use.
 
-> This checked-in file is the current MCP product contract. Protocol and security details are anchored in the MCP contracts and implementation; there is no separate MCP engineering PRD in this repository.
->
-> Adjacent PRDs: [`credentials`](./credentials.md), [`agent-manifest`](./agent-manifest.md), [`skill-interaction`](./skill-interaction.md), [`app-boundary`](./app-boundary.md).
->
-> Current boundary note: V1 MCP is App-owned. App is the implementation namespace; App is the product boundary. MCP servers and secrets live inside one App, and Agents in that App bind them as runtime capabilities. Credentials never travel with exported or forked Agent packages.
+## Why It Matters
 
----
+Mosoo Agents become more useful when they can act in products such as GitHub, Linear, or a Builder's own server. An App owner should connect once, share it with selected Agents, and keep credentials out of Agent configuration.
 
-## One-Line Positioning
+## Who It Is For
 
-> Connect one App to remote tools, then let Agents inside that App use those tools without moving secrets across boundaries.
+The Builder who owns an App configures MCP. App Users benefit when an Agent uses those tools, but do not manage connections.
 
-MCP (Model Context Protocol) is how a Mosoo App gives its Agents access to external tools such as Linear, GitHub, Notion, an internal HTTPS endpoint, or another remote tool server. In V1, MCP is not a company catalog or a role workflow. It is a single-owner App resource that can be created, connected, bound to Agents, and resolved safely at runtime.
+## User Flow
 
-V1 is scoped to remote HTTPS MCP servers using Streamable HTTP. Local process transport, marketplace discovery, intranet tunnels, human-role workflows, and global connector catalogs are outside the current App product path.
+1. In **MCP servers**, the App owner adds a name and remote HTTPS address, then chooses OAuth or a bearer token.
+2. Saving immediately starts authorization. OAuth opens the provider's page; bearer authorization asks for a token.
+3. In the Agent editor, the owner selects one or more MCP servers from the same App and saves the Agent.
+4. The owner tests it by asking the Agent to use it in Preview or a new Session. Only enabled, authorized connections are available during a run.
+5. The owner can later edit, disable, reconnect, revoke, or delete a connection. Its authorization type cannot be changed. Changing its address disconnects the existing credential and requires authorization again.
 
----
+## Current Availability and Boundaries
 
-## 1. User Problem
+The complete add-to-use path is available for remote HTTPS MCP servers. Binding before authorization is allowed, but does not make tools usable.
 
-The App owner needs a direct way to make an Agent useful:
+“Connected” means Mosoo has an active stored credential; it does not prove the server or its tools work. There is no standalone connection test or tool browser, so failures appear when an Agent first uses the server.
 
-| Need                                         | Product answer                                                       |
-| -------------------------------------------- | -------------------------------------------------------------------- |
-| "This Agent needs to call Linear."           | Add a Linear MCP server inside the active App.                       |
-| "This Agent needs a credential."             | Connect an App-local Bearer or OAuth credential for that server.     |
-| "This Agent should use the tool at runtime." | Bind the App MCP server in the Agent editor.                         |
-| "This Agent package is exported or forked."  | Export only the binding intent; require reconnect in the target App. |
-
-The current product path is intentionally narrow: one App owner configures MCP for one App, then runs Agents that belong to that same App.
-
----
-
-## 2. Three Concepts
-
-MCP is split into three independent concepts. Do not collapse them.
-
-| Concept               | Plain-language definition                                                                   | Boundary                                                                                |
-| --------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| **MCP Server**        | Name, HTTPS URL, auth type, display metadata, and connection policy. It contains no secret. | Belongs to exactly one App.                                                             |
-| **MCP Credential**    | Vault-backed Bearer or OAuth material for one MCP server. The UI never echoes the secret.   | Belongs to the same App as the server. It can be app-scoped or explicitly agent-scoped. |
-| **Agent MCP Binding** | The Agent config edge saying "this Agent may use this App MCP server."                      | Belongs to one Agent in the same App.                                                   |
-
-This split keeps the invariant simple:
-
-```text
-App owns MCP server
-App owns MCP credential
-Agent binds App-owned MCP server
-Runtime resolves credential only inside that same App
-```
-
-Deleting or exporting an Agent does not move the MCP credential. Importing a package creates reconnect work in the receiving App instead of reusing a runtime id from the package snapshot.
-
----
-
-## 3. Credential Model
-
-The runtime/API contract supports two credential shapes:
-
-| Shape                | Meaning                                                   | Runtime behavior                                                                              |
-| -------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| **App credential**   | Default App credential for one MCP server.                | A `runtime_resolved` Agent binding resolves this credential for the App.                      |
-| **Agent credential** | Explicit credential row for one Agent and one MCP server. | An `agent_bound` binding resolves only when the credential, Agent, server, and App all match. |
-
-Anything else fails closed. A credential from a different App, a different server, a different Agent, or the wrong secret purpose is denied or resolves to no credential.
-
-The current Web editor creates `runtime_resolved` bindings only. `agent_bound`
-remains a supported internal/API read and resolution contract, but there is no
-current Web control for selecting or configuring that mode.
-
----
-
-## 4. App MCP Journey
-
-The owner manages MCP from the active App:
-
-```text
-App
-  MCP
-    Add server
-      Name
-      HTTPS URL
-      Auth type
-    Save
-    Authorize or connect credential
-      Bearer token or OAuth
-```
-
-Visible states:
-
-| Visible state/action | What it means                                                                                                                 |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| **Connected**        | The current credential row is active. This does not prove the remote server is reachable.                                     |
-| **Connect**          | No active stored credential is available; the list presents this action rather than a separate “Not connected” durable badge. |
-| **Disabled**         | The server is disabled and is excluded from runtime use; this label may appear alongside its credential state.                |
-
-Other connection failures surface when runtime connects rather than as durable
-list states.
-
-The App owner can edit the server name, HTTPS URL, description, and icon;
-reconnect or revoke its credential; disable or enable it; or delete it. Auth type
-cannot be changed in the edit flow. Changing the URL revokes the credential
-bound to the previous endpoint and clears cached OAuth discovery metadata, so
-the owner must connect again. Delete removes the server and its credential
-rows.
-
-The current Add/connect flow validates configuration shape and stores secret
-material, but it does not probe the MCP server or list tools. Remote
-availability is established when runtime actually connects.
-
----
-
-## 5. Agent Editor Journey
-
-The Agent editor only binds MCP servers already available in the same App:
-
-```text
-Agent editor
-  Capabilities
-    MCP
-      Pick App MCP server
-      Save Agent config
-```
-
-Rules:
-
-- The picker only shows MCP servers from the active App.
-- New Web bindings store the server reference with `runtime_resolved`; they do not store a raw secret.
-- The disabled Switch control is not a credential-mode selector.
-- A Session freezes the MCP binding reference as part of its runtime snapshot.
-- Runtime resolution checks App ownership, Agent ownership, server ownership, server App, binding App, and credential shape before reading secret material.
-- If resolution fails, the Agent call fails with a reconnect or unavailable-capability state instead of falling back to another owner path.
-
----
-
-## 6. Export, Fork, And Import
-
-MCP package behavior follows the same security rule as Provider credentials and other runtime secrets:
-
-| Operation                           | Current behavior                                                                           |
-| ----------------------------------- | ------------------------------------------------------------------------------------------ |
-| Export Agent package                | Include MCP binding intent and reconnect metadata, not credential material.                |
-| Fork inside an App                  | Preserve MCP intent with `serverId: null`; reconnect is required even inside the same App. |
-| Import into another App             | Create reconnect intent; server id and credential id from the package are not trusted.     |
-| Run imported Agent before reconnect | Fail closed because no App-local credential proof exists.                                  |
-
-Legacy runtime ids such as package-scoped MCP server or credential ids are not ownership proof. They must not be used to derive access from package snapshots.
-
----
-
-## 7. Fail-Closed Invariants
-
-The product and implementation should keep these invariants aligned:
-
-| Invariant                 | Required behavior                                                                                                 |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| App id required           | MCP create, list, connect, update, delete, OAuth, registry, binding, and runtime APIs require explicit App proof. |
-| Owner proof required      | The caller must own the App. A tenant people record is not enough.                                                |
-| Server proof required     | The MCP server must belong to the requested App and to the current owner.                                         |
-| Credential proof required | Secret reads require the credential row, server id, App id, scope, owner, auth type, and purpose to match.        |
-| Runtime proof required    | Agent App, Session App, binding App, server App, and execution owner must match.                                  |
-| Package proof rejected    | Exported package snapshots and runtime ids are descriptive metadata, not authority.                               |
-
-When the system cannot prove one of these facts, it rejects the action instead of trying to infer a compatible path.
-
----
-
-## 8. V1 Scope
-
-In scope:
-
-- Remote HTTPS MCP servers using Streamable HTTP.
-- Bearer and OAuth credentials stored through the vault.
-- App-local MCP server registry.
-- App-local credential lifecycle.
-- Agent editor MCP binding to same-App servers.
-- Runtime credential resolution for app-scoped and agent-scoped rows.
-- Package export/import reconnect intent.
-
-Out of scope for the current App product path:
-
-- Local STDIO transport.
-- Intranet tunnel setup.
-- Connector marketplace.
-- Global connector catalog.
-- Tool-level allowlists.
-- Human-role workflows.
-- Cross-App connector reuse.
-- Reverse LLM calls from an MCP server.
-- Server-driven user prompts.
-
----
-
-## 9. Protocol Notes
-
-MCP is an open protocol (`https://modelcontextprotocol.io/`). The core model:
-
-- **Tools** are executable functions the AI can call.
-- **Resources** are data sources the server provides.
-- **Prompts** are reusable templates.
-
-Mosoo acts as MCP Host and Client for a running Agent. V1 uses only Streamable HTTP transport. V1 rejects Sampling and Elicitation: an MCP server cannot ask Mosoo for a reverse LLM completion, and it cannot open a new prompt flow to collect more user input.
-
----
-
-This for-human version reflects the current App-owned MCP boundary. The implementation names the boundary App, while the console and product story use App.
+Credentials are encrypted, are never shown again after entry, and stay inside their App. Mosoo gives Agents temporary, connection-specific access rather than revealing the stored secret. Exporting or forking an Agent does not carry credentials; the destination App must reconnect. Local-process servers, cross-App sharing, a connector marketplace, and tool-level selection are not available.
