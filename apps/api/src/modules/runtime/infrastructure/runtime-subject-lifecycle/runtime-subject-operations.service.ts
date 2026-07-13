@@ -10,6 +10,7 @@ import {
 } from "../../application/runtime-diagnostic-events";
 import { appendRuntimeSubjectTerminatedEvents } from "../../application/runtime-state-operation-target-events";
 import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
+import { deleteNativeResumeRefsForSessions } from "../native-resume-ref.repository";
 import { createSandboxCheckpoints } from "../sandbox-backup.service";
 import { stopRuntimeSubjectDrivers } from "./runtime-subject-driver-stop";
 import {
@@ -221,6 +222,10 @@ export async function resetRuntimeSubjectAgentState(
       rules: policy.checkpoint.clearOnReset,
       stateTargets,
     });
+    await deleteNativeResumeRefsForSessions(
+      bindings.DB,
+      input.targets.map((target) => target.sessionId),
+    );
     await createSandboxCheckpoints(bindings, {
       operationId: input.operationId,
       rules: policy.checkpoint.createOnReset,

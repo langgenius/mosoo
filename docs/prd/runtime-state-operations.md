@@ -17,6 +17,6 @@ Builders need to improve a live Agent without guessing whether conversations wil
 
 ## Safety And Visible Boundaries
 
-Reset is irreversible once clearing begins. It removes long-term memory and per-conversation runtime state, then destroys the sandbox, including local logins, caches, installed packages, and other files outside eligible checkpointed conversation workspaces. Agent settings, Skills, connected tools and credentials, explicit conversation files, transcripts, logs, and cost history remain. Stored vendor resume references are not removed, so Reset is not a complete erasure of every external runtime handle. If Reset fails after clearing starts, some state may already be gone.
+Reset is irreversible once clearing begins. It removes long-term memory, per-conversation runtime state, and stored vendor resume references for affected conversations, then destroys the sandbox, including local logins, caches, installed packages, and other files outside eligible checkpointed conversation workspaces. Agent settings, Skills, connected tools and credentials, explicit conversation files, transcripts, logs, and cost history remain. If Reset fails after clearing starts, some state may already be gone.
 
 There is no Hibernate button. Mosoo may automatically recycle an idle Assistant sandbox using the same checkpoint boundary as Recreate. Task Agent sandboxes are temporary and are recycled after each run without Assistant-style runtime-state continuity.
