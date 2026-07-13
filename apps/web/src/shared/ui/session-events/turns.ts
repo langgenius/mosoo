@@ -78,7 +78,7 @@ function finalizeTurns(turns: MutableSessionTurn[]): SessionTurn[] {
   }));
 }
 
-function createSessionTurns(events: readonly SessionProcessEvent[]): SessionTurn[] {
+export function projectSessionTurns(events: readonly SessionProcessEvent[]): SessionTurn[] {
   const turns: MutableSessionTurn[] = [];
   let pendingEvents: SessionProcessEvent[] = [];
   let current: MutableSessionTurn | null = null;
@@ -103,6 +103,18 @@ function createSessionTurns(events: readonly SessionProcessEvent[]): SessionTurn
 
     if (current === null) {
       pendingEvents.push(event);
+
+      if (event.type === "run.failed") {
+        const failedTurn = createPendingTurn(pendingEvents);
+
+        if (failedTurn !== null) {
+          failedTurn.endedAt = event.occurredAt;
+          failedTurn.status = "failed";
+          turns.push(failedTurn);
+          pendingEvents = [];
+        }
+      }
+
       continue;
     }
 
@@ -156,7 +168,7 @@ function createSessionTurns(events: readonly SessionProcessEvent[]): SessionTurn
 }
 
 export function useSessionTurns(events: readonly SessionProcessEvent[]): SessionTurn[] {
-  return useMemo(() => createSessionTurns(events), [events]);
+  return useMemo(() => projectSessionTurns(events), [events]);
 }
 
 export function countSessionTurnDomains(events: readonly SessionProcessEvent[]): SessionTurnCounts {

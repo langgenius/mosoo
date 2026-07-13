@@ -558,7 +558,14 @@ describe("API to driver boundary", () => {
       events: batch.events,
       link,
     });
+    const canonicalFailureSourceId = `session-run-terminal:${API_DRIVER_BOUNDARY_IDS.sessionRun}:run.failed`;
 
+    expect(projection.runtimeEvents).toMatchObject([{ sourceEventId: canonicalFailureSourceId }]);
+    expect(projection.sessionDeliveryEvents.map((record) => record.sourceEventId)).toEqual([
+      canonicalFailureSourceId,
+      canonicalFailureSourceId,
+      canonicalFailureSourceId,
+    ]);
     expect(projection.sessionDeliveryEvents.map((record) => record.event.type)).toEqual([
       EventType.TOOL_CALL_RESULT,
       EventType.TOOL_CALL_END,

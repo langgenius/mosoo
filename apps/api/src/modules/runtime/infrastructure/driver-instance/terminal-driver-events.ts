@@ -8,6 +8,7 @@ import { logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { appRuntimeEventToSessionDeliveryEvents } from "../../../sessions/application/session-live-state.service";
+import { recordCanonicalSessionRunFailure } from "../../application/session-runs/session-run-terminal-failure.service";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
 import { recordRuntimeRunLeaseReleasedOutcome } from "../runtime-subject-lifecycle/runtime-run-lease-store";
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
@@ -99,44 +100,23 @@ export async function recordDriverInstanceFailure(
   input: {
     error: DriverFailureInput["error"];
     driverInstanceId: DriverInstanceId;
+    link?: RuntimeSessionLink;
   },
 ): Promise<void> {
   const database = bindings.DB;
-  const link = await getRuntimeSessionLink(database, input.driverInstanceId);
+  const link = input.link ?? (await getRuntimeSessionLink(database, input.driverInstanceId));
 
-  if (
-    link.sessionRunId !== null &&
-    link.sessionRunStatus !== null &&
-    isTerminalSessionRunStatus(link.sessionRunStatus)
-  ) {
-    if (hasLinkedSessionRun(link) && link.sessionRunStatus === "failed") {
-      await appendCanonicalTerminalDriverEvent({
-        bindings,
-        event: createDriverRunFailedEvent({
-          driverInstanceId: input.driverInstanceId,
-          error: input.error,
-          link,
-        }),
-      });
-    }
-
-    const released = await releaseLinkedRunLease(bindings, {
-      driverInstanceId: input.driverInstanceId,
-      link,
-      sessionRunId: link.sessionRunId,
+  if (hasLinkedSessionRun(link)) {
+    const outcome = await recordCanonicalSessionRunFailure(bindings, {
+      error: input.error,
+      runId: link.sessionRunId,
+      sessionId: link.sessionId,
+      source: "driver",
     });
-    await recycleReleasedTerminalRuntimeLeaseIfNeeded(bindings, { link, released });
-    return;
-  }
-
-  if (link.sessionRunId !== null) {
-    const failedEvent = hasLinkedSessionRun(link)
-      ? createDriverRunFailedEvent({
-          driverInstanceId: input.driverInstanceId,
-          error: input.error,
-          link,
-        })
-      : null;
+    if (outcome.kind !== "failed") {
+      assertTerminalDriverSessionRunTransition(outcome.transition);
+    }
+  } else if (link.sessionRunId !== null) {
     const outcome = await setSessionRunStatus(database, {
       error: input.error,
       runId: link.sessionRunId,
@@ -144,16 +124,6 @@ export async function recordDriverInstanceFailure(
       status: "failed",
     });
     assertTerminalDriverSessionRunTransition(outcome);
-
-    if (
-      failedEvent !== null &&
-      (!isStaleTerminalRunTransition(outcome) || isStaleTerminalRunStatus(outcome, "failed"))
-    ) {
-      await appendCanonicalTerminalDriverEvent({
-        bindings,
-        event: failedEvent,
-      });
-    }
   }
 
   const released = await releaseLinkedRunLease(bindings, {
@@ -215,35 +185,6 @@ async function synthesizeDriverRunFinished(
   await appendCanonicalTerminalDriverEvent({
     bindings: input.bindings,
     event: runCompletedEvent,
-  });
-}
-
-function createDriverRunFailedEvent(input: {
-  readonly driverInstanceId: DriverInstanceId;
-  readonly error: DriverFailureInput["error"];
-  readonly link: RuntimeSessionLink & {
-    readonly sessionId: SessionId;
-    readonly sessionRunId: SessionRunId;
-  };
-}): RuntimeEventEnvelope {
-  const eventId = createTerminalDriverEventId({
-    driverInstanceId: input.driverInstanceId,
-    kind: "run.failed",
-    sessionRunId: input.link.sessionRunId,
-  });
-
-  return createRuntimeEvent({
-    driverInstanceId: input.driverInstanceId,
-    id: createPlatformId<RuntimeEventId>(),
-    kind: "run.failed",
-    occurredAt: new Date().toISOString(),
-    payload: {
-      error: input.error,
-      recoverable: false,
-    },
-    runId: input.link.sessionRunId,
-    sessionId: input.link.sessionId,
-    sourceEventId: eventId,
   });
 }
 

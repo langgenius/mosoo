@@ -37,6 +37,7 @@ import type {
   SessionLiveState,
 } from "../../../sessions/application/session-live-state.service";
 import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
+import { createSessionRunTerminalFailureSourceId } from "../../domain/session-run-terminal-event-id";
 import { upsertNativeResumeRef } from "../native-resume-ref.repository";
 import { getRuntimeSubjectKeepAliveHandle } from "../runtime-subject-lifecycle/runtime-subject-lifecycle.service";
 import { getRuntimeConversationSession } from "../runtime-subject-lifecycle/runtime-subject-store";
@@ -432,12 +433,13 @@ export async function appRuntimeDriverEvents(
         typeof source.occurredAt === "number" && Number.isFinite(source.occurredAt)
           ? source.occurredAt
           : null,
-      sourceEventId: source.eventId.trim().length > 0 ? source.eventId : null,
+      sourceEventId: resolveDriverEventPersistenceSourceId(source, event),
     });
   }
 
   function appendSessionDeliveryEvent(
     source: DriverEventEnvelope,
+    event: RuntimeEventEnvelope,
     deliveryEvent: SessionDeliveryEvent,
   ): void {
     sessionDeliveryEvents.push({
@@ -446,7 +448,7 @@ export async function appRuntimeDriverEvents(
         typeof source.occurredAt === "number" && Number.isFinite(source.occurredAt)
           ? source.occurredAt
           : null,
-      sourceEventId: source.eventId.trim().length > 0 ? source.eventId : null,
+      sourceEventId: resolveDriverEventPersistenceSourceId(source, event),
     });
   }
 
@@ -547,7 +549,7 @@ export async function appRuntimeDriverEvents(
         );
 
         nextLiveState = applyAgUiEventToSessionLiveState(nextLiveState, permissionsUpdatedEvent);
-        appendSessionDeliveryEvent(envelope, permissionsUpdatedEvent);
+        appendSessionDeliveryEvent(envelope, event, permissionsUpdatedEvent);
         liveStateChanged = true;
       }
 
@@ -572,7 +574,7 @@ export async function appRuntimeDriverEvents(
         );
 
         nextLiveState = applyAgUiEventToSessionLiveState(nextLiveState, permissionsUpdatedEvent);
-        appendSessionDeliveryEvent(envelope, permissionsUpdatedEvent);
+        appendSessionDeliveryEvent(envelope, event, permissionsUpdatedEvent);
         liveStateChanged = true;
       }
 
@@ -599,7 +601,7 @@ export async function appRuntimeDriverEvents(
 
     for (const liveEvent of liveEvents) {
       nextLiveState = applyAgUiEventToSessionLiveState(nextLiveState, liveEvent);
-      appendSessionDeliveryEvent(envelope, liveEvent);
+      appendSessionDeliveryEvent(envelope, event, liveEvent);
       liveStateChanged = true;
     }
   }
@@ -615,6 +617,17 @@ export async function appRuntimeDriverEvents(
     transitions,
     usage,
   };
+}
+
+function resolveDriverEventPersistenceSourceId(
+  source: DriverEventEnvelope,
+  event: RuntimeEventEnvelope,
+): string | null {
+  if (event.kind === "run.failed" && event.runId !== undefined) {
+    return createSessionRunTerminalFailureSourceId(event.runId);
+  }
+
+  return source.eventId.trim().length > 0 ? source.eventId : null;
 }
 
 function appendRuntimeDriverCanonicalSideEffects(
