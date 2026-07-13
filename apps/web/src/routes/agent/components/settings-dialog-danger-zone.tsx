@@ -244,10 +244,8 @@ export function AgentSettingsDangerZone({ agent }: { agent: Agent }) {
                     <li>Cache</li>
                     <li>Long-term memory</li>
                     <li>Session runtime directories</li>
+                    <li>Native runtime resume references</li>
                   </ul>
-                  <p className="mt-2">
-                    Stored native resume references are not currently removed by this operation.
-                  </p>
                 </div>
                 <div>
                   <div className="text-foreground font-medium">What will be preserved</div>

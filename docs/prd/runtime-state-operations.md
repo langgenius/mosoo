@@ -173,8 +173,8 @@ Reset agent-state is separate from Apply Changes.
 - It clears the policy-selected memory/Session targets, destroys the Pet runtime
   container, closes its runtime Sessions for recycle, and therefore loses
   container-local login, cache, installed packages, and arbitrary native state.
-- It does not currently delete persisted `native_resume_ref` rows, so it does
-  not guarantee erasure of every stored vendor resume handle.
+- It deletes persisted `native_resume_ref` rows for affected Sessions so a
+  cleared runtime state cannot retain a dangling vendor resume handle.
 - It does not delete Agent profile, prompt, Skills, MCP references, Provider credentials, Files, Threads, Session history, logs, or App Usage.
 - It cannot be used as a softer name for restart or recreate.
 
