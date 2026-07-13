@@ -1,6 +1,7 @@
 import BotIcon from "@hugeicons/core-free-icons/BotIcon";
 import ChevronRightIcon from "@hugeicons/core-free-icons/ChevronRightIcon";
 import DashboardSquare01Icon from "@hugeicons/core-free-icons/DashboardSquare01Icon";
+import Files02Icon from "@hugeicons/core-free-icons/Files02Icon";
 import InboxIcon from "@hugeicons/core-free-icons/InboxIcon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import SlidersHorizontalIcon from "@hugeicons/core-free-icons/SlidersHorizontalIcon";
@@ -43,6 +44,7 @@ const NAV_SECTIONS: AppNavSection[] = [
       { icon: createHugeicon(DashboardSquare01Icon, "OverviewIcon"), label: "Overview", path: "/" },
       { icon: createHugeicon(InboxIcon, "ThreadsIcon"), label: "Runs", path: "/threads" },
       { icon: createHugeicon(BotIcon, "AgentsIcon"), label: "Agents", path: "/agent" },
+      { icon: createHugeicon(Files02Icon, "FilesIcon"), label: "Files", path: "/files" },
       {
         children: [
           { label: "Skills", path: "/integrations/skills" },
