@@ -1018,7 +1018,7 @@ export type FileListQueryVariables = Exact<{
 }>;
 
 
-export type FileListQuery = { fileList: { files: Array<{ createdAt: string, createdBy: PlatformId, etag: string | null, expiresAt: string | null, id: PlatformId, mimeType: string | null, name: string, path: string, sessionKind: FileSessionKind | null, size: number, status: string, updatedAt: string, version: number }> } };
+export type FileListQuery = { fileList: { files: Array<{ createdAt: string, createdBy: PlatformId, etag: string | null, expiresAt: string | null, id: PlatformId, mimeType: string | null, name: string, path: string, sessionKind: FileSessionKind | null, size: number, status: string, updatedAt: string, version: number, scope: { id: PlatformId | null, kind: FileScopeKind } }> } };
 
 export type McpCredentialFieldsFragment = { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string };
 
@@ -1176,11 +1176,12 @@ export type PrewarmAgentSessionMutation = { prewarmAgentSession: { scheduledAt: 
 export type ThreadAgentSessionListQueryVariables = Exact<{
   appId: PlatformId;
   archived?: boolean | null | undefined;
+  beforeCursor?: string | null | undefined;
   type?: SessionType | null | undefined;
 }>;
 
 
-export type ThreadAgentSessionListQuery = { threadAgentSessionList: { nodes: Array<{ capabilities: Array<{ action: AgentSessionActionCapabilityName, reason: string | null, status: AgentSessionActionCapabilityStatus }>, session: { agentId: PlatformId, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, appId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } }> } };
+export type ThreadAgentSessionListQuery = { threadAgentSessionList: { nodes: Array<{ capabilities: Array<{ action: AgentSessionActionCapabilityName, reason: string | null, status: AgentSessionActionCapabilityStatus }>, session: { agentId: PlatformId, archivedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, kind: AgentKind, lastMessageAt: string | null, model: string, provider: string, appId: PlatformId, runtimeId: string, status: SessionStatus, title: string | null, type: SessionType, updatedAt: string, lastRun: { completedAt: string | null, createdAt: string, deploymentVersionId: PlatformId | null, deploymentVersionNumber: number | null, id: PlatformId, model: string | null, provider: string | null, startedAt: string | null, status: RunStatus, traceId: string, trigger: SessionRunTrigger, updatedAt: string, error: { code: string, details: PrimitiveRecord, message: string, retryable: boolean } | null } | null } }>, pageInfo: { endCursor: string | null, hasMore: boolean } } };
 
 export type AutoTitleSessionMutationVariables = Exact<{
   input: RenameSessionInput;
@@ -3222,6 +3223,10 @@ export const FileListDocument = /*#__PURE__*/ new TypedDocumentString(`
       path
       sessionKind
       size
+      scope {
+        id
+        kind
+      }
       status
       updatedAt
       version
@@ -3774,8 +3779,13 @@ export const PrewarmAgentSessionDocument = /*#__PURE__*/ new TypedDocumentString
 }
     `) as unknown as TypedDocumentString<PrewarmAgentSessionMutation, PrewarmAgentSessionMutationVariables>;
 export const ThreadAgentSessionListDocument = /*#__PURE__*/ new TypedDocumentString(`
-    query ThreadAgentSessionList($appId: ULID!, $archived: Boolean, $type: SessionType) {
-  threadAgentSessionList(appId: $appId, archived: $archived, type: $type) {
+    query ThreadAgentSessionList($appId: ULID!, $archived: Boolean, $beforeCursor: String, $type: SessionType) {
+  threadAgentSessionList(
+    appId: $appId
+    archived: $archived
+    beforeCursor: $beforeCursor
+    type: $type
+  ) {
     nodes {
       capabilities {
         action
@@ -3820,6 +3830,10 @@ export const ThreadAgentSessionListDocument = /*#__PURE__*/ new TypedDocumentStr
         type
         updatedAt
       }
+    }
+    pageInfo {
+      endCursor
+      hasMore
     }
   }
 }

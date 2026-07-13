@@ -17,8 +17,18 @@ export interface ThreadSessionListItem {
 }
 
 const THREAD_AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
-  query ThreadAgentSessionList($appId: ULID!, $archived: Boolean, $type: SessionType) {
-    threadAgentSessionList(appId: $appId, archived: $archived, type: $type) {
+  query ThreadAgentSessionList(
+    $appId: ULID!
+    $archived: Boolean
+    $beforeCursor: String
+    $type: SessionType
+  ) {
+    threadAgentSessionList(
+      appId: $appId
+      archived: $archived
+      beforeCursor: $beforeCursor
+      type: $type
+    ) {
       nodes {
         capabilities {
           action
@@ -64,9 +74,19 @@ const THREAD_AGENT_SESSION_LIST_QUERY = graphql(/* GraphQL */ `
           updatedAt
         }
       }
+      pageInfo {
+        endCursor
+        hasMore
+      }
     }
   }
 `);
+
+interface ThreadSessionsPage {
+  endCursor: string | null;
+  hasMore: boolean;
+  items: ThreadSessionListItem[];
+}
 
 function toThreadSessionListItem(
   node: ThreadAgentSessionListQuery["threadAgentSessionList"]["nodes"][number],
@@ -77,30 +97,72 @@ function toThreadSessionListItem(
   };
 }
 
-async function fetchThreadSessions(
+async function fetchThreadSessionsPage(
+  appId: AppId,
+  archived: boolean,
+  beforeCursor: string | null,
+  type?: SessionType | null,
+): Promise<ThreadSessionsPage> {
+  const payload = await requestGraphQL(THREAD_AGENT_SESSION_LIST_QUERY, {
+    archived,
+    appId,
+    beforeCursor,
+    type: type ?? null,
+  });
+
+  return {
+    endCursor: payload.threadAgentSessionList.pageInfo.endCursor,
+    hasMore: payload.threadAgentSessionList.pageInfo.hasMore,
+    items: payload.threadAgentSessionList.nodes.map(toThreadSessionListItem),
+  };
+}
+
+async function fetchAllThreadSessions(
   appId: AppId,
   archived: boolean,
   type?: SessionType | null,
 ): Promise<ThreadSessionListItem[]> {
-  const payload = await requestGraphQL(THREAD_AGENT_SESSION_LIST_QUERY, {
-    archived,
-    appId,
-    type: type ?? null,
-  });
+  const items: ThreadSessionListItem[] = [];
+  let beforeCursor: string | null = null;
 
-  return payload.threadAgentSessionList.nodes.map(toThreadSessionListItem);
+  while (true) {
+    const page = await fetchThreadSessionsPage(appId, archived, beforeCursor, type);
+    items.push(...page.items);
+
+    if (!page.hasMore) {
+      return items;
+    }
+
+    if (page.endCursor === null || page.endCursor === beforeCursor) {
+      throw new Error("Thread pagination did not provide a new cursor.");
+    }
+
+    beforeCursor = page.endCursor;
+  }
 }
 
 export async function threadSessions(
   appId: AppId,
   type?: SessionType | null,
 ): Promise<ThreadSessionListItem[]> {
-  return fetchThreadSessions(appId, false, type);
+  return (await fetchThreadSessionsPage(appId, false, null, type)).items;
 }
 
 export async function archivedThreadSessions(
   appId: AppId,
   type?: SessionType | null,
 ): Promise<ThreadSessionListItem[]> {
-  return fetchThreadSessions(appId, true, type);
+  return (await fetchThreadSessionsPage(appId, true, null, type)).items;
+}
+
+export async function allThreadSessions(
+  appId: AppId,
+  type?: SessionType | null,
+): Promise<ThreadSessionListItem[]> {
+  const [activeSessions, archivedSessions] = await Promise.all([
+    fetchAllThreadSessions(appId, false, type),
+    fetchAllThreadSessions(appId, true, type),
+  ]);
+
+  return [...activeSessions, ...archivedSessions];
 }
