@@ -27,6 +27,7 @@ import type {
   SkillId,
   SkillSnapshotId,
 } from "@mosoo/id";
+import type { DriverRecoveryMessage } from "agent-driver/boot";
 import type { DriverNativeRuntimeRef, DriverRuntime } from "agent-driver/runtime";
 
 export type { DriverRuntime };
@@ -177,6 +178,7 @@ export interface DriverExecutionSessionSpec {
   readonly cwd: string;
   readonly mcpServers: DriverBootMcpServer[];
   readonly nativeResumeRef: DriverNativeRuntimeRef | null;
+  readonly recoveryMessages: DriverRecoveryMessage[];
 }
 
 export interface DriverExecutionSpec {

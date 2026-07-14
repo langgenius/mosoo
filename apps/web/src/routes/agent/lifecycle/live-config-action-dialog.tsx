@@ -62,12 +62,12 @@ const META: Record<LifecycleActionKind, ActionMeta> = {
     title: "Switching runtime forks a new agent",
   },
   "reset-agent-state": {
-    body: "This destroys the current Pet Sandbox after clearing long-term memory and Session runtime directories; login and cache disappear with the container. Stored native resume references are not currently removed. Your Agent profile is untouched. Cannot be undone.",
+    body: "This destroys the current Pet Sandbox after clearing long-term memory, Session runtime directories, and native resume references; login and cache disappear with the container. Your Agent profile is untouched. Cannot be undone.",
     danger: "high",
     preservesState: false,
     primary: "Reset agent-state",
     stateNotice:
-      "Sandbox-local login/cache, checkpointed memory, and Session runtime directories are cleared. Stored native resume references may remain.",
+      "Sandbox-local login/cache, checkpointed memory, Session runtime directories, and native resume references are cleared.",
     title: "Reset agent-state · destructive",
   },
   "restart-process": {

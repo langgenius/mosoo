@@ -1,226 +1,24 @@
-# Skill — for humans
+# Skills
 
-Status: active and shipped for App-owned Skill packages and explicit Agent
-bindings. Retired Default Agent/sharing material is historical only.
+Status: Shipped for App owners, with important editing gaps.
 
-> This is the product-story version of Skill, written for non-engineering
-> readers. Exact package admission lives in `pkgs/skill-package`; API ownership
-> and binding behavior lives in the current Skill and Agent modules.
+## Why it matters
 
----
+A Skill lets a Builder reuse trusted instructions and supporting files across Agents without copying prompts by hand. Skills are for the person who owns and configures an App; App Users do not manage them.
 
-## Calibrate your mental model first (drift note)
+## Current user flow
 
-The retired pre-App design looked like this:
+1. Open **Skills** in the active App.
+2. Choose **Add skill**. Upload a `.md`, `.zip`, or `.skill` file, or import from GitHub or skills.sh. Mosoo previews the name, description, and author before adding it.
+3. Open a Skill card to read its main instructions. From this view, the owner can download, fork, or uninstall it.
+4. Open an Agent, add one or more Skills from that App, and save the Agent.
+5. When a new Session starts, its attached Skills become available to the Agent. The Agent reads a Skill only when the task calls for it.
 
-- An account-level **Default Agent** automatically picks Skills on the Work page.
-- Each user controls "does my Default Agent automatically invoke a given Skill" through a **per-user toggle**.
-- Skill sharing is a visible collaboration model with separate user-owned and received groups.
+Importing an Agent can also add Skills bundled with it to the destination App. If a referenced Skill is absent, the import reports the gap instead of borrowing a Skill from another App.
 
-After the App pivot, all of these are retired for V1: the Work page and Default Agent concept have been removed, the per-user toggle has neither UI nor persistence in the mainline code, and user-visible Skill sharing is future governance. The **only** Skill consumption path in the current product is:
+## Current availability and boundaries
 
-> **Explicitly bind an App-owned Skill to an Agent inside the same App.**
-
-The App owner controls Agent bindings. End-user Skill toggles, cross-account sharing, shared catalogs, and cascade-fork collaboration are not V1 behavior. Whether to bring any of them back will be decided in a future governance phase. See [App Boundary](./app-boundary.md).
-
-Where legacy words such as Workspace, Organization, team, or sharing appear in older source material, treat them as historical or future-governance context unless the section explicitly says App-owned V1. The term still follows external naming only when referring to a workspace on an external platform (Slack / Lark / Linear, etc.).
-
----
-
-## One-line positioning
-
-A Skill is a **stateless capability unit** (a prompt plus optional scripts / reference material) that an Agent invokes on demand.
-
-The registry entrypoint is the active App's Skills surface. Skills are App-owned resources alongside Agents, Files, MCP servers, Environments, Providers, and Channels.
-
-By analogy:
-
-> Like a capability package stored in an App and explicitly bound by one or more Agents in that App. A Session resolves the Agent's configured Skill references through the same App boundary at execution time.
-
----
-
-## 1. User problems
-
-Sentences Agent owners / configurators often say:
-
-- "I have a few prompts I've tuned. I want to bundle them into a reusable 'skill' so I can just attach it the next time I configure a new Agent."
-- "I imported an Agent package. Which Skills are now App-local and safe to mount?"
-- "I want to change a couple of lines without affecting the original package." — Copy it into a separate App-local Skill.
-- "If I delete that Skill, I need every affected Agent reference to become visible instead of silently falling back."
-- "A packaged Skill id from another App should not prove access here." — Reject it.
-- "Why is there no icon / avatar on the skill card?" — Intentional. A Skill is a tool, not a person.
-
----
-
-## 2. Goals
-
-When this is done, an Agent owner should be able to:
-
-- Upload a `.md` / `.zip` / `.skill` file, or import a skill from a GitHub or skills.sh URL (or a pasted `npx skills add … --skill <name>` install command), into the active App's Skill registry
-- Open an App-local Skill detail view to read `SKILL.md` or download the `.skill` archive
-- Mount App-local Skills in an Agent configuration
-- Copy or fork an App-local Skill when they want an independent package to edit
-- Delete an App-local Skill after confirmation, with no cross-user cascade;
-  affected Agents keep a visible missing-Skill tombstone, and future runs skip
-  the unavailable Skill with a warning until the binding is removed
-- Import valid embedded package Skills by materializing them inside the target App; missing/stripped Skills become explicit issues, and source ids never prove access
-
----
-
-## 3. V1 access model: owner-only App resources
-
-| Actor             | What I can do                                                                                                      |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **App owner**     | Create, read, download, re-upload, copy/fork, delete, and mount Skills on Agents inside the same App               |
-| **Everyone else** | Not a V1 access class for Skills; there is no received-Skill registry and no cross-account Skill permission matrix |
-
-We deliberately do **not** reuse the old (now-removed) Space three-tier admin / edit / read model. V1 Skill access is App-owner access only. Additional human roles belong to future governance.
-
----
-
-## 4. Registry: App-owned Skills
-
-The current registry has one product group:
-
-| Group          | Who's in it                                                                                |
-| -------------- | ------------------------------------------------------------------------------------------ |
-| **App Skills** | Skills whose `app_id` is the active App, including uploaded, imported, and copied packages |
-
-Future multi-user governance may add additional views, but V1 should not expose them or keep dormant route/API entrypoints for them.
-
----
-
-## 5. Ownership model (core semantics)
-
-### 5.1 Upload/import: visible inside the active App
-
-- The App owner uploads a `.md`, `.zip`, or `.skill` package, imports one from an Agent package, or imports a skill from a GitHub / skills.sh URL
-- The Skill row belongs to the active App
-- The Skill appears in the active App's Skill registry and nowhere else
-
-### 5.2 Agent binding: reference by id, resolved by App boundary
-
-- What an Agent stores is an explicit Skill id reference
-- At Session start, runtime resolves that reference through the Agent's App
-- Cross-App, legacy package, or missing ownership proof fails closed instead of deriving access from Organization state or package metadata
-- There is no upstream contribution workflow in V1; to edit, create an independent App-local copy
-
-### 5.3 Copy/fork: deliberately independent
-
-The App owner can copy or fork a Skill:
-
-- Copies the current package into a new App-local Skill row
-- The copy is independent from the source
-- The UI may show "Forked from X @ {time}" as a provenance hint, but this is not a sync indicator
-
-### 5.4 Delete: explicit fallout, no cascade
-
-When the App owner deletes a Skill:
-
-1. A confirmation dialog identifies the Skill being removed; it does not currently list impacted Agents
-2. The owner confirms and the Skill disappears from the active App registry
-3. Any mounted Agent reference remains visible as a missing-Skill tombstone
-4. Future runs skip that unavailable Skill and emit a `skill.tombstone` warning
-   until the owner removes the binding from the Agent
-
-The effect: nothing invents ownership for another user or App, and no compatibility layer silently recreates the deleted package.
-
-### 5.5 Who can do what
-
-| Action                             | App owner  | Other user |
-| ---------------------------------- | ---------- | ---------- |
-| View / preview / download `.skill` | Yes        | No V1 path |
-| Edit by re-uploading               | Yes        | No V1 path |
-| Copy/fork                          | Yes        | No V1 path |
-| Mount on an Agent                  | Yes        | No V1 path |
-| Delete                             | Yes        | No V1 path |
-| Manage external access             | No V1 path | No V1 path |
-
----
-
-## 6. What a Skill looks like: the special thing about the editing flow
-
-### 6.1 No in-app editor
-
-**App owners edit locally and re-upload.** This path is simple enough and avoids the awkwardness of "the product has an editor, but a weak one."
-
-A Skill's contents include at least one `SKILL.md` (with frontmatter). It can be packaged as a `.zip` / `.skill` (synonyms) together with scripts, reference material, and assets. The detail dialog only renders `SKILL.md`; the other assets come bundled with the download.
-
-### 6.2 The intended primary update path (drift: depends on the Default Agent, removed by the pivot)
-
-The retired design proposed editing a Skill through a Default Agent conversation
-on the removed Work page.
-
-This path depends on the Default Agent. After the pivot, the Default Agent has been removed, so this editing flow does not exist for now. The viable way for an Owner to update a skill today is:
-
-- Edit `SKILL.md` locally and use `Upload Skill` again. This creates a new Skill;
-  an explicit same-ID Upgrade entry point has not been built.
-
-Whether to reconnect "in-conversation editing" will be decided if and when the Default Agent concept returns.
-
----
-
-## 8. The relationship between Skill and Agent
-
-What's mounted in an Agent's configuration is an **App-owned Skill id reference**, not a copy of the content:
-
-- The Agent config stores explicit references to Skills in the same App
-- At Session start, runtime resolves and freezes the configured Skill bindings through the Agent's App
-- Legacy package runtime ids or cross-App references fail closed instead of deriving ownership from snapshots or historical tenant rows
-- If a bound Skill has been deleted, the Agent editor shows a missing-Skill
-  tombstone and Session start skips it with a `skill.tombstone` warning; no
-  shared-owner fallback is allowed
-- A non-package Skill reference whose expected snapshot has disappeared without
-  a tombstone is treated as corrupt state and fails Session start instead of
-  being silently skipped
-
-### 8.1 User-level "toggle" vs Agent mounting (drift)
-
-The retired per-user toggle affected only a removed Default Agent concept. It is
-not a current binding or availability rule.
-
-| Invocation method                               | Does the per-user toggle take effect?    |
-| ----------------------------------------------- | ---------------------------------------- |
-| Auto-selected within the Default Agent          | Yes in the old model                     |
-| `@mention`-ed within the Default Agent          | Explicit use won in the old model        |
-| **Explicitly mounted in an Agent's `skills[]`** | No; the Agent owner's configuration wins |
-
-But the Default Agent has been retired, so neither of the first two rows currently exists; today, **explicit mounting in an Agent** is the only real path. This actually makes it simpler to reason about:
-
-> Whether a Skill can be reached through Web Threads, an Agent API Endpoint, or a Channel delivery path depends on whether the Agent has mounted an App-local Skill and whether runtime can resolve that Skill through the Agent's App. It has nothing to do with end-user toggles.
-
----
-
-## 9. Lifecycle diagram
-
-```mermaid
-flowchart TD
-    OWNER(("App owner")) --> CREATE["Upload / import / copy Skill package"]
-    CREATE --> REGISTRY["App Skill registry<br/>app_id = active App"]
-
-    REGISTRY --> BIND["Agent config binds Skill id<br/>same App"]
-    BIND --> RUN["Session start<br/>resolve and freeze binding"]
-    RUN --> EXECUTE["Execution uses resolved Skill snapshot/reference"]
-
-    REGISTRY --> COPY["Copy or fork<br/>new independent App-local Skill"]
-    COPY --> REGISTRY
-
-    REGISTRY --> DELETE_Q{"Delete Skill?"}
-    DELETE_Q --> CONFIRM["Confirm Skill removal"]
-    CONFIRM --> DELETE["Remove Skill from App registry"]
-    DELETE --> TOMBSTONE["Mounted references show missing-Skill tombstone<br/>future runs skip it with a warning"]
-
-    style REGISTRY fill:#e3f2fd,stroke:#1976d2
-    style BIND fill:#fff3e0,stroke:#ff9800
-    style DELETE fill:#fce4ec,stroke:#e91e63
-    style TOMBSTONE fill:#fce4ec,stroke:#e91e63
-```
-
----
-
-## Related
-
-- **Exact implementation contracts**: `pkgs/skill-package`, Agent manifest
-  contracts, and the API Skill modules
-- **How a Skill is mounted in an Agent's configuration**: [`./agent-manifest.md`](./agent-manifest.md)
-- **Adjacent assets**: [Files](./files-api-contract.md) · [MCP](./mcp-interaction.md) · [Environment](./environment.md)
+- Each Skill belongs to one App. Only that App's owner can view, download, fork, uninstall, or attach it. There is no sharing or cross-App catalog.
+- There is no in-app editor and no user-facing update action. The detail view currently offers only **Download**, **Fork**, and **Uninstall**. Revising a Skill means editing it locally, adding it as a new Skill, and updating Agent attachments manually.
+- Fork creates an independent App-local copy. It does not stay in sync with its source, and deleting the source does not delete the copy.
+- Uninstall does not list affected Agents. The Skill disappears from the registry, while affected Agents show it as **Missing**. New Sessions skip it with a warning; existing Sessions keep the configuration they started with. Saving an affected Agent removes the missing attachment.

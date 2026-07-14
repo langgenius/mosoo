@@ -9,7 +9,7 @@ import {
   getExpectedDriverNativeRuntimeRefKind,
   parseDriverNativeRuntimeRef,
 } from "agent-driver/runtime";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../time";
@@ -78,6 +78,22 @@ export async function getNativeResumeRefForRuntime(
   const ref = toNativeRuntimeRef(row);
 
   return ref.runtimeId === input.runtimeId ? ref : null;
+}
+
+export async function deleteNativeResumeRefsForSessions(
+  database: D1Database,
+  sessionIds: readonly SessionId[],
+): Promise<void> {
+  const uniqueSessionIds = [...new Set(sessionIds)];
+
+  if (uniqueSessionIds.length === 0) {
+    return;
+  }
+
+  await getAppDatabase(database)
+    .delete(nativeResumeRefsTable)
+    .where(inArray(nativeResumeRefsTable.sessionId, uniqueSessionIds))
+    .run();
 }
 
 export async function upsertNativeResumeRef(

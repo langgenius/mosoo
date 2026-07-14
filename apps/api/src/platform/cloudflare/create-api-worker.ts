@@ -1,4 +1,5 @@
 import { enqueueScheduledMaintenanceCommand } from "../../modules/api-command/application/api-command-enqueue";
+import { redriveFailedApiCommandEnqueues } from "../../modules/api-command/application/api-command-ledger";
 import type { ApiCommandMessage } from "../../modules/api-command/application/api-command-message";
 import {
   processApiCommandDeadLetterMessage,
@@ -30,6 +31,7 @@ export function createApiWorker(): ExportedHandler<ApiBindings> {
       return response;
     },
     async scheduled(controller: ScheduledController, env: ApiBindings): Promise<void> {
+      await redriveFailedApiCommandEnqueues(env);
       await enqueueScheduledMaintenanceCommand(env, {
         scheduledTime: controller.scheduledTime,
       });
