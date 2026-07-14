@@ -2,7 +2,7 @@ import type { AppDeploymentRunStatus } from "@mosoo/contracts/app";
 import type { AppDeploymentRunRow, AppDeploymentRow } from "@mosoo/db";
 import { appDeploymentRunsTable, appDeploymentsTable } from "@mosoo/db";
 import type { AppDeploymentRunId } from "@mosoo/id";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
@@ -25,7 +25,11 @@ import {
 } from "./app-agent-binding-resolution";
 import type { ResolvableAppAgent } from "./app-agent-binding-resolution";
 import type { CloudflareDeploymentClient } from "./app-deployment-cloudflare-client";
-import { createCloudflareDeploymentClient } from "./app-deployment-cloudflare-client";
+import {
+  createCloudflareDeploymentClient,
+  deleteCloudflareDeploymentResources,
+  logCloudflareDeploymentResourceDeleteFailures,
+} from "./app-deployment-cloudflare-client";
 import {
   APP_DEPLOYMENT_COMPATIBILITY_DATE,
   detectAppDeploymentPlan,
@@ -398,6 +402,73 @@ async function completeDeploymentRun(input: {
     .run();
 
   return getD1ChangeCount(runUpdate) > 0;
+}
+
+async function shouldCompensateDeletedDeployment(input: {
+  database: D1Database;
+  deployment: AppDeploymentRow;
+}): Promise<boolean> {
+  const deletedDeployment =
+    (await getAppDatabase(input.database)
+      .select({ id: appDeploymentsTable.id })
+      .from(appDeploymentsTable)
+      .where(
+        and(
+          eq(appDeploymentsTable.id, input.deployment.id),
+          isNotNull(appDeploymentsTable.deletedAt),
+        ),
+      )
+      .limit(1)
+      .get()) ?? null;
+
+  if (deletedDeployment === null) {
+    return false;
+  }
+
+  const replacement =
+    (await getAppDatabase(input.database)
+      .select({ id: appDeploymentsTable.id })
+      .from(appDeploymentsTable)
+      .where(
+        and(
+          eq(appDeploymentsTable.appId, input.deployment.appId),
+          isNull(appDeploymentsTable.deletedAt),
+        ),
+      )
+      .limit(1)
+      .get()) ?? null;
+
+  return replacement === null;
+}
+
+async function compensateDeletedDeploymentResources(input: {
+  bindings: ApiBindings;
+  cloudflareClient: CloudflareDeploymentClient | null;
+  deployment: AppDeploymentRow;
+}): Promise<void> {
+  if (
+    !(await shouldCompensateDeletedDeployment({
+      database: input.bindings.DB,
+      deployment: input.deployment,
+    }))
+  ) {
+    return;
+  }
+
+  const deleteFailures = await deleteCloudflareDeploymentResources(
+    input.cloudflareClient ?? createCloudflareDeploymentClient(input.bindings),
+    {
+      hostname: deploymentHostname(input.deployment, input.bindings.MOSOO_APP_DEPLOYMENT_DOMAIN),
+      resourceName: input.deployment.mosooSubdomain,
+    },
+  );
+
+  if (deleteFailures.length > 0) {
+    logCloudflareDeploymentResourceDeleteFailures(
+      "app-deployment.cloudflare_delete_after_deletion_failed",
+      deleteFailures,
+    );
+  }
 }
 
 function shouldIncludeSnapshotPath(path: string): boolean {
@@ -813,6 +884,7 @@ export async function dispatchAppDeploymentRun(
       bindings,
       cloudflareClient ?? createCloudflareDeploymentClient(bindings),
     );
+  let externallyAttemptedDeployment: AppDeploymentRow | null = null;
 
   try {
     const prepared = await runner.prepare(context);
@@ -875,6 +947,7 @@ export async function dispatchAppDeploymentRun(
       return;
     }
 
+    externallyAttemptedDeployment = context.deployment;
     const result = await runner.deploy({ ...context, envVars, plan, prepared });
 
     if (!(await updateRunStatus(bindings.DB, input.appDeploymentRunId, "submitted"))) {
@@ -913,6 +986,22 @@ export async function dispatchAppDeploymentRun(
       });
     }
   } finally {
+    if (externallyAttemptedDeployment !== null) {
+      try {
+        await compensateDeletedDeploymentResources({
+          bindings,
+          cloudflareClient,
+          deployment: externallyAttemptedDeployment,
+        });
+      } catch (error) {
+        logError("app-deployment.cloudflare_delete_after_deletion_check_failed", {
+          ...createErrorLogContext(error),
+          deploymentId: externallyAttemptedDeployment.id,
+          runId: input.appDeploymentRunId,
+        });
+      }
+    }
+
     await runner.cleanup?.();
   }
 }
