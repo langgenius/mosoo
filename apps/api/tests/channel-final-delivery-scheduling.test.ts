@@ -527,16 +527,33 @@ describe("channel final delivery scheduling", () => {
     }
   });
 
-  test("fails the durable job after the final delivery retry attempt", async () => {
+  test("recovers a final delivery job after the retry limit through the scheduled worker", async () => {
     const telegramBodies: unknown[] = [];
+    let providerAvailable = false;
+    let recoveryQueueAvailable = true;
     const restoreFetch = installTelegramFetch(telegramBodies, {
       async onSendMessage() {
-        throw new Error("provider unavailable");
+        if (!providerAvailable) {
+          throw new Error("provider unavailable");
+        }
       },
     });
 
     try {
-      const { bindings, database, queue } = await createTestEnvironment();
+      const { bindings: baseBindings, database, queue } = await createTestEnvironment();
+      const bindings: ApiBindings = {
+        ...baseBindings,
+        CHANNEL_FINAL_DELIVERY_QUEUE: {
+          sent: queue.sent,
+          async send(body, options): Promise<void> {
+            if (!recoveryQueueAvailable) {
+              throw new Error("Queue unavailable during terminal recovery.");
+            }
+
+            await queue.send(body, options);
+          },
+        },
+      } as ApiBindings;
       const seed = await createCompletedTelegramFinalDeliveryJob({
         bindings,
         database,
@@ -570,11 +587,61 @@ describe("channel final delivery scheduling", () => {
       expect(telegramBodies).toHaveLength(1);
       expect(job).toEqual({
         attemptCount: 8,
-        lastErrorCode: "Error",
+        lastErrorCode: "delivery_retry_exhausted:Error",
         status: "failed",
       });
       expect(recorded.recorded).toEqual([{ type: "ack" }]);
       expect(queue.sent).toHaveLength(1);
+
+      providerAvailable = true;
+      recoveryQueueAvailable = false;
+      await createApiWorker().scheduled(
+        { scheduledTime: nowMsForTest() } as ScheduledController,
+        bindings,
+      );
+
+      const pendingRecovery = await database
+        .app()
+        .select({
+          lastErrorCode: channelFinalDeliveryJobsTable.lastErrorCode,
+          status: channelFinalDeliveryJobsTable.status,
+        })
+        .from(channelFinalDeliveryJobsTable)
+        .where(eq(channelFinalDeliveryJobsTable.id, seed.jobId))
+        .get();
+
+      expect(pendingRecovery).toEqual({
+        lastErrorCode: "channel_final_delivery_recovery_queue_pending",
+        status: "dispatched",
+      });
+      recoveryQueueAvailable = true;
+      await createApiWorker().scheduled(
+        { scheduledTime: nowMsForTest() } as ScheduledController,
+        bindings,
+      );
+      const redriven = createRecordedQueueMessage<ChannelFinalDeliveryMessage>({
+        body: takeQueuedMessageBody(queue, seed.jobId),
+      });
+      await processChannelFinalDeliveryMessage(bindings, redriven.message, {}, nowMsForTest);
+
+      const recovered = await database
+        .app()
+        .select({
+          attemptCount: channelFinalDeliveryJobsTable.attemptCount,
+          lastErrorCode: channelFinalDeliveryJobsTable.lastErrorCode,
+          status: channelFinalDeliveryJobsTable.status,
+        })
+        .from(channelFinalDeliveryJobsTable)
+        .where(eq(channelFinalDeliveryJobsTable.id, seed.jobId))
+        .get();
+
+      expect(telegramBodies).toHaveLength(2);
+      expect(recovered).toEqual({
+        attemptCount: 9,
+        lastErrorCode: null,
+        status: "delivered",
+      });
+      expect(redriven.recorded).toEqual([{ type: "ack" }]);
     } finally {
       restoreFetch();
     }
