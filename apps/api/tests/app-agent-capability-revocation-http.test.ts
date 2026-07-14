@@ -163,7 +163,10 @@ describe("bound Agent capability revocation HTTP boundary", () => {
 
   test("rejects a capability whose current successful revision removed its binding", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertDeploymentAuthority(database, { agentBindings: [], deletedAt: null });
+    await insertDeploymentAuthority(database, {
+      agentBindings: [],
+      deletedAt: null,
+    });
 
     const response = await requestBoundAgent(database, capabilityClaims());
 

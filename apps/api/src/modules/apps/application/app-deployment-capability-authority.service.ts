@@ -1,6 +1,7 @@
-import { appDeploymentRunsTable, appDeploymentsTable } from "@mosoo/db";
-import type { AppDeploymentId, AppDeploymentRunId, AppId } from "@mosoo/id";
-import { and, desc, eq } from "drizzle-orm";
+import { agentsTable, appDeploymentRunsTable, appDeploymentsTable } from "@mosoo/db";
+import type { AgentId, AppDeploymentId, AppDeploymentRunId, AppId } from "@mosoo/id";
+import { and, desc, eq, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 
@@ -67,7 +68,10 @@ export async function getDeploymentAgentCapabilityAuthority(
 ): Promise<DeploymentAgentCapabilityAuthorityResult> {
   const deployment =
     (await getAppDatabase(database)
-      .select({ deletedAt: appDeploymentsTable.deletedAt, id: appDeploymentsTable.id })
+      .select({
+        deletedAt: appDeploymentsTable.deletedAt,
+        id: appDeploymentsTable.id,
+      })
       .from(appDeploymentsTable)
       .where(
         and(
@@ -88,7 +92,10 @@ export async function getDeploymentAgentCapabilityAuthority(
 
   const currentSuccessfulRun =
     (await getAppDatabase(database)
-      .select({ id: appDeploymentRunsTable.id, planJson: appDeploymentRunsTable.planJson })
+      .select({
+        id: appDeploymentRunsTable.id,
+        planJson: appDeploymentRunsTable.planJson,
+      })
       .from(appDeploymentRunsTable)
       .where(
         and(
@@ -125,4 +132,40 @@ export async function getDeploymentAgentCapabilityAuthority(
   return binding === "present"
     ? { authorized: true }
     : { authorized: false, reason: "binding_removed" };
+}
+
+/**
+ * Adds the same revocation boundary to the statement that inserts a billable
+ * Run. The earlier read gives useful rejection reasons; this condition closes
+ * the race where deletion or a successful replacement commits before the Run
+ * insert. The already-verified binding plan is immutable once its run is
+ * successful, so the current successful run ID is the revision fence here.
+ */
+export function createDeploymentAgentCapabilityRunCreationGuard(
+  input: DeploymentAgentCapabilityAuthority & { agentId: AgentId },
+): SQL {
+  return sql`
+    EXISTS (
+      SELECT 1
+      FROM ${appDeploymentsTable}
+      INNER JOIN ${agentsTable}
+        ON ${agentsTable.id} = ${input.agentId}
+      WHERE ${appDeploymentsTable.id} = ${input.deploymentId}
+        AND ${appDeploymentsTable.appId} = ${input.appId}
+        AND ${appDeploymentsTable.deletedAt} IS NULL
+        AND ${agentsTable.appId} = ${input.appId}
+        AND ${agentsTable.name} = ${input.binding.name}
+        AND ${agentsTable.status} = 'published'
+        AND ${agentsTable.liveDeploymentVersionId} IS NOT NULL
+        AND ${input.deploymentRunId} = (
+          SELECT ${appDeploymentRunsTable.id}
+          FROM ${appDeploymentRunsTable}
+          WHERE ${appDeploymentRunsTable.appId} = ${input.appId}
+            AND ${appDeploymentRunsTable.deploymentId} = ${input.deploymentId}
+            AND ${appDeploymentRunsTable.status} = 'success'
+          ORDER BY ${appDeploymentRunsTable.id} DESC
+          LIMIT 1
+        )
+    )
+  `;
 }

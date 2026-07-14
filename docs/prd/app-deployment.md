@@ -17,7 +17,7 @@ The Builder who owns the App controls deployment. App Users only encounter the r
 3. Overview shows the attempt as **Deploying**, **Successful**, or **Failed**. After success, the Builder can open the live site and review earlier attempts.
 4. The Builder can publish the latest default branch again, change the source repository, or delete the deployment. A failed later attempt does not hide the last successful URL. Deletion removes the hosted site and its Agent access, but never changes the GitHub repository.
 
-Bound Agent URLs are signed bearer capabilities tied to one Deployment and its latest successful binding revision. Before a bound call starts an Agent Run, the API verifies that the Deployment is still active and that the revision still contains the named binding. Deleting the Deployment or successfully publishing a revision that removes a binding revokes its prior capability URL. A failed deployment leaves the previous successful revision authorized.
+Bound Agent URLs are signed bearer capabilities tied to one Deployment and its latest successful binding revision. Before a bound call starts an Agent Run, the API verifies that the Deployment is still active and that the revision still contains the named binding. The final Run insert repeats that D1 authority condition, so a deletion or successful revision replacement that commits during a request cannot create an owner-billed Run. Deleting the Deployment or successfully publishing a revision that removes a binding revokes its prior capability URL. A failed deployment leaves the previous successful revision authorized.
 
 ## Current Availability and Boundary
 
