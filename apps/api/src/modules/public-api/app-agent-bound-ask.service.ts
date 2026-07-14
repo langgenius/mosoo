@@ -15,6 +15,7 @@ import type { AgentId, AppId, SessionId, SessionRunId } from "@mosoo/id";
 import { createErrorLogContext, logError } from "../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { getAgentRow } from "../agents/application/agent-repository";
+import { isCurrentDeploymentAgentCapability } from "../apps/application/app-deployment-capability-authority.service";
 import { getAppRow } from "../apps/application/app.service";
 import { getAccountViewer } from "../auth/application/public-api-caller.service";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
@@ -27,7 +28,7 @@ import {
   waitForTerminalRun,
 } from "./app-agent-bound-call";
 import type { BoundAgentCallInput } from "./app-agent-bound-call";
-import { publicNotFound } from "./public-api-errors";
+import { publicAgentNotExposed, publicNotFound } from "./public-api-errors";
 import { enforcePublicApiRateLimit } from "./public-api-rate-limit.service";
 import { readPublicThreadRunFinalOutput } from "./public-thread-events";
 import { cleanupFailedThreadCreation } from "./public-thread-store";
@@ -155,6 +156,12 @@ export async function createBoundAgentThreadAndWait(
 
   const agent = await getAgentRow(request.bindings.DB, claims.agentId);
   ensureBoundAgentServable(agent, claims);
+
+  if (!(await isCurrentDeploymentAgentCapability(request.bindings.DB, claims))) {
+    throw publicAgentNotExposed(
+      "This capability is no longer authorized for the active deployment.",
+    );
+  }
 
   // The capability URL is keyless, long-lived, and internet-facing: without a
   // limit a single leaked URL could launch unbounded owner-billed runs. Reuse

@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
 import type { SessionRunStatus } from "@mosoo/contracts/session-run";
+import { parsePlatformId } from "@mosoo/id";
+import type { AgentId, AppDeploymentId, AppDeploymentRunId, AppId } from "@mosoo/id";
 
 import {
   isTerminalRunStatus,
@@ -22,13 +24,19 @@ import { PublicApiError } from "../src/modules/public-api/public-api-errors";
 
 const SECRET = "bound-test-secret";
 const NOW = 5_000_000;
+const AGENT_ID = parsePlatformId<AgentId>("01J00000000000000000000009");
+const APP_ID = parsePlatformId<AppId>("01J0000000000000000000000Q");
+const DEPLOYMENT_ID = parsePlatformId<AppDeploymentId>("01J0000000000000000000000D");
+const DEPLOYMENT_RUN_ID = parsePlatformId<AppDeploymentRunId>("01J0000000000000000000000R");
 
 function claims(overrides: Partial<AppAgentCapabilityClaims> = {}): AppAgentCapabilityClaims {
   return {
-    agentId: "agt_bound",
-    appId: "app_bound",
+    agentId: AGENT_ID,
+    appId: APP_ID,
+    binding: { env: "MOSOO_AGENT", expose: "public_thread", name: "Bound Agent" },
+    deploymentId: DEPLOYMENT_ID,
+    deploymentRunId: DEPLOYMENT_RUN_ID,
     exp: NOW + 60_000,
-    expose: "public_thread",
     ...overrides,
   };
 }

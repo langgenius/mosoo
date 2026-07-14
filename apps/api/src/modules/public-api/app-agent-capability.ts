@@ -2,23 +2,35 @@
  * Self-authorizing capability token for a deployed App's bound Agent.
  *
  * A deployed app reads one injected env var per binding whose value is a URL
- * carrying this token. The token encodes (appId, agentId, expose) and is signed
- * with an HMAC secret, so the bound app needs no API key — the URL itself is the
- * grant (PM decision #1, docs/prd/app-deployment.md "Agent Binding Wedge").
+ * carrying this token. The token encodes the App, Agent, deployment revision,
+ * and binding that authorized it, and is signed with an HMAC secret, so the
+ * bound app needs no API key — the URL itself is the grant (PM decision #1,
+ * docs/prd/app-deployment.md "Agent Binding Wedge").
  *
- * Stateless by design: no DB row, no token table. Revocation in v0 is implicit
- * (the Agent must still be `published`, re-checked at call time by the ask
- * endpoint) plus the embedded expiry. Uses Web Crypto so it runs on Workers.
+ * The token remains stateless, but the ask endpoint re-checks its deployment
+ * authority against D1 before starting a Run. Uses Web Crypto so it runs on
+ * Workers.
  */
+
+import type { AgentId, AppDeploymentId, AppDeploymentRunId, AppId } from "@mosoo/id";
+import { isPlatformId } from "@mosoo/id";
 
 export type AppAgentCapabilityExpose = "public_thread";
 
+export interface AppAgentCapabilityBinding {
+  env: string;
+  expose: AppAgentCapabilityExpose;
+  name: string;
+}
+
 export interface AppAgentCapabilityClaims {
-  agentId: string;
-  appId: string;
+  agentId: AgentId;
+  appId: AppId;
+  binding: AppAgentCapabilityBinding;
+  deploymentId: AppDeploymentId;
+  deploymentRunId: AppDeploymentRunId;
   /** Absolute expiry, epoch milliseconds. */
   exp: number;
-  expose: AppAgentCapabilityExpose;
 }
 
 const HMAC_PARAMS: HmacKeyGenParams = { hash: "SHA-256", name: "HMAC" };
@@ -70,11 +82,24 @@ function isCapabilityClaims(value: unknown): value is AppAgentCapabilityClaims {
     return false;
   }
   const record = value as Record<string, unknown>;
+  const binding = record["binding"];
+
+  if (typeof binding !== "object" || binding === null || Array.isArray(binding)) {
+    return false;
+  }
+
+  const bindingRecord = binding as Record<string, unknown>;
   return (
-    typeof record["agentId"] === "string" &&
-    typeof record["appId"] === "string" &&
+    isPlatformId(record["agentId"]) &&
+    isPlatformId(record["appId"]) &&
+    isPlatformId(record["deploymentId"]) &&
+    isPlatformId(record["deploymentRunId"]) &&
     typeof record["exp"] === "number" &&
-    record["expose"] === "public_thread"
+    typeof bindingRecord["env"] === "string" &&
+    bindingRecord["env"].length > 0 &&
+    bindingRecord["expose"] === "public_thread" &&
+    typeof bindingRecord["name"] === "string" &&
+    bindingRecord["name"].length > 0
   );
 }
 

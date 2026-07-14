@@ -93,6 +93,7 @@ export async function verifyBoundAgentCapability(
 export function ensureBoundAgentServable(agent: AgentRow, claims: AppAgentCapabilityClaims): void {
   const servable =
     agent.appId === claims.appId &&
+    agent.name === claims.binding.name &&
     agent.status === "published" &&
     agent.liveDeploymentVersionId !== null;
 
