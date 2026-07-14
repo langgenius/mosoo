@@ -21,6 +21,7 @@ import {
   ListPageToolbarSpacer,
 } from "@/shared/ui/list-page";
 import { PageHeader } from "@/shared/ui/page-header";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table";
 
 import { FilePreviewDialog } from "./file-preview-dialog";
@@ -55,14 +56,14 @@ function SegmentedButtonGroup<T extends string>({
   return (
     <fieldset
       aria-label={label}
-      className="bg-card border-border-strong m-0 inline-flex h-8 min-w-0 overflow-hidden rounded-md border p-0"
+      className="bg-card border-border-strong m-0 inline-flex h-8 w-full min-w-0 overflow-hidden rounded-md border p-0 sm:w-auto"
     >
       {options.map((option) => (
         <button
           key={option.value}
           aria-pressed={option.value === value}
           className={cn(
-            "border-border-strong min-w-24 border-r px-3 text-[12.5px] font-semibold transition-colors last:border-r-0",
+            "border-border-strong min-w-0 flex-1 border-r px-3 text-[12.5px] font-semibold transition-colors last:border-r-0 sm:min-w-24 sm:flex-none",
             option.value === value
               ? "bg-paper-200 text-fg-1"
               : "text-fg-2 hover:bg-paper-200/60 hover:text-fg-1",
@@ -262,6 +263,23 @@ export function FilesPage(): ReactElement {
       ),
     [agentId, agents, files, search, sessionId, sessionKind, sessionOptions],
   );
+  const agentItems = useMemo(
+    () => [
+      { label: "All agents", value: "" },
+      ...filesView.agentOptions.map((agent) => ({ label: agent.name, value: agent.id })),
+    ],
+    [filesView.agentOptions],
+  );
+  const sessionItems = useMemo(
+    () => [
+      { label: "All Threads", value: "" },
+      ...filesView.sessionOptions.map((session) => ({
+        label: session.title === null ? session.id : `${session.title} — ${session.id}`,
+        value: session.id,
+      })),
+    ],
+    [filesView.sessionOptions],
+  );
   const filtersActive =
     filesView.agentId !== "" ||
     filesView.sessionId !== "" ||
@@ -286,39 +304,51 @@ export function FilesPage(): ReactElement {
       </PageHeader>
 
       <ListPageToolbar className="flex-wrap">
-        <select
-          aria-label="Agent filter"
-          className="bg-card border-border-strong text-fg-2 focus:border-ring h-8 min-w-[220px] rounded-md border px-2 text-[12.5px] transition-colors outline-none"
+        <Select
           disabled={sessionOptionsLoading || sessionOptionsError !== null}
-          onChange={(event) => {
-            setAgentId(event.target.value);
+          items={agentItems}
+          onValueChange={(value) => {
+            setAgentId(value ?? "");
             setSessionId("");
           }}
           value={filesView.agentId}
         >
-          <option value="">All agents</option>
-          {filesView.agentOptions.map((agent) => (
-            <option key={agent.id} value={agent.id}>
-              {agent.name}
-            </option>
-          ))}
-        </select>
-        <select
-          aria-label="Thread filter"
-          className="bg-card border-border-strong text-fg-2 focus:border-ring h-8 min-w-[300px] rounded-md border px-2 text-[12.5px] transition-colors outline-none"
+          <SelectTrigger
+            aria-label="Agent filter"
+            className="w-full sm:w-auto sm:min-w-[220px] sm:grow lg:grow-0"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {agentItems.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
           disabled={sessionOptionsLoading || sessionOptionsError !== null}
-          onChange={(event) => {
-            setSessionId(event.target.value);
+          items={sessionItems}
+          onValueChange={(value) => {
+            setSessionId(value ?? "");
           }}
           value={filesView.sessionId}
         >
-          <option value="">All Threads</option>
-          {filesView.sessionOptions.map((session) => (
-            <option key={session.id} value={session.id}>
-              {session.title === null ? session.id : `${session.title} — ${session.id}`}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger
+            aria-label="Thread filter"
+            className="w-full sm:w-auto sm:min-w-[300px] sm:grow lg:max-w-[420px] lg:grow-0"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="max-w-[480px]">
+            {sessionItems.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <SegmentedButtonGroup<SessionKindFilter>
           label="Thread file category"
           onChange={setSessionKind}
@@ -327,7 +357,7 @@ export function FilesPage(): ReactElement {
         />
         <ListPageToolbarSpacer />
         <ListPageSearch
-          className="w-[280px]"
+          className="w-full sm:w-auto sm:min-w-[240px] sm:grow lg:w-[280px] lg:grow-0"
           onChange={setSearch}
           placeholder="Search files..."
           value={search}
