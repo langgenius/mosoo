@@ -18,6 +18,7 @@ import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.
 import { fileStore } from "../../../files/application/file-store";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { insertSessionMessageRecord } from "../../../sessions/application/session-message-write.service";
+import type { BoundCapabilityRunProvenance } from "../../domain/bound-capability-run-provenance";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import {
   createSessionRunRecordIfSessionIdle,
@@ -40,6 +41,7 @@ class SessionActiveRunExistsError extends Error {
 interface QueueSessionRunInput {
   accessViewer?: AuthenticatedViewer;
   attachmentIds: FileId[];
+  boundCapabilityProvenance?: BoundCapabilityRunProvenance;
   clientRequestId: string | null;
   prompt: string;
   runCreationGuard?: SQL;
@@ -98,6 +100,9 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
 
   const createRunResult = await createSessionRunRecordIfSessionIdle(bindings.DB, {
     agentId: input.session.agent_id,
+    ...(input.boundCapabilityProvenance === undefined
+      ? {}
+      : { boundCapabilityProvenance: input.boundCapabilityProvenance }),
     createdBy: viewerId,
     deploymentVersionId: input.session.deployment_version_id,
     deploymentVersionNumber: input.session.deployment_version_number,
