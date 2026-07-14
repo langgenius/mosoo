@@ -1,182 +1,33 @@
-# Agent Versions — for humans
+# Agent Version History
 
-Status: deferred design record; restore/time-machine UX is not shipped.
+Status: Available as read-only history. Restoring an earlier version is not shipped.
 
-> This is a retained deferred-design record, not an implementation contract.
->
-> **Current status: 🚫 Deferred from M2X (decided 2026-05-18).** This document covers two things: (1) what we wanted to build and how (the v1.1 design snapshot); and (2) why we are not building it this time.
+## Why it matters
 
----
+Publishing an Agent can change how it behaves for people using the App. An App Owner needs to
+know which configuration is live, recognize what changed, and understand whether an existing
+session is affected. Version history provides that context without interrupting active work.
 
-## One-line positioning
+## Who uses it
 
-Upgrade the Agent Page's **Versions sheet** from a "list of versions you can look at" into a **time machine**: click into any version to see what the agent looked like at that point (read-only), and press "Restore" to roll the entire agent back to that version — the kind of experience **Vercel's deployments page** offers, where "yesterday's deployment is still there and you can promote it back."
+This surface is for the App Owner who configures and publishes an Agent. App Users do not manage
+Agent versions or need to understand them.
 
-> **Reference shape (Vercel):** one row per deployment; click in to see the complete snapshot of that version; "Promote to Production" rolls back in a single click. The deferred design would make the Versions sheet the agent-equivalent of that.
+## Current user flow
 
----
+1. Open an Agent from the App and select its draft or live-version badge.
+2. Review the Versions sheet, ordered from newest to oldest.
+3. Identify the live version and scan each entry's change summary, runtime, model, and publish
+   time.
+4. Start a new session knowing it uses the current live version. A session that already exists
+   keeps the version it started with.
 
-## Why we are not building it this time (the v1.2 deferral decision)
+## Current availability and visible boundaries
 
-In short: **we assumed there was a "looks broken" experience that needed fixing, and then discovered there was no such thing.**
+The version list and live-version label are available today. The list is display-only: an owner
+cannot open a complete historical configuration, compare two versions, see who published one, or
+restore an earlier version from this surface.
 
-- The v1.1 draft repeatedly cited the claim that "the Versions sheet currently shows an awkward `Rollback is not available — clone or re-publish` banner; the experience is bad and needs fixing."
-- When we actually searched the code, **that banner does not exist anywhere in the UI a user can see** — it was only a mock-screenshot description from some old PRD that kept getting cited, and it never made it into the real product.
-- The Versions sheet as it stands today is a clean, display-only version list. It opens from Agent detail, and its header reads "New sessions use the live version. Existing sessions keep their pinned execution binding." — it already looks finished, with no sense of being incomplete.
-
-On top of that:
-
-- With a 4-week launch window and 3 engineers, **Terminal / Logs / Files are the capabilities the ops surface actually lacks**.
-- The "what if we publish the wrong version and need to roll back" case has no real evidence of frequency pre-launch (and if it does happen, a quick shout in Slack and we roll it back by hand).
-- Applying Musk's deletion test (delete aggressively; if you don't end up adding back at least 10% of what you deleted, you didn't delete enough) to the 10 scope items in v1.1: 9 of them would not be added back after deletion — a sign of over-engineering.
-
-So: **the v1.1 design is frozen and kept on the shelf, to be picked back up when a real signal appears.** The Versions sheet UI does not change by a single character.
-
----
-
-## 1. User problem (to solve when revived)
-
-Agent owners have real pain in two kinds of scenarios — but **there is currently no evidence that either occurs frequently in the first month after launch**:
-
-### Scenario A: routinely reviewing "what changed when v5 was published"
-
-- Today you only see a one-line summary ("Skills + 2 · MCP server added").
-- You want to know exactly which skill changed, whether the prompt was touched, whether the model was changed → you can't see it.
-- You want to know which version was published → you can inspect the deployment version history directly.
-
-### Scenario B: v5 broke and you need to roll back immediately
-
-- Today there is no Restore button.
-- To recover, you either fork the agent (which breaks all channel bindings) or go into the Edit form and retype the v3 fields by hand (a prompt that is hundreds of lines long is easy to mistype).
-- There is no "press once → back to v3" path.
-
----
-
-## 2. Goals (the promise when revived)
-
-Once done, an owner should be able to:
-
-- See a reverse-chronological list in the Versions sheet — each row carrying two extra fields: **who published it** + **how many sessions are still running on this version**.
-- **Click any row to enter a "snapshot view"** — seeing the complete configuration of that version (model / prompt / skills / MCP / environment bindings), all read-only, with the parts that differ from the current live version highlighted.
-- **Press "Restore this version" + a confirmation step** → the entire agent returns to the way it looked at that version (including the agent's own accumulated memory).
-
----
-
-## 3. Concept definitions
-
-| Term                                  | Meaning                                                                                                                                                                                        |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Version (DeploymentVersion)**       | The configuration snapshot left behind by one publish. New sessions use this version from then on; existing sessions keep their respective original versions.                                  |
-| **Live Version**                      | The version currently used for new sessions. There is only ever one at a time.                                                                                                                 |
-| **Snapshot view (frozen view)**       | The read-only page you reach by clicking a version row — it reuses the layout of the Edit page, but all inputs are disabled.                                                                   |
-| **Restore (rollback / time machine)** | Select an old version → the system creates a new live version that copies the configuration from that time + resets the agent's own accumulated memory back to its initial state at that time. |
-| **The "time machine" principle**      | From the user's point of view, the agent is 100% back to the way it was (configuration + memory); records that belong to the observer's point of view (cost / logs) keep their real history.   |
-| **Session pinning**                   | A session is bound to the live version that was current when it was created; this binding **never changes**. Restore does not switch sessions that are already running.                        |
-
----
-
-## 4. The relationship lock: what Restore does and does not do
-
-```mermaid
-flowchart LR
-  User["Owner clicks Restore v3"] --> Confirm["Confirmation dialog<br/>states three things explicitly"]
-  Confirm --> System["System executes"]
-
-  subgraph Restored["✅ Back to the way v3 looked"]
-    Config["v3 configuration<br/>(model / prompt / skills / MCP / environment)"]
-    AgentMem["The agent's own memory<br/>reset to the v3 baseline"]
-  end
-
-  subgraph Preserved["❌ Untouched (real history preserved)"]
-    Cost["Cost records"]
-    SystemLog["Runtime logs"]
-    OldSess["Running existing sessions<br/>continue on their respective versions"]
-  end
-
-  subgraph External["⚠️ External dependencies (out of scope)"]
-    Files["File contents in Files<br/>owner handles rollback of those files themselves"]
-  end
-
-  System --> Restored
-  System --> Preserved
-  System -.does not trigger.-> External
-```
-
-**Key boundaries:**
-
-- **Everything from the user's point of view is rolled back** (configuration + agent memory).
-- **Everything from the observer's point of view is preserved** (cost / logs = "things that actually happened").
-- **External dependencies are untouched** (Files has its own file versioning system).
-- **Running existing sessions are not switched** (this is a feature, not a bug — a customer's experience must not be interrupted midway).
-
----
-
-## 5. User journey map
-
-| Stage                   | What the owner is doing                             | What they see                                                                                                   | Mood           |
-| ----------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | -------------- |
-| Routine review          | Wants to see what changed in v5 after publishing    | Reverse-chronological list, each row carrying actor + count of running sessions                                 | Neutral        |
-| Entering snapshot view  | Clicks the v4 row                                   | Same layout as the Edit page, all inputs read-only, parts that differ from the current live version highlighted | Neutral → high |
-| Spotting the difference | "v4 is missing that new skill compared to v5"       | The highlight makes it obvious at a glance, no need to compare side by side                                     | Smooth         |
-| Discovering v5 broke    | User feedback: "the agent is answering incorrectly" | Opens the Versions sheet to find v3                                                                             | Anxious        |
-| Restore                 | Clicks v3 → confirmation → "Restore"                | The dialog clearly states three things (what is rolled back / what is not / running sessions are not switched)  | Neutral → high |
-| Done                    | Toast: "Rolled back to v3 (now v6 live)"            | v6 appears at the top of the list                                                                               | Reassured      |
-
----
-
-## 6. Information architecture (Before / After)
-
-```mermaid
-flowchart LR
-  subgraph Before["Today (v1.2 decided to leave it as is)"]
-    BTab["Versions sheet<br/>version list (display-only)"]
-  end
-
-  subgraph After["Future, when revived (the v1.1 design)"]
-    ATab["Versions sheet<br/>+ who published + count of running sessions<br/>+ row click into snapshot view<br/>+ Restore button"]
-    AFroze["Snapshot view<br/>same layout as the Edit page, read-only<br/>+ top banner + highlighted differences"]
-    ARestore["Restore dialog<br/>three-part copy + confirmation step<br/>→ back to the way that version looked"]
-  end
-
-  BTab ==>|future incremental upgrade| ATab
-  ATab --> AFroze
-  AFroze --> ARestore
-```
-
-**Very few things change:**
-
-1. The Versions list rows gain **two extra fields** (actor + count of running sessions).
-2. Rows become clickable → into the **snapshot view**.
-3. The snapshot view has a **Restore button** in the top right (only on non-live rows).
-4. The Restore dialog → the system executes the rollback.
-
-**Everything else (the overall list layout, the Edit page itself, Logs / Cost / Preview) is completely unchanged.**
-
----
-
-## Understanding the boundaries at a glance
-
-This product has several kinds of "logs / history / versions." Do not mix them up:
-
-| What you want to know                                             | Where to look                                         |
-| ----------------------------------------------------------------- | ----------------------------------------------------- |
-| What a given session did (messages / tools / permissions / files) | **Logs tab** → select session                         |
-| An agent's historical versions + rolling back to an old version   | **Versions sheet** (**this PRD, currently deferred**) |
-
----
-
-## When we will pick this back up
-
-We will not pick it up just because an engineer's gut says "it's time." Revival
-requires all three evidence conditions below:
-
-- **≥ 3 independent owners** complaining in Slack / Issues about the missing rollback.
-- **≥ 1 production incident** amplified by the lack of rollback (slow owner reaction → the customer perceives bad behavior persisting for > 30 min).
-- **The support team is asked ≥ 5 times/week** to "switch my agent back to an old version."
-
-**Reverse trigger:** if after 6 months the Versions sheet has MAU ≤ 5% and there are no rollback tickets → we instead **delete the Versions sheet itself**.
-
----
-
-> Any revival requires a new current PRD and implementation plan grounded in the
-> codebase at that time.
+Agent version history covers published Agent configuration. It is not the App's deployment
+history, a session log, or a backup of runtime files, Agent state, or App data. Those records and
+assets are not changed by viewing version history.
