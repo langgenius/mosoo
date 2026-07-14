@@ -166,7 +166,7 @@ export async function deleteFileScope(
   await deleteFileRows(bindings, {
     actorAccountId: input.actorAccountId,
     rows,
-    storageFailureMode: "ignore",
+    storageFailureMode: "throw",
   });
   await deleteFileControlRowsForScope(bindings.DB, input);
 }

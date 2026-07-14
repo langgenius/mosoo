@@ -30,6 +30,20 @@ const OWNER_VIEWER: AuthenticatedViewer = {
 };
 
 const FAILED_DRIVER_ID = "01J0000000000000000000000G";
+const SESSION_FILE_ID = "01J0000000000000000000000H";
+
+class RetriableSessionFileBucket {
+  readonly deletedKeys: string[] = [];
+  failDelete = true;
+
+  async delete(key: string): Promise<void> {
+    this.deletedKeys.push(key);
+
+    if (this.failDelete) {
+      throw new Error("R2 delete interrupted.");
+    }
+  }
+}
 
 function createDriverConnectionBinding(paths: string[]) {
   return {
@@ -286,6 +300,62 @@ async function insertDriverInstance(
   }
 }
 
+async function insertSessionFileForCleanup(database: D1Database): Promise<void> {
+  await database
+    .prepare(
+      `
+        INSERT INTO file_record (
+          id,
+          scope_kind,
+          scope_id,
+          session_kind,
+          status,
+          name,
+          path,
+          parent_path,
+          object_key,
+          owner_id,
+          owner_kind,
+          purpose,
+          expires_at,
+          mime_type,
+          size,
+          etag,
+          committed,
+          version,
+          created_by_account_id,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+    )
+    .bind(
+      SESSION_FILE_ID,
+      "session",
+      PUBLIC_API_TEST_IDS.nonOwnerSession,
+      "attachment",
+      "ready",
+      "notes.txt",
+      `attachment/${SESSION_FILE_ID}/notes.txt`,
+      `attachment/${SESSION_FILE_ID}`,
+      `session-files/${SESSION_FILE_ID}/notes.txt`,
+      PUBLIC_API_TEST_IDS.nonOwnerSession,
+      "session",
+      "session_attachment",
+      null,
+      "text/plain",
+      12,
+      null,
+      1,
+      1,
+      PUBLIC_API_TEST_IDS.nonOwnerAccount,
+      1,
+      1,
+    )
+    .run();
+}
+
 describe("session lifecycle mutations", () => {
   test("delete cascade removes live and terminal driver instances associated with the session", async () => {
     const database = await createPublicHttpContractDatabase();
@@ -414,6 +484,59 @@ describe("session lifecycle mutations", () => {
 
     expect(repairedCount).toBe(1);
     expect(session).toBeNull();
+  });
+
+  test("retains failed session R2 cleanup for repair instead of dropping its file record", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertNonOwnerSession(database);
+    await insertSessionFileForCleanup(database);
+    const bucket = new RetriableSessionFileBucket();
+    const bindings = withSessionLifecycleBinding(
+      createPublicHttpTestBindings(database, {
+        fileBucket: bucket as unknown as R2Bucket,
+      }) as ApiBindings,
+    );
+
+    await expect(
+      deleteSessionCascade(bindings, PUBLIC_API_TEST_IDS.nonOwnerSession, {
+        operationId: PUBLIC_API_TEST_IDS.operation as RuntimeOperationId,
+      }),
+    ).rejects.toThrow("R2 delete interrupted.");
+
+    const anchoredSession = await database
+      .prepare("SELECT status FROM session WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.nonOwnerSession)
+      .first<{ status: string }>();
+    const retainedFile = await database
+      .prepare("SELECT status FROM file_record WHERE id = ?")
+      .bind(SESSION_FILE_ID)
+      .first<{ status: string }>();
+
+    expect(bucket.deletedKeys).toEqual([`session-files/${SESSION_FILE_ID}/notes.txt`]);
+    expect(anchoredSession).toEqual({ status: "TERMINATED" });
+    expect(retainedFile).toEqual({ status: "deleting" });
+
+    bucket.failDelete = false;
+    const repairedCount = await repairStaleSessionDeleteCleanups(bindings, {
+      limit: 10,
+      staleUpdatedAtLte: Date.now(),
+    });
+    const session = await database
+      .prepare("SELECT id FROM session WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.nonOwnerSession)
+      .first();
+    const file = await database
+      .prepare("SELECT id FROM file_record WHERE id = ?")
+      .bind(SESSION_FILE_ID)
+      .first();
+
+    expect(repairedCount).toBe(1);
+    expect(bucket.deletedKeys).toEqual([
+      `session-files/${SESSION_FILE_ID}/notes.txt`,
+      `session-files/${SESSION_FILE_ID}/notes.txt`,
+    ]);
+    expect(session).toBeNull();
+    expect(file).toBeNull();
   });
 
   test("archive cancels active runs and exposes an idle archived session", async () => {
