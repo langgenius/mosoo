@@ -86,7 +86,7 @@ async function insertDeploymentAuthority(
 }
 
 async function requestBoundAgent(
-  database: SqliteD1Database,
+  database: D1Database,
   claims: AppAgentCapabilityClaims,
 ): Promise<Response> {
   const bindings = createPublicHttpTestBindings(database) as ApiBindings;
@@ -101,6 +101,62 @@ async function requestBoundAgent(
     bindings,
     createTestExecutionContext(),
   );
+}
+
+async function withProviderProbeMock<T>(operation: () => Promise<T>): Promise<T> {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json({
+      data: [{ id: "gpt-5.4" }],
+    });
+
+  try {
+    return await operation();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+function revokeDeploymentWhenRunInsertStarts(database: SqliteD1Database): D1Database {
+  let revoked = false;
+
+  function wrapStatement(statement: D1PreparedStatement, query: string): D1PreparedStatement {
+    const shouldRevoke = /\bINSERT\s+INTO\s+session_run\b/iu.test(query);
+
+    return new Proxy(statement, {
+      get(target, property, receiver) {
+        if (property === "bind") {
+          return (...values: unknown[]) => wrapStatement(target.bind(...values), query);
+        }
+
+        if (
+          shouldRevoke &&
+          !revoked &&
+          (property === "all" || property === "first" || property === "raw" || property === "run")
+        ) {
+          const method = Reflect.get(target, property, receiver);
+
+          if (typeof method === "function") {
+            return async (...args: unknown[]) => {
+              revoked = true;
+              await database
+                .prepare("UPDATE app_deployment SET deleted_at = ? WHERE id = ?")
+                .bind(Date.now(), DEPLOYMENT_ID)
+                .run();
+              return method.apply(target, args);
+            };
+          }
+        }
+
+        return Reflect.get(target, property, receiver);
+      },
+    });
+  }
+
+  return {
+    batch: database.batch.bind(database),
+    prepare: (query) => wrapStatement(database.prepare(query), query),
+  } as D1Database;
 }
 
 async function expectNoSessions(database: SqliteD1Database): Promise<void> {
@@ -178,5 +234,29 @@ describe("bound Agent capability revocation HTTP boundary", () => {
       },
     });
     await expectNoSessions(database);
+  });
+
+  test("cleans up the new Session when deletion wins the final Run creation race", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertDeploymentAuthority(database, {
+      agentBindings: [capabilityClaims().binding],
+      deletedAt: null,
+    });
+
+    const response = await withProviderProbeMock(() =>
+      requestBoundAgent(revokeDeploymentWhenRunInsertStarts(database), capabilityClaims()),
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "agent_not_published",
+        message: "This capability is no longer authorized for the active deployment.",
+      },
+    });
+    await expectNoSessions(database);
+    await expect(
+      database.prepare("SELECT COUNT(*) AS count FROM session_run").first<{ count: number }>(),
+    ).resolves.toEqual({ count: 0 });
   });
 });
