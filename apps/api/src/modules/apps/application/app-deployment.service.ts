@@ -12,7 +12,7 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, getD1ChangeCount } from "../../../platform/db/drizzle";
-import { validationError } from "../../../platform/errors";
+import { API_ERROR_CODE, createApiError, validationError } from "../../../platform/errors";
 import { currentTimestampMs, toIsoString } from "../../../time";
 import {
   createAppDeploymentRunDispatchDedupeKey,
@@ -330,16 +330,6 @@ export async function deleteAppDeployment(
   const nowMs = currentTimestampMs();
 
   await getAppDatabase(bindings.DB)
-    .update(appDeploymentsTable)
-    .set({
-      deletedAt: nowMs,
-      lastSuccessfulUrl: null,
-      updatedAt: nowMs,
-    })
-    .where(eq(appDeploymentsTable.id, deployment.id))
-    .run();
-
-  await getAppDatabase(bindings.DB)
     .update(appDeploymentRunsTable)
     .set({
       errorCode: "deployment_deleted",
@@ -357,19 +347,34 @@ export async function deleteAppDeployment(
 
   await destroyActiveDeploymentRunSandboxes(bindings, activeRunIds);
 
-  logCloudflareDeploymentResourceDeleteFailures(
-    "app-deployment.cloudflare_delete_failed",
-    await deleteCloudflareDeploymentResources(
-      options.cloudflareClient ?? createCloudflareDeploymentClient(bindings),
-      {
-        hostname: createPlannedHost(
-          deployment.mosooSubdomain,
-          bindings.MOSOO_APP_DEPLOYMENT_DOMAIN,
-        ),
-        resourceName: deployment.mosooSubdomain,
-      },
-    ),
+  const deleteFailures = await deleteCloudflareDeploymentResources(
+    options.cloudflareClient ?? createCloudflareDeploymentClient(bindings),
+    {
+      hostname: createPlannedHost(deployment.mosooSubdomain, bindings.MOSOO_APP_DEPLOYMENT_DOMAIN),
+      resourceName: deployment.mosooSubdomain,
+    },
   );
+
+  if (deleteFailures.length > 0) {
+    logCloudflareDeploymentResourceDeleteFailures(
+      "app-deployment.cloudflare_delete_failed",
+      deleteFailures,
+    );
+    throw createApiError(
+      API_ERROR_CODE.appDeploymentCleanupFailed,
+      "Cloudflare deployment cleanup failed. Retry deletion.",
+    );
+  }
+
+  await getAppDatabase(bindings.DB)
+    .update(appDeploymentsTable)
+    .set({
+      deletedAt: nowMs,
+      lastSuccessfulUrl: null,
+      updatedAt: nowMs,
+    })
+    .where(eq(appDeploymentsTable.id, deployment.id))
+    .run();
 
   return { ok: true };
 }
