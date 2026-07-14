@@ -1,8 +1,9 @@
 import { parsePlatformId } from "@mosoo/id";
-import type { AgentId, AppId, SessionId } from "@mosoo/id";
+import type { AgentId, AppId, SessionId, SessionRunId } from "@mosoo/id";
 
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { sessionGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
+import { getBoundCapabilityRunProvenance } from "../../public-api/bound-capability-run-provenance.service";
 import {
   createAgentSession,
   sendAgentSessionEvents,
@@ -36,6 +37,11 @@ import { listThreadAgentSessions } from "../application/thread-agent-session-lis
 interface SessionArgs {
   appId: string;
   sessionId: string;
+}
+
+interface BoundCapabilityRunProvenanceArgs {
+  appId: string;
+  runId: string;
 }
 
 interface SessionProcessEventsArgs extends SessionArgs {
@@ -101,6 +107,10 @@ function readAppId(value: string): AppId {
 
 function readSessionId(value: string): SessionId {
   return parsePlatformId<SessionId>(value, "Session ID");
+}
+
+function readSessionRunId(value: string): SessionRunId {
+  return parsePlatformId<SessionRunId>(value, "Session Run ID");
 }
 
 export const sessionGraphQLModule = {
@@ -195,6 +205,15 @@ export const sessionGraphQLModule = {
       getAgentSessionDiagnostics(context.bindings.DB, context.viewer, {
         appId: readAppId(args.appId),
         sessionId: readSessionId(args.sessionId),
+      }),
+    boundCapabilityRunProvenance: async (
+      _parent,
+      args: BoundCapabilityRunProvenanceArgs,
+      context,
+    ) =>
+      getBoundCapabilityRunProvenance(context.bindings.DB, context.viewer, {
+        appId: readAppId(args.appId),
+        runId: readSessionRunId(args.runId),
       }),
     agentSessionList: async (_parent, args: AgentSessionListArgs, context) =>
       listAgentSessions(context.bindings.DB, context.viewer, {

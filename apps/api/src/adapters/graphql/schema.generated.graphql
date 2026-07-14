@@ -610,6 +610,16 @@ input BootstrapOnboardingInput {
   name: String
 }
 
+type BoundCapabilityRunProvenance {
+  agentId: ULID!
+  appId: ULID!
+  bindingEnv: String!
+  bindingName: String!
+  deploymentId: ULID!
+  deploymentRunId: ULID!
+  runId: ULID!
+}
+
 enum ChannelProvider {
   discord
   lark
@@ -1356,6 +1366,7 @@ type Query {
   appOverview(agentLimit: Int, appId: ULID!, credentialLimit: Int): AppOverview!
   appSkillList(appId: ULID!): [SkillSummary!]!
   availableAgentModels(appId: ULID!, currentModelId: String, currentVendorId: String, runtimeId: String!): [ResolvedModelEntry!]!
+  boundCapabilityRunProvenance(appId: ULID!, runId: ULID!): BoundCapabilityRunProvenance
   controlPlaneOverview(agentLimit: Int, appLimit: Int, credentialLimit: Int): ControlPlaneOverview!
   environment(appId: ULID!, environmentId: ULID!): EnvironmentDetail!
   exportAgentPackage(agentId: ULID!, appId: ULID!): AgentPackageExport!
