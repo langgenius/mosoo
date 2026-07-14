@@ -24,6 +24,8 @@ import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
 import { createApiWorker } from "../src/platform/cloudflare/create-api-worker";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
+import { API_ERROR_CODE } from "../src/platform/errors";
+import type { ApiError } from "../src/platform/errors";
 import { currentTimestampMs } from "../src/time";
 import {
   createApiCommandQueueStub,
@@ -1032,6 +1034,71 @@ describe("app deployment service", () => {
     expect(deleted).toContain(`worker:app-${APP_ID.toLowerCase()}`);
     expect(destroyed).toContain(`${run.id}-build`);
     expect(destroyed).toContain(`${run.id}-deploy`);
+  });
+
+  test("keeps a deployment retryable when Cloudflare cleanup fails", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const failedDeletes: string[] = [];
+    const successfulDeletes: string[] = [];
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+    const failingClient = createCloudflareDeleteRecorder(failedDeletes, {
+      async deletePagesProject(input) {
+        failedDeletes.push(`pages:${input.projectName}`);
+        throw new Error("Cloudflare API unavailable.");
+      },
+    });
+
+    await expect(
+      deleteAppDeployment(bindings, VIEWER, { appId: APP_ID }, { cloudflareClient: failingClient }),
+    ).rejects.toMatchObject({
+      code: API_ERROR_CODE.appDeploymentCleanupFailed,
+      name: "ApiError",
+    } satisfies Partial<ApiError>);
+
+    const deploymentAfterFailure = await database
+      .app()
+      .select()
+      .from(appDeploymentsTable)
+      .where(eq(appDeploymentsTable.id, run.deploymentId))
+      .get();
+    const runAfterFailure = await database
+      .app()
+      .select()
+      .from(appDeploymentRunsTable)
+      .where(eq(appDeploymentRunsTable.id, run.id))
+      .get();
+
+    expect(deploymentAfterFailure).toMatchObject({ deletedAt: null });
+    expect(runAfterFailure).toMatchObject({
+      errorCode: "deployment_deleted",
+      status: "failed",
+    });
+    expect(failedDeletes).toHaveLength(5);
+
+    await expect(
+      deleteAppDeployment(
+        bindings,
+        VIEWER,
+        { appId: APP_ID },
+        { cloudflareClient: createCloudflareDeleteRecorder(successfulDeletes) },
+      ),
+    ).resolves.toEqual({ ok: true });
+
+    const deploymentAfterRetry = await database
+      .app()
+      .select({ deletedAt: appDeploymentsTable.deletedAt })
+      .from(appDeploymentsTable)
+      .where(eq(appDeploymentsTable.id, run.deploymentId))
+      .get();
+
+    expect(deploymentAfterRetry?.deletedAt).toBeNumber();
+    expect(successfulDeletes).toHaveLength(5);
   });
 
   test("does not expose a live URL after deleting a successful deployment", async () => {
