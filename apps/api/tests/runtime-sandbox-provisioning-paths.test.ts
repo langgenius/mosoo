@@ -29,4 +29,13 @@ describe("toContainerReachableOrigin", () => {
       "https://try.mosoo.ai/api/graphql",
     );
   });
+
+  test("uses an explicit container origin for tunneled requests", () => {
+    expect(
+      toContainerReachableOrigin(
+        "https://random.trycloudflare.com/api/v1/threads",
+        "http://host.docker.internal:8787",
+      ),
+    ).toBe("http://host.docker.internal:8787/api/v1/threads");
+  });
 });

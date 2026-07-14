@@ -202,7 +202,8 @@ async function provisionDriver(
         );
   void nativeResumeRefPromise.catch(() => undefined);
 
-  const containerRequestUrl = toContainerReachableOrigin(input.requestUrl);
+  const explicitControlOrigin = env.MOSOO_RUNTIME_CONTROL_ORIGIN?.trim() || undefined;
+  const containerRequestUrl = toContainerReachableOrigin(input.requestUrl, explicitControlOrigin);
   const environmentInstall = createRuntimeEnvironmentInstallState();
   let driverGeneration: number | null = null;
   let process: RuntimeProcessHandle | null = null;

@@ -2,8 +2,15 @@ import { SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH } from "agent-driver/paths";
 
 import type { DriverProfileConfig } from "../../domain/driver-snapshot";
 
-export function toContainerReachableOrigin(requestUrl: string): string {
+export function toContainerReachableOrigin(requestUrl: string, explicitOrigin?: string): string {
   const url = new URL(requestUrl);
+
+  if (explicitOrigin !== undefined) {
+    const origin = new URL(explicitOrigin);
+    url.protocol = origin.protocol;
+    url.host = origin.host;
+    return url.toString();
+  }
 
   // Keep the original port: local requests reach the API through whichever
   // dev server received them (vite on WEB_DEV_PORT or wrangler on
