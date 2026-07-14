@@ -26,7 +26,9 @@ function createBoundAgentRouteTestApp(): Hono<ApiGatewayEnvironment> {
   return app;
 }
 
-function capabilityClaims(): AppAgentCapabilityClaims {
+function capabilityClaims(
+  overrides: Partial<AppAgentCapabilityClaims> = {},
+): AppAgentCapabilityClaims {
   return {
     agentId: PUBLIC_API_TEST_IDS.agent,
     appId: PUBLIC_API_TEST_IDS.app,
@@ -38,10 +40,14 @@ function capabilityClaims(): AppAgentCapabilityClaims {
     deploymentId: DEPLOYMENT_ID,
     deploymentRunId: DEPLOYMENT_RUN_ID,
     exp: Date.now() + 60_000,
+    ...overrides,
   };
 }
 
-async function insertDeletedDeployment(database: SqliteD1Database): Promise<void> {
+async function insertDeploymentAuthority(
+  database: SqliteD1Database,
+  input: { agentBindings: unknown[]; deletedAt: number | null },
+): Promise<void> {
   database.execute(`
       CREATE TABLE app_deployment (
         app_id text NOT NULL,
@@ -63,7 +69,7 @@ async function insertDeletedDeployment(database: SqliteD1Database): Promise<void
 
   await database
     .prepare("INSERT INTO app_deployment (app_id, deleted_at, id) VALUES (?, ?, ?)")
-    .bind(PUBLIC_API_TEST_IDS.app, Date.now(), DEPLOYMENT_ID)
+    .bind(PUBLIC_API_TEST_IDS.app, input.deletedAt, DEPLOYMENT_ID)
     .run();
   await database
     .prepare(
@@ -73,31 +79,44 @@ async function insertDeletedDeployment(database: SqliteD1Database): Promise<void
       PUBLIC_API_TEST_IDS.app,
       DEPLOYMENT_ID,
       DEPLOYMENT_RUN_ID,
-      JSON.stringify({ agentBindings: [capabilityClaims().binding] }),
+      JSON.stringify({ agentBindings: input.agentBindings }),
       "success",
     )
     .run();
 }
 
+async function requestBoundAgent(
+  database: SqliteD1Database,
+  claims: AppAgentCapabilityClaims,
+): Promise<Response> {
+  const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+  const token = await mintAppAgentCapabilityToken(bindings.RUNTIME_ACTION_TOKEN_SECRET, claims);
+
+  return createBoundAgentRouteTestApp().request(
+    new Request(`https://api.example.com/api/v1/bound/${token}`, {
+      body: JSON.stringify({ message: "Hello" }),
+      method: "POST",
+    }),
+    undefined,
+    bindings,
+    createTestExecutionContext(),
+  );
+}
+
+async function expectNoSessions(database: SqliteD1Database): Promise<void> {
+  await expect(
+    database.prepare("SELECT COUNT(*) AS count FROM session").first<{ count: number }>(),
+  ).resolves.toEqual({ count: 0 });
+}
+
 describe("bound Agent capability revocation HTTP boundary", () => {
   test("rejects a deleted deployment capability before it can create a Session", async () => {
     const database = await createPublicHttpContractDatabase();
-    await insertDeletedDeployment(database);
-    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
-    const token = await mintAppAgentCapabilityToken(
-      bindings.RUNTIME_ACTION_TOKEN_SECRET,
-      capabilityClaims(),
-    );
-
-    const response = await createBoundAgentRouteTestApp().request(
-      new Request(`https://api.example.com/api/v1/bound/${token}`, {
-        body: JSON.stringify({ message: "Hello" }),
-        method: "POST",
-      }),
-      undefined,
-      bindings,
-      createTestExecutionContext(),
-    );
+    await insertDeploymentAuthority(database, {
+      agentBindings: [capabilityClaims().binding],
+      deletedAt: Date.now(),
+    });
+    const response = await requestBoundAgent(database, capabilityClaims());
 
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({
@@ -106,8 +125,55 @@ describe("bound Agent capability revocation HTTP boundary", () => {
         message: "This capability is no longer authorized for the active deployment.",
       },
     });
-    expect(
-      await database.prepare("SELECT COUNT(*) AS count FROM session").first<{ count: number }>(),
-    ).toEqual({ count: 0 });
+    await expectNoSessions(database);
+  });
+
+  test("rejects an expired capability before reading deployment state", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const response = await requestBoundAgent(database, capabilityClaims({ exp: Date.now() }));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "unauthenticated",
+        message: "The capability URL is invalid or has expired.",
+      },
+    });
+    await expectNoSessions(database);
+  });
+
+  test("rejects an unpublished Agent before it can create a Session", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await database
+      .prepare("UPDATE agent SET status = 'draft' WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.agent)
+      .run();
+
+    const response = await requestBoundAgent(database, capabilityClaims());
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "agent_not_published",
+        message: "This Agent is no longer published for bound calls.",
+      },
+    });
+    await expectNoSessions(database);
+  });
+
+  test("rejects a capability whose current successful revision removed its binding", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertDeploymentAuthority(database, { agentBindings: [], deletedAt: null });
+
+    const response = await requestBoundAgent(database, capabilityClaims());
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "agent_not_published",
+        message: "This capability is no longer authorized for the active deployment.",
+      },
+    });
+    await expectNoSessions(database);
   });
 });

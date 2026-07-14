@@ -5,6 +5,7 @@ import type { AgentId, AppDeploymentId, AppDeploymentRunId, AppId } from "@mosoo
 
 import {
   boundAgentUrl,
+  inspectAppAgentCapabilityToken,
   mintAppAgentCapabilityToken,
   verifyAppAgentCapabilityToken,
 } from "../src/modules/public-api/app-agent-capability";
@@ -49,6 +50,10 @@ describe("app agent capability token", () => {
   test("rejects an expired token", async () => {
     const token = await mintAppAgentCapabilityToken(SECRET, claims({ exp: NOW }));
     expect(await verifyAppAgentCapabilityToken(SECRET, token, NOW)).toBeNull();
+    await expect(inspectAppAgentCapabilityToken(SECRET, token, NOW)).resolves.toEqual({
+      claims: claims({ exp: NOW }),
+      status: "expired",
+    });
   });
 
   test("rejects a malformed token", async () => {

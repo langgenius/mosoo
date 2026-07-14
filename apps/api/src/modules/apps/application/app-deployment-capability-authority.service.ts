@@ -1,6 +1,6 @@
 import { appDeploymentRunsTable, appDeploymentsTable } from "@mosoo/db";
 import type { AppDeploymentId, AppDeploymentRunId, AppId } from "@mosoo/id";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 
@@ -15,6 +15,18 @@ interface DeploymentAgentCapabilityAuthority {
   deploymentRunId: AppDeploymentRunId;
 }
 
+export type DeploymentAgentCapabilityAuthorityRejection =
+  | "binding_removed"
+  | "deployment_deleted"
+  | "deployment_not_activated"
+  | "deployment_not_found"
+  | "deployment_plan_invalid"
+  | "deployment_revision_replaced";
+
+export type DeploymentAgentCapabilityAuthorityResult =
+  | { authorized: true }
+  | { authorized: false; reason: DeploymentAgentCapabilityAuthorityRejection };
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -22,12 +34,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function containsBoundAgentBinding(
   planJson: string,
   binding: DeploymentAgentCapabilityAuthority["binding"],
-): boolean {
+): "absent" | "invalid" | "present" {
   try {
     const plan = JSON.parse(planJson);
 
     if (!isRecord(plan) || !Array.isArray(plan["agentBindings"])) {
-      return false;
+      return "invalid";
     }
 
     return plan["agentBindings"].some(
@@ -36,9 +48,11 @@ function containsBoundAgentBinding(
         candidate["env"] === binding.env &&
         candidate["expose"] === binding.expose &&
         candidate["name"] === binding.name,
-    );
+    )
+      ? "present"
+      : "absent";
   } catch {
-    return false;
+    return "invalid";
   }
 }
 
@@ -47,26 +61,29 @@ function containsBoundAgentBinding(
  * its latest successful binding revision. Failed deployment attempts leave the
  * previous successful revision authoritative.
  */
-export async function isCurrentDeploymentAgentCapability(
+export async function getDeploymentAgentCapabilityAuthority(
   database: D1Database,
   input: DeploymentAgentCapabilityAuthority,
-): Promise<boolean> {
+): Promise<DeploymentAgentCapabilityAuthorityResult> {
   const deployment =
     (await getAppDatabase(database)
-      .select({ id: appDeploymentsTable.id })
+      .select({ deletedAt: appDeploymentsTable.deletedAt, id: appDeploymentsTable.id })
       .from(appDeploymentsTable)
       .where(
         and(
           eq(appDeploymentsTable.id, input.deploymentId),
           eq(appDeploymentsTable.appId, input.appId),
-          isNull(appDeploymentsTable.deletedAt),
         ),
       )
       .limit(1)
       .get()) ?? null;
 
   if (deployment === null) {
-    return false;
+    return { authorized: false, reason: "deployment_not_found" };
+  }
+
+  if (deployment.deletedAt !== null) {
+    return { authorized: false, reason: "deployment_deleted" };
   }
 
   const currentSuccessfulRun =
@@ -84,10 +101,28 @@ export async function isCurrentDeploymentAgentCapability(
       .limit(1)
       .get()) ?? null;
 
-  return (
-    currentSuccessfulRun !== null &&
-    currentSuccessfulRun.id === input.deploymentRunId &&
-    currentSuccessfulRun.planJson !== null &&
-    containsBoundAgentBinding(currentSuccessfulRun.planJson, input.binding)
-  );
+  if (currentSuccessfulRun === null) {
+    return { authorized: false, reason: "deployment_not_activated" };
+  }
+
+  if (currentSuccessfulRun.planJson === null) {
+    return { authorized: false, reason: "deployment_plan_invalid" };
+  }
+
+  const binding = containsBoundAgentBinding(currentSuccessfulRun.planJson, input.binding);
+
+  if (binding === "invalid") {
+    return { authorized: false, reason: "deployment_plan_invalid" };
+  }
+
+  if (currentSuccessfulRun.id !== input.deploymentRunId) {
+    return {
+      authorized: false,
+      reason: binding === "present" ? "deployment_revision_replaced" : "binding_removed",
+    };
+  }
+
+  return binding === "present"
+    ? { authorized: true }
+    : { authorized: false, reason: "binding_removed" };
 }

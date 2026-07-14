@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { createPlatformId } from "@mosoo/id";
 import type { AppDeploymentId, AppDeploymentRunId, AppId } from "@mosoo/id";
 
-import { isCurrentDeploymentAgentCapability } from "../src/modules/apps/application/app-deployment-capability-authority.service";
+import { getDeploymentAgentCapabilityAuthority } from "../src/modules/apps/application/app-deployment-capability-authority.service";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const APP_ID = createPlatformId<AppId>(1);
@@ -84,7 +84,9 @@ describe("deployment bound-agent capability authority", () => {
       status: "success",
     });
 
-    await expect(isCurrentDeploymentAgentCapability(database, authority())).resolves.toBe(true);
+    await expect(getDeploymentAgentCapabilityAuthority(database, authority())).resolves.toEqual({
+      authorized: true,
+    });
   });
 
   test("rejects a capability after its deployment is deleted", async () => {
@@ -97,7 +99,10 @@ describe("deployment bound-agent capability authority", () => {
       status: "success",
     });
 
-    await expect(isCurrentDeploymentAgentCapability(database, authority())).resolves.toBe(false);
+    await expect(getDeploymentAgentCapabilityAuthority(database, authority())).resolves.toEqual({
+      authorized: false,
+      reason: "deployment_deleted",
+    });
   });
 
   test("keeps the prior capability valid when a newer deployment run fails", async () => {
@@ -111,7 +116,9 @@ describe("deployment bound-agent capability authority", () => {
     });
     await insertRun({ database, id: FAILED_RUN_ID, planJson: plan([]), status: "failed" });
 
-    await expect(isCurrentDeploymentAgentCapability(database, authority())).resolves.toBe(true);
+    await expect(getDeploymentAgentCapabilityAuthority(database, authority())).resolves.toEqual({
+      authorized: true,
+    });
   });
 
   test("rejects a capability after a successful revision removes its binding", async () => {
@@ -125,6 +132,31 @@ describe("deployment bound-agent capability authority", () => {
     });
     await insertRun({ database, id: REPLACEMENT_RUN_ID, planJson: plan([]), status: "success" });
 
-    await expect(isCurrentDeploymentAgentCapability(database, authority())).resolves.toBe(false);
+    await expect(getDeploymentAgentCapabilityAuthority(database, authority())).resolves.toEqual({
+      authorized: false,
+      reason: "binding_removed",
+    });
+  });
+
+  test("reports a superseded successful revision even when it retains the binding", async () => {
+    const database = createDatabase();
+    await insertDeployment(database);
+    await insertRun({
+      database,
+      id: SUCCESSFUL_RUN_ID,
+      planJson: plan([BINDING]),
+      status: "success",
+    });
+    await insertRun({
+      database,
+      id: REPLACEMENT_RUN_ID,
+      planJson: plan([BINDING]),
+      status: "success",
+    });
+
+    await expect(getDeploymentAgentCapabilityAuthority(database, authority())).resolves.toEqual({
+      authorized: false,
+      reason: "deployment_revision_replaced",
+    });
   });
 });

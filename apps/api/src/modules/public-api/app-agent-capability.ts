@@ -33,6 +33,10 @@ export interface AppAgentCapabilityClaims {
   exp: number;
 }
 
+export type AppAgentCapabilityTokenVerification =
+  | { claims: AppAgentCapabilityClaims; status: "expired" | "valid" }
+  | { status: "invalid" };
+
 const HMAC_PARAMS: HmacKeyGenParams = { hash: "SHA-256", name: "HMAC" };
 
 /** Path the deployed app's injected URL points at (the capability ask endpoint). */
@@ -127,9 +131,24 @@ export async function verifyAppAgentCapabilityToken(
   token: string,
   nowMs: number,
 ): Promise<AppAgentCapabilityClaims | null> {
+  const verification = await inspectAppAgentCapabilityToken(secret, token, nowMs);
+
+  return verification.status === "valid" ? verification.claims : null;
+}
+
+/**
+ * Verify a token while preserving the single safe diagnostic state: a
+ * correctly signed capability whose authority has expired. Callers must keep
+ * invalid capabilities indistinguishable to external clients.
+ */
+export async function inspectAppAgentCapabilityToken(
+  secret: string,
+  token: string,
+  nowMs: number,
+): Promise<AppAgentCapabilityTokenVerification> {
   const separator = token.indexOf(".");
   if (separator <= 0 || separator === token.length - 1) {
-    return null;
+    return { status: "invalid" };
   }
   const payload = token.slice(0, separator);
   const signaturePart = token.slice(separator + 1);
@@ -144,20 +163,21 @@ export async function verifyAppAgentCapabilityToken(
       new TextEncoder().encode(payload),
     );
   } catch {
-    return null;
+    return { status: "invalid" };
   }
   if (!signatureValid) {
-    return null;
+    return { status: "invalid" };
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(new TextDecoder().decode(base64UrlToBytes(payload)));
   } catch {
-    return null;
+    return { status: "invalid" };
   }
-  if (!isCapabilityClaims(parsed) || parsed.exp <= nowMs) {
-    return null;
+  if (!isCapabilityClaims(parsed)) {
+    return { status: "invalid" };
   }
-  return parsed;
+
+  return { claims: parsed, status: parsed.exp <= nowMs ? "expired" : "valid" };
 }

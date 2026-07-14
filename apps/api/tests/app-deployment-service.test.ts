@@ -10,7 +10,7 @@ import {
   APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE,
 } from "../src/modules/api-command/application/api-command-policy";
 import { processApiCommandDeadLetterMessage } from "../src/modules/api-command/application/api-command-processor";
-import { isCurrentDeploymentAgentCapability } from "../src/modules/apps/application/app-deployment-capability-authority.service";
+import { getDeploymentAgentCapabilityAuthority } from "../src/modules/apps/application/app-deployment-capability-authority.service";
 import type { CloudflareDeploymentClient } from "../src/modules/apps/application/app-deployment-cloudflare-client";
 import type { AppDeploymentBuildRunner } from "../src/modules/apps/application/app-deployment-executor.service";
 import { dispatchAppDeploymentRun } from "../src/modules/apps/application/app-deployment-executor.service";
@@ -1314,7 +1314,9 @@ describe("app deployment service", () => {
       deploymentRunId: run.id,
     };
 
-    await expect(isCurrentDeploymentAgentCapability(database, authority)).resolves.toBe(true);
+    await expect(getDeploymentAgentCapabilityAuthority(database, authority)).resolves.toEqual({
+      authorized: true,
+    });
 
     await deleteAppDeployment(
       bindings,
@@ -1325,7 +1327,10 @@ describe("app deployment service", () => {
       },
     );
 
-    await expect(isCurrentDeploymentAgentCapability(database, authority)).resolves.toBe(false);
+    await expect(getDeploymentAgentCapabilityAuthority(database, authority)).resolves.toEqual({
+      authorized: false,
+      reason: "deployment_deleted",
+    });
   });
 
   test("uses the Pages deployment URL while the custom domain is pending", async () => {
