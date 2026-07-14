@@ -6,8 +6,15 @@ import {
   sessionsTable,
 } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { AccountId, FileId, PublicThreadId, SessionId } from "@mosoo/id";
-import { eq } from "drizzle-orm";
+import type {
+  AccountId,
+  AgentId,
+  FileId,
+  PersonalAccessTokenId,
+  PublicThreadId,
+  SessionId,
+} from "@mosoo/id";
+import { and, eq, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../platform/db/drizzle";
@@ -96,6 +103,55 @@ export async function getThreadSnapshot(
 
   if (!metadata) {
     throw publicNotFound("Thread not found.");
+  }
+
+  return {
+    metadata,
+    row: {
+      ...row,
+      creator_account_id: parsePlatformId<AccountId>(row.creator_account_id, "Creator account ID"),
+    },
+    session: buildSessionSummaryFromJoinedRow(row),
+  };
+}
+
+export async function findPublicThreadSnapshotByIdempotencyKey(
+  database: D1Database,
+  input: {
+    agentId: AgentId;
+    idempotencyKey: string;
+    tokenId: PersonalAccessTokenId;
+  },
+): Promise<ThreadSnapshot | null> {
+  const row =
+    (await getAppDatabase(database)
+      .select({
+        ...sessionSummaryWithLastRunColumns(),
+        attributed_user_id: sessionsTable.attributedUserId,
+        creator_account_id: sessionsTable.creatorAccountId,
+        metadata_json: sessionsTable.metadataJson,
+      })
+      .from(sessionsTable)
+      .leftJoin(sessionRunsTable, eq(sessionRunsTable.id, sessionsTable.lastRunId))
+      .where(
+        and(
+          eq(sessionsTable.agentId, input.agentId),
+          sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.source') = 'public_api'`,
+          sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.created_by.token_id') = ${input.tokenId}`,
+          sql`json_extract(${sessionsTable.metadataJson}, '$.public_api.idempotency_key') = ${input.idempotencyKey}`,
+        ),
+      )
+      .limit(1)
+      .get()) ?? null;
+
+  if (!row) {
+    return null;
+  }
+
+  const metadata = parsePublicApiThreadMetadata(row.metadata_json);
+
+  if (!metadata || metadata.idempotency_key !== input.idempotencyKey) {
+    return null;
   }
 
   return {

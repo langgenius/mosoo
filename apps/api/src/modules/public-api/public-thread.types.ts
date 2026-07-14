@@ -14,6 +14,7 @@ export interface CreatePublicThreadRequest {
   bindings: ApiBindings;
   caller: PublicApiCaller;
   executionContext: Pick<ExecutionContext, "waitUntil"> | null;
+  idempotencyKey: string | null;
   input: CreatePublicThreadInput;
   requestUrl: string;
 }
