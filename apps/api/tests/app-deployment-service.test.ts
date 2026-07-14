@@ -988,6 +988,118 @@ describe("app deployment service", () => {
     expect(runRow?.status).toBe("failed");
   });
 
+  test("compensates resources created after deployment deletion", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const deleted: string[] = [];
+    const externallyCreated: string[] = [];
+    const cloudflareClient = createCloudflareDeleteRecorder(deleted);
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+    const runner: AppDeploymentBuildRunner = {
+      async build() {},
+      async deploy() {
+        await deleteAppDeployment(bindings, VIEWER, { appId: APP_ID }, { cloudflareClient });
+        externallyCreated.push(`pages:${APP_ID}`);
+
+        return {
+          externalDeploymentId: "pages-deployment-after-delete",
+          externalProjectId: "pages-project-after-delete",
+          externalVersionId: null,
+          url: `https://app-${APP_ID.toLowerCase()}.apps.localhost`,
+        };
+      },
+      async prepare() {
+        return {
+          repoDir: "/repo",
+          snapshot: { files: { "index.html": "<main>Hello</main>" } },
+        };
+      },
+    };
+
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      { cloudflareClient, runner },
+    );
+
+    const deployment = await database
+      .app()
+      .select({ deletedAt: appDeploymentsTable.deletedAt })
+      .from(appDeploymentsTable)
+      .where(eq(appDeploymentsTable.id, run.deploymentId))
+      .get();
+    const runRow = await database
+      .app()
+      .select({
+        errorCode: appDeploymentRunsTable.errorCode,
+        status: appDeploymentRunsTable.status,
+      })
+      .from(appDeploymentRunsTable)
+      .where(eq(appDeploymentRunsTable.id, run.id))
+      .get();
+
+    expect(externallyCreated).toEqual([`pages:${APP_ID}`]);
+    expect(deployment?.deletedAt).toBeNumber();
+    expect(runRow).toEqual({ errorCode: "deployment_deleted", status: "failed" });
+    expect(deleted).toHaveLength(10);
+    expect(deleted.filter((entry) => entry.startsWith("pages:"))).toHaveLength(2);
+    expect(deleted.filter((entry) => entry.startsWith("worker:"))).toHaveLength(2);
+  });
+
+  test("does not compensate a deleted deployment after a replacement is active", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const deleted: string[] = [];
+    const cloudflareClient = createCloudflareDeleteRecorder(deleted);
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+    const runner: AppDeploymentBuildRunner = {
+      async build() {},
+      async deploy() {
+        await deleteAppDeployment(bindings, VIEWER, { appId: APP_ID }, { cloudflareClient });
+        await deployApp(
+          bindings,
+          VIEWER,
+          { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+          { fetch: githubFetch, nowMs: () => NOW_MS + 1 },
+        );
+
+        return {
+          externalDeploymentId: "pages-deployment-after-replacement",
+          externalProjectId: "pages-project-after-replacement",
+          externalVersionId: null,
+          url: `https://app-${APP_ID.toLowerCase()}.apps.localhost`,
+        };
+      },
+      async prepare() {
+        return {
+          repoDir: "/repo",
+          snapshot: { files: { "index.html": "<main>Hello</main>" } },
+        };
+      },
+    };
+
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      { cloudflareClient, runner },
+    );
+
+    const activeDeployment = await getAppDeployment(bindings, VIEWER, APP_ID);
+
+    expect(activeDeployment).not.toBeNull();
+    expect(deleted).toHaveLength(5);
+  });
+
   test("deletes the active deployment and fails the active run", async () => {
     const database = createDatabase();
     const { bindings } = createBindings(database);
