@@ -15,6 +15,7 @@ const wranglerBin = `${apiDir}/node_modules/.bin/wrangler`;
 const DOCKER_HOST_ENV_KEY = "DOCKER_HOST";
 const DEV_DOCKER_HOST_ENV_KEY = "MOSOO_API_DEV_DOCKER_HOST";
 const DEV_RUNTIME_PROXY_HOST_ENV_KEY = "MOSOO_API_DEV_RUNTIME_PROXY_HOST";
+const RUNTIME_CONTROL_ORIGIN_ENV_KEY = "MOSOO_RUNTIME_CONTROL_ORIGIN";
 const LARK_SIDECAR_DISABLED_ENV_KEY = "MOSOO_LARK_SIDECAR_DISABLED";
 const LARK_SIDECAR_SECRET_ENV_KEY = "MOSOO_LARK_SIDECAR_SECRET";
 const SCRUB_HOST_PROXY_ENV_KEY = "MOSOO_API_DEV_SCRUB_HOST_PROXY";
@@ -240,6 +241,13 @@ function createRuntimeProxyVarArgs(env: NodeJS.ProcessEnv): string[] {
   );
 
   return args;
+}
+
+function createRuntimeControlOriginVarArgs(env: NodeJS.ProcessEnv): string[] {
+  const value = env[RUNTIME_CONTROL_ORIGIN_ENV_KEY]?.trim();
+  return value === undefined || value.length === 0
+    ? []
+    : ["--var", `${RUNTIME_CONTROL_ORIGIN_ENV_KEY}:${value}`];
 }
 
 function unquoteDevVarValue(value: string): string {
@@ -486,6 +494,7 @@ const wranglerResult = await run(
     "--var",
     `WEB_ORIGIN:${webOrigin}`,
     ...createProviderFetchProxyVarArgs(providerFetchProxy),
+    ...createRuntimeControlOriginVarArgs(wranglerEnv),
     ...createRuntimeProxyVarArgs(wranglerEnv),
     ...(await createWeChatIlinkBaseUrlVarArgs(wranglerEnv)),
     ...(larkSidecarSecret ? createLarkSidecarVarArgs(larkSidecarSecret) : []),

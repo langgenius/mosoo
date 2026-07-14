@@ -13,6 +13,12 @@ import {
 } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
 
+import type { SkillFolderSelection } from "../../../domains/skill/lib/skill-folder-archive";
+import {
+  createSkillFolderArchiveFile,
+  readDroppedFolderSelection,
+  readFolderInputSelection,
+} from "../../../domains/skill/lib/skill-folder-archive";
 import { isTruthy } from "../../../shared/lib/truthiness";
 import type { useSkillRegistry } from "./use-skill-registry";
 type Mode = "file" | "url";
@@ -85,6 +91,7 @@ interface Props {
 
 export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, registry }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const [state, dispatch] = useReducer(uploadSkillReducer, UPLOAD_SKILL_INITIAL_STATE);
   const { dragOver, error, inspecting, mode, prepared, submitting, url } = state;
 
@@ -92,6 +99,9 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
     dispatch({ type: "reset" });
     if (inputRef.current) {
       inputRef.current.value = "";
+    }
+    if (folderInputRef.current) {
+      folderInputRef.current.value = "";
     }
   }
 
@@ -102,6 +112,25 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
     onOpenChange(next);
   }
 
+  async function inspectFile(file: File) {
+    const preview = registry ? await registry.inspectFile(file) : null;
+
+    if (!preview) {
+      throw new Error("Skill inspect service is unavailable.");
+    }
+
+    dispatch({ prepared: { kind: "file", file, preview }, type: "prepare" });
+  }
+
+  function dispatchInspectError(caughtError: unknown) {
+    dispatch({
+      error:
+        "Failed to inspect: " +
+        (caughtError instanceof Error ? caughtError.message : String(caughtError)),
+      type: "setError",
+    });
+  }
+
   async function handleFiles(files: FileList | null) {
     dispatch({ type: "clearError" });
     if (!files || files.length === 0) {
@@ -109,20 +138,25 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
     }
     const file = files[0]!;
     try {
-      const preview = registry ? await registry.inspectFile(file) : null;
+      await inspectFile(file);
+    } catch (caughtError) {
+      dispatchInspectError(caughtError);
+    }
+  }
 
-      if (!preview) {
-        throw new Error("Skill inspect service is unavailable.");
+  async function handleFolder(loadSelection: () => Promise<SkillFolderSelection | null>) {
+    dispatch({ type: "clearError" });
+    try {
+      const selection = await loadSelection();
+
+      if (!selection) {
+        return;
       }
 
-      dispatch({ prepared: { kind: "file", file, preview }, type: "prepare" });
+      const archive = await createSkillFolderArchiveFile(selection);
+      await inspectFile(archive);
     } catch (caughtError) {
-      dispatch({
-        error:
-          "Failed to inspect: " +
-          (caughtError instanceof Error ? caughtError.message : String(caughtError)),
-        type: "setError",
-      });
+      dispatchInspectError(caughtError);
     }
   }
 
@@ -179,7 +213,8 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
         <DialogHeader>
           <DialogTitle>Add skill</DialogTitle>
           <DialogDescription className="sr-only">
-            Upload a .md, .zip, or .skill file, or import a skill from a GitHub or skills.sh URL.
+            Upload a .md, .zip, or .skill file, upload a local skill folder, or import a skill from
+            a GitHub or skills.sh URL.
           </DialogDescription>
         </DialogHeader>
 
@@ -191,6 +226,22 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
           className="sr-only"
           onChange={(e) => {
             void handleFiles(e.target.files);
+          }}
+        />
+
+        <input
+          ref={(element) => {
+            folderInputRef.current = element;
+            if (element !== null) {
+              element.webkitdirectory = true;
+            }
+          }}
+          type="file"
+          aria-label="Upload skill folder"
+          className="sr-only"
+          onChange={(e) => {
+            const files = e.target.files;
+            void handleFolder(() => Promise.resolve(readFolderInputSelection(files)));
           }}
         />
 
@@ -240,32 +291,58 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
             ) : null}
           </div>
         ) : mode === "file" ? (
-          <button
-            className={cn(
-              "group flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-14 transition-colors",
-              dragOver
-                ? "border-primary bg-primary/5"
-                : "border-border hover:border-primary/60 hover:bg-muted/30",
-            )}
-            onDragOver={(e) => {
-              e.preventDefault();
-              dispatch({ dragOver: true, type: "setDragOver" });
-            }}
-            onDragLeave={() => {
-              dispatch({ dragOver: false, type: "setDragOver" });
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              dispatch({ dragOver: false, type: "setDragOver" });
-              void handleFiles(e.dataTransfer.files);
-            }}
-            onClick={() => inputRef.current?.click()}
-            type="button"
-          >
-            <div className="text-foreground text-[15px] font-medium">
-              Drag and drop or click to upload
+          <div className="flex flex-col gap-2">
+            <button
+              className={cn(
+                "group flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed py-14 transition-colors",
+                dragOver
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/60 hover:bg-muted/30",
+              )}
+              onDragOver={(e) => {
+                e.preventDefault();
+                dispatch({ dragOver: true, type: "setDragOver" });
+              }}
+              onDragLeave={() => {
+                dispatch({ dragOver: false, type: "setDragOver" });
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                dispatch({ dragOver: false, type: "setDragOver" });
+                const entry =
+                  e.dataTransfer.items.length === 1
+                    ? e.dataTransfer.items[0]?.webkitGetAsEntry()
+                    : null;
+
+                if (entry?.isDirectory) {
+                  const directory = entry as FileSystemDirectoryEntry;
+                  void handleFolder(() => readDroppedFolderSelection(directory));
+                } else {
+                  void handleFiles(e.dataTransfer.files);
+                }
+              }}
+              onClick={() => inputRef.current?.click()}
+              type="button"
+            >
+              <div className="text-foreground text-[15px] font-medium">
+                Drag and drop or click to upload
+              </div>
+              <div className="text-muted-foreground text-xs">
+                Drop a file or a whole skill folder
+              </div>
+            </button>
+            <div className="text-muted-foreground text-center text-xs">
+              or{" "}
+              <button
+                type="button"
+                className="text-primary underline-offset-2 hover:underline"
+                onClick={() => folderInputRef.current?.click()}
+              >
+                select a folder
+              </button>{" "}
+              from your computer
             </div>
-          </button>
+          </div>
         ) : (
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
@@ -308,6 +385,7 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
             <ul className="text-muted-foreground marker:text-muted-foreground/60 list-disc space-y-1 pl-4 text-[12.5px]">
               <li>.md file must contain skill name and description formatted in YAML</li>
               <li>.zip or .skill file must include a SKILL.md file</li>
+              <li>A folder must include a SKILL.md file at its root</li>
             </ul>
           </div>
         ) : null}
