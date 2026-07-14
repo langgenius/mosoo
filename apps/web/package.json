@@ -24,6 +24,7 @@
     "@mosoo/effects": "workspace:*",
     "@mosoo/id": "workspace:*",
     "@mosoo/runtime-catalog": "workspace:*",
+    "@mosoo/skill-package": "workspace:*",
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/react-query": "^5.100.10",
     "@xterm/addon-fit": "^0.11.0",
