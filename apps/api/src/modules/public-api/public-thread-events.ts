@@ -18,6 +18,7 @@ import type { SQL } from "drizzle-orm";
 import { getAppDatabase } from "../../platform/db/drizzle";
 import { createSessionProcessEventsFromSessionEventRows } from "../sessions/application/session-process-events.service";
 import type { SessionEventProcessRow } from "../sessions/application/session-process-events.service";
+import { foldStreamedSessionEventRows } from "../sessions/domain/session-event-stream-fold";
 import { publicInternalError, publicInvalidRequest, toPublicApiError } from "./public-api-errors";
 import { sanitizePublicOutput } from "./public-output-sanitization";
 import { admitPublicThreadReader } from "./public-thread-admission";
@@ -40,6 +41,7 @@ const SSE_TEXT_ENCODER = new TextEncoder();
 interface PublicThreadEventWindow {
   events: PublicThreadEventLogEntry[];
   latestSeq: number | null;
+  rows: PublicThreadEventProcessRow[];
   truncated: boolean;
 }
 
@@ -83,12 +85,13 @@ function toPublicThreadEventLogEntry(input: {
 
 function toPublicThreadEventLogEntries(
   rows: PublicThreadEventProcessRow[],
+  options: { foldStreamedRows?: boolean } = {},
 ): PublicThreadEventLogEntry[] {
   const runIdsByEventId = new Map<RuntimeEventId, SessionRunId | null>(
     rows.map((row) => [row.id, row.run_id]),
   );
 
-  return createSessionProcessEventsFromSessionEventRows(rows).flatMap((event) => {
+  return createSessionProcessEventsFromSessionEventRows(rows, options).flatMap((event) => {
     const publicEvent = toPublicThreadEventLogEntry({
       event,
       runId: runIdsByEventId.get(event.id) ?? null,
@@ -107,6 +110,7 @@ function selectPublicThreadEventRows(input: {
     .select({
       content_text: sessionEventsTable.contentText,
       ended_at: sessionEventsTable.endedAt,
+      event_type: sessionEventsTable.eventType,
       id: sessionEventsTable.id,
       occurred_at: sessionEventsTable.occurredAt,
       process_status: sessionEventsTable.processStatus,
@@ -166,6 +170,7 @@ async function readPublicThreadEventWindow(input: {
       return {
         events: events.slice(-input.limit),
         latestSeq,
+        rows: scannedRows.toReversed(),
         truncated: true,
       };
     }
@@ -182,6 +187,7 @@ async function readPublicThreadEventWindow(input: {
   return {
     events: truncated ? events.slice(-input.limit) : events,
     latestSeq,
+    rows: scannedRows.toReversed(),
     truncated,
   };
 }
@@ -335,6 +341,16 @@ export async function createPublicThreadEventStream(
     cancelled: false,
   };
   let lastSeenSeq = initialWindow.latestSeq ?? 0;
+  // Streamed text fragments are persisted one row each; hold a stream's rows
+  // back until its closing row lands so every message is emitted exactly once
+  // as a complete entry instead of one entry per fragment.
+  const initialFold = foldStreamedSessionEventRows(initialWindow.rows, {
+    flushOpenStreams: false,
+  });
+  let pendingStreamRows = initialFold.openStreamRows;
+  const initialEvents = toPublicThreadEventLogEntries(initialFold.rows, {
+    foldStreamedRows: false,
+  }).slice(-limit);
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -345,7 +361,7 @@ export async function createPublicThreadEventStream(
         enqueueThreadEvents({
           controller,
           emittedEventIds,
-          events: initialWindow.events,
+          events: initialEvents,
         });
 
         while (!isStreamStopped({ signal: request.signal, state })) {
@@ -369,11 +385,15 @@ export async function createPublicThreadEventStream(
             }
 
             lastSeenSeq = rows[rows.length - 1]?.seq ?? lastSeenSeq;
+            const fold = foldStreamedSessionEventRows([...pendingStreamRows, ...rows], {
+              flushOpenStreams: false,
+            });
+            pendingStreamRows = fold.openStreamRows;
             enqueuedEvents =
               enqueueThreadEvents({
                 controller,
                 emittedEventIds,
-                events: toPublicThreadEventLogEntries(rows),
+                events: toPublicThreadEventLogEntries(fold.rows, { foldStreamedRows: false }),
               }) || enqueuedEvents;
 
             if (rows.length < THREAD_EVENT_ROW_PAGE_SIZE) {
