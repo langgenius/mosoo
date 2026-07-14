@@ -367,4 +367,114 @@ describe("cost usage event", () => {
       run_purpose: "channel",
     });
   });
+
+  test("persists and idempotently updates reported USD cost without token counters", async () => {
+    const database = createUsageEventDatabase();
+    const usage = {
+      costAmount: 0.42,
+      costCurrency: "USD",
+      source: "session_update",
+      usageContract: "openai_total_with_cached_breakdown",
+    } satisfies SessionUsageSummary;
+    const input = {
+      callKey: "cost-only-call",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      nativeCallId: "cost-only-native-call",
+      run: RUN_CONTEXT,
+      usage,
+    };
+
+    await recordRuntimeUsageEvent(database, input);
+    await recordRuntimeUsageEvent(database, {
+      ...input,
+      usage: {
+        ...usage,
+        costAmount: 0.84,
+      },
+    });
+
+    const row = await database
+      .prepare(
+        `
+          SELECT
+            COUNT(*) AS count,
+            cache_creation_tokens,
+            cache_read_tokens,
+            input_tokens,
+            output_tokens,
+            pricing_status,
+            total_cost_usd_micros,
+            usage_contract
+          FROM usage_event
+        `,
+      )
+      .first<{
+        count: number;
+        cache_creation_tokens: number;
+        cache_read_tokens: number;
+        input_tokens: number;
+        output_tokens: number;
+        pricing_status: string;
+        total_cost_usd_micros: number;
+        usage_contract: string;
+      }>();
+
+    expect(row).toEqual({
+      cache_creation_tokens: 0,
+      cache_read_tokens: 0,
+      count: 1,
+      input_tokens: 0,
+      output_tokens: 0,
+      pricing_status: "unknown",
+      total_cost_usd_micros: 840_000,
+      usage_contract: "openai_total_with_cached_breakdown",
+    });
+  });
+
+  test("uses reported USD cost for a known model when token counters are unavailable", async () => {
+    const database = createUsageEventDatabase();
+    const usage = {
+      costAmount: 0.42,
+      costCurrency: "USD",
+      source: "session_update",
+      usageContract: "openai_total_with_cached_breakdown",
+    } satisfies SessionUsageSummary;
+
+    await recordRuntimeUsageEvent(database, {
+      callKey: "known-cost-only-call",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      nativeCallId: "known-cost-only-native-call",
+      run: {
+        ...RUN_CONTEXT,
+        model: "gpt-5.4",
+        provider: "openai",
+      },
+      usage,
+    });
+
+    const row = await database
+      .prepare(
+        `
+          SELECT price_snapshot_json, pricing_status, total_cost_usd_micros
+          FROM usage_event
+        `,
+      )
+      .first<{
+        price_snapshot_json: string | null;
+        pricing_status: string;
+        total_cost_usd_micros: number;
+      }>();
+
+    expect(row).toMatchObject({
+      pricing_status: "priced",
+      total_cost_usd_micros: 420_000,
+    });
+    expect(JSON.parse(row?.price_snapshot_json ?? "{}")).toEqual({
+      model: "gpt-5.4",
+      provider: "openai",
+      reportedCostUsd: 0.42,
+      source: "runtime_reported_usd",
+      tokenCountersUnavailable: true,
+    });
+  });
 });

@@ -131,12 +131,14 @@ export async function recordRuntimeUsageEvent(
   const rawOutputTokens = toTokenCount(input.usage.outputTokens);
   const rawCacheReadTokens = toTokenCount(input.usage.cachedReadTokens);
   const rawCacheCreationTokens = toTokenCount(input.usage.cachedWriteTokens);
+  const providedCostUsd = toProvidedUsdCost(input.usage);
 
   if (
     rawInputTokens === 0 &&
     rawOutputTokens === 0 &&
     rawCacheReadTokens === 0 &&
-    rawCacheCreationTokens === 0
+    rawCacheCreationTokens === 0 &&
+    providedCostUsd === null
   ) {
     return;
   }
@@ -158,7 +160,7 @@ export async function recordRuntimeUsageEvent(
     model,
     outputTokens: tokens.outputTokens,
     pricedAtMs: input.run.createdAtMs,
-    providedCostUsd: toProvidedUsdCost(input.usage),
+    providedCostUsd,
     provider,
   });
   const source = "runtime_driver";
