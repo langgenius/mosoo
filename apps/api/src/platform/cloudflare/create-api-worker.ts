@@ -5,7 +5,10 @@ import {
   processApiCommandDeadLetterMessage,
   processApiCommandMessage,
 } from "../../modules/api-command/application/api-command-processor";
-import { redriveFailedChannelFinalDeliveryEnqueues } from "../../modules/channels/application/channel-final-delivery-jobs";
+import {
+  redriveExhaustedChannelFinalDeliveryJobs,
+  redriveFailedChannelFinalDeliveryEnqueues,
+} from "../../modules/channels/application/channel-final-delivery-jobs";
 import type { ChannelFinalDeliveryMessage } from "../../modules/channels/application/channel-final-delivery-message";
 import type { ApiBindings } from "./worker-types";
 
@@ -34,6 +37,7 @@ export function createApiWorker(): ExportedHandler<ApiBindings> {
     async scheduled(controller: ScheduledController, env: ApiBindings): Promise<void> {
       await redriveFailedApiCommandEnqueues(env);
       await redriveFailedChannelFinalDeliveryEnqueues(env);
+      await redriveExhaustedChannelFinalDeliveryJobs(env);
       await enqueueScheduledMaintenanceCommand(env, {
         scheduledTime: controller.scheduledTime,
       });
