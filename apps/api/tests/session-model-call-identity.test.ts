@@ -157,6 +157,51 @@ function createSessionModelCallDatabase(): SqliteD1Database {
   return database;
 }
 
+function createUsageLedgerFailingDatabase(database: D1Database): D1Database {
+  let shouldFailUsageLedgerWrite = true;
+
+  function wrapStatement(
+    statement: D1PreparedStatement,
+    isUsageLedgerInsert: boolean,
+  ): D1PreparedStatement {
+    return new Proxy(statement, {
+      get(target, property) {
+        if (property === "bind") {
+          return (...values: unknown[]) =>
+            wrapStatement(target.bind(...values), isUsageLedgerInsert);
+        }
+
+        const value = Reflect.get(target, property);
+
+        if (property === "run" && typeof value === "function") {
+          return (...arguments_: unknown[]) => {
+            if (isUsageLedgerInsert && shouldFailUsageLedgerWrite) {
+              shouldFailUsageLedgerWrite = false;
+              throw new Error("injected usage ledger write failure");
+            }
+
+            return Reflect.apply(value, target, arguments_);
+          };
+        }
+
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  }
+
+  return new Proxy(database, {
+    get(target, property) {
+      if (property === "prepare") {
+        return (query: string) =>
+          wrapStatement(target.prepare(query), /insert\s+into\s+["`]usage_event["`]/iu.test(query));
+      }
+
+      const value = Reflect.get(target, property);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
 async function seedRunIdentity(
   database: SqliteD1Database,
   input: {
@@ -394,5 +439,54 @@ describe("session model call identity", () => {
         usage,
       }),
     ).rejects.toThrow("Session run not found for model call usage.");
+  });
+
+  test("rolls back the model call when its usage ledger write fails, then recovers once", async () => {
+    const database = createSessionModelCallDatabase();
+    await seedRunIdentity(database);
+    const usage = {
+      callId: "atomic-ledger-call",
+      inputTokens: 10,
+      outputTokens: 5,
+      source: "prompt_response",
+      usageContract: "openai_total_with_cached_breakdown",
+    } satisfies SessionUsageSummary;
+    const input = {
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      sessionId: SESSION_ID,
+      sessionRunId: SESSION_RUN_ID,
+      status: "completed" as const,
+      traceId: "trace-atomic-ledger",
+      usage,
+    };
+
+    await expect(
+      upsertSessionModelCallUsage(createUsageLedgerFailingDatabase(database), input),
+    ).rejects.toThrow("injected usage ledger write failure");
+
+    expect(
+      await database
+        .prepare("SELECT COUNT(*) AS count FROM session_model_call")
+        .first<{ count: number }>(),
+    ).toEqual({ count: 0 });
+    expect(
+      await database
+        .prepare("SELECT COUNT(*) AS count FROM usage_event")
+        .first<{ count: number }>(),
+    ).toEqual({ count: 0 });
+
+    await upsertSessionModelCallUsage(database, input);
+    await upsertSessionModelCallUsage(database, input);
+
+    expect(
+      await database
+        .prepare("SELECT COUNT(*) AS count FROM session_model_call")
+        .first<{ count: number }>(),
+    ).toEqual({ count: 1 });
+    expect(
+      await database
+        .prepare("SELECT COUNT(*) AS count FROM usage_event")
+        .first<{ count: number }>(),
+    ).toEqual({ count: 1 });
   });
 });
