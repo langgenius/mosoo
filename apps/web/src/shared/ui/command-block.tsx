@@ -3,19 +3,7 @@ import type { ReactElement } from "react";
 import { useState } from "react";
 
 import { cn } from "@/shared/lib/class-names";
-
-async function writeClipboardText(value: string): Promise<boolean> {
-  if (typeof navigator === "undefined" || !navigator.clipboard) {
-    return false;
-  }
-
-  try {
-    await navigator.clipboard.writeText(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
+import { writeClipboardText } from "@/shared/lib/clipboard";
 
 // A copyable terminal command / code line. The leading prompt (default "$") is
 // decorative and never copied — only `command` lands on the clipboard.

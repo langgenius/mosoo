@@ -1,7 +1,8 @@
 import type { AppDeploymentRunStatus } from "@mosoo/contracts/app";
 import type { AppDeploymentRunRow, AppDeploymentRow } from "@mosoo/db";
 import { appDeploymentRunsTable, appDeploymentsTable } from "@mosoo/db";
-import type { AppDeploymentRunId } from "@mosoo/id";
+import { parsePlatformId } from "@mosoo/id";
+import type { AgentId, AppDeploymentRunId } from "@mosoo/id";
 import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
@@ -828,6 +829,7 @@ const APP_AGENT_CAPABILITY_TTL_MS = 10 * 365 * 24 * 60 * 60 * 1000;
 async function resolveDeploymentEnvVars(
   bindings: ApiBindings,
   deployment: AppDeploymentRow,
+  run: AppDeploymentRunRow,
   plan: AppDeploymentPlan,
 ): Promise<Record<string, string>> {
   if (plan.agentBindings.length === 0) {
@@ -849,10 +851,16 @@ async function resolveDeploymentEnvVars(
 
   for (const binding of resolved) {
     const token = await mintAppAgentCapabilityToken(bindings.RUNTIME_ACTION_TOKEN_SECRET, {
-      agentId: binding.agentId,
+      agentId: parsePlatformId<AgentId>(binding.agentId, "bound Agent ID"),
       appId: deployment.appId,
+      binding: {
+        env: binding.envVar,
+        expose: binding.expose,
+        name: binding.name,
+      },
+      deploymentId: deployment.id,
+      deploymentRunId: run.id,
       exp: expiresAtMs,
-      expose: binding.expose,
     });
     envVars[binding.envVar] = boundAgentUrl(bindings.WEB_ORIGIN, token);
   }
@@ -905,7 +913,7 @@ export async function dispatchAppDeploymentRun(
 
     let envVars: Record<string, string>;
     try {
-      envVars = await resolveDeploymentEnvVars(bindings, context.deployment, plan);
+      envVars = await resolveDeploymentEnvVars(bindings, context.deployment, context.run, plan);
     } catch (error) {
       if (error instanceof AppAgentBindingResolutionError) {
         await failDeploymentRunIfActive({

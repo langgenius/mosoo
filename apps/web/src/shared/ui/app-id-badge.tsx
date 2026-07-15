@@ -3,20 +3,8 @@ import type { MouseEvent, ReactElement } from "react";
 import { useState } from "react";
 
 import { cn } from "@/shared/lib/class-names";
+import { writeClipboardText } from "@/shared/lib/clipboard";
 import { Button } from "@/shared/ui/button";
-
-async function writeClipboardText(text: string): Promise<boolean> {
-  if (typeof navigator === "undefined" || !navigator.clipboard) {
-    return false;
-  }
-
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export function AppIdBadge({
   appId,

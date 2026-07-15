@@ -6,6 +6,7 @@ export interface SkillRegistryRow {
   createdAt: number;
   currentSnapshotId: SkillSnapshotId;
   description: string;
+  fileCount: number;
   forkedFromOwnerName: string | null;
   forkedFromSkillId: SkillId | null;
   forkedFromSkillName: string | null;

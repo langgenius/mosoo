@@ -1,8 +1,19 @@
 import { describe, expect, test } from "bun:test";
 
 import type { SessionRunStatus } from "@mosoo/contracts/session-run";
+import { parsePlatformId } from "@mosoo/id";
+import type {
+  AccountId,
+  AgentDeploymentVersionId,
+  AgentId,
+  AppDeploymentId,
+  AppDeploymentRunId,
+  AppId,
+} from "@mosoo/id";
 
+import type { AgentRow } from "../src/modules/agents/application/agent-types";
 import {
+  getBoundAgentServabilityFailure,
   isTerminalRunStatus,
   parseBoundAgentCallBody,
   selectBoundAgentReply,
@@ -22,13 +33,44 @@ import { PublicApiError } from "../src/modules/public-api/public-api-errors";
 
 const SECRET = "bound-test-secret";
 const NOW = 5_000_000;
+const AGENT_ID = parsePlatformId<AgentId>("01J00000000000000000000009");
+const APP_ID = parsePlatformId<AppId>("01J0000000000000000000000Q");
+const DEPLOYMENT_ID = parsePlatformId<AppDeploymentId>("01J0000000000000000000000D");
+const DEPLOYMENT_RUN_ID = parsePlatformId<AppDeploymentRunId>("01J0000000000000000000000R");
+const OWNER_ID = parsePlatformId<AccountId>("01J00000000000000000000001");
+const AGENT_VERSION_ID = parsePlatformId<AgentDeploymentVersionId>("01J0000000000000000000000A");
 
 function claims(overrides: Partial<AppAgentCapabilityClaims> = {}): AppAgentCapabilityClaims {
   return {
-    agentId: "agt_bound",
-    appId: "app_bound",
+    agentId: AGENT_ID,
+    appId: APP_ID,
+    binding: { env: "MOSOO_AGENT", expose: "public_thread", name: "Bound Agent" },
+    deploymentId: DEPLOYMENT_ID,
+    deploymentRunId: DEPLOYMENT_RUN_ID,
     exp: NOW + 60_000,
-    expose: "public_thread",
+    ...overrides,
+  };
+}
+
+function agent(overrides: Partial<AgentRow> = {}): AgentRow {
+  return {
+    appId: APP_ID,
+    configJson: "{}",
+    createdAt: 0,
+    description: null,
+    environmentId: null,
+    id: AGENT_ID,
+    kind: "pet",
+    liveDeploymentVersionId: AGENT_VERSION_ID,
+    model: "gpt-5.4",
+    name: "Bound Agent",
+    ownerId: OWNER_ID,
+    prompt: "Help.",
+    provider: "openai",
+    runtimeId: "openai-runtime",
+    status: "published",
+    updatedAt: 0,
+    visibility: "private",
     ...overrides,
   };
 }
@@ -59,6 +101,20 @@ describe("verifyBoundAgentCapability (capability verify-on-route)", () => {
   test("returns claims for a valid token", async () => {
     const token = await mintAppAgentCapabilityToken(SECRET, claims());
     expect(await verifyBoundAgentCapability(SECRET, token, NOW)).toEqual(claims());
+  });
+});
+
+describe("bound Agent servability", () => {
+  test("classifies unpublished Agents for capability audit", () => {
+    expect(getBoundAgentServabilityFailure(agent({ status: "draft" }), claims())).toBe(
+      "agent_unpublished",
+    );
+  });
+
+  test("classifies a renamed binding target without treating it as unpublished", () => {
+    expect(getBoundAgentServabilityFailure(agent({ name: "Renamed" }), claims())).toBe(
+      "agent_mismatched",
+    );
   });
 });
 

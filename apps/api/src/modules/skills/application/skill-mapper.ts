@@ -22,6 +22,7 @@ export function toSkillSummary(row: SkillRegistryRow): SkillSummary {
     author: row.author,
     createdAt: toTimestampIsoString(row.createdAt),
     description: row.description,
+    fileCount: row.fileCount,
     forkOrigin:
       forkedFromSkillId && forkedFromSkillName && forkedFromOwnerName
         ? {

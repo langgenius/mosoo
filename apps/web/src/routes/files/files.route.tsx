@@ -27,6 +27,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { FilePreviewDialog } from "./file-preview-dialog";
 import { createFilesViewModel } from "./files-list-model";
 import type { FilesTableEntry, SessionKindFilter } from "./files-list-model";
+import { ThreadFilter } from "./thread-filter";
 
 const SESSION_KIND_OPTIONS: { label: string; value: SessionKindFilter }[] = [
   { label: "All", value: "all" },
@@ -165,7 +166,7 @@ function FileTable({
                 </TableCell>
                 <TableCell className="hidden lg:table-cell">
                   {file.agent === null ? (
-                    <span className="text-fg-3 text-[12px]">—</span>
+                    <span className="text-fg-3 text-[12px]">Not linked</span>
                   ) : (
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <span className="text-fg-1 max-w-[180px] truncate text-[12px] font-medium">
@@ -270,16 +271,6 @@ export function FilesPage(): ReactElement {
     ],
     [filesView.agentOptions],
   );
-  const sessionItems = useMemo(
-    () => [
-      { label: "All Threads", value: "" },
-      ...filesView.sessionOptions.map((session) => ({
-        label: session.title === null ? session.id : `${session.title} — ${session.id}`,
-        value: session.id,
-      })),
-    ],
-    [filesView.sessionOptions],
-  );
   const filtersActive =
     filesView.agentId !== "" ||
     filesView.sessionId !== "" ||
@@ -303,52 +294,37 @@ export function FilesPage(): ReactElement {
         </Button>
       </PageHeader>
 
-      <ListPageToolbar className="flex-wrap">
-        <Select
-          disabled={sessionOptionsLoading || sessionOptionsError !== null}
-          items={agentItems}
-          onValueChange={(value) => {
-            setAgentId(value ?? "");
-            setSessionId("");
-          }}
-          value={filesView.agentId}
-        >
-          <SelectTrigger
-            aria-label="Agent filter"
-            className="w-full sm:w-auto sm:min-w-[220px] sm:grow lg:grow-0"
+      <ListPageToolbar className="flex-wrap items-end">
+        <div className="flex w-full min-w-0 flex-col gap-1 sm:w-[220px]">
+          <span className="text-fg-3 text-[11px] font-semibold">Agent</span>
+          <Select
+            disabled={sessionOptionsLoading || sessionOptionsError !== null}
+            items={agentItems}
+            onValueChange={(value) => {
+              setAgentId(value ?? "");
+              setSessionId("");
+            }}
+            value={filesView.agentId}
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {agentItems.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
+            <SelectTrigger aria-label="Agent filter" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {agentItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <ThreadFilter
+          agents={filesView.agentOptions}
           disabled={sessionOptionsLoading || sessionOptionsError !== null}
-          items={sessionItems}
-          onValueChange={(value) => {
-            setSessionId(value ?? "");
-          }}
+          onChange={setSessionId}
+          sessions={filesView.sessionOptions}
           value={filesView.sessionId}
-        >
-          <SelectTrigger
-            aria-label="Thread filter"
-            className="w-full sm:w-auto sm:min-w-[300px] sm:grow lg:max-w-[420px] lg:grow-0"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="max-w-[480px]">
-            {sessionItems.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
         <SegmentedButtonGroup<SessionKindFilter>
           label="Thread file category"
           onChange={setSessionKind}

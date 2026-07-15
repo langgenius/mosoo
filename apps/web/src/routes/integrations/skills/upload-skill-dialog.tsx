@@ -12,7 +12,9 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
+import { SkillFileCountBadge } from "@/shared/ui/skill-file-count-badge";
 
+import { countSkillFiles } from "../../../domains/skill/lib/skill-entries";
 import type { SkillFolderSelection } from "../../../domains/skill/lib/skill-folder-archive";
 import {
   createSkillFolderArchiveFile,
@@ -268,9 +270,10 @@ export function UploadSkillDialog({ onImportUrl, onOpenChange, onUpload, open, r
         {prepared ? (
           <div className="border-border bg-muted/30 flex min-w-0 flex-col gap-3 rounded-lg border p-4">
             <div className="flex min-w-0 items-center gap-2 text-sm">
-              <span className="text-muted-foreground min-w-0 font-mono text-xs break-all">
+              <span className="text-muted-foreground min-w-0 flex-1 font-mono text-xs break-all">
                 {prepared.kind === "file" ? prepared.file.name : prepared.url}
               </span>
+              <SkillFileCountBadge count={countSkillFiles(prepared.preview.entries)} />
             </div>
             <div>
               <div className="text-muted-foreground text-[11px] tracking-wider uppercase">Name</div>

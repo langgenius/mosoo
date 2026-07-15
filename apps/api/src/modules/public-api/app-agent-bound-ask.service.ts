@@ -12,22 +12,33 @@
 
 import type { AgentId, AppId, SessionId, SessionRunId } from "@mosoo/id";
 
-import { createErrorLogContext, logError } from "../../platform/cloudflare/logger";
+import { createErrorLogContext, logError, logInfo } from "../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 import { getAgentRow } from "../agents/application/agent-repository";
+import {
+  createDeploymentAgentCapabilityRunCreationGuard,
+  getDeploymentAgentCapabilityAuthority,
+} from "../apps/application/app-deployment-capability-authority.service";
+import type { DeploymentAgentCapabilityAuthorityRejection } from "../apps/application/app-deployment-capability-authority.service";
 import { getAppRow } from "../apps/application/app.service";
 import { getAccountViewer } from "../auth/application/public-api-caller.service";
 import type { AuthenticatedViewer } from "../auth/application/viewer-auth.service";
-import { createAgentSession, queueSessionRun } from "../runtime/application/session-run.service";
+import {
+  createAgentSession,
+  queueSessionRun,
+  SessionRunCreationGuardRejectedError,
+} from "../runtime/application/session-run.service";
 import { getSessionRunSummary } from "../runtime/infrastructure/session-runs/session-run-store.repository";
 import {
-  ensureBoundAgentServable,
+  getBoundAgentServabilityFailure,
+  inspectBoundAgentCapability,
   selectBoundAgentReply,
-  verifyBoundAgentCapability,
   waitForTerminalRun,
 } from "./app-agent-bound-call";
+import type { BoundAgentServabilityFailure } from "./app-agent-bound-call";
 import type { BoundAgentCallInput } from "./app-agent-bound-call";
-import { publicNotFound } from "./public-api-errors";
+import type { AppAgentCapabilityClaims } from "./app-agent-capability";
+import { publicAgentNotExposed, publicNotFound, publicUnauthenticated } from "./public-api-errors";
 import { enforcePublicApiRateLimit } from "./public-api-rate-limit.service";
 import { readPublicThreadRunFinalOutput } from "./public-thread-events";
 import { cleanupFailedThreadCreation } from "./public-thread-store";
@@ -46,6 +57,26 @@ export interface CreateBoundAgentThreadAndWaitRequest {
 export interface BoundAgentCallResponse {
   reply: string;
   runId: SessionRunId;
+}
+
+type BoundAgentCapabilityRejectionReason =
+  | BoundAgentServabilityFailure
+  | DeploymentAgentCapabilityAuthorityRejection
+  | "expired";
+
+function logBoundAgentCapabilityRejection(
+  claims: AppAgentCapabilityClaims,
+  reason: BoundAgentCapabilityRejectionReason,
+): void {
+  logInfo("public-api.bound_agent_capability.rejected", {
+    agentId: claims.agentId,
+    appId: claims.appId,
+    bindingEnv: claims.binding.env,
+    bindingName: claims.binding.name,
+    deploymentId: claims.deploymentId,
+    deploymentRunId: claims.deploymentRunId,
+    reason,
+  });
 }
 
 function delay(ms: number): Promise<void> {
@@ -77,6 +108,7 @@ async function startBoundAgentRun(input: {
   agentId: AgentId;
   appId: AppId;
   bindings: ApiBindings;
+  capability: AppAgentCapabilityClaims;
   executionContext: Pick<ExecutionContext, "waitUntil"> | null;
   ownerViewer: AuthenticatedViewer;
   prompt: string;
@@ -108,8 +140,17 @@ async function startBoundAgentRun(input: {
       input: {
         accessViewer: input.ownerViewer,
         attachmentIds: [],
+        boundCapabilityProvenance: {
+          agentId: input.capability.agentId,
+          appId: input.capability.appId,
+          bindingEnv: input.capability.binding.env,
+          bindingName: input.capability.binding.name,
+          deploymentId: input.capability.deploymentId,
+          deploymentRunId: input.capability.deploymentRunId,
+        },
         clientRequestId: null,
         prompt: input.prompt,
+        runCreationGuard: createDeploymentAgentCapabilityRunCreationGuard(input.capability),
         session: {
           agent_id: session.agentId,
           deployment_version_id: session.deploymentVersionId,
@@ -147,14 +188,38 @@ async function startBoundAgentRun(input: {
 export async function createBoundAgentThreadAndWait(
   request: CreateBoundAgentThreadAndWaitRequest,
 ): Promise<BoundAgentCallResponse> {
-  const claims = await verifyBoundAgentCapability(
+  const verification = await inspectBoundAgentCapability(
     request.bindings.RUNTIME_ACTION_TOKEN_SECRET,
     request.token,
     Date.now(),
   );
 
+  if (verification.status !== "valid") {
+    if (verification.status === "expired") {
+      logBoundAgentCapabilityRejection(verification.claims, "expired");
+    }
+
+    throw publicUnauthenticated("The capability URL is invalid or has expired.");
+  }
+
+  const claims = verification.claims;
+
   const agent = await getAgentRow(request.bindings.DB, claims.agentId);
-  ensureBoundAgentServable(agent, claims);
+  const agentFailure = getBoundAgentServabilityFailure(agent, claims);
+
+  if (agentFailure !== null) {
+    logBoundAgentCapabilityRejection(claims, agentFailure);
+    throw publicAgentNotExposed("This Agent is no longer published for bound calls.");
+  }
+
+  const authority = await getDeploymentAgentCapabilityAuthority(request.bindings.DB, claims);
+
+  if (!authority.authorized) {
+    logBoundAgentCapabilityRejection(claims, authority.reason);
+    throw publicAgentNotExposed(
+      "This capability is no longer authorized for the active deployment.",
+    );
+  }
 
   // The capability URL is keyless, long-lived, and internet-facing: without a
   // limit a single leaked URL could launch unbounded owner-billed runs. Reuse
@@ -164,15 +229,48 @@ export async function createBoundAgentThreadAndWait(
 
   const ownerViewer = await resolveBoundAgentOwnerViewer(request.bindings, agent.appId);
 
-  const { runId, sessionId } = await startBoundAgentRun({
-    agentId: agent.id,
-    appId: agent.appId,
-    bindings: request.bindings,
-    executionContext: request.executionContext,
-    ownerViewer,
-    prompt: request.input.message,
-    requestUrl: request.requestUrl,
-  });
+  let startedRun: { runId: SessionRunId; sessionId: SessionId };
+
+  try {
+    startedRun = await startBoundAgentRun({
+      agentId: agent.id,
+      appId: agent.appId,
+      bindings: request.bindings,
+      capability: claims,
+      executionContext: request.executionContext,
+      ownerViewer,
+      prompt: request.input.message,
+      requestUrl: request.requestUrl,
+    });
+  } catch (error) {
+    if (!(error instanceof SessionRunCreationGuardRejectedError)) {
+      throw error;
+    }
+
+    const currentAgent = await getAgentRow(request.bindings.DB, claims.agentId);
+    const currentAgentFailure = getBoundAgentServabilityFailure(currentAgent, claims);
+
+    if (currentAgentFailure !== null) {
+      logBoundAgentCapabilityRejection(claims, currentAgentFailure);
+      throw publicAgentNotExposed("This Agent is no longer published for bound calls.");
+    }
+
+    const currentAuthority = await getDeploymentAgentCapabilityAuthority(
+      request.bindings.DB,
+      claims,
+    );
+
+    if (!currentAuthority.authorized) {
+      logBoundAgentCapabilityRejection(claims, currentAuthority.reason);
+      throw publicAgentNotExposed(
+        "This capability is no longer authorized for the active deployment.",
+      );
+    }
+
+    throw error;
+  }
+
+  const { runId, sessionId } = startedRun;
 
   const terminalRun = await waitForTerminalRun(
     {

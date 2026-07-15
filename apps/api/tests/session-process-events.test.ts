@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
+import {
+  createNoRuntimeEventsRecordedEventId,
+  createProcessEventsTruncatedEventId,
+} from "@mosoo/contracts/session";
 import type {
   SessionProcessEventStatus,
   SessionProcessEventType,
@@ -511,6 +515,56 @@ describe("session process event projection", () => {
       id: "event-1001",
       type: "run.completed",
     });
+  });
+
+  test("keeps synthetic process event ids valid and stable across repeated reads", async () => {
+    const innerDatabase = createProcessEventQueryDatabase();
+
+    for (let seq = 1; seq <= 3; seq += 1) {
+      await insertSessionProcessEvent(innerDatabase, {
+        id: `event-${seq}`,
+        seq,
+      });
+    }
+
+    const readTruncated = async () =>
+      getThreadSessionProcessEvents(
+        innerDatabase,
+        VIEWER,
+        {
+          appId: APP_ID,
+          sessionId: SESSION_ID,
+        },
+        {
+          limit: 2,
+        },
+      );
+    const readEmpty = async () =>
+      getThreadSessionProcessEvents(
+        innerDatabase,
+        VIEWER,
+        {
+          appId: APP_ID,
+          sessionId: ATTRIBUTED_SESSION_ID,
+        },
+        {
+          limit: 10,
+        },
+      );
+
+    const firstTruncated = await readTruncated();
+    const secondTruncated = await readTruncated();
+
+    expect(firstTruncated[0]?.id).toBe(createProcessEventsTruncatedEventId(SESSION_ID));
+    expect(secondTruncated[0]?.id).toBe(firstTruncated[0]?.id ?? "");
+    expect(() => parsePlatformId(firstTruncated[0]?.id, "truncated marker id")).not.toThrow();
+
+    const firstEmpty = await readEmpty();
+    const secondEmpty = await readEmpty();
+
+    expect(firstEmpty[0]?.id).toBe(createNoRuntimeEventsRecordedEventId(ATTRIBUTED_SESSION_ID));
+    expect(secondEmpty[0]?.id).toBe(firstEmpty[0]?.id ?? "");
+    expect(() => parsePlatformId(firstEmpty[0]?.id, "empty placeholder id")).not.toThrow();
   });
 
   test("admits attributed participants through the shared thread access path", async () => {

@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { writeClipboardText } from "@/shared/lib/clipboard";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 
@@ -26,19 +27,6 @@ interface ApiAccessDetailRowProps {
   action: ReactNode;
   label: string;
   value: string;
-}
-
-async function writeClipboardText(text: string): Promise<boolean> {
-  if (!navigator.clipboard) {
-    return false;
-  }
-
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function AgentApiAccessDialog({

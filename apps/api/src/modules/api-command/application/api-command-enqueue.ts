@@ -5,6 +5,7 @@ import { enqueueApiCommand } from "./api-command-ledger";
 import type {
   AppDeploymentRunDispatchCommandPayload,
   ChannelWorkTriggerCommandPayload,
+  CostLedgerReconciliationCommandPayload,
   ScheduledMaintenanceCommandPayload,
   SessionRunDispatchCommandPayload,
 } from "./api-command-payload";
@@ -37,6 +38,22 @@ export async function enqueueChannelWorkTriggerCommand(
   await enqueueApiCommand(bindings, {
     dedupeKey: createChannelWorkTriggerDedupeKey(payload),
     kind: "channel_work_trigger",
+    payload,
+  });
+}
+
+export async function enqueueCostLedgerReconciliationCommand(
+  bindings: Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB">,
+  payload: CostLedgerReconciliationCommandPayload,
+): Promise<void> {
+  await enqueueApiCommand(bindings, {
+    dedupeKey: [
+      "cost_ledger_reconciliation",
+      payload.scheduledTime,
+      payload.mode,
+      payload.cursor ?? "start",
+    ].join(":"),
+    kind: "cost_ledger_reconciliation",
     payload,
   });
 }

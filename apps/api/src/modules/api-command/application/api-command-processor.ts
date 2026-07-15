@@ -29,10 +29,17 @@ import { processLarkWorkTrigger } from "../../channels/lark/lark-first-party-ada
 import { processSlackWorkTrigger } from "../../channels/slack/slack-first-party-adapter";
 import { parseTelegramCredentials } from "../../channels/telegram/telegram-credentials";
 import { processTelegramWorkTrigger } from "../../channels/telegram/telegram-first-party-adapter";
+import {
+  parseCostLedgerReconciliationActivationMode,
+  reconcileCostLedgerPage,
+} from "../../cost/application/cost-ledger-reconciliation.service";
 import { runUsageDailyRollup } from "../../cost/application/cost-rollup.service";
 import { dispatchQueuedSessionRun } from "../../runtime/application/session-runs/dispatch-queued-run.service";
 import { runSandboxMaintenance } from "../../runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-maintenance.service";
-import { APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX } from "./api-command-enqueue";
+import {
+  APP_DEPLOYMENT_RUN_DISPATCH_DEDUPE_PREFIX,
+  enqueueCostLedgerReconciliationCommand,
+} from "./api-command-enqueue";
 import {
   API_COMMAND_LEASE_RENEWAL_INTERVAL_MS,
   claimApiCommand,
@@ -49,6 +56,7 @@ import { ApiCommandPayloadError, parseApiCommandPayload } from "./api-command-pa
 import type {
   AppDeploymentRunDispatchCommandPayload,
   ChannelWorkTriggerCommandPayload,
+  CostLedgerReconciliationCommandPayload,
   ScheduledMaintenanceCommandPayload,
   SessionRunDispatchCommandPayload,
 } from "./api-command-payload";
@@ -85,6 +93,10 @@ function shouldRunUsageDailyRollup(now: Date): boolean {
   return now.getUTCHours() === 2 && now.getUTCMinutes() === 0;
 }
 
+function shouldStartCostLedgerReconciliation(now: Date): boolean {
+  return now.getUTCHours() === 1 && now.getUTCMinutes() === 0;
+}
+
 async function processScheduledMaintenanceCommand(
   bindings: ApiBindings,
   payload: ScheduledMaintenanceCommandPayload,
@@ -102,7 +114,55 @@ async function processScheduledMaintenanceCommand(
     tasks.push(runUsageDailyRollup(bindings, scheduledAt));
   }
 
+  if (shouldStartCostLedgerReconciliation(scheduledAt)) {
+    const mode = parseCostLedgerReconciliationActivationMode(
+      bindings.MOSOO_COST_LEDGER_RECONCILIATION_MODE,
+    );
+
+    if (mode !== null) {
+      tasks.push(
+        enqueueCostLedgerReconciliationCommand(bindings, {
+          cursor: null,
+          mode,
+          scheduledTime: payload.scheduledTime,
+        }),
+      );
+    }
+  }
+
   await Promise.all(tasks);
+}
+
+async function processCostLedgerReconciliationCommand(
+  bindings: ApiBindings,
+  payload: CostLedgerReconciliationCommandPayload,
+  processedAtMs: number,
+): Promise<void> {
+  const result = await reconcileCostLedgerPage(bindings.DB, {
+    cursor: payload.cursor,
+    mode: payload.mode,
+    now: new Date(processedAtMs),
+  });
+
+  logInfo("cost.ledger_reconciliation.page_completed", {
+    ...result,
+    processedAtMs,
+    scheduledTime: payload.scheduledTime,
+  });
+
+  if (!result.hasMore) {
+    return;
+  }
+
+  if (result.nextCursor === null) {
+    throw new Error("Cost ledger reconciliation returned no cursor for an incomplete page.");
+  }
+
+  await enqueueCostLedgerReconciliationCommand(bindings, {
+    cursor: result.nextCursor,
+    mode: payload.mode,
+    scheduledTime: payload.scheduledTime,
+  });
 }
 
 async function processSlackChannelWorkTrigger(
@@ -436,6 +496,7 @@ function readAppDeploymentRunIdFromPayload(input: {
 async function processClaimedApiCommand(
   bindings: ApiBindings,
   claim: ApiCommandClaim,
+  processedAtMs: number,
 ): Promise<void> {
   const payload = parseApiCommandPayload(claim.kind, claim.payloadJson);
 
@@ -446,6 +507,14 @@ async function processClaimedApiCommand(
     }
     case "channel_work_trigger": {
       await processChannelWorkTriggerCommand(bindings, payload as ChannelWorkTriggerCommandPayload);
+      return;
+    }
+    case "cost_ledger_reconciliation": {
+      await processCostLedgerReconciliationCommand(
+        bindings,
+        payload as CostLedgerReconciliationCommandPayload,
+        processedAtMs,
+      );
       return;
     }
     case "scheduled_maintenance": {
@@ -466,6 +535,7 @@ async function processClaimedApiCommandWithLeaseRenewal(
   bindings: ApiBindings,
   claim: ApiCommandClaim,
   ownerId: string,
+  processedAtMs: number,
 ): Promise<void> {
   let stopped = false;
   let renewal = Promise.resolve();
@@ -503,7 +573,7 @@ async function processClaimedApiCommandWithLeaseRenewal(
   }, API_COMMAND_LEASE_RENEWAL_INTERVAL_MS);
 
   try {
-    await processClaimedApiCommand(bindings, claim);
+    await processClaimedApiCommand(bindings, claim, processedAtMs);
     stopped = true;
     await renewal;
   } finally {
@@ -545,7 +615,7 @@ export async function processApiCommandMessage(
   }
 
   try {
-    await processClaimedApiCommandWithLeaseRenewal(bindings, claim, ownerId);
+    await processClaimedApiCommandWithLeaseRenewal(bindings, claim, ownerId, nowMs());
     await completeApiCommand({
       commandId,
       database: bindings.DB,

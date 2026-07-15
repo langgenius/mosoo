@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
+import { parsePlatformId } from "@mosoo/id";
+import type { AgentId, AppDeploymentId, AppDeploymentRunId, AppId } from "@mosoo/id";
+
 import {
   boundAgentUrl,
+  inspectAppAgentCapabilityToken,
   mintAppAgentCapabilityToken,
   verifyAppAgentCapabilityToken,
 } from "../src/modules/public-api/app-agent-capability";
@@ -9,13 +13,19 @@ import type { AppAgentCapabilityClaims } from "../src/modules/public-api/app-age
 
 const SECRET = "test-capability-secret";
 const NOW = 1_000_000;
+const AGENT_ID = parsePlatformId<AgentId>("01J00000000000000000000009");
+const APP_ID = parsePlatformId<AppId>("01J0000000000000000000000Q");
+const DEPLOYMENT_ID = parsePlatformId<AppDeploymentId>("01J0000000000000000000000D");
+const DEPLOYMENT_RUN_ID = parsePlatformId<AppDeploymentRunId>("01J0000000000000000000000R");
 
 function claims(overrides: Partial<AppAgentCapabilityClaims> = {}): AppAgentCapabilityClaims {
   return {
-    agentId: "agt_3kf",
-    appId: "app_roadmap",
+    agentId: AGENT_ID,
+    appId: APP_ID,
+    binding: { env: "MOSOO_AGENT", expose: "public_thread", name: "Roadmap" },
+    deploymentId: DEPLOYMENT_ID,
+    deploymentRunId: DEPLOYMENT_RUN_ID,
     exp: NOW + 60_000,
-    expose: "public_thread",
     ...overrides,
   };
 }
@@ -40,11 +50,26 @@ describe("app agent capability token", () => {
   test("rejects an expired token", async () => {
     const token = await mintAppAgentCapabilityToken(SECRET, claims({ exp: NOW }));
     expect(await verifyAppAgentCapabilityToken(SECRET, token, NOW)).toBeNull();
+    await expect(inspectAppAgentCapabilityToken(SECRET, token, NOW)).resolves.toEqual({
+      claims: claims({ exp: NOW }),
+      status: "expired",
+    });
   });
 
   test("rejects a malformed token", async () => {
     expect(await verifyAppAgentCapabilityToken(SECRET, "not-a-token", NOW)).toBeNull();
     expect(await verifyAppAgentCapabilityToken(SECRET, "", NOW)).toBeNull();
+  });
+
+  test("rejects a legacy token without deployment authority claims", async () => {
+    const legacy = await mintLegacyToken(SECRET, {
+      agentId: AGENT_ID,
+      appId: APP_ID,
+      exp: NOW + 60_000,
+      expose: "public_thread",
+    });
+
+    expect(await verifyAppAgentCapabilityToken(SECRET, legacy, NOW)).toBeNull();
   });
 
   test("builds a bound-agent url whose embedded token verifies", async () => {
@@ -55,3 +80,24 @@ describe("app agent capability token", () => {
     expect(await verifyAppAgentCapabilityToken(SECRET, embedded, NOW)).toEqual(claims());
   });
 });
+
+async function mintLegacyToken(secret: string, payload: Record<string, unknown>): Promise<string> {
+  const encoded = btoa(JSON.stringify(payload))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { hash: "SHA-256", name: "HMAC" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(encoded));
+  const signatureEncoded = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+
+  return `${encoded}.${signatureEncoded}`;
+}

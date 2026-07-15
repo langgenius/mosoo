@@ -54,6 +54,24 @@ function createSkillAccessDatabase(): SqliteD1Database {
       version text
     );
 
+    CREATE TABLE skill_snapshot_entry (
+      snapshot_id text NOT NULL,
+      path text NOT NULL,
+      entry_kind text NOT NULL,
+      is_executable integer NOT NULL,
+      mime_type text,
+      sha256 text,
+      size integer NOT NULL,
+      PRIMARY KEY (snapshot_id, path)
+    );
+
+    INSERT INTO skill_snapshot_entry (snapshot_id, path, entry_kind, is_executable, mime_type, sha256, size)
+    VALUES
+      ('snapshot-1', 'SKILL.md', 'file', 0, 'text/markdown', NULL, 10),
+      ('snapshot-1', 'references', 'directory', 0, NULL, NULL, 0),
+      ('snapshot-1', 'references/tokens.json', 'file', 0, 'application/json', NULL, 20),
+      ('snapshot-2', 'SKILL.md', 'file', 0, 'text/markdown', NULL, 10);
+
     INSERT INTO account (id, name)
     VALUES
       ('${IDS.owner}', 'Owner One'),
@@ -133,5 +151,6 @@ describe("skill access policy", () => {
     const rows = await listAppSkillRows(database, IDS.owner, IDS.app);
 
     expect(rows.map((row) => row.id)).toEqual([IDS.skill]);
+    expect(rows[0]?.fileCount).toBe(2);
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
 
-import { projectSessionTurns } from "../src/shared/ui/session-events/turns";
+import { projectSessionTurns, resolveSessionTurn } from "../src/shared/ui/session-events/turns";
 
 function eventOf(
   id: string,
@@ -90,5 +90,42 @@ describe("session Turn projection", () => {
         status: "pending",
       }),
     ]);
+  });
+});
+
+describe("session Turn drawer resolution", () => {
+  test("prefers the freshly projected Turn when its id still exists", () => {
+    const snapshot = projectSessionTurns([
+      eventOf("event-1", "run.started", 1),
+      eventOf("event-2", "agent.message.delta", 2),
+    ])[0];
+    const refreshedTurns = projectSessionTurns([
+      eventOf("event-1", "run.started", 1),
+      eventOf("event-2", "agent.message.delta", 2),
+      eventOf("event-3", "run.completed", 3),
+    ]);
+
+    expect(snapshot).toBeDefined();
+    expect(resolveSessionTurn(refreshedTurns, snapshot ?? null)).toBe(refreshedTurns[0] ?? null);
+  });
+
+  test("falls back to the snapshot when the projected Turn id disappears", () => {
+    const snapshot = projectSessionTurns([
+      eventOf("marker-a", "session.status", 1),
+      eventOf("event-2", "tool.use.completed", 2),
+    ])[0];
+    const reprojectedTurns = projectSessionTurns([
+      eventOf("marker-b", "session.status", 1),
+      eventOf("event-2", "tool.use.completed", 2),
+    ]);
+
+    expect(snapshot).toBeDefined();
+    expect(snapshot?.id).toBe("pending:marker-a");
+    expect(reprojectedTurns[0]?.id).toBe("pending:marker-b");
+    expect(resolveSessionTurn(reprojectedTurns, snapshot ?? null)).toBe(snapshot ?? null);
+  });
+
+  test("resolves no Turn when the drawer has no snapshot", () => {
+    expect(resolveSessionTurn([], null)).toBeNull();
   });
 });

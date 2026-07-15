@@ -40,6 +40,7 @@ export interface SkillSummary {
   author: string;
   createdAt: string;
   description: string;
+  fileCount: number;
   forkOrigin: SkillForkOrigin | null;
   id: SkillId;
   name: string;
