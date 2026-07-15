@@ -52,7 +52,7 @@ type UpdateSessionRunStatusInput = SessionRunStatusUpdateInput & {
   runId: SessionRunId;
 };
 
-type CreateSessionRunSummaryInput = {
+export type CreateSessionRunSummaryInput = {
   deploymentVersionId?: AgentDeploymentVersionId | null;
   deploymentVersionNumber?: number | null;
   model?: string | null;
@@ -248,7 +248,7 @@ function toUpdatedSessionRunSummary(
   return applySessionRunStatusUpdate(toSessionRunSummaryFromLifecycleRow(row), input, timestampMs);
 }
 
-function createInsertedSessionRunSummary(
+export function createInsertedSessionRunSummary(
   input: CreateSessionRunSummaryInput,
   identifiers: {
     runId: SessionRunId;

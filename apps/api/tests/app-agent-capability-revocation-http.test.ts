@@ -121,7 +121,7 @@ function revokeDeploymentWhenRunInsertStarts(database: SqliteD1Database): D1Data
   let revoked = false;
 
   function wrapStatement(statement: D1PreparedStatement, query: string): D1PreparedStatement {
-    const shouldRevoke = /\bINSERT\s+INTO\s+session_run\b/iu.test(query);
+    const shouldRevoke = /\bINSERT\s+INTO\s+(?:"session_run"|session_run)(?:\s|\()/iu.test(query);
 
     return new Proxy(statement, {
       get(target, property, receiver) {

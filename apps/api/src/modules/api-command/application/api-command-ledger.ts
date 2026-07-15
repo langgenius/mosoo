@@ -30,6 +30,11 @@ export interface EnqueueApiCommandInput {
   retryTerminal?: boolean;
 }
 
+export interface PreparedApiCommand {
+  commandId: ApiCommandId;
+  record: ApiCommandRow;
+}
+
 export interface ApiCommandClaim {
   attemptCount: number;
   commandId: ApiCommandId;
@@ -188,40 +193,51 @@ export async function redriveFailedApiCommandEnqueues(
   }
 }
 
-export async function admitApiCommand(
-  bindings: ApiCommandDeliveryBindings,
+export function prepareApiCommand(
   input: EnqueueApiCommandInput,
-): Promise<ApiCommandAdmission> {
-  const nowMs = currentTimestampMs();
-  const commandId = createPlatformId<ApiCommandId>();
-  const dedupeKey = normalizeDedupeKey(input.dedupeKey);
-  const payloadJson = JSON.stringify(input.payload);
-  const database = getAppDatabase(bindings.DB);
-  const insertResult = await database
-    .insert(apiCommandsTable)
-    .values({
+  options: { commandId?: ApiCommandId; timestampMs?: number } = {},
+): PreparedApiCommand {
+  const timestampMs = options.timestampMs ?? currentTimestampMs();
+  const commandId = options.commandId ?? createPlatformId<ApiCommandId>();
+
+  return {
+    commandId,
+    record: {
       attemptCount: 0,
       claimExpiresAt: null,
       claimOwner: null,
       completedAt: null,
-      createdAt: nowMs,
-      dedupeKey,
+      createdAt: timestampMs,
+      dedupeKey: normalizeDedupeKey(input.dedupeKey),
       id: commandId,
       kind: input.kind,
       lastErrorCode: API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
       lastErrorMessage: API_COMMAND_QUEUE_DELIVERY_PENDING_MESSAGE,
-      payloadJson,
+      payloadJson: JSON.stringify(input.payload),
       status: "queued",
-      updatedAt: nowMs,
-    })
+      updatedAt: timestampMs,
+    },
+  };
+}
+
+export async function admitApiCommand(
+  bindings: ApiCommandDeliveryBindings,
+  input: EnqueueApiCommandInput,
+): Promise<ApiCommandAdmission> {
+  const prepared = prepareApiCommand(input);
+  const database = getAppDatabase(bindings.DB);
+
+  const insertResult = await database
+    .insert(apiCommandsTable)
+    .values(prepared.record)
     .onConflictDoNothing()
     .run();
 
   if (getD1ChangeCount(insertResult) > 0) {
-    return { commandId, kind: input.kind, shouldDeliver: true };
+    return { commandId: prepared.commandId, kind: input.kind, shouldDeliver: true };
   }
 
-  const current = await findApiCommandByDedupeKey(bindings.DB, dedupeKey);
+  const current = await findApiCommandByDedupeKey(bindings.DB, prepared.record.dedupeKey);
 
   if (current === null) {
     throw new Error("API command enqueue could not confirm the ledger row.");
@@ -237,9 +253,9 @@ export async function admitApiCommand(
         completedAt: null,
         lastErrorCode: API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
         lastErrorMessage: API_COMMAND_QUEUE_DELIVERY_PENDING_MESSAGE,
-        payloadJson,
+        payloadJson: prepared.record.payloadJson,
         status: "queued",
-        updatedAt: nowMs,
+        updatedAt: prepared.record.updatedAt,
       })
       .where(
         and(
