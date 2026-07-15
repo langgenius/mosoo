@@ -7,6 +7,7 @@ export {
 export {
   cancelActiveSessionRunsForRuntimeOperation,
   createSessionRunRecordIfSessionIdle,
+  SessionRunCreationGuardRejectedError,
   setSessionRunStatus,
 } from "./session-run-write.repository";
 export type { SessionRunTransitionOutcome } from "./session-run-write.repository";

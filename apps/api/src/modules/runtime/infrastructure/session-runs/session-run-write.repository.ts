@@ -17,6 +17,7 @@ import type {
 } from "@mosoo/id";
 import { generateTraceId } from "@mosoo/observability";
 import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 
 import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
 import { currentTimestampMs, toIsoString } from "../../../../time";
@@ -65,6 +66,17 @@ type SessionRunTransitionSource =
   | "viewer";
 
 const SESSION_RUN_STATUS_WRITE_BATCH_SIZE = 50;
+
+/**
+ * The caller supplied an atomic predicate for Run creation and it no longer
+ * held when the INSERT statement executed. No Run record was created.
+ */
+export class SessionRunCreationGuardRejectedError extends Error {
+  constructor() {
+    super("Session Run creation authorization changed before the Run could be inserted.");
+    this.name = "SessionRunCreationGuardRejectedError";
+  }
+}
 
 interface LoadedSessionRunLifecycleRow {
   completed_at: number | null;
@@ -267,6 +279,7 @@ export async function createSessionRunRecordIfSessionIdle(
     deploymentVersionNumber?: number | null;
     model?: string | null;
     provider?: string | null;
+    runCreationGuard?: SQL;
     runtimeId?: string | null;
     sessionId: SessionId;
     startedAt?: number | null;
@@ -354,6 +367,7 @@ export async function createSessionRunRecordIfSessionIdle(
               WHERE session_id = ${input.sessionId}
                 AND ${sql.raw(buildActiveSessionRunStatusFilter())}
             )
+            AND ${input.runCreationGuard ?? sql`TRUE`}
           RETURNING id
         `,
     )) ?? null;
@@ -362,6 +376,10 @@ export async function createSessionRunRecordIfSessionIdle(
     const activeRun = await getActiveSessionRunSummary(database, input.sessionId);
 
     if (!activeRun) {
+      if (input.runCreationGuard !== undefined) {
+        throw new SessionRunCreationGuardRejectedError();
+      }
+
       throw new Error("Session cannot accept a new run.");
     }
 
@@ -389,7 +407,11 @@ export async function createSessionRunRecordIfSessionIdle(
 
   return {
     activeRun: null,
-    createdRun: createInsertedSessionRunSummary(input, { runId, timestampMs, traceId }),
+    createdRun: createInsertedSessionRunSummary(input, {
+      runId,
+      timestampMs,
+      traceId,
+    }),
   };
 }
 
@@ -481,7 +503,10 @@ async function setNonTerminalSessionRunsStatus(
         inArray(sessionRunsTable.status, ACTIVE_SESSION_RUN_STATUSES),
       ),
     )
-    .returning({ id: sessionRunsTable.id, sessionId: sessionRunsTable.sessionId })
+    .returning({
+      id: sessionRunsTable.id,
+      sessionId: sessionRunsTable.sessionId,
+    })
     .all();
 
   if (input.preserveSessionLifecycle === true || updatedRuns.length === 0) {

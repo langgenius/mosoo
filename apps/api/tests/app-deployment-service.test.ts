@@ -10,6 +10,7 @@ import {
   APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE,
 } from "../src/modules/api-command/application/api-command-policy";
 import { processApiCommandDeadLetterMessage } from "../src/modules/api-command/application/api-command-processor";
+import { getDeploymentAgentCapabilityAuthority } from "../src/modules/apps/application/app-deployment-capability-authority.service";
 import type { CloudflareDeploymentClient } from "../src/modules/apps/application/app-deployment-cloudflare-client";
 import type { AppDeploymentBuildRunner } from "../src/modules/apps/application/app-deployment-executor.service";
 import { dispatchAppDeploymentRun } from "../src/modules/apps/application/app-deployment-executor.service";
@@ -1260,6 +1261,75 @@ describe("app deployment service", () => {
     await expect(getAppDeploymentStatus(bindings, VIEWER, APP_ID)).resolves.toMatchObject({
       liveUrl: null,
       status: "success",
+    });
+  });
+
+  test("revokes a bound Agent capability after local deployment cleanup succeeds", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const targetUrl = `https://app-${APP_ID.toLowerCase()}.apps.localhost`;
+    const runner: AppDeploymentBuildRunner = {
+      async build() {},
+      async deploy() {
+        return {
+          externalDeploymentId: "pages-deployment-1",
+          externalProjectId: "pages-project-1",
+          externalVersionId: null,
+          url: targetUrl,
+        };
+      },
+      async prepare() {
+        return {
+          repoDir: "/repo",
+          snapshot: { files: { "index.html": "<main>Hello</main>" } },
+        };
+      },
+    };
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      { runner },
+    );
+    await database
+      .prepare("UPDATE app_deployment_run SET plan_json = ? WHERE id = ?")
+      .bind(
+        JSON.stringify({
+          agentBindings: [{ env: "MOSOO_AGENT", expose: "public_thread", name: "Support" }],
+        }),
+        run.id,
+      )
+      .run();
+
+    const authority = {
+      appId: run.appId,
+      binding: { env: "MOSOO_AGENT", expose: "public_thread" as const, name: "Support" },
+      deploymentId: run.deploymentId,
+      deploymentRunId: run.id,
+    };
+
+    await expect(getDeploymentAgentCapabilityAuthority(database, authority)).resolves.toEqual({
+      authorized: true,
+    });
+
+    await deleteAppDeployment(
+      bindings,
+      VIEWER,
+      { appId: APP_ID },
+      {
+        cloudflareClient: createCloudflareDeleteRecorder([]),
+      },
+    );
+
+    await expect(getDeploymentAgentCapabilityAuthority(database, authority)).resolves.toEqual({
+      authorized: false,
+      reason: "deployment_deleted",
     });
   });
 
