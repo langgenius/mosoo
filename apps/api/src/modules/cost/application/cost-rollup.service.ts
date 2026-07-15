@@ -6,6 +6,8 @@ import { runAppDatabaseBatch } from "../../../platform/db/drizzle";
 
 const DETAIL_RETENTION_DAYS = 7;
 
+export const DAILY_ROLLUP_RETENTION_DAYS = 180;
+
 function startOfUtcDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
@@ -14,11 +16,31 @@ function toUtcDate(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
-export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): Promise<void> {
+export function getDailyRollupRetentionCutoffDate(now: Date): string {
+  const cutoff = startOfUtcDay(now);
+  cutoff.setUTCDate(cutoff.getUTCDate() - DAILY_ROLLUP_RETENTION_DAYS);
+  return toUtcDate(cutoff);
+}
+
+export function getUsageDetailRetentionCutoffMs(now: Date): number {
   const cutoff = startOfUtcDay(now);
   cutoff.setUTCDate(cutoff.getUTCDate() - DETAIL_RETENTION_DAYS);
-  const cutoffDate = toUtcDate(cutoff);
-  const cutoffMs = cutoff.getTime();
+  return cutoff.getTime();
+}
+
+export function createDailyRollupRetentionPredicate(now: Date) {
+  return lt(usageDailyRollupsTable.date, getDailyRollupRetentionCutoffDate(now));
+}
+
+export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): Promise<void> {
+  const cutoffMs = getUsageDetailRetentionCutoffMs(now);
+
+  if (!Number.isSafeInteger(cutoffMs)) {
+    throw new Error("Usage detail retention cutoff must be a valid timestamp.");
+  }
+
+  // Drizzle's D1 batch cannot prepare parameterized db.run(sql) queries.
+  const cutoffSql = sql.raw(String(cutoffMs));
 
   await runAppDatabaseBatch(env.DB, (db) => [
     db.run(sql`
@@ -62,7 +84,7 @@ export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): P
           SUM(CASE WHEN ${usageEventsTable.pricingStatus} = 'unknown' THEN 1 ELSE 0 END)
             AS unpriced_request_count
         FROM ${usageEventsTable}
-        WHERE ${usageEventsTable.createdAt} < ${cutoffMs}
+        WHERE ${usageEventsTable.createdAt} < ${cutoffSql}
         GROUP BY
           ${usageEventsTable.organizationId},
           ${usageEventsTable.appId},
@@ -98,8 +120,6 @@ export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): P
             usage_daily_rollup.unpriced_request_count + excluded.unpriced_request_count
       `),
     db.delete(usageEventsTable).where(lt(usageEventsTable.createdAt, cutoffMs)),
-    db
-      .delete(usageDailyRollupsTable)
-      .where(sql`${usageDailyRollupsTable.date} < date(${cutoffDate}, '-90 days')`),
+    db.delete(usageDailyRollupsTable).where(createDailyRollupRetentionPredicate(now)),
   ]);
 }

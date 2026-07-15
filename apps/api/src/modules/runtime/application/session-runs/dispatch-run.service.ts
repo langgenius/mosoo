@@ -28,12 +28,9 @@ import {
   SessionRunNoLongerActiveError,
   ensureSessionRunIsActive,
   getSessionRunState,
-  updateSessionRunStatusIfActive,
 } from "./session-run-state.repository";
-import {
-  createFailedSessionRunRuntimeEvent,
-  createSessionRunUpdatedEvent,
-} from "./session-run-view-events.service";
+import { recordCanonicalSessionRunFailure } from "./session-run-terminal-failure.service";
+import { createSessionRunUpdatedEvent } from "./session-run-view-events.service";
 import {
   appendSessionRuntimeTimingEventBestEffort,
   createRuntimeTimingRecorder,
@@ -325,35 +322,20 @@ export async function dispatchSessionRun(
       });
     }
 
-    const failedRun = await updateSessionRunStatusIfActive(bindings.DB, {
+    const failureOutcome = await recordCanonicalSessionRunFailure(bindings, {
       error: runError,
       runId: input.sessionRunId,
-      status: "failed",
+      sessionId: input.sessionId,
+      source: "api",
     });
-
-    if (!failedRun) {
-      const state = await getSessionRunState(bindings.DB, input.sessionRunId);
-
-      await appendSessionRuntimeEvents({
-        bindings,
-        events: [
-          createSessionRuntimeEvent({
-            kind: "run.failed",
-            payload: {
-              error: {
-                code: `${runError.code}.after_terminal`,
-                details: {},
-                message,
-                retryable: false,
-              },
-            },
-            runId: input.sessionRunId,
-            sessionId: input.sessionId,
-            traceId: input.traceId,
-          }),
-        ],
-        sessionId: input.sessionId,
+    if (failureOutcome.kind === "repair_needed") {
+      throw new Error("Session lifecycle projection needs repair.", {
+        cause: error,
       });
+    }
+
+    if (failureOutcome.kind === "not_failed") {
+      const state = await getSessionRunState(bindings.DB, input.sessionRunId);
 
       logWarn("session.run.provision.failed.after-terminal", {
         driverInstanceId,
@@ -366,18 +348,6 @@ export async function dispatchSessionRun(
 
       return;
     }
-
-    await appendSessionRuntimeEvents({
-      bindings,
-      events: [
-        createFailedSessionRunRuntimeEvent({
-          run: failedRun,
-          runError,
-          sessionId: input.sessionId,
-        }),
-      ],
-      sessionId: input.sessionId,
-    });
 
     logError("session.run.provision.failed", {
       message,

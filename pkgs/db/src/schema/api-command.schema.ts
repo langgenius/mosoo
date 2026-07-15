@@ -8,6 +8,7 @@ export type ApiCommandId = SemanticPlatformId<"ApiCommandId">;
 export type ApiCommandKind =
   | "app_deployment_run_dispatch"
   | "channel_work_trigger"
+  | "cost_ledger_reconciliation"
   | "scheduled_maintenance"
   | "session_run_dispatch";
 export type ApiCommandStatus = "dead_lettered" | "failed" | "queued" | "running" | "succeeded";

@@ -8,6 +8,7 @@ import type {
   AppId,
   SessionId,
 } from "@mosoo/id";
+import type { SQL } from "drizzle-orm";
 
 import { logError, logInfo } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -17,8 +18,12 @@ import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.
 import { fileStore } from "../../../files/application/file-store";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { insertSessionMessageRecord } from "../../../sessions/application/session-message-write.service";
+import type { BoundCapabilityRunProvenance } from "../../domain/bound-capability-run-provenance";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
-import { createSessionRunRecordIfSessionIdle } from "../../infrastructure/session-runs/session-run-store.repository";
+import {
+  createSessionRunRecordIfSessionIdle,
+  SessionRunCreationGuardRejectedError,
+} from "../../infrastructure/session-runs/session-run-store.repository";
 import { dispatchQueuedSessionRun } from "./dispatch-queued-run.service";
 import { createQueuedSessionRunRuntimeEvents } from "./session-run-view-events.service";
 import { reconcileStaleActiveSessionRun } from "./stale-run-reconciliation.service";
@@ -36,8 +41,10 @@ class SessionActiveRunExistsError extends Error {
 interface QueueSessionRunInput {
   accessViewer?: AuthenticatedViewer;
   attachmentIds: FileId[];
+  boundCapabilityProvenance?: BoundCapabilityRunProvenance;
   clientRequestId: string | null;
   prompt: string;
+  runCreationGuard?: SQL;
   session: {
     agent_id: AgentId;
     deployment_version_id: AgentDeploymentVersionId | null;
@@ -65,6 +72,8 @@ export interface QueuedSessionRunState {
   updatedAt: string;
 }
 
+export { SessionRunCreationGuardRejectedError };
+
 export async function queueSessionRun(request: QueueSessionRunRequest): Promise<{
   run: SessionRunSummary;
   sessionState: QueuedSessionRunState;
@@ -91,12 +100,16 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
 
   const createRunResult = await createSessionRunRecordIfSessionIdle(bindings.DB, {
     agentId: input.session.agent_id,
+    ...(input.boundCapabilityProvenance === undefined
+      ? {}
+      : { boundCapabilityProvenance: input.boundCapabilityProvenance }),
     createdBy: viewerId,
     deploymentVersionId: input.session.deployment_version_id,
     deploymentVersionNumber: input.session.deployment_version_number,
     model: input.session.model,
     provider: input.session.provider,
     runtimeId,
+    ...(input.runCreationGuard === undefined ? {} : { runCreationGuard: input.runCreationGuard }),
     sessionId: input.session.id,
     status: "queued",
     trigger: "user_prompt",

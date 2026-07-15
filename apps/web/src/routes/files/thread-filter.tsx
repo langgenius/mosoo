@@ -58,7 +58,7 @@ export function ThreadFilter({
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-1 sm:w-[360px]">
+    <div className="flex w-full min-w-0 flex-col gap-1 sm:w-[360px]">
       <span className="text-fg-3 text-[11px] font-semibold">Thread</span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

@@ -17,6 +17,7 @@ const SKILL_SUMMARY_FIELDS = graphql(/* GraphQL */ `
     author
     createdAt
     description
+    fileCount
     forkOrigin {
       name
       ownerName
@@ -38,6 +39,7 @@ const SKILL_DETAIL_FIELDS = graphql(/* GraphQL */ `
     author
     createdAt
     description
+    fileCount
     forkOrigin {
       name
       ownerName

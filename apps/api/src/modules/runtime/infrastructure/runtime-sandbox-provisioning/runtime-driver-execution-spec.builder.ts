@@ -6,6 +6,7 @@ import type {
   SessionRunId,
   SkillSnapshotId,
 } from "@mosoo/id";
+import type { DriverRecoveryMessage } from "agent-driver/boot";
 import type { DriverNativeRuntimeRef } from "agent-driver/runtime";
 
 import { appendRuntimeArtifactContextToPrompt } from "../../application/session-artifacts/session-artifact-prompt.service";
@@ -155,6 +156,7 @@ export async function buildExecutionSpec(
     requestUrl: string;
     resolvedMcpServers: DriverResolvedMcpServer[];
     nativeResumeRef?: DriverNativeRuntimeRef | null;
+    recoveryMessages?: DriverRecoveryMessage[];
     resolvedSkillCatalog: DriverSkillCatalogEntry[];
     resolvedSkills: Omit<DriverResolvedSkill, "downloadUrl">[];
     sessionRunId?: SessionRunId | null;
@@ -204,6 +206,7 @@ export async function buildExecutionSpec(
       cwd: organizationPath,
       mcpServers,
       nativeResumeRef: input.nativeResumeRef ?? null,
+      recoveryMessages: input.recoveryMessages ?? [],
     },
     skillCatalog: input.resolvedSkillCatalog,
     skills,

@@ -250,6 +250,17 @@ async function createFixture(input: { archiveBytes?: Uint8Array } = {}) {
       sort_order integer NOT NULL,
       PRIMARY KEY (agent_id, skill_id)
     );
+
+    CREATE TABLE IF NOT EXISTS skill_snapshot_entry (
+      snapshot_id text NOT NULL,
+      path text NOT NULL,
+      entry_kind text NOT NULL,
+      is_executable integer NOT NULL,
+      mime_type text,
+      sha256 text,
+      size integer NOT NULL,
+      PRIMARY KEY (snapshot_id, path)
+    );
   `);
   const bucket = new MemoryByteBucket();
   const bindings = createPublicHttpTestBindings(database, {

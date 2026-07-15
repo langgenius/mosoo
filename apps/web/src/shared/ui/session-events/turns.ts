@@ -78,7 +78,7 @@ function finalizeTurns(turns: MutableSessionTurn[]): SessionTurn[] {
   }));
 }
 
-function createSessionTurns(events: readonly SessionProcessEvent[]): SessionTurn[] {
+export function projectSessionTurns(events: readonly SessionProcessEvent[]): SessionTurn[] {
   const turns: MutableSessionTurn[] = [];
   let pendingEvents: SessionProcessEvent[] = [];
   let current: MutableSessionTurn | null = null;
@@ -103,6 +103,18 @@ function createSessionTurns(events: readonly SessionProcessEvent[]): SessionTurn
 
     if (current === null) {
       pendingEvents.push(event);
+
+      if (event.type === "run.failed") {
+        const failedTurn = createPendingTurn(pendingEvents);
+
+        if (failedTurn !== null) {
+          failedTurn.endedAt = event.occurredAt;
+          failedTurn.status = "failed";
+          turns.push(failedTurn);
+          pendingEvents = [];
+        }
+      }
+
       continue;
     }
 
@@ -156,7 +168,23 @@ function createSessionTurns(events: readonly SessionProcessEvent[]): SessionTurn
 }
 
 export function useSessionTurns(events: readonly SessionProcessEvent[]): SessionTurn[] {
-  return useMemo(() => createSessionTurns(events), [events]);
+  return useMemo(() => projectSessionTurns(events), [events]);
+}
+
+// Turn ids derive from event ids, and the projected turn for an open drawer
+// can disappear between polls (the bounded event window slides, or a pending
+// turn is absorbed by an arriving run.started). Prefer the freshly projected
+// turn so an open drawer keeps live-updating, but fall back to the snapshot
+// instead of blanking the drawer into a false "no events" state.
+export function resolveSessionTurn(
+  turns: readonly SessionTurn[],
+  snapshot: SessionTurn | null,
+): SessionTurn | null {
+  if (snapshot === null) {
+    return null;
+  }
+
+  return turns.find((turn) => turn.id === snapshot.id) ?? snapshot;
 }
 
 export function countSessionTurnDomains(events: readonly SessionProcessEvent[]): SessionTurnCounts {

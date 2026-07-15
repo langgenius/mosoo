@@ -1,4 +1,4 @@
-import { accountsTable, skillsTable } from "@mosoo/db";
+import { accountsTable, skillSnapshotEntriesTable, skillsTable } from "@mosoo/db";
 import type { AccountId, AppId, SkillId, SkillSnapshotId } from "@mosoo/id";
 import { and, desc, eq, sql } from "drizzle-orm";
 
@@ -15,6 +15,10 @@ function skillRegistryColumns() {
       "currentSnapshotId",
     ),
     description: skillsTable.description,
+    fileCount:
+      sql<number>`(select count(*) from ${skillSnapshotEntriesTable} where ${skillSnapshotEntriesTable.snapshotId} = ${skillsTable.currentSnapshotId} and ${skillSnapshotEntriesTable.entryKind} = 'file')`.as(
+        "fileCount",
+      ),
     forkedFromOwnerName: sql<string | null>`${skillsTable.forkedFromOwnerName}`.as(
       "forkedFromOwnerName",
     ),

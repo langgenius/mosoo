@@ -4,11 +4,13 @@ import { apiCommandsTable, appDeploymentRunsTable, appDeploymentsTable } from "@
 import { eq } from "drizzle-orm";
 
 import { createAppDeploymentRunDispatchDedupeKey } from "../src/modules/api-command/application/api-command-enqueue";
+import { API_COMMAND_QUEUE_SEND_FAILED_CODE } from "../src/modules/api-command/application/api-command-ledger";
 import {
   APP_DEPLOYMENT_RUN_DISPATCH_MAX_ATTEMPTS,
   APP_DEPLOYMENT_RUN_DISPATCH_RETRY_EXHAUSTED_CODE,
 } from "../src/modules/api-command/application/api-command-policy";
 import { processApiCommandDeadLetterMessage } from "../src/modules/api-command/application/api-command-processor";
+import { getDeploymentAgentCapabilityAuthority } from "../src/modules/apps/application/app-deployment-capability-authority.service";
 import type { CloudflareDeploymentClient } from "../src/modules/apps/application/app-deployment-cloudflare-client";
 import type { AppDeploymentBuildRunner } from "../src/modules/apps/application/app-deployment-executor.service";
 import { dispatchAppDeploymentRun } from "../src/modules/apps/application/app-deployment-executor.service";
@@ -21,7 +23,10 @@ import {
 } from "../src/modules/apps/application/app-deployment.service";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
+import { createApiWorker } from "../src/platform/cloudflare/create-api-worker";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
+import { API_ERROR_CODE } from "../src/platform/errors";
+import type { ApiError } from "../src/platform/errors";
 import { currentTimestampMs } from "../src/time";
 import {
   createApiCommandQueueStub,
@@ -545,6 +550,102 @@ describe("app deployment service", () => {
     expect(deploymentAfterPointerDrift?.latestRun?.id).toBe(run.id);
   });
 
+  test("redrives a dropped deployment dispatch without leaving its run queued forever", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const deliveredCommandIds: string[] = [];
+    let queueUnavailable = true;
+    const deferredBindings = {
+      ...bindings,
+      API_COMMAND_QUEUE: {
+        async send(input: { commandId: string }): Promise<void> {
+          if (queueUnavailable) {
+            throw new Error("Queue response timed out.");
+          }
+
+          deliveredCommandIds.push(input.commandId);
+        },
+      },
+    };
+
+    const run = await deployApp(
+      deferredBindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+
+    const command = await database
+      .app()
+      .select({
+        lastErrorCode: apiCommandsTable.lastErrorCode,
+        status: apiCommandsTable.status,
+      })
+      .from(apiCommandsTable)
+      .get();
+    const runRow = await database
+      .app()
+      .select({
+        errorCode: appDeploymentRunsTable.errorCode,
+        status: appDeploymentRunsTable.status,
+      })
+      .from(appDeploymentRunsTable)
+      .where(eq(appDeploymentRunsTable.id, run.id))
+      .get();
+
+    expect(command).toEqual({
+      lastErrorCode: API_COMMAND_QUEUE_SEND_FAILED_CODE,
+      status: "queued",
+    });
+    expect(runRow).toEqual({ errorCode: null, status: "queued" });
+
+    queueUnavailable = false;
+    await createApiWorker().scheduled(
+      { scheduledTime: NOW_MS } as ScheduledController,
+      deferredBindings as ApiBindings,
+    );
+
+    const redrivenCommand = await database
+      .app()
+      .select({
+        id: apiCommandsTable.id,
+        lastErrorCode: apiCommandsTable.lastErrorCode,
+        status: apiCommandsTable.status,
+      })
+      .from(apiCommandsTable)
+      .where(eq(apiCommandsTable.dedupeKey, createAppDeploymentRunDispatchDedupeKey(run.id)))
+      .get();
+    const runner: AppDeploymentBuildRunner = {
+      async build() {},
+      async deploy() {
+        return {
+          externalDeploymentId: "pages-deployment-after-redrive",
+          externalProjectId: "pages-project-after-redrive",
+          externalVersionId: null,
+          url: `https://app-${APP_ID.toLowerCase()}.apps.localhost`,
+        };
+      },
+      async prepare() {
+        return {
+          repoDir: "/repo",
+          snapshot: { files: { "index.html": "<main>Recovered</main>" } },
+        };
+      },
+    };
+
+    expect(deliveredCommandIds).toContain(redrivenCommand?.id);
+    expect(redrivenCommand).toMatchObject({ lastErrorCode: null, status: "queued" });
+
+    await dispatchAppDeploymentRun(
+      deferredBindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      { runner },
+    );
+
+    const status = await getAppDeploymentStatus(deferredBindings, VIEWER, APP_ID);
+    expect(status).toMatchObject({ status: "success" });
+  });
+
   test("rejects a second deploy while a run is active", async () => {
     const database = createDatabase();
     const { bindings } = createBindings(database);
@@ -888,6 +989,118 @@ describe("app deployment service", () => {
     expect(runRow?.status).toBe("failed");
   });
 
+  test("compensates resources created after deployment deletion", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const deleted: string[] = [];
+    const externallyCreated: string[] = [];
+    const cloudflareClient = createCloudflareDeleteRecorder(deleted);
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+    const runner: AppDeploymentBuildRunner = {
+      async build() {},
+      async deploy() {
+        await deleteAppDeployment(bindings, VIEWER, { appId: APP_ID }, { cloudflareClient });
+        externallyCreated.push(`pages:${APP_ID}`);
+
+        return {
+          externalDeploymentId: "pages-deployment-after-delete",
+          externalProjectId: "pages-project-after-delete",
+          externalVersionId: null,
+          url: `https://app-${APP_ID.toLowerCase()}.apps.localhost`,
+        };
+      },
+      async prepare() {
+        return {
+          repoDir: "/repo",
+          snapshot: { files: { "index.html": "<main>Hello</main>" } },
+        };
+      },
+    };
+
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      { cloudflareClient, runner },
+    );
+
+    const deployment = await database
+      .app()
+      .select({ deletedAt: appDeploymentsTable.deletedAt })
+      .from(appDeploymentsTable)
+      .where(eq(appDeploymentsTable.id, run.deploymentId))
+      .get();
+    const runRow = await database
+      .app()
+      .select({
+        errorCode: appDeploymentRunsTable.errorCode,
+        status: appDeploymentRunsTable.status,
+      })
+      .from(appDeploymentRunsTable)
+      .where(eq(appDeploymentRunsTable.id, run.id))
+      .get();
+
+    expect(externallyCreated).toEqual([`pages:${APP_ID}`]);
+    expect(deployment?.deletedAt).toBeNumber();
+    expect(runRow).toEqual({ errorCode: "deployment_deleted", status: "failed" });
+    expect(deleted).toHaveLength(10);
+    expect(deleted.filter((entry) => entry.startsWith("pages:"))).toHaveLength(2);
+    expect(deleted.filter((entry) => entry.startsWith("worker:"))).toHaveLength(2);
+  });
+
+  test("does not compensate a deleted deployment after a replacement is active", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const deleted: string[] = [];
+    const cloudflareClient = createCloudflareDeleteRecorder(deleted);
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+    const runner: AppDeploymentBuildRunner = {
+      async build() {},
+      async deploy() {
+        await deleteAppDeployment(bindings, VIEWER, { appId: APP_ID }, { cloudflareClient });
+        await deployApp(
+          bindings,
+          VIEWER,
+          { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+          { fetch: githubFetch, nowMs: () => NOW_MS + 1 },
+        );
+
+        return {
+          externalDeploymentId: "pages-deployment-after-replacement",
+          externalProjectId: "pages-project-after-replacement",
+          externalVersionId: null,
+          url: `https://app-${APP_ID.toLowerCase()}.apps.localhost`,
+        };
+      },
+      async prepare() {
+        return {
+          repoDir: "/repo",
+          snapshot: { files: { "index.html": "<main>Hello</main>" } },
+        };
+      },
+    };
+
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      { cloudflareClient, runner },
+    );
+
+    const activeDeployment = await getAppDeployment(bindings, VIEWER, APP_ID);
+
+    expect(activeDeployment).not.toBeNull();
+    expect(deleted).toHaveLength(5);
+  });
+
   test("deletes the active deployment and fails the active run", async () => {
     const database = createDatabase();
     const { bindings } = createBindings(database);
@@ -934,6 +1147,71 @@ describe("app deployment service", () => {
     expect(deleted).toContain(`worker:app-${APP_ID.toLowerCase()}`);
     expect(destroyed).toContain(`${run.id}-build`);
     expect(destroyed).toContain(`${run.id}-deploy`);
+  });
+
+  test("keeps a deployment retryable when Cloudflare cleanup fails", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const failedDeletes: string[] = [];
+    const successfulDeletes: string[] = [];
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+    const failingClient = createCloudflareDeleteRecorder(failedDeletes, {
+      async deletePagesProject(input) {
+        failedDeletes.push(`pages:${input.projectName}`);
+        throw new Error("Cloudflare API unavailable.");
+      },
+    });
+
+    await expect(
+      deleteAppDeployment(bindings, VIEWER, { appId: APP_ID }, { cloudflareClient: failingClient }),
+    ).rejects.toMatchObject({
+      code: API_ERROR_CODE.appDeploymentCleanupFailed,
+      name: "ApiError",
+    } satisfies Partial<ApiError>);
+
+    const deploymentAfterFailure = await database
+      .app()
+      .select()
+      .from(appDeploymentsTable)
+      .where(eq(appDeploymentsTable.id, run.deploymentId))
+      .get();
+    const runAfterFailure = await database
+      .app()
+      .select()
+      .from(appDeploymentRunsTable)
+      .where(eq(appDeploymentRunsTable.id, run.id))
+      .get();
+
+    expect(deploymentAfterFailure).toMatchObject({ deletedAt: null });
+    expect(runAfterFailure).toMatchObject({
+      errorCode: "deployment_deleted",
+      status: "failed",
+    });
+    expect(failedDeletes).toHaveLength(5);
+
+    await expect(
+      deleteAppDeployment(
+        bindings,
+        VIEWER,
+        { appId: APP_ID },
+        { cloudflareClient: createCloudflareDeleteRecorder(successfulDeletes) },
+      ),
+    ).resolves.toEqual({ ok: true });
+
+    const deploymentAfterRetry = await database
+      .app()
+      .select({ deletedAt: appDeploymentsTable.deletedAt })
+      .from(appDeploymentsTable)
+      .where(eq(appDeploymentsTable.id, run.deploymentId))
+      .get();
+
+    expect(deploymentAfterRetry?.deletedAt).toBeNumber();
+    expect(successfulDeletes).toHaveLength(5);
   });
 
   test("does not expose a live URL after deleting a successful deployment", async () => {
@@ -983,6 +1261,75 @@ describe("app deployment service", () => {
     await expect(getAppDeploymentStatus(bindings, VIEWER, APP_ID)).resolves.toMatchObject({
       liveUrl: null,
       status: "success",
+    });
+  });
+
+  test("revokes a bound Agent capability after local deployment cleanup succeeds", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const targetUrl = `https://app-${APP_ID.toLowerCase()}.apps.localhost`;
+    const runner: AppDeploymentBuildRunner = {
+      async build() {},
+      async deploy() {
+        return {
+          externalDeploymentId: "pages-deployment-1",
+          externalProjectId: "pages-project-1",
+          externalVersionId: null,
+          url: targetUrl,
+        };
+      },
+      async prepare() {
+        return {
+          repoDir: "/repo",
+          snapshot: { files: { "index.html": "<main>Hello</main>" } },
+        };
+      },
+    };
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      { runner },
+    );
+    await database
+      .prepare("UPDATE app_deployment_run SET plan_json = ? WHERE id = ?")
+      .bind(
+        JSON.stringify({
+          agentBindings: [{ env: "MOSOO_AGENT", expose: "public_thread", name: "Support" }],
+        }),
+        run.id,
+      )
+      .run();
+
+    const authority = {
+      appId: run.appId,
+      binding: { env: "MOSOO_AGENT", expose: "public_thread" as const, name: "Support" },
+      deploymentId: run.deploymentId,
+      deploymentRunId: run.id,
+    };
+
+    await expect(getDeploymentAgentCapabilityAuthority(database, authority)).resolves.toEqual({
+      authorized: true,
+    });
+
+    await deleteAppDeployment(
+      bindings,
+      VIEWER,
+      { appId: APP_ID },
+      {
+        cloudflareClient: createCloudflareDeleteRecorder([]),
+      },
+    );
+
+    await expect(getDeploymentAgentCapabilityAuthority(database, authority)).resolves.toEqual({
+      authorized: false,
+      reason: "deployment_deleted",
     });
   });
 

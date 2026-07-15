@@ -1,66 +1,51 @@
-# PRD Docs
+# Product Notes
 
-Product contracts and the standards used to write them.
+These pages are short, code-checked product snapshots for non-engineers. Each
+one explains why a capability exists, what people can do today, and its visible
+limits. They are not implementation specifications.
 
-## Architecture
+Read [Mosoo Spec](../SPEC.md) for the target product direction. When a product
+note, the Spec, and current code disagree, do not guess: verify the behavior and
+update the stale note. Exact APIs, data shapes, and runtime topology belong in
+their machine-readable contracts, code, or [Architecture](../architecture.md).
 
-- [Architecture](../architecture.md): stable engineering boundaries and system-level contracts.
+## Apps and Agents
 
-## Current direction
+- [App Boundary](./app-boundary.md)
+- [App Deployment](./app-deployment.md)
+- [Agent Type](./agent-type.md)
+- [Agent Manifest](./agent-manifest.md)
+- [Agent Publishing and Versions](./agent-service-identity.md)
+- [Agent Version History](./agent-versions.md)
+- [Agent Import, Export, and Fork](./agent-package-import-export-fork.md)
+- [Agent API Endpoint](./agent-endpoint-mvp.md)
 
-- [Mosoo Spec](../SPEC.md): the canonical target product contract — nouns, relationships, non-goals, and behavior. Migration is in progress; where current code or older PRDs disagree, the Spec wins.
-- [App Boundary](./app-boundary.md): historical baseline of the shipped App pivot, superseded by the Spec where they conflict. Useful for decoding older ownership and IA wording, not for deciding new behavior.
+## Work and runtime
 
-## PRDs
-
-This directory contains active contracts, shipped behavior, semantic companions, deferred work,
-and superseded link stubs. Presence in this index does not mean a capability is shipped. Each
-document must state its own status near the top; if it does not, verify it against the current
-implementation before treating it as authoritative. When older PRDs mention Organization-owned
-business assets, Workspace, or Agent-first service identity, resolve against the Spec first;
-App Boundary documents how that older wording was originally cut.
-
-### Agents & packaging
-
-- [Agent Type (Pet vs Cattle)](./agent-type.md)
-- [Agent Manifest](./agent-manifest.md) — active field contract; native-config drift/adopt UX is explicitly not shipped.
-- [Agent Endpoint MVP](./agent-endpoint-mvp.md)
-- [Agent Import / Export & Fork](./agent-package-import-export-fork.md)
-- [Agent Versions](./agent-versions.md) — deferred.
-- [Agent Exposure Identity & Deployment Version](./agent-service-identity.md)
-
-### Runtime & sessions
-
-- [Runtime Catalog Extension](./runtime-catalog.md) — implementation guide.
-- [Runtime Session Kernel](./runtime-session-kernel.md) — semantic overview; Architecture/code own exact topology.
-- [Agent Session API](./agent-session-api.md)
+- [Runs and Threads](./default-consumption-surface.md)
+- [Agent Work History](./agent-session-api.md)
+- [Thread Lifecycle](./session-lifecycle.md)
+- [Runtime Sessions](./runtime-session-kernel.md)
+- [Runtime Choice](./runtime-catalog.md)
 - [Runtime State Operations](./runtime-state-operations.md)
-- [Session Lifecycle](./session-lifecycle.md) — implemented core lifecycle contract plus explicitly disclosed gaps.
-- [Session Files](./session-files.md) — semantic companion for Thread files; OpenAPI owns the HTTP schema.
-- [Session Log](./session-log.md)
 - [Agent Terminal](./agent-terminal.md)
+- [Session Log](./session-log.md)
 
-### Surfaces & channels
+## Delivery and resources
 
-- [Default Consumption Surface (Threads)](./default-consumption-surface.md) — active shipped Runs/Thread UX.
-- [Channels](./channels.md) — partial implementation; no top-level App Channels console.
-- [App Deployment](./app-deployment.md) — active and shipped App-owned Cloudflare Pages / Workers deployment resource, embedded in App Overview and scoped separately from Agent versions and App runtime.
-- [Public Thread API Surface](./public-thread-api-surface.md) — canonical product contract; checked-in OpenAPI owns the exact HTTP schema.
-- [Public Thread API legacy link](./public-task-api.md) — superseded link stub.
-- [MCP (Connector)](./mcp-interaction.md)
-- [Skill](./skill-interaction.md)
-- [Files API Contract](./files-api-contract.md) — internal Files ownership/service contract, not the Public Thread HTTP schema.
-- [Credentials](./credentials.md) — Provider and MCP secrets owned by the active App; runtime resolves them from that same App boundary.
-
-Surface boundary: public HTTPS exposure is an Agent API Endpoint inside one App. Thread is the public conversation object, Session is the runtime record, and Thread files are scoped to the admitted Thread/backing Session. Organization remains account and billing context, not a public API authorization boundary.
-
-### Admin & cost
-
-- [Cost Dashboard](./cost-dashboard.md)
+- [Public Thread API](./public-thread-api-surface.md)
+- [Channels](./channels.md)
+- [Thread Files](./session-files.md)
+- [Files API legacy link](./files-api-contract.md)
+- [Skills](./skill-interaction.md)
+- [MCP Connections](./mcp-interaction.md)
+- [Credentials](./credentials.md)
 - [Environment](./environment.md)
 
-## Writing standards
+## Operations
 
-- [PRD writing standard](../good-prd.md): how product contracts should be written and reviewed.
-- [For-human PRD companion](../for-human-prd.md): how to mirror a full PRD into a high-readability, non-engineer version.
-- [PM reverse interview](../pm-reverse-interview.md): product decision quality checklist.
+- [App Usage](./cost-dashboard.md)
+
+## Removed names
+
+- [Public Task API](./public-task-api.md)

@@ -4,6 +4,9 @@ import type {
   AccountId,
   AgentDeploymentVersionId,
   AgentId,
+  AppDeploymentId,
+  AppDeploymentRunId,
+  AppId,
   DriverInstanceId,
   RuntimeOperationId,
   SessionId,
@@ -29,6 +32,16 @@ export const sessionRunsTable = sqliteTable(
   "session_run",
   {
     agentId: platformIdColumn<AgentId>("agent_id").notNull(),
+    boundCapabilityAgentId: platformIdColumn<AgentId>("bound_capability_agent_id"),
+    boundCapabilityAppId: platformIdColumn<AppId>("bound_capability_app_id"),
+    boundCapabilityBindingEnv: text("bound_capability_binding_env"),
+    boundCapabilityBindingName: text("bound_capability_binding_name"),
+    boundCapabilityDeploymentId: platformIdColumn<AppDeploymentId>(
+      "bound_capability_deployment_id",
+    ),
+    boundCapabilityDeploymentRunId: platformIdColumn<AppDeploymentRunId>(
+      "bound_capability_deployment_run_id",
+    ),
     completedAt: integer("completed_at"),
     createdAt: integer("created_at").notNull(),
     createdByAccountId: platformIdColumn<AccountId>("created_by_account_id").notNull(),

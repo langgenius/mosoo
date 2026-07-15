@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
+import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api";
+
+import { createHttpApp } from "../src/adapters/http/create-http-app";
 import {
   authenticatePersonalAccessToken,
   createPersonalAccessToken,
@@ -8,6 +11,12 @@ import {
   revokePersonalAccessToken,
 } from "../src/modules/auth/application/personal-access-token.service";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
+import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
+import {
+  createPublicHttpContractDatabase,
+  createPublicHttpTestBindings,
+  TOKENS,
+} from "./helpers/public-api-http-test-fixture";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const MISSING_TOKEN_ID = "01J000000000000000000000K6";
@@ -105,6 +114,24 @@ function createPersonalTokenDatabase(): SqliteD1Database {
 }
 
 describe("personal access tokens", () => {
+  test("creates a token over HTTP with Bearer authentication", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const response = await createHttpApp().request(
+      `${PUBLIC_API_PREFIX}/access-tokens`,
+      {
+        body: JSON.stringify({ label: "CLI token" }),
+        headers: {
+          authorization: `Bearer ${TOKENS.owner}`,
+          "content-type": "application/json",
+        },
+        method: "POST",
+      },
+      createPublicHttpTestBindings(database) as ApiBindings,
+    );
+
+    expect(response.status).toBe(201);
+  });
+
   test("generates Mosoo access tokens with the MST prefix", async () => {
     const database = createPersonalTokenDatabase();
 

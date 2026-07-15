@@ -12,6 +12,7 @@ import {
 } from "../../../../platform/cloudflare/logger";
 import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
+import { getSessionRuntimeRecoveryMessages } from "../../../sessions/application/session-runtime-recovery-query.service";
 import {
   appendRuntimeDiagnosticEvent,
   toRuntimeDiagnosticBaseValue,
@@ -201,7 +202,8 @@ async function provisionDriver(
         );
   void nativeResumeRefPromise.catch(() => undefined);
 
-  const containerRequestUrl = toContainerReachableOrigin(input.requestUrl);
+  const explicitControlOrigin = env.MOSOO_RUNTIME_CONTROL_ORIGIN?.trim() || undefined;
+  const containerRequestUrl = toContainerReachableOrigin(input.requestUrl, explicitControlOrigin);
   const environmentInstall = createRuntimeEnvironmentInstallState();
   let driverGeneration: number | null = null;
   let process: RuntimeProcessHandle | null = null;
@@ -222,10 +224,18 @@ async function provisionDriver(
       nativeResumeRefPromise,
       driverRecordPromise,
     ]);
-
     if (driverRecord.status === "skipped") {
       throw new DriverPrewarmProvisionSkippedError(driverInstanceId);
     }
+    const recoveryMessages =
+      nativeResumeRef === null || input.runtime !== "openai-runtime"
+        ? []
+        : await timing.measure("getRuntimeRecoveryMessages", () =>
+            getSessionRuntimeRecoveryMessages(env.DB, {
+              excludeRunId: input.sessionRunId ?? null,
+              sessionId: input.sandboxSessionId,
+            }),
+          );
     const activeDriverGeneration = driverRecord.generation;
     driverGeneration = activeDriverGeneration;
 
@@ -246,6 +256,7 @@ async function provisionDriver(
         driverInstanceId,
         nativeResumeRef,
         profile: input.profile,
+        recoveryMessages,
         requestUrl: containerRequestUrl,
         resolvedMcpServers: input.resolvedMcpServers,
         resolvedSkillCatalog: input.resolvedSkillCatalog,

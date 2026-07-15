@@ -44,6 +44,7 @@ export const skillSchema = /* GraphQL */ `
     author: String!
     createdAt: String!
     description: String!
+    fileCount: Int!
     forkOrigin: SkillForkOrigin
     id: ULID!
     name: String!
@@ -61,6 +62,7 @@ export const skillSchema = /* GraphQL */ `
     currentSnapshot: SkillSnapshotRecord!
     description: String!
     entries: [SkillSnapshotEntry!]!
+    fileCount: Int!
     forkOrigin: SkillForkOrigin
     id: ULID!
     name: String!

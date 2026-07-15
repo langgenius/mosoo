@@ -1,7 +1,10 @@
+import {
+  createNoRuntimeEventsRecordedEventId,
+  createProcessEventsTruncatedEventId,
+} from "@mosoo/contracts/session";
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
 import { sessionEventsTable } from "@mosoo/db";
-import { createPlatformId } from "@mosoo/id";
-import type { AccountId, AppId, RuntimeEventId, SessionId } from "@mosoo/id";
+import type { AccountId, AppId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, desc, eq } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
@@ -9,14 +12,17 @@ import { validationError } from "../../../platform/errors";
 import { toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { getAppSessionParticipantTimelineAccess } from "../domain/session-access.policy";
+import { foldStreamedSessionEventRows } from "../domain/session-event-stream-fold";
 
 export interface SessionEventProcessRow {
   content_text: string;
   ended_at: number;
+  event_type: string;
   id: RuntimeEventId;
   occurred_at: number;
   process_status: SessionProcessEvent["status"];
   process_type: SessionProcessEvent["type"];
+  run_id: SessionRunId | null;
   seq: number;
   tokens: number | null;
 }
@@ -97,8 +103,13 @@ function toProcessEventProjectionFromSessionEventRow(
 
 export function createSessionProcessEventsFromSessionEventRows(
   rows: SessionEventProcessRow[],
+  options: { foldStreamedRows?: boolean } = {},
 ): SessionProcessEvent[] {
-  const projections = rows.map(toProcessEventProjectionFromSessionEventRow);
+  const foldedRows =
+    options.foldStreamedRows === false
+      ? rows
+      : foldStreamedSessionEventRows(rows, { flushOpenStreams: true }).rows;
+  const projections = foldedRows.map(toProcessEventProjectionFromSessionEventRow);
 
   return finalizeProcessEventDurations(projections);
 }
@@ -109,7 +120,7 @@ function createNoRuntimeEventsRecordedEvent(
   return {
     content: "No runtime events have been recorded for this thread.",
     durationMs: null,
-    id: createPlatformId<RuntimeEventId>(),
+    id: createNoRuntimeEventsRecordedEventId(session.id),
     occurredAt: session.updatedAt,
     status: "unsupported",
     tokens: null,
@@ -125,7 +136,7 @@ function createProcessEventsTruncatedEvent(input: {
   return {
     content: `Earlier runtime events are hidden; showing the latest ${input.limit} events.`,
     durationMs: 0,
-    id: createPlatformId<RuntimeEventId>(),
+    id: createProcessEventsTruncatedEventId(input.sessionId),
     occurredAt: input.occurredAt,
     status: "unsupported",
     tokens: null,
@@ -167,10 +178,12 @@ async function listSessionProcessEvents(
     .select({
       content_text: sessionEventsTable.contentText,
       ended_at: sessionEventsTable.endedAt,
+      event_type: sessionEventsTable.eventType,
       id: sessionEventsTable.id,
       occurred_at: sessionEventsTable.occurredAt,
       process_status: sessionEventsTable.processStatus,
       process_type: sessionEventsTable.processType,
+      run_id: sessionEventsTable.runId,
       seq: sessionEventsTable.seq,
       tokens: sessionEventsTable.tokens,
     })
