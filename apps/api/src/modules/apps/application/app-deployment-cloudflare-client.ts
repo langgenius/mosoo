@@ -2,6 +2,7 @@ import Cloudflare from "cloudflare";
 
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import type { WfpDeploymentClient } from "./app-deployment-wfp-client";
 
 export interface CloudflarePagesProjectInput {
   branch: string;
@@ -34,6 +35,7 @@ export interface CloudflarePagesDomainResult {
 export type CloudflareDeploymentResourceTargetKind =
   | "cloudflare_pages"
   | "cloudflare_pages_domain"
+  | "cloudflare_wfp_user_worker"
   | "cloudflare_worker"
   | "cloudflare_worker_domain"
   | "cloudflare_worker_route";
@@ -277,9 +279,14 @@ export function createCloudflareDeploymentClient(
   };
 }
 
+// The Workers for Platforms script delete rides along whenever a dispatch
+// namespace is configured: deletion cannot tell which substrate a historical
+// run deployed to, so it clears both layouts (every delete here is
+// missing-resource tolerant).
 export async function deleteCloudflareDeploymentResources(
   cloudflareClient: CloudflareDeploymentClient,
   input: { hostname: string; resourceName: string },
+  wfpClient: WfpDeploymentClient | null = null,
 ): Promise<CloudflareDeploymentResourceDeleteFailure[]> {
   const failures = await Promise.all([
     deleteCloudflareDeploymentResource("cloudflare_pages_domain", input.resourceName, () =>
@@ -300,6 +307,13 @@ export async function deleteCloudflareDeploymentResources(
     deleteCloudflareDeploymentResource("cloudflare_worker", input.resourceName, () =>
       cloudflareClient.deleteWorkerScript({ scriptName: input.resourceName }),
     ),
+    ...(wfpClient === null
+      ? []
+      : [
+          deleteCloudflareDeploymentResource("cloudflare_wfp_user_worker", input.resourceName, () =>
+            wfpClient.deleteNamespacedWorker({ scriptName: input.resourceName }),
+          ),
+        ]),
   ]);
 
   return failures.filter(

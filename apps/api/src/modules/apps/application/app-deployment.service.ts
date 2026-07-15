@@ -36,6 +36,8 @@ import type {
   CloudflareDeploymentClient,
 } from "./app-deployment-cloudflare-client";
 import { destroyAppDeploymentRunSandboxesBestEffort } from "./app-deployment-executor.service";
+import { createWfpDeploymentClient, wfpDispatchNamespace } from "./app-deployment-wfp-client";
+import type { WfpDeploymentClient } from "./app-deployment-wfp-client";
 import { ensureAppOwnership } from "./app.service";
 import { normalizeLimit } from "./normalize-limit";
 
@@ -48,7 +50,9 @@ type AppDeploymentDeleteBindings = Pick<
   "DB" | "MOSOO_APP_DEPLOYMENT_DOMAIN"
 > &
   CloudflareClientBindings &
-  Partial<Pick<ApiBindings, "Sandbox" | "runtimeSubjectHandleFactory">>;
+  Partial<
+    Pick<ApiBindings, "MOSOO_WFP_DISPATCH_NAMESPACE" | "Sandbox" | "runtimeSubjectHandleFactory">
+  >;
 
 export type AppDeploymentReadBindings = Pick<
   AppDeploymentBindings,
@@ -59,6 +63,7 @@ interface AppDeploymentServiceOptions {
   cloudflareClient?: CloudflareDeploymentClient;
   fetch?: typeof fetch;
   nowMs?: () => number;
+  wfpClient?: WfpDeploymentClient;
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -347,12 +352,15 @@ export async function deleteAppDeployment(
 
   await destroyActiveDeploymentRunSandboxes(bindings, activeRunIds);
 
+  const dispatchNamespace = wfpDispatchNamespace(bindings);
   const deleteFailures = await deleteCloudflareDeploymentResources(
     options.cloudflareClient ?? createCloudflareDeploymentClient(bindings),
     {
       hostname: createPlannedHost(deployment.mosooSubdomain, bindings.MOSOO_APP_DEPLOYMENT_DOMAIN),
       resourceName: deployment.mosooSubdomain,
     },
+    options.wfpClient ??
+      (dispatchNamespace === null ? null : createWfpDeploymentClient(bindings, dispatchNamespace)),
   );
 
   if (deleteFailures.length > 0) {

@@ -36,6 +36,8 @@ import {
   detectAppDeploymentPlan,
 } from "./app-deployment-detector";
 import type { AppDeploymentPlan, AppDeploymentRepositorySnapshot } from "./app-deployment-detector";
+import { createWfpDeploymentClient, wfpDispatchNamespace } from "./app-deployment-wfp-client";
+import type { WfpAssetFile, WfpDeploymentClient } from "./app-deployment-wfp-client";
 
 interface AppDeploymentDispatchContext {
   deployment: AppDeploymentRow;
@@ -76,6 +78,7 @@ export interface AppDeploymentBuildRunner {
 export interface DispatchAppDeploymentRunOptions {
   cloudflareClient?: CloudflareDeploymentClient;
   runner?: AppDeploymentBuildRunner;
+  wfpClient?: WfpDeploymentClient;
 }
 
 export class AppDeploymentNonRetryableError extends Error {
@@ -446,6 +449,7 @@ async function compensateDeletedDeploymentResources(input: {
   bindings: ApiBindings;
   cloudflareClient: CloudflareDeploymentClient | null;
   deployment: AppDeploymentRow;
+  wfpClient: WfpDeploymentClient | null;
 }): Promise<void> {
   if (
     !(await shouldCompensateDeletedDeployment({
@@ -462,6 +466,7 @@ async function compensateDeletedDeploymentResources(input: {
       hostname: deploymentHostname(input.deployment, input.bindings.MOSOO_APP_DEPLOYMENT_DOMAIN),
       resourceName: input.deployment.mosooSubdomain,
     },
+    input.wfpClient,
   );
 
   if (deleteFailures.length > 0) {
@@ -576,13 +581,19 @@ async function extractPagesArtifactArchive(input: {
 class SandboxAppDeploymentBuildRunner implements AppDeploymentBuildRunner {
   readonly #bindings: ApiBindings;
   readonly #cloudflareClient: CloudflareDeploymentClient;
+  readonly #wfpClient: WfpDeploymentClient | null;
   #buildSandbox: SandboxHandle | null = null;
   #buildWorkDir: string | null = null;
   #runId: AppDeploymentRunId | null = null;
 
-  constructor(bindings: ApiBindings, cloudflareClient: CloudflareDeploymentClient) {
+  constructor(
+    bindings: ApiBindings,
+    cloudflareClient: CloudflareDeploymentClient,
+    wfpClient: WfpDeploymentClient | null = null,
+  ) {
     this.#bindings = bindings;
     this.#cloudflareClient = cloudflareClient;
+    this.#wfpClient = wfpClient;
   }
 
   async prepare(input: {
@@ -651,6 +662,10 @@ class SandboxAppDeploymentBuildRunner implements AppDeploymentBuildRunner {
     prepared: PreparedAppDeploymentRepository;
     run: AppDeploymentRunRow;
   }): Promise<AppDeploymentDeployResult> {
+    if (this.#wfpClient !== null) {
+      return this.#deployToDispatchNamespace(input, this.#wfpClient);
+    }
+
     const buildSandbox = this.#requireBuildSandbox();
     const buildWorkDir = this.#requireBuildWorkDir();
     const targetName = input.deployment.mosooSubdomain;
@@ -731,32 +746,13 @@ class SandboxAppDeploymentBuildRunner implements AppDeploymentBuildRunner {
       };
     }
 
-    if (input.plan.workerEntry === null) {
-      throw new AppDeploymentNonRetryableError("Worker deployment plan is missing workerEntry.");
-    }
-
-    if (!WORKER_JS_ENTRY_PATTERN.test(input.plan.workerEntry)) {
-      throw new AppDeploymentNonRetryableError(
-        "Worker deployment requires a JavaScript module entry.",
-      );
-    }
-
-    const mainModuleName = input.plan.workerEntry.split("/").at(-1) ?? input.plan.workerEntry;
-    const scriptContent = (
-      await buildSandbox.readFile(
-        `${input.prepared.repoDir}/${input.plan.rootDir}/${input.plan.workerEntry}`,
-        {
-          encoding: "utf8",
-        },
-      )
-    ).content;
-    assertSelfContainedWorkerModule(scriptContent);
+    const workerModule = await this.#readSelfContainedWorkerModule(input.plan, input.prepared);
     await this.#destroyBuildSandbox();
 
     const worker = await this.#cloudflareClient.deployWorkerModule({
       compatibilityDate: APP_DEPLOYMENT_COMPATIBILITY_DATE,
-      mainModuleName,
-      scriptContent,
+      mainModuleName: workerModule.name,
+      scriptContent: workerModule.content,
       scriptName: targetName,
       vars: input.envVars,
     });
@@ -785,6 +781,134 @@ class SandboxAppDeploymentBuildRunner implements AppDeploymentBuildRunner {
     await destroyAppDeploymentRunSandboxesBestEffort(this.#bindings, this.#runId);
     this.#buildSandbox = null;
     this.#buildWorkDir = null;
+  }
+
+  // Workers for Platforms path (issue #281 migration, phase 1): static and
+  // worker plans both deploy as one User Worker in the dispatch namespace,
+  // so no Pages project, route, or domain sibling resources are created. The
+  // returned URL is the planned hostname contract; eyeball routing through
+  // the dispatcher lands in phase 2.
+  async #deployToDispatchNamespace(
+    input: {
+      deployment: AppDeploymentRow;
+      envVars: Record<string, string>;
+      plan: AppDeploymentPlan;
+      prepared: PreparedAppDeploymentRepository;
+    },
+    wfpClient: WfpDeploymentClient,
+  ): Promise<AppDeploymentDeployResult> {
+    const targetName = input.deployment.mosooSubdomain;
+    const url = deploymentUrl(input.deployment, this.#bindings.MOSOO_APP_DEPLOYMENT_DOMAIN);
+
+    if (input.plan.targetKind === "cloudflare_pages") {
+      // Dispatch namespace assets only support the built-in index.html
+      // single-page-application fallback, not an arbitrary fallback file.
+      if (input.plan.routesFallback !== null && input.plan.routesFallback !== "index.html") {
+        throw new AppDeploymentNonRetryableError(
+          "Dispatch namespace asset deployment only supports index.html as routes fallback.",
+        );
+      }
+
+      const files = await this.#collectDispatchNamespaceAssets(input.plan, input.prepared);
+      await this.#destroyBuildSandbox();
+      const result = await wfpClient.deployNamespacedWorker({
+        assets: {
+          files,
+          notFoundHandling: input.plan.routesFallback === null ? "none" : "single-page-application",
+        },
+        compatibilityDate: APP_DEPLOYMENT_COMPATIBILITY_DATE,
+        mainModule: null,
+        scriptName: targetName,
+        vars: {},
+      });
+
+      return {
+        externalDeploymentId: null,
+        externalProjectId: null,
+        externalVersionId: result.etag,
+        url,
+      };
+    }
+
+    const workerModule = await this.#readSelfContainedWorkerModule(input.plan, input.prepared);
+    await this.#destroyBuildSandbox();
+    const result = await wfpClient.deployNamespacedWorker({
+      assets: null,
+      compatibilityDate: APP_DEPLOYMENT_COMPATIBILITY_DATE,
+      mainModule: workerModule,
+      scriptName: targetName,
+      vars: input.envVars,
+    });
+
+    return {
+      externalDeploymentId: null,
+      externalProjectId: null,
+      externalVersionId: result.etag,
+      url,
+    };
+  }
+
+  async #collectDispatchNamespaceAssets(
+    plan: AppDeploymentPlan,
+    prepared: PreparedAppDeploymentRepository,
+  ): Promise<WfpAssetFile[]> {
+    if (plan.outputDir === null) {
+      throw new AppDeploymentNonRetryableError("Pages deployment plan is missing outputDir.");
+    }
+
+    const buildSandbox = this.#requireBuildSandbox();
+    const outputDir = `${prepared.repoDir}/${plan.rootDir}/${plan.outputDir}`;
+    const listResult = await buildSandbox.exec(
+      `sh -lc ${quoteShellArg(`cd ${quoteShellArg(outputDir)} && find . -type f -print | sort`)}`,
+    );
+
+    assertSuccessfulCommand(listResult, "Static asset listing");
+
+    const paths = listResult.stdout
+      .split("\n")
+      .map((line) => line.trim().replace(/^\.\//u, ""))
+      .filter((path) => path.length > 0);
+
+    if (paths.length === 0) {
+      throw new AppDeploymentNonRetryableError(
+        "Static deployment output directory contains no files.",
+      );
+    }
+
+    return Promise.all(
+      paths.map(async (path) => ({
+        contentBase64: (await buildSandbox.readFile(`${outputDir}/${path}`, { encoding: "base64" }))
+          .content,
+        path: `/${path}`,
+      })),
+    );
+  }
+
+  async #readSelfContainedWorkerModule(
+    plan: AppDeploymentPlan,
+    prepared: PreparedAppDeploymentRepository,
+  ): Promise<{ content: string; name: string }> {
+    if (plan.workerEntry === null) {
+      throw new AppDeploymentNonRetryableError("Worker deployment plan is missing workerEntry.");
+    }
+
+    if (!WORKER_JS_ENTRY_PATTERN.test(plan.workerEntry)) {
+      throw new AppDeploymentNonRetryableError(
+        "Worker deployment requires a JavaScript module entry.",
+      );
+    }
+
+    const content = (
+      await this.#requireBuildSandbox().readFile(
+        `${prepared.repoDir}/${plan.rootDir}/${plan.workerEntry}`,
+        {
+          encoding: "utf8",
+        },
+      )
+    ).content;
+    assertSelfContainedWorkerModule(content);
+
+    return { content, name: plan.workerEntry.split("/").at(-1) ?? plan.workerEntry };
   }
 
   async #destroyBuildSandbox(): Promise<void> {
@@ -886,11 +1010,16 @@ export async function dispatchAppDeploymentRun(
   const cloudflareClient =
     options.cloudflareClient ??
     (options.runner === undefined ? createCloudflareDeploymentClient(bindings) : null);
+  const dispatchNamespace = wfpDispatchNamespace(bindings);
+  const wfpClient =
+    options.wfpClient ??
+    (dispatchNamespace === null ? null : createWfpDeploymentClient(bindings, dispatchNamespace));
   const runner =
     options.runner ??
     new SandboxAppDeploymentBuildRunner(
       bindings,
       cloudflareClient ?? createCloudflareDeploymentClient(bindings),
+      wfpClient,
     );
   let externallyAttemptedDeployment: AppDeploymentRow | null = null;
 
@@ -1000,6 +1129,7 @@ export async function dispatchAppDeploymentRun(
           bindings,
           cloudflareClient,
           deployment: externallyAttemptedDeployment,
+          wfpClient,
         });
       } catch (error) {
         logError("app-deployment.cloudflare_delete_after_deletion_check_failed", {

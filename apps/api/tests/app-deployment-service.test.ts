@@ -14,6 +14,7 @@ import { getDeploymentAgentCapabilityAuthority } from "../src/modules/apps/appli
 import type { CloudflareDeploymentClient } from "../src/modules/apps/application/app-deployment-cloudflare-client";
 import type { AppDeploymentBuildRunner } from "../src/modules/apps/application/app-deployment-executor.service";
 import { dispatchAppDeploymentRun } from "../src/modules/apps/application/app-deployment-executor.service";
+import type { WfpDeploymentClient } from "../src/modules/apps/application/app-deployment-wfp-client";
 import {
   deleteAppDeployment,
   deployApp,
@@ -382,6 +383,40 @@ function createCloudflareDeleteRecorder(
       throw new Error("Unexpected Pages deployment read.");
     },
     ...overrides,
+  };
+}
+
+interface RecordedWfpDeploy {
+  assets: { notFoundHandling: string; paths: string[] } | null;
+  mainModuleName: string | null;
+  scriptName: string;
+  vars: Record<string, string>;
+}
+
+function createWfpRecorder(events: {
+  deleted: string[];
+  deploys: RecordedWfpDeploy[];
+}): WfpDeploymentClient {
+  return {
+    async deleteNamespacedWorker(input) {
+      events.deleted.push(`wfp:${input.scriptName}`);
+    },
+    async deployNamespacedWorker(input) {
+      events.deploys.push({
+        assets:
+          input.assets === null
+            ? null
+            : {
+                notFoundHandling: input.assets.notFoundHandling,
+                paths: input.assets.files.map((file) => file.path),
+              },
+        mainModuleName: input.mainModule?.name ?? null,
+        scriptName: input.scriptName,
+        vars: input.vars,
+      });
+
+      return { etag: "wfp-etag-1" };
+    },
   };
 }
 
@@ -1438,6 +1473,200 @@ describe("app deployment service", () => {
       `worker-route:${hostname}:${targetName}`,
       `worker-domain:${hostname}:${targetName}`,
     ]);
+  });
+
+  test("deploys worker modules to the dispatch namespace when configured", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const calls: string[] = [];
+    const wfpEvents = { deleted: [] as string[], deploys: [] as RecordedWfpDeploy[] };
+    (bindings as ApiBindings).runtimeSubjectHandleFactory = (runtimeSubjectId) =>
+      createWorkerDeploymentSandboxHandle(runtimeSubjectId, calls);
+
+    // The base recorder throws on every legacy deploy/route/domain call, so a
+    // successful run proves no account-level sibling resources were touched.
+    const cloudflareClient = createCloudflareDeleteRecorder([]);
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, configPath: ".mosoo.toml", repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      { cloudflareClient, wfpClient: createWfpRecorder(wfpEvents) },
+    );
+
+    const targetName = `app-${APP_ID.toLowerCase()}`;
+    const targetUrl = `https://${targetName}.apps.localhost`;
+    const status = await getAppDeploymentStatus(bindings, VIEWER, APP_ID);
+    const runRow = await database.app().select().from(appDeploymentRunsTable).limit(1).get();
+
+    expect(status).toMatchObject({
+      liveUrl: targetUrl,
+      status: "success",
+    });
+    expect(runRow).toMatchObject({
+      externalDeploymentId: null,
+      externalProjectId: null,
+      externalVersionId: "wfp-etag-1",
+      status: "success",
+      targetKind: "cloudflare_worker",
+      targetScriptName: targetName,
+      url: targetUrl,
+    });
+    expect(wfpEvents.deploys).toEqual([
+      {
+        assets: null,
+        mainModuleName: "index.js",
+        scriptName: targetName,
+        vars: {},
+      },
+    ]);
+  });
+
+  test("deploys static assets to the dispatch namespace when configured", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const calls: string[] = [];
+    const wfpEvents = { deleted: [] as string[], deploys: [] as RecordedWfpDeploy[] };
+    (bindings as ApiBindings).runtimeSubjectHandleFactory = (runtimeSubjectId) =>
+      createTestSandboxHandle(runtimeSubjectId, calls, "deployment");
+
+    const cloudflareClient = createCloudflareDeleteRecorder([]);
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      { cloudflareClient, wfpClient: createWfpRecorder(wfpEvents) },
+    );
+
+    const targetName = `app-${APP_ID.toLowerCase()}`;
+    const targetUrl = `https://${targetName}.apps.localhost`;
+    const status = await getAppDeploymentStatus(bindings, VIEWER, APP_ID);
+    const runRow = await database.app().select().from(appDeploymentRunsTable).limit(1).get();
+
+    expect(status).toMatchObject({
+      liveUrl: targetUrl,
+      status: "success",
+    });
+    expect(runRow).toMatchObject({
+      externalDeploymentId: null,
+      externalProjectId: null,
+      externalVersionId: "wfp-etag-1",
+      status: "success",
+      targetKind: "cloudflare_pages",
+      url: targetUrl,
+    });
+    expect(wfpEvents.deploys).toEqual([
+      {
+        assets: { notFoundHandling: "none", paths: ["/index.html"] },
+        mainModuleName: null,
+        scriptName: targetName,
+        vars: {},
+      },
+    ]);
+    expect(calls.some((call) => call.includes("wrangler pages deploy"))).toBe(false);
+  });
+
+  test("deletes the dispatch namespace script alongside legacy resources", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const deleted: string[] = [];
+    const wfpEvents = { deleted: [] as string[], deploys: [] as RecordedWfpDeploy[] };
+
+    await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+
+    await deleteAppDeployment(
+      bindings,
+      VIEWER,
+      { appId: APP_ID },
+      {
+        cloudflareClient: createCloudflareDeleteRecorder(deleted),
+        wfpClient: createWfpRecorder(wfpEvents),
+      },
+    );
+
+    expect(deleted).toHaveLength(5);
+    expect(wfpEvents.deleted).toEqual([`wfp:app-${APP_ID.toLowerCase()}`]);
+    await expect(getAppDeployment(bindings, VIEWER, APP_ID)).resolves.toBeNull();
+  });
+
+  test("compensates dispatch namespace scripts created after deployment deletion", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const deleted: string[] = [];
+    const wfpEvents = { deleted: [] as string[], deploys: [] as RecordedWfpDeploy[] };
+    const cloudflareClient = createCloudflareDeleteRecorder(deleted);
+    const wfpClient = createWfpRecorder(wfpEvents);
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+    const runner: AppDeploymentBuildRunner = {
+      async build() {},
+      async deploy() {
+        await deleteAppDeployment(
+          bindings,
+          VIEWER,
+          { appId: APP_ID },
+          { cloudflareClient, wfpClient },
+        );
+
+        return {
+          externalDeploymentId: null,
+          externalProjectId: null,
+          externalVersionId: "wfp-etag-after-delete",
+          url: `https://app-${APP_ID.toLowerCase()}.apps.localhost`,
+        };
+      },
+      async prepare() {
+        return {
+          repoDir: "/repo",
+          snapshot: { files: { "index.html": "<main>Hello</main>" } },
+        };
+      },
+    };
+
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      { cloudflareClient, runner, wfpClient },
+    );
+
+    const runRow = await database
+      .app()
+      .select({
+        errorCode: appDeploymentRunsTable.errorCode,
+        status: appDeploymentRunsTable.status,
+      })
+      .from(appDeploymentRunsTable)
+      .where(eq(appDeploymentRunsTable.id, run.id))
+      .get();
+
+    expect(runRow).toEqual({ errorCode: "deployment_deleted", status: "failed" });
+    // One namespace delete from the deployment deletion, one from the
+    // compensation pass over the externally attempted deploy.
+    expect(wfpEvents.deleted).toEqual([
+      `wfp:app-${APP_ID.toLowerCase()}`,
+      `wfp:app-${APP_ID.toLowerCase()}`,
+    ]);
+    expect(deleted).toHaveLength(10);
   });
 
   test("dead letters active deployment runs without overwriting terminal runs", async () => {

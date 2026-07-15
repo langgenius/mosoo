@@ -46,6 +46,16 @@ interface OptionalCostLedgerReconciliationBindings {
   MOSOO_COST_LEDGER_RECONCILIATION_MODE?: string;
 }
 
+// Set to a Workers for Platforms dispatch namespace name to deploy Apps as
+// User Workers inside that namespace instead of provisioning account-level
+// Pages/Worker sibling resources (issue #281 migration, phase 1). Deploys go
+// through the Cloudflare REST API, so no `dispatch_namespaces` wrangler
+// binding is required until eyeball routing (phase 2) lands. Unset or blank
+// keeps the legacy deployment path.
+interface OptionalWorkersForPlatformsBindings {
+  MOSOO_WFP_DISPATCH_NAMESPACE?: string;
+}
+
 export interface OptionalSlackAdapterBindings {
   MOSOO_AGENT_ID?: string;
   MOSOO_API_BASE_URL?: string;
@@ -87,7 +97,8 @@ export type ApiBindings = Env &
   OptionalSlackAdapterBindings &
   OptionalWeChatIlinkBindings &
   OptionalLarkSidecarBindings &
-  OptionalRuntimeSubjectPlatformBindings;
+  OptionalRuntimeSubjectPlatformBindings &
+  OptionalWorkersForPlatformsBindings;
 
 export interface ApiGatewayEnvironment {
   Bindings: ApiBindings;
