@@ -171,6 +171,22 @@ export function useSessionTurns(events: readonly SessionProcessEvent[]): Session
   return useMemo(() => projectSessionTurns(events), [events]);
 }
 
+// Turn ids derive from event ids, and the projected turn for an open drawer
+// can disappear between polls (the bounded event window slides, or a pending
+// turn is absorbed by an arriving run.started). Prefer the freshly projected
+// turn so an open drawer keeps live-updating, but fall back to the snapshot
+// instead of blanking the drawer into a false "no events" state.
+export function resolveSessionTurn(
+  turns: readonly SessionTurn[],
+  snapshot: SessionTurn | null,
+): SessionTurn | null {
+  if (snapshot === null) {
+    return null;
+  }
+
+  return turns.find((turn) => turn.id === snapshot.id) ?? snapshot;
+}
+
 export function countSessionTurnDomains(events: readonly SessionProcessEvent[]): SessionTurnCounts {
   const counts = createEmptyCounts();
 

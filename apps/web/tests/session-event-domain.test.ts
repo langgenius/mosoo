@@ -1,11 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
+import type { SessionId } from "@mosoo/contracts/id";
+import { createNoRuntimeEventsRecordedEventId } from "@mosoo/contracts/session";
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
 
 import {
   SESSION_EVENT_FILTER_DOMAINS,
   getSessionEventDomain,
   isSessionEventVisibleInMainFeed,
+  isSyntheticNoRuntimeEventsEvent,
 } from "../src/shared/ui/session-events/domain";
 
 function eventOf(type: SessionProcessEvent["type"], content = type): SessionProcessEvent {
@@ -43,5 +46,20 @@ describe("session event v1.5 domain model", () => {
     expect(isSessionEventVisibleInMainFeed(assistantMessage)).toBe(true);
     expect(isSessionEventVisibleInMainFeed(toolUse)).toBe(true);
     expect(isSessionEventVisibleInMainFeed(runStarted)).toBe(true);
+  });
+
+  test("hides the synthetic no-runtime-events placeholder from the main feed", () => {
+    const sessionId = "01J0000000000000000000000B" as SessionId;
+    const placeholder: SessionProcessEvent = {
+      ...eventOf("session.status", "No runtime events have been recorded for this thread."),
+      id: createNoRuntimeEventsRecordedEventId(sessionId),
+      status: "unsupported",
+    };
+    const ordinaryStatus = eventOf("session.status");
+
+    expect(isSyntheticNoRuntimeEventsEvent(placeholder)).toBe(true);
+    expect(isSessionEventVisibleInMainFeed(placeholder)).toBe(false);
+    expect(isSyntheticNoRuntimeEventsEvent(ordinaryStatus)).toBe(false);
+    expect(isSessionEventVisibleInMainFeed(ordinaryStatus)).toBe(true);
   });
 });

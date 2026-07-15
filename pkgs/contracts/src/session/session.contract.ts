@@ -190,6 +190,35 @@ export interface SessionProcessEvent {
   type: SessionProcessEventType;
 }
 
+// Synthetic process events (the empty-feed placeholder and the hidden-older-
+// events marker) are minted at read time instead of being persisted. Their ids
+// must be valid platform ULIDs (the GraphQL ULID scalar validates output) AND
+// deterministic per session: readers poll this projection and key turn
+// grouping and drawer selection off event ids, so a fresh random id per read
+// makes every poll drop UI state. The ids reuse the session ULID's 10-char
+// time prefix plus a fixed Crockford-base32 tail that a random event tail
+// cannot realistically collide with.
+
+const SYNTHETIC_PROCESS_EVENT_TIME_PREFIX_LENGTH = 10;
+const NO_RUNTIME_EVENTS_RECORDED_EVENT_ID_TAIL = "0EVENTSEMPTY0000";
+const PROCESS_EVENTS_TRUNCATED_EVENT_ID_TAIL = "0EVENTSCAPPED000";
+
+function createSyntheticProcessEventId(sessionId: SessionId, tail: string): RuntimeEventId {
+  return `${sessionId.slice(0, SYNTHETIC_PROCESS_EVENT_TIME_PREFIX_LENGTH)}${tail}` as RuntimeEventId;
+}
+
+export function createNoRuntimeEventsRecordedEventId(sessionId: SessionId): RuntimeEventId {
+  return createSyntheticProcessEventId(sessionId, NO_RUNTIME_EVENTS_RECORDED_EVENT_ID_TAIL);
+}
+
+export function createProcessEventsTruncatedEventId(sessionId: SessionId): RuntimeEventId {
+  return createSyntheticProcessEventId(sessionId, PROCESS_EVENTS_TRUNCATED_EVENT_ID_TAIL);
+}
+
+export function isNoRuntimeEventsRecordedEventId(id: string): boolean {
+  return id.endsWith(NO_RUNTIME_EVENTS_RECORDED_EVENT_ID_TAIL);
+}
+
 export const SESSION_RUNTIME_EVENT_FAMILIES = [
   "config",
   "diagnostics",

@@ -1,6 +1,9 @@
+import {
+  createNoRuntimeEventsRecordedEventId,
+  createProcessEventsTruncatedEventId,
+} from "@mosoo/contracts/session";
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
 import { sessionEventsTable } from "@mosoo/db";
-import { createPlatformId } from "@mosoo/id";
 import type { AccountId, AppId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, desc, eq } from "drizzle-orm";
 
@@ -117,7 +120,7 @@ function createNoRuntimeEventsRecordedEvent(
   return {
     content: "No runtime events have been recorded for this thread.",
     durationMs: null,
-    id: createPlatformId<RuntimeEventId>(),
+    id: createNoRuntimeEventsRecordedEventId(session.id),
     occurredAt: session.updatedAt,
     status: "unsupported",
     tokens: null,
@@ -133,7 +136,7 @@ function createProcessEventsTruncatedEvent(input: {
   return {
     content: `Earlier runtime events are hidden; showing the latest ${input.limit} events.`,
     durationMs: 0,
-    id: createPlatformId<RuntimeEventId>(),
+    id: createProcessEventsTruncatedEventId(input.sessionId),
     occurredAt: input.occurredAt,
     status: "unsupported",
     tokens: null,
