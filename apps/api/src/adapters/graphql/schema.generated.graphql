@@ -1695,6 +1695,7 @@ type SkillDetail {
   currentSnapshot: SkillSnapshotRecord!
   description: String!
   entries: [SkillSnapshotEntry!]!
+  fileCount: Int!
   forkOrigin: SkillForkOrigin
   id: ULID!
   name: String!
@@ -1751,6 +1752,7 @@ type SkillSummary {
   author: String!
   createdAt: String!
   description: String!
+  fileCount: Int!
   forkOrigin: SkillForkOrigin
   id: ULID!
   name: String!
