@@ -2,6 +2,7 @@ import { Check, ChevronDown, Code, Copy, Inbox, MessageSquare, Upload } from "lu
 import type { ReactElement } from "react";
 import { useMemo, useState } from "react";
 
+import { writeClipboardText } from "@/shared/lib/clipboard";
 import { Button } from "@/shared/ui/button";
 import {
   DropdownMenu,
@@ -24,19 +25,6 @@ export interface PublishMenuProps {
   onChannelClick?: () => void;
   onPublish: () => void;
   showChannelSetup?: boolean;
-}
-
-async function writeClipboardText(text: string): Promise<boolean> {
-  if (typeof navigator === "undefined" || !navigator.clipboard) {
-    return false;
-  }
-
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function PublishMenu({

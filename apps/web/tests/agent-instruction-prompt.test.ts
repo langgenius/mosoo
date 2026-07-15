@@ -84,7 +84,7 @@ describe("agent instruction prompt", () => {
 
     expect(source).toContain("Instruction for LLM");
     expect(source).toContain("buildAgentInstructionPrompt(agent, distribution)");
-    expect(source).toContain("navigator.clipboard.writeText");
+    expect(source).toContain('import { writeClipboardText } from "@/shared/lib/clipboard"');
     expect(source).not.toContain("downloadTextFile");
     expect(source).not.toContain("skill.md</span>");
   });

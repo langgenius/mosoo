@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { writeClipboardText } from "@/shared/lib/clipboard";
 import { RuntimeIcon } from "@/shared/ui/brand-icons";
 import { Button } from "@/shared/ui/button";
 
@@ -20,19 +21,6 @@ const CODING_AGENT_HARNESSES = [
   { label: "Cursor", runtimeId: "cursor" },
   { label: "Cline", runtimeId: "cline" },
 ] as const;
-
-async function writeClipboardText(value: string): Promise<boolean> {
-  if (typeof navigator === "undefined" || !navigator.clipboard) {
-    return false;
-  }
-
-  try {
-    await navigator.clipboard.writeText(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export function AppOverviewInstallGuide(): ReactElement {
   const [copied, setCopied] = useState(false);
