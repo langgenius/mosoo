@@ -115,6 +115,17 @@ function createPackageResolutionDatabase(): SqliteD1Database {
       version text
     );
 
+    CREATE TABLE skill_snapshot_entry (
+      snapshot_id text NOT NULL,
+      path text NOT NULL,
+      entry_kind text NOT NULL,
+      is_executable integer NOT NULL,
+      mime_type text,
+      sha256 text,
+      size integer NOT NULL,
+      PRIMARY KEY (snapshot_id, path)
+    );
+
 	    INSERT INTO organization (id)
 	    VALUES ('${DRAFT_IDS.organization}');
 

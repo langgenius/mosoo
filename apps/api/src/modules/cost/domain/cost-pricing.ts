@@ -488,6 +488,29 @@ export function calculateUsageCost(input: {
     modelId: input.model,
     providerId: input.provider,
   });
+  const tokensUnavailable =
+    input.cacheCreationTokens === 0 &&
+    input.cacheReadTokens === 0 &&
+    input.inputTokens === 0 &&
+    input.outputTokens === 0;
+
+  if (tokensUnavailable && input.providedCostUsd !== null && input.providedCostUsd !== undefined) {
+    return {
+      priceSnapshotJson:
+        pricing === null
+          ? null
+          : JSON.stringify({
+              model: pricing.model,
+              provider: pricing.provider,
+              reportedCostUsd: input.providedCostUsd,
+              source: "runtime_reported_usd",
+              tokenCountersUnavailable: true,
+            }),
+      pricing,
+      pricingStatus: pricing === null ? "unknown" : "priced",
+      totalCostUsd: input.providedCostUsd,
+    };
+  }
 
   if (!pricing) {
     return {

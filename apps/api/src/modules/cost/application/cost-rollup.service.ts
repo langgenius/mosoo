@@ -22,14 +22,25 @@ export function getDailyRollupRetentionCutoffDate(now: Date): string {
   return toUtcDate(cutoff);
 }
 
+export function getUsageDetailRetentionCutoffMs(now: Date): number {
+  const cutoff = startOfUtcDay(now);
+  cutoff.setUTCDate(cutoff.getUTCDate() - DETAIL_RETENTION_DAYS);
+  return cutoff.getTime();
+}
+
 export function createDailyRollupRetentionPredicate(now: Date) {
   return lt(usageDailyRollupsTable.date, getDailyRollupRetentionCutoffDate(now));
 }
 
 export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): Promise<void> {
-  const cutoff = startOfUtcDay(now);
-  cutoff.setUTCDate(cutoff.getUTCDate() - DETAIL_RETENTION_DAYS);
-  const cutoffMs = cutoff.getTime();
+  const cutoffMs = getUsageDetailRetentionCutoffMs(now);
+
+  if (!Number.isSafeInteger(cutoffMs)) {
+    throw new Error("Usage detail retention cutoff must be a valid timestamp.");
+  }
+
+  // Drizzle's D1 batch cannot prepare parameterized db.run(sql) queries.
+  const cutoffSql = sql.raw(String(cutoffMs));
 
   await runAppDatabaseBatch(env.DB, (db) => [
     db.run(sql`
@@ -73,7 +84,7 @@ export async function runUsageDailyRollup(env: ApiBindings, now = new Date()): P
           SUM(CASE WHEN ${usageEventsTable.pricingStatus} = 'unknown' THEN 1 ELSE 0 END)
             AS unpriced_request_count
         FROM ${usageEventsTable}
-        WHERE ${usageEventsTable.createdAt} < ${cutoffMs}
+        WHERE ${usageEventsTable.createdAt} < ${cutoffSql}
         GROUP BY
           ${usageEventsTable.organizationId},
           ${usageEventsTable.appId},

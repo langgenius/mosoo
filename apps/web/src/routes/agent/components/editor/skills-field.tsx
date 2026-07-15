@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
+import { SkillFileCountBadge } from "@/shared/ui/skill-file-count-badge";
 
 import type { SkillInfo } from "../../agent.types";
 import { MarkdownPreviewDialog } from "./markdown-preview-dialog";
@@ -47,6 +48,9 @@ export function AgentSkillsField({
 
   const noOptions = model.availableSkills.length === 0;
   const triggerLabel = model.skillsLoading ? "Loading skills…" : "Add skill";
+  const previewFileCount = model.previewSkill
+    ? (model.fileCountBySkillId.get(model.previewSkill.id) ?? null)
+    : null;
   const handleAddSkill = (skill: SkillSummary): void => {
     model.handleAddSkill(skill);
     setOpen(false);
@@ -62,40 +66,47 @@ export function AgentSkillsField({
     <div>
       {selectedSkills.length > 0 || !readOnly ? (
         <div className="border-border divide-border-subtle divide-y overflow-hidden rounded-lg border">
-          {selectedSkills.map((skill) => (
-            <div
-              key={skill.id}
-              className="group hover:bg-accent/30 flex items-center gap-3 px-3 py-2.5 transition-colors"
-            >
-              <button
-                className="min-w-0 flex-1 cursor-pointer bg-transparent p-0 text-left"
-                onClick={() => {
-                  model.setPreviewSkill(skill);
-                }}
-                type="button"
+          {selectedSkills.map((skill) => {
+            const fileCount = model.fileCountBySkillId.get(skill.id) ?? null;
+
+            return (
+              <div
+                key={skill.id}
+                className="group hover:bg-accent/30 flex items-center gap-3 px-3 py-2.5 transition-colors"
               >
-                <div className="flex items-center gap-2">
-                  <div className="text-foreground truncate text-[13px] font-medium">
-                    {skill.name}
-                  </div>
-                  {skill.state === "tombstone" ? <MissingSkillBadge /> : null}
-                </div>
-                <div className="text-muted-foreground font-mono text-[11px]">{skill.filename}</div>
-              </button>
-              {!readOnly ? (
                 <button
-                  className="text-muted-foreground hover:text-destructive text-xs font-medium opacity-0 transition-colors group-hover:opacity-100"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    model.handleRemoveSkill(skill.id);
+                  className="min-w-0 flex-1 cursor-pointer bg-transparent p-0 text-left"
+                  onClick={() => {
+                    model.setPreviewSkill(skill);
                   }}
                   type="button"
                 >
-                  Remove
+                  <div className="flex items-center gap-2">
+                    <div className="text-foreground truncate text-[13px] font-medium">
+                      {skill.name}
+                    </div>
+                    {skill.state === "tombstone" ? <MissingSkillBadge /> : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground font-mono text-[11px]">SKILL.md</span>
+                    {fileCount === null ? null : <SkillFileCountBadge count={fileCount} />}
+                  </div>
                 </button>
-              ) : null}
-            </div>
-          ))}
+                {!readOnly ? (
+                  <button
+                    className="text-muted-foreground hover:text-destructive text-xs font-medium opacity-0 transition-colors group-hover:opacity-100"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      model.handleRemoveSkill(skill.id);
+                    }}
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
 
           {!readOnly ? (
             <DropdownMenu onOpenChange={setOpen} open={open}>
@@ -132,12 +143,15 @@ export function AgentSkillsField({
 
       {model.previewSkill ? (
         <MarkdownPreviewDialog
+          badge={
+            previewFileCount === null ? null : <SkillFileCountBadge count={previewFileCount} />
+          }
           content={model.previewContent}
           onOpenChange={() => {
             model.setPreviewSkill(null);
           }}
           open={model.previewSkill !== null}
-          title={model.previewSkill.filename}
+          title={`${model.previewSkill.name} · SKILL.md`}
         />
       ) : null}
     </div>
@@ -206,6 +220,7 @@ function SkillPickerGroup({
           }}
         >
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{skill.name}</span>
+          <SkillFileCountBadge count={skill.fileCount} />
           <span className="text-muted-foreground shrink-0 text-[11px]">{skill.ownerName}</span>
         </DropdownMenuItem>
       ))}
