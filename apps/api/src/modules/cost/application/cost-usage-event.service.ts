@@ -16,6 +16,7 @@ import type {
 import { sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
+import type { AppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import { calculateUsageCost } from "../domain/cost-pricing";
 import { normalizeUsageTokens } from "../domain/usage-contract";
@@ -123,10 +124,10 @@ function toUsdMicros(value: number): number {
   return Math.round(value * 1_000_000);
 }
 
-export async function recordRuntimeUsageEvent(
-  database: D1Database,
+export function createRuntimeUsageEventUpsert(
+  database: AppDatabase,
   input: RecordRuntimeUsageEventInput,
-): Promise<void> {
+) {
   const rawInputTokens = toTokenCount(input.usage.inputTokens);
   const rawOutputTokens = toTokenCount(input.usage.outputTokens);
   const rawCacheReadTokens = toTokenCount(input.usage.cachedReadTokens);
@@ -140,7 +141,7 @@ export async function recordRuntimeUsageEvent(
     rawCacheCreationTokens === 0 &&
     providedCostUsd === null
   ) {
-    return;
+    return null;
   }
 
   const provider = input.run.provider;
@@ -168,7 +169,7 @@ export async function recordRuntimeUsageEvent(
     ? `${input.driverInstanceId}:${input.nativeCallId}`
     : `${input.driverInstanceId}:${input.run.sessionRunId}:${input.callKey}`;
 
-  await getAppDatabase(database)
+  return database
     .insert(usageEventsTable)
     .values({
       actorUserId: input.run.actorUserId,
@@ -211,6 +212,18 @@ export async function recordRuntimeUsageEvent(
         usageContract: sql`excluded.usage_contract`,
       },
       target: [usageEventsTable.source, usageEventsTable.sourceEventId],
-    })
-    .run();
+    });
+}
+
+export async function recordRuntimeUsageEvent(
+  database: D1Database,
+  input: RecordRuntimeUsageEventInput,
+): Promise<void> {
+  const query = createRuntimeUsageEventUpsert(getAppDatabase(database), input);
+
+  if (query === null) {
+    return;
+  }
+
+  await query.run();
 }
