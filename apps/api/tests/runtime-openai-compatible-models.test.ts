@@ -60,13 +60,38 @@ function createAvailableModelsDatabase(): D1Database {
       1,
       1
     );
+
+    INSERT INTO vendor_credential (
+      api_base,
+      api_key_secret_id,
+      created_at,
+      id,
+      is_default,
+      models,
+      name,
+      app_id,
+      updated_at,
+      vendor_id
+    )
+    VALUES (
+      'https://models.example.com/v1',
+      'secret-custom',
+      1,
+      'credential-custom',
+      true,
+      '["qwen-coder"]',
+      'Custom default',
+      '${APP_ID}',
+      1,
+      '${VENDOR_OPENAI_COMPATIBLE.vendorId}'
+    );
   `);
 
   return database;
 }
 
 describe("OpenAI-compatible runtime model support", () => {
-  test("marks current custom models as wrong-runtime for OpenAI app-server runtime", async () => {
+  test("makes current custom models available for OpenAI app-server runtime", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
       currentModelId: "qwen-coder",
       currentVendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
@@ -79,8 +104,10 @@ describe("OpenAI-compatible runtime model support", () => {
     );
 
     expect(currentCustomEntry).toMatchObject({
-      available: false,
-      reason: "wrong-runtime",
+      available: true,
+      source: "custom",
+      statusDetail: null,
+      statusLabel: "Available",
     });
   });
 

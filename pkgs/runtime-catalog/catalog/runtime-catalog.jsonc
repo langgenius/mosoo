@@ -464,7 +464,7 @@
       "label": "OpenAI Runtime",
       "visibility": "public",
       "transport": "openai-app-server",
-      "acceptsCustomProvider": false,
+      "acceptsCustomProvider": true,
       "capabilityProfile": "standard",
       "defaultIdentity": {
         "providerId": "openai",
