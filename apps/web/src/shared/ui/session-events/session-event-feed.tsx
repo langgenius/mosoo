@@ -15,7 +15,8 @@ import { EmptyFeedState } from "./empty-feed-state";
 import { TurnCard } from "./feed-turn-card";
 import { SessionTurnDrawer } from "./feed-turn-drawer";
 import { FilterEmptyState } from "./filter-empty-state";
-import { filterSessionTurnEvents, useSessionTurns } from "./turns";
+import { filterSessionTurnEvents, resolveSessionTurn, useSessionTurns } from "./turns";
+import type { SessionTurn } from "./turns";
 
 interface SessionEventFeedProps {
   events: SessionProcessEvent[];
@@ -23,7 +24,7 @@ interface SessionEventFeedProps {
 
 interface DrawerState {
   eventId: string | null;
-  turnId: string;
+  turn: SessionTurn;
 }
 
 export function SessionEventFeed({ events }: SessionEventFeedProps): ReactElement {
@@ -42,7 +43,7 @@ export function SessionEventFeed({ events }: SessionEventFeedProps): ReactElemen
   const [errorsOnly, setErrorsOnly] = useState(false);
   const [collapsedTurnIds, setCollapsedTurnIds] = useState<Set<string>>(() => new Set());
   const [drawerState, setDrawerState] = useState<DrawerState | null>(null);
-  const drawerTurn = turns.find((turn) => turn.id === drawerState?.turnId) ?? null;
+  const drawerTurn = resolveSessionTurn(turns, drawerState?.turn ?? null);
   const filteredTurns = useMemo(
     () =>
       turns.map((turn) => ({
@@ -126,7 +127,7 @@ export function SessionEventFeed({ events }: SessionEventFeedProps): ReactElemen
                 collapsed={collapsedTurnIds.has(turn.id) || filteredEvents.length === 0}
                 filteredEvents={filteredEvents}
                 onOpenDrawer={(eventId) => {
-                  setDrawerState({ eventId, turnId: turn.id });
+                  setDrawerState({ eventId, turn });
                 }}
                 onToggleCollapsed={() => {
                   toggleTurnCollapsed(turn.id);
