@@ -144,6 +144,7 @@ export const sessionGraphQLSpec = {
   ],
   queryFields: [
     "agentSessionDiagnostics(appId: ULID!, sessionId: ULID!): AgentSessionDiagnostics!",
+    "boundCapabilityRunProvenance(appId: ULID!, runId: ULID!): BoundCapabilityRunProvenance",
     "agentSessionRetrieve(appId: ULID!, sessionId: ULID!): AgentSessionRetrieve!",
     "session(appId: ULID!, sessionId: ULID!): Session!",
     "sessionMessages(appId: ULID!, sessionId: ULID!): [SessionMessage!]!",

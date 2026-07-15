@@ -140,6 +140,14 @@ async function startBoundAgentRun(input: {
       input: {
         accessViewer: input.ownerViewer,
         attachmentIds: [],
+        boundCapabilityProvenance: {
+          agentId: input.capability.agentId,
+          appId: input.capability.appId,
+          bindingEnv: input.capability.binding.env,
+          bindingName: input.capability.binding.name,
+          deploymentId: input.capability.deploymentId,
+          deploymentRunId: input.capability.deploymentRunId,
+        },
         clientRequestId: null,
         prompt: input.prompt,
         runCreationGuard: createDeploymentAgentCapabilityRunCreationGuard(input.capability),

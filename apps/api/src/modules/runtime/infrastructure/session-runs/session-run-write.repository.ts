@@ -22,6 +22,7 @@ import type { SQL } from "drizzle-orm";
 import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
 import { currentTimestampMs, toIsoString } from "../../../../time";
 import { toSessionLifecycleStatusForRunStatus } from "../../../sessions/domain/session-lifecycle";
+import type { BoundCapabilityRunProvenance } from "../../domain/bound-capability-run-provenance";
 import {
   ACTIVE_SESSION_RUN_STATUSES,
   decideSessionRunTransition,
@@ -274,6 +275,7 @@ export async function createSessionRunRecordIfSessionIdle(
   database: D1Database,
   input: {
     agentId: AgentId;
+    boundCapabilityProvenance?: BoundCapabilityRunProvenance;
     createdBy: AccountId;
     deploymentVersionId?: AgentDeploymentVersionId | null;
     deploymentVersionNumber?: number | null;
@@ -311,6 +313,12 @@ export async function createSessionRunRecordIfSessionIdle(
               trigger,
               status,
               agent_id,
+              bound_capability_agent_id,
+              bound_capability_app_id,
+              bound_capability_binding_env,
+              bound_capability_binding_name,
+              bound_capability_deployment_id,
+              bound_capability_deployment_run_id,
               deployment_version_id,
               deployment_version_number,
               runtime_id,
@@ -337,6 +345,12 @@ export async function createSessionRunRecordIfSessionIdle(
             ${input.trigger},
             ${input.status},
             ${input.agentId},
+            ${input.boundCapabilityProvenance?.agentId ?? null},
+            ${input.boundCapabilityProvenance?.appId ?? null},
+            ${input.boundCapabilityProvenance?.bindingEnv ?? null},
+            ${input.boundCapabilityProvenance?.bindingName ?? null},
+            ${input.boundCapabilityProvenance?.deploymentId ?? null},
+            ${input.boundCapabilityProvenance?.deploymentRunId ?? null},
             ${input.deploymentVersionId ?? null},
             ${input.deploymentVersionNumber ?? null},
             ${input.runtimeId ?? null},

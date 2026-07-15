@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 
 import { parsePlatformId } from "@mosoo/id";
 import type { AgentDeploymentVersionId, SessionId } from "@mosoo/id";
+import { graphql } from "graphql";
 
+import { createGraphQLSchema } from "../src/adapters/graphql/create-graphql-schema";
+import type { GraphQLContext } from "../src/adapters/graphql/graphql-context";
 import { createDeploymentAgentCapabilityRunCreationGuard } from "../src/modules/apps/application/app-deployment-capability-authority.service";
 import { getAccountViewer } from "../src/modules/auth/application/public-api-caller.service";
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
@@ -16,6 +19,7 @@ import {
   PUBLIC_API_TEST_IDS,
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
+  createTestExecutionContext,
   insertOwnerSession,
 } from "./helpers/public-api-http-test-fixture";
 import type { SqliteD1Database } from "./helpers/public-api-http-test-fixture";
@@ -122,6 +126,14 @@ function queueBoundRun(input: { bindings: ApiBindings; viewer: AuthenticatedView
     input: {
       accessViewer: input.viewer,
       attachmentIds: [],
+      boundCapabilityProvenance: {
+        agentId: CLAIMS.agentId,
+        appId: CLAIMS.appId,
+        bindingEnv: CLAIMS.binding.env,
+        bindingName: CLAIMS.binding.name,
+        deploymentId: CLAIMS.deploymentId,
+        deploymentRunId: CLAIMS.deploymentRunId,
+      },
       clientRequestId: null,
       prompt: "Race the deployment deletion.",
       runCreationGuard: createDeploymentAgentCapabilityRunCreationGuard(CLAIMS),
@@ -144,6 +156,24 @@ function queueBoundRun(input: { bindings: ApiBindings; viewer: AuthenticatedView
   });
 }
 
+function createBoundCapabilityAuditContext(
+  bindings: ApiBindings,
+  viewer: AuthenticatedViewer,
+): GraphQLContext {
+  const executionCtx = createTestExecutionContext();
+
+  return {
+    bindings,
+    executionContext: executionCtx,
+    request: new Request("https://api.example.com/api/graphql"),
+    serverContext: {
+      ...bindings,
+      executionCtx,
+    },
+    viewer,
+  };
+}
+
 describe("bound Agent Run revocation boundary", () => {
   test("creates a Run while the claimed deployment authority remains current", async () => {
     const database = await createPublicHttpContractDatabase();
@@ -161,9 +191,168 @@ describe("bound Agent Run revocation boundary", () => {
     });
 
     expect(result.run.status).toBe("queued");
+    const response = await graphql({
+      contextValue: createBoundCapabilityAuditContext(
+        createPublicHttpTestBindings(database) as ApiBindings,
+        viewer,
+      ),
+      schema: createGraphQLSchema(),
+      source: `
+        query BoundCapabilityRunAudit($appId: ULID!, $runId: ULID!) {
+          boundCapabilityRunProvenance(appId: $appId, runId: $runId) {
+            agentId
+            appId
+            bindingEnv
+            bindingName
+            deploymentId
+            deploymentRunId
+            runId
+          }
+        }
+      `,
+      variableValues: {
+        appId: CLAIMS.appId,
+        runId: result.run.id,
+      },
+    });
+
+    expect(response).toEqual({
+      data: {
+        boundCapabilityRunProvenance: {
+          agentId: CLAIMS.agentId,
+          appId: CLAIMS.appId,
+          bindingEnv: CLAIMS.binding.env,
+          bindingName: CLAIMS.binding.name,
+          deploymentId: CLAIMS.deploymentId,
+          deploymentRunId: CLAIMS.deploymentRunId,
+          runId: result.run.id,
+        },
+      },
+    });
+    await expect(
+      database
+        .prepare(
+          `SELECT
+            bound_capability_agent_id,
+            bound_capability_app_id,
+            bound_capability_binding_env,
+            bound_capability_binding_name,
+            bound_capability_deployment_id,
+            bound_capability_deployment_run_id
+          FROM session_run`,
+        )
+        .first(),
+    ).resolves.toEqual({
+      bound_capability_agent_id: CLAIMS.agentId,
+      bound_capability_app_id: CLAIMS.appId,
+      bound_capability_binding_env: CLAIMS.binding.env,
+      bound_capability_binding_name: CLAIMS.binding.name,
+      bound_capability_deployment_id: CLAIMS.deploymentId,
+      bound_capability_deployment_run_id: CLAIMS.deploymentRunId,
+    });
     await expect(
       database.prepare("SELECT COUNT(*) AS count FROM session_run").first<{ count: number }>(),
     ).resolves.toEqual({ count: 1 });
+  });
+
+  test("does not expose accepted Run provenance to a non-owner", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertOwnerSession(database);
+    await insertDeploymentAuthority(database);
+    const owner = await getAccountViewer(database, PUBLIC_API_TEST_IDS.ownerAccount);
+    const nonOwner = await getAccountViewer(database, PUBLIC_API_TEST_IDS.nonOwnerAccount);
+
+    if (owner === null || nonOwner === null) {
+      throw new Error("Test viewers are missing.");
+    }
+
+    const result = await queueBoundRun({
+      bindings: createPublicHttpTestBindings(database) as ApiBindings,
+      viewer: owner,
+    });
+
+    const response = await graphql({
+      contextValue: createBoundCapabilityAuditContext(
+        createPublicHttpTestBindings(database) as ApiBindings,
+        nonOwner,
+      ),
+      schema: createGraphQLSchema(),
+      source: `
+        query BoundCapabilityRunAudit($appId: ULID!, $runId: ULID!) {
+          boundCapabilityRunProvenance(appId: $appId, runId: $runId) {
+            runId
+          }
+        }
+      `,
+      variableValues: {
+        appId: CLAIMS.appId,
+        runId: result.run.id,
+      },
+    });
+
+    expect(response.data).toEqual({ boundCapabilityRunProvenance: null });
+    expect(response.errors?.[0]?.extensions.code).toBe("FORBIDDEN");
+  });
+
+  test("returns no provenance for an existing non-bound Run", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertOwnerSession(database);
+    const viewer = await getAccountViewer(database, PUBLIC_API_TEST_IDS.ownerAccount);
+
+    if (viewer === null) {
+      throw new Error("Owner test viewer is missing.");
+    }
+
+    const result = await queueSessionRun({
+      bindings: createPublicHttpTestBindings(database) as ApiBindings,
+      executionContext: null,
+      input: {
+        accessViewer: viewer,
+        attachmentIds: [],
+        clientRequestId: null,
+        prompt: "Read a Run created before capability provenance.",
+        session: {
+          agent_id: CLAIMS.agentId,
+          app_id: CLAIMS.appId,
+          deployment_version_id: parsePlatformId<AgentDeploymentVersionId>(
+            PUBLIC_API_TEST_IDS.deployment,
+            "fixture deployment version",
+          ),
+          deployment_version_number: 1,
+          id: parsePlatformId<SessionId>(PUBLIC_API_TEST_IDS.ownerSession, "fixture session"),
+          model: "gpt-5.4",
+          provider: "openai",
+          runtime_id: "openai-runtime",
+        },
+      },
+      requestUrl: "https://api.example.com/api/graphql",
+      viewer,
+    });
+
+    const response = await graphql({
+      contextValue: createBoundCapabilityAuditContext(
+        createPublicHttpTestBindings(database) as ApiBindings,
+        viewer,
+      ),
+      schema: createGraphQLSchema(),
+      source: `
+        query BoundCapabilityRunAudit($appId: ULID!, $runId: ULID!) {
+          boundCapabilityRunProvenance(appId: $appId, runId: $runId) {
+            runId
+          }
+        }
+      `,
+      variableValues: {
+        appId: CLAIMS.appId,
+        runId: result.run.id,
+      },
+    });
+
+    expect(response).toEqual({
+      data: {
+        boundCapabilityRunProvenance: null,
+      },
+    });
   });
 
   test("does not insert a Run when deletion commits after preflight authorization", async () => {

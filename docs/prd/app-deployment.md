@@ -19,6 +19,8 @@ The Builder who owns the App controls deployment. App Users only encounter the r
 
 Bound Agent URLs are signed bearer capabilities tied to one Deployment and its latest successful binding revision. Before a bound call starts an Agent Run, the API verifies that the Deployment is still active and that the revision still contains the named binding. The final Run insert repeats that D1 authority condition, so a deletion or successful revision replacement that commits during a request cannot create an owner-billed Run. Deleting the Deployment or successfully publishing a revision that removes a binding revokes its prior capability URL. A failed deployment leaves the previous successful revision authorized.
 
+When a bound capability is accepted, the Run records the App, Agent, Deployment, successful Deployment Run, and binding environment/name that delegated that authority. The record never contains the capability URL or signed token and is available only through owner-authorized audit access. It follows the `session_run` lifecycle and is removed with its Run; it has no separate retention store.
+
 ## Current Availability and Boundary
 
 The console flow, deployment processing, history, retry, and deletion are implemented. Repository evidence does not prove a successful real production deployment or recovery exercise, so the honest claim is **implemented**, not **production-proven**.
