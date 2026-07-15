@@ -201,7 +201,7 @@ describe("runtime catalog identity admission", () => {
     });
   });
 
-  test("rejects custom providers for OpenAI app-server runtime", () => {
+  test("admits custom providers for OpenAI runtime but not the disabled System Agent", () => {
     const systemAgentRuntime = RUNTIME_CATALOG.find(
       (runtime) => runtime.runtimeId === SYSTEM_AGENT_RUNTIME_ID,
     );
@@ -228,10 +228,13 @@ describe("runtime catalog identity admission", () => {
     );
 
     expect(systemAgentRuntime?.acceptsCustomProvider).toBe(false);
-    expect(openAiRuntime?.acceptsCustomProvider).toBe(false);
+    expect(openAiRuntime?.acceptsCustomProvider).toBe(true);
     expect(custom).toMatchObject({
-      code: "provider-unsupported",
-      ok: false,
+      model: null,
+      ok: true,
+      vendor: {
+        vendorId: VENDOR_OPENAI_COMPATIBLE.vendorId,
+      },
     });
     expect(systemAgentCustom).toMatchObject({
       code: "runtime-disabled",

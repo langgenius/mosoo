@@ -7,6 +7,8 @@ import {
 
 import type { VendorCredential } from "@/domains/vendor-credential/api/vendor-credential-client";
 
+const DEFAULT_CUSTOM_PROVIDER_RUNTIME_ID = "acp-fallback";
+
 export interface DefaultAgentRuntimeSelection {
   readonly model: string;
   readonly provider: string;
@@ -64,7 +66,10 @@ export function resolveDefaultAgentRuntime(
       credential.vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId &&
       (credential.models?.length ?? 0) > 0,
   );
-  const customRuntime = PUBLIC_RUNTIME_CATALOG.find((entry) => entry.acceptsCustomProvider);
+  const customRuntime = PUBLIC_RUNTIME_CATALOG.find(
+    (entry) =>
+      entry.runtimeId === DEFAULT_CUSTOM_PROVIDER_RUNTIME_ID && entry.acceptsCustomProvider,
+  );
   const customModel = customCredential?.models?.[0];
 
   if (customCredential !== undefined && customRuntime !== undefined && customModel !== undefined) {

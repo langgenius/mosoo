@@ -554,7 +554,7 @@ export const GENERATED_RUNTIME_CATALOG = [
     ],
   },
   {
-    acceptsCustomProvider: false,
+    acceptsCustomProvider: true,
     defaultIdentity: {
       modelId: "gpt-5.5",
       providerId: "openai",

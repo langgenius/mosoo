@@ -62,8 +62,8 @@ describe("provider runtime availability", () => {
       tone: "ready",
     });
     expect(openAiRow).toMatchObject({
-      status: "Needs key · Add OpenAI",
-      tone: "muted",
+      status: "Ready · Custom model configured",
+      tone: "ready",
     });
     expect(claudeRow).toMatchObject({
       status: "Needs key · Add Anthropic",

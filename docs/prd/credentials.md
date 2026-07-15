@@ -20,7 +20,7 @@ The App owner manages credentials. Agents in that same App may use them when the
 
 ## Current Availability and Boundaries
 
-Provider keys and remote MCP credentials are available now, including custom provider endpoints. A connection test is optional and does not make saving conditional on success.
+Provider keys and remote MCP credentials are available now, including custom provider endpoints. Custom OpenAI-compatible credentials can run through OpenCode, or through OpenAI Runtime when the endpoint implements the Responses API. A connection test is optional and does not make saving conditional on success.
 
 Credentials belong to one App and can be managed only by its owner. There is no organization-wide pool, personal key selection, caller-selected key, or cross-App inheritance.
 

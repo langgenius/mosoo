@@ -20,8 +20,10 @@ The App Owner configures runtime access while creating and editing an Agent. The
 ## Current availability
 
 - **Claude Agent SDK** runs Anthropic Claude models.
-- **OpenAI Runtime** runs OpenAI GPT models.
+- **OpenAI Runtime** runs OpenAI GPT models and custom OpenAI-compatible models that implement the Responses API.
 - **OpenCode** can use Anthropic, OpenAI, DeepSeek, Gemini, Qwen, Kimi, Zhipu, MiniMax, OpenCode Zen, and custom OpenAI-compatible models.
+
+Custom OpenAI-compatible models remain on OpenCode by default because some endpoints implement only Chat Completions. Builders can explicitly select OpenAI Runtime when the configured endpoint implements the Responses API.
 
 The Providers page currently offers those nine named providers plus the custom-model action. A saved key unlocks only models that the selected runtime can run.
 
