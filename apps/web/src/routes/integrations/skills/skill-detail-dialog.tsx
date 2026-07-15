@@ -2,6 +2,7 @@ import type { SkillDetail, SkillSummary } from "@mosoo/contracts/skill";
 import { useEffect, useMemo, useReducer } from "react";
 
 import { skillPackageUrl } from "@/domains/skill/api/skill-client";
+import { countSkillFiles } from "@/domains/skill/lib/skill-entries";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -11,6 +12,7 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 import { Separator } from "@/shared/ui/separator";
+import { SkillFileCountBadge } from "@/shared/ui/skill-file-count-badge";
 import { StaticMarkdown } from "@/shared/ui/static-markdown";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
@@ -131,6 +133,7 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
 
   const canManageSkill = true;
   const displaySkill = detail ?? skill;
+  const fileCount = detail === null ? skill.fileCount : countSkillFiles(detail.entries);
 
   return (
     <>
@@ -155,6 +158,12 @@ export function SkillDetailDialog({ onOpenChange, registry, skill }: Props) {
           <Separator />
 
           <div className="text-foreground min-h-0 flex-1 overflow-y-auto px-6 py-5 text-[13.5px] leading-relaxed">
+            <div className="mb-4 flex items-center gap-2">
+              <span className="border-border bg-muted/50 text-foreground inline-flex items-center rounded-md border px-2 py-1 font-mono text-[11px]">
+                SKILL.md
+              </span>
+              <SkillFileCountBadge count={fileCount} />
+            </div>
             {displaySkill.forkOrigin ? (
               <div className="bg-muted/50 text-muted-foreground mb-4 rounded-md px-2.5 py-1.5 text-[11px]">
                 Forked from{" "}
