@@ -38,6 +38,7 @@ export interface CreateAgentSessionOptions {
   accessViewer?: AuthenticatedViewer;
   attributedUserId?: string | AccountId | null | undefined;
   metadata?: AgentSessionMetadata | null | undefined;
+  sessionId?: SessionId | undefined;
 }
 
 export interface ChannelSessionTriggeredByMetadata {
@@ -307,7 +308,7 @@ export async function createAgentSession(
     source.agent.appId,
     executionPlan.environment.packagesJson,
   );
-  const sessionId = createPlatformId<SessionId>();
+  const sessionId = options.sessionId ?? createPlatformId<SessionId>();
   const timestampMs = currentTimestampMs();
   const sessionType = request.input.type ?? "preview";
 
