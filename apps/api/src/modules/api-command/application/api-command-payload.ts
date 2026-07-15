@@ -15,10 +15,15 @@ import type { DiscordWorkTrigger } from "../../channels/discord/discord-events";
 import type { LarkWorkTrigger } from "../../channels/lark/lark-events";
 import type { SlackWorkTrigger } from "../../channels/slack/slack-events";
 import type { TelegramWorkTrigger } from "../../channels/telegram/telegram-events";
+import type {
+  CostLedgerReconciliationCursor,
+  CostLedgerReconciliationMode,
+} from "../../cost/application/cost-ledger-reconciliation.service";
 
 type ApiCommandPayload =
   | AppDeploymentRunDispatchCommandPayload
   | ChannelWorkTriggerCommandPayload
+  | CostLedgerReconciliationCommandPayload
   | ScheduledMaintenanceCommandPayload
   | SessionRunDispatchCommandPayload;
 
@@ -53,6 +58,12 @@ export type ChannelWorkTriggerCommandPayload =
     };
 
 export interface ScheduledMaintenanceCommandPayload {
+  scheduledTime: number;
+}
+
+export interface CostLedgerReconciliationCommandPayload {
+  cursor: CostLedgerReconciliationCursor | null;
+  mode: CostLedgerReconciliationMode;
   scheduledTime: number;
 }
 
@@ -436,6 +447,35 @@ function parseScheduledMaintenancePayload(value: unknown): ScheduledMaintenanceC
   };
 }
 
+function parseCostLedgerReconciliationPayload(
+  value: unknown,
+): CostLedgerReconciliationCommandPayload {
+  const label = "cost_ledger_reconciliation payload";
+  const record = requireRecord(value, label);
+  const cursor = readOptionalString(record, "cursor", label);
+  const mode = readNonEmptyString(record, "mode", label);
+
+  if (mode !== "audit" && mode !== "repair") {
+    throw new ApiCommandPayloadError(`${label}.mode must be 'audit' or 'repair'.`);
+  }
+
+  if (cursor !== null && cursor.length === 0) {
+    throw new ApiCommandPayloadError(`${label}.cursor must not be empty.`);
+  }
+
+  const scheduledTime = readInteger(record, "scheduledTime", label);
+
+  if (scheduledTime < 0 || !Number.isFinite(new Date(scheduledTime).getTime())) {
+    throw new ApiCommandPayloadError(`${label}.scheduledTime must be a valid timestamp.`);
+  }
+
+  return {
+    cursor,
+    mode,
+    scheduledTime,
+  };
+}
+
 function parseAppDeploymentRunDispatchPayload(
   value: unknown,
 ): AppDeploymentRunDispatchCommandPayload {
@@ -469,6 +509,9 @@ export function parseApiCommandPayload(
     }
     case "channel_work_trigger": {
       return parseChannelWorkTriggerPayload(parsed);
+    }
+    case "cost_ledger_reconciliation": {
+      return parseCostLedgerReconciliationPayload(parsed);
     }
     case "scheduled_maintenance": {
       return parseScheduledMaintenancePayload(parsed);

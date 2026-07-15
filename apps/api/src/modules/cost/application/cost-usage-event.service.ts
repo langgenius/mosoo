@@ -124,23 +124,24 @@ function toUsdMicros(value: number): number {
   return Math.round(value * 1_000_000);
 }
 
-export function createRuntimeUsageEventUpsert(
-  database: AppDatabase,
-  input: RecordRuntimeUsageEventInput,
-) {
+export function hasRecordableRuntimeUsage(usage: SessionUsageSummary): boolean {
+  return (
+    toTokenCount(usage.inputTokens) > 0 ||
+    toTokenCount(usage.outputTokens) > 0 ||
+    toTokenCount(usage.cachedReadTokens) > 0 ||
+    toTokenCount(usage.cachedWriteTokens) > 0 ||
+    toProvidedUsdCost(usage) !== null
+  );
+}
+
+function createRuntimeUsageEventInsert(database: AppDatabase, input: RecordRuntimeUsageEventInput) {
   const rawInputTokens = toTokenCount(input.usage.inputTokens);
   const rawOutputTokens = toTokenCount(input.usage.outputTokens);
   const rawCacheReadTokens = toTokenCount(input.usage.cachedReadTokens);
   const rawCacheCreationTokens = toTokenCount(input.usage.cachedWriteTokens);
   const providedCostUsd = toProvidedUsdCost(input.usage);
 
-  if (
-    rawInputTokens === 0 &&
-    rawOutputTokens === 0 &&
-    rawCacheReadTokens === 0 &&
-    rawCacheCreationTokens === 0 &&
-    providedCostUsd === null
-  ) {
+  if (!hasRecordableRuntimeUsage(input.usage)) {
     return null;
   }
 
@@ -169,50 +170,75 @@ export function createRuntimeUsageEventUpsert(
     ? `${input.driverInstanceId}:${input.nativeCallId}`
     : `${input.driverInstanceId}:${input.run.sessionRunId}:${input.callKey}`;
 
-  return database
-    .insert(usageEventsTable)
-    .values({
-      actorUserId: input.run.actorUserId,
-      agentId: input.run.agentId,
-      agentOwnerUserId: input.run.agentOwnerUserId,
-      agentPublicationStateAtRun: resolvePublicationState(input.run),
-      agentRevisionId: input.run.agentRevisionId,
-      cacheCreationTokens: tokens.cacheCreationTokens,
-      cacheReadTokens: tokens.cacheReadTokens,
-      createdAt: input.run.createdAtMs,
-      id: createPlatformId(),
-      inputTokens: tokens.inputTokens,
-      model,
-      organizationId: input.run.organizationId,
-      appId: input.run.appId,
-      outputTokens: tokens.outputTokens,
-      priceSnapshotJson: cost.priceSnapshotJson,
-      pricingStatus: cost.pricingStatus,
-      provider,
-      runPurpose: resolveRunPurpose(input.run),
-      runtimeId: input.run.runtimeId,
-      sessionId: input.run.sessionId,
-      sessionRunId: input.run.sessionRunId,
-      source,
-      sourceEventId,
-      totalCostUsdMicros: toUsdMicros(cost.totalCostUsd),
-      usageContract,
-    })
-    .onConflictDoUpdate({
-      set: {
-        cacheCreationTokens: sql`excluded.cache_creation_tokens`,
-        cacheReadTokens: sql`excluded.cache_read_tokens`,
-        inputTokens: sql`excluded.input_tokens`,
-        model: sql`excluded.model`,
-        outputTokens: sql`excluded.output_tokens`,
-        priceSnapshotJson: sql`excluded.price_snapshot_json`,
-        pricingStatus: sql`excluded.pricing_status`,
-        provider: sql`excluded.provider`,
-        totalCostUsdMicros: sql`excluded.total_cost_usd_micros`,
-        usageContract: sql`excluded.usage_contract`,
-      },
-      target: [usageEventsTable.source, usageEventsTable.sourceEventId],
-    });
+  return database.insert(usageEventsTable).values({
+    actorUserId: input.run.actorUserId,
+    agentId: input.run.agentId,
+    agentOwnerUserId: input.run.agentOwnerUserId,
+    agentPublicationStateAtRun: resolvePublicationState(input.run),
+    agentRevisionId: input.run.agentRevisionId,
+    cacheCreationTokens: tokens.cacheCreationTokens,
+    cacheReadTokens: tokens.cacheReadTokens,
+    createdAt: input.run.createdAtMs,
+    id: createPlatformId(),
+    inputTokens: tokens.inputTokens,
+    model,
+    organizationId: input.run.organizationId,
+    appId: input.run.appId,
+    outputTokens: tokens.outputTokens,
+    priceSnapshotJson: cost.priceSnapshotJson,
+    pricingStatus: cost.pricingStatus,
+    provider,
+    runPurpose: resolveRunPurpose(input.run),
+    runtimeId: input.run.runtimeId,
+    sessionId: input.run.sessionId,
+    sessionRunId: input.run.sessionRunId,
+    source,
+    sourceEventId,
+    totalCostUsdMicros: toUsdMicros(cost.totalCostUsd),
+    usageContract,
+  });
+}
+
+export function createRuntimeUsageEventUpsert(
+  database: AppDatabase,
+  input: RecordRuntimeUsageEventInput,
+) {
+  const query = createRuntimeUsageEventInsert(database, input);
+
+  if (query === null) {
+    return null;
+  }
+
+  return query.onConflictDoUpdate({
+    set: {
+      cacheCreationTokens: sql`excluded.cache_creation_tokens`,
+      cacheReadTokens: sql`excluded.cache_read_tokens`,
+      inputTokens: sql`excluded.input_tokens`,
+      model: sql`excluded.model`,
+      outputTokens: sql`excluded.output_tokens`,
+      priceSnapshotJson: sql`excluded.price_snapshot_json`,
+      pricingStatus: sql`excluded.pricing_status`,
+      provider: sql`excluded.provider`,
+      totalCostUsdMicros: sql`excluded.total_cost_usd_micros`,
+      usageContract: sql`excluded.usage_contract`,
+    },
+    target: [usageEventsTable.source, usageEventsTable.sourceEventId],
+  });
+}
+
+export function createRuntimeUsageEventInsertIfMissing(
+  database: AppDatabase,
+  input: RecordRuntimeUsageEventInput,
+) {
+  const query = createRuntimeUsageEventInsert(database, input);
+
+  if (query === null) {
+    return null;
+  }
+
+  return query.onConflictDoNothing({
+    target: [usageEventsTable.source, usageEventsTable.sourceEventId],
+  });
 }
 
 export async function recordRuntimeUsageEvent(

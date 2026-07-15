@@ -42,6 +42,10 @@ interface OptionalRuntimeBindings {
   MOSOO_RUNTIME_NO_PROXY?: string;
 }
 
+interface OptionalCostLedgerReconciliationBindings {
+  MOSOO_COST_LEDGER_RECONCILIATION_MODE?: string;
+}
+
 export interface OptionalSlackAdapterBindings {
   MOSOO_AGENT_ID?: string;
   MOSOO_API_BASE_URL?: string;
@@ -77,6 +81,7 @@ export type ApiBindings = Env &
   OptionalSandboxBinding &
   OptionalDriverConnectionBinding &
   OptionalSessionBinding &
+  OptionalCostLedgerReconciliationBindings &
   OptionalLocalProviderFetchProxyBindings &
   OptionalRuntimeBindings &
   OptionalSlackAdapterBindings &
