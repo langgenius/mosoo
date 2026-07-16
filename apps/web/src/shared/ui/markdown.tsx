@@ -1,4 +1,6 @@
-import type { ReactElement } from "react";
+import { FileText } from "lucide-react";
+import { useMemo } from "react";
+import type { ComponentProps, ReactElement } from "react";
 import { Streamdown, defaultRehypePlugins } from "streamdown";
 import type { Components } from "streamdown";
 
@@ -7,28 +9,50 @@ import { cn } from "@/shared/lib/class-names";
 interface MarkdownProps {
   children: string;
   className?: string;
+  linkResolver?: MarkdownLinkResolver;
   streaming?: boolean;
 }
 
-const baseMarkdownComponents: Components = {
-  a: ({ children, className, href, rel, target, ...props }) => {
-    const shouldOpenInNewTab = typeof href === "string" && href.length > 0 && !href.startsWith("#");
+export interface MarkdownLinkResolution {
+  href: string;
+  label: string;
+  onOpen?: () => void;
+  unavailable?: boolean;
+}
 
-    return (
-      <a
-        {...props}
-        className={cn(
-          "underline decoration-current/40 underline-offset-3 transition-colors",
-          className,
-        )}
-        href={href}
-        rel={shouldOpenInNewTab ? (rel ?? "noopener noreferrer") : rel}
-        target={shouldOpenInNewTab ? (target ?? "_blank") : target}
-      >
-        {children}
-      </a>
-    );
-  },
+export type MarkdownLinkResolver = (href: string) => MarkdownLinkResolution | null;
+
+type MarkdownAnchorProps = ComponentProps<"a"> & { node?: unknown };
+
+function MarkdownAnchor({
+  children,
+  className,
+  href,
+  node: _node,
+  rel,
+  target,
+  ...props
+}: MarkdownAnchorProps): ReactElement {
+  const shouldOpenInNewTab = typeof href === "string" && href.length > 0 && !href.startsWith("#");
+
+  return (
+    <a
+      {...props}
+      className={cn(
+        "underline decoration-current/40 underline-offset-3 transition-colors",
+        className,
+      )}
+      href={href}
+      rel={shouldOpenInNewTab ? (rel ?? "noopener noreferrer") : rel}
+      target={shouldOpenInNewTab ? (target ?? "_blank") : target}
+    >
+      {children}
+    </a>
+  );
+}
+
+const baseMarkdownComponents: Components = {
+  a: MarkdownAnchor,
   blockquote: ({ className, ...props }) => (
     <blockquote
       className={cn("border-l-2 border-border pl-3 text-muted-foreground", className)}
@@ -122,19 +146,143 @@ function getRequiredRehypePlugin(name: "sanitize" | "harden"): RequiredRehypePlu
 
 const chatRehypePlugins = [getRequiredRehypePlugin("sanitize"), getRequiredRehypePlugin("harden")];
 const chatDisallowedElements = ["img"];
+const resolvedLinkPluginCache = new WeakMap<MarkdownLinkResolver, ResolvedLinkPlugin>();
+let resolvedLinkPluginSequence = 0;
 
-export function Markdown({ children, className, streaming = false }: MarkdownProps): ReactElement {
+interface MarkdownTreeNode {
+  children?: MarkdownTreeNode[];
+  properties?: Record<string, unknown>;
+  tagName?: string;
+  type: string;
+}
+
+interface ResolvedLinkPlugin {
+  cacheKey: string;
+  plugin: RequiredRehypePlugin;
+}
+
+function rewriteResolvedLinks(node: MarkdownTreeNode, linkResolver: MarkdownLinkResolver): void {
+  if (node.type === "element" && node.tagName === "a" && node.properties !== undefined) {
+    const href = node.properties["href"];
+
+    if (typeof href === "string") {
+      const resolution = linkResolver(href);
+
+      if (resolution !== null) {
+        node.properties["href"] = resolution.href;
+      }
+    }
+  }
+
+  for (const child of node.children ?? []) {
+    rewriteResolvedLinks(child, linkResolver);
+  }
+}
+
+function createResolvedLinkPlugin(linkResolver: MarkdownLinkResolver): ResolvedLinkPlugin {
+  const cached = resolvedLinkPluginCache.get(linkResolver);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const plugin = () => (tree: MarkdownTreeNode) => {
+    rewriteResolvedLinks(tree, linkResolver);
+  };
+  const pluginName = `resolveMarkdownLinks$${resolvedLinkPluginSequence}`;
+
+  resolvedLinkPluginSequence += 1;
+  Object.defineProperty(plugin, "name", { value: pluginName });
+
+  const resolvedLinkPlugin = {
+    cacheKey: pluginName,
+    plugin: plugin as RequiredRehypePlugin,
+  };
+
+  resolvedLinkPluginCache.set(linkResolver, resolvedLinkPlugin);
+  return resolvedLinkPlugin;
+}
+
+function createMarkdownComponents(linkResolver: MarkdownLinkResolver | undefined): Components {
+  if (linkResolver === undefined) {
+    return chatMarkdownComponents;
+  }
+
+  return {
+    ...chatMarkdownComponents,
+    a: ({ children, className, href, node: _node, ...props }) => {
+      const resolution = typeof href === "string" ? linkResolver(href) : null;
+
+      if (resolution?.unavailable === true) {
+        return (
+          <span className={cn("text-fg-3", className)} title={resolution.label}>
+            {children}
+            <span className="text-[0.9em]"> (file unavailable)</span>
+          </span>
+        );
+      }
+
+      if (resolution?.onOpen !== undefined) {
+        return (
+          <button
+            aria-label={resolution.label}
+            className={cn(
+              "inline-flex cursor-pointer items-baseline gap-1 underline decoration-current/40 underline-offset-3 transition-colors hover:text-current/80",
+              className,
+            )}
+            onClick={resolution.onOpen}
+            type="button"
+          >
+            <FileText aria-hidden className="size-3.5 shrink-0 translate-y-[2px]" />
+            <span>{children}</span>
+          </button>
+        );
+      }
+
+      return (
+        <MarkdownAnchor className={className} href={href} {...props}>
+          {children}
+        </MarkdownAnchor>
+      );
+    },
+  };
+}
+
+export function Markdown({
+  children,
+  className,
+  linkResolver,
+  streaming = false,
+}: MarkdownProps): ReactElement {
+  const components = useMemo(() => createMarkdownComponents(linkResolver), [linkResolver]);
+  const resolvedLinkPlugin = useMemo(
+    () => (linkResolver === undefined ? null : createResolvedLinkPlugin(linkResolver)),
+    [linkResolver],
+  );
+  const rehypePlugins = useMemo(
+    () =>
+      resolvedLinkPlugin === null
+        ? chatRehypePlugins
+        : [
+            getRequiredRehypePlugin("sanitize"),
+            resolvedLinkPlugin.plugin,
+            getRequiredRehypePlugin("harden"),
+          ],
+    [resolvedLinkPlugin],
+  );
+
   return (
     <Streamdown
+      key={resolvedLinkPlugin?.cacheKey ?? "default"}
       className={cn(markdownClassName, className)}
-      components={chatMarkdownComponents}
+      components={components}
       controls={false}
       disallowedElements={chatDisallowedElements}
       dir="auto"
       isAnimating={streaming}
       lineNumbers={false}
       mode={streaming ? "streaming" : "static"}
-      rehypePlugins={chatRehypePlugins}
+      rehypePlugins={rehypePlugins}
     >
       {children}
     </Streamdown>

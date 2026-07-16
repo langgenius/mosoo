@@ -447,6 +447,7 @@ export interface FileRecord {
   purpose: FilePurpose;
   scope: FileScope;
   sessionKind: FileSessionKind | null;
+  sourcePath: string | null;
   size: number;
   status: FileStatus;
   updatedAt: string;

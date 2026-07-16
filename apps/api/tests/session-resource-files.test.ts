@@ -591,7 +591,7 @@ describe("session resource files", () => {
       body: new TextEncoder().encode("runtime summary"),
       contentType: "text/markdown",
       createdBy: PUBLIC_API_TEST_IDS.ownerAccount,
-      path: "summary.md",
+      path: "outputs/reports/summary.md",
       sessionId: PUBLIC_API_TEST_IDS.ownerSession,
     });
 
@@ -605,6 +605,7 @@ describe("session resource files", () => {
       kind: "session",
     });
     expect(file.sessionKind).toBe("artifact");
+    expect(file.sourcePath).toBe("outputs/reports/summary.md");
 
     const resources = await listSessionResources(database, ownerViewer, {
       appId: PUBLIC_API_TEST_IDS.app,
