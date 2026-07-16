@@ -127,7 +127,7 @@ function createAvailableModelsDatabase(): SqliteD1Database {
 }
 
 describe("available models", () => {
-  test("keeps custom models visible but unavailable for OpenAI runtime", async () => {
+  test("makes custom models available for OpenAI runtime", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
       appId: APP_ID,
       runtimeId: "openai-runtime",
@@ -141,11 +141,10 @@ describe("available models", () => {
         (entry) => entry.vendorId === "openai-compatible" && entry.modelId === "qwen-coder",
       ),
     ).toMatchObject({
-      available: false,
-      reason: "wrong-runtime",
+      available: true,
       source: "custom",
-      statusDetail: "Custom · Custom default is not available for OpenAI Runtime.",
-      statusLabel: "Not available",
+      statusDetail: null,
+      statusLabel: "Available",
     });
     expect(entries.find((entry) => entry.vendorId === "anthropic")).toMatchObject({
       available: false,
@@ -288,7 +287,7 @@ describe("available models", () => {
     });
   });
 
-  test("apps missing current custom models through runtime availability", async () => {
+  test("marks a missing current custom model as needing a key for OpenAI runtime", async () => {
     const entries = await resolveAvailableModels(createAvailableModelsDatabase(), {
       currentModelId: "removed-custom-model",
       currentVendorId: "openai-compatible",
@@ -303,10 +302,10 @@ describe("available models", () => {
       ),
     ).toMatchObject({
       available: false,
-      reason: "wrong-runtime",
+      reason: "needs-key",
       source: "custom",
-      statusDetail: "Custom Provider is not available for OpenAI Runtime.",
-      statusLabel: "Not available",
+      statusDetail: "Configure a Provider key for Custom Provider.",
+      statusLabel: "Provider key required",
     });
   });
 });

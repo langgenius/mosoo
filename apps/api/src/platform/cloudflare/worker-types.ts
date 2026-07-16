@@ -34,11 +34,16 @@ interface OptionalLocalProviderFetchProxyBindings {
   MOSOO_PROVIDER_FETCH_PROXY_URL?: string;
 }
 
-interface OptionalRuntimeProxyBindings {
+interface OptionalRuntimeBindings {
+  MOSOO_RUNTIME_CONTROL_ORIGIN?: string;
   MOSOO_RUNTIME_ALL_PROXY?: string;
   MOSOO_RUNTIME_HTTP_PROXY?: string;
   MOSOO_RUNTIME_HTTPS_PROXY?: string;
   MOSOO_RUNTIME_NO_PROXY?: string;
+}
+
+interface OptionalCostLedgerReconciliationBindings {
+  MOSOO_COST_LEDGER_RECONCILIATION_MODE?: string;
 }
 
 export interface OptionalSlackAdapterBindings {
@@ -76,8 +81,9 @@ export type ApiBindings = Env &
   OptionalSandboxBinding &
   OptionalDriverConnectionBinding &
   OptionalSessionBinding &
+  OptionalCostLedgerReconciliationBindings &
   OptionalLocalProviderFetchProxyBindings &
-  OptionalRuntimeProxyBindings &
+  OptionalRuntimeBindings &
   OptionalSlackAdapterBindings &
   OptionalWeChatIlinkBindings &
   OptionalLarkSidecarBindings &

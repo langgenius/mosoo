@@ -18,8 +18,9 @@ import {
   boundAgentNeedsInput,
   boundAgentRunFailed,
 } from "./app-agent-bound-errors";
-import { verifyAppAgentCapabilityToken } from "./app-agent-capability";
+import { inspectAppAgentCapabilityToken } from "./app-agent-capability";
 import type { AppAgentCapabilityClaims } from "./app-agent-capability";
+import type { AppAgentCapabilityTokenVerification } from "./app-agent-capability";
 import {
   publicAgentNotExposed,
   publicInvalidRequest,
@@ -29,6 +30,8 @@ import {
 export interface BoundAgentCallInput {
   message: string;
 }
+
+export type BoundAgentServabilityFailure = "agent_mismatched" | "agent_unpublished";
 
 function readBoundAgentMessage(value: unknown): string {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -76,13 +79,21 @@ export async function verifyBoundAgentCapability(
   token: string,
   nowMs: number,
 ): Promise<AppAgentCapabilityClaims> {
-  const claims = await verifyAppAgentCapabilityToken(secret, token, nowMs);
+  const verification = await inspectBoundAgentCapability(secret, token, nowMs);
 
-  if (claims === null) {
+  if (verification.status !== "valid") {
     throw publicUnauthenticated("The capability URL is invalid or has expired.");
   }
 
-  return claims;
+  return verification.claims;
+}
+
+export async function inspectBoundAgentCapability(
+  secret: string,
+  token: string,
+  nowMs: number,
+): Promise<AppAgentCapabilityTokenVerification> {
+  return inspectAppAgentCapabilityToken(secret, token, nowMs);
 }
 
 /**
@@ -90,13 +101,23 @@ export async function verifyBoundAgentCapability(
  * published (the same criterion the deploy-time resolver used) and that it
  * belongs to the App the capability was minted for.
  */
-export function ensureBoundAgentServable(agent: AgentRow, claims: AppAgentCapabilityClaims): void {
-  const servable =
-    agent.appId === claims.appId &&
-    agent.status === "published" &&
-    agent.liveDeploymentVersionId !== null;
+export function getBoundAgentServabilityFailure(
+  agent: AgentRow,
+  claims: AppAgentCapabilityClaims,
+): BoundAgentServabilityFailure | null {
+  if (agent.appId !== claims.appId || agent.name !== claims.binding.name) {
+    return "agent_mismatched";
+  }
 
-  if (!servable) {
+  if (agent.status !== "published" || agent.liveDeploymentVersionId === null) {
+    return "agent_unpublished";
+  }
+
+  return null;
+}
+
+export function ensureBoundAgentServable(agent: AgentRow, claims: AppAgentCapabilityClaims): void {
+  if (getBoundAgentServabilityFailure(agent, claims) !== null) {
     throw publicAgentNotExposed("This Agent is no longer published for bound calls.");
   }
 }

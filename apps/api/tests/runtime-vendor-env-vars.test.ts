@@ -16,6 +16,25 @@ import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
 import { buildRuntimeVendorEnvVars } from "../src/modules/runtime/application/session-definition/hydrate-run-context.service";
 
 describe("runtime vendor env vars", () => {
+  test("injects a custom Responses provider for OpenAI runtime", () => {
+    const envVars = buildRuntimeVendorEnvVars({
+      credential: {
+        apiBase: "https://gateway.example.com/v1",
+        apiKey: "sk-custom-responses",
+        credentialId: "01J000000000000000000000C9",
+        models: ["gpt-custom"],
+      },
+      model: "gpt-custom",
+      runtimeId: "openai-runtime",
+      vendor: VENDOR_OPENAI_COMPATIBLE,
+    });
+
+    expect(envVars).toEqual({
+      OPENAI_COMPATIBLE_API_KEY: "sk-custom-responses",
+      OPENAI_COMPATIBLE_BASE_URL: "https://gateway.example.com/v1",
+    });
+  });
+
   test("fails closed before injecting credentials for unsafe stored API bases", () => {
     expect(() =>
       buildRuntimeVendorEnvVars({

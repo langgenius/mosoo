@@ -1,3 +1,4 @@
+import { isNoRuntimeEventsRecordedEventId } from "@mosoo/contracts/session";
 import type {
   SessionProcessEvent,
   SessionProcessEventStatus,
@@ -258,5 +259,5 @@ export function summarizeSessionEvent(event: SessionProcessEvent): string {
 }
 
 export function isSyntheticNoRuntimeEventsEvent(event: SessionProcessEvent): boolean {
-  return event.id.endsWith(":process-events:not-recorded");
+  return isNoRuntimeEventsRecordedEventId(event.id);
 }

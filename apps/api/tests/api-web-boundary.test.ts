@@ -151,6 +151,22 @@ describe("API to web boundary", () => {
     expect(fields.ownerCostCard).toBeUndefined();
   });
 
+  test("keeps bound capability Run provenance behind an App-scoped audit query", () => {
+    const schema = createGraphQLSchema();
+    const query = schema.getQueryType();
+
+    if (!query) {
+      throw new Error("Expected Query in the GraphQL schema.");
+    }
+
+    const provenance = query.getFields().boundCapabilityRunProvenance;
+
+    expect(provenance).toBeDefined();
+    expect(String(provenance?.type)).toBe("BoundCapabilityRunProvenance");
+    expect(String(provenance?.args.find((arg) => arg.name === "appId")?.type)).toBe("ULID!");
+    expect(String(provenance?.args.find((arg) => arg.name === "runId")?.type)).toBe("ULID!");
+  });
+
   test("keeps Channel GraphQL setup App-scoped with Agent-owned delivery", () => {
     const schema = createGraphQLSchema();
 

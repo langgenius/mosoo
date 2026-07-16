@@ -1230,9 +1230,9 @@ export type SessionProcessEventsQueryVariables = Exact<{
 
 export type SessionProcessEventsQuery = { threadSessionProcessEvents: Array<{ content: string, durationMs: number | null, id: PlatformId, occurredAt: string, status: SessionProcessEventStatus, tokens: number | null, type: SessionProcessEventType }> };
 
-export type SkillSummaryFieldsFragment = { author: string, createdAt: string, description: string, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null };
+export type SkillSummaryFieldsFragment = { author: string, createdAt: string, description: string, fileCount: number, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null };
 
-export type SkillDetailFieldsFragment = { author: string, createdAt: string, description: string, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null, currentSnapshot: { archiveFormat: string, author: string, blobKey: string, blobSha256: string, blobSize: number, compression: string, createdAt: string, description: string, id: PlatformId, name: string, skillMarkdownPath: string, uncompressedSize: number, version: string | null }, entries: Array<{ entryKind: SkillSnapshotEntryKind, isExecutable: boolean, mimeType: string | null, path: string, sha256: string | null, size: number }> };
+export type SkillDetailFieldsFragment = { author: string, createdAt: string, description: string, fileCount: number, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null, currentSnapshot: { archiveFormat: string, author: string, blobKey: string, blobSha256: string, blobSize: number, compression: string, createdAt: string, description: string, id: PlatformId, name: string, skillMarkdownPath: string, uncompressedSize: number, version: string | null }, entries: Array<{ entryKind: SkillSnapshotEntryKind, isExecutable: boolean, mimeType: string | null, path: string, sha256: string | null, size: number }> };
 
 export type SkillDetailQueryVariables = Exact<{
   appId: PlatformId;
@@ -1240,21 +1240,21 @@ export type SkillDetailQueryVariables = Exact<{
 }>;
 
 
-export type SkillDetailQuery = { skillDetail: { author: string, createdAt: string, description: string, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null, currentSnapshot: { archiveFormat: string, author: string, blobKey: string, blobSha256: string, blobSize: number, compression: string, createdAt: string, description: string, id: PlatformId, name: string, skillMarkdownPath: string, uncompressedSize: number, version: string | null }, entries: Array<{ entryKind: SkillSnapshotEntryKind, isExecutable: boolean, mimeType: string | null, path: string, sha256: string | null, size: number }> } };
+export type SkillDetailQuery = { skillDetail: { author: string, createdAt: string, description: string, fileCount: number, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null, currentSnapshot: { archiveFormat: string, author: string, blobKey: string, blobSha256: string, blobSize: number, compression: string, createdAt: string, description: string, id: PlatformId, name: string, skillMarkdownPath: string, uncompressedSize: number, version: string | null }, entries: Array<{ entryKind: SkillSnapshotEntryKind, isExecutable: boolean, mimeType: string | null, path: string, sha256: string | null, size: number }> } };
 
 export type AppSkillsQueryVariables = Exact<{
   appId: PlatformId;
 }>;
 
 
-export type AppSkillsQuery = { appSkillList: Array<{ author: string, createdAt: string, description: string, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null }> };
+export type AppSkillsQuery = { appSkillList: Array<{ author: string, createdAt: string, description: string, fileCount: number, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null }> };
 
 export type CreateSkillForkMutationVariables = Exact<{
   input: CreateSkillForkInput;
 }>;
 
 
-export type CreateSkillForkMutation = { createSkillFork: { author: string, createdAt: string, description: string, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null } };
+export type CreateSkillForkMutation = { createSkillFork: { author: string, createdAt: string, description: string, fileCount: number, id: PlatformId, name: string, ownerId: PlatformId, ownerName: string, appId: PlatformId, snapshotId: PlatformId, sourceKind: SkillSourceKind, updatedAt: string, forkOrigin: { name: string, ownerName: string, skillId: PlatformId } | null } };
 
 export type DeleteOwnedSkillMutationVariables = Exact<{
   appId: PlatformId;
@@ -1819,6 +1819,7 @@ export const SkillSummaryFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentStri
   author
   createdAt
   description
+  fileCount
   forkOrigin {
     name
     ownerName
@@ -1839,6 +1840,7 @@ export const SkillDetailFieldsFragmentDoc = /*#__PURE__*/ new TypedDocumentStrin
   author
   createdAt
   description
+  fileCount
   forkOrigin {
     name
     ownerName
@@ -3903,6 +3905,7 @@ export const SkillDetailDocument = /*#__PURE__*/ new TypedDocumentString(`
   author
   createdAt
   description
+  fileCount
   forkOrigin {
     name
     ownerName
@@ -3950,6 +3953,7 @@ export const AppSkillsDocument = /*#__PURE__*/ new TypedDocumentString(`
   author
   createdAt
   description
+  fileCount
   forkOrigin {
     name
     ownerName
@@ -3974,6 +3978,7 @@ export const CreateSkillForkDocument = /*#__PURE__*/ new TypedDocumentString(`
   author
   createdAt
   description
+  fileCount
   forkOrigin {
     name
     ownerName

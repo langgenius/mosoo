@@ -9,6 +9,7 @@ export interface AgentSkillsFieldModel {
   availablePersonalSkills: SkillSummary[];
   availableSharedSkills: SkillSummary[];
   availableSkills: SkillSummary[];
+  fileCountBySkillId: ReadonlyMap<string, number>;
   handleAddSkill(skill: SkillSummary): void;
   handleRemoveSkill(skillId: string): void;
   previewContent: string;
@@ -48,6 +49,10 @@ export function useAgentSkillsFieldModel({
     () => new Set(selectedSkills.map((skill) => skill.id)),
     [selectedSkills],
   );
+  const fileCountBySkillId = useMemo(
+    () => new Map((skillsQuery.data ?? []).map((skill) => [skill.id as string, skill.fileCount])),
+    [skillsQuery.data],
+  );
   const availableSkills = (skillsQuery.data ?? []).filter((skill) => !selectedIds.has(skill.id));
   const availablePersonalSkills = availableSkills;
   const availableSharedSkills: SkillSummary[] = [];
@@ -64,6 +69,7 @@ export function useAgentSkillsFieldModel({
     availablePersonalSkills,
     availableSharedSkills,
     availableSkills,
+    fileCountBySkillId,
     handleAddSkill,
     handleRemoveSkill,
     previewContent:
