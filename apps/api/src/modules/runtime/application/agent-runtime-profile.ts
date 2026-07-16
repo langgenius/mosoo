@@ -5,6 +5,7 @@ import { getSessionOrganizationPath, getSessionRuntimeStatePath } from "agent-dr
 
 import type {
   DriverConfigRevision,
+  DriverEnvironmentArtifactProfile,
   DriverPermissionPolicy,
   DriverProfileConfig,
 } from "../domain/driver-snapshot";
@@ -18,6 +19,7 @@ export function createAgentRuntimeProfile(input: {
   configRevision: DriverConfigRevision;
   entrypoint?: "api" | "chat";
   envVars: Record<string, string>;
+  environmentArtifact?: DriverEnvironmentArtifactProfile | null;
   executionOwnerUserId: AccountId;
   kind: AgentKind;
   model: string;
@@ -45,6 +47,7 @@ export function createAgentRuntimeProfile(input: {
     configRevision: input.configRevision,
     envVarNames: Object.keys(input.envVars),
     envVars: input.envVars,
+    environmentArtifact: input.environmentArtifact ?? null,
     kind: input.kind,
     model: input.model,
     permissionPolicy: input.permissionPolicy ?? DEFAULT_DRIVER_PERMISSION_POLICY,

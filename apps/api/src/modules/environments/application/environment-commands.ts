@@ -28,6 +28,7 @@ import {
   toConfig,
   toEnvironmentSummary,
 } from "./environment-config-mapping";
+import { resolveEnvironmentPackageArtifact } from "./environment-package-artifact.service";
 import { getEnvironmentDetail } from "./environment-queries";
 import type { EnvironmentMutableConfig } from "./environment-types";
 import { createEnvironmentFromConfig, createRevision } from "./environment-write.service";
@@ -44,10 +45,12 @@ export async function createEnvironment(
   const environmentId = createPlatformId<EnvironmentId>();
   const normalized = normalizeConfigForCreate(input);
   const timestampMs = currentTimestampMs();
-  const envVars = await buildStoredEnvVars(bindings, {
-    envVars: input.envVars,
-    environmentId,
-  });
+  const [envVars] = await Promise.all([
+    buildStoredEnvVars(bindings, { envVars: input.envVars, environmentId }),
+    resolveEnvironmentPackageArtifact(bindings, app.id, normalized.packages, {
+      retryFailed: true,
+    }),
+  ]);
   const config: EnvironmentMutableConfig = {
     ...normalized,
     envVars,
@@ -86,11 +89,16 @@ export async function updateEnvironment(
   const metadata = normalizeEnvironmentMetadata(input);
   const normalized = normalizeConfigForCreate(input);
   const timestampMs = currentTimestampMs();
-  const envVars = await buildStoredEnvVars(bindings, {
-    envVars: input.envVars,
-    environmentId: access.row.id,
-    previousEnvVars: beforeConfig.envVars,
-  });
+  const [envVars] = await Promise.all([
+    buildStoredEnvVars(bindings, {
+      envVars: input.envVars,
+      environmentId: access.row.id,
+      previousEnvVars: beforeConfig.envVars,
+    }),
+    resolveEnvironmentPackageArtifact(bindings, access.row.appId, normalized.packages, {
+      retryFailed: true,
+    }),
+  ]);
   const config: EnvironmentMutableConfig = {
     ...normalized,
     envVars,

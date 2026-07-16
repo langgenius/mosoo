@@ -79,6 +79,7 @@ export interface DriverProfileConfig {
   readonly configRevision: DriverConfigRevision;
   readonly envVarNames: string[];
   readonly envVars: Record<string, string>;
+  readonly environmentArtifact?: DriverEnvironmentArtifactProfile | null;
   readonly kind: AgentKind;
   readonly model: string;
   readonly permissionPolicy: DriverPermissionPolicy;
@@ -91,6 +92,16 @@ export interface DriverProfileConfig {
   readonly session: DriverSessionContext;
   readonly setupScript: string;
   readonly sourceKind: "agent";
+}
+
+export interface DriverEnvironmentArtifactProfile {
+  readonly backupDir: string;
+  readonly backupId: string;
+  readonly paths: {
+    readonly executable: string[];
+    readonly node: string[];
+    readonly python: string[];
+  };
 }
 
 export interface DriverSkillCatalogFrontmatterSummary {
@@ -158,6 +169,7 @@ export type DriverBootMcpServer =
   | UnavailableDriverResolvedMcpServer;
 
 export interface DriverExecutionEnvironment {
+  readonly paths: DriverEnvironmentArtifactProfile["paths"];
   readonly variables: Record<string, string>;
 }
 

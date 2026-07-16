@@ -3,6 +3,7 @@ import {
   hasRequiredText,
   isRecord,
   readBuiltInToolConfig,
+  readEnvironmentPackageSpec,
   readAgentKind,
   readBooleanOrDefault,
   readNullableString,
@@ -117,6 +118,7 @@ function readPackageEnvironment(value: unknown): AgentManifest["environment"] {
       environmentId: null,
       envVars: {},
       expectedName: null,
+      packages: [],
       setupScript: "",
     };
   }
@@ -134,6 +136,7 @@ function readPackageEnvironment(value: unknown): AgentManifest["environment"] {
     environmentId: null,
     envVars,
     expectedName: readNullableString(value, "expectedName"),
+    packages: readParsedArray(value, "packages", readEnvironmentPackageSpec),
     setupScript: readString(value, "setupScript") ?? "",
   };
 }

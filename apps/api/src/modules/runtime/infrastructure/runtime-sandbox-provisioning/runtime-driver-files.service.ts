@@ -177,10 +177,22 @@ export async function runSetupScript(
     return;
   }
 
+  const artifactPaths = profile.environmentArtifact?.paths;
+  const pathEntries: readonly (readonly [string, readonly string[]])[] = [
+    ["PATH", artifactPaths?.executable ?? []],
+    ["PYTHONPATH", artifactPaths?.python ?? []],
+    ["NODE_PATH", artifactPaths?.node ?? []],
+  ];
+  const pathExports = pathEntries
+    .filter(([, paths]) => paths.length > 0)
+    .map(([name, paths]) =>
+      [`export ${name}=${quoteShellArg(paths.join(":"))}`, "${", name, ":+:$", name, "}"].join(""),
+    );
+  const setupScript = [...pathExports, profile.setupScript].join("\n");
   const organizationPath = getOrganizationPath(profile);
   const setupScriptPath = `${SANDBOX_CACHE_PATH}/setup/runtime-setup-${profile.session.sandboxSessionId}.sh`;
   const setupMarkerPath = `${SANDBOX_CACHE_PATH}/setup/runtime-setup-${profile.session.sandboxSessionId}.json`;
-  const setupDigest = await sha256(profile.setupScript);
+  const setupDigest = await sha256(setupScript);
   const marker = await readJsonFile(session, setupMarkerPath, parseSetupScriptMarker);
 
   if (marker?.digest === setupDigest) {
@@ -188,7 +200,7 @@ export async function runSetupScript(
   }
 
   await session.mkdir(getParentDirectory(setupScriptPath), { recursive: true });
-  await session.writeFile(setupScriptPath, profile.setupScript);
+  await session.writeFile(setupScriptPath, setupScript);
 
   const process = await session.startProcess(`sh -e ${quoteShellArg(setupScriptPath)}`, {
     autoCleanup: true,

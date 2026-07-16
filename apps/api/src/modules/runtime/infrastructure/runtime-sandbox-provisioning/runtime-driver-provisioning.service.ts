@@ -215,6 +215,7 @@ async function provisionDriver(
       environmentRevisionId,
       profile: input.profile,
       runtimeBase,
+      sandbox: input.sandbox,
       sessionId: input.sandboxSessionId,
       state: environmentInstall,
       timing,

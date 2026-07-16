@@ -19,6 +19,7 @@ APP_NAME = "mosoo"
 WEB_ORIGIN = "http://localhost:5173"
 AUTH_EMAIL_FROM = "Mosoo AUTH <auth@mosoo.ai>"
 FILE_BUCKET_NAME = "mosoo-file"
+BACKUP_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_STATE_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_FILE_BUCKET_LOCAL = "true"
 MOSOO_APP_DEPLOYMENT_DOMAIN = "apps.localhost"
@@ -68,6 +69,10 @@ binding = "FILE_BUCKET"
 bucket_name = "mosoo-file"
 
 [[r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "mosoo-sandbox-state"
+
+[[r2_buckets]]
 binding = "SANDBOX_STATE_BUCKET"
 bucket_name = "mosoo-sandbox-state"
 
@@ -80,6 +85,10 @@ migrations_dir = "../../pkgs/db/drizzle"
 [[queues.producers]]
 binding = "API_COMMAND_QUEUE"
 queue = "api-command"
+
+[[queues.producers]]
+binding = "ENVIRONMENT_ARTIFACT_BUILD_QUEUE"
+queue = "environment-artifact-build"
 
 [[queues.producers]]
 binding = "CHANNEL_FINAL_DELIVERY_QUEUE"
@@ -97,6 +106,14 @@ queue = "api-command-dlq"
 max_batch_size = 10
 max_batch_timeout = 5
 max_retries = 1
+
+[[queues.consumers]]
+queue = "environment-artifact-build"
+max_batch_size = 1
+max_batch_timeout = 1
+max_retries = 5
+max_concurrency = 5
+dead_letter_queue = "api-command-dlq"
 
 [[queues.consumers]]
 queue = "channel-final-delivery"
@@ -128,6 +145,7 @@ APP_NAME = "mosoo"
 WEB_ORIGIN = "https://try.mosoo.ai"
 AUTH_EMAIL_FROM = "Mosoo AUTH <auth@mosoo.ai>"
 FILE_BUCKET_NAME = "mosoo-file"
+BACKUP_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_STATE_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_FILE_BUCKET_LOCAL = "false"
 MOSOO_APP_DEPLOYMENT_DOMAIN = "apps.mosoo.ai"
@@ -180,6 +198,10 @@ binding = "FILE_BUCKET"
 bucket_name = "mosoo-file"
 
 [[env.prod.r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "mosoo-sandbox-state"
+
+[[env.prod.r2_buckets]]
 binding = "SANDBOX_STATE_BUCKET"
 bucket_name = "mosoo-sandbox-state"
 
@@ -192,6 +214,10 @@ migrations_dir = "../../pkgs/db/drizzle"
 [[env.prod.queues.producers]]
 binding = "API_COMMAND_QUEUE"
 queue = "api-command"
+
+[[env.prod.queues.producers]]
+binding = "ENVIRONMENT_ARTIFACT_BUILD_QUEUE"
+queue = "environment-artifact-build"
 
 [[env.prod.queues.producers]]
 binding = "CHANNEL_FINAL_DELIVERY_QUEUE"
@@ -212,6 +238,14 @@ queue = "api-command-dlq"
 max_batch_size = 10
 max_batch_timeout = 5
 max_retries = 1
+
+[[env.prod.queues.consumers]]
+queue = "environment-artifact-build"
+max_batch_size = 1
+max_batch_timeout = 1
+max_retries = 5
+max_concurrency = 5
+dead_letter_queue = "api-command-dlq"
 
 [[env.prod.queues.consumers]]
 queue = "channel-final-delivery"

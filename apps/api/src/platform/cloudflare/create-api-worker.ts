@@ -37,7 +37,7 @@ export function createApiWorker(): ExportedHandler<ApiBindings> {
       });
     },
     async queue(batch: MessageBatch, env: ApiBindings): Promise<void> {
-      if (batch.queue === "api-command") {
+      if (batch.queue === "api-command" || batch.queue === "environment-artifact-build") {
         const commandBatch = batch as MessageBatch<ApiCommandMessage>;
 
         for (const message of commandBatch.messages) {
