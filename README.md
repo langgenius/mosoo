@@ -38,6 +38,10 @@ Product and engineering references:
 - Current implementation architecture: [docs/architecture.md](./docs/architecture.md)
 - Development and contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
 
+## Use Cases
+
+- [Codex Pet — Agent as API](./examples/use-cases/codex-pet.md): publish one Mosoo Agent, then let Codex integrate it into an existing product backend.
+
 ## Local Development
 
 Prerequisites:
