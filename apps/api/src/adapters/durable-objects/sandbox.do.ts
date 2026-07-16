@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
+import { disableLocalSandboxHttpsInterception } from "./sandbox-https-interception";
 import { SANDBOX_RPC_FORWARD_METHODS } from "./sandbox-rpc-methods";
 import type { SandboxRpcForwardMethod } from "./sandbox-rpc-methods";
 
@@ -18,7 +19,13 @@ export class Sandbox extends DurableObject {
     super(ctx, env);
 
     this.#delegatePromise = import("@cloudflare/sandbox").then(
-      ({ Sandbox: SandboxImplementation }) => new SandboxImplementation(ctx, env),
+      ({ Sandbox: SandboxImplementation }) => {
+        const delegate = new SandboxImplementation(ctx, env);
+
+        disableLocalSandboxHttpsInterception(delegate, env.SANDBOX_FILE_BUCKET_LOCAL);
+
+        return delegate;
+      },
     );
   }
 
