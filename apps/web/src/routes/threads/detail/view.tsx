@@ -47,6 +47,7 @@ import { ThreadStateIcon } from "../thread-state-icon";
 import { UserAvatar } from "../user-avatar";
 import { createThreadArtifactLinkResolver } from "./artifact-links";
 import { ArtifactPreviewSheet } from "./artifact-preview-sheet";
+import { ThreadRunFailureNotice } from "./run-failure-notice";
 
 interface ViewerInfo {
   image: string | null;
@@ -196,12 +197,22 @@ function ThreadDetailHeader({
               <span>Working</span>
             </button>
           </Badge>
+        ) : thread.failed ? (
+          <Badge asChild variant="danger" className="cursor-pointer focus-visible:ring-offset-1">
+            <button
+              type="button"
+              aria-label="Open failed run process"
+              title="Open failed run process"
+              onClick={onOpenProcess}
+            >
+              <ThreadStateIcon glyph={stateGlyph} />
+              <span>Failed</span>
+            </button>
+          </Badge>
         ) : (
-          <Badge variant={thread.failed ? "danger" : "outline"}>
+          <Badge variant="outline">
             <ThreadStateIcon glyph={stateGlyph} />
-            <span>
-              {thread.failed ? "Failed" : thread.bucket === "archived" ? "Archived" : "Completed"}
-            </span>
+            <span>{thread.bucket === "archived" ? "Archived" : "Completed"}</span>
           </Badge>
         )}
         {threadActionCapabilities.archive.available ? (
@@ -455,6 +466,13 @@ export function ThreadDetail({
               </div>
             </div>
           ) : null}
+
+          <ThreadRunFailureNotice
+            onOpenProcess={() => {
+              setProcessOpen(true);
+            }}
+            run={thread.session.lastRun}
+          />
 
           {messagesLoading ? (
             <div className="text-fg-3 py-12 text-center text-[13px]">Loading thread…</div>
