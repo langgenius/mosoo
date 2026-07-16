@@ -1,4 +1,6 @@
-# <img src="https://github.com/user-attachments/assets/1f8e0e63-223c-4f04-b332-e34f8b087e5b" alt="Mosoo" width="220" />
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/4986c4b8-28fa-45ea-9be9-78c1c7133128" alt="Mosoo" width="96" height="96" />
+</p>
 
 Mosoo is building the production path from runnable agentic-app prototypes to hosted web products that real users can sign in to and use.
 
