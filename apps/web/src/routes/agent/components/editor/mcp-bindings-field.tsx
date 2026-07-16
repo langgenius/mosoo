@@ -43,6 +43,18 @@ function toDraftMcpServer(server: PoolServer): McpServer {
   return draftServer;
 }
 
+export function createPoolServerById(servers: readonly PoolServer[]): Map<string, PoolServer> {
+  const poolServerById = new Map<string, PoolServer>();
+
+  for (const server of servers) {
+    if (!poolServerById.has(server.id)) {
+      poolServerById.set(server.id, server);
+    }
+  }
+
+  return poolServerById;
+}
+
 function McpAddDropdown({
   addedIds,
   onPick,
@@ -137,6 +149,7 @@ export function AgentMcpBindingsField({
   const registryQuery = useMcpRegistryQuery(appId);
 
   const poolServers = registryQuery.data?.servers ?? [];
+  const poolServerById = useMemo(() => createPoolServerById(poolServers), [poolServers]);
   const addedIds = useMemo(
     () => new Set(selectedServers.map((server) => server.id)),
     [selectedServers],
@@ -180,7 +193,7 @@ export function AgentMcpBindingsField({
   return (
     <div className="border-border divide-border-subtle divide-y overflow-hidden rounded-lg border">
       {selectedServers.map((server) => {
-        const pool = poolServers.find((candidate) => candidate.id === server.id);
+        const pool = poolServerById.get(server.id);
         const sourceLabel = `App · ${pool?.ownerName ?? "Owner"}`;
 
         return (
