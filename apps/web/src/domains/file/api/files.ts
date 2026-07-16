@@ -24,6 +24,7 @@ const FILE_LIST_QUERY = graphql(/* GraphQL */ `
         name
         path
         sessionKind
+        sourcePath
         size
         scope {
           id
@@ -41,6 +42,7 @@ type FileRecordNode = FileListGraphQLQuery["fileList"]["files"][number];
 
 export interface ListedFileEntry extends FileEntry {
   sessionId: SessionId | null;
+  sourcePath: string | null;
 }
 
 export interface ListedFileEntryListing {
@@ -85,6 +87,7 @@ function toFileEntry(file: FileRecordNode): ListedFileEntry {
     path: file.path,
     sessionId: toFileSessionId(file),
     sessionKind: file.sessionKind,
+    sourcePath: file.sourcePath,
     size: file.size,
     status: toFileStatus(file.status),
     updatedAt: file.updatedAt,

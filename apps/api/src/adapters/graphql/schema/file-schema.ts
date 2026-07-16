@@ -28,6 +28,7 @@ export const fileSchema = /* GraphQL */ `
     purpose: FilePurpose!
     scope: FileScope!
     sessionKind: FileSessionKind
+    sourcePath: String
     size: Int!
     status: String!
     updatedAt: String!

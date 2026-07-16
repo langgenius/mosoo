@@ -176,7 +176,10 @@ function createFileRecord(input: {
     name: input.name,
     path: input.path,
     sessionKind: input.sessionKind,
+    sourcePath: input.sessionKind === "artifact" ? `outputs/${input.name}` : null,
     size: 42,
+    scope:
+      input.sessionKind === null ? { id: appId, kind: "app" } : { id: sessionId, kind: "session" },
     status: "ready",
     updatedAt: now,
     version: 1,
@@ -280,15 +283,29 @@ async function installFilesPageFixtures(
         });
         return;
       }
+      case "AccessibleAgents": {
+        await fulfillJson(route, {
+          accessibleAgentList: [],
+        });
+        return;
+      }
       case "ThreadAgentSessionList": {
+        const archived = body.variables?.["archived"] === true;
+
         await fulfillJson(route, {
           threadAgentSessionList: {
-            nodes: [
-              {
-                capabilities: [],
-                session: createSessionSummary(),
-              },
-            ],
+            nodes: archived
+              ? []
+              : [
+                  {
+                    capabilities: [],
+                    session: createSessionSummary(),
+                  },
+                ],
+            pageInfo: {
+              endCursor: null,
+              hasMore: false,
+            },
           },
         });
         return;
@@ -329,30 +346,21 @@ test("Files page lists Thread files and filters by Thread or session kind", asyn
   await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toBeVisible();
   expect(seenFileListInputs).toContainEqual({});
 
-  await page.getByLabel("Thread filter").selectOption(sessionId);
+  await page.getByRole("button", { name: "Thread filter" }).click();
+  await page.getByRole("menuitem", { name: /Files scope fixture session/u }).click();
 
   await expect(page.getByRole("row", { name: /library-seed\.csv/u })).toHaveCount(0);
   await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toBeVisible();
   await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toBeVisible();
-  expect(seenFileListInputs).toContainEqual({
-    sessionId,
-  });
 
   await page.getByRole("button", { name: "Artifacts" }).click();
 
   await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toBeVisible();
   await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toHaveCount(0);
-  expect(seenFileListInputs).toContainEqual({
-    sessionId,
-    sessionKind: "artifact",
-  });
 
   await page.getByRole("button", { name: "Attachments" }).click();
 
   await expect(page.getByRole("row", { name: /user-brief\.txt/u })).toBeVisible();
   await expect(page.getByRole("row", { name: /runtime-report\.md/u })).toHaveCount(0);
-  expect(seenFileListInputs).toContainEqual({
-    sessionId,
-    sessionKind: "attachment",
-  });
+  expect(seenFileListInputs).toEqual([{}]);
 });

@@ -5,7 +5,7 @@ import {
   getTableDelimiter,
   parseDelimitedText,
   UNSUPPORTED_FILE_PREVIEW_MESSAGE,
-} from "../src/routes/files/file-preview";
+} from "../src/features/file-preview/model";
 
 describe("file preview", () => {
   test("recognizes the supported preview formats by MIME type or extension", () => {
