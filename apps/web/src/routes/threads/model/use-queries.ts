@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { useVisibleAgentsQuery } from "@/domains/agent/query/agent-queries";
+import { fileKeys, listFiles } from "@/domains/file/api/files";
 import { getThreadSessionMessages } from "@/domains/session/api/agent-session";
 import { retrieveThreadAgentSession } from "@/domains/session/api/agent-session-retrieve";
 import { archivedThreadSessions, threadSessions } from "@/domains/session/api/list";
@@ -104,6 +105,30 @@ export function useThreadQueries({
     refetchInterval:
       selectedThread !== null && isThreadWorking(selectedThread.session) ? 3000 : false,
   });
+  const artifactsQuery = useQuery({
+    enabled: selectedThread !== null,
+    queryFn: async () => {
+      if (selectedThread === null) {
+        throw new Error("Thread id is required to load artifacts.");
+      }
+
+      return listFiles({
+        appId: selectedThread.session.appId,
+        sessionId: toSessionId(selectedThread.id),
+        sessionKind: "artifact",
+      });
+    },
+    queryKey:
+      selectedThread === null
+        ? [...fileKeys.lists(), "thread-artifacts", "missing"]
+        : fileKeys.list({
+            appId: selectedThread.session.appId,
+            sessionId: toSessionId(selectedThread.id),
+            sessionKind: "artifact",
+          }),
+    refetchInterval:
+      selectedThread !== null && isThreadWorking(selectedThread.session) ? 3000 : false,
+  });
   const retrieveQuery = useQuery({
     enabled: selectedThread !== null,
     queryFn: async () => {
@@ -146,6 +171,7 @@ export function useThreadQueries({
   return {
     agentsQuery,
     allThreads,
+    artifactsQuery,
     bucketCounts: threadSummary.bucketCounts,
     counts: threadSummary.counts,
     filteredThreads,

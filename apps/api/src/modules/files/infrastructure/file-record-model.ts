@@ -90,6 +90,29 @@ export interface FileUploadRow {
   updated_at: number;
 }
 
+const RUNTIME_OUTPUT_PARENT_ROOT = "runtime-output";
+const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+
+function toRuntimeOutputSourcePath(row: FileRecordRow): string | null {
+  if (row.session_kind !== "artifact") {
+    return null;
+  }
+
+  const segments = row.parent_path.split("/");
+  const contentSha256 = segments.at(-1);
+
+  if (
+    segments[0] !== RUNTIME_OUTPUT_PARENT_ROOT ||
+    segments.length < 3 ||
+    contentSha256 === undefined ||
+    !SHA256_PATTERN.test(contentSha256)
+  ) {
+    return null;
+  }
+
+  return segments.slice(1, -1).join("/");
+}
+
 export interface FileCleanupRow extends FileRecordRow {
   multipartUploadId: string | null;
   strategy: "multipart" | "single_put" | null;
@@ -179,6 +202,7 @@ export function toFileRecord(row: FileRecordRow): FileRecord {
     purpose: row.purpose,
     scope: createScope(row.scope_kind, toFileScopeId(row.scope_kind, row.scope_id)),
     sessionKind: row.session_kind,
+    sourcePath: toRuntimeOutputSourcePath(row),
     size: row.size,
     status: row.status,
     updatedAt: toIsoString(row.updated_at),

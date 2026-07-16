@@ -19,6 +19,8 @@
 - Keep the runtime dependency graph on a consistent public export surface. Do not mix source-only and dist-only artifacts on the same path. When downstream code depends on compiled output, build upstream packages before starting downstream apps.
 - Required business values and invariants should fail fast. Do not hide problems behind broad `try/catch`, silent fallbacks, or placeholder defaults.
 - Keep one canonical naming scheme or command grammar for each user concept, avoiding multiple names that make docs, implementation, and tests drift apart.
+- Follow the branch naming and PR rules in `CONTRIBUTING.md` → "Branch, Commit, Issue, And PR"; in particular, use the Conventional Commits-style `type/scope-subject` branch format.
+- Never prefix a branch with a tool or agent name. The `pr-ship-policy` CI workflow rejects branch names beginning with `codex`, `cursor`, `claude`, `agent`, `copilot`, `aider`, `devin`, `windsurf`, `codegen`, `opencode`, or `grok` (as the complete first path component).
 - Commit messages must strictly follow `Conventional Commits`. Avoid vague, casual, or inconsistent titles.
 - Commit messages must at least satisfy `type(scope): subject`. Use `!` only for intentional breaking changes, and keep `type`, `scope`, and `subject` semantically accurate.
 - Commit policy is enforced locally by `prek` (`commit-msg`, `pre-push`) and in CI (`pr-title-lint`, `pr-commits-lint`). `commit-msg` validates subject format plus author, committer, and `Co-authored-by` / `Signed-off-by` identity. Use a real human contributor identity; never commit as `claude-code`, `[codex]`, a bot, or a ticket-prefixed subject.

@@ -1018,7 +1018,7 @@ export type FileListQueryVariables = Exact<{
 }>;
 
 
-export type FileListQuery = { fileList: { files: Array<{ createdAt: string, createdBy: PlatformId, etag: string | null, expiresAt: string | null, id: PlatformId, mimeType: string | null, name: string, path: string, sessionKind: FileSessionKind | null, size: number, status: string, updatedAt: string, version: number, scope: { id: PlatformId | null, kind: FileScopeKind } }> } };
+export type FileListQuery = { fileList: { files: Array<{ createdAt: string, createdBy: PlatformId, etag: string | null, expiresAt: string | null, id: PlatformId, mimeType: string | null, name: string, path: string, sessionKind: FileSessionKind | null, sourcePath: string | null, size: number, status: string, updatedAt: string, version: number, scope: { id: PlatformId | null, kind: FileScopeKind } }> } };
 
 export type McpCredentialFieldsFragment = { authType: McpAuthType, createdAt: string, expiresAt: string | null, id: PlatformId, scope: McpCredentialRecordScope, scopeValues: Array<string>, status: McpCredentialStatus, subjectLabel: string | null, updatedAt: string };
 
@@ -3224,6 +3224,7 @@ export const FileListDocument = /*#__PURE__*/ new TypedDocumentString(`
       name
       path
       sessionKind
+      sourcePath
       size
       scope {
         id
