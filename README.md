@@ -1,4 +1,4 @@
-# <img src="apps/web/public/brand/logo-mark.svg" alt="" width="48" height="48" /> Mosoo
+# <img src="https://github.com/user-attachments/assets/1f8e0e63-223c-4f04-b332-e34f8b087e5b" alt="Mosoo" width="220" />
 
 Mosoo is building the production path from runnable agentic-app prototypes to hosted web products that real users can sign in to and use.
 
@@ -38,10 +38,9 @@ Product and engineering references:
 - Current implementation architecture: [docs/architecture.md](./docs/architecture.md)
 - Development and contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
 
-## Use Cases
+## Demo
 
-- [Codex Pet — Agent as API](./examples/use-cases/codex-pet.md): publish one Mosoo Agent, then let Codex integrate it into an existing product backend.
-- [Watch the 57-second Agent as API video →](https://github.com/Yevanchen/mosoo-codex-pet/blob/9662d6a93893816ddf8e01d6fbce7fb15cf08188/docs/assets/mosoo-agent-as-api.mp4)
+https://github.com/user-attachments/assets/4a4bbaab-c192-4462-99e0-020eab966fff
 
 ## Local Development
 
