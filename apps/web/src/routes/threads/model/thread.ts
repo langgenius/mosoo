@@ -58,6 +58,12 @@ const WORKING_RUN_STATUSES = new Set<SessionRunStatus>([
 ]);
 
 const FAILED_RUN_STATUSES = new Set<SessionRunStatus>(["cancelled", "expired", "failed"]);
+const TERMINAL_RUN_STATUSES = new Set<SessionRunStatus>([
+  "completed",
+  "cancelled",
+  "expired",
+  "failed",
+]);
 
 function getThreadLastActivityAt(session: SessionSummary): string {
   return session.lastMessageAt ?? session.lastRun?.updatedAt ?? session.updatedAt;
@@ -67,10 +73,18 @@ function isThreadFailed(session: SessionSummary): boolean {
   return session.lastRun !== null && FAILED_RUN_STATUSES.has(session.lastRun.status);
 }
 
+function hasTerminalLastRun(session: SessionSummary): boolean {
+  return session.lastRun !== null && TERMINAL_RUN_STATUSES.has(session.lastRun.status);
+}
+
 export function isThreadWorking(session: SessionSummary): boolean {
   const lifecycle = getAgentSessionUserLifecycleProjection(session);
 
   if (lifecycle.readOnly) {
+    return false;
+  }
+
+  if (hasTerminalLastRun(session)) {
     return false;
   }
 
@@ -117,7 +131,7 @@ function getThreadStatusLine(session: SessionSummary): string {
     return "archived";
   }
 
-  if (session.status === "RESCHEDULING") {
+  if (session.status === "RESCHEDULING" && !hasTerminalLastRun(session)) {
     const previous = getThreadStatusLine({
       ...session,
       archivedAt: null,
