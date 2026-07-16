@@ -5,6 +5,7 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Separator } from "@/shared/ui/separator";
 
+import { shouldSubmitLoginInput } from "./login-keyboard";
 import type { AuthStep } from "./use-login";
 
 const AUTH_CARD_STYLE = { boxShadow: "var(--shadow-md)" } satisfies CSSProperties;
@@ -71,7 +72,13 @@ export function LoginAuthCard({
                   onChangeOtp(event.target.value);
                 }}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") {
+                  if (
+                    shouldSubmitLoginInput({
+                      isComposing: event.nativeEvent.isComposing,
+                      key: event.key,
+                      keyCode: event.nativeEvent.keyCode,
+                    })
+                  ) {
                     onVerifyOtp();
                   }
                 }}
@@ -145,7 +152,13 @@ export function LoginAuthCard({
                   onChangeEmail(event.target.value);
                 }}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") {
+                  if (
+                    shouldSubmitLoginInput({
+                      isComposing: event.nativeEvent.isComposing,
+                      key: event.key,
+                      keyCode: event.nativeEvent.keyCode,
+                    })
+                  ) {
                     onSendOtp();
                   }
                 }}
