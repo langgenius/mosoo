@@ -1,3 +1,8 @@
+import {
+  ENVIRONMENT_PACKAGE_MANAGERS,
+  isWritableEnvironmentPackageManager,
+  WRITABLE_ENVIRONMENT_PACKAGE_MANAGERS,
+} from "@mosoo/contracts/environment";
 import type {
   EnvironmentConfigInput,
   EnvironmentPackageManager,
@@ -14,15 +19,20 @@ import {
 } from "./environment-secret-store";
 import type { EnvironmentMutableConfig, StoredEnvironmentVariable } from "./environment-types";
 
-const PACKAGE_MANAGERS: readonly EnvironmentPackageManager[] = [
-  "apt",
-  "cargo",
-  "gem",
-  "go",
-  "npm",
-  "pip",
-];
-const PACKAGE_MANAGER_SET = new Set<string>(PACKAGE_MANAGERS);
+const PACKAGE_MANAGER_SET = new Set<string>(ENVIRONMENT_PACKAGE_MANAGERS);
+const WRITABLE_PACKAGE_MANAGER_NAMES = WRITABLE_ENVIRONMENT_PACKAGE_MANAGERS.join(" or ");
+
+function unsupportedPackageManagerWriteMessage(manager: EnvironmentPackageManager): string {
+  return `Package manager ${manager} is not supported by the current Driver runtime. Remove it or replace it with ${WRITABLE_PACKAGE_MANAGER_NAMES} before saving.`;
+}
+
+export function assertWritableEnvironmentPackageManagers(packages: EnvironmentPackageSpec[]): void {
+  const unsupported = packages.find((entry) => !isWritableEnvironmentPackageManager(entry.manager));
+
+  if (unsupported) {
+    throw new Error(unsupportedPackageManagerWriteMessage(unsupported.manager));
+  }
+}
 
 function parseStringArray(value: unknown, fieldName: string): string[] {
   if (!Array.isArray(value)) {
@@ -183,9 +193,14 @@ export function normalizePackages(
   const grouped: Record<"npm" | "pip", Set<string>> = { npm: new Set(), pip: new Set() };
 
   for (const entry of packages) {
-    if (entry.manager !== "npm" && entry.manager !== "pip") {
-      throw new Error("Package manager must be npm or pip.");
+    if (!PACKAGE_MANAGER_SET.has(entry.manager)) {
+      throw new Error("Package manager must be apt, cargo, gem, go, npm, or pip.");
     }
+
+    if (!isWritableEnvironmentPackageManager(entry.manager)) {
+      throw new Error(unsupportedPackageManagerWriteMessage(entry.manager));
+    }
+
     for (const rawSpec of entry.packages) {
       const spec = rawSpec.trim();
       if (!(entry.manager === "npm" ? NPM_PACKAGE : PIP_PACKAGE).test(spec)) {

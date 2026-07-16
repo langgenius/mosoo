@@ -1,3 +1,4 @@
+import { isWritableEnvironmentPackageManager } from "@mosoo/contracts/environment";
 import { Check, Plus, Trash2 } from "lucide-react";
 
 import { cn } from "@/shared/lib/class-names";
@@ -13,7 +14,7 @@ import {
   NetworkPolicySelect,
   PackageManagerSelect,
 } from "./environment-form-controls";
-import { createDraftId, createPackageRow, hasPackageManagerError } from "./environment-form-model";
+import { createDraftId, createPackageRow, getPackageManagerError } from "./environment-form-model";
 import type { EditablePackageRow, EnvironmentDraft } from "./environment-form-model";
 
 function EnvironmentPackagesSection({
@@ -28,7 +29,7 @@ function EnvironmentPackagesSection({
   onAdd: () => void;
   onRemove: (id: string) => void;
   onUpdate: (id: string, transform: (row: EditablePackageRow) => EditablePackageRow) => void;
-  packageManagerError: boolean;
+  packageManagerError: string | null;
   packages: EditablePackageRow[];
 }) {
   return (
@@ -69,7 +70,10 @@ function EnvironmentPackagesSection({
               aria-label="Package name and version"
               className={cn(
                 "font-mono text-[12px]",
-                row.packagesText.trim() && !row.manager ? "border-destructive" : null,
+                row.packagesText.trim() &&
+                  (!row.manager || !isWritableEnvironmentPackageManager(row.manager))
+                  ? "border-destructive"
+                  : null,
               )}
               disabled={disabled}
               onChange={(event) => {
@@ -98,10 +102,7 @@ function EnvironmentPackagesSection({
         ))}
 
         {packageManagerError ? (
-          <div className="text-destructive text-[11px]">
-            Choose npm or pip for every package row. Legacy package managers are read-only and must
-            be replaced before saving.
-          </div>
+          <div className="text-destructive text-[11px]">{packageManagerError}</div>
         ) : null}
       </div>
     </EnvironmentFormSection>
@@ -230,7 +231,7 @@ export function EnvironmentForm({
   submitLabel: string;
 }) {
   const limited = draft.networkPolicy === "limited";
-  const packageManagerError = hasPackageManagerError(draft.packages);
+  const packageManagerError = getPackageManagerError(draft.packages);
 
   function update(transform: (current: EnvironmentDraft) => EnvironmentDraft) {
     onChange(transform(draft));
@@ -441,7 +442,7 @@ export function EnvironmentForm({
             </Button>
           ) : null}
           <Button
-            disabled={disabled || !draft.name.trim() || packageManagerError}
+            disabled={disabled || !draft.name.trim() || Boolean(packageManagerError)}
             onClick={onSubmit}
             type="button"
           >
