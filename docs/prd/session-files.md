@@ -23,7 +23,9 @@ saved.
 2. An attachment belongs to that Thread. Mosoo only promises to give the Agent
    files explicitly selected for the current message.
 3. Outputs that Mosoo records from the Agent appear as artifacts in the same
-   Thread.
+   Thread. When an Agent reply links to a recorded `outputs/` file, selecting
+   that link opens the artifact in a Thread preview drawer with a download
+   action.
 4. The Files page lets the Builder search, filter, preview supported formats,
    and download attachments and artifacts.
 

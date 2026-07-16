@@ -34,6 +34,7 @@ import {
   reconcileCostLedgerPage,
 } from "../../cost/application/cost-ledger-reconciliation.service";
 import { runUsageDailyRollup } from "../../cost/application/cost-rollup.service";
+import { buildEnvironmentPackageArtifact } from "../../environments/application/environment-package-artifact-build.service";
 import { dispatchQueuedSessionRun } from "../../runtime/application/session-runs/dispatch-queued-run.service";
 import { runSandboxMaintenance } from "../../runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-maintenance.service";
 import {
@@ -57,6 +58,7 @@ import type {
   AppDeploymentRunDispatchCommandPayload,
   ChannelWorkTriggerCommandPayload,
   CostLedgerReconciliationCommandPayload,
+  EnvironmentPackageArtifactBuildCommandPayload,
   ScheduledMaintenanceCommandPayload,
   SessionRunDispatchCommandPayload,
 } from "./api-command-payload";
@@ -517,6 +519,13 @@ async function processClaimedApiCommand(
       );
       return;
     }
+    case "environment_package_artifact_build": {
+      await buildEnvironmentPackageArtifact(
+        bindings,
+        payload as EnvironmentPackageArtifactBuildCommandPayload,
+      );
+      return;
+    }
     case "scheduled_maintenance": {
       await processScheduledMaintenanceCommand(
         bindings,
@@ -722,6 +731,8 @@ export async function processApiCommandDeadLetterMessage(
         .select({
           dedupeKey: apiCommandsTable.dedupeKey,
           kind: apiCommandsTable.kind,
+          lastErrorCode: apiCommandsTable.lastErrorCode,
+          lastErrorMessage: apiCommandsTable.lastErrorMessage,
           payloadJson: apiCommandsTable.payloadJson,
         })
         .from(apiCommandsTable)
@@ -743,11 +754,19 @@ export async function processApiCommandDeadLetterMessage(
       );
     }
 
+    const preserveArtifactFailure = command?.kind === "environment_package_artifact_build";
+
     await markApiCommandDeadLettered({
       commandId,
       database: bindings.DB,
-      errorCode: "queue_dead_lettered",
-      errorMessage: "API command reached the queue dead-letter consumer.",
+      errorCode:
+        preserveArtifactFailure && command.lastErrorCode
+          ? command.lastErrorCode
+          : "queue_dead_lettered",
+      errorMessage:
+        preserveArtifactFailure && command.lastErrorMessage
+          ? command.lastErrorMessage
+          : "API command reached the queue dead-letter consumer.",
       nowMs: deadLetteredAtMs,
     });
   } catch (error) {

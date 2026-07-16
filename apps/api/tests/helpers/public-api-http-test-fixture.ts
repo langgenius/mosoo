@@ -10,6 +10,7 @@ import {
   organizationsTable,
   personalAccessTokensTable,
   appsTable,
+  sessionExecutionSnapshotsTable,
   sessionsTable,
   vendorCredentialsTable,
 } from "@mosoo/db";
@@ -570,6 +571,41 @@ async function insertSession(
       title: input.title,
       type: "api_channel",
       updatedAt: nowMsForTest(),
+    })
+    .run();
+
+  await database
+    .app()
+    .insert(sessionExecutionSnapshotsTable)
+    .values({
+      createdAt: nowMsForTest(),
+      planJson: JSON.stringify({
+        binding: {
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          deploymentVersionId: PUBLIC_API_TEST_IDS.deployment,
+          deploymentVersionNumber: 1,
+          kind: "pet",
+          model: "gpt-5.4",
+          prompt: "Help.",
+          provider: "openai",
+          runtimeId: "openai-runtime",
+        },
+        environment: {
+          allowMcpServers: true,
+          allowPackageManagers: true,
+          allowedHostsJson: "[]",
+          envVarsJson: "[]",
+          environmentId: PUBLIC_API_TEST_IDS.environment,
+          environmentName: "Default",
+          networkPolicy: "full",
+          packagesJson: "[]",
+          revisionId: PUBLIC_API_TEST_IDS.environmentRevision,
+          setupScript: "",
+        },
+        skills: [],
+        tools: [],
+      }),
+      sessionId: input.id,
     })
     .run();
 }

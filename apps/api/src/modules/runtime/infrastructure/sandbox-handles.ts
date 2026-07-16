@@ -36,7 +36,7 @@ export interface RuntimeProcessHandle {
 }
 
 export interface ExecutionSessionHandle {
-  exec(command: string): Promise<RuntimeCommandResultHandle>;
+  exec(command: string, options?: { timeout?: number }): Promise<RuntimeCommandResultHandle>;
   mkdir(path: string, options?: { recursive?: boolean }): Promise<void>;
   readFile(
     path: string,
@@ -63,7 +63,11 @@ export interface ExecutionSessionHandle {
 }
 
 export interface SandboxHandle extends ExecutionSessionHandle {
-  createBackup(options: { dir: string; ttl?: number }): Promise<{ dir: string; id: string }>;
+  createBackup(options: {
+    dir: string;
+    localBucket?: boolean;
+    ttl?: number;
+  }): Promise<{ dir: string; id: string }>;
   createSession(options?: {
     cwd?: string;
     env?: Record<string, string>;
@@ -79,7 +83,11 @@ export interface SandboxHandle extends ExecutionSessionHandle {
     mountPath: string,
     options: RuntimeSandboxBucketMountOptions,
   ): Promise<void>;
-  restoreBackup(backup: { dir: string; id: string }): Promise<{ dir: string; id: string }>;
+  restoreBackup(backup: {
+    dir: string;
+    id: string;
+    localBucket?: boolean;
+  }): Promise<{ dir: string; id: string }>;
   setKeepAlive(keepAlive: boolean): Promise<void>;
   terminal(request: Request, options?: PtyOptions): Promise<Response>;
   wsConnect(request: Request, port: number): Promise<Response>;

@@ -27,6 +27,7 @@ export interface EnqueueApiCommandInput {
   dedupeKey: string;
   kind: ApiCommandKind;
   payload: unknown;
+  retryTerminal?: boolean;
 }
 
 export interface ApiCommandClaim {
@@ -36,6 +37,9 @@ export interface ApiCommandClaim {
   kind: ApiCommandKind;
   payloadJson: string;
 }
+
+type ApiCommandDeliveryBindings = Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB"> &
+  Partial<Pick<ApiBindings, "ENVIRONMENT_ARTIFACT_BUILD_QUEUE">>;
 
 function normalizeDedupeKey(value: string): string {
   const dedupeKey = value.trim();
@@ -51,15 +55,16 @@ function toQueueMessage(commandId: ApiCommandId): ApiCommandMessage {
   return { commandId };
 }
 
-async function readApiCommandByDedupeKey(
+export async function findApiCommandByDedupeKey(
   database: D1Database,
   dedupeKey: string,
-): Promise<Pick<ApiCommandRow, "id" | "lastErrorCode" | "status"> | null> {
+): Promise<Pick<ApiCommandRow, "id" | "lastErrorCode" | "lastErrorMessage" | "status"> | null> {
   return (
     (await getAppDatabase(database)
       .select({
         id: apiCommandsTable.id,
         lastErrorCode: apiCommandsTable.lastErrorCode,
+        lastErrorMessage: apiCommandsTable.lastErrorMessage,
         status: apiCommandsTable.status,
       })
       .from(apiCommandsTable)
@@ -109,11 +114,19 @@ async function clearApiCommandQueueSendFailure(input: {
 }
 
 async function sendApiCommandMessage(
-  bindings: Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB">,
+  bindings: ApiCommandDeliveryBindings,
   commandId: ApiCommandId,
+  kind: ApiCommandKind,
 ): Promise<void> {
+  const queue =
+    kind === "environment_package_artifact_build"
+      ? bindings.ENVIRONMENT_ARTIFACT_BUILD_QUEUE
+      : bindings.API_COMMAND_QUEUE;
+  if (!queue) {
+    throw new Error("Environment artifact build queue binding is required.");
+  }
   try {
-    await bindings.API_COMMAND_QUEUE.send(toQueueMessage(commandId));
+    await queue.send(toQueueMessage(commandId));
   } catch (error) {
     // A rejected producer response does not prove that Queue discarded the message.
     // The durable outbox record remains eligible for scheduled redrive either way.
@@ -146,10 +159,10 @@ async function sendApiCommandMessage(
 }
 
 export async function redriveFailedApiCommandEnqueues(
-  bindings: Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB">,
+  bindings: ApiCommandDeliveryBindings,
 ): Promise<void> {
   const commands = await getAppDatabase(bindings.DB)
-    .select({ id: apiCommandsTable.id })
+    .select({ id: apiCommandsTable.id, kind: apiCommandsTable.kind })
     .from(apiCommandsTable)
     .where(
       and(
@@ -165,19 +178,20 @@ export async function redriveFailedApiCommandEnqueues(
     .all();
 
   for (const command of commands) {
-    await sendApiCommandMessage(bindings, command.id);
+    await sendApiCommandMessage(bindings, command.id, command.kind);
   }
 }
 
 export async function enqueueApiCommand(
-  bindings: Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB">,
+  bindings: ApiCommandDeliveryBindings,
   input: EnqueueApiCommandInput,
 ): Promise<ApiCommandId> {
   const nowMs = currentTimestampMs();
   const commandId = createPlatformId<ApiCommandId>();
   const dedupeKey = normalizeDedupeKey(input.dedupeKey);
-
-  const insertResult = await getAppDatabase(bindings.DB)
+  const payloadJson = JSON.stringify(input.payload);
+  const database = getAppDatabase(bindings.DB);
+  const insertResult = await database
     .insert(apiCommandsTable)
     .values({
       attemptCount: 0,
@@ -190,7 +204,7 @@ export async function enqueueApiCommand(
       kind: input.kind,
       lastErrorCode: API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
       lastErrorMessage: API_COMMAND_QUEUE_DELIVERY_PENDING_MESSAGE,
-      payloadJson: JSON.stringify(input.payload),
+      payloadJson,
       status: "queued",
       updatedAt: nowMs,
     })
@@ -198,15 +212,39 @@ export async function enqueueApiCommand(
     .run();
 
   if (getD1ChangeCount(insertResult) > 0) {
-    await sendApiCommandMessage(bindings, commandId);
-
+    await sendApiCommandMessage(bindings, commandId, input.kind);
     return commandId;
   }
 
-  const current = await readApiCommandByDedupeKey(bindings.DB, dedupeKey);
+  const current = await findApiCommandByDedupeKey(bindings.DB, dedupeKey);
 
   if (current === null) {
     throw new Error("API command enqueue could not confirm the ledger row.");
+  }
+
+  if (input.retryTerminal === true && current.status !== "queued" && current.status !== "running") {
+    await database
+      .update(apiCommandsTable)
+      .set({
+        attemptCount: 0,
+        claimExpiresAt: null,
+        claimOwner: null,
+        completedAt: null,
+        lastErrorCode: API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
+        lastErrorMessage: API_COMMAND_QUEUE_DELIVERY_PENDING_MESSAGE,
+        payloadJson,
+        status: "queued",
+        updatedAt: nowMs,
+      })
+      .where(
+        and(
+          eq(apiCommandsTable.id, current.id),
+          inArray(apiCommandsTable.status, ["dead_lettered", "failed", "succeeded"]),
+        ),
+      )
+      .run();
+    await sendApiCommandMessage(bindings, current.id, input.kind);
+    return current.id;
   }
 
   if (
@@ -214,7 +252,7 @@ export async function enqueueApiCommand(
     (current.lastErrorCode === API_COMMAND_QUEUE_DELIVERY_PENDING_CODE ||
       current.lastErrorCode === API_COMMAND_QUEUE_SEND_FAILED_CODE)
   ) {
-    await sendApiCommandMessage(bindings, current.id);
+    await sendApiCommandMessage(bindings, current.id, input.kind);
   }
 
   return current.id;

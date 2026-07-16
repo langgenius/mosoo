@@ -3,6 +3,7 @@ import { useCallback, useMemo } from "react";
 import type { ReactElement } from "react";
 
 import { useAppSession } from "@/app/session-provider";
+import type { ListedFileEntry } from "@/domains/file/api/files";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { ListPageContent, ListPageToolbar, ListPageToolbarSpacer } from "@/shared/ui/list-page";
@@ -31,6 +32,8 @@ interface ThreadsWorkspaceProps {
   viewerImage: string | null;
   viewerName: string;
 }
+
+const EMPTY_ARTIFACTS: ListedFileEntry[] = [];
 
 export function ThreadsController(): ReactElement {
   const { activeAppId, user } = useAppSession();
@@ -101,6 +104,7 @@ function ThreadsWorkspace({
           <ThreadDetail
             actionError={actions.actionError}
             agent={threads.selectedThread.agent}
+            artifacts={threads.artifactsQuery.data?.files ?? EMPTY_ARTIFACTS}
             messages={threads.messagesQuery.data ?? []}
             messagesError={
               threads.messagesQuery.error instanceof Error ? threads.messagesQuery.error : null

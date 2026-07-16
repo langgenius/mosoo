@@ -11,12 +11,17 @@ import {
 } from "../../application/runtime-diagnostic-events";
 import type { RuntimeTimingRecorder } from "../../application/session-runs/session-runtime-timing";
 import type { DriverProfileConfig } from "../../domain/driver-snapshot";
-import type { ExecutionSessionHandle } from "../sandbox-handles";
+import type { ExecutionSessionHandle, SandboxHandle } from "../sandbox-handles";
 import {
   ensureProvisioningDirectories,
   ensureRuntimeMemoryMounts,
   runSetupScript,
 } from "./runtime-driver-files.service";
+import {
+  exposeEnvironmentNodeModules,
+  restoreEnvironmentArtifact,
+} from "./runtime-environment-artifact";
+import { getOrganizationPath } from "./runtime-sandbox-provisioning.paths";
 
 interface RuntimeDiagnosticBaseValue {
   readonly agentId: string;
@@ -45,6 +50,7 @@ export async function installRuntimeEnvironment(
     readonly environmentRevisionId: EnvironmentRevisionId;
     readonly profile: DriverProfileConfig;
     readonly runtimeBase: RuntimeDiagnosticBaseValue;
+    readonly sandbox: SandboxHandle;
     readonly sessionId: SessionId;
     readonly state: RuntimeEnvironmentInstallState;
     readonly timing: RuntimeTimingRecorder;
@@ -78,6 +84,17 @@ export async function installRuntimeEnvironment(
       ensureRuntimeMemoryMounts(input.cloudflareSession, input.profile),
     ]).then(() => undefined),
   );
+  const artifact = input.profile.environmentArtifact;
+  if (artifact) {
+    await input.timing.measure("environmentArtifactRestore", async () => {
+      await restoreEnvironmentArtifact(env, input.sandbox, artifact);
+      await exposeEnvironmentNodeModules(input.cloudflareSession, {
+        nodePaths: artifact.paths.node,
+        organizationPath: getOrganizationPath(input.profile),
+      });
+    });
+  }
+
   await input.timing.measure("runSetupScript", () =>
     runSetupScript(input.cloudflareSession, input.profile),
   );

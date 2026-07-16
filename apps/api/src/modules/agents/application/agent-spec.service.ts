@@ -6,6 +6,7 @@ import type {
 } from "@mosoo/contracts/agent";
 import type { AgentManifest, AgentManifestMcpServerBinding } from "@mosoo/contracts/agent-manifest";
 import { AGENT_MANIFEST_VERSION } from "@mosoo/contracts/agent-manifest";
+import type { EnvironmentPackageSpec } from "@mosoo/contracts/environment";
 import type {
   SessionExecutionSkillReference,
   SessionExecutionToolReference,
@@ -31,7 +32,6 @@ import { asc, eq, inArray, sql } from "drizzle-orm";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import {
-  makePackageSetupScript,
   parsePackagesJson,
   parseStoredEnvVarsJson,
 } from "../../environments/application/environment-config";
@@ -50,6 +50,7 @@ interface EnvironmentNameRow {
   appId: AppId;
   id: EnvironmentId;
   name: string;
+  packagesJson: string;
 }
 
 export interface AgentSpecSkill {
@@ -84,6 +85,7 @@ export interface AgentSpec {
   environment: AgentEnvironmentConfig;
   environmentManifest: {
     expectedName: string | null;
+    packages: EnvironmentPackageSpec[];
     secretNames: string[];
     setupScript: string;
   };
@@ -120,8 +122,13 @@ export async function getAgentEnvironmentName(
         appId: environmentsTable.appId,
         id: environmentsTable.id,
         name: environmentsTable.name,
+        packagesJson: environmentRevisionsTable.packagesJson,
       })
       .from(environmentsTable)
+      .innerJoin(
+        environmentRevisionsTable,
+        eq(environmentRevisionsTable.id, environmentsTable.currentRevisionId),
+      )
       .where(eq(environmentsTable.id, environmentId))
       .limit(1)
       .get()) ?? null
@@ -135,6 +142,7 @@ async function getAgentEnvironmentManifest(
   if (!isTruthy(environmentId)) {
     return {
       expectedName: null,
+      packages: [],
       secretNames: [],
       setupScript: "",
     };
@@ -160,17 +168,17 @@ async function getAgentEnvironmentManifest(
   if (!row) {
     return {
       expectedName: null,
+      packages: [],
       secretNames: [],
       setupScript: "",
     };
   }
 
-  const packageSetupScript = makePackageSetupScript(parsePackagesJson(row.packagesJson));
-
   return {
     expectedName: row.name,
+    packages: parsePackagesJson(row.packagesJson),
     secretNames: parseStoredEnvVarsJson(row.envVarsJson).map((envVar) => envVar.key),
-    setupScript: [packageSetupScript, row.setupScript].filter(Boolean).join("\n\n"),
+    setupScript: row.setupScript,
   };
 }
 
@@ -392,6 +400,7 @@ export function toAgentManifest(spec: AgentSpec): AgentManifest {
       envVars: Object.fromEntries(spec.environmentManifest.secretNames.map((key) => [key, ""])),
       environmentId: spec.environment.environmentId,
       expectedName: spec.environmentManifest.expectedName,
+      packages: spec.environmentManifest.packages,
       setupScript: spec.environmentManifest.setupScript,
     },
     kind: spec.kind,

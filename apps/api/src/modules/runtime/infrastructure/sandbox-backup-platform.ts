@@ -9,10 +9,6 @@ interface SandboxBackupObject {
   readonly id: string;
 }
 
-function getSandboxStateBucket(bindings: ApiBindings): R2Bucket {
-  return (bindings as ApiBindings & { SANDBOX_STATE_BUCKET?: R2Bucket }).SANDBOX_STATE_BUCKET;
-}
-
 function getSandboxBackupObjectKeys(backupId: string): string[] {
   return [`backups/${backupId}/data.sqsh`, `backups/${backupId}/meta.json`];
 }
@@ -52,8 +48,7 @@ export async function deleteSandboxBackupObjects(
     return;
   }
 
-  const bucket = getSandboxStateBucket(bindings);
   const objectKeys = backupIds.flatMap((backupId) => getSandboxBackupObjectKeys(backupId));
 
-  await bucket.delete(objectKeys);
+  await bindings.SANDBOX_STATE_BUCKET.delete(objectKeys);
 }

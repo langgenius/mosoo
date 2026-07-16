@@ -49,6 +49,7 @@ function buildEnvironmentDefinition(agentPackage: AgentPackage): string {
   return JSON.stringify(
     {
       expectedName: agentPackage.manifest.environment.expectedName,
+      packages: agentPackage.manifest.environment.packages ?? [],
       secretNames: Object.keys(agentPackage.manifest.environment.envVars).toSorted(),
       setupScript: agentPackage.manifest.environment.setupScript,
     },

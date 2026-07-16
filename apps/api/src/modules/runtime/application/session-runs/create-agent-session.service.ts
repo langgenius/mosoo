@@ -30,6 +30,7 @@ import {
 import { parseAgentStoredConfig } from "../../../agents/application/agent-stored-config.service";
 import type { AgentRow } from "../../../agents/application/agent-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
+import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
 import { resolveAgentEnvironmentSnapshot } from "../../../environments/application/environment.service";
 import type { SessionExecutionPlan } from "../session-definition/session-execution.types";
 
@@ -301,6 +302,11 @@ export async function createAgentSession(
     bindings: request.bindings,
     source,
   });
+  await resolveReadyEnvironmentPackageArtifact(
+    request.bindings,
+    source.agent.appId,
+    executionPlan.environment.packagesJson,
+  );
   const sessionId = createPlatformId<SessionId>();
   const timestampMs = currentTimestampMs();
   const sessionType = request.input.type ?? "preview";

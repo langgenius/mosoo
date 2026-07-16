@@ -18,9 +18,10 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ReactElement } from "react";
 
+import type { ListedFileEntry } from "@/domains/file/api/files";
 import { triggerAgentSessionPrewarm } from "@/domains/session/api/agent-session";
 import { toSessionId } from "@/routes/typed-id";
 import { Badge } from "@/shared/ui/badge";
@@ -33,6 +34,7 @@ import {
 } from "@/shared/ui/dropdown-menu";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { Markdown } from "@/shared/ui/markdown";
+import type { MarkdownLinkResolver } from "@/shared/ui/markdown";
 import { Textarea } from "@/shared/ui/textarea";
 
 import { AgentAvatar } from "../agent-avatar";
@@ -43,6 +45,9 @@ import type { ThreadListItem } from "../model/thread";
 import { ThreadProcessModal } from "../process-modal/modal";
 import { ThreadStateIcon } from "../thread-state-icon";
 import { UserAvatar } from "../user-avatar";
+import { createThreadArtifactLinkResolver } from "./artifact-links";
+import { ArtifactPreviewSheet } from "./artifact-preview-sheet";
+import { ThreadRunFailureNotice } from "./run-failure-notice";
 
 interface ViewerInfo {
   image: string | null;
@@ -52,6 +57,7 @@ interface ViewerInfo {
 function ThreadActivityCard({
   agent,
   agentName,
+  artifactLinkResolver,
   message,
   onOpenProcess,
   processButtonText,
@@ -60,6 +66,7 @@ function ThreadActivityCard({
 }: {
   agent: AgentSummary | null;
   agentName: string;
+  artifactLinkResolver: MarkdownLinkResolver;
   message: SessionMessage;
   onOpenProcess: () => void;
   processButtonText: string;
@@ -113,7 +120,7 @@ function ThreadActivityCard({
             </div>
           ) : (
             <div className="text-fg-1 text-[13.5px] leading-relaxed">
-              <Markdown>{message.content}</Markdown>
+              <Markdown linkResolver={artifactLinkResolver}>{message.content}</Markdown>
             </div>
           )}
           {!isUser ? (
@@ -190,12 +197,22 @@ function ThreadDetailHeader({
               <span>Working</span>
             </button>
           </Badge>
+        ) : thread.failed ? (
+          <Badge asChild variant="danger" className="cursor-pointer focus-visible:ring-offset-1">
+            <button
+              type="button"
+              aria-label="Open failed run process"
+              title="Open failed run process"
+              onClick={onOpenProcess}
+            >
+              <ThreadStateIcon glyph={stateGlyph} />
+              <span>Failed</span>
+            </button>
+          </Badge>
         ) : (
-          <Badge variant={thread.failed ? "danger" : "outline"}>
+          <Badge variant="outline">
             <ThreadStateIcon glyph={stateGlyph} />
-            <span>
-              {thread.failed ? "Failed" : thread.bucket === "archived" ? "Archived" : "Completed"}
-            </span>
+            <span>{thread.bucket === "archived" ? "Archived" : "Completed"}</span>
           </Badge>
         )}
         {threadActionCapabilities.archive.available ? (
@@ -337,6 +354,7 @@ function ThreadReplyComposer({
 export function ThreadDetail({
   actionError,
   agent,
+  artifacts,
   messages,
   messagesError,
   messagesLoading,
@@ -355,6 +373,7 @@ export function ThreadDetail({
 }: {
   actionError: string | null;
   agent: AgentSummary | null;
+  artifacts: readonly ListedFileEntry[];
   messages: SessionMessage[];
   messagesError: Error | null;
   messagesLoading: boolean;
@@ -373,6 +392,11 @@ export function ThreadDetail({
 }): ReactElement {
   const [reply, setReply] = useState("");
   const [processOpen, setProcessOpen] = useState(false);
+  const [previewArtifact, setPreviewArtifact] = useState<ListedFileEntry | null>(null);
+  const artifactLinkResolver = useMemo(
+    () => createThreadArtifactLinkResolver(artifacts, setPreviewArtifact),
+    [artifacts],
+  );
   const working = isThreadWorking(thread.session);
   const followUpMode = thread.bucket === "archived" || !working;
   const threadActionCapabilities = getThreadActionCapabilities({
@@ -443,6 +467,13 @@ export function ThreadDetail({
             </div>
           ) : null}
 
+          <ThreadRunFailureNotice
+            onOpenProcess={() => {
+              setProcessOpen(true);
+            }}
+            run={thread.session.lastRun}
+          />
+
           {messagesLoading ? (
             <div className="text-fg-3 py-12 text-center text-[13px]">Loading thread…</div>
           ) : messagesError ? (
@@ -466,6 +497,7 @@ export function ThreadDetail({
                     key={message.id}
                     agent={agent}
                     agentName={thread.agentName}
+                    artifactLinkResolver={artifactLinkResolver}
                     message={message}
                     onOpenProcess={() => {
                       setProcessOpen(true);
@@ -503,6 +535,15 @@ export function ThreadDetail({
         threadFailed={thread.failed}
         threadWorking={working}
       />
+
+      {previewArtifact === null ? null : (
+        <ArtifactPreviewSheet
+          file={previewArtifact}
+          onClose={() => {
+            setPreviewArtifact(null);
+          }}
+        />
+      )}
     </div>
   );
 }

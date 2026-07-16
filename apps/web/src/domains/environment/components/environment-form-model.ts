@@ -38,14 +38,10 @@ export interface EnvironmentDraft {
   setupScript: string;
 }
 
-export const PACKAGE_MANAGERS: EnvironmentPackageManager[] = [
-  "apt",
-  "cargo",
-  "gem",
-  "go",
+export const PACKAGE_MANAGERS = [
   "npm",
   "pip",
-];
+] as const satisfies readonly EnvironmentPackageManager[];
 
 export const PACKAGE_MANAGER_LABELS: Record<EnvironmentPackageManager, string> = {
   apt: "apt",
@@ -162,7 +158,11 @@ function toEnvVarInputs(envVars: EditableEnvVar[]) {
 }
 
 export function hasPackageManagerError(rows: EditablePackageRow[]): boolean {
-  return rows.some((row) => row.packagesText.trim() && !row.manager);
+  return rows.some(
+    (row) =>
+      row.packagesText.trim() &&
+      (row.manager === null || !PACKAGE_MANAGERS.some((manager) => manager === row.manager)),
+  );
 }
 
 export function toCreateEnvironmentInput(

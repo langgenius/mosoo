@@ -148,6 +148,19 @@ export function serializeAgentManifestToYaml(
   lines.push("environment:");
   lines.push(`  environmentId: ${yamlString(manifest.environment.environmentId)}`);
   lines.push(`  expectedName: ${yamlString(manifest.environment.expectedName)}`);
+  lines.push("  packages:");
+  const packages = manifest.environment.packages ?? [];
+  if (packages.length === 0) {
+    lines.push("    []");
+  } else {
+    for (const entry of packages) {
+      lines.push(`    - manager: ${yamlString(entry.manager)}`);
+      lines.push("      packages:");
+      for (const packageSpec of entry.packages) {
+        lines.push(`        - ${yamlString(packageSpec)}`);
+      }
+    }
+  }
   lines.push(`  setupScript: ${yamlString(manifest.environment.setupScript)}`);
   lines.push("  envVars:");
   appendStringRecordYaml(lines, manifest.environment.envVars, "    ");

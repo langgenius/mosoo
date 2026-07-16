@@ -27,6 +27,7 @@ function createFile(
     path: `${id}.md`,
     sessionId: sessionId === null ? null : toSessionId(sessionId),
     sessionKind,
+    sourcePath: sessionKind === "artifact" ? `outputs/${id}.md` : null,
     size: 32,
     status: "ready",
     updatedAt: "2026-07-13T00:00:00.000Z",

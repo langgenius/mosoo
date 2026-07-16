@@ -45,7 +45,7 @@ function EnvironmentPackagesSection({
           <Plus className="size-4" />
         </Button>
       }
-      description="Specify packages and their versions available in this environment. Separate multiple values with spaces."
+      description="Public packages with exact versions. npm provides CLIs and CommonJS require; Node ESM imports require a project-local install. PyPI provides Python imports and scripts."
       title="Packages"
     >
       <div className="environment-scroll-area max-h-[220px] space-y-2 overflow-y-auto pr-1">
@@ -76,7 +76,7 @@ function EnvironmentPackagesSection({
                   packagesText: event.target.value,
                 }));
               }}
-              placeholder="package package==1.0.0"
+              placeholder={row.manager === "npm" ? "package@1.0.0" : "package==1.0.0"}
               value={row.packagesText}
             />
             <Button
@@ -96,7 +96,8 @@ function EnvironmentPackagesSection({
 
         {packageManagerError ? (
           <div className="text-destructive text-[11px]">
-            Choose a package manager for every package row.
+            Choose npm or pip for every package row. Legacy package managers are read-only and must
+            be replaced before saving.
           </div>
         ) : null}
       </div>
@@ -396,7 +397,7 @@ export function EnvironmentForm({
       />
 
       <EnvironmentFormSection
-        description="Run after package installation before a session starts."
+        description="Runs after prepared packages are restored in every new Sandbox. Do not install persistent dependencies here."
         title="Setup script"
       >
         <Textarea

@@ -1052,6 +1052,7 @@ type FileRecord {
   scope: FileScope!
   sessionKind: FileSessionKind
   size: Int!
+  sourcePath: String
   status: String!
   updatedAt: String!
   version: Int!

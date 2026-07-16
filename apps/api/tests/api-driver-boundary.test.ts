@@ -47,6 +47,12 @@ const bindings = {
   RUNTIME_ACTION_TOKEN_SECRET: "test-runtime-action-secret",
 } satisfies RuntimeExecutionSpecBindings;
 
+const artifactPaths = {
+  executable: ["/workspace/.mosoo/environment-artifacts/artifact/python/local/bin"],
+  node: ["/workspace/.mosoo/environment-artifacts/artifact/npm/node_modules"],
+  python: ["/workspace/.mosoo/environment-artifacts/artifact/python/site-packages"],
+};
+
 function readText(path: string): string {
   return readFileSync(new URL(path, import.meta.url), "utf8");
 }
@@ -270,7 +276,14 @@ describe("API to driver boundary", () => {
         runtimeId: "openai-runtime",
         value: "thread-1",
       },
-      profile: createDriverProfile(),
+      profile: {
+        ...createDriverProfile(),
+        environmentArtifact: {
+          backupDir: "/workspace/.mosoo/environment-artifacts/artifact",
+          backupId: "11111111-1111-4111-8111-111111111111",
+          paths: artifactPaths,
+        },
+      },
       requestUrl: "http://localhost:8787/api/driver/connect",
       resolvedMcpServers: createResolvedMcpServers(),
       resolvedSkillCatalog: createResolvedSkillCatalog(),
@@ -287,6 +300,7 @@ describe("API to driver boundary", () => {
     expect(execution.environment.variables).toEqual({
       EXISTING_ENV: "kept",
     });
+    expect(execution.environment.paths).toEqual(artifactPaths);
 
     const activeMcpServer = execution.session.mcpServers.find(
       (server) => server.serverId === API_DRIVER_BOUNDARY_IDS.mcpServerLinear,
