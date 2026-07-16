@@ -22,6 +22,8 @@ The App owner creates and manages Environments for Agents in one App. App Users 
 
 The Web UI supports listing, searching, creating, editing, setting a default, and selecting an Environment. Owners can request deletion, but an App default or an Environment still used by an Agent is protected. There is no duplicate or cross-App reuse action in the current UI.
 
+New package declarations currently support `npm` and `pip`. The maintained Driver image verifies both tools during its build. Older revisions that contain `apt`, `cargo`, `gem`, or `go` remain readable, but the editor requires owners to remove or replace those declarations before saving a new revision; Runtime rejects them before allocating a Sandbox rather than failing later on a missing executable. System packages belong in the platform Driver image instead of App-local Environment declarations.
+
 Secret values are encrypted after saving. The editor shows only a masked hint for an existing value, never the full stored value; leaving it blank preserves it.
 
 Package declarations accept public npm and PyPI packages with exact versions. They are prepared asynchronously and reused within the same App when the declarations and artifact ABI are unchanged. A Session freezes its package declarations, so later Environment edits do not change an existing Session. Package managers never run on the Task provisioning hot path, and mosoo does not fall back to runtime installation when an artifact is unavailable.
