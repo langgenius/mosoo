@@ -6,7 +6,7 @@ import type {
   AgentPackageResolutionSummary,
   AgentResolutionIssue,
 } from "@mosoo/contracts/agent-manifest";
-import { environmentsTable } from "@mosoo/db";
+import { environmentRevisionsTable, environmentsTable } from "@mosoo/db";
 import type { AccountId, EnvironmentId, AppId, SkillId } from "@mosoo/id";
 import { and, eq, sql } from "drizzle-orm";
 import { zipSync } from "fflate";
@@ -15,6 +15,10 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { isTruthy } from "../../../shared/truthiness";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
+import {
+  normalizePackages,
+  parsePackagesJson,
+} from "../../environments/application/environment-config";
 import { listAppSkillRows } from "../../skills/application/skill-access.service";
 import { createSkillFromUpload } from "../../skills/application/skill-package-write.service";
 import { readEnvironmentId, readSkillId, readSkillSnapshotId } from "./agent-platform-ids";
@@ -223,15 +227,22 @@ async function findEnvironmentByName(
   database: D1Database,
   appId: AppId,
   name: string | null,
-): Promise<{ id: EnvironmentId } | null> {
+): Promise<{ id: EnvironmentId; packagesJson: string } | null> {
   if (!isTruthy(name)) {
     return null;
   }
 
   return (
     (await getAppDatabase(database)
-      .select({ id: environmentsTable.id })
+      .select({
+        id: environmentsTable.id,
+        packagesJson: environmentRevisionsTable.packagesJson,
+      })
       .from(environmentsTable)
+      .innerJoin(
+        environmentRevisionsTable,
+        eq(environmentRevisionsTable.id, environmentsTable.currentRevisionId),
+      )
       .where(
         and(
           eq(environmentsTable.appId, appId),
@@ -241,6 +252,39 @@ async function findEnvironmentByName(
       .limit(1)
       .get()) ?? null
   );
+}
+
+function environmentPackagesMatch(manifest: AgentManifest, packagesJson: string): boolean {
+  const expected = manifest.environment.packages ?? [];
+  if (!expected.some((entry) => entry.packages.length > 0)) {
+    return true;
+  }
+  const actual = parsePackagesJson(packagesJson);
+  if (
+    [...expected, ...actual].some((entry) => entry.manager !== "npm" && entry.manager !== "pip")
+  ) {
+    return false;
+  }
+  return JSON.stringify(normalizePackages(expected)) === JSON.stringify(normalizePackages(actual));
+}
+
+function resolveMatchedEnvironment(
+  input: { issues: AgentResolutionIssue[]; manifest: AgentManifest },
+  row: { id: EnvironmentId; packagesJson: string },
+): EnvironmentId | null {
+  if (environmentPackagesMatch(input.manifest, row.packagesJson)) {
+    return row.id;
+  }
+  input.issues.push(
+    createResolutionIssue({
+      actionLabel: "Choose Environment",
+      code: "agent.import.environment_packages.mismatch",
+      message: "Environment package declarations do not match the target Environment.",
+      targetLabel: input.manifest.environment.expectedName,
+      targetType: "environment",
+    }),
+  );
+  return null;
 }
 
 export async function resolvePackageEnvironment(input: {
@@ -259,7 +303,7 @@ export async function resolvePackageEnvironment(input: {
     );
 
     if (row?.appId === input.appId) {
-      return row.id;
+      return resolveMatchedEnvironment(input, row);
     }
   }
 
@@ -271,11 +315,22 @@ export async function resolvePackageEnvironment(input: {
     );
 
     if (matched) {
-      return matched.id;
+      return resolveMatchedEnvironment(input, matched);
     }
   }
 
   if (input.allowTargetNameMatch === false) {
+    if ((manifestEnvironment.packages ?? []).some((entry) => entry.packages.length > 0)) {
+      input.issues.push(
+        createResolutionIssue({
+          actionLabel: "Choose Environment",
+          code: "agent.import.environment_packages.missing",
+          message: "Imported package declarations require a matching target Environment.",
+          targetLabel: manifestEnvironment.expectedName,
+          targetType: "environment",
+        }),
+      );
+    }
     return null;
   }
 

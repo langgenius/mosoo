@@ -24,6 +24,7 @@ type ApiCommandPayload =
   | AppDeploymentRunDispatchCommandPayload
   | ChannelWorkTriggerCommandPayload
   | CostLedgerReconciliationCommandPayload
+  | EnvironmentPackageArtifactBuildCommandPayload
   | ScheduledMaintenanceCommandPayload
   | SessionRunDispatchCommandPayload;
 
@@ -69,6 +70,13 @@ export interface CostLedgerReconciliationCommandPayload {
 
 export interface AppDeploymentRunDispatchCommandPayload {
   appDeploymentRunId: AppDeploymentRunId;
+}
+
+export interface EnvironmentPackageArtifactBuildCommandPayload {
+  appId: AppId;
+  artifactAbi: string;
+  inputDigest: string;
+  packages: { manager: "npm" | "pip"; packages: string[] }[];
 }
 
 export interface SessionRunDispatchCommandPayload {
@@ -489,6 +497,38 @@ function parseAppDeploymentRunDispatchPayload(
   };
 }
 
+function parseEnvironmentPackageArtifactBuildPayload(
+  value: unknown,
+): EnvironmentPackageArtifactBuildCommandPayload {
+  const label = "environment_package_artifact_build payload";
+  const record = requireRecord(value, label);
+  const inputDigest = readNonEmptyString(record, "inputDigest", label);
+  const packageEntries = record["packages"];
+  if (!Array.isArray(packageEntries)) {
+    throw new ApiCommandPayloadError(`${label}.packages must be an array.`);
+  }
+  const packages: EnvironmentPackageArtifactBuildCommandPayload["packages"] = packageEntries.map(
+    (entry, index) => {
+      const packageRecord = requireRecord(entry, `${label}.packages[${index}]`);
+      const manager = readNonEmptyString(packageRecord, "manager", `${label}.packages[${index}]`);
+      if (manager !== "npm" && manager !== "pip") {
+        throw new ApiCommandPayloadError(`${label}.packages[${index}].manager is unsupported.`);
+      }
+      return {
+        manager,
+        packages: readStringArray(packageRecord, "packages", `${label}.packages[${index}]`),
+      };
+    },
+  );
+
+  return {
+    appId: parsePlatformId<AppId>(record["appId"], `${label}.appId`),
+    artifactAbi: readNonEmptyString(record, "artifactAbi", label),
+    inputDigest,
+    packages,
+  };
+}
+
 function parsePayloadJson(payloadJson: string): unknown {
   try {
     return JSON.parse(payloadJson) as unknown;
@@ -512,6 +552,9 @@ export function parseApiCommandPayload(
     }
     case "cost_ledger_reconciliation": {
       return parseCostLedgerReconciliationPayload(parsed);
+    }
+    case "environment_package_artifact_build": {
+      return parseEnvironmentPackageArtifactBuildPayload(parsed);
     }
     case "scheduled_maintenance": {
       return parseScheduledMaintenancePayload(parsed);

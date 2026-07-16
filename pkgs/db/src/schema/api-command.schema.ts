@@ -9,6 +9,7 @@ export type ApiCommandKind =
   | "app_deployment_run_dispatch"
   | "channel_work_trigger"
   | "cost_ledger_reconciliation"
+  | "environment_package_artifact_build"
   | "scheduled_maintenance"
   | "session_run_dispatch";
 export type ApiCommandStatus = "dead_lettered" | "failed" | "queued" | "running" | "succeeded";

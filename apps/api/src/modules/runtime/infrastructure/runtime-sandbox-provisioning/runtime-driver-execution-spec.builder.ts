@@ -184,6 +184,11 @@ export async function buildExecutionSpec(
       runId: input.sessionRunId ?? null,
     },
     environment: {
+      paths: input.profile.environmentArtifact?.paths ?? {
+        executable: [],
+        node: [],
+        python: [],
+      },
       variables: { ...input.profile.envVars },
     },
     model: input.profile.model,

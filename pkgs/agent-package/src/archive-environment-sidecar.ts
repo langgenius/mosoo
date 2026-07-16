@@ -3,12 +3,18 @@ import type {
   AgentPackage,
   AgentResolutionIssue,
 } from "@mosoo/contracts/agent-manifest";
+import type { EnvironmentPackageSpec } from "@mosoo/contracts/environment";
 
 import { readArchiveBytes, readArchiveJson } from "./archive-bytes";
 import { ENVIRONMENT_DEFINITION_PATH } from "./archive-constants";
 import { createArchiveIssue } from "./archive-issue";
 
-const ENVIRONMENT_SIDECAR_FIELDS = new Set(["expectedName", "secretNames", "setupScript"]);
+const ENVIRONMENT_SIDECAR_FIELDS = new Set([
+  "expectedName",
+  "packages",
+  "secretNames",
+  "setupScript",
+]);
 const ENVIRONMENT_SIDECAR_FORBIDDEN_SECRET_FIELDS = new Set([
   "access_token",
   "accesstoken",
@@ -169,11 +175,40 @@ function readEnvironmentDefinition(
       typeof environmentDefinition["expectedName"] === "string"
         ? environmentDefinition["expectedName"]
         : null,
+    packages: readEnvironmentPackages(environmentDefinition["packages"]),
     setupScript:
       typeof environmentDefinition["setupScript"] === "string"
         ? environmentDefinition["setupScript"]
         : "",
   };
+}
+
+function readEnvironmentPackages(value: unknown): EnvironmentPackageSpec[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry): EnvironmentPackageSpec[] => {
+    if (!isRecord(entry) || !Array.isArray(entry["packages"])) {
+      return [];
+    }
+    const manager = entry["manager"];
+    if (
+      manager !== "apt" &&
+      manager !== "cargo" &&
+      manager !== "gem" &&
+      manager !== "go" &&
+      manager !== "npm" &&
+      manager !== "pip"
+    ) {
+      return [];
+    }
+    const packages = entry["packages"];
+    if (!packages.every((packageSpec) => typeof packageSpec === "string")) {
+      return [];
+    }
+    return [{ manager, packages }];
+  });
 }
 
 function readEnvironmentDefinitionRef(manifestJson: string): string | null {

@@ -1,3 +1,4 @@
+import type { EnvironmentPackageSpec } from "../environment/environment.contract";
 import type { AgentId, FileId, AppId } from "../id/id.contract";
 import type { JsonObject } from "../validation/primitives.contract";
 import { AGENT_MANIFEST_VERSION, AGENT_PACKAGE_VERSION } from "./agent-manifest-version.contract";
@@ -74,6 +75,7 @@ export interface AgentManifestEnvironmentReference {
   environmentId: string | null;
   expectedName: string | null;
   envVars: Record<string, string>;
+  packages?: EnvironmentPackageSpec[];
   setupScript: string;
 }
 

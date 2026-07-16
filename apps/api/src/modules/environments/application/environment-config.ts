@@ -173,31 +173,32 @@ function normalizeAllowedHosts(hosts: string[]): string[] {
   return [...new Set(hosts.map(normalizeHost))];
 }
 
-function normalizePackages(packages: EnvironmentPackageSpec[]): EnvironmentPackageSpec[] {
-  const normalized: EnvironmentPackageSpec[] = [];
+const NPM_PACKAGE =
+  /^(?:[a-z0-9][a-z0-9._-]*|@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*)@[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/u;
+const PIP_PACKAGE = /^[A-Za-z0-9][A-Za-z0-9._-]*==[A-Za-z0-9][A-Za-z0-9._+!-]*$/u;
+
+export function normalizePackages(
+  packages: readonly EnvironmentPackageSpec[],
+): { manager: "npm" | "pip"; packages: string[] }[] {
+  const grouped: Record<"npm" | "pip", Set<string>> = { npm: new Set(), pip: new Set() };
 
   for (const entry of packages) {
-    if (!PACKAGE_MANAGER_SET.has(entry.manager)) {
-      throw new Error("Package manager must be apt, cargo, gem, go, npm, or pip.");
+    if (entry.manager !== "npm" && entry.manager !== "pip") {
+      throw new Error("Package manager must be npm or pip.");
     }
-
-    const specs = [...new Set(entry.packages.map((spec) => spec.trim()).filter(Boolean))];
-
-    for (const spec of specs) {
-      if (!/^[A-Za-z0-9._@/+=:-]+$/u.test(spec)) {
-        throw new Error(`Package spec ${spec} contains unsupported characters.`);
+    for (const rawSpec of entry.packages) {
+      const spec = rawSpec.trim();
+      if (!(entry.manager === "npm" ? NPM_PACKAGE : PIP_PACKAGE).test(spec)) {
+        throw new Error(`${entry.manager} package ${spec || "<empty>"} must use an exact version.`);
       }
-    }
-
-    if (specs.length > 0) {
-      normalized.push({
-        manager: entry.manager,
-        packages: specs,
-      });
+      grouped[entry.manager].add(spec);
     }
   }
 
-  return normalized;
+  return (["npm", "pip"] as const).flatMap((manager) => {
+    const specs = [...grouped[manager]].toSorted();
+    return specs.length === 0 ? [] : [{ manager, packages: specs }];
+  });
 }
 
 function normalizeEnvVarKey(key: string): string {
@@ -350,39 +351,4 @@ export function serializeConfig(input: EnvironmentMutableConfig): {
     envVarsJson: serializeEnvVars(input.envVars),
     packagesJson: JSON.stringify(input.packages),
   };
-}
-
-export function makePackageSetupScript(packages: EnvironmentPackageSpec[]): string {
-  const commands: string[] = [];
-  const byManager = new Map<EnvironmentPackageManager, string[]>();
-
-  for (const entry of packages) {
-    byManager.set(entry.manager, [...(byManager.get(entry.manager) ?? []), ...entry.packages]);
-  }
-
-  for (const manager of PACKAGE_MANAGERS) {
-    const specs = byManager.get(manager) ?? [];
-
-    if (specs.length === 0) {
-      continue;
-    }
-
-    const quoted = specs.map((spec) => `'${spec.replaceAll("'", String.raw`'\''`)}'`).join(" ");
-
-    if (manager === "apt") {
-      commands.push(`apt-get update && apt-get install -y ${quoted}`);
-    } else if (manager === "cargo") {
-      commands.push(`cargo install ${quoted}`);
-    } else if (manager === "gem") {
-      commands.push(`gem install ${quoted}`);
-    } else if (manager === "go") {
-      commands.push(`go install ${quoted}`);
-    } else if (manager === "npm") {
-      commands.push(`npm install -g ${quoted}`);
-    } else {
-      commands.push(`pip install ${quoted}`);
-    }
-  }
-
-  return commands.join("\n");
 }

@@ -1,3 +1,4 @@
+import type { EnvironmentPackageSpec } from "../environment/environment.contract";
 import type {
   AgentManifestMcpServerBinding,
   AgentManifestSkillReference,
@@ -96,6 +97,29 @@ export function readStringRecord(value: unknown): Record<string, string> {
   }
 
   return result;
+}
+
+export function readEnvironmentPackageSpec(value: unknown): EnvironmentPackageSpec | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const manager = readString(value, "manager");
+  if (
+    manager !== "apt" &&
+    manager !== "cargo" &&
+    manager !== "gem" &&
+    manager !== "go" &&
+    manager !== "npm" &&
+    manager !== "pip"
+  ) {
+    return null;
+  }
+  const packages = value["packages"];
+  if (!Array.isArray(packages) || !packages.every((entry) => typeof entry === "string")) {
+    return null;
+  }
+  return { manager, packages };
 }
 
 export function readJsonObjectField(value: unknown, label: string): Record<string, unknown> {

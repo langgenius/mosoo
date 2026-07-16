@@ -23,6 +23,8 @@ import {
   decryptEnvironmentVariables,
   parseStoredEnvVarsJson,
 } from "../../../environments/application/environment-config";
+import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
+import { resolveEnvironmentSetupScriptForExecution } from "../../../environments/application/environment-runtime-snapshot";
 import { resolveRuntimeMcpServersForSnapshot } from "../../../mcp/application/mcp-runtime.service";
 import { enforceSafeApiBase } from "../../../vendor-credentials/application/vendor-credential-validation";
 import { resolveVendorApiKey } from "../../../vendor-credentials/application/vendor-credential.service";
@@ -339,7 +341,7 @@ async function hydrateRunContextFromSession(
     throw new Error(`Runtime ${binding.runtimeId} does not declare vendor ${binding.provider}.`);
   }
 
-  const [credential, snapshotEnvVars] = await Promise.all([
+  const [credential, snapshotEnvVars, environmentArtifact, setupScript] = await Promise.all([
     resolveVendorApiKey({
       bindings,
       executionOwnerUserId: agent.ownerId,
@@ -351,6 +353,12 @@ async function hydrateRunContextFromSession(
       environmentId: environmentSnapshot.environmentId,
       envVars: parseStoredEnvVarsJson(environmentSnapshot.envVarsJson),
     }),
+    resolveReadyEnvironmentPackageArtifact(
+      bindings,
+      session.appId,
+      environmentSnapshot.packagesJson,
+    ),
+    resolveEnvironmentSetupScriptForExecution(bindings.DB, environmentSnapshot),
   ]);
 
   if (!credential) {
@@ -402,6 +410,7 @@ async function hydrateRunContextFromSession(
         sessionId: session.id,
       },
       envVars,
+      environmentArtifact,
       executionOwnerUserId: agent.ownerId,
       kind: binding.kind,
       model: binding.model,
@@ -412,7 +421,7 @@ async function hydrateRunContextFromSession(
       runtimeId,
       sandboxId: runtimeProfileIds.sandboxId,
       sessionId: session.id,
-      setupScript: environmentSnapshot.setupScript,
+      setupScript,
     });
   } catch (error) {
     await appendRuntimeDiagnosticEvent(bindings, {
@@ -558,6 +567,7 @@ async function refreshCachedRunContextVolatileFields(
       sessionId: session.id,
     },
     envVars,
+    environmentArtifact: cached.profile.environmentArtifact ?? null,
     executionOwnerUserId: agent.ownerId,
     kind: binding.kind,
     model: binding.model,

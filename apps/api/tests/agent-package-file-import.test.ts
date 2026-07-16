@@ -500,4 +500,29 @@ describe("agent package file import", () => {
 
     expect(row?.environment_id).toBeNull();
   });
+
+  test("reports imported package declarations as an Environment requirement", async () => {
+    const packageFixture = createPackageFixture();
+    packageFixture.manifest.environment.environmentId = PUBLIC_API_TEST_IDS.environment;
+    packageFixture.manifest.environment.packages = [
+      { manager: "pip", packages: ["requests==2.32.4"] },
+    ];
+    const { bindings, database, fileId } = await createFixture({
+      archiveBytes: createAgentPackageArchiveBytes(packageFixture),
+    });
+
+    const imported = await importAgentPackage(bindings, OWNER_VIEWER, {
+      fileId,
+      appId: APP_ID,
+    });
+    const row = await database
+      .prepare("SELECT environment_id FROM agent WHERE id = ?")
+      .bind(imported.agent.id)
+      .first<{ environment_id: string | null }>();
+
+    expect(row?.environment_id).toBeNull();
+    expect(imported.resolution.issues).toContainEqual(
+      expect.objectContaining({ code: "agent.import.environment_packages.missing" }),
+    );
+  });
 });

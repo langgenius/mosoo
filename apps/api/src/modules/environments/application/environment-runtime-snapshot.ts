@@ -1,11 +1,40 @@
-import type { AccountId, EnvironmentId, AppId } from "@mosoo/id";
+import { environmentRevisionsTable } from "@mosoo/db";
+import type { AccountId, EnvironmentId, EnvironmentRevisionId, AppId } from "@mosoo/id";
+import { eq } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import { getAppDatabase } from "../../../platform/db/drizzle";
 import { ensureEnvironmentAccess } from "./environment-access.service";
-import { decryptEnvironmentVariables, makePackageSetupScript } from "./environment-config";
+import { decryptEnvironmentVariables, parsePackagesJson } from "./environment-config";
 import { toConfig } from "./environment-config-mapping";
 import { getAppDefaultEnvironmentId } from "./environment-defaults";
 import type { EnvironmentRecordRow } from "./environment-types";
+
+export async function resolveEnvironmentSetupScriptForExecution(
+  database: D1Database,
+  input: {
+    packagesJson: string;
+    revisionId: EnvironmentRevisionId;
+    setupScript: string;
+  },
+): Promise<string> {
+  if (!parsePackagesJson(input.packagesJson).some((entry) => entry.packages.length > 0)) {
+    return input.setupScript;
+  }
+
+  const row = await getAppDatabase(database)
+    .select({ setupScript: environmentRevisionsTable.setupScript })
+    .from(environmentRevisionsTable)
+    .where(eq(environmentRevisionsTable.id, input.revisionId))
+    .limit(1)
+    .get();
+
+  if (!row) {
+    throw new Error("Session Environment revision is unavailable.");
+  }
+
+  return row.setupScript;
+}
 
 async function resolveAgentEnvironmentRecord(
   bindings: ApiBindings,
@@ -44,13 +73,11 @@ export async function resolveAgentEnvironmentSnapshot(
     environmentId: row.id,
     envVars: config.envVars,
   });
-  const packageSetupScript = makePackageSetupScript(config.packages);
-  const setupScript = [packageSetupScript, config.setupScript].filter(Boolean).join("\n\n");
 
   return {
     envVars,
     name: row.name,
     record: row,
-    setupScript,
+    setupScript: config.setupScript,
   };
 }

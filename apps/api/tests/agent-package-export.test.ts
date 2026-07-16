@@ -21,6 +21,7 @@ function createSourceManifest(): AgentManifest {
         API_TOKEN: "source-secret",
       },
       expectedName: "Production tools",
+      packages: [{ manager: "pip", packages: ["requests==2.32.4"] }],
       setupScript: "bun install",
     },
     kind: "pet",
@@ -70,6 +71,7 @@ describe("agent package export", () => {
       environmentId: null,
       envVars: { API_TOKEN: "" },
       expectedName: "Production tools",
+      packages: [{ manager: "pip", packages: ["requests==2.32.4"] }],
     });
     expect(manifest.mcpServers[0]?.serverId).toBeNull();
     expect(manifest.skills[0]?.skillId).toBe("skills/billing-helper/");
@@ -79,5 +81,6 @@ describe("agent package export", () => {
     for (const sourceId of Object.values(SOURCE_IDS)) {
       expect(manifestYaml).not.toContain(sourceId);
     }
+    expect(manifestYaml).toContain("requests==2.32.4");
   });
 });

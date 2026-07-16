@@ -6,6 +6,8 @@ import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
   createPublicHttpTestBindings,
+  createApiCommandQueueStub,
+  PublicApiMemoryFileBucket,
   PUBLIC_API_TEST_IDS,
 } from "./helpers/public-api-http-test-fixture";
 
@@ -162,6 +164,41 @@ describe("createAgentSession", () => {
       code: "AGENT_SESSION_NOT_READY",
       status: 400,
     });
+
+    const row = await database
+      .prepare('SELECT COUNT(*) AS count FROM "session"')
+      .first<{ count: number }>();
+    expect(row?.count).toBe(0);
+  });
+
+  test("does not create a Session while Environment packages are preparing", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await database
+      .prepare("UPDATE environment_revision SET packages_json = ? WHERE id = ?")
+      .bind(
+        JSON.stringify([{ manager: "pip", packages: ["requests==2.32.4"] }]),
+        PUBLIC_API_TEST_IDS.environmentRevision,
+      )
+      .run();
+    const bindings = {
+      ...createPublicHttpTestBindings(database),
+      ENVIRONMENT_ARTIFACT_BUILD_QUEUE: createApiCommandQueueStub(),
+      SANDBOX_STATE_BUCKET: new PublicApiMemoryFileBucket(),
+    } as ApiBindings;
+
+    await expect(
+      withProviderProbeMock(() =>
+        createAgentSession({
+          bindings,
+          input: {
+            agentId: PUBLIC_API_TEST_IDS.agent,
+            appId: PUBLIC_API_TEST_IDS.app,
+            type: "preview",
+          },
+          viewer: OWNER_VIEWER,
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "ENVIRONMENT_ARTIFACT_PREPARING" });
 
     const row = await database
       .prepare('SELECT COUNT(*) AS count FROM "session"')

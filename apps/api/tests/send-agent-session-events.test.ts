@@ -57,7 +57,7 @@ async function insertQueuedRunFixture(
   await database
     .prepare(
       `
-        INSERT INTO session_execution_snapshot (
+        INSERT OR REPLACE INTO session_execution_snapshot (
           session_id,
           plan_json,
           created_at
@@ -358,7 +358,7 @@ describe("send agent session events", () => {
     await database
       .prepare(
         `
-          INSERT INTO session_execution_snapshot (
+          INSERT OR REPLACE INTO session_execution_snapshot (
             session_id,
             plan_json,
             created_at

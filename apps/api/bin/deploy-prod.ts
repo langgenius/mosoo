@@ -103,7 +103,8 @@ async function assertProdSchemaMatchesBaseline(): Promise<void> {
   writeStdout(`  prod schema OK (${expectedTables.length} baseline tables present)`);
 }
 
-const CHANNEL_FINAL_DELIVERY_QUEUES: readonly string[] = [
+const REQUIRED_PROD_QUEUES: readonly string[] = [
+  "environment-artifact-build",
   "channel-final-delivery",
   "channel-final-delivery-dlq",
 ];
@@ -161,9 +162,9 @@ function ensureQueueExists(queueName: string, existingQueues: readonly string[])
   );
 }
 
-function ensureChannelFinalDeliveryQueues(): void {
+function ensureRequiredProdQueues(): void {
   const listing = listProdQueues();
-  for (const queueName of CHANNEL_FINAL_DELIVERY_QUEUES) {
+  for (const queueName of REQUIRED_PROD_QUEUES) {
     ensureQueueExists(queueName, listing);
   }
 }
@@ -177,8 +178,8 @@ await assertProdSchemaMatchesBaseline().catch((error: unknown) => {
   process.exit(1);
 });
 
-writeStdout("▶ Ensuring channel-final-delivery queues exist");
-ensureChannelFinalDeliveryQueues();
+writeStdout("▶ Ensuring required production queues exist");
+ensureRequiredProdQueues();
 
 writeStdout("▶ Building driver");
 runVp(["run", "--filter", "agent-driver", "build"]);

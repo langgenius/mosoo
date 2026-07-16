@@ -15,6 +15,7 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { toIsoString } from "../../../../time";
 import { enqueueSessionRunDispatchCommand } from "../../../api-command/application/api-command-enqueue";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
+import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
 import { fileStore } from "../../../files/application/file-store";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { insertSessionMessageRecord } from "../../../sessions/application/session-message-write.service";
@@ -24,6 +25,7 @@ import {
   createSessionRunRecordIfSessionIdle,
   SessionRunCreationGuardRejectedError,
 } from "../../infrastructure/session-runs/session-run-store.repository";
+import { getSessionExecutionPlan } from "../session-definition/session-execution.repository";
 import { dispatchQueuedSessionRun } from "./dispatch-queued-run.service";
 import { createQueuedSessionRunRuntimeEvents } from "./session-run-view-events.service";
 import { reconcileStaleActiveSessionRun } from "./stale-run-reconciliation.service";
@@ -90,6 +92,13 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
   if (runtimeId === null) {
     throw new Error(`Unsupported runtime: ${input.session.runtime_id}.`);
   }
+
+  const executionPlan = await getSessionExecutionPlan(bindings.DB, input.session.id);
+  await resolveReadyEnvironmentPackageArtifact(
+    bindings,
+    input.session.app_id,
+    executionPlan.environment.packagesJson,
+  );
 
   await fileStore.ensureSessionAttachments(
     bindings,

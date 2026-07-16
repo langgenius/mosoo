@@ -107,6 +107,7 @@ Acceptance:
 
 - `api-command` exists.
 - `api-command-dlq` exists.
+- `environment-artifact-build` exists.
 - `channel-final-delivery` exists.
 - `channel-final-delivery-dlq` exists.
 
@@ -125,7 +126,7 @@ Acceptance:
 
 This validates the API Worker bundle without publishing it. It does not run the
 full API deploy script because the real script applies D1 migrations and ensures
-the channel-final-delivery queues.
+the required artifact and channel-delivery queues.
 
 ```bash
 cd apps/api
@@ -181,9 +182,10 @@ Acceptance:
 - `apps/api/bin/deploy-prod.ts` still performs, in order: apply pending remote
   D1 migrations (its first remote mutation), verify every baseline table exists
   in prod (the DEPLOY-D1-001 guard against a rewritten baseline being silently
-  skipped), ensure the channel-final-delivery queues, build the Driver, then
-  deploy the API Worker. The script performs no clean-worktree check and no
-  dry-run of its own; Steps 0-7 of this runbook are the only preflight.
+  skipped), ensure the required artifact and channel-delivery queues, build the
+  Driver, then deploy the API Worker. The script performs no clean-worktree
+  check and no dry-run of its own; Steps 0-7 of this runbook are the only
+  preflight.
 
 ## Step 9 - Final Worktree Check
 
@@ -218,10 +220,10 @@ Acceptance before running `just deploy`:
 (`just check`), then `deploy:api`, then `deploy:web`. The API deploy
 (`apps/api/bin/deploy-prod.ts`) applies pending remote D1 migrations as its
 very first remote action — before any build or bundle validation — then runs
-the baseline schema guard, ensures the channel-final-delivery queues, builds
-the Driver, and deploys the API Worker. The Web deploy then builds and
-publishes the Web Worker. Neither deploy performs its own worktree check or
-dry-run; that is exactly why the simulation steps above are required.
+the baseline schema guard, ensures the required artifact and channel-delivery
+queues, builds the Driver, and deploys the API Worker. The Web deploy then
+builds and publishes the Web Worker. Neither deploy performs its own worktree
+check or dry-run; that is exactly why the simulation steps above are required.
 
 The preflights prevent deterministic build, bundle, config, and migration-chain
 failures from surfacing after a remote mutation. Cloudflare publication across
