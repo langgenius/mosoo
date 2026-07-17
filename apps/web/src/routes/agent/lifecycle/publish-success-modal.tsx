@@ -37,7 +37,7 @@ export function PublishSuccessModal({
       <DialogContent className="flex max-h-[88vh] flex-col overflow-hidden rounded-lg p-0 sm:max-w-[540px]">
         <DialogHeader className="px-6 pt-6 pb-3">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-800">
+            <div className="mosoo-success-pop flex size-10 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-800">
               <Check className="size-5" strokeWidth={2.5} />
             </div>
             <div className="min-w-0">

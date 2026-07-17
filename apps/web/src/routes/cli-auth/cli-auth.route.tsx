@@ -70,7 +70,7 @@ function StatusMessage({ error, status }: { error: Error | null; status: string 
   if (status === "authorized") {
     return (
       <p className="text-success inline-flex items-center gap-2 text-sm">
-        <CheckCircle2 className="size-4" />
+        <CheckCircle2 className="mosoo-success-pop size-4" />
         CLI access authorized.
       </p>
     );

@@ -39,6 +39,28 @@ function isOrgNavItemActive(pathname: string, path: string): boolean {
   return pathname === path || pathname.startsWith(`${path}/`);
 }
 
+function SidebarLabel({
+  children,
+  className,
+  collapsed,
+}: {
+  children: string;
+  className?: string;
+  collapsed: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "min-w-0 truncate transition-opacity duration-[var(--dur-1)] ease-[var(--ease-out)]",
+        collapsed ? "max-w-0 opacity-0" : "max-w-[160px] opacity-100 delay-[80ms]",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 function ComingSoonItem({
   collapsed,
   icon: Icon,
@@ -57,14 +79,17 @@ function ComingSoonItem({
       )}
     >
       <Icon className="size-4 shrink-0" />
-      {collapsed ? null : (
-        <>
-          <span className="flex-1 truncate text-left">{label}</span>
-          <span className="bg-bg-sunken text-fg-3 rounded-full px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wide uppercase">
-            Soon
-          </span>
-        </>
-      )}
+      <SidebarLabel className="flex-1 text-left" collapsed={collapsed}>
+        {label}
+      </SidebarLabel>
+      <span
+        className={cn(
+          "bg-bg-sunken text-fg-3 rounded-full px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wide uppercase transition-opacity duration-[var(--dur-1)] ease-[var(--ease-out)]",
+          collapsed ? "max-w-0 opacity-0" : "max-w-[44px] opacity-100 delay-[80ms]",
+        )}
+      >
+        Soon
+      </span>
     </div>
   );
 
@@ -104,7 +129,9 @@ function OrgNavLink({
       )}
     >
       <Icon className="size-4 shrink-0" />
-      {collapsed ? null : <span className="flex-1 truncate text-left">{label}</span>}
+      <SidebarLabel className="flex-1 text-left" collapsed={collapsed}>
+        {label}
+      </SidebarLabel>
     </Link>
   );
 

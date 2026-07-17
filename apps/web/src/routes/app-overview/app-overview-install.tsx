@@ -1,4 +1,4 @@
-import { Check, Copy, KeyRound } from "lucide-react";
+import { Check, KeyRound } from "lucide-react";
 import type { ReactElement } from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { writeClipboardText } from "@/shared/lib/clipboard";
 import { RuntimeIcon } from "@/shared/ui/brand-icons";
 import { Button } from "@/shared/ui/button";
+import { CopyIconFeedback } from "@/shared/ui/copy-icon-feedback";
 
 const INSTALL_COMMAND = "curl -fsSL https://install.mosoo.ai/install.sh | bash";
 const API_TOKENS_PATH = "/settings/access-tokens";
@@ -67,7 +68,7 @@ export function AppOverviewInstallGuide(): ReactElement {
             size="default"
             variant="accent"
           >
-            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+            <CopyIconFeedback copied={copied} />
             {copied ? "Copied" : "Copy"}
           </Button>
         </div>

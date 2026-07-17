@@ -133,19 +133,26 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                       className={cn("size-3.5 transition-transform", expanded && "rotate-180")}
                     />
                   </button>
-                  {expanded ? (
-                    <div className="border-border bg-bg-sunken/40 mt-1 rounded-md border px-3.5 py-2.5 text-[13px]">
-                      <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
-                        Failure details
+                  <div
+                    className={cn(
+                      "grid transition-[grid-template-rows] duration-200 ease-out",
+                      expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+                    )}
+                  >
+                    <div className="overflow-hidden">
+                      <div className="border-border bg-bg-sunken/40 mt-1 rounded-md border px-3.5 py-2.5 text-[13px]">
+                        <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
+                          Failure details
+                        </div>
+                        {run.errorCode === null ? null : (
+                          <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">
+                            {run.errorCode}
+                          </span>
+                        )}
+                        <span className="text-fg-2 break-words">{run.errorMessage ?? ""}</span>
                       </div>
-                      {run.errorCode === null ? null : (
-                        <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">
-                          {run.errorCode}
-                        </span>
-                      )}
-                      <span className="text-fg-2 break-words">{run.errorMessage ?? ""}</span>
                     </div>
-                  ) : null}
+                  </div>
                 </>
               )}
             </article>
@@ -225,19 +232,30 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                       </div>
                     </TableCell>
                   </TableRow>
-                  {failedError === null || !expanded ? null : (
+                  {failedError === null ? null : (
                     <TableRow className="hover:bg-transparent">
-                      <TableCell colSpan={3} className="px-5 pt-0 pb-4">
-                        <div className="border-border bg-bg-sunken/40 rounded-md border px-3.5 py-2.5 text-[13px]">
-                          <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
-                            Failure details
-                          </div>
-                          {run.errorCode === null ? null : (
-                            <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">
-                              {run.errorCode}
-                            </span>
+                      <TableCell colSpan={3} className="px-5 pt-0 pb-0">
+                        <div
+                          className={cn(
+                            "grid transition-[grid-template-rows] duration-200 ease-out",
+                            expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
                           )}
-                          <span className="text-fg-2">{run.errorMessage ?? ""}</span>
+                        >
+                          <div className="overflow-hidden">
+                            <div className="pb-4">
+                              <div className="border-border bg-bg-sunken/40 rounded-md border px-3.5 py-2.5 text-[13px]">
+                                <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
+                                  Failure details
+                                </div>
+                                {run.errorCode === null ? null : (
+                                  <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">
+                                    {run.errorCode}
+                                  </span>
+                                )}
+                                <span className="text-fg-2">{run.errorMessage ?? ""}</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </TableCell>
                     </TableRow>

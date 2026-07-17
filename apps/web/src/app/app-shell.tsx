@@ -39,6 +39,19 @@ const ExpandSidebarIcon = createHugeicon(PanelLeftOpenIcon, "ExpandSidebarIcon")
 const NewAgentIcon = createHugeicon(PlusSignIcon, "NewAgentIcon");
 const SwitcherChevronIcon = createHugeicon(ChevronsDownUpIcon, "SwitcherChevronIcon");
 
+function SidebarWordmark({ collapsed }: { collapsed: boolean }) {
+  return (
+    <span
+      className={cn(
+        "overflow-hidden transition-[max-width,opacity] duration-[var(--dur-1)] ease-[var(--ease-out)]",
+        collapsed ? "max-w-0 opacity-0" : "max-w-[104px] opacity-100 delay-[80ms]",
+      )}
+    >
+      <img src="/brand/logo-wordmark-onlight.svg" alt="Mosoo" className="block h-[22px]" />
+    </span>
+  );
+}
+
 // One-click return to the parent Org layer (the Apps list).
 function BackToOrgLink({ collapsed, orgName }: { collapsed: boolean; orgName: string | null }) {
   const label = orgName ?? "Apps";
@@ -321,9 +334,7 @@ function ConsoleShell({
             collapsed ? "justify-center" : "justify-between",
           )}
         >
-          {collapsed ? null : (
-            <img src="/brand/logo-wordmark-onlight.svg" alt="Mosoo" className="block h-[22px]" />
-          )}
+          <SidebarWordmark collapsed={collapsed} />
           <Tooltip>
             <TooltipTrigger asChild>
               <button

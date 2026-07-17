@@ -7,7 +7,6 @@ import type {
 import {
   Archive,
   ArrowLeft,
-  ChevronDown,
   ChevronRight,
   CornerDownLeft,
   Inbox,
@@ -24,6 +23,7 @@ import type { ReactElement } from "react";
 import type { ListedFileEntry } from "@/domains/file/api/files";
 import { triggerAgentSessionPrewarm } from "@/domains/session/api/agent-session";
 import { toSessionId } from "@/routes/typed-id";
+import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import {
@@ -88,11 +88,12 @@ function ThreadActivityCard({
         }}
         className="hover:bg-ink-900/[0.02] flex w-full items-center gap-2 rounded-t-lg px-3 py-2 text-left"
       >
-        {open ? (
-          <ChevronDown className="text-fg-3 size-3.5 shrink-0" />
-        ) : (
-          <ChevronRight className="text-fg-3 size-3.5 shrink-0" />
-        )}
+        <ChevronRight
+          className={cn(
+            "text-fg-3 size-3.5 shrink-0 transition-transform duration-150 ease-out",
+            open ? "rotate-90" : "rotate-0",
+          )}
+        />
         {isUser ? (
           <UserAvatar
             image={viewer.image}
@@ -112,35 +113,42 @@ function ThreadActivityCard({
           {formatRelativeTime(message.createdAt)}
         </span>
       </button>
-      {open ? (
-        <div className="border-border-subtle border-t px-4 py-3">
-          {isUser ? (
-            <div className="text-fg-1 text-[13.5px] leading-relaxed whitespace-pre-wrap">
-              {message.content}
-            </div>
-          ) : (
-            <div className="text-fg-1 text-[13.5px] leading-relaxed">
-              <Markdown linkResolver={artifactLinkResolver}>{message.content}</Markdown>
-            </div>
-          )}
-          {!isUser ? (
-            <div className="mt-3">
-              <Button
-                size="xs"
-                variant="outline"
-                className="font-mono text-[11px]"
-                onClick={onOpenProcess}
-              >
-                <ChevronRight className="size-3" />
-                {processButtonText}
-                {processEventCount > 0 ? (
-                  <span className="text-fg-3 ml-1">· {processEventCount} events</span>
-                ) : null}
-              </Button>
-            </div>
-          ) : null}
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-200 ease-out",
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+      >
+        <div aria-hidden={!open} className="overflow-hidden" inert={!open ? true : undefined}>
+          <div className="border-border-subtle border-t px-4 py-3">
+            {isUser ? (
+              <div className="text-fg-1 text-[13.5px] leading-relaxed whitespace-pre-wrap">
+                {message.content}
+              </div>
+            ) : (
+              <div className="text-fg-1 text-[13.5px] leading-relaxed">
+                <Markdown linkResolver={artifactLinkResolver}>{message.content}</Markdown>
+              </div>
+            )}
+            {!isUser ? (
+              <div className="mt-3">
+                <Button
+                  size="xs"
+                  variant="outline"
+                  className="font-mono text-[11px]"
+                  onClick={onOpenProcess}
+                >
+                  <ChevronRight className="size-3" />
+                  {processButtonText}
+                  {processEventCount > 0 ? (
+                    <span className="text-fg-3 ml-1">· {processEventCount} events</span>
+                  ) : null}
+                </Button>
+              </div>
+            ) : null}
+          </div>
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }

@@ -73,6 +73,28 @@ const NAV_SECTIONS: AppNavSection[] = [
 
 const ExpandIcon = createHugeicon(ChevronRightIcon, "ExpandIcon");
 
+function SidebarLabel({
+  children,
+  className,
+  collapsed,
+}: {
+  children: string;
+  className?: string;
+  collapsed: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "min-w-0 truncate transition-opacity duration-[var(--dur-1)] ease-[var(--ease-out)]",
+        collapsed ? "max-w-0 opacity-0" : "max-w-[160px] opacity-100 delay-[80ms]",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 function isNavItemActive(pathname: string, path: string): boolean {
   return pathname === path || pathname.startsWith(`${path}/`);
 }
@@ -101,7 +123,7 @@ function NavLink({
       )}
     >
       <Icon className="size-4" />
-      {collapsed ? null : <span>{label}</span>}
+      <SidebarLabel collapsed={collapsed}>{label}</SidebarLabel>
     </Link>
   );
 
