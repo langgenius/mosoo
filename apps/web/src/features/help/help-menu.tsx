@@ -85,7 +85,7 @@ export function HelpMenu({
       )}
     >
       <HelpCircle className="size-4" />
-      {collapsed ? null : <span>Help &amp; docs</span>}
+      {collapsed ? null : <span className="sidebar-label-enter">Help &amp; docs</span>}
     </button>
   );
 
