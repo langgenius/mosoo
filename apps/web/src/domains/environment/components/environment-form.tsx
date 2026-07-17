@@ -35,6 +35,7 @@ function EnvironmentPackagesSection({
     <EnvironmentFormSection
       action={
         <Button
+          aria-label="Add package"
           className="size-8"
           disabled={disabled}
           onClick={onAdd}
@@ -65,6 +66,7 @@ function EnvironmentPackagesSection({
               value={row.manager}
             />
             <Input
+              aria-label="Package name and version"
               className={cn(
                 "font-mono text-[12px]",
                 row.packagesText.trim() && !row.manager ? "border-destructive" : null,
@@ -80,6 +82,7 @@ function EnvironmentPackagesSection({
               value={row.packagesText}
             />
             <Button
+              aria-label="Remove package"
               className="text-fg-3 hover:text-destructive size-9"
               disabled={disabled}
               onClick={() => {
@@ -124,6 +127,7 @@ function EnvironmentVariablesSection({
     <EnvironmentFormSection
       action={
         <Button
+          aria-label="Add environment variable"
           className="size-8"
           disabled={disabled}
           onClick={onAdd}
@@ -150,6 +154,7 @@ function EnvironmentVariablesSection({
             key={envVar.id}
           >
             <Input
+              aria-label="Variable name"
               className="font-mono text-[12px]"
               disabled={disabled}
               onChange={(event) => {
@@ -166,6 +171,7 @@ function EnvironmentVariablesSection({
               value={envVar.key}
             />
             <Input
+              aria-label="Variable value"
               className="font-mono text-[12px]"
               disabled={disabled}
               onChange={(event) => {
@@ -189,6 +195,7 @@ function EnvironmentVariablesSection({
               value={envVar.value}
             />
             <Button
+              aria-label="Remove environment variable"
               className="text-fg-3 hover:text-destructive size-9"
               disabled={disabled}
               onClick={() => {

@@ -80,7 +80,12 @@ export function McpListItem({
         )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-muted-foreground size-8">
+            <Button
+              aria-label="Server actions"
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground size-8"
+            >
               <MoreHorizontal />
             </Button>
           </DropdownMenuTrigger>
