@@ -269,6 +269,7 @@ function CreatedTokenPanel({
           {token}
         </code>
         <Button
+          aria-label={tooltip}
           onClick={() => {
             void onCopy();
           }}
@@ -312,6 +313,7 @@ function AccessTokensTable({
                 </div>
               </div>
               <Button
+                aria-label="Revoke token"
                 className="min-h-10 min-w-10 shrink-0"
                 disabled={pending || token.revokedAt !== null}
                 onClick={() => {
@@ -386,6 +388,7 @@ function AccessTokenRow({
       <div className="text-muted-foreground text-xs">{formatDateTime(token.lastUsedAt)}</div>
       <div className="flex justify-end">
         <Button
+          aria-label="Revoke token"
           disabled={pending || token.revokedAt !== null}
           onClick={onRevoke}
           size="icon-xs"
