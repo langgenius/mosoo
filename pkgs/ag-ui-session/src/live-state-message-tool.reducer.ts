@@ -11,6 +11,12 @@ interface SegmentLocation<TSegment extends SessionViewSegment> {
   segmentIndex: number;
 }
 
+interface ToolSegmentLocations {
+  messageIndex: number;
+  toolResult: SegmentLocation<ToolResultSegment> | null;
+  toolUse: SegmentLocation<ToolUseSegment> | null;
+}
+
 function isGenericToolName(value: string): boolean {
   return value.trim().toLowerCase() === "tool";
 }
@@ -23,34 +29,47 @@ function mergeToolName(current: string, next: string): string {
   return next;
 }
 
-function findToolUse(
+function findToolSegmentLocations(
   messages: readonly SessionLiveState["messages"][number][],
-  toolCallId: string,
-): SegmentLocation<ToolUseSegment> | null {
-  for (const [messageIndex, message] of messages.entries()) {
+  input: {
+    messageId?: string;
+    primaryKind: ToolUseSegment["kind"] | ToolResultSegment["kind"];
+    toolCallId: string;
+  },
+): ToolSegmentLocations {
+  let messageIndex = -1;
+  let toolResult: SegmentLocation<ToolResultSegment> | null = null;
+  let toolUse: SegmentLocation<ToolUseSegment> | null = null;
+
+  for (const [currentMessageIndex, message] of messages.entries()) {
+    if (input.messageId !== undefined && message.id === input.messageId) {
+      messageIndex = currentMessageIndex;
+    }
+
     for (const [segmentIndex, segment] of message.segments.entries()) {
-      if (segment.kind === "tool_use" && segment.toolCallId === toolCallId) {
-        return { messageIndex, segment, segmentIndex };
+      if (segment.kind === "tool_use" && segment.toolCallId === input.toolCallId) {
+        const location = { messageIndex: currentMessageIndex, segment, segmentIndex };
+
+        if (input.primaryKind === "tool_use") {
+          return { messageIndex, toolResult, toolUse: location };
+        }
+
+        toolUse ??= location;
+      }
+
+      if (segment.kind === "tool_result" && segment.toolCallId === input.toolCallId) {
+        const location = { messageIndex: currentMessageIndex, segment, segmentIndex };
+
+        if (input.primaryKind === "tool_result") {
+          return { messageIndex, toolResult: location, toolUse };
+        }
+
+        toolResult ??= location;
       }
     }
   }
 
-  return null;
-}
-
-function findToolResult(
-  messages: readonly SessionLiveState["messages"][number][],
-  toolCallId: string,
-): SegmentLocation<ToolResultSegment> | null {
-  for (const [messageIndex, message] of messages.entries()) {
-    for (const [segmentIndex, segment] of message.segments.entries()) {
-      if (segment.kind === "tool_result" && segment.toolCallId === toolCallId) {
-        return { messageIndex, segment, segmentIndex };
-      }
-    }
-  }
-
-  return null;
+  return { messageIndex, toolResult, toolUse };
 }
 
 export function appendToolUse(
@@ -62,7 +81,13 @@ export function appendToolUse(
   },
 ): SessionLiveState {
   const messages = [...state.messages];
-  const existingUse = findToolUse(messages, input.toolCallId);
+  const parentMessageId = input.parentMessageId ?? undefined;
+  const locations = findToolSegmentLocations(messages, {
+    ...(parentMessageId ? { messageId: parentMessageId } : {}),
+    primaryKind: "tool_use",
+    toolCallId: input.toolCallId,
+  });
+  const existingUse = locations.toolUse;
 
   if (existingUse !== null) {
     const current = messages[existingUse.messageIndex];
@@ -91,7 +116,7 @@ export function appendToolUse(
     return state;
   }
 
-  const existingResult = findToolResult(messages, input.toolCallId);
+  const existingResult = locations.toolResult;
 
   if (existingResult !== null) {
     const current = messages[existingResult.messageIndex];
@@ -124,7 +149,7 @@ export function appendToolUse(
     });
   }
 
-  const index = messages.findIndex((message) => message.id === input.parentMessageId);
+  const index = locations.messageIndex;
   const toolSegment: SessionViewSegment = {
     argsText: "",
     kind: "tool_use",
@@ -183,7 +208,12 @@ export function appendToolResult(
   input: { content: string; messageId: string; toolCallId: string },
 ): SessionLiveState {
   const messages = [...state.messages];
-  const existingResult = findToolResult(messages, input.toolCallId);
+  const locations = findToolSegmentLocations(messages, {
+    messageId: input.messageId,
+    primaryKind: "tool_result",
+    toolCallId: input.toolCallId,
+  });
+  const existingResult = locations.toolResult;
 
   if (existingResult !== null) {
     const current = messages[existingResult.messageIndex];
@@ -208,7 +238,7 @@ export function appendToolResult(
     });
   }
 
-  const existingUse = findToolUse(messages, input.toolCallId);
+  const existingUse = locations.toolUse;
 
   if (existingUse !== null) {
     const current = messages[existingUse.messageIndex];
@@ -236,18 +266,13 @@ export function appendToolResult(
     });
   }
 
-  const index = messages.findIndex((message) => message.id === input.messageId);
-
+  const index = locations.messageIndex;
   const current = index === -1 ? undefined : messages[index];
-  const matchingToolUse = current?.segments.find(
-    (segment) => segment.kind === "tool_use" && segment.toolCallId === input.toolCallId,
-  );
-  const toolName = matchingToolUse?.kind === "tool_use" ? matchingToolUse.tool : "tool";
 
   const toolSegment: SessionViewSegment = {
     kind: "tool_result",
     output: input.content,
-    tool: toolName,
+    tool: "tool",
     toolCallId: input.toolCallId,
   };
 
@@ -283,24 +308,6 @@ export function appendToolResult(
     });
   }
 
-  const existingResultIndex = current.segments.findIndex(
-    (segment) => segment.kind === "tool_result" && segment.toolCallId === input.toolCallId,
-  );
-
-  if (existingResultIndex !== -1) {
-    const segments = [...current.segments];
-    segments[existingResultIndex] = toolSegment;
-    messages[index] = {
-      ...current,
-      segments,
-    };
-
-    return touchSessionLiveState({
-      ...state,
-      messages,
-    });
-  }
-
   messages[index] = {
     ...current,
     segments: [...current.segments, toolSegment],
@@ -321,17 +328,16 @@ export function appendToolArgs(
   }
 
   const messages = [...state.messages];
-  const messageIndex = messages.findIndex((message) =>
-    message.segments.some(
-      (segment) => segment.kind === "tool_use" && segment.toolCallId === input.toolCallId,
-    ),
-  );
+  const existingUse = findToolSegmentLocations(messages, {
+    primaryKind: "tool_use",
+    toolCallId: input.toolCallId,
+  }).toolUse;
 
-  if (messageIndex === -1) {
+  if (existingUse === null) {
     return state;
   }
 
-  const message = messages[messageIndex];
+  const message = messages[existingUse.messageIndex];
 
   if (!message) {
     return state;
@@ -346,7 +352,7 @@ export function appendToolArgs(
       : segment,
   );
 
-  messages[messageIndex] = {
+  messages[existingUse.messageIndex] = {
     ...message,
     segments,
   };
