@@ -1,3 +1,4 @@
+import { createSessionLiveStateMessage } from "@mosoo/ag-ui-session";
 import type { SessionViewMessage } from "@mosoo/ag-ui-session";
 
 // Optimistic overlay for user messages that were submitted but not yet echoed
@@ -13,10 +14,10 @@ export interface PendingSend {
   readonly text: string;
 }
 
-// Safety valve only: a persisted send always reconciles via echo or snapshot;
-// the TTL covers the black-swan case of server-side content transformation so
-// the composer can never stay blocked forever behind a stuck overlay entry.
-export const PENDING_SEND_TTL_MS = 30_000;
+// Safety valve only: a persisted send always reconciles via echo or snapshot
+// (normally well under a second); the TTL bounds how long the composer can
+// stay blocked in the black-swan case of server-side content transformation.
+export const PENDING_SEND_TTL_MS = 10_000;
 
 // The TTL sweep runs on an interval, not a one-shot timer: a one-shot whose
 // prune no-ops (identity-preserved state, e.g. after a backwards wall-clock
@@ -24,25 +25,23 @@ export const PENDING_SEND_TTL_MS = 30_000;
 export const PENDING_SEND_SWEEP_INTERVAL_MS = 5_000;
 
 export function createPendingSendMessage(pending: PendingSend): SessionViewMessage {
-  return {
+  return createSessionLiveStateMessage({
     content: pending.text,
     createdAt: new Date(pending.createdAtMs).toISOString(),
     id: `pending:${pending.clientRequestId}`,
-    plan: [],
     role: "user",
-    segments: [],
-  };
+  });
 }
 
 export function mergePendingSendMessages(
   messages: SessionViewMessage[],
-  pendingSends: readonly PendingSend[],
+  pendingMessages: readonly SessionViewMessage[],
 ): SessionViewMessage[] {
-  if (pendingSends.length === 0) {
+  if (pendingMessages.length === 0) {
     return messages;
   }
 
-  return [...messages, ...pendingSends.map(createPendingSendMessage)];
+  return [...messages, ...pendingMessages];
 }
 
 function isEchoOfPendingSend(message: SessionViewMessage, pending: PendingSend): boolean {
@@ -69,8 +68,8 @@ export function prunePendingSends(
   );
 
   // Identity preservation is load-bearing: the model prunes inside a state
-  // updater on every message batch, and the unchanged reference is what stops
-  // React from re-rendering in a loop.
+  // updater on every sweep, and the unchanged reference is what stops React
+  // from re-rendering in a loop.
   return remaining.length === pendingSends.length ? pendingSends : remaining;
 }
 

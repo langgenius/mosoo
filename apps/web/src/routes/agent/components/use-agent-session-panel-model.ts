@@ -33,6 +33,7 @@ import {
   deleteAgentSession,
 } from "./agent-session-panel-session-actions";
 import {
+  createPendingSendMessage,
   mergePendingSendMessages,
   PENDING_SEND_SWEEP_INTERVAL_MS,
   prunePendingSends,
@@ -147,40 +148,53 @@ export function useAgentSessionPanelModel(
   );
   const layout = useSessionChatLayoutState(stream.messages, permissionScrollSignal);
 
+  // Fresh messages for the sweep interval without keying the effect on
+  // stream.messages — that identity changes every animation frame during
+  // streaming and would tear the interval down per frame.
+  const streamMessagesRef = useRef(stream.messages);
+  streamMessagesRef.current = stream.messages;
+
   // Reconcile the optimistic overlay against server truth at render time, so
   // the frame that first contains the echoed message never also paints the
-  // pending bubble (a post-commit effect alone leaves a duplicate frame).
+  // pending bubble (a post-commit effect alone leaves a duplicate frame). The
+  // session filter runs here too so a pending entry bound to another session
+  // can never ghost into the newly selected session's thread mid-switch.
   const reconciledPendingSends = useMemo(
-    () => prunePendingSends(pendingSends, stream.messages, Date.now()),
-    [pendingSends, stream.messages],
+    () =>
+      prunePendingSends(
+        prunePendingSendsForSession(pendingSends, activeSessionId),
+        stream.messages,
+        Date.now(),
+      ),
+    [activeSessionId, pendingSends, stream.messages],
   );
-
-  // State GC for the same reconciliation: drop echoed/expired entries from
-  // state so gates and effects settle even when the derived value did the
-  // visual work first.
-  useEffect(() => {
-    setPendingSends((current) => prunePendingSends(current, stream.messages, Date.now()));
-  }, [stream.messages]);
 
   useEffect(() => {
     setPendingSends((current) => prunePendingSendsForSession(current, activeSessionId));
   }, [activeSessionId]);
 
-  // TTL sweep so a stuck entry expires even when no further events arrive;
-  // without it the composer could stay blocked behind a never-reconciled send.
+  // State GC + TTL sweep: gates and visuals read the render-time reconciled
+  // value, so state only needs to catch up eventually — eagerly when the
+  // overlay changes, then every sweep tick so a stuck entry expires even when
+  // no further events arrive and the composer can never stay blocked forever.
   useEffect(() => {
     if (pendingSends.length === 0) {
       return;
     }
 
-    const interval = globalThis.setInterval(() => {
-      setPendingSends((current) => prunePendingSends(current, stream.messages, Date.now()));
-    }, PENDING_SEND_SWEEP_INTERVAL_MS);
+    const sweep = (): void => {
+      setPendingSends((current) =>
+        prunePendingSends(current, streamMessagesRef.current, Date.now()),
+      );
+    };
+
+    sweep();
+    const interval = globalThis.setInterval(sweep, PENDING_SEND_SWEEP_INTERVAL_MS);
 
     return () => {
       globalThis.clearInterval(interval);
     };
-  }, [pendingSends, stream.messages]);
+  }, [pendingSends]);
 
   async function refreshSessions(): Promise<void> {
     if (input.appId === null) {
@@ -193,6 +207,15 @@ export function useAgentSessionPanelModel(
   function clearComposerError(): void {
     setComposerError(null);
   }
+
+  // "Supersede any in-flight create" is one invariant: the epoch bump and the
+  // promise-slot reset must always move together.
+  function supersedeInFlightSessionCreate(): void {
+    sessionEpochRef.current += 1;
+    sessionCreatePromiseRef.current = null;
+  }
+
+  const streamingWithPending = stream.streaming || reconciledPendingSends.length > 0;
 
   async function createSessionAndSelect(
     options: { waitForRuntimeReady?: boolean } = {},
@@ -237,8 +260,7 @@ export function useAgentSessionPanelModel(
     }
 
     setSending(true);
-    sessionEpochRef.current += 1;
-    sessionCreatePromiseRef.current = null;
+    supersedeInFlightSessionCreate();
     setSelectedSessionId(null);
     setInputValue("");
     setPendingSends([]);
@@ -265,8 +287,7 @@ export function useAgentSessionPanelModel(
     }
 
     setSending(true);
-    sessionEpochRef.current += 1;
-    sessionCreatePromiseRef.current = null;
+    supersedeInFlightSessionCreate();
     setInputValue("");
     setPendingSends([]);
     clearComposerError();
@@ -364,7 +385,9 @@ export function useAgentSessionPanelModel(
         appId: input.appId,
         readinessBlockMessage,
         sending,
-        sessionListLoaded: sessionsQuery.isFetched,
+        // isSuccess, not isFetched: a failed list query must not spawn
+        // invisible sessions the broken list cannot show.
+        sessionListLoaded: sessionsQuery.isSuccess,
         sessionType: input.sessionType,
       })
     ) {
@@ -383,8 +406,7 @@ export function useAgentSessionPanelModel(
     }
 
     setSending(true);
-    sessionEpochRef.current += 1;
-    sessionCreatePromiseRef.current = null;
+    supersedeInFlightSessionCreate();
     clearComposerError();
     setSelectedSessionId(null);
 
@@ -418,7 +440,7 @@ export function useAgentSessionPanelModel(
         // In-flight optimistic sends block re-submit like a running turn: the
         // server allows one active run, so a second Enter before the echo
         // would only surface an active-run error.
-        streaming: stream.streaming || reconciledPendingSends.length > 0,
+        streaming: streamingWithPending,
         typedText,
       })
     ) {
@@ -540,20 +562,31 @@ export function useAgentSessionPanelModel(
       return;
     }
 
-    // During the optimistic pending window there is no run to interrupt yet;
-    // skip only when the server itself does not report a running turn (a
-    // null runId with server-side RUNNING is a legitimate interrupt, e.g.
-    // right after a reconnect resume).
-    if (stream.run.id === null && !stream.streaming) {
-      return;
-    }
+    const runId = stream.run.id;
 
-    await stream.sendUserInterrupt({ runId: stream.run.id, sessionId: activeSessionId });
+    try {
+      // A null runId is resolved to the session's active run server-side, so
+      // Stop works during the optimistic window too: once the send HTTP has
+      // resolved, the queued run exists and gets interrupted.
+      await stream.sendUserInterrupt({ runId, sessionId: activeSessionId });
+    } catch (error) {
+      if (runId !== null) {
+        throw error;
+      }
+      // Best-effort in the optimistic window: with no known run a failed
+      // interrupt just means there was nothing to stop yet.
+    }
   }
 
+  // Two-step memo keeps the pending bubbles' object identity stable across
+  // streaming frames, so assistant-ui's per-message memoization holds.
+  const pendingSendMessages = useMemo(
+    () => reconciledPendingSends.map((pending) => createPendingSendMessage(pending)),
+    [reconciledPendingSends],
+  );
   const displayMessages = useMemo(
-    () => mergePendingSendMessages(stream.messages, reconciledPendingSends),
-    [stream.messages, reconciledPendingSends],
+    () => mergePendingSendMessages(stream.messages, pendingSendMessages),
+    [stream.messages, pendingSendMessages],
   );
 
   return {
@@ -587,6 +620,6 @@ export function useAgentSessionPanelModel(
     sessionCount: agentSessions.length,
     sessionLoadError: sessionsQuery.error instanceof Error ? sessionsQuery.error.message : null,
     setInput: setInputValue,
-    streaming: stream.streaming || reconciledPendingSends.length > 0,
+    streaming: streamingWithPending,
   };
 }

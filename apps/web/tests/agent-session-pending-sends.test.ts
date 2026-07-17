@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { SessionViewMessage } from "@mosoo/ag-ui-session";
 
 import {
+  createPendingSendMessage,
   mergePendingSendMessages,
   PENDING_SEND_TTL_MS,
   prunePendingSends,
@@ -37,7 +38,7 @@ describe("agent session pending sends", () => {
   test("merges the pending user bubble after server messages", () => {
     const serverMessages = [message({ id: "msg_1", role: "assistant" })];
     const merged = mergePendingSendMessages(serverMessages, [
-      pendingSend({ clientRequestId: "req_a", text: "run the tests" }),
+      createPendingSendMessage(pendingSend({ clientRequestId: "req_a", text: "run the tests" })),
     ]);
 
     expect(merged).toHaveLength(2);
