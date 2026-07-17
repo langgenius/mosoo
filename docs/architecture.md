@@ -1,10 +1,10 @@
-# Cloudflare-native Agent Cloud Architecture
+# Managed Agent Runtime Architecture
 
 ## 1. Vision And Principles
 
-Mosoo provides a deliberately simple web experience for orchestrating App-local Agents and concrete resources backed by CLI tools and SDK-based runtimes.
+Mosoo provides an App-scoped control plane for configuring, publishing, running, and observing coding Agents through the console and Public Thread API.
 
-The current priority is OPCs, personal developers, and small self-hosted deployments. A user should be able to bring `PRD.md`, invoke `@mosoo`, and get a running Agent App with low operational overhead. In the hosted product, App Deployment publishes an App-owned external Web artifact into Mosoo's Cloudflare account; users do not provide their own Cloudflare credentials for that flow. The deployed artifact remains separate from Agent runtime. In the current construction phase, assume one human owns one Organization: Organization is the account / billing / tenant shell, and App is the code, data, product, and console boundary. App owns concrete resources directly; it does not introduce a generic Service entity, `services` table, or polymorphic `service.kind`. Additional operational controls are extension paths for the same architecture, not default complexity for the current community edition.
+The product boundary is managed Agent execution. Builders keep ownership of their application and end-user identity; Mosoo owns runtime adaptation, Sandbox lifecycle, durable Thread and Run records, managed files, credentials, events, and usage visibility. App Deployment is a separate Alpha surface and does not define the runtime or API contract. In the current construction phase, assume one human owns one Organization: Organization is the account / billing / tenant shell, and App is the code, data, product, and console boundary. App owns concrete resources directly; it does not introduce a generic Service entity, `services` table, or polymorphic `service.kind`. Additional operational controls are extension paths for the same architecture, not default complexity for the current community edition.
 
 To support lightweight deployment, fast iteration, and future governance expansion, the architecture embraces Serverless and edge computing and follows these baseline principles:
 
@@ -29,7 +29,7 @@ The architecture is built on the Cloudflare platform and uses a Serverless shape
   as session artifacts. Sandbox private state backups use a separate backup
   bucket and must not be mixed with user-visible file prefixes.
 - **Execution sandbox: Cloudflare Sandbox / Containers**. Heterogeneous Agents run in container-image-backed isolated environments, with Sandbox APIs and Durable Object boundaries controlling runtime lifecycle.
-- **App deployment: Mosoo-managed Cloudflare Pages / Workers**. App Deployment clones and builds a public GitHub repository in an isolated Sandbox, then publishes the resulting Web artifact with Mosoo platform credentials. D1 stores the App-owned Deployment and DeploymentRun records, while the successful artifact receives a Mosoo-owned URL. This is not App runtime and does not change Agent runtime ownership.
+- **Secondary App deployment: Mosoo-managed Cloudflare Pages / Workers**. App Deployment clones and builds a public GitHub repository in an isolated Sandbox, then publishes the resulting Web artifact with Mosoo platform credentials. D1 stores the App-owned Deployment and DeploymentRun records, while the successful artifact receives a Mosoo-owned URL. This is an independent Alpha capability, not App runtime or part of the core Agent API promise.
 - **Configuration editing**. Owner-side Agent configuration is currently edited through Preview, which combines the writable configuration form with in-context test chat. There is no dedicated `AgentBuilderSystemAgent` topology in the current codebase. Future configuration assistance must remain a control-plane feature and must not enter the full Sandbox / Driver runtime path.
 
 ---

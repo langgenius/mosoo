@@ -1,6 +1,6 @@
 # Runs and Threads
 
-Status: available in the current Mosoo web console. This document describes the product users can see today; it does not treat the target launch model in `docs/SPEC.md` as already delivered.
+Status: available in the current Mosoo web console as the human-facing view of managed Agent work.
 
 ## Product value
 

@@ -2,16 +2,22 @@
   <img src="https://github.com/user-attachments/assets/4986c4b8-28fa-45ea-9be9-78c1c7133128" alt="Mosoo" width="96" height="96" />
 </p>
 
-Mosoo is building the production path from runnable agentic-app prototypes to hosted web products that real users can sign in to and use.
+# Mosoo
 
-Builders keep authoring with a local coding agent. The Mosoo Production Alpha target handles a strict repository contract, deterministic validation, isolated builds, App authentication, durable data and files, managed agent execution, observable Runs, enforceable confirmation gates, immutable Releases, and recovery.
+**An open-source agent runtime for coding agents.**
+
+Run OpenAI Codex, Claude Agent SDK, and OpenCode behind API endpoints in isolated AI agent sandboxes.
+
+Mosoo provides a Cloudflare-native control plane to stream tool activity, inspect Run history, and keep Threads and files across executions. It is self-hostable in your own account.
+
+Your application remains yours. Its backend owns product behavior and end-user access. Mosoo focuses on Agent execution and lifecycle; App Deployment is a separate Alpha surface, not the core product contract.
 
 ```text
-describe the business to Codex / Claude Code / OpenCode
-  + use the Mosoo Build Skill and CLI
-  -> produce a Deployable Repo that passes the Mosoo Contract
-  -> deploy through Mosoo
-  -> App Users sign in to the hosted App
+configure Agent + Skills + MCP + provider
+  -> preview and publish an Agent version
+  -> call it from a backend or the Mosoo console
+  -> stream events, handle permission requests, inspect files and usage
+  -> continue a durable Thread across Runs
 ```
 
 <p align="center">
@@ -21,17 +27,21 @@ describe the business to Codex / Claude Code / OpenCode
   <a href="https://github.com/langgenius/mosoo-connector">Mosoo Connector</a>
 </p>
 
+## Agent Runtime and API: What Works Today
+
+- **Agent runtime and control plane.** Configure and run OpenAI Codex, Claude Agent SDK, and OpenCode behind one normalized runtime protocol.
+- **Agent API.** Start, follow, continue, stop, archive, and delete Agent work from a trusted backend.
+- **AI agent sandboxes.** Stream responses and tool activity, handle permission requests, cancel work, and inspect diagnostics in isolated execution environments.
+- **Durable work.** Keep Threads, Runs, events, and managed files across individual executions.
+- **Agent observability.** Inspect Run status, replayable activity, diagnostics, and usage estimates; this is operational visibility, not a compliance audit trail or provider bill.
+
 ## Who It Is For
 
-Mosoo is for independent builders and small teams that already use local coding agents to make working software but do not want to become the DevOps, backend, and security team for every App.
-
-The narrow first use case is an existing runnable App that combines ordinary web behavior with one agentic business workflow. The Builder keeps using their preferred local coding agent; Mosoo starts where local authoring ends.
+Mosoo is for developers extending Codex, Claude Agent SDK, OpenCode, or another coding agent into products and automations who do not want to operate a separate agent runtime, Sandbox service, session store, file pipeline, and Agent API for every integration.
 
 ## Product Status
 
-Mosoo is being reset around this production path. The canonical target contract is [docs/SPEC.md](./docs/SPEC.md). Existing Agent-first, Thread-first, and public-GitHub-Web-artifact behavior in the repository is migration input, not the desired product model when it conflicts with that Spec.
-
-The launch standard is **Production Alpha**: isolation, durable state, recoverability, and portability are hard requirements; SLA, compliance certification, custom infrastructure, and reversal of already-completed business side effects are not promised yet. This repository does not claim stable APIs or backward compatibility while the migration is in progress.
+Mosoo is in Alpha. The managed runtime and Agent API surfaces above are shipped and covered by repository tests, but production reliability and external adoption have not been proven. Public APIs and product behavior may still change.
 
 Product and engineering references:
 
@@ -40,7 +50,9 @@ Product and engineering references:
 - Current implementation architecture: [docs/architecture.md](./docs/architecture.md)
 - Development and contribution guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
 
-## Demo
+## Example: Build a Codex Agent API
+
+[Codex Pet](./examples/use-cases/codex-pet.md) shows a published Mosoo Agent integrated into an existing product backend through the Thread API. The same API can expose Agents backed by Claude Agent SDK or OpenCode.
 
 https://github.com/user-attachments/assets/4a4bbaab-c192-4462-99e0-020eab966fff
 
@@ -50,7 +62,7 @@ Prerequisites:
 
 - `bun >= 1.4.0-canary.1`
 - `just >= 1.51`
-- Docker Desktop for Agent runtime and Sandbox flows
+- A Docker-compatible daemon for Agent runtime and Sandbox flows
 
 From a clean clone:
 
@@ -75,7 +87,7 @@ curl http://localhost:5173/api/health
 curl http://localhost:8787/api/health
 ```
 
-API health is `/api/health`, not `/health`. The current Mosoo control-plane development login uses OTP; under local loopback origins, addresses ending with `@mosoo.ai` skip that OTP and log in directly. This is separate from the target per-App Auth Realm.
+API health is `/api/health`, not `/health`. The Mosoo control-plane development login uses OTP; under local loopback origins, addresses ending with `@mosoo.ai` skip that OTP and log in directly.
 
 If setup fails, start with the focused recipe: submodule issues use `git submodule update --init`, missing local secrets use `just env-init`, and D1 schema errors use `just db-migrate`. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow and verification expectations.
 

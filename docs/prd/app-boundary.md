@@ -1,6 +1,6 @@
 # App Boundary
 
-Status: historical shipped baseline. [Mosoo Spec](../SPEC.md) is the source of truth wherever the two documents differ.
+Status: shipped resource and ownership boundary. [Mosoo Spec](../SPEC.md) defines the managed Agent runtime contract.
 
 ## Problem
 
@@ -24,12 +24,12 @@ Agent conversations and channel delivery remain managed through individual Agent
 
 ## Current Availability
 
-The App-centered console and public-repository deployment flow are implemented in the current Alpha. They are useful for organizing and operating today's Mosoo resources, but the repository does not prove a successful production deployment or recovery exercise.
+The App-centered console and managed Agent resources are implemented in the current Alpha. App Deployment is also implemented as a separate public-repository publishing surface, but the repository does not prove a successful production deployment or recovery exercise.
 
-They do not yet deliver the complete hosted App described by the Spec. The current deployment publishes a website while Agent operations remain a separate part of the App experience.
+The current deployment publishes a website while Agent operations remain a separate part of the App experience. It is not part of the core runtime and Agent API contract.
 
 ## User-Visible Boundary
 
 An App is the Builder's product container in Mosoo. Its resources, activity, settings, usage, and deployed site are kept separate from other Apps.
 
-The baseline is single-owner and does not offer organization-wide catalogs or collaboration. Use the Spec—not this historical document—for new launch promises and product decisions.
+The baseline is single-owner and does not offer organization-wide catalogs or collaboration. Use the Spec for new runtime and integration promises.

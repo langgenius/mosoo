@@ -1,6 +1,6 @@
 # Agent Work History
 
-Status: implemented foundation in Alpha. [Mosoo Spec](../SPEC.md) defines the launch direction.
+Status: implemented foundation in Alpha and part of the managed runtime contract in the [Mosoo Spec](../SPEC.md).
 
 ## Why It Exists
 

@@ -1,10 +1,10 @@
 # App Deployment
 
-Status: implemented migration baseline. This is not yet the complete Production Alpha Release experience defined by the [Mosoo Spec](../SPEC.md).
+Status: implemented secondary Alpha surface. It is not part of the core managed Agent runtime contract in the [Mosoo Spec](../SPEC.md).
 
 ## Why It Matters
 
-A Builder with a working agentic App should not need to become a deployment specialist just to share it. App Deployment covers a narrower first step: publish a supported public repository to a Mosoo-managed URL and operate that site from the App Overview.
+A Builder may want a simple way to share a supported website alongside a Mosoo Agent. App Deployment covers that secondary use case: publish a supported public repository to a Mosoo-managed URL and operate that site from the App Overview.
 
 ## Who Uses It
 
@@ -25,4 +25,4 @@ When a bound capability is accepted, the Run records the App, Agent, Deployment,
 
 The console flow, deployment processing, history, retry, and deletion are implemented. Repository evidence does not prove a successful real production deployment or recovery exercise, so the honest claim is **implemented**, not **production-proven**.
 
-The canonical Spec supersedes the older idea that App Deployment is merely an external Web artifact. Its target is a strict Deployable Repo becoming a managed Release for authenticated App Users, with durable state, Agent Workload Runs, and recovery. Today's baseline publishes one supported public repository to a Mosoo-owned URL. It does not itself provide App User authentication, durable backend state, schedules, recovery, private repositories, custom domains, branch previews, automatic deployment, or rollback.
+App Deployment is not the canonical Mosoo product wedge. Today's baseline publishes one supported public repository to a Mosoo-owned URL. It does not itself provide App User authentication, durable backend state, schedules, recovery, private repositories, custom domains, branch previews, automatic deployment, or rollback.

@@ -1,6 +1,6 @@
 # Runtime Choice
 
-Status: current console behavior during migration to the canonical [Mosoo Spec](../SPEC.md).
+Status: current core runtime surface under the canonical [Mosoo Spec](../SPEC.md).
 
 ## Value
 
@@ -27,6 +27,6 @@ Custom OpenAI-compatible models remain on OpenCode by default because some endpo
 
 The Providers page currently offers those nine named providers plus the custom-model action. A saved key unlocks only models that the selected runtime can run.
 
-## Launch boundary
+## Product boundary
 
-This chooser is a migration baseline, not a launch promise. The canonical Spec commits to turning a supported repository into a hosted App with a reliable Agent Workload; it explicitly avoids a broad provider matrix, and App Users remain unaware of runtime choices. Launch acceptance therefore requires the supported workload to run, not preservation or expansion of this entire chooser.
+The runtime catalog exists to launch supported Agents reliably, not to become a provider marketplace. The exact provider list may change during Alpha; the stable product promise is a normalized managed runtime and API for supported Agent configurations.
