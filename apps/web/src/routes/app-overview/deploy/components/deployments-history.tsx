@@ -79,100 +79,175 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
   }
 
   return (
-    <div className="border-border overflow-hidden rounded-xl border">
-      <Table>
-        <TableHeader>
-          <TableRow className="border-border hover:bg-transparent">
-            <TableHead className="text-fg-3 h-11 pl-5 text-[13px] font-medium">Deploy</TableHead>
-            <TableHead className="text-fg-3 h-11 text-[13px] font-medium">Status</TableHead>
-            <TableHead className="text-fg-3 h-11 pr-5 text-[13px] font-medium">Changes</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {runs.map((run) => {
-            const failedError =
-              run.outcome === "failed" ? (run.errorMessage ?? run.errorCode) : null;
-            const expanded = expandedRunIds.has(run.id);
-            return (
-              <Fragment key={run.id}>
-                <TableRow>
-                  <TableCell className="py-4 pl-5">
-                    <div className="flex items-center gap-3">
-                      <span className="bg-bg-sunken text-fg-3 flex size-8 shrink-0 items-center justify-center rounded-full">
-                        <Rocket className="size-3.5" />
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-fg-1 text-[13.5px] font-semibold">
-                          {run.number === null ? "Deploy" : `Deploy #${String(run.number)}`}
-                        </div>
-                        <div className="text-fg-3 text-[12.5px]">
-                          {relativeLabel(run.createdAt, now)}
-                        </div>
-                      </div>
+    <>
+      <div className="space-y-2 md:hidden">
+        {runs.map((run) => {
+          const failedError = run.outcome === "failed" ? (run.errorMessage ?? run.errorCode) : null;
+          const expanded = expandedRunIds.has(run.id);
+
+          return (
+            <article className="border-border rounded-xl border p-4" key={run.id}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="bg-bg-sunken text-fg-3 flex size-8 shrink-0 items-center justify-center rounded-full">
+                    <Rocket className="size-3.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-fg-1 text-[13.5px] font-semibold">
+                      {run.number === null ? "Deploy" : `Deploy #${String(run.number)}`}
                     </div>
-                  </TableCell>
-                  <TableCell className="py-4 align-middle">
-                    <StatusBadge outcome={run.outcome} />
-                  </TableCell>
-                  <TableCell className="py-4 pr-5 align-middle">
-                    <div className="flex min-w-0 items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-fg-2 flex min-w-0 items-center gap-1.5 text-[13px]">
-                          <Code2 className="text-fg-3 size-3.5 shrink-0" />
-                          <span>commit</span>
-                          <span className="text-fg-1 truncate font-mono">{run.commitSha}</span>
-                          <span className="text-fg-3">· default branch HEAD</span>
-                        </div>
-                        <div className="text-fg-3 mt-0.5 flex items-center gap-1.5 text-[12px]">
-                          <GitBranch className="size-3.5" />
-                          <span className="font-mono">
-                            {run.targetKind === null
-                              ? "detecting target"
-                              : DEPLOY_TARGET_LABELS[run.targetKind]}
-                          </span>
-                        </div>
+                    <div className="text-fg-3 text-[12.5px]">
+                      {relativeLabel(run.createdAt, now)}
+                    </div>
+                  </div>
+                </div>
+                <StatusBadge outcome={run.outcome} />
+              </div>
+
+              <div className="text-fg-2 mt-3 flex min-w-0 items-start gap-1.5 text-[13px]">
+                <Code2 className="text-fg-3 mt-0.5 size-3.5 shrink-0" />
+                <span className="min-w-0 break-words">
+                  commit <span className="text-fg-1 font-mono">{run.commitSha}</span>
+                  <span className="text-fg-3"> · default branch HEAD</span>
+                </span>
+              </div>
+              <div className="text-fg-3 mt-1 flex items-center gap-1.5 text-[12px]">
+                <GitBranch className="size-3.5 shrink-0" />
+                <span className="font-mono">
+                  {run.targetKind === null
+                    ? "detecting target"
+                    : DEPLOY_TARGET_LABELS[run.targetKind]}
+                </span>
+              </div>
+
+              {failedError === null ? null : (
+                <>
+                  <button
+                    aria-expanded={expanded}
+                    className="text-fg-3 hover:text-fg-1 focus-visible:ring-ring mt-2 inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-[12px] font-medium transition-colors focus:outline-none focus-visible:ring-2"
+                    onClick={() => toggleRun(run.id)}
+                    type="button"
+                  >
+                    Details
+                    <ChevronDown
+                      className={cn("size-3.5 transition-transform", expanded && "rotate-180")}
+                    />
+                  </button>
+                  {expanded ? (
+                    <div className="border-border bg-bg-sunken/40 mt-1 rounded-md border px-3.5 py-2.5 text-[13px]">
+                      <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
+                        Failure details
                       </div>
-                      {failedError === null ? null : (
-                        <button
-                          type="button"
-                          aria-expanded={expanded}
-                          onClick={() => toggleRun(run.id)}
-                          className="text-fg-3 hover:text-fg-1 focus-visible:ring-ring inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[12px] font-medium transition-colors focus:outline-none focus-visible:ring-2"
-                        >
-                          Details
-                          <ChevronDown
-                            className={cn(
-                              "size-3.5 transition-transform",
-                              expanded && "rotate-180",
-                            )}
-                          />
-                        </button>
+                      {run.errorCode === null ? null : (
+                        <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">
+                          {run.errorCode}
+                        </span>
                       )}
+                      <span className="text-fg-2 break-words">{run.errorMessage ?? ""}</span>
                     </div>
-                  </TableCell>
-                </TableRow>
-                {failedError === null || !expanded ? null : (
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={3} className="px-5 pt-0 pb-4">
-                      <div className="border-border bg-bg-sunken/40 rounded-md border px-3.5 py-2.5 text-[13px]">
-                        <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
-                          Failure details
+                  ) : null}
+                </>
+              )}
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="border-border hidden overflow-hidden rounded-xl border md:block">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-border hover:bg-transparent">
+              <TableHead className="text-fg-3 h-11 pl-5 text-[13px] font-medium">Deploy</TableHead>
+              <TableHead className="text-fg-3 h-11 text-[13px] font-medium">Status</TableHead>
+              <TableHead className="text-fg-3 h-11 pr-5 text-[13px] font-medium">Changes</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {runs.map((run) => {
+              const failedError =
+                run.outcome === "failed" ? (run.errorMessage ?? run.errorCode) : null;
+              const expanded = expandedRunIds.has(run.id);
+              return (
+                <Fragment key={run.id}>
+                  <TableRow>
+                    <TableCell className="py-4 pl-5">
+                      <div className="flex items-center gap-3">
+                        <span className="bg-bg-sunken text-fg-3 flex size-8 shrink-0 items-center justify-center rounded-full">
+                          <Rocket className="size-3.5" />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-fg-1 text-[13.5px] font-semibold">
+                            {run.number === null ? "Deploy" : `Deploy #${String(run.number)}`}
+                          </div>
+                          <div className="text-fg-3 text-[12.5px]">
+                            {relativeLabel(run.createdAt, now)}
+                          </div>
                         </div>
-                        {run.errorCode === null ? null : (
-                          <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">
-                            {run.errorCode}
-                          </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-4 align-middle">
+                      <StatusBadge outcome={run.outcome} />
+                    </TableCell>
+                    <TableCell className="py-4 pr-5 align-middle">
+                      <div className="flex min-w-0 items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-fg-2 flex min-w-0 items-center gap-1.5 text-[13px]">
+                            <Code2 className="text-fg-3 size-3.5 shrink-0" />
+                            <span>commit</span>
+                            <span className="text-fg-1 truncate font-mono">{run.commitSha}</span>
+                            <span className="text-fg-3">· default branch HEAD</span>
+                          </div>
+                          <div className="text-fg-3 mt-0.5 flex items-center gap-1.5 text-[12px]">
+                            <GitBranch className="size-3.5" />
+                            <span className="font-mono">
+                              {run.targetKind === null
+                                ? "detecting target"
+                                : DEPLOY_TARGET_LABELS[run.targetKind]}
+                            </span>
+                          </div>
+                        </div>
+                        {failedError === null ? null : (
+                          <button
+                            type="button"
+                            aria-expanded={expanded}
+                            onClick={() => toggleRun(run.id)}
+                            className="text-fg-3 hover:text-fg-1 focus-visible:ring-ring inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[12px] font-medium transition-colors focus:outline-none focus-visible:ring-2"
+                          >
+                            Details
+                            <ChevronDown
+                              className={cn(
+                                "size-3.5 transition-transform",
+                                expanded && "rotate-180",
+                              )}
+                            />
+                          </button>
                         )}
-                        <span className="text-fg-2">{run.errorMessage ?? ""}</span>
                       </div>
                     </TableCell>
                   </TableRow>
-                )}
-              </Fragment>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
+                  {failedError === null || !expanded ? null : (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={3} className="px-5 pt-0 pb-4">
+                        <div className="border-border bg-bg-sunken/40 rounded-md border px-3.5 py-2.5 text-[13px]">
+                          <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
+                            Failure details
+                          </div>
+                          {run.errorCode === null ? null : (
+                            <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">
+                              {run.errorCode}
+                            </span>
+                          )}
+                          <span className="text-fg-2">{run.errorMessage ?? ""}</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 }

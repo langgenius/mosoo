@@ -6,6 +6,7 @@ import PanelLeftCloseIcon from "@hugeicons/core-free-icons/PanelLeftCloseIcon";
 import PanelLeftOpenIcon from "@hugeicons/core-free-icons/PanelLeftOpenIcon";
 import PlusSignIcon from "@hugeicons/core-free-icons/PlusSignIcon";
 import type { AppSummary } from "@mosoo/contracts/app";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
@@ -20,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu";
 import { Separator } from "@/shared/ui/separator";
+import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import { AccountMenu } from "./account-menu";
@@ -171,17 +173,107 @@ function NewAgentCta({ collapsed, disabled }: { collapsed: boolean; disabled: bo
   );
 }
 
-function ConsoleSidebarFooter({ collapsed }: { collapsed: boolean }) {
+function ConsoleSidebarFooter({
+  collapsed,
+  helpShortcutEnabled = true,
+}: {
+  collapsed: boolean;
+  helpShortcutEnabled?: boolean;
+}) {
   const { user } = useAppSession();
 
   return (
     <>
       <div className={cn("pb-2", collapsed ? "flex justify-center" : "px-0.5")}>
-        <HelpMenu collapsed={collapsed} />
+        <HelpMenu collapsed={collapsed} shortcutEnabled={helpShortcutEnabled} />
       </div>
       <Separator className="bg-border-soft" />
       <AccountMenu collapsed={collapsed} user={user} />
     </>
+  );
+}
+
+function MobileNavigation({
+  renderNavigation,
+  title,
+}: {
+  renderNavigation: (closeNavigation: () => void) => ReactNode;
+  title?: string | null;
+}) {
+  const location = useLocation();
+  const navigationLocation = `${location.pathname}${location.search}`;
+  const [openedAtLocation, setOpenedAtLocation] = useState<string | null>(null);
+  const open = openedAtLocation === navigationLocation;
+
+  function closeNavigation(): void {
+    setOpenedAtLocation(null);
+  }
+
+  useEffect(() => {
+    if (typeof globalThis.matchMedia !== "function") {
+      return;
+    }
+
+    const desktopBreakpoint = globalThis.matchMedia("(min-width: 768px)");
+
+    function handleBreakpointChange(event: MediaQueryListEvent): void {
+      if (event.matches) {
+        setOpenedAtLocation(null);
+      }
+    }
+
+    desktopBreakpoint.addEventListener("change", handleBreakpointChange);
+    return () => {
+      desktopBreakpoint.removeEventListener("change", handleBreakpointChange);
+    };
+  }, []);
+
+  return (
+    <div className="md:hidden">
+      <header className="border-border-soft bg-background flex h-14 shrink-0 items-center gap-3 border-b px-4">
+        <button
+          aria-label="Open navigation"
+          className="text-fg-2 hover:bg-ink-900/[0.04] hover:text-fg-1 flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-md px-2 transition-colors"
+          onClick={() => {
+            setOpenedAtLocation(navigationLocation);
+          }}
+          type="button"
+        >
+          <ExpandSidebarIcon className="size-5" />
+          <span className="text-xs font-semibold">Menu</span>
+        </button>
+        <img src="/brand/logo-wordmark-onlight.svg" alt="Mosoo" className="block h-5" />
+        {title ? (
+          <h1 className="text-fg-1 ml-auto truncate text-sm font-semibold">{title}</h1>
+        ) : null}
+      </header>
+
+      <Sheet
+        onOpenChange={(nextOpen) => {
+          setOpenedAtLocation(nextOpen ? navigationLocation : null);
+        }}
+        open={open}
+      >
+        <SheetContent className="bg-sidebar data-[closed]:slide-out-to-left data-[open]:slide-in-from-left right-auto left-0 flex w-[min(20rem,calc(100vw-2rem))] max-w-none flex-col p-3">
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <div className="flex h-11 shrink-0 items-center px-1.5">
+            <img src="/brand/logo-wordmark-onlight.svg" alt="Mosoo" className="block h-[22px]" />
+          </div>
+          <nav
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-2 [&_a]:min-h-11 [&_button]:min-h-11"
+            onClickCapture={(event) => {
+              if (event.target instanceof Element && event.target.closest("a") !== null) {
+                closeNavigation();
+              }
+            }}
+          >
+            {renderNavigation(closeNavigation)}
+            <div className="min-h-4 flex-1" />
+            <ConsoleSidebarFooter collapsed={false} helpShortcutEnabled={false} />
+          </nav>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }
 
@@ -202,11 +294,13 @@ function getOrgHeaderTitle(pathname: string): string | null {
 function ConsoleShell({
   children,
   collapsed,
+  mobileSidebar,
   onToggleCollapsed,
   sidebar,
 }: {
   children: ReactNode;
   collapsed: boolean;
+  mobileSidebar: (closeNavigation: () => void) => ReactNode;
   onToggleCollapsed: () => void;
   sidebar: ReactNode;
 }) {
@@ -214,7 +308,7 @@ function ConsoleShell({
   const toggleLabel = collapsed ? "Expand sidebar" : "Collapse sidebar";
 
   return (
-    <div className="bg-sidebar flex h-screen">
+    <div className="bg-sidebar flex h-dvh">
       <nav
         className={cn(
           "hidden shrink-0 flex-col bg-sidebar pt-3.5 transition-[width] duration-200 ease-out md:flex",
@@ -254,7 +348,8 @@ function ConsoleShell({
 
       <div className="flex min-w-0 flex-1">
         <main className="bg-background md:border-border-soft flex min-w-0 flex-1 flex-col overflow-hidden md:rounded-md md:border-l">
-          {children}
+          <MobileNavigation renderNavigation={mobileSidebar} />
+          <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
         </main>
       </div>
     </div>
@@ -273,24 +368,32 @@ export function Layout({ children }: { children: ReactNode }) {
     void navigate("/");
   }
 
+  function appSidebar(isCollapsed: boolean, onNavigate?: () => void): ReactNode {
+    return (
+      <>
+        <BackToOrgLink collapsed={isCollapsed} orgName={activeOrganization?.name ?? null} />
+        <AppSwitcher
+          activeApp={activeApp}
+          apps={apps}
+          collapsed={isCollapsed}
+          loading={appsLoading}
+          onSwitch={(appId) => {
+            switchApp(appId);
+            onNavigate?.();
+          }}
+        />
+        <NewAgentCta collapsed={isCollapsed} disabled={activeApp === null} />
+        <AppNavigation collapsed={isCollapsed} pathname={location.pathname} />
+      </>
+    );
+  }
+
   return (
     <ConsoleShell
       collapsed={collapsed}
+      mobileSidebar={(closeNavigation) => appSidebar(false, closeNavigation)}
       onToggleCollapsed={toggleCollapsed}
-      sidebar={
-        <>
-          <BackToOrgLink collapsed={collapsed} orgName={activeOrganization?.name ?? null} />
-          <AppSwitcher
-            activeApp={activeApp}
-            apps={apps}
-            collapsed={collapsed}
-            loading={appsLoading}
-            onSwitch={switchApp}
-          />
-          <NewAgentCta collapsed={collapsed} disabled={activeApp === null} />
-          <AppNavigation collapsed={collapsed} pathname={location.pathname} />
-        </>
-      }
+      sidebar={appSidebar(collapsed)}
     >
       {children}
     </ConsoleShell>
@@ -306,8 +409,8 @@ export function OrgLayout({ children }: { children: ReactNode }) {
   const headerTitle = getOrgHeaderTitle(location.pathname);
 
   return (
-    <div className="bg-background flex h-screen flex-col">
-      <header className="border-border-soft flex shrink-0 border-b">
+    <div className="bg-background flex h-dvh flex-col">
+      <header className="border-border-soft hidden shrink-0 border-b md:flex">
         <div className="flex min-h-[76px] w-[224px] shrink-0 items-center gap-2 px-4">
           <Link to="/apps" aria-label="Apps" className="flex items-center">
             <img src="/brand/logo-mark.svg" alt="Mosoo" className="block size-6" />
@@ -329,8 +432,12 @@ export function OrgLayout({ children }: { children: ReactNode }) {
           </div>
         )}
       </header>
+      <MobileNavigation
+        renderNavigation={() => <OrgNavigation collapsed={false} pathname={location.pathname} />}
+        title={headerTitle}
+      />
       <div className="flex min-h-0 flex-1">
-        <aside className="border-border-soft flex w-[224px] shrink-0 flex-col border-r px-3 py-4">
+        <aside className="border-border-soft hidden w-[224px] shrink-0 flex-col border-r px-3 py-4 md:flex">
           <OrgNavigation collapsed={false} pathname={location.pathname} />
           <div className="flex-1" />
           <ConsoleSidebarFooter collapsed={false} />
