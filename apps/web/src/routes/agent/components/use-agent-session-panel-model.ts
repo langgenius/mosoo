@@ -34,11 +34,13 @@ import {
 } from "./agent-session-panel-session-actions";
 import {
   mergePendingSendMessages,
-  PENDING_SEND_TTL_MS,
+  PENDING_SEND_SWEEP_INTERVAL_MS,
   prunePendingSends,
   prunePendingSendsForSession,
 } from "./agent-session-pending-sends";
 import type { PendingSend } from "./agent-session-pending-sends";
+
+const SPECULATIVE_CREATE_FAILURE_COOLDOWN_MS = 30_000;
 
 async function autoTitleSessionAndRefresh(input: {
   appId: string | null;
@@ -99,6 +101,10 @@ export function useAgentSessionPanelModel(
   const [sending, setSending] = useState(false);
   const [pendingSends, setPendingSends] = useState<PendingSend[]>([]);
   const sessionCreatePromiseRef = useRef<Promise<string> | null>(null);
+  // Bumped by reset/new-session/retry so an in-flight create that they
+  // superseded cannot re-select its (now orphaned) session when it resolves.
+  const sessionEpochRef = useRef(0);
+  const speculativeCreateFailedAtMsRef = useRef(0);
 
   const sessionsQuery = useQuery({
     enabled: input.appId !== null,
@@ -141,8 +147,17 @@ export function useAgentSessionPanelModel(
   );
   const layout = useSessionChatLayoutState(stream.messages, permissionScrollSignal);
 
-  // Reconcile the optimistic overlay against server truth: drop an entry as
-  // soon as its echo (or any snapshot containing the persisted message) lands.
+  // Reconcile the optimistic overlay against server truth at render time, so
+  // the frame that first contains the echoed message never also paints the
+  // pending bubble (a post-commit effect alone leaves a duplicate frame).
+  const reconciledPendingSends = useMemo(
+    () => prunePendingSends(pendingSends, stream.messages, Date.now()),
+    [pendingSends, stream.messages],
+  );
+
+  // State GC for the same reconciliation: drop echoed/expired entries from
+  // state so gates and effects settle even when the derived value did the
+  // visual work first.
   useEffect(() => {
     setPendingSends((current) => prunePendingSends(current, stream.messages, Date.now()));
   }, [stream.messages]);
@@ -158,18 +173,12 @@ export function useAgentSessionPanelModel(
       return;
     }
 
-    const nextExpiryMs = Math.min(
-      ...pendingSends.map((pending) => pending.createdAtMs + PENDING_SEND_TTL_MS),
-    );
-    const timer = globalThis.setTimeout(
-      () => {
-        setPendingSends((current) => prunePendingSends(current, stream.messages, Date.now()));
-      },
-      Math.max(0, nextExpiryMs - Date.now()),
-    );
+    const interval = globalThis.setInterval(() => {
+      setPendingSends((current) => prunePendingSends(current, stream.messages, Date.now()));
+    }, PENDING_SEND_SWEEP_INTERVAL_MS);
 
     return () => {
-      globalThis.clearTimeout(timer);
+      globalThis.clearInterval(interval);
     };
   }, [pendingSends, stream.messages]);
 
@@ -192,6 +201,7 @@ export function useAgentSessionPanelModel(
       throw new Error("App id is required to create an agent session.");
     }
 
+    const epoch = sessionEpochRef.current;
     const createdSession = await createAgentSession(
       toAppId(input.appId),
       toAgentId(input.agentId),
@@ -200,6 +210,13 @@ export function useAgentSessionPanelModel(
         waitForRuntimeReady: options.waitForRuntimeReady === true,
       },
     );
+
+    if (sessionEpochRef.current !== epoch) {
+      // Reset/new-session superseded this create while it was in flight; the
+      // orphaned session is reaped by the next reset.
+      return createdSession.id;
+    }
+
     const revisionKey = input.configurationRevisionKey;
 
     if (revisionKey !== null && revisionKey.length > 0) {
@@ -220,6 +237,7 @@ export function useAgentSessionPanelModel(
     }
 
     setSending(true);
+    sessionEpochRef.current += 1;
     sessionCreatePromiseRef.current = null;
     setSelectedSessionId(null);
     setInputValue("");
@@ -247,6 +265,7 @@ export function useAgentSessionPanelModel(
     }
 
     setSending(true);
+    sessionEpochRef.current += 1;
     sessionCreatePromiseRef.current = null;
     setInputValue("");
     setPendingSends([]);
@@ -294,13 +313,19 @@ export function useAgentSessionPanelModel(
     // Typing-triggered speculative creation and send-triggered creation share
     // one in-flight promise so a send never races a second create. A resolved
     // promise stays cached on purpose: activeSessionId state can lag a render
-    // and re-awaiting it returns the same id. Failures clear the slot so the
-    // next attempt retries and owns error surfacing.
+    // and re-awaiting it returns the same id. Failures clear the slot (only if
+    // it still owns it — reset may have handed the slot to a newer create) so
+    // the next attempt retries and owns error surfacing.
     if (sessionCreatePromiseRef.current === null) {
-      sessionCreatePromiseRef.current = createSessionAndSelect().catch((error: unknown) => {
-        sessionCreatePromiseRef.current = null;
+      const createPromise = createSessionAndSelect().catch((error: unknown) => {
+        if (sessionCreatePromiseRef.current === createPromise) {
+          sessionCreatePromiseRef.current = null;
+        }
+
         throw error;
       });
+
+      sessionCreatePromiseRef.current = createPromise;
     }
 
     return sessionCreatePromiseRef.current;
@@ -324,6 +349,15 @@ export function useAgentSessionPanelModel(
       return;
     }
 
+    // Cooldown after a failed speculative create so a failing endpoint is not
+    // re-hit on every keystroke; a real send retries immediately regardless.
+    if (
+      Date.now() - speculativeCreateFailedAtMsRef.current <
+      SPECULATIVE_CREATE_FAILURE_COOLDOWN_MS
+    ) {
+      return;
+    }
+
     if (
       shouldSpeculativelyCreateSessionOnTyping({
         activeSessionId,
@@ -336,7 +370,10 @@ export function useAgentSessionPanelModel(
     ) {
       // Silent by design: the user has not acted yet, so the send path owns
       // error surfacing when creation genuinely fails.
-      void ensureActiveSession().catch(ignorePromiseRejection);
+      void ensureActiveSession().catch((error: unknown) => {
+        speculativeCreateFailedAtMsRef.current = Date.now();
+        ignorePromiseRejection(error);
+      });
     }
   }
 
@@ -346,6 +383,7 @@ export function useAgentSessionPanelModel(
     }
 
     setSending(true);
+    sessionEpochRef.current += 1;
     sessionCreatePromiseRef.current = null;
     clearComposerError();
     setSelectedSessionId(null);
@@ -380,7 +418,7 @@ export function useAgentSessionPanelModel(
         // In-flight optimistic sends block re-submit like a running turn: the
         // server allows one active run, so a second Enter before the echo
         // would only surface an active-run error.
-        streaming: stream.streaming || pendingSends.length > 0,
+        streaming: stream.streaming || reconciledPendingSends.length > 0,
         typedText,
       })
     ) {
@@ -392,6 +430,10 @@ export function useAgentSessionPanelModel(
     options.onAccepted?.();
 
     const clientRequestId = crypto.randomUUID();
+    // Sending into an existing but not-yet-hydrated session would capture an
+    // empty baseline, letting an identical message from history falsely prune
+    // the overlay — skip optimism there (sub-second race, pre-existing UX).
+    const canRenderOptimistically = activeSessionId === null || stream.hydrated;
     const pendingSend: PendingSend = {
       baselineUserMessageIds: stream.messages
         .filter((message) => message.role === "user")
@@ -401,7 +443,10 @@ export function useAgentSessionPanelModel(
       sessionId: activeSessionId,
       text: payload.text,
     };
-    setPendingSends((current) => [...current, pendingSend]);
+
+    if (canRenderOptimistically) {
+      setPendingSends((current) => [...current, pendingSend]);
+    }
 
     const shouldAutoTitle =
       activeSessionId === null ||
@@ -495,12 +540,20 @@ export function useAgentSessionPanelModel(
       return;
     }
 
+    // During the optimistic pending window there is no run to interrupt yet;
+    // skip only when the server itself does not report a running turn (a
+    // null runId with server-side RUNNING is a legitimate interrupt, e.g.
+    // right after a reconnect resume).
+    if (stream.run.id === null && !stream.streaming) {
+      return;
+    }
+
     await stream.sendUserInterrupt({ runId: stream.run.id, sessionId: activeSessionId });
   }
 
   const displayMessages = useMemo(
-    () => mergePendingSendMessages(stream.messages, pendingSends),
-    [stream.messages, pendingSends],
+    () => mergePendingSendMessages(stream.messages, reconciledPendingSends),
+    [stream.messages, reconciledPendingSends],
   );
 
   return {
@@ -518,7 +571,7 @@ export function useAgentSessionPanelModel(
     input: inputValue,
     inputRef: layout.inputRef,
     isConversationLoading:
-      activeSessionId !== null && !stream.hydrated && pendingSends.length === 0,
+      activeSessionId !== null && !stream.hydrated && reconciledPendingSends.length === 0,
     lifecycle: stream.lifecycle,
     messages: displayMessages,
     messagesEndRef: layout.messagesEndRef,
@@ -534,6 +587,6 @@ export function useAgentSessionPanelModel(
     sessionCount: agentSessions.length,
     sessionLoadError: sessionsQuery.error instanceof Error ? sessionsQuery.error.message : null,
     setInput: setInputValue,
-    streaming: stream.streaming || pendingSends.length > 0,
+    streaming: stream.streaming || reconciledPendingSends.length > 0,
   };
 }

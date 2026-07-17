@@ -18,6 +18,11 @@ export interface PendingSend {
 // the composer can never stay blocked forever behind a stuck overlay entry.
 export const PENDING_SEND_TTL_MS = 30_000;
 
+// The TTL sweep runs on an interval, not a one-shot timer: a one-shot whose
+// prune no-ops (identity-preserved state, e.g. after a backwards wall-clock
+// step) would never re-arm and could leave the composer blocked forever.
+export const PENDING_SEND_SWEEP_INTERVAL_MS = 5_000;
+
 export function createPendingSendMessage(pending: PendingSend): SessionViewMessage {
   return {
     content: pending.text,
