@@ -51,6 +51,7 @@ export interface AgentSessionPanelModel {
   lifecycle: SessionLiveState["lifecycle"];
   messages: SessionLiveState["messages"];
   messagesEndRef: RefObject<HTMLDivElement | null>;
+  notifyComposerTyping: () => void;
   permissionRequests: PermissionRequest[];
   readiness: AgentReadiness | null;
   readinessBlockMessage: string | null;

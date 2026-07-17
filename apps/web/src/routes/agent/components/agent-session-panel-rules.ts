@@ -108,6 +108,31 @@ export function shouldWaitForRuntimeReadyOnNewSession(input: RuntimeReadyWaitInp
   return input.waitForRuntimeReadyOnNewSession && input.sessionType === "preview";
 }
 
+export interface SpeculativeSessionCreateInput {
+  activeSessionId: string | null;
+  appId: string | null;
+  readinessBlockMessage: string | null;
+  sending: boolean;
+  sessionListLoaded: boolean;
+  sessionType: SessionType;
+}
+
+// Speculatively creating a session on typing is preview-only: preview sessions
+// are reset-scoped and cheap to abandon, while consume ("ui") sessions are
+// user-visible history and must not be created before a real send.
+export function shouldSpeculativelyCreateSessionOnTyping(
+  input: SpeculativeSessionCreateInput,
+): boolean {
+  return (
+    input.sessionType === "preview" &&
+    input.appId !== null &&
+    input.activeSessionId === null &&
+    input.sessionListLoaded &&
+    !input.sending &&
+    input.readinessBlockMessage === null
+  );
+}
+
 export function getSessionControlMode(tone: AgentSessionPanelTone): SessionControlMode {
   return tone === "preview" ? "reset" : "new_session";
 }

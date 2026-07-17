@@ -308,6 +308,7 @@ export function AgentSessionPanel({
                 fileInputRef={model.fileInputRef}
                 onFilesSelected={(files) => void handleUploadFiles(files)}
                 onRetry={handleRetrySend}
+                onTypingActivity={model.notifyComposerTyping}
                 pendingSessionFiles={pendingSessionFiles}
                 sendDisabledReason={sendDisabledReason}
                 sessionResourceMentions={sessionResourceMentions}

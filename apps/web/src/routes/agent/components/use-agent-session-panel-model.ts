@@ -1,12 +1,12 @@
 import type { SessionType } from "@mosoo/contracts/session";
 import { ignorePromiseRejection } from "@mosoo/effects";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import { useSessionStream } from "@/domains/runtime/use-session-stream";
 import type { PermissionRequest } from "@/domains/runtime/use-session-stream";
-import { listAgentSessions } from "@/domains/session/api/agent-session";
+import { listAgentSessions, triggerAgentSessionPrewarm } from "@/domains/session/api/agent-session";
 import { createSessionResourceMentionMessagePayload } from "@/features/session-chat/session-resource-mentions";
 import { useSessionChatLayoutState } from "@/features/session-chat/use-session-chat-layout-state";
 import { toAgentId, toAppId, toSessionId } from "@/routes/typed-id";
@@ -24,6 +24,7 @@ import {
   hasStaleSessionConfiguration,
   isComposerSendBlocked,
   selectSessionPanelReadiness,
+  shouldSpeculativelyCreateSessionOnTyping,
   shouldWaitForRuntimeReadyOnNewSession,
 } from "./agent-session-panel-rules";
 import {
@@ -97,6 +98,7 @@ export function useAgentSessionPanelModel(
   const [composerError, setComposerError] = useState<ComposerError | null>(null);
   const [sending, setSending] = useState(false);
   const [pendingSends, setPendingSends] = useState<PendingSend[]>([]);
+  const sessionCreatePromiseRef = useRef<Promise<string> | null>(null);
 
   const sessionsQuery = useQuery({
     enabled: input.appId !== null,
@@ -218,6 +220,7 @@ export function useAgentSessionPanelModel(
     }
 
     setSending(true);
+    sessionCreatePromiseRef.current = null;
     setSelectedSessionId(null);
     setInputValue("");
     setPendingSends([]);
@@ -244,6 +247,7 @@ export function useAgentSessionPanelModel(
     }
 
     setSending(true);
+    sessionCreatePromiseRef.current = null;
     setInputValue("");
     setPendingSends([]);
     clearComposerError();
@@ -287,7 +291,53 @@ export function useAgentSessionPanelModel(
       return activeSessionId;
     }
 
-    return createSessionAndSelect();
+    // Typing-triggered speculative creation and send-triggered creation share
+    // one in-flight promise so a send never races a second create. A resolved
+    // promise stays cached on purpose: activeSessionId state can lag a render
+    // and re-awaiting it returns the same id. Failures clear the slot so the
+    // next attempt retries and owns error surfacing.
+    if (sessionCreatePromiseRef.current === null) {
+      sessionCreatePromiseRef.current = createSessionAndSelect().catch((error: unknown) => {
+        sessionCreatePromiseRef.current = null;
+        throw error;
+      });
+    }
+
+    return sessionCreatePromiseRef.current;
+  }
+
+  function notifyComposerTyping(): void {
+    if (input.appId === null) {
+      return;
+    }
+
+    if (activeSessionId !== null) {
+      if (
+        stream.lifecycle === "TERMINATED" ||
+        configurationRefreshRequired ||
+        readinessBlockMessage !== null
+      ) {
+        return;
+      }
+
+      triggerAgentSessionPrewarm(toAppId(input.appId), toSessionId(activeSessionId));
+      return;
+    }
+
+    if (
+      shouldSpeculativelyCreateSessionOnTyping({
+        activeSessionId,
+        appId: input.appId,
+        readinessBlockMessage,
+        sending,
+        sessionListLoaded: sessionsQuery.isFetched,
+        sessionType: input.sessionType,
+      })
+    ) {
+      // Silent by design: the user has not acted yet, so the send path owns
+      // error surfacing when creation genuinely fails.
+      void ensureActiveSession().catch(ignorePromiseRejection);
+    }
   }
 
   async function retryProviderCheck(): Promise<void> {
@@ -296,6 +346,7 @@ export function useAgentSessionPanelModel(
     }
 
     setSending(true);
+    sessionCreatePromiseRef.current = null;
     clearComposerError();
     setSelectedSessionId(null);
 
@@ -470,6 +521,7 @@ export function useAgentSessionPanelModel(
     lifecycle: stream.lifecycle,
     messages: displayMessages,
     messagesEndRef: layout.messagesEndRef,
+    notifyComposerTyping,
     permissionRequests: stream.permissionRequests,
     readiness,
     readinessBlockMessage,
