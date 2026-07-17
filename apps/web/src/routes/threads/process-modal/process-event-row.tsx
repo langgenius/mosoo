@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
@@ -42,11 +42,12 @@ export function ProcessEventRow({
         }}
         className="grid w-full grid-cols-[12px_136px_minmax(0,1fr)_56px_56px_40px_56px] items-center gap-2 px-3 py-2 pl-4 text-left"
       >
-        {expanded ? (
-          <ChevronDown className="text-fg-3 size-3 shrink-0" />
-        ) : (
-          <ChevronRight className="text-fg-3 size-3 shrink-0" />
-        )}
+        <ChevronRight
+          className={cn(
+            "text-fg-3 size-3 shrink-0 transition-transform duration-150 ease-out",
+            expanded ? "rotate-90" : "rotate-0",
+          )}
+        />
 
         <span
           className={cn(
@@ -74,13 +75,17 @@ export function ProcessEventRow({
       </button>
 
       {expanded ? (
-        <div className="border-border-subtle bg-muted/20 border-t px-3 py-2">
-          <div className="text-fg-3 text-[10.5px] font-bold tracking-[0.14em] uppercase">
-            content
+        <div className="grid grid-rows-[1fr] transition-[grid-template-rows] duration-200 ease-out starting:grid-rows-[0fr]">
+          <div className="overflow-hidden">
+            <div className="border-border-subtle bg-muted/20 border-t px-3 py-2">
+              <div className="text-fg-3 text-[10.5px] font-bold tracking-[0.14em] uppercase">
+                content
+              </div>
+              <pre className="text-fg-2 mt-1 max-h-40 overflow-auto font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
+                {event.content}
+              </pre>
+            </div>
           </div>
-          <pre className="text-fg-2 mt-1 max-h-40 overflow-auto font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
-            {event.content}
-          </pre>
         </div>
       ) : null}
     </div>
