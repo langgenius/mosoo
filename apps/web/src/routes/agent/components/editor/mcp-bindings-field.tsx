@@ -18,6 +18,7 @@ import { Switch } from "@/shared/ui/switch";
 import { isTruthy } from "../../../../shared/lib/truthiness";
 import { IconAvatar } from "../../../integrations/mcp/icon-avatar";
 import type { McpServer } from "../../agent.types";
+import { createPoolServerById } from "./mcp-bindings-projections";
 
 function toDraftMcpServer(server: PoolServer): McpServer {
   const draftServer: McpServer = {
@@ -137,6 +138,7 @@ export function AgentMcpBindingsField({
   const registryQuery = useMcpRegistryQuery(appId);
 
   const poolServers = registryQuery.data?.servers ?? [];
+  const poolServerById = useMemo(() => createPoolServerById(poolServers), [poolServers]);
   const addedIds = useMemo(
     () => new Set(selectedServers.map((server) => server.id)),
     [selectedServers],
@@ -180,7 +182,7 @@ export function AgentMcpBindingsField({
   return (
     <div className="border-border divide-border-subtle divide-y overflow-hidden rounded-lg border">
       {selectedServers.map((server) => {
-        const pool = poolServers.find((candidate) => candidate.id === server.id);
+        const pool = poolServerById.get(server.id);
         const sourceLabel = `App · ${pool?.ownerName ?? "Owner"}`;
 
         return (
