@@ -475,10 +475,23 @@
   }
 }
 
+@keyframes login-doodle-bob {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-7px);
+  }
+}
+
 @layer utilities {
   .environment-row-enter {
     animation: environment-row-enter 220ms cubic-bezier(0.22, 1, 0.36, 1);
     transform-origin: top center;
+  }
+
+  .login-doodle {
+    animation: login-doodle-bob 3.6s ease-in-out infinite alternate;
   }
 
   .environment-scroll-area {
@@ -507,6 +520,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .environment-row-enter {
+    animation: none;
+  }
+
+  .login-doodle {
     animation: none;
   }
 }

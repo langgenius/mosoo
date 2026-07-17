@@ -1,12 +1,14 @@
 import type { ReactElement } from "react";
 
 import { LoginAuthCard } from "./auth-card";
+import { LoginDoodles } from "./doodles";
 import { LoginAuthTopbar } from "./topbar";
 import { useLoginFlow } from "./use-login";
 
+// Warm cream ground so the hand-drawn doodle characters read as paper, not UI.
 const authBackgroundStyle = {
   background:
-    "radial-gradient(900px 500px at 85% -10%, rgba(28,32,36,.04), transparent 60%), var(--bg)",
+    "radial-gradient(900px 500px at 85% -10%, rgba(28,32,36,.04), transparent 60%), #FDFBF7",
 } as const;
 
 export function LoginPage(): ReactElement {
@@ -26,6 +28,7 @@ export function LoginPage(): ReactElement {
 
   return (
     <div className="fixed inset-0 flex flex-col" style={authBackgroundStyle}>
+      <LoginDoodles />
       <LoginAuthTopbar />
       <LoginAuthCard
         email={login.email}
