@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { McpServerWithCredential } from "@mosoo/contracts/mcp";
 
-import { createPoolServerById } from "../src/routes/agent/components/editor/mcp-bindings-field";
+import { createPoolServerById } from "../src/routes/agent/components/editor/mcp-bindings-projections";
 
 function poolServer(id: string, ownerName: string): McpServerWithCredential {
   return {

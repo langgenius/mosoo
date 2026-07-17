@@ -18,6 +18,7 @@ import { Switch } from "@/shared/ui/switch";
 import { isTruthy } from "../../../../shared/lib/truthiness";
 import { IconAvatar } from "../../../integrations/mcp/icon-avatar";
 import type { McpServer } from "../../agent.types";
+import { createPoolServerById } from "./mcp-bindings-projections";
 
 function toDraftMcpServer(server: PoolServer): McpServer {
   const draftServer: McpServer = {
@@ -41,18 +42,6 @@ function toDraftMcpServer(server: PoolServer): McpServer {
   }
 
   return draftServer;
-}
-
-export function createPoolServerById(servers: readonly PoolServer[]): Map<string, PoolServer> {
-  const poolServerById = new Map<string, PoolServer>();
-
-  for (const server of servers) {
-    if (!poolServerById.has(server.id)) {
-      poolServerById.set(server.id, server);
-    }
-  }
-
-  return poolServerById;
 }
 
 function McpAddDropdown({
