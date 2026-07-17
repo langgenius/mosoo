@@ -1,5 +1,6 @@
 import { ArrowLeft, Settings } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactElement } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { useAppSession } from "@/app/session-provider";
@@ -7,19 +8,13 @@ import { useAgentDetailQuery, useAgentEditorStateQuery } from "@/domains/agent/q
 import { useAuth } from "@/domains/auth/use-auth";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
-import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
 
 import { isTruthy } from "../../shared/lib/truthiness";
 import { canShowAgentDebugMenuItem } from "./agent-debug-menu-policy";
 import { mapAgentDetailToView } from "./agent-view.mapper";
 import type { Agent, AgentMode } from "./agent.types";
-import { ConsumeMode } from "./components/consume-mode";
-import { AgentCostTab } from "./components/cost-tab";
-import { LogsTab } from "./components/logs-tab";
 import { PreviewMode } from "./components/preview-mode";
 import { RuntimeIcon } from "./components/runtime-icon";
-import { SettingsSheet } from "./components/settings-dialog";
-import { VersionsTab } from "./components/versions-tab";
 import { getRuntimeInfo } from "./runtime-catalog";
 
 // The terminal pulls in the full xterm engine (~250 kB) and its stylesheet, yet
@@ -31,7 +26,55 @@ const TerminalMode = lazy(async () => {
   return { default: mod.TerminalMode };
 });
 
+const LogsTab = lazy(async () => {
+  const mod = await import("./components/logs-tab");
+  return { default: mod.LogsTab };
+});
+
+const AgentCostTab = lazy(async () => {
+  const mod = await import("./components/cost-tab");
+  return { default: mod.AgentCostTab };
+});
+
+const SettingsSheet = lazy(async () => {
+  const mod = await import("./components/settings-dialog");
+  return { default: mod.SettingsSheet };
+});
+
+const ConsumeMode = lazy(async () => {
+  const mod = await import("./components/consume-mode");
+  return { default: mod.ConsumeMode };
+});
+
 type DetailMode = AgentMode | "cost" | "logs" | "terminal";
+
+interface VersionsSheetProps {
+  agent: Agent;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+}
+
+const VersionsSheet = lazy(async () => {
+  const [sheetModule, versionsModule] = await Promise.all([
+    import("@/shared/ui/sheet"),
+    import("./components/versions-tab"),
+  ]);
+  const { Sheet, SheetContent, SheetTitle } = sheetModule;
+  const { VersionsTab } = versionsModule;
+
+  function VersionsSheetContent({ agent, onOpenChange, open }: VersionsSheetProps) {
+    return (
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="w-[560px] max-w-[calc(100vw-2rem)] p-0">
+          <SheetTitle className="sr-only">Versions</SheetTitle>
+          <VersionsTab agent={agent} />
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  return { default: VersionsSheetContent };
+});
 
 const MODE_TABS: { id: DetailMode; label: string }[] = [
   { id: "preview", label: "Preview" },
@@ -166,6 +209,14 @@ function AgentDetailHeader({
   );
 }
 
+function PanelLoading(): ReactElement {
+  return (
+    <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
+      Loading…
+    </div>
+  );
+}
+
 export function AgentDetailPage() {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
@@ -296,13 +347,15 @@ export function AgentDetailPage() {
   // Consume mode keeps a config entry point back into the editor.
   if (mode === "consume") {
     return (
-      <ConsumeMode
-        agent={agent}
-        onOpenConfig={() => {
-          handleSelectMode("preview");
-        }}
-        showConfigButton
-      />
+      <Suspense fallback={<PanelLoading />}>
+        <ConsumeMode
+          agent={agent}
+          onOpenConfig={() => {
+            handleSelectMode("preview");
+          }}
+          showConfigButton
+        />
+      </Suspense>
     );
   }
 
@@ -331,28 +384,39 @@ export function AgentDetailPage() {
         {mode === "preview" && (
           <PreviewMode agent={agent} headerActionTarget={headerActionTarget} />
         )}
-        {mode === "logs" && <LogsTab agentId={agent.id} appId={agent.appId} />}
-        {mode === "cost" && <AgentCostTab agentId={agent.id} appId={agent.appId} />}
+        {mode === "logs" && (
+          <Suspense fallback={<PanelLoading />}>
+            <LogsTab agentId={agent.id} appId={agent.appId} />
+          </Suspense>
+        )}
+        {mode === "cost" && (
+          <Suspense fallback={<PanelLoading />}>
+            <AgentCostTab agentId={agent.id} appId={agent.appId} />
+          </Suspense>
+        )}
         {mode === "terminal" && (
-          <Suspense fallback={null}>
+          <Suspense fallback={<PanelLoading />}>
             <TerminalMode key={agent.id} agent={agent} />
           </Suspense>
         )}
       </div>
 
-      <SettingsSheet
-        agent={agent}
-        open={showSettings}
-        onOpenChange={setShowSettings}
-        canManageAccess={canManageAgentAccess}
-      />
+      {showSettings ? (
+        <Suspense fallback={null}>
+          <SettingsSheet
+            agent={agent}
+            open={showSettings}
+            onOpenChange={setShowSettings}
+            canManageAccess={canManageAgentAccess}
+          />
+        </Suspense>
+      ) : null}
 
-      <Sheet open={showVersions} onOpenChange={setShowVersions}>
-        <SheetContent className="w-[560px] max-w-[calc(100vw-2rem)] p-0">
-          <SheetTitle className="sr-only">Versions</SheetTitle>
-          <VersionsTab agent={agent} />
-        </SheetContent>
-      </Sheet>
+      {showVersions ? (
+        <Suspense fallback={null}>
+          <VersionsSheet agent={agent} open={showVersions} onOpenChange={setShowVersions} />
+        </Suspense>
+      ) : null}
     </div>
   );
 }
