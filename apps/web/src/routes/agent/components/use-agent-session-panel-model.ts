@@ -1,7 +1,7 @@
 import type { SessionType } from "@mosoo/contracts/session";
 import { ignorePromiseRejection } from "@mosoo/effects";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import { useSessionStream } from "@/domains/runtime/use-session-stream";
@@ -31,6 +31,13 @@ import {
   createAgentSession,
   deleteAgentSession,
 } from "./agent-session-panel-session-actions";
+import {
+  mergePendingSendMessages,
+  PENDING_SEND_TTL_MS,
+  prunePendingSends,
+  prunePendingSendsForSession,
+} from "./agent-session-pending-sends";
+import type { PendingSend } from "./agent-session-pending-sends";
 
 async function autoTitleSessionAndRefresh(input: {
   appId: string | null;
@@ -89,6 +96,7 @@ export function useAgentSessionPanelModel(
   const [inputValue, setInputValue] = useState("");
   const [composerError, setComposerError] = useState<ComposerError | null>(null);
   const [sending, setSending] = useState(false);
+  const [pendingSends, setPendingSends] = useState<PendingSend[]>([]);
 
   const sessionsQuery = useQuery({
     enabled: input.appId !== null,
@@ -130,6 +138,38 @@ export function useAgentSessionPanelModel(
     [stream.permissionRequests],
   );
   const layout = useSessionChatLayoutState(stream.messages, permissionScrollSignal);
+
+  // Reconcile the optimistic overlay against server truth: drop an entry as
+  // soon as its echo (or any snapshot containing the persisted message) lands.
+  useEffect(() => {
+    setPendingSends((current) => prunePendingSends(current, stream.messages, Date.now()));
+  }, [stream.messages]);
+
+  useEffect(() => {
+    setPendingSends((current) => prunePendingSendsForSession(current, activeSessionId));
+  }, [activeSessionId]);
+
+  // TTL sweep so a stuck entry expires even when no further events arrive;
+  // without it the composer could stay blocked behind a never-reconciled send.
+  useEffect(() => {
+    if (pendingSends.length === 0) {
+      return;
+    }
+
+    const nextExpiryMs = Math.min(
+      ...pendingSends.map((pending) => pending.createdAtMs + PENDING_SEND_TTL_MS),
+    );
+    const timer = globalThis.setTimeout(
+      () => {
+        setPendingSends((current) => prunePendingSends(current, stream.messages, Date.now()));
+      },
+      Math.max(0, nextExpiryMs - Date.now()),
+    );
+
+    return () => {
+      globalThis.clearTimeout(timer);
+    };
+  }, [pendingSends, stream.messages]);
 
   async function refreshSessions(): Promise<void> {
     if (input.appId === null) {
@@ -180,6 +220,7 @@ export function useAgentSessionPanelModel(
     setSending(true);
     setSelectedSessionId(null);
     setInputValue("");
+    setPendingSends([]);
     clearComposerError();
 
     try {
@@ -204,6 +245,7 @@ export function useAgentSessionPanelModel(
 
     setSending(true);
     setInputValue("");
+    setPendingSends([]);
     clearComposerError();
 
     try {
@@ -284,7 +326,10 @@ export function useAgentSessionPanelModel(
         readinessBlockMessage,
         reconnecting: stream.reconnecting,
         sending,
-        streaming: stream.streaming,
+        // In-flight optimistic sends block re-submit like a running turn: the
+        // server allows one active run, so a second Enter before the echo
+        // would only surface an active-run error.
+        streaming: stream.streaming || pendingSends.length > 0,
         typedText,
       })
     ) {
@@ -294,6 +339,18 @@ export function useAgentSessionPanelModel(
     setSending(true);
     clearComposerError();
 
+    const clientRequestId = crypto.randomUUID();
+    const pendingSend: PendingSend = {
+      baselineUserMessageIds: stream.messages
+        .filter((message) => message.role === "user")
+        .map((message) => message.id),
+      clientRequestId,
+      createdAtMs: Date.now(),
+      sessionId: activeSessionId,
+      text: payload.text,
+    };
+    setPendingSends((current) => [...current, pendingSend]);
+
     const shouldAutoTitle =
       activeSessionId === null ||
       activeSession?.lastMessageAt === null ||
@@ -302,9 +359,17 @@ export function useAgentSessionPanelModel(
     try {
       const sessionId = await ensureActiveSession();
 
+      if (pendingSend.sessionId !== sessionId) {
+        setPendingSends((current) =>
+          current.map((pending) =>
+            pending.clientRequestId === clientRequestId ? { ...pending, sessionId } : pending,
+          ),
+        );
+      }
+
       await stream.sendUserMessage({
         attachmentIds: payload.attachmentIds,
-        clientRequestId: crypto.randomUUID(),
+        clientRequestId,
         sessionId,
         text: payload.text,
       });
@@ -331,6 +396,9 @@ export function useAgentSessionPanelModel(
       void refreshSessions();
       return true;
     } catch (error) {
+      setPendingSends((current) =>
+        current.filter((pending) => pending.clientRequestId !== clientRequestId),
+      );
       setComposerError({
         actionLabel: "Retry send",
         message: error instanceof Error ? error.message : "Message send failed.",
@@ -378,6 +446,11 @@ export function useAgentSessionPanelModel(
     await stream.sendUserInterrupt({ runId: stream.run.id, sessionId: activeSessionId });
   }
 
+  const displayMessages = useMemo(
+    () => mergePendingSendMessages(stream.messages, pendingSends),
+    [stream.messages, pendingSends],
+  );
+
   return {
     activeSession,
     activeSessionId,
@@ -392,9 +465,10 @@ export function useAgentSessionPanelModel(
     handleStartNewSession,
     input: inputValue,
     inputRef: layout.inputRef,
-    isConversationLoading: activeSessionId !== null && !stream.hydrated,
+    isConversationLoading:
+      activeSessionId !== null && !stream.hydrated && pendingSends.length === 0,
     lifecycle: stream.lifecycle,
-    messages: stream.messages,
+    messages: displayMessages,
     messagesEndRef: layout.messagesEndRef,
     permissionRequests: stream.permissionRequests,
     readiness,
@@ -407,6 +481,6 @@ export function useAgentSessionPanelModel(
     sessionCount: agentSessions.length,
     sessionLoadError: sessionsQuery.error instanceof Error ? sessionsQuery.error.message : null,
     setInput: setInputValue,
-    streaming: stream.streaming,
+    streaming: stream.streaming || pendingSends.length > 0,
   };
 }
