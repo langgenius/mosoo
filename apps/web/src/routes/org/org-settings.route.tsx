@@ -48,7 +48,7 @@ export function OrgSettingsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <main className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+      <main className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8">
         <div className="max-w-[560px]">
           {activeOrganization === null ? (
             <div className="text-muted-foreground text-sm">

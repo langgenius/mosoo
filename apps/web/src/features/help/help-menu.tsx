@@ -22,7 +22,13 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable;
 }
 
-export function HelpMenu({ collapsed }: { collapsed: boolean }) {
+export function HelpMenu({
+  collapsed,
+  shortcutEnabled = true,
+}: {
+  collapsed: boolean;
+  shortcutEnabled?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   // Keep the dialog mounted once it has been opened so its close animation can
   // still play, but never mount it before the first open so the chunk is not
@@ -44,6 +50,10 @@ export function HelpMenu({ collapsed }: { collapsed: boolean }) {
   // Press "?" anywhere outside a text field to open help, matching the common
   // shortcut used by other apps.
   useEffect(() => {
+    if (!shortcutEnabled) {
+      return;
+    }
+
     function handleKeyDown(event: KeyboardEvent): void {
       if (event.key !== "?" || event.metaKey || event.ctrlKey || event.altKey) {
         return;
@@ -60,7 +70,7 @@ export function HelpMenu({ collapsed }: { collapsed: boolean }) {
     return () => {
       globalThis.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
+  }, [shortcutEnabled]);
 
   const button = (
     <button
