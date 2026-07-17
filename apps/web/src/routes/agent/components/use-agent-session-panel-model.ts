@@ -389,6 +389,7 @@ export function useAgentSessionPanelModel(
 
     setSending(true);
     clearComposerError();
+    options.onAccepted?.();
 
     const clientRequestId = crypto.randomUUID();
     const pendingSend: PendingSend = {

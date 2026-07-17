@@ -13,6 +13,10 @@ export interface ComposerError {
 }
 
 export interface SendOptions {
+  // Invoked once the send passes the composer gate, before any network I/O.
+  // Lets the caller apply optimistic UI (e.g. clear mention chips) exactly when
+  // the send is committed rather than when it completes.
+  onAccepted?: () => void;
   sessionResourceMentions?: SessionResourceMention[];
   // Explicit text to send. When omitted, the model falls back to its own
   // composer input state (legacy path). assistant-ui owns the composer text and
