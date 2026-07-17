@@ -35,8 +35,8 @@ export function AgentTable({
   className?: string;
 }): ReactElement {
   const gridCols = showOwner
-    ? "grid-cols-[1fr_160px_120px_180px_140px_48px]"
-    : "grid-cols-[1fr_160px_120px_140px_48px]";
+    ? "grid-cols-[minmax(0,1fr)_auto_32px] lg:grid-cols-[minmax(0,1fr)_160px_120px_180px_140px_48px]"
+    : "grid-cols-[minmax(0,1fr)_auto_32px] lg:grid-cols-[minmax(0,1fr)_160px_120px_140px_48px]";
 
   return (
     <div className={className}>
@@ -45,18 +45,18 @@ export function AgentTable({
           <span className="text-fg-3 text-[11px] font-extrabold tracking-[0.1em] uppercase">
             Agent
           </span>
-          <span className="text-fg-3 text-[11px] font-extrabold tracking-[0.1em] uppercase">
+          <span className="text-fg-3 hidden text-[11px] font-extrabold tracking-[0.1em] uppercase lg:block">
             Tools
           </span>
           <span className="text-fg-3 text-[11px] font-extrabold tracking-[0.1em] uppercase">
             Status
           </span>
           {showOwner && (
-            <span className="text-fg-3 text-[11px] font-extrabold tracking-[0.1em] uppercase">
+            <span className="text-fg-3 hidden text-[11px] font-extrabold tracking-[0.1em] uppercase lg:block">
               Owner
             </span>
           )}
-          <span className="text-fg-3 text-[11px] font-extrabold tracking-[0.1em] uppercase">
+          <span className="text-fg-3 hidden text-[11px] font-extrabold tracking-[0.1em] uppercase lg:block">
             Created
           </span>
           <span />
@@ -96,12 +96,14 @@ export function AgentTable({
                   </div>
                 </div>
 
-                <ToolIcons tools={agent.tools} />
+                <div className="hidden lg:block">
+                  <ToolIcons tools={agent.tools} />
+                </div>
 
                 <StatusBadge status={agent.status} />
 
                 {showOwner && (
-                  <div className="flex min-w-0 items-center gap-2">
+                  <div className="hidden min-w-0 items-center gap-2 lg:flex">
                     <Avatar size="sm">
                       {agent.owner.avatar !== undefined && agent.owner.avatar.length > 0 ? (
                         <AvatarImage
@@ -118,7 +120,7 @@ export function AgentTable({
                   </div>
                 )}
 
-                <span className="text-fg-3 font-mono text-[12px]">
+                <span className="text-fg-3 hidden font-mono text-[12px] lg:inline">
                   {formatDate(agent.createdAt)}
                 </span>
               </button>

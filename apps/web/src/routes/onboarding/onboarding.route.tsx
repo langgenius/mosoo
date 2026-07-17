@@ -145,7 +145,7 @@ function OnboardingProvisioningScreen() {
 function OnboardingErrorScreen({ error, onRetry }: { error: string | null; onRetry: () => void }) {
   return (
     <div className="bg-background fixed inset-0 flex flex-col">
-      <div className="flex items-center px-8 py-5">
+      <div className="flex items-center px-4 py-5 sm:px-8">
         <span className="text-xl font-light tracking-tight">Mosoo</span>
       </div>
 
