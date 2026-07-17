@@ -134,16 +134,20 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                     />
                   </button>
                   {expanded ? (
-                    <div className="border-border bg-bg-sunken/40 mt-1 rounded-md border px-3.5 py-2.5 text-[13px]">
-                      <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
-                        Failure details
+                    <div className="grid grid-rows-[1fr] transition-[grid-template-rows] duration-200 ease-out starting:grid-rows-[0fr]">
+                      <div className="overflow-hidden">
+                        <div className="border-border bg-bg-sunken/40 mt-1 rounded-md border px-3.5 py-2.5 text-[13px]">
+                          <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
+                            Failure details
+                          </div>
+                          {run.errorCode === null ? null : (
+                            <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">
+                              {run.errorCode}
+                            </span>
+                          )}
+                          <span className="text-fg-2 break-words">{run.errorMessage ?? ""}</span>
+                        </div>
                       </div>
-                      {run.errorCode === null ? null : (
-                        <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">
-                          {run.errorCode}
-                        </span>
-                      )}
-                      <span className="text-fg-2 break-words">{run.errorMessage ?? ""}</span>
                     </div>
                   ) : null}
                 </>
@@ -228,16 +232,20 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                   {failedError === null || !expanded ? null : (
                     <TableRow className="hover:bg-transparent">
                       <TableCell colSpan={3} className="px-5 pt-0 pb-4">
-                        <div className="border-border bg-bg-sunken/40 rounded-md border px-3.5 py-2.5 text-[13px]">
-                          <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
-                            Failure details
+                        <div className="grid grid-rows-[1fr] transition-[grid-template-rows] duration-200 ease-out starting:grid-rows-[0fr]">
+                          <div className="overflow-hidden">
+                            <div className="border-border bg-bg-sunken/40 rounded-md border px-3.5 py-2.5 text-[13px]">
+                              <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
+                                Failure details
+                              </div>
+                              {run.errorCode === null ? null : (
+                                <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">
+                                  {run.errorCode}
+                                </span>
+                              )}
+                              <span className="text-fg-2">{run.errorMessage ?? ""}</span>
+                            </div>
                           </div>
-                          {run.errorCode === null ? null : (
-                            <span className="text-destructive mr-2 font-mono text-[12px] font-semibold">
-                              {run.errorCode}
-                            </span>
-                          )}
-                          <span className="text-fg-2">{run.errorMessage ?? ""}</span>
                         </div>
                       </TableCell>
                     </TableRow>

@@ -92,11 +92,11 @@ export function AccountMenu({
       className="hover:bg-ink-900/[0.04] flex h-auto w-full items-center justify-start gap-2.5 rounded-lg p-2 text-left"
     >
       <UserAvatar user={user} />
-      <div className="min-w-0 flex-1">
+      <div className="sidebar-label-enter min-w-0 flex-1">
         <div className="text-fg-1 truncate text-[13px] font-bold">{user?.name}</div>
         <div className="text-fg-3 truncate text-[11.5px]">{user?.email}</div>
       </div>
-      <AccountMenuChevronIcon className="text-fg-3 size-3.5 shrink-0" />
+      <AccountMenuChevronIcon className="sidebar-label-enter text-fg-3 size-3.5 shrink-0" />
     </Button>
   );
 
