@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ReactElement } from "react";
-import { useEffect, useReducer } from "react";
+import { lazy, Suspense, useEffect, useReducer } from "react";
 import { createPortal } from "react-dom";
 
 import { publishAgent } from "@/domains/agent/api/agent-client";
@@ -14,12 +14,16 @@ import { PendingChangesBanner } from "../lifecycle/pending-changes-banner";
 import { PublishMenu } from "../lifecycle/publish-menu";
 import { PublishSuccessModal } from "../lifecycle/publish-success-modal";
 import { AgentKindSection } from "./agent-kind-section";
-import { AgentSessionPanel } from "./agent-session-panel";
 import { ChannelsConfigDialog } from "./channels-config-dialog";
 import { AgentFormView } from "./editor/form-view";
 import { useAgentEditorAutoSave } from "./editor/use-auto-save";
 import { useAgentEditorModel } from "./editor/use-model";
 import type { ChannelId } from "./settings-dialog-model";
+
+const AgentSessionPanel = lazy(async () => {
+  const mod = await import("./agent-session-panel");
+  return { default: mod.AgentSessionPanel };
+});
 
 type AppliedToastKind = LifecycleActionKind | "direct-update";
 
@@ -58,6 +62,14 @@ const PREVIEW_MODE_INITIAL_STATE: PreviewModeState = {
 export interface PreviewModeProps {
   agent: Agent;
   headerActionTarget: HTMLDivElement | null;
+}
+
+function PreviewChatLoading(): ReactElement {
+  return (
+    <div className="text-muted-foreground flex h-full items-center justify-center text-[13px]">
+      Loading preview…
+    </div>
+  );
 }
 
 function publishStatusMessage({
@@ -189,16 +201,18 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
         : null}
       <div className="border-border-subtle flex min-h-0 w-1/2 shrink-0 flex-col border-r">
         <div className="min-h-0 flex-1 overflow-hidden">
-          <AgentSessionPanel
-            agentId={agent.id}
-            agentName={agent.name}
-            configurationChangedAt={agent.updatedAt}
-            configurationRevisionKey={`${agent.updatedAt}:${agent.liveVersion?.id ?? "draft"}`}
-            key={agent.id}
-            appId={agent.appId}
-            readiness={agent.readiness}
-            tone="preview"
-          />
+          <Suspense fallback={<PreviewChatLoading />}>
+            <AgentSessionPanel
+              agentId={agent.id}
+              agentName={agent.name}
+              configurationChangedAt={agent.updatedAt}
+              configurationRevisionKey={`${agent.updatedAt}:${agent.liveVersion?.id ?? "draft"}`}
+              key={agent.id}
+              appId={agent.appId}
+              readiness={agent.readiness}
+              tone="preview"
+            />
+          </Suspense>
         </div>
 
         {showAppliedToast && appliedKind ? (
