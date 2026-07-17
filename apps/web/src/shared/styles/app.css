@@ -494,6 +494,16 @@
     animation: login-doodle-bob 3.6s ease-in-out infinite alternate;
   }
 
+  .doodle-eye {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: transform 90ms ease-in;
+  }
+
+  .doodle-eye.doodle-blink {
+    transform: scaleY(0.12);
+  }
+
   .environment-scroll-area {
     scrollbar-color: rgba(28, 32, 36, 0.22) transparent;
     scrollbar-gutter: stable;
@@ -525,6 +535,10 @@
 
   .login-doodle {
     animation: none;
+  }
+
+  .doodle-eye {
+    transition: none;
   }
 }
 
