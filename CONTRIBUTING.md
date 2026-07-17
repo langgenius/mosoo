@@ -11,7 +11,7 @@ Before changing code, read the relevant product and architecture documents:
 
 These documents define system boundaries, module relationships, and design intent. If the PRD, architecture, and implementation disagree, fix the source of truth instead of hiding the mismatch in generated files, local adapters, or temporary branches.
 
-When a change pivots a core noun or ownership boundary, update the documentation anchors first: README, architecture, PRD index, and the active boundary PRD. The canonical product contract is [docs/SPEC.md](./docs/SPEC.md); [App Boundary](./docs/prd/app-boundary.md) is the historical App-pivot baseline that decodes older Organization-owned, member-governance, Workspace, and Agent-first wording, and yields to the Spec where they conflict.
+When a change pivots a core noun or ownership boundary, update the documentation anchors first: README, architecture, PRD index, and the active boundary PRD. The canonical product contract is [docs/SPEC.md](./docs/SPEC.md); [App Boundary](./docs/prd/app-boundary.md) records the current resource and ownership shell around the managed Agent runtime.
 
 ## Repository Structure
 

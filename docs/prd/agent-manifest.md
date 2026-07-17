@@ -1,6 +1,6 @@
 # Agent Manifest
 
-Status: available in the current alpha console. Mosoo's launch product direction is defined by the [Mosoo Spec](../SPEC.md); this page explains the Agent configuration people can use today.
+Status: available in the current Alpha console. The [Mosoo Spec](../SPEC.md) defines how this configuration fits the managed Agent runtime.
 
 ## What problem it solves
 
