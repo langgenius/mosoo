@@ -71,7 +71,12 @@ export function EnvironmentListTable({
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button className="size-8" size="icon" variant="ghost">
+              <Button
+                aria-label="Environment actions"
+                className="size-8"
+                size="icon"
+                variant="ghost"
+              >
                 <MoreHorizontal className="size-4" />
               </Button>
             </DropdownMenuTrigger>
