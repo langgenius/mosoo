@@ -61,10 +61,10 @@ export function SkillsTab() {
         </Button>
       </PageHeader>
 
-      <div className="flex shrink-0 items-center gap-2.5 px-8 pb-4">
-        <div className="flex-1" />
+      <div className="flex shrink-0 flex-wrap items-center gap-2.5 px-4 pb-4 sm:px-8">
+        <div className="hidden flex-1 sm:block" />
 
-        <div className="relative w-[260px]">
+        <div className="relative w-full sm:w-[260px]">
           <Search className="text-fg-3 absolute top-1/2 left-3 size-3.5 -translate-y-1/2" />
           <Input
             placeholder="Search skills…"
@@ -77,7 +77,7 @@ export function SkillsTab() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 sm:px-8">
         {registry.loading ? (
           <div className="text-fg-3 py-12 text-center text-[13px]">Loading skills…</div>
         ) : filtered.length === 0 ? (

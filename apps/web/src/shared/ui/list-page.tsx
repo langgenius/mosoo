@@ -11,7 +11,16 @@ export function ListPageToolbar({
   children: ReactNode;
   className?: string;
 }): ReactElement {
-  return <div className={cn("flex items-center gap-2.5 px-8 pb-4", className)}>{children}</div>;
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center gap-2.5 px-4 pb-4 sm:px-8 [&_button]:min-h-10 sm:[&_button]:min-h-0",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
 export function ListPageToolbarSpacer(): ReactElement {
@@ -30,7 +39,7 @@ export function ListPageSearch({
   className?: string;
 }): ReactElement {
   return (
-    <div className={cn("relative w-[260px]", className)}>
+    <div className={cn("relative w-full sm:w-[260px]", className)}>
       <Search className="text-fg-3 absolute top-1/2 left-3 size-3.5 -translate-y-1/2" />
       <Input
         className="h-8 pl-9"
@@ -51,5 +60,7 @@ export function ListPageContent({
   children: ReactNode;
   className?: string;
 }): ReactElement {
-  return <div className={cn("flex-1 overflow-y-auto px-8 pb-8", className)}>{children}</div>;
+  return (
+    <div className={cn("flex-1 overflow-y-auto px-4 pb-8 sm:px-8", className)}>{children}</div>
+  );
 }

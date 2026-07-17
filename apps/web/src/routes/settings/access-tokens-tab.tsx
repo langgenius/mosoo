@@ -294,9 +294,51 @@ function AccessTokensTable({
   pending: boolean;
   tokens: PersonalAccessTokenSummary[] | null;
 }) {
+  const emptyState = loading ? "Loading tokens..." : tokens?.length === 0 ? "No tokens yet." : null;
+
   return (
-    <section className="border-border bg-card overflow-x-auto rounded-lg border">
-      <div className="min-w-[560px]">
+    <section className="border-border bg-card overflow-hidden rounded-lg border xl:overflow-x-auto">
+      <div className="xl:hidden">
+        {emptyState === null ? null : (
+          <div className="text-muted-foreground px-4 py-8 text-sm">{emptyState}</div>
+        )}
+        {tokens?.map((token) => (
+          <div className="border-border border-b p-4 last:border-b-0" key={token.id}>
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-foreground truncate text-sm font-medium">{token.label}</div>
+                <div className="text-muted-foreground mt-1 text-xs">
+                  Created {formatDateTime(token.createdAt)}
+                </div>
+              </div>
+              <Button
+                className="min-h-10 min-w-10 shrink-0"
+                disabled={pending || token.revokedAt !== null}
+                onClick={() => {
+                  onRevoke(token.id);
+                }}
+                size="icon-xs"
+                title="Revoke token"
+                variant="ghost"
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            </div>
+            <dl className="mt-3 grid gap-2 text-xs">
+              <div>
+                <dt className="text-muted-foreground">Token ID</dt>
+                <dd className="text-foreground mt-0.5 font-mono break-all">{token.id}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Last used</dt>
+                <dd className="text-foreground mt-0.5">{formatDateTime(token.lastUsedAt)}</dd>
+              </div>
+            </dl>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden min-w-[560px] xl:block">
         <div className="border-border text-muted-foreground grid grid-cols-[minmax(180px,1fr)_140px_160px_64px] border-b px-4 py-2.5 text-[11px] font-semibold tracking-[0.12em] uppercase">
           <div>Label</div>
           <div>Token ID</div>
@@ -304,13 +346,9 @@ function AccessTokensTable({
           <div className="text-right">Action</div>
         </div>
 
-        {loading ? (
-          <div className="text-muted-foreground px-4 py-6 text-sm">Loading tokens...</div>
-        ) : null}
-
-        {tokens?.length === 0 ? (
-          <div className="text-muted-foreground px-4 py-8 text-sm">No tokens yet.</div>
-        ) : null}
+        {emptyState === null ? null : (
+          <div className="text-muted-foreground px-4 py-8 text-sm">{emptyState}</div>
+        )}
 
         {tokens?.map((token) => (
           <AccessTokenRow
