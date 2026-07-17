@@ -178,7 +178,7 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
   };
 
   return (
-    <div className="flex h-full" data-testid="agent-preview-panel">
+    <div className="flex h-full flex-col md:flex-row" data-testid="agent-preview-panel">
       {headerActionTarget !== null
         ? createPortal(
             <PublishMenu
@@ -199,7 +199,7 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
             headerActionTarget,
           )
         : null}
-      <div className="border-border-subtle flex min-h-0 w-1/2 shrink-0 flex-col border-r">
+      <div className="border-border-subtle flex h-[42%] w-full shrink-0 flex-col border-b md:h-auto md:w-1/2 md:border-r md:border-b-0">
         <div className="min-h-0 flex-1 overflow-hidden">
           <Suspense fallback={<PreviewChatLoading />}>
             <AgentSessionPanel
@@ -222,7 +222,7 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
         ) : null}
       </div>
 
-      <div className="flex min-h-0 w-1/2 min-w-0 flex-col">
+      <div className="flex h-[58%] w-full min-w-0 flex-col md:h-auto md:w-1/2">
         <PendingChangesBanner
           agent={agent}
           key={`${agent.id}:${discardCounter}`}
@@ -236,7 +236,10 @@ export function PreviewMode({ agent, headerActionTarget }: PreviewModeProps): Re
           }}
         />
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-white p-5" data-agent-editor-scroll>
+        <div
+          className="min-h-0 flex-1 overflow-y-auto bg-white p-4 sm:p-5"
+          data-agent-editor-scroll
+        >
           <div className="space-y-5">
             <AgentKindSection agent={draftAgent} onKindChange={model.setKind} />
             <AgentFormView agent={draftAgent} model={model} />

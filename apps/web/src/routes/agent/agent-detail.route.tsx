@@ -118,14 +118,26 @@ function AgentDetailHeader({
   runtime: ReturnType<typeof getRuntimeInfo> | null;
 }) {
   return (
-    <header className="border-border-subtle relative flex h-13 shrink-0 items-center justify-between border-b bg-white px-5">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon-sm" onClick={onBack} className="text-muted-foreground">
+    <header className="border-border-subtle relative flex min-h-13 shrink-0 flex-wrap items-center gap-y-2 border-b bg-white px-3 py-2 sm:px-5 md:h-13 md:flex-nowrap md:py-0">
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+        <Button
+          aria-label="Back to agents"
+          variant="ghost"
+          size="icon-sm"
+          onClick={onBack}
+          className="text-muted-foreground shrink-0"
+        >
           <ArrowLeft className="size-4" />
         </Button>
 
-        {runtime ? <RuntimeIcon runtime={runtime} size={28} /> : null}
-        <span className="text-foreground text-[14px] font-medium">{agent.name}</span>
+        {runtime ? (
+          <span className="hidden shrink-0 sm:block">
+            <RuntimeIcon runtime={runtime} size={28} />
+          </span>
+        ) : null}
+        <span className="text-foreground min-w-0 truncate text-[14px] font-medium">
+          {agent.name}
+        </span>
         {agent.status === "draft" ? (
           <button
             type="button"
@@ -147,7 +159,7 @@ function AgentDetailHeader({
         ) : null}
       </div>
 
-      <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-1">
+      <div className="border-border-subtle order-3 flex w-full items-center gap-1 overflow-x-auto border-t pt-2 md:absolute md:left-1/2 md:order-none md:w-auto md:-translate-x-1/2 md:border-0 md:pt-0">
         {MODE_TABS.map((tab) => (
           <button
             key={tab.id}
@@ -182,7 +194,7 @@ function AgentDetailHeader({
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         <div ref={headerActionTargetRef} className="flex items-center gap-2" />
         <Button
           variant="ghost"
