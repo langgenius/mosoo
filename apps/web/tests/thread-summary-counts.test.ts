@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { SessionSummary } from "@mosoo/contracts/session";
+import type { SessionRunSummary } from "@mosoo/contracts/session-run";
 
 import { summarizeThreads, toThreadListItem } from "../src/routes/threads/model/thread";
 import type {
@@ -44,6 +45,24 @@ function session(id: string): SessionSummary {
     title: "Thread",
     type: "ui",
     updatedAt: "2026-05-27T00:00:00.000Z",
+  };
+}
+
+function run(input: Pick<SessionRunSummary, "status">): SessionRunSummary {
+  return {
+    completedAt: input.status === "completed" ? "2026-05-27T00:01:00.000Z" : null,
+    createdAt: "2026-05-27T00:00:00.000Z",
+    deploymentVersionId: null,
+    deploymentVersionNumber: null,
+    error: null,
+    id: "run-1",
+    model: "gpt-5.4",
+    provider: "openai",
+    startedAt: "2026-05-27T00:00:01.000Z",
+    status: input.status,
+    traceId: "trace-1",
+    trigger: "user_prompt",
+    updatedAt: "2026-05-27T00:01:00.000Z",
   };
 }
 
@@ -113,5 +132,25 @@ describe("thread summary counts", () => {
 
     expect(archived.bucket).toBe("archived");
     expect(terminal.bucket).toBe("completed");
+  });
+
+  test("does not treat stale rescheduling sessions with terminal runs as working", () => {
+    const ui = {
+      pinnedThreadIds: new Set<string>(),
+      readAtByThreadId: {},
+    } satisfies ThreadUiSnapshot;
+    const threadItem = toThreadListItem({
+      actionCapabilities: [],
+      agentsById: new Map(),
+      session: {
+        ...session("thread-stale-rescheduling"),
+        lastRun: run({ status: "completed" }),
+        status: "RESCHEDULING",
+      },
+      ui,
+    });
+
+    expect(threadItem.bucket).toBe("completed");
+    expect(threadItem.statusLine).not.toContain("reconnecting");
   });
 });
