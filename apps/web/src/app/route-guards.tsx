@@ -28,7 +28,7 @@ interface RouteChildrenProps {
 
 export function AppLoading(): ReactElement {
   return (
-    <div className="text-muted-foreground flex h-screen items-center justify-center">Loading…</div>
+    <div className="text-muted-foreground flex h-dvh items-center justify-center">Loading…</div>
   );
 }
 

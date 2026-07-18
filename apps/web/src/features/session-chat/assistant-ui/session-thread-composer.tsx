@@ -22,6 +22,9 @@ interface SessionThreadComposerProps {
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onFilesSelected: (files: File[]) => void;
   onRetry: () => void;
+  // Send-intent signal (typing, opening the file picker) used to warm the
+  // session/runtime before the actual send. Callee is throttled/deduped.
+  onTypingActivity?: () => void;
   pendingSessionFiles: PendingSessionFileChip[];
   sendDisabledReason?: string | null;
   sessionResourceMentions: SessionResourceMention[];
@@ -83,6 +86,7 @@ export function SessionThreadComposer({
   fileInputRef,
   onFilesSelected,
   onRetry,
+  onTypingActivity,
   pendingSessionFiles,
   sendDisabledReason,
   sessionResourceMentions,
@@ -120,6 +124,7 @@ export function SessionThreadComposer({
         submitOnEnter
         minRows={1}
         maxRows={8}
+        onChange={onTypingActivity}
         placeholder="Describe a task for the agent…"
         className="text-fg-1 placeholder:text-fg-muted w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-[14.5px] leading-[1.5] outline-none"
         data-testid="agent-session-composer-input"
@@ -147,6 +152,7 @@ export function SessionThreadComposer({
           size="icon-sm"
           className="text-fg-3 rounded-full"
           onClick={() => {
+            onTypingActivity?.();
             fileInputRef.current?.click();
           }}
           aria-label="Attach file"

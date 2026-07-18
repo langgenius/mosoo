@@ -1,5 +1,5 @@
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
-import { ChevronDown, ChevronRight, Clock3 } from "lucide-react";
+import { ChevronRight, Clock3 } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { cn } from "@/shared/lib/class-names";
@@ -116,11 +116,12 @@ export function TurnCard({
           className="flex min-w-0 flex-1 items-start gap-2 text-left"
         >
           <span className="text-fg-3 mt-0.5 flex size-5 shrink-0 items-center justify-center">
-            {collapsed ? (
-              <ChevronRight className="size-3.5" />
-            ) : (
-              <ChevronDown className="size-3.5" />
-            )}
+            <ChevronRight
+              className={cn(
+                "size-3.5 transition-transform duration-150 ease-out",
+                collapsed ? "rotate-0" : "rotate-90",
+              )}
+            />
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -155,17 +156,26 @@ export function TurnCard({
           <span className="text-fg-3">{visibleTurnEventCount}</span>
         </Button>
       </div>
-      {!collapsed && visible ? (
-        <div className="border-border-subtle bg-paper-100 flex flex-col gap-1.5 border-t p-2.5">
-          {filteredEvents.map((event) => (
-            <SessionEventRow
-              key={event.id}
-              event={event}
-              onOpen={() => {
-                onOpenDrawer(event.id);
-              }}
-            />
-          ))}
+      {visible ? (
+        <div
+          className={cn(
+            "grid transition-[grid-template-rows] duration-200 ease-out",
+            collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]",
+          )}
+        >
+          <div className="overflow-hidden">
+            <div className="border-border-subtle bg-paper-100 flex flex-col gap-1.5 border-t p-2.5">
+              {filteredEvents.map((event) => (
+                <SessionEventRow
+                  key={event.id}
+                  event={event}
+                  onOpen={() => {
+                    onOpenDrawer(event.id);
+                  }}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       ) : null}
     </section>

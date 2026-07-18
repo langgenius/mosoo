@@ -1,10 +1,19 @@
 import type { EnvironmentSummary } from "@mosoo/contracts/environment";
-import { GitFork, MoreHorizontal } from "lucide-react";
+import { GitFork, MoreHorizontal, Trash2 } from "lucide-react";
+import { useState } from "react";
 import type { ReactElement } from "react";
 import { Link } from "react-router-dom";
 
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +43,17 @@ export function EnvironmentListTable({
   onDelete,
   onSetDefault,
 }: EnvironmentListTableProps): ReactElement {
+  // Delete is destructive and irreversible, so it sits behind a confirm dialog
+  // (same convention as deleting a deployment in deploy-actions.tsx).
+  const [confirmingDelete, setConfirmingDelete] = useState<EnvironmentSummary | null>(null);
+
+  function confirmDelete(): void {
+    if (confirmingDelete !== null) {
+      onDelete(confirmingDelete.id);
+    }
+    setConfirmingDelete(null);
+  }
+
   return (
     <div className="border-border bg-card overflow-hidden rounded-lg border">
       {environments.map((environment, index) => (
@@ -71,7 +91,12 @@ export function EnvironmentListTable({
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button className="size-8" size="icon" variant="ghost">
+              <Button
+                aria-label="Environment actions"
+                className="size-8"
+                size="icon"
+                variant="ghost"
+              >
                 <MoreHorizontal className="size-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -92,8 +117,9 @@ export function EnvironmentListTable({
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
+                    variant="destructive"
                     onClick={() => {
-                      onDelete(environment.id);
+                      setConfirmingDelete(environment);
                     }}
                   >
                     Delete
@@ -104,6 +130,45 @@ export function EnvironmentListTable({
           </DropdownMenu>
         </div>
       ))}
+
+      <Dialog
+        open={confirmingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmingDelete(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete this environment?</DialogTitle>
+            <DialogDescription>
+              This permanently deletes{" "}
+              <span className="text-fg-1 font-semibold">{confirmingDelete?.name}</span> from this
+              App and cannot be undone.
+              {confirmingDelete !== null && confirmingDelete.usedByAgentCount > 0
+                ? ` It is currently used by ${String(confirmingDelete.usedByAgentCount)} ${
+                    confirmingDelete.usedByAgentCount === 1 ? "agent" : "agents"
+                  }.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConfirmingDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete}>
+              <Trash2 className="size-4" />
+              Delete environment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

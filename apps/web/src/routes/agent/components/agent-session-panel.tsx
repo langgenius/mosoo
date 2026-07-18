@@ -146,10 +146,25 @@ export function AgentSessionPanel({
   const handleSendText = useCallback(
     async (text: string): Promise<void> => {
       lastSentTextRef.current = text;
-      const sent = await model.handleSend({ sessionResourceMentions, text });
+      const mentionsAtSend = sessionResourceMentions;
+      let accepted = false;
 
-      if (sent) {
-        resourceDraft.clearActiveMentions();
+      const sent = await model.handleSend({
+        onAccepted: () => {
+          accepted = true;
+          resourceDraft.clearActiveMentions();
+        },
+        sessionResourceMentions: mentionsAtSend,
+        text,
+      });
+
+      if (!sent && accepted && model.activeSessionId !== null) {
+        // Send failed after the optimistic clear — put the chips back so the
+        // existing "Retry send" path still carries the attachments.
+        // appendMention prepends, so reverse restores the original order.
+        for (const mention of mentionsAtSend.toReversed()) {
+          resourceDraft.appendMention(model.activeSessionId, mention);
+        }
       }
     },
     [model, resourceDraft, sessionResourceMentions],
@@ -308,6 +323,7 @@ export function AgentSessionPanel({
                 fileInputRef={model.fileInputRef}
                 onFilesSelected={(files) => void handleUploadFiles(files)}
                 onRetry={handleRetrySend}
+                onTypingActivity={model.notifyComposerTyping}
                 pendingSessionFiles={pendingSessionFiles}
                 sendDisabledReason={sendDisabledReason}
                 sessionResourceMentions={sessionResourceMentions}

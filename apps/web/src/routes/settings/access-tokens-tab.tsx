@@ -1,6 +1,6 @@
 import type { PersonalAccessTokenSummary } from "@mosoo/contracts/auth";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, ExternalLink, KeyRound, Loader2, Plus, Trash2 } from "lucide-react";
+import { ExternalLink, KeyRound, Loader2, Plus, Trash2 } from "lucide-react";
 import { useReducer } from "react";
 
 import {
@@ -10,6 +10,7 @@ import {
 } from "@/domains/auth/api/personal-access-token-client";
 import { MOSOO_API_REFERENCE_URL } from "@/shared/config/external-links";
 import { Button } from "@/shared/ui/button";
+import { CopyCheckIcon } from "@/shared/ui/copy-check-icon";
 import { Input } from "@/shared/ui/input";
 
 import { isTruthy } from "../../shared/lib/truthiness";
@@ -269,6 +270,7 @@ function CreatedTokenPanel({
           {token}
         </code>
         <Button
+          aria-label={tooltip}
           onClick={() => {
             void onCopy();
           }}
@@ -276,7 +278,7 @@ function CreatedTokenPanel({
           title={tooltip}
           variant="outline"
         >
-          {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+          <CopyCheckIcon copied={copied} />
         </Button>
       </div>
     </div>
@@ -312,6 +314,7 @@ function AccessTokensTable({
                 </div>
               </div>
               <Button
+                aria-label="Revoke token"
                 className="min-h-10 min-w-10 shrink-0"
                 disabled={pending || token.revokedAt !== null}
                 onClick={() => {
@@ -386,6 +389,7 @@ function AccessTokenRow({
       <div className="text-muted-foreground text-xs">{formatDateTime(token.lastUsedAt)}</div>
       <div className="flex justify-end">
         <Button
+          aria-label="Revoke token"
           disabled={pending || token.revokedAt !== null}
           onClick={onRevoke}
           size="icon-xs"

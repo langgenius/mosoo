@@ -101,7 +101,7 @@ function NavLink({
       )}
     >
       <Icon className="size-4" />
-      {collapsed ? null : <span>{label}</span>}
+      {collapsed ? null : <span className="sidebar-label-enter">{label}</span>}
     </Link>
   );
 
@@ -192,7 +192,7 @@ function NavGroup({
           className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] font-semibold"
         >
           <Icon className="size-4 shrink-0" />
-          <span className="flex-1 truncate text-left">{item.label}</span>
+          <span className="sidebar-label-enter flex-1 truncate text-left">{item.label}</span>
         </Link>
         {item.children && item.children.length > 0 ? (
           <button
@@ -220,7 +220,7 @@ function NavGroup({
           )}
         >
           <div className="overflow-hidden">
-            <div className="mt-0.5 flex flex-col gap-0.5 pl-[34px]">
+            <div className="sidebar-label-enter mt-0.5 flex flex-col gap-0.5 pl-[34px]">
               {item.children.map((child) => {
                 const childActive = isNavItemActive(pathname, child.path);
                 return (
@@ -265,7 +265,7 @@ function NavSection({
   return (
     <div className={cn("flex flex-col", collapsed ? "gap-1" : "gap-0.5")}>
       {!collapsed && section.label ? (
-        <div className="text-fg-3 mt-3 mb-1 px-2.5 text-[10.5px] font-semibold tracking-wider uppercase">
+        <div className="sidebar-label-enter text-fg-3 mt-3 mb-1 px-2.5 text-[10.5px] font-semibold tracking-wider uppercase">
           {section.label}
         </div>
       ) : null}

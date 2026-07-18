@@ -54,7 +54,7 @@ function BackToOrgLink({ collapsed, orgName }: { collapsed: boolean; orgName: st
       )}
     >
       <BackIcon className="size-3.5 shrink-0" />
-      {collapsed ? null : <span className="truncate">{label}</span>}
+      {collapsed ? null : <span className="sidebar-label-enter truncate">{label}</span>}
     </Link>
   );
 
@@ -98,13 +98,13 @@ function AppSwitcher({
       <AppSwitcherIcon className="size-4 shrink-0" />
       {collapsed ? null : (
         <>
-          <div className="min-w-0 flex-1 text-left">
+          <div className="sidebar-label-enter min-w-0 flex-1 text-left">
             <div className="text-muted-foreground text-[10.5px] leading-3 font-semibold uppercase">
               App
             </div>
             <div className="truncate">{displayLabel}</div>
           </div>
-          <SwitcherChevronIcon className="text-fg-3 size-3.5 shrink-0" />
+          <SwitcherChevronIcon className="sidebar-label-enter text-fg-3 size-3.5 shrink-0" />
         </>
       )}
     </button>
@@ -147,7 +147,7 @@ function NewAgentCta({ collapsed, disabled }: { collapsed: boolean; disabled: bo
     return (
       <Button disabled aria-label={label} className={className}>
         <NewAgentIcon className="size-4" />
-        {collapsed ? null : label}
+        {collapsed ? null : <span className="sidebar-label-enter">{label}</span>}
       </Button>
     );
   }
@@ -156,7 +156,7 @@ function NewAgentCta({ collapsed, disabled }: { collapsed: boolean; disabled: bo
     <Button asChild aria-label={label} className={className}>
       <Link to="/agent?create=1">
         <NewAgentIcon className="size-4" />
-        {collapsed ? null : label}
+        {collapsed ? null : <span className="sidebar-label-enter">{label}</span>}
       </Link>
     </Button>
   );
@@ -322,7 +322,11 @@ function ConsoleShell({
           )}
         >
           {collapsed ? null : (
-            <img src="/brand/logo-wordmark-onlight.svg" alt="Mosoo" className="block h-[22px]" />
+            <img
+              src="/brand/logo-wordmark-onlight.svg"
+              alt="Mosoo"
+              className="sidebar-label-enter block h-[22px]"
+            />
           )}
           <Tooltip>
             <TooltipTrigger asChild>

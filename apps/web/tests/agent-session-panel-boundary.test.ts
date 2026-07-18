@@ -5,8 +5,10 @@ import type { AgentReadiness } from "@mosoo/contracts/agent";
 import {
   getSessionControlMode,
   selectSessionPanelReadiness,
+  shouldSpeculativelyCreateSessionOnTyping,
   shouldWaitForRuntimeReadyOnNewSession,
 } from "../src/routes/agent/components/agent-session-panel-rules";
+import type { SpeculativeSessionCreateInput } from "../src/routes/agent/components/agent-session-panel-rules";
 import {
   getResetSessionIds,
   removeSessionConfigurationRevisionKeys,
@@ -64,6 +66,36 @@ describe("agent session panel boundary", () => {
       shouldWaitForRuntimeReadyOnNewSession({
         sessionType: "preview",
         waitForRuntimeReadyOnNewSession: false,
+      }),
+    ).toBe(false);
+  });
+
+  test("speculatively creates a session on typing only for a ready, empty Preview panel", () => {
+    const readyInput: SpeculativeSessionCreateInput = {
+      activeSessionId: null,
+      appId: "app_1",
+      readinessBlockMessage: null,
+      sending: false,
+      sessionListLoaded: true,
+      sessionType: "preview",
+    };
+
+    expect(shouldSpeculativelyCreateSessionOnTyping(readyInput)).toBe(true);
+    expect(shouldSpeculativelyCreateSessionOnTyping({ ...readyInput, sessionType: "ui" })).toBe(
+      false,
+    );
+    expect(shouldSpeculativelyCreateSessionOnTyping({ ...readyInput, appId: null })).toBe(false);
+    expect(
+      shouldSpeculativelyCreateSessionOnTyping({ ...readyInput, activeSessionId: "session_1" }),
+    ).toBe(false);
+    expect(
+      shouldSpeculativelyCreateSessionOnTyping({ ...readyInput, sessionListLoaded: false }),
+    ).toBe(false);
+    expect(shouldSpeculativelyCreateSessionOnTyping({ ...readyInput, sending: true })).toBe(false);
+    expect(
+      shouldSpeculativelyCreateSessionOnTyping({
+        ...readyInput,
+        readinessBlockMessage: "Provider key required.",
       }),
     ).toBe(false);
   });
