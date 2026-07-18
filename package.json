@@ -41,10 +41,10 @@
     "@graphql-codegen/cli": "^7.2.0",
     "@graphql-codegen/client-preset": "^6.1.0",
     "@graphql-codegen/schema-ast": "^6.1.0",
-    "@j178/prek": "^0.4.6",
+    "@j178/prek": "^0.4.10",
     "graphql": "^17.0.2",
     "knip": "^6.21.0",
-    "react-doctor": "0.7.0",
+    "react-doctor": "0.8.1",
     "tsx": "^4.22.4",
     "vite-plus": "^0.1.24"
   },
