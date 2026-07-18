@@ -523,6 +523,16 @@
     animation: login-doodle-bob 3.6s ease-in-out infinite alternate;
   }
 
+  .doodle-eye {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: transform 90ms ease-in;
+  }
+
+  .doodle-eye.doodle-blink {
+    transform: scaleY(0.12);
+  }
+
   /* Sidebar labels fade in slightly after the rail starts widening, so text
      never overflows the mid-animation rail; collapse unmounts them instantly
      which matches the rail clipping them away. */
@@ -567,6 +577,10 @@
 
   .login-doodle {
     animation: none;
+  }
+
+  .doodle-eye {
+    transition: none;
   }
 
   .sidebar-label-enter {
