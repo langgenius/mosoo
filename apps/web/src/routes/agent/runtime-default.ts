@@ -15,8 +15,8 @@ export interface DefaultAgentRuntimeSelection {
   readonly runtimeId: string;
 }
 
-function isVendorConfigured(credentials: readonly VendorCredential[], vendorId: string): boolean {
-  return credentials.some((credential) => credential.vendorId === vendorId);
+function toConfiguredVendorIds(credentials: readonly VendorCredential[]): ReadonlySet<string> {
+  return new Set(credentials.map((credential) => credential.vendorId));
 }
 
 function defaultModelForVendor(
@@ -47,9 +47,11 @@ function defaultModelForVendor(
 export function resolveDefaultAgentRuntime(
   credentials: readonly VendorCredential[],
 ): DefaultAgentRuntimeSelection | null {
+  const configuredVendorIds = toConfiguredVendorIds(credentials);
+
   for (const entry of PUBLIC_RUNTIME_CATALOG) {
     const configuredVendor = entry.vendors.find((vendor) =>
-      isVendorConfigured(credentials, vendor.vendorId),
+      configuredVendorIds.has(vendor.vendorId),
     );
 
     if (configuredVendor !== undefined) {

@@ -48,4 +48,12 @@ describe("default agent runtime", () => {
       runtimeId: "acp-fallback",
     });
   });
+
+  test("keeps runtime catalog priority when multiple providers are configured", () => {
+    expect(resolveDefaultAgentRuntime([credential("deepseek"), credential("openai")])).toEqual({
+      model: "gpt-5.5",
+      provider: "openai",
+      runtimeId: "openai-runtime",
+    });
+  });
 });
