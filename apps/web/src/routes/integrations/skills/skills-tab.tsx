@@ -1,4 +1,5 @@
-import { Search, Sparkles, Upload } from "lucide-react";
+import { Compass, Library, Search, Sparkles, Upload } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { cn } from "@/shared/lib/class-names";
@@ -10,11 +11,16 @@ import { PageHeader } from "@/shared/ui/page-header";
 import { isTruthy } from "../../../shared/lib/truthiness";
 import { SkillCard } from "./skill-card";
 import { SkillDetailDialog } from "./skill-detail-dialog";
+import { SkillsShCatalog } from "./skills-sh-catalog";
 import { UploadSkillDialog } from "./upload-skill-dialog";
 import { useSkillRegistry } from "./use-skill-registry";
+
+type SkillsTabMode = "discover" | "installed";
+
 export function SkillsTab() {
   const registry = useSkillRegistry();
   const [search, setSearch] = useState("");
+  const [mode, setMode] = useState<SkillsTabMode>("installed");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [detailSkillId, setDetailSkillId] = useState<string | null>(null);
 
@@ -62,12 +68,32 @@ export function SkillsTab() {
       </PageHeader>
 
       <div className="flex shrink-0 flex-wrap items-center gap-2.5 px-4 pb-4 sm:px-8">
+        <div className="border-border-strong bg-card inline-flex items-center overflow-hidden rounded-md border">
+          <SkillsModeButton
+            active={mode === "installed"}
+            icon={Library}
+            label="Installed"
+            onClick={() => {
+              setMode("installed");
+            }}
+          />
+          <span className="bg-border-strong h-5 w-px" />
+          <SkillsModeButton
+            active={mode === "discover"}
+            icon={Compass}
+            label="Discover"
+            onClick={() => {
+              setMode("discover");
+            }}
+          />
+        </div>
+
         <div className="hidden flex-1 sm:block" />
 
         <div className="relative w-full sm:w-[260px]">
           <Search className="text-fg-3 absolute top-1/2 left-3 size-3.5 -translate-y-1/2" />
           <Input
-            placeholder="Search skills…"
+            placeholder={mode === "installed" ? "Search installed skills…" : "Search skills.sh…"}
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -78,32 +104,26 @@ export function SkillsTab() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 sm:px-8">
-        {registry.loading ? (
-          <div className="text-fg-3 py-12 text-center text-[13px]">Loading skills…</div>
-        ) : filtered.length === 0 ? (
-          <SkillsEmptyState
-            searching={search.length > 0}
-            onUpload={() => {
-              setUploadOpen(true);
+        {mode === "discover" ? (
+          <SkillsShCatalog
+            registry={registry}
+            search={search}
+            onInstalled={(skillId) => {
+              setMode("installed");
+              setSearch("");
+              setDetailSkillId(skillId);
             }}
           />
         ) : (
-          <div
-            className={cn(
-              "grid gap-3",
-              "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4",
-            )}
-          >
-            {filtered.map((s) => (
-              <SkillCard
-                key={s.id}
-                skill={s}
-                onOpen={() => {
-                  setDetailSkillId(s.id);
-                }}
-              />
-            ))}
-          </div>
+          <InstalledSkillsGrid
+            filtered={filtered}
+            loading={registry.loading}
+            onOpenSkill={setDetailSkillId}
+            onUpload={() => {
+              setUploadOpen(true);
+            }}
+            search={search}
+          />
         )}
       </div>
 
@@ -127,6 +147,69 @@ export function SkillsTab() {
         />
       ) : null}
     </div>
+  );
+}
+
+function InstalledSkillsGrid({
+  filtered,
+  loading,
+  onOpenSkill,
+  onUpload,
+  search,
+}: {
+  filtered: ReturnType<typeof useSkillRegistry>["personal"];
+  loading: boolean;
+  onOpenSkill: (skillId: string) => void;
+  onUpload: () => void;
+  search: string;
+}) {
+  if (loading) {
+    return <div className="text-fg-3 py-12 text-center text-[13px]">Loading skills…</div>;
+  }
+
+  if (filtered.length === 0) {
+    return <SkillsEmptyState searching={search.length > 0} onUpload={onUpload} />;
+  }
+
+  return (
+    <div className={cn("grid gap-3", "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4")}>
+      {filtered.map((s) => (
+        <SkillCard
+          key={s.id}
+          skill={s}
+          onOpen={() => {
+            onOpenSkill(s.id);
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SkillsModeButton({
+  active,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "inline-flex h-8 items-center gap-1.5 px-3 text-[13px] font-medium transition-colors",
+        active ? "bg-paper-200 text-fg-1" : "text-fg-3 hover:bg-paper-200/50",
+      )}
+    >
+      <Icon className="size-3.5" />
+      {label}
+    </button>
   );
 }
 
