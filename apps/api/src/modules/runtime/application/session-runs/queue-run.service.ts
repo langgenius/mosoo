@@ -13,7 +13,8 @@ import type { SQL } from "drizzle-orm";
 import { logError, logInfo } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { toIsoString } from "../../../../time";
-import { enqueueSessionRunDispatchCommand } from "../../../api-command/application/api-command-enqueue";
+import { admitSessionRunDispatchCommand } from "../../../api-command/application/api-command-enqueue";
+import { deliverApiCommand } from "../../../api-command/application/api-command-ledger";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
 import { fileStore } from "../../../files/application/file-store";
@@ -165,7 +166,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     viewerId: viewer.id,
   });
 
-  await enqueueSessionRunDispatchCommand(bindings, {
+  const dispatchCommand = await admitSessionRunDispatchCommand(bindings, {
     attachmentIds: input.attachmentIds,
     prompt: input.prompt,
     queuedAtMs,
@@ -180,12 +181,19 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     ...(input.accessViewer ? { accessViewer: input.accessViewer } : {}),
   });
 
-  // O1: dispatch inline via waitUntil so an interactive run does not wait for
-  // the api-command queue's batch window (max_batch_timeout = 5s). The queue
-  // enqueue above stays as the durable fallback if the worker is evicted before
-  // waitUntil runs; the queued->booting CAS inside dispatch makes this
-  // exactly-once (whichever path wins, the other logs dispatch.skipped).
+  // Start both paths after durable admission. Queue delivery stays retryable,
+  // while the queued->booting CAS prevents duplicate model execution.
   if (request.executionContext) {
+    const queueDelivery = deliverApiCommand(bindings, dispatchCommand).catch((error: unknown) => {
+      logError("session.run.queue_delivery.failed", {
+        commandId: dispatchCommand.commandId,
+        message: error instanceof Error ? error.message : String(error),
+        runId: createdRun.id,
+        sessionId: input.session.id,
+        traceId: createdRun.traceId,
+      });
+    });
+    request.executionContext.waitUntil(queueDelivery);
     const inlineDispatch = dispatchQueuedSessionRun({
       bindings,
       input: {
@@ -208,6 +216,8 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
       });
     });
     request.executionContext.waitUntil(inlineDispatch);
+  } else {
+    await deliverApiCommand(bindings, dispatchCommand);
   }
 
   logInfo("session.run.accepted", {
