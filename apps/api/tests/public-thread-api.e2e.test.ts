@@ -835,12 +835,7 @@ describe("Public Thread API e2e", () => {
         app,
         database,
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
-          body: JSON.stringify({
-            input: {
-              content: [{ text: "Create a streamable Thread.", type: "text" }],
-              type: "user.message",
-            },
-          }),
+          body: JSON.stringify({}),
           headers: {
             Authorization: bearer(TOKENS.owner),
             "Content-Type": "application/json",
@@ -851,14 +846,16 @@ describe("Public Thread API e2e", () => {
       expect(response.status).toBe(201);
       const body = await readJson(response);
       const threadId = expectString(expectRecord(body["thread"])["id"]);
-      const runId = expectString(expectRecord(body["run"])["id"]);
+      const runId = null;
 
       await database.prepare("DELETE FROM session_event WHERE session_id = ?").bind(threadId).run();
       await insertRuntimeEvent(database, {
-        kind: "run.started",
+        kind: "message.added",
         occurredAt: 3_000,
         payload: {
-          startedAt: "1970-01-01T00:00:03.000Z",
+          content: "Initial stream history A",
+          messageId: "assistant-stream-initial-1",
+          role: "agent",
         },
         runId,
         seq: 1,
@@ -868,24 +865,12 @@ describe("Public Thread API e2e", () => {
         kind: "message.added",
         occurredAt: 3_050,
         payload: {
-          content: "Initial stream history A",
-          messageId: "assistant-stream-initial-1",
-          role: "agent",
-        },
-        runId,
-        seq: 2,
-        sessionId: threadId,
-      });
-      await insertRuntimeEvent(database, {
-        kind: "message.added",
-        occurredAt: 3_100,
-        payload: {
           content: "Initial stream history B",
           messageId: "assistant-stream-initial-2",
           role: "agent",
         },
         runId,
-        seq: 3,
+        seq: 2,
         sessionId: threadId,
       });
 
@@ -906,19 +891,35 @@ describe("Public Thread API e2e", () => {
       await reader.read();
 
       await insertRuntimeEvent(database, {
-        kind: "run.completed",
-        occurredAt: 3_150,
-        payload: { stopReason: "private-diagnostic" },
+        kind: "message.added",
+        occurredAt: 3_100,
+        payload: {
+          content: "private-diagnostic",
+          messageId: "private-message",
+          role: "agent",
+        },
         runId,
-        seq: 4,
+        seq: 3,
         sessionId: threadId,
         visibility: "owner_debug",
       });
       await insertRuntimeEvent(database, {
-        kind: "message.added",
+        kind: "message.delta",
+        occurredAt: 3_150,
+        payload: {
+          contentDelta: "Live stream \uE200ci",
+          messageId: "assistant-stream-live-1",
+          role: "agent",
+        },
+        runId,
+        seq: 4,
+        sessionId: threadId,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "message.delta",
         occurredAt: 3_200,
         payload: {
-          content: "Live stream delta A",
+          contentDelta: "te\uE202hidden\uE201delta A",
           messageId: "assistant-stream-live-1",
           role: "agent",
         },
@@ -926,43 +927,92 @@ describe("Public Thread API e2e", () => {
         seq: 5,
         sessionId: threadId,
       });
+
+      const readUntil = async (marker: string): Promise<string> => {
+        let text = "";
+
+        while (!text.includes(marker)) {
+          const chunk = await Promise.race([
+            reader.read(),
+            Bun.sleep(3_000).then(() => {
+              throw new Error(`Timed out waiting for ${marker}.`);
+            }),
+          ]);
+
+          if (chunk.done) {
+            throw new Error(`SSE closed before ${marker}.`);
+          }
+
+          text += new TextDecoder().decode(chunk.value);
+        }
+
+        return text;
+      };
+
+      const deltaCommittedAt = performance.now();
+      const openDeltaText = await readUntil("id: 01J00000000000000000000014");
+      const openDeltaMs = performance.now() - deltaCommittedAt;
+
+      expect(openDeltaMs).toBeLessThan(3_000);
+      expect(openDeltaText).toContain("Live stream ");
+      expect(openDeltaText).toContain("delta A");
+      expect(openDeltaText).not.toContain("hidden");
+      expect(openDeltaText).not.toContain("\uE200");
+
       await insertRuntimeEvent(database, {
-        kind: "run.completed",
+        kind: "message.completed",
         occurredAt: 3_250,
-        payload: { stopReason: "end_turn" },
+        payload: { messageId: "assistant-stream-live-1", role: "agent" },
         runId,
         seq: 6,
         sessionId: threadId,
       });
+      await insertRuntimeEvent(database, {
+        kind: "message.added",
+        occurredAt: 3_300,
+        payload: {
+          content: "Live stream \uE200cite\uE202hidden\uE201delta A",
+          messageId: "assistant-stream-live-1",
+          role: "agent",
+        },
+        runId,
+        seq: 7,
+        sessionId: threadId,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "message.added",
+        occurredAt: 3_350,
+        payload: {
+          content: "Tail marker",
+          messageId: "tail-message",
+          role: "agent",
+        },
+        runId,
+        seq: 8,
+        sessionId: threadId,
+      });
 
-      let text = "";
-      for (
-        let index = 0;
-        index < 8 && !text.includes("id: 01J00000000000000000000015");
-        index += 1
-      ) {
-        const chunk = await reader.read();
-        if (chunk.done) {
-          break;
-        }
-        text += new TextDecoder().decode(chunk.value);
-      }
+      const text = `${openDeltaText}${await readUntil("id: 01J00000000000000000000017")}`;
       await reader.cancel();
       expect(text).toContain("event: thread.event");
-      expect(text).toContain("id: 01J00000000000000000000012");
+      expect(text).toContain("id: 01J00000000000000000000011");
+      expect(text).not.toContain("id: 01J00000000000000000000012");
       expect(text).not.toContain("id: 01J00000000000000000000013");
       expect(text).toContain("id: 01J00000000000000000000014");
-      expect(text).toContain("id: 01J00000000000000000000015");
+      expect(text).not.toContain("id: 01J00000000000000000000015");
+      expect(text).not.toContain("id: 01J00000000000000000000016");
+      expect(text).toContain("id: 01J00000000000000000000017");
+      expect(text.match(/Live stream /gu)).toHaveLength(1);
+      expect(text.match(/delta A/gu)).toHaveLength(1);
       expect(text).toContain('"type":"agent.message.delta"');
-      expect(text).toContain('"type":"run.completed"');
-      expect(text).toContain(`"runId":"${runId}"`);
+      expect(text).toContain('"runId":null');
       expect(text).toContain('"content":"');
       expect(text).not.toContain("owner_debug");
       expect(text).not.toContain("payload");
       expect(text).not.toContain("private-diagnostic");
       expect(text).not.toContain("traceId");
     });
-  });
+  }, 10_000);
 
   test("bounds public Thread lists on stable latest ordering", async () => {
     const database = await createPublicHttpContractDatabase();

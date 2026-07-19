@@ -12,13 +12,13 @@ import type { SessionProcessEvent } from "@mosoo/contracts/session";
 import { sessionEventsTable, sessionMessagesTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type { RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
+import { OpenAiPrivateCitationStreamFilter } from "agent-driver/provider-output";
 import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import { getAppDatabase } from "../../platform/db/drizzle";
 import { createSessionProcessEventsFromSessionEventRows } from "../sessions/application/session-process-events.service";
 import type { SessionEventProcessRow } from "../sessions/application/session-process-events.service";
-import { foldStreamedSessionEventRows } from "../sessions/domain/session-event-stream-fold";
 import { publicInternalError, publicInvalidRequest, toPublicApiError } from "./public-api-errors";
 import { sanitizePublicOutput } from "./public-output-sanitization";
 import { admitPublicThreadReader } from "./public-thread-admission";
@@ -47,6 +47,103 @@ interface PublicThreadEventWindow {
 
 interface PublicThreadEventProcessRow extends SessionEventProcessRow {
   run_id: SessionRunId | null;
+}
+
+interface LiveMessageState {
+  filter: OpenAiPrivateCitationStreamFilter;
+  text: string;
+}
+
+class PublicLiveEventRowProjector {
+  readonly #messages = new Map<string, LiveMessageState>();
+
+  project(rows: readonly PublicThreadEventProcessRow[]): PublicThreadEventProcessRow[] {
+    const output: PublicThreadEventProcessRow[] = [];
+
+    for (const row of rows) {
+      const key = `${row.run_id ?? ""}:${row.process_type}`;
+
+      if (row.event_type === "message.started") {
+        this.#messages.set(key, {
+          filter: new OpenAiPrivateCitationStreamFilter(),
+          text: "",
+        });
+        continue;
+      }
+
+      if (row.event_type === "message.delta") {
+        let message = this.#messages.get(key);
+
+        if (message === undefined) {
+          message = { filter: new OpenAiPrivateCitationStreamFilter(), text: "" };
+          this.#messages.set(key, message);
+        }
+
+        const contentText = message.filter.push(row.content_text).text;
+        message.text += contentText;
+
+        if (contentText.length > 0) {
+          output.push({ ...row, content_text: contentText });
+        }
+        continue;
+      }
+
+      if (row.event_type === "message.completed") {
+        const message = this.#messages.get(key);
+        const contentText = message?.filter.finish().text ?? "";
+
+        if (message !== undefined) {
+          message.text += contentText;
+        }
+        if (contentText.length > 0) {
+          output.push({ ...row, content_text: contentText });
+        }
+        continue;
+      }
+
+      if (row.event_type === "message.added") {
+        const message = this.#messages.get(key);
+        this.#messages.delete(key);
+
+        if (message !== undefined) {
+          const snapshotText = sanitizePublicOutput(row.content_text).text;
+
+          // SSE is append-only; a divergent snapshot stays canonical through
+          // run.finalOutput because emitted text cannot be retracted.
+          if (snapshotText.startsWith(message.text)) {
+            const suffix = snapshotText.slice(message.text.length);
+
+            if (suffix.length > 0) {
+              output.push({ ...row, content_text: suffix });
+            }
+          }
+          continue;
+        }
+      }
+
+      if (row.event_type === "thought.started" || row.event_type === "thought.completed") {
+        continue;
+      }
+
+      if (
+        row.event_type === "run.cancelled" ||
+        row.event_type === "run.completed" ||
+        row.event_type === "run.failed"
+      ) {
+        const runPrefix = `${row.run_id ?? ""}:`;
+
+        for (const messageKey of this.#messages.keys()) {
+          if (messageKey.startsWith(runPrefix)) {
+            this.#messages.delete(messageKey);
+          }
+        }
+      }
+
+      output.push(row);
+    }
+
+    return output;
+  }
 }
 
 function isPublicThreadEventLogType(value: string): value is PublicThreadEventLogType {
@@ -341,16 +438,10 @@ export async function createPublicThreadEventStream(
     cancelled: false,
   };
   let lastSeenSeq = initialWindow.latestSeq ?? 0;
-  // Streamed text fragments are persisted one row each; hold a stream's rows
-  // back until its closing row lands so every message is emitted exactly once
-  // as a complete entry instead of one entry per fragment.
-  const initialFold = foldStreamedSessionEventRows(initialWindow.rows, {
-    flushOpenStreams: false,
-  });
-  let pendingStreamRows = initialFold.openStreamRows;
-  const initialEvents = toPublicThreadEventLogEntries(initialFold.rows, {
-    foldStreamedRows: false,
-  }).slice(-limit);
+  const liveProjector = new PublicLiveEventRowProjector();
+  const initialEvents = toPublicThreadEventLogEntries(
+    liveProjector.project(initialWindow.rows),
+  ).slice(-limit);
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -385,15 +476,11 @@ export async function createPublicThreadEventStream(
             }
 
             lastSeenSeq = rows[rows.length - 1]?.seq ?? lastSeenSeq;
-            const fold = foldStreamedSessionEventRows([...pendingStreamRows, ...rows], {
-              flushOpenStreams: false,
-            });
-            pendingStreamRows = fold.openStreamRows;
             enqueuedEvents =
               enqueueThreadEvents({
                 controller,
                 emittedEventIds,
-                events: toPublicThreadEventLogEntries(fold.rows, { foldStreamedRows: false }),
+                events: toPublicThreadEventLogEntries(liveProjector.project(rows)),
               }) || enqueuedEvents;
 
             if (rows.length < THREAD_EVENT_ROW_PAGE_SIZE) {
