@@ -46,6 +46,8 @@ function createRuntimeSubjectRecycleDatabase(): SqliteD1Database {
       status_operation_id text,
       status_seq integer DEFAULT 0 NOT NULL,
       status_source text DEFAULT 'system' NOT NULL,
+      subject_id text NOT NULL,
+      subject_kind text NOT NULL,
       updated_at integer NOT NULL
     );
 
@@ -76,8 +78,10 @@ function createRuntimeSubjectRecycleDatabase(): SqliteD1Database {
     );
 
     CREATE TABLE session_run (
+      agent_id text DEFAULT '' NOT NULL,
       id text PRIMARY KEY NOT NULL,
       driver_instance_id text,
+      session_id text DEFAULT '' NOT NULL,
       status text NOT NULL
     );
 
@@ -94,9 +98,11 @@ function createRuntimeSubjectRecycleDatabase(): SqliteD1Database {
       status_operation_id,
       status_seq,
       status_source,
+      subject_id,
+      subject_kind,
       updated_at
     )
-    VALUES (9999999999999, '${CLAIM_OWNER}', '${SANDBOX_ID}', 1, 'pet', NULL, NULL, NULL, 'active', NULL, 0, 'test', 1);
+    VALUES (9999999999999, '${CLAIM_OWNER}', '${SANDBOX_ID}', 1, 'pet', NULL, NULL, NULL, 'active', NULL, 0, 'test', '01J00000000000000000000009', 'session', 1);
   `);
 
   return database;

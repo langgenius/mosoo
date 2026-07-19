@@ -224,3 +224,26 @@ export async function claimInactiveRuntimeSubject(
 
   return Boolean(claimed?.id);
 }
+
+export async function releaseInactiveRuntimeSubjectClaim(
+  database: D1Database,
+  input: {
+    readonly claimOwner: string;
+    readonly runtimeSubjectId: SandboxId;
+  },
+): Promise<void> {
+  await getAppDatabase(database)
+    .update(sandboxesTable)
+    .set({
+      claimExpiresAt: null,
+      claimOwner: null,
+      updatedAt: currentTimestampMs(),
+    })
+    .where(
+      and(
+        eq(sandboxesTable.id, input.runtimeSubjectId),
+        eq(sandboxesTable.claimOwner, input.claimOwner),
+      ),
+    )
+    .run();
+}
