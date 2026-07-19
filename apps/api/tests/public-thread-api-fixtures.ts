@@ -186,3 +186,61 @@ export async function insertRuntimeEvent(
     })
     .run();
 }
+
+class PublicEventTestSocket extends EventTarget {
+  readyState = WebSocket.CONNECTING;
+
+  accept(): void {
+    this.readyState = WebSocket.OPEN;
+  }
+
+  close(): void {
+    if (this.readyState >= WebSocket.CLOSING) {
+      return;
+    }
+
+    this.readyState = WebSocket.CLOSED;
+    this.dispatchEvent(new Event("close"));
+  }
+
+  emit(): void {
+    this.dispatchEvent(new MessageEvent("message", { data: "events" }));
+  }
+}
+
+export function createPublicEventSessionNamespace(): {
+  binding: ApiBindings["Session"];
+  close: () => void;
+  emit: () => void;
+} {
+  const sockets = new Set<PublicEventTestSocket>();
+  const stub = {
+    closeViewers: async () => {},
+    destroy: async () => {},
+    fetch: async () => {
+      const socket = new PublicEventTestSocket();
+      sockets.add(socket);
+      return { status: 101, webSocket: socket as unknown as WebSocket } as Response;
+    },
+    publishEvents: async () => {
+      for (const socket of sockets) {
+        socket.emit();
+      }
+    },
+  };
+
+  return {
+    binding: {
+      get: () => stub,
+      idFromName: (name: string) => name,
+    } as unknown as ApiBindings["Session"],
+    close: () => {
+      for (const socket of sockets) {
+        socket.close();
+      }
+    },
+    emit: () => {
+      void stub.publishEvents();
+    },
+  };
+}

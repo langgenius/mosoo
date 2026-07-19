@@ -33,5 +33,6 @@ export interface ListPublicThreadEventsRequest {
 }
 
 export interface StreamPublicThreadEventsRequest extends ListPublicThreadEventsRequest {
+  bindings: ApiBindings;
   signal?: AbortSignal | null | undefined;
 }

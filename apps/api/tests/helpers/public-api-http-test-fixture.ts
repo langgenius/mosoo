@@ -269,6 +269,7 @@ export function createPublicHttpTestBindings(
     apiCommandQueue?: ApiCommandQueueStub;
     fileBucket?: R2Bucket;
     queue?: ChannelFinalDeliveryQueueStub;
+    sessionNamespace?: ApiBindings["Session"];
   } = {},
 ): Record<string, unknown> {
   return {
@@ -289,7 +290,7 @@ export function createPublicHttpTestBindings(
     SANDBOX_FILE_BUCKET_LOCAL: "true",
     SANDBOX_STATE_BUCKET: unavailableBinding<R2Bucket>("SANDBOX_STATE_BUCKET"),
     SANDBOX_STATE_BUCKET_NAME: "mosoo-sandbox-state",
-    Session: createOkDurableObjectNamespace(),
+    Session: options.sessionNamespace ?? createOkDurableObjectNamespace(),
     VAULT_ROOT_SECRET: "test-vault-secret",
     WEB_ORIGIN: "https://mosoo.ai",
   };
