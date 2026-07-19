@@ -33,8 +33,11 @@ export function findCustomCredentialRowForModel(
   rows: readonly VendorCredentialRow[],
   modelId: string,
 ): VendorCredentialRow | null {
-  return (
-    listEffectiveCustomCredentialModelRows(rows).find((entry) => entry.modelId === modelId)?.row ??
-    null
-  );
+  for (const row of [...rows].toSorted(compareCredentialRows)) {
+    if ((parseCredentialModels(row.modelsJson) ?? []).includes(modelId)) {
+      return row;
+    }
+  }
+
+  return null;
 }
