@@ -56,6 +56,25 @@ Product and engineering references:
 
 https://github.com/user-attachments/assets/4a4bbaab-c192-4462-99e0-020eab966fff
 
+## Docker Deployment
+
+The supported Compose deployment targets a dedicated **Linux Docker host**. Mosoo uses the host network namespace so Workerd can publish Sandbox listeners on Docker's bridge gateway; the control-plane API itself remains loopback-only.
+
+```bash
+install -m 600 docker/.env.example .env
+# For remote access, set WEB_ORIGIN to the public browser origin and
+# MOSOO_WEB_BIND_IP to the host address that should accept traffic.
+docker compose pull
+docker compose up -d --wait
+curl --fail http://127.0.0.1:8080/api/health
+```
+
+The safe default listens only on `127.0.0.1`. Startup fails closed if a loopback `WEB_ORIGIN` is combined with a non-loopback listener, because that combination would expose Mosoo's local-development login endpoint. Put TLS and public access behind a trusted host-level reverse proxy, or set both values explicitly for direct exposure.
+
+If Docker's bridge gateway is not `172.17.0.1`, update `MOSOO_RUNTIME_BIND_IP` and `MOSOO_RUNTIME_CONTROL_ORIGIN` together. The Mosoo container controls dynamic Sandbox containers and therefore needs root-equivalent access to a Docker daemon. Use a dedicated host; prefer a dedicated rootless daemon or constrained socket proxy where compatible, and restrict access to the daemon and `.env` file.
+
+Before upgrades, back up both named volumes: `mosoo_data` stores generated secrets and Caddy state, while `mosoo_wrangler` stores local Wrangler/D1 state. Restore both volumes together before starting the replacement stack. Sandbox containers are Docker-managed runtime state and are not included in either volume.
+
 ## Local Development
 
 Prerequisites:

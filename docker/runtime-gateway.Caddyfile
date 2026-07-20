@@ -1,0 +1,16 @@
+{
+	auto_https off
+	admin off
+}
+
+:{$MOSOO_RUNTIME_CONTROL_PORT:8787} {
+	bind {$MOSOO_RUNTIME_BIND_IP:172.17.0.1}
+	respond /healthz 200
+
+	@driver path /api/driver /api/driver/*
+	handle @driver {
+		reverse_proxy 127.0.0.1:{$WRANGLER_DEV_PORT:8788}
+	}
+
+	respond 404
+}

@@ -1,0 +1,37 @@
+# Runtime state and generated secrets
+/data/
+apps/api/.dev.vars
+apps/api/.wrangler/
+
+# Local dependencies and build outputs
+node_modules/
+**/node_modules/
+**/dist/
+**/.tmp/
+.tmp/
+
+# Source control and local tooling
+.git/
+.github/
+.hermes/
+.idea/
+.vscode/
+.dockerignore
+Dockerfile
+docs/
+examples/
+README.md
+CONTRIBUTING.md
+compose.yaml
+
+# Test and local artifacts
+coverage/
+playwright-report/
+test-results/
+**/tests/
+*.log
+*.eml
+
+# Local environment files
+.env
+.env.*
