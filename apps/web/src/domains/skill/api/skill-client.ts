@@ -1,9 +1,12 @@
 import type { AppId, SkillId } from "@mosoo/contracts/id";
 import type {
   CreateSkillForkInput,
+  InstallSkillsShSkillInput,
   SkillDetail,
   SkillInspectResult,
   SkillSummary,
+  SkillsShCatalogResult,
+  SkillsShCatalogView,
 } from "@mosoo/contracts/skill";
 
 import { graphql } from "@/gql";
@@ -224,6 +227,57 @@ export async function publishSkillPackage(input: {
   if (!response.ok) {
     const body = await safeJson(response);
     throw new Error(body?.error ?? `Publish failed: ${response.status}`);
+  }
+
+  const body: unknown = await response.json();
+  return body as SkillSummary;
+}
+
+export async function listSkillsShCatalog(input: {
+  page: number;
+  perPage: number;
+  query: string;
+  view: SkillsShCatalogView;
+}): Promise<SkillsShCatalogResult> {
+  const params = new URLSearchParams({
+    page: String(input.page),
+    perPage: String(input.perPage),
+    view: input.view,
+  });
+  const query = input.query.trim();
+
+  if (query.length > 0) {
+    params.set("q", query);
+  }
+
+  const response = await apiFetch(`/skill/skills-sh/catalog?${params.toString()}`, {
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const body = await safeJson(response);
+    throw new Error(body?.error ?? `skills.sh catalog failed: ${response.status}`);
+  }
+
+  const body: unknown = await response.json();
+  return body as SkillsShCatalogResult;
+}
+
+export async function installSkillsShSkill(
+  input: InstallSkillsShSkillInput,
+): Promise<SkillSummary> {
+  const response = await apiFetch("/skill/skills-sh/install", {
+    body: JSON.stringify(input),
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    const body = await safeJson(response);
+    throw new Error(body?.error ?? `skills.sh install failed: ${response.status}`);
   }
 
   const body: unknown = await response.json();

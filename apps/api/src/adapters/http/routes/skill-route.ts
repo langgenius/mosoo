@@ -12,6 +12,10 @@ import {
   downloadSkillPackage,
   readSkillSource,
 } from "../../../modules/skills/application/skill-read.service";
+import {
+  createSkillFromSkillsSh,
+  listSkillsShCatalog,
+} from "../../../modules/skills/application/skills-sh-catalog.service";
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { isApiError } from "../../../platform/errors";
@@ -49,6 +53,10 @@ function errorResponse(error: unknown): Response {
   return Response.json({ error: "Skill request failed." }, { status: 500 });
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
   app.post("/skill/inspect", async (c) => {
     try {
@@ -73,6 +81,79 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
           : {}),
       });
       return c.json(inspected);
+    } catch (error) {
+      return errorResponse(error);
+    }
+  });
+
+  app.get("/skill/skills-sh/catalog", async (c) => {
+    try {
+      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
+      if (!viewer) {
+        return unauthorized();
+      }
+
+      const page = c.req.query("page");
+      const perPage = c.req.query("perPage");
+      const query = c.req.query("q");
+      const view = c.req.query("view");
+
+      return c.json(
+        await listSkillsShCatalog(c.env, {
+          ...(page !== undefined ? { page } : {}),
+          ...(perPage !== undefined ? { perPage } : {}),
+          ...(query !== undefined ? { query } : {}),
+          ...(view !== undefined ? { view } : {}),
+        }),
+      );
+    } catch (error) {
+      return errorResponse(error);
+    }
+  });
+
+  app.post("/skill/skills-sh/install", async (c) => {
+    try {
+      const viewer = await getAuthenticatedViewerFromRequest(c.env, c.req.raw);
+      if (!viewer) {
+        return unauthorized();
+      }
+
+      const body: unknown = await c.req.json().catch(() => null);
+
+      if (!isRecord(body)) {
+        throw new SkillRequestError("A JSON body is required.");
+      }
+
+      const { appId, id, installUrl, slug } = body;
+
+      if (typeof appId !== "string" || !appId) {
+        throw new SkillRequestError("appId is required.");
+      }
+
+      if (typeof id !== "string" || !id) {
+        throw new SkillRequestError("skills.sh skill id is required.");
+      }
+
+      if (typeof slug !== "string" || !slug) {
+        throw new SkillRequestError("skills.sh skill slug is required.");
+      }
+
+      if (
+        installUrl !== undefined &&
+        installUrl !== null &&
+        (typeof installUrl !== "string" || installUrl.length === 0)
+      ) {
+        throw new SkillRequestError("skills.sh installUrl must be a string when provided.");
+      }
+
+      return c.json(
+        await createSkillFromSkillsSh(c.env, viewer, toPlatformId<AppId>(appId, "App ID"), {
+          appId: toPlatformId<AppId>(appId, "App ID"),
+          id,
+          ...(installUrl !== undefined ? { installUrl } : {}),
+          slug,
+        }),
+      );
     } catch (error) {
       return errorResponse(error);
     }
