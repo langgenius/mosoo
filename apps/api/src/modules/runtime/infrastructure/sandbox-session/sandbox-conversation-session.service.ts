@@ -129,15 +129,20 @@ export async function ensureSandboxConversationSession(
   const frozenOrigin = existingSession
     ? parseSandboxConversationOrigin(existingSession.originJson)
     : input.origin;
-  const sessionRecord = await measureOptional(input.timing, "conversation.ensureRecord", () =>
-    ensureRuntimeConversationSessionRecord(bindings.DB, {
-      cwd,
-      now,
-      originJson: JSON.stringify(frozenOrigin),
-      runtimeSubjectId: input.sandboxId,
-      sessionId: input.sessionId,
-    }),
-  );
+  // ensureRuntimeConversationSessionRecord only re-reads the row we already
+  // loaded above when a record exists (the sandbox-mismatch guard ran there
+  // too), so the round trip is only needed for first-time allocation.
+  const sessionRecord =
+    existingSession ??
+    (await measureOptional(input.timing, "conversation.ensureRecord", () =>
+      ensureRuntimeConversationSessionRecord(bindings.DB, {
+        cwd,
+        now,
+        originJson: JSON.stringify(frozenOrigin),
+        runtimeSubjectId: input.sandboxId,
+        sessionId: input.sessionId,
+      }),
+    ));
   const sandboxSessionId = continuation.sandboxSessionId ?? sessionRecord.sandboxSessionId;
 
   if (continuation.shouldRestoreCwd && existingSession) {
