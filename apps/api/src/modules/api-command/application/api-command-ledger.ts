@@ -38,6 +38,12 @@ export interface ApiCommandClaim {
   payloadJson: string;
 }
 
+export interface ApiCommandAdmission {
+  readonly commandId: ApiCommandId;
+  readonly kind: ApiCommandKind;
+  readonly shouldDeliver: boolean;
+}
+
 type ApiCommandDeliveryBindings = Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB"> &
   Partial<Pick<ApiBindings, "ENVIRONMENT_ARTIFACT_BUILD_QUEUE">>;
 
@@ -182,10 +188,10 @@ export async function redriveFailedApiCommandEnqueues(
   }
 }
 
-export async function enqueueApiCommand(
+export async function admitApiCommand(
   bindings: ApiCommandDeliveryBindings,
   input: EnqueueApiCommandInput,
-): Promise<ApiCommandId> {
+): Promise<ApiCommandAdmission> {
   const nowMs = currentTimestampMs();
   const commandId = createPlatformId<ApiCommandId>();
   const dedupeKey = normalizeDedupeKey(input.dedupeKey);
@@ -212,8 +218,7 @@ export async function enqueueApiCommand(
     .run();
 
   if (getD1ChangeCount(insertResult) > 0) {
-    await sendApiCommandMessage(bindings, commandId, input.kind);
-    return commandId;
+    return { commandId, kind: input.kind, shouldDeliver: true };
   }
 
   const current = await findApiCommandByDedupeKey(bindings.DB, dedupeKey);
@@ -243,8 +248,7 @@ export async function enqueueApiCommand(
         ),
       )
       .run();
-    await sendApiCommandMessage(bindings, current.id, input.kind);
-    return current.id;
+    return { commandId: current.id, kind: input.kind, shouldDeliver: true };
   }
 
   if (
@@ -252,10 +256,30 @@ export async function enqueueApiCommand(
     (current.lastErrorCode === API_COMMAND_QUEUE_DELIVERY_PENDING_CODE ||
       current.lastErrorCode === API_COMMAND_QUEUE_SEND_FAILED_CODE)
   ) {
-    await sendApiCommandMessage(bindings, current.id, input.kind);
+    return { commandId: current.id, kind: input.kind, shouldDeliver: true };
   }
 
-  return current.id;
+  return { commandId: current.id, kind: input.kind, shouldDeliver: false };
+}
+
+export async function deliverApiCommand(
+  bindings: ApiCommandDeliveryBindings,
+  admission: ApiCommandAdmission,
+): Promise<void> {
+  if (!admission.shouldDeliver) {
+    return;
+  }
+
+  await sendApiCommandMessage(bindings, admission.commandId, admission.kind);
+}
+
+export async function enqueueApiCommand(
+  bindings: ApiCommandDeliveryBindings,
+  input: EnqueueApiCommandInput,
+): Promise<ApiCommandId> {
+  const admission = await admitApiCommand(bindings, input);
+  await deliverApiCommand(bindings, admission);
+  return admission.commandId;
 }
 
 export async function claimApiCommand(input: {

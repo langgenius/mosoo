@@ -222,6 +222,77 @@ describe("send agent session events", () => {
     expect(response.session.status).toBe("RUNNING");
   });
 
+  test("returns after durable admission without waiting for Queue delivery", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertOwnerSession(database);
+    const waitUntilTasks: Promise<unknown>[] = [];
+    let releaseQueue: (() => void) | null = null;
+    const queueReleased = new Promise<void>((resolve) => {
+      releaseQueue = resolve;
+    });
+    let queueStarted: (() => void) | null = null;
+    const queueStart = new Promise<void>((resolve) => {
+      queueStarted = resolve;
+    });
+    const bindings = createPublicHttpTestBindings(database, {
+      apiCommandQueue: {
+        sent: [],
+        async send(): Promise<void> {
+          queueStarted?.();
+          await queueReleased;
+        },
+      },
+    }) as ApiBindings;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => Response.json({ data: [{ id: "gpt-5.4" }] });
+
+    try {
+      const operation = sendAgentSessionEvents({
+        bindings,
+        executionContext: {
+          ...createTestExecutionContext(),
+          waitUntil: (task: Promise<unknown>) => {
+            waitUntilTasks.push(task);
+          },
+        },
+        input: {
+          events: [
+            {
+              attachmentIds: [],
+              clientRequestId: "deferred-queue-delivery",
+              text: "Run without producer latency.",
+              type: "user_message",
+            },
+          ],
+          appId: PUBLIC_API_TEST_IDS.app,
+          sessionId: PUBLIC_API_TEST_IDS.ownerSession,
+        },
+        requestUrl: `https://api.example.com/api/v1/sessions/${PUBLIC_API_TEST_IDS.ownerSession}/events`,
+        viewer: {
+          email: "owner@example.com",
+          emailVerified: true,
+          id: PUBLIC_API_TEST_IDS.ownerAccount,
+          imageUrl: null,
+          name: "Owner",
+        },
+      });
+
+      await queueStart;
+      const responseState = await Promise.race([
+        operation.then(() => "resolved" as const),
+        Bun.sleep(250).then(() => "pending" as const),
+      ]);
+      releaseQueue?.();
+      const response = await operation;
+      await Promise.all(waitUntilTasks);
+
+      expect(responseState).toBe("resolved");
+      expect(response.events[0]?.run).not.toBeNull();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test("rejects run attachmentIds before queueing when the file is not a session attachment", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
