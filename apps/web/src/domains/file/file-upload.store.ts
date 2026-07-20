@@ -18,6 +18,49 @@ export interface StoredFileUploadSession {
   strategy: "multipart" | "single_put";
 }
 
+function areUploadedPartsSorted(parts: StoredUploadedPart[]): boolean {
+  for (let index = 1; index < parts.length; index += 1) {
+    const currentPart = parts[index];
+    const previousPart = parts[index - 1];
+
+    if (currentPart && previousPart && currentPart.partNumber < previousPart.partNumber) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function mergeUploadedPart(
+  parts: StoredUploadedPart[],
+  part: StoredUploadedPart,
+): StoredUploadedPart[] {
+  const sourceParts = areUploadedPartsSorted(parts)
+    ? parts
+    : parts.toSorted((left, right) => left.partNumber - right.partNumber);
+  const nextParts: StoredUploadedPart[] = [];
+  let inserted = false;
+
+  for (const entry of sourceParts) {
+    if (entry.partNumber === part.partNumber) {
+      continue;
+    }
+
+    if (!inserted && entry.partNumber > part.partNumber) {
+      nextParts.push(part);
+      inserted = true;
+    }
+
+    nextParts.push(entry);
+  }
+
+  if (!inserted) {
+    nextParts.push(part);
+  }
+
+  return nextParts;
+}
+
 const DATABASE_NAME = "mosoo-file-uploads";
 const DATABASE_VERSION = 2;
 const STORE_NAME = "uploads";
@@ -107,13 +150,9 @@ export async function appendUploadedPart(fileId: string, part: StoredUploadedPar
     throw new Error(`Upload file ${fileId} was not found in IndexedDB.`);
   }
 
-  const nextParts = existing.parts.filter((entry) => entry.partNumber !== part.partNumber);
-  nextParts.push(part);
-  nextParts.sort((left, right) => left.partNumber - right.partNumber);
-
   await saveFileUploadSession({
     ...existing,
-    parts: nextParts,
+    parts: mergeUploadedPart(existing.parts, part),
   });
 }
 
