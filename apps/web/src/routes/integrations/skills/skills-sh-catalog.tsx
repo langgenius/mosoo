@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 import { EmptyState } from "@/shared/ui/empty-state";
+import { Switch } from "@/shared/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
@@ -33,6 +34,7 @@ import type { useSkillRegistry } from "./use-skill-registry";
 const CATALOG_PER_PAGE = 24;
 
 interface SkillsShCatalogState {
+  availableOnly: boolean;
   error: string | null;
   installingId: string | null;
   page: number;
@@ -45,10 +47,12 @@ type SkillsShCatalogAction =
   | { type: "installStart"; id: string }
   | { type: "installSuccess" }
   | { type: "resetPage" }
+  | { type: "setAvailableOnly"; availableOnly: boolean }
   | { type: "setPage"; page: number }
   | { type: "setView"; view: SkillsShCatalogView };
 
 const SKILLS_SH_CATALOG_INITIAL_STATE: SkillsShCatalogState = {
+  availableOnly: true,
   error: null,
   installingId: null,
   page: 0,
@@ -70,6 +74,8 @@ function skillsShCatalogReducer(
       return { ...state, error: null, installingId: null };
     case "resetPage":
       return { ...state, page: 0 };
+    case "setAvailableOnly":
+      return { ...state, availableOnly: action.availableOnly, page: 0 };
     case "setPage":
       return { ...state, page: Math.max(action.page, 0) };
     case "setView":
@@ -88,9 +94,10 @@ export function SkillsShCatalog({
 }) {
   const [state, dispatch] = useReducer(skillsShCatalogReducer, SKILLS_SH_CATALOG_INITIAL_STATE);
   const [confirmingSkill, setConfirmingSkill] = useState<SkillsShCatalogSkill | null>(null);
-  const { error, installingId, page, view } = state;
+  const { availableOnly, error, installingId, page, view } = state;
   const trimmedSearch = search.trim();
   const catalogQuery = useSkillsShCatalogQuery({
+    availableOnly,
     enabled: isTruthy(registry.appId),
     page,
     perPage: CATALOG_PER_PAGE,
@@ -167,6 +174,20 @@ export function SkillsShCatalog({
             }}
           />
         </div>
+
+        <label
+          className="border-border bg-card text-fg-2 inline-flex h-8 items-center gap-2 rounded-md border px-2.5 text-[12.5px] font-medium"
+          htmlFor="skills-sh-show-available-only"
+        >
+          <Switch
+            checked={availableOnly}
+            id="skills-sh-show-available-only"
+            onCheckedChange={(checked) => {
+              dispatch({ availableOnly: checked, type: "setAvailableOnly" });
+            }}
+          />
+          Show available only
+        </label>
 
         <div className="flex-1" />
 
@@ -277,8 +298,8 @@ function SkillsShSourceTooltip({ source }: { source: "api" | "public-page" }) {
       </TooltipTrigger>
       <TooltipContent side="bottom" align="end" className="max-w-[280px] text-left">
         {source === "api"
-          ? "Discover results are sourced from the skills.sh API."
-          : "Discover results are sourced from the public skills.sh directory."}
+          ? "Discover results are sourced from the skills.sh API, so Well-known entries can be installed directly."
+          : "Discover results are sourced from the public skills.sh directory. GitHub skills can install directly; Well-known entries need server-side skills.sh API access."}
       </TooltipContent>
     </Tooltip>
   );
@@ -391,6 +412,7 @@ function SkillsShCatalogCard({
   skill: SkillsShCatalogSkill;
 }) {
   const installable = authConfigured || skill.sourceType === "github";
+  const installRequiresApi = !installable && skill.sourceType === "well-known";
 
   return (
     <article className="border-border bg-card hover:border-border-strong flex min-h-[168px] min-w-0 flex-col gap-3 rounded-lg border p-4 transition-all hover:shadow-sm">
@@ -423,24 +445,46 @@ function SkillsShCatalogCard({
           <span className="font-mono tabular-nums">{formatCatalogCount(skill.installs)}</span>{" "}
           installs
         </div>
-        <Button
-          size="sm"
-          variant={installed ? "outline" : "default"}
-          disabled={installed || installing || !installable}
-          onClick={onInstall}
-          title={installable ? undefined : "Requires skills.sh API access"}
-        >
-          {installed ? (
-            <>
-              <Check className="size-3.5" />
-              Installed
-            </>
-          ) : installing ? (
-            "Installing…"
-          ) : (
-            "Install"
-          )}
-        </Button>
+        {installRequiresApi ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                size="sm"
+                aria-disabled="true"
+                aria-label={`Cannot install ${skill.name}: skills.sh API access is required`}
+                className="hover:bg-primary cursor-not-allowed opacity-40 active:scale-100"
+                onClick={(event) => {
+                  event.preventDefault();
+                }}
+              >
+                API required
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" align="end" className="max-w-[280px] text-left">
+              This Well-known entry needs server-side skills.sh API access before Mosoo can download
+              its files. GitHub-sourced skills can install without it.
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Button
+            size="sm"
+            variant={installed ? "outline" : "default"}
+            disabled={installed || installing}
+            onClick={onInstall}
+          >
+            {installed ? (
+              <>
+                <Check className="size-3.5" />
+                Installed
+              </>
+            ) : installing ? (
+              "Installing…"
+            ) : (
+              "Install"
+            )}
+          </Button>
+        )}
       </div>
     </article>
   );

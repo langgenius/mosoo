@@ -12,8 +12,13 @@ import { fetchSkillSource, listAppSkills, listSkillsShCatalog } from "../api/ski
 
 export const skillKeys = {
   all: ["skill"] as const,
-  catalog: (view: SkillsShCatalogView, query: string, page: number, perPage: number) =>
-    [...skillKeys.catalogs(), view, query, page, perPage] as const,
+  catalog: (
+    view: SkillsShCatalogView,
+    query: string,
+    page: number,
+    perPage: number,
+    availableOnly: boolean,
+  ) => [...skillKeys.catalogs(), view, query, page, perPage, availableOnly] as const,
   catalogs: () => [...skillKeys.all, "skills-sh-catalog"] as const,
   detail: (skillId: string) => [...skillKeys.details(), skillId] as const,
   details: () => [...skillKeys.all, "detail"] as const,
@@ -32,6 +37,7 @@ export function useAppSkillsQuery(appId: string | null): UseQueryResult<SkillSum
 }
 
 export function useSkillsShCatalogQuery(input: {
+  availableOnly: boolean;
   enabled?: boolean;
   page: number;
   perPage: number;
@@ -42,12 +48,19 @@ export function useSkillsShCatalogQuery(input: {
     enabled: input.enabled ?? true,
     queryFn: async () =>
       listSkillsShCatalog({
+        availableOnly: input.availableOnly,
         page: input.page,
         perPage: input.perPage,
         query: input.query,
         view: input.view,
       }),
-    queryKey: skillKeys.catalog(input.view, input.query, input.page, input.perPage),
+    queryKey: skillKeys.catalog(
+      input.view,
+      input.query,
+      input.page,
+      input.perPage,
+      input.availableOnly,
+    ),
     staleTime: 60_000,
   });
 }
