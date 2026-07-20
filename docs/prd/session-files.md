@@ -20,9 +20,9 @@ saved.
 1. A Builder attaches files while starting a Thread or from an Agent session
    chat. An integration can attach a file when starting a Thread or sending a
    later message.
-2. An attachment belongs to that Thread. Mosoo only promises to give the Agent
+2. An attachment belongs to that Thread. mosoo only promises to give the Agent
    files explicitly selected for the current message.
-3. Outputs that Mosoo records from the Agent appear as artifacts in the same
+3. Outputs that mosoo records from the Agent appear as artifacts in the same
    Thread. When an Agent reply links to a recorded `outputs/` file, selecting
    that link opens the artifact in a Thread preview drawer with a download
    action.

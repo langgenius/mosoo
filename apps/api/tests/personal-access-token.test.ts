@@ -132,7 +132,7 @@ describe("personal access tokens", () => {
     expect(response.status).toBe(201);
   });
 
-  test("generates Mosoo access tokens with the MST prefix", async () => {
+  test("generates mosoo access tokens with the MST prefix", async () => {
     const database = createPersonalTokenDatabase();
 
     const response = await createPersonalAccessToken(database, VIEWER, {

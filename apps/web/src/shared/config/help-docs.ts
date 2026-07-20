@@ -1,4 +1,4 @@
-// Index of the Mosoo help documentation hosted at https://mosoo.ai/docs.
+// Index of the mosoo help documentation hosted at https://mosoo.ai/docs.
 //
 // The `HELP_DOCS` array below is generated from the site's public documentation
 // manifest (https://mosoo.ai/docs/llms.txt). To refresh it after the docs change,
@@ -25,7 +25,7 @@ export interface HelpDoc {
 
 export const HELP_DOCS: readonly HelpDoc[] = [
   // <generated:help-docs> -- do not edit by hand; see header comment.
-  { section: "Getting started", title: "Mosoo Public Thread API", url: "https://mosoo.ai/docs/" },
+  { section: "Getting started", title: "mosoo Public Thread API", url: "https://mosoo.ai/docs/" },
   { section: "Getting started", title: "Quickstart", url: "https://mosoo.ai/docs/quickstart" },
   {
     section: "Getting started",
@@ -55,7 +55,7 @@ export const HELP_DOCS: readonly HelpDoc[] = [
   },
   {
     section: "Getting started",
-    title: "Mosoo API for coding agents",
+    title: "mosoo API for coding agents",
     url: "https://mosoo.ai/docs/coding-agents",
   },
   { section: "CLI", title: "CLI", url: "https://mosoo.ai/docs/cli/overview" },

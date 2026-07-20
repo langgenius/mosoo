@@ -1,19 +1,19 @@
 # App Deployment
 
-Status: implemented secondary Alpha surface. It is not part of the core managed Agent runtime contract in the [Mosoo Spec](../SPEC.md).
+Status: implemented secondary Alpha surface. It is not part of the core managed Agent runtime contract in the [mosoo Spec](../SPEC.md).
 
 ## Why It Matters
 
-A Builder may want a simple way to share a supported website alongside a Mosoo Agent. App Deployment covers that secondary use case: publish a supported public repository to a Mosoo-managed URL and operate that site from the App Overview.
+A Builder may want a simple way to share a supported website alongside a mosoo Agent. App Deployment covers that secondary use case: publish a supported public repository to a mosoo-managed URL and operate that site from the App Overview.
 
 ## Who Uses It
 
-The Builder who owns the App controls deployment. App Users only encounter the resulting site; they do not see Mosoo's deployment controls. The current baseline supports one owner and one deployed site per App.
+The Builder who owns the App controls deployment. App Users only encounter the resulting site; they do not see mosoo's deployment controls. The current baseline supports one owner and one deployed site per App.
 
 ## User Flow
 
 1. From App Overview, the Builder enters a public GitHub repository and starts deployment.
-2. Mosoo uses the repository's default branch and checks whether the project is a supported static or request-handling web app. Unsupported or unclear projects fail with an explanation.
+2. mosoo uses the repository's default branch and checks whether the project is a supported static or request-handling web app. Unsupported or unclear projects fail with an explanation.
 3. Overview shows the attempt as **Deploying**, **Successful**, or **Failed**. After success, the Builder can open the live site and review earlier attempts.
 4. The Builder can publish the latest default branch again, change the source repository, or delete the deployment. A failed later attempt does not hide the last successful URL. Deletion removes the hosted site and its Agent access, but never changes the GitHub repository.
 
@@ -25,4 +25,4 @@ When a bound capability is accepted, the Run records the App, Agent, Deployment,
 
 The console flow, deployment processing, history, retry, and deletion are implemented. Repository evidence does not prove a successful real production deployment or recovery exercise, so the honest claim is **implemented**, not **production-proven**.
 
-App Deployment is not the canonical Mosoo product wedge. Today's baseline publishes one supported public repository to a Mosoo-owned URL. It does not itself provide App User authentication, durable backend state, schedules, recovery, private repositories, custom domains, branch previews, automatic deployment, or rollback.
+App Deployment is not the canonical mosoo product wedge. Today's baseline publishes one supported public repository to a mosoo-owned URL. It does not itself provide App User authentication, durable backend state, schedules, recovery, private repositories, custom domains, branch previews, automatic deployment, or rollback.

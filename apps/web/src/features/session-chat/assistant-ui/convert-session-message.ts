@@ -2,7 +2,7 @@ import type { ThreadMessageLike } from "@assistant-ui/react";
 import type { SessionViewMessage, SessionViewSegment } from "@mosoo/ag-ui-session";
 
 // Assistant content parts we emit for assistant-ui. The tool-call part keeps the
-// Mosoo `path` on `args` so the ported tool card can render it; permission status
+// mosoo `path` on `args` so the ported tool card can render it; permission status
 // is resolved separately in the renderer (see session-permission-context).
 type AssistantContentPart =
   | { type: "text"; text: string }
@@ -15,7 +15,7 @@ type AssistantContentPart =
       result?: string;
     };
 
-// Collapses Mosoo's flat segment stream into assistant-ui content parts.
+// Collapses mosoo's flat segment stream into assistant-ui content parts.
 // Consecutive text segments merge into one markdown part; tool_use absorbs its
 // matching tool_result (paired by toolCallId). Order is preserved exactly. This
 // is the relocated `sessionMessageSegmentsToBlocks` logic — the only behavioural

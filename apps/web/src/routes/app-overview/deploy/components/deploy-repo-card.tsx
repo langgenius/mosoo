@@ -97,7 +97,7 @@ export function DeployRepoCard({
         <h2 className="text-fg-1 text-sm font-semibold">Deploy from a public GitHub repo</h2>
       </div>
       <p className="text-fg-3 mt-1.5 text-[13.5px] leading-relaxed">
-        Mosoo pulls your default branch HEAD, builds it, and binds your agents.
+        mosoo pulls your default branch HEAD, builds it, and binds your agents.
       </p>
       <div className="mt-4">
         <RepoDeployForm deploying={deploying} serverError={serverError} onDeploy={onDeploy} />

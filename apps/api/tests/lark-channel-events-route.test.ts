@@ -104,7 +104,7 @@ async function withLarkFetchMock<T>(operation: () => Promise<T>): Promise<T> {
       return Response.json({
         code: 0,
         bot: {
-          app_name: "Mosoo Feishu",
+          app_name: "mosoo Feishu",
           open_id: "ou_bot",
         },
       });

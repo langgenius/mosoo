@@ -22,7 +22,7 @@ export function ProcessTimelineBar({
   selectedId,
 }: ProcessTimelineBarProps): ReactElement {
   return (
-    <div className="border-border-subtle bg-muted/10 flex h-7 min-w-0 items-center gap-0.5 overflow-hidden rounded-md border p-1">
+    <div className="border-border-subtle bg-muted/10 flex h-7 w-full max-w-full min-w-0 items-center gap-0.5 overflow-hidden rounded-md border p-1">
       {events.map((event) => {
         const domain = getSessionEventDomain(event.type);
         const tone = SESSION_EVENT_DOMAIN_TONE[domain];
