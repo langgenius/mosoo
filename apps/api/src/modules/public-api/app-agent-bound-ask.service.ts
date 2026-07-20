@@ -10,10 +10,15 @@
  * reach a terminal state -> return the final output text.
  */
 
-import type { AgentId, AppId, SessionId, SessionRunId } from "@mosoo/id";
+import type { SessionSummary } from "@mosoo/contracts/session";
+import { sessionEventsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
+import { parsePlatformId } from "@mosoo/id";
+import type { AccountId, AgentId, AppId, SessionId, SessionRunId } from "@mosoo/id";
+import { and, asc, eq } from "drizzle-orm";
 
 import { createErrorLogContext, logError, logInfo } from "../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
+import { getAppDatabase } from "../../platform/db/drizzle";
 import { getAgentRow } from "../agents/application/agent-repository";
 import {
   createDeploymentAgentCapabilityRunCreationGuard,
@@ -28,7 +33,9 @@ import {
   queueSessionRun,
   SessionRunCreationGuardRejectedError,
 } from "../runtime/application/session-run.service";
+import { getActiveSessionRunSummary } from "../runtime/infrastructure/session-runs/session-run-read.repository";
 import { getSessionRunSummary } from "../runtime/infrastructure/session-runs/session-run-store.repository";
+import { getSessionSummaryForCreator } from "../sessions/application/session-summary-query.service";
 import {
   getBoundAgentServabilityFailure,
   inspectBoundAgentCapability,
@@ -37,6 +44,12 @@ import {
 } from "./app-agent-bound-call";
 import type { BoundAgentServabilityFailure } from "./app-agent-bound-call";
 import type { BoundAgentCallInput } from "./app-agent-bound-call";
+import {
+  beginBoundAgentCallIdempotency,
+  bindBoundAgentCallIdempotencyRun,
+  hashBoundAgentCallIdempotencyBody,
+  hashBoundAgentCallIdempotencySubject,
+} from "./app-agent-bound-idempotency.service";
 import type { AppAgentCapabilityClaims } from "./app-agent-capability";
 import { publicAgentNotExposed, publicNotFound, publicUnauthenticated } from "./public-api-errors";
 import { enforcePublicApiRateLimit } from "./public-api-rate-limit.service";
@@ -49,6 +62,7 @@ const BOUND_AGENT_WAIT_POLL_INTERVAL_MS = 1_000;
 export interface CreateBoundAgentThreadAndWaitRequest {
   bindings: ApiBindings;
   executionContext: Pick<ExecutionContext, "waitUntil"> | null;
+  idempotencyKey?: string | null;
   input: BoundAgentCallInput;
   requestUrl: string;
   token: string;
@@ -99,25 +113,61 @@ async function resolveBoundAgentOwnerViewer(
   return ownerViewer;
 }
 
-/**
- * Create the session and queue the run as the App owner. On failure before the
- * run is queued, the half-created session is cleaned up (mirrors the PAT thread
- * path). Once queued, the run is left in place for the wait + extraction.
- */
-async function startBoundAgentRun(input: {
+async function loadRecoverableBoundSession(input: {
+  agentId: AgentId;
+  appId: AppId;
+  database: D1Database;
+  ownerViewer: AuthenticatedViewer;
+  sessionId: SessionId;
+}): Promise<SessionSummary | null> {
+  const ownerId = parsePlatformId<AccountId>(input.ownerViewer.id, "bound Agent owner id");
+  const existing =
+    (await getAppDatabase(input.database)
+      .select({ id: sessionsTable.id })
+      .from(sessionsTable)
+      .where(
+        and(
+          eq(sessionsTable.id, input.sessionId),
+          eq(sessionsTable.agentId, input.agentId),
+          eq(sessionsTable.appId, input.appId),
+          eq(sessionsTable.creatorAccountId, ownerId),
+        ),
+      )
+      .limit(1)
+      .get()) ?? null;
+
+  if (existing === null) {
+    return null;
+  }
+
+  return getSessionSummaryForCreator(input.database, ownerId, {
+    appId: input.appId,
+    sessionId: input.sessionId,
+  });
+}
+
+async function ensureRecoverableBoundSession(input: {
   agentId: AgentId;
   appId: AppId;
   bindings: ApiBindings;
-  capability: AppAgentCapabilityClaims;
   executionContext: Pick<ExecutionContext, "waitUntil"> | null;
   ownerViewer: AuthenticatedViewer;
-  prompt: string;
-  requestUrl: string;
-}): Promise<{ runId: SessionRunId; sessionId: SessionId }> {
-  let createdSessionId: SessionId | null = null;
+  sessionId: SessionId;
+}): Promise<SessionSummary> {
+  const existing = await loadRecoverableBoundSession({
+    agentId: input.agentId,
+    appId: input.appId,
+    database: input.bindings.DB,
+    ownerViewer: input.ownerViewer,
+    sessionId: input.sessionId,
+  });
+
+  if (existing !== null) {
+    return existing;
+  }
 
   try {
-    const session = await createAgentSession({
+    return await createAgentSession({
       bindings: input.bindings,
       executionContext: input.executionContext,
       input: {
@@ -129,46 +179,228 @@ async function startBoundAgentRun(input: {
         accessViewer: input.ownerViewer,
         attributedUserId: input.ownerViewer.id,
         metadata: null,
+        sessionId: input.sessionId,
       },
       viewer: input.ownerViewer,
     });
+  } catch (error) {
+    const recovered = await loadRecoverableBoundSession({
+      agentId: input.agentId,
+      appId: input.appId,
+      database: input.bindings.DB,
+      ownerViewer: input.ownerViewer,
+      sessionId: input.sessionId,
+    });
+
+    if (recovered !== null) {
+      return recovered;
+    }
+
+    throw error;
+  }
+}
+
+async function findRecoverableBoundRun(
+  database: D1Database,
+  input: {
+    clientRequestId: string | null;
+    recoverableRunId?: SessionRunId;
+    session: SessionSummary;
+  },
+): Promise<{ runId: SessionRunId; sessionId: SessionId } | null> {
+  if (input.recoverableRunId !== undefined) {
+    const runScope =
+      (await getAppDatabase(database)
+        .select({ sessionId: sessionRunsTable.sessionId })
+        .from(sessionRunsTable)
+        .where(eq(sessionRunsTable.id, input.recoverableRunId))
+        .limit(1)
+        .get()) ?? null;
+
+    if (runScope?.sessionId !== input.session.id) {
+      throw new Error("Bound Agent idempotency Run is missing or belongs to another Session.");
+    }
+
+    const run = await getSessionRunSummary(database, input.recoverableRunId);
+
+    if (run === null) {
+      throw new Error("Bound Agent idempotency Run summary is missing.");
+    }
+
+    return { runId: run.id, sessionId: input.session.id };
+  }
+
+  if (input.clientRequestId !== null) {
+    const event =
+      (await getAppDatabase(database)
+        .select({ runId: sessionEventsTable.runId })
+        .from(sessionEventsTable)
+        .where(
+          and(
+            eq(sessionEventsTable.sessionId, input.session.id),
+            eq(sessionEventsTable.sourceEventId, input.clientRequestId),
+          ),
+        )
+        .limit(1)
+        .get()) ?? null;
+
+    if (event?.runId) {
+      const run = await getSessionRunSummary(database, event.runId);
+
+      if (run !== null) {
+        return { runId: run.id, sessionId: input.session.id };
+      }
+    }
+
+    // A reserved idempotency key owns a dedicated Session. If the Worker is
+    // interrupted after the Run insert but before the event receipt or
+    // reservation binding is durable, the first Run in that Session remains
+    // the canonical execution even after it becomes terminal.
+    const firstRun =
+      (await getAppDatabase(database)
+        .select({ id: sessionRunsTable.id })
+        .from(sessionRunsTable)
+        .where(eq(sessionRunsTable.sessionId, input.session.id))
+        .orderBy(asc(sessionRunsTable.id))
+        .limit(1)
+        .get()) ?? null;
+
+    if (firstRun !== null) {
+      const run = await getSessionRunSummary(database, firstRun.id);
+
+      if (run === null) {
+        throw new Error("Bound Agent idempotency Run summary is missing.");
+      }
+
+      return { runId: run.id, sessionId: input.session.id };
+    }
+  }
+
+  const run =
+    input.session.lastRun ?? (await getActiveSessionRunSummary(database, input.session.id));
+
+  return run === null ? null : { runId: run.id, sessionId: input.session.id };
+}
+
+/**
+ * Create the session and queue the run as the App owner. On failure before the
+ * run is queued, the half-created session is cleaned up (mirrors the PAT thread
+ * path). Once queued, the run is left in place for the wait + extraction.
+ */
+async function startBoundAgentRun(input: {
+  agentId: AgentId;
+  appId: AppId;
+  bindings: ApiBindings;
+  capability: AppAgentCapabilityClaims;
+  clientRequestId: string | null;
+  executionContext: Pick<ExecutionContext, "waitUntil"> | null;
+  ownerViewer: AuthenticatedViewer;
+  prompt: string;
+  recoverableSessionId?: SessionId;
+  recoverableRunId?: SessionRunId;
+  requestUrl: string;
+}): Promise<{ runId: SessionRunId; sessionId: SessionId }> {
+  let createdSessionId: SessionId | null = null;
+
+  try {
+    const session =
+      input.recoverableSessionId === undefined
+        ? await createAgentSession({
+            bindings: input.bindings,
+            executionContext: input.executionContext,
+            input: {
+              agentId: input.agentId,
+              appId: input.appId,
+              type: "ui",
+            },
+            options: {
+              accessViewer: input.ownerViewer,
+              attributedUserId: input.ownerViewer.id,
+              metadata: null,
+            },
+            viewer: input.ownerViewer,
+          })
+        : await ensureRecoverableBoundSession({
+            agentId: input.agentId,
+            appId: input.appId,
+            bindings: input.bindings,
+            executionContext: input.executionContext,
+            ownerViewer: input.ownerViewer,
+            sessionId: input.recoverableSessionId,
+          });
     createdSessionId = session.id;
 
-    const queued = await queueSessionRun({
-      bindings: input.bindings,
-      executionContext: input.executionContext,
-      input: {
-        accessViewer: input.ownerViewer,
-        attachmentIds: [],
-        boundCapabilityProvenance: {
-          agentId: input.capability.agentId,
-          appId: input.capability.appId,
-          bindingEnv: input.capability.binding.env,
-          bindingName: input.capability.binding.name,
-          deploymentId: input.capability.deploymentId,
-          deploymentRunId: input.capability.deploymentRunId,
-        },
-        clientRequestId: null,
-        prompt: input.prompt,
-        runCreationGuard: createDeploymentAgentCapabilityRunCreationGuard(input.capability),
-        session: {
-          agent_id: session.agentId,
-          deployment_version_id: session.deploymentVersionId,
-          deployment_version_number: session.deploymentVersionNumber,
-          id: session.id,
-          model: session.model,
-          app_id: session.appId,
-          provider: session.provider,
-          runtime_id: session.runtimeId,
-        },
-      },
-      requestUrl: input.requestUrl,
-      viewer: input.ownerViewer,
+    const existingRun = await findRecoverableBoundRun(input.bindings.DB, {
+      clientRequestId: input.clientRequestId,
+      ...(input.recoverableRunId === undefined ? {} : { recoverableRunId: input.recoverableRunId }),
+      session,
     });
 
-    return { runId: queued.run.id, sessionId: session.id };
+    if (existingRun !== null) {
+      return existingRun;
+    }
+
+    try {
+      const queued = await queueSessionRun({
+        bindings: input.bindings,
+        executionContext: input.executionContext,
+        input: {
+          accessViewer: input.ownerViewer,
+          attachmentIds: [],
+          boundCapabilityProvenance: {
+            agentId: input.capability.agentId,
+            appId: input.capability.appId,
+            bindingEnv: input.capability.binding.env,
+            bindingName: input.capability.binding.name,
+            deploymentId: input.capability.deploymentId,
+            deploymentRunId: input.capability.deploymentRunId,
+          },
+          clientRequestId: input.clientRequestId,
+          prompt: input.prompt,
+          runCreationGuard: createDeploymentAgentCapabilityRunCreationGuard(input.capability),
+          session: {
+            agent_id: session.agentId,
+            deployment_version_id: session.deploymentVersionId,
+            deployment_version_number: session.deploymentVersionNumber,
+            id: session.id,
+            model: session.model,
+            app_id: session.appId,
+            provider: session.provider,
+            runtime_id: session.runtimeId,
+          },
+        },
+        requestUrl: input.requestUrl,
+        viewer: input.ownerViewer,
+      });
+
+      return { runId: queued.run.id, sessionId: session.id };
+    } catch (error) {
+      const recoveredSession = await loadRecoverableBoundSession({
+        agentId: input.agentId,
+        appId: input.appId,
+        database: input.bindings.DB,
+        ownerViewer: input.ownerViewer,
+        sessionId: session.id,
+      });
+      const recoveredRun =
+        recoveredSession === null
+          ? null
+          : await findRecoverableBoundRun(input.bindings.DB, {
+              clientRequestId: input.clientRequestId,
+              ...(input.recoverableRunId === undefined
+                ? {}
+                : { recoverableRunId: input.recoverableRunId }),
+              session: recoveredSession,
+            });
+
+      if (recoveredRun !== null) {
+        return recoveredRun;
+      }
+
+      throw error;
+    }
   } catch (error) {
-    if (createdSessionId !== null) {
+    if (createdSessionId !== null && input.recoverableSessionId === undefined) {
       await cleanupFailedThreadCreation({
         bindings: input.bindings,
         fileIds: [],
@@ -229,6 +461,15 @@ export async function createBoundAgentThreadAndWait(
 
   const ownerViewer = await resolveBoundAgentOwnerViewer(request.bindings, agent.appId);
 
+  const idempotency =
+    request.idempotencyKey === null || request.idempotencyKey === undefined
+      ? null
+      : await beginBoundAgentCallIdempotency(request.bindings.DB, {
+          bodyHash: await hashBoundAgentCallIdempotencyBody(request.input.message),
+          idempotencyKey: request.idempotencyKey,
+          subjectHash: await hashBoundAgentCallIdempotencySubject(claims),
+        });
+
   let startedRun: { runId: SessionRunId; sessionId: SessionId };
 
   try {
@@ -237,9 +478,14 @@ export async function createBoundAgentThreadAndWait(
       appId: agent.appId,
       bindings: request.bindings,
       capability: claims,
+      clientRequestId: idempotency?.reservationId ?? null,
       executionContext: request.executionContext,
       ownerViewer,
       prompt: request.input.message,
+      ...(idempotency === null ? {} : { recoverableSessionId: idempotency.sessionId }),
+      ...(idempotency?.runId === null || idempotency?.runId === undefined
+        ? {}
+        : { recoverableRunId: idempotency.runId }),
       requestUrl: request.requestUrl,
     });
   } catch (error) {
@@ -271,6 +517,14 @@ export async function createBoundAgentThreadAndWait(
   }
 
   const { runId, sessionId } = startedRun;
+
+  if (idempotency !== null) {
+    await bindBoundAgentCallIdempotencyRun(request.bindings.DB, {
+      reservationId: idempotency.reservationId,
+      runId,
+      sessionId,
+    });
+  }
 
   const terminalRun = await waitForTerminalRun(
     {

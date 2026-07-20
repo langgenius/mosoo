@@ -15,6 +15,13 @@
       "when": 1784041916585,
       "tag": "0001_bound-capability-run-provenance",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784151656487,
+      "tag": "0002_bound-agent-call-idempotency",
+      "breakpoints": true
     }
   ]
 }
