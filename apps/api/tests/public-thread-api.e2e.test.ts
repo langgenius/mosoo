@@ -21,6 +21,7 @@ import {
 import {
   OWNER_VIEWER,
   bearer,
+  createPublicEventSessionNamespace,
   createPublicThreadApiTestApp,
   expectArray,
   expectRecord,
@@ -935,6 +936,7 @@ describe("Public Thread API e2e", () => {
   test("streams Thread events as public SSE entries", async () => {
     const database = await createPublicHttpContractDatabase();
     const app = createPublicThreadApiTestApp();
+    const liveEvents = createPublicEventSessionNamespace();
 
     await withProviderProbeMock(async () => {
       const response = await requestPublicApi(
@@ -986,6 +988,7 @@ describe("Public Thread API e2e", () => {
         new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream?limit=1`, {
           headers: { Authorization: bearer(TOKENS.owner) },
         }),
+        { sessionNamespace: liveEvents.binding },
       );
       expect(streamResponse.status).toBe(200);
       expect(streamResponse.headers.get("Content-Type")).toContain("text/event-stream");
@@ -1056,14 +1059,17 @@ describe("Public Thread API e2e", () => {
       };
 
       const deltaCommittedAt = performance.now();
+      liveEvents.emit();
       const openDeltaText = await readUntil("id: 01J00000000000000000000014");
       const openDeltaMs = performance.now() - deltaCommittedAt;
 
-      expect(openDeltaMs).toBeLessThan(3_000);
+      expect(openDeltaMs).toBeLessThan(500);
       expect(openDeltaText).toContain("Live stream ");
       expect(openDeltaText).toContain("delta A");
       expect(openDeltaText).not.toContain("hidden");
       expect(openDeltaText).not.toContain("\uE200");
+
+      liveEvents.close();
 
       await insertRuntimeEvent(database, {
         kind: "message.completed",
@@ -1117,6 +1123,7 @@ describe("Public Thread API e2e", () => {
       expect(text).not.toContain("payload");
       expect(text).not.toContain("private-diagnostic");
       expect(text).not.toContain("traceId");
+      expect(text).not.toContain("event: thread.error");
     });
   }, 10_000);
 

@@ -214,6 +214,7 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
       operation: async ({ caller, threadId }) => {
         const { createPublicThreadEventStream } = await loadPublicThreadService();
         const stream = await createPublicThreadEventStream({
+          bindings: c.env,
           caller,
           database: c.env.DB,
           limit: parseThreadEventsLimit(c.req.query("limit")),

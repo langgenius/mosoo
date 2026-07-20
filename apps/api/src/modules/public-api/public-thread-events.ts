@@ -16,9 +16,11 @@ import { OpenAiPrivateCitationStreamFilter } from "agent-driver/provider-output"
 import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
+import { createErrorLogContext, logWarn } from "../../platform/cloudflare/logger";
 import { getAppDatabase } from "../../platform/db/drizzle";
 import { createSessionProcessEventsFromSessionEventRows } from "../sessions/application/session-process-events.service";
 import type { SessionEventProcessRow } from "../sessions/application/session-process-events.service";
+import { connectSessionPublicEventWebSocket } from "../sessions/infrastructure/session/client";
 import { publicInternalError, publicInvalidRequest, toPublicApiError } from "./public-api-errors";
 import { sanitizePublicOutput } from "./public-output-sanitization";
 import { admitPublicThreadReader } from "./public-thread-admission";
@@ -143,6 +145,112 @@ class PublicLiveEventRowProjector {
     }
 
     return output;
+  }
+}
+
+class PublicThreadEventWakeup {
+  #pending = false;
+  #socket: WebSocket | null;
+  #waiter: (() => void) | null = null;
+
+  constructor(socket: WebSocket | null) {
+    this.#socket = socket;
+    socket?.addEventListener("message", this.#handleMessage);
+    socket?.addEventListener("close", this.#handleSocketUnavailable);
+    socket?.addEventListener("error", this.#handleSocketUnavailable);
+  }
+
+  close(): void {
+    const socket = this.#socket;
+
+    this.#detachSocket();
+    this.#waiter?.();
+
+    if (socket !== null && socket.readyState < WebSocket.CLOSING) {
+      socket.close(1000, "public-event-stream.closed");
+    }
+  }
+
+  wait(timeoutMs: number, signal: AbortSignal | null | undefined): Promise<void> {
+    if (this.#pending) {
+      this.#pending = false;
+      return Promise.resolve();
+    }
+
+    if (signal?.aborted === true) {
+      return Promise.resolve();
+    }
+
+    const wakeController = new AbortController();
+    const wake = () => wakeController.abort();
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, timeoutMs);
+    });
+    const notified = new Promise<void>((resolve) => {
+      wakeController.signal.addEventListener("abort", () => resolve(), { once: true });
+    });
+    let detachAbort = () => {};
+    const aborted = new Promise<void>((resolve) => {
+      const handleAbort = () => resolve();
+
+      signal?.addEventListener("abort", handleAbort, { once: true });
+      detachAbort = () => signal?.removeEventListener("abort", handleAbort);
+    });
+
+    this.#waiter = wake;
+
+    return Promise.race([timeout, notified, aborted]).finally(() => {
+      clearTimeout(timer);
+      detachAbort();
+      if (this.#waiter === wake) {
+        this.#waiter = null;
+      }
+    });
+  }
+
+  readonly #handleMessage = () => {
+    if (this.#waiter !== null) {
+      this.#waiter();
+      return;
+    }
+
+    this.#pending = true;
+  };
+
+  readonly #handleSocketUnavailable = () => {
+    this.#detachSocket();
+    this.#waiter?.();
+  };
+
+  #detachSocket(): void {
+    const socket = this.#socket;
+
+    if (socket === null) {
+      return;
+    }
+
+    socket.removeEventListener("message", this.#handleMessage);
+    socket.removeEventListener("close", this.#handleSocketUnavailable);
+    socket.removeEventListener("error", this.#handleSocketUnavailable);
+    this.#socket = null;
+  }
+}
+
+async function connectPublicThreadEventWakeup(
+  request: StreamPublicThreadEventsRequest,
+  sessionId: SessionId,
+): Promise<PublicThreadEventWakeup> {
+  try {
+    return new PublicThreadEventWakeup(
+      await connectSessionPublicEventWebSocket(request.bindings, sessionId),
+    );
+  } catch (error) {
+    logWarn("public_thread.event_wakeup.connect_failed", {
+      ...createErrorLogContext(error),
+      sessionId,
+    });
+    return new PublicThreadEventWakeup(null);
   }
 }
 
@@ -399,12 +507,6 @@ function enqueueThreadEvents(input: {
   return enqueued;
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
 function isStreamStopped(input: {
   signal: AbortSignal | null | undefined;
   state: { cancelled: boolean };
@@ -428,11 +530,19 @@ export async function createPublicThreadEventStream(
 ): Promise<ReadableStream<Uint8Array>> {
   const limit = normalizePublicThreadEventsLimit(request.limit);
   const sessionId = await resolvePublicThreadEventSessionId(request);
-  const initialWindow = await readPublicThreadEventWindow({
-    database: request.database,
-    limit,
-    sessionId,
-  });
+  const wakeup = await connectPublicThreadEventWakeup(request, sessionId);
+  let initialWindow: PublicThreadEventWindow;
+
+  try {
+    initialWindow = await readPublicThreadEventWindow({
+      database: request.database,
+      limit,
+      sessionId,
+    });
+  } catch (error) {
+    wakeup.close();
+    throw error;
+  }
   const emittedEventIds = new Set<RuntimeEventId>();
   const state = {
     cancelled: false,
@@ -456,7 +566,7 @@ export async function createPublicThreadEventStream(
         });
 
         while (!isStreamStopped({ signal: request.signal, state })) {
-          await delay(THREAD_EVENT_STREAM_POLL_INTERVAL_MS);
+          await wakeup.wait(THREAD_EVENT_STREAM_POLL_INTERVAL_MS, request.signal);
 
           if (isStreamStopped({ signal: request.signal, state })) {
             break;
@@ -506,11 +616,13 @@ export async function createPublicThreadEventStream(
           `event: thread.error\ndata: ${JSON.stringify(toSseErrorPayload(error))}\n\n`,
         );
       } finally {
+        wakeup.close();
         controller.close();
       }
     },
     cancel() {
       state.cancelled = true;
+      wakeup.close();
     },
   });
 }
