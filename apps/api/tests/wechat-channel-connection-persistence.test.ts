@@ -202,7 +202,7 @@ describe("WeChat channel runtime persistence", () => {
       clientId: "reply-client-1",
       fetchImpl,
       peerId: "peer-1",
-      text: "reply from Mosoo",
+      text: "reply from mosoo",
     });
 
     expect(sendRequests).toHaveLength(1);
@@ -212,7 +212,7 @@ describe("WeChat channel runtime persistence", () => {
       msg: {
         client_id: "reply-client-1",
         context_token: "ctx-secret",
-        item_list: [{ text_item: { text: "reply from Mosoo" }, type: 1 }],
+        item_list: [{ text_item: { text: "reply from mosoo" }, type: 1 }],
         to_user_id: "peer-1",
       },
     });

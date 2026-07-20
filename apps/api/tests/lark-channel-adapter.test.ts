@@ -224,7 +224,7 @@ describe("Lark channel adapter", () => {
       expect(requestBodies).toEqual([
         {
           content: JSON.stringify({
-            text: "Mosoo session created: https://mosoo.ai/agent/01J00000000000000000000009?tab=consume&sessionId=session-1. Agent is working...",
+            text: "mosoo session created: https://mosoo.ai/agent/01J00000000000000000000009?tab=consume&sessionId=session-1. Agent is working...",
           }),
           msg_type: "text",
         },

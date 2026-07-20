@@ -192,7 +192,7 @@ describe("Telegram channel adapter", () => {
       expect(requestBodies).toEqual([
         {
           chat_id: "42",
-          text: "Mosoo session created: https://mosoo.ai/agent/01J00000000000000000000009?tab=consume&sessionId=session-1. Agent is working...",
+          text: "mosoo session created: https://mosoo.ai/agent/01J00000000000000000000009?tab=consume&sessionId=session-1. Agent is working...",
         },
       ]);
       expect(finalDeliveryJobs).toEqual([

@@ -4,7 +4,7 @@ Status: core behavior is shipped, with known console gaps.
 
 ## Why this exists
 
-A Builder can improve an Agent after people have started using it. Without a stable identity and saved versions, every edit could send users to a new Agent or silently change an existing conversation. Mosoo keeps the published Agent recognizable while separating its past and current behavior.
+A Builder can improve an Agent after people have started using it. Without a stable identity and saved versions, every edit could send users to a new Agent or silently change an existing conversation. mosoo keeps the published Agent recognizable while separating its past and current behavior.
 
 ## Who uses it
 

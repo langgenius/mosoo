@@ -64,6 +64,26 @@ export async function publishSessionViewerEvents(
   await getSessionStub(env, sessionId).publishEvents(sessionId, events);
 }
 
+export async function connectSessionPublicEventWebSocket(
+  env: ApiBindings,
+  sessionId: SessionId,
+): Promise<WebSocket> {
+  const response = await getSessionStub(env, sessionId).fetch(
+    createSessionDoRequest(sessionId, "/public-events/ws", {
+      headers: { Upgrade: "websocket" },
+      method: "GET",
+    }),
+  );
+  const socket = response.webSocket;
+
+  if (response.status !== 101 || socket === null) {
+    throw new Error(`Session public event socket upgrade failed with status ${response.status}.`);
+  }
+
+  socket.accept();
+  return socket;
+}
+
 export async function syncSessionViewerState(
   env: ApiBindings,
   sessionId: SessionId | null,

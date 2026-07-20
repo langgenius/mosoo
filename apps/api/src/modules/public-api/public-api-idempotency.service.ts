@@ -1,7 +1,7 @@
 import { publicApiIdempotencyKeysTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type { PlatformId } from "@mosoo/id";
-import { and, eq, isNotNull, isNull, lt, or } from "drizzle-orm";
+import { and, eq, isNull, lt } from "drizzle-orm";
 
 import { getAppDatabase } from "../../platform/db/drizzle";
 import { currentTimestampMs } from "../../time";
@@ -21,6 +21,7 @@ interface PublicApiIdempotencyRow {
   response_status: number | null;
   route: string;
   token_id: PlatformId;
+  updated_at: number;
 }
 
 export interface PublicApiIdempotencyInput {
@@ -40,6 +41,12 @@ export type PublicApiIdempotencyBeginResult =
       body: unknown;
       responseStatus: number;
       status: "replay";
+    }
+  | {
+      reservationId: PlatformId;
+      retryAfterSeconds: number;
+      status: "processing";
+      stale: boolean;
     };
 
 export function readPublicApiIdempotencyKey(request: Request): string | null {
@@ -97,12 +104,32 @@ function parseStoredReplayBody(raw: string): unknown {
   }
 }
 
+function isCompletedIdempotencyRow(row: PublicApiIdempotencyRow): boolean {
+  return row.response_status !== null && row.response_json !== null;
+}
+
+function toProcessingResult(
+  row: PublicApiIdempotencyRow,
+  nowMs: number,
+): PublicApiIdempotencyBeginResult {
+  const stale = row.updated_at < nowMs - PUBLIC_API_IDEMPOTENCY_PROCESSING_TTL_MS;
+
+  return {
+    reservationId: row.id,
+    retryAfterSeconds: stale
+      ? Math.max(
+          1,
+          Math.ceil((row.updated_at + PUBLIC_API_IDEMPOTENCY_RETENTION_MS - nowMs) / 1_000),
+        )
+      : IDEMPOTENCY_RETRY_AFTER_SECONDS,
+    stale,
+    status: "processing",
+  };
+}
+
 function toReplayResult(row: PublicApiIdempotencyRow): PublicApiIdempotencyBeginResult {
   if (row.response_status === null || row.response_json === null) {
-    throw publicIdempotencyConflict(
-      "A request with this Idempotency-Key is still processing.",
-      IDEMPOTENCY_RETRY_AFTER_SECONDS,
-    );
+    throw new Error("Cannot replay an incomplete public API idempotency record.");
   }
 
   return {
@@ -128,6 +155,7 @@ async function getIdempotencyRow(
         response_status: publicApiIdempotencyKeysTable.responseStatus,
         route: publicApiIdempotencyKeysTable.route,
         token_id: publicApiIdempotencyKeysTable.tokenId,
+        updated_at: publicApiIdempotencyKeysTable.updatedAt,
       })
       .from(publicApiIdempotencyKeysTable)
       .where(
@@ -144,24 +172,34 @@ async function getIdempotencyRow(
 export async function beginPublicApiIdempotency(
   database: D1Database,
   input: PublicApiIdempotencyInput,
+  nowMs = currentTimestampMs(),
 ): Promise<PublicApiIdempotencyBeginResult> {
-  await cleanupPublicApiIdempotencyKeys(database);
-
   const existing = await getIdempotencyRow(database, input.tokenId, input.idempotencyKey);
 
   if (existing) {
     enforceSameIdempotentRequest(existing, input);
-    return toReplayResult(existing);
+
+    if (existing.updated_at < nowMs - PUBLIC_API_IDEMPOTENCY_RETENTION_MS) {
+      await getAppDatabase(database)
+        .delete(publicApiIdempotencyKeysTable)
+        .where(eq(publicApiIdempotencyKeysTable.id, existing.id))
+        .run();
+    } else if (!isCompletedIdempotencyRow(existing)) {
+      return toProcessingResult(existing, nowMs);
+    } else {
+      return toReplayResult(existing);
+    }
   }
 
+  await cleanupPublicApiIdempotencyKeys(database, nowMs);
+
   const reservationId = createPlatformId();
-  const timestampMs = currentTimestampMs();
 
   await getAppDatabase(database)
     .insert(publicApiIdempotencyKeysTable)
     .values({
       bodyHash: input.bodyHash,
-      createdAt: timestampMs,
+      createdAt: nowMs,
       id: reservationId,
       idempotencyKey: input.idempotencyKey,
       method: input.method,
@@ -169,7 +207,7 @@ export async function beginPublicApiIdempotency(
       responseStatus: null,
       route: input.route,
       tokenId: input.tokenId,
-      updatedAt: timestampMs,
+      updatedAt: nowMs,
     })
     .onConflictDoNothing()
     .run();
@@ -185,6 +223,11 @@ export async function beginPublicApiIdempotency(
 
   if (current.id !== reservationId) {
     enforceSameIdempotentRequest(current, input);
+
+    if (!isCompletedIdempotencyRow(current)) {
+      return toProcessingResult(current, nowMs);
+    }
+
     return toReplayResult(current);
   }
 
@@ -236,20 +279,6 @@ async function cleanupPublicApiIdempotencyKeys(
 ): Promise<void> {
   await getAppDatabase(database)
     .delete(publicApiIdempotencyKeysTable)
-    .where(
-      or(
-        and(
-          isNotNull(publicApiIdempotencyKeysTable.responseStatus),
-          lt(publicApiIdempotencyKeysTable.updatedAt, nowMs - PUBLIC_API_IDEMPOTENCY_RETENTION_MS),
-        ),
-        and(
-          isNull(publicApiIdempotencyKeysTable.responseStatus),
-          lt(
-            publicApiIdempotencyKeysTable.updatedAt,
-            nowMs - PUBLIC_API_IDEMPOTENCY_PROCESSING_TTL_MS,
-          ),
-        ),
-      ),
-    )
+    .where(lt(publicApiIdempotencyKeysTable.updatedAt, nowMs - PUBLIC_API_IDEMPOTENCY_RETENTION_MS))
     .run();
 }

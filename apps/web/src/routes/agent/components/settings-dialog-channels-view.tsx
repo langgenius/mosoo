@@ -455,7 +455,7 @@ export function AgentSettingsChannelsView({
           </DialogHeader>
           <div className="text-muted-foreground space-y-2 text-sm">
             <p>The Agent will no longer respond in the connected channel surface.</p>
-            <p>Existing Mosoo Sessions keep their channel source metadata.</p>
+            <p>Existing mosoo Sessions keep their channel source metadata.</p>
             <p>To recover, create a new binding and paste the credentials again.</p>
           </div>
           <DialogFooter>

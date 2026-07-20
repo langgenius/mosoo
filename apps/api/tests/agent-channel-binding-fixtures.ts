@@ -48,7 +48,7 @@ const LARK_BOT_INFO_OK_RESPONSE = {
   code: 0,
   data: {
     bot: {
-      app_name: "Mosoo Bot",
+      app_name: "mosoo Bot",
       open_id: "lark-bot-open-id",
     },
   },
@@ -80,7 +80,7 @@ const LARK_APP_REGISTRATION_POLL_OK_RESPONSE = {
 const TELEGRAM_GET_ME_OK_RESPONSE = {
   ok: true,
   result: {
-    first_name: "Mosoo",
+    first_name: "mosoo",
     id: 12345,
     username: "mosoo_bot",
   },

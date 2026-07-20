@@ -1,8 +1,8 @@
 # Codex Pet — Agent as API
 
-Codex Pet shows how a workflow built in a coding IDE can become a reusable Mosoo-managed Agent exposed through an API.
+Codex Pet shows how a workflow built in a coding IDE can become a reusable mosoo-managed Agent exposed through an API.
 
-A builder publishes a Pet Agent with an avatar-generation skill, then copies its generated **Instruction for LLM** into Codex. Codex uses that instruction to integrate the Mosoo Thread API into an existing product backend. The finished app accepts one avatar and returns a validated ZIP containing all nine Codex Pet animation states.
+A builder publishes a Pet Agent with an avatar-generation skill, then copies its generated **Instruction for LLM** into Codex. Codex uses that instruction to integrate the mosoo Thread API into an existing product backend. The finished app accepts one avatar and returns a validated ZIP containing all nine Codex Pet animation states.
 
 ```text
 publish Agent -> copy Instruction for LLM -> integrate from Codex

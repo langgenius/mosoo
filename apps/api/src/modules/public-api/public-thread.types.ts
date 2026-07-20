@@ -14,6 +14,7 @@ export interface CreatePublicThreadRequest {
   bindings: ApiBindings;
   caller: PublicApiCaller;
   executionContext: Pick<ExecutionContext, "waitUntil"> | null;
+  idempotencyKey: string | null;
   input: CreatePublicThreadInput;
   requestUrl: string;
 }
@@ -32,5 +33,6 @@ export interface ListPublicThreadEventsRequest {
 }
 
 export interface StreamPublicThreadEventsRequest extends ListPublicThreadEventsRequest {
+  bindings: ApiBindings;
   signal?: AbortSignal | null | undefined;
 }

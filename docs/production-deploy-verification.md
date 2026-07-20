@@ -201,7 +201,26 @@ Acceptance:
 
 ## Real Deploy Safe Sequence
 
-Run the real deploy only after all simulation steps above pass.
+The normal production entry point is
+`.github/workflows/deploy-try.yml`. A push to `deploy/try` in
+`langgenius/mosoo` runs the simulation steps, invokes `just deploy`, and verifies
+the public production endpoints. The workflow intentionally refuses to deploy
+from a fork.
+
+Configure the GitHub `try` Environment before the first release:
+
+- Restrict deployment branches to `deploy/try`.
+- Add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` as Environment
+  secrets. Keep Worker runtime secrets in Cloudflare.
+- Protect `deploy/try` from force-push and deletion, and restrict who may push
+  it. Advance it only to a reviewed commit from `main`.
+
+The workflow uses one `production` concurrency group and never cancels an
+in-progress release because D1 migration, queue updates, and Worker publication
+are not transactional.
+
+For a manual release, run the real deploy only after all simulation steps above
+pass.
 
 ```bash
 git status --short --branch

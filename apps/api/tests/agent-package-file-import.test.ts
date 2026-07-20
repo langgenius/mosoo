@@ -425,7 +425,7 @@ describe("agent package file import", () => {
       bindings,
       fileId,
       message:
-        "Runtime setting sandbox_mode is managed by Mosoo platform policy and cannot be set here.",
+        "Runtime setting sandbox_mode is managed by mosoo platform policy and cannot be set here.",
     });
   });
 

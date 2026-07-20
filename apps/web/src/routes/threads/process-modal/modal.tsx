@@ -55,8 +55,8 @@ export function ThreadProcessModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] gap-0 overflow-hidden p-0 sm:max-w-[1080px]">
-        <DialogHeader className="border-border-subtle border-b px-7 pt-4 pb-3">
+      <DialogContent className="flex max-h-[88vh] !w-[calc(100vw-2rem)] !max-w-[1080px] flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-border-subtle shrink-0 border-b px-7 pt-4 pb-3">
           <div className="flex items-start justify-between gap-4 pr-8">
             <div className="flex min-w-0 items-center gap-2.5">
               <AgentAvatar agent={agent} defaultName={agentName} className="size-7 text-[10px]" />

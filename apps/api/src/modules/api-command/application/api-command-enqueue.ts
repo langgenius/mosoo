@@ -1,7 +1,8 @@
 import type { AppDeploymentRunId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { enqueueApiCommand } from "./api-command-ledger";
+import { admitApiCommand, enqueueApiCommand } from "./api-command-ledger";
+import type { ApiCommandAdmission } from "./api-command-ledger";
 import type {
   AppDeploymentRunDispatchCommandPayload,
   ChannelWorkTriggerCommandPayload,
@@ -69,11 +70,11 @@ export async function enqueueScheduledMaintenanceCommand(
   });
 }
 
-export async function enqueueSessionRunDispatchCommand(
+export async function admitSessionRunDispatchCommand(
   bindings: Pick<ApiBindings, "API_COMMAND_QUEUE" | "DB">,
   payload: SessionRunDispatchCommandPayload,
-): Promise<void> {
-  await enqueueApiCommand(bindings, {
+): Promise<ApiCommandAdmission> {
+  return admitApiCommand(bindings, {
     dedupeKey: `session_run_dispatch:${payload.sessionRunId}`,
     kind: "session_run_dispatch",
     payload,

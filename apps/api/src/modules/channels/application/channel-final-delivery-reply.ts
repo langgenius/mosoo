@@ -29,7 +29,7 @@ function truncateReplyText(input: { maxLength: number; text: string }): string {
     return input.text;
   }
 
-  return `${input.text.slice(0, input.maxLength - 70)}\n\n[Mosoo reply truncated. Open the session for the full output.]`;
+  return `${input.text.slice(0, input.maxLength - 70)}\n\n[mosoo reply truncated. Open the session for the full output.]`;
 }
 
 function buildAgentReplyText(input: {
@@ -48,10 +48,10 @@ function buildAgentReplyText(input: {
     case "completed": {
       return replyText
         ? `${input.sessionLabel}\n\n${replyText}`
-        : `${input.sessionLabel}\n\nAgent completed. Open Mosoo for the full output.`;
+        : `${input.sessionLabel}\n\nAgent completed. Open mosoo for the full output.`;
     }
     case "failed": {
-      return `${input.sessionLabel}\n\nAgent run failed: ${replyText ?? "Open Mosoo for details."}`;
+      return `${input.sessionLabel}\n\nAgent run failed: ${replyText ?? "Open mosoo for details."}`;
     }
     case "timeout": {
       return replyText
@@ -60,9 +60,9 @@ function buildAgentReplyText(input: {
             "",
             replyText,
             "",
-            "Agent is still running. Open Mosoo for the latest output.",
+            "Agent is still running. Open mosoo for the latest output.",
           ].join("\n")
-        : `${input.sessionLabel}\n\nAgent is still running. Open Mosoo for the latest output.`;
+        : `${input.sessionLabel}\n\nAgent is still running. Open mosoo for the latest output.`;
     }
     default: {
       throw new Error("Unsupported channel final delivery result status.");
@@ -95,7 +95,7 @@ async function sendDiscordFinalReply(input: {
       maxLength: 1900,
       result: input.result,
       sessionId: input.sessionId,
-      sessionLabel: `Mosoo session ${input.sessionId}`,
+      sessionLabel: `mosoo session ${input.sessionId}`,
     }),
   });
 }
@@ -127,7 +127,7 @@ async function sendSlackFinalReply(input: {
     maxLength: 3500,
     result: input.result,
     sessionId: input.sessionId,
-    sessionLabel: `Mosoo session <${sessionLink}|${input.sessionId}>`,
+    sessionLabel: `mosoo session <${sessionLink}|${input.sessionId}>`,
   });
 
   if (input.payload.workingMessage) {
@@ -173,7 +173,7 @@ async function sendLarkFinalReply(input: {
       maxLength: null,
       result: input.result,
       sessionId: input.sessionId,
-      sessionLabel: `Mosoo session ${input.sessionId}`,
+      sessionLabel: `mosoo session ${input.sessionId}`,
     }),
   });
 }
@@ -203,7 +203,7 @@ async function sendTelegramFinalReply(input: {
       maxLength: 3900,
       result: input.result,
       sessionId: input.sessionId,
-      sessionLabel: `Mosoo session ${input.sessionId}`,
+      sessionLabel: `mosoo session ${input.sessionId}`,
     }),
   });
 }
@@ -228,7 +228,7 @@ async function sendWeChatFinalReply(input: {
       maxLength: 3000,
       result: input.result,
       sessionId: input.sessionId,
-      sessionLabel: `Mosoo session ${input.sessionId}`,
+      sessionLabel: `mosoo session ${input.sessionId}`,
     }),
   });
 }

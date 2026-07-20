@@ -21,9 +21,9 @@ The current user is the single owner of the selected App. App Users cannot see t
 
 ## Current availability and visible boundaries
 
-The shipped view uses model-call usage recorded by Mosoo. For recognized models, dollar amounts are estimates calculated from observed tokens and Mosoo's reference prices. For an unknown model, Mosoo may retain a reported USD amount; without one, usage remains visible and the model is marked for pricing attention, but the event contributes $0, so totals can be understated.
+The shipped view uses model-call usage recorded by mosoo. For recognized models, dollar amounts are estimates calculated from observed tokens and mosoo's reference prices. For an unknown model, mosoo may retain a reported USD amount; without one, usage remains visible and the model is marked for pricing attention, but the event contributes $0, so totals can be understated.
 
-This view is not a Provider invoice or a Mosoo charge. It does not reconcile taxes, credits, discounts, subscriptions, or infrastructure costs. **All** can include usage types that have no separate filter. On an Agent's Cost tab, the latest seven usage events are shown and currently are not limited by the selected time range. Budgets, alerts, invoices, and payment controls are not available here.
+This view is not a Provider invoice or a mosoo charge. It does not reconcile taxes, credits, discounts, subscriptions, or infrastructure costs. **All** can include usage types that have no separate filter. On an Agent's Cost tab, the latest seven usage events are shown and currently are not limited by the selected time range. Budgets, alerts, invoices, and payment controls are not available here.
 
 ## Historical ledger reconciliation
 
@@ -36,4 +36,4 @@ The API can audit model calls created before atomic model-call and usage-ledger 
 - Missing driver identity, usage metadata, published revision, or run context is reported as indeterminate instead of being inferred from mutable current state.
 - Calls created before the current raw-detail window, invalid stored usage values, and events that may already exist under a historical driver identity are also indeterminate; repair never normalizes or guesses through these states.
 
-Operators should begin with `audit`, inspect the structured `cost.ledger_reconciliation.page_completed` logs, enable `repair` only after reviewing those classifications, and unset the variable after the intended reconciliation run. This workflow repairs locally provable ledger gaps; it does not compare Mosoo estimates with a Provider invoice.
+Operators should begin with `audit`, inspect the structured `cost.ledger_reconciliation.page_completed` logs, enable `repair` only after reviewing those classifications, and unset the variable after the intended reconciliation run. This workflow repairs locally provable ledger gaps; it does not compare mosoo estimates with a Provider invoice.

@@ -104,7 +104,7 @@ describe("WeChat channel final delivery", () => {
         runId: sessionCommand.runId,
         seq: 2,
         sessionId: sessionCommand.sessionId,
-        text: "Final answer from Mosoo",
+        text: "Final answer from mosoo",
       });
       const jobId = await enqueueChannelFinalDeliveryJob(
         bindings,
@@ -149,7 +149,7 @@ describe("WeChat channel final delivery", () => {
           item_list: [
             {
               text_item: {
-                text: `Mosoo session ${sessionCommand.sessionId}\n\nFinal answer from Mosoo`,
+                text: `mosoo session ${sessionCommand.sessionId}\n\nFinal answer from mosoo`,
               },
               type: 1,
             },

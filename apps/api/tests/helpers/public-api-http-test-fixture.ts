@@ -269,12 +269,13 @@ export function createPublicHttpTestBindings(
     apiCommandQueue?: ApiCommandQueueStub;
     fileBucket?: R2Bucket;
     queue?: ChannelFinalDeliveryQueueStub;
+    sessionNamespace?: ApiBindings["Session"];
   } = {},
 ): Record<string, unknown> {
   return {
     APP_NAME: "mosoo",
     AUTH_EMAIL: unavailableBinding<SendEmail>("AUTH_EMAIL"),
-    AUTH_EMAIL_FROM: "Mosoo AUTH <auth@mosoo.ai>",
+    AUTH_EMAIL_FROM: "mosoo AUTH <auth@mosoo.ai>",
     BETTER_AUTH_SECRET: "test-secret",
     API_COMMAND_QUEUE: options.apiCommandQueue ?? createApiCommandQueueStub(),
     CHANNEL_FINAL_DELIVERY_QUEUE: options.queue ?? createChannelFinalDeliveryQueueStub(),
@@ -289,7 +290,7 @@ export function createPublicHttpTestBindings(
     SANDBOX_FILE_BUCKET_LOCAL: "true",
     SANDBOX_STATE_BUCKET: unavailableBinding<R2Bucket>("SANDBOX_STATE_BUCKET"),
     SANDBOX_STATE_BUCKET_NAME: "mosoo-sandbox-state",
-    Session: createOkDurableObjectNamespace(),
+    Session: options.sessionNamespace ?? createOkDurableObjectNamespace(),
     VAULT_ROOT_SECRET: "test-vault-secret",
     WEB_ORIGIN: "https://mosoo.ai",
   };
@@ -332,7 +333,7 @@ export async function createPublicHttpContractDatabase(): Promise<SqliteD1Databa
       createdAt: nowMs,
       creatorAccountId: PUBLIC_API_TEST_IDS.ownerAccount,
       id: PUBLIC_API_TEST_IDS.organization,
-      name: "Mosoo Test Org",
+      name: "mosoo Test Org",
       updatedAt: nowMs,
     })
     .run();

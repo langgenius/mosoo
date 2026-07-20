@@ -1,6 +1,6 @@
 # Session Log
 
-Status: available in the current Mosoo console under each Agent's Logs tab.
+Status: available in the current mosoo console under each Agent's Logs tab.
 
 ## Why it matters
 

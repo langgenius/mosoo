@@ -1,6 +1,6 @@
 import type { AgentId, SessionId, SessionRunId } from "@mosoo/id";
 
-export const CHANNEL_AGENT_FAILURE_TEXT = "Mosoo is having trouble responding. Try again later.";
+export const CHANNEL_AGENT_FAILURE_TEXT = "mosoo is having trouble responding. Try again later.";
 
 export function buildChannelSessionLink(input: {
   agentId: AgentId;
@@ -19,7 +19,7 @@ export function buildChannelWorkingText(input: {
   sessionLink: string;
 }): string {
   const target = input.linkLabel ? `<${input.sessionLink}|${input.linkLabel}>` : input.sessionLink;
-  return `Mosoo session created: ${target}. Agent is working...`;
+  return `mosoo session created: ${target}. Agent is working...`;
 }
 
 export type ChannelAgentReplyResult =
