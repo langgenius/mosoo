@@ -67,8 +67,12 @@ export function SkillsTab() {
         </Button>
       </PageHeader>
 
-      <div className="flex shrink-0 flex-wrap items-center gap-2.5 px-4 pb-4 sm:px-8">
-        <div className="border-border-strong bg-card inline-flex items-center overflow-hidden rounded-md border">
+      <div className="flex shrink-0 flex-wrap items-center gap-3 px-4 pb-4 sm:px-8">
+        <div
+          role="tablist"
+          aria-label="Skill view"
+          className="border-border-subtle inline-flex h-8 items-center gap-5 border-b"
+        >
           <SkillsModeButton
             active={mode === "installed"}
             icon={Library}
@@ -77,7 +81,6 @@ export function SkillsTab() {
               setMode("installed");
             }}
           />
-          <span className="bg-border-strong h-5 w-px" />
           <SkillsModeButton
             active={mode === "discover"}
             icon={Compass}
@@ -200,11 +203,12 @@ function SkillsModeButton({
   return (
     <button
       type="button"
+      role="tab"
       onClick={onClick}
-      aria-pressed={active}
+      aria-selected={active}
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 px-3 text-[13px] font-medium transition-colors",
-        active ? "bg-paper-200 text-fg-1" : "text-fg-3 hover:bg-paper-200/50",
+        "relative inline-flex h-8 items-center gap-1.5 text-[13px] font-semibold transition-colors after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:rounded-full",
+        active ? "text-fg-1 after:bg-fg-1" : "text-fg-3 after:bg-transparent hover:text-fg-1",
       )}
     >
       <Icon className="size-3.5" />

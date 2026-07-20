@@ -5,6 +5,7 @@ import {
   Check,
   ExternalLink,
   Flame,
+  Info,
   RefreshCw,
   TrendingUp,
 } from "lucide-react";
@@ -16,6 +17,7 @@ import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { EmptyState } from "@/shared/ui/empty-state";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
 import type { useSkillRegistry } from "./use-skill-registry";
@@ -125,8 +127,11 @@ export function SkillsShCatalog({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="border-border-strong bg-card inline-flex items-center overflow-hidden rounded-md border">
+      <div className="flex flex-wrap items-center gap-3">
+        <div
+          aria-label="skills.sh catalog view"
+          className="inline-flex flex-wrap items-center gap-1"
+        >
           <CatalogViewButton
             active={view === "trending"}
             icon={TrendingUp}
@@ -135,7 +140,6 @@ export function SkillsShCatalog({
               dispatch({ type: "setView", view: "trending" });
             }}
           />
-          <span className="bg-border-strong h-5 w-px" />
           <CatalogViewButton
             active={view === "hot"}
             icon={Flame}
@@ -144,7 +148,6 @@ export function SkillsShCatalog({
               dispatch({ type: "setView", view: "hot" });
             }}
           />
-          <span className="bg-border-strong h-5 w-px" />
           <CatalogViewButton
             active={view === "all-time"}
             icon={Check}
@@ -158,9 +161,12 @@ export function SkillsShCatalog({
         <div className="flex-1" />
 
         {result ? (
-          <div className="text-fg-3 text-[12px] tabular-nums">
-            {formatCatalogCount(result.total ?? result.count)}
-            {result.source === "public-page" ? " · public index" : " · skills.sh API"}
+          <div className="text-fg-3 flex items-center gap-1.5 text-[12px] tabular-nums">
+            <span>
+              {formatCatalogCount(result.total ?? result.count)}
+              {result.source === "public-page" ? " · public index" : " · skills.sh API"}
+            </span>
+            <SkillsShSourceTooltip source={result.source} />
           </div>
         ) : null}
       </div>
@@ -231,6 +237,27 @@ export function SkillsShCatalog({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function SkillsShSourceTooltip({ source }: { source: "api" | "public-page" }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label="skills.sh source"
+          className="text-fg-3 hover:text-fg-1 focus-visible:ring-brand-ring inline-flex size-5 items-center justify-center rounded-full transition-colors focus-visible:ring-2 focus-visible:outline-none"
+        >
+          <Info className="size-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" align="end" className="max-w-[280px] text-left">
+        {source === "api"
+          ? "Discover results are sourced from the skills.sh API."
+          : "Discover results are sourced from the public skills.sh directory."}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -320,8 +347,10 @@ function CatalogViewButton({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 px-3 text-[13px] font-medium transition-colors",
-        active ? "bg-paper-200 text-fg-1" : "text-fg-3 hover:bg-paper-200/50",
+        "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-medium transition-colors",
+        active
+          ? "border-border-strong bg-card text-fg-1 border shadow-sm"
+          : "text-fg-3 hover:bg-paper-200/70 hover:text-fg-1",
       )}
     >
       <Icon className="size-3.5" />
