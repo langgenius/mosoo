@@ -10,12 +10,14 @@ declare const Bun: BunRuntime;
 const scriptDir = decodeURIComponent(new URL(".", import.meta.url).pathname).replace(/\/$/u, "");
 const apiDir = `${scriptDir}/..`;
 const repoRoot = `${apiDir}/../..`;
-const vpBin = `${repoRoot}/node_modules/.bin/vp`;
+const apiVpBin = `${apiDir}/node_modules/.bin/vp`;
+const vpBin = (await Bun.file(apiVpBin).exists()) ? apiVpBin : `${repoRoot}/node_modules/.bin/vp`;
 const wranglerBin = `${apiDir}/node_modules/.bin/wrangler`;
 const DOCKER_HOST_ENV_KEY = "DOCKER_HOST";
 const DEV_DOCKER_HOST_ENV_KEY = "MOSOO_API_DEV_DOCKER_HOST";
 const DEV_RUNTIME_PROXY_HOST_ENV_KEY = "MOSOO_API_DEV_RUNTIME_PROXY_HOST";
 const RUNTIME_CONTROL_ORIGIN_ENV_KEY = "MOSOO_RUNTIME_CONTROL_ORIGIN";
+const SKIP_DRIVER_BUILD_ENV_KEY = "MOSOO_API_DEV_SKIP_DRIVER_BUILD";
 const LARK_SIDECAR_DISABLED_ENV_KEY = "MOSOO_LARK_SIDECAR_DISABLED";
 const LARK_SIDECAR_SECRET_ENV_KEY = "MOSOO_LARK_SIDECAR_SECRET";
 const SCRUB_HOST_PROXY_ENV_KEY = "MOSOO_API_DEV_SCRUB_HOST_PROXY";
@@ -437,17 +439,50 @@ async function run(
     stdin: "inherit",
     stdout: "inherit",
   });
-  return { code: await child.exited };
+  const onSigint = () => {
+    try {
+      child.kill("SIGINT");
+    } catch {
+      // The child may have exited between signal delivery and forwarding.
+    }
+  };
+  const onSigterm = () => {
+    try {
+      child.kill("SIGTERM");
+    } catch {
+      // The child may have exited between signal delivery and forwarding.
+    }
+  };
+  process.on("SIGINT", onSigint);
+  process.on("SIGTERM", onSigterm);
+  try {
+    return { code: await child.exited };
+  } finally {
+    process.off("SIGINT", onSigint);
+    process.off("SIGTERM", onSigterm);
+  }
 }
 
-const buildResult = await run(vpBin, ["run", "--filter", "agent-driver", "build"], {
-  cwd: repoRoot,
-});
-if (buildResult.code !== 0) {
-  process.exit(getExitCode(buildResult));
+if (getHostEnv()[SKIP_DRIVER_BUILD_ENV_KEY]?.trim() === "1") {
+  const driverBundlePath = `${repoRoot}/apps/driver/dist/driver.mjs`;
+  if (!(await Bun.file(driverBundlePath).exists())) {
+    writeStderr(
+      `[mosoo/api] ${SKIP_DRIVER_BUILD_ENV_KEY}=1 but ${driverBundlePath} does not exist.`,
+    );
+    process.exit(1);
+  }
+  writeStderr(`[mosoo/api] Using prebuilt agent driver at ${driverBundlePath}.`);
+} else {
+  const buildResult = await run(vpBin, ["run", "--filter", "agent-driver", "build"], {
+    cwd: repoRoot,
+  });
+  if (buildResult.code !== 0) {
+    process.exit(getExitCode(buildResult));
+  }
 }
 
 const wranglerEnv = await createWranglerDevEnv();
+const wranglerIp = wranglerEnv.WRANGLER_DEV_IP?.trim() ?? "0.0.0.0";
 const wranglerPort = wranglerEnv.WRANGLER_DEV_PORT?.trim() ?? "8787";
 const webDevPort = wranglerEnv.WEB_DEV_PORT?.trim() ?? "5173";
 const webOrigin = resolveDevWebOrigin(wranglerEnv);
@@ -488,7 +523,7 @@ const wranglerResult = await run(
     "dev",
     "--local",
     "--ip",
-    "0.0.0.0",
+    wranglerIp,
     "--port",
     wranglerPort,
     "--var",

@@ -1,0 +1,82 @@
+name: mosoo
+
+services:
+  mosoo:
+    image: ${MOSOO_IMAGE:-ghcr.io/langgenius/mosoo:edge}
+    build:
+      context: .
+      args:
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+        VERSION: ${VERSION:-dev}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    # Wrangler's local container engine asks Docker to publish ephemeral ports
+    # on the daemon bridge gateway. Sharing the host network namespace lets the
+    # workerd process bind those gateway addresses while the API stays loopback-only.
+    network_mode: host
+    environment:
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:8080}
+      MOSOO_WEB_BIND_IP: "${MOSOO_WEB_BIND_IP:-127.0.0.1}"
+      MOSOO_WEB_PORT: ${MOSOO_WEB_PORT:-8080}
+      MOSOO_RUNTIME_CONTROL_ORIGIN: ${MOSOO_RUNTIME_CONTROL_ORIGIN:-http://172.17.0.1:8787}
+      MOSOO_API_DEV_DOCKER_HOST: unix:///var/run/docker.sock
+      MOSOO_API_DEV_SKIP_DRIVER_BUILD: "1"
+      MOSOO_API_DEV_USE_DEFAULT_DOCKER: "1"
+      WRANGLER_DEV_IP: "127.0.0.1"
+      WRANGLER_DEV_PORT: "${MOSOO_API_PORT:-8788}"
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
+      RUNTIME_ACTION_TOKEN_SECRET: ${RUNTIME_ACTION_TOKEN_SECRET:-}
+      VAULT_ROOT_SECRET: ${VAULT_ROOT_SECRET:-}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      SKILLS_SH_API_TOKEN: ${SKILLS_SH_API_TOKEN:-}
+      VERCEL_OIDC_TOKEN: ${VERCEL_OIDC_TOKEN:-}
+      WECHAT_ILINK_BASE_URL: ${WECHAT_ILINK_BASE_URL:-}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+      CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+    volumes:
+      - mosoo_data:/data
+      - mosoo_wrangler:/app/apps/api/.wrangler
+      - ${MOSOO_DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
+
+  runtime-gateway:
+    image: ${MOSOO_RUNTIME_GATEWAY_IMAGE:-caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d}
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      mosoo:
+        condition: service_healthy
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+    read_only: true
+    cap_drop:
+      - ALL
+    # The official Caddy binary carries this file capability; without it in the
+    # bounding set Linux rejects execve even though this gateway uses port 8787.
+    cap_add:
+      - NET_BIND_SERVICE
+    environment:
+      MOSOO_RUNTIME_BIND_IP: ${MOSOO_RUNTIME_BIND_IP:-172.17.0.1}
+      MOSOO_RUNTIME_CONTROL_PORT: ${MOSOO_RUNTIME_CONTROL_PORT:-8787}
+      WRANGLER_DEV_PORT: "${MOSOO_API_PORT:-8788}"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'gateway_host="$${MOSOO_RUNTIME_BIND_IP:-172.17.0.1}"; case "$${gateway_host}" in "0.0.0.0") gateway_host="127.0.0.1" ;; "::") gateway_host="[::1]" ;; *:*) gateway_host="[$${gateway_host}]" ;; esac; wget -qO- "http://$${gateway_host}:$${MOSOO_RUNTIME_CONTROL_PORT:-8787}/healthz"',
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - ./docker/runtime-gateway.Caddyfile:/etc/caddy/Caddyfile:ro
+    tmpfs:
+      - /config:size=16m,mode=0700
+      - /data:size=16m,mode=0700
+
+volumes:
+  mosoo_data:
+  mosoo_wrangler:

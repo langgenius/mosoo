@@ -1,0 +1,19 @@
+{
+	auto_https off
+	admin off
+}
+
+:{$MOSOO_WEB_PORT:8080} {
+	bind {$MOSOO_WEB_BIND_IP:127.0.0.1}
+	encode zstd gzip
+
+	handle /api* {
+		reverse_proxy 127.0.0.1:{$WRANGLER_DEV_PORT:8788}
+	}
+
+	handle {
+		root * /app/apps/web/dist
+		try_files {path} /index.html
+		file_server
+	}
+}
