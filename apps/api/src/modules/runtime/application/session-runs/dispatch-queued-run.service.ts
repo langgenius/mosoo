@@ -78,6 +78,7 @@ async function failQueuedSessionRunBeforeDispatch(
 interface DispatchQueuedSessionRunInput {
   accessViewer?: AuthenticatedViewer;
   attachmentIds: FileId[];
+  dispatchSource: "inline" | "queue";
   prompt: string;
   queuedAtMs: number;
   session: {
@@ -99,20 +100,27 @@ export async function dispatchQueuedSessionRun(
   request: DispatchQueuedSessionRunRequest,
 ): Promise<UserWarning[]> {
   const { bindings, input, requestUrl, viewer } = request;
-  const runState = await getSessionRunState(bindings.DB, input.sessionRunId);
 
-  if (!runState) {
-    throw new Error("Session run not found.");
-  }
+  // Inline dispatch starts inside the request that just created the queued
+  // run, so re-reading its status is a wasted D1 round trip. Queue delivery
+  // can arrive late or duplicated and must still skip stale runs.
+  if (input.dispatchSource === "queue") {
+    const runState = await getSessionRunState(bindings.DB, input.sessionRunId);
 
-  if (runState.status !== "queued") {
-    logInfo("session.run.context_hydration.skipped", {
-      runId: input.sessionRunId,
-      sessionId: input.session.id,
-      status: runState.status,
-      traceId: input.traceId,
-    });
-    return [];
+    if (!runState) {
+      throw new Error("Session run not found.");
+    }
+
+    if (runState.status !== "queued") {
+      logInfo("session.run.context_hydration.skipped", {
+        dispatchSource: input.dispatchSource,
+        runId: input.sessionRunId,
+        sessionId: input.session.id,
+        status: runState.status,
+        traceId: input.traceId,
+      });
+      return [];
+    }
   }
 
   const hydrationTiming = createRuntimeTimingRecorder({
@@ -169,6 +177,7 @@ export async function dispatchQueuedSessionRun(
 
   logInfo("session.run.context_hydrated", {
     cacheHit: resolved.hydrated.cacheHit,
+    dispatchSource: input.dispatchSource,
     hydrationLatencyMs: hydrationSnapshot.totalMs,
     queuedToHydratedMs: hydrationSnapshot.completedAtMs - input.queuedAtMs,
     runId: input.sessionRunId,

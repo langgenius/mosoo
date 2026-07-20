@@ -414,6 +414,7 @@ describe("send agent session events", () => {
         bindings: createPublicHttpTestBindings(database) as ApiBindings,
         input: {
           attachmentIds: [PUBLIC_API_TEST_IDS.file],
+          dispatchSource: "queue",
           prompt: "This duplicate delivery must not hydrate.",
           queuedAtMs: nowMs,
           session: {
@@ -594,6 +595,7 @@ describe("send agent session events", () => {
         bindings,
         input: {
           attachmentIds: [PUBLIC_API_TEST_IDS.file],
+          dispatchSource: "queue",
           prompt: "Use the attached file.",
           queuedAtMs: nowMs,
           session: {
@@ -654,6 +656,7 @@ describe("send agent session events", () => {
         bindings,
         input: {
           attachmentIds: [PUBLIC_API_TEST_IDS.fileAlt],
+          dispatchSource: "queue",
           prompt: "Use the attached file.",
           queuedAtMs: nowMs,
           session: {
