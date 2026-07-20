@@ -35,8 +35,12 @@ async function failQueuedSessionRunBeforeDispatch(
     message,
     retryable: false,
   } as const;
+  // Only fail the run while it is still queued. Once another dispatcher CASed
+  // it to booting, this path is a losing contender and its hydration error
+  // must not tear down the run the winner is provisioning.
   const failedRun = await updateSessionRunStatusIfActive(bindings.DB, {
     error: runError,
+    expectedCurrentStatus: "queued",
     runId: input.sessionRunId,
     status: "failed",
   });
@@ -44,7 +48,7 @@ async function failQueuedSessionRunBeforeDispatch(
   if (!failedRun) {
     const state = await getSessionRunState(bindings.DB, input.sessionRunId);
 
-    logWarn("session.run.context_hydration.failed.after-terminal", {
+    logWarn("session.run.context_hydration.failed.run-not-queued", {
       message,
       runId: input.sessionRunId,
       sessionId: input.sessionId,

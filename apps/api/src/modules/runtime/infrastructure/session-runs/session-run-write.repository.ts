@@ -43,6 +43,11 @@ type SessionRunStatusUpdateInput = {
 };
 
 type UpdateSessionRunStatusInput = SessionRunStatusUpdateInput & {
+  /**
+   * Reject the transition unless the run is currently in this status. The
+   * check is atomic with the write via the status_seq optimistic guard.
+   */
+  expectedCurrentStatus?: SessionRunStatus;
   preserveSessionLifecycle?: boolean;
   runId: SessionRunId;
 };
@@ -118,7 +123,7 @@ export type SessionRunTransitionOutcome =
   | {
       currentStatus: SessionRunStatus;
       kind: "rejected";
-      reason: "illegal_transition";
+      reason: "illegal_transition" | "unexpected_current_status";
       targetStatus: SessionRunStatus;
     }
   | {
@@ -627,6 +632,15 @@ async function transitionSessionRunStatus(
     return {
       kind: "rejected",
       reason: "not_found",
+      targetStatus: input.status,
+    };
+  }
+
+  if (input.expectedCurrentStatus !== undefined && current.status !== input.expectedCurrentStatus) {
+    return {
+      currentStatus: current.status,
+      kind: "rejected",
+      reason: "unexpected_current_status",
       targetStatus: input.status,
     };
   }
