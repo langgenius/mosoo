@@ -31,7 +31,7 @@ async function withProviderFetchMock<T>(operation: () => Promise<T>): Promise<T>
       return Response.json({
         ok: true,
         result: {
-          first_name: "Mosoo Telegram",
+          first_name: "mosoo Telegram",
           id: 9001,
           is_bot: true,
           username: "mosoo_telegram_bot",
@@ -55,7 +55,7 @@ async function withProviderFetchMock<T>(operation: () => Promise<T>): Promise<T>
     ) {
       return Response.json({
         bot: {
-          app_name: "Mosoo Lark",
+          app_name: "mosoo Lark",
           open_id: "ou_bot",
         },
         code: 0,
@@ -89,7 +89,7 @@ describe("multi-provider channel sessions", () => {
       expect(binding).toMatchObject({
         agentId: "01J00000000000000000000009",
         displayMetadata: {
-          bot_first_name: "Mosoo Telegram",
+          bot_first_name: "mosoo Telegram",
           bot_username: "mosoo_telegram_bot",
         },
         externalBotId: "9001",
@@ -243,7 +243,7 @@ describe("multi-provider channel sessions", () => {
 
       expect(binding).toMatchObject({
         displayMetadata: {
-          app_name: "Mosoo Lark",
+          app_name: "mosoo Lark",
           bot_open_id: "ou_bot",
           domain: "feishu",
         },

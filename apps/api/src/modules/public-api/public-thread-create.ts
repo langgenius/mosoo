@@ -8,6 +8,7 @@ import { fileStore } from "../files/application/file-store";
 import { createAgentSession, queueSessionRun } from "../runtime/application/session-run.service";
 import { admitPublicThreadCreator } from "./public-thread-admission";
 import type { ThreadCreationAdmission } from "./public-thread-admission";
+import { toPublicThreadSessionSummary } from "./public-thread-api-presenter";
 import { createPublicApiThreadMetadata } from "./public-thread-metadata";
 import {
   toCreateEmptyThreadSessionSummary,
@@ -16,6 +17,7 @@ import {
 } from "./public-thread-presenter";
 import {
   cleanupFailedThreadCreation,
+  findPublicThreadSnapshotByIdempotencyKey,
   setSessionTitleFromThreadPrompt,
 } from "./public-thread-store";
 import type { CreatePublicThreadRequest } from "./public-thread.types";
@@ -61,6 +63,7 @@ export async function createPublicThread(
   const metadata = createPublicApiThreadMetadata({
     admission,
     clientExternalRef: request.input.clientExternalRef ?? null,
+    idempotencyKey: request.idempotencyKey,
   });
 
   try {
@@ -165,4 +168,32 @@ export async function createPublicThread(
 
     throw error;
   }
+}
+
+export async function recoverPublicThreadCreation(
+  request: CreatePublicThreadRequest,
+): Promise<PublicThreadApiCreateThreadResponse | null> {
+  if (request.idempotencyKey === null) {
+    return null;
+  }
+
+  const admission = await admitPublicThreadCreator(request.bindings.DB, request.caller, {
+    agentId: request.agentId,
+  });
+  const snapshot = await findPublicThreadSnapshotByIdempotencyKey(request.bindings.DB, {
+    agentId: request.agentId,
+    idempotencyKey: request.idempotencyKey,
+    tokenId: admission.tokenId,
+  });
+
+  if (!snapshot) {
+    return null;
+  }
+
+  return toCreateThreadResponse({
+    attributedUserId: snapshot.row.attributed_user_id,
+    metadata: snapshot.metadata,
+    run: snapshot.session.lastRun,
+    session: toPublicThreadSessionSummary(snapshot.session),
+  });
 }

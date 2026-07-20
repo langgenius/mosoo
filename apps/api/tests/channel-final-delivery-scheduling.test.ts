@@ -69,7 +69,7 @@ describe("channel final delivery scheduling", () => {
       expect(telegramBodies).toEqual([
         {
           chat_id: "42",
-          text: `Mosoo session ${seed.sessionId}\n\nFinal answer`,
+          text: `mosoo session ${seed.sessionId}\n\nFinal answer`,
         },
       ]);
       expect(job).toEqual({
@@ -111,7 +111,7 @@ describe("channel final delivery scheduling", () => {
       expect(discordRequests.map((request) => request.body)).toEqual([
         {
           allowed_mentions: { parse: [] },
-          content: `Mosoo session ${seed.sessionId}\n\nFinal answer`,
+          content: `mosoo session ${seed.sessionId}\n\nFinal answer`,
         },
       ]);
       expect(job).toEqual({
@@ -265,7 +265,7 @@ describe("channel final delivery scheduling", () => {
       expect(telegramBodies).toEqual([
         {
           chat_id: "42",
-          text: `Mosoo session ${seed.sessionId}\n\nFinal answer`,
+          text: `mosoo session ${seed.sessionId}\n\nFinal answer`,
         },
       ]);
       expect(job).toEqual({
@@ -445,7 +445,7 @@ describe("channel final delivery scheduling", () => {
         return Response.json({
           ok: true,
           result: {
-            first_name: "Mosoo Telegram",
+            first_name: "mosoo Telegram",
             id: 9001,
             is_bot: true,
             username: "mosoo_telegram_bot",

@@ -14,8 +14,8 @@ The App owner creates and manages Environments for Agents in one App. App Users 
 
 1. On the Environments page, the owner creates a reusable setup with packages, a startup script, and environment variables.
 2. The owner can make one Environment the App default. In the Agent editor, they can select another Environment or create one without leaving the flow.
-3. When a new Session is created, Mosoo captures the Environment selected at that moment. If the Agent has no explicit selection, Mosoo uses the App default.
-4. Mosoo prepares exact-version npm and PyPI packages once, stores the isolated dependency prefix as a Sandbox Backup, and restores it before the Agent starts. The custom setup script then runs with those package paths available. A package build, restore, script, or required variable failure prevents startup rather than running with an incomplete setup.
+3. When a new Session is created, mosoo captures the Environment selected at that moment. If the Agent has no explicit selection, mosoo uses the App default.
+4. mosoo prepares exact-version npm and PyPI packages once, stores the isolated dependency prefix as a Sandbox Backup, and restores it before the Agent starts. The custom setup script then runs with those package paths available. A package build, restore, script, or required variable failure prevents startup rather than running with an incomplete setup.
 5. Later Environment edits apply only to Sessions created afterward; an in-progress Session keeps the version it started with.
 
 ## What works today
@@ -24,7 +24,7 @@ The Web UI supports listing, searching, creating, editing, setting a default, an
 
 Secret values are encrypted after saving. The editor shows only a masked hint for an existing value, never the full stored value; leaving it blank preserves it.
 
-Package declarations accept public npm and PyPI packages with exact versions. They are prepared asynchronously and reused within the same App when the declarations and artifact ABI are unchanged. A Session freezes its package declarations, so later Environment edits do not change an existing Session. Package managers never run on the Task provisioning hot path, and Mosoo does not fall back to runtime installation when an artifact is unavailable.
+Package declarations accept public npm and PyPI packages with exact versions. They are prepared asynchronously and reused within the same App when the declarations and artifact ABI are unchanged. A Session freezes its package declarations, so later Environment edits do not change an existing Session. Package managers never run on the Task provisioning hot path, and mosoo does not fall back to runtime installation when an artifact is unavailable.
 
 npm artifacts expose package CLIs through `PATH` and CommonJS packages through `NODE_PATH`. Node.js ESM bare imports do not use `NODE_PATH`; projects that need `import "package"` must install that dependency in the project itself. PyPI artifacts expose console scripts through `PATH` and modules through `PYTHONPATH`.
 

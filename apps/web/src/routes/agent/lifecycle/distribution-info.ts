@@ -111,7 +111,7 @@ export function buildAgentInstructionPrompt(
 
   return `# Instruction for LLM: ${agent.name}
 
-Use this \`.md\` instruction with a coding agent that needs to control or use this Mosoo agent programmatically.
+Use this \`.md\` instruction with a coding agent that needs to control or use this mosoo agent programmatically.
 
 ## Generated variables
 
@@ -135,7 +135,7 @@ ${description}
 
 ## Programmatic control
 
-1. Create a Mosoo API token in the console if one is not already available.
+1. Create a mosoo API token in the console if one is not already available.
 2. Store it locally as \`MOSOO_API_TOKEN\`.
 3. Create a thread by sending a user message to \`MOSOO_CREATE_THREAD_URL\` with a bearer token.
 4. Persist the returned thread and run identifiers so follow-up calls can continue the same work.

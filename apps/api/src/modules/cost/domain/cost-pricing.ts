@@ -215,7 +215,7 @@ const MODEL_PRICING: readonly ModelPricingScheduleEntry[] = [
     provider: "minimax",
     vendor: "MiniMax",
   }),
-  // Keep legacy upstream provider IDs for usage rows written before Mosoo provider IDs were canonical.
+  // Keep legacy upstream provider IDs for usage rows written before mosoo provider IDs were canonical.
   providerPricing({
     cacheReadUsdPerMillion: 0.125,
     cacheWriteUsdPerMillion: 1.875,

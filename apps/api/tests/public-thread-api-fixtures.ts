@@ -79,13 +79,20 @@ export async function requestPublicApi(
   request: Request,
   options: Parameters<typeof createPublicHttpTestBindings>[1] = {},
 ): Promise<Response> {
+  return requestPublicApiWithBindings(
+    app,
+    request,
+    createPublicHttpTestBindings(database, options) as ApiBindings,
+  );
+}
+
+export async function requestPublicApiWithBindings(
+  app: Hono,
+  request: Request,
+  bindings: ApiBindings,
+): Promise<Response> {
   return runWithRequestLogContext(request, () =>
-    app.request(
-      request,
-      undefined,
-      createPublicHttpTestBindings(database, options),
-      createTestExecutionContext(),
-    ),
+    app.request(request, undefined, bindings, createTestExecutionContext()),
   );
 }
 

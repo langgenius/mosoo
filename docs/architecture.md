@@ -2,15 +2,15 @@
 
 ## 1. Vision And Principles
 
-Mosoo provides an App-scoped control plane for configuring, publishing, running, and observing coding Agents through the console and Public Thread API.
+mosoo provides an App-scoped control plane for configuring, publishing, running, and observing coding Agents through the console and Public Thread API.
 
-The product boundary is managed Agent execution. Builders keep ownership of their application and end-user identity; Mosoo owns runtime adaptation, Sandbox lifecycle, durable Thread and Run records, managed files, credentials, events, and usage visibility. App Deployment is a separate Alpha surface and does not define the runtime or API contract. In the current construction phase, assume one human owns one Organization: Organization is the account / billing / tenant shell, and App is the code, data, product, and console boundary. App owns concrete resources directly; it does not introduce a generic Service entity, `services` table, or polymorphic `service.kind`. Additional operational controls are extension paths for the same architecture, not default complexity for the current community edition.
+The product boundary is managed Agent execution. Builders keep ownership of their application and end-user identity; mosoo owns runtime adaptation, Sandbox lifecycle, durable Thread and Run records, managed files, credentials, events, and usage visibility. App Deployment is a separate Alpha surface and does not define the runtime or API contract. In the current construction phase, assume one human owns one Organization: Organization is the account / billing / tenant shell, and App is the code, data, product, and console boundary. App owns concrete resources directly; it does not introduce a generic Service entity, `services` table, or polymorphic `service.kind`. Additional operational controls are extension paths for the same architecture, not default complexity for the current community edition.
 
 To support lightweight deployment, fast iteration, and future governance expansion, the architecture embraces Serverless and edge computing and follows these baseline principles:
 
 - **Vectorized API design**: Core business APIs, especially northbound GraphQL, internal Worker RPC, and data mutation surfaces, should accept arrays of target entity IDs by default where it is natural. This reduces network round trips and gives the data layer room for batch writes and deletes.
 - **Single ULID business identifier system**: The control plane, execution plane, internal RPC, and public APIs use server-generated ULIDs as canonical business and protocol identifiers. At persistence boundaries, ULIDs are stored and indexed as strings to preserve distributed generation performance and time-sortability.
-- **Observability native**: Mosoo emits Vestig structured logs and wide events, propagates W3C `traceparent` context across supported HTTP and Driver control boundaries, and enables Cloudflare Workers native logs and traces. Correlation is explicit at implemented boundaries; the architecture does not claim blanket OpenTelemetry instrumentation for database, queue, or Worker RPC calls.
+- **Observability native**: mosoo emits Vestig structured logs and wide events, propagates W3C `traceparent` context across supported HTTP and Driver control boundaries, and enables Cloudflare Workers native logs and traces. Correlation is explicit at implemented boundaries; the architecture does not claim blanket OpenTelemetry instrumentation for database, queue, or Worker RPC calls.
 - **Minimal Web / API / Driver topology**: The system is split by build and deployment boundary into three top-level planes: Web, API, and Driver.
 
 ---
@@ -29,7 +29,7 @@ The architecture is built on the Cloudflare platform and uses a Serverless shape
   as session artifacts. Sandbox private state backups use a separate backup
   bucket and must not be mixed with user-visible file prefixes.
 - **Execution sandbox: Cloudflare Sandbox / Containers**. Heterogeneous Agents run in container-image-backed isolated environments, with Sandbox APIs and Durable Object boundaries controlling runtime lifecycle.
-- **Secondary App deployment: Mosoo-managed Cloudflare Pages / Workers**. App Deployment clones and builds a public GitHub repository in an isolated Sandbox, then publishes the resulting Web artifact with Mosoo platform credentials. D1 stores the App-owned Deployment and DeploymentRun records, while the successful artifact receives a Mosoo-owned URL. This is an independent Alpha capability, not App runtime or part of the core Agent API promise.
+- **Secondary App deployment: mosoo-managed Cloudflare Pages / Workers**. App Deployment clones and builds a public GitHub repository in an isolated Sandbox, then publishes the resulting Web artifact with mosoo platform credentials. D1 stores the App-owned Deployment and DeploymentRun records, while the successful artifact receives a mosoo-owned URL. This is an independent Alpha capability, not App runtime or part of the core Agent API promise.
 - **Configuration editing**. Owner-side Agent configuration is currently edited through Preview, which combines the writable configuration form with in-context test chat. There is no dedicated `AgentBuilderSystemAgent` topology in the current codebase. Future configuration assistance must remain a control-plane feature and must not enter the full Sandbox / Driver runtime path.
 
 ---
@@ -91,7 +91,7 @@ graph TD
 
     FileBucket[(R2 FILE_BUCKET<br/>Session & internal file objects)]
     SandboxStateBucket[(R2 SANDBOX_STATE_BUCKET<br/>Sandbox State Objects)]
-    DeployedApp[Cloudflare Pages / Workers<br/>Mosoo-owned App URL]
+    DeployedApp[Cloudflare Pages / Workers<br/>mosoo-owned App URL]
 
     Client <==> |HTTPS: App Shell / Assets| WebWorker
     Client <==> |HTTPS: Same-Origin /api/*| Ingress
@@ -101,7 +101,7 @@ graph TD
     Runtime --> |Checkpoint / Restore selected Pet paths| SandboxStateBucket
     File --> |Session Snapshots / File Objects| FileBucket
     Deployment --> |Build public repository| CF_Sandbox
-    Deployment --> |Publish with Mosoo credentials| DeployedApp
+    Deployment --> |Publish with mosoo credentials| DeployedApp
 
     classDef web fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
     classDef api fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px;
@@ -139,7 +139,7 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
    - **Default App provisioning**: Onboarding / Organization provisioning creates a default App. If the Organization has exactly one App, the console routes directly into that App instead of forcing an App picker.
    - **Agent and resource ownership**: Agents, Threads / Sessions, Environments, Skills, MCP servers, Provider credentials, Channels, file records, Agent exposure state, App Deployments and DeploymentRuns, Agent runtime logs/state, and app-scoped cost are App-owned resources. The current UI keeps Agent logs/runtime operations on Agent detail and App Usage under App Settings; it does not expose a generic App health/log console.
    - **No generic Service entity**: Do not add a unified `services` table, polymorphic `service.kind`, or generic Service CRUD for concrete App resources. If a future Web/API runtime, database service, worker process, or scheduled job is needed, model it with an explicit noun and lifecycle.
-   - **App Deployment**: One active Deployment per App records the public GitHub source and its DeploymentRuns. Build and publish work is asynchronous. Successful runs expose a Mosoo-owned Cloudflare Pages or Workers URL under the configured App deployment domain. Users do not bring their own Cloudflare account in the current flow.
+   - **App Deployment**: One active Deployment per App records the public GitHub source and its DeploymentRuns. Build and publish work is asynchronous. Successful runs expose a mosoo-owned Cloudflare Pages or Workers URL under the configured App deployment domain. Users do not bring their own Cloudflare account in the current flow.
    - **Access boundary**: App access maps to the single Organization owner for this phase. No secondary principal model is part of the first cut.
 
 3. **Agent Plane**
@@ -174,7 +174,7 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
    - Login selects the account's Organization shell, then routes to the default App when the Organization has exactly one App. The system no longer maintains `account.origin_organization_id` or an "Origin Org for life" concept.
 
 7. **Auth Service**
-   - Authentication is built on Better Auth. Supported authentication methods are **Google OAuth** and **Email OTP**. Both can create or sign in to the same email-backed Account; Email OTP is the fallback when Google is unavailable. Mosoo has no password or password-recovery flow. Passkey (WebAuthn) is a planned future option but is not enabled in the current build.
+   - Authentication is built on Better Auth. Supported authentication methods are **Google OAuth** and **Email OTP**. Both can create or sign in to the same email-backed Account; Email OTP is the fallback when Google is unavailable. mosoo has no password or password-recovery flow. Passkey (WebAuthn) is a planned future option but is not enabled in the current build.
    - The same verified email across providers maps to the same Account.
    - CLI and other programmatic clients authenticate through a device authorization flow, not a separate login method. `POST /api/auth/cli/start` returns a `device_code`, a short `user_code`, and a `/cli-auth` verification URI; the user confirms inside an authenticated web session via `POST /api/auth/cli/confirm`, and the client polls `POST /api/auth/cli/token` until it receives a one-time `Bearer` token. The issued token is a Personal Access Token, so CLI access reuses the Account identity already established by Google OAuth or Email OTP rather than introducing a new credential type.
    - The current version does not support passwords, magic links, federated identity, directory sync, domain-based routing, or invite/request flows. Post-auth resolver logic outside the single-owner App path is not part of V1.
@@ -207,7 +207,7 @@ The **Agent Driver** is a top-level independently built execution component beca
      Driver protocol runtime, and not user-selectable. New provider integrations
      must add a real Driver backend and declare capabilities and gaps in Runtime
      Catalog before admission.
-   - **Boot configuration injection**: Runtime writes the complete boot payload to a private Sandbox file and passes the file path through `MOSOO_DRIVER_BOOT_PAYLOAD_FILE`. The payload carries `controlUrl`, a one-time boot token, `traceparent`, Driver identity, and the frozen execution spec. The Driver removes the file after reading it. Mosoo's runtime path does not send this configuration through standard input.
+   - **Boot configuration injection**: Runtime writes the complete boot payload to a private Sandbox file and passes the file path through `MOSOO_DRIVER_BOOT_PAYLOAD_FILE`. The payload carries `controlUrl`, a one-time boot token, `traceparent`, Driver identity, and the frozen execution spec. The Driver removes the file after reading it. mosoo's runtime path does not send this configuration through standard input.
    - **Control flow establishment**: The Driver does not listen on a sandbox-local control port. It actively opens an authenticated WebSocket to the payload's `controlUrl`, currently `/api/driver/socket`. The API Worker hands the upgrade to the `DriverConnection` binding, whose `DriverInstance` Durable Object owns the socket and ORPC command/event lifecycle. Runtime talks to that Durable Object for readiness, commands, status, and cleanup. Protocol v1 still carries a required `driverControlPort` field for legacy diagnostics, but neither side binds that port and new integrations must not depend on it; removal needs a versioned API/Driver rollout. Authentication, routing, App access checks, and asset boundaries remain in Worker / Runtime.
    - **Multi-Session isolation**: `AgentSession` is the product-level conversation boundary. Cloudflare Sandbox and container processes are execution resource boundaries. If multiple long-lived Driver / Agent processes in one Sandbox need stronger process, filesystem, or environment isolation, evaluate user-space container tooling such as `bubblewrap` inside the container for narrower per-session namespaces.
 

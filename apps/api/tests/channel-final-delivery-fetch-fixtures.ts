@@ -73,7 +73,7 @@ export function installTelegramFetch(
       return Response.json({
         ok: true,
         result: {
-          first_name: "Mosoo Telegram",
+          first_name: "mosoo Telegram",
           id: 9001,
           is_bot: true,
           username: "mosoo_telegram_bot",
@@ -157,7 +157,7 @@ export function installLarkFetch(input: {
     if (requestUrl === "https://open.feishu.cn/open-apis/bot/v3/info") {
       return Response.json({
         bot: {
-          app_name: "Mosoo Lark",
+          app_name: "mosoo Lark",
           open_id: "ou_bot",
         },
         code: 0,

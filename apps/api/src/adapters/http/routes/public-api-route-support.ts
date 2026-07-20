@@ -14,6 +14,7 @@ import type { PublicApiCaller } from "../../../modules/auth/application/public-a
 import { FileControlError } from "../../../modules/files/application/file-control-errors";
 import {
   publicInternalError,
+  publicIdempotencyConflict,
   publicInvalidJson,
   publicInvalidRequest,
   publicReadinessBlocked,
@@ -227,8 +228,9 @@ async function runPublicApiIdempotentJson<T>(
     bodyHash: string | null;
     idempotencySubjectId: PlatformId;
     beforeOperation?: (() => Promise<void>) | undefined;
-    operation: () => Promise<T>;
+    operation: (idempotencyKey: string | null) => Promise<T>;
     persistOperationErrors?: boolean | undefined;
+    recover?: ((idempotencyKey: string) => Promise<T | null>) | undefined;
     status: number;
   },
 ): Promise<Response> {
@@ -236,10 +238,10 @@ async function runPublicApiIdempotentJson<T>(
 
   if (!isTruthy(idempotencyKey)) {
     await input.beforeOperation?.();
-    return Response.json(await input.operation(), { status: input.status });
+    return Response.json(await input.operation(null), { status: input.status });
   }
 
-  const reservation = await beginPublicApiIdempotency(c.env.DB, {
+  let reservation = await beginPublicApiIdempotency(c.env.DB, {
     bodyHash: input.bodyHash,
     idempotencyKey,
     method: c.req.raw.method,
@@ -249,6 +251,62 @@ async function runPublicApiIdempotentJson<T>(
 
   if (reservation.status === "replay") {
     return jsonReplayResponse(reservation.body, reservation.responseStatus);
+  }
+
+  if (reservation.status === "processing") {
+    if (!reservation.stale) {
+      throw publicIdempotencyConflict(
+        "A request with this Idempotency-Key is still processing.",
+        reservation.retryAfterSeconds,
+      );
+    }
+
+    const recovered = input.recover ? await input.recover(idempotencyKey) : null;
+
+    if (recovered !== null) {
+      try {
+        await completePublicApiIdempotency(c.env.DB, reservation.reservationId, {
+          body: recovered,
+          status: input.status,
+        });
+      } catch (error) {
+        logError("public-api.idempotency_recovery_completion_failed", {
+          ...createErrorLogContext(error),
+          reservationId: reservation.reservationId,
+          route: new URL(c.req.url).pathname,
+          tokenId: input.idempotencySubjectId,
+        });
+      }
+
+      return jsonReplayResponse(recovered, input.status);
+    }
+
+    if (!input.recover) {
+      throw publicIdempotencyConflict(
+        "A previous request with this Idempotency-Key cannot be safely replayed. Its reservation will remain retained to prevent duplicate execution.",
+        reservation.retryAfterSeconds,
+      );
+    }
+
+    await clearPublicApiIdempotencyReservation(c.env.DB, reservation.reservationId);
+    reservation = await beginPublicApiIdempotency(c.env.DB, {
+      bodyHash: input.bodyHash,
+      idempotencyKey,
+      method: c.req.raw.method,
+      route: new URL(c.req.url).pathname,
+      tokenId: input.idempotencySubjectId,
+    });
+
+    if (reservation.status === "replay") {
+      return jsonReplayResponse(reservation.body, reservation.responseStatus);
+    }
+
+    if (reservation.status === "processing") {
+      throw publicIdempotencyConflict(
+        "A request with this Idempotency-Key is still processing.",
+        reservation.retryAfterSeconds,
+      );
+    }
   }
 
   let body: T;
@@ -261,7 +319,7 @@ async function runPublicApiIdempotentJson<T>(
   }
 
   try {
-    body = await input.operation();
+    body = await input.operation(idempotencyKey);
   } catch (error) {
     if (input.persistOperationErrors === true) {
       const errorResponse = toErrorResponseDetails(error);
@@ -350,7 +408,8 @@ export async function runPublicApiSessionMutation<T, Prepared = undefined>(
     const operationInput: PublicApiAuthenticatedOperation = { caller };
     const prepared = input.prepare ? await input.prepare(operationInput) : (undefined as Prepared);
     const status = input.status ?? 200;
-    const operation = async () => input.operation({ ...operationInput, prepared, threadId });
+    const operation = async (_idempotencyKey: string | null) =>
+      input.operation({ ...operationInput, prepared, threadId });
     const beforeOperation = () => enforcePublicApiRateLimit(c.env.DB, caller.tokenId);
 
     if (input.bodyHash) {
@@ -364,7 +423,7 @@ export async function runPublicApiSessionMutation<T, Prepared = undefined>(
     }
 
     await beforeOperation();
-    return Response.json(await operation(), { status });
+    return Response.json(await operation(null), { status });
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -414,9 +473,20 @@ export async function runPublicApiThreadMutation<T, Prepared = undefined>(
     agentId: RouteValue<AgentId>;
     bodyHash?: (prepared: Prepared) => string | null;
     operation: (
-      input: PublicApiThreadOperation & { agentId: AgentId; prepared: Prepared },
+      input: PublicApiThreadOperation & {
+        agentId: AgentId;
+        idempotencyKey: string | null;
+        prepared: Prepared;
+      },
     ) => Promise<T>;
     prepare?: (input: PublicApiThreadOperation) => Promise<Prepared>;
+    recover?: (
+      input: PublicApiThreadOperation & {
+        agentId: AgentId;
+        idempotencyKey: string;
+        prepared: Prepared;
+      },
+    ) => Promise<T | null>;
     status?: number | undefined;
   },
 ): Promise<Response> {
@@ -426,7 +496,12 @@ export async function runPublicApiThreadMutation<T, Prepared = undefined>(
     const operationInput: PublicApiThreadOperation = { caller };
     const prepared = input.prepare ? await input.prepare(operationInput) : (undefined as Prepared);
     const status = input.status ?? 200;
-    const operation = async () => input.operation({ ...operationInput, agentId, prepared });
+    const operation = async (idempotencyKey: string | null) =>
+      input.operation({ ...operationInput, agentId, idempotencyKey, prepared });
+    const recover = input.recover
+      ? async (idempotencyKey: string) =>
+          input.recover?.({ ...operationInput, agentId, idempotencyKey, prepared }) ?? null
+      : undefined;
     const beforeOperation = () => enforcePublicApiRateLimit(c.env.DB, caller.tokenId);
 
     if (input.bodyHash) {
@@ -436,12 +511,13 @@ export async function runPublicApiThreadMutation<T, Prepared = undefined>(
         idempotencySubjectId: caller.tokenId,
         operation,
         persistOperationErrors: true,
+        recover,
         status,
       });
     }
 
     await beforeOperation();
-    return Response.json(await operation(), { status });
+    return Response.json(await operation(null), { status });
   } catch (error) {
     return toErrorResponse(error);
   }

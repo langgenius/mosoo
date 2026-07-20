@@ -7,7 +7,10 @@ import type { PersonalAccessTokenCaller } from "../../../modules/auth/applicatio
 import { parseBoundAgentCallBody } from "../../../modules/public-api/app-agent-bound-call";
 import { renderBoundAgentCallError } from "../../../modules/public-api/app-agent-bound-errors";
 import { publicInvalidRequest } from "../../../modules/public-api/public-api-errors";
-import { hashPublicApiIdempotencyBody } from "../../../modules/public-api/public-api-idempotency.service";
+import {
+  hashPublicApiIdempotencyBody,
+  readPublicApiIdempotencyKey,
+} from "../../../modules/public-api/public-api-idempotency.service";
 import { listAgentApiEndpointThreads } from "../../../modules/public-api/public-thread-session-query.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { createPublicApiOpenApiDocument } from "./public-api-openapi";
@@ -110,6 +113,7 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
       const result = await createBoundAgentThreadAndWait({
         bindings: c.env,
         executionContext: c.executionCtx,
+        idempotencyKey: readPublicApiIdempotencyKey(c.req.raw),
         input: parseBoundAgentCallBody(body),
         requestUrl: c.req.url,
         token: c.req.param("token") ?? "",
@@ -126,13 +130,14 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
     return runPublicApiThreadMutation(c, {
       agentId: () => parseAgentIdParam(c.req.param("agentId")),
       bodyHash: (prepared) => prepared.bodyHash,
-      operation: async ({ agentId, caller, prepared }) => {
+      operation: async ({ agentId, caller, idempotencyKey, prepared }) => {
         const { createPublicThread } = await loadPublicThreadService();
         return createPublicThread({
           agentId,
           bindings: c.env,
           caller,
           executionContext: c.executionCtx,
+          idempotencyKey,
           input: prepared.body,
           requestUrl: c.req.url,
         });
@@ -143,6 +148,18 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
           body,
           bodyHash: await hashCreateThreadIdempotencyBody(body),
         };
+      },
+      recover: async ({ agentId, caller, idempotencyKey, prepared }) => {
+        const { recoverPublicThreadCreation } = await loadPublicThreadService();
+        return recoverPublicThreadCreation({
+          agentId,
+          bindings: c.env,
+          caller,
+          executionContext: c.executionCtx,
+          idempotencyKey,
+          input: prepared.body,
+          requestUrl: c.req.url,
+        });
       },
       status: 201,
     });

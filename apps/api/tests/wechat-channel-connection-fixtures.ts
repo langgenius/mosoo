@@ -175,7 +175,7 @@ export function createWeChatDmMessage(input: {
   return {
     context_token: input.contextToken ?? "ctx-secret",
     from_user_id: input.fromUserId ?? "peer-1",
-    item_list: [{ text_item: { text: input.text ?? "hello Mosoo" }, type: 1 }],
+    item_list: [{ text_item: { text: input.text ?? "hello mosoo" }, type: 1 }],
     message_id: input.messageId ?? 123,
     message_state: 2,
     message_type: 1,
