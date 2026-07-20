@@ -149,6 +149,58 @@ describe("skills.sh catalog", () => {
     ]);
   });
 
+  test("filters public-page skills to installable entries when available-only is requested", async () => {
+    globalThis.fetch = async (input) => {
+      const url = typeof input === "string" ? input : input.url;
+
+      expect(url).toBe("https://www.skills.sh/trending");
+
+      return new Response(
+        publicCatalogHtml(
+          [
+            {
+              installs: 10,
+              name: "React Native",
+              skillId: "react-native",
+              source: "expo/skills",
+            },
+            {
+              installs: 9,
+              name: "Lark Approval",
+              skillId: "lark-approval",
+              source: "open.feishu.cn",
+            },
+          ],
+          2,
+        ),
+      );
+    };
+
+    const result = await listSkillsShCatalog({} as ApiBindings, {
+      availableOnly: "true",
+      perPage: "10",
+      view: "trending",
+    });
+
+    expect(result.authConfigured).toBe(false);
+    expect(result.source).toBe("public-page");
+    expect(result.total).toBe(1);
+    expect(result.skills).toEqual([
+      {
+        id: "expo/skills/react-native",
+        installUrl: "https://github.com/expo/skills",
+        installs: 10,
+        isDuplicate: false,
+        isOfficial: false,
+        name: "React Native",
+        slug: "react-native",
+        source: "expo/skills",
+        sourceType: "github",
+        url: "https://www.skills.sh/expo/skills/react-native",
+      },
+    ]);
+  });
+
   test("resolves a GitHub target for one-click fallback installs", () => {
     expect(
       resolveSkillsShGitHubInstallTarget({

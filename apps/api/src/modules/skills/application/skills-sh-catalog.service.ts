@@ -29,6 +29,7 @@ const MAX_CATALOG_PER_PAGE = 60;
 const MIN_SEARCH_LENGTH = 2;
 
 interface ListSkillsShCatalogInput {
+  availableOnly?: string;
   page?: string;
   perPage?: string;
   query?: string;
@@ -90,6 +91,7 @@ export async function listSkillsShCatalog(
   bindings: ApiBindings,
   input: ListSkillsShCatalogInput,
 ): Promise<SkillsShCatalogResult> {
+  const availableOnly = parseBoolean(input.availableOnly, false);
   const view = parseCatalogView(input.view);
   const page = parseInteger(input.page, 0, 0, Number.MAX_SAFE_INTEGER);
   const perPage = parseInteger(input.perPage, DEFAULT_CATALOG_PER_PAGE, 1, MAX_CATALOG_PER_PAGE);
@@ -97,10 +99,10 @@ export async function listSkillsShCatalog(
   const token = readSkillsShApiToken(bindings);
 
   if (token !== null) {
-    return listSkillsShCatalogFromApi({ page, perPage, query, token, view });
+    return listSkillsShCatalogFromApi({ availableOnly, page, perPage, query, token, view });
   }
 
-  return listSkillsShCatalogFromPublicPage({ page, perPage, query, view });
+  return listSkillsShCatalogFromPublicPage({ availableOnly, page, perPage, query, view });
 }
 
 export async function createSkillFromSkillsSh(
@@ -121,6 +123,7 @@ export async function createSkillFromSkillsSh(
 }
 
 async function listSkillsShCatalogFromApi(input: {
+  availableOnly: boolean;
   page: number;
   perPage: number;
   query: string | null;
@@ -145,7 +148,10 @@ async function listSkillsShCatalogFromApi(input: {
 
   const payload = await fetchSkillsShJson(url, input.token);
   const data = isRecord(payload) && Array.isArray(payload["data"]) ? payload["data"] : [];
-  const skills = data.map(parseSkillsShApiSkill).filter(isNonNull);
+  const parsedSkills = data.map(parseSkillsShApiSkill).filter(isNonNull);
+  const skills = input.availableOnly
+    ? parsedSkills.filter((skill) => isSkillsShCatalogSkillAvailable(skill, true))
+    : parsedSkills;
   const pagination = isRecord(payload) ? payload["pagination"] : null;
   const total = readApiTotal(pagination, searchQuery === null ? null : payload);
   const hasMore =
@@ -168,6 +174,7 @@ async function listSkillsShCatalogFromApi(input: {
 }
 
 async function listSkillsShCatalogFromPublicPage(input: {
+  availableOnly: boolean;
   page: number;
   perPage: number;
   query: string | null;
@@ -183,10 +190,14 @@ async function listSkillsShCatalogFromPublicPage(input: {
   const catalog = parseSkillsShPublicCatalog(await response.text());
   const query =
     input.query !== null && input.query.length >= MIN_SEARCH_LENGTH ? input.query : null;
-  const filtered =
+  const queryFiltered =
     query === null ? catalog.skills : filterPublicCatalogSkills(catalog.skills, query);
+  const catalogSkills = queryFiltered.map(toCatalogSkillFromPublic);
+  const filtered = input.availableOnly
+    ? catalogSkills.filter((skill) => isSkillsShCatalogSkillAvailable(skill, false))
+    : catalogSkills;
   const start = input.page * input.perPage;
-  const skills = filtered.slice(start, start + input.perPage).map(toCatalogSkillFromPublic);
+  const skills = filtered.slice(start, start + input.perPage);
 
   return {
     authConfigured: false,
@@ -197,7 +208,7 @@ async function listSkillsShCatalogFromPublicPage(input: {
     query,
     skills,
     source: "public-page",
-    total: query === null ? catalog.total : filtered.length,
+    total: query === null && !input.availableOnly ? catalog.total : filtered.length,
     view: input.view,
   };
 }
@@ -553,6 +564,21 @@ function readSkillsShApiToken(bindings: ApiBindings): string | null {
   const token = bindings.SKILLS_SH_API_TOKEN?.trim() || bindings.VERCEL_OIDC_TOKEN?.trim() || "";
 
   return token.length > 0 ? token : null;
+}
+
+function isSkillsShCatalogSkillAvailable(
+  skill: Pick<SkillsShCatalogSkill, "sourceType">,
+  authConfigured: boolean,
+): boolean {
+  return authConfigured || skill.sourceType === "github";
+}
+
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  return value === "true" || value === "1";
 }
 
 function parseCatalogView(value: string | undefined): SkillsShCatalogView {

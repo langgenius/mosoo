@@ -234,6 +234,7 @@ export async function publishSkillPackage(input: {
 }
 
 export async function listSkillsShCatalog(input: {
+  availableOnly: boolean;
   page: number;
   perPage: number;
   query: string;
@@ -244,6 +245,7 @@ export async function listSkillsShCatalog(input: {
     perPage: String(input.perPage),
     view: input.view,
   });
+  params.set("availableOnly", String(input.availableOnly));
   const query = input.query.trim();
 
   if (query.length > 0) {

@@ -97,9 +97,11 @@ export function registerSkillRoute(app: Hono<ApiGatewayEnvironment>) {
       const perPage = c.req.query("perPage");
       const query = c.req.query("q");
       const view = c.req.query("view");
+      const availableOnly = c.req.query("availableOnly");
 
       return c.json(
         await listSkillsShCatalog(c.env, {
+          ...(availableOnly !== undefined ? { availableOnly } : {}),
           ...(page !== undefined ? { page } : {}),
           ...(perPage !== undefined ? { perPage } : {}),
           ...(query !== undefined ? { query } : {}),
