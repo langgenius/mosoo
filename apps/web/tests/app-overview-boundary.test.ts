@@ -46,7 +46,7 @@ describe("App overview boundary", () => {
     expect(installSource).toContain("bg-[rgb(111_211_4)]");
     expect(installSource).toContain("hover:bg-[rgb(111_211_4)]");
     expect(installSource).toContain("curl -fsSL https://install.mosoo.ai/install.sh | bash");
-    expect(installSource).toContain("Installs Mosoo CLI");
+    expect(installSource).toContain("Installs mosoo CLI");
     expect(installSource).toContain("Installs the @mosoo skill");
     expect(installSource).toContain("Signs in to cloud and runs doctor");
     expect(installSource).toContain("try.mosoo.ai");

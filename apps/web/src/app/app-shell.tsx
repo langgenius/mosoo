@@ -242,7 +242,7 @@ function MobileNavigation({
           <ExpandSidebarIcon className="size-5" />
           <span className="text-xs font-semibold">Menu</span>
         </button>
-        <img src="/brand/logo-wordmark-onlight.svg" alt="Mosoo" className="block h-5" />
+        <img src="/brand/logo-wordmark-onlight.svg" alt="mosoo" className="block h-5" />
         {title ? (
           <h1 className="text-fg-1 ml-auto truncate text-sm font-semibold">{title}</h1>
         ) : null}
@@ -257,7 +257,7 @@ function MobileNavigation({
         <SheetContent className="bg-sidebar data-[closed]:slide-out-to-left data-[open]:slide-in-from-left right-auto left-0 flex w-[min(20rem,calc(100vw-2rem))] max-w-none flex-col p-3">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="flex h-11 shrink-0 items-center px-1.5">
-            <img src="/brand/logo-wordmark-onlight.svg" alt="Mosoo" className="block h-[22px]" />
+            <img src="/brand/logo-wordmark-onlight.svg" alt="mosoo" className="block h-[22px]" />
           </div>
           <nav
             className="flex min-h-0 flex-1 flex-col overflow-y-auto pt-2 [&_a]:min-h-11 [&_button]:min-h-11"
@@ -324,7 +324,7 @@ function ConsoleShell({
           {collapsed ? null : (
             <img
               src="/brand/logo-wordmark-onlight.svg"
-              alt="Mosoo"
+              alt="mosoo"
               className="sidebar-label-enter block h-[22px]"
             />
           )}
@@ -417,7 +417,7 @@ export function OrgLayout({ children }: { children: ReactNode }) {
       <header className="border-border-soft hidden shrink-0 border-b md:flex">
         <div className="flex min-h-[76px] w-[224px] shrink-0 items-center gap-2 px-4">
           <Link to="/apps" aria-label="Apps" className="flex items-center">
-            <img src="/brand/logo-mark.svg" alt="Mosoo" className="block size-6" />
+            <img src="/brand/logo-mark.svg" alt="mosoo" className="block size-6" />
           </Link>
           {activeOrganization === null ? null : (
             <>

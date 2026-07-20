@@ -99,6 +99,22 @@ export async function dispatchQueuedSessionRun(
   request: DispatchQueuedSessionRunRequest,
 ): Promise<UserWarning[]> {
   const { bindings, input, requestUrl, viewer } = request;
+  const runState = await getSessionRunState(bindings.DB, input.sessionRunId);
+
+  if (!runState) {
+    throw new Error("Session run not found.");
+  }
+
+  if (runState.status !== "queued") {
+    logInfo("session.run.context_hydration.skipped", {
+      runId: input.sessionRunId,
+      sessionId: input.session.id,
+      status: runState.status,
+      traceId: input.traceId,
+    });
+    return [];
+  }
+
   const hydrationTiming = createRuntimeTimingRecorder({
     path: "unknown",
     runId: input.sessionRunId,

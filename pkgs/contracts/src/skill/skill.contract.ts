@@ -4,6 +4,8 @@ export type SkillSourceKind = "official" | "user";
 export type SkillSnapshotEntryKind = "directory" | "file";
 export type SkillResolutionMode = "auto" | "explicit" | "tombstone";
 export type SkillMaterializationStatus = "failed" | "pending" | "ready" | "skipped";
+export type SkillsShCatalogView = "all-time" | "hot" | "trending";
+export type SkillsShSourceType = "github" | "well-known";
 
 export interface SkillForkOrigin {
   name: string;
@@ -87,4 +89,37 @@ export interface ResolvedRunSkill {
 export interface CreateSkillForkInput {
   appId: AppId;
   skillId: SkillId;
+}
+
+export interface SkillsShCatalogSkill {
+  id: string;
+  installUrl: string | null;
+  installs: number;
+  isDuplicate: boolean;
+  isOfficial: boolean;
+  name: string;
+  slug: string;
+  source: string;
+  sourceType: SkillsShSourceType;
+  url: string;
+}
+
+export interface SkillsShCatalogResult {
+  authConfigured: boolean;
+  count: number;
+  hasMore: boolean;
+  page: number;
+  perPage: number;
+  query: string | null;
+  skills: SkillsShCatalogSkill[];
+  source: "api" | "public-page";
+  total: number | null;
+  view: SkillsShCatalogView;
+}
+
+export interface InstallSkillsShSkillInput {
+  appId: AppId;
+  id: string;
+  installUrl?: string | null;
+  slug: string;
 }

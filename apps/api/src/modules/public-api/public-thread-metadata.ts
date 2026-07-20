@@ -15,6 +15,7 @@ export interface PublicApiThreadCreatedByMetadata {
 export interface PublicApiThreadMetadata {
   client_external_ref: string | null;
   created_by: PublicApiThreadCreatedByMetadata;
+  idempotency_key: string | null;
   source: "public_api";
 }
 
@@ -25,6 +26,7 @@ interface PublicApiThreadMetadataInput {
     tokenLabel: string;
   };
   clientExternalRef: string | null;
+  idempotencyKey: string | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -90,6 +92,7 @@ export function createPublicApiThreadMetadata(
       ),
       token_label: input.admission.tokenLabel,
     },
+    idempotency_key: input.idempotencyKey,
     source: "public_api",
   };
 }
@@ -115,14 +118,20 @@ export function parsePublicApiThreadMetadata(raw: string): PublicApiThreadMetada
 
   const clientExternalRef = metadata["client_external_ref"];
   const createdBy = readCreatedByMetadata(metadata["created_by"]);
+  const idempotencyKey = metadata["idempotency_key"] ?? null;
 
-  if ((clientExternalRef !== null && typeof clientExternalRef !== "string") || createdBy === null) {
+  if (
+    (clientExternalRef !== null && typeof clientExternalRef !== "string") ||
+    (idempotencyKey !== null && typeof idempotencyKey !== "string") ||
+    createdBy === null
+  ) {
     return null;
   }
 
   return {
     client_external_ref: clientExternalRef,
     created_by: createdBy,
+    idempotency_key: idempotencyKey,
     source: "public_api",
   };
 }

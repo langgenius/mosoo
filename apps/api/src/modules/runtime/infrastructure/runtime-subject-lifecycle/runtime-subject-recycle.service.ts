@@ -16,6 +16,7 @@ import {
   markRuntimeSubjectCold,
   markRuntimeSubjectOperationStarted,
   markRuntimeSubjectOperationRepairNeeded,
+  releaseInactiveRuntimeSubjectClaim,
 } from "./runtime-subject-store";
 
 const RECYCLE_CLAIM_TTL_MS = 10 * 60_000;
@@ -108,6 +109,10 @@ export async function recycleRuntimeSubject(
   });
 
   if (!started) {
+    await releaseInactiveRuntimeSubjectClaim(bindings.DB, {
+      claimOwner: input.claimOwner,
+      runtimeSubjectId: input.runtimeSubjectId,
+    });
     return false;
   }
 

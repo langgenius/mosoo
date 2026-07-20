@@ -210,7 +210,7 @@ describe("runtime vendor env vars", () => {
     },
   );
 
-  test("rewrites Mosoo Zhipu model prefix to OpenCode's Z.ai provider id", () => {
+  test("rewrites mosoo Zhipu model prefix to OpenCode's Z.ai provider id", () => {
     const envVars = buildRuntimeVendorEnvVars({
       credential: {
         apiBase: null,

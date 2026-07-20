@@ -146,14 +146,14 @@ function OnboardingErrorScreen({ error, onRetry }: { error: string | null; onRet
   return (
     <div className="bg-background fixed inset-0 flex flex-col">
       <div className="flex items-center px-4 py-5 sm:px-8">
-        <span className="text-xl font-light tracking-tight">Mosoo</span>
+        <span className="text-xl font-light tracking-tight">mosoo</span>
       </div>
 
       <div className="flex flex-1 items-center justify-center">
         <div className="w-full max-w-[520px] px-6">
           <h2 className="text-foreground text-center text-2xl font-semibold">App setup failed</h2>
           <p className="text-muted-foreground mt-2 text-center text-sm">
-            {isTruthy(error) ? error : "Mosoo could not create your default App."}
+            {isTruthy(error) ? error : "mosoo could not create your default App."}
           </p>
 
           <div className="mt-6">

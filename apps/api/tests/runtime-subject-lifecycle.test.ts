@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { decideRuntimeSubjectTransition } from "../src/modules/runtime/domain/runtime-subject-lifecycle.machine";
 import { createRuntimeSubjectLifecycleService } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
+import { recycleRuntimeSubject } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-recycle.service";
 import {
   advanceRuntimeSubjectOperationStatus,
   markRuntimeSubjectCold,
@@ -51,6 +52,20 @@ function createRuntimeSubjectLifecycleDatabase(): SqliteD1Database {
       status text NOT NULL,
       ttl_seconds integer NOT NULL,
       updated_at integer NOT NULL
+    );
+
+    CREATE TABLE driver_instance (
+      id text PRIMARY KEY NOT NULL,
+      sandbox_id text NOT NULL,
+      status text NOT NULL
+    );
+
+    CREATE TABLE session_run (
+      agent_id text NOT NULL,
+      driver_instance_id text,
+      id text PRIMARY KEY NOT NULL,
+      session_id text NOT NULL,
+      status text NOT NULL
     );
   `);
 
@@ -299,6 +314,43 @@ describe("runtime subject lifecycle machine", () => {
       claim_owner: null,
       status: "active",
     });
+  });
+
+  test("releases maintenance claim after a Run wins the post-claim race", async () => {
+    const database = createRuntimeSubjectLifecycleDatabase();
+    await insertRuntimeSubject(database, { status: "active" });
+    await database
+      .prepare("UPDATE sandbox SET claim_owner = ?, claim_expires_at = ? WHERE id = ?")
+      .bind("scheduled-race", Date.now() + 60_000, RUNTIME_SUBJECT_ID)
+      .run();
+    await database
+      .prepare(
+        `INSERT INTO session_run (agent_id, driver_instance_id, id, session_id, status)
+         VALUES (?, NULL, ?, ?, 'queued')`,
+      )
+      .bind(
+        "01J00000000000000000000001",
+        "01J0000000000000000000000E",
+        "01J00000000000000000000009",
+      )
+      .run();
+
+    await expect(
+      recycleRuntimeSubject(createBindings(database), {
+        claimOwner: "scheduled-race",
+        kind: "cattle",
+        now: Date.now(),
+        reason: "test",
+        runtimeSubjectId: RUNTIME_SUBJECT_ID,
+      }),
+    ).resolves.toBe(false);
+    await expect(readRuntimeSubject(database)).resolves.toMatchObject({ status: "active" });
+    await expect(
+      database
+        .prepare("SELECT claim_owner FROM sandbox WHERE id = ?")
+        .bind(RUNTIME_SUBJECT_ID)
+        .first("claim_owner"),
+    ).resolves.toBeNull();
   });
 
   test("lets interactive activation retry after activation failures", async () => {

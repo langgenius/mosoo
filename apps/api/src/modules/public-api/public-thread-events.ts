@@ -12,13 +12,15 @@ import type { SessionProcessEvent } from "@mosoo/contracts/session";
 import { sessionEventsTable, sessionMessagesTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type { RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
+import { OpenAiPrivateCitationStreamFilter } from "agent-driver/provider-output";
 import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
+import { createErrorLogContext, logWarn } from "../../platform/cloudflare/logger";
 import { getAppDatabase } from "../../platform/db/drizzle";
 import { createSessionProcessEventsFromSessionEventRows } from "../sessions/application/session-process-events.service";
 import type { SessionEventProcessRow } from "../sessions/application/session-process-events.service";
-import { foldStreamedSessionEventRows } from "../sessions/domain/session-event-stream-fold";
+import { connectSessionPublicEventWebSocket } from "../sessions/infrastructure/session/client";
 import { publicInternalError, publicInvalidRequest, toPublicApiError } from "./public-api-errors";
 import { sanitizePublicOutput } from "./public-output-sanitization";
 import { admitPublicThreadReader } from "./public-thread-admission";
@@ -47,6 +49,209 @@ interface PublicThreadEventWindow {
 
 interface PublicThreadEventProcessRow extends SessionEventProcessRow {
   run_id: SessionRunId | null;
+}
+
+interface LiveMessageState {
+  filter: OpenAiPrivateCitationStreamFilter;
+  text: string;
+}
+
+class PublicLiveEventRowProjector {
+  readonly #messages = new Map<string, LiveMessageState>();
+
+  project(rows: readonly PublicThreadEventProcessRow[]): PublicThreadEventProcessRow[] {
+    const output: PublicThreadEventProcessRow[] = [];
+
+    for (const row of rows) {
+      const key = `${row.run_id ?? ""}:${row.process_type}`;
+
+      if (row.event_type === "message.started") {
+        this.#messages.set(key, {
+          filter: new OpenAiPrivateCitationStreamFilter(),
+          text: "",
+        });
+        continue;
+      }
+
+      if (row.event_type === "message.delta") {
+        let message = this.#messages.get(key);
+
+        if (message === undefined) {
+          message = { filter: new OpenAiPrivateCitationStreamFilter(), text: "" };
+          this.#messages.set(key, message);
+        }
+
+        const contentText = message.filter.push(row.content_text).text;
+        message.text += contentText;
+
+        if (contentText.length > 0) {
+          output.push({ ...row, content_text: contentText });
+        }
+        continue;
+      }
+
+      if (row.event_type === "message.completed") {
+        const message = this.#messages.get(key);
+        const contentText = message?.filter.finish().text ?? "";
+
+        if (message !== undefined) {
+          message.text += contentText;
+        }
+        if (contentText.length > 0) {
+          output.push({ ...row, content_text: contentText });
+        }
+        continue;
+      }
+
+      if (row.event_type === "message.added") {
+        const message = this.#messages.get(key);
+        this.#messages.delete(key);
+
+        if (message !== undefined) {
+          const snapshotText = sanitizePublicOutput(row.content_text).text;
+
+          // SSE is append-only; a divergent snapshot stays canonical through
+          // run.finalOutput because emitted text cannot be retracted.
+          if (snapshotText.startsWith(message.text)) {
+            const suffix = snapshotText.slice(message.text.length);
+
+            if (suffix.length > 0) {
+              output.push({ ...row, content_text: suffix });
+            }
+          }
+          continue;
+        }
+      }
+
+      if (row.event_type === "thought.started" || row.event_type === "thought.completed") {
+        continue;
+      }
+
+      if (
+        row.event_type === "run.cancelled" ||
+        row.event_type === "run.completed" ||
+        row.event_type === "run.failed"
+      ) {
+        const runPrefix = `${row.run_id ?? ""}:`;
+
+        for (const messageKey of this.#messages.keys()) {
+          if (messageKey.startsWith(runPrefix)) {
+            this.#messages.delete(messageKey);
+          }
+        }
+      }
+
+      output.push(row);
+    }
+
+    return output;
+  }
+}
+
+class PublicThreadEventWakeup {
+  #pending = false;
+  #socket: WebSocket | null;
+  #waiter: (() => void) | null = null;
+
+  constructor(socket: WebSocket | null) {
+    this.#socket = socket;
+    socket?.addEventListener("message", this.#handleMessage);
+    socket?.addEventListener("close", this.#handleSocketUnavailable);
+    socket?.addEventListener("error", this.#handleSocketUnavailable);
+  }
+
+  close(): void {
+    const socket = this.#socket;
+
+    this.#detachSocket();
+    this.#waiter?.();
+
+    if (socket !== null && socket.readyState < WebSocket.CLOSING) {
+      socket.close(1000, "public-event-stream.closed");
+    }
+  }
+
+  wait(timeoutMs: number, signal: AbortSignal | null | undefined): Promise<void> {
+    if (this.#pending) {
+      this.#pending = false;
+      return Promise.resolve();
+    }
+
+    if (signal?.aborted === true) {
+      return Promise.resolve();
+    }
+
+    const wakeController = new AbortController();
+    const wake = () => wakeController.abort();
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, timeoutMs);
+    });
+    const notified = new Promise<void>((resolve) => {
+      wakeController.signal.addEventListener("abort", () => resolve(), { once: true });
+    });
+    let detachAbort = () => {};
+    const aborted = new Promise<void>((resolve) => {
+      const handleAbort = () => resolve();
+
+      signal?.addEventListener("abort", handleAbort, { once: true });
+      detachAbort = () => signal?.removeEventListener("abort", handleAbort);
+    });
+
+    this.#waiter = wake;
+
+    return Promise.race([timeout, notified, aborted]).finally(() => {
+      clearTimeout(timer);
+      detachAbort();
+      if (this.#waiter === wake) {
+        this.#waiter = null;
+      }
+    });
+  }
+
+  readonly #handleMessage = () => {
+    if (this.#waiter !== null) {
+      this.#waiter();
+      return;
+    }
+
+    this.#pending = true;
+  };
+
+  readonly #handleSocketUnavailable = () => {
+    this.#detachSocket();
+    this.#waiter?.();
+  };
+
+  #detachSocket(): void {
+    const socket = this.#socket;
+
+    if (socket === null) {
+      return;
+    }
+
+    socket.removeEventListener("message", this.#handleMessage);
+    socket.removeEventListener("close", this.#handleSocketUnavailable);
+    socket.removeEventListener("error", this.#handleSocketUnavailable);
+    this.#socket = null;
+  }
+}
+
+async function connectPublicThreadEventWakeup(
+  request: StreamPublicThreadEventsRequest,
+  sessionId: SessionId,
+): Promise<PublicThreadEventWakeup> {
+  try {
+    return new PublicThreadEventWakeup(
+      await connectSessionPublicEventWebSocket(request.bindings, sessionId),
+    );
+  } catch (error) {
+    logWarn("public_thread.event_wakeup.connect_failed", {
+      ...createErrorLogContext(error),
+      sessionId,
+    });
+    return new PublicThreadEventWakeup(null);
+  }
 }
 
 function isPublicThreadEventLogType(value: string): value is PublicThreadEventLogType {
@@ -302,12 +507,6 @@ function enqueueThreadEvents(input: {
   return enqueued;
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
 function isStreamStopped(input: {
   signal: AbortSignal | null | undefined;
   state: { cancelled: boolean };
@@ -331,26 +530,28 @@ export async function createPublicThreadEventStream(
 ): Promise<ReadableStream<Uint8Array>> {
   const limit = normalizePublicThreadEventsLimit(request.limit);
   const sessionId = await resolvePublicThreadEventSessionId(request);
-  const initialWindow = await readPublicThreadEventWindow({
-    database: request.database,
-    limit,
-    sessionId,
-  });
+  const wakeup = await connectPublicThreadEventWakeup(request, sessionId);
+  let initialWindow: PublicThreadEventWindow;
+
+  try {
+    initialWindow = await readPublicThreadEventWindow({
+      database: request.database,
+      limit,
+      sessionId,
+    });
+  } catch (error) {
+    wakeup.close();
+    throw error;
+  }
   const emittedEventIds = new Set<RuntimeEventId>();
   const state = {
     cancelled: false,
   };
   let lastSeenSeq = initialWindow.latestSeq ?? 0;
-  // Streamed text fragments are persisted one row each; hold a stream's rows
-  // back until its closing row lands so every message is emitted exactly once
-  // as a complete entry instead of one entry per fragment.
-  const initialFold = foldStreamedSessionEventRows(initialWindow.rows, {
-    flushOpenStreams: false,
-  });
-  let pendingStreamRows = initialFold.openStreamRows;
-  const initialEvents = toPublicThreadEventLogEntries(initialFold.rows, {
-    foldStreamedRows: false,
-  }).slice(-limit);
+  const liveProjector = new PublicLiveEventRowProjector();
+  const initialEvents = toPublicThreadEventLogEntries(
+    liveProjector.project(initialWindow.rows),
+  ).slice(-limit);
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -365,7 +566,7 @@ export async function createPublicThreadEventStream(
         });
 
         while (!isStreamStopped({ signal: request.signal, state })) {
-          await delay(THREAD_EVENT_STREAM_POLL_INTERVAL_MS);
+          await wakeup.wait(THREAD_EVENT_STREAM_POLL_INTERVAL_MS, request.signal);
 
           if (isStreamStopped({ signal: request.signal, state })) {
             break;
@@ -385,15 +586,11 @@ export async function createPublicThreadEventStream(
             }
 
             lastSeenSeq = rows[rows.length - 1]?.seq ?? lastSeenSeq;
-            const fold = foldStreamedSessionEventRows([...pendingStreamRows, ...rows], {
-              flushOpenStreams: false,
-            });
-            pendingStreamRows = fold.openStreamRows;
             enqueuedEvents =
               enqueueThreadEvents({
                 controller,
                 emittedEventIds,
-                events: toPublicThreadEventLogEntries(fold.rows, { foldStreamedRows: false }),
+                events: toPublicThreadEventLogEntries(liveProjector.project(rows)),
               }) || enqueuedEvents;
 
             if (rows.length < THREAD_EVENT_ROW_PAGE_SIZE) {
@@ -419,11 +616,13 @@ export async function createPublicThreadEventStream(
           `event: thread.error\ndata: ${JSON.stringify(toSseErrorPayload(error))}\n\n`,
         );
       } finally {
+        wakeup.close();
         controller.close();
       }
     },
     cancel() {
       state.cancelled = true;
+      wakeup.close();
     },
   });
 }

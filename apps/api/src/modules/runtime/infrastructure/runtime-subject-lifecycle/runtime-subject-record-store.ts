@@ -3,7 +3,7 @@ import type { RuntimeSubjectErrorCode, SandboxSubjectKind } from "@mosoo/contrac
 import { sandboxesTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type { PlatformId, RuntimeOperationId, SandboxBackupId, SandboxId } from "@mosoo/id";
-import { and, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
@@ -18,10 +18,12 @@ import {
 } from "../../domain/runtime-subject-lifecycle.machine";
 import type { RuntimeSubjectOperationStatus } from "../../domain/runtime-subject-lifecycle.machine";
 import {
+  activeSessionRunQueryForListedSubject,
   lastBackupTable,
   mapRuntimeSubjectBackup,
   mapReadyRuntimeSubjectBackup,
   readyLastBackupTable,
+  runLeaseQuery,
 } from "./runtime-subject-store-queries";
 import type {
   RuntimeSubjectActivationRecord,
@@ -495,6 +497,7 @@ export async function markRuntimeSubjectOperationStarted(
   },
 ): Promise<boolean> {
   const now = input.now ?? currentTimestampMs();
+  const appDb = getAppDatabase(database);
   const claimPredicate =
     input.claimOwner === undefined
       ? or(
@@ -503,7 +506,7 @@ export async function markRuntimeSubjectOperationStarted(
           lte(sandboxesTable.claimExpiresAt, now),
         )
       : eq(sandboxesTable.claimOwner, input.claimOwner);
-  const result = await getAppDatabase(database)
+  const result = await appDb
     .update(sandboxesTable)
     .set({
       claimExpiresAt: null,
@@ -523,6 +526,12 @@ export async function markRuntimeSubjectOperationStarted(
         eq(sandboxesTable.id, input.runtimeSubjectId),
         inArray(sandboxesTable.status, RUNTIME_SUBJECT_CLAIMABLE_STATUSES),
         claimPredicate,
+        ...(input.source === "maintenance"
+          ? [
+              notExists(activeSessionRunQueryForListedSubject(appDb)),
+              notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
+            ]
+          : []),
       ),
     )
     .run();

@@ -13,6 +13,7 @@ export {
   listRuntimeSubjectDriverIds,
   listRuntimeSubjectSessionStateTargets,
   listStaleRuntimeSubjectOperations,
+  releaseInactiveRuntimeSubjectClaim,
 } from "./runtime-subject-maintenance-store";
 export {
   advanceRuntimeSubjectOperationStatus,

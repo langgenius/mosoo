@@ -1,11 +1,11 @@
 ---
 name: for-human-prd
-description: Mirror an existing Mosoo PRD into a high-readability for-human companion that preserves user intent while removing implementation detail. Use when a PRD needs a plain-language companion under `docs/prd/`, or when the user asks for a "for human" / "human-readable" PRD.
+description: Mirror an existing mosoo PRD into a high-readability for-human companion that preserves user intent while removing implementation detail. Use when a PRD needs a plain-language companion under `docs/prd/`, or when the user asks for a "for human" / "human-readable" PRD.
 ---
 
 # For-Human PRD Companion
 
-Turn an already-shaped Mosoo PRD into a readable companion for PMs, founders, designers, GTM teammates, and future reviewers.
+Turn an already-shaped mosoo PRD into a readable companion for PMs, founders, designers, GTM teammates, and future reviewers.
 
 This does not replace [`good-prd.md`](./good-prd.md). The full PRD remains the implementation contract; the for-human companion is the product story mirror.
 

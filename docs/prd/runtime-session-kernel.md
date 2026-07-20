@@ -4,7 +4,7 @@ Status: available in the current Preview experience, with the limits below.
 
 ## Why this matters
 
-An Agent configuration is useful only when a Builder can prove that it works. Mosoo should make that proof quick and understandable: show whether the Agent is ready, stream real work, and distinguish a setup problem from an interrupted execution without requiring infrastructure knowledge.
+An Agent configuration is useful only when a Builder can prove that it works. mosoo should make that proof quick and understandable: show whether the Agent is ready, stream real work, and distinguish a setup problem from an interrupted execution without requiring infrastructure knowledge.
 
 ## Who uses it
 
@@ -19,7 +19,7 @@ Builders and App Owners are the primary users. They configure and test an App's 
 
 ## Current availability
 
-Preview runs real sessions for the runtime choices currently offered by Mosoo; it is not a mock chat. The shipped surface covers readiness blockers, streaming responses, tool activity, cancellation, stopped sessions, and diagnostics. Live success still depends on valid setup and an available provider.
+Preview runs real sessions for the runtime choices currently offered by mosoo; it is not a mock chat. The shipped surface covers readiness blockers, streaming responses, tool activity, cancellation, stopped sessions, and diagnostics. Live success still depends on valid setup and an available provider.
 
 ## User-visible boundaries
 

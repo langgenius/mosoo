@@ -46,6 +46,11 @@ interface OptionalCostLedgerReconciliationBindings {
   MOSOO_COST_LEDGER_RECONCILIATION_MODE?: string;
 }
 
+interface OptionalSkillsShBindings {
+  SKILLS_SH_API_TOKEN?: string;
+  VERCEL_OIDC_TOKEN?: string;
+}
+
 export interface OptionalSlackAdapterBindings {
   MOSOO_AGENT_ID?: string;
   MOSOO_API_BASE_URL?: string;
@@ -84,6 +89,7 @@ export type ApiBindings = Env &
   OptionalCostLedgerReconciliationBindings &
   OptionalLocalProviderFetchProxyBindings &
   OptionalRuntimeBindings &
+  OptionalSkillsShBindings &
   OptionalSlackAdapterBindings &
   OptionalWeChatIlinkBindings &
   OptionalLarkSidecarBindings &

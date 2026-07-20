@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { PUBLIC_THREAD_API_THREADS_MAX_LIMIT } from "@mosoo/contracts/public-api";
-import { sessionRunsTable, sessionsTable } from "@mosoo/db";
+import { sessionExecutionSnapshotsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
 import { eq } from "drizzle-orm";
 
 import { fileStore } from "../src/modules/files/application/file-store";
@@ -21,6 +21,7 @@ import {
 import {
   OWNER_VIEWER,
   bearer,
+  createPublicEventSessionNamespace,
   createPublicThreadApiTestApp,
   expectArray,
   expectRecord,
@@ -28,6 +29,7 @@ import {
   insertRuntimeEvent,
   readJson,
   requestPublicApi,
+  requestPublicApiWithBindings,
   withProviderProbeMock,
 } from "./public-thread-api-fixtures";
 
@@ -193,6 +195,76 @@ async function countPublicApiIdempotencyRows(
   return row?.row_count ?? 0;
 }
 
+async function countPublicThreadsForAgent(database: PublicHttpTestDatabase): Promise<number> {
+  const row = await database
+    .prepare("SELECT COUNT(*) AS row_count FROM session WHERE agent_id = ?")
+    .bind(PUBLIC_API_TEST_IDS.agent)
+    .first<{ row_count: number }>();
+
+  return row?.row_count ?? 0;
+}
+
+async function countSessionRows(
+  database: PublicHttpTestDatabase,
+  table: "session_message" | "session_run",
+  sessionId: string,
+): Promise<number> {
+  const row = await database
+    .prepare(`SELECT COUNT(*) AS row_count FROM ${table} WHERE session_id = ?`)
+    .bind(sessionId)
+    .first<{ row_count: number }>();
+
+  return row?.row_count ?? 0;
+}
+
+function failFirstPublicApiIdempotencyCompletion(database: D1Database): D1Database {
+  let shouldFail = true;
+
+  const wrapStatement = (
+    statement: D1PreparedStatement,
+    failCompletion: boolean,
+  ): D1PreparedStatement =>
+    new Proxy(statement, {
+      get(target, property, receiver) {
+        if (property === "bind") {
+          return (...values: unknown[]) => wrapStatement(target.bind(...values), failCompletion);
+        }
+
+        if (property === "run" && failCompletion) {
+          return async () => {
+            if (shouldFail) {
+              shouldFail = false;
+              throw new Error("Injected public API idempotency completion failure.");
+            }
+
+            return target.run();
+          };
+        }
+
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+
+  return new Proxy(database, {
+    get(target, property, receiver) {
+      if (property === "prepare") {
+        return (query: string) => {
+          const statement = target.prepare(query);
+          const isCompletionUpdate =
+            query.startsWith('update "public_api_idempotency_key"') &&
+            query.includes('set "response_json"');
+
+          return wrapStatement(statement, isCompletionUpdate);
+        };
+      }
+
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
 async function insertPublicThread(
   database: PublicHttpTestDatabase,
   input: {
@@ -238,6 +310,41 @@ async function insertPublicThread(
       title: input.title,
       type: "api_channel",
       updatedAt: input.updatedAt,
+    })
+    .run();
+
+  await database
+    .app()
+    .insert(sessionExecutionSnapshotsTable)
+    .values({
+      createdAt: input.updatedAt,
+      planJson: JSON.stringify({
+        binding: {
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          deploymentVersionId: PUBLIC_API_TEST_IDS.deployment,
+          deploymentVersionNumber: 1,
+          kind: "pet",
+          model: "gpt-5.4",
+          prompt: "Help.",
+          provider: "openai",
+          runtimeId: "openai-runtime",
+        },
+        environment: {
+          allowMcpServers: true,
+          allowPackageManagers: true,
+          allowedHostsJson: "[]",
+          envVarsJson: "[]",
+          environmentId: PUBLIC_API_TEST_IDS.environment,
+          environmentName: "Default",
+          networkPolicy: "full",
+          packagesJson: "[]",
+          revisionId: PUBLIC_API_TEST_IDS.environmentRevision,
+          setupScript: "",
+        },
+        skills: [],
+        tools: [],
+      }),
+      sessionId: input.id,
     })
     .run();
 }
@@ -829,18 +936,14 @@ describe("Public Thread API e2e", () => {
   test("streams Thread events as public SSE entries", async () => {
     const database = await createPublicHttpContractDatabase();
     const app = createPublicThreadApiTestApp();
+    const liveEvents = createPublicEventSessionNamespace();
 
     await withProviderProbeMock(async () => {
       const response = await requestPublicApi(
         app,
         database,
         new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
-          body: JSON.stringify({
-            input: {
-              content: [{ text: "Create a streamable Thread.", type: "text" }],
-              type: "user.message",
-            },
-          }),
+          body: JSON.stringify({}),
           headers: {
             Authorization: bearer(TOKENS.owner),
             "Content-Type": "application/json",
@@ -851,14 +954,16 @@ describe("Public Thread API e2e", () => {
       expect(response.status).toBe(201);
       const body = await readJson(response);
       const threadId = expectString(expectRecord(body["thread"])["id"]);
-      const runId = expectString(expectRecord(body["run"])["id"]);
+      const runId = null;
 
       await database.prepare("DELETE FROM session_event WHERE session_id = ?").bind(threadId).run();
       await insertRuntimeEvent(database, {
-        kind: "run.started",
+        kind: "message.added",
         occurredAt: 3_000,
         payload: {
-          startedAt: "1970-01-01T00:00:03.000Z",
+          content: "Initial stream history A",
+          messageId: "assistant-stream-initial-1",
+          role: "agent",
         },
         runId,
         seq: 1,
@@ -868,24 +973,12 @@ describe("Public Thread API e2e", () => {
         kind: "message.added",
         occurredAt: 3_050,
         payload: {
-          content: "Initial stream history A",
-          messageId: "assistant-stream-initial-1",
-          role: "agent",
-        },
-        runId,
-        seq: 2,
-        sessionId: threadId,
-      });
-      await insertRuntimeEvent(database, {
-        kind: "message.added",
-        occurredAt: 3_100,
-        payload: {
           content: "Initial stream history B",
           messageId: "assistant-stream-initial-2",
           role: "agent",
         },
         runId,
-        seq: 3,
+        seq: 2,
         sessionId: threadId,
       });
 
@@ -895,6 +988,7 @@ describe("Public Thread API e2e", () => {
         new Request(`https://api.example.com/api/v1/threads/${threadId}/events/stream?limit=1`, {
           headers: { Authorization: bearer(TOKENS.owner) },
         }),
+        { sessionNamespace: liveEvents.binding },
       );
       expect(streamResponse.status).toBe(200);
       expect(streamResponse.headers.get("Content-Type")).toContain("text/event-stream");
@@ -906,19 +1000,35 @@ describe("Public Thread API e2e", () => {
       await reader.read();
 
       await insertRuntimeEvent(database, {
-        kind: "run.completed",
-        occurredAt: 3_150,
-        payload: { stopReason: "private-diagnostic" },
+        kind: "message.added",
+        occurredAt: 3_100,
+        payload: {
+          content: "private-diagnostic",
+          messageId: "private-message",
+          role: "agent",
+        },
         runId,
-        seq: 4,
+        seq: 3,
         sessionId: threadId,
         visibility: "owner_debug",
       });
       await insertRuntimeEvent(database, {
-        kind: "message.added",
+        kind: "message.delta",
+        occurredAt: 3_150,
+        payload: {
+          contentDelta: "Live stream \uE200ci",
+          messageId: "assistant-stream-live-1",
+          role: "agent",
+        },
+        runId,
+        seq: 4,
+        sessionId: threadId,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "message.delta",
         occurredAt: 3_200,
         payload: {
-          content: "Live stream delta A",
+          contentDelta: "te\uE202hidden\uE201delta A",
           messageId: "assistant-stream-live-1",
           role: "agent",
         },
@@ -926,43 +1036,96 @@ describe("Public Thread API e2e", () => {
         seq: 5,
         sessionId: threadId,
       });
+
+      const readUntil = async (marker: string): Promise<string> => {
+        let text = "";
+
+        while (!text.includes(marker)) {
+          const chunk = await Promise.race([
+            reader.read(),
+            Bun.sleep(3_000).then(() => {
+              throw new Error(`Timed out waiting for ${marker}.`);
+            }),
+          ]);
+
+          if (chunk.done) {
+            throw new Error(`SSE closed before ${marker}.`);
+          }
+
+          text += new TextDecoder().decode(chunk.value);
+        }
+
+        return text;
+      };
+
+      const deltaCommittedAt = performance.now();
+      liveEvents.emit();
+      const openDeltaText = await readUntil("id: 01J00000000000000000000014");
+      const openDeltaMs = performance.now() - deltaCommittedAt;
+
+      expect(openDeltaMs).toBeLessThan(500);
+      expect(openDeltaText).toContain("Live stream ");
+      expect(openDeltaText).toContain("delta A");
+      expect(openDeltaText).not.toContain("hidden");
+      expect(openDeltaText).not.toContain("\uE200");
+
+      liveEvents.close();
+
       await insertRuntimeEvent(database, {
-        kind: "run.completed",
+        kind: "message.completed",
         occurredAt: 3_250,
-        payload: { stopReason: "end_turn" },
+        payload: { messageId: "assistant-stream-live-1", role: "agent" },
         runId,
         seq: 6,
         sessionId: threadId,
       });
+      await insertRuntimeEvent(database, {
+        kind: "message.added",
+        occurredAt: 3_300,
+        payload: {
+          content: "Live stream \uE200cite\uE202hidden\uE201delta A",
+          messageId: "assistant-stream-live-1",
+          role: "agent",
+        },
+        runId,
+        seq: 7,
+        sessionId: threadId,
+      });
+      await insertRuntimeEvent(database, {
+        kind: "message.added",
+        occurredAt: 3_350,
+        payload: {
+          content: "Tail marker",
+          messageId: "tail-message",
+          role: "agent",
+        },
+        runId,
+        seq: 8,
+        sessionId: threadId,
+      });
 
-      let text = "";
-      for (
-        let index = 0;
-        index < 8 && !text.includes("id: 01J00000000000000000000015");
-        index += 1
-      ) {
-        const chunk = await reader.read();
-        if (chunk.done) {
-          break;
-        }
-        text += new TextDecoder().decode(chunk.value);
-      }
+      const text = `${openDeltaText}${await readUntil("id: 01J00000000000000000000017")}`;
       await reader.cancel();
       expect(text).toContain("event: thread.event");
-      expect(text).toContain("id: 01J00000000000000000000012");
+      expect(text).toContain("id: 01J00000000000000000000011");
+      expect(text).not.toContain("id: 01J00000000000000000000012");
       expect(text).not.toContain("id: 01J00000000000000000000013");
       expect(text).toContain("id: 01J00000000000000000000014");
-      expect(text).toContain("id: 01J00000000000000000000015");
+      expect(text).not.toContain("id: 01J00000000000000000000015");
+      expect(text).not.toContain("id: 01J00000000000000000000016");
+      expect(text).toContain("id: 01J00000000000000000000017");
+      expect(text.match(/Live stream /gu)).toHaveLength(1);
+      expect(text.match(/delta A/gu)).toHaveLength(1);
       expect(text).toContain('"type":"agent.message.delta"');
-      expect(text).toContain('"type":"run.completed"');
-      expect(text).toContain(`"runId":"${runId}"`);
+      expect(text).toContain('"runId":null');
       expect(text).toContain('"content":"');
       expect(text).not.toContain("owner_debug");
       expect(text).not.toContain("payload");
       expect(text).not.toContain("private-diagnostic");
       expect(text).not.toContain("traceId");
+      expect(text).not.toContain("event: thread.error");
     });
-  });
+  }, 10_000);
 
   test("bounds public Thread lists on stable latest ordering", async () => {
     const database = await createPublicHttpContractDatabase();
@@ -1898,6 +2061,127 @@ describe("Public Thread API e2e", () => {
       expect(await readJson(replay)).toEqual(firstBody);
       await expect(
         countPublicApiRateLimitRequests(database, PUBLIC_API_TEST_IDS.patOwner),
+      ).resolves.toBe(1);
+    });
+  });
+
+  test("recovers a completed Thread creation after its idempotency completion write fails", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const idempotencyKey = "thread-create-completion-failure";
+    const createRequest = (key = idempotencyKey) =>
+      new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
+        body: JSON.stringify({
+          input: {
+            content: [{ text: "Recover the completed Thread.", type: "text" }],
+            type: "user.message",
+          },
+        }),
+        headers: {
+          Authorization: bearer(TOKENS.owner),
+          "Content-Type": "application/json",
+          "Idempotency-Key": key,
+        },
+        method: "POST",
+      });
+
+    await withProviderProbeMock(async () => {
+      const first = await requestPublicApiWithBindings(
+        app,
+        createRequest(),
+        createPublicHttpTestBindings(
+          failFirstPublicApiIdempotencyCompletion(database),
+        ) as ApiBindings,
+      );
+      expect(first.status).toBe(201);
+      const firstBody = await readJson(first);
+      const firstThread = expectRecord(firstBody["thread"]);
+      const firstRun = expectRecord(firstBody["run"]);
+      const firstThreadId = expectString(firstThread["id"]);
+      const firstRunId = expectString(firstRun["id"]);
+
+      await expect(countPublicThreadsForAgent(database)).resolves.toBe(1);
+      await database
+        .prepare(
+          "UPDATE public_api_idempotency_key SET updated_at = ? WHERE token_id = ? AND idempotency_key = ?",
+        )
+        .bind(Date.now() - 11 * 60 * 1000, PUBLIC_API_TEST_IDS.patOwner, idempotencyKey)
+        .run();
+
+      const unrelated = await requestPublicApi(
+        app,
+        database,
+        createRequest("other-idempotency-key"),
+      );
+      expect(unrelated.status).toBe(201);
+      await expect(countPublicThreadsForAgent(database)).resolves.toBe(2);
+
+      const retry = await requestPublicApi(app, database, createRequest());
+      expect(retry.status).toBe(201);
+      expect(retry.headers.get("Idempotency-Replayed")).toBe("true");
+      const retryBody = await readJson(retry);
+      expect(expectRecord(retryBody["thread"])["id"]).toBe(firstThreadId);
+      expect(expectRecord(retryBody["run"])["id"]).toBe(firstRunId);
+      await expect(countPublicThreadsForAgent(database)).resolves.toBe(2);
+      await expect(
+        countPublicApiIdempotencyRows(database, PUBLIC_API_TEST_IDS.patOwner, idempotencyKey),
+      ).resolves.toBe(1);
+    });
+  });
+
+  test("does not re-execute a stale public Thread event after its idempotency completion write fails", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const threadId = generatedPublicThreadId(240);
+    const idempotencyKey = "thread-event-completion-failure";
+    const sendEventRequest = () =>
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
+        body: JSON.stringify({
+          events: [{ text: "Do not queue this event twice.", type: "user_message" }],
+        }),
+        headers: {
+          Authorization: bearer(TOKENS.owner),
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        method: "POST",
+      });
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Event idempotency recovery",
+      updatedAt: 2_400,
+    });
+
+    await withProviderProbeMock(async () => {
+      const first = await requestPublicApiWithBindings(
+        app,
+        sendEventRequest(),
+        createPublicHttpTestBindings(
+          failFirstPublicApiIdempotencyCompletion(database),
+        ) as ApiBindings,
+      );
+      expect(first.status).toBe(200);
+      await expect(countSessionRows(database, "session_run", threadId)).resolves.toBe(1);
+      await expect(countSessionRows(database, "session_message", threadId)).resolves.toBe(1);
+
+      await database
+        .prepare(
+          "UPDATE public_api_idempotency_key SET updated_at = ? WHERE token_id = ? AND idempotency_key = ?",
+        )
+        .bind(Date.now() - 11 * 60 * 1000, PUBLIC_API_TEST_IDS.patOwner, idempotencyKey)
+        .run();
+
+      const retry = await requestPublicApi(app, database, sendEventRequest());
+      expect(retry.status).toBe(409);
+      expect(Number(retry.headers.get("Retry-After"))).toBeGreaterThan(60 * 60);
+      expect(expectRecord(await readJson(retry))["error"]).toMatchObject({
+        code: "idempotency_conflict",
+      });
+      await expect(countSessionRows(database, "session_run", threadId)).resolves.toBe(1);
+      await expect(countSessionRows(database, "session_message", threadId)).resolves.toBe(1);
+      await expect(
+        countPublicApiIdempotencyRows(database, PUBLIC_API_TEST_IDS.patOwner, idempotencyKey),
       ).resolves.toBe(1);
     });
   });

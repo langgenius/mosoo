@@ -4,7 +4,7 @@ These pages are short, code-checked product snapshots for non-engineers. Each
 one explains why a capability exists, what people can do today, and its visible
 limits. They are not implementation specifications.
 
-Read [Mosoo Spec](../SPEC.md) for the target product direction. When a product
+Read [mosoo Spec](../SPEC.md) for the target product direction. When a product
 note, the Spec, and current code disagree, do not guess: verify the behavior and
 update the stale note. Exact APIs, data shapes, and runtime topology belong in
 their machine-readable contracts, code, or [Architecture](../architecture.md).

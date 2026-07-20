@@ -7,7 +7,9 @@ import {
   API_COMMAND_LEASE_MS,
   API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
   API_COMMAND_QUEUE_SEND_FAILED_CODE,
+  admitApiCommand,
   claimApiCommand,
+  deliverApiCommand,
   enqueueApiCommand,
   redriveFailedApiCommandEnqueues,
   renewApiCommandClaim,
@@ -59,6 +61,37 @@ describe("API command queue", () => {
       kind: "scheduled_maintenance",
       status: "queued",
     });
+  });
+
+  test("persists admission before deferred Queue delivery", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const queue = createApiCommandQueueStub();
+    const bindings = createPublicHttpTestBindings(database, {
+      apiCommandQueue: queue,
+    }) as ApiBindings;
+
+    const admission = await admitApiCommand(bindings, {
+      dedupeKey: "scheduled:deferred",
+      kind: "scheduled_maintenance",
+      payload: { scheduledTime: nowMsForTest() },
+    });
+
+    expect(queue.sent).toEqual([]);
+    await expect(
+      database
+        .app()
+        .select()
+        .from(apiCommandsTable)
+        .where(eq(apiCommandsTable.id, admission.commandId))
+        .get(),
+    ).resolves.toMatchObject({
+      id: admission.commandId,
+      lastErrorCode: API_COMMAND_QUEUE_DELIVERY_PENDING_CODE,
+      status: "queued",
+    });
+
+    await deliverApiCommand(bindings, admission);
+    expect(queue.sent[0]?.body).toEqual({ commandId: admission.commandId });
   });
 
   test("marks malformed payload commands failed and acks the message", async () => {

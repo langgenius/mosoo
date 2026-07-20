@@ -38,7 +38,7 @@ export async function registerDynamicOAuthClient(
 
   const response = await fetch(metadata.registration_endpoint, {
     body: JSON.stringify({
-      client_name: "Mosoo MCP",
+      client_name: "mosoo MCP",
       grant_types: ["authorization_code", "refresh_token"],
       redirect_uris: [redirectUri],
       response_types: ["code"],
