@@ -191,9 +191,13 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
   }
 
   return (
-    <div className="flex min-h-0 flex-col gap-3 px-7 py-4">
-      <TimelineComponent events={events} onSelect={selectEvent} selectedId={selectedId} />
-      <LegendComponent events={events} />
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden px-7 py-4">
+      <div className="min-w-0 shrink-0">
+        <TimelineComponent events={events} onSelect={selectEvent} selectedId={selectedId} />
+      </div>
+      <div className="min-w-0 shrink-0">
+        <LegendComponent events={events} />
+      </div>
       <div
         ref={(node) => {
           listRef.current = node;
@@ -204,7 +208,7 @@ export function SessionEventDrawerCore<TEvent extends SessionEventDrawerCoreEven
         onScroll={(event) => {
           setScrollTop(event.currentTarget.scrollTop);
         }}
-        className="h-[420px] min-h-0 overflow-y-auto pr-1"
+        className="min-h-0 flex-1 overflow-y-auto pr-1"
       >
         {virtualized ? (
           <div className="relative" style={{ height: totalHeight }}>
