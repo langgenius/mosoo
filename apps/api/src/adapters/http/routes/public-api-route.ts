@@ -130,13 +130,14 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
     return runPublicApiThreadMutation(c, {
       agentId: () => parseAgentIdParam(c.req.param("agentId")),
       bodyHash: (prepared) => prepared.bodyHash,
-      operation: async ({ agentId, caller, prepared }) => {
+      operation: async ({ agentId, caller, idempotencyKey, prepared }) => {
         const { createPublicThread } = await loadPublicThreadService();
         return createPublicThread({
           agentId,
           bindings: c.env,
           caller,
           executionContext: c.executionCtx,
+          idempotencyKey,
           input: prepared.body,
           requestUrl: c.req.url,
         });
@@ -147,6 +148,18 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
           body,
           bodyHash: await hashCreateThreadIdempotencyBody(body),
         };
+      },
+      recover: async ({ agentId, caller, idempotencyKey, prepared }) => {
+        const { recoverPublicThreadCreation } = await loadPublicThreadService();
+        return recoverPublicThreadCreation({
+          agentId,
+          bindings: c.env,
+          caller,
+          executionContext: c.executionCtx,
+          idempotencyKey,
+          input: prepared.body,
+          requestUrl: c.req.url,
+        });
       },
       status: 201,
     });

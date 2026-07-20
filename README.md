@@ -1,30 +1,30 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/4986c4b8-28fa-45ea-9be9-78c1c7133128" alt="Mosoo" width="96" height="96" />
+  <img src="https://github.com/user-attachments/assets/4986c4b8-28fa-45ea-9be9-78c1c7133128" alt="mosoo" width="96" height="96" />
 </p>
 
-# Mosoo
+# mosoo
 
 **An open-source agent runtime for coding agents.**
 
 Run OpenAI Codex, Claude Agent SDK, and OpenCode behind API endpoints in isolated AI agent sandboxes.
 
-Mosoo provides a Cloudflare-native control plane to stream tool activity, inspect Run history, and keep Threads and files across executions. It is self-hostable in your own account.
+mosoo provides a Cloudflare-native control plane to stream tool activity, inspect Run history, and keep Threads and files across executions. It is self-hostable in your own account.
 
-Your application remains yours. Its backend owns product behavior and end-user access. Mosoo focuses on Agent execution and lifecycle; App Deployment is a separate Alpha surface, not the core product contract.
+Your application remains yours. Its backend owns product behavior and end-user access. mosoo focuses on Agent execution and lifecycle; App Deployment is a separate Alpha surface, not the core product contract.
 
 ```text
 configure Agent + Skills + MCP + provider
   -> preview and publish an Agent version
-  -> call it from a backend or the Mosoo console
+  -> call it from a backend or the mosoo console
   -> stream events, handle permission requests, inspect files and usage
   -> continue a durable Thread across Runs
 ```
 
 <p align="center">
-  <a href="https://try.mosoo.ai">Try Mosoo</a> ·
+  <a href="https://try.mosoo.ai">Try mosoo</a> ·
   <a href="https://mosoo.ai">Website</a> ·
   <a href="https://mosoo.ai/docs">API Documentation</a> ·
-  <a href="https://github.com/langgenius/mosoo-connector">Mosoo Connector</a>
+  <a href="https://github.com/langgenius/mosoo-connector">mosoo Connector</a>
 </p>
 
 ## Agent Runtime and API: What Works Today
@@ -37,11 +37,11 @@ configure Agent + Skills + MCP + provider
 
 ## Who It Is For
 
-Mosoo is for developers extending Codex, Claude Agent SDK, OpenCode, or another coding agent into products and automations who do not want to operate a separate agent runtime, Sandbox service, session store, file pipeline, and Agent API for every integration.
+mosoo is for developers extending Codex, Claude Agent SDK, OpenCode, or another coding agent into products and automations who do not want to operate a separate agent runtime, Sandbox service, session store, file pipeline, and Agent API for every integration.
 
 ## Product Status
 
-Mosoo is in Alpha. The managed runtime and Agent API surfaces above are shipped and covered by repository tests, but production reliability and external adoption have not been proven. Public APIs and product behavior may still change.
+mosoo is in Alpha. The managed runtime and Agent API surfaces above are shipped and covered by repository tests, but production reliability and external adoption have not been proven. Public APIs and product behavior may still change.
 
 Product and engineering references:
 
@@ -52,7 +52,7 @@ Product and engineering references:
 
 ## Example: Build a Codex Agent API
 
-[Codex Pet](./examples/use-cases/codex-pet.md) shows a published Mosoo Agent integrated into an existing product backend through the Thread API. The same API can expose Agents backed by Claude Agent SDK or OpenCode.
+[Codex Pet](./examples/use-cases/codex-pet.md) shows a published mosoo Agent integrated into an existing product backend through the Thread API. The same API can expose Agents backed by Claude Agent SDK or OpenCode.
 
 https://github.com/user-attachments/assets/4a4bbaab-c192-4462-99e0-020eab966fff
 
@@ -87,7 +87,7 @@ curl http://localhost:5173/api/health
 curl http://localhost:8787/api/health
 ```
 
-API health is `/api/health`, not `/health`. The Mosoo control-plane development login uses OTP; under local loopback origins, addresses ending with `@mosoo.ai` skip that OTP and log in directly.
+API health is `/api/health`, not `/health`. The mosoo control-plane development login uses OTP; under local loopback origins, addresses ending with `@mosoo.ai` skip that OTP and log in directly.
 
 If setup fails, start with the focused recipe: submodule issues use `git submodule update --init`, missing local secrets use `just env-init`, and D1 schema errors use `just db-migrate`. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow and verification expectations.
 

@@ -151,7 +151,7 @@ export function PublishMenu({
           <div className="flex min-w-0 flex-col">
             <span className="text-[13px] font-medium">Thread</span>
             <span className="text-muted-foreground text-[11.5px] leading-snug">
-              Start a thread with this agent in Mosoo.
+              Start a thread with this agent in mosoo.
             </span>
           </div>
         </DropdownMenuItem>

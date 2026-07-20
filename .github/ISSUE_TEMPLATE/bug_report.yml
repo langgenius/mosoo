@@ -76,7 +76,7 @@ body:
       placeholder: |
         Browser:
         OS:
-        Mosoo version or commit:
+        mosoo version or commit:
         Local or production:
 
   - type: dropdown

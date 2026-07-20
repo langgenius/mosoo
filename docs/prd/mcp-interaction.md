@@ -4,7 +4,7 @@ Status: available in the console for App-owned remote MCP servers and Agent use.
 
 ## Why It Matters
 
-Mosoo Agents become more useful when they can act in products such as GitHub, Linear, or a Builder's own server. An App owner should connect once, share it with selected Agents, and keep credentials out of Agent configuration.
+mosoo Agents become more useful when they can act in products such as GitHub, Linear, or a Builder's own server. An App owner should connect once, share it with selected Agents, and keep credentials out of Agent configuration.
 
 ## Who It Is For
 
@@ -22,6 +22,6 @@ The Builder who owns an App configures MCP. App Users benefit when an Agent uses
 
 The complete add-to-use path is available for remote HTTPS MCP servers. Binding before authorization is allowed, but does not make tools usable.
 
-“Connected” means Mosoo has an active stored credential; it does not prove the server or its tools work. There is no standalone connection test or tool browser, so failures appear when an Agent first uses the server.
+“Connected” means mosoo has an active stored credential; it does not prove the server or its tools work. There is no standalone connection test or tool browser, so failures appear when an Agent first uses the server.
 
-Credentials are encrypted, are never shown again after entry, and stay inside their App. Mosoo gives Agents temporary, connection-specific access rather than revealing the stored secret. Exporting or forking an Agent does not carry credentials; the destination App must reconnect. Local-process servers, cross-App sharing, a connector marketplace, and tool-level selection are not available.
+Credentials are encrypted, are never shown again after entry, and stay inside their App. mosoo gives Agents temporary, connection-specific access rather than revealing the stored secret. Exporting or forking an Agent does not carry credentials; the destination App must reconnect. Local-process servers, cross-App sharing, a connector marketplace, and tool-level selection are not available.

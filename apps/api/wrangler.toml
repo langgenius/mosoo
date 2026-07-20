@@ -17,7 +17,7 @@ head_sampling_rate = 1
 [vars]
 APP_NAME = "mosoo"
 WEB_ORIGIN = "http://localhost:5173"
-AUTH_EMAIL_FROM = "Mosoo AUTH <auth@mosoo.ai>"
+AUTH_EMAIL_FROM = "mosoo AUTH <auth@mosoo.ai>"
 FILE_BUCKET_NAME = "mosoo-file"
 BACKUP_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_STATE_BUCKET_NAME = "mosoo-sandbox-state"
@@ -143,7 +143,7 @@ head_sampling_rate = 0.1
 [env.prod.vars]
 APP_NAME = "mosoo"
 WEB_ORIGIN = "https://try.mosoo.ai"
-AUTH_EMAIL_FROM = "Mosoo AUTH <auth@mosoo.ai>"
+AUTH_EMAIL_FROM = "mosoo AUTH <auth@mosoo.ai>"
 FILE_BUCKET_NAME = "mosoo-file"
 BACKUP_BUCKET_NAME = "mosoo-sandbox-state"
 SANDBOX_STATE_BUCKET_NAME = "mosoo-sandbox-state"

@@ -11,7 +11,7 @@ import { CopyCheckIcon } from "@/shared/ui/copy-check-icon";
 const INSTALL_COMMAND = "curl -fsSL https://install.mosoo.ai/install.sh | bash";
 const API_TOKENS_PATH = "/settings/access-tokens";
 const READY_STEPS = [
-  "Installs Mosoo CLI",
+  "Installs mosoo CLI",
   "Installs the @mosoo skill",
   "Signs in to cloud and runs doctor",
 ] as const;
@@ -47,11 +47,11 @@ export function AppOverviewInstallGuide(): ReactElement {
     <section className="py-8 sm:py-10">
       <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
         <h2 className="text-foreground text-3xl font-semibold tracking-tight sm:text-4xl">
-          Build agent app with <span className="text-[rgb(111_211_4)]">Mosoo</span> in your coding
+          Build agent app with <span className="text-[rgb(111_211_4)]">mosoo</span> in your coding
           agent
         </h2>
         <p className="text-muted-foreground mt-3 max-w-2xl text-base leading-7">
-          One command installs Mosoo CLI and the @mosoo skill, signs in to try.mosoo.ai, and checks
+          One command installs mosoo CLI and the @mosoo skill, signs in to try.mosoo.ai, and checks
           cloud readiness.
         </p>
 

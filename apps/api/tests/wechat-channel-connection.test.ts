@@ -18,7 +18,7 @@ describe("WeChat channel connection scaffold", () => {
           context_token: "ctx-secret",
           create_time_ms: 1779646500000,
           from_user_id: "peer-1",
-          item_list: [{ text_item: { text: "hello Mosoo" }, type: 1 }],
+          item_list: [{ text_item: { text: "hello mosoo" }, type: 1 }],
           message_id: 123,
           message_state: 2,
           message_type: 1,
@@ -52,7 +52,7 @@ describe("WeChat channel connection scaffold", () => {
         contextTokenValue: "ctx-secret",
         toUserId: "peer-1",
       },
-      text: "hello Mosoo",
+      text: "hello mosoo",
     });
 
     if (!trigger) {

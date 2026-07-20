@@ -47,7 +47,7 @@ async function withTelegramFetchMock<T>(operation: () => Promise<T>): Promise<T>
       return Response.json({
         ok: true,
         result: {
-          first_name: "Mosoo Telegram",
+          first_name: "mosoo Telegram",
           id: 9001,
           is_bot: true,
           username: "mosoo_telegram_bot",

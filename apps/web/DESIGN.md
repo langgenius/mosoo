@@ -1,6 +1,6 @@
 # Design
 
-Visual system for the Mosoo web app. Tokens are the source of truth and live in
+Visual system for the mosoo web app. Tokens are the source of truth and live in
 `src/shared/styles/app.css` (`:root`, `.dark`, and the `@theme inline` Tailwind bridge).
 This document describes them; the CSS implements them.
 
@@ -33,7 +33,7 @@ Selection fills are neutral (`--color-brand-light` = ink-50), not green washes.
 **Rule:** product semantic colors consume Tailwind token classes (`text-fg-2`,
 `bg-paper-200`, `border-border-strong`, `bg-accent-soft`, etc.). External brand
 art, the terminal palette, and deterministic avatar palettes may use fixed colors
-when they are not expressing a Mosoo semantic state.
+when they are not expressing a mosoo semantic state.
 
 ## Typography
 

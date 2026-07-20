@@ -292,7 +292,7 @@ export function validateRuntimeAdvancedSettings(input: {
           ? {
               code: "runtime_settings_security_boundary",
               key,
-              message: `Runtime setting ${key} is managed by Mosoo platform policy and cannot be set here.`,
+              message: `Runtime setting ${key} is managed by mosoo platform policy and cannot be set here.`,
             }
           : {
               code: "runtime_settings_unsupported",

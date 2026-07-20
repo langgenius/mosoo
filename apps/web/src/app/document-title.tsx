@@ -3,7 +3,7 @@ import { matchPath, useLocation } from "react-router-dom";
 
 import { useAppSession } from "./session-provider";
 
-const PRODUCT_NAME = "Mosoo";
+const PRODUCT_NAME = "mosoo";
 
 type DocumentTitleScope = "app" | "global" | "org";
 

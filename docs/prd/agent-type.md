@@ -4,7 +4,7 @@ Status: available in the current Agent Preview flow.
 
 ## Why this matters
 
-Mosoo supports two Agent types because users need different kinds of continuity. Some Agents should feel like ongoing teammates; others should start each job cleanly so unrelated work does not share temporary state. The App owner chooses the type based on that user expectation, not on the model or provider.
+mosoo supports two Agent types because users need different kinds of continuity. Some Agents should feel like ongoing teammates; others should start each job cleanly so unrelated work does not share temporary state. The App owner chooses the type based on that user expectation, not on the model or provider.
 
 ## The two choices
 
