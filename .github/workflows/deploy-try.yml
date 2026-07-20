@@ -1,0 +1,101 @@
+name: deploy-try
+
+on:
+  push:
+    branches:
+      - deploy/try
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: production
+    if: github.repository == 'langgenius/mosoo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: try
+      url: https://try.mosoo.ai
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 1
+          submodules: true
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.0-canary.1
+
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: 1.57.0
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify Docker
+        run: docker info
+
+      - name: Run repository check
+        run: just check
+
+      - name: Verify migration chain
+        working-directory: apps/api
+        run: |
+          set -euo pipefail
+          persist_dir="$(mktemp -d)"
+          trap 'rm -rf "$persist_dir"' EXIT
+          ../../node_modules/.bin/vp exec wrangler d1 migrations apply DB \
+            --local --env prod --persist-to "$persist_dir"
+
+      - name: Inspect migration and queue state
+        working-directory: apps/api
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          ../../node_modules/.bin/vp exec wrangler d1 migrations list DB --remote --env prod
+          ../../node_modules/.bin/vp exec wrangler queues list
+
+      - name: Build deploy artifacts
+        run: |
+          ./node_modules/.bin/vp run --filter agent-driver build
+          ./node_modules/.bin/vp run --filter @mosoo/web build
+
+      - name: Dry-run API Worker
+        working-directory: apps/api
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: ../../node_modules/.bin/vp exec wrangler deploy --env prod --minify --dry-run
+
+      - name: Dry-run Web Worker
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: ../../node_modules/.bin/vp exec wrangler deploy --env prod --dry-run
+
+      - name: Deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: just deploy
+
+      - name: Verify
+        run: |
+          set -euo pipefail
+          curl_args=(--fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 10)
+          curl "${curl_args[@]}" --output /dev/null https://try.mosoo.ai/
+          curl "${curl_args[@]}" https://try.mosoo.ai/api/health \
+            | jq -e '.name == "mosoo" and .ok == true'
+          curl "${curl_args[@]}" https://try.mosoo.ai/api/graphql \
+            -H 'content-type: application/json' \
+            --data '{"query":"query { __typename }"}' \
+            | jq -e '.data.__typename == "Query"'
