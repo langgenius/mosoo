@@ -295,9 +295,13 @@ async function hydrateRunContextFromSession(
   const snapshotEnvironment = buildSnapshotAgentEnvironment({
     environmentId: environmentSnapshot.environmentId,
   });
+  // No `bindings` here on purpose: passing them makes readiness run a live
+  // provider probe (GET /models plus a possible POST /chat/completions, 10s
+  // timeout each) on the first-token critical path. D1-backed checks still
+  // gate the run; broken credentials surface from the actual model call.
+  // Config/publish readiness callers keep the live probe.
   const agentReadiness = await computeAgentReadiness(bindings.DB, agent.ownerId, {
     agentId: agent.id,
-    bindings,
     environment: snapshotEnvironment,
     mcpServerIds: toolReferences.map((reference) => reference.serverId),
     model: binding.model,
