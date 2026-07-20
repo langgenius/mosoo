@@ -35,7 +35,7 @@
     "react-doctor:diff": "vp exec react-doctor apps/web --verbose --diff",
     "react-doctor:report": "vp exec react-doctor apps/web --json --json-compact --full --fail-on none",
     "tc": "vp run -r tc",
-    "test": "vp exec bun test config/commit-policy.test.ts scripts/validate-commit-message.test.ts scripts/docker-runtime-config.test.ts && vp run --filter @mosoo/api --filter agent-driver --filter @mosoo/web --filter @mosoo/ag-ui-session --filter @mosoo/agent-package --filter @mosoo/contracts --filter @mosoo/db --filter @mosoo/id --filter @mosoo/public-api-client --filter @mosoo/runtime-catalog --filter @mosoo/runtime-events --filter @mosoo/session-policy --filter @mosoo/skill-package test && vp run -w graphql:codegen:check"
+    "test": "vp exec bun test config/commit-policy.test.ts scripts/validate-commit-message.test.ts scripts/docker-runtime-config.test.ts scripts/docker-entrypoint-signal.test.ts && vp run --filter @mosoo/api --filter agent-driver --filter @mosoo/web --filter @mosoo/ag-ui-session --filter @mosoo/agent-package --filter @mosoo/contracts --filter @mosoo/db --filter @mosoo/id --filter @mosoo/public-api-client --filter @mosoo/runtime-catalog --filter @mosoo/runtime-events --filter @mosoo/session-policy --filter @mosoo/skill-package test && vp run -w graphql:codegen:check"
   },
   "devDependencies": {
     "@graphql-codegen/cli": "^7.2.0",

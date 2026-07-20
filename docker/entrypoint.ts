@@ -2,6 +2,8 @@
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, open, readFile, rename, rm, symlink } from "node:fs/promises";
 
+import { createProcessSupervisor } from "./process-supervisor";
+import type { ProcessSupervisor } from "./process-supervisor";
 import { buildDevVars, validateWebExposure } from "./runtime-config";
 
 const repositoryRoot = "/app";
@@ -69,60 +71,71 @@ async function preparePersistentState(): Promise<void> {
   }
 }
 
-async function runMigration(): Promise<void> {
+async function runMigration(supervisor: ProcessSupervisor): Promise<boolean> {
   log("Applying local D1 migrations.");
-  const migration = Bun.spawn(["bun", "run", "--filter", "@mosoo/api", "db:migrate:local"], {
-    cwd: repositoryRoot,
-    env: process.env,
-    stderr: "inherit",
-    stdout: "inherit",
-  });
-  const exitCode = await migration.exited;
+  const migration = supervisor.track(
+    Bun.spawn(["bun", "run", "--filter", "@mosoo/api", "db:migrate:local"], {
+      cwd: repositoryRoot,
+      env: process.env,
+      stderr: "inherit",
+      stdout: "inherit",
+    }),
+  );
+  let exitCode: number;
+  try {
+    exitCode = await migration.exited;
+  } finally {
+    supervisor.untrack(migration);
+  }
+  if (supervisor.stopping) {
+    return false;
+  }
   if (exitCode !== 0) {
     throw new Error(`Local D1 migration failed with exit code ${exitCode}.`);
   }
+  return true;
 }
 
 validateWebExposure(process.env);
 await preparePersistentState();
-await runMigration();
-
-const api = Bun.spawn(["bun", "apps/api/bin/dev-local.ts"], {
-  cwd: repositoryRoot,
-  env: process.env,
-  stderr: "inherit",
-  stdout: "inherit",
-});
-const web = Bun.spawn(["caddy", "run", "--config", `${repositoryRoot}/docker/Caddyfile`], {
-  cwd: repositoryRoot,
-  env: process.env,
-  stderr: "inherit",
-  stdout: "inherit",
-});
-
-let stopping = false;
-function stop(signal: NodeJS.Signals): void {
-  if (stopping) {
-    return;
-  }
-  stopping = true;
-  api.kill(signal);
-  web.kill(signal);
+const supervisor = createProcessSupervisor();
+const removeSignalHandlers = supervisor.installSignalHandlers();
+if (!(await runMigration(supervisor))) {
+  removeSignalHandlers();
+  process.exit(0);
 }
-process.on("SIGINT", () => stop("SIGINT"));
-process.on("SIGTERM", () => stop("SIGTERM"));
+
+const api = supervisor.track(
+  Bun.spawn(["bun", "apps/api/bin/dev-local.ts"], {
+    cwd: repositoryRoot,
+    env: process.env,
+    stderr: "inherit",
+    stdout: "inherit",
+  }),
+);
+const web = supervisor.track(
+  Bun.spawn(["caddy", "run", "--config", `${repositoryRoot}/docker/Caddyfile`], {
+    cwd: repositoryRoot,
+    env: process.env,
+    stderr: "inherit",
+    stdout: "inherit",
+  }),
+);
 
 const firstExit = await Promise.race([
   api.exited.then((exitCode) => ({ exitCode, processName: "API" })),
   web.exited.then((exitCode) => ({ exitCode, processName: "web server" })),
 ]);
 
-if (!stopping) {
+if (!supervisor.stopping) {
   process.stderr.write(
     `[mosoo/docker] ${firstExit.processName} exited unexpectedly with code ${firstExit.exitCode}.\n`,
   );
-  stop("SIGTERM");
+  supervisor.stop("SIGTERM");
 }
 
 await Promise.allSettled([api.exited, web.exited]);
-process.exit(firstExit.exitCode);
+supervisor.untrack(api);
+supervisor.untrack(web);
+removeSignalHandlers();
+process.exit(supervisor.receivedSignal === null ? firstExit.exitCode : 0);
