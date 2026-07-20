@@ -9,7 +9,7 @@ A Skill lets a Builder reuse trusted instructions and supporting files across Ag
 ## Current user flow
 
 1. Open **Skills** in the active App.
-2. Choose **Add skill**. Upload a `.md`, `.zip`, or `.skill` file, or import from GitHub or skills.sh. Mosoo previews the name, description, and author before adding it.
+2. Choose **Add skill**. Upload a `.md`, `.zip`, or `.skill` file, or import from GitHub or skills.sh. mosoo previews the name, description, and author before adding it.
 3. Open a Skill card to read its main instructions. From this view, the owner can download, fork, or uninstall it.
 4. Open an Agent, add one or more Skills from that App, and save the Agent.
 5. When a new Session starts, its attached Skills become available to the Agent. The Agent reads a Skill only when the task calls for it.

@@ -5,7 +5,7 @@ import { ToolCallCard } from "../tool-call-card";
 import type { ToolCall } from "../tool-call-card";
 import { useSessionPermissionForToolCall } from "./session-permission-context";
 
-// Renders every assistant-ui tool-call part via the existing Mosoo tool card
+// Renders every assistant-ui tool-call part via the existing mosoo tool card
 // (registered as `tools.Override`). Status is re-derived: a matching permission
 // request wins (needs_approval), otherwise a present result or a completed part
 // status means done, else it is still running.

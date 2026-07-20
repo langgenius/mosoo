@@ -462,7 +462,7 @@ function SkillsShCatalogCard({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top" align="end" className="max-w-[280px] text-left">
-              This Well-known entry needs server-side skills.sh API access before Mosoo can download
+              This Well-known entry needs server-side skills.sh API access before mosoo can download
               its files. GitHub-sourced skills can install without it.
             </TooltipContent>
           </Tooltip>

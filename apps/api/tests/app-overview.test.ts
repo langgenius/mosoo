@@ -431,7 +431,7 @@ describe("App overview", () => {
 
     expect(overview.activeOrganization).toMatchObject({
       id: fixture.ids.organizationId,
-      name: "Mosoo API Test",
+      name: "mosoo API Test",
     });
     expect(overview.apps).toMatchObject({
       hasMore: false,

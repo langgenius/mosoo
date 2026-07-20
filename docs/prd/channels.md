@@ -8,7 +8,7 @@ no provider has a recorded live-account smoke test.
 
 App owners want a published Agent to answer people in the messaging tools they
 already use. External participants should be able to ask for help without
-creating a Mosoo account or leaving their current conversation.
+creating a mosoo account or leaving their current conversation.
 
 ## People
 
@@ -23,10 +23,10 @@ creating a Mosoo account or leaving their current conversation.
 2. The owner connects Slack, Lark / Feishu, Telegram, Discord, or personal
    WeChat and confirms which Agent should answer.
 3. An external participant sends a direct message or supported mention.
-4. Mosoo starts a new Agent conversation for a new external thread, or
+4. mosoo starts a new Agent conversation for a new external thread, or
    continues the existing conversation for a follow-up.
 5. The Agent's response returns to the same external thread. Disconnecting the
-   channel stops new messages while preserving existing Mosoo conversations.
+   channel stops new messages while preserving existing mosoo conversations.
 
 ## Current availability
 
@@ -42,4 +42,4 @@ creating a Mosoo account or leaving their current conversation.
   is still required for each provider.
 
 External participants remain external identities. They do not gain access to
-the App, the Mosoo console, or private Web conversations.
+the App, the mosoo console, or private Web conversations.

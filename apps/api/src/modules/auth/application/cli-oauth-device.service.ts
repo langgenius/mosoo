@@ -228,7 +228,7 @@ function normalizeProvider(value: string | undefined): "google" {
     throw new CliOAuthDeviceError(
       400,
       "unsupported_provider",
-      "Mosoo CLI OAuth supports google only.",
+      "mosoo CLI OAuth supports google only.",
     );
   }
   return "google";

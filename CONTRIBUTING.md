@@ -1,6 +1,6 @@
-# Mosoo Contributing Guide
+# mosoo Contributing Guide
 
-Mosoo is still in alpha exploration, and the repository moves quickly. This document only describes the development and contribution flow that is currently real and usable in this repository, avoiding stale instructions inherited from older versions.
+mosoo is still in alpha exploration, and the repository moves quickly. This document only describes the development and contribution flow that is currently real and usable in this repository, avoiding stale instructions inherited from older versions.
 
 ## Before You Start
 
@@ -118,7 +118,7 @@ Local development notes:
   `just db-regen`, review the regenerated SQL, then run `just db-reset-local`
   to prove the migration chain against a fresh local database.
 - External MCP services used during Preview choose their own documented local
-  port; Mosoo does not reserve a `5180+` range for them.
+  port; mosoo does not reserve a `5180+` range for them.
 - Before asserting port conflicts or performance problems, measure with `lsof`, `curl`, timing, or another reproducible command.
 - On macOS, API dev auto-selects `$HOME/.docker/run/docker.sock` when present,
   even if `DOCKER_HOST` was inherited. Set
@@ -153,7 +153,7 @@ just test-file apps/api/tests/session-run-cancel.test.ts
 
 ## Database And Migrations
 
-Mosoo uses generated Drizzle migrations for local and production D1:
+mosoo uses generated Drizzle migrations for local and production D1:
 
 - The schema source of truth is `pkgs/db/src/schema/**`.
 - The generated chain currently consists of one squashed baseline,

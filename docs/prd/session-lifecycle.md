@@ -20,7 +20,7 @@ they create or continue work for an end user.
    that already happened.
 3. When an attempt completes or fails, the conversation and saved files remain readable. The
    user can send a follow-up. Preview offers retry actions for some provider checks and send
-   failures. After an unexpected runtime loss, Mosoo reports the failure but does not
+   failures. After an unexpected runtime loss, mosoo reports the failure but does not
    automatically replay the request; the user must deliberately resend it.
 4. **Archive** moves the Thread out of active work. Its history and saved files stay readable,
    but messages and file changes are blocked. In the Console, sending a follow-up restores the

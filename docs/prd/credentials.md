@@ -15,7 +15,7 @@ The App owner manages credentials. Agents in that same App may use them when the
 1. Open the active App's Providers or MCP servers page.
 2. Add the provider key or authorize the MCP connection. Provider keys can be named, edited, tested, chosen as the default, and deleted. MCP connections can be connected, revoked, disabled, edited, and deleted.
 3. Select the provider and model or MCP connection while configuring an Agent.
-4. Run the Agent. Mosoo supplies only a matching credential from that App. If none exists, or ownership does not match, setup or the run stops with a configuration error instead of using another App's secret.
+4. Run the Agent. mosoo supplies only a matching credential from that App. If none exists, or ownership does not match, setup or the run stops with a configuration error instead of using another App's secret.
 5. When moving an Agent package to another App, reconnect credentials there; packages do not carry secrets.
 
 ## Current Availability and Boundaries

@@ -234,7 +234,7 @@ async function loadSkillPackageFromSkillsSh(
   }
 
   throw new SkillRequestError(
-    "This skills.sh skill requires server-side skills.sh API access before Mosoo can install it.",
+    "This skills.sh skill requires server-side skills.sh API access before mosoo can install it.",
     400,
   );
 }
