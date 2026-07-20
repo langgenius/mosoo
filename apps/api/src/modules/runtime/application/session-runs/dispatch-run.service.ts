@@ -120,6 +120,9 @@ export async function dispatchSessionRun(
   const sandboxId = input.profile.sandbox.id;
   let driverInstanceId: DriverInstanceId | null = null;
   let prepareTimingEventPromise: Promise<void> = Promise.resolve();
+  // Boot-payload config traces are owner-debug telemetry; they persist off the
+  // provision critical path and settle with the post-dispatch awaits.
+  let pendingBootPayloadEvents: Promise<void> = Promise.resolve();
   let runLease: RuntimeExecutionPlaneRunLease | null = null;
 
   try {
@@ -160,25 +163,41 @@ export async function dispatchSessionRun(
         onBootPayloadPrepared: async ({ bootPayload }) => {
           const configTraceValue = buildSessionConfigTraceValue(bootPayload);
 
-          await appendSessionRuntimeEvents({
-            bindings,
-            events: [
-              createSessionRuntimeEvent({
-                kind: "runtime.config.updated",
-                payload: configTraceValue,
-                runId: input.sessionRunId,
+          pendingBootPayloadEvents = pendingBootPayloadEvents
+            .then(() =>
+              appendSessionRuntimeEvents({
+                bindings,
+                events: [
+                  createSessionRuntimeEvent({
+                    kind: "runtime.config.updated",
+                    payload: configTraceValue,
+                    runId: input.sessionRunId,
+                    sessionId: input.sessionId,
+                    traceId: input.traceId,
+                    visibility: "owner_debug",
+                  }),
+                ],
+                sessionId: input.sessionId,
+              }),
+            )
+            .then(() =>
+              appendBootPayloadRuntimeEvents(bindings, {
+                bootPayload,
                 sessionId: input.sessionId,
                 traceId: input.traceId,
-                visibility: "owner_debug",
               }),
-            ],
-            sessionId: input.sessionId,
-          });
-          await appendBootPayloadRuntimeEvents(bindings, {
-            bootPayload,
-            sessionId: input.sessionId,
-            traceId: input.traceId,
-          });
+            )
+            .then(
+              () => undefined,
+              (error: unknown) => {
+                logWarn("session.run.config_trace.append_failed", {
+                  message: error instanceof Error ? error.message : String(error),
+                  runId: input.sessionRunId,
+                  sessionId: input.sessionId,
+                  traceId: input.traceId,
+                });
+              },
+            );
         },
         profile: input.profile,
         resolvedMcpServers: input.resolvedMcpServers,
@@ -229,6 +248,7 @@ export async function dispatchSessionRun(
       });
       await Promise.all([
         prepareTimingEventPromise,
+        pendingBootPayloadEvents,
         appendSessionRuntimeTimingEventBestEffort({
           bindings,
           timing: dispatchTimingSnapshot,
@@ -240,6 +260,7 @@ export async function dispatchSessionRun(
 
     const handlePreReadyRetry = async (failure: Error, retriesRemaining: number): Promise<void> => {
       await prepareTimingEventPromise;
+      await pendingBootPayloadEvents;
       prepareTimingEventPromise = Promise.resolve();
 
       logWarn("session.run.dispatch.pre_ready_retry", {
@@ -286,6 +307,7 @@ export async function dispatchSessionRun(
     });
   } catch (error) {
     await prepareTimingEventPromise;
+    await pendingBootPayloadEvents;
 
     if (error instanceof SessionRunNoLongerActiveError) {
       if (isTruthy(driverInstanceId)) {
