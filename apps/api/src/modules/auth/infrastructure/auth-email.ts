@@ -81,26 +81,26 @@ function buildOtpMessage(type: string, otp: string): { subject: string; text: st
   switch (type) {
     case "sign-in": {
       return {
-        subject: "Your Mosoo sign-in code",
-        text: `Your Mosoo sign-in code is ${otp}. It expires in 10 minutes.`,
+        subject: "Your mosoo sign-in code",
+        text: `Your mosoo sign-in code is ${otp}. It expires in 10 minutes.`,
       };
     }
     case "email-verification": {
       return {
-        subject: "Verify your Mosoo email",
-        text: `Your Mosoo email verification code is ${otp}. It expires in 10 minutes.`,
+        subject: "Verify your mosoo email",
+        text: `Your mosoo email verification code is ${otp}. It expires in 10 minutes.`,
       };
     }
     case "forget-password": {
       return {
-        subject: "Your Mosoo password reset code",
-        text: `Your Mosoo password reset code is ${otp}. It expires in 10 minutes.`,
+        subject: "Your mosoo password reset code",
+        text: `Your mosoo password reset code is ${otp}. It expires in 10 minutes.`,
       };
     }
     default: {
       return {
-        subject: "Your Mosoo verification code",
-        text: `Your Mosoo verification code is ${otp}. It expires in 10 minutes.`,
+        subject: "Your mosoo verification code",
+        text: `Your mosoo verification code is ${otp}. It expires in 10 minutes.`,
       };
     }
   }

@@ -186,7 +186,7 @@ describe("Discord channel adapter", () => {
         {
           allowed_mentions: { parse: [] },
           content:
-            "Mosoo session created: https://mosoo.ai/agent/01J00000000000000000000009?tab=consume&sessionId=session-1. Agent is working...",
+            "mosoo session created: https://mosoo.ai/agent/01J00000000000000000000009?tab=consume&sessionId=session-1. Agent is working...",
         },
       ]);
       expect(finalDeliveryJobs).toEqual([

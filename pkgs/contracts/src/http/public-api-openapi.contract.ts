@@ -334,7 +334,7 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
     properties: {
       client_external_ref: {
         description:
-          "Optional caller-owned reference (for example an external ticket key) stored on the Thread for correlation. Not unique and not validated by Mosoo.",
+          "Optional caller-owned reference (for example an external ticket key) stored on the Thread for correlation. Not unique and not validated by mosoo.",
         maxLength: PUBLIC_THREAD_CLIENT_EXTERNAL_REF_MAX_LENGTH,
         type: "string",
       },

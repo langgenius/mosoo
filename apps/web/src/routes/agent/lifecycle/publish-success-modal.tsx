@@ -55,7 +55,7 @@ export function PublishSuccessModal({
             <div className="flex items-start gap-3">
               <Globe className="text-fg-3 mt-0.5 size-4 shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="text-foreground text-[13px] font-medium">Try in Mosoo</div>
+                <div className="text-foreground text-[13px] font-medium">Try in mosoo</div>
                 <div className="text-fg-2 mt-0.5 text-[12px]">Start a Thread with this agent.</div>
               </div>
               <Button

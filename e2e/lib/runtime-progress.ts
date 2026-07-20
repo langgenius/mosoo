@@ -123,7 +123,7 @@ export function assertRuntimeSignalCoverage(
         options.fix ??
         "Attach `createRuntimeSignalCollector(...).attachToPage(page)` before navigation, add feature checkpoints / resource samples, or record a live-smoke-only gap in the PR / handoff evidence.",
       what: `Runtime signal collection is missing required coverage: ${summary.missingCategories.join(", ")}.`,
-      why: "Lecture 11 and the Mosoo harness contract require the harness to collect lifecycle, feature path, data flow, resource utilization, and error context signals instead of relying on agent-written logs.",
+      why: "Lecture 11 and the mosoo harness contract require the harness to collect lifecycle, feature path, data flow, resource utilization, and error context signals instead of relying on agent-written logs.",
     }),
   );
 }

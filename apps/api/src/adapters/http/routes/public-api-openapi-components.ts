@@ -54,7 +54,7 @@ export function createPublicApiOpenApiComponents() {
     schemas: PUBLIC_API_OPENAPI_SCHEMAS,
     securitySchemes: {
       accessToken: {
-        bearerFormat: "Mosoo Access Token",
+        bearerFormat: "mosoo Access Token",
         description:
           "Use Authorization: Bearer mst_... . Access Tokens identify an account and do not carry scopes.",
         scheme: "bearer",

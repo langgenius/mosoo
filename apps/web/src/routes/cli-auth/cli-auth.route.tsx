@@ -37,7 +37,7 @@ export function CliAuthPage() {
           <div className="min-w-0 flex-1">
             <h1 className="text-fg-1 text-lg font-semibold">Authorize CLI access</h1>
             <p className="text-fg-2 mt-2 text-sm leading-6">
-              Connect this browser session to the Mosoo CLI request below.
+              Connect this browser session to the mosoo CLI request below.
             </p>
             <div className="border-border-default bg-bg-sunken text-fg-1 mt-4 rounded-md border px-3 py-2 font-mono text-sm">
               {code || "Missing code"}

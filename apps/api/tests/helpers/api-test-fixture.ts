@@ -126,7 +126,7 @@ export class ApiTestClient {
     );
 
     if (!response.ok) {
-      throw new Error(`Mosoo.ai test login failed with status ${response.status}.`);
+      throw new Error(`mosoo.ai test login failed with status ${response.status}.`);
     }
 
     return (await response.json()) as MosooAiBackdoorResponse;
@@ -748,7 +748,7 @@ async function seedApiTestFixture(database: D1Database): Promise<void> {
         updated_at
       ) VALUES (?, ?, ?, ?, ?)`,
     )
-    .bind(1, API_TEST_VIEWER.id, API_TEST_IDS.organizationId, "Mosoo API Test", 1)
+    .bind(1, API_TEST_VIEWER.id, API_TEST_IDS.organizationId, "mosoo API Test", 1)
     .run();
 
   await database

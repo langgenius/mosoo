@@ -41,7 +41,7 @@ describe("default agent runtime", () => {
     });
   });
 
-  test("uses the Mosoo Zhipu provider identity when only Zhipu is configured", () => {
+  test("uses the mosoo Zhipu provider identity when only Zhipu is configured", () => {
     expect(resolveDefaultAgentRuntime([credential("zhipu")])).toEqual({
       model: "glm-4.7",
       provider: "zhipu",
