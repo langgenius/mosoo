@@ -10,12 +10,20 @@ import {
   TrendingUp,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useMemo, useReducer } from "react";
+import { useEffect, useMemo, useReducer, useState } from "react";
 
 import { useSkillsShCatalogQuery } from "@/domains/skill/query/skill-queries";
 import { cn } from "@/shared/lib/class-names";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/ui/dialog";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
@@ -79,6 +87,7 @@ export function SkillsShCatalog({
   search: string;
 }) {
   const [state, dispatch] = useReducer(skillsShCatalogReducer, SKILLS_SH_CATALOG_INITIAL_STATE);
+  const [confirmingSkill, setConfirmingSkill] = useState<SkillsShCatalogSkill | null>(null);
   const { error, installingId, page, view } = state;
   const trimmedSearch = search.trim();
   const catalogQuery = useSkillsShCatalogQuery({
@@ -112,6 +121,7 @@ export function SkillsShCatalog({
         slug: skill.slug,
       });
       dispatch({ type: "installSuccess" });
+      setConfirmingSkill(null);
       onInstalled(created.id);
     } catch (caughtError) {
       dispatch({
@@ -202,7 +212,7 @@ export function SkillsShCatalog({
               installing={installingId === skill.id}
               key={skill.id}
               onInstall={() => {
-                void handleInstall(skill);
+                setConfirmingSkill(skill);
               }}
               skill={skill}
             />
@@ -236,6 +246,19 @@ export function SkillsShCatalog({
           </Button>
         </div>
       ) : null}
+
+      <SkillsShInstallConfirmDialog
+        installing={confirmingSkill !== null && installingId === confirmingSkill.id}
+        onConfirm={(skill) => {
+          void handleInstall(skill);
+        }}
+        onOpenChange={(open) => {
+          if (!open && installingId === null) {
+            setConfirmingSkill(null);
+          }
+        }}
+        skill={confirmingSkill}
+      />
     </div>
   );
 }
@@ -258,6 +281,99 @@ function SkillsShSourceTooltip({ source }: { source: "api" | "public-page" }) {
           : "Discover results are sourced from the public skills.sh directory."}
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+function SkillsShInstallConfirmDialog({
+  installing,
+  onConfirm,
+  onOpenChange,
+  skill,
+}: {
+  installing: boolean;
+  onConfirm: (skill: SkillsShCatalogSkill) => void;
+  onOpenChange: (open: boolean) => void;
+  skill: SkillsShCatalogSkill | null;
+}) {
+  return (
+    <Dialog open={skill !== null} onOpenChange={onOpenChange}>
+      {skill ? (
+        <DialogContent className="z-[60] sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Install {skill.name}</DialogTitle>
+            <DialogDescription>
+              Review this skills.sh entry before installing it into the current app.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="border-border bg-card rounded-lg border p-4">
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-fg-1 truncate text-[15px] font-bold">{skill.name}</div>
+                  <a
+                    className="text-fg-3 hover:text-fg-1 mt-1 inline-flex max-w-full items-center gap-1 font-mono text-[11px]"
+                    href={skill.url}
+                    rel="noreferrer"
+                    target="_blank"
+                    title={skill.source}
+                  >
+                    <span className="truncate">{skill.source}</span>
+                    <ExternalLink className="size-3 shrink-0" />
+                  </a>
+                </div>
+                {skill.isOfficial ? <Badge variant="success">Official</Badge> : null}
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <Badge variant="outline">
+                  {skill.sourceType === "github" ? "GitHub" : "Well-known"}
+                </Badge>
+                {skill.isDuplicate ? <Badge variant="warning">Duplicate</Badge> : null}
+                <Badge variant="default">{formatCatalogCount(skill.installs)} installs</Badge>
+              </div>
+            </div>
+
+            <dl className="grid grid-cols-[96px_minmax(0,1fr)] gap-x-3 gap-y-2 text-[12.5px]">
+              <dt className="text-fg-3">Registry</dt>
+              <dd className="text-fg-1 min-w-0">skills.sh</dd>
+              <dt className="text-fg-3">Skill ID</dt>
+              <dd className="text-fg-1 min-w-0 truncate font-mono" title={skill.id}>
+                {skill.id}
+              </dd>
+              <dt className="text-fg-3">Slug</dt>
+              <dd className="text-fg-1 min-w-0 truncate font-mono" title={skill.slug}>
+                {skill.slug}
+              </dd>
+              <dt className="text-fg-3">Install from</dt>
+              <dd className="text-fg-1 min-w-0 truncate font-mono" title={skill.installUrl ?? ""}>
+                {skill.installUrl ?? "skills.sh API"}
+              </dd>
+            </dl>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={installing}
+              onClick={() => {
+                onOpenChange(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={installing}
+              onClick={() => {
+                onConfirm(skill);
+              }}
+            >
+              {installing ? "Installing…" : "Install skill"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      ) : null}
+    </Dialog>
   );
 }
 
