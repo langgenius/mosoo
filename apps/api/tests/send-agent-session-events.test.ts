@@ -322,6 +322,58 @@ describe("send agent session events", () => {
     });
   });
 
+  test("skips stale queued delivery before hydrating its context", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertOwnerSession(database);
+    const nowMs = nowMsForTest();
+    const traceId = "stale-dispatch-trace";
+
+    await insertQueuedRunFixture(database, {
+      nowMs,
+      runId: PUBLIC_API_TEST_IDS.run,
+      traceId,
+    });
+    await database
+      .prepare("UPDATE session_run SET status = 'booting' WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.run)
+      .run();
+
+    await expect(
+      dispatchQueuedSessionRun({
+        bindings: createPublicHttpTestBindings(database) as ApiBindings,
+        input: {
+          attachmentIds: [PUBLIC_API_TEST_IDS.file],
+          prompt: "This duplicate delivery must not hydrate.",
+          queuedAtMs: nowMs,
+          session: {
+            app_id: PUBLIC_API_TEST_IDS.app,
+            id: PUBLIC_API_TEST_IDS.ownerSession,
+          },
+          sessionRunId: PUBLIC_API_TEST_IDS.run,
+          traceId,
+        },
+        requestUrl: `https://api.example.com/api/v1/sessions/${PUBLIC_API_TEST_IDS.ownerSession}/events`,
+        viewer: {
+          email: "owner@example.com",
+          emailVerified: true,
+          id: PUBLIC_API_TEST_IDS.ownerAccount,
+          imageUrl: null,
+          name: "Owner",
+        },
+      }),
+    ).resolves.toEqual([]);
+
+    const row = await database
+      .prepare("SELECT status, error_code FROM session_run WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.run)
+      .first<{ error_code: string | null; status: string }>();
+
+    expect(row).toEqual({
+      error_code: null,
+      status: "booting",
+    });
+  });
+
   test("rejects queued dispatch when a previously valid attachment is no longer session-ready", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertOwnerSession(database);
