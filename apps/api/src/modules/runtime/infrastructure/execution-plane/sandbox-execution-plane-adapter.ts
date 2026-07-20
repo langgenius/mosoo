@@ -139,6 +139,10 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
       executionSession: null,
       subject: null,
     };
+    // Success diagnostics are owner-debug, persist-only (deliver: false) and
+    // swallow their own errors; keep them off the first-token critical path and
+    // settle them before the lease is returned.
+    let pendingDiagnostics: Promise<unknown> = Promise.resolve();
 
     try {
       const timing = createRuntimeTimingRecorder({
@@ -149,7 +153,7 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
         traceId: input.traceId,
       });
       const runtimeSubjectLifecycle = createRuntimeSubjectLifecycleService(bindings);
-      await appendRuntimeDiagnosticEvent(bindings, {
+      pendingDiagnostics = appendRuntimeDiagnosticEvent(bindings, {
         eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxProvisioningStarted.name,
         sessionId: input.sessionId,
         value: {
@@ -173,15 +177,19 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
         }),
       );
       handles.subject = sandbox;
-      await appendRuntimeDiagnosticEvent(bindings, {
-        eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxProvisioningCompleted.name,
-        sessionId: input.sessionId,
-        value: {
-          ...runtimeBase,
-          coldStartMs: sandboxProvisioningTimer.elapsedMs(),
-          sandboxId,
-        },
-      });
+      const provisioningCompletedValue = {
+        ...runtimeBase,
+        coldStartMs: sandboxProvisioningTimer.elapsedMs(),
+        sandboxId,
+      };
+      // Chain after the started event so the two diagnostics keep their order.
+      pendingDiagnostics = pendingDiagnostics.then(() =>
+        appendRuntimeDiagnosticEvent(bindings, {
+          eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxProvisioningCompleted.name,
+          sessionId: input.sessionId,
+          value: provisioningCompletedValue,
+        }),
+      );
       sandboxProvisioned = true;
 
       const executionSession = await timing.measure("ensureSandboxConversationSession", () =>
@@ -230,6 +238,8 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
       }
       const initialDriverPhaseCount = driver.timing.phases.length;
 
+      await pendingDiagnostics;
+
       return {
         driverInstanceId: driver.driverInstanceId,
         readiness: async () => {
@@ -247,6 +257,7 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
         },
       };
     } catch (error) {
+      await pendingDiagnostics;
       if (!sandboxProvisioned) {
         await appendRuntimeDiagnosticEvent(bindings, {
           eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxProvisioningFailed.name,

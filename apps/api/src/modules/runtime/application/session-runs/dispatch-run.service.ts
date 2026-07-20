@@ -123,8 +123,8 @@ export async function dispatchSessionRun(
   let runLease: RuntimeExecutionPlaneRunLease | null = null;
 
   try {
-    await ensureSessionRunIsActive(bindings.DB, input.sessionRunId);
-
+    // acquireSessionRunDispatch CASes queued -> booting and returns null for
+    // every other state, so a separate pre-check read is redundant.
     const bootingRun = await acquireSessionRunDispatch(bindings.DB, input.sessionRunId);
 
     if (!bootingRun) {
@@ -144,13 +144,14 @@ export async function dispatchSessionRun(
 
     // Only the dispatch winner writes run state; the losing path above must
     // stay write-free so it cannot fail a run the winner is provisioning.
-    await persistSessionRunSkills(bindings.DB, input.sessionRunId, input.resolvedSkills);
-
-    await appendSessionRuntimeEvents({
-      bindings,
-      events: [createSessionRunUpdatedEvent(bootingRun, input.sessionId)],
-      sessionId: input.sessionId,
-    });
+    await Promise.all([
+      persistSessionRunSkills(bindings.DB, input.sessionRunId, input.resolvedSkills),
+      appendSessionRuntimeEvents({
+        bindings,
+        events: [createSessionRunUpdatedEvent(bootingRun, input.sessionId)],
+        sessionId: input.sessionId,
+      }),
+    ]);
 
     const attemptPrepareAndDispatch = async (): Promise<RuntimeExecutionPlaneRunLease> => {
       const preparedRunLease = await executionPlane.prepareRun(bindings, requestUrl, {
@@ -217,17 +218,22 @@ export async function dispatchSessionRun(
           sessionRunId: input.sessionRunId,
         }),
       );
+      // Snapshot before the readiness/telemetry awaits so the published
+      // driver_turn stage measures command dispatch only.
+      const dispatchTimingSnapshot = dispatchTiming.snapshot();
       const readyTiming = await preparedRunLease.readiness();
       await ensureSessionRunIsActive(bindings.DB, input.sessionRunId);
       prepareTimingEventPromise = appendSessionRuntimeTimingEventBestEffort({
         bindings,
         timing: readyTiming,
       });
-      await prepareTimingEventPromise;
-      await appendSessionRuntimeTimingEventBestEffort({
-        bindings,
-        timing: dispatchTiming.snapshot(),
-      });
+      await Promise.all([
+        prepareTimingEventPromise,
+        appendSessionRuntimeTimingEventBestEffort({
+          bindings,
+          timing: dispatchTimingSnapshot,
+        }),
+      ]);
 
       return preparedRunLease;
     };
