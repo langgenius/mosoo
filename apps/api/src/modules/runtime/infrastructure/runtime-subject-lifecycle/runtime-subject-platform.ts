@@ -46,15 +46,17 @@ export async function prepareRuntimeSubjectFilesystem(subject: SandboxHandle): P
   // port-readiness wait can stall ~120s; without a timeout the run wedges in `booting`
   // indefinitely until the next message reconciles it as `runtime.inactive`. Failing fast
   // surfaces a retryable `runtime.provision_failed` instead.
+  // The four RPCs are mutually independent: setKeepAlive configures the
+  // container lifetime while the mkdirs assert platform roots. Awaiting all of
+  // them keeps the explicit completion barrier for each call while removing
+  // the serial keep-alive wait from the first-token critical path.
   await withRuntimeProvisionTimeout(
-    (async (): Promise<void> => {
-      await subject.setKeepAlive(true);
-      await Promise.all([
-        subject.mkdir(SANDBOX_CACHE_PATH, { recursive: true }),
-        subject.mkdir(SANDBOX_MEMORY_PATH, { recursive: true }),
-        subject.mkdir(SANDBOX_SESSION_ROOT, { recursive: true }),
-      ]);
-    })(),
+    Promise.all([
+      subject.setKeepAlive(true),
+      subject.mkdir(SANDBOX_CACHE_PATH, { recursive: true }),
+      subject.mkdir(SANDBOX_MEMORY_PATH, { recursive: true }),
+      subject.mkdir(SANDBOX_SESSION_ROOT, { recursive: true }),
+    ]).then(() => undefined),
     "Runtime subject filesystem prepare",
   );
 }
