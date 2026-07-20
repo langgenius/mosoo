@@ -390,6 +390,7 @@ async function processSessionRunDispatchCommand(
     bindings,
     input: {
       attachmentIds: payload.attachmentIds,
+      dispatchSource: "queue",
       prompt: payload.prompt,
       queuedAtMs: payload.queuedAtMs,
       session: payload.session,
