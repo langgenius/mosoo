@@ -822,7 +822,7 @@ export class MosooPublicThreadClient {
     throw new MosooPublicApiError({
       body,
       code: payload.code,
-      message: payload.message ?? `Mosoo Public API request failed with HTTP ${response.status}.`,
+      message: payload.message ?? `mosoo Public API request failed with HTTP ${response.status}.`,
       status: response.status,
     });
   }

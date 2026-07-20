@@ -25,7 +25,7 @@ import type { DeploymentRunOutcome } from "./deployment-status";
 export type AgentExposure = "public_thread";
 
 export interface BoundAgentVM {
-  /** Mosoo agent id, e.g. "agt_3kf". */
+  /** mosoo agent id, e.g. "agt_3kf". */
   id: string;
   name: string;
   expose: AgentExposure;
@@ -66,13 +66,13 @@ export interface DeploymentVM {
   repoUrl: string;
   defaultBranch: string;
   /**
-   * Mosoo-managed production URL reserved for this deployment. It may exist
+   * mosoo-managed production URL reserved for this deployment. It may exist
    * before a deploy succeeds, so the console can show the production pipe
    * independently from the current run status.
    */
   plannedUrl: string | null;
   /**
-   * Mosoo-managed URL currently serving production traffic. `null` until a run
+   * mosoo-managed URL currently serving production traffic. `null` until a run
    * has reached the live state.
    */
   liveUrl: string | null;

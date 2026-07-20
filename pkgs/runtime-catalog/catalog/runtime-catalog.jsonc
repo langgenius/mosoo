@@ -1,5 +1,5 @@
 {
-  // Hand-authored source of truth for Mosoo runtime, provider, model, and runtime-display
+  // Hand-authored source of truth for mosoo runtime, provider, model, and runtime-display
   // metadata. Do not edit src/catalog.generated.ts directly; regenerate it from this file.
   "modelDefaults": {
     "anthropic": "claude-sonnet-5",

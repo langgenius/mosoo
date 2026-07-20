@@ -77,7 +77,7 @@ function HelpDocsDialogContent({ onOpenChange }: { onOpenChange: (open: boolean)
       <DialogHeader className="sr-only">
         <DialogTitle>Help &amp; docs</DialogTitle>
         <DialogDescription>
-          Search the Mosoo documentation hosted at mosoo.ai/docs.
+          Search the mosoo documentation hosted at mosoo.ai/docs.
         </DialogDescription>
       </DialogHeader>
 

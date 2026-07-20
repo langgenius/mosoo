@@ -12,7 +12,7 @@
     "test": "vp exec bun test tests"
   },
   "dependencies": {
-    "@assistant-ui/react": "0.14.26",
+    "@assistant-ui/react": "0.14.27",
     "@base-ui/react": "^1.5.0",
     "@cloudflare/sandbox": "0.12.3",
     "@hugeicons/core-free-icons": "^4.2.1",

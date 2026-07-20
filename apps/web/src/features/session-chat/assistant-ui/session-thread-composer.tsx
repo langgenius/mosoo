@@ -78,7 +78,7 @@ function SessionResourceChips({
 
 // Composer rebuilt on assistant-ui's ComposerPrimitive. Slim single-line input
 // that grows; submit/cancel + Enter / Shift+Enter come from the primitive. The
-// Mosoo upload button, resource-mention chips, and error card are preserved as
+// mosoo upload button, resource-mention chips, and error card are preserved as
 // custom children. The mention pipeline runs in onNew/onSend (see
 // agent-session-panel), so this composer only collects the typed text.
 export function SessionThreadComposer({

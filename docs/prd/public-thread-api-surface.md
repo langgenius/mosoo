@@ -6,7 +6,7 @@ exact HTTP contract is the
 
 ## Why it exists
 
-Builders need to use a Mosoo Agent from their own product without learning how
+Builders need to use a mosoo Agent from their own product without learning how
 it runs. The Public Thread API makes each conversation or job a durable Thread
 that an integration can start, follow, continue, and recover.
 
@@ -14,7 +14,7 @@ that an integration can start, follow, continue, and recover.
 
 - An App owner connects an exposed Agent to a server-side integration.
 - An App user may trigger that integration, but does not authenticate directly
-  with Mosoo today.
+  with mosoo today.
 
 ## User flow
 
@@ -35,8 +35,8 @@ Agent's API Access panel shows its identifier, token creation, and API reference
 
 - Access Tokens belong to the App owner. The Agent must be exposed, owned by
   that same owner, and remain inside the same App.
-- Mosoo does not yet represent the integration's end users. Every public Thread
-  is attributed to the App owner's Mosoo account, so the integration must
+- mosoo does not yet represent the integration's end users. Every public Thread
+  is attributed to the App owner's mosoo account, so the integration must
   enforce end-user access and maintain its own user-to-Thread mapping.
 - Tokens are backend secrets and are not suitable for browser or mobile clients
   that cannot keep them private.

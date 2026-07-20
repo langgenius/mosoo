@@ -24,10 +24,10 @@ describe("file preview", () => {
   });
 
   test("parses quoted CSV cells and line breaks", () => {
-    expect(parseDelimitedText('name,note\n"Mosoo, Inc.","line 1\nline 2"', ",")).toEqual({
+    expect(parseDelimitedText('name,note\n"mosoo, Inc.","line 1\nline 2"', ",")).toEqual({
       rows: [
         ["name", "note"],
-        ["Mosoo, Inc.", "line 1\nline 2"],
+        ["mosoo, Inc.", "line 1\nline 2"],
       ],
       truncated: false,
     });

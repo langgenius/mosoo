@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { PUBLIC_THREAD_API_THREADS_MAX_LIMIT } from "@mosoo/contracts/public-api";
-import { sessionRunsTable, sessionsTable } from "@mosoo/db";
+import { sessionExecutionSnapshotsTable, sessionRunsTable, sessionsTable } from "@mosoo/db";
 import { eq } from "drizzle-orm";
 
 import { fileStore } from "../src/modules/files/application/file-store";
@@ -28,6 +28,7 @@ import {
   insertRuntimeEvent,
   readJson,
   requestPublicApi,
+  requestPublicApiWithBindings,
   withProviderProbeMock,
 } from "./public-thread-api-fixtures";
 
@@ -193,6 +194,76 @@ async function countPublicApiIdempotencyRows(
   return row?.row_count ?? 0;
 }
 
+async function countPublicThreadsForAgent(database: PublicHttpTestDatabase): Promise<number> {
+  const row = await database
+    .prepare("SELECT COUNT(*) AS row_count FROM session WHERE agent_id = ?")
+    .bind(PUBLIC_API_TEST_IDS.agent)
+    .first<{ row_count: number }>();
+
+  return row?.row_count ?? 0;
+}
+
+async function countSessionRows(
+  database: PublicHttpTestDatabase,
+  table: "session_message" | "session_run",
+  sessionId: string,
+): Promise<number> {
+  const row = await database
+    .prepare(`SELECT COUNT(*) AS row_count FROM ${table} WHERE session_id = ?`)
+    .bind(sessionId)
+    .first<{ row_count: number }>();
+
+  return row?.row_count ?? 0;
+}
+
+function failFirstPublicApiIdempotencyCompletion(database: D1Database): D1Database {
+  let shouldFail = true;
+
+  const wrapStatement = (
+    statement: D1PreparedStatement,
+    failCompletion: boolean,
+  ): D1PreparedStatement =>
+    new Proxy(statement, {
+      get(target, property, receiver) {
+        if (property === "bind") {
+          return (...values: unknown[]) => wrapStatement(target.bind(...values), failCompletion);
+        }
+
+        if (property === "run" && failCompletion) {
+          return async () => {
+            if (shouldFail) {
+              shouldFail = false;
+              throw new Error("Injected public API idempotency completion failure.");
+            }
+
+            return target.run();
+          };
+        }
+
+        const value = Reflect.get(target, property, receiver);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+
+  return new Proxy(database, {
+    get(target, property, receiver) {
+      if (property === "prepare") {
+        return (query: string) => {
+          const statement = target.prepare(query);
+          const isCompletionUpdate =
+            query.startsWith('update "public_api_idempotency_key"') &&
+            query.includes('set "response_json"');
+
+          return wrapStatement(statement, isCompletionUpdate);
+        };
+      }
+
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
 async function insertPublicThread(
   database: PublicHttpTestDatabase,
   input: {
@@ -238,6 +309,41 @@ async function insertPublicThread(
       title: input.title,
       type: "api_channel",
       updatedAt: input.updatedAt,
+    })
+    .run();
+
+  await database
+    .app()
+    .insert(sessionExecutionSnapshotsTable)
+    .values({
+      createdAt: input.updatedAt,
+      planJson: JSON.stringify({
+        binding: {
+          agentId: PUBLIC_API_TEST_IDS.agent,
+          deploymentVersionId: PUBLIC_API_TEST_IDS.deployment,
+          deploymentVersionNumber: 1,
+          kind: "pet",
+          model: "gpt-5.4",
+          prompt: "Help.",
+          provider: "openai",
+          runtimeId: "openai-runtime",
+        },
+        environment: {
+          allowMcpServers: true,
+          allowPackageManagers: true,
+          allowedHostsJson: "[]",
+          envVarsJson: "[]",
+          environmentId: PUBLIC_API_TEST_IDS.environment,
+          environmentName: "Default",
+          networkPolicy: "full",
+          packagesJson: "[]",
+          revisionId: PUBLIC_API_TEST_IDS.environmentRevision,
+          setupScript: "",
+        },
+        skills: [],
+        tools: [],
+      }),
+      sessionId: input.id,
     })
     .run();
 }
@@ -1948,6 +2054,127 @@ describe("Public Thread API e2e", () => {
       expect(await readJson(replay)).toEqual(firstBody);
       await expect(
         countPublicApiRateLimitRequests(database, PUBLIC_API_TEST_IDS.patOwner),
+      ).resolves.toBe(1);
+    });
+  });
+
+  test("recovers a completed Thread creation after its idempotency completion write fails", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const idempotencyKey = "thread-create-completion-failure";
+    const createRequest = (key = idempotencyKey) =>
+      new Request(`https://api.example.com/api/v1/agents/${PUBLIC_API_TEST_IDS.agent}/threads`, {
+        body: JSON.stringify({
+          input: {
+            content: [{ text: "Recover the completed Thread.", type: "text" }],
+            type: "user.message",
+          },
+        }),
+        headers: {
+          Authorization: bearer(TOKENS.owner),
+          "Content-Type": "application/json",
+          "Idempotency-Key": key,
+        },
+        method: "POST",
+      });
+
+    await withProviderProbeMock(async () => {
+      const first = await requestPublicApiWithBindings(
+        app,
+        createRequest(),
+        createPublicHttpTestBindings(
+          failFirstPublicApiIdempotencyCompletion(database),
+        ) as ApiBindings,
+      );
+      expect(first.status).toBe(201);
+      const firstBody = await readJson(first);
+      const firstThread = expectRecord(firstBody["thread"]);
+      const firstRun = expectRecord(firstBody["run"]);
+      const firstThreadId = expectString(firstThread["id"]);
+      const firstRunId = expectString(firstRun["id"]);
+
+      await expect(countPublicThreadsForAgent(database)).resolves.toBe(1);
+      await database
+        .prepare(
+          "UPDATE public_api_idempotency_key SET updated_at = ? WHERE token_id = ? AND idempotency_key = ?",
+        )
+        .bind(Date.now() - 11 * 60 * 1000, PUBLIC_API_TEST_IDS.patOwner, idempotencyKey)
+        .run();
+
+      const unrelated = await requestPublicApi(
+        app,
+        database,
+        createRequest("other-idempotency-key"),
+      );
+      expect(unrelated.status).toBe(201);
+      await expect(countPublicThreadsForAgent(database)).resolves.toBe(2);
+
+      const retry = await requestPublicApi(app, database, createRequest());
+      expect(retry.status).toBe(201);
+      expect(retry.headers.get("Idempotency-Replayed")).toBe("true");
+      const retryBody = await readJson(retry);
+      expect(expectRecord(retryBody["thread"])["id"]).toBe(firstThreadId);
+      expect(expectRecord(retryBody["run"])["id"]).toBe(firstRunId);
+      await expect(countPublicThreadsForAgent(database)).resolves.toBe(2);
+      await expect(
+        countPublicApiIdempotencyRows(database, PUBLIC_API_TEST_IDS.patOwner, idempotencyKey),
+      ).resolves.toBe(1);
+    });
+  });
+
+  test("does not re-execute a stale public Thread event after its idempotency completion write fails", async () => {
+    const database = await createPublicHttpContractDatabase();
+    const app = createPublicThreadApiTestApp();
+    const threadId = generatedPublicThreadId(240);
+    const idempotencyKey = "thread-event-completion-failure";
+    const sendEventRequest = () =>
+      new Request(`https://api.example.com/api/v1/threads/${threadId}/events`, {
+        body: JSON.stringify({
+          events: [{ text: "Do not queue this event twice.", type: "user_message" }],
+        }),
+        headers: {
+          Authorization: bearer(TOKENS.owner),
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        method: "POST",
+      });
+
+    await insertPublicThread(database, {
+      id: threadId,
+      title: "Event idempotency recovery",
+      updatedAt: 2_400,
+    });
+
+    await withProviderProbeMock(async () => {
+      const first = await requestPublicApiWithBindings(
+        app,
+        sendEventRequest(),
+        createPublicHttpTestBindings(
+          failFirstPublicApiIdempotencyCompletion(database),
+        ) as ApiBindings,
+      );
+      expect(first.status).toBe(200);
+      await expect(countSessionRows(database, "session_run", threadId)).resolves.toBe(1);
+      await expect(countSessionRows(database, "session_message", threadId)).resolves.toBe(1);
+
+      await database
+        .prepare(
+          "UPDATE public_api_idempotency_key SET updated_at = ? WHERE token_id = ? AND idempotency_key = ?",
+        )
+        .bind(Date.now() - 11 * 60 * 1000, PUBLIC_API_TEST_IDS.patOwner, idempotencyKey)
+        .run();
+
+      const retry = await requestPublicApi(app, database, sendEventRequest());
+      expect(retry.status).toBe(409);
+      expect(Number(retry.headers.get("Retry-After"))).toBeGreaterThan(60 * 60);
+      expect(expectRecord(await readJson(retry))["error"]).toMatchObject({
+        code: "idempotency_conflict",
+      });
+      await expect(countSessionRows(database, "session_run", threadId)).resolves.toBe(1);
+      await expect(countSessionRows(database, "session_message", threadId)).resolves.toBe(1);
+      await expect(
+        countPublicApiIdempotencyRows(database, PUBLIC_API_TEST_IDS.patOwner, idempotencyKey),
       ).resolves.toBe(1);
     });
   });
