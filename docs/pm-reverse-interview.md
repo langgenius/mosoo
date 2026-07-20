@@ -16,10 +16,10 @@ A PM handed an engineering-language question cannot make a product judgment; all
 
 ### 1.1 A Historical Anti-pattern: Q12
 
-> **Historical Q12 phrasing (not a current Mosoo contract)**: For the list of env var keys that affect PATH / auth (e.g. `OPENAI_API_KEY`), are they hard-coded by the platform or self-reported by the Driver? This determines the source of truth for deciding when a maintenance restart is triggered. The scope is a "field name → restart kind" mapping table in the Driver protocol layer, so the PRD does not need to choose the implementation owner. The product layer only needs to define which configuration changes interrupt the user's active work and what recovery they see.
+> **Historical Q12 phrasing (not a current mosoo contract)**: For the list of env var keys that affect PATH / auth (e.g. `OPENAI_API_KEY`), are they hard-coded by the platform or self-reported by the Driver? This determines the source of truth for deciding when a maintenance restart is triggered. The scope is a "field name → restart kind" mapping table in the Driver protocol layer, so the PRD does not need to choose the implementation owner. The product layer only needs to define which configuration changes interrupt the user's active work and what recovery they see.
 
 This example preserves the questioning mistake, not its old implementation
-details. Do not infer a runtime state-directory layout or a currently open Mosoo
+details. Do not infer a runtime state-directory layout or a currently open mosoo
 decision from it; those contracts must come from the current architecture and
 code.
 

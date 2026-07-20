@@ -1,10 +1,10 @@
 # Runtime Choice
 
-Status: current core runtime surface under the canonical [Mosoo Spec](../SPEC.md).
+Status: current core runtime surface under the canonical [mosoo Spec](../SPEC.md).
 
 ## Value
 
-Mosoo lets a Builder run an Agent Workload without learning how each model provider starts or operates it. Runtime choice exists to make supported workloads launch reliably; it is not a marketplace.
+mosoo lets a Builder run an Agent Workload without learning how each model provider starts or operates it. Runtime choice exists to make supported workloads launch reliably; it is not a marketplace.
 
 ## Users and problem
 

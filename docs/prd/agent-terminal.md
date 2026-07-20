@@ -15,7 +15,7 @@ Agent.
 
 ## How to use it
 
-Open an Assistant Agent in the Mosoo console and select **Terminal**. Mosoo shows the
+Open an Assistant Agent in the mosoo console and select **Terminal**. mosoo shows the
 connection status and offers a reconnect action. The first connection may take a few
 seconds while the Agent's environment wakes up.
 
@@ -28,5 +28,5 @@ changes through the Agent's normal configuration and publishing flows.
 - Only the Agent owner can open the Terminal.
 - Task Agents do not show it because their environments are temporary.
 - Terminal changes may disappear after an environment is reset, rebuilt, or replaced.
-- Mosoo does not promise a specific folder layout, source-code checkout, or set of
+- mosoo does not promise a specific folder layout, source-code checkout, or set of
   maintenance commands inside the Terminal.

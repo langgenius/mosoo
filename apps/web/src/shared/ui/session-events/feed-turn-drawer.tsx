@@ -46,7 +46,7 @@ function SessionTimelineBar({
   selectedId: string | null;
 }): ReactElement {
   return (
-    <div className="border-border-subtle bg-muted/10 flex h-7 min-w-0 items-center gap-0.5 overflow-hidden rounded-md border p-1">
+    <div className="border-border-subtle bg-muted/10 flex h-7 w-full max-w-full min-w-0 items-center gap-0.5 overflow-hidden rounded-md border p-1">
       {events.map((event) => {
         const domain = getSessionEventDomain(event.type);
         const tone = SESSION_EVENT_DOMAIN_TONE[domain];
@@ -237,8 +237,8 @@ export function SessionTurnDrawer({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] gap-0 overflow-hidden p-0 sm:max-w-[1080px]">
-        <DialogHeader className="border-border-subtle border-b px-7 pt-4 pb-3">
+      <DialogContent className="flex max-h-[88vh] !w-[calc(100vw-2rem)] !max-w-[1080px] flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-border-subtle shrink-0 border-b px-7 pt-4 pb-3">
           <div className="flex items-start justify-between gap-4 pr-8">
             <div className="min-w-0">
               <div className="flex items-center gap-2">

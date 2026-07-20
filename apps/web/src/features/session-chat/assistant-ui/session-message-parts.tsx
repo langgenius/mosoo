@@ -7,7 +7,7 @@ import { Markdown } from "@/shared/ui/markdown";
 
 import { SessionToolPart } from "./session-tool-part";
 
-// Assistant text renders through Mosoo's hardened Markdown (sanitize/harden,
+// Assistant text renders through mosoo's hardened Markdown (sanitize/harden,
 // <img> disallowed), streaming-animated while the part is still running.
 const AssistantText: TextMessagePartComponent = ({ status, text }) => (
   <Markdown streaming={status.type === "running"}>{text}</Markdown>

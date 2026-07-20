@@ -8,6 +8,7 @@ import {
   deleteOwnedSkill as deleteOwnedSkillRemote,
   fetchSkillSource,
   getSkillDetail as getSkillDetailRemote,
+  installSkillsShSkill as installSkillsShSkillRemote,
   inspectSkillUpload,
   publishSkillPackage,
 } from "../../../domains/skill/api/skill-client";
@@ -118,6 +119,28 @@ export function useSkillRegistry() {
     [refresh, appId],
   );
 
+  const installSkillsShSkill = useCallback(
+    async (input: {
+      id: string;
+      installUrl: string | null;
+      slug: string;
+    }): Promise<SkillSummary> => {
+      if (!isTruthy(appId)) {
+        throw new Error("App is required.");
+      }
+
+      const created = await installSkillsShSkillRemote({
+        appId: toAppId(appId),
+        id: input.id,
+        installUrl: input.installUrl,
+        slug: input.slug,
+      });
+      await refresh();
+      return created;
+    },
+    [refresh, appId],
+  );
+
   const deleteOwnedSkill = useCallback(
     async (skillId: string) => {
       if (!isTruthy(appId)) {
@@ -138,6 +161,7 @@ export function useSkillRegistry() {
     getSkillSource,
     inspectFile,
     inspectGithub,
+    installSkillsShSkill,
     loading: isTruthy(appId) ? skillsQuery.isLoading : appsLoading,
     personal,
     appId,

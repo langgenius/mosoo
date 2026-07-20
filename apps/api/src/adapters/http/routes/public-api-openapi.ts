@@ -400,7 +400,7 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
       }),
       post: operation({
         description:
-          "Creates a Thread and the backing AgentSession. If input is present, Mosoo also queues the initial Run. If input is omitted, the Thread is immediately visible with IDLE status and no run. Access Token callers are attributed to the token owner.",
+          "Creates a Thread and the backing AgentSession. If input is present, mosoo also queues the initial Run. If input is omitted, the Thread is immediately visible with IDLE status and no run. Access Token callers are attributed to the token owner.",
         parameters: [exampleAgentIdParameter, idempotencyKeyParameter],
         requestBody: jsonRequestBodyExamples(
           { $ref: "#/components/schemas/CreateThreadRequest" },
@@ -582,8 +582,8 @@ export function createPublicApiOpenApiDocument(origin: string): PublicApiOpenApi
     components: createPublicApiOpenApiComponents(),
     info: {
       description:
-        "Public HTTPS API for creating and retrieving Threads on Mosoo Agent API Endpoints. v1 resource identifiers are bare ULIDs, not prefixed IDs. Access Tokens identify the account caller. Runtime execution resolves the Agent API Endpoint owner's capabilities while the Thread is attributed to the token owner.",
-      title: "Mosoo Public Thread API",
+        "Public HTTPS API for creating and retrieving Threads on mosoo Agent API Endpoints. v1 resource identifiers are bare ULIDs, not prefixed IDs. Access Tokens identify the account caller. Runtime execution resolves the Agent API Endpoint owner's capabilities while the Thread is attributed to the token owner.",
+      title: "mosoo Public Thread API",
       version: PUBLIC_API_VERSION,
     },
     openapi: "3.1.0",
