@@ -63,12 +63,16 @@ export async function updateSessionRunStatusIfActive(
   database: D1Database,
   input: {
     error?: RunError | null;
+    expectedCurrentStatus?: SessionRunSummary["status"];
     runId: SessionRunId;
     status: SessionRunSummary["status"];
   },
 ): Promise<SessionRunSummary | null> {
   const outcome = await setSessionRunStatus(database, {
     ...(input.error !== undefined ? { error: input.error } : {}),
+    ...(input.expectedCurrentStatus !== undefined
+      ? { expectedCurrentStatus: input.expectedCurrentStatus }
+      : {}),
     runId: input.runId,
     source: "api",
     status: input.status,

@@ -85,8 +85,6 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
   const { bindings, input, requestUrl, viewer } = request;
   const queueStartedAtMs = Date.now();
 
-  await reconcileStaleActiveSessionRun(bindings.DB, input.session.id);
-
   const runtimeId = getSupportedRuntimeId(input.session.runtime_id);
   const viewerId: AccountId = parsePlatformId(viewer.id, "viewer id");
 
@@ -94,19 +92,24 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     throw new Error(`Unsupported runtime: ${input.session.runtime_id}.`);
   }
 
-  const executionPlan = await getSessionExecutionPlan(bindings.DB, input.session.id);
-  await resolveReadyEnvironmentPackageArtifact(
-    bindings,
-    input.session.app_id,
-    executionPlan.environment.packagesJson,
-  );
-
-  await fileStore.ensureSessionAttachments(
-    bindings,
-    input.accessViewer ?? viewer,
-    input.session.id,
-    input.attachmentIds,
-  );
+  // Pre-admission guards are independent; run them concurrently instead of
+  // paying three serial D1 round trips before the run row exists.
+  await Promise.all([
+    reconcileStaleActiveSessionRun(bindings.DB, input.session.id),
+    getSessionExecutionPlan(bindings.DB, input.session.id).then((executionPlan) =>
+      resolveReadyEnvironmentPackageArtifact(
+        bindings,
+        input.session.app_id,
+        executionPlan.environment.packagesJson,
+      ),
+    ),
+    fileStore.ensureSessionAttachments(
+      bindings,
+      input.accessViewer ?? viewer,
+      input.session.id,
+      input.attachmentIds,
+    ),
+  ]);
 
   const createRunResult = await createSessionRunRecordIfSessionIdle(bindings.DB, {
     agentId: input.session.agent_id,
@@ -198,6 +201,7 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
       bindings,
       input: {
         attachmentIds: input.attachmentIds,
+        dispatchSource: "inline",
         prompt: input.prompt,
         queuedAtMs,
         session: { id: input.session.id, app_id: input.session.app_id },

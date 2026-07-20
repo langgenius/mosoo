@@ -414,6 +414,7 @@ describe("send agent session events", () => {
         bindings: createPublicHttpTestBindings(database) as ApiBindings,
         input: {
           attachmentIds: [PUBLIC_API_TEST_IDS.file],
+          dispatchSource: "queue",
           prompt: "This duplicate delivery must not hydrate.",
           queuedAtMs: nowMs,
           session: {
@@ -594,6 +595,7 @@ describe("send agent session events", () => {
         bindings,
         input: {
           attachmentIds: [PUBLIC_API_TEST_IDS.file],
+          dispatchSource: "queue",
           prompt: "Use the attached file.",
           queuedAtMs: nowMs,
           session: {
@@ -654,6 +656,7 @@ describe("send agent session events", () => {
         bindings,
         input: {
           attachmentIds: [PUBLIC_API_TEST_IDS.fileAlt],
+          dispatchSource: "queue",
           prompt: "Use the attached file.",
           queuedAtMs: nowMs,
           session: {
@@ -684,6 +687,71 @@ describe("send agent session events", () => {
       status: "failed",
     });
     expect(row?.error_message).toContain("is not available for this session");
+  });
+
+  test("keeps a dispatched run untouched when a losing hydration fails", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertOwnerSession(database);
+    const nowMs = nowMsForTest();
+    const traceId = "loser-hydration-trace";
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+
+    await insertQueuedRunFixture(database, {
+      nowMs,
+      runId: PUBLIC_API_TEST_IDS.run,
+      traceId,
+    });
+    // A winning dispatcher already CASed the run out of queued.
+    await database
+      .prepare("UPDATE session_run SET status = 'booting' WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.run)
+      .run();
+    await insertSessionFileRecord(database, {
+      etag: null,
+      fileId: PUBLIC_API_TEST_IDS.fileAlt,
+      mimeType: "text/markdown",
+      name: "summary.md",
+      nowMs,
+      sessionKind: "artifact",
+      size: 23,
+      status: "ready",
+    });
+
+    await expect(
+      dispatchQueuedSessionRun({
+        bindings,
+        input: {
+          attachmentIds: [PUBLIC_API_TEST_IDS.fileAlt],
+          dispatchSource: "inline",
+          prompt: "Use the attached file.",
+          queuedAtMs: nowMs,
+          session: {
+            app_id: PUBLIC_API_TEST_IDS.app,
+            id: PUBLIC_API_TEST_IDS.ownerSession,
+          },
+          sessionRunId: PUBLIC_API_TEST_IDS.run,
+          traceId,
+        },
+        requestUrl: `https://api.example.com/api/v1/sessions/${PUBLIC_API_TEST_IDS.ownerSession}/events`,
+        viewer: {
+          email: "owner@example.com",
+          emailVerified: true,
+          id: PUBLIC_API_TEST_IDS.ownerAccount,
+          imageUrl: null,
+          name: "Owner",
+        },
+      }),
+    ).rejects.toThrow("is not available for this session");
+
+    const row = await database
+      .prepare("SELECT status, error_code FROM session_run WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.run)
+      .first<{ error_code: string | null; status: string }>();
+
+    expect(row).toEqual({
+      error_code: null,
+      status: "booting",
+    });
   });
 
   test("rejects participant sends when the viewer is not the session creator", async () => {
