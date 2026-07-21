@@ -61,6 +61,15 @@ export interface RuntimeKindPolicy {
 
 const RUNTIME_SUBJECT_IDLE_GRACE_MS = 5 * 60_000;
 
+// Cattle subjects are per-session sandboxes; tearing them down after every
+// terminal run made each follow-up turn in the same session pay the full
+// container boot (measured 2.4-4.8s vs ~0.3s on a warm container). A short
+// idle grace keeps the sandbox alive between turns while the kind-agnostic
+// inactive-deadline sweep still reclaims it shortly after the session goes
+// quiet. Cost ceiling: one extra <=90s of container residency per session
+// after its last run.
+const CATTLE_SUBJECT_IDLE_GRACE_MS = 90_000;
+
 const SUBJECT_MEMORY_CHECKPOINT = {
   path: SANDBOX_MEMORY_PATH,
   type: "subject_memory",
@@ -104,7 +113,7 @@ export const RUNTIME_KIND_POLICIES = {
       terminalTarget: AGENT_KIND_RUNTIME_POLICIES.cattle.terminal.target,
     },
     subject: {
-      idleReleaseDelayMs: 0,
+      idleReleaseDelayMs: CATTLE_SUBJECT_IDLE_GRACE_MS,
       scope: AGENT_KIND_RUNTIME_POLICIES.cattle.subject.scope,
       subjectKind: AGENT_KIND_RUNTIME_POLICIES.cattle.subject.scope,
     },
