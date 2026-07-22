@@ -58,15 +58,64 @@ interface LiveMessageState {
 
 class PublicLiveEventRowProjector {
   readonly #messages = new Map<string, LiveMessageState>();
+  readonly #messageKeysByRun = new Map<string, Set<string>>();
+
+  #getMessageRunKey(row: PublicThreadEventProcessRow): string {
+    return row.run_id ?? "";
+  }
+
+  #getMessageKey(row: PublicThreadEventProcessRow): string {
+    return `${this.#getMessageRunKey(row)}:${row.process_type}`;
+  }
+
+  #setMessage(row: PublicThreadEventProcessRow, message: LiveMessageState): void {
+    const key = this.#getMessageKey(row);
+    const runKey = this.#getMessageRunKey(row);
+    const runKeys = this.#messageKeysByRun.get(runKey);
+
+    this.#messages.set(key, message);
+    if (runKeys === undefined) {
+      this.#messageKeysByRun.set(runKey, new Set([key]));
+    } else {
+      runKeys.add(key);
+    }
+  }
+
+  #deleteMessage(row: PublicThreadEventProcessRow): void {
+    const key = this.#getMessageKey(row);
+    const runKey = this.#getMessageRunKey(row);
+    const runKeys = this.#messageKeysByRun.get(runKey);
+
+    this.#messages.delete(key);
+    runKeys?.delete(key);
+    if (runKeys?.size === 0) {
+      this.#messageKeysByRun.delete(runKey);
+    }
+  }
+
+  #deleteRunMessages(runId: SessionRunId | null): void {
+    const runKey = runId ?? "";
+    const messageKeys = this.#messageKeysByRun.get(runKey);
+
+    if (messageKeys === undefined) {
+      return;
+    }
+
+    for (const messageKey of messageKeys) {
+      this.#messages.delete(messageKey);
+    }
+
+    this.#messageKeysByRun.delete(runKey);
+  }
 
   project(rows: readonly PublicThreadEventProcessRow[]): PublicThreadEventProcessRow[] {
     const output: PublicThreadEventProcessRow[] = [];
 
     for (const row of rows) {
-      const key = `${row.run_id ?? ""}:${row.process_type}`;
+      const key = this.#getMessageKey(row);
 
       if (row.event_type === "message.started") {
-        this.#messages.set(key, {
+        this.#setMessage(row, {
           filter: new OpenAiPrivateCitationStreamFilter(),
           text: "",
         });
@@ -78,7 +127,7 @@ class PublicLiveEventRowProjector {
 
         if (message === undefined) {
           message = { filter: new OpenAiPrivateCitationStreamFilter(), text: "" };
-          this.#messages.set(key, message);
+          this.#setMessage(row, message);
         }
 
         const contentText = message.filter.push(row.content_text).text;
@@ -105,7 +154,7 @@ class PublicLiveEventRowProjector {
 
       if (row.event_type === "message.added") {
         const message = this.#messages.get(key);
-        this.#messages.delete(key);
+        this.#deleteMessage(row);
 
         if (message !== undefined) {
           const snapshotText = sanitizePublicOutput(row.content_text).text;
@@ -132,13 +181,7 @@ class PublicLiveEventRowProjector {
         row.event_type === "run.completed" ||
         row.event_type === "run.failed"
       ) {
-        const runPrefix = `${row.run_id ?? ""}:`;
-
-        for (const messageKey of this.#messages.keys()) {
-          if (messageKey.startsWith(runPrefix)) {
-            this.#messages.delete(messageKey);
-          }
-        }
+        this.#deleteRunMessages(row.run_id);
       }
 
       output.push(row);
