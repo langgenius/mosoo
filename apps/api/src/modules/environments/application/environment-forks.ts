@@ -18,6 +18,7 @@ import {
   ensureEnvironmentEditor,
   getEnvironmentRecordRow,
 } from "./environment-access.service";
+import { assertWritableEnvironmentPackageManagers } from "./environment-config";
 import { toConfig, toEnvironmentSummary } from "./environment-config-mapping";
 import {
   allocateCopyName,
@@ -34,9 +35,13 @@ export async function createEnvironmentFork(
     environmentId: input.environmentId,
     appId: input.appId,
   });
+  const sourceConfig = toConfig(access.row);
+
+  assertWritableEnvironmentPackageManagers(sourceConfig.packages);
+
   const environmentId = createPlatformId<EnvironmentId>();
   const config = await cloneConfigWithNewSecrets(bindings, {
-    config: toConfig(access.row),
+    config: sourceConfig,
     environmentId,
   });
   const timestampMs = currentTimestampMs();
