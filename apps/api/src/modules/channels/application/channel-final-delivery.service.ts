@@ -14,6 +14,7 @@ import {
 } from "./channel-final-delivery-errors";
 import {
   claimJobForDelivery,
+  markJobDeliveryRetryExhausted,
   markJobDelivered,
   markJobFailed,
   parseActiveChannelFinalDeliveryClaim,
@@ -39,6 +40,8 @@ export type { ChannelFinalDeliveryMessage } from "./channel-final-delivery-messa
 export {
   createChannelFinalDeliveryScheduler,
   enqueueChannelFinalDeliveryJob,
+  redriveFailedChannelFinalDeliveryEnqueues,
+  redriveExhaustedChannelFinalDeliveryJobs,
 } from "./channel-final-delivery-jobs";
 export type {
   ChannelFinalDeliveryScheduler,
@@ -305,7 +308,7 @@ export async function processChannelFinalDeliveryMessage(
     }
 
     if (attemptCount >= CHANNEL_FINAL_DELIVERY_MAX_DELIVERY_ATTEMPTS) {
-      await markJobFailed({
+      await markJobDeliveryRetryExhausted({
         attemptCount,
         database: bindings.DB,
         errorCode,
