@@ -44,12 +44,52 @@ export function mergePendingSendMessages(
   return [...messages, ...pendingMessages];
 }
 
-function isEchoOfPendingSend(message: SessionViewMessage, pending: PendingSend): boolean {
-  return (
-    message.role === "user" &&
-    !pending.baselineUserMessageIds.includes(message.id) &&
-    message.content.trim() === pending.text.trim()
-  );
+function indexUserMessageIdsByTrimmedContent(
+  messages: readonly SessionViewMessage[],
+): Map<string, Set<string>> {
+  const idsByContent = new Map<string, Set<string>>();
+
+  for (const message of messages) {
+    if (message.role !== "user") {
+      continue;
+    }
+
+    const content = message.content.trim();
+    const ids = idsByContent.get(content);
+
+    if (ids === undefined) {
+      idsByContent.set(content, new Set([message.id]));
+    } else {
+      ids.add(message.id);
+    }
+  }
+
+  return idsByContent;
+}
+
+function hasEchoOfPendingSend(
+  userMessageIdsByContent: ReadonlyMap<string, ReadonlySet<string>>,
+  pending: PendingSend,
+): boolean {
+  const candidateIds = userMessageIdsByContent.get(pending.text.trim());
+
+  if (candidateIds === undefined) {
+    return false;
+  }
+
+  if (pending.baselineUserMessageIds.length === 0) {
+    return candidateIds.size > 0;
+  }
+
+  const baselineIds = new Set(pending.baselineUserMessageIds);
+
+  for (const candidateId of candidateIds) {
+    if (!baselineIds.has(candidateId)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export function prunePendingSends(
@@ -61,10 +101,11 @@ export function prunePendingSends(
     return pendingSends;
   }
 
+  const userMessageIdsByContent = indexUserMessageIdsByTrimmedContent(messages);
   const remaining = pendingSends.filter(
     (pending) =>
       nowMs - pending.createdAtMs < PENDING_SEND_TTL_MS &&
-      !messages.some((message) => isEchoOfPendingSend(message, pending)),
+      !hasEchoOfPendingSend(userMessageIdsByContent, pending),
   );
 
   // Identity preservation is load-bearing: the model prunes inside a state
