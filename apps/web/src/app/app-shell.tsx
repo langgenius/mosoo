@@ -22,7 +22,7 @@ import {
 } from "@/shared/ui/dropdown-menu";
 import { Separator } from "@/shared/ui/separator";
 import { Sheet, SheetContent, SheetTitle } from "@/shared/ui/sheet";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import { AccountMenu } from "./account-menu";
 import { createHugeicon } from "./hugeicon";
@@ -393,14 +393,16 @@ export function Layout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <ConsoleShell
-      collapsed={collapsed}
-      mobileSidebar={(closeNavigation) => appSidebar(false, closeNavigation)}
-      onToggleCollapsed={toggleCollapsed}
-      sidebar={appSidebar(collapsed)}
-    >
-      {children}
-    </ConsoleShell>
+    <TooltipProvider>
+      <ConsoleShell
+        collapsed={collapsed}
+        mobileSidebar={(closeNavigation) => appSidebar(false, closeNavigation)}
+        onToggleCollapsed={toggleCollapsed}
+        sidebar={appSidebar(collapsed)}
+      >
+        {children}
+      </ConsoleShell>
+    </TooltipProvider>
   );
 }
 
@@ -413,41 +415,43 @@ export function OrgLayout({ children }: { children: ReactNode }) {
   const headerTitle = getOrgHeaderTitle(location.pathname);
 
   return (
-    <div className="bg-background flex h-dvh flex-col">
-      <header className="border-border-soft hidden shrink-0 border-b md:flex">
-        <div className="flex min-h-[76px] w-[224px] shrink-0 items-center gap-2 px-4">
-          <Link to="/apps" aria-label="Apps" className="flex items-center">
-            <img src="/brand/logo-mark.svg" alt="mosoo" className="block size-6" />
-          </Link>
-          {activeOrganization === null ? null : (
-            <>
-              <span className="text-fg-muted text-base font-light">/</span>
-              <span className="text-foreground max-w-[144px] truncate text-sm font-semibold">
-                {activeOrganization.name}
-              </span>
-            </>
-          )}
-        </div>
-        {headerTitle === null ? null : (
-          <div className="flex min-w-0 flex-1 items-center px-8">
-            <h1 className="text-foreground truncate text-2xl font-semibold tracking-normal">
-              {headerTitle}
-            </h1>
+    <TooltipProvider>
+      <div className="bg-background flex h-dvh flex-col">
+        <header className="border-border-soft hidden shrink-0 border-b md:flex">
+          <div className="flex min-h-[76px] w-[224px] shrink-0 items-center gap-2 px-4">
+            <Link to="/apps" aria-label="Apps" className="flex items-center">
+              <img src="/brand/logo-mark.svg" alt="mosoo" className="block size-6" />
+            </Link>
+            {activeOrganization === null ? null : (
+              <>
+                <span className="text-fg-muted text-base font-light">/</span>
+                <span className="text-foreground max-w-[144px] truncate text-sm font-semibold">
+                  {activeOrganization.name}
+                </span>
+              </>
+            )}
           </div>
-        )}
-      </header>
-      <MobileNavigation
-        renderNavigation={() => <OrgNavigation collapsed={false} pathname={location.pathname} />}
-        title={headerTitle}
-      />
-      <div className="flex min-h-0 flex-1">
-        <aside className="border-border-soft hidden w-[224px] shrink-0 flex-col border-r px-3 py-4 md:flex">
-          <OrgNavigation collapsed={false} pathname={location.pathname} />
-          <div className="flex-1" />
-          <ConsoleSidebarFooter collapsed={false} />
-        </aside>
-        <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
+          {headerTitle === null ? null : (
+            <div className="flex min-w-0 flex-1 items-center px-8">
+              <h1 className="text-foreground truncate text-2xl font-semibold tracking-normal">
+                {headerTitle}
+              </h1>
+            </div>
+          )}
+        </header>
+        <MobileNavigation
+          renderNavigation={() => <OrgNavigation collapsed={false} pathname={location.pathname} />}
+          title={headerTitle}
+        />
+        <div className="flex min-h-0 flex-1">
+          <aside className="border-border-soft hidden w-[224px] shrink-0 flex-col border-r px-3 py-4 md:flex">
+            <OrgNavigation collapsed={false} pathname={location.pathname} />
+            <div className="flex-1" />
+            <ConsoleSidebarFooter collapsed={false} />
+          </aside>
+          <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
