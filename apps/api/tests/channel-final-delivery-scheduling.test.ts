@@ -12,7 +12,9 @@ import type { ChannelFinalDeliveryMessage } from "../src/modules/channels/applic
 import {
   enqueueChannelFinalDeliveryJob,
   processChannelFinalDeliveryMessage,
+  redriveFailedChannelFinalDeliveryEnqueues,
 } from "../src/modules/channels/application/channel-final-delivery.service";
+import { createApiWorker } from "../src/platform/cloudflare/create-api-worker";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createTestEnvironment,
@@ -660,6 +662,99 @@ describe("channel final delivery scheduling", () => {
       );
 
       expect(duplicateJobId).toBeNull();
+      expect(queue.sent).toHaveLength(1);
+    } finally {
+      restoreFetch();
+    }
+  });
+
+  test("retains an ambiguously accepted enqueue and delivers the retained job", async () => {
+    const telegramBodies: unknown[] = [];
+    const restoreFetch = installTelegramFetch(telegramBodies);
+
+    try {
+      const { bindings: baseBindings, database, queue } = await createTestEnvironment();
+      const bindings: ApiBindings = {
+        ...baseBindings,
+        CHANNEL_FINAL_DELIVERY_QUEUE: {
+          sent: queue.sent,
+          async send(body, options): Promise<void> {
+            await queue.send(body, options);
+            throw new Error("Queue response timed out after accepting the message.");
+          },
+        },
+      } as ApiBindings;
+      const seed = await createCompletedTelegramFinalDeliveryJob({
+        bindings,
+        database,
+        externalEventId: "telegram:update:ambiguous-enqueue",
+      });
+
+      const retained = await database
+        .app()
+        .select({
+          lastErrorCode: channelFinalDeliveryJobsTable.lastErrorCode,
+          status: channelFinalDeliveryJobsTable.status,
+        })
+        .from(channelFinalDeliveryJobsTable)
+        .where(eq(channelFinalDeliveryJobsTable.id, seed.jobId))
+        .get();
+      const recorded = createRecordedQueueMessage<ChannelFinalDeliveryMessage>({
+        body: takeQueuedMessageBody(queue, seed.jobId),
+      });
+      await processChannelFinalDeliveryMessage(bindings, recorded.message, {}, nowMsForTest);
+
+      expect(retained).toEqual({
+        lastErrorCode: "channel_final_delivery_queue_send_failed",
+        status: "dispatched",
+      });
+      expect(telegramBodies).toHaveLength(1);
+      expect(recorded.recorded).toEqual([{ type: "ack" }]);
+    } finally {
+      restoreFetch();
+    }
+  });
+
+  test("scheduled redrive delivers jobs when the initial queue send is rejected", async () => {
+    const telegramBodies: unknown[] = [];
+    const restoreFetch = installTelegramFetch(telegramBodies);
+
+    try {
+      const { bindings: baseBindings, database, queue } = await createTestEnvironment();
+      let queueAvailable = false;
+      const bindings: ApiBindings = {
+        ...baseBindings,
+        CHANNEL_FINAL_DELIVERY_QUEUE: {
+          sent: queue.sent,
+          async send(body, options): Promise<void> {
+            if (!queueAvailable) {
+              throw new Error("Queue unavailable.");
+            }
+
+            await queue.send(body, options);
+          },
+        },
+      } as ApiBindings;
+      const seed = await createCompletedTelegramFinalDeliveryJob({
+        bindings,
+        database,
+        externalEventId: "telegram:update:enqueue-redrive",
+      });
+
+      expect(queue.sent).toEqual([]);
+      queueAvailable = true;
+      await createApiWorker().scheduled(
+        { scheduledTime: nowMsForTest() } as ScheduledController,
+        bindings,
+      );
+
+      const queued = takeQueuedMessageBody(queue, seed.jobId);
+      const recorded = createRecordedQueueMessage<ChannelFinalDeliveryMessage>({ body: queued });
+      await processChannelFinalDeliveryMessage(bindings, recorded.message, {}, nowMsForTest);
+
+      expect(telegramBodies).toHaveLength(1);
+      expect(recorded.recorded).toEqual([{ type: "ack" }]);
+      await redriveFailedChannelFinalDeliveryEnqueues(bindings);
       expect(queue.sent).toHaveLength(1);
     } finally {
       restoreFetch();

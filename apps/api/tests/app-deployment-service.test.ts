@@ -111,6 +111,13 @@ function createDatabase(): SqliteD1Database {
       ON app_deployment_run (app_id)
       WHERE status IN ('queued', 'preparing', 'building', 'submitting', 'submitted', 'activating');
 
+    -- The Worker scheduled handler also redrives final-delivery queue enqueues.
+    CREATE TABLE channel_final_delivery_job (
+      id text PRIMARY KEY NOT NULL,
+      last_error_code text,
+      status text NOT NULL
+    );
+
     CREATE TABLE api_command (
       attempt_count integer DEFAULT 0 NOT NULL,
       claim_expires_at integer,
