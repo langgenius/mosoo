@@ -262,13 +262,6 @@ async function closeIdleSessionScopedConversationSessions(
     limit: MAINTENANCE_BATCH_SIZE,
   });
 
-  // TEMP-DEBUG(vc2): remove before merge — proves the sweep runs on staging.
-  logWarn("runtime.conversation.idle_sweep.debug", {
-    cutoff: now - idleGraceMs,
-    eligible: idle.length,
-    idleGraceMs,
-  });
-
   for (const conversation of idle) {
     try {
       const { closeSandboxConversationSession } = await import("../sandbox-session.service");
