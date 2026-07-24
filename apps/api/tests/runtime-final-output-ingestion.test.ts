@@ -521,6 +521,58 @@ describe("runtime final output ingestion", () => {
     });
   });
 
+  test("omits live-only reasoning from stored final assistant segments", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertRuntimeFixture(database);
+    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    const finalMessageId = createPlatformId<SessionMessageId>();
+    const privateReasoningText = "Private reasoning should stay out of stored history.";
+    const events = [
+      runtimeEvent({
+        kind: "thought.started",
+        payload: { messageId: finalMessageId },
+        sourceEventId: "reasoning:started",
+      }),
+      runtimeEvent({
+        kind: "thought.delta",
+        payload: { contentDelta: privateReasoningText, messageId: finalMessageId },
+        sourceEventId: "reasoning:delta",
+      }),
+      runtimeEvent({
+        kind: "thought.completed",
+        payload: { messageId: finalMessageId },
+        sourceEventId: "reasoning:completed",
+      }),
+      ...messageEvents({
+        messageId: finalMessageId,
+        sourcePrefix: "reasoning:final",
+        text: FINAL_TEXT,
+      }),
+      runtimeEvent({
+        kind: "run.completed",
+        payload: {
+          finalMessageId,
+          finalMessageText: FINAL_TEXT,
+          stopReason: "end_turn",
+        },
+        sourceEventId: "reasoning:run-completed",
+      }),
+    ];
+
+    await pushFreshController(bindings, events);
+
+    const persistedMessage = await database
+      .prepare("SELECT content_text, segments_json FROM session_message WHERE id = ?")
+      .bind(finalMessageId)
+      .first<{ content_text: string; segments_json: string }>();
+
+    expect(persistedMessage?.content_text).toBe(FINAL_TEXT);
+    expect(JSON.parse(persistedMessage?.segments_json ?? "[]")).toEqual([
+      { kind: "text", text: FINAL_TEXT },
+    ]);
+    expect(persistedMessage?.segments_json).not.toContain(privateReasoningText);
+  });
+
   test("fails closed when a cross-boot replay conflicts with the persisted final snapshot", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertRuntimeFixture(database);
