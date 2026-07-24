@@ -5,28 +5,29 @@ import type { AgUiSessionEvent } from "@mosoo/ag-ui-session";
 import type { SessionStreamRenderSchedulerHost } from "../src/domains/runtime/session-stream/session-stream-render-scheduler";
 import { SessionStreamRenderScheduler } from "../src/domains/runtime/session-stream/session-stream-render-scheduler";
 
-function createManualFrameHost(): {
-  callbacks: (() => void)[];
-  getNowCalls: () => number;
+function createManualHost(): {
+  frameCallbacks: (() => void)[];
   host: SessionStreamRenderSchedulerHost;
+  timeoutCallbacks: (() => void)[];
 } {
-  const callbacks: (() => void)[] = [];
-  let nowCalls = 0;
+  const frameCallbacks: (() => void)[] = [];
+  const timeoutCallbacks: (() => void)[] = [];
 
   return {
-    callbacks,
-    getNowCalls: () => nowCalls,
+    frameCallbacks,
     host: {
       cancelFrame: () => {},
-      now: () => {
-        nowCalls += 1;
-        return 0;
-      },
+      cancelTimeout: () => {},
       requestFrame: (callback) => {
-        callbacks.push(callback);
-        return callbacks.length;
+        frameCallbacks.push(callback);
+        return frameCallbacks.length;
+      },
+      requestTimeout: (callback) => {
+        timeoutCallbacks.push(callback);
+        return timeoutCallbacks.length;
       },
     },
+    timeoutCallbacks,
   };
 }
 
@@ -52,26 +53,27 @@ function stateDeltaEvent(): AgUiSessionEvent {
 }
 
 describe("session stream render scheduler", () => {
-  test("drains long text queues without dropping or reordering chunks", () => {
-    const { callbacks, host } = createManualFrameHost();
+  test("delivers every queued text chunk unthrottled and in order", () => {
+    const { frameCallbacks, host } = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
     const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
       batches.push(events);
       return true;
     }, host);
-    const events = Array.from({ length: 300 }, () => textEvent("x"));
+    const events = Array.from({ length: 600 }, (_unused, index) => textEvent(`chunk-${index}`));
 
     scheduler.enqueueMany("session-1", events);
-    drainFrames(callbacks);
+    drainFrames(frameCallbacks);
 
-    expect(batches.length).toBeGreaterThan(1);
+    // 600 events exceed one frame's flood guard, never more than two frames.
+    expect(batches.length).toBe(2);
     expect(
       batches.flat().map((event) => (event.type === "TEXT_MESSAGE_CONTENT" ? event.delta : "")),
-    ).toEqual(Array.from({ length: 300 }, () => "x"));
+    ).toEqual(events.map((event) => (event.type === "TEXT_MESSAGE_CONTENT" ? event.delta : "")));
   });
 
   test("keeps another session queued while flushing the first session", () => {
-    const { callbacks, host } = createManualFrameHost();
+    const { frameCallbacks, host } = createManualHost();
     const applied: { events: AgUiSessionEvent[]; sessionId: string }[] = [];
     const scheduler = new SessionStreamRenderScheduler((sessionId, events) => {
       applied.push({ events, sessionId });
@@ -81,7 +83,7 @@ describe("session stream render scheduler", () => {
     scheduler.enqueueMany("session-1", [textEvent("a"), textEvent("b")]);
     scheduler.enqueueMany("session-2", [textEvent("c")]);
     scheduler.flushNow("session-1");
-    drainFrames(callbacks);
+    drainFrames(frameCallbacks);
 
     expect(applied.map((batch) => batch.sessionId)).toEqual(["session-1", "session-2"]);
     expect(
@@ -93,30 +95,24 @@ describe("session stream render scheduler", () => {
     ).toEqual(["ab", "c"]);
   });
 
-  test("does not scan the text budget for non-text backlogs", () => {
-    const { callbacks, getNowCalls, host } = createManualFrameHost();
-    let applied = 0;
+  test("delivers mixed event types in arrival order", () => {
+    const { frameCallbacks, host } = createManualHost();
+    const types: string[] = [];
     const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
-      applied += events.length;
+      for (const event of events) {
+        types.push(event.type);
+      }
       return true;
     }, host);
 
-    scheduler.enqueueMany(
-      "session-1",
-      Array.from({ length: 500 }, () => stateDeltaEvent()),
-    );
+    scheduler.enqueueMany("session-1", [textEvent("a"), stateDeltaEvent(), textEvent("b")]);
+    drainFrames(frameCallbacks);
 
-    expect(getNowCalls()).toBe(1);
-
-    drainFrames(callbacks);
-
-    expect(applied).toBe(500);
-    expect(getNowCalls()).toBe(1);
+    expect(types).toEqual(["TEXT_MESSAGE_CONTENT", "STATE_DELTA", "TEXT_MESSAGE_CONTENT"]);
   });
 
-  test("requeues a failed partial text slice without losing content", () => {
-    const { callbacks, host } = createManualFrameHost();
-    const content = "x".repeat(1300);
+  test("requeues a rejected batch without losing content", () => {
+    const { frameCallbacks, host } = createManualHost();
     const appliedDeltas: string[] = [];
     let rejectNextBatch = true;
     const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
@@ -134,10 +130,29 @@ describe("session stream render scheduler", () => {
       return true;
     }, host);
 
-    scheduler.enqueueMany("session-1", [textEvent(content)]);
-    drainFrames(callbacks);
+    scheduler.enqueueMany("session-1", [textEvent("x".repeat(1300))]);
+    drainFrames(frameCallbacks);
 
     expect(rejectNextBatch).toBe(false);
-    expect(appliedDeltas.join("")).toBe(content);
+    expect(appliedDeltas.join("")).toBe("x".repeat(1300));
+  });
+
+  test("drains through the timeout fallback when frames never fire", () => {
+    const { host, timeoutCallbacks } = createManualHost();
+    const appliedDeltas: string[] = [];
+    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+      for (const event of events) {
+        if (event.type === "TEXT_MESSAGE_CONTENT") {
+          appliedDeltas.push(event.delta);
+        }
+      }
+      return true;
+    }, host);
+
+    scheduler.enqueueMany("session-1", [textEvent("hidden"), textEvent("window")]);
+    // requestAnimationFrame is throttled or paused: only the timer fires.
+    drainFrames(timeoutCallbacks);
+
+    expect(appliedDeltas).toEqual(["hidden", "window"]);
   });
 });

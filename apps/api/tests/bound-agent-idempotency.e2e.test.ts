@@ -691,7 +691,7 @@ describe("bound Agent HTTP idempotency", () => {
     const { database, queue } = await createFixture();
     const injectedDatabase = failFirstMatchingStatement(
       database,
-      /\bINSERT\s+INTO\s+session_run\b/iu,
+      /\bINSERT\s+INTO\s+"session_run"(?:\s|\()/iu,
     );
 
     await withProviderProbeMock(async () => {

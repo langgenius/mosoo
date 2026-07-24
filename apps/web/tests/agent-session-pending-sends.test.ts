@@ -69,6 +69,18 @@ describe("agent session pending sends", () => {
     expect(prunePendingSends(pending, messages, 2_000)).toBe(pending);
   });
 
+  test("prunes only when a same-text message is newer than the baseline", () => {
+    const pending = [
+      pendingSend({ baselineUserMessageIds: ["msg_old", "msg_other"], text: "hello" }),
+    ];
+    const messages = [
+      message({ content: "hello", id: "msg_old", role: "user" }),
+      message({ content: "hello", id: "msg_new", role: "user" }),
+    ];
+
+    expect(prunePendingSends(pending, messages, 2_000)).toHaveLength(0);
+  });
+
   test("ignores assistant messages with matching content", () => {
     const pending = [pendingSend({ text: "hello" })];
     const messages = [message({ content: "hello", id: "msg_new", role: "assistant" })];

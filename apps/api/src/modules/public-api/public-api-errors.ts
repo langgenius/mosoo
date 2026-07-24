@@ -39,6 +39,8 @@ export function toPublicApiError(error: unknown): PublicApiError | null {
       return publicForbidden(error.message);
     case API_ERROR_CODE.notFound:
       return publicNotFound(error.message);
+    case API_ERROR_CODE.sessionRunClientRequestDuplicate:
+      return publicIdempotencyConflict(error.message);
     case API_ERROR_CODE.unauthorized:
       return publicUnauthenticated(error.message);
     default:
