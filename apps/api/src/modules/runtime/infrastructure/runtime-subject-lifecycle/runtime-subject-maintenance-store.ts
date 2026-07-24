@@ -1,3 +1,4 @@
+import { SANDBOX_SESSION_STATE_DIR } from "@mosoo/agent-driver/paths";
 import {
   driverInstancesTable,
   sandboxesTable,
@@ -5,7 +6,6 @@ import {
   sessionRunsTable,
 } from "@mosoo/db";
 import type { DriverInstanceId, SandboxId, SessionId } from "@mosoo/id";
-import { SANDBOX_SESSION_STATE_DIR } from "agent-driver/paths";
 import { and, asc, eq, exists, inArray, isNotNull, isNull, lte, notExists, or } from "drizzle-orm";
 
 import { getAppDatabase, runAppDatabaseBatch } from "../../../../platform/db/drizzle";

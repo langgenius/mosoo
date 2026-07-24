@@ -2,14 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 import { EventType, MOSOO_CUSTOM_EVENT } from "@mosoo/ag-ui-session";
-import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
-import { RUNTIME_EVENT_SCHEMA_VERSION, createRuntimeEvent } from "@mosoo/runtime-events";
 import {
   DRIVER_CONTROL_PORT_MAX,
   DRIVER_CONTROL_PORT_MIN,
   DRIVER_PROTOCOL_VERSION,
   parseDriverBootPayloadJson,
-} from "agent-driver/boot";
+} from "@mosoo/agent-driver/boot";
+import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
+import { RUNTIME_EVENT_SCHEMA_VERSION, createRuntimeEvent } from "@mosoo/runtime-events";
 
 import { getDriverControlPort } from "../src/modules/runtime/domain/sandbox-layout";
 import {
@@ -81,13 +81,13 @@ describe("API to driver boundary", () => {
       "../src/modules/runtime/infrastructure/driver-instance/native-resume-ref-event.ts",
     );
 
-    expect(runtimeConfig).toContain('from "agent-driver/runtime"');
+    expect(runtimeConfig).toContain('from "@mosoo/agent-driver/runtime"');
     expect(runtimeConfig).not.toContain('from "@mosoo/driver-protocol"');
-    expect(agentConfig).toContain('from "agent-driver/runtime"');
+    expect(agentConfig).toContain('from "@mosoo/agent-driver/runtime"');
     expect(agentConfig).not.toContain('from "@mosoo/driver-protocol"');
-    expect(nativeResumeRef).toContain('from "agent-driver/runtime"');
+    expect(nativeResumeRef).toContain('from "@mosoo/agent-driver/runtime"');
     expect(nativeResumeRef).not.toContain('from "@mosoo/driver-protocol"');
-    expect(nativeResumeRefEvent).toContain('from "agent-driver/runtime"');
+    expect(nativeResumeRefEvent).toContain('from "@mosoo/agent-driver/runtime"');
     expect(nativeResumeRefEvent).not.toContain('from "@mosoo/driver-protocol"');
   });
 
@@ -101,16 +101,16 @@ describe("API to driver boundary", () => {
     );
     const sandboxLayout = readText("../src/modules/runtime/domain/sandbox-layout.ts");
 
-    expect(bootToken).toContain('from "agent-driver/boot"');
+    expect(bootToken).toContain('from "@mosoo/agent-driver/boot"');
     expect(bootToken).toContain("DRIVER_PROTOCOL_VERSION");
     expect(bootToken).not.toContain('from "@mosoo/driver-protocol"');
-    expect(provisioning).toContain('from "agent-driver/boot"');
+    expect(provisioning).toContain('from "@mosoo/agent-driver/boot"');
     expect(provisioning).toContain("DRIVER_BOOT_PAYLOAD_FILE_ENV_NAME");
     expect(provisioning).toContain("const bootPayload = createDriverBootPayload");
     expect(provisioning).toContain("JSON.stringify(bootPayload)");
-    expect(driverRecord).toContain('from "agent-driver/boot"');
+    expect(driverRecord).toContain('from "@mosoo/agent-driver/boot"');
     expect(driverRecord).toContain("DRIVER_PROTOCOL_VERSION");
-    expect(sandboxLayout).toContain('from "agent-driver/boot"');
+    expect(sandboxLayout).toContain('from "@mosoo/agent-driver/boot"');
     expect(sandboxLayout).toContain("DRIVER_CONTROL_PORT_COUNT");
     expect(sandboxLayout).toContain("DRIVER_CONTROL_PORT_MIN");
   });
@@ -121,8 +121,8 @@ describe("API to driver boundary", () => {
       "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-platform.ts",
     );
 
-    expect(runtimeProfile).toContain('from "agent-driver/paths"');
-    expect(subjectPlatform).toContain('from "agent-driver/paths"');
+    expect(runtimeProfile).toContain('from "@mosoo/agent-driver/paths"');
+    expect(subjectPlatform).toContain('from "@mosoo/agent-driver/paths"');
   });
 
   test("publishes agent-driver event envelope contracts", () => {
@@ -142,17 +142,17 @@ describe("API to driver boundary", () => {
     const fixtures = readText("./api-driver-boundary-fixtures.ts");
 
     expect(driverPublicEvents).toContain("./protocol/events");
-    expect(rpcWire).toContain('from "agent-driver/events"');
+    expect(rpcWire).toContain('from "@mosoo/agent-driver/events"');
     expect(rpcWire).toContain("parseDriverEventEnvelope");
     expect(rpcWire).not.toContain('from "@mosoo/driver-protocol"');
     expect(rpc).not.toContain("toAgentDriverEventEnvelopes");
     expect(ingestion).toContain("state.readProcessedDriverEventReceipts(input.events)");
     expect(ingestion).toContain("state.filterUnprocessedDriverEvents(input.events)");
-    expect(projection).toContain('from "agent-driver/events"');
+    expect(projection).toContain('from "@mosoo/agent-driver/events"');
     expect(projection).not.toContain('from "@mosoo/driver-protocol"');
-    expect(receipts).toContain('from "agent-driver/events"');
-    expect(replayFilter).toContain('from "agent-driver/events"');
-    expect(fixtures).toContain('from "agent-driver/events"');
+    expect(receipts).toContain('from "@mosoo/agent-driver/events"');
+    expect(replayFilter).toContain('from "@mosoo/agent-driver/events"');
+    expect(fixtures).toContain('from "@mosoo/agent-driver/events"');
   });
 
   test("uses agent-driver ORPC contracts behind the API wire parser", () => {
@@ -184,24 +184,24 @@ describe("API to driver boundary", () => {
     );
     const rpcWire = readText("../src/modules/runtime/infrastructure/driver-instance/rpc-wire.ts");
 
-    expect(rpc).toContain('from "agent-driver/orpc"');
+    expect(rpc).toContain('from "@mosoo/agent-driver/orpc"');
     expect(rpc).toContain('from "./rpc-wire"');
-    expect(controller).toContain('from "agent-driver/orpc"');
-    expect(command).toContain('from "agent-driver/orpc"');
-    expect(eventIngestion).toContain('from "agent-driver/orpc"');
-    expect(handshake).toContain('from "agent-driver/orpc"');
-    expect(state).toContain('from "agent-driver/orpc"');
-    expect(runtimeState).toContain('from "agent-driver/orpc"');
-    expect(runtimeStateStore).toContain('from "agent-driver/orpc"');
+    expect(controller).toContain('from "@mosoo/agent-driver/orpc"');
+    expect(command).toContain('from "@mosoo/agent-driver/orpc"');
+    expect(eventIngestion).toContain('from "@mosoo/agent-driver/orpc"');
+    expect(handshake).toContain('from "@mosoo/agent-driver/orpc"');
+    expect(state).toContain('from "@mosoo/agent-driver/orpc"');
+    expect(runtimeState).toContain('from "@mosoo/agent-driver/orpc"');
+    expect(runtimeStateStore).toContain('from "@mosoo/agent-driver/orpc"');
     expect(runtimeStateStore).toContain("parseDriverHelloInput");
     expect(runtimeStateStore).not.toContain('from "@mosoo/driver-protocol"');
-    expect(lifecycle).toContain('from "agent-driver/orpc"');
+    expect(lifecycle).toContain('from "@mosoo/agent-driver/orpc"');
     expect(controller).not.toContain('from "@mosoo/driver-protocol"');
     expect(eventIngestion).not.toContain('from "@mosoo/driver-protocol"');
     expect(rpc).not.toContain('from "@mosoo/driver-protocol"');
     expect(rpcWire).toContain("runtimeOrpcRouter");
-    expect(rpcWire).toContain('from "agent-driver/orpc"');
-    expect(rpcWire).toContain('from "agent-driver/events"');
+    expect(rpcWire).toContain('from "@mosoo/agent-driver/orpc"');
+    expect(rpcWire).toContain('from "@mosoo/agent-driver/events"');
     expect(rpcWire).not.toContain('from "@mosoo/driver-protocol"');
     expect(handler).not.toContain('from "@mosoo/driver-protocol"');
     expect(handler).toContain("runtimeOrpcRouter");
@@ -218,13 +218,13 @@ describe("API to driver boundary", () => {
       "../src/modules/runtime/application/session-definition/session-config-trace-event.ts",
     );
 
-    expect(callbackContract).toContain('from "agent-driver/boot"');
+    expect(callbackContract).toContain('from "@mosoo/agent-driver/boot"');
     expect(dispatchRun).toContain("onBootPayloadPrepared: async ({ bootPayload })");
     expect(dispatchRun).not.toContain("toAgentDriverBootPayload(bootPayload)");
     expect(dispatchRun).toContain("buildSessionConfigTraceValue(bootPayload)");
     expect(dispatchRun).toContain("bootPayload.execution.session.mcpServers.length");
     expect(dispatchRun).toContain("bootPayload.execution.provider");
-    expect(configTrace).toContain('from "agent-driver/boot"');
+    expect(configTrace).toContain('from "@mosoo/agent-driver/boot"');
     expect(configTrace).not.toContain('from "@mosoo/driver-protocol"');
   });
 
@@ -246,7 +246,7 @@ describe("API to driver boundary", () => {
     const mcpRuntime = readText("../src/modules/mcp/application/mcp-runtime.service.ts");
     const fixtures = readText("./api-driver-boundary-fixtures.ts");
 
-    expect(driverSnapshot).toContain('from "agent-driver/runtime"');
+    expect(driverSnapshot).toContain('from "@mosoo/agent-driver/runtime"');
     expect(driverSnapshot).not.toContain('from "@mosoo/driver-protocol"');
     expect(runtimeProfile).toContain('from "../domain/driver-snapshot"');
     expect(executionTypes).toContain('from "../../domain/driver-snapshot"');
@@ -427,7 +427,7 @@ describe("API to driver boundary", () => {
         },
       }),
       eventId: "source-1",
-      occurredAt: 10,
+      occurredAt: "1970-01-01T00:00:00.010Z",
     };
     const batch = parseDriverEventBatchInput({
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
@@ -438,7 +438,7 @@ describe("API to driver boundary", () => {
     expect(batch.driverInstanceId).toBe(API_DRIVER_BOUNDARY_IDS.driverInstance);
     expect(envelope.eventId).toBe("source-1");
     expect(envelope.event.kind).toBe("message.delta");
-    expect(envelope.occurredAt).toBe(10);
+    expect(envelope.occurredAt).toBe("1970-01-01T00:00:00.010Z");
   });
 
   test("apps admitted driver wire events into API runtime and viewer events", async () => {
@@ -464,7 +464,7 @@ describe("API to driver boundary", () => {
         {
           event: permissionRequested,
           eventId: "source-permission-1",
-          occurredAt: 1_000,
+          occurredAt: "1970-01-01T00:00:01.000Z",
         },
       ],
     });
@@ -535,7 +535,7 @@ describe("API to driver boundary", () => {
         {
           event: runFailed,
           eventId: "source-run-failed",
-          occurredAt: 1_000,
+          occurredAt: "1970-01-01T00:00:01.000Z",
         },
       ],
     });

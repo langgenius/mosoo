@@ -1,5 +1,5 @@
+import type { DriverBootPayload } from "@mosoo/agent-driver/boot";
 import type { DriverInstanceId, SandboxId, SessionId, SessionRunId } from "@mosoo/id";
-import type { DriverBootPayload } from "agent-driver/boot";
 
 import type { DriverBootPayloadPreparedHandler } from "../../application/execution-plane/driver-boot-payload-prepared";
 import type { RuntimeTimingSnapshot } from "../../application/session-runs/session-runtime-timing";

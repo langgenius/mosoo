@@ -1,4 +1,4 @@
-import type { DriverCompletionInput, DriverFailureInput } from "agent-driver/orpc";
+import type { DriverCompletionInput, DriverFailureInput } from "@mosoo/agent-driver/orpc";
 
 import { logError, logInfo } from "../../../../platform/cloudflare/logger";
 import { syncSessionViewerState } from "../../../sessions/application/session-viewer-events.service";

@@ -1,3 +1,4 @@
+import type { DriverEvent } from "@mosoo/agent-driver/events";
 import { parsePlatformId } from "@mosoo/id";
 import type {
   CredentialId,
@@ -8,7 +9,6 @@ import type {
 } from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 import { toRuntimeEventInput } from "@mosoo/runtime-events";
-import type { DriverEvent } from "agent-driver/events";
 
 import type {
   DriverProfileConfig,

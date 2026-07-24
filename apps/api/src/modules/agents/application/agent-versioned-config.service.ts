@@ -1,3 +1,5 @@
+import { isSupportedDriverRuntime } from "@mosoo/agent-driver/runtime";
+import type { DriverRuntime } from "@mosoo/agent-driver/runtime";
 import type { JsonObject } from "@mosoo/contracts";
 import type { AgentBuiltInToolConfig, AgentEnvironmentConfig } from "@mosoo/contracts/agent";
 import { classifyAgentConfigChanges } from "@mosoo/contracts/agent-config-change-plan";
@@ -7,8 +9,6 @@ import type {
 } from "@mosoo/contracts/agent-config-change-plan";
 import type { AgentId, McpServerId, SkillId } from "@mosoo/id";
 import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
-import { isSupportedDriverRuntime } from "agent-driver/runtime";
-import type { DriverRuntime } from "agent-driver/runtime";
 
 import { listEditableAgentSkillReferences } from "./agent-deployment-version.service";
 import type { AgentRow } from "./agent-types";

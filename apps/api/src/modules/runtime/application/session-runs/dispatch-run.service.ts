@@ -1,7 +1,7 @@
+import type { DriverBootPayload, DriverRuntime } from "@mosoo/agent-driver/boot";
 import { parsePlatformId } from "@mosoo/id";
 import type { AgentId, DriverInstanceId, FileId, SessionId, SessionRunId } from "@mosoo/id";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
-import type { DriverBootPayload, DriverRuntime } from "agent-driver/boot";
 
 import { logError, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";

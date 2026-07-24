@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
+import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
+import type { DriverEventReceipt } from "@mosoo/agent-driver/orpc";
 import { createPlatformId } from "@mosoo/id";
 import type {
   DriverInstanceId,
@@ -10,8 +12,6 @@ import type {
 } from "@mosoo/id";
 import { createRuntimeEvent } from "@mosoo/runtime-events";
 import type { RuntimeEventKind } from "@mosoo/runtime-events";
-import type { DriverEventEnvelope } from "agent-driver/events";
-import type { DriverEventReceipt } from "agent-driver/orpc";
 
 import { readPublicThreadRunFinalOutput } from "../src/modules/public-api/public-thread-events";
 import {

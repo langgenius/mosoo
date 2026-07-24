@@ -75,8 +75,8 @@ function readPackageName(packageRoot: string): string {
     readonly name?: unknown;
   };
 
-  if (packageJson.name !== "agent-driver") {
-    fail(`driver package name must be agent-driver, got ${String(packageJson.name)}.`);
+  if (packageJson.name !== "@mosoo/agent-driver") {
+    fail(`driver package name must be @mosoo/agent-driver, got ${String(packageJson.name)}.`);
   }
 
   return packageJson.name;

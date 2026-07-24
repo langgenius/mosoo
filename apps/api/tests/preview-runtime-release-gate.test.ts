@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { PUBLIC_RUNTIME_CATALOG, RUNTIME_CATALOG } from "@mosoo/runtime-catalog";
 import {
   SUPPORTED_DRIVER_RUNTIMES,
   SUPPORTED_DRIVER_RUNTIME_TRANSPORTS,
-} from "agent-driver/runtime";
+} from "@mosoo/agent-driver/runtime";
+import { PUBLIC_RUNTIME_CATALOG, RUNTIME_CATALOG } from "@mosoo/runtime-catalog";
 
 describe("Preview runtime release gate", () => {
   test("maps public Preview live smoke providers to public driver runtimes", () => {

@@ -1,4 +1,8 @@
-import type { DriverHeartbeatInput, DriverHelloInput, DriverReadyInput } from "agent-driver/orpc";
+import type {
+  DriverHeartbeatInput,
+  DriverHelloInput,
+  DriverReadyInput,
+} from "@mosoo/agent-driver/orpc";
 
 import type { DriverDebugResumeSnapshot } from "./debug-resume-snapshot";
 import type { Deferred } from "./driver-instance-support";

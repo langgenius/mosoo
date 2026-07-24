@@ -1,5 +1,5 @@
+import { filterOpenAiPrivateCitations } from "@mosoo/agent-driver/provider-output";
 import type { SessionMessageSegment } from "@mosoo/contracts/session";
-import { filterOpenAiPrivateCitations } from "agent-driver/provider-output";
 
 export const sanitizeProviderPrivateMarkup = filterOpenAiPrivateCitations;
 

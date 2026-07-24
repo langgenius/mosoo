@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
+import {
+  SANDBOX_CACHE_PATH,
+  SANDBOX_MEMORY_PATH,
+  SANDBOX_SESSION_ROOT,
+} from "@mosoo/agent-driver/paths";
 import type { AccountId } from "@mosoo/id";
-import { SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH, SANDBOX_SESSION_ROOT } from "agent-driver/paths";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { connectOwnerDebugTerminalWebSocket } from "../src/modules/runtime/application/owner-debug-terminal.service";

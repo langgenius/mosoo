@@ -1,13 +1,4 @@
-import { DriverCapability } from "@mosoo/contracts/driver-instance";
-import {
-  RuntimeCommand,
-  RuntimeCommandResult,
-  RuntimeCommandStatus,
-} from "@mosoo/contracts/runtime-command";
-import { RunError } from "@mosoo/contracts/session-run";
-import { NonEmptyString, PrimitiveRecord, parseSchemaValue } from "@mosoo/contracts/validation";
-import { eventIterator, os } from "@orpc/server";
-import { parseDriverEventEnvelope } from "agent-driver/events";
+import { parseDriverEventEnvelope } from "@mosoo/agent-driver/events";
 import type {
   DriverCommandUpdateInput,
   DriverCompletionInput,
@@ -23,7 +14,16 @@ import type {
   DriverNextCommandInput,
   DriverNextCommandOutput,
   DriverReadyInput,
-} from "agent-driver/orpc";
+} from "@mosoo/agent-driver/orpc";
+import { DriverCapability } from "@mosoo/contracts/driver-instance";
+import {
+  RuntimeCommand,
+  RuntimeCommandResult,
+  RuntimeCommandStatus,
+} from "@mosoo/contracts/runtime-command";
+import { RunError } from "@mosoo/contracts/session-run";
+import { NonEmptyString, PrimitiveRecord, parseSchemaValue } from "@mosoo/contracts/validation";
+import { eventIterator, os } from "@orpc/server";
 import { type } from "arktype";
 
 const DriverHelloInputWire = type({
@@ -69,7 +69,7 @@ const DriverReadyInputWire = type({
 const DriverEventEnvelopeWire = type({
   event: "unknown",
   eventId: NonEmptyString,
-  "occurredAt?": "number | null | undefined",
+  "occurredAt?": "string | null | undefined",
 });
 
 const DriverEventReceiptWire = type({

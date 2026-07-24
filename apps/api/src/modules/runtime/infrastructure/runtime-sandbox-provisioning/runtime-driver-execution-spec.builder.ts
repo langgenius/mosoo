@@ -1,3 +1,5 @@
+import type { DriverRecoveryMessage } from "@mosoo/agent-driver/boot";
+import type { DriverNativeRuntimeRef } from "@mosoo/agent-driver/runtime";
 import { parsePlatformId } from "@mosoo/id";
 import type {
   CredentialId,
@@ -6,8 +8,6 @@ import type {
   SessionRunId,
   SkillSnapshotId,
 } from "@mosoo/id";
-import type { DriverRecoveryMessage } from "agent-driver/boot";
-import type { DriverNativeRuntimeRef } from "agent-driver/runtime";
 
 import { appendRuntimeArtifactContextToPrompt } from "../../application/session-artifacts/session-artifact-prompt.service";
 import type {

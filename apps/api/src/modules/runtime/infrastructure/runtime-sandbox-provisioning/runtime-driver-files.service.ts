@@ -1,4 +1,4 @@
-import { SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH } from "agent-driver/paths";
+import { SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH } from "@mosoo/agent-driver/paths";
 
 import { disposeRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import type { DriverProfileConfig } from "../../domain/driver-snapshot";

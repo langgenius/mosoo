@@ -1,12 +1,12 @@
-import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
-import type { DriverInstanceId } from "@mosoo/id";
-import type { DriverEventEnvelope } from "agent-driver/events";
+import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
 import type {
   DriverEventReceipt,
   DriverHeartbeatInput,
   DriverHelloInput,
   DriverReadyInput,
-} from "agent-driver/orpc";
+} from "@mosoo/agent-driver/orpc";
+import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
+import type { DriverInstanceId } from "@mosoo/id";
 
 import { isTruthy } from "../../../../shared/truthiness";
 import type { DriverInstanceCommandState, RuntimeCommandWaiter } from "./commands";

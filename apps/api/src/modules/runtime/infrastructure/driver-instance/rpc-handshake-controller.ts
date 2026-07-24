@@ -1,11 +1,11 @@
-import { createPlatformId } from "@mosoo/id";
 import type {
   DriverHeartbeatInput,
   DriverHelloInput,
   DriverHelloOutput,
   DriverReadyInput,
-} from "agent-driver/orpc";
-import { SANDBOX_ORGANIZATION_ROOT } from "agent-driver/paths";
+} from "@mosoo/agent-driver/orpc";
+import { SANDBOX_ORGANIZATION_ROOT } from "@mosoo/agent-driver/paths";
+import { createPlatformId } from "@mosoo/id";
 
 import { logInfo } from "../../../../platform/cloudflare/logger";
 import { DRIVER_HEARTBEAT_INTERVAL_MS } from "../../domain/runtime-config";
