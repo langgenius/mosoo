@@ -7,6 +7,14 @@ import type { RuntimeEventId, SessionRunId } from "@mosoo/id";
 // events. The merge rules mirror the pre-persistence compactor
 // (runtime-event-compaction.ts): deltas append, snapshots prefer the longer
 // prefix-matching text.
+//
+// Rows carry no message identity, so a stream whose driver-side identity
+// fractured (a dropped message_start splits one reply across several
+// started/delta groups, YEF-884) still folds into several fragment rows, and
+// the trailing message.added snapshot lands after its stream already closed.
+// To heal both shapes, closed fragment rows are kept as supersede candidates:
+// a snapshot whose text prefix-matches the concatenated fragments replaces
+// them with a single row instead of rendering a duplicate.
 
 export interface StreamFoldableSessionEventRow {
   content_text: string;
@@ -59,6 +67,11 @@ interface OpenStreamGroup<R extends StreamFoldableSessionEventRow> {
   runId: SessionRunId | null;
 }
 
+interface ClosedFragmentSegment {
+  content: string;
+  outputIndex: number;
+}
+
 function appendStreamText(current: string, next: string): string {
   if (next.length === 0) {
     return current;
@@ -85,6 +98,14 @@ function mergeSnapshotText(current: string, next: string): string {
   }
 
   return `${current}${next}`;
+}
+
+function isSnapshotOfFragments(fragments: string, snapshot: string): boolean {
+  if (fragments.length === 0 || snapshot.length === 0) {
+    return false;
+  }
+
+  return snapshot.startsWith(fragments) || fragments.startsWith(snapshot);
 }
 
 function createOpenStreamGroup<R extends StreamFoldableSessionEventRow>(
@@ -140,15 +161,60 @@ export function foldStreamedSessionEventRows<R extends StreamFoldableSessionEven
   rows: readonly R[],
   options: { flushOpenStreams: boolean },
 ): FoldedStreamedSessionEventRows<R> {
-  const output: R[] = [];
+  const output: (R | null)[] = [];
   const openGroups = new Map<string, OpenStreamGroup<R>>();
+  const fragmentSegments = new Map<string, ClosedFragmentSegment[]>();
 
-  function closeGroup(group: OpenStreamGroup<R>): void {
+  function closeGroupAsFragment(key: string, group: OpenStreamGroup<R>): void {
     const folded = createFoldedStreamRow(group);
 
-    if (folded !== null) {
-      output.push(folded);
+    if (folded === null) {
+      return;
     }
+
+    output.push(folded);
+    const segments = fragmentSegments.get(key) ?? [];
+    segments.push({ content: folded.content_text, outputIndex: output.length - 1 });
+    fragmentSegments.set(key, segments);
+  }
+
+  // A snapshot row is the authoritative text of the message it closes. When
+  // its text extends (or repeats) the fragment rows already emitted for the
+  // same stream key, those fragments were partial views of this snapshot:
+  // collapse them into one row at the first fragment's timeline position.
+  function closeGroupWithSnapshot(key: string, folded: R | null): void {
+    if (folded === null) {
+      return;
+    }
+
+    const segments = fragmentSegments.get(key) ?? [];
+    fragmentSegments.delete(key);
+    const fragments = segments.map((segment) => segment.content).join("");
+
+    if (!isSnapshotOfFragments(fragments, folded.content_text)) {
+      output.push(folded);
+      return;
+    }
+
+    const firstSegment = segments[0];
+    const anchorRow = firstSegment === undefined ? null : output[firstSegment.outputIndex];
+
+    if (firstSegment === undefined || anchorRow === null || anchorRow === undefined) {
+      output.push(folded);
+      return;
+    }
+
+    for (const segment of segments) {
+      output[segment.outputIndex] = null;
+    }
+
+    output[firstSegment.outputIndex] = {
+      ...folded,
+      content_text:
+        folded.content_text.length >= fragments.length ? folded.content_text : fragments,
+      occurred_at: anchorRow.occurred_at,
+      seq: anchorRow.seq,
+    };
   }
 
   for (const row of rows) {
@@ -162,7 +228,7 @@ export function foldStreamedSessionEventRows<R extends StreamFoldableSessionEven
         for (const [key, group] of openGroups) {
           if (group.runId === row.run_id) {
             openGroups.delete(key);
-            closeGroup(group);
+            closeGroupAsFragment(key, group);
           }
         }
       }
@@ -177,7 +243,7 @@ export function foldStreamedSessionEventRows<R extends StreamFoldableSessionEven
     if (classification.phase === "started") {
       if (existing !== null) {
         openGroups.delete(key);
-        closeGroup(existing);
+        closeGroupAsFragment(key, existing);
       }
 
       const group = createOpenStreamGroup(row, classification);
@@ -187,35 +253,44 @@ export function foldStreamedSessionEventRows<R extends StreamFoldableSessionEven
     }
 
     if (classification.phase === "added" && existing === null) {
-      // A standalone message.added row is already a complete message (legacy
-      // compacted rows and non-streamed messages) — pass it through verbatim.
-      output.push(row);
+      // A snapshot with no open stream is either a complete standalone
+      // message (legacy compacted rows and non-streamed messages) or the
+      // authoritative copy of fragments that already closed; the supersede
+      // check keeps the first case verbatim.
+      closeGroupWithSnapshot(key, row.content_text === classification.placeholder ? null : row);
+
+      if (row.content_text === classification.placeholder) {
+        output.push(row);
+      }
       continue;
     }
 
     const group = existing ?? createOpenStreamGroup(row, classification);
     mergeStreamRow(group, row, classification);
 
-    if (classification.phase === "completed" || classification.phase === "added") {
+    if (classification.phase === "added") {
       openGroups.delete(key);
-      closeGroup(group);
+      closeGroupWithSnapshot(key, createFoldedStreamRow(group));
+    } else if (classification.phase === "completed") {
+      openGroups.delete(key);
+      closeGroupAsFragment(key, group);
     } else if (existing === null) {
       openGroups.set(key, group);
     }
   }
 
   if (options.flushOpenStreams) {
-    for (const group of openGroups.values()) {
-      closeGroup(group);
+    for (const [key, group] of openGroups) {
+      closeGroupAsFragment(key, group);
     }
 
-    return { openStreamRows: [], rows: output };
+    return { openStreamRows: [], rows: output.filter((row): row is R => row !== null) };
   }
 
   return {
     openStreamRows: [...openGroups.values()]
       .flatMap((group) => group.rows)
       .toSorted((a, b) => a.seq - b.seq),
-    rows: output,
+    rows: output.filter((row): row is R => row !== null),
   };
 }

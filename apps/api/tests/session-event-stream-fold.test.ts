@@ -212,6 +212,141 @@ describe("session event stream folding", () => {
     expect(secondFold.rows[0]).toMatchObject({ content_text: "流式输出完成", id: "m-end" });
   });
 
+  test("supersedes a closed stream with its trailing snapshot instead of duplicating it", () => {
+    // Streamed replies persist message.completed (at message_stop) before the
+    // aggregated assistant snapshot arrives, so the snapshot lands after its
+    // stream already closed and must replace the folded row, not repeat it.
+    const folded = foldStreamedSessionEventRows(
+      [
+        row({ content: "Message updated.", eventType: "message.started", id: "m-start", seq: 1 }),
+        row({ content: "P", eventType: "message.delta", id: "m-1", seq: 2 }),
+        row({
+          content: "ong. What would you like to work on?",
+          eventType: "message.delta",
+          id: "m-2",
+          seq: 3,
+        }),
+        row({ content: "Message updated.", eventType: "message.completed", id: "m-end", seq: 4 }),
+        row({
+          content: "Pong. What would you like to work on?",
+          eventType: "message.added",
+          id: "m-added",
+          seq: 5,
+        }),
+      ],
+      { flushOpenStreams: true },
+    );
+
+    expect(folded.rows).toHaveLength(1);
+    expect(folded.rows[0]).toMatchObject({
+      content_text: "Pong. What would you like to work on?",
+      event_type: "message.added",
+      id: "m-added",
+      seq: 1,
+    });
+  });
+
+  test("collapses a fractured stream whose snapshot matches the concatenated fragments", () => {
+    // YEF-884: a dropped message_start fractures one reply into per-fragment
+    // messages, so the rows arrive as started/delta pairs per fragment plus a
+    // final full snapshot. The snapshot equals the fragment concatenation and
+    // must fold everything into a single timeline entry.
+    const folded = foldStreamedSessionEventRows(
+      [
+        row({ content: "Message updated.", eventType: "message.started", id: "s-1", seq: 1 }),
+        row({ content: "P", eventType: "message.delta", id: "m-1", seq: 2 }),
+        row({ content: "Message updated.", eventType: "message.started", id: "s-2", seq: 3 }),
+        row({
+          content: "ong. What would you like to work on?",
+          eventType: "message.delta",
+          id: "m-2",
+          seq: 4,
+        }),
+        row({ content: "Message updated.", eventType: "message.started", id: "s-3", seq: 5 }),
+        row({
+          content: "Pong. What would you like to work on?",
+          eventType: "message.delta",
+          id: "m-3",
+          seq: 6,
+        }),
+        row({
+          content: "Pong. What would you like to work on?",
+          eventType: "message.added",
+          id: "m-added",
+          seq: 7,
+        }),
+        row({ content: "Message updated.", eventType: "message.completed", id: "c-3", seq: 8 }),
+        row({ content: "Message updated.", eventType: "message.completed", id: "c-1", seq: 9 }),
+        row({ content: "Message updated.", eventType: "message.completed", id: "c-2", seq: 10 }),
+        row({
+          content: "run-1",
+          eventType: "run.completed",
+          id: "r-done",
+          processType: "run.completed",
+          seq: 11,
+        }),
+      ],
+      { flushOpenStreams: true },
+    );
+
+    expect(folded.rows.map((entry) => entry.content_text)).toEqual([
+      "Pong. What would you like to work on?",
+      "run-1",
+    ]);
+    expect(folded.rows[0]).toMatchObject({ id: "m-added", seq: 1 });
+  });
+
+  test("supersedes a truncated stream with the longer prefix-matching snapshot", () => {
+    const folded = foldStreamedSessionEventRows(
+      [
+        row({ content: "Final ans", eventType: "message.delta", id: "m-1", seq: 1 }),
+        row({ content: "Message updated.", eventType: "message.completed", id: "m-end", seq: 2 }),
+        row({ content: "Final answer.", eventType: "message.added", id: "m-added", seq: 3 }),
+      ],
+      { flushOpenStreams: true },
+    );
+
+    expect(folded.rows).toHaveLength(1);
+    expect(folded.rows[0]).toMatchObject({
+      content_text: "Final answer.",
+      id: "m-added",
+      seq: 1,
+    });
+  });
+
+  test("keeps a snapshot that does not extend the closed stream as its own message", () => {
+    const folded = foldStreamedSessionEventRows(
+      [
+        row({ content: "第一条进度", eventType: "message.delta", id: "m-1", seq: 1 }),
+        row({ content: "Message updated.", eventType: "message.completed", id: "m-end", seq: 2 }),
+        row({ content: "另一条最终回复", eventType: "message.added", id: "m-added", seq: 3 }),
+      ],
+      { flushOpenStreams: true },
+    );
+
+    expect(folded.rows.map((entry) => entry.content_text)).toEqual([
+      "第一条进度",
+      "另一条最终回复",
+    ]);
+  });
+
+  test("consumes fragments per snapshot across a multi-message turn", () => {
+    const folded = foldStreamedSessionEventRows(
+      [
+        row({ content: "进度说明", eventType: "message.delta", id: "m-1", seq: 1 }),
+        row({ content: "Message updated.", eventType: "message.completed", id: "c-1", seq: 2 }),
+        row({ content: "进度说明", eventType: "message.added", id: "a-1", seq: 3 }),
+        row({ content: "最终回复", eventType: "message.delta", id: "m-2", seq: 4 }),
+        row({ content: "Message updated.", eventType: "message.completed", id: "c-2", seq: 5 }),
+        row({ content: "最终回复", eventType: "message.added", id: "a-2", seq: 6 }),
+      ],
+      { flushOpenStreams: true },
+    );
+
+    expect(folded.rows.map((entry) => entry.content_text)).toEqual(["进度说明", "最终回复"]);
+    expect(folded.rows.map((entry) => entry.id)).toEqual(["a-1", "a-2"]);
+  });
+
   test("drops streams that never carried text", () => {
     const folded = foldStreamedSessionEventRows(
       [
