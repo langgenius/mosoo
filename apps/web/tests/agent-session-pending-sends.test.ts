@@ -81,6 +81,16 @@ describe("agent session pending sends", () => {
     expect(prunePendingSends(pending, messages, 2_000)).toHaveLength(0);
   });
 
+  test("prunes an entry when the new matching echo has extra whitespace", () => {
+    const pending = [pendingSend({ baselineUserMessageIds: ["msg_old"], text: "hello" })];
+    const messages = [
+      message({ content: "hello", id: "msg_old", role: "user" }),
+      message({ content: "hello ", id: "msg_new", role: "user" }),
+    ];
+
+    expect(prunePendingSends(pending, messages, 2_000)).toHaveLength(0);
+  });
+
   test("ignores assistant messages with matching content", () => {
     const pending = [pendingSend({ text: "hello" })];
     const messages = [message({ content: "hello", id: "msg_new", role: "assistant" })];
