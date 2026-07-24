@@ -117,5 +117,19 @@ export const usageDailyRollupsTable = sqliteTable(
   ],
 );
 
+export const usageEventRollupReceiptsTable = sqliteTable(
+  "usage_event_rollup_receipt",
+  {
+    rolledUpAt: integer("rolled_up_at").notNull(),
+    source: text("source").notNull(),
+    sourceEventId: text("source_event_id").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.source, table.sourceEventId] }),
+    index("usage_event_rollup_receipt_rolled_up_at_idx").on(table.rolledUpAt),
+  ],
+);
+
 export type UsageDailyRollupRow = typeof usageDailyRollupsTable.$inferSelect;
+export type UsageEventRollupReceiptRow = typeof usageEventRollupReceiptsTable.$inferSelect;
 export type UsageEventRow = typeof usageEventsTable.$inferSelect;
