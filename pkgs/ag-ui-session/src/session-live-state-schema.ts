@@ -18,6 +18,10 @@ export const SessionViewSegmentSchema = type.or(
     text: "string",
   }),
   type({
+    kind: '"reasoning"',
+    text: "string",
+  }),
+  type({
     argsText: "string",
     kind: '"tool_use"',
     path: NullableString,

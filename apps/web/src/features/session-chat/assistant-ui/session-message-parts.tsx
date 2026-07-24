@@ -1,7 +1,8 @@
 import { ActionBarPrimitive, MessagePrimitive, useMessage } from "@assistant-ui/react";
-import type { TextMessagePartComponent } from "@assistant-ui/react";
-import { Copy } from "lucide-react";
+import type { ReasoningMessagePartComponent, TextMessagePartComponent } from "@assistant-ui/react";
+import { ChevronRight, Copy } from "lucide-react";
 import type { ReactElement } from "react";
+import { useState } from "react";
 
 import { Markdown } from "@/shared/ui/markdown";
 
@@ -43,6 +44,43 @@ function ThinkingIndicator({ status }: { status: { readonly type: string } }): R
   );
 }
 
+// Reasoning stream from thinking models (e.g. DeepSeek V4 Pro reasons for
+// minutes before the first visible token). Rendered as a collapsed disclosure
+// so the user sees live progress — shimmering "Thinking" plus a growing
+// character count — instead of dead air, and can expand the raw thought text.
+const AssistantReasoning: ReasoningMessagePartComponent = ({ status, text }) => {
+  const [expanded, setExpanded] = useState(false);
+  const running = status.type === "running";
+  const charCount = text.length;
+
+  return (
+    <div className="text-fg-3 min-w-0 text-[13px]">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((value) => !value)}
+        className="hover:text-fg-1 inline-flex items-center gap-1 font-medium transition-colors"
+      >
+        <ChevronRight className={`size-3.5 transition-transform ${expanded ? "rotate-90" : ""}`} />
+        {running ? <span className="mosoo-thinking">Thinking</span> : <span>Thought</span>}
+        <span className="font-normal tabular-nums">· {charCount.toLocaleString()} chars</span>
+        {running ? (
+          <span aria-hidden className="mosoo-thinking-dots inline-flex items-center gap-[3px]">
+            <span className="size-1 rounded-full bg-current" />
+            <span className="size-1 rounded-full bg-current" />
+            <span className="size-1 rounded-full bg-current" />
+          </span>
+        ) : null}
+      </button>
+      {expanded ? (
+        <div className="border-ink-900/10 mt-1.5 max-h-64 overflow-y-auto border-l-2 pl-3 leading-[1.5] break-words whitespace-pre-wrap">
+          {text}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 export function UserMessage(): ReactElement {
   return (
     <MessagePrimitive.Root className="flex min-w-0 justify-start">
@@ -72,6 +110,7 @@ export function AssistantMessage(): ReactElement {
             unstable_showEmptyOnNonTextEnd={false}
             components={{
               Empty: ThinkingIndicator,
+              Reasoning: AssistantReasoning,
               Text: AssistantText,
               tools: { Override: SessionToolPart },
             }}

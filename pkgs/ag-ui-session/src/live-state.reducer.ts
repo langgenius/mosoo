@@ -7,6 +7,7 @@ import type { SessionLiveState, SessionViewMessage } from "./live-state";
 import { updateCustomState } from "./live-state-custom.reducer";
 import { applyJsonPatch } from "./live-state-json-patch.reducer";
 import {
+  appendReasoningDelta,
   appendTextDelta,
   appendToolArgs,
   appendToolResult,
@@ -14,6 +15,7 @@ import {
   completePendingToolUses,
   completeToolUse,
   createSessionLiveStateMessage,
+  startReasoning,
   upsertMessage,
 } from "./live-state-message.reducer";
 import {
@@ -279,14 +281,21 @@ function applyEvent(state: SessionLiveState, event: AgUiEvent): SessionLiveState
         },
       });
     }
+    case EventType.REASONING_MESSAGE_START: {
+      return startReasoning(currentState, { messageId: event.messageId });
+    }
+    case EventType.REASONING_MESSAGE_CONTENT: {
+      return appendReasoningDelta(currentState, {
+        delta: event.delta,
+        messageId: event.messageId,
+      });
+    }
     case EventType.ACTIVITY_DELTA:
     case EventType.ACTIVITY_SNAPSHOT:
     case EventType.REASONING_ENCRYPTED_VALUE:
     case EventType.REASONING_END:
     case EventType.REASONING_MESSAGE_CHUNK:
-    case EventType.REASONING_MESSAGE_CONTENT:
     case EventType.REASONING_MESSAGE_END:
-    case EventType.REASONING_MESSAGE_START:
     case EventType.REASONING_START:
     case EventType.STEP_FINISHED:
     case EventType.STEP_STARTED:
