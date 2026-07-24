@@ -4,7 +4,9 @@ default:
 
 # Prepare a new checkout for local development.
 setup:
-    git submodule update --init
+    git config submodule.recurse true
+    git submodule update --init --recursive --checkout
+    just driver-submodule-check
     bun install --frozen-lockfile
     just env-init
     just hooks-install
@@ -23,7 +25,7 @@ commit-check:
     bun run commit:check
 
 # Start the local development stack after applying local migrations.
-dev:
+dev: driver-submodule-check
     just db-migrate
     bun run dev
 
@@ -127,6 +129,10 @@ e2e *args:
 # Verify the Agent Driver submodule cutover.
 driver-submodule-smoke:
     bun run driver:submodule:smoke
+
+# Verify that the Agent Driver checkout matches the repository gitlink.
+driver-submodule-check:
+    bun run driver:submodule:check
 
 # Update the Agent Driver submodule to upstream HEAD.
 driver-update:

@@ -99,6 +99,10 @@ just dev
 
 This command runs local D1 migration first, then starts the driver build, API Worker, and web app.
 
+`just dev`, `just build`, and `just check` fail fast when `apps/driver` is not initialized or its checked-out commit differs from the gitlink recorded by the main repository. Run `git submodule update --init --checkout apps/driver` to restore the pinned Driver version. The guard never updates the submodule automatically, so intentional Driver work remains explicit and reviewable.
+
+`just setup` also enables `submodule.recurse` in the current checkout so later Git operations keep submodule state visible and synchronized where Git supports recursive behavior. The fail-fast guard remains authoritative because local Git configuration can be changed or bypassed.
+
 Default local URLs:
 
 - Web: `http://localhost:5173`
