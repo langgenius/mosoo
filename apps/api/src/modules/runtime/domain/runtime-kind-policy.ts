@@ -63,12 +63,15 @@ const RUNTIME_SUBJECT_IDLE_GRACE_MS = 5 * 60_000;
 
 // Cattle subjects are per-session sandboxes; tearing them down after every
 // terminal run made each follow-up turn in the same session pay the full
-// container boot (measured 2.4-4.8s vs ~0.3s on a warm container). A short
-// idle grace keeps the sandbox alive between turns while the kind-agnostic
-// inactive-deadline sweep still reclaims it shortly after the session goes
-// quiet. Cost ceiling: one extra <=90s of container residency per session
+// container boot (measured 2.4-4.8s vs ~0.3s on a warm container). The idle
+// grace keeps the sandbox — and, since conversations no longer close on run
+// terminal, the resident driver — alive between turns while the
+// kind-agnostic inactive-deadline sweep still reclaims it after the session
+// goes quiet. Five minutes matches the human read-think-type rhythm between
+// follow-up turns (90s covered only a third of observed gaps) and the pet
+// grace. Cost ceiling: one extra <=5min of container residency per session
 // after its last run.
-const CATTLE_SUBJECT_IDLE_GRACE_MS = 90_000;
+const CATTLE_SUBJECT_IDLE_GRACE_MS = 5 * 60_000;
 
 const SUBJECT_MEMORY_CHECKPOINT = {
   path: SANDBOX_MEMORY_PATH,
