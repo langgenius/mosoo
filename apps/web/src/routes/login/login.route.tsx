@@ -1,15 +1,38 @@
+import { lazy, Suspense, useEffect, useState } from "react";
 import type { ReactElement } from "react";
 
 import { LoginAuthCard } from "./auth-card";
-import { LoginDoodles } from "./doodles";
 import { LoginAuthTopbar } from "./topbar";
 import { useLoginFlow } from "./use-login";
+
+const LoginDoodles = lazy(async () => {
+  const doodles = await import("./doodles");
+  return { default: doodles.LoginDoodles };
+});
 
 // Warm cream ground so the hand-drawn doodle characters read as paper, not UI.
 const authBackgroundStyle = {
   background:
     "radial-gradient(900px 500px at 85% -10%, rgba(28,32,36,.04), transparent 60%), #FDFBF7",
 } as const;
+
+function DeferredLoginDoodles(): ReactElement | null {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
+  return (
+    <Suspense fallback={null}>
+      <LoginDoodles />
+    </Suspense>
+  );
+}
 
 export function LoginPage(): ReactElement {
   const login = useLoginFlow();
@@ -28,7 +51,7 @@ export function LoginPage(): ReactElement {
 
   return (
     <div className="fixed inset-0 flex flex-col" style={authBackgroundStyle}>
-      <LoginDoodles />
+      <DeferredLoginDoodles />
       <LoginAuthTopbar />
       <LoginAuthCard
         email={login.email}
