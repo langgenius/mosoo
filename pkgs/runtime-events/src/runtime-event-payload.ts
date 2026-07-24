@@ -685,7 +685,7 @@ function readStrictRuntimeTimingPayload(
   payload: unknown,
 ): RuntimeTimingPayload {
   const record = requireRuntimeEventPayloadRecord("runtime.timing.recorded", payload);
-  const completedAtMs = requireNonNegativeNumber(record, "completedAtMs");
+  const completedAtMs = requireTimingTimestampMs(record, "completedAtMs", "completedAt");
   const path = requireEnumValue(record, "path", runtimeTimingPaths, "runtime.timing.recorded");
   const source = requireEnumValue(
     record,
@@ -694,7 +694,7 @@ function readStrictRuntimeTimingPayload(
     "runtime.timing.recorded",
   );
   const stage = requireEnumValue(record, "stage", runtimeTimingStages, "runtime.timing.recorded");
-  const startedAtMs = requireNonNegativeNumber(record, "startedAtMs");
+  const startedAtMs = requireTimingTimestampMs(record, "startedAtMs", "startedAt");
   const totalMs = requireNonNegativeNumber(record, "totalMs");
   const phases = readStrictRuntimeTimingPhases(record["phases"]);
 
@@ -1191,6 +1191,30 @@ function requireNonNegativeNumber(record: RuntimeEventRecord, field: string): nu
   }
 
   return value;
+}
+
+// Driver Contract v2 emits timing timestamps as ISO 8601 strings (completedAt/
+// startedAt) while API-produced timing snapshots still carry epoch-ms fields
+// (completedAtMs/startedAtMs). Accept either and normalize to epoch ms.
+function requireTimingTimestampMs(
+  record: RuntimeEventRecord,
+  msField: string,
+  isoField: string,
+): number {
+  if (record[msField] !== undefined) {
+    return requireNonNegativeNumber(record, msField);
+  }
+
+  const isoValue = record[isoField];
+  const parsed = typeof isoValue === "string" ? Date.parse(isoValue) : Number.NaN;
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(
+      `Runtime event runtime.timing.recorded payload requires ${msField} or an ISO 8601 ${isoField}.`,
+    );
+  }
+
+  return parsed;
 }
 
 function requireOptionalEnumValue(
