@@ -1,7 +1,7 @@
 import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
 import type { SessionType } from "@mosoo/contracts/session";
 import type { SessionRunTrigger } from "@mosoo/contracts/session-run";
-import { usageEventsTable } from "@mosoo/db";
+import { usageEventRollupReceiptsTable, usageEventsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type {
   AccountId,
@@ -13,7 +13,7 @@ import type {
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import type { AppDatabase } from "../../../platform/db/drizzle";
@@ -134,6 +134,37 @@ export function hasRecordableRuntimeUsage(usage: SessionUsageSummary): boolean {
   );
 }
 
+const RUNTIME_USAGE_SOURCE = "runtime_driver";
+
+function resolveUsageEventIdentity(input: RecordRuntimeUsageEventInput): {
+  source: string;
+  sourceEventId: string;
+} {
+  const sourceEventId = isTruthy(input.nativeCallId)
+    ? `${input.driverInstanceId}:${input.nativeCallId}`
+    : `${input.driverInstanceId}:${input.run.sessionRunId}:${input.callKey}`;
+
+  return { source: RUNTIME_USAGE_SOURCE, sourceEventId };
+}
+
+async function isUsageEventAlreadyRolledUp(
+  database: AppDatabase,
+  identity: { source: string; sourceEventId: string },
+): Promise<boolean> {
+  const existing = await database
+    .select({ source: usageEventRollupReceiptsTable.source })
+    .from(usageEventRollupReceiptsTable)
+    .where(
+      and(
+        eq(usageEventRollupReceiptsTable.source, identity.source),
+        eq(usageEventRollupReceiptsTable.sourceEventId, identity.sourceEventId),
+      ),
+    )
+    .limit(1);
+
+  return existing.length > 0;
+}
+
 function createRuntimeUsageEventInsert(database: AppDatabase, input: RecordRuntimeUsageEventInput) {
   const rawInputTokens = toTokenCount(input.usage.inputTokens);
   const rawOutputTokens = toTokenCount(input.usage.outputTokens);
@@ -165,10 +196,7 @@ function createRuntimeUsageEventInsert(database: AppDatabase, input: RecordRunti
     providedCostUsd,
     provider,
   });
-  const source = "runtime_driver";
-  const sourceEventId = isTruthy(input.nativeCallId)
-    ? `${input.driverInstanceId}:${input.nativeCallId}`
-    : `${input.driverInstanceId}:${input.run.sessionRunId}:${input.callKey}`;
+  const { source, sourceEventId } = resolveUsageEventIdentity(input);
 
   return database.insert(usageEventsTable).values({
     actorUserId: input.run.actorUserId,
@@ -245,7 +273,17 @@ export async function recordRuntimeUsageEvent(
   database: D1Database,
   input: RecordRuntimeUsageEventInput,
 ): Promise<void> {
-  const query = createRuntimeUsageEventUpsert(getAppDatabase(database), input);
+  if (!hasRecordableRuntimeUsage(input.usage)) {
+    return;
+  }
+
+  const appDatabase = getAppDatabase(database);
+
+  if (await isUsageEventAlreadyRolledUp(appDatabase, resolveUsageEventIdentity(input))) {
+    return;
+  }
+
+  const query = createRuntimeUsageEventUpsert(appDatabase, input);
 
   if (query === null) {
     return;

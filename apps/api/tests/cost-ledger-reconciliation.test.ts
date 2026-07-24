@@ -218,6 +218,13 @@ async function createReconciliationDatabase(): Promise<SqliteD1Database> {
       )
     );
 
+    CREATE TABLE usage_event_rollup_receipt (
+      rolled_up_at integer NOT NULL,
+      source text NOT NULL,
+      source_event_id text NOT NULL,
+      PRIMARY KEY (source, source_event_id)
+    );
+
     CREATE TABLE api_command (
       id text PRIMARY KEY NOT NULL,
       kind text NOT NULL,
