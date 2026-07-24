@@ -1,5 +1,5 @@
 import type { SessionRunSummary, UserWarning } from "@mosoo/contracts/session-run";
-import { parsePlatformId } from "@mosoo/id";
+import { createPlatformId, parsePlatformId } from "@mosoo/id";
 import type {
   AccountId,
   AgentDeploymentVersionId,
@@ -7,25 +7,35 @@ import type {
   FileId,
   AppId,
   SessionId,
+  SessionMessageId,
+  SessionRunId,
 } from "@mosoo/id";
+import { generateTraceId } from "@mosoo/observability";
 import type { SQL } from "drizzle-orm";
 
 import { logError, logInfo } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
-import { toIsoString } from "../../../../time";
-import { admitSessionRunDispatchCommand } from "../../../api-command/application/api-command-enqueue";
-import { deliverApiCommand } from "../../../api-command/application/api-command-ledger";
+import { API_ERROR_CODE, createApiError } from "../../../../platform/errors";
+import { currentTimestampMs, toIsoString } from "../../../../time";
+import { createSessionRunDispatchApiCommandInput } from "../../../api-command/application/api-command-enqueue";
+import {
+  deliverApiCommand,
+  prepareApiCommand,
+} from "../../../api-command/application/api-command-ledger";
+import type { ApiCommandAdmission } from "../../../api-command/application/api-command-ledger";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
 import { fileStore } from "../../../files/application/file-store";
-import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
-import { insertSessionMessageRecord } from "../../../sessions/application/session-message-write.service";
+import { publishPersistedSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import type { BoundCapabilityRunProvenance } from "../../domain/bound-capability-run-provenance";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import {
-  createSessionRunRecordIfSessionIdle,
-  SessionRunCreationGuardRejectedError,
-} from "../../infrastructure/session-runs/session-run-store.repository";
+  commitQueuedSessionRunAdmission,
+  hasSessionRunAdmissionClientRequestReceipt,
+} from "../../infrastructure/session-runs/session-run-admission.repository";
+import { getActiveSessionRunSummary } from "../../infrastructure/session-runs/session-run-read.repository";
+import { SessionRunCreationGuardRejectedError } from "../../infrastructure/session-runs/session-run-store.repository";
+import { createInsertedSessionRunSummary } from "../../infrastructure/session-runs/session-run-write.repository";
 import { getSessionExecutionPlan } from "../session-definition/session-execution.repository";
 import { dispatchQueuedSessionRun } from "./dispatch-queued-run.service";
 import { createQueuedSessionRunRuntimeEvents } from "./session-run-view-events.service";
@@ -111,37 +121,22 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     ),
   ]);
 
-  const createRunResult = await createSessionRunRecordIfSessionIdle(bindings.DB, {
-    agentId: input.session.agent_id,
-    ...(input.boundCapabilityProvenance === undefined
-      ? {}
-      : { boundCapabilityProvenance: input.boundCapabilityProvenance }),
-    createdBy: viewerId,
-    deploymentVersionId: input.session.deployment_version_id,
-    deploymentVersionNumber: input.session.deployment_version_number,
-    model: input.session.model,
-    provider: input.session.provider,
-    runtimeId,
-    ...(input.runCreationGuard === undefined ? {} : { runCreationGuard: input.runCreationGuard }),
-    sessionId: input.session.id,
-    status: "queued",
-    trigger: "user_prompt",
-  });
-
-  if (createRunResult.activeRun) {
-    throw new SessionActiveRunExistsError(createRunResult.activeRun);
-  }
-
-  const { createdRun } = createRunResult;
-
-  const sessionMessage = await insertSessionMessageRecord(bindings.DB, {
-    content: input.prompt,
-    createdByAccountId: viewer.id,
-    role: "user",
-    sessionId: input.session.id,
-    sessionRunId: createdRun.id,
-  });
-  const sessionMessageId = sessionMessage.id;
+  const admittedAtMs = currentTimestampMs();
+  const runId = createPlatformId<SessionRunId>();
+  const traceId = generateTraceId();
+  const createdRun = createInsertedSessionRunSummary(
+    {
+      deploymentVersionId: input.session.deployment_version_id,
+      deploymentVersionNumber: input.session.deployment_version_number,
+      model: input.session.model,
+      provider: input.session.provider,
+      sessionId: input.session.id,
+      status: "queued",
+      trigger: "user_prompt",
+    },
+    { runId, timestampMs: admittedAtMs, traceId },
+  );
+  const sessionMessageId = createPlatformId<SessionMessageId>();
 
   const queuedEvents = createQueuedSessionRunRuntimeEvents({
     prompt: input.prompt,
@@ -149,27 +144,8 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     sessionId: input.session.id,
     sessionMessageId,
   });
-  await appendSessionRuntimeEvents({
-    bindings,
-    events: queuedEvents,
-    sessionId: input.session.id,
-    sourceEventId: input.clientRequestId,
-  });
-  const queuedAtMs = Date.now();
-
-  logInfo("session.run.queued", {
-    agentId: input.session.agent_id,
-    attachmentCount: input.attachmentIds.length,
-    clientRequestId: input.clientRequestId,
-    queuedLatencyMs: queuedAtMs - queueStartedAtMs,
-    runId: createdRun.id,
-    runtimeId,
-    sessionId: input.session.id,
-    traceId: createdRun.traceId,
-    viewerId: viewer.id,
-  });
-
-  const dispatchCommand = await admitSessionRunDispatchCommand(bindings, {
+  const queuedAtMs = admittedAtMs;
+  const dispatchPayload = {
     attachmentIds: input.attachmentIds,
     prompt: input.prompt,
     queuedAtMs,
@@ -182,6 +158,92 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
     traceId: createdRun.traceId,
     viewer,
     ...(input.accessViewer ? { accessViewer: input.accessViewer } : {}),
+  };
+  const apiCommand = prepareApiCommand(createSessionRunDispatchApiCommandInput(dispatchPayload), {
+    timestampMs: admittedAtMs,
+  });
+  const admitted = await commitQueuedSessionRunAdmission(bindings.DB, {
+    apiCommand,
+    clientRequestId: input.clientRequestId,
+    events: queuedEvents,
+    message: {
+      content: input.prompt,
+      createdByAccountId: viewer.id,
+      id: sessionMessageId,
+      timestampMs: admittedAtMs,
+    },
+    run: {
+      agentId: input.session.agent_id,
+      ...(input.boundCapabilityProvenance === undefined
+        ? {}
+        : { boundCapabilityProvenance: input.boundCapabilityProvenance }),
+      createdBy: viewerId,
+      deploymentVersionId: input.session.deployment_version_id,
+      deploymentVersionNumber: input.session.deployment_version_number,
+      id: createdRun.id,
+      model: input.session.model,
+      provider: input.session.provider,
+      runtimeId,
+      sessionId: input.session.id,
+      timestampMs: admittedAtMs,
+      traceId: createdRun.traceId,
+      trigger: "user_prompt",
+    },
+    ...(input.runCreationGuard === undefined ? {} : { runCreationGuard: input.runCreationGuard }),
+    session: {
+      agentId: input.session.agent_id,
+      appId: input.session.app_id,
+      id: input.session.id,
+    },
+  });
+
+  if (!admitted) {
+    if (
+      await hasSessionRunAdmissionClientRequestReceipt(bindings.DB, {
+        clientRequestId: input.clientRequestId,
+        sessionId: input.session.id,
+      })
+    ) {
+      throw createApiError(
+        API_ERROR_CODE.sessionRunClientRequestDuplicate,
+        "This client request has already been applied to the conversation.",
+      );
+    }
+
+    const activeRun = await getActiveSessionRunSummary(bindings.DB, input.session.id);
+
+    if (activeRun !== null) {
+      throw new SessionActiveRunExistsError(activeRun);
+    }
+
+    if (input.runCreationGuard !== undefined) {
+      throw new SessionRunCreationGuardRejectedError();
+    }
+
+    throw new Error("Session cannot accept a new run.");
+  }
+
+  await publishPersistedSessionRuntimeEvents({
+    bindings,
+    events: queuedEvents,
+    sessionId: input.session.id,
+  });
+  const dispatchCommand: ApiCommandAdmission = {
+    commandId: apiCommand.commandId,
+    kind: apiCommand.record.kind,
+    shouldDeliver: true,
+  };
+
+  logInfo("session.run.queued", {
+    agentId: input.session.agent_id,
+    attachmentCount: input.attachmentIds.length,
+    clientRequestId: input.clientRequestId,
+    queuedLatencyMs: Date.now() - queueStartedAtMs,
+    runId: createdRun.id,
+    runtimeId,
+    sessionId: input.session.id,
+    traceId: createdRun.traceId,
+    viewerId: viewer.id,
   });
 
   // Start both paths after durable admission. Queue delivery stays retryable,
@@ -240,10 +302,10 @@ export async function queueSessionRun(request: QueueSessionRunRequest): Promise<
   return {
     run: createdRun,
     sessionState: {
-      lastMessageAt: toIsoString(sessionMessage.timestampMs),
+      lastMessageAt: toIsoString(admittedAtMs),
       sessionId: input.session.id,
       status: "RUNNING",
-      updatedAt: toIsoString(sessionMessage.timestampMs),
+      updatedAt: toIsoString(admittedAtMs),
     },
     warnings: [],
   };
