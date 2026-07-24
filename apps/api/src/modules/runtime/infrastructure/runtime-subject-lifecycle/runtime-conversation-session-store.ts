@@ -11,6 +11,7 @@ import {
   mapReadyRuntimeSubjectBackup,
   readyConversationBackupTable,
   runLeaseQuery,
+  runLeaseQueryForListedSubject,
 } from "./runtime-subject-store-queries";
 import type {
   RuntimeConversationSessionRecord,
@@ -90,6 +91,39 @@ export async function getRuntimeConversationSessionState(
       .limit(1)
       .get()) ?? null
   );
+}
+
+// Session-scoped (cattle) conversations stay open across terminal runs so the
+// driver survives the idle grace. This lists the ones quiet past that grace so
+// the maintenance sweep can close them; the close path arms the subject
+// inactive deadline, which feeds the existing subject reclamation chain. Rows
+// with an active run lease are skipped — a long-running turn is not idle.
+export async function listIdleSessionScopedConversationSessions(
+  database: D1Database,
+  input: {
+    readonly idleSinceLte: number;
+    readonly limit: number;
+  },
+): Promise<Array<{ sandboxId: SandboxId; sessionId: SessionId }>> {
+  const appDb = getAppDatabase(database);
+
+  return appDb
+    .select({
+      sandboxId: sandboxSessionsTable.sandboxId,
+      sessionId: sandboxSessionsTable.sessionId,
+    })
+    .from(sandboxSessionsTable)
+    .innerJoin(sandboxesTable, eq(sandboxesTable.id, sandboxSessionsTable.sandboxId))
+    .where(
+      and(
+        eq(sandboxSessionsTable.status, "active"),
+        eq(sandboxesTable.kind, "cattle"),
+        sql`${sandboxSessionsTable.updatedAt} <= ${input.idleSinceLte}`,
+        notExists(runLeaseQueryForListedSubject(appDb)),
+      ),
+    )
+    .limit(input.limit)
+    .all();
 }
 
 export async function ensureRuntimeConversationSessionRecord(

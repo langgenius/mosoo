@@ -101,7 +101,14 @@ export const RUNTIME_KIND_POLICIES = {
     },
     kind: "cattle",
     lease: {
-      closeOnRunTerminal: true,
+      // Keeping the conversation session open across terminal runs keeps the
+      // driver process (and its provider session) resident inside the idle
+      // grace window, so a follow-up turn skips the driver respawn that
+      // dominated the warm prepare path. The conversation idle sweep closes
+      // sessions quiet for longer than the subject grace, which arms the
+      // subject inactive deadline and hands reclamation to the existing
+      // maintenance chain.
+      closeOnRunTerminal: false,
     },
     nativeResume: {
       persistence: AGENT_KIND_RUNTIME_POLICIES.cattle.nativeResume.persistence,

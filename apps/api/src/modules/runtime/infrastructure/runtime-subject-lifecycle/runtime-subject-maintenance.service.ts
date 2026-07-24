@@ -13,11 +13,13 @@ import { syncSessionViewerState } from "../../../sessions/application/session-vi
 import { RESCHEDULING_RECONNECT_WINDOW_MS } from "../../../sessions/domain/session-lifecycle";
 import { createSessionLifecycleTerminatedEvent } from "../../application/session-runs/session-run-view-events.service";
 import { reconcileStaleActiveSessionRuns } from "../../application/session-runs/stale-run-reconciliation.service";
+import { getRuntimeKindPolicy } from "../../domain/runtime-kind-policy";
 import { cleanupDriverInstances } from "../driver-instance/maintenance";
 import { repairRuntimeCommandRecords } from "../session-runs/runtime-command-store.repository";
 import { createSessionStatusTransitionPatch } from "../session-runs/session-lifecycle-projection.repository";
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
 import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
+import { listIdleSessionScopedConversationSessions } from "./runtime-conversation-session-store";
 import {
   claimInactiveRuntimeSubject,
   listInactiveRuntimeSubjects,
@@ -246,6 +248,37 @@ export async function expireStaleReschedulingSessions(bindings: ApiBindings): Pr
   );
 }
 
+// Cattle conversations no longer close on run terminal (the resident driver is
+// what makes follow-up turns warm), so this sweep is what ends them: close the
+// ones quiet past the cattle idle grace, which arms the subject inactive
+// deadline and hands the container to the existing subject reclamation pass.
+async function closeIdleSessionScopedConversationSessions(
+  bindings: ApiBindings,
+  now: number,
+): Promise<void> {
+  const idleGraceMs = getRuntimeKindPolicy("cattle").subject.idleReleaseDelayMs;
+  const idle = await listIdleSessionScopedConversationSessions(bindings.DB, {
+    idleSinceLte: now - idleGraceMs,
+    limit: MAINTENANCE_BATCH_SIZE,
+  });
+
+  for (const conversation of idle) {
+    try {
+      const { closeSandboxConversationSession } = await import("../sandbox-session.service");
+      await closeSandboxConversationSession(bindings, {
+        sandboxId: conversation.sandboxId,
+        sessionId: conversation.sessionId,
+      });
+    } catch (error) {
+      logWarn("runtime.conversation.idle_close_failed", {
+        ...createErrorLogContext(error),
+        runtimeSubjectId: conversation.sandboxId,
+        sessionId: conversation.sessionId,
+      });
+    }
+  }
+}
+
 export async function runSandboxMaintenance(bindings: ApiBindings): Promise<void> {
   const now = Date.now();
 
@@ -264,6 +297,7 @@ export async function runSandboxMaintenance(bindings: ApiBindings): Promise<void
     limit: MAINTENANCE_BATCH_SIZE,
     staleUpdatedAtLte: now - MAINTENANCE_OPERATION_REPAIR_AFTER_MS,
   });
+  await closeIdleSessionScopedConversationSessions(bindings, now);
 
   const [candidates, repairCandidates] = await Promise.all([
     listInactiveRuntimeSubjects(bindings.DB, {
