@@ -58,6 +58,18 @@ async function publishSessionViewerEventsSafely(
   }
 }
 
+export async function publishPersistedSessionRuntimeEvents(input: {
+  bindings: ApiBindings;
+  events: readonly RuntimeEventEnvelope[];
+  sessionId: SessionId;
+}): Promise<void> {
+  const deliveryEvents = appRuntimeEventsToSessionDeliveryEvents(input.events);
+
+  if (deliveryEvents.length > 0) {
+    await publishSessionViewerEventsSafely(input.bindings, input.sessionId, deliveryEvents);
+  }
+}
+
 export interface AppendSessionRuntimeEventsInput {
   bindings: ApiBindings;
   deliver?: boolean;
@@ -120,10 +132,12 @@ export async function appendSessionRuntimeEvents(
     sessionId: input.sessionId,
   });
 
-  const deliveryEvents = appRuntimeEventsToSessionDeliveryEvents(result.persistedEvents);
-
-  if (input.deliver !== false && deliveryEvents.length > 0) {
-    await publishSessionViewerEventsSafely(input.bindings, input.sessionId, deliveryEvents);
+  if (input.deliver !== false) {
+    await publishPersistedSessionRuntimeEvents({
+      bindings: input.bindings,
+      events: result.persistedEvents,
+      sessionId: input.sessionId,
+    });
   }
 
   return result;
