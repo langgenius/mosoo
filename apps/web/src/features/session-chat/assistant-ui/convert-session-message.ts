@@ -6,6 +6,7 @@ import type { SessionViewMessage, SessionViewSegment } from "@mosoo/ag-ui-sessio
 // is resolved separately in the renderer (see session-permission-context).
 type AssistantContentPart =
   | { type: "text"; text: string }
+  | { type: "reasoning"; text: string }
   | {
       type: "tool-call";
       toolCallId: string;
@@ -32,6 +33,18 @@ function sessionSegmentsToParts(segments: readonly SessionViewSegment[]): Assist
         last.text += segment.text;
       } else {
         parts.push({ type: "text", text: segment.text });
+      }
+
+      continue;
+    }
+
+    if (segment.kind === "reasoning") {
+      const last = parts.at(-1);
+
+      if (last?.type === "reasoning") {
+        last.text += segment.text;
+      } else {
+        parts.push({ type: "reasoning", text: segment.text });
       }
 
       continue;
