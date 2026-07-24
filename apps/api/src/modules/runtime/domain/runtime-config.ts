@@ -1,6 +1,6 @@
+import { isSupportedDriverRuntime } from "@mosoo/agent-driver/runtime";
+import type { DriverRuntime } from "@mosoo/agent-driver/runtime";
 import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
-import { isSupportedDriverRuntime } from "agent-driver/runtime";
-import type { DriverRuntime } from "agent-driver/runtime";
 
 export const DRIVER_BOOT_TOKEN_TTL_MS = 60_000;
 export const RUNTIME_ACTION_TOKEN_TTL_MS = 10 * 60_000;

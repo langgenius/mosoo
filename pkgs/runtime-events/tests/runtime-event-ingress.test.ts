@@ -298,6 +298,36 @@ describe("runtime event ingress", () => {
     });
   });
 
+  test("admits Driver Contract v2 timing payloads with ISO timestamps", () => {
+    const event = first(
+      toRuntimeEventInput(createContext(), {
+        kind: "runtime.timing.recorded",
+        payload: {
+          completedAt: "1970-01-01T00:00:01.100Z",
+          path: "cold",
+          phases: [{ durationMs: 100, name: "config_bootstrap" }],
+          runId: "run-payload",
+          sessionId: "session-payload",
+          source: "driver",
+          stage: "driver_backend",
+          startedAt: "1970-01-01T00:00:01.000Z",
+          totalMs: 100,
+          traceId: null,
+        },
+      }),
+    );
+
+    if (!isRuntimeEventRecord(event.payload)) {
+      throw new Error("Expected a runtime timing payload.");
+    }
+
+    expect(event.payload).toMatchObject({
+      completedAtMs: 1_100,
+      startedAtMs: 1_000,
+      totalMs: 100,
+    });
+  });
+
   test("removes envelope-owned fields from public payloads", () => {
     const event = first(
       toRuntimeEventInput(createContext(), {

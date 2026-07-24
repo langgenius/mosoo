@@ -1,3 +1,4 @@
+import { SANDBOX_MEMORY_PATH } from "@mosoo/agent-driver/paths";
 import { AGENT_KIND_RUNTIME_POLICIES } from "@mosoo/contracts/agent";
 import type {
   AgentKind,
@@ -6,7 +7,6 @@ import type {
   AgentRuntimeTerminalTarget,
 } from "@mosoo/contracts/agent";
 import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
-import { SANDBOX_MEMORY_PATH } from "agent-driver/paths";
 
 export type RuntimeSubjectScope = AgentRuntimeSubjectScope;
 export type RuntimeCheckpointRule =

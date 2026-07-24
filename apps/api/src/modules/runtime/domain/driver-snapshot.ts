@@ -1,3 +1,5 @@
+import type { DriverRecoveryMessage } from "@mosoo/agent-driver/boot";
+import type { DriverNativeRuntimeRef, DriverRuntime } from "@mosoo/agent-driver/runtime";
 import type { JsonObject } from "@mosoo/contracts";
 import type { AgentBuiltInToolConfig, AgentKind, AgentReadiness } from "@mosoo/contracts/agent";
 import type {
@@ -27,8 +29,6 @@ import type {
   SkillId,
   SkillSnapshotId,
 } from "@mosoo/id";
-import type { DriverRecoveryMessage } from "agent-driver/boot";
-import type { DriverNativeRuntimeRef, DriverRuntime } from "agent-driver/runtime";
 
 export type { DriverRuntime };
 

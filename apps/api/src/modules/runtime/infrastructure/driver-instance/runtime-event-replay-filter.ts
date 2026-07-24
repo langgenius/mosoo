@@ -1,4 +1,4 @@
-import type { DriverEventEnvelope } from "agent-driver/events";
+import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
 
 type ReplayRuntimeEvent = DriverEventEnvelope["event"];
 type ReplayRuntimeEventPayload = Record<string, unknown>;

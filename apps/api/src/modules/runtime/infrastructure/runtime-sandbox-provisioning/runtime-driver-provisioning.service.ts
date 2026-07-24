@@ -1,6 +1,6 @@
+import { DRIVER_BOOT_PAYLOAD_FILE_ENV_NAME } from "@mosoo/agent-driver/boot";
 import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
-import { DRIVER_BOOT_PAYLOAD_FILE_ENV_NAME } from "agent-driver/boot";
 
 import {
   createApiWideEvent,

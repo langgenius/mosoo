@@ -1,4 +1,4 @@
-import type { DriverBootPayload } from "agent-driver/boot";
+import type { DriverBootPayload } from "@mosoo/agent-driver/boot";
 
 export interface DriverBootPayloadPreparedInput {
   readonly bootPayload: DriverBootPayload;

@@ -1,3 +1,4 @@
+import { getSessionOrganizationPath } from "@mosoo/agent-driver/paths";
 import type { SessionSummary } from "@mosoo/contracts/session";
 import type { UserWarning } from "@mosoo/contracts/session-run";
 import type { ResolvedRunSkill } from "@mosoo/contracts/skill";
@@ -6,7 +7,6 @@ import type { AgentId, PlatformId, AppId, SandboxId, SandboxSessionId, SessionId
 import { getRuntimeCatalogEntry, getRuntimeCatalogVendorForProvider } from "@mosoo/runtime-catalog";
 import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
-import { getSessionOrganizationPath } from "agent-driver/paths";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { validationError } from "../../../../platform/errors";

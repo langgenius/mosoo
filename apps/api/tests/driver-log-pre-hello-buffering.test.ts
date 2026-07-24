@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-import type { DriverLogBatchInput } from "agent-driver/orpc";
+import type { DriverLogBatchInput } from "@mosoo/agent-driver/orpc";
 
 const publishedBatches: DriverLogBatchInput[] = [];
 

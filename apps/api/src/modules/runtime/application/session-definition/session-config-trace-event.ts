@@ -2,7 +2,7 @@ import type {
   MosooSessionConfigTraceMcpServer,
   MosooSessionConfigTraceValue,
 } from "@mosoo/ag-ui-session";
-import type { DriverBootMcpServer, DriverBootPayload } from "agent-driver/boot";
+import type { DriverBootMcpServer, DriverBootPayload } from "@mosoo/agent-driver/boot";
 
 function summarizeMcpServer(server: DriverBootMcpServer): MosooSessionConfigTraceMcpServer {
   return {

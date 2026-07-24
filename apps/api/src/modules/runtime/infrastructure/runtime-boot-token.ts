@@ -1,3 +1,9 @@
+import type {
+  DriverBootPayload,
+  DriverRuntime,
+  DriverRuntimeTransport,
+} from "@mosoo/agent-driver/boot";
+import { DRIVER_PROTOCOL_VERSION, parseDriverBootPayload } from "@mosoo/agent-driver/boot";
 import { parsePlatformId } from "@mosoo/id";
 import type {
   CredentialId,
@@ -6,8 +12,6 @@ import type {
   SandboxId,
   SkillSnapshotId,
 } from "@mosoo/id";
-import type { DriverBootPayload, DriverRuntime, DriverRuntimeTransport } from "agent-driver/boot";
-import { DRIVER_PROTOCOL_VERSION, parseDriverBootPayload } from "agent-driver/boot";
 
 import { fromBase64Url, toArrayBuffer, toBase64Url } from "../../../shared/bytes";
 

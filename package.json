@@ -8,7 +8,7 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "vp run --filter agent-driver build && vp run --filter @mosoo/web build",
+    "build": "vp run --filter @mosoo/agent-driver build && vp run --filter @mosoo/web build",
     "cf:types": "vp run --filter @mosoo/api cf:types",
     "check": "vp run -w fmt:check && vp run -w docs:check && vp run -w lint && vp run -w tc && vp run -w test",
     "db:migrate:local": "vp run --filter @mosoo/api db:migrate:local",
@@ -21,8 +21,8 @@
     "driver:submodule:smoke": "vp exec bun scripts/check-driver-submodule-cutover.ts",
     "e2e": "bun e2e/cli.ts",
     "env:init": "vp run --filter @mosoo/api env:init",
-    "fmt": "vp fmt --write config docker scripts vite.config.ts justfile apps pkgs e2e --ignore-path .gitignore",
-    "fmt:check": "vp fmt --check config docker scripts vite.config.ts justfile apps pkgs e2e --ignore-path .gitignore",
+    "fmt": "vp fmt --write config docker scripts vite.config.ts justfile apps/api apps/web pkgs e2e --ignore-path .gitignore",
+    "fmt:check": "vp fmt --check config docker scripts vite.config.ts justfile apps/api apps/web pkgs e2e --ignore-path .gitignore",
     "fmt:check:path": "vp fmt --check --ignore-path .gitignore",
     "graphql:codegen": "vp exec tsx node_modules/.bin/graphql-codegen --config config/graphql-codegen.ts",
     "commit:check": "vp exec bun scripts/validate-commit-range.ts origin/main HEAD",
@@ -30,12 +30,12 @@
     "help-docs-index": "bun scripts/generate-help-docs-index.ts",
     "hooks:install": "vp exec prek -c config/prek.toml install",
     "knip": "vp exec knip --config config/knip.jsonc",
-    "lint": "vp run -w cf:types && vp lint vite.config.ts config/bun-script-types.d.ts config/vite-plus.shared.ts docker scripts apps pkgs e2e",
+    "lint": "vp run -w cf:types && vp lint vite.config.ts config/bun-script-types.d.ts config/vite-plus.shared.ts docker scripts apps/api apps/web pkgs e2e",
     "react-doctor": "vp exec react-doctor apps/web --full",
     "react-doctor:diff": "vp exec react-doctor apps/web --verbose --diff",
     "react-doctor:report": "vp exec react-doctor apps/web --json --json-compact --full --fail-on none",
     "tc": "vp run -r tc",
-    "test": "vp exec bun test config/commit-policy.test.ts scripts/validate-commit-message.test.ts scripts/docker-runtime-config.test.ts scripts/docker-entrypoint-signal.test.ts && vp run --filter @mosoo/api --filter agent-driver --filter @mosoo/web --filter @mosoo/ag-ui-session --filter @mosoo/agent-package --filter @mosoo/contracts --filter @mosoo/db --filter @mosoo/id --filter @mosoo/public-api-client --filter @mosoo/runtime-catalog --filter @mosoo/runtime-events --filter @mosoo/session-policy --filter @mosoo/skill-package test && vp run -w graphql:codegen:check"
+    "test": "vp exec bun test config/commit-policy.test.ts scripts/validate-commit-message.test.ts scripts/docker-runtime-config.test.ts scripts/docker-entrypoint-signal.test.ts && vp run --filter @mosoo/api --filter @mosoo/agent-driver --filter @mosoo/web --filter @mosoo/ag-ui-session --filter @mosoo/agent-package --filter @mosoo/contracts --filter @mosoo/db --filter @mosoo/id --filter @mosoo/public-api-client --filter @mosoo/runtime-catalog --filter @mosoo/runtime-events --filter @mosoo/session-policy --filter @mosoo/skill-package test && vp run -w graphql:codegen:check"
   },
   "devDependencies": {
     "@graphql-codegen/cli": "^7.2.0",

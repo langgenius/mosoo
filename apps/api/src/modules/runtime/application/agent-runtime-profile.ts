@@ -1,7 +1,7 @@
+import { getSessionOrganizationPath, getSessionRuntimeStatePath } from "@mosoo/agent-driver/paths";
 import type { JsonObject } from "@mosoo/contracts";
 import type { AgentKind, AgentReadiness } from "@mosoo/contracts/agent";
 import type { AccountId, AgentId, SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
-import { getSessionOrganizationPath, getSessionRuntimeStatePath } from "agent-driver/paths";
 
 import type {
   DriverConfigRevision,

@@ -1,7 +1,7 @@
+import type { DriverNativeRuntimeRef } from "@mosoo/agent-driver/runtime";
+import { parseDriverNativeRuntimeRef } from "@mosoo/agent-driver/runtime";
 import { readRuntimeEventPayload, readRuntimeEventString } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
-import type { DriverNativeRuntimeRef } from "agent-driver/runtime";
-import { parseDriverNativeRuntimeRef } from "agent-driver/runtime";
 
 export function readNativeResumeRef(event: RuntimeEventEnvelope): DriverNativeRuntimeRef | null {
   const payload = readRuntimeEventPayload(event);

@@ -1,4 +1,3 @@
-import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
 import type {
   DriverCommandUpdateInput,
   DriverCompletionInput,
@@ -13,7 +12,8 @@ import type {
   DriverNextCommandInput,
   DriverNextCommandOutput,
   DriverReadyInput,
-} from "agent-driver/orpc";
+} from "@mosoo/agent-driver/orpc";
+import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
 
 import type { DriverInstanceRpcHandler, DriverInstanceRpcOperationContext } from "./rpc";
 import { DriverInstanceRpcCommandController } from "./rpc-command-controller";

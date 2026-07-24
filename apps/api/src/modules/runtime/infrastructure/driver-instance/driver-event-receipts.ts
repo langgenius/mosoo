@@ -1,5 +1,5 @@
-import type { DriverEventEnvelope } from "agent-driver/events";
-import type { DriverEventReceipt } from "agent-driver/orpc";
+import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
+import type { DriverEventReceipt } from "@mosoo/agent-driver/orpc";
 
 const MAX_PROCESSED_DRIVER_EVENT_RECEIPTS = 8192;
 

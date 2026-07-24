@@ -1,8 +1,8 @@
+import type { DriverFailureInput } from "@mosoo/agent-driver/orpc";
 import { createPlatformId } from "@mosoo/id";
 import type { DriverInstanceId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
 import { createRuntimeEvent } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
-import type { DriverFailureInput } from "agent-driver/orpc";
 
 import { logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";

@@ -1,5 +1,7 @@
+import { DRIVER_CONTROL_PORT_MAX, DRIVER_CONTROL_PORT_MIN } from "@mosoo/agent-driver/boot";
+
+const DRIVER_CONTROL_PORT_COUNT = DRIVER_CONTROL_PORT_MAX - DRIVER_CONTROL_PORT_MIN + 1;
 import type { DriverInstanceId } from "@mosoo/id";
-import { DRIVER_CONTROL_PORT_COUNT, DRIVER_CONTROL_PORT_MIN } from "agent-driver/boot";
 
 function xorUint32(left: number, right: number): number {
   let result = 0;

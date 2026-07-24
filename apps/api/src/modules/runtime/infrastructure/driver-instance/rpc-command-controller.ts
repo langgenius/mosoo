@@ -1,13 +1,13 @@
+import type {
+  DriverCommandUpdateInput,
+  DriverNextCommandInput,
+  DriverNextCommandOutput,
+} from "@mosoo/agent-driver/orpc";
 import { RuntimeCommandResult } from "@mosoo/contracts/runtime-command";
 import type { RuntimeCommand } from "@mosoo/contracts/runtime-command";
 import { parseSchemaValue } from "@mosoo/contracts/validation";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverCommandId } from "@mosoo/id";
-import type {
-  DriverCommandUpdateInput,
-  DriverNextCommandInput,
-  DriverNextCommandOutput,
-} from "agent-driver/orpc";
 
 import {
   claimNextQueuedRuntimeCommandRecord,

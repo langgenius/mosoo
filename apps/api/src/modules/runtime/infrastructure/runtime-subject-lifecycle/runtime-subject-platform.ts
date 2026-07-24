@@ -1,5 +1,9 @@
+import {
+  SANDBOX_CACHE_PATH,
+  SANDBOX_MEMORY_PATH,
+  SANDBOX_SESSION_ROOT,
+} from "@mosoo/agent-driver/paths";
 import { discardPromiseResult } from "@mosoo/effects";
-import { SANDBOX_CACHE_PATH, SANDBOX_MEMORY_PATH, SANDBOX_SESSION_ROOT } from "agent-driver/paths";
 
 import {
   withDisposedRpcResource,

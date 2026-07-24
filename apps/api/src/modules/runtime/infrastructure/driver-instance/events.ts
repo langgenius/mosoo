@@ -4,6 +4,7 @@ import {
   createServerCustomEvent,
   parseNullableSessionUsageSummary,
 } from "@mosoo/ag-ui-session";
+import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverInstanceId } from "@mosoo/id";
 import type { AccountId, SessionId } from "@mosoo/id";
@@ -16,7 +17,6 @@ import {
   readRuntimeRunPayload,
 } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
-import type { DriverEventEnvelope } from "agent-driver/events";
 
 import { createErrorLogContext, logInfo, logWarn } from "../../../../platform/cloudflare/logger";
 import { withDisposedRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
@@ -429,10 +429,7 @@ export async function appRuntimeDriverEvents(
   function appendCanonicalEvent(source: DriverEventEnvelope, event: RuntimeEventEnvelope): void {
     runtimeEvents.push({
       event,
-      occurredAt:
-        typeof source.occurredAt === "number" && Number.isFinite(source.occurredAt)
-          ? source.occurredAt
-          : null,
+      occurredAt: toDriverEventOccurredAtMs(source.occurredAt),
       sourceEventId: resolveDriverEventPersistenceSourceId(source, event),
     });
   }
@@ -444,10 +441,7 @@ export async function appRuntimeDriverEvents(
   ): void {
     sessionDeliveryEvents.push({
       event: deliveryEvent,
-      occurredAt:
-        typeof source.occurredAt === "number" && Number.isFinite(source.occurredAt)
-          ? source.occurredAt
-          : null,
+      occurredAt: toDriverEventOccurredAtMs(source.occurredAt),
       sourceEventId: resolveDriverEventPersistenceSourceId(source, event),
     });
   }
@@ -617,6 +611,17 @@ export async function appRuntimeDriverEvents(
     transitions,
     usage,
   };
+}
+
+// Driver Contract v2 carries envelope occurredAt as an ISO 8601 string;
+// persistence keeps epoch milliseconds. Unparsable or absent values stay null.
+function toDriverEventOccurredAtMs(occurredAt: DriverEventEnvelope["occurredAt"]): number | null {
+  if (typeof occurredAt !== "string") {
+    return null;
+  }
+
+  const parsed = Date.parse(occurredAt);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function resolveDriverEventPersistenceSourceId(

@@ -1,4 +1,4 @@
-import type { DriverLogBatchInput } from "agent-driver/orpc";
+import type { DriverLogBatchInput } from "@mosoo/agent-driver/orpc";
 
 import { createApiChildLogger, runWithApiLogContext } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
