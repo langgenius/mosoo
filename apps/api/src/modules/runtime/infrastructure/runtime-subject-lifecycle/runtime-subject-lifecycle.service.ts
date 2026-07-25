@@ -12,6 +12,7 @@ import type {
 } from "@mosoo/id";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
+import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { currentTimestampMs } from "../../../../time";
 import {
@@ -35,11 +36,11 @@ import {
 import type { RuntimeRunLeaseTransitionOutcome } from "./runtime-run-lease-store";
 import {
   getRuntimeSubjectErrorCode,
-  isRecoverableRuntimeSubjectErrorCode,
   RuntimeSubjectBackupNotReadyError,
   RuntimeSubjectRestoreFailedError,
 } from "./runtime-subject-errors";
 import {
+  destroyRuntimeSubjectContainer,
   getRuntimeSubjectKeepAliveHandle,
   prepareRuntimeSubjectFilesystem,
   restoreRuntimeSubjectBackup,
@@ -118,7 +119,7 @@ function isPrewarmActivationClaim(record: RuntimeSubjectActivationRecord): boole
 }
 
 function isClaimableRuntimeSubjectStatus(record: RuntimeSubjectActivationRecord): boolean {
-  return record.status === "active" || record.status === "cold" || record.status === "error";
+  return record.status === "active" || record.status === "cold";
 }
 
 function isUnstartedMaintenanceClaim(record: RuntimeSubjectActivationRecord): boolean {
@@ -220,6 +221,20 @@ export class RuntimeSubjectLifecycleService {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Runtime subject activation failed.";
       const errorCode = getRuntimeSubjectErrorCode(error);
+
+      // Activation failed, so the container DO is no longer trustworthy (a hung
+      // keep-alive, a half-restored filesystem, a lost port). Destroy it so the
+      // subject returns to a true cold state and the next run cold-starts a
+      // fresh container instead of reclaiming this broken one. Best-effort: a
+      // destroy failure must not mask the original activation error.
+      try {
+        await destroyRuntimeSubjectContainer(this.#bindings, input.runtimeSubjectId);
+      } catch (destroyError) {
+        logWarn("runtime.subject.activation_failure.destroy_failed", {
+          ...createErrorLogContext(destroyError),
+          runtimeSubjectId: input.runtimeSubjectId,
+        });
+      }
 
       await markRuntimeSubjectActivationFailed(this.#bindings.DB, {
         claimOwner,
@@ -451,13 +466,6 @@ export class RuntimeSubjectLifecycleService {
       }
 
       throw new Error("Runtime subject is claimed by lifecycle maintenance.");
-    }
-
-    const canRecoverFromMountError =
-      record.status === "error" && isRecoverableRuntimeSubjectErrorCode(record.lastErrorCode);
-
-    if (record.status === "error" && !canRecoverFromMountError) {
-      throw new Error(record.lastError ?? "Runtime subject is blocked by a previous error.");
     }
 
     const claimed = await claimRuntimeSubjectActivation(this.#bindings.DB, {

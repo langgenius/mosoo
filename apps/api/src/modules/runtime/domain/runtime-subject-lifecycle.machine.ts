@@ -4,7 +4,6 @@ import { createMachine, transition } from "xstate";
 export const RUNTIME_SUBJECT_CLAIMABLE_STATUSES = [
   "active",
   "cold",
-  "error",
 ] as const satisfies readonly SandboxStatus[];
 
 export const RUNTIME_SUBJECT_OPERATION_STATUSES = [
@@ -14,13 +13,17 @@ export const RUNTIME_SUBJECT_OPERATION_STATUSES = [
 
 export type RuntimeSubjectOperationStatus = (typeof RUNTIME_SUBJECT_OPERATION_STATUSES)[number];
 
+// There is no dedicated failure state. A failed lifecycle step means the
+// container DO is no longer trustworthy, so the subject returns to `cold` (no
+// live container) via a `runtime_subject.cold` event; the caller destroys the
+// container and records the diagnostic in lastError. Reclaiming a "failed"
+// subject is therefore just a normal cold start, which rebuilds the container.
 export type RuntimeSubjectLifecycleEvent =
   | { type: "runtime_subject.activate" }
   | { type: "runtime_subject.active" }
   | { type: "runtime_subject.back_up" }
   | { type: "runtime_subject.cold" }
-  | { type: "runtime_subject.destroy" }
-  | { type: "runtime_subject.fail" };
+  | { type: "runtime_subject.destroy" };
 
 const RUNTIME_SUBJECT_STATUS_BY_EVENT = {
   "runtime_subject.activate": "restoring",
@@ -28,7 +31,6 @@ const RUNTIME_SUBJECT_STATUS_BY_EVENT = {
   "runtime_subject.back_up": "backing_up",
   "runtime_subject.cold": "cold",
   "runtime_subject.destroy": "destroying",
-  "runtime_subject.fail": "error",
 } as const satisfies Record<RuntimeSubjectLifecycleEvent["type"], SandboxStatus>;
 
 const RUNTIME_SUBJECT_EVENT_BY_STATUS = {
@@ -36,7 +38,6 @@ const RUNTIME_SUBJECT_EVENT_BY_STATUS = {
   backing_up: { type: "runtime_subject.back_up" },
   cold: { type: "runtime_subject.cold" },
   destroying: { type: "runtime_subject.destroy" },
-  error: { type: "runtime_subject.fail" },
   restoring: { type: "runtime_subject.activate" },
 } as const satisfies Record<SandboxStatus, RuntimeSubjectLifecycleEvent>;
 
@@ -48,8 +49,8 @@ const runtimeSubjectLifecycleMachine = createMachine({
       on: {
         "runtime_subject.active": "active",
         "runtime_subject.back_up": "backing_up",
+        "runtime_subject.cold": "cold",
         "runtime_subject.destroy": "destroying",
-        "runtime_subject.fail": "error",
       },
     },
     backing_up: {
@@ -57,7 +58,6 @@ const runtimeSubjectLifecycleMachine = createMachine({
         "runtime_subject.active": "active",
         "runtime_subject.cold": "cold",
         "runtime_subject.destroy": "destroying",
-        "runtime_subject.fail": "error",
       },
     },
     cold: {
@@ -65,26 +65,17 @@ const runtimeSubjectLifecycleMachine = createMachine({
         "runtime_subject.activate": "restoring",
         "runtime_subject.back_up": "backing_up",
         "runtime_subject.destroy": "destroying",
-        "runtime_subject.fail": "error",
       },
     },
     destroying: {
       on: {
         "runtime_subject.cold": "cold",
-        "runtime_subject.fail": "error",
-      },
-    },
-    error: {
-      on: {
-        "runtime_subject.active": "active",
-        "runtime_subject.back_up": "backing_up",
-        "runtime_subject.destroy": "destroying",
       },
     },
     restoring: {
       on: {
         "runtime_subject.active": "active",
-        "runtime_subject.fail": "error",
+        "runtime_subject.cold": "cold",
       },
     },
   },

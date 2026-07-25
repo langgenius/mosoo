@@ -156,7 +156,9 @@ async function readRuntimeSubject(database: D1Database): Promise<{
   return row;
 }
 
-function createSandboxHandle(options: { readonly prepareError?: Error } = {}): SandboxHandle {
+function createSandboxHandle(
+  options: { readonly prepareError?: Error; readonly onDestroy?: () => void } = {},
+): SandboxHandle {
   const unavailable = async () => {
     throw new Error("Unexpected sandbox test method call.");
   };
@@ -165,7 +167,11 @@ function createSandboxHandle(options: { readonly prepareError?: Error } = {}): S
     createBackup: unavailable,
     createSession: unavailable,
     deleteSession: unavailable,
-    destroy: unavailable,
+    destroy: options.onDestroy
+      ? async () => {
+          options.onDestroy?.();
+        }
+      : unavailable,
     exec: unavailable,
     getSession: unavailable,
     mkdir: async () => {
@@ -187,7 +193,7 @@ function createSandboxHandle(options: { readonly prepareError?: Error } = {}): S
 
 function createBindings(
   database: D1Database,
-  options: { readonly prepareError?: Error } = {},
+  options: { readonly prepareError?: Error; readonly onDestroy?: () => void } = {},
 ): ApiBindings {
   return {
     DB: database,
@@ -216,6 +222,14 @@ describe("runtime subject lifecycle machine", () => {
         targetStatus: "destroying",
       }),
     ).toMatchObject({ kind: "accepted", nextStatus: "destroying" });
+    // Failure returns to cold from any in-flight state; there is no `error`
+    // status to strand a subject in.
+    expect(
+      decideRuntimeSubjectTransition({ currentStatus: "active", targetStatus: "cold" }),
+    ).toMatchObject({ kind: "accepted", nextStatus: "cold" });
+    expect(
+      decideRuntimeSubjectTransition({ currentStatus: "restoring", targetStatus: "cold" }),
+    ).toMatchObject({ kind: "accepted", nextStatus: "cold" });
   });
 
   test("records operation transitions with monotonic status metadata", async () => {
@@ -353,12 +367,15 @@ describe("runtime subject lifecycle machine", () => {
     ).resolves.toBeNull();
   });
 
-  test("lets interactive activation retry after activation failures", async () => {
+  test("lets interactive activation retry after a prior activation failure", async () => {
     const database = createRuntimeSubjectLifecycleDatabase();
+    // A prior activation failure leaves the subject cold (no live container)
+    // with the diagnostic retained in lastError. Re-activation is a normal
+    // cold start that recovers it and clears the stale diagnostic.
     await insertRuntimeSubject(database, {
       lastError: "Runtime subject filesystem prepare timed out after 15000ms.",
       lastErrorCode: "runtime.subject_activation_failed",
-      status: "error",
+      status: "cold",
       statusSeq: 7,
     });
 
@@ -437,7 +454,51 @@ describe("runtime subject lifecycle machine", () => {
       claim_owner: null,
       last_error: "Runtime subject filesystem prepare timed out after 15000ms.",
       last_error_code: "runtime.subject_activation_failed",
-      status: "error",
+      status: "cold",
     });
+  });
+
+  test("destroys the container on activation failure so it cannot be reused", async () => {
+    const database = createRuntimeSubjectLifecycleDatabase();
+    await insertRuntimeSubject(database, { status: "cold", statusSeq: 0 });
+    const prepareError = new Error("Runtime subject filesystem prepare timed out after 15000ms.");
+    let destroyCalls = 0;
+
+    // First activation fails at prepareFilesystem. The broken container must be
+    // destroyed and the subject returned to cold — never left in a reclaimable
+    // "failed" state that would hand the next run the same dead container. This
+    // is the production death loop (sandbox 01KYC1ZB…): reproduce it and prove
+    // it converges instead of looping.
+    await expect(
+      createRuntimeSubjectLifecycleService(
+        createBindings(database, { onDestroy: () => (destroyCalls += 1), prepareError }),
+      ).activate({
+        executionOwnerUserId: "01J00000000000000000000002",
+        kind: "cattle",
+        runtimeSubjectId: RUNTIME_SUBJECT_ID,
+        spaceAliases: [],
+        subjectId: "01J00000000000000000000009",
+        subjectKind: "session",
+      }),
+    ).rejects.toThrow("filesystem prepare timed out");
+
+    expect(destroyCalls).toBe(1);
+    expect((await readRuntimeSubject(database)).status).toBe("cold");
+
+    // Second activation on the now-cold subject succeeds — self-healed, no
+    // manual recreate needed.
+    const recovered = await createRuntimeSubjectLifecycleService(createBindings(database)).activate(
+      {
+        executionOwnerUserId: "01J00000000000000000000002",
+        kind: "cattle",
+        runtimeSubjectId: RUNTIME_SUBJECT_ID,
+        spaceAliases: [],
+        subjectId: "01J00000000000000000000009",
+        subjectKind: "session",
+      },
+    );
+
+    expect(recovered.subject).toBeTruthy();
+    expect((await readRuntimeSubject(database)).status).toBe("active");
   });
 });
