@@ -170,6 +170,73 @@ describe("agent package archive entry admission", () => {
       "skills/demo/SKILL.md",
     ]);
   });
+
+  test("admits nested package assets under declared skill roots", () => {
+    const parsed = parseAgentPackageArchiveBytes(
+      createStoredZipArchive([
+        {
+          body: textToArchiveBytes(
+            createPackageManifestJson({
+              skills: [
+                { name: "Demo", path: "skills/demo/" },
+                { name: "Other", path: "skills/other/" },
+              ],
+            }),
+          ),
+          path: "manifest.json",
+        },
+        {
+          body: textToArchiveBytes('{"secretNames":[],"setupScript":""}'),
+          path: "environment/definition.json",
+        },
+        {
+          body: textToArchiveBytes("---\nname: Demo\n---\nUse this skill."),
+          path: "skills/demo/SKILL.md",
+        },
+        {
+          body: textToArchiveBytes("helper"),
+          path: "skills/demo/scripts/run.ts",
+        },
+        {
+          body: textToArchiveBytes("---\nname: Other\n---\nUse this skill."),
+          path: "skills/other/SKILL.md",
+        },
+      ]),
+    );
+
+    expect(parsed.package).not.toBeNull();
+    expect(parsed.package?.assets.map((asset) => asset.key).toSorted()).toEqual([
+      "skills/demo/SKILL.md",
+      "skills/demo/scripts/run.ts",
+      "skills/other/SKILL.md",
+    ]);
+  });
+
+  test("rejects package assets that point at a declared skill root", () => {
+    const parsed = parseAgentPackageArchiveBytes(
+      createStoredZipArchive([
+        {
+          body: textToArchiveBytes(
+            createPackageManifestJson({
+              skills: [{ name: "Demo", path: "skills/demo/" }],
+            }),
+          ),
+          path: "manifest.json",
+        },
+        {
+          body: textToArchiveBytes('{"secretNames":[],"setupScript":""}'),
+          path: "environment/definition.json",
+        },
+        {
+          body: textToArchiveBytes("not a directory entry"),
+          path: "skills/demo",
+        },
+      ]),
+    );
+
+    expect(parsed.package).toBeNull();
+    expect(parsed.issues[0]?.code).toBe("package.archive.entry_unsupported");
+  });
 });
 
 function createAgentPackageFixture(
