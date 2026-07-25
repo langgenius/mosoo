@@ -28,6 +28,9 @@ function toSessionMessageSegments(segments: SessionViewSegment[]): SessionMessag
         result.push({ kind: "text", text: segment.text });
         break;
       }
+      case "reasoning": {
+        break;
+      }
       case "tool_use": {
         result.push({
           argsText: segment.argsText,
