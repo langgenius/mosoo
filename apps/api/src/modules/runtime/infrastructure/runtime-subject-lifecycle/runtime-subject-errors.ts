@@ -1,10 +1,5 @@
 import type { RuntimeSubjectErrorCode } from "@mosoo/contracts/sandbox";
 
-const RECOVERABLE_RUNTIME_SUBJECT_ERROR_CODES: ReadonlySet<RuntimeSubjectErrorCode> = new Set([
-  "runtime.conversation_mount_failed",
-  "runtime.subject_activation_failed",
-]);
-
 export class RuntimeSubjectBackupNotReadyError extends Error {
   readonly backupId: string;
   readonly status: string;
@@ -84,12 +79,6 @@ export class RuntimeBucketMountConflictError extends Error {
     this.mountPath = input.mountPath;
     this.prefix = input.prefix;
   }
-}
-
-export function isRecoverableRuntimeSubjectErrorCode(
-  code: RuntimeSubjectErrorCode | null,
-): boolean {
-  return code !== null && RECOVERABLE_RUNTIME_SUBJECT_ERROR_CODES.has(code);
 }
 
 export function getRuntimeSubjectErrorCode(error: unknown): RuntimeSubjectErrorCode {

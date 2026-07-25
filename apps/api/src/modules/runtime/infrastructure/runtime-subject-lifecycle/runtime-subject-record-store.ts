@@ -442,7 +442,7 @@ export async function markRuntimeSubjectActive(
       and(
         eq(sandboxesTable.id, input.runtimeSubjectId),
         eq(sandboxesTable.claimOwner, input.claimOwner),
-        inArray(sandboxesTable.status, ["restoring", "active", "error"]),
+        inArray(sandboxesTable.status, ["restoring", "active"]),
       ),
     )
     .run();
@@ -472,14 +472,16 @@ export async function markRuntimeSubjectActivationFailed(
         now,
         operationId: null,
         source: "api",
-        status: "error",
+        status: "cold",
       }),
     })
     .where(
       and(
         eq(sandboxesTable.id, input.runtimeSubjectId),
         eq(sandboxesTable.claimOwner, input.claimOwner),
-        inArray(sandboxesTable.status, ["cold", "restoring", "active", "error"]),
+        // Activation can fail at any point after the claim: still cold (during
+        // prepareFilesystem), restoring (during restore), or active.
+        inArray(sandboxesTable.status, ["cold", "restoring", "active"]),
       ),
     )
     .run();

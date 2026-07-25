@@ -172,7 +172,7 @@ export async function recreateRuntimeSubjectPreservingState(
       expectedStatus: destroyStarted ? "destroying" : "backing_up",
       operationId: input.operationId,
       runtimeSubjectId: input.runtimeSubjectId,
-      status: "error",
+      status: "cold",
     });
     throw error;
   }
@@ -259,7 +259,7 @@ export async function resetRuntimeSubjectAgentState(
       expectedStatus: "destroying",
       operationId: input.operationId,
       runtimeSubjectId: input.runtimeSubjectId,
-      status: "error",
+      status: "cold",
     });
     throw error;
   }

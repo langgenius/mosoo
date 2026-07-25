@@ -14,9 +14,11 @@ import type {
 export const SandboxSubjectKind = type('"user" | "agent" | "session"');
 export type SandboxSubjectKind = typeof SandboxSubjectKind.infer;
 
-export const SandboxStatus = type(
-  '"cold" | "restoring" | "active" | "backing_up" | "destroying" | "error"',
-);
+// No failure state: a failed lifecycle step returns the subject to `cold` (no
+// live container) with the diagnostic kept in lastError. This removes the
+// "failed but reclaimable" contradiction that let a broken container DO be
+// reused instead of rebuilt.
+export const SandboxStatus = type('"cold" | "restoring" | "active" | "backing_up" | "destroying"');
 export type SandboxStatus = typeof SandboxStatus.infer;
 
 export const SandboxSessionStatus = type('"active" | "closed" | "error"');

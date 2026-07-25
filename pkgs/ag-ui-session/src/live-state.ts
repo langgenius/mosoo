@@ -10,6 +10,10 @@ export type SessionViewSegment =
       text: string;
     }
   | {
+      kind: "reasoning";
+      text: string;
+    }
+  | {
       argsText: string;
       kind: "tool_use";
       path: string | null;
