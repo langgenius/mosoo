@@ -111,6 +111,55 @@ describe("session live-state transcript reducer", () => {
     ]);
   });
 
+  test("streams reasoning deltas into a collapsed reasoning segment", () => {
+    const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
+      { messageId: "prompt-1:thought", role: "reasoning", type: "REASONING_MESSAGE_START" },
+      {
+        delta: "The user asks about MCP.",
+        messageId: "prompt-1:thought",
+        type: "REASONING_MESSAGE_CONTENT",
+      },
+      {
+        delta: " Check the configured servers.",
+        messageId: "prompt-1:thought",
+        type: "REASONING_MESSAGE_CONTENT",
+      },
+      { messageId: "prompt-1:thought", type: "REASONING_MESSAGE_END" },
+    ]);
+
+    expect(nextState.messages).toHaveLength(1);
+    expect(nextState.messages[0]?.role).toBe("assistant");
+    expect(nextState.messages[0]?.content).toBe("");
+    expect(nextState.messages[0]?.segments).toEqual([
+      { kind: "reasoning", text: "The user asks about MCP. Check the configured servers." },
+    ]);
+  });
+
+  test("reasoning start alone creates the message so the UI can show progress", () => {
+    const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
+      { messageId: "prompt-1:thought", role: "reasoning", type: "REASONING_MESSAGE_START" },
+    ]);
+
+    expect(nextState.messages).toHaveLength(1);
+    expect(nextState.messages[0]?.segments).toEqual([{ kind: "reasoning", text: "" }]);
+  });
+
+  test("keeps reasoning separate from assistant text in the same turn", () => {
+    const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
+      { messageId: "prompt-1:thought", role: "reasoning", type: "REASONING_MESSAGE_START" },
+      { delta: "thinking...", messageId: "prompt-1:thought", type: "REASONING_MESSAGE_CONTENT" },
+      { messageId: "assistant-1", role: "assistant", type: "TEXT_MESSAGE_START" },
+      { delta: "Answer.", messageId: "assistant-1", type: "TEXT_MESSAGE_CONTENT" },
+      { messageId: "prompt-1:thought", type: "REASONING_MESSAGE_END" },
+      { messageId: "assistant-1", type: "TEXT_MESSAGE_END" },
+    ]);
+
+    expect(nextState.messages).toHaveLength(2);
+    expect(nextState.messages[0]?.segments).toEqual([{ kind: "reasoning", text: "thinking..." }]);
+    expect(nextState.messages[1]?.segments).toEqual([{ kind: "text", text: "Answer." }]);
+    expect(nextState.messages[1]?.content).toBe("Answer.");
+  });
+
   test("does not merge streamed text across intervening transcript events", () => {
     const nextState = applyAgUiEventsToSessionLiveState(baseState(), [
       { messageId: "assistant-1", role: "assistant", type: "TEXT_MESSAGE_START" },
