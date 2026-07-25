@@ -63,12 +63,18 @@ const RUNTIME_SUBJECT_IDLE_GRACE_MS = 5 * 60_000;
 
 // Cattle subjects are per-session sandboxes; tearing them down after every
 // terminal run made each follow-up turn in the same session pay the full
-// container boot (measured 2.4-4.8s vs ~0.3s on a warm container). A short
-// idle grace keeps the sandbox alive between turns while the kind-agnostic
-// inactive-deadline sweep still reclaims it shortly after the session goes
-// quiet. Cost ceiling: one extra <=90s of container residency per session
-// after its last run.
-const CATTLE_SUBJECT_IDLE_GRACE_MS = 90_000;
+// container boot (measured 2.4-4.8s vs ~0.3s on a warm container). The idle
+// grace keeps the sandbox — and, since conversations no longer close on run
+// terminal, the resident driver — alive between turns while the
+// kind-agnostic inactive-deadline sweep still reclaims it after the session
+// goes quiet. Five minutes matches the human read-think-type rhythm between
+// follow-up turns (90s covered only a third of observed gaps) and the pet
+// grace. Cost: the grace applies twice in series — the sweep waits it out as
+// the idle threshold, then the close arms the same grace as the subject's
+// inactive deadline — so worst-case container residency after the last run is
+// ~2x the grace (~10min), not one grace. Acceptable at current cattle volume;
+// shorten the post-close deadline for sweep-closes if that residency matters.
+const CATTLE_SUBJECT_IDLE_GRACE_MS = 5 * 60_000;
 
 const SUBJECT_MEMORY_CHECKPOINT = {
   path: SANDBOX_MEMORY_PATH,
@@ -101,7 +107,14 @@ export const RUNTIME_KIND_POLICIES = {
     },
     kind: "cattle",
     lease: {
-      closeOnRunTerminal: true,
+      // Keeping the conversation session open across terminal runs keeps the
+      // driver process (and its provider session) resident inside the idle
+      // grace window, so a follow-up turn skips the driver respawn that
+      // dominated the warm prepare path. The conversation idle sweep closes
+      // sessions quiet for longer than the subject grace, which arms the
+      // subject inactive deadline and hands reclamation to the existing
+      // maintenance chain.
+      closeOnRunTerminal: false,
     },
     nativeResume: {
       persistence: AGENT_KIND_RUNTIME_POLICIES.cattle.nativeResume.persistence,

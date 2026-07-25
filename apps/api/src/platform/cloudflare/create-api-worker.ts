@@ -37,17 +37,14 @@ export function createApiWorker(): ExportedHandler<ApiBindings> {
       });
     },
     async queue(batch: MessageBatch, env: ApiBindings): Promise<void> {
-      if (batch.queue === "api-command" || batch.queue === "environment-artifact-build") {
-        const commandBatch = batch as MessageBatch<ApiCommandMessage>;
+      // Queue names are account-global, so isolated environments (the perf
+      // stacks) deploy prefixed copies like "mosoo-perf-stage-b-api-command".
+      // Route by suffix so a renamed queue still reaches its consumer instead
+      // of silently acking every batch unprocessed.
+      const isQueue = (name: string): boolean =>
+        batch.queue === name || batch.queue.endsWith(`-${name}`);
 
-        for (const message of commandBatch.messages) {
-          await processApiCommandMessage(env, message);
-        }
-
-        return;
-      }
-
-      if (batch.queue === "api-command-dlq") {
+      if (isQueue("api-command-dlq")) {
         const commandBatch = batch as MessageBatch<ApiCommandMessage>;
 
         for (const message of commandBatch.messages) {
@@ -57,7 +54,17 @@ export function createApiWorker(): ExportedHandler<ApiBindings> {
         return;
       }
 
-      if (batch.queue === "channel-final-delivery") {
+      if (isQueue("api-command") || isQueue("environment-artifact-build")) {
+        const commandBatch = batch as MessageBatch<ApiCommandMessage>;
+
+        for (const message of commandBatch.messages) {
+          await processApiCommandMessage(env, message);
+        }
+
+        return;
+      }
+
+      if (isQueue("channel-final-delivery")) {
         const { processChannelFinalDeliveryMessage } =
           await import("../../modules/channels/application/channel-final-delivery.service");
         const channelBatch = batch as MessageBatch<ChannelFinalDeliveryMessage>;
