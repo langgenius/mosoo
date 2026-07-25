@@ -178,9 +178,9 @@ export async function recordRuntimeConversationSessionError(
       .set({
         lastError: input.message,
         lastErrorCode: input.errorCode,
-        status: "error",
+        status: "cold",
         statusChangedAt: input.now,
-        statusEvent: toRuntimeSubjectStatusLifecycleEventName("error"),
+        statusEvent: toRuntimeSubjectStatusLifecycleEventName("cold"),
         statusOperationId: null,
         statusSeq: sql`${sandboxesTable.statusSeq} + 1`,
         statusSource: "runtime",
@@ -189,7 +189,7 @@ export async function recordRuntimeConversationSessionError(
       .where(
         and(
           eq(sandboxesTable.id, input.runtimeSubjectId),
-          inArray(sandboxesTable.status, ["restoring", "active", "error"]),
+          inArray(sandboxesTable.status, ["restoring", "active"]),
         ),
       ),
   ]);
