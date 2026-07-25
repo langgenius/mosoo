@@ -1,4 +1,5 @@
 export {
+  claimIdleSessionScopedConversationForClose,
   ensureRuntimeConversationSessionRecord,
   getRuntimeConversationSession,
   getRuntimeConversationSessionState,

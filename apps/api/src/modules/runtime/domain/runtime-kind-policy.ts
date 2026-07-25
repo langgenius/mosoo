@@ -69,8 +69,11 @@ const RUNTIME_SUBJECT_IDLE_GRACE_MS = 5 * 60_000;
 // kind-agnostic inactive-deadline sweep still reclaims it after the session
 // goes quiet. Five minutes matches the human read-think-type rhythm between
 // follow-up turns (90s covered only a third of observed gaps) and the pet
-// grace. Cost ceiling: one extra <=5min of container residency per session
-// after its last run.
+// grace. Cost: the grace applies twice in series — the sweep waits it out as
+// the idle threshold, then the close arms the same grace as the subject's
+// inactive deadline — so worst-case container residency after the last run is
+// ~2x the grace (~10min), not one grace. Acceptable at current cattle volume;
+// shorten the post-close deadline for sweep-closes if that residency matters.
 const CATTLE_SUBJECT_IDLE_GRACE_MS = 5 * 60_000;
 
 const SUBJECT_MEMORY_CHECKPOINT = {

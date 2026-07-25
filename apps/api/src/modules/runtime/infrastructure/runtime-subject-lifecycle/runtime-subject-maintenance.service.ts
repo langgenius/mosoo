@@ -257,15 +257,20 @@ async function closeIdleSessionScopedConversationSessions(
   now: number,
 ): Promise<void> {
   const idleGraceMs = getRuntimeKindPolicy("cattle").subject.idleReleaseDelayMs;
+  const idleSinceLte = now - idleGraceMs;
   const idle = await listIdleSessionScopedConversationSessions(bindings.DB, {
-    idleSinceLte: now - idleGraceMs,
+    idleSinceLte,
     limit: MAINTENANCE_BATCH_SIZE,
   });
+  const { closeIdleCattleConversationSession } = await import("../sandbox-session.service");
 
   for (const conversation of idle) {
     try {
-      const { closeSandboxConversationSession } = await import("../sandbox-session.service");
-      await closeSandboxConversationSession(bindings, {
+      // Atomic claim inside: closes only if the row is still the same, idle,
+      // lease-free session — a follow-up turn that re-used it since the list
+      // snapshot makes the claim lose and is left running.
+      await closeIdleCattleConversationSession(bindings, {
+        idleSinceLte,
         sandboxId: conversation.sandboxId,
         sessionId: conversation.sessionId,
       });

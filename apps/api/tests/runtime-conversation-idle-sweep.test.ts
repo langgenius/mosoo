@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { listIdleSessionScopedConversationSessions } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-conversation-session-store";
+import {
+  claimIdleSessionScopedConversationForClose,
+  listIdleSessionScopedConversationSessions,
+} from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-conversation-session-store";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const NOW = 1_000_000;
@@ -137,5 +140,70 @@ describe("idle session-scoped conversation sweep", () => {
     });
 
     expect(idle).toEqual([{ sandboxId: "sb-idle", sessionId: "session-idle" }]);
+  });
+
+  test("atomic claim closes an idle conversation but loses to any re-activation", async () => {
+    const database = createDatabase();
+    const idleSinceLte = NOW - GRACE_MS;
+    const claim = (sandboxId: string, sessionId: string, sandboxSessionId: string) =>
+      claimIdleSessionScopedConversationForClose(database, {
+        idleSinceLte,
+        now: NOW,
+        runtimeSubjectId: sandboxId as never,
+        sandboxSessionId: sandboxSessionId as never,
+        sessionId: sessionId as never,
+      });
+    const statusOf = async (sessionId: string) =>
+      (
+        await database
+          .prepare("SELECT status FROM sandbox_session WHERE session_id = ?")
+          .bind(sessionId)
+          .first<{ status: string }>()
+      )?.status;
+
+    // (1) still-idle, same session instance, no lease → claim wins, row closed.
+    await insertConversation(database, {
+      kind: "cattle",
+      sandboxId: "sb-a",
+      sessionId: "sess-a",
+      status: "active",
+      updatedAt: NOW - GRACE_MS - 1,
+    });
+    expect(await claim("sb-a", "sess-a", "cf-sess-a")).toBe(true);
+    expect(await statusOf("sess-a")).toBe("closed");
+
+    // (2) a follow-up refreshed updated_at past the grace → claim loses, untouched.
+    await insertConversation(database, {
+      kind: "cattle",
+      sandboxId: "sb-b",
+      sessionId: "sess-b",
+      status: "active",
+      updatedAt: NOW, // refreshed by ensureSandboxConversationSession
+    });
+    expect(await claim("sb-b", "sess-b", "cf-sess-b")).toBe(false);
+    expect(await statusOf("sess-b")).toBe("active");
+
+    // (3) the session was rebuilt (new cloudflare_session_id) → claim loses.
+    await insertConversation(database, {
+      kind: "cattle",
+      sandboxId: "sb-c",
+      sessionId: "sess-c",
+      status: "active",
+      updatedAt: NOW - GRACE_MS - 1,
+    });
+    expect(await claim("sb-c", "sess-c", "cf-STALE")).toBe(false);
+    expect(await statusOf("sess-c")).toBe("active");
+
+    // (4) an active run lease appeared → claim loses.
+    await insertConversation(database, {
+      kind: "cattle",
+      sandboxId: "sb-d",
+      sessionId: "sess-d",
+      status: "active",
+      updatedAt: NOW - GRACE_MS - 1,
+    });
+    await insertActiveRunLease(database, { runId: "run-d", sandboxId: "sb-d" });
+    expect(await claim("sb-d", "sess-d", "cf-sess-d")).toBe(false);
+    expect(await statusOf("sess-d")).toBe("active");
   });
 });

@@ -2,7 +2,7 @@ import type { RuntimeSubjectErrorCode } from "@mosoo/contracts/sandbox";
 import { sandboxesTable, sandboxSessionsTable, sessionsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type { SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
-import { and, desc, eq, inArray, notExists, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lte, notExists, sql } from "drizzle-orm";
 
 import { getAppDatabase, runAppDatabaseBatch } from "../../../../platform/db/drizzle";
 import { toRuntimeSubjectStatusLifecycleEventName } from "../../domain/runtime-subject-lifecycle.machine";
@@ -124,6 +124,46 @@ export async function listIdleSessionScopedConversationSessions(
     )
     .limit(input.limit)
     .all();
+}
+
+// Atomically claim an idle cattle conversation for the sweep to close. Between
+// the sweep's LIST and its per-row close there is a window where a follow-up
+// turn can re-use the resident session (ensureSandboxConversationSession
+// refreshes updatedAt) before its run lease exists — the list-time lease guard
+// would miss it and the close would delete the session mid-run. This flips the
+// row active->closed only if it is STILL the same session instance
+// (cloudflare_session_id), still idle (updatedAt <= idleSinceLte), and still
+// lease-free. A refreshed updatedAt or a rebuilt session makes the claim fail,
+// so the caller skips it; once claimed, a follow-up sees status=closed and
+// rebuilds a fresh session, so the sweep only ever finalizes the stale one.
+export async function claimIdleSessionScopedConversationForClose(
+  database: D1Database,
+  input: {
+    readonly idleSinceLte: number;
+    readonly now: number;
+    readonly runtimeSubjectId: SandboxId;
+    readonly sandboxSessionId: SandboxSessionId;
+    readonly sessionId: SessionId;
+  },
+): Promise<boolean> {
+  const appDb = getAppDatabase(database);
+  const claimed = await appDb
+    .update(sandboxSessionsTable)
+    .set({ status: "closed", updatedAt: input.now })
+    .where(
+      and(
+        eq(sandboxSessionsTable.sessionId, input.sessionId),
+        eq(sandboxSessionsTable.sandboxId, input.runtimeSubjectId),
+        eq(sandboxSessionsTable.sandboxSessionId, input.sandboxSessionId),
+        eq(sandboxSessionsTable.status, "active"),
+        lte(sandboxSessionsTable.updatedAt, input.idleSinceLte),
+        notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
+      ),
+    )
+    .returning({ sessionId: sandboxSessionsTable.sessionId })
+    .get();
+
+  return claimed != null;
 }
 
 export async function ensureRuntimeConversationSessionRecord(

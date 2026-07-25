@@ -17,6 +17,7 @@ import {
 } from "../../domain/runtime-kind-policy";
 import type { RuntimeConversationSessionRecord } from "../runtime-subject-lifecycle/runtime-subject-store";
 import {
+  claimIdleSessionScopedConversationForClose,
   ensureRuntimeConversationSessionRecord,
   getRuntimeConversationSession,
   getRuntimeConversationSessionState,
@@ -24,6 +25,7 @@ import {
   recordRuntimeConversationSessionClosed,
   recordRuntimeConversationSessionError,
 } from "../runtime-subject-lifecycle/runtime-subject-store";
+import type { RuntimeConversationSessionState } from "../runtime-subject-lifecycle/runtime-subject-store";
 import { ensureSessionResourcesMounted } from "../session-resources/session-resource-mount.service";
 import { parseSandboxConversationOrigin } from "./sandbox-conversation-session-codec";
 import {
@@ -250,22 +252,83 @@ export async function closeSandboxConversationSession(
     return;
   }
 
+  // Force-close: session-end / cleanup callers must tear down regardless of
+  // idleness. The idle sweep uses closeIdleCattleConversationSession instead.
+  await finalizeSandboxConversationClose(bindings, {
+    sandboxId: input.sandboxId,
+    sessionId: input.sessionId,
+    state,
+  });
+}
+
+// Sweep-only close. Unlike closeSandboxConversationSession this does NOT
+// force-close: it atomically claims the row (active->closed) only if it is
+// still the same, still-idle, lease-free session, which closes the
+// LIST->CLOSE race where a follow-up turn re-uses the resident session before
+// its run lease exists. If the claim loses, the follow-up owns the session and
+// the sweep leaves it. Returns true when it closed the conversation.
+export async function closeIdleCattleConversationSession(
+  bindings: ApiBindings,
+  input: {
+    idleSinceLte: number;
+    sandboxId: SandboxId;
+    sessionId: SessionId;
+  },
+): Promise<boolean> {
+  const state = await getRuntimeConversationSessionState(bindings.DB, {
+    runtimeSubjectId: input.sandboxId,
+    sessionId: input.sessionId,
+  });
+
+  if (!state || state.status !== "active") {
+    return false;
+  }
+
+  const claimed = await claimIdleSessionScopedConversationForClose(bindings.DB, {
+    idleSinceLte: input.idleSinceLte,
+    now: currentTimestampMs(),
+    runtimeSubjectId: input.sandboxId,
+    sandboxSessionId: state.sandboxSessionId,
+    sessionId: input.sessionId,
+  });
+
+  if (!claimed) {
+    return false;
+  }
+
+  await finalizeSandboxConversationClose(bindings, {
+    sandboxId: input.sandboxId,
+    sessionId: input.sessionId,
+    state,
+  });
+
+  return true;
+}
+
+async function finalizeSandboxConversationClose(
+  bindings: ApiBindings,
+  input: {
+    sandboxId: SandboxId;
+    sessionId: SessionId;
+    state: RuntimeConversationSessionState;
+  },
+): Promise<void> {
   const now = currentTimestampMs();
   const { deleteActiveSandboxConversationSession } =
     await import("./sandbox-conversation-session-delete");
 
   await deleteActiveSandboxConversationSession(bindings, {
-    sandboxSessionId: state.sandboxSessionId,
+    sandboxSessionId: input.state.sandboxSessionId,
     sandboxId: input.sandboxId,
   });
 
-  if (state.agentId) {
+  if (input.state.agentId) {
     await appendRuntimeDiagnosticEvent(bindings, {
       eventName: RUNTIME_DIAGNOSTIC_EVENT.sandboxSessionDestroyed.name,
       sessionId: input.sessionId,
       value: {
         ...toRuntimeDiagnosticBaseValue({
-          agentId: state.agentId,
+          agentId: input.state.agentId,
           sessionId: input.sessionId,
         }),
         reason: "runtime_subject_session_closed",
@@ -275,7 +338,10 @@ export async function closeSandboxConversationSession(
   }
 
   await recordRuntimeConversationSessionClosed(bindings.DB, {
-    inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(getRuntimeKindPolicy(state.kind), now),
+    inactiveDeadlineAt: getRuntimeSubjectInactiveDeadline(
+      getRuntimeKindPolicy(input.state.kind),
+      now,
+    ),
     now,
     runtimeSubjectId: input.sandboxId,
     sessionId: input.sessionId,
