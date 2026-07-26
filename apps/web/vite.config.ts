@@ -131,7 +131,7 @@ const webConfig = {
         // of re-downloading ~150 KB of unchanged framework code baked into the
         // entry. The framework and its peers share one chunk so React stays a
         // single instance and there is no cross-chunk import waterfall.
-        advancedChunks: {
+        codeSplitting: {
           groups: [
             {
               name: "framework",
