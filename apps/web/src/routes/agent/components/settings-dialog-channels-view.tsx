@@ -10,7 +10,7 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { AgentChannelBindingFieldsFragment } from "@/gql/graphql";
 import { toChannelBindingId } from "@/routes/typed-id";
@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 
+import { indexChannelBindingsByProvider } from "./channel-binding-index";
 import { resolveChannelWebhookOrigin } from "./channel-webhook-origin";
 import type { ChannelInlineSetupAgent } from "./settings-dialog-channel-agent";
 import { DiscordChannelInlineSetup } from "./settings-dialog-discord-setup";
@@ -318,8 +319,11 @@ export function AgentSettingsChannelsView({
   selectedChannelId: ChannelId;
 }) {
   const selectedChannel = DISTRIBUTION_CHANNELS.find((channel) => channel.id === selectedChannelId);
-  const selectedBinding =
-    channelBindings.find((binding) => binding.provider === selectedChannelId) ?? null;
+  const channelBindingByProvider = useMemo(
+    () => indexChannelBindingsByProvider(channelBindings),
+    [channelBindings],
+  );
+  const selectedBinding = channelBindingByProvider.get(selectedChannelId) ?? null;
   const [confirmRemoveBinding, setConfirmRemoveBinding] =
     useState<AgentChannelBindingFieldsFragment | null>(null);
 
@@ -353,7 +357,7 @@ export function AgentSettingsChannelsView({
       <div className="border-border-subtle flex min-h-0 flex-1 border-t">
         <nav className="border-border-subtle bg-muted/20 w-[180px] shrink-0 overflow-y-auto border-r py-2">
           {DISTRIBUTION_CHANNELS.map((channel) => {
-            const connected = channelBindings.some((binding) => binding.provider === channel.id);
+            const connected = channelBindingByProvider.has(channel.id);
             const isActive = selectedChannelId === channel.id;
             return (
               <button

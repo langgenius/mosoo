@@ -1,8 +1,10 @@
 import { ChevronRight, CircleCheck } from "lucide-react";
+import { useMemo } from "react";
 
 import type { AgentChannelBindingFieldsFragment } from "@/gql/graphql";
 import { ChannelBrandIcon } from "@/shared/ui/channel-brand-icon";
 
+import { indexChannelBindingsByProvider } from "./channel-binding-index";
 import { DISTRIBUTION_CHANNELS } from "./settings-dialog-model";
 import type { ChannelId } from "./settings-dialog-model";
 
@@ -26,11 +28,15 @@ export function ChannelsListWidget({
   isPublished: boolean;
   onOpenChannelView: (channelId: ChannelId) => void;
 }) {
+  const channelBindingByProvider = useMemo(
+    () => indexChannelBindingsByProvider(channelBindings),
+    [channelBindings],
+  );
+
   return (
     <ul className="divide-border-subtle border-border bg-background divide-y rounded-md border">
       {DISTRIBUTION_CHANNELS.map((channel) => {
-        const connected =
-          channel.enabled && channelBindings.some((binding) => binding.provider === channel.id);
+        const connected = channel.enabled && channelBindingByProvider.has(channel.id);
         const statusLabel = !channel.enabled
           ? "Soon"
           : connected
