@@ -8,6 +8,7 @@ import {
   setAppDefaultEnvironment,
 } from "@/domains/environment/api/environment-client";
 import { CreateEnvironmentDialog } from "@/domains/environment/components/create-environment-dialog";
+import { EnvironmentCliTip } from "@/domains/environment/components/environment-cli-tip";
 import {
   environmentKeys,
   useAppEnvironmentsQuery,
@@ -102,6 +103,7 @@ export function EnvironmentsListPage() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <PageHeader title="Environments" description="Runtime templates that Agents can run inside.">
+        <EnvironmentCliTip align="end" side="bottom" />
         <Button
           onClick={() => {
             setCreateOpen(true);
