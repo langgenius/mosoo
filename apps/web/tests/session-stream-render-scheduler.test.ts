@@ -95,6 +95,40 @@ describe("session stream render scheduler", () => {
     ).toEqual(["ab", "c"]);
   });
 
+  test("flushes only undelivered events after a partial frame drain", () => {
+    const { frameCallbacks, host } = createManualHost();
+    const applied: { events: AgUiSessionEvent[]; sessionId: string }[] = [];
+    const scheduler = new SessionStreamRenderScheduler((sessionId, events) => {
+      applied.push({ events, sessionId });
+      return true;
+    }, host);
+    const sessionOneEvents = Array.from({ length: 600 }, (_unused, index) =>
+      textEvent(`a-${index}`),
+    );
+
+    scheduler.enqueueMany("session-1", sessionOneEvents);
+    scheduler.enqueueMany("session-2", [textEvent("b")]);
+    frameCallbacks.shift()?.();
+    scheduler.flushNow("session-2");
+    drainFrames(frameCallbacks);
+
+    expect(applied.map((batch) => batch.sessionId)).toEqual([
+      "session-1",
+      "session-2",
+      "session-1",
+    ]);
+    expect(applied.map((batch) => batch.events.length)).toEqual([512, 1, 88]);
+    expect(
+      applied
+        .flatMap((batch) => batch.events)
+        .map((event) => (event.type === "TEXT_MESSAGE_CONTENT" ? event.delta : "")),
+    ).toEqual([
+      ...sessionOneEvents.slice(0, 512).map((event) => event.delta),
+      "b",
+      ...sessionOneEvents.slice(512).map((event) => event.delta),
+    ]);
+  });
+
   test("delivers mixed event types in arrival order", () => {
     const { frameCallbacks, host } = createManualHost();
     const types: string[] = [];
@@ -135,6 +169,34 @@ describe("session stream render scheduler", () => {
 
     expect(rejectNextBatch).toBe(false);
     expect(appliedDeltas.join("")).toBe("x".repeat(1300));
+  });
+
+  test("requeues a rejected batch after compacting consumed events", () => {
+    const { frameCallbacks, host } = createManualHost();
+    const appliedDeltas: string[] = [];
+    let applyAttempts = 0;
+    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+      applyAttempts += 1;
+
+      if (applyAttempts === 4) {
+        return false;
+      }
+
+      for (const event of events) {
+        if (event.type === "TEXT_MESSAGE_CONTENT") {
+          appliedDeltas.push(event.delta);
+        }
+      }
+
+      return true;
+    }, host);
+    const events = Array.from({ length: 3000 }, (_unused, index) => textEvent(`chunk-${index}`));
+
+    scheduler.enqueueMany("session-1", events);
+    drainFrames(frameCallbacks);
+
+    expect(applyAttempts).toBe(7);
+    expect(appliedDeltas).toEqual(events.map((event) => event.delta));
   });
 
   test("drains through the timeout fallback when frames never fire", () => {
