@@ -61,6 +61,10 @@ export function ListPageContent({
   className?: string;
 }): ReactElement {
   return (
-    <div className={cn("flex-1 overflow-y-auto px-4 pb-8 sm:px-8", className)}>{children}</div>
+    <div
+      className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-8 sm:px-8", className)}
+    >
+      {children}
+    </div>
   );
 }
