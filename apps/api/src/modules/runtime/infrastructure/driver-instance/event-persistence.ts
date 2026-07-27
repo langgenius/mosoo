@@ -2,6 +2,10 @@ import { sessionsTable } from "@mosoo/db";
 import type { DriverInstanceId } from "@mosoo/id";
 import { and, eq, isNull } from "drizzle-orm";
 
+import {
+  captureServerProductEvent,
+  SERVER_PRODUCT_ANALYTICS_EVENTS,
+} from "../../../../platform/analytics/product-analytics";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
@@ -303,6 +307,23 @@ export async function persistProjectedRuntimeDriverEvents(
       runId: link.sessionRunId,
       source: "driver",
       status: "waiting_input",
+    });
+  }
+
+  if (
+    completedTransition !== undefined &&
+    runTransitionOutcome?.kind === "applied" &&
+    link.executionOwnerId !== null
+  ) {
+    await captureServerProductEvent(bindings, {
+      distinctId: link.executionOwnerId,
+      event: SERVER_PRODUCT_ANALYTICS_EVENTS.taskSucceeded,
+      properties: {
+        agent_id: link.agentId,
+        app_id: link.appId,
+        run_id: link.sessionRunId,
+        session_id: link.sessionId,
+      },
     });
   }
 

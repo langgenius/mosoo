@@ -3,6 +3,7 @@ import Logout01Icon from "@hugeicons/core-free-icons/Logout01Icon";
 import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
 import { Link } from "react-router-dom";
 
+import { resetProductAnalytics } from "@/analytics/product-analytics";
 import { cn } from "@/shared/lib/class-names";
 import { Button } from "@/shared/ui/button";
 import {
@@ -122,6 +123,7 @@ export function AccountMenu({
             onSelect={() => {
               void (async () => {
                 await authClient["signOut"]();
+                resetProductAnalytics();
                 globalThis.location.href = "/login";
               })();
             }}

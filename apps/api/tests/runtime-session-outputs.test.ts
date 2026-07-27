@@ -137,6 +137,7 @@ async function insertActiveSandboxSession(database: D1Database): Promise<void> {
 function createRuntimeLink(): RuntimeSessionLink {
   return {
     agentId: PUBLIC_API_TEST_IDS.agent,
+    appId: PUBLIC_API_TEST_IDS.app,
     callerId: PUBLIC_API_TEST_IDS.ownerAccount,
     creatorId: PUBLIC_API_TEST_IDS.ownerAccount,
     executionOwnerId: PUBLIC_API_TEST_IDS.ownerAccount,

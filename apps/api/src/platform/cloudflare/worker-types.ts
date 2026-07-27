@@ -42,6 +42,13 @@ interface OptionalRuntimeBindings {
   MOSOO_RUNTIME_NO_PROXY?: string;
 }
 
+interface OptionalProductAnalyticsBindings {
+  MOSOO_DEPLOYMENT_MODE?: string;
+  MOSOO_ENVIRONMENT?: string;
+  POSTHOG_API_HOST?: string;
+  POSTHOG_PROJECT_KEY?: string;
+}
+
 interface OptionalCostLedgerReconciliationBindings {
   MOSOO_COST_LEDGER_RECONCILIATION_MODE?: string;
 }
@@ -88,6 +95,7 @@ export type ApiBindings = Env &
   OptionalSessionBinding &
   OptionalCostLedgerReconciliationBindings &
   OptionalLocalProviderFetchProxyBindings &
+  OptionalProductAnalyticsBindings &
   OptionalRuntimeBindings &
   OptionalSkillsShBindings &
   OptionalSlackAdapterBindings &

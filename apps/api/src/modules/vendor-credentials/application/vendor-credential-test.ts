@@ -5,6 +5,10 @@ import type {
 import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
 import { VENDOR_OPENAI_COMPATIBLE, getVendor } from "@mosoo/runtime-catalog";
 
+import {
+  captureServerProductEvent,
+  SERVER_PRODUCT_ANALYTICS_EVENTS,
+} from "../../../platform/analytics/product-analytics";
 import { createApiWideEvent, emitApiWideEvent } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { ensureAppOwnership } from "../../apps/application/app.service";
@@ -112,17 +116,36 @@ async function ensureCredentialTestAccess(
 export async function testVendorCredential(
   bindings: Pick<
     ApiBindings,
-    "DB" | "MOSOO_PROVIDER_FETCH_PROXY_TOKEN" | "MOSOO_PROVIDER_FETCH_PROXY_URL" | "WEB_ORIGIN"
+    | "DB"
+    | "MOSOO_DEPLOYMENT_MODE"
+    | "MOSOO_ENVIRONMENT"
+    | "MOSOO_PROVIDER_FETCH_PROXY_TOKEN"
+    | "MOSOO_PROVIDER_FETCH_PROXY_URL"
+    | "POSTHOG_API_HOST"
+    | "POSTHOG_PROJECT_KEY"
+    | "WEB_ORIGIN"
   >,
   viewer: AuthenticatedViewer,
   input: TestVendorCredentialInput,
 ): Promise<TestVendorCredentialResult> {
   await ensureCredentialTestAccess(bindings.DB, viewer, input);
 
-  return probeVendorCredential({
+  const result = await probeVendorCredential({
     ...input,
     fetchProxy: resolveProviderFetchProxy(bindings),
   });
+  if (result.ok) {
+    await captureServerProductEvent(bindings, {
+      distinctId: viewer.id,
+      event: SERVER_PRODUCT_ANALYTICS_EVENTS.integrationConnected,
+      properties: {
+        app_id: input.appId,
+        integration_type: "model_provider",
+        vendor_id: input.vendorId,
+      },
+    });
+  }
+  return result;
 }
 
 export async function probeVendorCredential(

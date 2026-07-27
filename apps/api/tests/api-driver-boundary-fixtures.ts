@@ -181,6 +181,7 @@ export function createDriverEvent(value: object): DriverEvent {
 export function createRuntimeSessionLink(): RuntimeSessionLink {
   return {
     agentId: API_DRIVER_BOUNDARY_IDS.agent,
+    appId: API_DRIVER_BOUNDARY_IDS.app,
     callerId: API_DRIVER_BOUNDARY_IDS.account,
     creatorId: API_DRIVER_BOUNDARY_IDS.account,
     executionOwnerId: API_DRIVER_BOUNDARY_IDS.account,

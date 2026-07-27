@@ -61,7 +61,7 @@ export const appGraphQLModule = {
   ...appGraphQLSpec,
   authenticatedMutationResolvers: {
     createApp: async (_parent, args: CreateAppArgs, context) =>
-      createApp(context.bindings.DB, context.viewer, args.input),
+      createApp(context.bindings, context.viewer, args.input),
     deleteAppDeployment: async (_parent, args: DeleteAppDeploymentArgs, context) =>
       deleteAppDeployment(context.bindings, context.viewer, args.input),
     deployApp: async (_parent, args: DeployAppArgs, context) =>

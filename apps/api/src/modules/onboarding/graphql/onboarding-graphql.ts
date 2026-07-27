@@ -10,6 +10,6 @@ export const onboardingGraphQLModule = {
   ...onboardingGraphQLSpec,
   authenticatedMutationResolvers: {
     onboardingBootstrap: async (_parent, args: BootstrapOnboardingArgs, context) =>
-      bootstrapOnboarding(context.bindings.DB, context.viewer, args.input),
+      bootstrapOnboarding(context.bindings, context.viewer, args.input),
   },
 } satisfies GraphQLModule;

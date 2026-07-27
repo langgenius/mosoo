@@ -10,6 +10,10 @@ import { createPlatformId } from "@mosoo/id";
 import type { AgentId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 
+import {
+  captureServerProductEvent,
+  SERVER_PRODUCT_ANALYTICS_EVENTS,
+} from "../../../platform/analytics/product-analytics";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import { forbiddenError } from "../../../platform/errors";
@@ -69,7 +73,14 @@ function stableStringify(value: unknown): string {
 }
 
 export async function createAgent(
-  bindings: Pick<ApiBindings, "DB">,
+  bindings: Pick<
+    ApiBindings,
+    | "DB"
+    | "MOSOO_DEPLOYMENT_MODE"
+    | "MOSOO_ENVIRONMENT"
+    | "POSTHOG_API_HOST"
+    | "POSTHOG_PROJECT_KEY"
+  >,
   viewer: AuthenticatedViewer,
   input: CreateAgentInput,
 ): Promise<Agent> {
@@ -119,6 +130,17 @@ export async function createAgent(
   await replaceAgentSkills(database, agentId, skillIds, timestampMs);
 
   const createdAgent = await getAgentRow(database, agentId);
+  await captureServerProductEvent(bindings, {
+    distinctId: viewer.id,
+    event: SERVER_PRODUCT_ANALYTICS_EVENTS.agentCreated,
+    properties: {
+      agent_id: agentId,
+      app_id: appId,
+      agent_kind: input.kind,
+      provider: input.provider,
+      runtime_id: runtimeId,
+    },
+  });
 
   return toAgentModel(database, viewer, createdAgent);
 }
