@@ -8,7 +8,6 @@ import { Switch } from "@/shared/ui/switch";
 import { Textarea } from "@/shared/ui/textarea";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
-import { EnvironmentCliTip } from "./environment-cli-tip";
 import {
   EnvironmentFormSection,
   NetworkPolicySelect,
@@ -35,20 +34,17 @@ function EnvironmentPackagesSection({
   return (
     <EnvironmentFormSection
       action={
-        <div className="flex items-center gap-1">
-          <EnvironmentCliTip align="end" side="left" />
-          <Button
-            aria-label="Add package"
-            className="size-8"
-            disabled={disabled}
-            onClick={onAdd}
-            size="icon-sm"
-            type="button"
-            variant="ghost"
-          >
-            <Plus className="size-4" />
-          </Button>
-        </div>
+        <Button
+          aria-label="Add package"
+          className="size-8"
+          disabled={disabled}
+          onClick={onAdd}
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+        >
+          <Plus className="size-4" />
+        </Button>
       }
       description="Public packages with exact versions. npm provides CLIs and CommonJS require; Node ESM imports require a project-local install. PyPI provides Python imports and scripts."
       title="Packages"

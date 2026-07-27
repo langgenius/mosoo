@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { createEnvironment } from "@/domains/environment/api/environment-client";
+import { EnvironmentCliCallout } from "@/domains/environment/components/environment-cli-callout";
 import { environmentKeys } from "@/domains/environment/query/environment-queries";
 import {
   Dialog,
@@ -71,6 +72,8 @@ export function CreateEnvironmentDialog({
             Define a reusable runtime container template for new sessions.
           </DialogDescription>
         </DialogHeader>
+
+        <EnvironmentCliCallout />
 
         {isTruthy(error) ? (
           <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-[13px]">
