@@ -8,6 +8,7 @@ import {
   setAppDefaultEnvironment,
 } from "@/domains/environment/api/environment-client";
 import { CreateEnvironmentDialog } from "@/domains/environment/components/create-environment-dialog";
+import { EnvironmentCliCallout } from "@/domains/environment/components/environment-cli-callout";
 import {
   environmentKeys,
   useAppEnvironmentsQuery,
@@ -118,6 +119,8 @@ export function EnvironmentsListPage() {
       </ListPageToolbar>
 
       <ListPageContent className="space-y-3">
+        <EnvironmentCliCallout />
+
         {isTruthy(error) ? (
           <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-[13px]">
             {error}
