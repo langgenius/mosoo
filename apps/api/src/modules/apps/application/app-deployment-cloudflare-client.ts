@@ -3,9 +3,9 @@ import Cloudflare from "cloudflare";
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 
-type CloudflareWorkerUploadMetadata = Parameters<
-  Cloudflare["workers"]["scripts"]["versions"]["create"]
->[1]["metadata"];
+type CloudflareWorkerVersion = Awaited<
+  ReturnType<Cloudflare["workers"]["scripts"]["versions"]["create"]>
+>;
 
 export interface CloudflarePagesProjectInput {
   branch: string;
@@ -149,27 +149,26 @@ export function createCloudflareDeploymentClient(
       }
     },
     async deployWorkerModule(input) {
-      const workerUpload = createWorkerModuleUpload(input);
+      const scriptPath = `/accounts/${accountId}/workers/scripts/${encodeURIComponent(input.scriptName)}`;
+      const createVersion = async (): Promise<CloudflareWorkerVersion> =>
+        (
+          await client.post<{ result: CloudflareWorkerVersion }>(`${scriptPath}/versions`, {
+            body: createWorkerModuleUpload(input),
+          })
+        ).result;
       let version;
 
       try {
-        version = await client.workers.scripts.versions.create(input.scriptName, {
-          account_id: accountId,
-          ...workerUpload,
-        });
+        version = await createVersion();
       } catch (error) {
         if (!toCloudflareCode(error, 10007)) {
           throw error;
         }
 
-        await client.workers.scripts.update(input.scriptName, {
-          account_id: accountId,
-          ...createWorkerModuleUpload(input),
+        await client.put(scriptPath, {
+          body: createWorkerModuleUpload(input),
         });
-        version = await client.workers.scripts.versions.create(input.scriptName, {
-          account_id: accountId,
-          ...createWorkerModuleUpload(input),
-        });
+        version = await createVersion();
       }
       const versionId = version.id ?? null;
 
@@ -328,9 +327,8 @@ function workerRoutePattern(hostname: string): string {
   return `${hostname}/*`;
 }
 
-export function createWorkerModuleUpload(
-  input: CloudflareWorkerModuleInput,
-): Pick<Parameters<Cloudflare["workers"]["scripts"]["versions"]["create"]>[1], "metadata"> {
+export function createWorkerModuleUpload(input: CloudflareWorkerModuleInput): FormData {
+  const upload = new FormData();
   const file = new File([input.scriptContent], input.mainModuleName, {
     type: "application/javascript+module",
   });
@@ -344,14 +342,10 @@ export function createWorkerModuleUpload(
     main_module: input.mainModuleName,
   };
 
-  return {
-    // `main_module` identifies a multipart part name. The SDK's `files` array
-    // becomes `files[]`, so put the module at its real part name instead.
-    [input.mainModuleName]: file,
-    // The SDK's generic multipart encoder expands objects into metadata[...]
-    // fields, but the Workers upload API requires one JSON `metadata` part.
-    metadata: JSON.stringify(metadata) as unknown as CloudflareWorkerUploadMetadata,
-  };
+  upload.append("metadata", JSON.stringify(metadata));
+  upload.append(input.mainModuleName, file);
+
+  return upload;
 }
 
 function toCloudflareCode(error: unknown, code: number): boolean {
