@@ -2,6 +2,11 @@ import type { BootstrapOnboardingInput, OnboardingStatus } from "@mosoo/contract
 import { organizationsTable } from "@mosoo/db";
 import { desc, eq } from "drizzle-orm";
 
+import {
+  captureServerProductEvent,
+  SERVER_PRODUCT_ANALYTICS_EVENTS,
+} from "../../../platform/analytics/product-analytics";
+import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { provisionOrganizationWithOwner } from "../../organizations/application/organization-provisioning.service";
@@ -54,10 +59,18 @@ export async function getOnboardingStatus(
 }
 
 export async function bootstrapOnboarding(
-  database: D1Database,
+  bindings: Pick<
+    ApiBindings,
+    | "DB"
+    | "MOSOO_DEPLOYMENT_MODE"
+    | "MOSOO_ENVIRONMENT"
+    | "POSTHOG_API_HOST"
+    | "POSTHOG_PROJECT_KEY"
+  >,
   viewer: AuthenticatedViewer,
   input: BootstrapOnboardingInput,
 ): Promise<OnboardingStatus> {
+  const database = bindings.DB;
   const currentStatus = await getOnboardingStatus(database, viewer);
 
   if (currentStatus.completed) {
@@ -69,6 +82,12 @@ export async function bootstrapOnboarding(
   const organization = await provisionOrganizationWithOwner(database, viewer, {
     makeActive: true,
     name: organizationName,
+  });
+
+  await captureServerProductEvent(bindings, {
+    distinctId: viewer.id,
+    event: SERVER_PRODUCT_ANALYTICS_EVENTS.onboardingCompleted,
+    properties: { organization_id: organization.id },
   });
 
   return {

@@ -2,6 +2,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import { captureProductEvent, PRODUCT_ANALYTICS_EVENTS } from "@/analytics/product-analytics";
+
 import { authClient } from "../../domains/auth/api/auth-client";
 import {
   shouldUseMosooAiDevelopmentBackdoor,
@@ -107,6 +109,7 @@ export function useLoginFlow(): LoginFlow {
 
   async function handleGoogleLogin(): Promise<void> {
     setError(null);
+    captureProductEvent(PRODUCT_ANALYTICS_EVENTS.loginStarted, { method: "google" });
 
     const result = await authClient["signIn"].social({
       callbackURL: redirectPath,
@@ -129,6 +132,7 @@ export function useLoginFlow(): LoginFlow {
 
     setError(null);
     setOtpSending(true);
+    captureProductEvent(PRODUCT_ANALYTICS_EVENTS.loginStarted, { method: "email_otp" });
 
     try {
       if (shouldUseMosooAiDevelopmentBackdoor(normalizedEmail)) {

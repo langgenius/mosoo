@@ -109,7 +109,7 @@ describe("onboarding bootstrap", () => {
   test("creates an organization and activates it for the viewer", async () => {
     const database = createOnboardingDatabase();
 
-    const status = await bootstrapOnboarding(database, VIEWER, {
+    const status = await bootstrapOnboarding({ DB: database }, VIEWER, {
       name: "Created Org",
     });
 

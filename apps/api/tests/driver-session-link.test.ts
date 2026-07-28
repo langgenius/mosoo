@@ -37,6 +37,7 @@ function createDriverSessionLinkDatabase(): SqliteD1Database {
 
     CREATE TABLE session (
       agent_id text,
+      app_id text,
       creator_account_id text NOT NULL,
       id text PRIMARY KEY NOT NULL
 );

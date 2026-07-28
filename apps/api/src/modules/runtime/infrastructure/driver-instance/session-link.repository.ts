@@ -12,6 +12,7 @@ import {
 import type {
   AccountId,
   AgentId,
+  AppId,
   DriverInstanceId,
   PlatformId,
   SandboxId,
@@ -28,6 +29,7 @@ import type { RuntimeSessionLink } from "./event-types";
 
 interface RuntimeSessionLinkRow {
   agent_id: AgentId | null;
+  app_id: AppId | null;
   agent_owner_account_id: AccountId | null;
   caller_account_id: AccountId | null;
   creator_account_id: PlatformId | null;
@@ -91,6 +93,7 @@ export async function getRuntimeSessionLink(
     (await getAppDatabase(database)
       .select({
         agent_id: sessionsTable.agentId,
+        app_id: sessionsTable.appId,
         agent_owner_account_id: agentsTable.ownerId,
         caller_account_id: sessionRunsTable.createdByAccountId,
         creator_account_id: sessionsTable.creatorAccountId,
@@ -119,6 +122,7 @@ export async function getRuntimeSessionLink(
 
   return {
     agentId: row?.agent_id ?? null,
+    appId: row?.app_id ?? null,
     callerId: principals.callerId,
     creatorId: row?.creator_account_id ?? null,
     executionOwnerId: principals.executionOwnerId,

@@ -12,6 +12,10 @@ import type { BetterAuthPlugin } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { emailOTP } from "better-auth/plugins/email-otp";
 
+import {
+  captureServerProductEvent,
+  SERVER_PRODUCT_ANALYTICS_EVENTS,
+} from "../../../platform/analytics/product-analytics";
 import { logInfo, logWarn } from "../../../platform/cloudflare/logger";
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import type { AuthEmailBindings } from "./auth-email";
@@ -22,6 +26,10 @@ export interface AuthBindings extends AuthEmailBindings {
   readonly BETTER_AUTH_SECRET?: string;
   readonly GOOGLE_OAUTH_CLIENT_ID?: string;
   readonly GOOGLE_OAUTH_CLIENT_SECRET?: string;
+  readonly MOSOO_DEPLOYMENT_MODE?: string;
+  readonly MOSOO_ENVIRONMENT?: string;
+  readonly POSTHOG_API_HOST?: string;
+  readonly POSTHOG_PROJECT_KEY?: string;
   readonly WEB_ORIGIN: string;
 }
 
@@ -110,6 +118,12 @@ function createAppAuth(bindings: AuthBindings) {
           before: async (user) => ({
             data: serializeAccountTimestampFields(user),
           }),
+          after: async (user) => {
+            await captureServerProductEvent(bindings, {
+              distinctId: user.id,
+              event: SERVER_PRODUCT_ANALYTICS_EVENTS.signupCompleted,
+            });
+          },
         },
         update: {
           before: async (user) => ({

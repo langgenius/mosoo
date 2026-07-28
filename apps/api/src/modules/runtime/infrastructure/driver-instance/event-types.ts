@@ -2,7 +2,15 @@ import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
 import type { AgentKind } from "@mosoo/contracts/agent";
 import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
 import type { SessionRunStatus } from "@mosoo/contracts/session-run";
-import type { AccountId, AgentId, PlatformId, SandboxId, SessionId, SessionRunId } from "@mosoo/id";
+import type {
+  AccountId,
+  AgentId,
+  AppId,
+  PlatformId,
+  SandboxId,
+  SessionId,
+  SessionRunId,
+} from "@mosoo/id";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 
 import type {
@@ -14,6 +22,7 @@ export type { SessionLiveState };
 
 export interface RuntimeSessionLink {
   agentId: AgentId | null;
+  appId: AppId | null;
   callerId: PlatformId | null;
   creatorId: PlatformId | null;
   executionOwnerId: AccountId | null;

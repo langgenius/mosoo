@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useReducer } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { captureProductEvent, PRODUCT_ANALYTICS_EVENTS } from "../../analytics/product-analytics";
 import { useAppSession } from "../../app/session-provider";
 import { onboardingBootstrap } from "../../domains/onboarding/api/onboarding-client";
 import { isTruthy } from "../../shared/lib/truthiness";
@@ -66,6 +67,7 @@ export function Onboarding() {
   const handleBootstrap = useCallback(
     async (input?: { name?: string }) => {
       dispatch({ type: "bootstrapStarted" });
+      captureProductEvent(PRODUCT_ANALYTICS_EVENTS.onboardingStarted);
       try {
         await onboardingBootstrap(toOnboardingBootstrapInput(input));
         await Promise.all([refreshOrganizations(), sleepPromise(800)]);

@@ -146,7 +146,10 @@ describe("App provisioning boundary", () => {
     `);
 
     await expect(
-      createApp(database, makeViewer("account-2"), { name: "New App", organizationId: "org-1" }),
+      createApp({ DB: database }, makeViewer("account-2"), {
+        name: "New App",
+        organizationId: "org-1",
+      }),
     ).rejects.toThrow();
 
     const apps = await listOrganizationApps(database, makeViewer("account-1"), "org-1");
