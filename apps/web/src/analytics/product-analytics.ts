@@ -103,10 +103,8 @@ function locationProperties(): ProductAnalyticsProperties {
   }
 
   return {
-    $current_url: window.location.href,
     $host: window.location.host,
     $pathname: window.location.pathname,
-    $referrer: typeof document === "undefined" ? "" : document.referrer,
   };
 }
 

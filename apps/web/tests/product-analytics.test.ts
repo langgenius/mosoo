@@ -31,7 +31,7 @@ function installBrowserLocation(pathname = "/apps", search = "?source=test"): vo
   });
   Object.defineProperty(globalThis, "document", {
     configurable: true,
-    value: { referrer: "https://mosoo.ai/" },
+    value: { referrer: "https://mosoo.ai/?code=referrer-secret" },
   });
 }
 
@@ -84,7 +84,10 @@ describe("product analytics", () => {
     expect(properties["deployment_mode"]).toBe("cloud");
     expect(properties["environment"]).toBe("test");
     expect(properties["step"]).toBe("welcome");
-    expect(properties["$current_url"]).toBe("https://app.mosoo.ai/apps?source=test");
+    expect(properties["$host"]).toBe("app.mosoo.ai");
+    expect(properties["$pathname"]).toBe("/apps");
+    expect(JSON.stringify(requests[0]?.body)).not.toContain("source=test");
+    expect(JSON.stringify(requests[0]?.body)).not.toContain("referrer-secret");
   });
 
   it("aliases the anonymous identity once, then uses the stable account id", async () => {
