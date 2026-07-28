@@ -7,9 +7,13 @@ export function EnvironmentsPage() {
   const params = useParams();
   const { environmentId } = params;
 
-  if (isTruthy(environmentId)) {
-    return <EnvironmentDetailPage key={environmentId} environmentId={environmentId} />;
-  }
-
-  return <EnvironmentsListPage />;
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {isTruthy(environmentId) ? (
+        <EnvironmentDetailPage key={environmentId} environmentId={environmentId} />
+      ) : (
+        <EnvironmentsListPage />
+      )}
+    </div>
+  );
 }
