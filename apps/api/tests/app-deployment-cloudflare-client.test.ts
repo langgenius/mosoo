@@ -13,14 +13,15 @@ describe("app deployment Cloudflare client", () => {
       vars: { MOSOO_AGENT_URL: "https://example.com/bound/token" },
     });
 
-    const modulePart = Reflect.get(upload, "worker.js");
+    const modulePart = upload.get("worker.js");
 
+    expect(upload).toBeInstanceOf(FormData);
     expect(modulePart).toBeInstanceOf(File);
     expect((modulePart as File).name).toBe("worker.js");
     expect((modulePart as File).type).toBe("application/javascript+module");
     expect(await (modulePart as File).text()).toBe(scriptContent);
-    expect(Reflect.get(upload, "files")).toBeUndefined();
-    expect(upload.metadata).toBe(
+    expect(upload.get("files")).toBeNull();
+    expect(upload.get("metadata")).toBe(
       JSON.stringify({
         bindings: [
           {
