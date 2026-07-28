@@ -29,6 +29,7 @@ import { Switch } from "@/shared/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 import { isTruthy } from "../../../shared/lib/truthiness";
+import { formatCatalogCount } from "./format";
 import type { useSkillRegistry } from "./use-skill-registry";
 
 const CATALOG_PER_PAGE = 24;
@@ -517,11 +518,4 @@ function CatalogViewButton({
       {label}
     </button>
   );
-}
-
-function formatCatalogCount(value: number): string {
-  return new Intl.NumberFormat(undefined, {
-    maximumFractionDigits: value >= 1000 ? 1 : 0,
-    notation: value >= 10_000 ? "compact" : "standard",
-  }).format(value);
 }
