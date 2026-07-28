@@ -3,6 +3,10 @@ import Cloudflare from "cloudflare";
 import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 
+type CloudflareWorkerUploadMetadata = Parameters<
+  Cloudflare["workers"]["scripts"]["versions"]["create"]
+>[1]["metadata"];
+
 export interface CloudflarePagesProjectInput {
   branch: string;
   projectName: string;
@@ -324,22 +328,25 @@ function workerRoutePattern(hostname: string): string {
   return `${hostname}/*`;
 }
 
-function createWorkerModuleUpload(input: CloudflareWorkerModuleInput) {
+export function createWorkerModuleUpload(input: CloudflareWorkerModuleInput) {
   const file = new File([input.scriptContent], input.mainModuleName, {
     type: "application/javascript+module",
   });
+  const metadata = {
+    bindings: Object.entries(input.vars).map(([name, text]) => ({
+      name,
+      text,
+      type: "plain_text" as const,
+    })),
+    compatibility_date: input.compatibilityDate,
+    main_module: input.mainModuleName,
+  };
 
   return {
     files: [file],
-    metadata: {
-      bindings: Object.entries(input.vars).map(([name, text]) => ({
-        name,
-        text,
-        type: "plain_text" as const,
-      })),
-      compatibility_date: input.compatibilityDate,
-      main_module: input.mainModuleName,
-    },
+    // The SDK's generic multipart encoder expands objects into metadata[...]
+    // fields, but the Workers upload API requires one JSON `metadata` part.
+    metadata: JSON.stringify(metadata) as unknown as CloudflareWorkerUploadMetadata,
   };
 }
 

@@ -32,8 +32,16 @@ function installDom(): void {
   });
   const { window } = dom;
 
-  globalThis.window = window as unknown as Window & typeof globalThis;
-  globalThis.document = window.document;
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: window,
+    writable: true,
+  });
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: window.document,
+    writable: true,
+  });
   globalThis.Element = window.Element;
   globalThis.HTMLElement = window.HTMLElement;
   globalThis.HTMLButtonElement = window.HTMLButtonElement;
