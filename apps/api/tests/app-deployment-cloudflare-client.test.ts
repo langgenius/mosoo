@@ -3,16 +3,23 @@ import { describe, expect, test } from "bun:test";
 import { createWorkerModuleUpload } from "../src/modules/apps/application/app-deployment-cloudflare-client";
 
 describe("app deployment Cloudflare client", () => {
-  test("encodes Worker metadata as one JSON multipart field", () => {
+  test("uses the module name and metadata as multipart part names", async () => {
+    const scriptContent = "export default { fetch() {} };";
     const upload = createWorkerModuleUpload({
       compatibilityDate: "2026-07-14",
       mainModuleName: "worker.js",
-      scriptContent: "export default { fetch() {} };",
+      scriptContent,
       scriptName: "example",
       vars: { MOSOO_AGENT_URL: "https://example.com/bound/token" },
     });
 
-    expect(upload.files[0]?.name).toBe("worker.js");
+    const modulePart = Reflect.get(upload, "worker.js");
+
+    expect(modulePart).toBeInstanceOf(File);
+    expect((modulePart as File).name).toBe("worker.js");
+    expect((modulePart as File).type).toBe("application/javascript+module");
+    expect(await (modulePart as File).text()).toBe(scriptContent);
+    expect(Reflect.get(upload, "files")).toBeUndefined();
     expect(upload.metadata).toBe(
       JSON.stringify({
         bindings: [

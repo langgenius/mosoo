@@ -328,7 +328,9 @@ function workerRoutePattern(hostname: string): string {
   return `${hostname}/*`;
 }
 
-export function createWorkerModuleUpload(input: CloudflareWorkerModuleInput) {
+export function createWorkerModuleUpload(
+  input: CloudflareWorkerModuleInput,
+): Pick<Parameters<Cloudflare["workers"]["scripts"]["versions"]["create"]>[1], "metadata"> {
   const file = new File([input.scriptContent], input.mainModuleName, {
     type: "application/javascript+module",
   });
@@ -343,7 +345,9 @@ export function createWorkerModuleUpload(input: CloudflareWorkerModuleInput) {
   };
 
   return {
-    files: [file],
+    // `main_module` identifies a multipart part name. The SDK's `files` array
+    // becomes `files[]`, so put the module at its real part name instead.
+    [input.mainModuleName]: file,
     // The SDK's generic multipart encoder expands objects into metadata[...]
     // fields, but the Workers upload API requires one JSON `metadata` part.
     metadata: JSON.stringify(metadata) as unknown as CloudflareWorkerUploadMetadata,
