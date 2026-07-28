@@ -136,7 +136,7 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                   {expanded ? (
                     <div className="grid grid-rows-[1fr] transition-[grid-template-rows] duration-200 ease-out starting:grid-rows-[0fr]">
                       <div className="overflow-hidden">
-                        <div className="border-border bg-bg-sunken/40 mt-1 rounded-md border px-3.5 py-2.5 text-[13px]">
+                        <div className="mt-1 text-[13px]">
                           <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
                             Failure details
                           </div>
@@ -173,7 +173,7 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
               const expanded = expandedRunIds.has(run.id);
               return (
                 <Fragment key={run.id}>
-                  <TableRow>
+                  <TableRow className={cn(failedError !== null && expanded && "border-b-0")}>
                     <TableCell className="py-4 pl-5">
                       <div className="flex items-center gap-3">
                         <span className="bg-bg-sunken text-fg-3 flex size-8 shrink-0 items-center justify-center rounded-full">
@@ -230,11 +230,11 @@ export function DeploymentsHistory({ runs }: { runs: DeploymentRunVM[] }) {
                     </TableCell>
                   </TableRow>
                   {failedError === null || !expanded ? null : (
-                    <TableRow className="hover:bg-transparent">
+                    <TableRow className="bg-muted/50">
                       <TableCell colSpan={3} className="px-5 pt-0 pb-4">
                         <div className="grid grid-rows-[1fr] transition-[grid-template-rows] duration-200 ease-out starting:grid-rows-[0fr]">
                           <div className="overflow-hidden">
-                            <div className="border-border bg-bg-sunken/40 rounded-md border px-3.5 py-2.5 text-[13px]">
+                            <div className="text-[13px]">
                               <div className="text-fg-3 mb-1 text-[11.5px] font-medium">
                                 Failure details
                               </div>
