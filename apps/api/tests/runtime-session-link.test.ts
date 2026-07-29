@@ -8,6 +8,7 @@ function createRuntimeSessionLinkDatabase(): SqliteD1Database {
 
   database.execute(`
     CREATE TABLE driver_instance (
+      created_at integer,
       id text PRIMARY KEY NOT NULL,
       sandbox_id text NOT NULL,
       sandbox_session_id text NOT NULL
@@ -37,10 +38,12 @@ function createRuntimeSessionLinkDatabase(): SqliteD1Database {
     CREATE TABLE sandbox (
       id text PRIMARY KEY NOT NULL,
       kind text NOT NULL,
+      subject_id text,
       subject_kind text NOT NULL
     );
 
     CREATE TABLE sandbox_session (
+      cloudflare_session_id text,
       session_id text PRIMARY KEY NOT NULL,
       origin_json text
     );

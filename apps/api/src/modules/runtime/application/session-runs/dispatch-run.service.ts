@@ -116,6 +116,7 @@ export async function dispatchSessionRun(
     sessionRunId: SessionRunId;
     traceId: string;
   },
+  activeExecutionPlane = executionPlane,
 ): Promise<void> {
   const sandboxId = input.profile.sandbox.id;
   let driverInstanceId: DriverInstanceId | null = null;
@@ -157,7 +158,7 @@ export async function dispatchSessionRun(
     ]);
 
     const attemptPrepareAndDispatch = async (): Promise<RuntimeExecutionPlaneRunLease> => {
-      const preparedRunLease = await executionPlane.prepareRun(bindings, requestUrl, {
+      const preparedRunLease = await activeExecutionPlane.prepareRun(bindings, requestUrl, {
         attachmentIds: input.attachmentIds,
         builtInTools: input.builtInTools,
         onBootPayloadPrepared: async ({ bootPayload }) => {
@@ -230,7 +231,7 @@ export async function dispatchSessionRun(
         traceId: input.traceId,
       });
       await dispatchTiming.measure("dispatchDriverTurn", () =>
-        executionPlane.dispatchTurn(bindings, {
+        activeExecutionPlane.dispatchTurn(bindings, {
           attachmentIds: input.attachmentIds,
           driverInstanceId: preparedDriverInstanceId,
           prompt: input.prompt,

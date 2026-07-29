@@ -1,10 +1,11 @@
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
 import { parseRuntimeTimingProcessContent } from "@mosoo/runtime-events";
 
 import type { RuntimeExecutionPlaneAdapter } from "../src/modules/runtime/application/execution-plane/execution-plane-adapter";
+import { dispatchSessionRun } from "../src/modules/runtime/application/session-runs/dispatch-run.service";
 import type { RuntimeTimingSnapshot } from "../src/modules/runtime/application/session-runs/session-runtime-timing";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { createDriverProfile } from "./api-driver-boundary-fixtures";
@@ -45,16 +46,6 @@ const executionPlane = {
     };
   },
 } as RuntimeExecutionPlaneAdapter;
-
-mock.module(
-  "../src/modules/runtime/infrastructure/execution-plane/sandbox-execution-plane-adapter",
-  () => ({
-    createSandboxExecutionPlaneAdapter: () => executionPlane,
-  }),
-);
-
-const { dispatchSessionRun } =
-  await import("../src/modules/runtime/application/session-runs/dispatch-run.service");
 
 const bootingRun = {
   completedAt: null,
@@ -158,6 +149,7 @@ describe("dispatch run timing", () => {
         sessionRunId: PUBLIC_API_TEST_IDS.run,
         traceId: bootingRun.traceId,
       } as unknown as Parameters<typeof dispatchSessionRun>[2],
+      executionPlane,
     );
 
     await readinessStarted.promise;
