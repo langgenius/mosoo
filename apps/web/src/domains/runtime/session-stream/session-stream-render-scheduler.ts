@@ -47,6 +47,7 @@ export class SessionStreamRenderScheduler {
   #frameHandle: number | null = null;
   readonly #host: SessionStreamRenderSchedulerHost;
   #queue: QueuedSessionEvent[] = [];
+  #queueOffset = 0;
   #timeoutHandle: number | null = null;
 
   public constructor(
@@ -60,6 +61,7 @@ export class SessionStreamRenderScheduler {
   public clear(): void {
     this.#cancelPending();
     this.#queue = [];
+    this.#queueOffset = 0;
   }
 
   public enqueue(sessionId: string, event: AgUiSessionEvent): void {
@@ -87,7 +89,13 @@ export class SessionStreamRenderScheduler {
     const events: AgUiSessionEvent[] = [];
     const remaining: QueuedSessionEvent[] = [];
 
-    for (const item of this.#queue) {
+    for (let index = this.#queueOffset; index < this.#queue.length; index += 1) {
+      const item = this.#queue[index];
+
+      if (!item) {
+        continue;
+      }
+
       if (item.sessionId === sessionId) {
         events.push(item.event);
       } else {
@@ -96,6 +104,7 @@ export class SessionStreamRenderScheduler {
     }
 
     this.#queue = remaining;
+    this.#queueOffset = 0;
 
     if (events.length > 0) {
       if (!this.#apply(sessionId, events)) {
@@ -106,6 +115,7 @@ export class SessionStreamRenderScheduler {
           })),
           ...this.#queue,
         ];
+        this.#queueOffset = 0;
       }
     }
 
@@ -147,41 +157,62 @@ export class SessionStreamRenderScheduler {
           event,
           sessionId: batch.sessionId,
         })),
-        ...this.#queue,
+        ...this.#queue.slice(this.#queueOffset),
       ];
+      this.#queueOffset = 0;
     }
 
     this.#schedule();
+  }
+
+  #compactConsumedQueue(): void {
+    if (this.#queueOffset === 0) {
+      return;
+    }
+
+    if (this.#queueOffset >= this.#queue.length) {
+      this.#queue = [];
+      this.#queueOffset = 0;
+      return;
+    }
+
+    if (
+      this.#queueOffset >= MAX_EVENTS_PER_FRAME * 4 &&
+      this.#queueOffset * 2 >= this.#queue.length
+    ) {
+      this.#queue = this.#queue.slice(this.#queueOffset);
+      this.#queueOffset = 0;
+    }
   }
 
   #takeFrameBatch(): {
     events: AgUiSessionEvent[];
     sessionId: string;
   } | null {
-    const first = this.#queue[0];
+    const first = this.#queue[this.#queueOffset];
 
     if (!first) {
+      this.#compactConsumedQueue();
       return null;
     }
 
     const { sessionId } = first;
     const events: AgUiSessionEvent[] = [];
-    let consumedQueueItems = 0;
+    let nextQueueOffset = this.#queueOffset;
 
-    while (consumedQueueItems < this.#queue.length && events.length < MAX_EVENTS_PER_FRAME) {
-      const item = this.#queue[consumedQueueItems];
+    while (nextQueueOffset < this.#queue.length && events.length < MAX_EVENTS_PER_FRAME) {
+      const item = this.#queue[nextQueueOffset];
 
       if (!item || item.sessionId !== sessionId) {
         break;
       }
 
       events.push(item.event);
-      consumedQueueItems += 1;
+      nextQueueOffset += 1;
     }
 
-    if (consumedQueueItems > 0) {
-      this.#queue.splice(0, consumedQueueItems);
-    }
+    this.#queueOffset = nextQueueOffset;
+    this.#compactConsumedQueue();
 
     return { events, sessionId };
   }
