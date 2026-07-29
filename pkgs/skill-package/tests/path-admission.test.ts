@@ -35,6 +35,14 @@ describe("skill package path admission", () => {
         "references/a.txt": { body: data },
       }),
     ).toThrow(SkillPackageError);
+
+    expect(() =>
+      normalizeSkillEntries({
+        "SKILL.md": { body: markdown },
+        "references/a.txt": { body: data },
+        references: { body: data },
+      }),
+    ).toThrow(SkillPackageError);
   });
 
   test("rejects unsafe paths before normalizing them", () => {
