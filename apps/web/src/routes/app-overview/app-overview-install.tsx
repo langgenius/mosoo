@@ -1,29 +1,64 @@
-import { Check, KeyRound } from "lucide-react";
+import { MousePointerClick, SquareTerminal } from "lucide-react";
 import type { ReactElement } from "react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
 
+import { cn } from "@/shared/lib/class-names";
 import { writeClipboardText } from "@/shared/lib/clipboard";
-import { RuntimeIcon } from "@/shared/ui/brand-icons";
 import { Button } from "@/shared/ui/button";
 import { CopyCheckIcon } from "@/shared/ui/copy-check-icon";
 
-const INSTALL_COMMAND = "curl -fsSL https://install.mosoo.ai/install.sh | bash";
-const API_TOKENS_PATH = "/settings/access-tokens";
-const READY_STEPS = [
-  "Installs mosoo CLI",
-  "Installs the @mosoo skill",
-  "Signs in to cloud and runs doctor",
-] as const;
-const CODING_AGENT_HARNESSES = [
-  { label: "Codex", runtimeId: "codex" },
-  { label: "Claude Code", runtimeId: "claude-code" },
-  { label: "OpenCode", runtimeId: "opencode" },
-  { label: "Cursor", runtimeId: "cursor" },
-  { label: "Cline", runtimeId: "cline" },
-] as const;
+import { INSTALL_COMMAND } from "./onboarding-setup-prompt";
+import { DocsAction, OnboardingActions, OnboardingSteps } from "./onboarding-steps";
 
-export function AppOverviewInstallGuide(): ReactElement {
+type SetupLane = "cli" | "console";
+
+const SETUP_LANE_STORAGE_KEY = "mosoo_overview_setup_lane";
+
+function readStoredSetupLane(): SetupLane | null {
+  try {
+    const value = globalThis.localStorage.getItem(SETUP_LANE_STORAGE_KEY);
+    return value === "cli" || value === "console" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeSetupLane(lane: SetupLane): void {
+  try {
+    globalThis.localStorage.setItem(SETUP_LANE_STORAGE_KEY, lane);
+  } catch {
+    // Storage can be unavailable in restricted browser contexts.
+  }
+}
+
+function SetupLaneTab({
+  active,
+  icon,
+  label,
+  onSelect,
+}: {
+  active: boolean;
+  icon: ReactElement;
+  label: string;
+  onSelect: () => void;
+}): ReactElement {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onSelect}
+      className={cn(
+        "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors",
+        active ? "bg-card text-fg-1 shadow-xs" : "text-fg-3 hover:text-fg-2",
+      )}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function CodingAgentLane(): ReactElement {
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
 
@@ -44,83 +79,108 @@ export function AppOverviewInstallGuide(): ReactElement {
   }
 
   return (
+    <>
+      <div className="border-border bg-bg-sunken mt-7 flex w-full flex-col items-stretch gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center">
+        <code className="text-fg-1 min-w-0 flex-1 truncate text-left font-mono text-[13px] sm:text-base">
+          <span className="text-fg-3 select-none">$ </span>
+          {INSTALL_COMMAND}
+        </code>
+        <Button
+          onClick={() => {
+            void copyInstallCommand();
+          }}
+          className="w-full bg-[rgb(111_211_4)] text-black hover:bg-[rgb(111_211_4)] sm:w-auto"
+          size="default"
+          variant="accent"
+        >
+          <CopyCheckIcon copied={copied} />
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </div>
+
+      {copyFailed ? (
+        <div className="mt-2 w-full text-left">
+          <input
+            aria-label="mosoo install command"
+            readOnly
+            value={INSTALL_COMMAND}
+            onFocus={(event) => {
+              event.currentTarget.select();
+            }}
+            className="border-border bg-bg-sunken text-fg-1 w-full rounded-md border px-3 py-2 font-mono text-xs"
+          />
+          <p className="text-fg-3 mt-1 text-xs">Copy failed. Select and copy the command above.</p>
+        </div>
+      ) : null}
+
+      <p className="text-fg-3 mt-3 max-w-2xl text-[13px] leading-5">
+        One command installs the mosoo CLI and the @mosoo skill, signs in to try.mosoo.ai, and
+        checks cloud readiness. Sign-in creates your API token automatically; you will be asked for
+        a provider key before sessions can run.
+      </p>
+
+      <OnboardingActions />
+    </>
+  );
+}
+
+function ConsoleLane(): ReactElement {
+  return (
+    <>
+      <OnboardingSteps />
+      <div className="mt-3 w-full">
+        <DocsAction />
+      </div>
+    </>
+  );
+}
+
+/**
+ * The pre-deploy Overview hero, split into two explicit setup lanes: "In your
+ * coding agent" (install command, auto-minted CLI token, copyable setup
+ * prompt) and "In the console" (the three-step checklist). Both lanes read
+ * the same account state, so progress counts once wherever a step happens.
+ * The last chosen lane is remembered locally; first visits land on the
+ * coding-agent lane.
+ */
+export function AppOverviewInstallGuide(): ReactElement {
+  const [lane, setLane] = useState<SetupLane>(() => readStoredSetupLane() ?? "cli");
+
+  function selectLane(nextLane: SetupLane): void {
+    setLane(nextLane);
+    storeSetupLane(nextLane);
+  }
+
+  return (
     <section className="py-8 sm:py-10">
       <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
         <h2 className="text-foreground text-3xl font-semibold tracking-tight sm:text-4xl">
-          Build agent app with <span className="text-[rgb(111_211_4)]">mosoo</span> in your coding
-          agent
+          Build agent app with <span className="text-[rgb(111_211_4)]">mosoo</span>
         </h2>
         <p className="text-muted-foreground mt-3 max-w-2xl text-base leading-7">
-          One command installs mosoo CLI and the @mosoo skill, signs in to try.mosoo.ai, and checks
-          cloud readiness.
+          Pick how you want to set up. Progress counts the same either way.
         </p>
 
-        <div className="border-border bg-bg-sunken mt-8 flex w-full flex-col items-stretch gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center">
-          <code className="text-fg-1 min-w-0 flex-1 truncate text-left font-mono text-[13px] sm:text-base">
-            <span className="text-fg-3 select-none">$ </span>
-            {INSTALL_COMMAND}
-          </code>
-          <Button
-            onClick={() => {
-              void copyInstallCommand();
+        <div className="border-border bg-bg-sunken mt-7 inline-flex rounded-lg border p-1">
+          <SetupLaneTab
+            active={lane === "cli"}
+            icon={<SquareTerminal className="size-4" />}
+            label="In your coding agent"
+            onSelect={() => {
+              selectLane("cli");
             }}
-            className="w-full bg-[rgb(111_211_4)] text-black hover:bg-[rgb(111_211_4)] sm:w-auto"
-            size="default"
-            variant="accent"
-          >
-            <CopyCheckIcon copied={copied} />
-            {copied ? "Copied" : "Copy"}
-          </Button>
+          />
+          <SetupLaneTab
+            active={lane === "console"}
+            icon={<MousePointerClick className="size-4" />}
+            label="In the console"
+            onSelect={() => {
+              selectLane("console");
+            }}
+          />
         </div>
 
-        {copyFailed ? (
-          <div className="mt-2 w-full text-left">
-            <input
-              aria-label="mosoo install command"
-              readOnly
-              value={INSTALL_COMMAND}
-              onFocus={(event) => {
-                event.currentTarget.select();
-              }}
-              className="border-border bg-bg-sunken text-fg-1 w-full rounded-md border px-3 py-2 font-mono text-xs"
-            />
-            <p className="text-fg-3 mt-1 text-xs">
-              Copy failed. Select and copy the command above.
-            </p>
-          </div>
-        ) : null}
-
-        <div className="text-fg-2 mt-7 grid w-full max-w-3xl grid-cols-1 gap-3 text-sm leading-6 font-medium sm:grid-cols-3 sm:gap-4 sm:text-base">
-          {READY_STEPS.map((label) => (
-            <span className="inline-flex min-w-0 items-center justify-center gap-2" key={label}>
-              <Check className="size-4 shrink-0 text-green-600" />
-              {label}
-            </span>
-          ))}
-        </div>
-
-        <Button asChild className="mt-6" size="default" variant="outline">
-          <Link to={API_TOKENS_PATH}>
-            <KeyRound className="size-4" />
-            Create API token
-          </Link>
-        </Button>
-
-        <div
-          aria-label="Supported coding agent harnesses"
-          className="mt-8 flex w-full max-w-2xl flex-wrap items-center justify-center gap-3"
-        >
-          {CODING_AGENT_HARNESSES.map((harness) => (
-            <span
-              className="border-border bg-card inline-flex size-12 items-center justify-center rounded-md border shadow-xs"
-              key={harness.runtimeId}
-              title={harness.label}
-            >
-              <RuntimeIcon className="size-7" runtimeId={harness.runtimeId} />
-              <span className="sr-only">{harness.label}</span>
-            </span>
-          ))}
-        </div>
+        {lane === "cli" ? <CodingAgentLane /> : <ConsoleLane />}
       </div>
     </section>
   );
