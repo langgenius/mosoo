@@ -1,5 +1,6 @@
 import type { PtyOptions } from "@cloudflare/sandbox";
 
+import type { SandboxNetworkConstraints } from "../domain/sandbox-network-constraints";
 import type { RuntimeSandboxBucketMountOptions } from "./runtime-sandbox-bucket-mount";
 
 export interface RuntimeCommandResultHandle {
@@ -63,6 +64,7 @@ export interface ExecutionSessionHandle {
 }
 
 export interface SandboxHandle extends ExecutionSessionHandle {
+  configureNetworkConstraints(constraints: SandboxNetworkConstraints): Promise<void>;
   createBackup(options: {
     dir: string;
     localBucket?: boolean;
@@ -94,6 +96,7 @@ export interface SandboxHandle extends ExecutionSessionHandle {
 }
 
 const SANDBOX_HANDLE_METHODS = [
+  "configureNetworkConstraints",
   "createBackup",
   "createSession",
   "deleteSession",

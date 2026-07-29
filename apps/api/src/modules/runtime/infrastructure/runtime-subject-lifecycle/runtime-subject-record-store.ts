@@ -450,18 +450,19 @@ export async function markRuntimeSubjectActive(
   return getD1ChangeCount(result) > 0;
 }
 
-export async function markRuntimeSubjectActivationFailed(
+export async function markRuntimeSubjectActivationDestroying(
   database: D1Database,
   input: {
     readonly claimOwner: string;
     readonly message: string;
     readonly errorCode: RuntimeSubjectErrorCode;
+    readonly operationId: RuntimeOperationId;
     readonly runtimeSubjectId: SandboxId;
   },
-): Promise<void> {
+): Promise<boolean> {
   const now = currentTimestampMs();
 
-  await getAppDatabase(database)
+  const result = await getAppDatabase(database)
     .update(sandboxesTable)
     .set({
       claimExpiresAt: null,
@@ -470,9 +471,9 @@ export async function markRuntimeSubjectActivationFailed(
       lastErrorCode: input.errorCode,
       ...runtimeSubjectStatusPatch({
         now,
-        operationId: null,
+        operationId: input.operationId,
         source: "api",
-        status: "cold",
+        status: "destroying",
       }),
     })
     .where(
@@ -485,6 +486,47 @@ export async function markRuntimeSubjectActivationFailed(
       ),
     )
     .run();
+
+  return getD1ChangeCount(result) > 0;
+}
+
+export async function markRuntimeSubjectActivationFailed(
+  database: D1Database,
+  input: {
+    readonly message: string;
+    readonly errorCode: RuntimeSubjectErrorCode;
+    readonly operationId: RuntimeOperationId;
+    readonly runtimeSubjectId: SandboxId;
+  },
+): Promise<boolean> {
+  const now = currentTimestampMs();
+
+  const result = await getAppDatabase(database)
+    .update(sandboxesTable)
+    .set({
+      claimExpiresAt: null,
+      claimOwner: null,
+      // Preserve the activation failure even though teardown succeeded. The
+      // next activation can diagnose why this cold start was required.
+      lastError: input.message,
+      lastErrorCode: input.errorCode,
+      ...runtimeSubjectStatusPatch({
+        now,
+        operationId: null,
+        source: "api",
+        status: "cold",
+      }),
+    })
+    .where(
+      and(
+        eq(sandboxesTable.id, input.runtimeSubjectId),
+        eq(sandboxesTable.status, "destroying"),
+        eq(sandboxesTable.statusOperationId, input.operationId),
+      ),
+    )
+    .run();
+
+  return getD1ChangeCount(result) > 0;
 }
 
 export async function markRuntimeSubjectOperationStarted(

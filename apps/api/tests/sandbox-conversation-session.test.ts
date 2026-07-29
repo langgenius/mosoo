@@ -212,6 +212,7 @@ function createSandbox(
 
   return {
     ...executionSession,
+    async configureNetworkConstraints() {},
     async createBackup() {
       return { dir: "/backup", id: "backup-1" };
     },

@@ -53,6 +53,7 @@ export async function publishAgent(
     agentId: agent.id,
     bindings,
     environment,
+    kind: agent.kind,
     model: agent.model,
     packageResolution,
     appId: agent.appId,

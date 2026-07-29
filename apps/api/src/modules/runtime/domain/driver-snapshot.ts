@@ -2,6 +2,7 @@ import type { DriverRecoveryMessage } from "@mosoo/agent-driver/boot";
 import type { DriverNativeRuntimeRef, DriverRuntime } from "@mosoo/agent-driver/runtime";
 import type { JsonObject } from "@mosoo/contracts";
 import type { AgentBuiltInToolConfig, AgentKind, AgentReadiness } from "@mosoo/contracts/agent";
+import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
 import type {
   ActiveMcpAuthorizationState,
   ActiveMcpCredentialStatus,
@@ -89,6 +90,15 @@ export interface DriverVendorCredentialProfile {
   readonly vendorId: string;
 }
 
+/**
+ * Environment egress intent for the session's sandbox, snapshotted with the
+ * run. `environmentAllowedHosts` holds the parsed environment allowlist.
+ */
+export interface DriverNetworkProfile {
+  readonly environmentAllowedHosts: readonly string[];
+  readonly networkPolicy: EnvironmentNetworkPolicy;
+}
+
 export interface DriverProfileConfig {
   readonly agentId: AgentId;
   readonly configRevision: DriverConfigRevision;
@@ -97,6 +107,7 @@ export interface DriverProfileConfig {
   readonly environmentArtifact?: DriverEnvironmentArtifactProfile | null;
   readonly kind: AgentKind;
   readonly model: string;
+  readonly network: DriverNetworkProfile;
   readonly permissionPolicy: DriverPermissionPolicy;
   readonly prompt: string;
   readonly provider: string;

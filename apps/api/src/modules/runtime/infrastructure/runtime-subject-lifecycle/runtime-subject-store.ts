@@ -24,6 +24,7 @@ export {
   getRuntimeSubject,
   getRuntimeSubjectActivationRecord,
   getRuntimeSubjectIdByTuple,
+  markRuntimeSubjectActivationDestroying,
   markRuntimeSubjectActivationFailed,
   markRuntimeSubjectActive,
   markRuntimeSubjectCold,

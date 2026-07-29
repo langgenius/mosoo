@@ -26,9 +26,14 @@ import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/ap
 import { resolveEnvironmentSetupScriptForExecution } from "../../../environments/application/environment-runtime-snapshot";
 import { resolveRuntimeMcpServersForSnapshot } from "../../../mcp/application/mcp-runtime.service";
 import { resolveVendorCredentialRef } from "../../../vendor-credentials/application/vendor-credential.service";
-import type { DriverProfileConfig, DriverSkillCatalogEntry } from "../../domain/driver-snapshot";
+import type {
+  DriverNetworkProfile,
+  DriverProfileConfig,
+  DriverSkillCatalogEntry,
+} from "../../domain/driver-snapshot";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import { resolveAgentRuntimeSandboxSubject } from "../../domain/runtime-sandbox-subject";
+import { parseEnvironmentAllowedHosts } from "../../domain/sandbox-network-constraints";
 import {
   ensureRuntimeSubjectId,
   getRuntimeConversationSession,
@@ -127,6 +132,14 @@ function sanitizeHydratedRunContextForCache(
   };
 }
 
+export function toDriverNetworkProfile(input: {
+  environment: { allowedHostsJson: string; networkPolicy: DriverNetworkProfile["networkPolicy"] };
+}): DriverNetworkProfile {
+  return {
+    environmentAllowedHosts: parseEnvironmentAllowedHosts(input.environment.allowedHostsJson),
+    networkPolicy: input.environment.networkPolicy,
+  };
+}
 async function hydrateRunContextFromSession(
   bindings: ApiBindings,
   viewer: AuthenticatedViewer,
@@ -177,6 +190,8 @@ async function hydrateRunContextFromSession(
   const agentReadiness = await computeAgentReadiness(bindings.DB, agent.ownerId, {
     agentId: agent.id,
     environment: snapshotEnvironment,
+    environmentNetworkPolicy: environmentSnapshot.networkPolicy,
+    kind: binding.kind,
     mcpServerIds: toolReferences.map((reference) => reference.serverId),
     model: binding.model,
     packageResolution: storedConfig.packageResolution,
@@ -281,6 +296,9 @@ async function hydrateRunContextFromSession(
       executionOwnerUserId: agent.ownerId,
       kind: binding.kind,
       model: binding.model,
+      network: toDriverNetworkProfile({
+        environment: environmentSnapshot,
+      }),
       prompt: binding.prompt,
       provider: binding.provider,
       providerOptions: storedConfig.providerOptions,
@@ -430,6 +448,9 @@ async function refreshCachedRunContextVolatileFields(
     executionOwnerUserId: agent.ownerId,
     kind: binding.kind,
     model: binding.model,
+    network: toDriverNetworkProfile({
+      environment: environmentSnapshot,
+    }),
     prompt: binding.prompt,
     provider: binding.provider,
     providerOptions: storedConfig.providerOptions,

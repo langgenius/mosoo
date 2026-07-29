@@ -1,4 +1,5 @@
 import { DRIVER_BOOT_PAYLOAD_FILE_ENV_NAME } from "@mosoo/agent-driver/boot";
+import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
 import { getRuntimeCatalogEntry } from "@mosoo/runtime-catalog";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
@@ -93,7 +94,17 @@ function mergeRuntimeNoProxy(value: string | null): string {
   return [...entries].join(",");
 }
 
-export function toRuntimeProcessProxyEnv(bindings: RuntimeProxyBindings): Record<string, string> {
+export function toRuntimeProcessProxyEnv(
+  bindings: RuntimeProxyBindings,
+  networkPolicy: EnvironmentNetworkPolicy,
+): Record<string, string> {
+  // Runtime proxy bindings are host-wide ambient configuration, not
+  // session-scoped policy. Injecting them into Limited would turn an allowed
+  // proxy host into a tunnel around the per-session destination allowlist.
+  if (networkPolicy === "limited") {
+    return {};
+  }
+
   const httpProxy = readRuntimeProxyBinding(bindings, "MOSOO_RUNTIME_HTTP_PROXY");
   const httpsProxy = readRuntimeProxyBinding(bindings, "MOSOO_RUNTIME_HTTPS_PROXY");
   const allProxy = readRuntimeProxyBinding(bindings, "MOSOO_RUNTIME_ALL_PROXY");
@@ -316,7 +327,7 @@ async function provisionDriver(
         cwd: organizationPath,
         env: {
           [DRIVER_BOOT_PAYLOAD_FILE_ENV_NAME]: bootPayloadPath,
-          ...toRuntimeProcessProxyEnv(env),
+          ...toRuntimeProcessProxyEnv(env, runtimeProfile.network.networkPolicy),
         },
         processId,
       }),

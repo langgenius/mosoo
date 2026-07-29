@@ -6,6 +6,7 @@ import type { AccountId, AgentId, SandboxId, SandboxSessionId, SessionId } from 
 import type {
   DriverConfigRevision,
   DriverEnvironmentArtifactProfile,
+  DriverNetworkProfile,
   DriverPermissionPolicy,
   DriverProfileConfig,
   DriverVendorCredentialProfile,
@@ -24,6 +25,7 @@ export function createAgentRuntimeProfile(input: {
   executionOwnerUserId: AccountId;
   kind: AgentKind;
   model: string;
+  network: DriverNetworkProfile;
   permissionPolicy?: DriverPermissionPolicy;
   prompt: string;
   provider: string;
@@ -52,6 +54,7 @@ export function createAgentRuntimeProfile(input: {
     environmentArtifact: input.environmentArtifact ?? null,
     kind: input.kind,
     model: input.model,
+    network: input.network,
     permissionPolicy: input.permissionPolicy ?? DEFAULT_DRIVER_PERMISSION_POLICY,
     prompt: input.prompt,
     provider: input.provider,

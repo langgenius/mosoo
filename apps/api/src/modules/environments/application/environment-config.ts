@@ -158,11 +158,17 @@ function normalizeHost(host: string): string {
     throw new Error("Allowed host cannot be empty.");
   }
 
-  if (
-    normalized.includes("://") ||
-    normalized.includes(":") ||
-    !/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/u.test(normalized)
-  ) {
+  const labels = normalized.split(".");
+  const isDomain =
+    normalized.length <= 253 &&
+    labels.length >= 2 &&
+    labels.some((label) => /[a-z]/u.test(label)) &&
+    labels.every(
+      (label) =>
+        label.length > 0 && label.length <= 63 && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/u.test(label),
+    );
+
+  if (!isDomain) {
     throw new Error("Allowed hosts must be domains without protocol or port.");
   }
 

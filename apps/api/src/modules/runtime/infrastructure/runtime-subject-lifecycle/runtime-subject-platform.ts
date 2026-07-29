@@ -12,6 +12,7 @@ import {
 import { requireCloudflareSandboxBinding } from "../../../../platform/cloudflare/sandbox-binding";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type { RuntimeStateClearRule } from "../../domain/runtime-kind-policy";
+import type { SandboxNetworkConstraints } from "../../domain/sandbox-network-constraints";
 import { withRuntimeProvisionTimeout } from "../runtime-provision-timeout";
 import { decodeSandboxBackupIdForPlatform } from "../sandbox-backup-id";
 import { toSandboxHandle } from "../sandbox-handles";
@@ -43,6 +44,22 @@ async function getCloudflareRuntimeSubjectKeepAliveHandle(
     normalizeId: true,
   });
   return toSandboxHandle(sandbox);
+}
+
+/**
+ * Pushes the environment egress policy into the sandbox Durable Object. Must
+ * run before any container-starting call (mkdir/exec/session create): the
+ * internet switch only takes effect at container start, and a limited policy
+ * must fail closed here rather than let the container come up unrestricted.
+ */
+export async function configureRuntimeSubjectNetwork(
+  subject: SandboxHandle,
+  constraints: SandboxNetworkConstraints,
+): Promise<void> {
+  await withRuntimeProvisionTimeout(
+    subject.configureNetworkConstraints(constraints),
+    "Runtime subject network configure",
+  );
 }
 
 export async function prepareRuntimeSubjectFilesystem(subject: SandboxHandle): Promise<void> {
@@ -88,13 +105,19 @@ export async function restoreRuntimeSubjectBackup(
 export async function destroyRuntimeSubjectContainer(
   bindings: ApiBindings,
   runtimeSubjectId: string,
+  timeoutMs?: number,
 ): Promise<void> {
-  await withDisposedRpcResource(
-    await getRuntimeSubjectKeepAliveHandle(bindings, runtimeSubjectId),
-    async (subject) => {
-      await subject.setKeepAlive(false);
-      await subject.destroy();
-    },
+  await withRuntimeProvisionTimeout(
+    (async () =>
+      withDisposedRpcResource(
+        await getRuntimeSubjectKeepAliveHandle(bindings, runtimeSubjectId),
+        async (subject) => {
+          await subject.setKeepAlive(false);
+          await subject.destroy();
+        },
+      ))(),
+    `Runtime subject destroy for ${runtimeSubjectId}`,
+    timeoutMs,
   );
 }
 

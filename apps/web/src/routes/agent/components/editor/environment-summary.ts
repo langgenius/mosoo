@@ -2,9 +2,7 @@ import type { EnvironmentSummary } from "@mosoo/contracts/environment";
 
 export function describeEnvironment(environment: EnvironmentSummary): string {
   const network =
-    environment.networkPolicy === "full"
-      ? "Full network intent (not enforced)"
-      : "Limited network intent (not enforced)";
+    environment.networkPolicy === "full" ? "Full network" : "Limited network (Task sessions only)";
   const packages = environment.packages.reduce((count, entry) => count + entry.packages.length, 0);
 
   if (packages === 0) {

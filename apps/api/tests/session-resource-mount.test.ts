@@ -43,17 +43,26 @@ function createSandbox(input: {
   readonly calls: {
     exec: string[];
     mkdir: string[];
-    mountBucket: string[];
+    mountBucket: {
+      bucket: string;
+      mountPath: string;
+      options: RuntimeSandboxBucketMountOptions;
+    }[];
   };
 } {
   const calls = {
     exec: [] as string[],
     mkdir: [] as string[],
-    mountBucket: [] as string[],
+    mountBucket: [] as {
+      bucket: string;
+      mountPath: string;
+      options: RuntimeSandboxBucketMountOptions;
+    }[],
   };
 
   return {
     calls,
+    async configureNetworkConstraints() {},
     async createBackup() {
       return { dir: "/backup", id: "backup-1" };
     },
@@ -75,7 +84,7 @@ function createSandbox(input: {
       calls.mkdir.push(path);
     },
     async mountBucket(bucket, mountPath, options) {
-      calls.mountBucket.push(mountPath);
+      calls.mountBucket.push({ bucket, mountPath, options });
       await input.onMountBucket?.(bucket, mountPath, options);
     },
     async readFile() {
@@ -127,7 +136,19 @@ describe("ensureSessionResourcesMounted", () => {
 
     expect(sandbox.calls.exec).toHaveLength(1);
     expect(sandbox.calls.mkdir).toHaveLength(1);
-    expect(sandbox.calls.mountBucket).toEqual(sandbox.calls.mkdir);
+    expect(sandbox.calls.mountBucket).toHaveLength(1);
+    expect(sandbox.calls.mountBucket[0]).toEqual({
+      bucket: "mosoo-file",
+      mountPath: sandbox.calls.mkdir[0],
+      options: {
+        credentialProxy: true,
+        endpoint: "https://account-1.r2.cloudflarestorage.com",
+        localBucket: false,
+        prefix: "/session/session-remote/attachment/",
+        provider: "r2",
+        readOnly: true,
+      },
+    });
   });
 
   test("accepts remote bucket already mounted at the same session resource path", async () => {
@@ -148,7 +169,7 @@ describe("ensureSessionResourcesMounted", () => {
 
     expect(sandbox.calls.exec).toHaveLength(2);
     expect(sandbox.calls.mkdir).toHaveLength(1);
-    expect(sandbox.calls.mountBucket).toEqual(sandbox.calls.mkdir);
+    expect(sandbox.calls.mountBucket.map((call) => call.mountPath)).toEqual(sandbox.calls.mkdir);
   });
 
   test("rejects remote bucket conflict for a different prefix", async () => {

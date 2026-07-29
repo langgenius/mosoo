@@ -181,6 +181,7 @@ function createSandboxHandle(): SandboxHandle {
   };
 
   return {
+    configureNetworkConstraints: async () => {},
     createBackup: async (options) => ({
       dir: options.dir,
       id: CLOUDFLARE_BACKUP_ID,

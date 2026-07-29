@@ -13,6 +13,7 @@ interface RuntimeSandboxLocalBucketMountOptions extends RuntimeSandboxBucketMoun
 }
 
 interface RuntimeSandboxRemoteBucketMountOptions extends RuntimeSandboxBucketMountBaseOptions {
+  credentialProxy: true;
   endpoint: string;
   localBucket: false;
   provider: RuntimeSandboxBucketProvider;
@@ -121,6 +122,7 @@ export function createRuntimeSandboxBucketMountOptions(
 
   return {
     ...baseOptions,
+    credentialProxy: true,
     endpoint: createRuntimeSandboxBucketEndpoint(bindings),
     localBucket: false,
     provider: "r2",

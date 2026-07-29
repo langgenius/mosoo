@@ -13,11 +13,10 @@ export const RUNTIME_SUBJECT_OPERATION_STATUSES = [
 
 export type RuntimeSubjectOperationStatus = (typeof RUNTIME_SUBJECT_OPERATION_STATUSES)[number];
 
-// There is no dedicated failure state. A failed lifecycle step means the
-// container DO is no longer trustworthy, so the subject returns to `cold` (no
-// live container) via a `runtime_subject.cold` event; the caller destroys the
-// container and records the diagnostic in lastError. Reclaiming a "failed"
-// subject is therefore just a normal cold start, which rebuilds the container.
+// There is no dedicated failure state. A failed lifecycle step makes the
+// container untrustworthy, so activation first enters `destroying`. Successful
+// teardown returns it to `cold`; a failed/timeout teardown stays `destroying`
+// with its operation id so maintenance can resume the same repair.
 export type RuntimeSubjectLifecycleEvent =
   | { type: "runtime_subject.activate" }
   | { type: "runtime_subject.active" }
@@ -76,6 +75,7 @@ const runtimeSubjectLifecycleMachine = createMachine({
       on: {
         "runtime_subject.active": "active",
         "runtime_subject.cold": "cold",
+        "runtime_subject.destroy": "destroying",
       },
     },
   },
