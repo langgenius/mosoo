@@ -21,6 +21,19 @@ Bound Agent URLs are signed bearer capabilities tied to one Deployment and its l
 
 When a bound capability is accepted, the Run records the App, Agent, Deployment, successful Deployment Run, and binding environment/name that delegated that authority. The record never contains the capability URL or signed token and is available only through owner-authorized audit access. It follows the `session_run` lifecycle and is removed with its Run; it has no separate retention store.
 
+## App Secrets
+
+An App owner can save, rotate, list by name, or revoke App-scoped deployment secrets through the Console and GraphQL API. Values are write-only: they are encrypted in the Vault, never returned by list/read surfaces, and never stored in `.mosoo.toml`, Deployment plans, generated Wrangler configuration, build Sandbox state, logs, or API responses.
+
+A Worker repository declares only the required names:
+
+```toml
+[secrets]
+required = ["MOSOO_API_TOKEN"]
+```
+
+Before build or Cloudflare submission, deployment verifies that every declared name has an App-owned value. On a Worker deployment, values are sent only as Cloudflare `secret_text` bindings; plain-text Agent capability URLs remain distinct bindings. Static deployments cannot declare secrets in this Alpha surface. A saved or rotated value takes effect on the next successful deployment. Deleting a managed deployment first removes its Cloudflare resources, then revokes and deletes its App deployment secrets; if Cloudflare cleanup fails, values remain for a safe retry.
+
 ## Current Availability and Boundary
 
 The console flow, deployment processing, history, retry, and deletion are implemented. Repository evidence does not prove a successful real production deployment or recovery exercise, so the honest claim is **implemented**, not **production-proven**.

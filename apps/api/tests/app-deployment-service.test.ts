@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { apiCommandsTable, appDeploymentRunsTable, appDeploymentsTable } from "@mosoo/db";
+import {
+  apiCommandsTable,
+  appDeploymentRunsTable,
+  appDeploymentSecretsTable,
+  appDeploymentsTable,
+  vaultSecretsTable,
+} from "@mosoo/db";
 import { eq } from "drizzle-orm";
 
 import { createAppDeploymentRunDispatchDedupeKey } from "../src/modules/api-command/application/api-command-enqueue";
@@ -14,6 +20,12 @@ import { getDeploymentAgentCapabilityAuthority } from "../src/modules/apps/appli
 import type { CloudflareDeploymentClient } from "../src/modules/apps/application/app-deployment-cloudflare-client";
 import type { AppDeploymentBuildRunner } from "../src/modules/apps/application/app-deployment-executor.service";
 import { dispatchAppDeploymentRun } from "../src/modules/apps/application/app-deployment-executor.service";
+import {
+  deleteAppDeploymentSecret,
+  listAppDeploymentSecrets,
+  resolveAppDeploymentSecretValues,
+  setAppDeploymentSecret,
+} from "../src/modules/apps/application/app-deployment-secret.service";
 import {
   deleteAppDeployment,
   deployApp,
@@ -111,6 +123,31 @@ function createDatabase(): SqliteD1Database {
       ON app_deployment_run (app_id)
       WHERE status IN ('queued', 'preparing', 'building', 'submitting', 'submitted', 'activating');
 
+    CREATE TABLE vault_secret (
+      algorithm text NOT NULL DEFAULT 'AES-GCM',
+      ciphertext text NOT NULL,
+      ciphertext_iv text NOT NULL,
+      created_at integer NOT NULL,
+      id text PRIMARY KEY NOT NULL,
+      kind text NOT NULL,
+      updated_at integer NOT NULL,
+      wrapped_dek text NOT NULL,
+      wrapped_dek_iv text NOT NULL
+    );
+
+    CREATE TABLE app_deployment_secret (
+      app_id text NOT NULL,
+      created_at integer NOT NULL,
+      name text NOT NULL,
+      vault_secret_id text NOT NULL
+    );
+
+    CREATE UNIQUE INDEX app_deployment_secret_app_name_idx
+      ON app_deployment_secret (app_id, name);
+
+    CREATE UNIQUE INDEX app_deployment_secret_vault_secret_idx
+      ON app_deployment_secret (vault_secret_id);
+
     CREATE TABLE api_command (
       attempt_count integer DEFAULT 0 NOT NULL,
       claim_expires_at integer,
@@ -154,6 +191,7 @@ function createBindings(database: SqliteD1Database) {
       CLOUDFLARE_ZONE_ID: "test-zone",
       DB: database,
       MOSOO_APP_DEPLOYMENT_DOMAIN: "apps.localhost",
+      VAULT_ROOT_SECRET: "test-vault-root-secret",
     } as Pick<
       ApiBindings,
       | "API_COMMAND_QUEUE"
@@ -162,6 +200,7 @@ function createBindings(database: SqliteD1Database) {
       | "CLOUDFLARE_ZONE_ID"
       | "DB"
       | "MOSOO_APP_DEPLOYMENT_DOMAIN"
+      | "VAULT_ROOT_SECRET"
     >,
     queue,
   };
@@ -550,6 +589,269 @@ describe("app deployment service", () => {
 
     const deploymentAfterPointerDrift = await getAppDeployment(bindings, VIEWER, APP_ID);
     expect(deploymentAfterPointerDrift?.latestRun?.id).toBe(run.id);
+  });
+
+  test("stores, rotates, and revokes App deployment secrets without exposing their values", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+
+    const created = await setAppDeploymentSecret(bindings, VIEWER, {
+      appId: APP_ID,
+      name: "MOSOO_API_TOKEN",
+      value: "first-secret-value",
+    });
+
+    expect(created).toMatchObject({ appId: APP_ID, name: "MOSOO_API_TOKEN" });
+    expect(await listAppDeploymentSecrets(bindings, VIEWER, APP_ID)).toEqual([
+      expect.objectContaining({ name: "MOSOO_API_TOKEN" }),
+    ]);
+
+    const storedBeforeRotation = await database
+      .app()
+      .select({ ciphertext: vaultSecretsTable.ciphertext, id: vaultSecretsTable.id })
+      .from(vaultSecretsTable)
+      .get();
+
+    expect(storedBeforeRotation?.ciphertext).not.toContain("first-secret-value");
+    await setAppDeploymentSecret(bindings, VIEWER, {
+      appId: APP_ID,
+      name: "MOSOO_API_TOKEN",
+      value: "rotated-secret-value",
+    });
+
+    expect(
+      await resolveAppDeploymentSecretValues(bindings, {
+        appId: APP_ID,
+        names: ["MOSOO_API_TOKEN"],
+      }),
+    ).toEqual({ MOSOO_API_TOKEN: "rotated-secret-value" });
+    expect(
+      await database
+        .app()
+        .select({ id: appDeploymentSecretsTable.vaultSecretId })
+        .from(appDeploymentSecretsTable)
+        .all(),
+    ).toEqual([{ id: storedBeforeRotation?.id }]);
+
+    await deleteAppDeploymentSecret(bindings, VIEWER, {
+      appId: APP_ID,
+      name: "MOSOO_API_TOKEN",
+    });
+
+    expect(await listAppDeploymentSecrets(bindings, VIEWER, APP_ID)).toEqual([]);
+    expect(await database.app().select().from(vaultSecretsTable).all()).toEqual([]);
+  });
+
+  test("fails before build when a manifest-required App secret is absent", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const calls: string[] = [];
+    const runner: AppDeploymentBuildRunner = {
+      async build() {
+        calls.push("build");
+      },
+      async deploy() {
+        calls.push("deploy");
+        return {
+          externalDeploymentId: "worker-deployment-1",
+          externalProjectId: null,
+          externalVersionId: "worker-version-1",
+          url: "https://example.test",
+        };
+      },
+      async prepare() {
+        return {
+          repoDir: "/repo",
+          snapshot: {
+            files: {
+              ".mosoo.toml": [
+                'type = "worker"',
+                "",
+                "[worker]",
+                'entry = "src/index.js"',
+                "",
+                "[secrets]",
+                'required = ["MOSOO_API_TOKEN"]',
+              ].join("\n"),
+            },
+          },
+        };
+      },
+    };
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      { runner },
+    );
+
+    await expect(getAppDeploymentStatus(bindings, VIEWER, APP_ID)).resolves.toMatchObject({
+      errorCode: "deployment_required_secret_missing",
+      status: "failed",
+    });
+    expect(calls).toEqual([]);
+  });
+
+  test("injects declared App secrets only at the Worker submission boundary", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const submittedSecrets: Record<string, string>[] = [];
+    let planJson: string | null = null;
+    const runner: AppDeploymentBuildRunner = {
+      async build({ plan }) {
+        planJson = JSON.stringify(plan);
+      },
+      async deploy({ secretVars }) {
+        submittedSecrets.push(secretVars);
+        return {
+          externalDeploymentId: "worker-deployment-1",
+          externalProjectId: null,
+          externalVersionId: "worker-version-1",
+          url: `https://app-${APP_ID.toLowerCase()}.apps.localhost`,
+        };
+      },
+      async prepare() {
+        return {
+          repoDir: "/repo",
+          snapshot: {
+            files: {
+              ".mosoo.toml": [
+                'type = "worker"',
+                "",
+                "[worker]",
+                'entry = "src/index.js"',
+                "",
+                "[secrets]",
+                'required = ["MOSOO_API_TOKEN"]',
+              ].join("\n"),
+            },
+          },
+        };
+      },
+    };
+    await setAppDeploymentSecret(bindings, VIEWER, {
+      appId: APP_ID,
+      name: "MOSOO_API_TOKEN",
+      value: "worker-only-secret",
+    });
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      { runner },
+    );
+
+    await setAppDeploymentSecret(bindings, VIEWER, {
+      appId: APP_ID,
+      name: "MOSOO_API_TOKEN",
+      value: "rotated-worker-secret",
+    });
+    const redeploy = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS + 1 },
+    );
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: redeploy.id },
+      { runner },
+    );
+
+    expect(submittedSecrets).toEqual([
+      { MOSOO_API_TOKEN: "worker-only-secret" },
+      { MOSOO_API_TOKEN: "rotated-worker-secret" },
+    ]);
+    expect(planJson).toContain("MOSOO_API_TOKEN");
+    expect(planJson).not.toContain("worker-only-secret");
+    expect(planJson).not.toContain("rotated-worker-secret");
+    const runRows = await database
+      .app()
+      .select({ planJson: appDeploymentRunsTable.planJson })
+      .from(appDeploymentRunsTable)
+      .all();
+    expect(runRows).toHaveLength(2);
+    expect(runRows.map((row) => row.planJson)).toEqual([
+      expect.stringContaining("MOSOO_API_TOKEN"),
+      expect.stringContaining("MOSOO_API_TOKEN"),
+    ]);
+    expect(runRows.map((row) => row.planJson).join("\n")).not.toContain("worker-only-secret");
+    expect(runRows.map((row) => row.planJson).join("\n")).not.toContain("rotated-worker-secret");
+  });
+
+  test("removes App deployment secrets after managed Worker cleanup", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    await setAppDeploymentSecret(bindings, VIEWER, {
+      appId: APP_ID,
+      name: "MOSOO_API_TOKEN",
+      value: "secret-to-revoke",
+    });
+    await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+
+    await deleteAppDeployment(
+      bindings,
+      VIEWER,
+      { appId: APP_ID },
+      {
+        cloudflareClient: createCloudflareDeleteRecorder([]),
+      },
+    );
+
+    expect(await database.app().select().from(appDeploymentSecretsTable).all()).toEqual([]);
+    expect(await database.app().select().from(vaultSecretsTable).all()).toEqual([]);
+  });
+
+  test("retains App deployment secrets when Cloudflare cleanup must be retried", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    await setAppDeploymentSecret(bindings, VIEWER, {
+      appId: APP_ID,
+      name: "MOSOO_API_TOKEN",
+      value: "retain-until-cleanup-succeeds",
+    });
+    await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+
+    await expect(
+      deleteAppDeployment(
+        bindings,
+        VIEWER,
+        { appId: APP_ID },
+        {
+          cloudflareClient: createCloudflareDeleteRecorder([], {
+            async deletePagesProject() {
+              throw new Error("Cloudflare API unavailable.");
+            },
+          }),
+        },
+      ),
+    ).rejects.toMatchObject({ code: API_ERROR_CODE.appDeploymentCleanupFailed });
+
+    expect(await listAppDeploymentSecrets(bindings, VIEWER, APP_ID)).toEqual([
+      expect.objectContaining({ name: "MOSOO_API_TOKEN" }),
+    ]);
   });
 
   test("redrives a dropped deployment dispatch without leaving its run queued forever", async () => {

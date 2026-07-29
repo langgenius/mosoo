@@ -10,6 +10,7 @@ import { sql } from "drizzle-orm";
 import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 import { platformIdColumn } from "./id-column";
+import { vaultSecretsTable } from "./mcp.schema";
 
 export type AppDeploymentSourceKind = "github_public";
 export type AppDeploymentTargetKind = "cloudflare_pages" | "cloudflare_worker";
@@ -105,6 +106,28 @@ export const appDeploymentRunsTable = sqliteTable(
   ],
 );
 
+/**
+ * App-owned values injected as Cloudflare Worker secret bindings during a
+ * deployment. The plaintext lives only in vault_secret; this table exposes
+ * names and ownership metadata, never a value.
+ */
+export const appDeploymentSecretsTable = sqliteTable(
+  "app_deployment_secret",
+  {
+    appId: platformIdColumn<AppId>("app_id").notNull(),
+    createdAt: integer("created_at").notNull(),
+    name: text("name").notNull(),
+    vaultSecretId: platformIdColumn("vault_secret_id")
+      .notNull()
+      .references(() => vaultSecretsTable.id, { onDelete: "restrict" }),
+  },
+  (table) => [
+    uniqueIndex("app_deployment_secret_app_name_idx").on(table.appId, table.name),
+    uniqueIndex("app_deployment_secret_vault_secret_idx").on(table.vaultSecretId),
+  ],
+);
+
 export type AppDeploymentRow = typeof appDeploymentsTable.$inferSelect;
 export type AppDeploymentRunRow = typeof appDeploymentRunsTable.$inferSelect;
+export type AppDeploymentSecretRow = typeof appDeploymentSecretsTable.$inferSelect;
 export type AppRow = typeof appsTable.$inferSelect;

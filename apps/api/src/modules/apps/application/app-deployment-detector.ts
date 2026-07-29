@@ -25,6 +25,8 @@ export interface AppDeploymentPlan {
   packageManager: AppDeploymentPackageManager;
   routesFallback: string | null;
   rootDir: string;
+  /** Names declared in `.mosoo.toml`; values are resolved only at submission. */
+  secretNames: string[];
   targetKind: AppDeploymentTargetKind;
   targetMode: AppDeploymentTargetMode;
   warnings: string[];
@@ -55,6 +57,7 @@ interface MosooConfig {
   outputDir: string | null;
   routesFallback: string | null;
   rootDir: string;
+  secretNames: string[];
   workerEntry: string | null;
   wranglerConfigPath: string | null;
   type: "static" | "worker";
@@ -67,6 +70,7 @@ interface RepositoryFiles {
 
 export const APP_DEPLOYMENT_COMPATIBILITY_DATE = "2026-06-26";
 const WORKER_JS_ENTRY_PATTERN = /\.(?:mjs|js)$/u;
+const APP_DEPLOYMENT_SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/u;
 
 export class AppDeploymentDetectionError extends Error {
   readonly code: AppDeploymentDetectionErrorCode;
@@ -113,6 +117,13 @@ function detectFromMosooConfig(
       );
     }
 
+    if (config.secretNames.length > 0) {
+      throw new AppDeploymentDetectionError(
+        "deployment_shape_unsupported",
+        "App secrets ([secrets].required) require a worker deployment",
+      );
+    }
+
     const outputDir =
       config.outputDir ??
       fail("deployment_config_required", "static deployment requires build.output");
@@ -127,6 +138,7 @@ function detectFromMosooConfig(
       resourceName,
       routesFallback: config.routesFallback,
       rootDir: config.rootDir,
+      secretNames: config.secretNames,
     });
   }
 
@@ -150,6 +162,7 @@ function detectFromMosooConfig(
     packageManager,
     resourceName,
     rootDir: config.rootDir,
+    secretNames: config.secretNames,
     workerEntry,
   });
 }
@@ -172,6 +185,7 @@ function detectFromRepository(
       packageManager,
       resourceName,
       rootDir,
+      secretNames: [],
       workerEntry: wranglerMain,
     });
   }
@@ -188,6 +202,7 @@ function detectFromRepository(
         resourceName,
         routesFallback: null,
         rootDir,
+        secretNames: [],
       });
     }
 
@@ -231,6 +246,7 @@ function detectFromRepository(
       resourceName,
       routesFallback: null,
       rootDir,
+      secretNames: [],
     });
   }
 
@@ -262,6 +278,7 @@ function packagePagesPlan(
     resourceName,
     routesFallback: null,
     rootDir,
+    secretNames: [],
   });
 }
 
@@ -275,6 +292,7 @@ function pagesPlan(input: {
   resourceName: string;
   routesFallback: string | null;
   rootDir: string;
+  secretNames: string[];
 }): AppDeploymentPlan {
   return {
     agentBindings: input.agentBindings,
@@ -290,6 +308,7 @@ function pagesPlan(input: {
     packageManager: input.packageManager,
     routesFallback: input.routesFallback,
     rootDir: input.rootDir,
+    secretNames: input.secretNames,
     targetKind: "cloudflare_pages",
     targetMode: "static_assets",
     warnings: [],
@@ -305,6 +324,7 @@ function workerPlan(input: {
   packageManager: AppDeploymentPackageManager;
   resourceName: string;
   rootDir: string;
+  secretNames: string[];
   workerEntry: string;
 }): AppDeploymentPlan {
   if (!WORKER_JS_ENTRY_PATTERN.test(input.workerEntry)) {
@@ -328,6 +348,7 @@ function workerPlan(input: {
     packageManager: input.packageManager,
     routesFallback: null,
     rootDir: input.rootDir,
+    secretNames: input.secretNames,
     targetKind: "cloudflare_worker",
     targetMode: "worker_module",
     warnings: [],
@@ -356,7 +377,7 @@ function parseMosooConfig(source: string): MosooConfig {
   const value = parseTomlObject(source, ".mosoo.toml");
   requireAllowedKeys(
     value,
-    ["agents", "build", "deploy", "name", "root", "routes", "schema", "type", "worker"],
+    ["agents", "build", "deploy", "name", "root", "routes", "schema", "secrets", "type", "worker"],
     ".mosoo.toml",
   );
 
@@ -378,6 +399,7 @@ function parseMosooConfig(source: string): MosooConfig {
   const build = readTable(value, "build", ".mosoo.toml");
   const worker = readTable(value, "worker", ".mosoo.toml");
   const routes = readTable(value, "routes", ".mosoo.toml");
+  const secrets = readTable(value, "secrets", ".mosoo.toml");
   const routesFallback = normalizeOptionalRelativePath(
     readOptionalString(routes, "fallback", ".mosoo.toml routes"),
     "routes.fallback",
@@ -386,10 +408,15 @@ function parseMosooConfig(source: string): MosooConfig {
   requireAllowedKeys(build, ["command", "install", "output"], ".mosoo.toml build");
   requireAllowedKeys(worker, ["entry"], ".mosoo.toml worker");
   requireAllowedKeys(routes, ["fallback"], ".mosoo.toml routes");
+  requireAllowedKeys(secrets, ["required"], ".mosoo.toml secrets");
   readOptionalString(value, "name", ".mosoo.toml");
 
+  const agents = readAgentBindings(value);
+  const secretNames = readDeploymentSecretNames(secrets);
+  assertSecretNamesDoNotCollideWithAgentBindings(secretNames, agents);
+
   return {
-    agents: readAgentBindings(value),
+    agents,
     buildCommand: readOptionalString(build, "command", ".mosoo.toml build"),
     installCommand: readOptionalString(build, "install", ".mosoo.toml build"),
     outputDir: normalizeOptionalRelativePath(
@@ -398,6 +425,7 @@ function parseMosooConfig(source: string): MosooConfig {
     ),
     rootDir: normalizeRelativePath(readOptionalString(value, "root", ".mosoo.toml") ?? ".", "root"),
     routesFallback,
+    secretNames,
     type,
     workerEntry: normalizeOptionalRelativePath(
       readOptionalString(worker, "entry", ".mosoo.toml worker"),
@@ -831,6 +859,63 @@ function readAgentBindings(value: Readonly<Record<string, unknown>>): AppDeploym
   }
 
   return bindings;
+}
+
+function readDeploymentSecretNames(source: Readonly<Record<string, unknown>>): string[] {
+  const required = source["required"];
+
+  if (required === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(required)) {
+    throw new AppDeploymentDetectionError(
+      "deployment_config_required",
+      ".mosoo.toml secrets.required must be an array of secret names",
+    );
+  }
+
+  if (required.length > 50) {
+    throw new AppDeploymentDetectionError(
+      "deployment_config_required",
+      ".mosoo.toml secrets.required supports at most 50 secret names",
+    );
+  }
+
+  const names = required.map((value, index) => {
+    if (typeof value !== "string" || !APP_DEPLOYMENT_SECRET_NAME.test(value)) {
+      throw new AppDeploymentDetectionError(
+        "deployment_config_required",
+        `.mosoo.toml secrets.required[${index}] must be a Cloudflare Worker binding name`,
+      );
+    }
+
+    return value;
+  });
+
+  if (new Set(names).size !== names.length) {
+    throw new AppDeploymentDetectionError(
+      "deployment_config_required",
+      ".mosoo.toml secrets.required must not contain duplicate names",
+    );
+  }
+
+  return names;
+}
+
+function assertSecretNamesDoNotCollideWithAgentBindings(
+  secretNames: readonly string[],
+  agentBindings: readonly AppDeploymentAgentBinding[],
+): void {
+  const agentEnvVars = new Set(agentBindings.map((binding) => binding.env));
+  const collision = secretNames.find((name) => agentEnvVars.has(name));
+
+  if (collision !== undefined) {
+    throw new AppDeploymentDetectionError(
+      "deployment_config_required",
+      `.mosoo.toml secret "${collision}" conflicts with an agents.env binding`,
+    );
+  }
 }
 
 function readRequiredString(
