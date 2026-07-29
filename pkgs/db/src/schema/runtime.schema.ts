@@ -1,5 +1,9 @@
 import type { AgentKind } from "@mosoo/contracts/agent";
 import type { DriverInstanceProtocol } from "@mosoo/contracts/driver-instance";
+import type {
+  ExternalToolEffectAttemptStatus,
+  ExternalToolEffectStatus,
+} from "@mosoo/contracts/external-tool-effect";
 import type { McpAuthType, McpAuthorizationState } from "@mosoo/contracts/mcp";
 import type { RuntimeCommandStatus } from "@mosoo/contracts/runtime-command";
 import type {
@@ -16,6 +20,7 @@ import type {
   CredentialId,
   DriverCommandId,
   DriverInstanceId,
+  ExternalToolEffectId,
   McpServerId,
   PlatformId,
   AppId,
@@ -32,6 +37,7 @@ import {
   check,
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
@@ -39,6 +45,7 @@ import {
 
 import { platformIdColumn } from "./id-column";
 import { sessionsTable } from "./session/core.schema";
+import { sessionRunsTable } from "./session/runs.schema";
 
 export const sandboxesTable = sqliteTable(
   "sandbox",
@@ -224,6 +231,74 @@ export const driverCommandsTable = sqliteTable(
   ],
 );
 
+/**
+ * The durable fence around a write-capable MCP call. A command is allowed to
+ * invoke the provider only after this record moves from intent to executing.
+ */
+export const externalToolEffectsTable = sqliteTable(
+  "external_tool_effect",
+  {
+    attemptCount: integer("attempt_count").notNull().default(0),
+    commandId: platformIdColumn<DriverCommandId>("command_id")
+      .notNull()
+      .references(() => driverCommandsTable.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at").notNull(),
+    driverInstanceId: platformIdColumn<DriverInstanceId>("driver_instance_id")
+      .notNull()
+      .references(() => driverInstancesTable.id, { onDelete: "cascade" }),
+    id: platformIdColumn<ExternalToolEffectId>("id").primaryKey(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    providerReceiptJson: text("provider_receipt_json"),
+    resultJson: text("result_json"),
+    serverId: platformIdColumn<McpServerId>("server_id").notNull(),
+    sessionRunId: platformIdColumn<SessionRunId>("session_run_id")
+      .notNull()
+      .references(() => sessionRunsTable.id, { onDelete: "cascade" }),
+    status: text("status").$type<ExternalToolEffectStatus>().notNull(),
+    toolName: text("tool_name").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    check(
+      "external_tool_effect_status_check",
+      sql`${table.status} IN ('intent', 'executing', 'succeeded', 'unknown')`,
+    ),
+    uniqueIndex("external_tool_effect_command_idx").on(table.commandId),
+    uniqueIndex("external_tool_effect_idempotency_key_idx").on(table.idempotencyKey),
+    index("external_tool_effect_run_status_idx").on(table.sessionRunId, table.status, table.id),
+    index("external_tool_effect_driver_status_idx").on(table.driverInstanceId, table.status),
+  ],
+);
+
+/**
+ * Append-only execution observations. A provider response is optional because
+ * MCP does not define a portable receipt or reconciliation endpoint.
+ */
+export const externalToolEffectAttemptsTable = sqliteTable(
+  "external_tool_effect_attempt",
+  {
+    attempt: integer("attempt").notNull(),
+    completedAt: integer("completed_at"),
+    createdAt: integer("created_at").notNull(),
+    effectId: platformIdColumn<ExternalToolEffectId>("effect_id")
+      .notNull()
+      .references(() => externalToolEffectsTable.id, { onDelete: "cascade" }),
+    providerReceiptJson: text("provider_receipt_json"),
+    resultJson: text("result_json"),
+    status: text("status").$type<ExternalToolEffectAttemptStatus>().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.effectId, table.attempt],
+    }),
+    check(
+      "external_tool_effect_attempt_status_check",
+      sql`${table.status} IN ('executing', 'succeeded', 'unknown')`,
+    ),
+    index("external_tool_effect_attempt_status_idx").on(table.status, table.createdAt),
+  ],
+);
+
 export const driverInstanceMcpGrantsTable = sqliteTable(
   "driver_instance_mcp_grant",
   {
@@ -277,6 +352,8 @@ export type SandboxRow = typeof sandboxesTable.$inferSelect;
 export type SandboxSessionRow = typeof sandboxSessionsTable.$inferSelect;
 export type SandboxBackupRow = typeof sandboxBackupsTable.$inferSelect;
 export type DriverCommandRow = typeof driverCommandsTable.$inferSelect;
+export type ExternalToolEffectAttemptRow = typeof externalToolEffectAttemptsTable.$inferSelect;
+export type ExternalToolEffectRow = typeof externalToolEffectsTable.$inferSelect;
 export type DriverInstanceMcpGrantRow = typeof driverInstanceMcpGrantsTable.$inferSelect;
 export type DriverInstanceRow = typeof driverInstancesTable.$inferSelect;
 export type NativeResumeRefRow = typeof nativeResumeRefsTable.$inferSelect;

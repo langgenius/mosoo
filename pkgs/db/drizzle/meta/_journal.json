@@ -71,6 +71,13 @@
       "when": 1787057554558,
       "tag": "0009_terminal_event_lookup_index",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1785332217208,
+      "tag": "0010_external-tool-effects",
+      "breakpoints": true
     }
   ]
 }
