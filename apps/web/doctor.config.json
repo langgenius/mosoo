@@ -2,7 +2,7 @@
   "$schema": "https://react.doctor/schema/config.json",
   "lint": true,
   "verbose": true,
-  "failOn": "warning",
+  "blocking": "warning",
   "share": false,
   "respectInlineDisables": true,
   "adoptExistingLintConfig": true,
