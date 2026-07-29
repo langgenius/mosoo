@@ -76,3 +76,45 @@ MOSOO_E2E_LATENCY_OUTPUT=.tmp/e2e/preview-latency-current.json
 ```
 
 Runtime signal artifacts are collected by `lib/runtime-progress.ts`.
+
+## Runtime performance overlay
+
+The Runtime E2E Scoreboard and frozen performance harness are intentionally
+maintained outside `main`, so their probes cannot affect the production
+runtime. Treat these remote refs as one staging-only overlay:
+
+| Repository                      | Remote ref                                 |
+| ------------------------------- | ------------------------------------------ |
+| `langgenius/mosoo`              | `origin/perf/runtime-e2e-scoreboard-infra` |
+| `langgenius/mosoo-agent-driver` | `origin/feat/runtime-performance-evidence` |
+
+The Mosoo ref pins the paired Driver revision through `apps/driver`. Follow the
+[canonical overlay instructions](https://github.com/langgenius/mosoo/blob/perf/runtime-e2e-scoreboard-infra/e2e/README.md#unmerged-runtime-performance-overlay)
+for disposable worktrees, provenance, validation, and staging cleanup.
+
+The minimum checkout and identity check is:
+
+```bash
+git fetch origin perf/runtime-e2e-scoreboard-infra
+PERF_OVERLAY_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/mosoo-perf-overlay.XXXXXX")"
+git worktree add --detach \
+  "$PERF_OVERLAY_ROOT/before" origin/perf/runtime-e2e-scoreboard-infra
+git -C "$PERF_OVERLAY_ROOT/before" \
+  submodule update --init .skills/mosoo-skills apps/driver
+git -C "$PERF_OVERLAY_ROOT/before/apps/driver" \
+  fetch origin feat/runtime-performance-evidence
+test "$(git -C "$PERF_OVERLAY_ROOT/before/apps/driver" rev-parse HEAD)" = \
+  "$(git -C "$PERF_OVERLAY_ROOT/before/apps/driver" \
+    rev-parse origin/feat/runtime-performance-evidence)"
+```
+
+For instrumentation acceptance, compare target Mosoo/Driver SHAs with those
+same SHAs plus the overlay. For product experiments, both sides must use the
+same overlay and only the candidate may add the Mosoo and/or Driver
+optimization. An API-only candidate must keep the Driver submodule identical
+on both sides.
+
+Use dedicated performance staging only; never deploy the overlay to production.
+Missing provenance or stage evidence fails closed. The balanced 4-pair
+`1/2/17/18` run is staging acceptance, not statistical certification, and does
+not modify or replace the frozen 32-pair protocol.
