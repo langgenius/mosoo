@@ -15,6 +15,7 @@ export type * from "./transport/operation-result.contract";
 export * from "./http/public-api.contract";
 export type * from "./id/id.contract";
 export * from "./runtime/driver-instance.contract";
+export * from "./runtime/external-tool-effect.contract";
 export * from "./runtime/runtime-command.contract";
 export * from "./runtime/sandbox.contract";
 export type * from "./session/session.contract";

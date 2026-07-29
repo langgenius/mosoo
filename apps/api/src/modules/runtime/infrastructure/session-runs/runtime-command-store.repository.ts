@@ -6,14 +6,19 @@ import type {
 } from "@mosoo/contracts/runtime-command";
 import type { RunError } from "@mosoo/contracts/session-run";
 import { parseSchemaValue } from "@mosoo/contracts/validation";
-import { driverCommandsTable, driverInstancesTable } from "@mosoo/db";
+import { driverCommandsTable, driverInstancesTable, externalToolEffectsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverCommandId, DriverInstanceId, SessionRunId } from "@mosoo/id";
 import { and, asc, eq, exists, gt, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 
-import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
+import {
+  getAppDatabase,
+  getD1ChangeCount,
+  runAppDatabaseBatch,
+} from "../../../../platform/db/drizzle";
 import { currentTimestampMs, toIsoString } from "../../../../time";
 import { LIVE_DRIVER_INSTANCE_STATUSES } from "../../domain/driver-instance-lifecycle.machine";
+import { prepareExternalToolEffectIntent } from "./external-tool-effect-store.repository";
 import { toRuntimeCommandRecordFromRow } from "./runtime-command-record.mapper";
 import type { RuntimeCommandRecordRow } from "./runtime-command-record.mapper";
 import {
@@ -133,29 +138,41 @@ async function createRuntimeCommandRecordAttempt(
     throw new Error("Failed to allocate a runtime command sequence.");
   }
 
-  const seq = await getNextRuntimeCommandSeq(database, input.driverInstanceId);
-
   try {
-    await getAppDatabase(database)
-      .insert(driverCommandsTable)
-      .values({
-        ackedAt: null,
-        completedAt: null,
-        deliveryConnectionId: null,
-        driverInstanceId: input.driverInstanceId,
-        errorJson: null,
-        expiresAt: input.expiresAt ?? null,
-        id: state.commandId,
-        issuedAt: state.issuedAt,
-        kind: input.command.kind,
-        payloadJson: state.payloadJson,
-        resultJson: null,
-        seq,
-        status: state.status,
-      })
-      .run();
+    const externalToolEffectIntent =
+      input.command.kind === "mcp.execute"
+        ? await prepareExternalToolEffectIntent(database, {
+            command: input.command,
+            driverInstanceId: input.driverInstanceId,
+          })
+        : null;
+    const seq = await getNextRuntimeCommandSeq(database, input.driverInstanceId);
+    const commandValues = {
+      ackedAt: null,
+      completedAt: null,
+      deliveryConnectionId: null,
+      driverInstanceId: input.driverInstanceId,
+      errorJson: null,
+      expiresAt: input.expiresAt ?? null,
+      id: state.commandId,
+      issuedAt: state.issuedAt,
+      kind: input.command.kind,
+      payloadJson: state.payloadJson,
+      resultJson: null,
+      seq,
+      status: state.status,
+    };
 
-    return parseSchemaValue(RuntimeCommandRecord, {
+    if (externalToolEffectIntent === null) {
+      await getAppDatabase(database).insert(driverCommandsTable).values(commandValues).run();
+    } else {
+      await runAppDatabaseBatch(database, (appDatabase) => [
+        appDatabase.insert(driverCommandsTable).values(commandValues),
+        appDatabase.insert(externalToolEffectsTable).values(externalToolEffectIntent),
+      ]);
+    }
+
+    const record = parseSchemaValue(RuntimeCommandRecord, {
       ackedAt: null,
       completedAt: null,
       driverInstanceId: input.driverInstanceId,
@@ -172,6 +189,8 @@ async function createRuntimeCommandRecordAttempt(
       seq,
       status: state.status,
     });
+
+    return record;
   } catch (error) {
     if (state.attempt < 4 && isDriverCommandSeqConflict(error)) {
       return createRuntimeCommandRecordAttempt(database, input, {

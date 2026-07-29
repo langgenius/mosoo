@@ -3,6 +3,10 @@ import type {
   DriverCompletionInput,
   DriverEventBatchInput,
   DriverEventBatchOutput,
+  DriverExternalToolEffectClaimInput,
+  DriverExternalToolEffectClaimOutput,
+  DriverExternalToolEffectCompleteInput,
+  DriverExternalToolEffectUnknownInput,
   DriverFailureInput,
   DriverHeartbeatInput,
   DriverHelloInput,
@@ -27,6 +31,14 @@ export interface DriverInstanceRpcOperationContext {
 export interface DriverInstanceRpcHandler {
   handleCommandUpdate(
     input: DriverCommandUpdateInput,
+    context: DriverInstanceRpcOperationContext,
+  ): Promise<{ ok: true }>;
+  handleClaimExternalToolEffect(
+    input: DriverExternalToolEffectClaimInput,
+    context: DriverInstanceRpcOperationContext,
+  ): Promise<DriverExternalToolEffectClaimOutput>;
+  handleCompleteExternalToolEffect(
+    input: DriverExternalToolEffectCompleteInput,
     context: DriverInstanceRpcOperationContext,
   ): Promise<{ ok: true }>;
   handleCompleteRun(
@@ -57,6 +69,10 @@ export interface DriverInstanceRpcHandler {
     input: DriverLogBatchInput,
     context: DriverInstanceRpcOperationContext,
   ): Promise<DriverLogBatchOutput>;
+  handleMarkExternalToolEffectUnknown(
+    input: DriverExternalToolEffectUnknownInput,
+    context: DriverInstanceRpcOperationContext,
+  ): Promise<{ ok: true }>;
   handleReady(
     input: DriverReadyInput,
     context: DriverInstanceRpcOperationContext,
@@ -69,7 +85,11 @@ export function createDriverInstanceRpcContext(
   context: DriverInstanceRpcOperationContext,
 ): DriverInstanceRpcContext {
   return {
+    onClaimExternalToolEffect: async (input) =>
+      handler.handleClaimExternalToolEffect(input, context),
     onCommandUpdate: async (input) => handler.handleCommandUpdate(input, context),
+    onCompleteExternalToolEffect: async (input) =>
+      handler.handleCompleteExternalToolEffect(input, context),
     onCompleteRun: async (input) => handler.handleCompleteRun(input, context),
     onFailRun: async (input) => handler.handleFailRun(input, context),
     onHeartbeat: async (input) => handler.handleHeartbeat(input, context),
@@ -77,6 +97,8 @@ export function createDriverInstanceRpcContext(
     onNextCommand: async (input) => handler.handleNextCommand(input, context),
     onPushEvents: async (input) => handler.handlePushEvents(input, context),
     onPushLogs: async (input) => handler.handlePushLogs(input, context),
+    onMarkExternalToolEffectUnknown: async (input) =>
+      handler.handleMarkExternalToolEffectUnknown(input, context),
     onReady: async (input) => handler.handleReady(input, context),
     onWatchCommands: () =>
       handler.watchCommands(context)[Symbol.asyncIterator]() as ReturnType<

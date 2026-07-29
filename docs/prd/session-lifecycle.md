@@ -21,7 +21,14 @@ they create or continue work for an end user.
 3. When an attempt completes or fails, the conversation and saved files remain readable. The
    user can send a follow-up. Preview offers retry actions for some provider checks and send
    failures. After an unexpected runtime loss, mosoo reports the failure but does not
-   automatically replay the request; the user must deliberately resend it.
+   automatically replay the request; the user must deliberately resend it. If the Run had a
+   write-capable external tool call whose final receipt was lost, Mosoo records the effect as
+   **unknown** and blocks automatic replay; an operator or the user must explicitly resolve it.
+   The error includes the durable effect id. For generic MCP servers, Mosoo sends a stable
+   idempotency key in request metadata and retains any returned metadata as an opaque provider
+   receipt, but MCP defines no universal receipt lookup or compensation protocol. Mosoo therefore
+   never infers that an unknown effect is safe to retry: creating another external action is a
+   deliberate user or operator decision, not recovery automation.
 4. **Archive** moves the Thread out of active work. Its history and saved files stay readable,
    but messages and file changes are blocked. In the Console, sending a follow-up restores the
    Thread first. Archiving also asks active work to stop; if cleanup fails, the Thread can already

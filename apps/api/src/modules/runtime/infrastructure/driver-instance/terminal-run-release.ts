@@ -12,6 +12,7 @@ import { classifyReclaim, decideReclaimRecovery } from "../../domain/session-run
 import { isTerminalSessionRunStatus } from "../../domain/session-run-status";
 import { createSessionRunTerminalFailureSourceId } from "../../domain/session-run-terminal-event-id";
 import { recordRuntimeRunLeaseReleasedOutcome } from "../runtime-subject-lifecycle/runtime-run-lease-store";
+import { markExecutingExternalToolEffectsUnknownForDriver } from "../session-runs/external-tool-effect-store.repository";
 import { failAcceptedRuntimeCommandsForTerminalDriver } from "../session-runs/runtime-command-store.repository";
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
 import type { SessionRunTransitionOutcome } from "../session-runs/session-run-store.repository";
@@ -110,6 +111,7 @@ export async function repairFinalizedTerminalDriverRunState(
     status: "failed" | "stopped";
   },
 ): Promise<TerminalDriverInstanceSessionRunReleaseResult> {
+  await markExecutingExternalToolEffectsUnknownForDriver(bindings.DB, input.driverInstanceId);
   await failAcceptedRuntimeCommandsForTerminalDriver(bindings.DB, {
     driverInstanceId: input.driverInstanceId,
   });

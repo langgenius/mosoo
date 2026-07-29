@@ -4,6 +4,10 @@ import type {
   DriverCompletionInput,
   DriverEventBatchInput,
   DriverEventBatchOutput,
+  DriverExternalToolEffectClaimInput,
+  DriverExternalToolEffectClaimOutput,
+  DriverExternalToolEffectCompleteInput,
+  DriverExternalToolEffectUnknownInput,
   DriverFailureInput,
   DriverHeartbeatInput,
   DriverHeartbeatOutput,
@@ -16,8 +20,10 @@ import type {
   DriverReadyInput,
 } from "@mosoo/agent-driver/orpc";
 import { DriverCapability } from "@mosoo/contracts/driver-instance";
+import { ExternalToolEffectClaim } from "@mosoo/contracts/external-tool-effect";
 import {
   RuntimeCommand,
+  McpExecuteCommandResult,
   RuntimeCommandResult,
   RuntimeCommandStatus,
 } from "@mosoo/contracts/runtime-command";
@@ -30,7 +36,7 @@ const DriverHelloInputWire = type({
   capabilities: DriverCapability.array(),
   driverVersion: NonEmptyString,
   pid: "number",
-  protocolVersion: "1",
+  protocolVersion: "2",
   runtime: '"openai-runtime" | "claude-agent-sdk" | "acp-fallback"',
   startedAt: "string",
 });
@@ -131,6 +137,23 @@ const DriverCommandUpdateInputWire = type({
   status: RuntimeCommandStatus,
 });
 
+const DriverExternalToolEffectClaimInputWire = type({
+  commandId: NonEmptyString,
+  driverInstanceId: NonEmptyString,
+});
+
+const DriverExternalToolEffectCompleteInputWire = type({
+  commandId: NonEmptyString,
+  driverInstanceId: NonEmptyString,
+  "providerReceiptJson?": "string | null | undefined",
+  result: McpExecuteCommandResult,
+});
+
+const DriverExternalToolEffectUnknownInputWire = type({
+  commandId: NonEmptyString,
+  driverInstanceId: NonEmptyString,
+});
+
 const DriverNextCommandInputWire = type({
   driverInstanceId: NonEmptyString,
 });
@@ -154,6 +177,10 @@ type DriverNextCommandOutputWireValue = typeof DriverNextCommandOutputWire.infer
 
 export interface RuntimeOrpcContext {
   onCommandUpdate(input: DriverCommandUpdateInput): Promise<{ ok: true }>;
+  onClaimExternalToolEffect(
+    input: DriverExternalToolEffectClaimInput,
+  ): Promise<DriverExternalToolEffectClaimOutput>;
+  onCompleteExternalToolEffect(input: DriverExternalToolEffectCompleteInput): Promise<{ ok: true }>;
   onCompleteRun(input: DriverCompletionInput): Promise<{ ok: true }>;
   onFailRun(input: DriverFailureInput): Promise<{ ok: true }>;
   onHeartbeat(input: DriverHeartbeatInput): Promise<DriverHeartbeatOutput>;
@@ -161,12 +188,33 @@ export interface RuntimeOrpcContext {
   onNextCommand(input: DriverNextCommandInput): Promise<DriverNextCommandOutput>;
   onPushEvents(input: DriverEventBatchInput): Promise<DriverEventBatchOutput>;
   onPushLogs(input: DriverLogBatchInput): Promise<DriverLogBatchOutput>;
+  onMarkExternalToolEffectUnknown(
+    input: DriverExternalToolEffectUnknownInput,
+  ): Promise<{ ok: true }>;
   onReady(input: DriverReadyInput): Promise<{ ok: true }>;
   onWatchCommands(): AsyncIteratorObject<RuntimeCommand>;
 }
 
 function parseDriverCommandUpdateInput(input: unknown): DriverCommandUpdateInput {
   return parseSchemaValue(DriverCommandUpdateInputWire, input);
+}
+
+function parseDriverExternalToolEffectClaimInput(
+  input: unknown,
+): DriverExternalToolEffectClaimInput {
+  return parseSchemaValue(DriverExternalToolEffectClaimInputWire, input);
+}
+
+function parseDriverExternalToolEffectCompleteInput(
+  input: unknown,
+): DriverExternalToolEffectCompleteInput {
+  return parseSchemaValue(DriverExternalToolEffectCompleteInputWire, input);
+}
+
+function parseDriverExternalToolEffectUnknownInput(
+  input: unknown,
+): DriverExternalToolEffectUnknownInput {
+  return parseSchemaValue(DriverExternalToolEffectUnknownInputWire, input);
 }
 
 function parseDriverCompletionInput(input: unknown): DriverCompletionInput {
@@ -218,11 +266,23 @@ const base = os.$context<RuntimeOrpcContext>();
 
 export const runtimeOrpcRouter = {
   driver: {
+    claimExternalToolEffect: base
+      .input(DriverExternalToolEffectClaimInputWire)
+      .output(ExternalToolEffectClaim)
+      .handler(async ({ context, input }) =>
+        context.onClaimExternalToolEffect(parseDriverExternalToolEffectClaimInput(input)),
+      ),
     commandUpdate: base
       .input(DriverCommandUpdateInputWire)
       .output(type({ ok: "true" }))
       .handler(async ({ context, input }) =>
         context.onCommandUpdate(parseDriverCommandUpdateInput(input)),
+      ),
+    completeExternalToolEffect: base
+      .input(DriverExternalToolEffectCompleteInputWire)
+      .output(type({ ok: "true" }))
+      .handler(async ({ context, input }) =>
+        context.onCompleteExternalToolEffect(parseDriverExternalToolEffectCompleteInput(input)),
       ),
     completeRun: base
       .input(DriverCompletionInputWire)
@@ -256,6 +316,12 @@ export const runtimeOrpcRouter = {
       .input(DriverReadyInputWire)
       .output(type({ ok: "true" }))
       .handler(async ({ context, input }) => context.onReady(parseDriverReadyInput(input))),
+    markExternalToolEffectUnknown: base
+      .input(DriverExternalToolEffectUnknownInputWire)
+      .output(type({ ok: "true" }))
+      .handler(async ({ context, input }) =>
+        context.onMarkExternalToolEffectUnknown(parseDriverExternalToolEffectUnknownInput(input)),
+      ),
   },
   driverInstance: {
     nextCommand: base

@@ -19,6 +19,7 @@ export type CliOAuthFlowId = SemanticPlatformId<"CliOAuthFlowId">;
 export type CredentialId = SemanticPlatformId<"CredentialId">;
 export type DriverCommandId = SemanticPlatformId<"DriverCommandId">;
 export type DriverInstanceId = SemanticPlatformId<"DriverInstanceId">;
+export type ExternalToolEffectId = SemanticPlatformId<"ExternalToolEffectId">;
 export type EnvironmentId = SemanticPlatformId<"EnvironmentId">;
 export type EnvironmentRevisionId = SemanticPlatformId<"EnvironmentRevisionId">;
 export type FileId = SemanticPlatformId<"FileId">;
