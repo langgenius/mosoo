@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/4986c4b8-28fa-45ea-9be9-78c1c7133128" alt="mosoo" width="96" height="96" />
+  <img src="docs/assets/mosoo-banner.png" alt="mosoo" />
 </p>
 
 # mosoo
