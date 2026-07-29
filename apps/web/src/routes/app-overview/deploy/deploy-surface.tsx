@@ -8,6 +8,7 @@ import { Badge } from "@/shared/ui/badge";
 import { DeployActions } from "./components/deploy-actions";
 import { DeployOverview } from "./components/deploy-overview";
 import { DeployRepoCard } from "./components/deploy-repo-card";
+import { DeploymentSecrets } from "./components/deployment-secrets";
 import { ActivitySection } from "./components/deployments-history";
 import type { DeployConsoleState } from "./deploy-console-data";
 import type { ProductionEnvironmentStatus } from "./deployment-status";
@@ -104,6 +105,7 @@ export function DeploySurface({
   loadError = null,
   loading = false,
   runsError = null,
+  showDeploymentSecrets = true,
 }: {
   appId: string;
   appName: string;
@@ -123,6 +125,8 @@ export function DeploySurface({
   loading?: boolean;
   /** The run-list read failed — surfaced inside the Activity section. */
   runsError?: string | null;
+  /** Fixture previews do not have an authenticated App-secret API boundary. */
+  showDeploymentSecrets?: boolean;
 }) {
   const { deployment, runs, agents } = deploy.state;
   const latestRun = runs[0];
@@ -186,6 +190,7 @@ export function DeploySurface({
               serverError={deployError}
               onDeploy={deploy.deployRepo}
             />
+            {showDeploymentSecrets ? <DeploymentSecrets appId={appId} /> : null}
             <ActivitySection preDeploy runs={[]} error={runsError} />
           </div>
         ) : (
@@ -202,6 +207,7 @@ export function DeploySurface({
               deployError={deployError}
               onDeployRepo={deploy.deployRepo}
             />
+            {showDeploymentSecrets ? <DeploymentSecrets appId={appId} /> : null}
             <ActivitySection className="mt-14" runs={runs} error={runsError} />
           </div>
         )}

@@ -31,6 +31,7 @@ export function V0DeployPreviewPage() {
         deployError={null}
         emptyHero={<AppOverviewInstallGuide />}
         headerBadges={<Badge variant="soil">Demo data</Badge>}
+        showDeploymentSecrets={false}
         headerActions={
           deployment === null || demo.deploying ? null : (
             <Button variant="outline" size="sm" onClick={demo.failDeploy}>

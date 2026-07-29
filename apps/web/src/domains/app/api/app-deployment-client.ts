@@ -2,11 +2,14 @@ import type {
   AppDeployment,
   AppDeploymentRun,
   AppDeploymentRunStatus,
+  AppDeploymentSecret,
   AppDeploymentTargetKind,
   AppOverviewBoundAgent,
   AppOverviewBoundAgentExposure,
+  DeleteAppDeploymentSecretInput,
   DeleteAppDeploymentInput,
   DeployAppInput,
+  SetAppDeploymentSecretInput,
 } from "@mosoo/contracts/app";
 import type { AppId } from "@mosoo/contracts/id";
 import type { PlatformId } from "@mosoo/id";
@@ -86,6 +89,17 @@ const APP_DEPLOYMENT_RUN_LIST_QUERY = graphql(/* GraphQL */ `
   }
 `);
 
+const APP_DEPLOYMENT_SECRET_LIST_QUERY = graphql(/* GraphQL */ `
+  query AppDeploymentSecretList($appId: ULID!) {
+    appDeploymentSecretList(appId: $appId) {
+      appId
+      createdAt
+      name
+      updatedAt
+    }
+  }
+`);
+
 const DEPLOY_APP_MUTATION = graphql(/* GraphQL */ `
   mutation DeployApp($input: DeployAppInput!) {
     deployApp(input: $input) {
@@ -109,6 +123,25 @@ const DEPLOY_APP_MUTATION = graphql(/* GraphQL */ `
 const DELETE_APP_DEPLOYMENT_MUTATION = graphql(/* GraphQL */ `
   mutation DeleteAppDeployment($input: DeleteAppDeploymentInput!) {
     deleteAppDeployment(input: $input) {
+      ok
+    }
+  }
+`);
+
+const SET_APP_DEPLOYMENT_SECRET_MUTATION = graphql(/* GraphQL */ `
+  mutation SetAppDeploymentSecret($input: SetAppDeploymentSecretInput!) {
+    setAppDeploymentSecret(input: $input) {
+      appId
+      createdAt
+      name
+      updatedAt
+    }
+  }
+`);
+
+const DELETE_APP_DEPLOYMENT_SECRET_MUTATION = graphql(/* GraphQL */ `
+  mutation DeleteAppDeploymentSecret($input: DeleteAppDeploymentSecretInput!) {
+    deleteAppDeploymentSecret(input: $input) {
       ok
     }
   }
@@ -161,6 +194,13 @@ interface RawBoundAgent {
   name: string;
 }
 
+interface RawAppDeploymentSecret {
+  appId: PlatformId;
+  createdAt: string;
+  name: string;
+  updatedAt: string;
+}
+
 function toAppDeploymentRun(run: RawDeploymentRun): AppDeploymentRun {
   return {
     appId: toAppId(run.appId),
@@ -204,6 +244,15 @@ function toBoundAgent(agent: RawBoundAgent): AppOverviewBoundAgent {
   };
 }
 
+function toAppDeploymentSecret(secret: RawAppDeploymentSecret): AppDeploymentSecret {
+  return {
+    appId: toAppId(secret.appId),
+    createdAt: secret.createdAt,
+    name: secret.name,
+    updatedAt: secret.updatedAt,
+  };
+}
+
 export async function getAppDeploymentOverview(appId: AppId): Promise<AppDeploymentOverview> {
   const payload = await requestGraphQL(APP_DEPLOYMENT_OVERVIEW_QUERY, { appId });
   const { app, boundAgents, deployment } = payload.appOverview;
@@ -228,6 +277,12 @@ export async function listAppDeploymentRuns(
   return payload.appDeploymentRunList.map(toAppDeploymentRun);
 }
 
+export async function listAppDeploymentSecrets(appId: AppId): Promise<AppDeploymentSecret[]> {
+  const payload = await requestGraphQL(APP_DEPLOYMENT_SECRET_LIST_QUERY, { appId });
+
+  return payload.appDeploymentSecretList.map(toAppDeploymentSecret);
+}
+
 export async function deployApp(input: DeployAppInput): Promise<AppDeploymentRun> {
   const payload = await requestGraphQL(DEPLOY_APP_MUTATION, { input });
 
@@ -238,4 +293,20 @@ export async function deleteAppDeployment(input: DeleteAppDeploymentInput): Prom
   const payload = await requestGraphQL(DELETE_APP_DEPLOYMENT_MUTATION, { input });
 
   return payload.deleteAppDeployment.ok;
+}
+
+export async function setAppDeploymentSecret(
+  input: SetAppDeploymentSecretInput,
+): Promise<AppDeploymentSecret> {
+  const payload = await requestGraphQL(SET_APP_DEPLOYMENT_SECRET_MUTATION, { input });
+
+  return toAppDeploymentSecret(payload.setAppDeploymentSecret);
+}
+
+export async function deleteAppDeploymentSecret(
+  input: DeleteAppDeploymentSecretInput,
+): Promise<boolean> {
+  const payload = await requestGraphQL(DELETE_APP_DEPLOYMENT_SECRET_MUTATION, { input });
+
+  return payload.deleteAppDeploymentSecret.ok;
 }
