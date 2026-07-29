@@ -30,9 +30,9 @@
     "hooks:install": "vp exec prek -c config/prek.toml install",
     "knip": "vp exec knip --config config/knip.jsonc",
     "lint": "vp run -w cf:types && vp lint vite.config.ts config/bun-script-types.d.ts config/vite-plus.shared.ts scripts apps/api apps/web pkgs e2e",
-    "react-doctor": "vp exec react-doctor apps/web --full",
-    "react-doctor:diff": "vp exec react-doctor apps/web --verbose --diff",
-    "react-doctor:report": "vp exec react-doctor apps/web --json --json-compact --full --fail-on none",
+    "react-doctor": "vp exec react-doctor apps/web --scope full --blocking none",
+    "react-doctor:diff": "vp exec react-doctor apps/web --verbose --scope changed --blocking none",
+    "react-doctor:report": "vp exec react-doctor apps/web --json --json-compact --scope full --blocking none",
     "tc": "vp run -r tc",
     "test": "vp exec bun test config/commit-policy.test.ts scripts/validate-commit-message.test.ts && vp run --filter @mosoo/api --filter @mosoo/agent-driver --filter @mosoo/web --filter @mosoo/ag-ui-session --filter @mosoo/agent-package --filter @mosoo/contracts --filter @mosoo/db --filter @mosoo/id --filter @mosoo/public-api-client --filter @mosoo/runtime-catalog --filter @mosoo/runtime-events --filter @mosoo/session-policy --filter @mosoo/skill-package test && vp run -w graphql:codegen:check"
   },
