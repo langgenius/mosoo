@@ -32,8 +32,9 @@ export async function createRuntimeSandboxBackup(
 
   return withDisposedRpcResource(
     await getRuntimeSubjectKeepAliveHandle(bindings, input.sandboxId),
-    async (sandbox) =>
-      withDisposedRpcResult(
+    async (sandbox) => {
+      await sandbox.mkdir(input.dir, { recursive: true });
+      return withDisposedRpcResult(
         sandbox.createBackup({
           dir: input.dir,
           ttl: input.ttlSeconds,
@@ -42,7 +43,8 @@ export async function createRuntimeSandboxBackup(
           dir: result.dir,
           id: encodeSandboxBackupIdForStorage(result.id),
         }),
-      ),
+      );
+    },
   );
 }
 

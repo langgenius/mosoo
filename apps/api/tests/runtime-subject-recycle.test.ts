@@ -191,7 +191,7 @@ function createSandboxHandle(): SandboxHandle {
     destroy: async () => {},
     exec: unavailable,
     getSession: unavailable,
-    mkdir: unavailable,
+    mkdir: async () => {},
     mountBucket: unavailable,
     readFile: unavailable,
     restoreBackup: unavailable,
@@ -269,6 +269,7 @@ describe("runtime subject recycle", () => {
         ('01J0000000000000000000000U', 1, 'TERMINATED');
     `);
     const checkpointDirs: string[] = [];
+    const preparedDirs: string[] = [];
     const lifecycleCalls: string[] = [];
     let backupIndex = 0;
     currentSandbox = {
@@ -281,6 +282,9 @@ describe("runtime subject recycle", () => {
           throw new Error("Unexpected extra checkpoint.");
         }
         return { dir: options.dir, id };
+      },
+      mkdir: async (path) => {
+        preparedDirs.push(path);
       },
       destroy: async () => {
         lifecycleCalls.push("destroy");
@@ -319,6 +323,7 @@ describe("runtime subject recycle", () => {
       "/workspace/se/session-1",
       "/workspace/se/session-2",
     ]);
+    expect(preparedDirs.toSorted()).toEqual(checkpointDirs.toSorted());
     expect(lifecycleCalls).toEqual(["keepAlive:false", "destroy"]);
     await expect(readRuntimeSubjectRecycleRow(database)).resolves.toMatchObject({
       last_error: null,
