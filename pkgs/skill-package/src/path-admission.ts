@@ -13,6 +13,11 @@ export interface SkillPackagePathAdmission {
 
 export const SKILL_PACKAGE_MANIFEST_PATH = "SKILL.md";
 
+interface SkillPackagePathAdmissionIndex {
+  entries: Map<string, SkillPackagePathKind>;
+  pathsWithDescendants: Set<string>;
+}
+
 const RESERVED_PATH_KEYS = new Set([
   "__proto__",
   "constructor",
@@ -32,13 +37,12 @@ const RESERVED_PATH_KEYS = new Set([
 ]);
 
 export function createSkillPackagePathAdmission(): SkillPackagePathAdmission {
-  const entries = new Map<string, SkillPackagePathKind>();
+  const index = createSkillPackagePathAdmissionIndex();
 
   return {
     admit(path, entryKind) {
       const admitted = admitSkillPackagePath(path, entryKind);
-      rejectDuplicateOrCollision(entries, admitted.path, admitted.entryKind);
-      entries.set(admitted.path, admitted.entryKind);
+      addAdmittedPath(index, admitted.path, admitted.entryKind);
 
       return admitted;
     },
@@ -46,13 +50,12 @@ export function createSkillPackagePathAdmission(): SkillPackagePathAdmission {
 }
 
 export function createSkillPackageArchivePathAdmission(): SkillPackagePathAdmission {
-  const entries = new Map<string, SkillPackagePathKind>();
+  const index = createSkillPackagePathAdmissionIndex();
 
   return {
     admit(path, entryKind) {
       const admitted = admitSkillPackageArchivePath(path, entryKind);
-      rejectDuplicateOrCollision(entries, admitted.path, admitted.entryKind);
-      entries.set(admitted.path, admitted.entryKind);
+      addAdmittedPath(index, admitted.path, admitted.entryKind);
 
       return admitted;
     },
@@ -120,53 +123,65 @@ function readPathSegments(path: string, entryKind: SkillPackagePathKind): string
   return segmentSource.split("/");
 }
 
-function rejectDuplicateOrCollision(
-  entries: Map<string, SkillPackagePathKind>,
+function createSkillPackagePathAdmissionIndex(): SkillPackagePathAdmissionIndex {
+  return {
+    entries: new Map<string, SkillPackagePathKind>(),
+    pathsWithDescendants: new Set<string>(),
+  };
+}
+
+function addAdmittedPath(
+  index: SkillPackagePathAdmissionIndex,
   path: string,
   entryKind: SkillPackagePathKind,
 ): void {
-  if (entries.has(path)) {
+  rejectDuplicateOrCollision(index, path, entryKind);
+  index.entries.set(path, entryKind);
+  markAncestorPathsWithDescendants(index, path);
+}
+
+function rejectDuplicateOrCollision(
+  index: SkillPackagePathAdmissionIndex,
+  path: string,
+  entryKind: SkillPackagePathKind,
+): void {
+  if (index.entries.has(path)) {
     throw new SkillPackageError(
       `The skill package contains a duplicate path after normalization: ${path}`,
     );
   }
 
-  if (entryKind === "file" && hasDescendant(entries, path)) {
+  if (entryKind === "file" && index.pathsWithDescendants.has(path)) {
     throw new SkillPackageError(
       `The skill package contains both a file and child path under: ${path}`,
     );
   }
 
-  for (const ancestor of readAncestorPaths(path)) {
-    if (entries.get(ancestor) === "file") {
+  forEachAncestorPath(path, (ancestor) => {
+    if (index.entries.get(ancestor) === "file") {
       throw new SkillPackageError(
         `The skill package contains both a file and child path under: ${ancestor}`,
       );
     }
-  }
+  });
 }
 
-function hasDescendant(entries: Map<string, SkillPackagePathKind>, path: string): boolean {
-  const prefix = `${path}/`;
-
-  for (const admittedPath of entries.keys()) {
-    if (admittedPath.startsWith(prefix)) {
-      return true;
-    }
-  }
-
-  return false;
+function markAncestorPathsWithDescendants(
+  index: SkillPackagePathAdmissionIndex,
+  path: string,
+): void {
+  forEachAncestorPath(path, (ancestor) => {
+    index.pathsWithDescendants.add(ancestor);
+  });
 }
 
-function readAncestorPaths(path: string): string[] {
-  const segments = path.split("/");
-  const ancestors: string[] = [];
+function forEachAncestorPath(path: string, visit: (ancestor: string) => void): void {
+  let separatorIndex = path.indexOf("/");
 
-  for (let index = 1; index < segments.length; index += 1) {
-    ancestors.push(segments.slice(0, index).join("/"));
+  while (separatorIndex !== -1) {
+    visit(path.slice(0, separatorIndex));
+    separatorIndex = path.indexOf("/", separatorIndex + 1);
   }
-
-  return ancestors;
 }
 
 function rejectUnsupportedArchivePath(admitted: AdmittedSkillPackagePath): void {
