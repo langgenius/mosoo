@@ -13,6 +13,7 @@ import {
 } from "../../../modules/public-api/public-api-idempotency.service";
 import { listAgentApiEndpointThreads } from "../../../modules/public-api/public-thread-session-query.service";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
+import { exposeWorkerVersion } from "../worker-version-response";
 import { createPublicApiOpenApiDocument } from "./public-api-openapi";
 import {
   runPublicApiAuthenticatedJson,
@@ -127,7 +128,7 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
   });
 
   v1.post("/agents/:agentId/threads", async (c) => {
-    return runPublicApiThreadMutation(c, {
+    const response = await runPublicApiThreadMutation(c, {
       agentId: () => parseAgentIdParam(c.req.param("agentId")),
       bodyHash: (prepared) => prepared.bodyHash,
       operation: async ({ agentId, caller, idempotencyKey, prepared }) => {
@@ -163,6 +164,8 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
       },
       status: 201,
     });
+
+    return exposeWorkerVersion(response, c.env);
   });
 
   v1.post("/agents/:agentId/files", async (c) =>
@@ -222,13 +225,16 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
           threadId,
         });
 
-        return new Response(stream, {
-          headers: {
-            "Cache-Control": "no-store",
-            "Content-Type": "text/event-stream; charset=utf-8",
-            "X-Accel-Buffering": "no",
-          },
-        });
+        return exposeWorkerVersion(
+          new Response(stream, {
+            headers: {
+              "Cache-Control": "no-store",
+              "Content-Type": "text/event-stream; charset=utf-8",
+              "X-Accel-Buffering": "no",
+            },
+          }),
+          c.env,
+        );
       },
       threadId: () => parseThreadIdParam(c.req.param("threadId")),
     }),
@@ -273,7 +279,7 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
   );
 
   v1.post("/threads/:threadId/events", async (c) => {
-    return runPublicApiSessionMutation(c, {
+    const response = await runPublicApiSessionMutation(c, {
       bodyHash: (prepared) => prepared.bodyHash,
       operation: async ({ caller, prepared, threadId }) => {
         const { sendPublicThreadSessionEvents } = await loadPublicThreadCommandService();
@@ -295,6 +301,8 @@ export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
       },
       threadId: () => parseThreadIdParam(c.req.param("threadId")),
     });
+
+    return exposeWorkerVersion(response, c.env);
   });
 
   v1.post("/threads/:threadId/archive", async (c) => {

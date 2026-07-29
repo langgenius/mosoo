@@ -240,11 +240,9 @@ export async function dispatchSessionRun(
       // Snapshot before the readiness/telemetry awaits so the published
       // driver_turn stage measures command dispatch only.
       const dispatchTimingSnapshot = dispatchTiming.snapshot();
-      const readyTiming = await preparedRunLease.readiness();
-      await ensureSessionRunIsActive(bindings.DB, input.sessionRunId);
       prepareTimingEventPromise = appendSessionRuntimeTimingEventBestEffort({
         bindings,
-        timing: readyTiming,
+        timing: preparedRunLease.timing,
       });
       await Promise.all([
         prepareTimingEventPromise,
@@ -254,6 +252,10 @@ export async function dispatchSessionRun(
           timing: dispatchTimingSnapshot,
         }),
       ]);
+      // Inline dispatch only has Cloudflare's post-response waitUntil window.
+      // Persist observed timings before a cold Driver can outlive that window.
+      await preparedRunLease.readiness();
+      await ensureSessionRunIsActive(bindings.DB, input.sessionRunId);
 
       return preparedRunLease;
     };

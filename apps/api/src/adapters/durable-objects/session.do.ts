@@ -1,6 +1,7 @@
 import type { AgUiSessionEvent } from "@mosoo/ag-ui-session";
 import { DurableObject } from "cloudflare:workers";
 
+import type { SessionRuntimePerformanceIdentityEvidence } from "../../modules/sessions/infrastructure/session/runtime-performance-identity-evidence";
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
 
 interface SessionDelegate {
@@ -9,6 +10,14 @@ interface SessionDelegate {
   destroy(sessionId: string, reason: string): Promise<void>;
   fetch(request: Request): Promise<Response>;
   publishEvents(sessionId: string, events: AgUiSessionEvent[]): Promise<void>;
+  readRuntimePerformanceIdentityEvidence(
+    sessionId: string,
+    runId: string,
+  ): Promise<SessionRuntimePerformanceIdentityEvidence | null>;
+  recordRuntimePerformanceIdentityEvidence(
+    sessionId: string,
+    evidence: SessionRuntimePerformanceIdentityEvidence,
+  ): Promise<void>;
   syncViewers(sessionId: string): Promise<void>;
   webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void>;
   webSocketError(ws: WebSocket, error: unknown): Promise<void> | void;
@@ -40,6 +49,22 @@ export class Session extends DurableObject {
 
   async syncViewers(sessionId: string): Promise<void> {
     await (await this.#delegatePromise).syncViewers(sessionId);
+  }
+
+  async recordRuntimePerformanceIdentityEvidence(
+    sessionId: string,
+    evidence: SessionRuntimePerformanceIdentityEvidence,
+  ): Promise<void> {
+    await (
+      await this.#delegatePromise
+    ).recordRuntimePerformanceIdentityEvidence(sessionId, evidence);
+  }
+
+  async readRuntimePerformanceIdentityEvidence(
+    sessionId: string,
+    runId: string,
+  ): Promise<SessionRuntimePerformanceIdentityEvidence | null> {
+    return (await this.#delegatePromise).readRuntimePerformanceIdentityEvidence(sessionId, runId);
   }
 
   async closeViewers(sessionId: string, reason: string): Promise<void> {

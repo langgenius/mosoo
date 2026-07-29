@@ -4,13 +4,24 @@ import { TURN_TIMEOUT_MS } from "./runtime-progress";
 import type { LatencyTraceEvent } from "./runtime-progress";
 
 export interface PublicApiCreateThreadLatency {
+  assistantChunkCount: number;
   createThreadAcceptedMs: number;
   createSessionMs: number;
   firstAssistantTextMs: number;
+  interChunkMaxMs: number | null;
+  interChunkP50Ms: number | null;
+  interChunkP95Ms: number | null;
   label: string;
+  pauseOver250MsCount: number;
+  pauseOver500MsCount: number;
+  runCompletedMs: number;
   sessionId: string;
+  streamConnectedMs: number;
+  streamFirstByteMs: number;
+  streamHandshakeMs: number;
   tokenCompletedMs: number;
   trace: LatencyTraceEvent[];
+  usageTotalTokens: number | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -97,27 +108,48 @@ export async function runPublicApiCreateThreadLatency(
       }
 
       interface BrowserPublicApiLatency {
+        assistantChunkCount: number;
         createThreadAcceptedMs: number;
         createSessionMs: number;
         firstAssistantTextMs: number;
+        interChunkMaxMs: number | null;
+        interChunkP50Ms: number | null;
+        interChunkP95Ms: number | null;
         label: string;
+        pauseOver250MsCount: number;
+        pauseOver500MsCount: number;
+        runCompletedMs: number;
         sessionId: string;
+        streamConnectedMs: number;
+        streamFirstByteMs: number;
+        streamHandshakeMs: number;
         tokenCompletedMs: number;
         trace: BrowserLatencyTraceEvent[];
+        usageTotalTokens: number | null;
       }
 
       interface BrowserPublicThreadEvent {
         content: string;
         id: string;
         status: string | null;
+        tokens: number | null;
         type: string;
       }
 
       const round = (value: number) => Math.max(0, Math.round(value));
-      const delay = async (ms: number): Promise<void> =>
-        new Promise((resolve) => {
-          window.setTimeout(resolve, ms);
-        });
+      const percentile = (values: number[], percentage: number): number | null => {
+        if (values.length === 0) {
+          return null;
+        }
+
+        const sorted = values.toSorted((a, b) => a - b);
+        const index = Math.min(
+          sorted.length - 1,
+          Math.max(0, Math.ceil((percentage / 100) * sorted.length) - 1),
+        );
+
+        return round(sorted[index] ?? 0);
+      };
       const readJson = async (response: Response): Promise<unknown> => response.json();
       const isObject = (value: unknown): value is Record<string, unknown> =>
         value !== null && typeof value === "object" && !Array.isArray(value);
@@ -143,6 +175,7 @@ export async function runPublicApiCreateThreadLatency(
           content,
           id,
           status: readStringField(value, "status"),
+          tokens: typeof value["tokens"] === "number" ? value["tokens"] : null,
           type,
         };
       };
@@ -155,26 +188,27 @@ export async function runPublicApiCreateThreadLatency(
 
         return payload;
       };
-      const readThreadEvents = async (threadId: string): Promise<BrowserPublicThreadEvent[]> => {
-        const response = await fetch(
-          `/api/v1/threads/${encodeURIComponent(threadId)}/events?limit=100`,
-          {
-            headers: {
-              Authorization: `Bearer ${pat}`,
-            },
-          },
-        );
-        const payload = await requireOk(response, "public API list thread events");
+      const readSseBlock = (block: string): BrowserPublicThreadEvent | null => {
+        let eventName = "message";
+        const dataLines: string[] = [];
 
-        if (!isObject(payload) || !Array.isArray(payload["events"])) {
-          throw new Error("Public API thread events response did not include events.");
+        for (const line of block.split(/\r?\n/u)) {
+          if (line.startsWith("event:")) {
+            eventName = line.slice("event:".length).trimStart();
+          } else if (line.startsWith("data:")) {
+            dataLines.push(line.slice("data:".length).trimStart());
+          }
         }
 
-        return payload["events"].flatMap((event) => {
-          const parsed = readThreadEvent(event);
+        if (eventName === "thread.error") {
+          throw new Error(`Public API event stream failed: ${dataLines.join("\n")}`);
+        }
 
-          return parsed === null ? [] : [parsed];
-        });
+        if (eventName !== "thread.event" || dataLines.length === 0) {
+          return null;
+        }
+
+        return readThreadEvent(JSON.parse(dataLines.join("\n")));
       };
       const createStartedAt = performance.now();
       const prompt = `Reply with exactly ${expectedToken}. Do not use tools.`;
@@ -212,68 +246,157 @@ export async function runPublicApiCreateThreadLatency(
 
       const trace: BrowserLatencyTraceEvent[] = [];
       const seenEventIds = new Set<string>();
+      const assistantChunkTimestamps: number[] = [];
       let assistantText = "";
       let firstAssistantTextMs: number | null = null;
+      let usageTotalTokens: number | null = null;
+      let runCompletedMs: number | null = null;
+      let streamFirstByteMs: number | null = null;
       let tokenCompletedMs: number | null = null;
       const createThreadAcceptedMs = createSessionMs;
       const deadline = createStartedAt + timeoutMs;
+      const streamStartedAt = performance.now();
+      const streamController = new AbortController();
+      const streamResponse = await fetch(
+        `/api/v1/threads/${encodeURIComponent(threadId)}/events/stream?limit=100`,
+        {
+          headers: {
+            Accept: "text/event-stream",
+            Authorization: `Bearer ${pat}`,
+          },
+          signal: streamController.signal,
+        },
+      );
 
-      while (performance.now() < deadline && tokenCompletedMs === null) {
-        const events = await readThreadEvents(threadId);
-
-        for (const event of events) {
-          if (seenEventIds.has(event.id)) {
-            continue;
-          }
-
-          seenEventIds.add(event.id);
-          const elapsedMs = round(performance.now() - createStartedAt);
-          trace.push({
-            elapsedMs,
-            name: event.type,
-            runStatus: event.type.startsWith("run.") ? event.type.slice("run.".length) : null,
-            type: event.type,
-          });
-
-          if (event.type === "run.failed") {
-            throw new Error("Public API run failed before producing the expected token.");
-          }
-
-          if (!event.type.startsWith("agent.message") || event.content.trim().length === 0) {
-            continue;
-          }
-
-          if (firstAssistantTextMs === null) {
-            firstAssistantTextMs = elapsedMs;
-          }
-
-          assistantText += event.content;
-
-          if (assistantText.includes(expectedToken)) {
-            tokenCompletedMs = elapsedMs;
-            break;
-          }
-        }
-
-        if (tokenCompletedMs === null) {
-          await delay(250);
-        }
+      if (!streamResponse.ok) {
+        await requireOk(streamResponse, "public API stream thread events");
       }
 
-      if (firstAssistantTextMs === null || tokenCompletedMs === null) {
+      const streamConnectedMs = round(performance.now() - createStartedAt);
+      const streamHandshakeMs = round(performance.now() - streamStartedAt);
+      const reader = streamResponse.body?.getReader();
+
+      if (!reader) {
+        throw new Error("Public API event stream did not include a readable body.");
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      try {
+        while (
+          performance.now() < deadline &&
+          (tokenCompletedMs === null || runCompletedMs === null)
+        ) {
+          const chunk = await reader.read();
+
+          if (chunk.done) {
+            throw new Error("Public API event stream closed before the Run completed.");
+          }
+
+          if (streamFirstByteMs === null) {
+            streamFirstByteMs = round(performance.now() - createStartedAt);
+          }
+
+          buffer += decoder.decode(chunk.value, { stream: true });
+          const events: BrowserPublicThreadEvent[] = [];
+
+          for (;;) {
+            const separator = /\r?\n\r?\n/u.exec(buffer);
+
+            if (separator === null) {
+              break;
+            }
+
+            const block = buffer.slice(0, separator.index);
+            buffer = buffer.slice(separator.index + separator[0].length);
+            const event = readSseBlock(block);
+
+            if (event !== null) {
+              events.push(event);
+            }
+          }
+
+          for (const event of events) {
+            if (seenEventIds.has(event.id)) {
+              continue;
+            }
+
+            seenEventIds.add(event.id);
+            const elapsedMs = round(performance.now() - createStartedAt);
+            trace.push({
+              elapsedMs,
+              name: event.type,
+              runStatus: event.type.startsWith("run.") ? event.type.slice("run.".length) : null,
+              type: event.type,
+            });
+
+            if (event.tokens !== null) {
+              usageTotalTokens = Math.max(usageTotalTokens ?? 0, event.tokens);
+            }
+
+            if (event.type === "run.failed") {
+              throw new Error("Public API run failed before producing the expected token.");
+            }
+
+            if (event.type === "run.completed") {
+              runCompletedMs = elapsedMs;
+            }
+
+            if (!event.type.startsWith("agent.message") || event.content.length === 0) {
+              continue;
+            }
+
+            if (firstAssistantTextMs === null) {
+              firstAssistantTextMs = elapsedMs;
+            }
+
+            assistantChunkTimestamps.push(performance.now());
+            assistantText += event.content;
+
+            if (assistantText.includes(expectedToken)) {
+              tokenCompletedMs ??= elapsedMs;
+            }
+          }
+        }
+      } finally {
+        streamController.abort();
+        await reader.cancel().catch(() => {});
+      }
+
+      if (
+        firstAssistantTextMs === null ||
+        runCompletedMs === null ||
+        streamFirstByteMs === null ||
+        tokenCompletedMs === null
+      ) {
         throw new Error(
-          `Public API thread events did not include ${expectedToken} within ${timeoutMs}ms.`,
+          `Public API event stream did not complete ${expectedToken} within ${timeoutMs}ms.`,
         );
       }
 
+      const interChunkGaps = assistantChunkTimestamps
+        .slice(1)
+        .map((timestamp, index) => timestamp - (assistantChunkTimestamps[index] ?? timestamp));
       return {
+        assistantChunkCount: assistantChunkTimestamps.length,
         createThreadAcceptedMs,
         createSessionMs,
         firstAssistantTextMs,
+        interChunkMaxMs: interChunkGaps.length === 0 ? null : round(Math.max(...interChunkGaps)),
+        interChunkP50Ms: percentile(interChunkGaps, 50),
+        interChunkP95Ms: percentile(interChunkGaps, 95),
         label,
+        pauseOver250MsCount: interChunkGaps.filter((gap) => gap > 250).length,
+        pauseOver500MsCount: interChunkGaps.filter((gap) => gap > 500).length,
+        runCompletedMs,
         sessionId: threadId,
+        streamConnectedMs,
+        streamFirstByteMs,
+        streamHandshakeMs,
         tokenCompletedMs,
         trace,
+        usageTotalTokens,
       } satisfies BrowserPublicApiLatency;
     },
     {

@@ -1,3 +1,7 @@
+import { createHash } from "node:crypto";
+import { chmod, mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
+
 import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api";
 import { PUBLIC_RUNTIME_CATALOG, listPresetModelsForVendor } from "@mosoo/runtime-catalog";
 import { expect, test } from "@playwright/test";
@@ -22,6 +26,77 @@ interface RuntimeSelection {
   providerId: ProviderId;
   providerModelIds: readonly string[];
   runtimeId: string;
+}
+
+interface RuntimeBenchmarkFixture {
+  agentConfigSha256: string;
+  agentId: string;
+  appId: string;
+  baseURL: string;
+  createdAt: string;
+  model: string;
+  pat: string;
+  providerId: ProviderId;
+  runtimeId: string;
+}
+
+interface PublishedAgentConfig {
+  kind: string;
+  liveVersion: {
+    isLive: boolean;
+    kind: string;
+    model: string;
+    provider: string;
+    runtimeId: string;
+    versionNumber: number;
+  } | null;
+  model: string;
+  prompt: string;
+  provider: string;
+  runtimeId: string;
+  skills: Array<{
+    skillName: string;
+    state: string;
+  }>;
+  status: string;
+}
+
+function hashPublishedAgentConfig(agent: PublishedAgentConfig): string {
+  const liveVersion = agent.liveVersion;
+  if (
+    liveVersion === null ||
+    !liveVersion.isLive ||
+    liveVersion.kind !== agent.kind ||
+    liveVersion.model !== agent.model ||
+    liveVersion.provider !== agent.provider ||
+    liveVersion.runtimeId !== agent.runtimeId
+  ) {
+    throw new Error("Published Agent does not expose a matching live deployment version.");
+  }
+
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        kind: agent.kind,
+        liveVersion: {
+          kind: liveVersion.kind,
+          model: liveVersion.model,
+          provider: liveVersion.provider,
+          runtimeId: liveVersion.runtimeId,
+          versionNumber: liveVersion.versionNumber,
+        },
+        model: agent.model,
+        prompt: agent.prompt,
+        provider: agent.provider,
+        runtimeId: agent.runtimeId,
+        schema: "mosoo.perf-agent-config.v1",
+        skills: agent.skills
+          .map(({ skillName, state }) => ({ skillName, state }))
+          .toSorted((left, right) => left.skillName.localeCompare(right.skillName)),
+        status: agent.status,
+      }),
+    )
+    .digest("hex");
 }
 
 function readProviderId(): ProviderId {
@@ -225,10 +300,12 @@ async function requestGraphQL<TData>(
 }
 
 async function login(request: APIRequestContext, email: string): Promise<void> {
+  const perfAuthToken = process.env["MOSOO_E2E_PERF_AUTH_TOKEN"]?.trim() ?? "";
   const response = await request.post(
     `${PUBLIC_API_PREFIX}/auth/development-backdoor/mosoo-ai-login`,
     {
       data: { email },
+      headers: perfAuthToken.length === 0 ? {} : { "x-mosoo-perf-auth": perfAuthToken },
       timeout: 30_000,
     },
   );
@@ -236,6 +313,17 @@ async function login(request: APIRequestContext, email: string): Promise<void> {
   if (!response.ok()) {
     throw new Error(`Development login failed with HTTP ${response.status()}.`);
   }
+}
+
+async function writeRuntimeBenchmarkFixture(
+  fixture: RuntimeBenchmarkFixture,
+  outputPath: string,
+): Promise<void> {
+  await mkdir(dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, `${JSON.stringify(fixture, null, 2)}\n`, {
+    mode: 0o600,
+  });
+  await chmod(outputPath, 0o600);
 }
 
 async function ensureOnboarding(request: APIRequestContext): Promise<void> {
@@ -402,13 +490,30 @@ async function publishAgent(
     agentId: string;
     appId: string;
   },
-): Promise<void> {
-  await requestGraphQL(
+): Promise<PublishedAgentConfig> {
+  const data = await requestGraphQL<{ publishAgent: PublishedAgentConfig }>(
     request,
     `
       mutation E2EPublishAgent($input: PublishAgentInput!) {
         publishAgent(input: $input) {
-          id
+          kind
+          liveVersion {
+            isLive
+            kind
+            model
+            provider
+            runtimeId
+            versionNumber
+          }
+          model
+          prompt
+          provider
+          runtimeId
+          skills {
+            skillName
+            state
+          }
+          status
         }
       }
     `,
@@ -416,6 +521,8 @@ async function publishAgent(
       input,
     },
   );
+
+  return data.publishAgent;
 }
 
 async function createPersonalAccessToken(
@@ -598,10 +705,44 @@ test("Public API creates a real runtime thread and receives runtime events", asy
     provider: providerId,
     runtimeProvider: runtime.credentialVendorId,
   });
-  await publishAgent(request, { agentId, appId });
+  const publishedAgent = await publishAgent(request, { agentId, appId });
+  const agentConfigSha256 = hashPublishedAgentConfig(publishedAgent);
   signals.checkpoint("api.agent.published", { agentId });
   const pat = await createPersonalAccessToken(request, `Public API runtime ${label}`);
   signals.checkpoint("public-api.token.created");
+  const fixtureOutputPath = process.env["MOSOO_E2E_RUNTIME_FIXTURE_OUTPUT"]?.trim() ?? "";
+  const setupOnly = process.env["MOSOO_E2E_SETUP_ONLY"]?.trim() === "1";
+
+  if (fixtureOutputPath.length > 0) {
+    await writeRuntimeBenchmarkFixture(
+      {
+        agentConfigSha256,
+        agentId,
+        appId,
+        baseURL: testInfo.project.use.baseURL ?? "",
+        createdAt: new Date().toISOString(),
+        model: runtime.model,
+        pat,
+        providerId,
+        runtimeId: runtime.runtimeId,
+      },
+      fixtureOutputPath,
+    );
+    signals.checkpoint("public-api.runtime-fixture.written");
+  }
+
+  if (setupOnly) {
+    if (fixtureOutputPath.length === 0) {
+      throw new Error("MOSOO_E2E_SETUP_ONLY=1 requires MOSOO_E2E_RUNTIME_FIXTURE_OUTPUT.");
+    }
+
+    signals.assertCoverage({
+      requiredCategories: ["feature_path_execution"],
+    });
+    await signals.attachArtifact(testInfo);
+    return;
+  }
+
   const threadId = await createThreadViaPublicApi(request, {
     agentId,
     expectedToken,

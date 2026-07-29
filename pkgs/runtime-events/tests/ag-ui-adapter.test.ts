@@ -5,6 +5,7 @@ import { createPlatformId } from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 import {
   createProcessDraftFromRuntimeEvent,
+  parseRuntimeTimingProcessContent,
   createRuntimeEvent,
   parseRuntimeEventEnvelope,
   appRuntimeEventToAgUiSessionEvents,
@@ -745,8 +746,18 @@ describe("runtime event AG-UI adapter", () => {
     const draft = createProcessDraftFromRuntimeEvent(event);
 
     expect(draft.type).toBe("session.status");
-    expect(draft.content.includes("driver_turn")).toBe(true);
-    expect(draft.content.includes("50")).toBe(true);
+    expect(parseRuntimeTimingProcessContent(draft.content)).toEqual({
+      completedAtMs: 1_050,
+      path: "warm",
+      phases: [],
+      runId: null,
+      sessionId: PLATFORM_ID_FIXTURES.session,
+      source: "driver",
+      stage: "driver_turn",
+      startedAtMs: 1_000,
+      totalMs: 50,
+      traceId: null,
+    });
   });
 
   test("creates process drafts directly from canonical file change payloads", () => {

@@ -8,6 +8,7 @@ import type {
   AppId,
   PlatformId,
   SandboxId,
+  SandboxSessionId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
@@ -25,9 +26,12 @@ export interface RuntimeSessionLink {
   appId: AppId | null;
   callerId: PlatformId | null;
   creatorId: PlatformId | null;
+  driverCreatedAt?: number | null;
   executionOwnerId: AccountId | null;
   sandboxId: SandboxId | null;
   sandboxKind: AgentKind | null;
+  sandboxSessionId?: SandboxSessionId | null;
+  sandboxSubjectId?: PlatformId | null;
   sessionId: SessionId | null;
   sessionRunId: SessionRunId | null;
   sessionRunStatus: SessionRunStatus | null;

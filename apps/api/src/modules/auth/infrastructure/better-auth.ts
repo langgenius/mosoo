@@ -26,6 +26,7 @@ export interface AuthBindings extends AuthEmailBindings {
   readonly BETTER_AUTH_SECRET?: string;
   readonly GOOGLE_OAUTH_CLIENT_ID?: string;
   readonly GOOGLE_OAUTH_CLIENT_SECRET?: string;
+  readonly MOSOO_PERF_AUTH_TOKEN?: string;
   readonly MOSOO_DEPLOYMENT_MODE?: string;
   readonly MOSOO_ENVIRONMENT?: string;
   readonly POSTHOG_API_HOST?: string;
@@ -73,6 +74,8 @@ export function isBetterAuthConfigured(
 function createAppAuth(bindings: AuthBindings) {
   const googleClientId = bindings.GOOGLE_OAUTH_CLIENT_ID?.trim() ?? "";
   const googleClientSecret = bindings.GOOGLE_OAUTH_CLIENT_SECRET?.trim() ?? "";
+  const perfAuthToken = bindings.MOSOO_PERF_AUTH_TOKEN?.trim() || null;
+  const loopbackBackdoorEnabled = isDevelopmentBackdoorLoopbackOrigin(bindings.WEB_ORIGIN);
   const authPlugins: BetterAuthPlugin[] = [
     emailOTP({
       async sendVerificationOTP({ email, otp, type }) {
@@ -85,11 +88,16 @@ function createAppAuth(bindings: AuthBindings) {
     }),
   ];
 
-  if (isDevelopmentBackdoorLoopbackOrigin(bindings.WEB_ORIGIN)) {
+  if (loopbackBackdoorEnabled || perfAuthToken !== null) {
     logWarn("auth.development-backdoor.enabled", {
+      mode: perfAuthToken === null ? "loopback" : "protected_performance_staging",
       webOrigin: bindings.WEB_ORIGIN,
     });
-    authPlugins.unshift(mosooAiDevelopmentBackdoorPlugin());
+    authPlugins.unshift(
+      mosooAiDevelopmentBackdoorPlugin({
+        expectedToken: perfAuthToken,
+      }),
+    );
   }
 
   const schema = {
@@ -151,7 +159,7 @@ function createAppAuth(bindings: AuthBindings) {
           },
         }
       : {}),
-    trustedOrigins: isDevelopmentBackdoorLoopbackOrigin(bindings.WEB_ORIGIN)
+    trustedOrigins: loopbackBackdoorEnabled
       ? (request?: Request) => {
           const origin = request?.headers.get("origin") ?? null;
           return origin !== null && isDevelopmentBackdoorLoopbackOrigin(origin)

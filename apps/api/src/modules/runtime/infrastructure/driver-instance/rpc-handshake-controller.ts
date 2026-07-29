@@ -7,7 +7,12 @@ import type {
 import { SANDBOX_ORGANIZATION_ROOT } from "@mosoo/agent-driver/paths";
 import { createPlatformId } from "@mosoo/id";
 
-import { logInfo } from "../../../../platform/cloudflare/logger";
+import { logInfo, logWarn } from "../../../../platform/cloudflare/logger";
+import { recordSessionRuntimePerformanceIdentityEvidence } from "../../../sessions/infrastructure/session/client";
+import {
+  createSessionRuntimePerformanceIdentityEvidence,
+  runtimePerformanceIdentityEvidenceEnabled,
+} from "../../../sessions/infrastructure/session/runtime-performance-identity-evidence";
 import { DRIVER_HEARTBEAT_INTERVAL_MS } from "../../domain/runtime-config";
 import { COMMAND_LEASE_MS } from "./commands";
 import { EVENT_BATCH_MAX_SIZE } from "./connections";
@@ -86,13 +91,42 @@ export class DriverInstanceRpcHandshakeController {
     context.assertActiveConnection();
 
     const result = await state.recordHello(input);
-    state.resolveHelloWaiters(result);
-
     const link = await this.#getRuntimeSessionLink();
 
     if (state.traceId === null && link.traceId !== null) {
       await state.setTraceId(link.traceId);
     }
+
+    if (
+      runtimePerformanceIdentityEvidenceEnabled(env.MOSOO_PERF_AUTH_TOKEN) &&
+      input.runtimeIdentity !== undefined
+    ) {
+      const evidence = createSessionRuntimePerformanceIdentityEvidence({
+        driverCreatedAt: link.driverCreatedAt ?? null,
+        driverInstanceId: state.requireDriverInstanceId(),
+        runId: link.sessionRunId,
+        runtimeIdentity: input.runtimeIdentity,
+        sandboxId: link.sandboxId,
+        sandboxKind: link.sandboxKind,
+        sandboxSessionId: link.sandboxSessionId ?? null,
+        sandboxSubjectId: link.sandboxSubjectId ?? null,
+        sandboxSubjectKind: link.sandboxSubjectKind,
+        sessionId: link.sessionId,
+      });
+
+      if (evidence !== null) {
+        void recordSessionRuntimePerformanceIdentityEvidence(env, evidence).catch((error) => {
+          logWarn("runtime.performance_identity.persist_failed", {
+            driverInstanceId: evidence.driverInstanceId,
+            error: error instanceof Error ? error.message : String(error),
+            runId: evidence.runId,
+            sessionId: evidence.sessionId,
+          });
+        });
+      }
+    }
+
+    state.resolveHelloWaiters(result);
 
     withRuntimeLogContext(() => {
       logInfo("runtime.driver.hello.received", {

@@ -37,6 +37,7 @@ const smokeAgentName = `Preview latency ${benchmarkLabel} ${runId}`;
 const FIRST_TURN_TOKEN = "LATENCY_READY_TOKEN";
 const REOPEN_TURN_TOKEN = "LATENCY_REOPEN_TOKEN";
 const PUBLIC_API_TURN_TOKEN = "LATENCY_PUBLIC_API_TOKEN";
+const UI_INPUT_DWELL_MS = 1_000;
 
 interface BenchmarkResult {
   agentId: string;
@@ -47,6 +48,7 @@ interface BenchmarkResult {
   publicApiTurns: PublicApiCreateThreadLatency[];
   runId: string;
   turns: TurnLatency[];
+  uiInputDwellMs: number;
 }
 
 async function writeBenchmarkResult(result: BenchmarkResult, testInfo: TestInfo): Promise<void> {
@@ -72,7 +74,7 @@ test("Preview latency captures first assistant text for initial dispatch and reo
   const runtimeSignals = createRuntimeSignalCollector({
     source: "preview-latency",
   });
-  const probe = createLatencyProbe();
+  const probe = createLatencyProbe({ page });
 
   runtimeSignals.attachToPage(page);
   runtimeSignals.checkpoint("preview-latency.login.start", {
@@ -111,6 +113,7 @@ test("Preview latency captures first assistant text for initial dispatch and reo
         publicApiTurns,
         runId,
         turns,
+        uiInputDwellMs: UI_INPUT_DWELL_MS,
       },
       testInfo,
     );
@@ -125,6 +128,7 @@ test("Preview latency captures first assistant text for initial dispatch and reo
   runtimeSignals.checkpoint("preview-latency.initial-dispatch.start", { agentId });
   const initialDispatch = await sendMeasuredTurn(page, probe, {
     expectedToken: FIRST_TURN_TOKEN,
+    inputDwellMs: UI_INPUT_DWELL_MS,
     label: "initial_dispatch",
     prompt: `Reply with exactly ${FIRST_TURN_TOKEN}. Do not use tools.`,
   });
@@ -141,6 +145,7 @@ test("Preview latency captures first assistant text for initial dispatch and reo
   runtimeSignals.checkpoint("preview-latency.reopen-dispatch.start", { agentId });
   const reopenDispatch = await sendMeasuredTurn(page, probe, {
     expectedToken: REOPEN_TURN_TOKEN,
+    inputDwellMs: UI_INPUT_DWELL_MS,
     label: "reopen_dispatch",
     prompt: `Follow up in the same thread. Reply with exactly ${REOPEN_TURN_TOKEN}. Do not use tools.`,
   });

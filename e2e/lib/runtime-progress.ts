@@ -64,18 +64,43 @@ export interface LatencyTraceEvent {
 }
 
 export interface TurnLatency {
+  clickToFirstAssistantDeltaMs: number | null;
+  clickToFirstPaintMs: number | null;
+  firstAssistantDeltaAtEpochMs: number | null;
   firstAssistantTextMs: number;
+  firstPaintAtEpochMs: number | null;
+  inputToClickMs: number | null;
+  inputToFirstPaintMs: number | null;
   label: string;
+  sendClickedAtEpochMs: number;
   terminalRunStatus: string | null;
   trace: LatencyTraceEvent[];
   turnCompletedMs: number | null;
 }
 
 interface ActiveTurn {
+  assistantDeltaDetector: (payload: unknown) => boolean;
+  firstAssistantDeltaAtEpochMs: number | null;
   label: string;
+  sendClickedAtEpochMs: number;
   sendStartedAt: number;
   trace: LatencyTraceEvent[];
 }
+
+interface LatencyProbeOptions {
+  readonly nowEpochMs?: () => number;
+  readonly page?: {
+    on(event: "websocket", listener: (socket: PlaywrightWebSocket) => void): unknown;
+  };
+}
+
+interface RenderMilestones {
+  readonly firstPaintAtEpochMs: number;
+  readonly visibleTextMs: number;
+}
+
+const LATENCY_INPUT_AT_DATA_KEY = "mosooLatencyInputAt";
+const LATENCY_SEND_CLICK_AT_DATA_KEY = "mosooLatencySendClickAt";
 
 export function summarizeRuntimeSignalCoverage(
   signals: readonly RuntimeHarnessSignal[],
@@ -123,7 +148,7 @@ export function assertRuntimeSignalCoverage(
         options.fix ??
         "Attach `createRuntimeSignalCollector(...).attachToPage(page)` before navigation, add feature checkpoints / resource samples, or record a live-smoke-only gap in the PR / handoff evidence.",
       what: `Runtime signal collection is missing required coverage: ${summary.missingCategories.join(", ")}.`,
-      why: "Lecture 11 and the mosoo harness contract require the harness to collect lifecycle, feature path, data flow, resource utilization, and error context signals instead of relying on agent-written logs.",
+      why: "Lecture 11 and the Mosoo harness contract require the harness to collect lifecycle, feature path, data flow, resource utilization, and error context signals instead of relying on agent-written logs.",
     }),
   );
 }
@@ -132,14 +157,72 @@ function roundMs(value: number): number {
   return Math.round(value);
 }
 
-async function waitForNewExactText(
+function epochNowMs(): number {
+  return performance.timeOrigin + performance.now();
+}
+
+function elapsedEpochMs(startedAt: number, completedAt: number): number {
+  return roundMs(Math.max(0, completedAt - startedAt));
+}
+
+function createViewerAssistantDeltaDetector(): (payload: unknown) => boolean {
+  const assistantMessageIds = new Set<string>();
+
+  return (payload) => {
+    if (typeof payload !== "string") {
+      return false;
+    }
+
+    let event: unknown;
+
+    try {
+      event = JSON.parse(payload);
+    } catch {
+      return false;
+    }
+
+    if (event === null || typeof event !== "object" || Array.isArray(event)) {
+      return false;
+    }
+
+    const record = event as Record<string, unknown>;
+    const messageId = record["messageId"];
+
+    if (
+      record["type"] === "TEXT_MESSAGE_START" &&
+      record["role"] === "assistant" &&
+      typeof messageId === "string"
+    ) {
+      assistantMessageIds.add(messageId);
+      return false;
+    }
+
+    if (
+      record["type"] === "TEXT_MESSAGE_CHUNK" &&
+      record["role"] === "assistant" &&
+      typeof record["delta"] === "string"
+    ) {
+      return record["delta"].length > 0;
+    }
+
+    return (
+      record["type"] === "TEXT_MESSAGE_CONTENT" &&
+      typeof messageId === "string" &&
+      assistantMessageIds.has(messageId) &&
+      typeof record["delta"] === "string" &&
+      record["delta"].length > 0
+    );
+  };
+}
+
+async function waitForNewExactTextAndPaint(
   page: Page,
   input: {
     baselineCount: number;
     expectedToken: string;
     sendStartedAt: number;
   },
-): Promise<number> {
+): Promise<RenderMilestones> {
   const tokenLocator = page.getByText(input.expectedToken, { exact: true });
   const deadline = performance.now() + TURN_TIMEOUT_MS;
 
@@ -147,7 +230,17 @@ async function waitForNewExactText(
     const visibleCount = await tokenLocator.count();
 
     if (visibleCount > input.baselineCount) {
-      return roundMs(performance.now() - input.sendStartedAt);
+      const visibleTextMs = roundMs(performance.now() - input.sendStartedAt);
+      const firstPaintAtEpochMs = await page.evaluate(
+        () =>
+          new Promise<number>((resolve) => {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => resolve(performance.timeOrigin + performance.now()));
+            });
+          }),
+      );
+
+      return { firstPaintAtEpochMs, visibleTextMs };
     }
 
     await page.waitForTimeout(50);
@@ -158,13 +251,39 @@ async function waitForNewExactText(
   );
 }
 
-export function createLatencyProbe(): {
+export function createLatencyProbe(options: LatencyProbeOptions = {}): {
   readonly startTurn: (label: string) => {
+    readonly markSendClick: (clickedAtEpochMs: number) => void;
     readonly sendStartedAt: number;
-    readonly wait: (input: { readonly visibleText: Promise<number> }) => Promise<TurnLatency>;
+    readonly wait: (input: {
+      readonly firstPaintAtEpochMs?: Promise<number>;
+      readonly inputStartedAtEpochMs?: number | null;
+      readonly visibleText: Promise<number>;
+    }) => Promise<TurnLatency>;
   };
 } {
   let activeTurn: ActiveTurn | null = null;
+  const nowEpochMs = options.nowEpochMs ?? epochNowMs;
+
+  options.page?.on("websocket", (socket) => {
+    if (!socket.url().includes("/api/ag-ui/session/")) {
+      return;
+    }
+
+    socket.on("framereceived", (frame) => {
+      const turn = activeTurn;
+
+      if (
+        turn === null ||
+        turn.firstAssistantDeltaAtEpochMs !== null ||
+        !turn.assistantDeltaDetector(frame.payload)
+      ) {
+        return;
+      }
+
+      turn.firstAssistantDeltaAtEpochMs = nowEpochMs();
+    });
+  });
 
   return {
     startTurn(label) {
@@ -173,28 +292,85 @@ export function createLatencyProbe(): {
       }
 
       const turn: ActiveTurn = {
+        assistantDeltaDetector: createViewerAssistantDeltaDetector(),
+        firstAssistantDeltaAtEpochMs: null,
         label,
+        sendClickedAtEpochMs: nowEpochMs(),
         sendStartedAt: performance.now(),
         trace: [],
       };
       activeTurn = turn;
 
       return {
+        markSendClick(clickedAtEpochMs: number): void {
+          if (!Number.isFinite(clickedAtEpochMs)) {
+            throw new Error("Latency Send click timestamp must be finite.");
+          }
+
+          turn.sendClickedAtEpochMs = clickedAtEpochMs;
+
+          if (
+            turn.firstAssistantDeltaAtEpochMs !== null &&
+            turn.firstAssistantDeltaAtEpochMs < clickedAtEpochMs
+          ) {
+            turn.firstAssistantDeltaAtEpochMs = null;
+          }
+        },
         sendStartedAt: turn.sendStartedAt,
-        async wait(input: { readonly visibleText: Promise<number> }): Promise<TurnLatency> {
+        async wait(input: {
+          readonly firstPaintAtEpochMs?: Promise<number>;
+          readonly inputStartedAtEpochMs?: number | null;
+          readonly visibleText: Promise<number>;
+        }): Promise<TurnLatency> {
+          let timeoutId: ReturnType<typeof setTimeout> | undefined;
           const timeout = new Promise<never>((_, reject) => {
-            setTimeout(() => {
+            timeoutId = setTimeout(() => {
               reject(
                 new Error(`Preview latency turn ${label} timed out after ${TURN_TIMEOUT_MS}ms.`),
               );
             }, TURN_TIMEOUT_MS);
           });
-          const firstAssistantTextMs = await Promise.race([input.visibleText, timeout]);
-          activeTurn = null;
+
+          let firstAssistantTextMs: number;
+          let firstPaintAtEpochMs: number | null;
+
+          try {
+            [firstAssistantTextMs, firstPaintAtEpochMs] = await Promise.race([
+              Promise.all([input.visibleText, input.firstPaintAtEpochMs ?? Promise.resolve(null)]),
+              timeout,
+            ]);
+          } finally {
+            clearTimeout(timeoutId);
+
+            if (activeTurn === turn) {
+              activeTurn = null;
+            }
+          }
+
+          const inputStartedAtEpochMs = input.inputStartedAtEpochMs ?? null;
 
           return {
+            clickToFirstAssistantDeltaMs:
+              turn.firstAssistantDeltaAtEpochMs === null
+                ? null
+                : elapsedEpochMs(turn.sendClickedAtEpochMs, turn.firstAssistantDeltaAtEpochMs),
+            clickToFirstPaintMs:
+              firstPaintAtEpochMs === null
+                ? null
+                : elapsedEpochMs(turn.sendClickedAtEpochMs, firstPaintAtEpochMs),
+            firstAssistantDeltaAtEpochMs: turn.firstAssistantDeltaAtEpochMs,
             firstAssistantTextMs,
+            firstPaintAtEpochMs,
+            inputToClickMs:
+              inputStartedAtEpochMs === null
+                ? null
+                : elapsedEpochMs(inputStartedAtEpochMs, turn.sendClickedAtEpochMs),
+            inputToFirstPaintMs:
+              inputStartedAtEpochMs === null || firstPaintAtEpochMs === null
+                ? null
+                : elapsedEpochMs(inputStartedAtEpochMs, firstPaintAtEpochMs),
             label,
+            sendClickedAtEpochMs: turn.sendClickedAtEpochMs,
             terminalRunStatus: null,
             trace: turn.trace,
             turnCompletedMs: null,
@@ -205,25 +381,111 @@ export function createLatencyProbe(): {
   };
 }
 
+async function armComposerInputTimestamp(page: Page): Promise<void> {
+  await page.getByTestId("agent-session-composer-input").evaluate((element, dataKey) => {
+    delete document.documentElement.dataset[dataKey];
+    const input = element as HTMLInputElement | HTMLTextAreaElement;
+    const recordFirstInput = () => {
+      if (input.value.length === 0) {
+        return;
+      }
+
+      document.documentElement.dataset[dataKey] = String(
+        performance.timeOrigin + performance.now(),
+      );
+      input.removeEventListener("input", recordFirstInput);
+    };
+
+    input.addEventListener("input", recordFirstInput);
+  }, LATENCY_INPUT_AT_DATA_KEY);
+}
+
+async function armSendClickTimestamp(page: Page): Promise<void> {
+  await page.getByTestId("agent-session-send").evaluate((element, dataKey) => {
+    delete document.documentElement.dataset[dataKey];
+    element.addEventListener(
+      "click",
+      () => {
+        document.documentElement.dataset[dataKey] = String(
+          performance.timeOrigin + performance.now(),
+        );
+      },
+      { once: true },
+    );
+  }, LATENCY_SEND_CLICK_AT_DATA_KEY);
+}
+
+async function takeBrowserTimestamp(page: Page, dataKey: string, label: string): Promise<number> {
+  const rawTimestamp = await page.evaluate((key) => {
+    const value = document.documentElement.dataset[key] ?? null;
+    delete document.documentElement.dataset[key];
+    return value;
+  }, dataKey);
+  const timestamp = rawTimestamp === null ? Number.NaN : Number(rawTimestamp);
+
+  if (!Number.isFinite(timestamp)) {
+    throw new Error(`Preview latency did not observe ${label}.`);
+  }
+
+  return timestamp;
+}
+
 export async function sendMeasuredTurn(
   page: Page,
   probe: ReturnType<typeof createLatencyProbe>,
   input: {
     expectedToken: string;
+    inputDwellMs?: number;
     label: string;
     prompt: string;
   },
 ): Promise<TurnLatency> {
+  if (
+    input.inputDwellMs !== undefined &&
+    (!Number.isFinite(input.inputDwellMs) || input.inputDwellMs < 0)
+  ) {
+    throw new Error("Preview latency input dwell must be a non-negative finite number.");
+  }
+
   const baselineTokenCount = await page.getByText(input.expectedToken, { exact: true }).count();
+  const measureFromInput = input.inputDwellMs !== undefined;
+
+  if (measureFromInput) {
+    await armComposerInputTimestamp(page);
+  }
+
   await page.getByTestId("agent-session-composer-input").fill(input.prompt);
+
+  const inputStartedAtEpochMs = measureFromInput
+    ? await takeBrowserTimestamp(page, LATENCY_INPUT_AT_DATA_KEY, "the first non-empty input")
+    : null;
+
+  if (inputStartedAtEpochMs !== null && input.inputDwellMs !== undefined) {
+    const remainingDwellMs = input.inputDwellMs - (epochNowMs() - inputStartedAtEpochMs);
+
+    if (remainingDwellMs > 0) {
+      await page.waitForTimeout(Math.ceil(remainingDwellMs));
+    }
+  }
+
+  await armSendClickTimestamp(page);
   const turn = probe.startTurn(input.label);
   await page.getByTestId("agent-session-send").click();
+  const sendClickedAtEpochMs = await takeBrowserTimestamp(
+    page,
+    LATENCY_SEND_CLICK_AT_DATA_KEY,
+    "the Send click",
+  );
+  turn.markSendClick(sendClickedAtEpochMs);
+  const renderMilestones = waitForNewExactTextAndPaint(page, {
+    baselineCount: baselineTokenCount,
+    expectedToken: input.expectedToken,
+    sendStartedAt: turn.sendStartedAt,
+  });
   const latency = await turn.wait({
-    visibleText: waitForNewExactText(page, {
-      baselineCount: baselineTokenCount,
-      expectedToken: input.expectedToken,
-      sendStartedAt: turn.sendStartedAt,
-    }),
+    firstPaintAtEpochMs: renderMilestones.then((milestones) => milestones.firstPaintAtEpochMs),
+    inputStartedAtEpochMs,
+    visibleText: renderMilestones.then((milestones) => milestones.visibleTextMs),
   });
   await expect(page.getByTestId("agent-session-pill")).toContainText("Ready", {
     timeout: 30_000,

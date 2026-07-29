@@ -10,6 +10,7 @@ import type {
 
 import type { RuntimeEventEnvelope } from "./runtime-event";
 import {
+  parseRuntimeTimingPayload,
   readRuntimeEventFileChangePath,
   readRuntimeEventMessageDelta,
   readRuntimeEventMessageRole,
@@ -21,6 +22,32 @@ import {
   readRuntimeEventToolCallUpdate,
   readRuntimeEventToolStatusFromEvent,
 } from "./runtime-event-payload";
+import type { RuntimeTimingPayload } from "./runtime-event-payload";
+
+export const PERSISTED_RUNTIME_TIMING_SCHEMA_VERSION = "mosoo.runtime-timing.v1" as const;
+
+export function serializeRuntimeTimingProcessContent(timing: RuntimeTimingPayload): string {
+  return JSON.stringify({
+    schemaVersion: PERSISTED_RUNTIME_TIMING_SCHEMA_VERSION,
+    timing,
+  });
+}
+
+export function parseRuntimeTimingProcessContent(content: string): RuntimeTimingPayload {
+  const value: unknown = JSON.parse(content);
+
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Persisted runtime timing content must be an object.");
+  }
+
+  const record = value as Record<string, unknown>;
+
+  if (record["schemaVersion"] !== PERSISTED_RUNTIME_TIMING_SCHEMA_VERSION) {
+    throw new Error("Persisted runtime timing schema version is unsupported.");
+  }
+
+  return parseRuntimeTimingPayload(record["timing"]);
+}
 
 export type ProcessDraftType = SessionProcessEventType;
 
@@ -185,7 +212,7 @@ export function createProcessDraftFromRuntimeEvent(event: RuntimeEventEnvelope):
     case "runtime.timing.recorded": {
       const timing = readRuntimeTimingPayload(event);
       return {
-        content: `Runtime timing ${timing.stage}: ${timing.totalMs} ms.`,
+        content: serializeRuntimeTimingProcessContent(timing),
         type: "session.status",
       };
     }

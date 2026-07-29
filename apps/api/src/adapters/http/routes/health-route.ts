@@ -1,14 +1,18 @@
 import type { Hono } from "hono";
 
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
+import { exposeWorkerVersion } from "../worker-version-response";
 
 export function registerHealthRoute(app: Hono<ApiGatewayEnvironment>) {
   app.get("/health", async (c) => {
     if (c.req.query("deep") !== "1") {
-      return c.json({
-        name: c.env.APP_NAME,
-        ok: true,
-      });
+      return exposeWorkerVersion(
+        c.json({
+          name: c.env.APP_NAME,
+          ok: true,
+        }),
+        c.env,
+      );
     }
 
     // Three sequential round trips measure Worker->D1 RTT rather than
@@ -23,10 +27,13 @@ export function registerHealthRoute(app: Hono<ApiGatewayEnvironment>) {
       d1PingsMs.push(Date.now() - startedAtMs);
     }
 
-    return c.json({
-      d1PingsMs,
-      name: c.env.APP_NAME,
-      ok: true,
-    });
+    return exposeWorkerVersion(
+      c.json({
+        d1PingsMs,
+        name: c.env.APP_NAME,
+        ok: true,
+      }),
+      c.env,
+    );
   });
 }

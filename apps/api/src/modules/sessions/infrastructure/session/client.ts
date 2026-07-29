@@ -1,9 +1,11 @@
 import type { AgUiSessionEvent } from "@mosoo/ag-ui-session";
+import { parsePlatformId } from "@mosoo/id";
 import type { AppId, SessionId } from "@mosoo/id";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import type { Session } from "./do";
+import type { SessionRuntimePerformanceIdentityEvidence } from "./runtime-performance-identity-evidence";
 import { SESSION_ID_HEADER, writeSessionViewerSocketHeaders } from "./socket-headers";
 
 function requireSessionBinding(env: ApiBindings): DurableObjectNamespace<Session> {
@@ -105,6 +107,27 @@ export async function closeSessionViewerSockets(
   }
 
   await getSessionStub(env, sessionId).closeViewers(sessionId, reason);
+}
+
+export async function recordSessionRuntimePerformanceIdentityEvidence(
+  env: ApiBindings,
+  input: SessionRuntimePerformanceIdentityEvidence,
+): Promise<void> {
+  const sessionId = parsePlatformId<SessionId>(
+    input.sessionId,
+    "Runtime performance identity Session ID",
+  );
+  await getSessionStub(env, sessionId).recordRuntimePerformanceIdentityEvidence(sessionId, input);
+}
+
+export async function readSessionRuntimePerformanceIdentityEvidence(
+  env: ApiBindings,
+  input: { readonly runId: string; readonly sessionId: SessionId },
+): Promise<SessionRuntimePerformanceIdentityEvidence | null> {
+  return getSessionStub(env, input.sessionId).readRuntimePerformanceIdentityEvidence(
+    input.sessionId,
+    input.runId,
+  );
 }
 
 export async function destroySessionDurableObject(

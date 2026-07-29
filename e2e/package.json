@@ -6,6 +6,7 @@
     "tc": "vp exec tsc --noEmit"
   },
   "dependencies": {
+    "@mosoo/ag-ui-session": "workspace:*",
     "@mosoo/contracts": "workspace:*",
     "@mosoo/runtime-catalog": "workspace:*"
   },

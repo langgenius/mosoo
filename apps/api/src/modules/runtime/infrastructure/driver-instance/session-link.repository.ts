@@ -16,6 +16,7 @@ import type {
   DriverInstanceId,
   PlatformId,
   SandboxId,
+  SandboxSessionId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
@@ -33,9 +34,12 @@ interface RuntimeSessionLinkRow {
   agent_owner_account_id: AccountId | null;
   caller_account_id: AccountId | null;
   creator_account_id: PlatformId | null;
+  driver_created_at: number | null;
   origin_json: string | null;
   sandbox_id: SandboxId | null;
   sandbox_kind: AgentKind | null;
+  sandbox_session_id: SandboxSessionId | null;
+  sandbox_subject_id: PlatformId | null;
   sandbox_subject_kind: SandboxSubjectKind | null;
   session_id: SessionId | null;
   session_run_id: SessionRunId | null;
@@ -97,9 +101,12 @@ export async function getRuntimeSessionLink(
         agent_owner_account_id: agentsTable.ownerId,
         caller_account_id: sessionRunsTable.createdByAccountId,
         creator_account_id: sessionsTable.creatorAccountId,
+        driver_created_at: driverInstancesTable.createdAt,
         origin_json: sandboxSessionsTable.originJson,
         sandbox_id: driverInstancesTable.sandboxId,
         sandbox_kind: sandboxesTable.kind,
+        sandbox_session_id: sandboxSessionsTable.sandboxSessionId,
+        sandbox_subject_id: sandboxesTable.subjectId,
         sandbox_subject_kind: sandboxesTable.subjectKind,
         session_id: linkedSessionId.as("session_id"),
         session_run_id: sessionRunsTable.id,
@@ -125,9 +132,12 @@ export async function getRuntimeSessionLink(
     appId: row?.app_id ?? null,
     callerId: principals.callerId,
     creatorId: row?.creator_account_id ?? null,
+    driverCreatedAt: row?.driver_created_at ?? null,
     executionOwnerId: principals.executionOwnerId,
     sandboxId: row?.sandbox_id ?? null,
     sandboxKind: row?.sandbox_kind ?? null,
+    sandboxSessionId: row?.sandbox_session_id ?? null,
+    sandboxSubjectId: row?.sandbox_subject_id ?? null,
     sandboxSubjectKind: row?.sandbox_subject_kind ?? null,
     sessionId: row?.session_id ?? null,
     sessionRunId: row?.session_run_id ?? null,

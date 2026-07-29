@@ -10,9 +10,11 @@ import { parsePlatformId } from "@mosoo/id";
 import type { SessionRunId } from "@mosoo/id";
 
 import { createErrorLogContext, logError } from "../../../../platform/cloudflare/logger";
+import { currentTimestampMs } from "../../../../time";
 import type { SessionDeliveryEvent } from "../../../sessions/application/session-live-state.service";
 import { getSessionRuntimeEventSourceReceipts } from "../../../sessions/infrastructure/session-runtime-event-store.repository";
 import { createSessionRunTerminalFailureSourceId } from "../../domain/session-run-terminal-event-id";
+import { attachFirstCommittedRuntimeE2EDeltaEvidence } from "../performance/runtime-e2e-stage-evidence";
 import { EVENT_BATCH_MAX_SIZE, LOG_BATCH_MAX_SIZE } from "./connections";
 import { DriverEventTerminalGate } from "./driver-event-terminal-gate";
 import { publishDriverLogBatch } from "./driver-log-batch-publisher";
@@ -76,6 +78,7 @@ export class DriverInstanceRpcEventIngestionController {
   readonly #eventTerminalGate = new DriverEventTerminalGate();
   #droppedPreHelloLogBatches = 0;
   readonly #pendingPreHelloLogBatches: DriverLogBatchInput[] = [];
+  #runtimeE2EEvidenceRunId: string | null = null;
 
   public constructor(dependencies: DriverInstanceRpcControllerDependencies) {
     this.#dependencies = dependencies;
@@ -179,10 +182,38 @@ export class DriverInstanceRpcEventIngestionController {
           throw error;
         }
       })();
+      const d1CommitObservedAtEpochMs =
+        (env.MOSOO_PERF_AUTH_TOKEN?.trim().length ?? 0) > 0 ? currentTimestampMs() : null;
       context.assertActiveConnection();
 
       if (commit.liveState) {
         viewCache.update(commit.liveState);
+      }
+
+      let sessionDeliveryEvents = projection.sessionDeliveryEvents;
+      const evidenceRunId = projection.link.sessionRunId;
+      const evidenceSessionId = projection.link.sessionId;
+
+      if (
+        d1CommitObservedAtEpochMs !== null &&
+        evidenceRunId !== null &&
+        evidenceSessionId !== null &&
+        evidenceRunId !== this.#runtimeE2EEvidenceRunId
+      ) {
+        const attached = attachFirstCommittedRuntimeE2EDeltaEvidence({
+          committedSourceEventIds: commit.persistedSourceEventIds,
+          d1CommitObservedAtEpochMs,
+          runId: evidenceRunId,
+          runtimeEvents: persistenceRuntimeEvents,
+          sessionDeliveryEvents,
+          sessionId: evidenceSessionId,
+          traceId: projection.link.traceId,
+        });
+        sessionDeliveryEvents = [...attached.sessionDeliveryEvents];
+
+        if (attached.evidenceAttached) {
+          this.#runtimeE2EEvidenceRunId = evidenceRunId;
+        }
       }
 
       viewerEventDelivery.enqueue(
@@ -190,7 +221,7 @@ export class DriverInstanceRpcEventIngestionController {
         filterDurablyCommittedDeliveryEvents({
           persistenceEvents: persistenceRuntimeEvents,
           persistedSourceEventIds: commit.persistedSourceEventIds,
-          sessionDeliveryEvents: projection.sessionDeliveryEvents,
+          sessionDeliveryEvents,
         }),
       );
 

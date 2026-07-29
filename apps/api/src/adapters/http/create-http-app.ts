@@ -20,6 +20,7 @@ import { registerLarkEventsRoute } from "./routes/lark-events-route";
 import { registerLarkGatewayInternalRoute } from "./routes/lark-gateway-internal-route";
 import { registerMcpRoute } from "./routes/mcp-route";
 import { registerOwnerDebugTerminalRoute } from "./routes/owner-debug-terminal-route";
+import { registerPerformanceStagingRoute } from "./routes/performance-staging-route";
 import { registerPublicApiRoute } from "./routes/public-api-route";
 import { registerRootRoute } from "./routes/root-route";
 import { registerSkillRoute } from "./routes/skill-route";
@@ -47,6 +48,7 @@ export function createHttpApp() {
   registerFileRoute(publicApi);
   registerMcpRoute(publicApi);
   registerOwnerDebugTerminalRoute(publicApi);
+  registerPerformanceStagingRoute(app);
   registerPublicApiRoute(publicApi);
   registerSkillRoute(publicApi);
   registerDiscordEventsRoute(publicApi);

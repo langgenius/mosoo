@@ -27,6 +27,39 @@ const DevelopmentBackdoorBody: StandardSchemaV1<unknown, { email: string }> = {
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PERF_AUTH_HEADER = "x-mosoo-perf-auth";
+
+async function digestSecret(value: string): Promise<Uint8Array> {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+}
+
+export async function isAuthorizedMosooAiDevelopmentBackdoorRequest(
+  request: Request | undefined,
+  expectedToken: string | null | undefined,
+): Promise<boolean> {
+  if (expectedToken === null) {
+    return true;
+  }
+
+  const normalizedExpectedToken = expectedToken?.trim() ?? "";
+  const actualToken = request?.headers.get(PERF_AUTH_HEADER)?.trim() ?? "";
+
+  if (normalizedExpectedToken.length === 0 || actualToken.length === 0) {
+    return false;
+  }
+
+  const [actualDigest, expectedDigest] = await Promise.all([
+    digestSecret(actualToken),
+    digestSecret(normalizedExpectedToken),
+  ]);
+  let mismatch = 0;
+
+  for (let index = 0; index < expectedDigest.length; index += 1) {
+    mismatch |= (actualDigest[index] ?? 0) ^ (expectedDigest[index] ?? 0);
+  }
+
+  return mismatch === 0;
+}
 
 function isWellFormedEmail(value: string): boolean {
   return EMAIL_PATTERN.test(value);
@@ -43,7 +76,9 @@ function deriveDevelopmentBackdoorNameFromEmail(email: string): string {
   return normalized || "User";
 }
 
-export function mosooAiDevelopmentBackdoorPlugin(): BetterAuthPlugin {
+export function mosooAiDevelopmentBackdoorPlugin(options: {
+  readonly expectedToken: string | null;
+}): BetterAuthPlugin {
   return {
     endpoints: {
       signInWithMosooAiDevelopmentBackdoor: createAuthEndpoint(
@@ -79,6 +114,15 @@ export function mosooAiDevelopmentBackdoorPlugin(): BetterAuthPlugin {
           method: "POST",
         },
         async (ctx) => {
+          if (
+            !(await isAuthorizedMosooAiDevelopmentBackdoorRequest(
+              ctx.request,
+              options.expectedToken,
+            ))
+          ) {
+            throw APIError.fromStatus("NOT_FOUND", { message: "Not found" });
+          }
+
           const email = ctx.body.email.trim().toLowerCase();
 
           if (!isWellFormedEmail(email) || !isMosooAiDevelopmentBackdoorEmail(email)) {

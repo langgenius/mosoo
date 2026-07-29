@@ -1,3 +1,4 @@
+import { parsePlatformId } from "@mosoo/id";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 
 import type { RuntimeEventEnvelope, RuntimeEventKind } from "./runtime-event";
@@ -290,6 +291,34 @@ export function readRuntimeTimingPayload(event: RuntimeEventEnvelope): RuntimeTi
       ...(event.traceId === undefined ? {} : { traceId: event.traceId }),
     },
     event.payload,
+  );
+}
+
+export function parseRuntimeTimingPayload(value: unknown): RuntimeTimingPayload {
+  const record = requireRuntimeEventPayloadRecord("runtime.timing.recorded", value);
+  const sessionId = parsePlatformId<SessionId>(
+    record["sessionId"],
+    "Persisted runtime timing session ID",
+  );
+  const rawRunId = record["runId"];
+  const runId =
+    rawRunId === null || rawRunId === undefined
+      ? undefined
+      : parsePlatformId<SessionRunId>(rawRunId, "Persisted runtime timing run ID");
+  const rawTraceId = record["traceId"];
+
+  if (rawTraceId !== null && rawTraceId !== undefined && typeof rawTraceId !== "string") {
+    throw new Error("Persisted runtime timing trace ID must be a string or null.");
+  }
+
+  return readStrictRuntimeTimingPayload(
+    {
+      kind: "runtime.timing.recorded",
+      ...(runId === undefined ? {} : { runId }),
+      sessionId,
+      ...(typeof rawTraceId === "string" ? { traceId: rawTraceId } : {}),
+    },
+    record,
   );
 }
 

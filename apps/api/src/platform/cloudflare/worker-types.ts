@@ -58,6 +58,17 @@ interface OptionalCostLedgerReconciliationBindings {
   MOSOO_COST_LEDGER_RECONCILIATION_MODE?: string;
 }
 
+export interface WorkerVersionMetadataBinding {
+  readonly id: string;
+  readonly tag: string;
+  readonly timestamp: string;
+}
+
+interface OptionalPerformanceBindings {
+  readonly CF_VERSION_METADATA?: WorkerVersionMetadataBinding;
+  readonly MOSOO_PERF_AUTH_TOKEN?: string;
+}
+
 interface OptionalSkillsShBindings {
   SKILLS_SH_API_TOKEN?: string;
   VERCEL_OIDC_TOKEN?: string;
@@ -103,6 +114,7 @@ export type ApiBindings = Env &
   OptionalDriverConnectionBinding &
   OptionalSessionBinding &
   OptionalCostLedgerReconciliationBindings &
+  OptionalPerformanceBindings &
   OptionalLocalProviderFetchProxyBindings &
   OptionalProductAnalyticsBindings &
   OptionalRuntimeBindings &
