@@ -383,7 +383,7 @@ async function proxyRuntimeLlmRequest(
   const init: RequestInit = {
     headers: buildLlmProxyUpstreamHeaders(request.headers, target),
     method: request.method,
-    redirect: "error",
+    redirect: "manual",
     signal: request.signal,
   };
 

@@ -261,7 +261,7 @@ describe("driver LLM proxy route", () => {
     const upstream = captured[0];
     expect(upstream?.url).toBe("https://api.anthropic.com/v1/messages?beta=true");
     expect(upstream?.method).toBe("POST");
-    expect(upstream?.redirect).toBe("error");
+    expect(upstream?.redirect).toBe("manual");
     expect(upstream?.body).toBe(JSON.stringify({ model: "claude-sonnet-5" }));
     // The grant never leaves the control plane; the vault key does not exist
     // anywhere in the sandbox-visible request.
