@@ -83,9 +83,9 @@ graphql-codegen:
 graphql-codegen-check:
     bun run graphql:codegen:check
 
-# Regenerate the Drizzle database baseline.
-db-regen:
-    bun run db:regen
+# Generate one append-only Drizzle migration. Pass --custom for data-only SQL.
+db-generate name *args:
+    bun run --filter @mosoo/db db:generate -- --name "{{ name }}" {{args}}
 
 # Apply pending migrations to the existing local D1 state.
 db-migrate:

@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import type { BunRuntime } from "../../../config/bun-script-types";
+import { resolveMacDockerHost } from "./dev-local-docker-host";
 import {
   createProviderFetchProxyVarArgs,
   startLocalProviderFetchProxy,
@@ -50,26 +51,7 @@ function getExitCode(result: RunResult): number {
   return result.code;
 }
 
-async function getMacDockerDesktopHost(): Promise<string | null> {
-  if (process.platform !== "darwin") {
-    return null;
-  }
-
-  const home = process.env.HOME?.trim();
-  if (home === undefined || home.length === 0) {
-    return null;
-  }
-
-  const socketPath = `${home}/.docker/run/docker.sock`;
-
-  if (!(await Bun.file(socketPath).exists())) {
-    return null;
-  }
-
-  return `unix://${socketPath}`;
-}
-
-async function applyLocalDockerHost(env: NodeJS.ProcessEnv): Promise<void> {
+function applyLocalDockerHost(env: NodeJS.ProcessEnv): void {
   const configuredDockerHost = env[DEV_DOCKER_HOST_ENV_KEY]?.trim();
 
   if (configuredDockerHost !== undefined && configuredDockerHost.length > 0) {
@@ -90,18 +72,18 @@ async function applyLocalDockerHost(env: NodeJS.ProcessEnv): Promise<void> {
     return;
   }
 
-  const dockerDesktopHost = await getMacDockerDesktopHost();
+  const localDockerHost = resolveMacDockerHost(process.platform, process.env.HOME);
 
-  if (dockerDesktopHost === null) {
+  if (localDockerHost === null) {
     return;
   }
 
   const inheritedDockerHost = env[DOCKER_HOST_ENV_KEY]?.trim();
-  env[DOCKER_HOST_ENV_KEY] = dockerDesktopHost;
+  env[DOCKER_HOST_ENV_KEY] = localDockerHost.host;
   const dockerHostMessage =
     inheritedDockerHost !== undefined && inheritedDockerHost.length > 0
-      ? `[mosoo/api] Overriding inherited ${DOCKER_HOST_ENV_KEY}=${inheritedDockerHost} with Docker Desktop socket for wrangler dev: ${dockerDesktopHost}.`
-      : `[mosoo/api] Using Docker Desktop socket for wrangler dev: ${dockerDesktopHost}.`;
+      ? `[mosoo/api] Overriding inherited ${DOCKER_HOST_ENV_KEY}=${inheritedDockerHost} with ${localDockerHost.name} socket for wrangler dev: ${localDockerHost.host}.`
+      : `[mosoo/api] Using ${localDockerHost.name} socket for wrangler dev: ${localDockerHost.host}.`;
 
   writeStderr(
     [
@@ -112,7 +94,7 @@ async function applyLocalDockerHost(env: NodeJS.ProcessEnv): Promise<void> {
   );
 }
 
-async function createWranglerDevEnv(): Promise<NodeJS.ProcessEnv> {
+function createWranglerDevEnv(): NodeJS.ProcessEnv {
   const hostEnv = getHostEnv();
   const scrubHostProxy =
     hostEnv[SCRUB_HOST_PROXY_ENV_KEY] === "1" && hostEnv.MOSOO_API_DEV_USE_HOST_PROXY !== "1";
@@ -140,7 +122,7 @@ async function createWranglerDevEnv(): Promise<NodeJS.ProcessEnv> {
     );
   }
 
-  await applyLocalDockerHost(env);
+  applyLocalDockerHost(env);
 
   return env;
 }
@@ -447,7 +429,7 @@ if (buildResult.code !== 0) {
   process.exit(getExitCode(buildResult));
 }
 
-const wranglerEnv = await createWranglerDevEnv();
+const wranglerEnv = createWranglerDevEnv();
 const wranglerPort = wranglerEnv.WRANGLER_DEV_PORT?.trim() ?? "8787";
 const webDevPort = wranglerEnv.WEB_DEV_PORT?.trim() ?? "5173";
 const webOrigin = resolveDevWebOrigin(wranglerEnv);

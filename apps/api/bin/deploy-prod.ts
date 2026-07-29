@@ -3,6 +3,7 @@ import type { BunRuntime } from "../../../config/bun-script-types";
 import {
   extractTableNames,
   findMissingProdTables,
+  getLatestSnapshotFilename,
   parseExpectedTableNames,
 } from "./prod-schema-guard";
 
@@ -49,18 +50,22 @@ function applyD1Migrations(): void {
   run(["d1", "migrations", "apply", D1_BINDING, "--remote", "--env", ENV]);
 }
 
-const BASELINE_SQL_PATH = `${repoRoot}/pkgs/db/drizzle/0000_baseline.sql`;
+const MIGRATION_META_DIR = `${repoRoot}/pkgs/db/drizzle/meta`;
 
 /**
  * Refuse to deploy a Worker whose schema references tables missing from prod.
- * Runs AFTER `applyD1Migrations`, so on the correct incremental path every
- * table is already present; it only fires when a rewritten baseline was skipped
- * because wrangler matched its filename as already-applied (DEPLOY-D1-001).
+ * Runs AFTER `applyD1Migrations`, so on the correct append-only path every
+ * table is already present (DEPLOY-D1-001).
  */
-async function assertProdSchemaMatchesBaseline(): Promise<void> {
-  const baselineSql = await Bun.file(BASELINE_SQL_PATH).text();
-  const expectedTables = parseExpectedTableNames(baselineSql);
+async function loadExpectedMigrationTables(): Promise<string[]> {
+  const journal = await Bun.file(`${MIGRATION_META_DIR}/_journal.json`).text();
+  const snapshotFilename = getLatestSnapshotFilename(journal);
+  const snapshot = await Bun.file(`${MIGRATION_META_DIR}/${snapshotFilename}`).text();
 
+  return parseExpectedTableNames(snapshot);
+}
+
+async function assertProdSchemaMatchesMigrations(expectedTables: readonly string[]): Promise<void> {
   const result = Bun.spawnSync(
     [
       wranglerBin,
@@ -90,17 +95,16 @@ async function assertProdSchemaMatchesBaseline(): Promise<void> {
   if (missingTables.length > 0) {
     throw new Error(
       [
-        "✗ Prod D1 schema drift: the migration baseline defines tables absent from prod.",
+        "✗ Prod D1 schema drift: the latest migration snapshot defines tables absent from prod.",
         `  Missing: ${missingTables.join(", ")}`,
-        "  Cause: wrangler records applied migrations by FILENAME, so a rewritten",
-        "  0000_baseline.sql is skipped on a database that already recorded it (DEPLOY-D1-001).",
-        "  Fix: add and review a NEW migration file instead of rewriting the applied",
-        "  baseline, then re-run the deploy.",
+        "  Cause: a migration expected to create a table was skipped, rewritten,",
+        "  or incomplete (DEPLOY-D1-001). Fix the history with a new reviewed",
+        "  migration; never rewrite an applied migration, then re-run the deploy.",
       ].join("\n"),
     );
   }
 
-  writeStdout(`  prod schema OK (${expectedTables.length} baseline tables present)`);
+  writeStdout(`  prod schema OK (${expectedTables.length} migration tables present)`);
 }
 
 const REQUIRED_PROD_QUEUES: readonly string[] = [
@@ -169,11 +173,16 @@ function ensureRequiredProdQueues(): void {
   }
 }
 
+const expectedMigrationTables = await loadExpectedMigrationTables().catch((error: unknown) => {
+  writeStdout(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});
+
 writeStdout("▶ Applying pending D1 migrations");
 applyD1Migrations();
 
-writeStdout("▶ Verifying prod D1 schema matches the migration baseline");
-await assertProdSchemaMatchesBaseline().catch((error: unknown) => {
+writeStdout("▶ Verifying prod D1 schema matches the latest migration snapshot");
+await assertProdSchemaMatchesMigrations(expectedMigrationTables).catch((error: unknown) => {
   writeStdout(error instanceof Error ? error.message : String(error));
   process.exit(1);
 });

@@ -3,26 +3,71 @@ import { describe, expect, test } from "bun:test";
 import {
   extractTableNames,
   findMissingProdTables,
+  getLatestSnapshotFilename,
   parseExpectedTableNames,
 } from "../bin/prod-schema-guard";
 
-describe("parseExpectedTableNames", () => {
-  test("extracts backtick-quoted table names, dedups, and handles IF NOT EXISTS", () => {
-    const sql = [
-      "CREATE TABLE `agent` (",
-      "  `id` text PRIMARY KEY NOT NULL",
-      ");",
-      "CREATE TABLE IF NOT EXISTS `session_run` (",
-      "  `id` text PRIMARY KEY NOT NULL",
-      ");",
-      "CREATE INDEX `agent_app_idx` ON `agent` (`app_id`);",
-    ].join("\n");
-
-    expect(parseExpectedTableNames(sql).toSorted()).toEqual(["agent", "session_run"]);
+describe("getLatestSnapshotFilename", () => {
+  test("resolves the latest Drizzle snapshot from the journal", () => {
+    expect(
+      getLatestSnapshotFilename(
+        JSON.stringify({
+          entries: [
+            { idx: 0, tag: "0000_baseline" },
+            { idx: 1 },
+            { idx: 2 },
+            { idx: 3 },
+            { idx: 4 },
+          ],
+        }),
+      ),
+    ).toBe("0004_snapshot.json");
   });
 
-  test("returns an empty list when there are no CREATE TABLE statements", () => {
-    expect(parseExpectedTableNames("CREATE INDEX `x` ON `y` (`z`);")).toEqual([]);
+  test("fails closed when the journal has no valid latest entry", () => {
+    expect(() => getLatestSnapshotFilename('{"entries":[]}')).toThrow();
+  });
+
+  test("fails closed when journal indexes are out of order, duplicated, or non-contiguous", () => {
+    for (const entries of [
+      [{ idx: 1 }, { idx: 0 }],
+      [{ idx: 0 }, { idx: 0 }],
+      [{ idx: 0 }, { idx: 2 }],
+    ]) {
+      expect(() => getLatestSnapshotFilename(JSON.stringify({ entries }))).toThrow();
+    }
+  });
+});
+
+describe("parseExpectedTableNames", () => {
+  test("extracts sorted table names from a Drizzle snapshot", () => {
+    const snapshot = JSON.stringify({
+      tables: {
+        session_run: { name: "session_run" },
+        agent: { name: "agent" },
+      },
+    });
+
+    expect(parseExpectedTableNames(snapshot)).toEqual(["agent", "session_run"]);
+  });
+
+  test("fails closed when the snapshot has no tables object", () => {
+    expect(() => parseExpectedTableNames("{}")).toThrow();
+  });
+
+  test("fails closed when the snapshot tables object is empty", () => {
+    expect(() => parseExpectedTableNames('{"tables":{}}')).toThrow();
+  });
+
+  test("resolves the checked-in migration chain to a non-empty latest snapshot", async () => {
+    const metaDir = new URL("../../../pkgs/db/drizzle/meta/", import.meta.url);
+    const journal = await Bun.file(new URL("_journal.json", metaDir)).text();
+    const snapshotFilename = getLatestSnapshotFilename(journal);
+    const snapshot = await Bun.file(new URL(snapshotFilename, metaDir)).text();
+    const tableNames = parseExpectedTableNames(snapshot);
+
+    expect(tableNames).toContain("bound_agent_call_idempotency_key");
+    expect(tableNames).toContain("usage_event_rollup_receipt");
   });
 });
 

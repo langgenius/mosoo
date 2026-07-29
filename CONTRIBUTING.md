@@ -23,7 +23,7 @@ This repository is a monorepo:
 | `apps/web`             | React console app built with Vite Plus and deployed as Cloudflare Worker assets on `try.mosoo.ai`.                              |
 | `apps/driver`          | Agent Driver bundle used by API Worker / Sandbox paths.                                                                         |
 | `pkgs/contracts`       | Cross-boundary TypeScript contracts and parser surfaces; cross app / package DTOs should go here first.                         |
-| `pkgs/db`              | Drizzle schema and generated D1 migrations (currently one squashed baseline).                                                   |
+| `pkgs/db`              | Drizzle schema and its append-only D1 migration chain.                                                                          |
 | `pkgs/*`               | Runtime-neutral shared packages for events, policy, package format, observability, dev auth, effects, and related capabilities. |
 | `e2e`                  | Playwright local acceptance scripts and runtime signal contract checks.                                                         |
 | `config`               | Shared repository tooling config (prek, GraphQL codegen, TypeScript bases, lint).                                               |
@@ -36,21 +36,23 @@ The following generated files must not be edited by hand:
 
 - `apps/api/src/adapters/graphql/schema.generated.graphql`
 - `apps/web/src/gql/**`
-- `pkgs/db/drizzle/**`
 
 If generated output is wrong, fix the schema, contract, resolver, or PRD source that produced it.
+Established migration files and generated Drizzle snapshots or journal entries
+are also immutable. A newly generated `--custom` migration SQL file is the
+deliberate exception: add its reviewed data-migration statements before merge.
 
 Minimum generated-file rules:
 
 - GraphQL schema, scalar mapping, query, mutation, or fragment changes require `just graphql-codegen`.
-- DB schema changes require regenerating migrations with `just db-regen`; production constraints on the recorded baseline are described in [Database And Migrations](#database-and-migrations).
+- DB schema changes require a new migration from `just db-generate <name>`; use `--custom` for data-only SQL. Review the SQL and metadata without changing established migration history.
 - Dependency changes require committing the resulting `bun.lock`; install-only lockfile churn should stay out of the PR.
 
 ## Toolchain
 
 Required tools:
 
-- `bun >= 1.4.0-canary.1` with text `bun.lock` `lockfileVersion: 2` support.
+- `bun >= 1.4.0-canary.1` with text `bun.lock` support.
 - `just >= 1.51`
 
 The repository already pins Vite Plus and Git hook tooling dependencies. Human-facing repository operations use `just`; the `justfile` delegates to `bun run`, which resolves the pinned local Vite Plus binary after `bun install`. A global Vite Plus install is optional for direct shell use: `curl -fsSL https://vite.plus | bash`.
@@ -115,16 +117,19 @@ Local development notes:
 
 - D1 migration is not applied automatically on the first request. Run
   `just db-migrate` before starting services. After a DB schema change, run
-  `just db-regen`, review the regenerated SQL, then run `just db-reset-local`
+  `just db-generate <name>`, review the appended SQL and metadata, then run
+  `just db-reset-local`
   to prove the migration chain against a fresh local database.
 - External MCP services used during Preview choose their own documented local
   port; mosoo does not reserve a `5180+` range for them.
 - Before asserting port conflicts or performance problems, measure with `lsof`, `curl`, timing, or another reproducible command.
-- On macOS, API dev auto-selects `$HOME/.docker/run/docker.sock` when present,
-  even if `DOCKER_HOST` was inherited. Set
-  `MOSOO_API_DEV_DOCKER_HOST=unix:///path/to/docker.sock` for another engine, or
-  `MOSOO_API_DEV_USE_DEFAULT_DOCKER=1` to keep the inherited Docker host/current
-  context. Other platforms keep the inherited/default Docker configuration.
+- On macOS, API dev prefers OrbStack at
+  `$HOME/.orbstack/run/docker.sock`, then falls back to Docker Desktop at
+  `$HOME/.docker/run/docker.sock`. Either socket overrides an inherited
+  `DOCKER_HOST`. Set `MOSOO_API_DEV_DOCKER_HOST=unix:///path/to/docker.sock`
+  for an explicit engine, or `MOSOO_API_DEV_USE_DEFAULT_DOCKER=1` to keep the
+  inherited Docker host/current context. Other platforms keep the
+  inherited/default Docker configuration.
 
 ## Common Commands
 
@@ -139,7 +144,7 @@ just tc                # run workspace typecheck
 just test              # run regular unit tests
 just check             # fmt + doc links + lint + tc + tests + GraphQL freshness
 just graphql-codegen   # regenerate GraphQL schema and web gql output
-just db-regen          # regenerate the Drizzle baseline from the schema
+just db-generate name  # append a Drizzle migration from the schema
 just db-reset-local    # destroy local D1 state and reapply migrations
 ```
 
@@ -156,35 +161,38 @@ just test-file apps/api/tests/session-run-cancel.test.ts
 mosoo uses generated Drizzle migrations for local and production D1:
 
 - The schema source of truth is `pkgs/db/src/schema/**`.
-- The generated chain currently consists of one squashed baseline,
-  `pkgs/db/drizzle/0000_baseline.sql`, which production has recorded.
-- `just db-regen` deletes and regenerates that baseline from the schema.
-  Wrangler records applied migrations by filename, so a regenerated baseline is
-  silently skipped by any database that already recorded it — production will
-  never re-run it. Once the baseline has shipped, schema changes must land as a
-  new appended migration file instead. There is no `just` recipe for appending
-  yet; it is a manual `drizzle-kit generate --name <name>` step in `pkgs/db`,
-  reviewed like any other SQL change.
+- The chain is append-only. Once a migration SQL file, Drizzle snapshot, or
+  journal entry is merged or applied, do not modify, delete, rename, or
+  regenerate it.
+- Run `just db-generate <name>` after a schema change. For a data-only
+  migration, run `just db-generate <name> --custom`, then add the reviewed SQL
+  to the new empty migration. Commit the new SQL, snapshot, and journal update
+  together.
+- Wrangler records applied migrations by filename. Rewriting an existing file
+  is silently skipped by a database that already recorded it, which creates
+  production schema drift.
 - Destructive or data-rewrite migrations require explicit approval plus a
   separate backup and rollback plan.
 
 Common commands:
 
 ```bash
-just db-regen        # regenerate the squashed baseline from the schema
+just db-generate name          # append a schema migration
+just db-generate name --custom # append a data-only migration
 just db-reset-local  # destroy local D1 state, then reapply the chain
 just db-migrate      # apply pending migrations to existing local state
 ```
 
 If local state is dirty, use `just db-reset-local`; it deletes only local Wrangler
-D1 state and reapplies the chain. Do not hand-edit `pkgs/db/drizzle`.
+D1 state and reapplies the chain. Never delete or regenerate established files
+under `pkgs/db/drizzle`.
 
 Production D1 is not reset during deploy. `just deploy-api` runs
 `apps/api/bin/deploy-prod.ts`, whose first remote action is applying pending D1
-migrations. It then verifies that every baseline table exists in production —
-the DEPLOY-D1-001 guard that refuses to deploy a Worker whose schema references
-tables a rewritten, silently-skipped baseline never created — ensures the
+migrations. It then verifies that every table in the latest Drizzle snapshot
+exists in production — the DEPLOY-D1-001 missing-table guard — ensures the
 channel-final-delivery queues, builds the Driver, and deploys the API Worker.
+The guard does not compare columns, indexes, constraints, or extra live tables.
 No other automated migration gate exists today: there is no trusted-Git-range
 check, no clean-worktree check, and no dry-run inside the deploy script. Run
 `just check` and the
@@ -221,7 +229,7 @@ Recommended baseline:
 - API behavior changes: focused `just test-file <path>`; add `just tc-package @mosoo/api` when types or bindings are involved.
 - Web behavior changes: focused `just test-file <path>` and `just tc-package @mosoo/web`; user-visible flows need browser or manual checks.
 - GraphQL changes: `just graphql-codegen`.
-- DB schema changes: `just db-regen`, `just db-reset-local`, and relevant API tests.
+- DB schema changes: `just db-generate <name>`, SQL and metadata review, `just db-reset-local`, and relevant API tests.
 
 E2E entry points:
 
@@ -249,6 +257,12 @@ Keep changes small, direct, and aligned with existing boundaries.
 - Keep TypeScript strict and do not introduce `any`.
 - Prefer semantically clear named types for exported APIs, avoiding complex inline types that pollute interfaces.
 - Put platform-specific implementation only at platform boundaries; shared packages must stay runtime-neutral.
+- Keep the runtime dependency graph on one public export surface. Do not mix
+  source-only and compiled artifacts on the same import path; build upstream
+  packages before starting consumers that require compiled output.
+- Preserve intentional dynamic `import()` boundaries used for route splitting,
+  Worker lazy initialization, platform isolation, or documented cycle
+  avoidance. New dynamic imports require a concrete loading or boundary reason.
 - Fail fast for required business values and invariants; avoid broad `try/catch`, silent fallbacks, or placeholder defaults that hide problems.
 - Keep one canonical naming or command grammar for each user-facing concept.
 
@@ -304,7 +318,12 @@ fix/auth-local-backdoor
 chore/dev-docs-layout
 ```
 
-Use `!` only for intentional breaking changes. PRs should keep a clear scope, describe verification results, and explicitly state whether they include generated files, GraphQL codegen, new DB migration files, or lockfile changes. The frozen baseline is not a normal PR update surface.
+The `pr-ship-policy` workflow rejects branch names whose first path component
+is `codex`, `cursor`, `claude`, `agent`, `copilot`, `aider`, `devin`,
+`windsurf`, `codegen`, `opencode`, or `grok`. Use the Conventional
+Commit-style type as the first component instead.
+
+Use `!` only for intentional breaking changes. PRs should keep a clear scope, describe verification results, and explicitly state whether they include generated files, GraphQL codegen, new DB migration files, or lockfile changes. Established migration history is not a normal PR update surface.
 
 ### Pull Requests
 

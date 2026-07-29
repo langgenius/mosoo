@@ -84,8 +84,8 @@ Acceptance:
   actually executes before production. No automated append-only or
   trusted-range check exists; review the diff of `pkgs/db/drizzle/**` against
   the last deployed commit by hand. Remember that Wrangler records applied
-  migrations by filename: a rewritten `0000_baseline.sql` is silently skipped
-  by the production database that already recorded it.
+  migrations by filename: a rewritten migration is silently skipped by a
+  production database that already recorded it.
 - For a no-op schema release, output says no migrations need to apply.
 - If pending migrations are listed, stop and review the exact SQL before any
   real deploy.
@@ -179,13 +179,14 @@ rg -n "wipeProdD1|Wiping prod D1|database delete|database create" apps/api/bin/d
 Acceptance:
 
 - The `rg` command returns no matches.
-- `apps/api/bin/deploy-prod.ts` still performs, in order: apply pending remote
-  D1 migrations (its first remote mutation), verify every baseline table exists
-  in prod (the DEPLOY-D1-001 guard against a rewritten baseline being silently
-  skipped), ensure the required artifact and channel-delivery queues, build the
-  Driver, then deploy the API Worker. The script performs no clean-worktree
-  check and no dry-run of its own; Steps 0-7 of this runbook are the only
-  preflight.
+- `apps/api/bin/deploy-prod.ts` still performs, in order: load and validate the
+  latest local Drizzle snapshot, apply pending remote D1 migrations (its first
+  remote mutation), verify every expected table exists in prod (the
+  DEPLOY-D1-001 missing-table guard), ensure the required artifact and
+  channel-delivery queues, build the Driver, then deploy the API Worker.
+- The guard does not compare columns, indexes, constraints, or extra live
+  tables. The script performs no clean-worktree check and no dry-run of its own;
+  Steps 0-7 of this runbook are the only preflight.
 
 ## Step 9 - Final Worktree Check
 
@@ -238,11 +239,12 @@ Acceptance before running `just deploy`:
 `just deploy` publishes production resources. It runs the full repository check
 (`just check`), then `deploy:api`, then `deploy:web`. The API deploy
 (`apps/api/bin/deploy-prod.ts`) applies pending remote D1 migrations as its
-very first remote action — before any build or bundle validation — then runs
-the baseline schema guard, ensures the required artifact and channel-delivery
-queues, builds the Driver, and deploys the API Worker. The Web deploy then
-builds and publishes the Web Worker. Neither deploy performs its own worktree
-check or dry-run; that is exactly why the simulation steps above are required.
+very first remote action — after loading the local snapshot but before any
+build or bundle validation — then runs the latest-snapshot missing-table guard,
+ensures the required artifact and channel-delivery queues, builds the Driver,
+and deploys the API Worker. The Web deploy then builds and publishes the Web
+Worker. Neither deploy performs its own worktree check or dry-run; that is
+exactly why the simulation steps above are required.
 
 The preflights prevent deterministic build, bundle, config, and migration-chain
 failures from surfacing after a remote mutation. Cloudflare publication across
