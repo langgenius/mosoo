@@ -2,7 +2,7 @@ import { DRIVER_PROTOCOL_VERSION } from "@mosoo/agent-driver/boot";
 import type { DriverRuntime } from "@mosoo/agent-driver/runtime";
 import { driverCommandsTable, driverInstanceMcpGrantsTable, driverInstancesTable } from "@mosoo/db";
 import type { DriverInstanceId, SandboxId, SessionId } from "@mosoo/id";
-import { and, desc, eq, inArray, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, notInArray, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -13,7 +13,11 @@ import {
   LIVE_DRIVER_INSTANCE_STATUSES,
   toDriverInstanceStatusLifecycleEventName,
 } from "../../domain/driver-instance-lifecycle.machine";
-import { DRIVER_BOOT_TOKEN_TTL_MS } from "../../domain/runtime-config";
+import {
+  DRIVER_BOOT_TOKEN_TTL_MS,
+  DRIVER_COLD_READY_TIMEOUT_MS,
+  RUNTIME_SOCKET_TIMEOUT_MS,
+} from "../../domain/runtime-config";
 import type { DriverInstanceMcpGrantRecord } from "./mcp-grants.repository";
 import { driverInstanceExpiresAt } from "./status";
 import type { DriverInstanceStatus } from "./status";
@@ -246,6 +250,53 @@ export async function getDriverInstanceRecord(
   }
 
   return row;
+}
+
+export async function isDriverInstanceGenerationActive(
+  database: D1Database,
+  input: {
+    driverInstanceId: DriverInstanceId;
+    generation: number;
+  },
+): Promise<boolean> {
+  const now = currentTimestampMs();
+  const row =
+    (await getAppDatabase(database)
+      .select({ id: driverInstancesTable.id })
+      .from(driverInstancesTable)
+      .where(
+        and(
+          eq(driverInstancesTable.id, input.driverInstanceId),
+          eq(driverInstancesTable.generation, input.generation),
+          or(
+            and(
+              eq(driverInstancesTable.status, "provisioning"),
+              or(
+                isNotNull(driverInstancesTable.bootTokenUsedAt),
+                gt(driverInstancesTable.bootTokenExpiresAt, now),
+              ),
+            ),
+            and(
+              eq(driverInstancesTable.status, "connecting"),
+              gt(
+                sql<number>`COALESCE(${driverInstancesTable.lastHeartbeatAt}, ${driverInstancesTable.updatedAt})`,
+                now - DRIVER_COLD_READY_TIMEOUT_MS,
+              ),
+            ),
+            and(
+              eq(driverInstancesTable.status, "ready"),
+              gt(
+                sql<number>`COALESCE(${driverInstancesTable.lastHeartbeatAt}, ${driverInstancesTable.updatedAt})`,
+                now - RUNTIME_SOCKET_TIMEOUT_MS,
+              ),
+            ),
+          ),
+        ),
+      )
+      .limit(1)
+      .get()) ?? null;
+
+  return row !== null;
 }
 
 export async function getReusableDriverInstanceRecord(

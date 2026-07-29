@@ -86,6 +86,13 @@ export function createDriverProfile(): DriverProfileConfig {
     },
     setupScript: "",
     sourceKind: "agent",
+    vendorCredential: {
+      apiBase: null,
+      appId: API_DRIVER_BOUNDARY_IDS.app,
+      credentialId: PLATFORM_ID_FIXTURES.vendorCredential,
+      models: null,
+      vendorId: "openai",
+    },
   };
 }
 

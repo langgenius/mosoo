@@ -13,4 +13,7 @@ export { resolveProviderFetchProxy } from "./provider-fetch-proxy";
 
 export { probeVendorCredential, testVendorCredential } from "./vendor-credential-test";
 
-export { resolveVendorApiKey } from "./vendor-credential.secret-resolution";
+export {
+  resolveVendorApiKey,
+  resolveVendorCredentialRef,
+} from "./vendor-credential.secret-resolution";

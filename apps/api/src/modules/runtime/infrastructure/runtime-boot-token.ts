@@ -4,13 +4,16 @@ import type {
   DriverRuntimeTransport,
 } from "@mosoo/agent-driver/boot";
 import { DRIVER_PROTOCOL_VERSION, parseDriverBootPayload } from "@mosoo/agent-driver/boot";
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import { parsePlatformId } from "@mosoo/id";
 import type {
   CredentialId,
   DriverInstanceId,
   McpServerId,
+  AppId,
   SandboxId,
   SkillSnapshotId,
+  VendorCredentialId,
 } from "@mosoo/id";
 
 import { fromBase64Url, toArrayBuffer, toBase64Url } from "../../../shared/bytes";
@@ -32,6 +35,7 @@ export interface CreateBootPayloadInput {
 export type RuntimeActionTokenAction =
   | "credential_invalidate"
   | "credential_refresh"
+  | "llm_proxy"
   | "mcp_proxy"
   | "skill_snapshot";
 
@@ -46,6 +50,14 @@ export type RuntimeActionTokenPayload =
       resourceId: CredentialId;
     })
   | (RuntimeActionTokenPayloadBase & {
+      action: "llm_proxy";
+      appId: AppId;
+      driverGeneration: number;
+      modelId: string;
+      modelProtocol: PresetModelProtocol;
+      resourceId: VendorCredentialId;
+    })
+  | (RuntimeActionTokenPayloadBase & {
       action: "mcp_proxy";
       resourceId: McpServerId;
     })
@@ -57,6 +69,8 @@ export type RuntimeActionTokenPayload =
 export interface RuntimeActionTokenBindings {
   readonly RUNTIME_ACTION_TOKEN_SECRET: string;
 }
+
+export const RUNTIME_LLM_PROXY_MODEL_ID_MAX_LENGTH = 512;
 
 function toUtf8Bytes(value: string): Uint8Array {
   return new TextEncoder().encode(value);
@@ -132,6 +146,7 @@ function isRuntimeActionTokenAction(value: unknown): value is RuntimeActionToken
   return (
     value === "credential_invalidate" ||
     value === "credential_refresh" ||
+    value === "llm_proxy" ||
     value === "mcp_proxy" ||
     value === "skill_snapshot"
   );
@@ -139,6 +154,15 @@ function isRuntimeActionTokenAction(value: unknown): value is RuntimeActionToken
 
 function isRuntimeActionTokenPayloadRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isPresetModelProtocol(value: unknown): value is PresetModelProtocol {
+  return (
+    value === "anthropic-messages" ||
+    value === "google-gemini" ||
+    value === "openai-chat-completions" ||
+    value === "openai-responses"
+  );
 }
 
 function parseRuntimeActionTokenPayload(encodedPayload: string): RuntimeActionTokenPayload {
@@ -166,6 +190,38 @@ function parseRuntimeActionTokenPayload(encodedPayload: string): RuntimeActionTo
     driverInstanceId,
     "Runtime action token driver instance ID",
   );
+
+  if (action === "llm_proxy") {
+    const { appId, driverGeneration, modelId, modelProtocol } = parsed;
+
+    if (
+      typeof appId !== "string" ||
+      appId === "" ||
+      typeof driverGeneration !== "number" ||
+      !Number.isSafeInteger(driverGeneration) ||
+      driverGeneration < 0 ||
+      typeof modelId !== "string" ||
+      modelId === "" ||
+      modelId.length > RUNTIME_LLM_PROXY_MODEL_ID_MAX_LENGTH ||
+      !isPresetModelProtocol(modelProtocol)
+    ) {
+      throw new Error("Runtime action token payload is invalid.");
+    }
+
+    return {
+      action,
+      appId: parsePlatformId<AppId>(appId, "Runtime action token app ID"),
+      driverGeneration,
+      driverInstanceId: parsedDriverInstanceId,
+      expiresAt,
+      modelId,
+      modelProtocol,
+      resourceId: parsePlatformId<VendorCredentialId>(
+        resourceId,
+        "Runtime action token vendor credential ID",
+      ),
+    };
+  }
 
   if (action === "mcp_proxy") {
     return {

@@ -1,4 +1,11 @@
-import type { CredentialId, DriverInstanceId, McpServerId, SkillSnapshotId } from "@mosoo/id";
+import type { PresetModelProtocol } from "@mosoo/contracts/models";
+import type {
+  CredentialId,
+  DriverInstanceId,
+  McpServerId,
+  SkillSnapshotId,
+  VendorCredentialId,
+} from "@mosoo/id";
 import type { Context } from "hono";
 import { Hono } from "hono";
 
@@ -12,6 +19,12 @@ import {
   requireRuntimeDriverInstanceGrant,
   verifyRuntimeActionToken,
 } from "../../../modules/runtime/application/runtime-driver-access.service";
+import type { RuntimeLlmProxyTarget } from "../../../modules/runtime/application/runtime-llm-proxy.service";
+import {
+  RuntimeLlmProxyError,
+  requireActiveRuntimeLlmProxyDriver,
+  resolveRuntimeLlmProxyTarget,
+} from "../../../modules/runtime/application/runtime-llm-proxy.service";
 import {
   createRuntimeMcpProxyError,
   runtimeMcpProxyErrorBody,
@@ -39,6 +52,12 @@ const HOP_BY_HOP_HEADERS = new Set([
   "transfer-encoding",
   "upgrade",
 ]);
+
+// Headers LLM SDKs use to carry the proxy grant. They are stripped before the
+// request goes upstream and replaced with the vendor's real credential.
+const LLM_PROXY_GRANT_HEADERS = new Set(["authorization", "x-api-key", "x-goog-api-key"]);
+const LLM_PROXY_PATH_MARKER = "/llm/proxy/";
+const LLM_PROXY_UNSAFE_PATH_ENCODING = /%(?:25|2f|5c)/iu;
 
 async function requireDriverActionGrant(c: Context<ApiGatewayEnvironment>) {
   const grant = c.req.query("grant");
@@ -142,6 +161,245 @@ async function requireSkillSnapshotDownloadGrant(
     }
     throw error;
   }
+}
+
+function readLlmProxyGrantToken(headers: Headers): string | null {
+  const apiKey = headers.get("x-api-key")?.trim();
+
+  if (isTruthy(apiKey)) {
+    return apiKey;
+  }
+
+  const googApiKey = headers.get("x-goog-api-key")?.trim();
+
+  if (isTruthy(googApiKey)) {
+    return googApiKey;
+  }
+
+  const authorization = headers.get("Authorization");
+  const [scheme, grant] = authorization?.split(/\s+/, 2) ?? [];
+
+  if (scheme?.toLowerCase() === "bearer" && isTruthy(grant)) {
+    return grant;
+  }
+
+  return null;
+}
+
+function extractLlmProxySubPath(pathname: string): string | null {
+  const markerIndex = pathname.indexOf(LLM_PROXY_PATH_MARKER);
+
+  if (markerIndex === -1) {
+    return null;
+  }
+
+  const rest = pathname.slice(markerIndex + LLM_PROXY_PATH_MARKER.length);
+  const slashIndex = rest.indexOf("/");
+  const subPath = slashIndex === -1 ? "" : rest.slice(slashIndex);
+
+  if (subPath.includes("\\") || LLM_PROXY_UNSAFE_PATH_ENCODING.test(subPath)) {
+    return null;
+  }
+
+  for (const segment of subPath.split("/")) {
+    let decoded: string;
+
+    try {
+      decoded = decodeURIComponent(segment);
+    } catch {
+      return null;
+    }
+
+    if (
+      decoded === "." ||
+      decoded === ".." ||
+      decoded.includes("/") ||
+      decoded.includes("\\") ||
+      decoded.includes("%")
+    ) {
+      return null;
+    }
+  }
+
+  return subPath;
+}
+
+function isLlmProxyCapabilityAllowed(
+  method: string,
+  subPath: string,
+  modelId: string,
+  modelProtocol: PresetModelProtocol,
+): boolean {
+  const decodedPath = decodeURIComponent(subPath);
+
+  if (decodedPath !== subPath) {
+    return false;
+  }
+
+  switch (modelProtocol) {
+    case "anthropic-messages":
+      return (
+        method === "POST" &&
+        ["/messages", "/v1/messages", "/v1/messages/count_tokens"].includes(decodedPath)
+      );
+    case "google-gemini": {
+      const modelPath = modelId.includes("/") ? modelId : `models/${modelId}`;
+      const modelPathIsCanonical = modelPath
+        .split("/")
+        .every(
+          (segment) =>
+            segment !== "" &&
+            segment !== "." &&
+            segment !== ".." &&
+            /^[A-Za-z0-9._-]+$/u.test(segment),
+        );
+
+      return (
+        method === "POST" &&
+        modelPathIsCanonical &&
+        [`/${modelPath}:generateContent`, `/${modelPath}:streamGenerateContent`].includes(
+          decodedPath,
+        )
+      );
+    }
+    case "openai-chat-completions":
+      return method === "POST" && decodedPath === "/chat/completions";
+    case "openai-responses":
+      return method === "POST" && ["/responses", "/responses/compact"].includes(decodedPath);
+  }
+}
+
+function isOpenAiResponsesWebSocketProbe(
+  request: Request,
+  subPath: string,
+  modelProtocol: PresetModelProtocol,
+): boolean {
+  return (
+    modelProtocol === "openai-responses" &&
+    request.method === "GET" &&
+    subPath === "/responses" &&
+    request.headers.get("Upgrade")?.toLowerCase() === "websocket"
+  );
+}
+
+async function readGrantedLlmProxyRequestBody(
+  request: Request,
+  modelId: string,
+  modelProtocol: PresetModelProtocol,
+): Promise<{ body: BodyInit | null } | null> {
+  if (modelProtocol === "google-gemini") {
+    // Gemini binds the model in the exact admitted request path.
+    return { body: request.body };
+  }
+
+  try {
+    const body: unknown = await request.json();
+
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      !Array.isArray(body) &&
+      "model" in body &&
+      body.model === modelId
+    ) {
+      // Re-serialize the parsed body so duplicate JSON keys cannot make the
+      // proxy and the upstream disagree about which model was requested.
+      return { body: JSON.stringify(body) };
+    }
+  } catch {
+    // Invalid JSON is outside the model inference capability.
+  }
+
+  return null;
+}
+
+function toLlmProxyUpstreamUrl(request: Request, upstreamBaseUrl: string, subPath: string): string {
+  const base = new URL(upstreamBaseUrl);
+  const basePath = base.pathname === "/" ? "" : base.pathname.replace(/\/+$/u, "");
+  const expectedPath = `${basePath}${subPath}`;
+
+  if (
+    base.hash !== "" ||
+    basePath.includes("\\") ||
+    LLM_PROXY_UNSAFE_PATH_ENCODING.test(basePath)
+  ) {
+    throw new RuntimeLlmProxyError("LLM proxy upstream base URL is invalid.", 502);
+  }
+
+  const target = new URL(`${base.origin}${expectedPath}`);
+
+  for (const [key, value] of base.searchParams) {
+    target.searchParams.append(key, value);
+  }
+
+  for (const [key, value] of new URL(request.url).searchParams) {
+    target.searchParams.append(key, value);
+  }
+
+  if (target.origin !== base.origin || target.pathname !== expectedPath) {
+    throw new RuntimeLlmProxyError("LLM proxy path is invalid.", 400);
+  }
+
+  return target.toString();
+}
+
+function buildLlmProxyUpstreamHeaders(incoming: Headers, target: RuntimeLlmProxyTarget): Headers {
+  const headers = new Headers();
+
+  for (const [key, value] of incoming) {
+    const lowered = key.toLowerCase();
+
+    if (!HOP_BY_HOP_HEADERS.has(lowered) && !LLM_PROXY_GRANT_HEADERS.has(lowered)) {
+      headers.set(key, value);
+    }
+  }
+
+  const { authHeader } = target.vendor;
+
+  if (authHeader.scheme === "bearer") {
+    headers.set(authHeader.apiKeyHeader, `Bearer ${target.apiKey}`);
+    return headers;
+  }
+
+  for (const [key, value] of Object.entries(authHeader.extraHeaders)) {
+    // Only fill protocol headers the client did not set itself: SDKs pin
+    // e.g. anthropic-version to the wire format they actually speak.
+    if (!headers.has(key)) {
+      headers.set(key, value);
+    }
+  }
+
+  headers.set(authHeader.apiKeyHeader, target.apiKey);
+  return headers;
+}
+
+async function proxyRuntimeLlmRequest(
+  request: Request,
+  subPath: string,
+  target: RuntimeLlmProxyTarget,
+  body: BodyInit | null,
+): Promise<Response> {
+  const init: RequestInit = {
+    headers: buildLlmProxyUpstreamHeaders(request.headers, target),
+    method: request.method,
+    redirect: "error",
+    signal: request.signal,
+  };
+
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    init.body = body;
+  }
+
+  const response = await fetch(
+    toLlmProxyUpstreamUrl(request, target.upstreamBaseUrl, subPath),
+    init,
+  );
+
+  return new Response(response.body, {
+    headers: copyProxyResponseHeaders(response.headers),
+    status: response.status,
+    statusText: response.statusText,
+  });
 }
 
 async function proxyRuntimeMcpRequest(
@@ -339,6 +597,127 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
         { error: error instanceof Error ? error.message : "Credential invalidate failed." },
         { status: 400 },
       );
+    }
+  });
+
+  driver.all("/llm/proxy/:credentialId/*", async (c) => {
+    const grantToken = readLlmProxyGrantToken(c.req.raw.headers);
+
+    if (grantToken === null) {
+      return Response.json(
+        { error: "LLM proxy authorization grant is required." },
+        { status: 401 },
+      );
+    }
+
+    let grant: RuntimeActionTokenPayload;
+
+    try {
+      grant = await verifyRuntimeActionToken(c.env, grantToken);
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : "Unauthorized." },
+        { status: 401 },
+      );
+    }
+
+    if (grant.action !== "llm_proxy") {
+      return Response.json(
+        { error: "Runtime action grant is invalid for LLM proxy." },
+        { status: 403 },
+      );
+    }
+
+    let credentialId: VendorCredentialId;
+
+    try {
+      credentialId = toPlatformId<VendorCredentialId>(
+        c.req.param("credentialId"),
+        "Vendor credential ID",
+      );
+    } catch (error) {
+      const response = driverPlatformIdErrorResponse(error);
+      if (response !== null) {
+        return response;
+      }
+      throw error;
+    }
+
+    if (grant.resourceId !== credentialId) {
+      return Response.json(
+        { error: "Runtime action grant does not match this credential." },
+        { status: 403 },
+      );
+    }
+
+    const subPath = extractLlmProxySubPath(new URL(c.req.url).pathname);
+
+    if (subPath === null) {
+      return Response.json({ error: "LLM proxy path is invalid." }, { status: 400 });
+    }
+
+    try {
+      await requireActiveRuntimeLlmProxyDriver(c.env, {
+        driverGeneration: grant.driverGeneration,
+        driverInstanceId: grant.driverInstanceId,
+      });
+    } catch (error) {
+      if (error instanceof RuntimeLlmProxyError) {
+        return Response.json({ error: error.message }, { status: error.status });
+      }
+      throw error;
+    }
+
+    if (isOpenAiResponsesWebSocketProbe(c.req.raw, subPath, grant.modelProtocol)) {
+      // Codex falls back to HTTP Responses only on 426. Never turn this
+      // WebSocket handshake into a credential-bearing HTTP upstream request.
+      return new Response(null, {
+        headers: { Upgrade: "websocket" },
+        status: 426,
+      });
+    }
+
+    if (!isLlmProxyCapabilityAllowed(c.req.method, subPath, grant.modelId, grant.modelProtocol)) {
+      return Response.json(
+        { error: "LLM proxy request is outside the granted model capability." },
+        { status: 403 },
+      );
+    }
+
+    const grantedRequestBody = await readGrantedLlmProxyRequestBody(
+      c.req.raw,
+      grant.modelId,
+      grant.modelProtocol,
+    );
+
+    if (grantedRequestBody === null) {
+      return Response.json(
+        { error: "LLM proxy request is outside the granted model capability." },
+        { status: 403 },
+      );
+    }
+
+    let target: RuntimeLlmProxyTarget;
+
+    try {
+      target = await resolveRuntimeLlmProxyTarget(c.env, {
+        credentialId,
+        appId: grant.appId,
+      });
+    } catch (error) {
+      if (error instanceof RuntimeLlmProxyError) {
+        return Response.json({ error: error.message }, { status: error.status });
+      }
+      throw error;
+    }
+
+    try {
+      return await proxyRuntimeLlmRequest(c.req.raw, subPath, target, grantedRequestBody.body);
+    } catch (error) {
+      if (error instanceof RuntimeLlmProxyError) {
+        return Response.json({ error: error.message }, { status: error.status });
+      }
+      return Response.json({ error: "LLM proxy upstream request failed." }, { status: 502 });
     }
   });
 

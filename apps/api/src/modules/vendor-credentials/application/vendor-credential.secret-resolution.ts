@@ -18,7 +18,11 @@ import {
   getAppVendorCredentialRow,
   listAppCustomCredentialRows,
 } from "./vendor-credential.repository";
-import type { ResolvedVendorCredential, VendorCredentialRow } from "./vendor-credential.types";
+import type {
+  ResolvedVendorCredential,
+  ResolvedVendorCredentialRef,
+  VendorCredentialRow,
+} from "./vendor-credential.types";
 
 export interface ResolveVendorApiKeyOptions {
   modelId?: string;
@@ -35,6 +39,7 @@ export interface ResolveVendorApiKeyRequest {
 export type VendorCredentialSecretReadPurpose =
   | "credential_display_api_key"
   | "custom_model_runtime_api_key"
+  | "llm_proxy_api_key"
   | "runtime_api_key";
 
 export type VendorCredentialSecretWritePurpose =
@@ -263,13 +268,16 @@ async function canResolveRuntimeCredentialForExecutionOwner(input: {
   }
 }
 
-export async function resolveVendorApiKey({
+async function resolveRuntimeVendorCredentialRow({
   bindings,
   executionOwnerUserId,
   options = {},
   appId,
   vendorId,
-}: ResolveVendorApiKeyRequest): Promise<ResolvedVendorCredential | null> {
+}: ResolveVendorApiKeyRequest): Promise<{
+  purpose: VendorCredentialSecretReadPurpose;
+  row: VendorCredentialRow;
+} | null> {
   const modelId = options.modelId;
   const canResolveCredential = await canResolveRuntimeCredentialForExecutionOwner({
     bindings,
@@ -289,12 +297,7 @@ export async function resolveVendorApiKey({
       return null;
     }
 
-    return resolveCredentialFromRow(bindings, {
-      credential: row,
-      appId,
-      providerId: vendorId,
-      purpose: "custom_model_runtime_api_key",
-    });
+    return { purpose: "custom_model_runtime_api_key", row };
   }
 
   const row = await getAppVendorCredentialRow(bindings.DB, appId, vendorId);
@@ -303,10 +306,45 @@ export async function resolveVendorApiKey({
     return null;
   }
 
-  return resolveCredentialFromRow(bindings, {
-    credential: row,
-    appId,
-    providerId: vendorId,
-    purpose: "runtime_api_key",
+  return { purpose: "runtime_api_key", row };
+}
+
+export async function resolveVendorApiKey(
+  request: ResolveVendorApiKeyRequest,
+): Promise<ResolvedVendorCredential | null> {
+  const resolved = await resolveRuntimeVendorCredentialRow(request);
+
+  if (!resolved) {
+    return null;
+  }
+
+  return resolveCredentialFromRow(request.bindings, {
+    credential: resolved.row,
+    appId: request.appId,
+    providerId: request.vendorId,
+    purpose: resolved.purpose,
   });
+}
+
+/**
+ * Resolves the credential a runtime session should use without touching the
+ * vault: no secret read happens here. The returned reference is safe to embed
+ * in driver profiles; the LLM proxy reads the key back at request time.
+ */
+export async function resolveVendorCredentialRef(
+  request: ResolveVendorApiKeyRequest,
+): Promise<ResolvedVendorCredentialRef | null> {
+  const resolved = await resolveRuntimeVendorCredentialRow(request);
+
+  if (!resolved) {
+    return null;
+  }
+
+  return {
+    apiBase: resolved.row.apiBase,
+    appId: resolved.row.appId,
+    credentialId: resolved.row.id,
+    models: parseCredentialModels(resolved.row.modelsJson),
+    vendorId: resolved.row.vendorId,
+  };
 }
