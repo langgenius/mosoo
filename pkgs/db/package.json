@@ -6,7 +6,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "db:regen": "rm -rf ./drizzle && vp exec drizzle-kit generate --config drizzle.config.ts --name baseline && vp exec bun ./scripts/normalize-drizzle-baseline.ts && vp fmt --write ./drizzle",
+    "db:generate": "vp exec drizzle-kit generate --config drizzle.config.ts",
     "lint": "vp lint .",
     "tc": "vp exec tsc --noEmit",
     "test": "vp exec bun test tests"

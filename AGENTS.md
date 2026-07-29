@@ -1,62 +1,6 @@
 # AGENTS.md
 
-## Project Notes
-
-- Development, verification, commit, and PR rules live in `CONTRIBUTING.md`.
-- Before coding, read the relevant documents under `docs/` (especially `docs/prd/` and `docs/architecture.md`) to understand system boundaries, module relationships, and design intent.
-- When boundaries are clear and maintenance cost stays reasonable, split subpackages to avoid large modules without clear ownership.
-- Reusable coding-agent skills live under `.claude/skills` (a symlink into the `.skills/mosoo-skills` submodule, sourced from `langgenius/mosoo-skills`). Run `git submodule update --init` once so they resolve. Prefer an existing skill over re-deriving the same guidance; see `CONTRIBUTING.md` → "Agent Skills".
-
-## Engineering Guidance
-
-- Before implementation, prefer using available tools to inspect related code, best practices, and library documentation so boundaries and rationale are clear.
-- By default, inspect the file hierarchy around the current change. If files carry too many responsibilities, unclear names, or blurry directory boundaries, split, rename, and organize them along the way. Keep names short, direct, and predictable.
-- Put shared contracts, cross-package payloads, and public schemas in shared packages only when they clearly cross boundaries. Keep app-local types, view models, and implementation details inside their owning module.
-- Before adding DTOs, types, or constants, reuse existing shared contracts and module exports to avoid redefining the same concept.
-- Keep `TypeScript` strict with clear boundaries. Do not introduce `any`. Export APIs should prefer semantically clear named types instead of complex inline types that pollute interfaces.
-- Separate pure transformation logic from I/O, framework lifecycles, and platform APIs. Avoid circular dependencies and keep responsibilities focused.
-- Keep platform implementations at platform boundaries. Shared packages must remain runtime-neutral and must not leak Node-only, browser-only, or mobile-specific dependencies into incompatible runtimes.
-- Keep the runtime dependency graph on a consistent public export surface. Do not mix source-only and dist-only artifacts on the same path. When downstream code depends on compiled output, build upstream packages before starting downstream apps.
-- Required business values and invariants should fail fast. Do not hide problems behind broad `try/catch`, silent fallbacks, or placeholder defaults.
-- Keep one canonical naming scheme or command grammar for each user concept, avoiding multiple names that make docs, implementation, and tests drift apart.
-- Follow the branch naming and PR rules in `CONTRIBUTING.md` → "Branch, Commit, Issue, And PR"; in particular, use the Conventional Commits-style `type/scope-subject` branch format.
-- Never prefix a branch with a tool or agent name. The `pr-ship-policy` CI workflow rejects branch names beginning with `codex`, `cursor`, `claude`, `agent`, `copilot`, `aider`, `devin`, `windsurf`, `codegen`, `opencode`, or `grok` (as the complete first path component).
-- Commit messages must strictly follow `Conventional Commits`. Avoid vague, casual, or inconsistent titles.
-- Commit messages must at least satisfy `type(scope): subject`. Use `!` only for intentional breaking changes, and keep `type`, `scope`, and `subject` semantically accurate.
-- Commit policy is enforced locally by `prek` (`commit-msg`, `pre-push`) and in CI (`pr-title-lint`, `pr-commits-lint`). `commit-msg` validates subject format plus author, committer, and `Co-authored-by` / `Signed-off-by` identity. Use a real human contributor identity; never commit as `claude-code`, `[codex]`, a bot, or a ticket-prefixed subject.
-
-## Production Deployment And D1 Safety
-
-- Production D1 deploys must never reset, wipe, drop, recreate, or replace the production database as part of a normal release.
-- `just deploy-api` and any production API deploy script may only apply pending remote D1 migrations before deploying the Worker.
-- Once production has data, schema changes must be represented as new migration files under `pkgs/db/drizzle`; do not rewrite an already-applied baseline and expect production to update.
-- Any destructive production D1 SQL, including `DROP TABLE`, table recreation, truncation, or lossy data transformation, requires explicit user approval plus a backup and rollback plan before execution.
-- Before changing deployment scripts or D1 migrations, verify the diff contains no production reset path and no destructive SQL unless the user explicitly requested it.
-
-## Monorepo Scaling And Performance Constraints
-
-- Design database queries explicitly around access paths. Prefer `ORDER BY id` for list sorting, and do not default to `ORDER BY created_at`. ORM layers must not hide default filters or sorting; query conditions must be declared at the call site.
-- Do not use full `count()` queries to calculate total pages for very large tables. Prefer cursor pagination, remove useless joins, and use database estimates when necessary. ORM relations must be explicitly preloaded; N+1 queries in loops are forbidden.
-- Keep static imports at the top of the file. Preserve intentional dynamic
-  `import()` boundaries used for route/code splitting, Worker lazy
-  initialization, platform isolation, or documented cycle avoidance; do not
-  replace them mechanically with eager imports. New dynamic imports require a
-  concrete loading or boundary reason, and circular dependencies should still
-  surface through startup or build-time errors.
-- Data models should carry only data and local invariants. Put complex business orchestration in verb-level services or modules instead of continuing to expand model methods.
-- Avoid low-value third-party libraries. Prefer implementing small generic logic inside the repository. For third-party service integrations, prefer lightweight handwritten API clients instead of bulky vendor dependencies.
-- Frontend API access must be generated from backend schema/codegen and stay strongly typed. Do not handwrite a parallel request layer. Avoid overusing React Context; high-frequency shared state should prefer fine-grained subscription tools such as zustand.
-- Caching must not hide inefficient SQL or incorrect modeling. For user-personalized data, separate shared data pools from user-local data at the query layer.
-
-## Protocol And Data Structure Design Guidance
-
-Based on RFC 3117, RFC 5218, and RFC 6709, use these abstract constraints:
-
-- Solve real problems first. Prefer existing protocols, formats, and conventions. Do not invent a new protocol without clear benefit.
-- Keep semantics simple and singular. Common paths must be direct, and each capability should have one primary way to do it.
-- Treat interoperability as the first goal. Semantics, boundaries, errors, state changes, and compatibility strategies must be clear.
-- Default to backward compatibility. New fields and extensions should not break old implementations, and unknown content needs explicit handling rules.
-- Keep extension points few and explicit. Reserve them only for foreseeable needs, and do not use extensions to create private forks or incompatible variants.
-- Design version, number, and parameter spaces for long-term evolution. Avoid bit widths that are too small, exhausting number spaces, or ambiguous version semantics.
-- Security capabilities must be negotiable and migratable, and no extension may weaken the original security model.
-- During design, account for deployment cost, scale limits, performance inflection points, and pressure on shared infrastructure.
+- Follow `CONTRIBUTING.md` for setup, development, verification, generated files, Git/PR, migrations, and deployment.
+- For product behavior or module-boundary changes, read only the relevant PRD and architecture sections before editing.
+- Production D1 is append-only: never reset production or rewrite an applied migration; follow `CONTRIBUTING.md#database-and-migrations` and `docs/production-deploy-verification.md`.
+- Destructive or data-rewrite migrations require explicit user approval plus a backup and rollback plan.

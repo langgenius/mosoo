@@ -2,10 +2,9 @@
  * Fail-fast guard against the DEPLOY-D1-001 hazard.
  *
  * `wrangler d1 migrations apply` records applied migrations by filename. This
- * guard detects damage from the repository's former rewritten-baseline alpha
- * workflow: a database may have recorded an older file with the same name and
- * therefore miss tables. Applied migrations are immutable now; every production
- * schema change must use a new migration file.
+ * guard detects damage from skipped, rewritten, or incomplete migrations by
+ * comparing the live database with the latest Drizzle schema snapshot. Applied
+ * migrations are immutable; every production schema change must use a new file.
  *
  * These functions are pure (no I/O) so the deploy script can stay thin and the
  * detection logic stays unit-testable. Table-level only: this catches a missing
@@ -13,21 +12,55 @@
  * added column on an existing table.
  */
 
-const CREATE_TABLE_PATTERN = /CREATE TABLE(?:\s+IF NOT EXISTS)?\s+`([^`]+)`/gi;
+interface DrizzleJournal {
+  entries?: unknown;
+}
 
-/** Table names declared by the migration baseline wrangler treats as applied. */
-export function parseExpectedTableNames(migrationSql: string): string[] {
-  const names = new Set<string>();
+interface DrizzleSnapshot {
+  tables?: unknown;
+}
 
-  for (const match of migrationSql.matchAll(CREATE_TABLE_PATTERN)) {
-    const name = match[1];
+/** Latest snapshot filename recorded by Drizzle's migration journal. */
+export function getLatestSnapshotFilename(rawJournal: string): string {
+  const journal = JSON.parse(rawJournal) as DrizzleJournal | null;
+  const entries: readonly unknown[] = Array.isArray(journal?.entries) ? journal.entries : [];
 
-    if (name !== undefined) {
-      names.add(name);
+  if (entries.length === 0) {
+    throw new Error("Drizzle migration journal has no valid latest entry.");
+  }
+
+  for (const [expectedIndex, entry] of entries.entries()) {
+    const index =
+      typeof entry === "object" && entry !== null && "idx" in entry ? entry.idx : undefined;
+
+    if (index !== expectedIndex) {
+      throw new Error("Drizzle migration journal indexes must be contiguous from zero.");
     }
   }
 
-  return [...names];
+  return `${String(entries.length - 1).padStart(4, "0")}_snapshot.json`;
+}
+
+/** Table names declared by the latest Drizzle schema snapshot. */
+export function parseExpectedTableNames(rawSnapshot: string): string[] {
+  const snapshot = JSON.parse(rawSnapshot) as DrizzleSnapshot | null;
+
+  if (
+    snapshot === null ||
+    typeof snapshot.tables !== "object" ||
+    snapshot.tables === null ||
+    Array.isArray(snapshot.tables)
+  ) {
+    throw new Error("Drizzle schema snapshot has no valid tables object.");
+  }
+
+  const tableNames = Object.keys(snapshot.tables).toSorted();
+
+  if (tableNames.length === 0) {
+    throw new Error("Drizzle schema snapshot has no tables.");
+  }
+
+  return tableNames;
 }
 
 /** Expected tables that are not present in the live database. */
