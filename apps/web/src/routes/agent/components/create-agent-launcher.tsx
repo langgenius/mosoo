@@ -60,19 +60,19 @@ function CreateAgentLauncherBody({
   const [name, setName] = useState("");
   const [selectedRuntimeId, setSelectedRuntimeId] = useState<string | null>(null);
 
+  // The runtime catalog is static, so the cards render immediately. Credentials
+  // only refine which runtime is preselected once they arrive.
+  const runtimeOptions = useMemo(
+    () => listRuntimeOptions().filter((runtime) => isRuntimeSelectable(runtime.id)),
+    [],
+  );
   const defaultRuntime = useMemo(
     () => (credentialsLoading ? null : resolveDefaultAgentRuntime(credentials)),
     [credentials, credentialsLoading],
   );
-  const runtimeOptions = useMemo(
-    () =>
-      listRuntimeOptions(defaultRuntime?.runtimeId).filter((runtime) =>
-        isRuntimeSelectable(runtime.id),
-      ),
-    [defaultRuntime],
-  );
 
-  const activeRuntimeId = selectedRuntimeId ?? defaultRuntime?.runtimeId ?? null;
+  const activeRuntimeId =
+    selectedRuntimeId ?? defaultRuntime?.runtimeId ?? runtimeOptions[0]?.id ?? null;
 
   const createAgentMutation = useMutation({
     mutationFn: createAgent,
@@ -149,12 +149,7 @@ function CreateAgentLauncherBody({
 
         <div className="space-y-2">
           <Label className="text-muted-foreground text-[12px]">Runtime</Label>
-          {credentialsLoading ? (
-            <div className="text-muted-foreground flex items-center gap-2 py-2 text-[13px]">
-              <Loader2 className="size-4 animate-spin" />
-              Loading runtimes…
-            </div>
-          ) : runtimeOptions.length === 0 ? (
+          {runtimeOptions.length === 0 ? (
             <div className="text-muted-foreground text-[13px]">No runtimes available.</div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
