@@ -781,13 +781,18 @@ async function getDefaultBranch(owner: string, repo: string): Promise<string> {
   return payload["default_branch"];
 }
 
-function longestMatchingRef(segments: string[], candidates: string[]): string | null {
+function longestMatchingRef(
+  segments: readonly string[],
+  candidates: readonly string[],
+): string | null {
+  const candidateRefs = new Set(candidates);
+  let candidate = "";
   let matched: string | null = null;
 
-  for (let index = 1; index <= segments.length; index += 1) {
-    const candidate = segments.slice(0, index).join("/");
+  for (const segment of segments) {
+    candidate = candidate.length === 0 ? segment : `${candidate}/${segment}`;
 
-    if (!candidates.includes(candidate)) {
+    if (!candidateRefs.has(candidate)) {
       continue;
     }
 

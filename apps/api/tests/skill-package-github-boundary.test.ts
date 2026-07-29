@@ -117,6 +117,47 @@ describe("GitHub skill package boundary", () => {
     expect(downloads).toEqual(new Map([...fileBodies.keys()].map((url) => [url, 1] as const)));
   });
 
+  test("resolves tree URLs whose branch names contain slashes", async () => {
+    globalThis.fetch = async (input) => {
+      const url = typeof input === "string" ? input : input.url;
+
+      if (url === "https://api.github.com/repos/acme/repo/branches?per_page=100") {
+        return Response.json([{ name: "main" }, { name: "release/2026" }]);
+      }
+
+      if (url === "https://api.github.com/repos/acme/repo/contents/skills?ref=release%2F2026") {
+        return Response.json([
+          {
+            download_url:
+              "https://raw.githubusercontent.com/acme/repo/release/2026/skills/SKILL.md",
+            path: "skills/SKILL.md",
+            type: "file",
+          },
+        ]);
+      }
+
+      if (url === "https://raw.githubusercontent.com/acme/repo/release/2026/skills/SKILL.md") {
+        return new Response(
+          "---\nname: slash-branch-skill\ndescription: branch ref test\n---\n# Skill\n",
+          {
+            headers: {
+              "content-length": "69",
+            },
+          },
+        );
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    };
+
+    const normalized = await loadSkillPackageFromGithub(
+      "https://github.com/acme/repo/tree/release/2026/skills",
+    );
+
+    expect(normalized.frontmatter.name).toBe("slash-branch-skill");
+    expect(normalized.entries.map((entry) => entry.path)).toEqual(["SKILL.md"]);
+  });
+
   test("resolves a --skill selector to the skills/<name> directory", async () => {
     globalThis.fetch = async (input) => {
       const url = typeof input === "string" ? input : input.url;
