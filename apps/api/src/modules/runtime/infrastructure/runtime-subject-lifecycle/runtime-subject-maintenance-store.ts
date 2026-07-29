@@ -135,7 +135,10 @@ export async function listInactiveRuntimeSubjects(
     .where(
       and(
         eq(sandboxesTable.status, "active"),
-        notExists(activeConversationSessionQueryForListedSubject(appDb)),
+        or(
+          eq(sandboxesTable.kind, "pet"),
+          notExists(activeConversationSessionQueryForListedSubject(appDb)),
+        ),
         notExists(runLeaseQueryForListedSubject(appDb)),
         isNotNull(sandboxesTable.inactiveDeadlineAt),
         lte(sandboxesTable.inactiveDeadlineAt, input.now),
@@ -208,7 +211,10 @@ export async function claimInactiveRuntimeSubject(
         and(
           eq(sandboxesTable.id, input.runtimeSubjectId),
           eq(sandboxesTable.status, "active"),
-          notExists(activeConversationSessionQuery(appDb, input.runtimeSubjectId)),
+          or(
+            eq(sandboxesTable.kind, "pet"),
+            notExists(activeConversationSessionQuery(appDb, input.runtimeSubjectId)),
+          ),
           notExists(runLeaseQuery(appDb, input.runtimeSubjectId)),
           isNotNull(sandboxesTable.inactiveDeadlineAt),
           lte(sandboxesTable.inactiveDeadlineAt, input.now),

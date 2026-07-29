@@ -4,6 +4,7 @@ import type { SandboxBackupId, SandboxSessionId } from "@mosoo/id";
 import { withDisposedRpcResult } from "../../../../platform/cloudflare/rpc-disposal";
 import { getRuntimeSessionOutputDirectory } from "../driver-instance/runtime-session-outputs";
 import { withRuntimeProvisionTimeout } from "../runtime-provision-timeout";
+import { decodeSandboxBackupIdForPlatform } from "../sandbox-backup-id";
 import type { ExecutionSessionHandle, SandboxHandle } from "../sandbox-handles";
 
 interface SandboxConversationDirectoryBackup {
@@ -50,7 +51,7 @@ export async function restoreSandboxConversationDirectoryBackup(
     withRuntimeProvisionTimeout(
       sandbox.restoreBackup({
         dir: input.backup.dir,
-        id: input.backup.id,
+        id: decodeSandboxBackupIdForPlatform(input.backup.id),
       }),
       `Sandbox session cwd restore for ${input.cwd}`,
     ),
