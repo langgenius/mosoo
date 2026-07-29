@@ -30,6 +30,8 @@ import {
   getOrganizationPath,
   listAdditionalDirectories,
 } from "./runtime-sandbox-provisioning.paths";
+import { sanitizeRuntimeVendorEnvVars } from "./runtime-vendor-env-policy";
+import { buildVendorProxyEnvVars } from "./runtime-vendor-proxy-env.builder";
 
 interface RuntimeActionUrlContext {
   bindings: RuntimeExecutionSpecBindings;
@@ -151,6 +153,7 @@ export async function buildExecutionSpec(
   bindings: RuntimeExecutionSpecBindings,
   input: {
     builtInTools: DriverExecutionSpec["builtInTools"];
+    driverGeneration: number;
     driverInstanceId: DriverInstanceId;
     profile: DriverProfileConfig;
     requestUrl: string;
@@ -168,13 +171,20 @@ export async function buildExecutionSpec(
     driverInstanceId: input.driverInstanceId,
     requestUrl: input.requestUrl,
   };
-  const [mcpServers, skills] = await Promise.all([
+  const [mcpServers, skills, vendorProxyEnvVars] = await Promise.all([
     Promise.all(
       input.resolvedMcpServers.map(async (server) => withRuntimeMcpProxy(actionUrlContext, server)),
     ),
     Promise.all(
       input.resolvedSkills.map(async (skill) => toRuntimeResolvedSkill(actionUrlContext, skill)),
     ),
+    buildVendorProxyEnvVars({
+      bindings,
+      driverGeneration: input.driverGeneration,
+      driverInstanceId: input.driverInstanceId,
+      profile: input.profile,
+      requestUrl: input.requestUrl,
+    }),
   ]);
 
   return {
@@ -189,7 +199,10 @@ export async function buildExecutionSpec(
         node: [],
         python: [],
       },
-      variables: { ...input.profile.envVars },
+      variables: {
+        ...sanitizeRuntimeVendorEnvVars(input.profile.envVars),
+        ...vendorProxyEnvVars,
+      },
     },
     model: input.profile.model,
     permissionPolicy: input.profile.permissionPolicy,

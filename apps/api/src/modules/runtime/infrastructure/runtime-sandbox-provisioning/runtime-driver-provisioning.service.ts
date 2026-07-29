@@ -59,6 +59,7 @@ import type {
   ProvisionDriverInput,
   RuntimeSmokeProvision,
 } from "./runtime-sandbox-provisioning.types";
+import { sanitizeRuntimeVendorEnvVars } from "./runtime-vendor-env-policy";
 
 export { DriverPrewarmProvisionSkippedError } from "./runtime-driver-prewarm-ownership";
 
@@ -153,7 +154,13 @@ async function provisionDriver(
     throw new Error(`Unsupported runtime: ${input.runtime}.`);
   }
 
-  const organizationPath = getOrganizationPath(input.profile);
+  const runtimeEnvVars = sanitizeRuntimeVendorEnvVars(input.profile.envVars);
+  const runtimeProfile = {
+    ...input.profile,
+    envVarNames: input.profile.envVarNames.filter((name) => Object.hasOwn(runtimeEnvVars, name)),
+    envVars: runtimeEnvVars,
+  };
+  const organizationPath = getOrganizationPath(runtimeProfile);
   const driverControlPort = getDriverControlPort(driverInstanceId);
   const bootToken = await timing.measure("createBootToken", () => createOpaqueBootToken());
   const insertOnlyDriverRecord = usesInsertOnlyDriverRecord(input);
@@ -213,7 +220,7 @@ async function provisionDriver(
     await installRuntimeEnvironment(env, {
       cloudflareSession: input.cloudflareSession,
       environmentRevisionId,
-      profile: input.profile,
+      profile: runtimeProfile,
       runtimeBase,
       sandbox: input.sandbox,
       sessionId: input.sandboxSessionId,
@@ -254,9 +261,10 @@ async function provisionDriver(
     const execution = await timing.measure("buildExecutionSpec", () =>
       buildExecutionSpec(env, {
         builtInTools: input.builtInTools,
+        driverGeneration: activeDriverGeneration,
         driverInstanceId,
         nativeResumeRef,
-        profile: input.profile,
+        profile: runtimeProfile,
         recoveryMessages,
         requestUrl: containerRequestUrl,
         resolvedMcpServers: input.resolvedMcpServers,

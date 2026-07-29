@@ -5,7 +5,6 @@ import type { ResolvedRunSkill } from "@mosoo/contracts/skill";
 import { createPlatformId } from "@mosoo/id";
 import type { AgentId, PlatformId, AppId, SandboxId, SandboxSessionId, SessionId } from "@mosoo/id";
 import { getRuntimeCatalogEntry, getRuntimeCatalogVendorForProvider } from "@mosoo/runtime-catalog";
-import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -26,14 +25,8 @@ import {
 import { resolveReadyEnvironmentPackageArtifact } from "../../../environments/application/environment-package-artifact.service";
 import { resolveEnvironmentSetupScriptForExecution } from "../../../environments/application/environment-runtime-snapshot";
 import { resolveRuntimeMcpServersForSnapshot } from "../../../mcp/application/mcp-runtime.service";
-import { enforceSafeApiBase } from "../../../vendor-credentials/application/vendor-credential-validation";
-import { resolveVendorApiKey } from "../../../vendor-credentials/application/vendor-credential.service";
-import type { ResolvedVendorCredential } from "../../../vendor-credentials/application/vendor-credential.types";
-import type {
-  DriverProfileConfig,
-  DriverRuntime,
-  DriverSkillCatalogEntry,
-} from "../../domain/driver-snapshot";
+import { resolveVendorCredentialRef } from "../../../vendor-credentials/application/vendor-credential.service";
+import type { DriverProfileConfig, DriverSkillCatalogEntry } from "../../domain/driver-snapshot";
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import { resolveAgentRuntimeSandboxSubject } from "../../domain/runtime-sandbox-subject";
 import {
@@ -49,33 +42,15 @@ import {
 import { getSessionExecutionPlan } from "./session-execution.repository";
 import type { HydratedSessionRunContext } from "./session-execution.types";
 import { resolveSessionSkillReferences } from "./session-skill-reference-resolution.service";
-import {
-  buildSnapshotAgentEnvironment,
-  mergeSessionSnapshotEnvVars,
-} from "./session-snapshot-hydration";
+import { buildSnapshotAgentEnvironment } from "./session-snapshot-hydration";
 
 interface HydratedRunContextCacheEntry {
   expiresAtMs: number;
   value: HydratedSessionRunContext;
 }
 
-interface RuntimeVendorEnvironmentInput {
-  credential: ResolvedVendorCredential;
-  model: DriverProfileConfig["model"];
-  runtimeId: DriverRuntime;
-  vendor: RuntimeCatalogVendor;
-}
-
-const OPENCODE_CONFIG_CONTENT_ENV = "OPENCODE_CONFIG_CONTENT";
 const HYDRATED_RUN_CONTEXT_CACHE_TTL_MS = 20_000;
 const hydratedRunContextCache = new Map<string, HydratedRunContextCacheEntry>();
-
-interface OpenCodeProviderConfig {
-  readonly models?: Record<string, { name: string }>;
-  readonly name?: string;
-  readonly npm?: string;
-  readonly options: Record<string, string>;
-}
 
 async function resolveRuntimeProfileIds(
   bindings: ApiBindings,
@@ -150,107 +125,6 @@ function sanitizeHydratedRunContextForCache(
       envVars: {},
     },
   };
-}
-
-export function buildRuntimeVendorEnvVars(
-  input: RuntimeVendorEnvironmentInput,
-): Record<string, string> {
-  const envVars: Record<string, string> = {
-    [input.vendor.apiKeyEnvVar]: input.credential.apiKey,
-  };
-
-  if (isTruthy(input.credential.apiBase)) {
-    if (!isTruthy(input.vendor.apiBaseEnvVar)) {
-      throw new Error(
-        `${input.vendor.label} does not support a custom API base URL for the configured runtime. Remove the apiBase override from the credential or pick a vendor that supports it.`,
-      );
-    }
-
-    enforceSafeApiBase(input.credential.apiBase);
-    envVars[input.vendor.apiBaseEnvVar] = input.credential.apiBase;
-  }
-
-  if (input.runtimeId === "acp-fallback") {
-    envVars[OPENCODE_CONFIG_CONTENT_ENV] = buildOpenCodeConfig(input);
-  }
-
-  return envVars;
-}
-
-function buildOpenCodeConfig(input: RuntimeVendorEnvironmentInput): string {
-  const openCodeProviderId = resolveOpenCodeProviderId(input.vendor);
-  const model = resolveOpenCodeModelId(input.vendor, input.model);
-  const providerConfig = buildOpenCodeProviderConfig(input);
-
-  return JSON.stringify({
-    $schema: "https://opencode.ai/config.json",
-    enabled_providers: [openCodeProviderId],
-    model,
-    provider: {
-      [openCodeProviderId]: providerConfig,
-    },
-    small_model: model,
-  });
-}
-
-function resolveOpenCodeProviderId(vendor: RuntimeCatalogVendor): string {
-  return vendor.openCodeProvider?.providerId ?? vendor.vendorId;
-}
-
-function resolveOpenCodeModelId(vendor: RuntimeCatalogVendor, model: string): string {
-  const openCodeProviderId = resolveOpenCodeProviderId(vendor);
-
-  if (!model.includes("/")) {
-    return `${openCodeProviderId}/${model}`;
-  }
-
-  const vendorPrefix = `${vendor.vendorId}/`;
-
-  if (openCodeProviderId !== vendor.vendorId && model.startsWith(vendorPrefix)) {
-    return `${openCodeProviderId}/${model.slice(vendorPrefix.length)}`;
-  }
-
-  return model;
-}
-
-function buildOpenCodeProviderConfig(input: RuntimeVendorEnvironmentInput): OpenCodeProviderConfig {
-  const options: Record<string, string> = {
-    apiKey: `{env:${input.vendor.apiKeyEnvVar}}`,
-  };
-  const models =
-    input.credential.models === null
-      ? undefined
-      : Object.fromEntries(input.credential.models.map((modelId) => [modelId, { name: modelId }]));
-  const provider = input.vendor.openCodeProvider;
-
-  if (provider === undefined) {
-    return {
-      ...(models === undefined ? {} : { models }),
-      options,
-    };
-  }
-
-  if (provider.apiBaseOption !== undefined) {
-    options[provider.apiBaseOption] = resolveOpenCodeProviderApiBase(input);
-  }
-
-  return {
-    ...(models === undefined ? {} : { models }),
-    name: provider.name,
-    npm: provider.npmPackage,
-    options,
-  };
-}
-
-function resolveOpenCodeProviderApiBase(input: RuntimeVendorEnvironmentInput): string {
-  const apiBase = input.credential.apiBase ?? input.vendor.defaultApiBase ?? null;
-
-  if (!isTruthy(apiBase)) {
-    throw new Error(`${input.vendor.label} requires a Base URL before it can be used by OpenCode.`);
-  }
-
-  enforceSafeApiBase(apiBase);
-  return apiBase;
 }
 
 async function hydrateRunContextFromSession(
@@ -345,8 +219,8 @@ async function hydrateRunContextFromSession(
     throw new Error(`Runtime ${binding.runtimeId} does not declare vendor ${binding.provider}.`);
   }
 
-  const [credential, snapshotEnvVars, environmentArtifact, setupScript] = await Promise.all([
-    resolveVendorApiKey({
+  const [vendorCredential, envVars, environmentArtifact, setupScript] = await Promise.all([
+    resolveVendorCredentialRef({
       bindings,
       executionOwnerUserId: agent.ownerId,
       options: { modelId: binding.model },
@@ -365,7 +239,7 @@ async function hydrateRunContextFromSession(
     resolveEnvironmentSetupScriptForExecution(bindings.DB, environmentSnapshot),
   ]);
 
-  if (!credential) {
+  if (!vendorCredential) {
     await appendRuntimeDiagnosticEvent(bindings, {
       eventName: RUNTIME_DIAGNOSTIC_EVENT.configCredentialMissing.name,
       sessionId: session.id,
@@ -381,17 +255,6 @@ async function hydrateRunContextFromSession(
     throw new Error(`No credential available for ${vendor.label}. Configure in Providers.`);
   }
 
-  const vendorEnvVars = buildRuntimeVendorEnvVars({
-    credential,
-    model: binding.model,
-    runtimeId,
-    vendor,
-  });
-
-  const envVars = mergeSessionSnapshotEnvVars({
-    snapshotEnvVars,
-    vendorEnvVars,
-  });
   let profile: DriverProfileConfig;
   const runtimeProfileIds = await resolveRuntimeProfileIds(bindings, {
     agentId: agent.id,
@@ -426,6 +289,7 @@ async function hydrateRunContextFromSession(
       sandboxId: runtimeProfileIds.sandboxId,
       sessionId: session.id,
       setupScript,
+      vendorCredential,
     });
   } catch (error) {
     await appendRuntimeDiagnosticEvent(bindings, {
@@ -511,8 +375,8 @@ async function refreshCachedRunContextVolatileFields(
   const toolReferences = executionPlan.tools.toSorted(
     (left, right) => left.sortOrder - right.sortOrder,
   );
-  const [credential, snapshotEnvVars, mcpServers] = await Promise.all([
-    resolveVendorApiKey({
+  const [vendorCredential, envVars, mcpServers] = await Promise.all([
+    resolveVendorCredentialRef({
       bindings,
       executionOwnerUserId: agent.ownerId,
       options: { modelId: binding.model },
@@ -539,19 +403,10 @@ async function refreshCachedRunContextVolatileFields(
       : Promise.resolve([]),
   ]);
 
-  if (!credential) {
+  if (!vendorCredential) {
     throw new Error(`No credential available for ${vendor.label}. Configure in Providers.`);
   }
 
-  const envVars = mergeSessionSnapshotEnvVars({
-    snapshotEnvVars,
-    vendorEnvVars: buildRuntimeVendorEnvVars({
-      credential,
-      model: binding.model,
-      runtimeId,
-      vendor,
-    }),
-  });
   const runtimeProfileIds = await resolveRuntimeProfileIds(bindings, {
     agentId: agent.id,
     kind: binding.kind,
@@ -583,6 +438,7 @@ async function refreshCachedRunContextVolatileFields(
     sandboxId: runtimeProfileIds.sandboxId,
     sessionId: session.id,
     setupScript: environmentSnapshot.setupScript,
+    vendorCredential,
   });
 
   return {

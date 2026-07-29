@@ -8,6 +8,7 @@ import type {
   DriverEnvironmentArtifactProfile,
   DriverPermissionPolicy,
   DriverProfileConfig,
+  DriverVendorCredentialProfile,
 } from "../domain/driver-snapshot";
 import { DEFAULT_DRIVER_PERMISSION_POLICY } from "../domain/driver-snapshot";
 import { getSupportedRuntimeId } from "../domain/runtime-config";
@@ -33,6 +34,7 @@ export function createAgentRuntimeProfile(input: {
   sandboxSessionId: SandboxSessionId;
   sessionId: SessionId;
   setupScript: string;
+  vendorCredential: DriverVendorCredentialProfile;
 }): DriverProfileConfig {
   const runtimeId = getSupportedRuntimeId(input.runtimeId);
 
@@ -75,5 +77,6 @@ export function createAgentRuntimeProfile(input: {
     },
     setupScript: input.setupScript,
     sourceKind: "agent",
+    vendorCredential: input.vendorCredential,
   };
 }

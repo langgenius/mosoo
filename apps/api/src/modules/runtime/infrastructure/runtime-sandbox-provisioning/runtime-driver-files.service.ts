@@ -8,6 +8,7 @@ import {
   getParentDirectory,
   listAdditionalDirectories,
 } from "./runtime-sandbox-provisioning.paths";
+import { sanitizeRuntimeVendorEnvVars } from "./runtime-vendor-env-policy";
 
 interface RuntimeMemoryMount {
   sourcePath: string;
@@ -205,7 +206,7 @@ export async function runSetupScript(
   const process = await session.startProcess(`sh -e ${quoteShellArg(setupScriptPath)}`, {
     autoCleanup: true,
     cwd: organizationPath,
-    env: profile.envVars,
+    env: sanitizeRuntimeVendorEnvVars(profile.envVars),
   });
   try {
     const exit = await process.waitForExit();

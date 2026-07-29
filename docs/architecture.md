@@ -186,6 +186,7 @@ Except for runtime boundaries such as Session Durable Objects and Sandbox instan
 9. **Credential / Secret Vault Service**
    - Provider keys, API keys, and MCP credentials are App-scoped for current App work. Runtime resolves the active key by `(execution_actor, app, provider)` and fails closed when the App-scoped credential cannot be proven. In Agent execution, the execution actor is the Agent owner; the caller is used only for ingress context.
    - API keys, provider keys, and MCP access credentials are encrypted at rest with envelope encryption. Plaintext exists only briefly in runtime memory. Profiles store provider and credential references, never plaintext secrets.
+   - Provider model calls authenticate through the Worker-side LLM proxy (`/api/driver/llm/proxy/:credentialId/*`). The Sandbox receives only an expiring, driver-generation- and model-bound `llm_proxy` grant in the vendor key env var and the proxy endpoint in the vendor base-URL env var (or rendered OpenCode config); the Worker verifies the active driver generation, admits only the model protocol's required endpoints, reads the vault secret per forwarded request, and injects the vendor auth header upstream. Raw provider keys never enter the Sandbox boot payload, process environment, or setup script environment.
    - Credential CRUD, active key switching, and Agent / MCP binding changes are control-plane changes. High-frequency `resolveCredential()` calls are runtime reads and remain outside mutation workflows.
 
 10. **Cost / Billing Service**

@@ -9,6 +9,7 @@ import {
   parseDriverBootPayloadJson,
 } from "@mosoo/agent-driver/boot";
 import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
+import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 import { RUNTIME_EVENT_SCHEMA_VERSION, createRuntimeEvent } from "@mosoo/runtime-events";
 
 import { getDriverControlPort } from "../src/modules/runtime/domain/sandbox-layout";
@@ -31,6 +32,8 @@ import {
 import { AGENT_DRIVER_PROCESS_COMMAND } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-artifact";
 import { buildExecutionSpec } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-execution-spec.builder";
 import type { RuntimeExecutionSpecBindings } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-execution-spec.builder";
+import { runSetupScript } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-files.service";
+import type { ExecutionSessionHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   API_DRIVER_BOUNDARY_IDS,
@@ -270,6 +273,7 @@ describe("API to driver boundary", () => {
         { enabled: true, name: "web_fetch" },
         { enabled: true, name: "web_search" },
       ],
+      driverGeneration: 7,
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
       nativeResumeRef: {
         kind: "openai_thread_id",
@@ -278,6 +282,18 @@ describe("API to driver boundary", () => {
       },
       profile: {
         ...createDriverProfile(),
+        envVarNames: [
+          "EXISTING_ENV",
+          "OPENAI_API_KEY",
+          "OPENAI_BASE_URL",
+          "OPENCODE_CONFIG_CONTENT",
+        ],
+        envVars: {
+          EXISTING_ENV: "kept",
+          OPENAI_API_KEY: "raw-environment-key",
+          OPENAI_BASE_URL: "https://attacker.example.com/v1",
+          OPENCODE_CONFIG_CONTENT: '{"provider":{"openai":{"options":{"apiKey":"raw"}}}}',
+        },
         environmentArtifact: {
           backupDir: "/workspace/.mosoo/environment-artifacts/artifact",
           backupId: "11111111-1111-4111-8111-111111111111",
@@ -297,8 +313,24 @@ describe("API to driver boundary", () => {
     expect(execution.profilePrompt).toContain("only user-downloadable session output directory");
     expect(execution.profilePrompt).toContain("even if the user does not explicitly ask");
     expect(execution.profilePrompt).toContain("Files written anywhere else are scratch");
+    const llmProxyGrant = execution.environment.variables["OPENAI_API_KEY"];
+    if (llmProxyGrant === undefined) {
+      throw new Error("Expected an LLM proxy grant env var.");
+    }
+
     expect(execution.environment.variables).toEqual({
       EXISTING_ENV: "kept",
+      OPENAI_API_KEY: llmProxyGrant,
+      OPENAI_BASE_URL: `http://localhost:8787/api/driver/llm/proxy/${PLATFORM_ID_FIXTURES.vendorCredential}`,
+    });
+    await expect(verifyRuntimeActionToken(bindings, llmProxyGrant)).resolves.toMatchObject({
+      action: "llm_proxy",
+      appId: API_DRIVER_BOUNDARY_IDS.app,
+      driverGeneration: 7,
+      driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+      modelId: "gpt-5.1",
+      modelProtocol: "openai-responses",
+      resourceId: PLATFORM_ID_FIXTURES.vendorCredential,
     });
     expect(execution.environment.paths).toEqual(artifactPaths);
 
@@ -340,9 +372,46 @@ describe("API to driver boundary", () => {
     ).toBe("https://invalid.local/tombstone.skill");
   });
 
+  test("removes runtime-managed provider values from the setup process", async () => {
+    let setupEnv: Record<string, string | undefined> | undefined;
+    const session: ExecutionSessionHandle = {
+      exec: async () => ({ exitCode: 0, stderr: "", stdout: "missing", success: true }),
+      mkdir: async () => undefined,
+      readFile: async () => ({ content: "", encoding: "utf8" }),
+      startProcess: async (_command, options) => {
+        setupEnv = options.env;
+        return {
+          getLogs: async () => "",
+          getStatus: async () => "completed",
+          id: "setup",
+          kill: async () => undefined,
+          pid: 1,
+          waitForExit: async () => ({ exitCode: 0 }),
+          waitForPort: async () => undefined,
+        };
+      },
+      watch: async () => new ReadableStream<Uint8Array>(),
+      writeFile: async () => undefined,
+    };
+
+    await runSetupScript(session, {
+      ...createDriverProfile(),
+      envVarNames: ["EXISTING_ENV", "OPENAI_API_KEY", "OPENAI_BASE_URL"],
+      envVars: {
+        EXISTING_ENV: "kept",
+        OPENAI_API_KEY: "raw-environment-key",
+        OPENAI_BASE_URL: "https://attacker.example.com/v1",
+      },
+      setupScript: "echo setup",
+    });
+
+    expect(setupEnv).toEqual({ EXISTING_ENV: "kept" });
+  });
+
   test("emits a boot payload that the driver protocol parser accepts", async () => {
     const execution = await buildExecutionSpec(bindings, {
       builtInTools: createDefaultAgentBuiltInTools(),
+      driverGeneration: 0,
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
       profile: createDriverProfile(),
       requestUrl: "https://api.example.com/api/driver/connect",

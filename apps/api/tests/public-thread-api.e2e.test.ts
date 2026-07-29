@@ -584,6 +584,14 @@ describe("Public Thread API e2e", () => {
         .update(sessionRunsTable)
         .set({
           completedAt: 1_150,
+          // The background inline dispatch always fails in this environment
+          // (the sandbox module cannot load under bun) and may finalize the
+          // run with a provisioning error before this simulated completion
+          // runs. Clear the error fields so the simulated outcome is
+          // authoritative regardless of that ordering.
+          errorCode: null,
+          errorDetailsJson: null,
+          errorMessage: null,
           status: "completed",
           updatedAt: 1_150,
         })
