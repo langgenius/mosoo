@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "bench:queue-delivery": "bun bench/queue-delivery-ab.ts",
+    "bench:runtime-subject-filesystem": "bun bench/runtime-subject-filesystem-ab.ts",
     "dev": "vp exec bun bin/dev-local.ts",
     "deploy": "vp exec bun bin/deploy-prod.ts",
     "env:init": "vp exec bun bin/init-dev-vars.ts",

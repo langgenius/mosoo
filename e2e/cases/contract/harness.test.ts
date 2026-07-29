@@ -13,6 +13,7 @@ import {
 } from "../../lib/env-preflight";
 import {
   assertRuntimeSignalCoverage,
+  createLatencyProbe,
   createRuntimeSignalCollector,
   summarizeRuntimeSignalCoverage,
 } from "../../lib/runtime-progress";
@@ -136,6 +137,37 @@ describe("E2E CLI target matching", () => {
     expect(target?.args).toEqual(["--list"]);
     expect(target === null ? [] : commandNames(target)).toEqual(["public-api runtime"]);
   });
+
+  test("requires the complete isolated A/B staging configuration for cold-start crossover", () => {
+    const benchmark = e2eCases.find((entry) => entry.id.join(" ") === "public-api cold-start-ab");
+
+    expect(benchmark?.description).toContain("dual-stack");
+    expect(benchmark?.requiresEnv).toEqual(
+      expect.arrayContaining([
+        "CLOUDFLARE_ACCOUNT_ID",
+        "MOSOO_PERF_FIXTURE_A",
+        "MOSOO_PERF_FIXTURE_B",
+        "MOSOO_PERF_BEFORE_CONTAINER_INSTANCE_TYPE",
+        "MOSOO_PERF_BEFORE_CONTAINER_VCPU",
+        "MOSOO_PERF_BEFORE_CONTAINER_MEMORY_MIB",
+        "MOSOO_PERF_BEFORE_CONTAINER_DISK_MB",
+        "MOSOO_PERF_BEFORE_CONTAINER_MAX_INSTANCES",
+        "MOSOO_PERF_AFTER_CONTAINER_INSTANCE_TYPE",
+        "MOSOO_PERF_AFTER_CONTAINER_VCPU",
+        "MOSOO_PERF_AFTER_CONTAINER_MEMORY_MIB",
+        "MOSOO_PERF_AFTER_CONTAINER_DISK_MB",
+        "MOSOO_PERF_AFTER_CONTAINER_MAX_INSTANCES",
+        "MOSOO_PERF_A_CF_ENV",
+        "MOSOO_PERF_A_RESOURCE_PREFIX",
+        "MOSOO_PERF_A_WRANGLER_TEMPLATE",
+        "MOSOO_PERF_B_CF_ENV",
+        "MOSOO_PERF_B_RESOURCE_PREFIX",
+        "MOSOO_PERF_B_WRANGLER_TEMPLATE",
+      ]),
+    );
+    expect(benchmark?.requiresEnv).not.toContain("MOSOO_PERF_FIXTURE");
+    expect(benchmark?.requiresEnv).not.toContain("MOSOO_PERF_BASE_URL");
+  });
 });
 
 describe("E2E CLI help", () => {
@@ -210,6 +242,72 @@ describe("runtime signal coverage contract", () => {
         category: "application_lifecycle",
       }),
     );
+  });
+
+  test("measures input, Send click, first assistant delta, and first paint independently", async () => {
+    let nowEpochMs = 2_000;
+    const page = new FakePage();
+    const probe = createLatencyProbe({
+      nowEpochMs: () => nowEpochMs,
+      page,
+    });
+    const socket = new FakeWebSocket(
+      "ws://localhost:5173/api/ag-ui/session/session-1/ws?appId=app-1",
+    );
+    page.emit("websocket", socket);
+
+    const turn = probe.startTurn("measured-turn");
+    turn.markSendClick(2_000);
+    socket.emit("framereceived", {
+      payload: JSON.stringify({
+        messageId: "user-1",
+        role: "user",
+        type: "TEXT_MESSAGE_START",
+      }),
+    });
+    socket.emit("framereceived", {
+      payload: JSON.stringify({
+        delta: "ignored",
+        messageId: "user-1",
+        type: "TEXT_MESSAGE_CONTENT",
+      }),
+    });
+    socket.emit("framereceived", {
+      payload: JSON.stringify({
+        messageId: "assistant-1",
+        role: "assistant",
+        type: "TEXT_MESSAGE_START",
+      }),
+    });
+    socket.emit("framereceived", {
+      payload: JSON.stringify({
+        delta: "",
+        messageId: "assistant-1",
+        type: "TEXT_MESSAGE_CONTENT",
+      }),
+    });
+    nowEpochMs = 2_300;
+    socket.emit("framereceived", {
+      payload: JSON.stringify({
+        delta: "first token",
+        messageId: "assistant-1",
+        type: "TEXT_MESSAGE_CONTENT",
+      }),
+    });
+
+    const latency = await turn.wait({
+      firstPaintAtEpochMs: Promise.resolve(2_800),
+      inputStartedAtEpochMs: 1_000,
+      visibleText: Promise.resolve(700),
+    });
+
+    expect(latency).toMatchObject({
+      clickToFirstAssistantDeltaMs: 300,
+      clickToFirstPaintMs: 800,
+      firstAssistantTextMs: 700,
+      inputToClickMs: 1_000,
+      inputToFirstPaintMs: 1_800,
+    });
   });
 
   test("emits concise progress lines for feature checkpoints when enabled", () => {
