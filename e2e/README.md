@@ -217,6 +217,74 @@ total usage rather than output tokens, so this harness does not mislabel it as
 output token/s; provider output token/s is measured separately by the Driver TTFT
 benchmark.
 
+## Unmerged runtime performance overlay
+
+The runtime performance infrastructure is intentionally maintained outside
+`main`. It is not a release dependency and must never be deployed to
+production. The canonical remote refs are:
+
+| Repository                      | Remote ref                                 | Role                                      |
+| ------------------------------- | ------------------------------------------ | ----------------------------------------- |
+| `langgenius/mosoo`              | `origin/perf/runtime-e2e-scoreboard-infra` | Harness, Scoreboard, and API evidence     |
+| `langgenius/mosoo-agent-driver` | `origin/feat/runtime-performance-evidence` | Driver identity and provider-direct bench |
+
+Treat the refs as one overlay revision: the Mosoo ref must pin the current
+Driver overlay through `apps/driver`. Fetch and verify the pair before every
+experiment:
+
+```bash
+git fetch origin perf/runtime-e2e-scoreboard-infra
+git worktree add --detach <before-root> origin/perf/runtime-e2e-scoreboard-infra
+git -C <before-root> submodule update --init .skills/mosoo-skills apps/driver
+git -C <before-root>/apps/driver fetch origin feat/runtime-performance-evidence
+test "$(git -C <before-root>/apps/driver rev-parse HEAD)" = \
+  "$(git -C <before-root>/apps/driver rev-parse origin/feat/runtime-performance-evidence)"
+git -C <before-root> rev-parse HEAD
+git -C <before-root>/apps/driver rev-parse HEAD
+```
+
+Record both printed SHAs in the experiment provenance. If the Driver equality
+check fails, or the overlay does not contain the intended Mosoo target SHA,
+stop and port the overlay in a focused maintenance commit before collecting
+samples. Never repair or rebase the overlay during a formal run.
+
+Create the candidate from the exact same Mosoo overlay revision:
+
+```bash
+git worktree add -b perf/runtime-e2e-candidate \
+  <after-root> origin/perf/runtime-e2e-scoreboard-infra
+git -C <after-root> submodule update --init .skills/mosoo-skills apps/driver
+git -C <after-root> cherry-pick <mosoo-optimization-commit>...
+```
+
+For an API-only experiment, `before` and `after` must retain the same
+`apps/driver` commit. For a Driver experiment, create the candidate Driver from
+`origin/feat/runtime-performance-evidence`, cherry-pick only the Driver
+optimization into `<after-root>/apps/driver`, and update only the candidate
+Mosoo submodule pointer. Cross-repository optimization commits together form
+the treatment; do not include unrelated Driver upgrades or fixes.
+
+There are two distinct comparisons:
+
+- Instrumentation acceptance: target Mosoo/Driver SHAs versus those same SHAs
+  plus the overlay. Run only the balanced 4-pair `1/2/17/18` intrusion gate.
+- Product optimization: both sides use the same overlay; only the candidate
+  side adds the Mosoo and/or Driver optimization.
+
+Before remote use, run these local gates from both roots:
+
+```bash
+just e2e contract runtime-scoreboard
+just e2e contract cold-start-benchmark
+bun e2e/bin/perf-intrusion-ab.ts --self-test
+just tc-package @mosoo/api
+```
+
+Use only dedicated performance staging stacks. Preserve the frozen harness,
+provenance, identity, trace, cleanup, and exact-output checks; missing evidence
+fails closed. The 4-pair path is staging acceptance, not statistical
+certification, and does not replace or modify the frozen 32-pair protocol.
+
 ## Runtime E2E scoreboard
 
 The scoreboard reuses the frozen crossover artifact and joins provider first
