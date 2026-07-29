@@ -3,17 +3,18 @@ import { describe, expect, test } from "bun:test";
 import { configureSandboxHttpsInterception } from "../src/adapters/durable-objects/sandbox-https-interception";
 
 describe("Sandbox HTTPS interception", () => {
-  test("pins production on and preserves the explicit local CA escape hatch", () => {
-    const local = { interceptHttps: true };
-    configureSandboxHttpsInterception(local, "true");
-    expect(local.interceptHttps).toBe(false);
+  test("keeps the platform hook and Sandbox startup flag aligned", () => {
+    const sandbox = {
+      envVars: { EXISTING: "kept" },
+      interceptHttps: false,
+    };
 
-    const production = { interceptHttps: false };
-    configureSandboxHttpsInterception(production, "false");
-    expect(production.interceptHttps).toBe(true);
+    configureSandboxHttpsInterception(sandbox, true);
+    expect(sandbox.interceptHttps).toBe(true);
+    expect(sandbox.envVars).toEqual({ EXISTING: "kept", SANDBOX_INTERCEPT_HTTPS: "1" });
 
-    const unset = { interceptHttps: false };
-    configureSandboxHttpsInterception(unset, undefined);
-    expect(unset.interceptHttps).toBe(true);
+    configureSandboxHttpsInterception(sandbox, false);
+    expect(sandbox.interceptHttps).toBe(false);
+    expect(sandbox.envVars).toEqual({ EXISTING: "kept" });
   });
 });

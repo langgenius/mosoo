@@ -1,7 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 
 import type { ApiBindings } from "../../platform/cloudflare/worker-types";
-import { configureSandboxHttpsInterception } from "./sandbox-https-interception";
 import {
   configureSandboxNetworkConstraints,
   restoreSandboxNetworkEnforcement,
@@ -34,19 +33,15 @@ export class Sandbox extends DurableObject {
 
     this.#httpsInterceptionDisabled = env.SANDBOX_FILE_BUCKET_LOCAL === "true";
     this.#delegatePromise = import("@cloudflare/sandbox").then(
-      ({ Sandbox: SandboxImplementation }) => {
-        const delegate = new SandboxImplementation(ctx, env);
-
-        configureSandboxHttpsInterception(delegate, env.SANDBOX_FILE_BUCKET_LOCAL);
-
-        return delegate;
-      },
+      ({ Sandbox: SandboxImplementation }) => new SandboxImplementation(ctx, env),
     );
     // Re-assert the persisted internet switch before any container start. A
     // rejected restore blocks every access/start RPC, while teardown remains
     // available so lifecycle repair can remove the untrusted container.
     this.#networkRestorePromise = this.#delegatePromise.then((delegate) =>
-      restoreSandboxNetworkEnforcement(ctx.storage, delegate),
+      restoreSandboxNetworkEnforcement(ctx.storage, delegate, {
+        httpsInterceptionDisabled: this.#httpsInterceptionDisabled,
+      }),
     );
   }
 

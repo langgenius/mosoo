@@ -27,6 +27,8 @@ function createDelegate() {
   return {
     allowedHostsCalls,
     enableInternet: true,
+    envVars: {},
+    interceptHttps: false,
     setAllowedHosts: (hosts: string[]) => {
       allowedHostsCalls.push(hosts);
       return Promise.resolve();
@@ -48,6 +50,8 @@ describe("sandbox network enforcement", () => {
     await configureSandboxNetworkConstraints(storage, delegate, constraints, ENFORCEABLE);
 
     expect(delegate.enableInternet).toBe(false);
+    expect(delegate.interceptHttps).toBe(true);
+    expect(delegate.envVars).toEqual({ SANDBOX_INTERCEPT_HTTPS: "1" });
     expect(delegate.allowedHostsCalls).toEqual([["api.anthropic.com", "api.example.com"]]);
     expect(storage.values.get(SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY)).toEqual(constraints);
   });
@@ -66,6 +70,8 @@ describe("sandbox network enforcement", () => {
     ).rejects.toThrow("cannot be enforced");
 
     expect(delegate.enableInternet).toBe(true);
+    expect(delegate.interceptHttps).toBe(false);
+    expect(delegate.envVars).toEqual({});
     expect(delegate.allowedHostsCalls).toEqual([]);
     expect(storage.values.has(SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY)).toBe(false);
   });
@@ -82,6 +88,8 @@ describe("sandbox network enforcement", () => {
     );
 
     expect(delegate.enableInternet).toBe(true);
+    expect(delegate.interceptHttps).toBe(false);
+    expect(delegate.envVars).toEqual({});
     expect(delegate.allowedHostsCalls).toEqual([]);
   });
 
@@ -102,6 +110,8 @@ describe("sandbox network enforcement", () => {
     let persistedAtSdkCall = false;
     const delegate = {
       enableInternet: true,
+      envVars: {},
+      interceptHttps: false,
       setAllowedHosts: () => {
         persistedAtSdkCall = storage.values.has(SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY);
         return Promise.reject(new Error("SDK interception failed"));
@@ -204,16 +214,44 @@ describe("sandbox network enforcement", () => {
         },
       }),
       limited,
+      { httpsInterceptionDisabled: false },
     );
     expect(limited.enableInternet).toBe(false);
+    expect(limited.interceptHttps).toBe(true);
+    expect(limited.envVars).toEqual({ SANDBOX_INTERCEPT_HTTPS: "1" });
     // The SDK restores its own persisted allowlist; restore only re-applies
-    // the start-time internet switch.
+    // the start-time properties.
     expect(limited.allowedHostsCalls).toEqual([]);
 
     const untouched = createDelegate();
 
-    await restoreSandboxNetworkEnforcement(createStorage(), untouched);
+    await restoreSandboxNetworkEnforcement(createStorage(), untouched, {
+      httpsInterceptionDisabled: false,
+    });
     expect(untouched.enableInternet).toBe(true);
+    expect(untouched.interceptHttps).toBe(false);
+    expect(untouched.envVars).toEqual({});
+  });
+
+  test("restore fails closed for persisted Limited policy without HTTPS interception", async () => {
+    const delegate = createDelegate();
+
+    await expect(
+      restoreSandboxNetworkEnforcement(
+        createStorage({
+          [SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY]: {
+            allowedHosts: ["api.example.com"],
+            networkPolicy: "limited",
+          },
+        }),
+        delegate,
+        { httpsInterceptionDisabled: true },
+      ),
+    ).rejects.toThrow("cannot be enforced");
+
+    expect(delegate.enableInternet).toBe(false);
+    expect(delegate.interceptHttps).toBe(false);
+    expect(delegate.envVars).toEqual({});
   });
 
   test("restore fails closed on a corrupt persisted record", async () => {
@@ -223,6 +261,7 @@ describe("sandbox network enforcement", () => {
       restoreSandboxNetworkEnforcement(
         createStorage({ [SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY]: { networkPolicy: "open" } }),
         delegate,
+        { httpsInterceptionDisabled: false },
       ),
     ).rejects.toThrow("unknown network policy");
     expect(delegate.enableInternet).toBe(false);
