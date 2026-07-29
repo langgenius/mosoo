@@ -17,10 +17,10 @@ import type { LarkSidecarBindingDescriptor } from "../../../modules/channels/lar
 import { logInfo } from "../../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { toPlatformId } from "../../../shared/platform-id";
+import { matchesInternalRouteSecret } from "./internal-route-auth";
 import { platformIdRouteErrorResponse } from "./platform-id-route-error";
 
 const SIDECAR_AUTH_HEADER = "x-sidecar-auth";
-const secretEncoder = new TextEncoder();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -43,32 +43,6 @@ function rejectDisabled(): Response {
     },
     { status: 404 },
   );
-}
-
-async function hashSidecarSecret(value: string): Promise<Uint8Array> {
-  return new Uint8Array(await crypto.subtle.digest("SHA-256", secretEncoder.encode(value)));
-}
-
-async function matchesSidecarSecret(
-  submitted: string | undefined,
-  configured: string,
-): Promise<boolean> {
-  if (!submitted) {
-    return false;
-  }
-
-  const [submittedHash, configuredHash] = await Promise.all([
-    hashSidecarSecret(submitted),
-    hashSidecarSecret(configured),
-  ]);
-  let diff = submittedHash.length ^ configuredHash.length;
-  const length = Math.max(submittedHash.length, configuredHash.length);
-
-  for (let index = 0; index < length; index += 1) {
-    diff |= (submittedHash[index] ?? 0) ^ (configuredHash[index] ?? 0);
-  }
-
-  return diff === 0;
 }
 
 interface DescriptorPayload {
@@ -95,7 +69,7 @@ export function registerLarkGatewayInternalRoute(app: Hono<ApiGatewayEnvironment
     }
 
     const submitted = c.req.header(SIDECAR_AUTH_HEADER);
-    if (!(await matchesSidecarSecret(submitted, configured))) {
+    if (!(await matchesInternalRouteSecret(submitted, configured))) {
       return rejectUnauthenticated();
     }
 
@@ -113,7 +87,7 @@ export function registerLarkGatewayInternalRoute(app: Hono<ApiGatewayEnvironment
     }
 
     const submitted = c.req.header(SIDECAR_AUTH_HEADER);
-    if (!(await matchesSidecarSecret(submitted, configured))) {
+    if (!(await matchesInternalRouteSecret(submitted, configured))) {
       return rejectUnauthenticated();
     }
 

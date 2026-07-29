@@ -103,6 +103,7 @@ https://github.com/user-attachments/assets/4a4bbaab-c192-4462-99e0-020eab966fff
 - API documentation: [mosoo.ai/docs](https://mosoo.ai/docs)
 - Canonical product contract: [docs/SPEC.md](./docs/SPEC.md)
 - Current implementation architecture: [docs/architecture.md](./docs/architecture.md)
+- Production SLO and incident policy: [docs/operations/reliability.md](./docs/operations/reliability.md)
 - PRD index and historical implementation contracts: [docs/prd/README.md](./docs/prd/README.md)
 
 The public landing page and blog live in the private `langgenius/mosoo-website` repository and are deployed separately on `mosoo.ai`.
