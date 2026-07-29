@@ -35,6 +35,7 @@ import { getRuntimeDriverRoutePrefix } from "../../../modules/runtime/domain/run
 import { upgradeDriverInstanceSocket } from "../../../modules/runtime/infrastructure/driver-instance/client";
 import { getDriverInstanceRecord } from "../../../modules/runtime/infrastructure/driver-instance/driver-instance-record.repository";
 import { readSkillPackageBytesFromSnapshot } from "../../../modules/skills/application/skill-package-snapshot.service";
+import { createErrorLogContext, logError } from "../../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { toArrayBuffer } from "../../../shared/bytes";
 import { toPlatformId } from "../../../shared/platform-id";
@@ -717,6 +718,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
       if (error instanceof RuntimeLlmProxyError) {
         return Response.json({ error: error.message }, { status: error.status });
       }
+      logError("runtime.llm_proxy.upstream_failed", createErrorLogContext(error));
       return Response.json({ error: "LLM proxy upstream request failed." }, { status: 502 });
     }
   });
