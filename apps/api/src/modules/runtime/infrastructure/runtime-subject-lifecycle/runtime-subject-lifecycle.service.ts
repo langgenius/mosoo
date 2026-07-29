@@ -5,11 +5,13 @@ import type {
   AccountId,
   DriverInstanceId,
   PlatformId,
+  RuntimeOperationId,
   SandboxId,
   SandboxSessionId,
   SessionId,
   SessionRunId,
 } from "@mosoo/id";
+import { createPlatformId } from "@mosoo/id";
 import { RUNTIME_DIAGNOSTIC_EVENT } from "@mosoo/runtime-events";
 
 import { createErrorLogContext, logWarn } from "../../../../platform/cloudflare/logger";
@@ -27,6 +29,7 @@ import {
   getRuntimeSubjectInactiveDeadline,
   runtimeCheckpointRulesInclude,
 } from "../../domain/runtime-kind-policy";
+import type { SandboxNetworkConstraints } from "../../domain/sandbox-network-constraints";
 import type { SandboxHandle } from "../sandbox-handles";
 import { deleteActiveSandboxConversationSession } from "../sandbox-session/sandbox-conversation-session-delete";
 import {
@@ -39,7 +42,9 @@ import {
   RuntimeSubjectBackupNotReadyError,
   RuntimeSubjectRestoreFailedError,
 } from "./runtime-subject-errors";
+import { assertRuntimeSubjectNetworkPolicySupported } from "./runtime-subject-network";
 import {
+  configureRuntimeSubjectNetwork,
   destroyRuntimeSubjectContainer,
   getRuntimeSubjectKeepAliveHandle,
   prepareRuntimeSubjectFilesystem,
@@ -50,6 +55,7 @@ import {
   createClaimedColdRuntimeSubjectRecord,
   getRuntimeConversationSessionState,
   getRuntimeSubjectActivationRecord,
+  markRuntimeSubjectActivationDestroying,
   markRuntimeSubjectActivationFailed,
   markRuntimeSubjectActive,
   markRuntimeSubjectRestoreApplied,
@@ -75,6 +81,7 @@ export interface ActivateRuntimeSubjectInput {
   readonly executionOwnerUserId: AccountId;
   readonly kind: AgentKind;
   readonly diagnosticContext?: RuntimeDiagnosticContext;
+  readonly networkConstraints: SandboxNetworkConstraints;
   readonly purpose?: RuntimeSubjectActivationPurpose;
   readonly runtimeSubjectId: SandboxId;
   readonly subjectId: PlatformId;
@@ -171,6 +178,12 @@ export class RuntimeSubjectLifecycleService {
   }
 
   async activate(input: ActivateRuntimeSubjectInput): Promise<ActiveRuntimeSubject> {
+    assertRuntimeSubjectNetworkPolicySupported({
+      kind: input.kind,
+      networkPolicy: input.networkConstraints.networkPolicy,
+      subjectKind: input.subjectKind,
+    });
+
     const purpose = input.purpose ?? "interactive";
     const claimOwner = createRuntimeSubjectActivationClaimOwner(purpose);
     const record = await measureOptional(input.timing, "runtimeSubject.admitLifecycle", () =>
@@ -180,6 +193,17 @@ export class RuntimeSubjectLifecycleService {
     const isCold = record === null || record.status === "cold";
 
     try {
+      // Network constraints must land before the first container-starting RPC
+      // below; a limited policy that cannot be applied fails the activation
+      // (and the catch path destroys the container) instead of running open.
+      // Stable Pet subjects support Full only and keep their existing runtime
+      // path unchanged. Cattle records Full as well as Limited so the
+      // session-scoped subject can never switch policy after admission.
+      if (input.kind === "cattle") {
+        await measureOptional(input.timing, "runtimeSubject.configureNetwork", () =>
+          configureRuntimeSubjectNetwork(subject, input.networkConstraints),
+        );
+      }
       await measureOptional(input.timing, "runtimeSubject.prepareFilesystem", () =>
         prepareRuntimeSubjectFilesystem(subject),
       );
@@ -221,27 +245,57 @@ export class RuntimeSubjectLifecycleService {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Runtime subject activation failed.";
       const errorCode = getRuntimeSubjectErrorCode(error);
+      const operationId = createPlatformId<RuntimeOperationId>();
+      let destroyingRecorded = false;
 
-      // Activation failed, so the container DO is no longer trustworthy (a hung
-      // keep-alive, a half-restored filesystem, a lost port). Destroy it so the
-      // subject returns to a true cold state and the next run cold-starts a
-      // fresh container instead of reclaiming this broken one. Best-effort: a
-      // destroy failure must not mask the original activation error.
       try {
-        await destroyRuntimeSubjectContainer(this.#bindings, input.runtimeSubjectId);
-      } catch (destroyError) {
-        logWarn("runtime.subject.activation_failure.destroy_failed", {
-          ...createErrorLogContext(destroyError),
+        destroyingRecorded = await markRuntimeSubjectActivationDestroying(this.#bindings.DB, {
+          claimOwner,
+          errorCode,
+          message,
+          operationId,
+          runtimeSubjectId: input.runtimeSubjectId,
+        });
+      } catch (recordError) {
+        logWarn("runtime.subject.activation_failure.destroy_record_failed", {
+          ...createErrorLogContext(recordError),
           runtimeSubjectId: input.runtimeSubjectId,
         });
       }
 
-      await markRuntimeSubjectActivationFailed(this.#bindings.DB, {
-        claimOwner,
-        errorCode,
-        message,
-        runtimeSubjectId: input.runtimeSubjectId,
-      });
+      // Teardown is bounded by the provision timeout. Only confirmed teardown
+      // may advertise cold; failure leaves destroying + operationId for the
+      // maintenance repair loop. Neither path masks the activation error.
+      let destroyed = false;
+
+      if (destroyingRecorded) {
+        try {
+          await destroyRuntimeSubjectContainer(this.#bindings, input.runtimeSubjectId);
+          destroyed = true;
+        } catch (destroyError) {
+          logWarn("runtime.subject.activation_failure.destroy_failed", {
+            ...createErrorLogContext(destroyError),
+            runtimeSubjectId: input.runtimeSubjectId,
+          });
+        }
+      }
+
+      if (destroyingRecorded && destroyed) {
+        try {
+          await markRuntimeSubjectActivationFailed(this.#bindings.DB, {
+            errorCode,
+            message,
+            operationId,
+            runtimeSubjectId: input.runtimeSubjectId,
+          });
+        } catch (finalizeError) {
+          logWarn("runtime.subject.activation_failure.destroy_finalize_failed", {
+            ...createErrorLogContext(finalizeError),
+            runtimeSubjectId: input.runtimeSubjectId,
+          });
+        }
+      }
+
       await this.#appendRestoreFailureDiagnostic({
         diagnosticContext: input.diagnosticContext,
         error,

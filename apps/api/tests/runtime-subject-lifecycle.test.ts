@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { decideRuntimeSubjectTransition } from "../src/modules/runtime/domain/runtime-subject-lifecycle.machine";
 import { createRuntimeSubjectLifecycleService } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
+import { destroyRuntimeSubjectContainer } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-platform";
 import { recycleRuntimeSubject } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-recycle.service";
 import {
   advanceRuntimeSubjectOperationStatus,
@@ -161,6 +162,10 @@ async function readRuntimeSubject(database: D1Database): Promise<{
 
 function createSandboxHandle(
   options: {
+    readonly configureNetworkError?: Error;
+    readonly destroyError?: Error;
+    readonly destroyPromise?: Promise<void>;
+    readonly onConfigureNetwork?: () => void;
     readonly onDestroy?: () => void;
     readonly onRestore?: (backup: { readonly dir: string; readonly id: string }) => void;
     readonly prepareError?: Error;
@@ -171,14 +176,24 @@ function createSandboxHandle(
   };
 
   return {
+    configureNetworkConstraints: async () => {
+      options.onConfigureNetwork?.();
+      if (options.configureNetworkError) {
+        throw options.configureNetworkError;
+      }
+    },
     createBackup: unavailable,
     createSession: unavailable,
     deleteSession: unavailable,
-    destroy: options.onDestroy
-      ? async () => {
-          options.onDestroy?.();
-        }
-      : unavailable,
+    destroy: async () => {
+      options.onDestroy?.();
+
+      if (options.destroyError) {
+        throw options.destroyError;
+      }
+
+      await options.destroyPromise;
+    },
     exec: unavailable,
     getSession: unavailable,
     mkdir: async () => {
@@ -206,6 +221,10 @@ function createSandboxHandle(
 function createBindings(
   database: D1Database,
   options: {
+    readonly configureNetworkError?: Error;
+    readonly destroyError?: Error;
+    readonly destroyPromise?: Promise<void>;
+    readonly onConfigureNetwork?: () => void;
     readonly onDestroy?: () => void;
     readonly onRestore?: (backup: { readonly dir: string; readonly id: string }) => void;
     readonly prepareError?: Error;
@@ -238,14 +257,39 @@ describe("runtime subject lifecycle machine", () => {
         targetStatus: "destroying",
       }),
     ).toMatchObject({ kind: "accepted", nextStatus: "destroying" });
-    // Failure returns to cold from any in-flight state; there is no `error`
-    // status to strand a subject in.
+    expect(
+      decideRuntimeSubjectTransition({
+        currentStatus: "restoring",
+        targetStatus: "destroying",
+      }),
+    ).toMatchObject({ kind: "accepted", nextStatus: "destroying" });
+    // Confirmed teardown returns to cold; there is no `error` status.
     expect(
       decideRuntimeSubjectTransition({ currentStatus: "active", targetStatus: "cold" }),
     ).toMatchObject({ kind: "accepted", nextStatus: "cold" });
     expect(
       decideRuntimeSubjectTransition({ currentStatus: "restoring", targetStatus: "cold" }),
     ).toMatchObject({ kind: "accepted", nextStatus: "cold" });
+  });
+
+  test("rejects Pet Limited before lifecycle admission", async () => {
+    const database = createRuntimeSubjectLifecycleDatabase();
+
+    await expect(
+      createRuntimeSubjectLifecycleService(createBindings(database)).activate({
+        executionOwnerUserId: "01J00000000000000000000002",
+        kind: "pet",
+        networkConstraints: { allowedHosts: ["api.example.com"], networkPolicy: "limited" },
+        runtimeSubjectId: RUNTIME_SUBJECT_ID,
+        spaceAliases: [],
+        subjectId: "01J00000000000000000000009",
+        subjectKind: "agent",
+      }),
+    ).rejects.toThrow("only for Task Agents");
+
+    await expect(
+      database.prepare("SELECT id FROM sandbox WHERE id = ?").bind(RUNTIME_SUBJECT_ID).first("id"),
+    ).resolves.toBeNull();
   });
 
   test("records operation transitions with monotonic status metadata", async () => {
@@ -317,6 +361,7 @@ describe("runtime subject lifecycle machine", () => {
     ).activate({
       executionOwnerUserId: "01J00000000000000000000002",
       kind: "cattle",
+      networkConstraints: { allowedHosts: [], networkPolicy: "full" },
       runtimeSubjectId: RUNTIME_SUBJECT_ID,
       spaceAliases: [],
       subjectId: "01J00000000000000000000009",
@@ -424,16 +469,21 @@ describe("runtime subject lifecycle machine", () => {
       .bind("pet", STORED_BACKUP_ID, "agent", RUNTIME_SUBJECT_ID)
       .run();
     let restoredBackup: { readonly dir: string; readonly id: string } | null = null;
+    let configureNetworkCalls = 0;
 
     const activation = await createRuntimeSubjectLifecycleService(
       createBindings(database, {
         onRestore: (backup) => {
           restoredBackup = backup;
         },
+        onConfigureNetwork: () => {
+          configureNetworkCalls += 1;
+        },
       }),
     ).activate({
       executionOwnerUserId: "01J00000000000000000000002",
       kind: "pet",
+      networkConstraints: { allowedHosts: [], networkPolicy: "full" },
       runtimeSubjectId: RUNTIME_SUBJECT_ID,
       spaceAliases: [],
       subjectId: "01J00000000000000000000009",
@@ -441,6 +491,7 @@ describe("runtime subject lifecycle machine", () => {
     });
 
     expect(activation.subject).toBeTruthy();
+    expect(configureNetworkCalls).toBe(0);
     expect(restoredBackup).toEqual({
       dir: "/workspace/memory",
       id: CLOUDFLARE_BACKUP_ID,
@@ -465,6 +516,7 @@ describe("runtime subject lifecycle machine", () => {
     ).activate({
       executionOwnerUserId: "01J00000000000000000000002",
       kind: "cattle",
+      networkConstraints: { allowedHosts: [], networkPolicy: "full" },
       runtimeSubjectId: RUNTIME_SUBJECT_ID,
       spaceAliases: [],
       subjectId: "01J00000000000000000000009",
@@ -475,7 +527,8 @@ describe("runtime subject lifecycle machine", () => {
     const row = await database
       .prepare(
         `
-          SELECT claim_expires_at, claim_owner, last_error, last_error_code, status
+          SELECT claim_expires_at, claim_owner, last_error, last_error_code, status,
+                 status_operation_id
           FROM sandbox
           WHERE id = ?
         `,
@@ -487,6 +540,7 @@ describe("runtime subject lifecycle machine", () => {
         last_error: string | null;
         last_error_code: string | null;
         status: string;
+        status_operation_id: string | null;
       }>();
 
     expect(row).toEqual({
@@ -495,6 +549,7 @@ describe("runtime subject lifecycle machine", () => {
       last_error: null,
       last_error_code: null,
       status: "active",
+      status_operation_id: null,
     });
   });
 
@@ -506,6 +561,7 @@ describe("runtime subject lifecycle machine", () => {
       createRuntimeSubjectLifecycleService(createBindings(database, { prepareError })).activate({
         executionOwnerUserId: "01J00000000000000000000002",
         kind: "cattle",
+        networkConstraints: { allowedHosts: [], networkPolicy: "full" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
         spaceAliases: [],
         subjectId: "01J00000000000000000000009",
@@ -516,7 +572,8 @@ describe("runtime subject lifecycle machine", () => {
     const row = await database
       .prepare(
         `
-          SELECT claim_expires_at, claim_owner, last_error, last_error_code, status
+          SELECT claim_expires_at, claim_owner, last_error, last_error_code, status,
+                 status_operation_id
           FROM sandbox
           WHERE id = ?
         `,
@@ -528,6 +585,7 @@ describe("runtime subject lifecycle machine", () => {
         last_error: string | null;
         last_error_code: string | null;
         status: string;
+        status_operation_id: string | null;
       }>();
 
     expect(row).toEqual({
@@ -536,7 +594,95 @@ describe("runtime subject lifecycle machine", () => {
       last_error: "Runtime subject filesystem prepare timed out after 15000ms.",
       last_error_code: "runtime.subject_activation_failed",
       status: "cold",
+      status_operation_id: null,
     });
+  });
+
+  test("keeps activation failure destroying with an operation id when teardown fails", async () => {
+    const database = createRuntimeSubjectLifecycleDatabase();
+    const prepareError = new Error("original activation failure");
+
+    await expect(
+      createRuntimeSubjectLifecycleService(
+        createBindings(database, {
+          destroyError: new Error("container destroy failed"),
+          prepareError,
+        }),
+      ).activate({
+        executionOwnerUserId: "01J00000000000000000000002",
+        kind: "cattle",
+        networkConstraints: { allowedHosts: [], networkPolicy: "full" },
+        runtimeSubjectId: RUNTIME_SUBJECT_ID,
+        spaceAliases: [],
+        subjectId: "01J00000000000000000000009",
+        subjectKind: "session",
+      }),
+    ).rejects.toThrow("original activation failure");
+
+    const row = await database
+      .prepare(
+        `
+          SELECT last_error, last_error_code, status, status_operation_id
+          FROM sandbox
+          WHERE id = ?
+        `,
+      )
+      .bind(RUNTIME_SUBJECT_ID)
+      .first<{
+        last_error: string | null;
+        last_error_code: string | null;
+        status: string;
+        status_operation_id: string | null;
+      }>();
+
+    expect(row).toMatchObject({
+      last_error: "original activation failure",
+      last_error_code: "runtime.subject_activation_failed",
+      status: "destroying",
+    });
+    expect(row?.status_operation_id).toMatch(/^01/);
+  });
+
+  test("bounds teardown with the runtime provision timeout", async () => {
+    const database = createRuntimeSubjectLifecycleDatabase();
+    const destroyPromise = new Promise<void>(() => {});
+
+    await expect(
+      destroyRuntimeSubjectContainer(
+        createBindings(database, { destroyPromise }),
+        RUNTIME_SUBJECT_ID,
+        5,
+      ),
+    ).rejects.toThrow("Runtime subject destroy");
+  });
+
+  test("fails activation and destroys the container when network constraints cannot apply", async () => {
+    const database = createRuntimeSubjectLifecycleDatabase();
+    await insertRuntimeSubject(database, { status: "cold", statusSeq: 0 });
+    const configureNetworkError = new Error(
+      "Environment network policy 'limited' cannot be enforced here: sandbox HTTPS interception is disabled.",
+    );
+    let destroyCalls = 0;
+
+    await expect(
+      createRuntimeSubjectLifecycleService(
+        createBindings(database, {
+          configureNetworkError,
+          onDestroy: () => (destroyCalls += 1),
+        }),
+      ).activate({
+        executionOwnerUserId: "01J00000000000000000000002",
+        kind: "cattle",
+        networkConstraints: { allowedHosts: [], networkPolicy: "limited" },
+        runtimeSubjectId: RUNTIME_SUBJECT_ID,
+        spaceAliases: [],
+        subjectId: "01J00000000000000000000009",
+        subjectKind: "session",
+      }),
+    ).rejects.toThrow("cannot be enforced");
+
+    expect(destroyCalls).toBe(1);
+    expect((await readRuntimeSubject(database)).status).toBe("cold");
   });
 
   test("destroys the container on activation failure so it cannot be reused", async () => {
@@ -556,6 +702,7 @@ describe("runtime subject lifecycle machine", () => {
       ).activate({
         executionOwnerUserId: "01J00000000000000000000002",
         kind: "cattle",
+        networkConstraints: { allowedHosts: [], networkPolicy: "full" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
         spaceAliases: [],
         subjectId: "01J00000000000000000000009",
@@ -572,6 +719,7 @@ describe("runtime subject lifecycle machine", () => {
       {
         executionOwnerUserId: "01J00000000000000000000002",
         kind: "cattle",
+        networkConstraints: { allowedHosts: [], networkPolicy: "full" },
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
         spaceAliases: [],
         subjectId: "01J00000000000000000000009",

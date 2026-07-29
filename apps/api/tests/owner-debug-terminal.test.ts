@@ -50,6 +50,7 @@ function createTerminalSandboxHandleSpy(): TerminalSpy {
   const sessionResponse = new Response("ok", { status: 200 });
 
   const handle = {
+    configureNetworkConstraints: async () => {},
     createBackup: unavailable,
     createSession: async (options) => {
       createSessionCalls.push({ cwd: options?.cwd, id: options?.id });

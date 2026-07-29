@@ -1,5 +1,6 @@
 import type {
   AgentEnvironmentConfig,
+  AgentKind,
   AgentReadiness,
   AgentReadinessIssue,
 } from "@mosoo/contracts/agent";
@@ -7,8 +8,10 @@ import type {
   AgentPackageResolutionState,
   AgentResolutionIssue,
 } from "@mosoo/contracts/agent-manifest";
+import type { EnvironmentNetworkPolicy } from "@mosoo/contracts/environment";
 import {
   agentMcpBindingsTable,
+  appsTable,
   environmentRevisionsTable,
   environmentsTable,
   mcpServersTable,
@@ -320,6 +323,43 @@ function dedupeReadinessIssues(issues: AgentReadinessIssue[]): AgentReadinessIss
   return deduped;
 }
 
+async function resolveEffectiveEnvironmentNetworkPolicy(
+  database: D1Database,
+  input: {
+    appId: AppId;
+    environmentId: EnvironmentId | null;
+  },
+): Promise<EnvironmentNetworkPolicy | null> {
+  const environmentId =
+    input.environmentId ??
+    (
+      await getAppDatabase(database)
+        .select({ environmentId: appsTable.defaultEnvironmentId })
+        .from(appsTable)
+        .where(eq(appsTable.id, input.appId))
+        .limit(1)
+        .get()
+    )?.environmentId ??
+    null;
+
+  if (environmentId === null || environmentId === "") {
+    return null;
+  }
+
+  const row = await getAppDatabase(database)
+    .select({ networkPolicy: environmentRevisionsTable.networkPolicy })
+    .from(environmentsTable)
+    .innerJoin(
+      environmentRevisionsTable,
+      eq(environmentRevisionsTable.id, environmentsTable.currentRevisionId),
+    )
+    .where(and(eq(environmentsTable.id, environmentId), eq(environmentsTable.appId, input.appId)))
+    .limit(1)
+    .get();
+
+  return row?.networkPolicy ?? null;
+}
+
 export function formatAgentReadinessFailureMessage(
   prefix: string,
   readiness: Pick<AgentReadiness, "issues">,
@@ -337,6 +377,8 @@ export async function computeAgentReadiness(
   input: {
     agentId: AgentId;
     environment: AgentEnvironmentConfig;
+    environmentNetworkPolicy?: EnvironmentNetworkPolicy;
+    kind: AgentKind;
     model: string;
     packageResolution?: AgentPackageResolutionState | null;
     bindings?: ApiBindings;
@@ -347,6 +389,21 @@ export async function computeAgentReadiness(
   },
 ): Promise<AgentReadiness> {
   const issues: AgentReadinessIssue[] = [];
+  const effectiveEnvironmentNetworkPolicy =
+    input.environmentNetworkPolicy ??
+    (await resolveEffectiveEnvironmentNetworkPolicy(database, {
+      appId: input.appId,
+      environmentId: input.environment.environmentId,
+    }));
+
+  if (input.kind === "pet" && effectiveEnvironmentNetworkPolicy === "limited") {
+    issues.push(
+      createIssue(
+        "agent.environment.network_policy_unsupported",
+        "Assistant Agents require a Full network Environment because their stable sandbox cannot safely change egress policy between sessions.",
+      ),
+    );
+  }
 
   if (getSupportedRuntimeId(input.runtimeId) === null) {
     issues.push(

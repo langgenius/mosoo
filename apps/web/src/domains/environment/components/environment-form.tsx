@@ -320,7 +320,7 @@ export function EnvironmentForm({
       </EnvironmentFormSection>
 
       <EnvironmentFormSection
-        description="Save network-policy intent for this Environment. The current Sandbox runtime does not enforce these controls yet."
+        description="Limited is enforced only for Task Agent session sandboxes. It denies egress by default and allows the listed hosts plus Mosoo control and artifact endpoints. Assistant Agents cannot start with Limited; local development also fails closed."
         title="Networking"
       >
         <div className="space-y-3">
@@ -375,7 +375,7 @@ export function EnvironmentForm({
                 />
               </label>
               <div className="space-y-1.5">
-                <Label>Allowed hosts (saved only)</Label>
+                <Label>Allowed hosts</Label>
                 <Textarea
                   className="min-h-[96px] font-mono text-[12px]"
                   disabled={disabled}

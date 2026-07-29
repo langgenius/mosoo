@@ -11,5 +11,7 @@ export function requireCloudflareSandboxBinding(env: ApiBindings): CloudflareSan
     throw new Error("Sandbox binding is not configured in wrangler.toml.");
   }
 
-  return binding as CloudflareSandboxNamespace;
+  // The wrapper DO forwards the SDK surface dynamically, so its declared shape
+  // stops overlapping the SDK stub type once it defines methods of its own.
+  return binding as unknown as CloudflareSandboxNamespace;
 }

@@ -49,6 +49,7 @@ export async function getAgentEditorState(
     readiness: await computeAgentReadiness(database, editable.agent.ownerId, {
       agentId: editable.agent.id,
       environment,
+      kind: editable.agent.kind,
       model: editable.agent.model,
       packageResolution: storedConfig.packageResolution,
       appId: editable.agent.appId,

@@ -23,8 +23,8 @@ export function EnvironmentBadges({
       ) : null}
       <Badge variant={environment.networkPolicy === "limited" ? "soil" : "default"}>
         {environment.networkPolicy === "limited"
-          ? "Limited intent · not enforced"
-          : "Full intent · not enforced"}
+          ? "Limited network · Task sessions"
+          : "Full network"}
       </Badge>
     </div>
   );

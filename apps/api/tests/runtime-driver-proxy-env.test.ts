@@ -4,16 +4,19 @@ import { toRuntimeProcessProxyEnv } from "../src/modules/runtime/infrastructure/
 
 describe("runtime driver proxy env", () => {
   test("does not inject proxy env when runtime proxy bindings are absent", () => {
-    expect(toRuntimeProcessProxyEnv({})).toEqual({});
+    expect(toRuntimeProcessProxyEnv({}, "full")).toEqual({});
   });
 
   test("injects uppercase and lowercase proxy env for runtime child processes", () => {
     expect(
-      toRuntimeProcessProxyEnv({
-        MOSOO_RUNTIME_ALL_PROXY: "http://host.docker.internal:1080",
-        MOSOO_RUNTIME_HTTPS_PROXY: "http://host.docker.internal:1080",
-        MOSOO_RUNTIME_NO_PROXY: "metadata.local",
-      }),
+      toRuntimeProcessProxyEnv(
+        {
+          MOSOO_RUNTIME_ALL_PROXY: "http://host.docker.internal:1080",
+          MOSOO_RUNTIME_HTTPS_PROXY: "http://host.docker.internal:1080",
+          MOSOO_RUNTIME_NO_PROXY: "metadata.local",
+        },
+        "full",
+      ),
     ).toEqual({
       ALL_PROXY: "http://host.docker.internal:1080",
       HTTPS_PROXY: "http://host.docker.internal:1080",
@@ -23,5 +26,18 @@ describe("runtime driver proxy env", () => {
       https_proxy: "http://host.docker.internal:1080",
       no_proxy: "metadata.local,localhost,127.0.0.1,::1,host.docker.internal",
     });
+  });
+
+  test("does not inject ambient runtime proxies into Limited sessions", () => {
+    expect(
+      toRuntimeProcessProxyEnv(
+        {
+          MOSOO_RUNTIME_ALL_PROXY: "http://host.docker.internal:1080",
+          MOSOO_RUNTIME_HTTPS_PROXY: "http://host.docker.internal:1080",
+          MOSOO_RUNTIME_NO_PROXY: "metadata.local",
+        },
+        "limited",
+      ),
+    ).toEqual({});
   });
 });

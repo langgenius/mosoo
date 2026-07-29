@@ -391,6 +391,7 @@ function createTestSandboxHandle(
   mode: "destroy-only" | "deployment",
 ): SandboxHandle {
   const base = {
+    configureNetworkConstraints: async () => {},
     createBackup: unexpectedSandboxCall,
     deleteSession: unexpectedSandboxCall,
     getSession: unexpectedSandboxCall,
@@ -454,6 +455,7 @@ function createTestSandboxHandle(
 
 function createWorkerDeploymentSandboxHandle(id: string, events: string[]): SandboxHandle {
   const base = {
+    configureNetworkConstraints: async () => {},
     createBackup: unexpectedSandboxCall,
     deleteSession: unexpectedSandboxCall,
     getSession: unexpectedSandboxCall,

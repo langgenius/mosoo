@@ -8,6 +8,7 @@ import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.
 import { getSupportedRuntimeId } from "../../domain/runtime-config";
 import { prewarmDriverSession } from "../../infrastructure/driver-session.service";
 import { createRuntimeSubjectLifecycleService } from "../../infrastructure/runtime-subject-lifecycle/runtime-subject-lifecycle.service";
+import { resolveRuntimeSubjectNetworkConstraints } from "../../infrastructure/runtime-subject-lifecycle/runtime-subject-network";
 import type { ExecutionSessionHandle, SandboxHandle } from "../../infrastructure/sandbox-handles";
 import { ensureSandboxConversationSession } from "../../infrastructure/sandbox-session.service";
 import { hasActiveSessionRun } from "../../infrastructure/session-runs/session-run-store.repository";
@@ -76,6 +77,13 @@ export async function prewarmAgentSessionRuntime(
       createRuntimeSubjectLifecycleService(bindings).activate({
         executionOwnerUserId: hydrated.value.profile.session.origin.executionOwnerUserId,
         kind: hydrated.value.profile.kind,
+        networkConstraints: resolveRuntimeSubjectNetworkConstraints(bindings, {
+          envVars: hydrated.value.profile.envVars,
+          kind: hydrated.value.profile.kind,
+          network: hydrated.value.profile.network,
+          requestUrl: request.requestUrl,
+          subjectKind: hydrated.value.profile.sandbox.subjectKind,
+        }),
         runtimeSubjectId: sandboxId,
         purpose: "prewarm",
         subjectId: hydrated.value.profile.sandbox.subjectId,

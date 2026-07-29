@@ -78,6 +78,7 @@ function createSandboxHandle(files: ReadonlyMap<string, string>): SandboxHandle 
   };
 
   return {
+    configureNetworkConstraints: unavailable,
     createBackup: unavailable,
     createSession: unavailable,
     deleteSession: unavailable,

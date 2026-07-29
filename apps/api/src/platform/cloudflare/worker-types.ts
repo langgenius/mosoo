@@ -40,6 +40,11 @@ interface OptionalRuntimeBindings {
   MOSOO_RUNTIME_HTTP_PROXY?: string;
   MOSOO_RUNTIME_HTTPS_PROXY?: string;
   MOSOO_RUNTIME_NO_PROXY?: string;
+  // Secrets read by @cloudflare/sandbox backups; mirrored here so the limited
+  // network policy can allowlist the R2 endpoint the container will curl.
+  BACKUP_BUCKET_ENDPOINT?: string;
+  CLOUDFLARE_ACCOUNT_ID?: string;
+  CLOUDFLARE_R2_ACCOUNT_ID?: string;
 }
 
 interface OptionalProductAnalyticsBindings {

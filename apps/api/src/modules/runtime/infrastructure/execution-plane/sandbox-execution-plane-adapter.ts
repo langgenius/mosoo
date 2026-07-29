@@ -28,6 +28,7 @@ import {
   getRuntimeSubjectKeepAliveHandle,
   prepareRuntimeSubjectFilesystem,
 } from "../runtime-subject-lifecycle/runtime-subject-lifecycle.service";
+import { resolveRuntimeSubjectNetworkConstraints } from "../runtime-subject-lifecycle/runtime-subject-network";
 import {
   recreateRuntimeSubjectPreservingState,
   resetRuntimeSubjectAgentState,
@@ -170,6 +171,13 @@ class SandboxExecutionPlaneAdapter implements RuntimeExecutionPlaneAdapter {
           },
           executionOwnerUserId: input.profile.session.origin.executionOwnerUserId,
           kind: input.profile.kind,
+          networkConstraints: resolveRuntimeSubjectNetworkConstraints(bindings, {
+            envVars: input.profile.envVars,
+            kind: input.profile.kind,
+            network: input.profile.network,
+            requestUrl,
+            subjectKind: input.profile.sandbox.subjectKind,
+          }),
           runtimeSubjectId: sandboxId,
           subjectId: input.profile.sandbox.subjectId,
           subjectKind: input.profile.sandbox.subjectKind,
