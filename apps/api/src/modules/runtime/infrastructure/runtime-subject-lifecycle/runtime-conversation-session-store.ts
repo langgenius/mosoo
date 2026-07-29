@@ -305,7 +305,12 @@ export async function recordRuntimeConversationSessionActive(
     appDb
       .update(sandboxesTable)
       .set({
-        inactiveDeadlineAt: null,
+        inactiveDeadlineAt: sql`
+          CASE
+            WHEN ${sandboxesTable.kind} = 'pet' THEN ${sandboxesTable.inactiveDeadlineAt}
+            ELSE NULL
+          END
+        `,
         updatedAt: input.now,
       })
       .where(eq(sandboxesTable.id, input.runtimeSubjectId)),

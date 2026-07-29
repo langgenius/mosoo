@@ -3,6 +3,10 @@ import {
   withDisposedRpcResult,
 } from "../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
+import {
+  decodeSandboxBackupIdForPlatform,
+  encodeSandboxBackupIdForStorage,
+} from "./sandbox-backup-id";
 
 interface SandboxBackupObject {
   readonly dir: string;
@@ -10,7 +14,9 @@ interface SandboxBackupObject {
 }
 
 function getSandboxBackupObjectKeys(backupId: string): string[] {
-  return [`backups/${backupId}/data.sqsh`, `backups/${backupId}/meta.json`];
+  const platformBackupId = decodeSandboxBackupIdForPlatform(backupId);
+
+  return [`backups/${platformBackupId}/data.sqsh`, `backups/${platformBackupId}/meta.json`];
 }
 
 export async function createRuntimeSandboxBackup(
@@ -34,7 +40,7 @@ export async function createRuntimeSandboxBackup(
         }),
         (result) => ({
           dir: result.dir,
-          id: result.id,
+          id: encodeSandboxBackupIdForStorage(result.id),
         }),
       ),
   );

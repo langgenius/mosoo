@@ -5,15 +5,26 @@ import type { RuntimeOperationId } from "@mosoo/id";
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
 
 import {
+  recycleInactiveRuntimeSubjectNow,
   recycleRuntimeSubject,
   resumeRuntimeSubjectRecycleOperation,
 } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-recycle.service";
-import { listStaleRuntimeSubjectOperations } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
+import {
+  listInactiveRuntimeSubjects,
+  listStaleRuntimeSubjectOperations,
+} from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
+import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
-const BACKUP_ID = "01J0000000000000000000000V";
+const CLOUDFLARE_BACKUP_ID = "550e8400-e29b-41d4-a716-446655440000";
+const CLOUDFLARE_BACKUP_IDS = [
+  CLOUDFLARE_BACKUP_ID,
+  "550e8400-e29b-41d4-a716-446655440001",
+  "550e8400-e29b-41d4-a716-446655440002",
+] as const;
+const BACKUP_ID = encodeSandboxBackupIdForStorage(CLOUDFLARE_BACKUP_ID);
 const CLAIM_OWNER = "scheduled-maintenance-owner";
 const OPERATION_ID = "01J0000000000000000000000R";
 const SANDBOX_ID = PLATFORM_ID_FIXTURES.sandbox;
@@ -172,7 +183,7 @@ function createSandboxHandle(): SandboxHandle {
   return {
     createBackup: async (options) => ({
       dir: options.dir,
-      id: BACKUP_ID,
+      id: CLOUDFLARE_BACKUP_ID,
     }),
     createSession: unavailable,
     deleteSession: unavailable,
@@ -226,6 +237,107 @@ describe("runtime subject recycle", () => {
     expect(subject?.last_backup_id).toBe(BACKUP_ID);
     expect(subject?.status_operation_id).not.toBe(CLAIM_OWNER);
     expect(isPlatformId(subject?.status_operation_id)).toBe(true);
+  });
+
+  test("hibernates one idle pet subject across sessions after checkpointing durable state", async () => {
+    const database = createRuntimeSubjectRecycleDatabase();
+    await database
+      .prepare(
+        `
+          UPDATE sandbox
+          SET claim_expires_at = NULL,
+              claim_owner = NULL,
+              inactive_deadline_at = ?,
+              subject_kind = ?
+          WHERE id = ?
+        `,
+      )
+      .bind(10, "agent", SANDBOX_ID)
+      .run();
+    database.execute(`
+      INSERT INTO sandbox_session (cwd, sandbox_id, session_id, status, updated_at)
+      VALUES
+        ('/workspace/se/session-1', '${SANDBOX_ID}', '01J0000000000000000000000S', 'active', 1),
+        ('/workspace/se/session-2', '${SANDBOX_ID}', '01J0000000000000000000000T', 'active', 1),
+        ('/workspace/se/terminated', '${SANDBOX_ID}', '01J0000000000000000000000U', 'active', 1);
+
+      INSERT INTO session (id, last_message_at, status)
+      VALUES
+        ('01J0000000000000000000000S', 1, 'IDLE'),
+        ('01J0000000000000000000000T', 1, 'IDLE'),
+        ('01J0000000000000000000000U', 1, 'TERMINATED');
+    `);
+    const checkpointDirs: string[] = [];
+    const lifecycleCalls: string[] = [];
+    let backupIndex = 0;
+    currentSandbox = {
+      ...createSandboxHandle(),
+      createBackup: async (options) => {
+        checkpointDirs.push(options.dir);
+        const id = CLOUDFLARE_BACKUP_IDS[backupIndex];
+        backupIndex += 1;
+        if (!id) {
+          throw new Error("Unexpected extra checkpoint.");
+        }
+        return { dir: options.dir, id };
+      },
+      destroy: async () => {
+        lifecycleCalls.push("destroy");
+      },
+      setKeepAlive: async (keepAlive) => {
+        lifecycleCalls.push(`keepAlive:${keepAlive}`);
+      },
+    };
+    const bindings = createBindings(database);
+
+    await expect(
+      listInactiveRuntimeSubjects(database, {
+        limit: 10,
+        now: 10,
+      }),
+    ).resolves.toEqual([{ id: SANDBOX_ID, kind: "pet" }]);
+    await expect(
+      recycleInactiveRuntimeSubjectNow(bindings, {
+        kind: "pet",
+        now: 10,
+        reason: "test.pet_idle_hibernate",
+        runtimeSubjectId: SANDBOX_ID,
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      recycleInactiveRuntimeSubjectNow(bindings, {
+        kind: "pet",
+        now: 10,
+        reason: "test.pet_idle_hibernate_duplicate",
+        runtimeSubjectId: SANDBOX_ID,
+      }),
+    ).resolves.toBe(false);
+
+    expect(checkpointDirs.toSorted()).toEqual([
+      "/workspace/memory",
+      "/workspace/se/session-1",
+      "/workspace/se/session-2",
+    ]);
+    expect(lifecycleCalls).toEqual(["keepAlive:false", "destroy"]);
+    await expect(readRuntimeSubjectRecycleRow(database)).resolves.toMatchObject({
+      last_error: null,
+      last_error_code: null,
+      status: "cold",
+    });
+    const sessions = await database
+      .prepare("SELECT status FROM sandbox_session ORDER BY session_id")
+      .all<{ status: string }>();
+    expect(sessions.results).toEqual([
+      { status: "closed" },
+      { status: "closed" },
+      { status: "closed" },
+    ]);
+    await expect(
+      listInactiveRuntimeSubjects(database, {
+        limit: 10,
+        now: Number.MAX_SAFE_INTEGER,
+      }),
+    ).resolves.toEqual([]);
   });
 
   test("resumes a stale destroy phase using the recorded operation id", async () => {
@@ -292,6 +404,16 @@ describe("runtime subject recycle", () => {
   test("keeps backup failures as stale repair candidates", async () => {
     const database = createRuntimeSubjectRecycleDatabase();
     let backupAvailable = false;
+    const lifecycleCalls: string[] = [];
+    await database
+      .prepare(
+        `
+          INSERT INTO sandbox_session (cwd, sandbox_id, session_id, status, updated_at)
+          VALUES (?, ?, ?, ?, ?)
+        `,
+      )
+      .bind("/workspace/se/session-1", SANDBOX_ID, "01J0000000000000000000000S", "active", 1)
+      .run();
     currentSandbox = {
       ...createSandboxHandle(),
       createBackup: async (options) => {
@@ -302,8 +424,14 @@ describe("runtime subject recycle", () => {
 
         return {
           dir: options.dir,
-          id: BACKUP_ID,
+          id: CLOUDFLARE_BACKUP_ID,
         };
+      },
+      destroy: async () => {
+        lifecycleCalls.push("destroy");
+      },
+      setKeepAlive: async (keepAlive) => {
+        lifecycleCalls.push(`keepAlive:${keepAlive}`);
       },
     };
 
@@ -327,6 +455,13 @@ describe("runtime subject recycle", () => {
       status_operation_id: operationId,
     });
     expect(failedSubject.last_error).toContain("checkpoint failed");
+    expect(lifecycleCalls).toEqual([]);
+    await expect(
+      database
+        .prepare("SELECT status FROM sandbox_session WHERE session_id = ?")
+        .bind("01J0000000000000000000000S")
+        .first("status"),
+    ).resolves.toBe("active");
     await expect(
       listStaleRuntimeSubjectOperations(database, {
         limit: 10,
@@ -358,6 +493,7 @@ describe("runtime subject recycle", () => {
       status: "cold",
       status_operation_id: operationId,
     });
+    expect(lifecycleCalls).toEqual(["keepAlive:false", "destroy"]);
   });
 
   test("keeps destroy failures as stale repair candidates with the recorded backup", async () => {
@@ -368,7 +504,7 @@ describe("runtime subject recycle", () => {
       createBackup: async (options) => {
         return {
           dir: options.dir,
-          id: BACKUP_ID,
+          id: CLOUDFLARE_BACKUP_ID,
         };
       },
       destroy: async () => {

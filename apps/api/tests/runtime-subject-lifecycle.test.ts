@@ -8,11 +8,14 @@ import {
   markRuntimeSubjectCold,
   markRuntimeSubjectOperationStarted,
 } from "../src/modules/runtime/infrastructure/runtime-subject-lifecycle/runtime-subject-store";
+import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
 import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbox-handles";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const RUNTIME_SUBJECT_ID = "01J0000000000000000000000D";
+const CLOUDFLARE_BACKUP_ID = "550e8400-e29b-41d4-a716-446655440000";
+const STORED_BACKUP_ID = encodeSandboxBackupIdForStorage(CLOUDFLARE_BACKUP_ID);
 
 function createRuntimeSubjectLifecycleDatabase(): SqliteD1Database {
   const database = new SqliteD1Database();
@@ -157,7 +160,11 @@ async function readRuntimeSubject(database: D1Database): Promise<{
 }
 
 function createSandboxHandle(
-  options: { readonly prepareError?: Error; readonly onDestroy?: () => void } = {},
+  options: {
+    readonly onDestroy?: () => void;
+    readonly onRestore?: (backup: { readonly dir: string; readonly id: string }) => void;
+    readonly prepareError?: Error;
+  } = {},
 ): SandboxHandle {
   const unavailable = async () => {
     throw new Error("Unexpected sandbox test method call.");
@@ -181,7 +188,12 @@ function createSandboxHandle(
     },
     mountBucket: unavailable,
     readFile: unavailable,
-    restoreBackup: unavailable,
+    restoreBackup: options.onRestore
+      ? async (backup) => {
+          options.onRestore?.(backup);
+          return backup;
+        }
+      : unavailable,
     setKeepAlive: async () => {},
     startProcess: unavailable,
     terminal: unavailable,
@@ -193,7 +205,11 @@ function createSandboxHandle(
 
 function createBindings(
   database: D1Database,
-  options: { readonly prepareError?: Error; readonly onDestroy?: () => void } = {},
+  options: {
+    readonly onDestroy?: () => void;
+    readonly onRestore?: (backup: { readonly dir: string; readonly id: string }) => void;
+    readonly prepareError?: Error;
+  } = {},
 ): ApiBindings {
   return {
     DB: database,
@@ -334,6 +350,10 @@ describe("runtime subject lifecycle machine", () => {
     const database = createRuntimeSubjectLifecycleDatabase();
     await insertRuntimeSubject(database, { status: "active" });
     await database
+      .prepare("UPDATE sandbox SET kind = ?, subject_id = ?, subject_kind = ? WHERE id = ?")
+      .bind("pet", "01J00000000000000000000001", "agent", RUNTIME_SUBJECT_ID)
+      .run();
+    await database
       .prepare("UPDATE sandbox SET claim_owner = ?, claim_expires_at = ? WHERE id = ?")
       .bind("scheduled-race", Date.now() + 60_000, RUNTIME_SUBJECT_ID)
       .run();
@@ -352,7 +372,7 @@ describe("runtime subject lifecycle machine", () => {
     await expect(
       recycleRuntimeSubject(createBindings(database), {
         claimOwner: "scheduled-race",
-        kind: "cattle",
+        kind: "pet",
         now: Date.now(),
         reason: "test",
         runtimeSubjectId: RUNTIME_SUBJECT_ID,
@@ -365,6 +385,67 @@ describe("runtime subject lifecycle machine", () => {
         .bind(RUNTIME_SUBJECT_ID)
         .first("claim_owner"),
     ).resolves.toBeNull();
+  });
+
+  test("restores pet memory when the same logical subject activates from cold", async () => {
+    const database = createRuntimeSubjectLifecycleDatabase();
+    await insertRuntimeSubject(database, { status: "cold" });
+    await database
+      .prepare(
+        `
+          INSERT INTO sandbox_backup (
+            created_at,
+            dir,
+            error_message,
+            id,
+            keep,
+            sandbox_id,
+            status,
+            ttl_seconds,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .bind(
+        1,
+        "/workspace/memory",
+        null,
+        STORED_BACKUP_ID,
+        false,
+        RUNTIME_SUBJECT_ID,
+        "ready",
+        600,
+        1,
+      )
+      .run();
+    await database
+      .prepare("UPDATE sandbox SET kind = ?, last_backup_id = ?, subject_kind = ? WHERE id = ?")
+      .bind("pet", STORED_BACKUP_ID, "agent", RUNTIME_SUBJECT_ID)
+      .run();
+    let restoredBackup: { readonly dir: string; readonly id: string } | null = null;
+
+    const activation = await createRuntimeSubjectLifecycleService(
+      createBindings(database, {
+        onRestore: (backup) => {
+          restoredBackup = backup;
+        },
+      }),
+    ).activate({
+      executionOwnerUserId: "01J00000000000000000000002",
+      kind: "pet",
+      runtimeSubjectId: RUNTIME_SUBJECT_ID,
+      spaceAliases: [],
+      subjectId: "01J00000000000000000000009",
+      subjectKind: "agent",
+    });
+
+    expect(activation.subject).toBeTruthy();
+    expect(restoredBackup).toEqual({
+      dir: "/workspace/memory",
+      id: CLOUDFLARE_BACKUP_ID,
+    });
+    expect((await readRuntimeSubject(database)).status).toBe("active");
   });
 
   test("lets interactive activation retry after a prior activation failure", async () => {

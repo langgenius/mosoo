@@ -11,7 +11,10 @@ type NormalizedLogArray = readonly NormalizedLogValue[];
 type NormalizedLogValue = NormalizedLogArray | NormalizedLogRecord | PrimitiveLogValue;
 
 const CIRCULAR_REFERENCE_LABEL = "[Circular]";
+const ERROR_CAUSE_DEPTH_LIMIT = 5;
+const ERROR_CAUSE_DEPTH_LIMIT_LABEL = "[Cause depth limit]";
 const FUNCTION_VALUE_LABEL = "[Function]";
+const NON_ERROR_CAUSE_LABEL = "[Non-Error cause]";
 const SERIALIZATION_FAILURE_LABEL = "[Unserializable]";
 
 function formatSymbolValue(value: symbol): string {
@@ -20,6 +23,34 @@ function formatSymbolValue(value: symbol): string {
 
 function formatFunctionName(name: string): string {
   return name.length > 0 ? `[Function ${name}]` : FUNCTION_VALUE_LABEL;
+}
+
+function normalizeError(
+  error: Error,
+  seenObjects: WeakSet<object>,
+  causeDepth: number,
+): NormalizedLogValue {
+  if (seenObjects.has(error)) {
+    return CIRCULAR_REFERENCE_LABEL;
+  }
+
+  seenObjects.add(error);
+  const cause =
+    error.cause === undefined
+      ? undefined
+      : causeDepth >= ERROR_CAUSE_DEPTH_LIMIT
+        ? ERROR_CAUSE_DEPTH_LIMIT_LABEL
+        : error.cause instanceof Error
+          ? normalizeError(error.cause, seenObjects, causeDepth + 1)
+          : NON_ERROR_CAUSE_LABEL;
+  seenObjects.delete(error);
+
+  return {
+    ...(cause === undefined ? {} : { cause }),
+    message: error.message,
+    name: error.name,
+    stack: error.stack ?? null,
+  };
 }
 
 function normalizeValue(
@@ -52,11 +83,7 @@ function normalizeValue(
   }
 
   if (value instanceof Error) {
-    return {
-      message: value.message,
-      name: value.name,
-      stack: value.stack ?? null,
-    };
+    return normalizeError(value, seenObjects, 0);
   }
 
   if (Array.isArray(value)) {

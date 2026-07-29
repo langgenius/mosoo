@@ -4,6 +4,7 @@ import type { AgentKind } from "@mosoo/contracts/agent";
 import type { SandboxSessionStatus } from "@mosoo/contracts/sandbox";
 import { isPlatformId } from "@mosoo/id";
 
+import { encodeSandboxBackupIdForStorage } from "../src/modules/runtime/infrastructure/sandbox-backup-id";
 import type {
   ExecutionSessionHandle,
   RuntimeCommandResultHandle,
@@ -27,6 +28,8 @@ const ORIGIN = {
   executionOwnerUserId: "01J00000000000000000000001",
   type: "agent",
 } as const;
+const CLOUDFLARE_BACKUP_ID = "550e8400-e29b-41d4-a716-446655440000";
+const STORED_BACKUP_ID = encodeSandboxBackupIdForStorage(CLOUDFLARE_BACKUP_ID);
 
 function commandResult(): RuntimeCommandResultHandle {
   return {
@@ -46,13 +49,14 @@ function failedCommandResult(): RuntimeCommandResultHandle {
   };
 }
 
-function createConversationSessionDatabase(): SqliteD1Database {
+function createConversationSessionDatabase(kind: AgentKind = "pet"): SqliteD1Database {
   const database = new SqliteD1Database();
 
   database.execute(`
     CREATE TABLE sandbox (
       id text PRIMARY KEY NOT NULL,
       inactive_deadline_at integer,
+      kind text NOT NULL,
       status text DEFAULT 'active' NOT NULL,
       status_changed_at integer DEFAULT 0 NOT NULL,
       status_event text DEFAULT 'runtime_subject.active' NOT NULL,
@@ -83,8 +87,8 @@ function createConversationSessionDatabase(): SqliteD1Database {
   `);
 
   database.execute(`
-    INSERT INTO sandbox (id, inactive_deadline_at, updated_at)
-    VALUES ('01J0000000000000000000000D', NULL, 1);
+    INSERT INTO sandbox (id, inactive_deadline_at, kind, updated_at)
+    VALUES ('01J0000000000000000000000D', 123, '${kind}', 1);
   `);
 
   return database;
@@ -139,13 +143,7 @@ async function insertConversationBackup(database: D1Database): Promise<void> {
         VALUES (?, ?, ?, ?, ?)
       `,
     )
-    .bind(
-      1,
-      "/workspace/se/session-1",
-      "01J00000000000000000000002",
-      "01J0000000000000000000000D",
-      "ready",
-    )
+    .bind(1, "/workspace/se/session-1", STORED_BACKUP_ID, "01J0000000000000000000000D", "ready")
     .run();
 }
 
@@ -176,6 +174,13 @@ async function readConversationSession(database: D1Database): Promise<{
   return row;
 }
 
+async function readInactiveDeadline(database: D1Database): Promise<number | null> {
+  return database
+    .prepare("SELECT inactive_deadline_at FROM sandbox WHERE id = ?")
+    .bind("01J0000000000000000000000D")
+    .first<number>("inactive_deadline_at");
+}
+
 function createExecutionSession(options: { cwdHasContent: boolean }): ExecutionSessionHandle {
   return {
     async exec() {
@@ -195,7 +200,12 @@ function createExecutionSession(options: { cwdHasContent: boolean }): ExecutionS
   };
 }
 
-function createSandbox(options: { cwdHasContent?: boolean } = {}): SandboxHandle {
+function createSandbox(
+  options: {
+    cwdHasContent?: boolean;
+    onRestore?: (backup: { readonly dir: string; readonly id: string }) => void;
+  } = {},
+): SandboxHandle {
   const executionSession = createExecutionSession({
     cwdHasContent: options.cwdHasContent ?? true,
   });
@@ -217,6 +227,7 @@ function createSandbox(options: { cwdHasContent?: boolean } = {}): SandboxHandle
     },
     async mountBucket() {},
     async restoreBackup(backup) {
+      options.onRestore?.(backup);
       return backup;
     },
     async setKeepAlive() {},
@@ -261,6 +272,7 @@ describe("ensureSandboxConversationSession", () => {
       cwd: "/workspace/se/session-1",
       status: "active",
     });
+    await expect(readInactiveDeadline(database)).resolves.toBe(123);
   });
 
   test("creates a missing conversation session record", async () => {
@@ -281,7 +293,7 @@ describe("ensureSandboxConversationSession", () => {
   });
 
   test("continues a closed cattle session with a new execution session id", async () => {
-    const database = createConversationSessionDatabase();
+    const database = createConversationSessionDatabase("cattle");
     await insertConversationSession(database, { status: "closed" });
     const sandbox = createSandbox();
 
@@ -297,13 +309,20 @@ describe("ensureSandboxConversationSession", () => {
       cloudflare_session_id: result.sandboxSessionId,
       status: "active",
     });
+    await expect(readInactiveDeadline(database)).resolves.toBeNull();
   });
 
   test("continues a closed pet session through the stable restore path", async () => {
     const database = createConversationSessionDatabase();
     await insertConversationSession(database, { status: "closed" });
     await insertConversationBackup(database);
-    const sandbox = createSandbox({ cwdHasContent: false });
+    let restoredBackup: { readonly dir: string; readonly id: string } | null = null;
+    const sandbox = createSandbox({
+      cwdHasContent: false,
+      onRestore: (backup) => {
+        restoredBackup = backup;
+      },
+    });
 
     const result = await ensureSandboxConversationSession(
       createBindings(database),
@@ -311,6 +330,10 @@ describe("ensureSandboxConversationSession", () => {
     );
 
     expect(result.sandboxSessionId).toBe("01J00000000000000000000001");
+    expect(restoredBackup).toEqual({
+      dir: "/workspace/se/session-1",
+      id: CLOUDFLARE_BACKUP_ID,
+    });
     await expect(readConversationSession(database)).resolves.toMatchObject({
       cloudflare_session_id: "01J00000000000000000000001",
       status: "active",

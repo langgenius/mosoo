@@ -13,6 +13,7 @@ import { requireCloudflareSandboxBinding } from "../../../../platform/cloudflare
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type { RuntimeStateClearRule } from "../../domain/runtime-kind-policy";
 import { withRuntimeProvisionTimeout } from "../runtime-provision-timeout";
+import { decodeSandboxBackupIdForPlatform } from "../sandbox-backup-id";
 import { toSandboxHandle } from "../sandbox-handles";
 import type { SandboxHandle } from "../sandbox-handles";
 import type { ReadyRuntimeSubjectBackupRecord } from "./runtime-subject-store";
@@ -76,7 +77,7 @@ export async function restoreRuntimeSubjectBackup(
     withRuntimeProvisionTimeout(
       subject.restoreBackup({
         dir: input.backup.dir,
-        id: input.backup.id,
+        id: decodeSandboxBackupIdForPlatform(input.backup.id),
       }),
       `Runtime subject restore for ${input.runtimeSubjectId}`,
     ),
