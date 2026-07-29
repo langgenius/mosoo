@@ -42,6 +42,7 @@ export const SANDBOX_RPC_FORWARD_METHODS = [
   "setContainerTimeouts",
   "setEnvVars",
   "setKeepAlive",
+  "setLabels",
   "setSandboxName",
   "setSleepAfter",
   "setTransport",
