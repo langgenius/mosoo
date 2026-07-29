@@ -9,6 +9,7 @@ import { parseSchemaValue } from "@mosoo/contracts/validation";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverCommandId } from "@mosoo/id";
 
+import { createErrorLogContext, logError } from "../../../../platform/cloudflare/logger";
 import {
   claimNextQueuedRuntimeCommandRecord,
   createRuntimeCommandRecord,
@@ -93,7 +94,17 @@ export class DriverInstanceRpcCommandController {
         input.status === "cancelled" ||
         input.status === "expired")
     ) {
-      await releaseLinkedTerminalDriverInstanceSessionRun(env, driverInstanceId);
+      const release = releaseLinkedTerminalDriverInstanceSessionRun(env, driverInstanceId).catch(
+        (error: unknown) => {
+          this.#dependencies.withRuntimeLogContext(() => {
+            logError("runtime.terminal.lease_release.failed", {
+              ...createErrorLogContext(error),
+              driverInstanceId,
+            });
+          });
+        },
+      );
+      this.#dependencies.waitUntil(release);
     }
 
     return { ok: true };

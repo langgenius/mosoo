@@ -11,5 +11,6 @@ export interface DriverInstanceRpcControllerDependencies {
   state: DriverInstanceRuntimeState;
   viewCache: RuntimeSessionViewCache;
   viewerEventDelivery: SessionViewerEventDeliveryBuffer;
+  waitUntil: (task: Promise<unknown>) => void;
   withRuntimeLogContext: <T>(fn: () => T) => T;
 }
