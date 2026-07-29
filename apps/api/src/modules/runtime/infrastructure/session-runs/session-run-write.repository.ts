@@ -16,10 +16,14 @@ import type {
   SessionRunId,
 } from "@mosoo/id";
 import { generateTraceId } from "@mosoo/observability";
-import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
+import { and, eq, exists, inArray, notInArray, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
-import { getAppDatabase, getD1ChangeCount } from "../../../../platform/db/drizzle";
+import {
+  getAppDatabase,
+  getD1ChangeCount,
+  runAppDatabaseBatch,
+} from "../../../../platform/db/drizzle";
 import { currentTimestampMs, toIsoString } from "../../../../time";
 import { toSessionLifecycleStatusForRunStatus } from "../../../sessions/domain/session-lifecycle";
 import type { BoundCapabilityRunProvenance } from "../../domain/bound-capability-run-provenance";
@@ -698,33 +702,31 @@ async function transitionSessionRunStatus(
     }
   }
 
-  const runUpdateValues = createSessionRunStatusUpdate(input, timestampMs);
-
-  const runUpdateResult = await getAppDatabase(database)
-    .update(sessionRunsTable)
-    .set(runUpdateValues)
-    .where(
-      and(
-        eq(sessionRunsTable.id, input.runId),
-        eq(sessionRunsTable.status, current.status),
-        eq(sessionRunsTable.statusSeq, current.status_seq),
-      ),
-    )
-    .run();
-
-  if (getD1ChangeCount(runUpdateResult) === 0) {
-    return {
-      currentStatus: current.status,
-      kind: "stale",
-      reason: "concurrent_transition",
-      targetStatus: input.status,
-    };
-  }
-
   const run = toUpdatedSessionRunSummary(current, input, timestampMs);
   const statusSeq = current.status_seq + 1;
 
   if (input.preserveSessionLifecycle === true) {
+    const runUpdateResult = await getAppDatabase(database)
+      .update(sessionRunsTable)
+      .set(createSessionRunStatusUpdate(input, timestampMs))
+      .where(
+        and(
+          eq(sessionRunsTable.id, input.runId),
+          eq(sessionRunsTable.status, current.status),
+          eq(sessionRunsTable.statusSeq, current.status_seq),
+        ),
+      )
+      .run();
+
+    if (getD1ChangeCount(runUpdateResult) === 0) {
+      return {
+        currentStatus: current.status,
+        kind: "stale",
+        reason: "concurrent_transition",
+        targetStatus: input.status,
+      };
+    }
+
     return {
       kind: "applied",
       previousStatus: current.status,
@@ -735,6 +737,27 @@ async function transitionSessionRunStatus(
   }
 
   if (current.session_last_run_id !== input.runId) {
+    const runUpdateResult = await getAppDatabase(database)
+      .update(sessionRunsTable)
+      .set(createSessionRunStatusUpdate(input, timestampMs))
+      .where(
+        and(
+          eq(sessionRunsTable.id, input.runId),
+          eq(sessionRunsTable.status, current.status),
+          eq(sessionRunsTable.statusSeq, current.status_seq),
+        ),
+      )
+      .run();
+
+    if (getD1ChangeCount(runUpdateResult) === 0) {
+      return {
+        currentStatus: current.status,
+        kind: "stale",
+        reason: "concurrent_transition",
+        targetStatus: input.status,
+      };
+    }
+
     return {
       kind: "applied",
       previousStatus: current.status,
@@ -744,22 +767,54 @@ async function transitionSessionRunStatus(
     };
   }
 
-  const sessionUpdateResult = await getAppDatabase(database)
-    .update(sessionsTable)
-    .set(
-      createSessionStatusTransitionPatch({
-        status: toSessionLifecycleStatusForRunStatus(input.status),
-        timestampMs,
-      }),
-    )
-    .where(
-      and(
-        eq(sessionsTable.id, current.session_id),
-        eq(sessionsTable.lastRunId, input.runId),
-        notInArray(sessionsTable.status, ["TERMINATED"]),
+  const [runUpdateResult, sessionUpdateResult] = await runAppDatabaseBatch(database, (db) => [
+    db
+      .update(sessionRunsTable)
+      .set(createSessionRunStatusUpdate(input, timestampMs))
+      .where(
+        and(
+          eq(sessionRunsTable.id, input.runId),
+          eq(sessionRunsTable.status, current.status),
+          eq(sessionRunsTable.statusSeq, current.status_seq),
+        ),
       ),
-    )
-    .run();
+    db
+      .update(sessionsTable)
+      .set(
+        createSessionStatusTransitionPatch({
+          status: toSessionLifecycleStatusForRunStatus(input.status),
+          timestampMs,
+        }),
+      )
+      .where(
+        and(
+          eq(sessionsTable.id, current.session_id),
+          eq(sessionsTable.lastRunId, input.runId),
+          notInArray(sessionsTable.status, ["TERMINATED"]),
+          exists(
+            db
+              .select({ id: sessionRunsTable.id })
+              .from(sessionRunsTable)
+              .where(
+                and(
+                  eq(sessionRunsTable.id, input.runId),
+                  eq(sessionRunsTable.status, input.status),
+                  eq(sessionRunsTable.statusSeq, statusSeq),
+                ),
+              ),
+          ),
+        ),
+      ),
+  ]);
+
+  if (getD1ChangeCount(runUpdateResult) === 0) {
+    return {
+      currentStatus: current.status,
+      kind: "stale",
+      reason: "concurrent_transition",
+      targetStatus: input.status,
+    };
+  }
 
   if (getD1ChangeCount(sessionUpdateResult) === 0 && current.session_status !== "TERMINATED") {
     return {

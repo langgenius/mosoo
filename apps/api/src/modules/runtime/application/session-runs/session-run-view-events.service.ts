@@ -51,6 +51,7 @@ export function createSessionRunUpdatedEvent(
   run: SessionRunSummary,
   sessionId: SessionId,
   lifecycle = toSessionLifecycleStatusForRunView(run.status),
+  sourceEventId?: string,
 ): RuntimeEventEnvelope {
   return createSessionRuntimeEvent({
     kind: toRuntimeEventKindForRunStatus(run.status),
@@ -60,6 +61,7 @@ export function createSessionRunUpdatedEvent(
     },
     runId: run.id,
     sessionId,
+    ...(sourceEventId === undefined ? {} : { sourceEventId }),
     traceId: run.traceId,
   });
 }

@@ -64,6 +64,71 @@ async function insertSessionRun(
     .run();
 }
 
+function failSessionProjectionStatementInBatch(database: D1Database): D1Database {
+  return new Proxy(database, {
+    get(target, property, receiver) {
+      if (property === "batch") {
+        return async (statements: D1PreparedStatement[]) => {
+          const firstStatement = statements[0];
+
+          if (firstStatement === undefined) {
+            throw new Error("Expected a Run status statement in the D1 batch.");
+          }
+
+          const failingStatement = new Proxy(target.prepare("SELECT 1"), {
+            get(statement, statementProperty, statementReceiver) {
+              if (statementProperty === "run") {
+                return async () => {
+                  throw new Error("injected Session lifecycle projection failure");
+                };
+              }
+
+              const value = Reflect.get(statement, statementProperty, statementReceiver);
+              return typeof value === "function" ? value.bind(statement) : value;
+            },
+          });
+
+          return target.batch([firstStatement, failingStatement]);
+        };
+      }
+
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
+function advanceRunBeforeBatch(
+  database: D1Database,
+  input: {
+    readonly runId: string;
+  },
+): D1Database {
+  let advanced = false;
+
+  return new Proxy(database, {
+    get(target, property, receiver) {
+      if (property === "batch") {
+        return async (statements: D1PreparedStatement[]) => {
+          if (!advanced) {
+            advanced = true;
+            await setSessionRunStatus(target, {
+              runId: input.runId,
+              source: "driver",
+              status: "running",
+            });
+          }
+
+          return target.batch(statements);
+        };
+      }
+
+      const value = Reflect.get(target, property, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
 describe("session run lifecycle", () => {
   test("does not let a stale terminal event revive or overwrite a completed run", async () => {
     const database = await createPublicHttpContractDatabase();
@@ -220,6 +285,106 @@ describe("session run lifecycle", () => {
     expect(row).toEqual({
       status: "IDLE",
       status_operation_id: null,
+    });
+  });
+
+  test("rolls back a terminal Run transition when its Session projection fails", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertNonOwnerSession(database);
+    await insertSessionRun(database, {
+      runId: "run-atomic-terminal-projection",
+      status: "running",
+    });
+
+    await expect(
+      setSessionRunStatus(failSessionProjectionStatementInBatch(database), {
+        runId: "run-atomic-terminal-projection",
+        source: "driver",
+        status: "completed",
+      }),
+    ).rejects.toThrow("injected Session lifecycle projection failure");
+
+    const interrupted = await database
+      .prepare(
+        `
+          SELECT session.status AS session_status, session_run.status AS run_status
+          FROM session
+          INNER JOIN session_run ON session_run.id = session.last_run_id
+          WHERE session.id = ?
+        `,
+      )
+      .bind("01J0000000000000000000000B")
+      .first<{ run_status: string; session_status: string }>();
+
+    expect(interrupted).toEqual({
+      run_status: "running",
+      session_status: "RUNNING",
+    });
+
+    await setSessionRunStatus(database, {
+      runId: "run-atomic-terminal-projection",
+      source: "driver",
+      status: "completed",
+    });
+
+    const admitted = await createSessionRunRecordIfSessionIdle(database, {
+      agentId: "01J00000000000000000000009",
+      createdBy: "01J00000000000000000000002",
+      model: "gpt-5.4",
+      provider: "openai",
+      runtimeId: "openai-runtime",
+      sessionId: "01J0000000000000000000000B",
+      status: "queued",
+      trigger: "user_prompt",
+    });
+
+    expect(admitted.createdRun).not.toBeNull();
+  });
+
+  test("does not project a stale terminal transition onto a newer Run state", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertNonOwnerSession(database);
+    await insertSessionRun(database, {
+      runId: "run-stale-terminal-projection",
+      status: "booting",
+    });
+
+    const outcome = await setSessionRunStatus(
+      advanceRunBeforeBatch(database, {
+        runId: "run-stale-terminal-projection",
+      }),
+      {
+        error: {
+          code: "runtime.stale_terminal",
+          details: {},
+          message: "The stale terminal transition must not update the Session.",
+          retryable: false,
+        },
+        runId: "run-stale-terminal-projection",
+        source: "driver",
+        status: "failed",
+      },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "stale",
+      reason: "concurrent_transition",
+    });
+    const current = await database
+      .prepare(
+        `
+          SELECT session.status AS session_status, session_run.status AS run_status
+          FROM session
+          INNER JOIN session_run ON session_run.id = session.last_run_id
+          WHERE session.id = ?
+        `,
+      )
+      .bind("01J0000000000000000000000B")
+      .first<{ run_status: string; session_status: string }>();
+
+    expect(current).toEqual({
+      run_status: "running",
+      session_status: "RUNNING",
     });
   });
 
