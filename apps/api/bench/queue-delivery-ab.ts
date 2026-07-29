@@ -139,7 +139,12 @@ async function main(): Promise<void> {
         before: "await Queue send and delivery-marker clear before returning",
       },
     },
-    samples: samples.map((sample) => ({ ...sample, durationMs: round(sample.durationMs) })),
+    samples: samples.map((sample) => ({
+      block: sample.block,
+      durationMs: round(sample.durationMs),
+      position: sample.position,
+      variant: sample.variant,
+    })),
     summary: {
       after: {
         medianMs: round(afterMedian),

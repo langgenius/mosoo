@@ -162,8 +162,12 @@ async function main(): Promise<void> {
       },
     },
     samples: samples.map((sample) => ({
-      ...sample,
+      block: sample.block,
       durationMs: round(sample.durationMs),
+      maxConcurrentCalls: sample.maxConcurrentCalls,
+      position: sample.position,
+      rpcCalls: sample.rpcCalls,
+      variant: sample.variant,
     })),
     summary: {
       after: {

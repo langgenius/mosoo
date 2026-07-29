@@ -213,8 +213,8 @@ async function fetchJsonWithHardTimeout(
   }
 
   return {
-    payload: JSON.parse(envelope["body"] as string) as unknown,
-    status: envelope["status"] as number,
+    payload: JSON.parse(envelope["body"]),
+    status: envelope["status"],
   };
 }
 
