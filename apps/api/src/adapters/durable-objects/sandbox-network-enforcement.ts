@@ -1,13 +1,15 @@
 import type { SandboxNetworkConstraints } from "../../modules/runtime/domain/sandbox-network-constraints";
 import { parseSandboxNetworkConstraints } from "../../modules/runtime/domain/sandbox-network-constraints";
+import type { SandboxHttpsInterception } from "./sandbox-https-interception";
+import { configureSandboxHttpsInterception } from "./sandbox-https-interception";
 
 /**
  * Storage key for the constraints applied to this sandbox. The record must
  * survive container restarts and `destroy()` (which only clears SDK
  * port/tunnel keys), so a rehydrated Durable Object can re-apply
- * `enableInternet` before the next container start: the SDK persists its own
- * allowlist, but `enableInternet` is a plain instance property read at
- * container start time.
+ * `enableInternet` and HTTPS interception before the next container start:
+ * the SDK persists its own allowlist, but those startup settings are plain
+ * instance properties.
  */
 export const SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY = "mosooSandboxNetworkConstraints";
 
@@ -17,7 +19,7 @@ export const SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY = "mosooSandboxNetworkConst
  * `setAllowedHosts` persists in DO storage and applies live via intercept-all
  * outbound HTTP/HTTPS routing.
  */
-export interface SandboxNetworkDelegate {
+export interface SandboxNetworkDelegate extends SandboxHttpsInterception {
   enableInternet: boolean;
   setAllowedHosts(hosts: string[]): Promise<void>;
 }
@@ -122,6 +124,8 @@ export async function configureSandboxNetworkConstraints(
       await storage.put(SANDBOX_NETWORK_CONSTRAINTS_STORAGE_KEY, constraints);
     }
 
+    configureSandboxHttpsInterception(delegate, true);
+
     // Repeat the SDK call even for an unchanged policy. This is intentionally
     // idempotent and repairs SDK-local interception state after a partial
     // configure, DO wake, or container restart while our fail-closed record
@@ -131,6 +135,7 @@ export async function configureSandboxNetworkConstraints(
     return;
   }
 
+  configureSandboxHttpsInterception(delegate, false);
   delegate.enableInternet = true;
 
   if (previous === null) {
@@ -139,14 +144,14 @@ export async function configureSandboxNetworkConstraints(
 }
 
 /**
- * Re-applies the persisted `enableInternet` decision when the Durable Object
- * wakes, before any container start. The SDK restores its own allowlist and
- * interception state from its storage; only the start-time internet switch
- * needs re-asserting from our record.
+ * Re-applies the persisted network decision when the Durable Object wakes,
+ * before any container start. The SDK restores its allowlist from storage;
+ * Mosoo restores the start-time internet and HTTPS interception settings.
  */
 export async function restoreSandboxNetworkEnforcement(
   storage: SandboxNetworkStorage,
   delegate: SandboxNetworkDelegate,
+  options: { httpsInterceptionDisabled: boolean },
 ): Promise<void> {
   // The persisted policy is the only authority available after a DO wake.
   // Close internet before reading it so storage or validation failures cannot
@@ -154,10 +159,15 @@ export async function restoreSandboxNetworkEnforcement(
   delegate.enableInternet = false;
   const stored = await readStoredSandboxNetworkConstraints(storage);
 
-  if (stored === null) {
-    delegate.enableInternet = true;
+  if (stored?.networkPolicy === "limited") {
+    assertEnforceableSandboxNetworkConstraints(stored, {
+      containerRunning: false,
+      httpsInterceptionDisabled: options.httpsInterceptionDisabled,
+    });
+    configureSandboxHttpsInterception(delegate, true);
     return;
   }
 
-  delegate.enableInternet = stored.networkPolicy !== "limited";
+  configureSandboxHttpsInterception(delegate, false);
+  delegate.enableInternet = true;
 }

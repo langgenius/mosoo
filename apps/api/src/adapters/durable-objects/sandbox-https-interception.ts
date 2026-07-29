@@ -1,19 +1,25 @@
-interface SandboxHttpsInterception {
+export interface SandboxHttpsInterception {
+  envVars: Record<string, string>;
   interceptHttps: boolean;
 }
 
 /**
- * Pins the HTTPS interception choice instead of inheriting the SDK default.
- * Local Sandbox keeps the existing CA compatibility escape hatch; production
- * must intercept HTTPS or a Limited allowlist would cover only plain HTTP.
+ * Keeps the Cloudflare interception hook and Sandbox control-plane startup
+ * flag aligned. Full network Sandboxes must keep interception off; otherwise
+ * the control plane requires a CA that Cloudflare only injects after an
+ * outbound interception rule is installed.
  */
 export function configureSandboxHttpsInterception(
   sandbox: SandboxHttpsInterception,
-  localBinding: string | undefined,
+  enabled: boolean,
 ): void {
-  // Local workerd can omit the ephemeral CA while HTTPS interception is active,
-  // resetting TLS before the sandbox reaches providers.
-  // With interception off the egress allowlist cannot cover HTTPS, so limited
-  // network policies fail closed while this is in effect (sandbox-network-enforcement.ts).
-  sandbox.interceptHttps = localBinding !== "true";
+  sandbox.interceptHttps = enabled;
+
+  const envVars = { ...sandbox.envVars };
+  if (enabled) {
+    envVars["SANDBOX_INTERCEPT_HTTPS"] = "1";
+  } else {
+    delete envVars["SANDBOX_INTERCEPT_HTTPS"];
+  }
+  sandbox.envVars = envVars;
 }
