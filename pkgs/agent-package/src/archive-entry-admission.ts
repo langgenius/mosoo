@@ -69,6 +69,7 @@ export function admitAgentPackageArchiveEntries(
   candidates: AgentPackageArchiveEntryCandidate[],
 ): AgentPackageArchiveAdmissionResult {
   const admittedEntries: AgentPackageArchiveEntry[] = [];
+  const descendantPathByAncestorPath = new Map<string, string>();
   const paths = new Map<string, AgentPackageArchiveEntry>();
   const filePaths = new Set<string>();
 
@@ -103,7 +104,7 @@ export function admitAgentPackageArchiveEntries(
     }
 
     if (entry.entryKind === "file") {
-      const descendantPath = findDescendantPath(entry.normalizedPath, paths);
+      const descendantPath = descendantPathByAncestorPath.get(entry.normalizedPath) ?? null;
 
       if (descendantPath !== null) {
         return archiveEntryAdmissionFailure({
@@ -117,6 +118,7 @@ export function admitAgentPackageArchiveEntries(
       filePaths.add(entry.normalizedPath);
     }
 
+    rememberAncestorPaths(entry.normalizedPath, descendantPathByAncestorPath);
     paths.set(entry.normalizedPath, entry);
     admittedEntries.push(entry);
   }
@@ -469,32 +471,35 @@ function throwArchiveReadError(failure: AgentPackageArchiveAdmissionFailure): ne
 }
 
 function findAncestorFilePath(path: string, filePaths: Set<string>): string | null {
-  const segments = path.split("/");
+  let slashIndex = path.indexOf("/");
 
-  for (let index = 1; index < segments.length; index += 1) {
-    const ancestorPath = segments.slice(0, index).join("/");
-
+  while (slashIndex !== -1) {
+    const ancestorPath = path.slice(0, slashIndex);
     if (filePaths.has(ancestorPath)) {
       return ancestorPath;
     }
+
+    slashIndex = path.indexOf("/", slashIndex + 1);
   }
 
   return null;
 }
 
-function findDescendantPath(
+function rememberAncestorPaths(
   path: string,
-  paths: Map<string, AgentPackageArchiveEntry>,
-): string | null {
-  const descendantPrefix = `${path}/`;
+  descendantPathByAncestorPath: Map<string, string>,
+): void {
+  let slashIndex = path.indexOf("/");
 
-  for (const existingPath of paths.keys()) {
-    if (existingPath.startsWith(descendantPrefix)) {
-      return existingPath;
+  while (slashIndex !== -1) {
+    const ancestorPath = path.slice(0, slashIndex);
+
+    if (!descendantPathByAncestorPath.has(ancestorPath)) {
+      descendantPathByAncestorPath.set(ancestorPath, path);
     }
-  }
 
-  return null;
+    slashIndex = path.indexOf("/", slashIndex + 1);
+  }
 }
 
 function findEndOfCentralDirectory(bytes: Uint8Array): number {

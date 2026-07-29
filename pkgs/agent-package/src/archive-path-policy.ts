@@ -12,6 +12,8 @@ interface ArchiveManifestCatalog {
   mcpServerNames: Set<string>;
 }
 
+type ArchiveSkillAssetRoots = ReadonlySet<string>;
+
 interface ArchivePathDeclaration {
   entryKind: "directory" | "file";
   path: string;
@@ -121,6 +123,7 @@ export function collectArchiveAdmissionIssues(input: {
 }): AgentResolutionIssue[] {
   const catalog = readArchiveManifestCatalog(input.manifestJson);
   const allowedPaths = createAllowedArchivePaths(input.agentPackage, catalog);
+  const skillAssetRoots = createManifestSkillAssetRoots(input.agentPackage);
   const issues: AgentResolutionIssue[] = collectArchiveDeclarationIssues(input.agentPackage);
 
   for (const path of Object.keys(input.entries)) {
@@ -139,7 +142,7 @@ export function collectArchiveAdmissionIssues(input: {
       continue;
     }
 
-    if (isAllowedArchivePath(path, allowedPaths, input.agentPackage)) {
+    if (isAllowedArchivePath(path, allowedPaths, input.agentPackage, skillAssetRoots)) {
       continue;
     }
 
@@ -258,6 +261,14 @@ export function createAllowedArchivePaths(
   return allowedPaths;
 }
 
+function createManifestSkillAssetRoots(agentPackage: AgentPackage): ArchiveSkillAssetRoots {
+  return new Set(
+    agentPackage.manifest.skills.map((skill) =>
+      skill.skillId.endsWith("/") ? skill.skillId : `${skill.skillId}/`,
+    ),
+  );
+}
+
 function readArchiveManifestCatalog(manifestJson: string): ArchiveManifestCatalog {
   const parsedManifest: unknown = JSON.parse(manifestJson);
   const mcpServerNames = new Set<string>();
@@ -295,7 +306,7 @@ function isAllowedArchivePath(
   path: string,
   allowedPaths: Set<string>,
   agentPackage: AgentPackage,
-  exportSkillAssetRoots?: Set<string>,
+  skillAssetRoots: ArchiveSkillAssetRoots = createManifestSkillAssetRoots(agentPackage),
 ): boolean {
   if (path.length === 0 || path.startsWith("/") || path.split("/").includes("..")) {
     return false;
@@ -305,24 +316,20 @@ function isAllowedArchivePath(
     return true;
   }
 
-  const skillRoots =
-    exportSkillAssetRoots ??
-    new Set(
-      agentPackage.manifest.skills.map((skill) =>
-        skill.skillId.endsWith("/") ? skill.skillId : `${skill.skillId}/`,
-      ),
-    );
+  return isAllowedSkillAssetPath(path, skillAssetRoots);
+}
 
-  for (const skillPath of skillRoots) {
-    if (!path.startsWith(skillPath)) {
-      continue;
-    }
+function isAllowedSkillAssetPath(path: string, skillAssetRoots: ArchiveSkillAssetRoots): boolean {
+  let slashIndex = path.indexOf("/");
 
-    const relativePath = path.slice(skillPath.length);
+  while (slashIndex !== -1) {
+    const candidateRoot = path.slice(0, slashIndex + 1);
 
-    if (relativePath.length > 0) {
+    if (candidateRoot.length < path.length && skillAssetRoots.has(candidateRoot)) {
       return true;
     }
+
+    slashIndex = path.indexOf("/", slashIndex + 1);
   }
 
   return false;
