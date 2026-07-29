@@ -92,6 +92,7 @@ export class DriverInstance extends DurableObject implements DriverInstanceHttpH
       state: this.#state,
       viewCache: this.#viewCache,
       viewerEventDelivery: this.#viewerEventDelivery,
+      waitUntil: (task) => this.ctx.waitUntil(task),
       withRuntimeLogContext: (fn) => this.#withRuntimeLogContext(fn),
     });
     void this.ctx.blockConcurrencyWhile(async () => this.#state.load());
