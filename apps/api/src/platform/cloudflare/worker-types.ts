@@ -87,6 +87,10 @@ interface OptionalLarkSidecarBindings {
   MOSOO_LARK_SIDECAR_SECRET?: string;
 }
 
+interface OptionalStatusCanaryBindings {
+  MOSOO_STATUS_CANARY_SECRET?: string;
+}
+
 interface OptionalRuntimeSubjectPlatformBindings {
   runtimeSubjectHandleFactory?: (runtimeSubjectId: string) => unknown;
 }
@@ -106,6 +110,7 @@ export type ApiBindings = Env &
   OptionalSlackAdapterBindings &
   OptionalWeChatIlinkBindings &
   OptionalLarkSidecarBindings &
+  OptionalStatusCanaryBindings &
   OptionalRuntimeSubjectPlatformBindings;
 
 export interface ApiGatewayEnvironment {
