@@ -118,5 +118,12 @@ jobs:
             sleep 10
           done
           test "$actual_redirect" = "$expected_redirect"
+          test "$(curl "${curl_args[@]}" --output /dev/null \
+            --write-out '%{http_code} %{redirect_url}' \
+            http://cloud.mosoo.ai/)" = '308 https://cloud.mosoo.ai/'
+          test "$(curl "${curl_args[@]}" --output /dev/null \
+            --write-out '%{http_code} %{redirect_url}' \
+            http://cloud.mosoo.ai/api/health)" = \
+            '308 https://cloud.mosoo.ai/api/health'
           curl "${curl_args[@]}" https://try.mosoo.ai/api/health \
             | jq -e '.name == "mosoo" and .ok == true'

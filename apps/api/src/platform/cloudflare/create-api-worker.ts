@@ -1,3 +1,5 @@
+import { MOSOO_CONSOLE_HOST, MOSOO_LEGACY_CONSOLE_HOST } from "@mosoo/contracts/origin";
+
 import { enqueueScheduledMaintenanceCommand } from "../../modules/api-command/application/api-command-enqueue";
 import { redriveFailedApiCommandEnqueues } from "../../modules/api-command/application/api-command-ledger";
 import type { ApiCommandMessage } from "../../modules/api-command/application/api-command-message";
@@ -25,6 +27,16 @@ function getHttpApp(): Promise<ApiHttpApp> {
 export function createApiWorker(): ExportedHandler<ApiBindings> {
   return {
     async fetch(request: Request, env: ApiBindings, ctx: ExecutionContext): Promise<Response> {
+      const url = new URL(request.url);
+
+      if (
+        url.protocol === "http:" &&
+        (url.hostname === MOSOO_CONSOLE_HOST || url.hostname === MOSOO_LEGACY_CONSOLE_HOST)
+      ) {
+        url.protocol = "https:";
+        return Response.redirect(url.toString(), 308);
+      }
+
       const app = await getHttpApp();
       const response = await app.fetch(request, env, ctx);
 
