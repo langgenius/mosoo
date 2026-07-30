@@ -46,6 +46,7 @@ function vendorCredential(
 async function expectLlmProxyGrant(
   grant: string | undefined,
   modelBinding: {
+    imageModelId?: string;
     modelId: string;
     modelProtocol:
       | "anthropic-messages"
@@ -99,6 +100,27 @@ describe("runtime vendor proxy env vars", () => {
     await expectLlmProxyGrant(envVars["ANTHROPIC_API_KEY"], {
       modelId: "claude-sonnet-5",
       modelProtocol: "anthropic-messages",
+    });
+  });
+
+  test("scopes official OpenAI runtime grants to the GPT Image model", async () => {
+    const envVars = await buildVendorProxyEnvVars({
+      bindings: BINDINGS,
+      driverGeneration: DRIVER_GENERATION,
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      profile: {
+        model: "gpt-5.4",
+        runtimeId: "openai-runtime",
+        vendorCredential: vendorCredential({ vendorId: "openai" }),
+      },
+      requestUrl: REQUEST_URL,
+    });
+
+    expect(envVars["OPENAI_BASE_URL"]).toBe(PROXY_URL);
+    await expectLlmProxyGrant(envVars["OPENAI_API_KEY"], {
+      imageModelId: "gpt-image-2",
+      modelId: "gpt-5.4",
+      modelProtocol: "openai-responses",
     });
   });
 

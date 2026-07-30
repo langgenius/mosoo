@@ -53,6 +53,7 @@ export type RuntimeActionTokenPayload =
       action: "llm_proxy";
       appId: AppId;
       driverGeneration: number;
+      imageModelId?: string;
       modelId: string;
       modelProtocol: PresetModelProtocol;
       resourceId: VendorCredentialId;
@@ -192,7 +193,7 @@ function parseRuntimeActionTokenPayload(encodedPayload: string): RuntimeActionTo
   );
 
   if (action === "llm_proxy") {
-    const { appId, driverGeneration, modelId, modelProtocol } = parsed;
+    const { appId, driverGeneration, imageModelId, modelId, modelProtocol } = parsed;
 
     if (
       typeof appId !== "string" ||
@@ -203,6 +204,11 @@ function parseRuntimeActionTokenPayload(encodedPayload: string): RuntimeActionTo
       typeof modelId !== "string" ||
       modelId === "" ||
       modelId.length > RUNTIME_LLM_PROXY_MODEL_ID_MAX_LENGTH ||
+      (imageModelId !== undefined &&
+        (modelProtocol !== "openai-responses" ||
+          typeof imageModelId !== "string" ||
+          imageModelId === "" ||
+          imageModelId.length > RUNTIME_LLM_PROXY_MODEL_ID_MAX_LENGTH)) ||
       !isPresetModelProtocol(modelProtocol)
     ) {
       throw new Error("Runtime action token payload is invalid.");
@@ -214,6 +220,7 @@ function parseRuntimeActionTokenPayload(encodedPayload: string): RuntimeActionTo
       driverGeneration,
       driverInstanceId: parsedDriverInstanceId,
       expiresAt,
+      ...(imageModelId === undefined ? {} : { imageModelId }),
       modelId,
       modelProtocol,
       resourceId: parsePlatformId<VendorCredentialId>(

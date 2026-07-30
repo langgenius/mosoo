@@ -59,6 +59,7 @@ const HOP_BY_HOP_HEADERS = new Set([
 const LLM_PROXY_GRANT_HEADERS = new Set(["authorization", "x-api-key", "x-goog-api-key"]);
 const LLM_PROXY_PATH_MARKER = "/llm/proxy/";
 const LLM_PROXY_UNSAFE_PATH_ENCODING = /%(?:25|2f|5c)/iu;
+const OPENAI_IMAGE_API_PATHS = new Set(["/images/edits", "/images/generations"]);
 
 async function requireDriverActionGrant(c: Context<ApiGatewayEnvironment>) {
   const grant = c.req.query("grant");
@@ -225,24 +226,25 @@ function extractLlmProxySubPath(pathname: string): string | null {
   return subPath;
 }
 
-function isLlmProxyCapabilityAllowed(
+function resolveGrantedLlmProxyModelId(
   method: string,
   subPath: string,
   modelId: string,
   modelProtocol: PresetModelProtocol,
-): boolean {
+  imageModelId?: string,
+): string | null {
   const decodedPath = decodeURIComponent(subPath);
 
   if (decodedPath !== subPath) {
-    return false;
+    return null;
   }
 
   switch (modelProtocol) {
     case "anthropic-messages":
-      return (
-        method === "POST" &&
+      return method === "POST" &&
         ["/messages", "/v1/messages", "/v1/messages/count_tokens"].includes(decodedPath)
-      );
+        ? modelId
+        : null;
     case "google-gemini": {
       const modelPath = modelId.includes("/") ? modelId : `models/${modelId}`;
       const modelPathIsCanonical = modelPath
@@ -255,18 +257,29 @@ function isLlmProxyCapabilityAllowed(
             /^[A-Za-z0-9._-]+$/u.test(segment),
         );
 
-      return (
-        method === "POST" &&
+      return method === "POST" &&
         modelPathIsCanonical &&
         [`/${modelPath}:generateContent`, `/${modelPath}:streamGenerateContent`].includes(
           decodedPath,
         )
-      );
+        ? modelId
+        : null;
     }
     case "openai-chat-completions":
-      return method === "POST" && decodedPath === "/chat/completions";
-    case "openai-responses":
-      return method === "POST" && ["/responses", "/responses/compact"].includes(decodedPath);
+      return method === "POST" && decodedPath === "/chat/completions" ? modelId : null;
+    case "openai-responses": {
+      if (method !== "POST") {
+        return null;
+      }
+
+      if (["/responses", "/responses/compact"].includes(decodedPath)) {
+        return modelId;
+      }
+
+      return imageModelId !== undefined && OPENAI_IMAGE_API_PATHS.has(decodedPath)
+        ? imageModelId
+        : null;
+    }
   }
 }
 
@@ -287,10 +300,26 @@ async function readGrantedLlmProxyRequestBody(
   request: Request,
   modelId: string,
   modelProtocol: PresetModelProtocol,
+  subPath: string,
 ): Promise<{ body: BodyInit | null } | null> {
   if (modelProtocol === "google-gemini") {
     // Gemini binds the model in the exact admitted request path.
     return { body: request.body };
+  }
+
+  const mediaType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+
+  if (
+    modelProtocol === "openai-responses" &&
+    subPath === "/images/edits" &&
+    mediaType === "multipart/form-data"
+  ) {
+    try {
+      const models = (await request.clone().formData()).getAll("model");
+      return models.length === 1 && models[0] === modelId ? { body: request.body } : null;
+    } catch {
+      return null;
+    }
   }
 
   try {
@@ -678,7 +707,15 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
       });
     }
 
-    if (!isLlmProxyCapabilityAllowed(c.req.method, subPath, grant.modelId, grant.modelProtocol)) {
+    const grantedModelId = resolveGrantedLlmProxyModelId(
+      c.req.method,
+      subPath,
+      grant.modelId,
+      grant.modelProtocol,
+      grant.imageModelId,
+    );
+
+    if (grantedModelId === null) {
       return Response.json(
         { error: "LLM proxy request is outside the granted model capability." },
         { status: 403 },
@@ -687,8 +724,9 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
 
     const grantedRequestBody = await readGrantedLlmProxyRequestBody(
       c.req.raw,
-      grant.modelId,
+      grantedModelId,
       grant.modelProtocol,
+      subPath,
     );
 
     if (grantedRequestBody === null) {

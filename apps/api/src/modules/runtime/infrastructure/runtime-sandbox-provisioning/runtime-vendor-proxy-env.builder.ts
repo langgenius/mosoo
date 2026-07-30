@@ -19,6 +19,8 @@ import {
 import type { RuntimeActionTokenBindings } from "../runtime-boot-token";
 import { OPENCODE_CONFIG_CONTENT_ENV } from "./runtime-vendor-env-policy";
 
+const OPENAI_IMAGE_MODEL_ID = "gpt-image-2";
+
 export interface VendorProxyEnvironmentInput {
   bindings: RuntimeActionTokenBindings;
   driverGeneration: number;
@@ -136,6 +138,9 @@ export async function buildVendorProxyEnvVars(
     driverGeneration: input.driverGeneration,
     driverInstanceId: input.driverInstanceId,
     expiresAt: Date.now() + RUNTIME_RUN_RETENTION_MS,
+    ...(input.profile.runtimeId === "openai-runtime" && vendor.vendorId === "openai"
+      ? { imageModelId: OPENAI_IMAGE_MODEL_ID }
+      : {}),
     ...modelBinding,
     resourceId: credential.credentialId,
   });
