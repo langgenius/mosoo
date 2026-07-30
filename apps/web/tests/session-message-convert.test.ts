@@ -29,6 +29,34 @@ describe("convertSessionMessage", () => {
     expect(message.role).toBe("user");
   });
 
+  test("keeps a user bubble identity when the optimistic message is replaced by its echo", () => {
+    const optimistic = convertSessionMessage(
+      {
+        content: "hello",
+        createdAt: "",
+        id: "pending:request-1",
+        plan: [],
+        role: "user",
+        segments: [],
+      },
+      2,
+    );
+    const echoed = convertSessionMessage(
+      {
+        content: "hello",
+        createdAt: "",
+        id: "01J0000000000000000000000U",
+        plan: [],
+        role: "user",
+        segments: [],
+      },
+      2,
+    );
+
+    expect(optimistic.id).toBe("user:2");
+    expect(echoed.id).toBe(optimistic.id);
+  });
+
   test("merges consecutive text segments into one markdown part", () => {
     const like = convertSessionMessage(
       assistantMessage([

@@ -354,6 +354,25 @@ describe("session stream render scheduler", () => {
     expect(drainFrames(manual)).toBe(0);
   });
 
+  test("delivers user start/content events atomically instead of pacing the server echo", () => {
+    const manual = createManualHost();
+    const batches: AgUiSessionEvent[][] = [];
+    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+      batches.push(events);
+      return true;
+    }, manual.host);
+    const events = [
+      { messageId: "message-user", role: "user", type: "TEXT_MESSAGE_START" },
+      textEvent("用".repeat(1000), "message-user"),
+    ] as const satisfies readonly AgUiSessionEvent[];
+
+    scheduler.enqueueMany("session-1", [...events]);
+    manual.fireFrame();
+
+    expect(batches).toEqual([[...events]]);
+    expect(drainFrames(manual)).toBe(0);
+  });
+
   test("flushNow delivers the paced remainder exactly once", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];
