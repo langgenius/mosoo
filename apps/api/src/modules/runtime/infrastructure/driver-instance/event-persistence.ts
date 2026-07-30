@@ -1,4 +1,4 @@
-import { sessionsTable } from "@mosoo/db";
+import { sessionEventsTable, sessionsTable } from "@mosoo/db";
 import type { DriverInstanceId } from "@mosoo/id";
 import { and, eq, isNull } from "drizzle-orm";
 
@@ -9,6 +9,7 @@ import {
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
+import { createSessionRuntimeEvent } from "../../../sessions/application/session-event-write.service";
 import { upsertSessionModelCallUsage } from "../../../sessions/application/session-model-call.service";
 import { persistSessionRuntimeEvents } from "../../../sessions/infrastructure/session-runtime-event-store.repository";
 import { setSessionRunStatus } from "../session-runs/session-run-store.repository";
@@ -219,6 +220,7 @@ export async function persistProjectedRuntimeDriverEvents(
     completedTransition === undefined
       ? projection.runtimeEvents
       : projection.runtimeEvents.filter((record) => record.event.kind === "run.completed");
+  const finalAssistantRuntimeEvents: typeof terminalRuntimeEvents = [];
   const persistedSourceEventIds: string[] = [];
 
   if (preCompletionRuntimeEvents.length > 0) {
@@ -280,10 +282,53 @@ export async function persistProjectedRuntimeDriverEvents(
       sessionRunId: link.sessionRunId,
       state: nextLiveState,
     });
+
+    const terminalRuntimeEvent = terminalRuntimeEvents[0];
+    const finalSnapshotAlreadyPersisted =
+      (await getAppDatabase(database)
+        .select({ id: sessionEventsTable.id })
+        .from(sessionEventsTable)
+        .where(
+          and(
+            eq(sessionEventsTable.sessionId, link.sessionId),
+            eq(sessionEventsTable.runId, link.sessionRunId),
+            eq(sessionEventsTable.eventType, "message.added"),
+            eq(sessionEventsTable.processType, "agent.message.delta"),
+            eq(sessionEventsTable.contentText, projection.finalAssistantMessage.text),
+          ),
+        )
+        .limit(1)
+        .get()) !== undefined;
+
+    if (terminalRuntimeEvent !== undefined && !finalSnapshotAlreadyPersisted) {
+      const sourceEventId = `session-run:${link.sessionRunId}:final-assistant`;
+      finalAssistantRuntimeEvents.push({
+        event: createSessionRuntimeEvent({
+          actor: terminalRuntimeEvent.event.actor,
+          kind: "message.added",
+          ...(terminalRuntimeEvent.occurredAt === null
+            ? {}
+            : { occurredAtMs: terminalRuntimeEvent.occurredAt }),
+          origin: terminalRuntimeEvent.event.origin,
+          payload: {
+            content: projection.finalAssistantMessage.text,
+            messageId: projection.finalAssistantMessage.id,
+            role: "agent",
+          },
+          runId: link.sessionRunId,
+          sessionId: link.sessionId,
+          sourceEventId,
+          traceId: terminalRuntimeEvent.event.traceId ?? link.traceId,
+          visibility: terminalRuntimeEvent.event.visibility,
+        }),
+        occurredAt: terminalRuntimeEvent.occurredAt,
+        sourceEventId,
+      });
+    }
   }
 
   const persistedTerminalEvents = await persistSessionRuntimeEvents(database, {
-    records: terminalRuntimeEvents,
+    records: [...finalAssistantRuntimeEvents, ...terminalRuntimeEvents],
     sessionId: link.sessionId,
   });
   persistedSourceEventIds.push(...persistedTerminalEvents.persistedSourceEventIds);
