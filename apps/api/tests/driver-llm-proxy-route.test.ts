@@ -317,6 +317,99 @@ describe("driver LLM proxy route", () => {
     expect(captured[0]?.headers.get("x-api-key")).toBeNull();
   });
 
+  test("forwards scoped OpenAI image generations and multipart edits", async () => {
+    const { bindings } = await setupFixture({ vendorId: "openai" });
+    const captured = captureUpstreamFetch();
+    const grant = await createLlmProxyGrant(bindings, {
+      imageModelId: "gpt-image-2",
+      modelId: "gpt-5.4",
+      modelProtocol: "openai-responses",
+    });
+
+    const generationResponse = await dispatch(
+      bindings,
+      llmProxyRequest("/images/generations", {
+        body: JSON.stringify({ model: "gpt-image-2", prompt: "Draw a pet." }),
+        headers: {
+          Authorization: `Bearer ${grant}`,
+          "content-type": "application/json",
+        },
+        method: "POST",
+      }),
+    );
+    const editBody = new FormData();
+    editBody.append("model", "gpt-image-2");
+    editBody.append("prompt", "Animate this pet.");
+    editBody.append("image", new Blob(["png"], { type: "image/png" }), "pet.png");
+    const editResponse = await dispatch(
+      bindings,
+      llmProxyRequest("/images/edits", {
+        body: editBody,
+        headers: { Authorization: `Bearer ${grant}` },
+        method: "POST",
+      }),
+    );
+
+    expect(generationResponse.status).toBe(200);
+    expect(editResponse.status).toBe(200);
+    expect(captured.map((request) => request.url)).toEqual([
+      "https://api.openai.com/v1/images/generations",
+      "https://api.openai.com/v1/images/edits",
+    ]);
+    expect(captured[0]?.body).toBe(JSON.stringify({ model: "gpt-image-2", prompt: "Draw a pet." }));
+    expect(captured[1]?.headers.get("content-type")).toStartWith("multipart/form-data; boundary=");
+    expect(captured[1]?.body).toContain('name="model"');
+    expect(captured[1]?.body).toContain("gpt-image-2");
+  });
+
+  test("rejects OpenAI image calls outside the scoped model capability", async () => {
+    const { bindings } = await setupFixture({ vendorId: "openai" });
+    const captured = captureUpstreamFetch();
+    const unscopedGrant = await createLlmProxyGrant(bindings, {
+      modelId: "gpt-5.4",
+      modelProtocol: "openai-responses",
+    });
+    const scopedGrant = await createLlmProxyGrant(bindings, {
+      imageModelId: "gpt-image-2",
+      modelId: "gpt-5.4",
+      modelProtocol: "openai-responses",
+    });
+
+    const unscopedResponse = await dispatch(
+      bindings,
+      llmProxyRequest("/images/generations", {
+        body: JSON.stringify({ model: "gpt-image-2", prompt: "Draw a pet." }),
+        headers: { Authorization: `Bearer ${unscopedGrant}` },
+        method: "POST",
+      }),
+    );
+    const wrongModelResponse = await dispatch(
+      bindings,
+      llmProxyRequest("/images/generations", {
+        body: JSON.stringify({ model: "gpt-image-1", prompt: "Draw a pet." }),
+        headers: { Authorization: `Bearer ${scopedGrant}` },
+        method: "POST",
+      }),
+    );
+    const duplicateModelBody = new FormData();
+    duplicateModelBody.append("model", "gpt-image-2");
+    duplicateModelBody.append("model", "gpt-image-1");
+    duplicateModelBody.append("image", new Blob(["png"], { type: "image/png" }), "pet.png");
+    const duplicateModelResponse = await dispatch(
+      bindings,
+      llmProxyRequest("/images/edits", {
+        body: duplicateModelBody,
+        headers: { Authorization: `Bearer ${scopedGrant}` },
+        method: "POST",
+      }),
+    );
+
+    expect(unscopedResponse.status).toBe(403);
+    expect(wrongModelResponse.status).toBe(403);
+    expect(duplicateModelResponse.status).toBe(403);
+    expect(captured).toHaveLength(0);
+  });
+
   test("binds native Gemini endpoints to the granted model", async () => {
     const { bindings } = await setupFixture({ vendorId: "opencode" });
     const captured = captureUpstreamFetch();
