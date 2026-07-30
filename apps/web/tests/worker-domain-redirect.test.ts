@@ -1,6 +1,13 @@
 import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
 import worker from "../src/worker";
+
+test("routes the root asset through the Worker before serving it", () => {
+  const wrangler = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
+
+  expect(wrangler).toContain('run_worker_first = ["/"]');
+});
 
 test("redirects the legacy console host without losing the path or query", async () => {
   let fetchedAsset = false;
