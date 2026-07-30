@@ -27,6 +27,7 @@ describe("production origins", () => {
     expect(apiWrangler).toContain('"GOOGLE_OAUTH_CLIENT_SECRET"');
     expect(webWrangler).toContain(`pattern = "${MOSOO_CONSOLE_HOST}"`);
     expect(webWrangler).toContain(`pattern = "${MOSOO_LEGACY_CONSOLE_HOST}"`);
+    expect(webWrangler).toContain("run_worker_first = true");
     expect(webWrangler).not.toContain(`pattern = "${MOSOO_MARKETING_HOST}"`);
   });
 
