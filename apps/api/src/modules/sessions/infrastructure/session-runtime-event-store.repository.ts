@@ -35,6 +35,8 @@ export type {
 } from "./session-runtime-event-store.types";
 
 const MAX_SESSION_RUNTIME_EVENT_INSERT_ATTEMPTS = 5;
+// D1 accepts at most 100 bound parameters; each session_event row binds 18.
+const MAX_SESSION_EVENT_ROWS_PER_INSERT = 5;
 const WRITABLE_SESSION_STATUSES = ["IDLE", "RUNNING", "RESCHEDULING"] as const;
 const TERMINAL_LIFECYCLE_WRITABLE_SESSION_STATUSES = [
   ...WRITABLE_SESSION_STATUSES,
@@ -419,17 +421,34 @@ async function insertSessionEventRows(
     };
   }
 
-  const insertedRows = await getAppDatabase(database)
-    .insert(sessionEventsTable)
-    .values([...values])
-    .onConflictDoNothing({
-      target: [sessionEventsTable.sessionId, sessionEventsTable.sourceEventId],
-    })
-    .returning({
-      sessionId: sessionEventsTable.sessionId,
-      sourceEventId: sessionEventsTable.sourceEventId,
-    })
-    .all();
+  const appDatabase = getAppDatabase(database);
+  const statements: D1PreparedStatement[] = [];
+
+  for (let index = 0; index < values.length; index += MAX_SESSION_EVENT_ROWS_PER_INSERT) {
+    const query = appDatabase
+      .insert(sessionEventsTable)
+      .values(values.slice(index, index + MAX_SESSION_EVENT_ROWS_PER_INSERT))
+      .onConflictDoNothing({
+        target: [sessionEventsTable.sessionId, sessionEventsTable.sourceEventId],
+      })
+      .returning({
+        sessionId: sessionEventsTable.sessionId,
+        sourceEventId: sessionEventsTable.sourceEventId,
+      })
+      .toSQL();
+
+    statements.push(database.prepare(query.sql).bind(...query.params));
+  }
+
+  const results = await database.batch<{ session_id: SessionId; source_event_id: string }>(
+    statements,
+  );
+  const insertedRows = results.flatMap((result) =>
+    result.results.map((row) => ({
+      sessionId: row.session_id,
+      sourceEventId: row.source_event_id,
+    })),
+  );
 
   return {
     insertedCount: insertedRows.length,

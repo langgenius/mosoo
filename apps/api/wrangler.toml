@@ -145,7 +145,7 @@ head_sampling_rate = 0.1
 
 [env.prod.vars]
 APP_NAME = "mosoo"
-WEB_ORIGIN = "https://try.mosoo.ai"
+WEB_ORIGIN = "https://cloud.mosoo.ai"
 AUTH_EMAIL_FROM = "mosoo AUTH <auth@mosoo.ai>"
 FILE_BUCKET_NAME = "mosoo-file"
 BACKUP_BUCKET_NAME = "mosoo-sandbox-state"
@@ -172,6 +172,10 @@ required = [
   "GOOGLE_OAUTH_CLIENT_ID",
   "GOOGLE_OAUTH_CLIENT_SECRET",
 ]
+
+[[env.prod.routes]]
+zone_name = "mosoo.ai"
+pattern = "cloud.mosoo.ai/api/*"
 
 [[env.prod.routes]]
 zone_name = "mosoo.ai"

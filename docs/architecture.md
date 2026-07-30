@@ -19,7 +19,7 @@ To support lightweight deployment, fast iteration, and future governance expansi
 
 The architecture is built on the Cloudflare platform and uses a Serverless shape for elastic scaling:
 
-- **Frontend and ingress: Cloudflare Workers**. The Web Worker serves Vite-built console assets. The API Worker handles stateless GraphQL / Web API requests and WebSocket handshakes, then hands upgraded session connections to the corresponding Session Durable Object. `mosoo.ai` is the marketing / landing / blog origin owned by `langgenius/mosoo-website`. Authenticated console traffic uses `try.mosoo.ai`, with Cloudflare routing `try.mosoo.ai/api/*` to the API Worker and console paths to the Web Worker.
+- **Frontend and ingress: Cloudflare Workers**. The Web Worker serves Vite-built console assets. The API Worker handles stateless GraphQL / Web API requests and WebSocket handshakes, then hands upgraded session connections to the corresponding Session Durable Object. `mosoo.ai` is the marketing / landing / blog origin owned by `langgenius/mosoo-website`. Authenticated console traffic uses `cloud.mosoo.ai`, with Cloudflare routing `cloud.mosoo.ai/api/*` to the API Worker and console paths to the Web Worker. During the domain migration, console requests on `try.mosoo.ai` redirect permanently to the new host while `try.mosoo.ai/api/*` remains a direct API route for existing CLI credentials and webhooks.
 - **State and connection management: Cloudflare Durable Objects**. Durable Objects hold upgraded WebSocket connections, high-frequency Session state, and distributed coordination points that need single-instance concurrency.
 - **Primary database: Cloudflare D1**. D1 stores Account records, Organization shell records, App records, core entity configuration, and metadata.
 - **Message queues: Cloudflare Queues**. Queues decouple the control plane from offline tasks. They provide ACK semantics, dead-letter queues, and at-least-once delivery for API commands (including deployment and scheduled maintenance) and Channel final delivery. Cost usage is written from normalized runtime events, not ingested through a queue.
@@ -120,8 +120,8 @@ graph TD
 
 The Web layer provides the interactive client experience.
 
-- It is built with **React / React Router / Vite** and served through Cloudflare Workers Static Assets on `try.mosoo.ai`.
-- Browsers access a same-origin `/api/*` entry point from the console origin. Cloudflare routes `try.mosoo.ai/api/*` to the API Worker and console paths on `try.mosoo.ai` to the Web Worker, preserving independent Web/API deployments while keeping a same-origin product experience. `mosoo.ai` remains the marketing / landing / blog origin in the private website repository and sends login intent to the console origin.
+- It is built with **React / React Router / Vite** and served through Cloudflare Workers Static Assets on `cloud.mosoo.ai`.
+- Browsers access a same-origin `/api/*` entry point from the console origin. Cloudflare routes `cloud.mosoo.ai/api/*` to the API Worker and console paths on `cloud.mosoo.ai` to the Web Worker, preserving independent Web/API deployments while keeping a same-origin product experience. `mosoo.ai` remains the marketing / landing / blog origin in the private website repository and sends login intent to the console origin. The legacy Web host preserves paths and query strings when redirecting; its `/api/*` route does not redirect across hosts because clients may drop authorization headers.
 - WebSocket, using the `AG-UI WebSocket` protocol, carries bidirectional high-frequency streaming events such as text streaming and state synchronization.
 
 ### 4.2 API Layer

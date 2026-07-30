@@ -50,7 +50,7 @@ describe("App overview boundary", () => {
     expect(installSource).toContain("installs the mosoo CLI");
     expect(installSource).toContain("@mosoo skill");
     expect(installSource).toContain("checks cloud readiness");
-    expect(installSource).toContain("try.mosoo.ai");
+    expect(installSource).toContain("cloud.mosoo.ai");
     expect(installSource).toContain('"Copy"');
     expect(appIdBadgeSource).toContain("Copy app ID");
 

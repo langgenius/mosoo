@@ -227,18 +227,21 @@ async function insertRuntimeFixture(database: SqliteD1Database): Promise<void> {
   `);
 }
 
-function failSecondSessionEventInsert(database: D1Database): D1Database {
-  let sessionEventInsertCount = 0;
-
+function failTerminalSessionEventInsert(database: D1Database): D1Database {
   function wrapStatement(
     statement: D1PreparedStatement,
     isSessionEventInsert: boolean,
+    shouldFail: boolean,
   ): D1PreparedStatement {
     return new Proxy(statement, {
       get(target, property) {
         if (property === "bind") {
           return (...values: unknown[]) =>
-            wrapStatement(target.bind(...values), isSessionEventInsert);
+            wrapStatement(
+              target.bind(...values),
+              isSessionEventInsert,
+              isSessionEventInsert && values.includes(TERMINAL_SOURCE_EVENT_ID),
+            );
         }
 
         const value = Reflect.get(target, property);
@@ -248,12 +251,8 @@ function failSecondSessionEventInsert(database: D1Database): D1Database {
           (property === "all" || property === "first" || property === "raw" || property === "run")
         ) {
           return (...arguments_: unknown[]) => {
-            if (isSessionEventInsert) {
-              sessionEventInsertCount += 1;
-
-              if (sessionEventInsertCount === 2) {
-                throw new Error("injected terminal session_event persistence failure");
-              }
+            if (shouldFail) {
+              throw new Error("injected terminal session_event persistence failure");
             }
 
             return Reflect.apply(value, target, arguments_);
@@ -272,6 +271,7 @@ function failSecondSessionEventInsert(database: D1Database): D1Database {
           wrapStatement(
             target.prepare(query),
             /insert\s+into\s+["`]session_event["`]/iu.test(query),
+            false,
           );
       }
 
@@ -456,7 +456,7 @@ describe("runtime final output ingestion", () => {
     ];
     const failingBindings = {
       ...bindings,
-      DB: failSecondSessionEventInsert(database),
+      DB: failTerminalSessionEventInsert(database),
     } as ApiBindings;
 
     await expect(pushFreshController(failingBindings, terminalBatch)).rejects.toBeInstanceOf(Error);
@@ -663,7 +663,7 @@ describe("runtime final output ingestion", () => {
     ];
     const failingBindings = {
       ...bindings,
-      DB: failSecondSessionEventInsert(database),
+      DB: failTerminalSessionEventInsert(database),
     } as ApiBindings;
 
     await expect(pushFreshController(failingBindings, terminalBatch)).rejects.toBeInstanceOf(Error);

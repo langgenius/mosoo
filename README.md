@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://try.mosoo.ai">Try mosoo</a> ·
+  <a href="https://cloud.mosoo.ai">Try mosoo</a> ·
   <a href="https://mosoo.ai">Website</a> ·
   <a href="https://mosoo.ai/docs">API Documentation</a> ·
   <a href="https://github.com/langgenius/mosoo-connector">mosoo Connector</a>
@@ -55,7 +55,7 @@ mosoo is in Alpha. The managed runtime and Agent API surfaces above are shipped 
 
 ## Getting Started
 
-The fastest way to try mosoo is the hosted console at [try.mosoo.ai](https://try.mosoo.ai). To run it yourself, self-host from a clean clone as below.
+The fastest way to try mosoo is the hosted console at [cloud.mosoo.ai](https://cloud.mosoo.ai). To run it yourself, self-host from a clean clone as below.
 
 ### Prerequisites
 

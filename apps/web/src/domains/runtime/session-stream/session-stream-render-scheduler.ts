@@ -76,6 +76,10 @@ function getPaceableTextDelta(event: AgUiSessionEvent): string | null {
   }
 
   if (event.type === "TEXT_MESSAGE_CHUNK") {
+    if (event.role === "user") {
+      return null;
+    }
+
     return typeof event.delta === "string" && event.delta.length > 0 ? event.delta : null;
   }
 

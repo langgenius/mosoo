@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 60
     environment:
       name: try
-      url: https://try.mosoo.ai
+      url: https://cloud.mosoo.ai
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -101,10 +101,16 @@ jobs:
         run: |
           set -euo pipefail
           curl_args=(--fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 10)
-          curl "${curl_args[@]}" --output /dev/null https://try.mosoo.ai/
-          curl "${curl_args[@]}" https://try.mosoo.ai/api/health \
+          curl "${curl_args[@]}" --output /dev/null https://cloud.mosoo.ai/
+          curl "${curl_args[@]}" https://cloud.mosoo.ai/api/health \
             | jq -e '.name == "mosoo" and .ok == true'
-          curl "${curl_args[@]}" https://try.mosoo.ai/api/graphql \
+          curl "${curl_args[@]}" https://cloud.mosoo.ai/api/graphql \
             -H 'content-type: application/json' \
             --data '{"query":"query { __typename }"}' \
             | jq -e '.data.__typename == "Query"'
+          test "$(curl "${curl_args[@]}" --output /dev/null \
+            --write-out '%{http_code} %{redirect_url}' \
+            'https://try.mosoo.ai/domain-migration-check?source=deploy')" = \
+            '308 https://cloud.mosoo.ai/domain-migration-check?source=deploy'
+          curl "${curl_args[@]}" https://try.mosoo.ai/api/health \
+            | jq -e '.name == "mosoo" and .ok == true'

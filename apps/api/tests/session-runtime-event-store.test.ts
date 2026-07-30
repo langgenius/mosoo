@@ -39,8 +39,13 @@ function runtimeEvent(input: {
   });
 }
 
-function createRuntimeEventStoreDatabase(): SqliteD1Database {
-  const database = new SqliteD1Database({ foreignKeys: false });
+function createRuntimeEventStoreDatabase(
+  input: { maxBoundParams?: number } = {},
+): SqliteD1Database {
+  const database = new SqliteD1Database({
+    foreignKeys: false,
+    maxBoundParams: input.maxBoundParams,
+  });
 
   database.execute(`
     CREATE TABLE session (
@@ -115,6 +120,67 @@ function createRuntimeEventStoreDatabase(): SqliteD1Database {
 }
 
 describe("session runtime event store", () => {
+  test("keeps runtime event inserts within D1's bound parameter limit", async () => {
+    const database = createRuntimeEventStoreDatabase({ maxBoundParams: 100 });
+    const records = Array.from({ length: 6 }, (_, index) => {
+      const eventId = `event-${index + 1}`;
+
+      return {
+        event: runtimeEvent({
+          id: eventId,
+          kind: "message.delta",
+          occurredAtMs: 1_000 + index,
+          payload: {
+            contentDelta: `${index}`,
+            messageId: "message-1",
+          },
+          runId: "run-1",
+        }),
+        occurredAt: 1_000 + index,
+        sourceEventId: eventId,
+      };
+    });
+
+    const result = await persistSessionRuntimeEvents(database, {
+      records,
+      sessionId: "session-1",
+    });
+    const rows = await database
+      .prepare("SELECT seq, source_event_id FROM session_event ORDER BY seq")
+      .all<{ seq: number; source_event_id: string }>();
+
+    expect(result.persistedCount).toBe(6);
+    expect(rows.results).toEqual(
+      records.map((record, index) => ({
+        seq: index + 1,
+        source_event_id: record.sourceEventId,
+      })),
+    );
+
+    const failingDatabase = createRuntimeEventStoreDatabase({ maxBoundParams: 100 });
+    failingDatabase.execute(`
+      CREATE TRIGGER reject_last_event
+      BEFORE INSERT ON session_event
+      WHEN NEW.source_event_id = 'event-6'
+      BEGIN
+        SELECT RAISE(ABORT, 'forced event insert failure');
+      END;
+    `);
+
+    await expect(
+      persistSessionRuntimeEvents(failingDatabase, {
+        records,
+        sessionId: "session-1",
+      }),
+    ).rejects.toThrow("forced event insert failure");
+
+    const count = await failingDatabase
+      .prepare("SELECT COUNT(*) AS count FROM session_event")
+      .first<{ count: number }>();
+
+    expect(count?.count).toBe(0);
+  });
+
   test("persists mixed source ids and skips source replays before allocating sequence", async () => {
     const database = createRuntimeEventStoreDatabase();
 
