@@ -108,22 +108,30 @@ jobs:
             -H 'content-type: application/json' \
             --data '{"query":"query { __typename }"}' \
             | jq -e '.data.__typename == "Query"'
-          expected_redirect='308 https://cloud.mosoo.ai/domain-migration-check?source=deploy'
-          for attempt in {1..12}; do
-            actual_redirect="$(curl "${curl_args[@]}" --output /dev/null \
-              --write-out '%{http_code} %{redirect_url}' \
-              'https://try.mosoo.ai/domain-migration-check?source=deploy')"
-            [[ "$actual_redirect" == "$expected_redirect" ]] && break
-            printf 'Waiting for redirect propagation (%s/12): %s\n' "$attempt" "$actual_redirect"
-            sleep 10
-          done
-          test "$actual_redirect" = "$expected_redirect"
-          test "$(curl "${curl_args[@]}" --output /dev/null \
-            --write-out '%{http_code} %{redirect_url}' \
-            http://cloud.mosoo.ai/)" = '308 https://cloud.mosoo.ai/'
-          test "$(curl "${curl_args[@]}" --output /dev/null \
-            --write-out '%{http_code} %{redirect_url}' \
-            http://cloud.mosoo.ai/api/health)" = \
+          wait_for_redirect() {
+            local url="$1"
+            local expected="$2"
+            local actual=""
+            for attempt in {1..12}; do
+              actual="$(curl "${curl_args[@]}" --output /dev/null \
+                --write-out '%{http_code} %{redirect_url}' "$url")"
+              [[ "$actual" == "$expected" ]] && return 0
+              printf 'Waiting for redirect propagation (%s/12): %s\n' "$attempt" "$actual"
+              sleep 10
+            done
+            return 1
+          }
+          wait_for_redirect \
+            'https://try.mosoo.ai/domain-migration-check?source=deploy' \
+            '308 https://cloud.mosoo.ai/domain-migration-check?source=deploy'
+          wait_for_redirect \
+            'https://try.mosoo.ai/' \
+            '308 https://cloud.mosoo.ai/'
+          wait_for_redirect \
+            'http://cloud.mosoo.ai/' \
+            '308 https://cloud.mosoo.ai/'
+          wait_for_redirect \
+            'http://cloud.mosoo.ai/api/health' \
             '308 https://cloud.mosoo.ai/api/health'
           curl "${curl_args[@]}" https://try.mosoo.ai/api/health \
             | jq -e '.name == "mosoo" and .ok == true'
