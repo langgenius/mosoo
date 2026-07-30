@@ -200,7 +200,7 @@ class_name = "Sandbox"
 [[env.prod.containers]]
 class_name = "Sandbox"
 image = "../driver/Containerfile"
-instance_type = "basic"
+instance_type = "standard-2"
 max_instances = 1000
 
 [[env.prod.r2_buckets]]

@@ -80,6 +80,7 @@ export async function createPublicThread(
         attributedUserId: admission.attributedUserId,
         metadata: { public_api: metadata },
       },
+      ...(request.input.inputText === undefined ? { requestUrl: request.requestUrl } : {}),
       viewer: admission.creatorViewer,
     });
     const sessionId = session.id;
