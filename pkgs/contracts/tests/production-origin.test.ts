@@ -16,6 +16,12 @@ function readRepoFile(path: string): string {
 }
 
 describe("production origins", () => {
+  test("pins the production Sandbox capacity accepted by the account quota", () => {
+    const apiWrangler = readRepoFile("apps/api/wrangler.toml");
+
+    expect(apiWrangler).toContain('instance_type = "standard-2"\nmax_instances = 500');
+  });
+
   test("keeps Cloudflare routes and OAuth origin aligned", () => {
     const apiWrangler = readRepoFile("apps/api/wrangler.toml");
     const webWrangler = readRepoFile("apps/web/wrangler.toml");
