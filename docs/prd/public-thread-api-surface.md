@@ -2,7 +2,7 @@
 
 Status: Available for App-owner integrations with a limited identity model. The
 exact HTTP contract is the
-[OpenAPI document](https://try.mosoo.ai/api/v1/openapi.json).
+[OpenAPI document](https://cloud.mosoo.ai/api/v1/openapi.json).
 
 ## Why it exists
 

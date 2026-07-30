@@ -1,3 +1,5 @@
+import { MOSOO_CONSOLE_HOST, MOSOO_LEGACY_CONSOLE_HOST } from "@mosoo/contracts/origin";
+
 // Locally-typed binding so we don't have to pull `@cloudflare/workers-types`
 // into the SPA build. ASSETS is provided by Workers Assets and only exposes
 // `fetch` at runtime.
@@ -15,6 +17,12 @@ export interface Env {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.hostname === MOSOO_LEGACY_CONSOLE_HOST) {
+      url.protocol = "https:";
+      url.hostname = MOSOO_CONSOLE_HOST;
+      return Response.redirect(url.toString(), 308);
+    }
 
     if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
       if (env.API === undefined) {

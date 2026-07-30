@@ -114,7 +114,7 @@ function CodingAgentLane(): ReactElement {
       ) : null}
 
       <p className="text-fg-3 mt-3 max-w-2xl text-[13px] leading-5">
-        One command installs the mosoo CLI and the @mosoo skill, signs in to try.mosoo.ai, and
+        One command installs the mosoo CLI and the @mosoo skill, signs in to cloud.mosoo.ai, and
         checks cloud readiness. Sign-in creates your API token automatically; you will be asked for
         a provider key before sessions can run.
       </p>

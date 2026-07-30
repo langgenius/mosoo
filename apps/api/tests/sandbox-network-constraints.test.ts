@@ -75,7 +75,7 @@ describe("sandbox network constraints", () => {
   test("system host extraction handles URLs, proxy notation, and IPv6", () => {
     expect(
       toSandboxSystemHostsFromUrls([
-        "https://try.mosoo.ai/api/runtime",
+        "https://cloud.mosoo.ai/api/runtime",
         "http://proxy.internal:3128",
         "proxy-host:8080",
         "https://abc123.r2.cloudflarestorage.com",
@@ -87,7 +87,7 @@ describe("sandbox network constraints", () => {
         "http://[::1]:8080",
       ]),
     ).toEqual([
-      "try.mosoo.ai",
+      "cloud.mosoo.ai",
       "proxy.internal",
       "proxy-host",
       "abc123.r2.cloudflarestorage.com",

@@ -25,8 +25,8 @@ describe("toContainerReachableOrigin", () => {
   });
 
   test("leaves public origins untouched", () => {
-    expect(toContainerReachableOrigin("https://try.mosoo.ai/api/graphql")).toBe(
-      "https://try.mosoo.ai/api/graphql",
+    expect(toContainerReachableOrigin("https://cloud.mosoo.ai/api/graphql")).toBe(
+      "https://cloud.mosoo.ai/api/graphql",
     );
   });
 

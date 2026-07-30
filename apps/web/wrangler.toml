@@ -16,6 +16,10 @@ name = "mosoo-web-prod"
 workers_dev = false
 
 [[env.prod.routes]]
+pattern = "cloud.mosoo.ai"
+custom_domain = true
+
+[[env.prod.routes]]
 pattern = "try.mosoo.ai"
 custom_domain = true
 

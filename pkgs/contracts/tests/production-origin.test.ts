@@ -5,6 +5,8 @@ import {
   MOSOO_CONSOLE_HOST,
   MOSOO_CONSOLE_ORIGIN,
   MOSOO_GOOGLE_OAUTH_CALLBACK_URL,
+  MOSOO_LEGACY_CONSOLE_HOST,
+  MOSOO_LEGACY_PRODUCTION_API_ROUTE_PATTERN,
   MOSOO_MARKETING_HOST,
   MOSOO_PRODUCTION_API_ROUTE_PATTERN,
 } from "@mosoo/contracts/origin";
@@ -20,9 +22,11 @@ describe("production origins", () => {
 
     expect(apiWrangler).toContain(`WEB_ORIGIN = "${MOSOO_CONSOLE_ORIGIN}"`);
     expect(apiWrangler).toContain(`pattern = "${MOSOO_PRODUCTION_API_ROUTE_PATTERN}"`);
+    expect(apiWrangler).toContain(`pattern = "${MOSOO_LEGACY_PRODUCTION_API_ROUTE_PATTERN}"`);
     expect(apiWrangler).toContain('"GOOGLE_OAUTH_CLIENT_ID"');
     expect(apiWrangler).toContain('"GOOGLE_OAUTH_CLIENT_SECRET"');
     expect(webWrangler).toContain(`pattern = "${MOSOO_CONSOLE_HOST}"`);
+    expect(webWrangler).toContain(`pattern = "${MOSOO_LEGACY_CONSOLE_HOST}"`);
     expect(webWrangler).not.toContain(`pattern = "${MOSOO_MARKETING_HOST}"`);
   });
 
