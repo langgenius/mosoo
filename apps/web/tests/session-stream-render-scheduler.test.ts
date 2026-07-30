@@ -333,6 +333,27 @@ describe("session stream render scheduler", () => {
     expect(batchText(chunks)).toBe(text);
   });
 
+  test("delivers user chunks atomically instead of pacing the server echo", () => {
+    const manual = createManualHost();
+    const batches: AgUiSessionEvent[][] = [];
+    const scheduler = new SessionStreamRenderScheduler((_sessionId, events) => {
+      batches.push(events);
+      return true;
+    }, manual.host);
+    const event = {
+      delta: "用户发送的内容",
+      messageId: "message-user",
+      role: "user",
+      type: "TEXT_MESSAGE_CHUNK",
+    } as const satisfies AgUiSessionEvent;
+
+    scheduler.enqueue("session-1", event);
+    manual.fireFrame();
+
+    expect(batches).toEqual([[event]]);
+    expect(drainFrames(manual)).toBe(0);
+  });
+
   test("flushNow delivers the paced remainder exactly once", () => {
     const manual = createManualHost();
     const batches: AgUiSessionEvent[][] = [];

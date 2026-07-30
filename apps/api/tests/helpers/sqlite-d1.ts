@@ -5,10 +5,14 @@ import { getAppDatabase } from "../../src/platform/db/drizzle";
 
 type RawOptions = { columnNames?: boolean } | undefined;
 
+const statementQueries = new WeakMap<D1PreparedStatement, string>();
+
 export class SqliteD1Database implements D1Database {
   readonly #database = new Database(":memory:");
+  readonly #maxBoundParams: number | undefined;
 
-  constructor(input: { foreignKeys?: boolean } = {}) {
+  constructor(input: { foreignKeys?: boolean; maxBoundParams?: number } = {}) {
+    this.#maxBoundParams = input.maxBoundParams;
     this.#database.run(`PRAGMA foreign_keys = ${input.foreignKeys === false ? "OFF" : "ON"}`);
   }
 
@@ -17,7 +21,7 @@ export class SqliteD1Database implements D1Database {
   }
 
   prepare(query: string): D1PreparedStatement {
-    return createSqliteD1Statement(this.#database, query);
+    return createSqliteD1Statement(this.#database, query, [], this.#maxBoundParams);
   }
 
   app(): AppDatabase {
@@ -30,7 +34,11 @@ export class SqliteD1Database implements D1Database {
 
     try {
       for (const statement of statements) {
-        results.push((await statement.run<T>()) as D1Result<T>);
+        const query = statementQueries.get(statement) ?? "";
+        const returnsRows = /^\s*(select|with)\b/i.test(query) || /\breturning\b/i.test(query);
+        results.push(
+          returnsRows ? await statement.all<T>() : ((await statement.run<T>()) as D1Result<T>),
+        );
       }
       this.#database.run("COMMIT");
       return results;
@@ -62,13 +70,20 @@ function createSqliteD1Statement(
   database: Database,
   query: string,
   values: readonly unknown[] = [],
+  maxBoundParams?: number,
 ): D1PreparedStatement {
-  return {
+  const statement: D1PreparedStatement = {
     all: async <T = unknown>() => {
       const results = database.query(query).all(...values) as T[];
       return { meta: createD1Meta(), results, success: true };
     },
-    bind: (...nextValues: unknown[]) => createSqliteD1Statement(database, query, nextValues),
+    bind: (...nextValues: unknown[]) => {
+      if (maxBoundParams !== undefined && nextValues.length > maxBoundParams) {
+        throw new Error(`too many SQL variables: ${nextValues.length} > ${maxBoundParams}`);
+      }
+
+      return createSqliteD1Statement(database, query, nextValues, maxBoundParams);
+    },
     first: async <T = unknown>(colName?: string) => {
       const row = (database.query(query).get(...values) as Record<string, unknown> | null) ?? null;
 
@@ -83,11 +98,11 @@ function createSqliteD1Statement(
       return row as T;
     },
     raw: async <T = unknown[]>(options?: RawOptions) => {
-      const statement = database.query(query);
-      const rows = statement.values(...values) as T[];
+      const sqliteStatement = database.query(query);
+      const rows = sqliteStatement.values(...values) as T[];
 
       if (options?.columnNames === true) {
-        return [statement.columnNames as T, ...rows];
+        return [sqliteStatement.columnNames as T, ...rows];
       }
 
       return rows;
@@ -101,6 +116,9 @@ function createSqliteD1Statement(
       };
     },
   };
+
+  statementQueries.set(statement, query);
+  return statement;
 }
 
 function createD1Meta(overrides: Partial<D1Meta> = {}): D1Meta {
