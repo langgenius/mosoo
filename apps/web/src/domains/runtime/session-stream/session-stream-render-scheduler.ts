@@ -70,8 +70,15 @@ const segmentGraphemes = createGraphemeSegmenter();
 // Only visible streaming text is paced. Tool-call args and lifecycle events
 // pass through so pacing never delays structural updates, and reasoning-chunk /
 // thinking deltas are live-state reducer no-ops not worth throttling.
-function getPaceableTextDelta(event: AgUiSessionEvent): string | null {
+function getPaceableTextDelta(
+  event: AgUiSessionEvent,
+  messageRole: "assistant" | "user" | undefined,
+): string | null {
   if (event.type === "REASONING_MESSAGE_CONTENT" || event.type === "TEXT_MESSAGE_CONTENT") {
+    if (event.type === "TEXT_MESSAGE_CONTENT" && messageRole === "user") {
+      return null;
+    }
+
     return event.delta.length > 0 ? event.delta : null;
   }
 
@@ -150,6 +157,7 @@ export class SessionStreamRenderScheduler {
   #frameHandle: number | null = null;
   readonly #host: SessionStreamRenderSchedulerHost;
   #lastDrainAt: number | null = null;
+  readonly #messageRoles = new Map<string, "assistant" | "user">();
   #pacingCarry = 0;
   #queue: QueuedSessionEvent[] = [];
   #queueOffset = 0;
@@ -168,6 +176,7 @@ export class SessionStreamRenderScheduler {
     this.#queue = [];
     this.#queueOffset = 0;
     this.#lastDrainAt = null;
+    this.#messageRoles.clear();
     this.#pacingCarry = 0;
   }
 
@@ -181,7 +190,23 @@ export class SessionStreamRenderScheduler {
     }
 
     for (const event of events) {
+      const messageKey =
+        "messageId" in event && typeof event.messageId === "string"
+          ? `${sessionId}\0${event.messageId}`
+          : null;
+
+      if (
+        event.type === "TEXT_MESSAGE_START" &&
+        (event.role === "assistant" || event.role === "user")
+      ) {
+        this.#messageRoles.set(`${sessionId}\0${event.messageId}`, event.role);
+      }
+
       this.#queue.push(this.#toQueueItem(sessionId, event));
+
+      if (event.type === "TEXT_MESSAGE_END" && messageKey !== null) {
+        this.#messageRoles.delete(messageKey);
+      }
     }
 
     this.#schedule();
@@ -411,7 +436,11 @@ export class SessionStreamRenderScheduler {
   }
 
   #toQueueItem(sessionId: string, event: AgUiSessionEvent): QueuedSessionEvent {
-    const delta = getPaceableTextDelta(event);
+    const messageRole =
+      "messageId" in event && typeof event.messageId === "string"
+        ? this.#messageRoles.get(`${sessionId}\0${event.messageId}`)
+        : undefined;
+    const delta = getPaceableTextDelta(event, messageRole);
 
     return {
       event,

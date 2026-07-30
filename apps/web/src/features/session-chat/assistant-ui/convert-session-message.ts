@@ -109,9 +109,16 @@ function sessionSegmentsToParts(segments: readonly SessionViewSegment[]): Assist
 // keeps assistant-ui's per-message memo + keys aligned with the live stream.
 // Permission/needs_approval is intentionally NOT folded here (this conversion is
 // identity-cached and permissionRequests live in a separate array).
-export function convertSessionMessage(message: SessionViewMessage): ThreadMessageLike {
+export function convertSessionMessage(
+  message: SessionViewMessage,
+  messageIndex?: number,
+): ThreadMessageLike {
   if (message.role === "user") {
-    return { role: "user", id: message.id, content: message.content };
+    // The optimistic message and its server echo have different source ids but
+    // occupy the same append-only transcript slot. Keep the UI id stable so
+    // assistant-ui updates the bubble instead of deleting and remounting it.
+    const id = messageIndex === undefined ? message.id : `user:${messageIndex}`;
+    return { role: "user", id, content: message.content };
   }
 
   const parts = sessionSegmentsToParts(message.segments);
