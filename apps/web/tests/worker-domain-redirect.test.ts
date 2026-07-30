@@ -20,3 +20,14 @@ test("redirects the legacy console host without losing the path or query", async
   expect(response.headers.get("location")).toBe("https://cloud.mosoo.ai/apps/demo?source=bookmark");
   expect(fetchedAsset).toBe(false);
 });
+
+test("redirects plaintext requests for the canonical console host", async () => {
+  const response = await worker.fetch(new Request("http://cloud.mosoo.ai/settings?tab=profile"), {
+    ASSETS: {
+      fetch: () => Promise.resolve(new Response(null, { status: 404 })),
+    },
+  });
+
+  expect(response.status).toBe(308);
+  expect(response.headers.get("location")).toBe("https://cloud.mosoo.ai/settings?tab=profile");
+});
