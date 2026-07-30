@@ -22,7 +22,7 @@ describe("runtime subject network constraints", () => {
           environmentAllowedHosts: ["api.example.com"],
           networkPolicy: "full",
         },
-        requestUrl: "https://try.mosoo.ai/api/session",
+        requestUrl: "https://cloud.mosoo.ai/api/session",
         subjectKind: "agent",
       }),
     ).toEqual({ allowedHosts: [], networkPolicy: "full" });
@@ -34,11 +34,11 @@ describe("runtime subject network constraints", () => {
         envVars: {},
         kind: "cattle",
         network: LIMITED_NETWORK,
-        requestUrl: "https://try.mosoo.ai/api/session",
+        requestUrl: "https://cloud.mosoo.ai/api/session",
         subjectKind: "session",
       }),
     ).toEqual({
-      allowedHosts: ["api.example.com", "mcp.linear.app", "try.mosoo.ai"],
+      allowedHosts: ["api.example.com", "cloud.mosoo.ai", "mcp.linear.app"],
       networkPolicy: "limited",
     });
   });
@@ -54,15 +54,15 @@ describe("runtime subject network constraints", () => {
           envVars: {},
           kind: "cattle",
           network: LIMITED_NETWORK,
-          requestUrl: "https://try.mosoo.ai/api/session",
+          requestUrl: "https://cloud.mosoo.ai/api/session",
           subjectKind: "session",
         },
       ).allowedHosts,
     ).toEqual([
       "abc123.r2.cloudflarestorage.com",
       "api.example.com",
+      "cloud.mosoo.ai",
       "mcp.linear.app",
-      "try.mosoo.ai",
     ]);
   });
 
@@ -78,7 +78,7 @@ describe("runtime subject network constraints", () => {
           envVars: {},
           kind: "cattle",
           network: { ...LIMITED_NETWORK, environmentAllowedHosts: [] },
-          requestUrl: "https://try.mosoo.ai/api/session",
+          requestUrl: "https://cloud.mosoo.ai/api/session",
           subjectKind: "session",
         },
       ).allowedHosts,
@@ -103,7 +103,7 @@ describe("runtime subject network constraints", () => {
         envVars: {},
         kind: "pet",
         network: LIMITED_NETWORK,
-        requestUrl: "https://try.mosoo.ai/api/session",
+        requestUrl: "https://cloud.mosoo.ai/api/session",
         subjectKind: "agent",
       }),
     ).toThrow("only for Task Agents");
@@ -118,7 +118,7 @@ describe("runtime subject network constraints", () => {
         },
         kind: "cattle",
         network: LIMITED_NETWORK,
-        requestUrl: "https://try.mosoo.ai/api/session",
+        requestUrl: "https://cloud.mosoo.ai/api/session",
         subjectKind: "session",
       }),
     ).toThrow("HTTPS_PROXY, http_proxy");

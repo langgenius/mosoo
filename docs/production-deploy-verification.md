@@ -220,6 +220,24 @@ The workflow uses one `production` concurrency group and never cancels an
 in-progress release because D1 migration, queue updates, and Worker publication
 are not transactional.
 
+### First `cloud.mosoo.ai` Release
+
+Complete these one-time prerequisites before releasing the domain migration:
+
+- Attach `cloud.mosoo.ai` as an additional Custom Domain on the
+  `mosoo-web-prod` Worker and wait for its DNS record and certificate to become
+  active. The normal deploy publishes the API Worker first, and its
+  `cloud.mosoo.ai/api/*` route requires that hostname to exist already.
+- Add `https://cloud.mosoo.ai/api/auth/callback/google` to the Google OAuth
+  client. Keep the old callback during the compatibility window.
+- Expect existing browser sessions to sign in again because host-scoped cookies
+  do not move between subdomains.
+
+Keep the `try.mosoo.ai` Web Custom Domain and API route during the compatibility
+window. Web requests redirect to the new host; `/api/*` continues to execute on
+the API Worker so existing CLI credentials and webhook URLs do not cross a
+redirect boundary.
+
 For a manual release, run the real deploy only after all simulation steps above
 pass.
 
@@ -259,11 +277,14 @@ provider failure, repeat Steps 6-7 (build and dry-run) manually, then rerun
 After a real production deploy, verify the public surface:
 
 ```bash
-curl https://try.mosoo.ai/
-curl https://try.mosoo.ai/api/health
-curl https://try.mosoo.ai/api/graphql \
+curl https://cloud.mosoo.ai/
+curl https://cloud.mosoo.ai/api/health
+curl https://cloud.mosoo.ai/api/graphql \
   -H 'content-type: application/json' \
   --data '{"query":"query { __typename }"}'
+curl --head --max-redirs 0 \
+  'https://try.mosoo.ai/domain-migration-check?source=runbook'
+curl https://try.mosoo.ai/api/health
 ```
 
 Acceptance:
@@ -271,6 +292,9 @@ Acceptance:
 - `/` returns HTTP 200.
 - `/api/health` returns HTTP 200 and `{"name":"mosoo","ok":true}`.
 - `/api/graphql` returns HTTP 200 and `{"data":{"__typename":"Query"}}`.
+- The old Web URL returns HTTP 308 with the same path and query on
+  `https://cloud.mosoo.ai`.
+- The old `/api/health` URL returns HTTP 200 without redirecting.
 - If local HTTPS probes resolve through the local TUN/fake-IP path, keep
   `--interface en0` and `--resolve` in the smoke commands.
 

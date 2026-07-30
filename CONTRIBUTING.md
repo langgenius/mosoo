@@ -20,7 +20,7 @@ This repository is a monorepo:
 | Path                   | Description                                                                                                                     |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/api`             | Cloudflare Worker API with GraphQL, auth, sessions, channels, runtime control plane, and D1/R2/DO bindings.                     |
-| `apps/web`             | React console app built with Vite Plus and deployed as Cloudflare Worker assets on `try.mosoo.ai`.                              |
+| `apps/web`             | React console app built with Vite Plus and deployed as Cloudflare Worker assets on `cloud.mosoo.ai`.                              |
 | `apps/driver`          | Agent Driver bundle used by API Worker / Sandbox paths.                                                                         |
 | `pkgs/contracts`       | Cross-boundary TypeScript contracts and parser surfaces; cross app / package DTOs should go here first.                         |
 | `pkgs/db`              | Drizzle schema and its append-only D1 migration chain.                                                                          |
@@ -407,7 +407,7 @@ and `just deploy-web` publish directly. The API deploy applies pending remote D1
 migrations as its first remote action (see
 [Database And Migrations](#database-and-migrations)).
 
-API production config lives in `apps/api/wrangler.toml`; web production config lives in `apps/web/wrangler.toml`. Cloudflare routes send `try.mosoo.ai/api/*` to the API Worker and `try.mosoo.ai/*` to the console Web Worker. The public landing page and blog on `mosoo.ai/*` are owned by `langgenius/mosoo-website`.
+API production config lives in `apps/api/wrangler.toml`; web production config lives in `apps/web/wrangler.toml`. Cloudflare routes send `cloud.mosoo.ai/api/*` to the API Worker and `cloud.mosoo.ai/*` to the console Web Worker. The legacy console host redirects Web traffic to `cloud.mosoo.ai` but keeps `try.mosoo.ai/api/*` as a direct compatibility route. The public landing page and blog on `mosoo.ai/*` are owned by `langgenius/mosoo-website`.
 
 Do not deploy production directly from an unreviewed local branch.
 
