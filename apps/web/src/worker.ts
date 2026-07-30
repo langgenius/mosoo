@@ -18,7 +18,10 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.hostname === MOSOO_LEGACY_CONSOLE_HOST) {
+    if (
+      url.hostname === MOSOO_LEGACY_CONSOLE_HOST ||
+      (url.hostname === MOSOO_CONSOLE_HOST && url.protocol === "http:")
+    ) {
       url.protocol = "https:";
       url.hostname = MOSOO_CONSOLE_HOST;
       return Response.redirect(url.toString(), 308);
