@@ -25,6 +25,8 @@ import { DriverInstanceRpcEventIngestionController } from "../src/modules/runtim
 import { RuntimeSessionViewCache } from "../src/modules/runtime/infrastructure/driver-instance/runtime-session-view-cache";
 import { recordDriverInstanceCompletion } from "../src/modules/runtime/infrastructure/driver-instance/terminal-driver-events";
 import { loadSessionViewerState } from "../src/modules/sessions/application/session-live-state.service";
+import { createSessionProcessEventsFromSessionEventRows } from "../src/modules/sessions/application/session-process-events.service";
+import type { SessionEventProcessRow } from "../src/modules/sessions/application/session-process-events.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
@@ -296,6 +298,71 @@ async function pushFreshController(
 }
 
 describe("runtime final output ingestion", () => {
+  test.each([
+    ["omits", false],
+    ["provides", true],
+  ] as const)(
+    "persists one final assistant snapshot when the driver %s it",
+    async (_driverBehavior, driverProvidesSnapshot) => {
+      const database = await createPublicHttpContractDatabase();
+      await insertRuntimeFixture(database);
+      const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+      const finalText = "The final answer.";
+      const fragmentTexts = ["The ", "final ", "answer."];
+      const finalMessageId = createPlatformId<SessionMessageId>();
+      const events = [
+        ...fragmentTexts.flatMap((text, index) =>
+          messageEvents({
+            messageId: createPlatformId<SessionMessageId>(),
+            sourcePrefix: `fractured:${index + 1}`,
+            text,
+          }),
+        ),
+        ...(driverProvidesSnapshot
+          ? [
+              runtimeEvent({
+                kind: "message.added",
+                payload: { content: finalText, messageId: finalMessageId, role: "agent" },
+                sourceEventId: "fractured:final-snapshot",
+              }),
+            ]
+          : []),
+        runtimeEvent({
+          kind: "run.completed",
+          payload: {
+            finalMessageId,
+            finalMessageText: finalText,
+            stopReason: "end_turn",
+          },
+          sourceEventId: "fractured:run-completed",
+        }),
+      ];
+
+      await pushFreshController(bindings, events);
+
+      const rows = await database
+        .prepare(
+          `SELECT content_text, ended_at, event_type, id, occurred_at, process_status,
+                process_type, run_id, seq, tokens
+         FROM session_event
+         WHERE session_id = ? AND run_id = ?
+         ORDER BY seq`,
+        )
+        .bind(SESSION_ID, RUN_ID)
+        .all<SessionEventProcessRow>();
+      const assistantMessages = createSessionProcessEventsFromSessionEventRows(rows.results).filter(
+        (event) => event.type === "agent.message.delta",
+      );
+
+      expect(
+        rows.results
+          .filter((row) => row.event_type === "message.added")
+          .map((row) => row.content_text),
+      ).toEqual([finalText]);
+      expect(assistantMessages.map((event) => event.content)).toEqual([finalText]);
+    },
+  );
+
   test("preserves a long final snapshot across hibernation, terminal failure, and replay", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertRuntimeFixture(database);
