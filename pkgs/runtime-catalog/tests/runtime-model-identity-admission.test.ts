@@ -15,9 +15,16 @@ import {
   VENDOR_ZHIPU,
   admitRuntimeModelIdentity,
   admitRuntimeModelIdentityForCatalog,
+  getPresetModel,
+  getPresetModelForIdentity,
+  getPublicRuntimeCatalogEntry,
+  getRuntimeCatalogEntry,
   getRuntimeDisplayColor,
   getRuntimeIconKey,
+  getVendor,
+  isPublicRuntimeCatalogEntry,
   listPlannedRuntimeDisplayEntries,
+  listPresetModelsForVendor,
   listRuntimeShowcaseDisplayEntries,
 } from "@mosoo/runtime-catalog";
 import type { RuntimeCatalogEntry } from "@mosoo/runtime-catalog";
@@ -290,6 +297,52 @@ describe("runtime catalog identity admission", () => {
     expect(listRuntimeShowcaseDisplayEntries()).toEqual(PUBLIC_RUNTIME_DISPLAY_CATALOG);
     expect(getRuntimeIconKey("acp-fallback")).toBe("opencode");
     expect(getRuntimeDisplayColor("openai-runtime")).toBe("#7A9DFF");
+  });
+
+  test("resolves catalog entries and preset models through helper APIs", () => {
+    const openAiRuntime = getRuntimeCatalogEntry("openai-runtime");
+    const publicOpenAiRuntime = getPublicRuntimeCatalogEntry("openai-runtime");
+    const openAiModels = PRESET_MODEL_CATALOG.filter(
+      (model) => model.vendorId === VENDOR_OPENAI.vendorId,
+    );
+    const listedOpenAiModels = listPresetModelsForVendor(VENDOR_OPENAI.vendorId);
+    const defaultModel = getPresetModel({
+      modelId: OPENAI_DEFAULT_MODEL_ID,
+      vendorId: VENDOR_OPENAI.vendorId,
+    });
+    const identityModel = getPresetModelForIdentity(
+      createRuntimeModelIdentity({
+        modelId: OPENAI_DEFAULT_MODEL_ID,
+        provider: {
+          kind: "preset",
+          providerId: VENDOR_OPENAI.vendorId,
+        },
+        runtimeId: "openai-runtime",
+      }),
+    );
+
+    expect(openAiRuntime).toBe(
+      RUNTIME_CATALOG.find((entry) => entry.runtimeId === "openai-runtime"),
+    );
+    expect(publicOpenAiRuntime).toBe(openAiRuntime);
+    expect(getRuntimeCatalogEntry("missing-runtime")).toBeNull();
+    expect(getPublicRuntimeCatalogEntry(SYSTEM_AGENT_RUNTIME_ID)).toBeNull();
+    expect(isPublicRuntimeCatalogEntry("openai-runtime")).toBe(true);
+    expect(isPublicRuntimeCatalogEntry(SYSTEM_AGENT_RUNTIME_ID)).toBe(false);
+    expect(getVendor(VENDOR_OPENAI.vendorId)).toBe(VENDOR_OPENAI);
+    expect(getVendor("missing-vendor")).toBeNull();
+    expect(listedOpenAiModels).toEqual(openAiModels);
+    expect(listedOpenAiModels).not.toBe(listPresetModelsForVendor(VENDOR_OPENAI.vendorId));
+    expect(defaultModel).toBe(
+      openAiModels.find((model) => model.modelId === OPENAI_DEFAULT_MODEL_ID),
+    );
+    expect(identityModel).toBe(defaultModel);
+    expect(
+      getPresetModel({
+        modelId: "missing-model",
+        vendorId: VENDOR_OPENAI.vendorId,
+      }),
+    ).toBeNull();
   });
 
   test("keeps mosoo Zhipu identity while rendering OpenCode with the Z.ai provider id", () => {

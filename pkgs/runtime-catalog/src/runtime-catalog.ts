@@ -251,8 +251,65 @@ function runtimeCatalogCapability(input: {
   };
 }
 
+function indexFirstBy<T>(
+  values: readonly T[],
+  keyOf: (value: T) => string,
+): ReadonlyMap<string, T> {
+  const indexed = new Map<string, T>();
+
+  for (const value of values) {
+    const key = keyOf(value);
+
+    if (!indexed.has(key)) {
+      indexed.set(key, value);
+    }
+  }
+
+  return indexed;
+}
+
+function groupPresetModelsByVendor(
+  models: readonly PresetModelEntry[],
+): ReadonlyMap<string, readonly PresetModelEntry[]> {
+  const grouped = new Map<string, PresetModelEntry[]>();
+
+  for (const model of models) {
+    const vendorModels = grouped.get(model.vendorId);
+
+    if (vendorModels === undefined) {
+      grouped.set(model.vendorId, [model]);
+      continue;
+    }
+
+    vendorModels.push(model);
+  }
+
+  return grouped;
+}
+
+function indexPresetModelsByIdentity(
+  models: readonly PresetModelEntry[],
+): ReadonlyMap<string, ReadonlyMap<string, PresetModelEntry>> {
+  const indexed = new Map<string, Map<string, PresetModelEntry>>();
+
+  for (const model of models) {
+    let vendorModels = indexed.get(model.vendorId);
+
+    if (vendorModels === undefined) {
+      vendorModels = new Map<string, PresetModelEntry>();
+      indexed.set(model.vendorId, vendorModels);
+    }
+
+    if (!vendorModels.has(model.modelId)) {
+      vendorModels.set(model.modelId, model);
+    }
+  }
+
+  return indexed;
+}
+
 function requireVendor(vendorId: string): RuntimeCatalogVendor {
-  const vendor = ALL_VENDORS.find((candidate) => candidate.vendorId === vendorId);
+  const vendor = VENDORS_BY_ID.get(vendorId);
 
   if (vendor === undefined) {
     throw new Error(`Runtime catalog references unknown vendor ${vendorId}.`);
@@ -338,6 +395,8 @@ function toComingSoonRuntimeDisplayEntry(
 
 export const PRESET_MODEL_CATALOG: readonly PresetModelEntry[] =
   GENERATED_PRESET_MODEL_CATALOG.map(presetModel);
+const PRESET_MODELS_BY_VENDOR_ID = groupPresetModelsByVendor(PRESET_MODEL_CATALOG);
+const PRESET_MODEL_BY_VENDOR_AND_MODEL_ID = indexPresetModelsByIdentity(PRESET_MODEL_CATALOG);
 
 export const ANTHROPIC_DEFAULT_MODEL_ID = admitModelId(GENERATED_MODEL_DEFAULT_IDS.anthropic);
 export const DEEPSEEK_DEFAULT_MODEL_ID = admitModelId(GENERATED_MODEL_DEFAULT_IDS.deepseek);
@@ -345,6 +404,7 @@ export const OPENAI_DEFAULT_MODEL_ID = admitModelId(GENERATED_MODEL_DEFAULT_IDS.
 
 export const ALL_VENDORS: readonly RuntimeCatalogVendor[] =
   GENERATED_VENDOR_CATALOG.map(runtimeCatalogVendor);
+const VENDORS_BY_ID = indexFirstBy(ALL_VENDORS, (vendor) => vendor.vendorId);
 
 export const VENDOR_ANTHROPIC = requireVendor("anthropic");
 export const VENDOR_DEEPSEEK = requireVendor("deepseek");
@@ -364,11 +424,11 @@ export function listPresetModelsForProvider(provider: RuntimeModelProviderRef): 
     return [];
   }
 
-  return PRESET_MODEL_CATALOG.filter((entry) => entry.vendorId === provider.providerId);
+  return listPresetModelsForVendor(provider.providerId);
 }
 
 export function listPresetModelsForVendor(vendorId: string): PresetModelEntry[] {
-  return PRESET_MODEL_CATALOG.filter((entry) => entry.vendorId === vendorId);
+  return [...(PRESET_MODELS_BY_VENDOR_ID.get(vendorId) ?? [])];
 }
 
 export function getDefaultModelIdForVendor(vendorId: string): ModelId | null {
@@ -382,10 +442,8 @@ export function getPresetModelForIdentity(identity: RuntimeModelIdentity): Prese
   }
 
   return (
-    PRESET_MODEL_CATALOG.find(
-      (entry) =>
-        entry.vendorId === identity.provider.providerId && entry.modelId === identity.modelId,
-    ) ?? null
+    PRESET_MODEL_BY_VENDOR_AND_MODEL_ID.get(identity.provider.providerId)?.get(identity.modelId) ??
+    null
   );
 }
 
@@ -393,11 +451,7 @@ export function getPresetModel(input: {
   readonly modelId: string;
   readonly vendorId: string;
 }): PresetModelEntry | null {
-  return (
-    PRESET_MODEL_CATALOG.find(
-      (entry) => entry.vendorId === input.vendorId && entry.modelId === input.modelId,
-    ) ?? null
-  );
+  return PRESET_MODEL_BY_VENDOR_AND_MODEL_ID.get(input.vendorId)?.get(input.modelId) ?? null;
 }
 
 export function createCatalogRuntimeModelIdentity(input: {
@@ -420,19 +474,24 @@ export function createCatalogRuntimeModelIdentity(input: {
 export const RUNTIME_CATALOG: readonly RuntimeCatalogEntry[] = GENERATED_RUNTIME_CATALOG.map(
   createGeneratedRuntimeCatalogEntry,
 );
+const RUNTIME_CATALOG_BY_ID = indexFirstBy(RUNTIME_CATALOG, (entry) => entry.runtimeId);
 
 export const PUBLIC_RUNTIME_CATALOG: readonly RuntimeCatalogEntry[] = RUNTIME_CATALOG.filter(
   (entry) => entry.visibility === "public",
+);
+const PUBLIC_RUNTIME_CATALOG_BY_ID = indexFirstBy(
+  PUBLIC_RUNTIME_CATALOG,
+  (entry) => entry.runtimeId,
+);
+const PUBLIC_VENDOR_IDS = new Set(
+  PUBLIC_RUNTIME_CATALOG.flatMap((entry) => entry.vendors.map((vendor) => vendor.vendorId)),
 );
 
 // Custom providers are created through the dedicated OpenAI-Compatible flow,
 // not rendered as a preset vendor card.
 export const PUBLIC_VENDORS: readonly RuntimeCatalogVendor[] = ALL_VENDORS.filter(
   (vendor) =>
-    vendor.vendorId !== VENDOR_OPENAI_COMPATIBLE.vendorId &&
-    PUBLIC_RUNTIME_CATALOG.some((entry) =>
-      entry.vendors.some((runtimeVendor) => runtimeVendor.vendorId === vendor.vendorId),
-    ),
+    vendor.vendorId !== VENDOR_OPENAI_COMPATIBLE.vendorId && PUBLIC_VENDOR_IDS.has(vendor.vendorId),
 );
 
 export const PLANNED_RUNTIME_DISPLAY_CATALOG: readonly PlannedRuntimeDisplayEntry[] = (
@@ -455,19 +514,19 @@ export function listRuntimeShowcaseDisplayEntries(): RuntimeDisplayCatalogEntry[
 }
 
 export function getRuntimeDisplayColor(runtimeId: string): string | null {
-  return RUNTIME_CATALOG.find((entry) => entry.runtimeId === runtimeId)?.display.color ?? null;
+  return RUNTIME_CATALOG_BY_ID.get(runtimeId)?.display.color ?? null;
 }
 
 export function getRuntimeCatalogEntry(runtimeId: string): RuntimeCatalogEntry | null {
-  return RUNTIME_CATALOG.find((candidate) => candidate.runtimeId === runtimeId) ?? null;
+  return RUNTIME_CATALOG_BY_ID.get(runtimeId) ?? null;
 }
 
 export function getPublicRuntimeCatalogEntry(runtimeId: string): RuntimeCatalogEntry | null {
-  return PUBLIC_RUNTIME_CATALOG.find((candidate) => candidate.runtimeId === runtimeId) ?? null;
+  return PUBLIC_RUNTIME_CATALOG_BY_ID.get(runtimeId) ?? null;
 }
 
 export function isPublicRuntimeCatalogEntry(runtimeId: string): boolean {
-  return PUBLIC_RUNTIME_CATALOG.some((entry) => entry.runtimeId === runtimeId);
+  return PUBLIC_RUNTIME_CATALOG_BY_ID.has(runtimeId);
 }
 
 export type RuntimeModelIdentityRejectionCode =
@@ -640,5 +699,5 @@ export function getRuntimeCatalogVendorForProvider(
 }
 
 export function getVendor(vendorId: string): RuntimeCatalogVendor | null {
-  return ALL_VENDORS.find((candidate) => candidate.vendorId === vendorId) ?? null;
+  return VENDORS_BY_ID.get(vendorId) ?? null;
 }
