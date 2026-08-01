@@ -23,7 +23,25 @@ When a bound capability is accepted, the Run records the App, Agent, Deployment,
 
 ## App Secrets
 
-An App owner can save, rotate, list by name, or revoke App-scoped deployment secrets through the Console and GraphQL API. Values are write-only: they are encrypted in the Vault, never returned by list/read surfaces, and never stored in `.mosoo.toml`, Deployment plans, generated Wrangler configuration, build Sandbox state, logs, or API responses.
+An App owner can save, rotate, list by name, or revoke App-scoped deployment secrets through the Console, generated CLI, and GraphQL API. Values are write-only: they are encrypted in the Vault, never returned by list/read surfaces, and never stored in `.mosoo.toml`, Deployment plans, generated Wrangler configuration, build Sandbox state, logs, or API responses.
+
+The CLI implementation lives in `mosoo-connector`, where Lathe generates `mosoo console` commands from this repository's Console GraphQL schema. The mosoo-side contract is therefore the GraphQL fields and their stable generated command paths:
+
+- `mosoo console apps app-deployment-secret-list --app-id <app-id>`
+- `mosoo console apps set-app-deployment-secret --file app-secret.json -o json`
+- `mosoo console apps delete-app-deployment-secret --input-app-id <app-id> --input-name MOSOO_API_TOKEN`
+
+Use a JSON body file or stdin for `set-app-deployment-secret` so values do not appear directly in shell history:
+
+```json
+{
+  "input": {
+    "appId": "<app-id>",
+    "name": "MOSOO_API_TOKEN",
+    "value": "<secret-value>"
+  }
+}
+```
 
 A Worker repository declares only the required names:
 

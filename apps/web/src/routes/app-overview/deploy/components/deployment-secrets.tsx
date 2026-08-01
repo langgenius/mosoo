@@ -1,6 +1,6 @@
 import type { AppDeploymentSecret } from "@mosoo/contracts/app";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Loader2, Trash2 } from "lucide-react";
+import { KeyRound, Loader2, Terminal, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 
@@ -11,7 +11,15 @@ import {
 } from "@/domains/app/api/app-deployment-client";
 import { toAppId } from "@/routes/typed-id";
 import { Button } from "@/shared/ui/button";
+import { CommandBlock } from "@/shared/ui/command-block";
 import { Input } from "@/shared/ui/input";
+
+import {
+  APP_DEPLOYMENT_SECRET_EXAMPLE_NAME,
+  deleteAppDeploymentSecretCommand,
+  listAppDeploymentSecretsCommand,
+  setAppDeploymentSecretCommand,
+} from "./deployment-secret-commands";
 
 function secretQueryKey(appId: string) {
   return ["app-deployment-secrets", appId] as const;
@@ -85,6 +93,7 @@ export function DeploymentSecrets({ appId }: { appId: string }) {
       await queryClient.invalidateQueries({ queryKey: secretQueryKey(appId) });
     },
   });
+  const exampleSecretName = secretsQuery.data?.[0]?.name ?? APP_DEPLOYMENT_SECRET_EXAMPLE_NAME;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -176,6 +185,36 @@ export function DeploymentSecrets({ appId }: { appId: string }) {
           </Button>
         </form>
         {formError === null ? null : <p className="text-destructive text-[13px]">{formError}</p>}
+        <div className="border-brand/25 bg-brand-light rounded-lg border px-4 py-3.5">
+          <div className="flex items-center gap-2">
+            <Terminal className="text-brand size-4 shrink-0" />
+            <h3 className="text-fg-1 text-[13px] font-semibold">
+              Manage App secrets from your terminal
+            </h3>
+          </div>
+          <p className="text-fg-2 mt-1.5 text-[12.5px] leading-relaxed">
+            The generated <code>mosoo console</code> commands use the same App-scoped secret API.
+            Values stay write-only; use a JSON body file so they stay out of shell history.
+          </p>
+          <div className="mt-2.5 grid gap-2">
+            <CommandBlock
+              className="bg-white"
+              command={listAppDeploymentSecretsCommand(appId)}
+              copyLabel="Copy list secrets command"
+            />
+            <CommandBlock
+              className="bg-white"
+              command={setAppDeploymentSecretCommand(appId, exampleSecretName)}
+              copyLabel="Copy set secret command"
+              multiline
+            />
+            <CommandBlock
+              className="bg-white"
+              command={deleteAppDeploymentSecretCommand(appId, exampleSecretName)}
+              copyLabel="Copy delete secret command"
+            />
+          </div>
+        </div>
       </div>
     </section>
   );
