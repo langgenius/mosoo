@@ -28,7 +28,7 @@
     "@mosoo/runtime-events": "workspace:*",
     "@mosoo/session-policy": "workspace:*",
     "@mosoo/skill-package": "workspace:*",
-    "@orpc/server": "^1.14.3",
+    "@orpc/server": "^1.14.13",
     "arktype": "^2.2.0",
     "better-auth": "1.6.25",
     "cloudflare": "7.0.0",
@@ -38,7 +38,7 @@
     "graphql-yoga": "^5.21.0",
     "hono": "^4.12.32",
     "jsonc-parser": "3.3.1",
-    "smol-toml": "1.7.0",
+    "smol-toml": "1.7.1",
     "xstate": "^5.32.0"
   },
   "devDependencies": {
