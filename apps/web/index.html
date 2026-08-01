@@ -18,19 +18,6 @@
     <meta property="og:site_name" content="mosoo" />
     <meta name="twitter:card" content="summary" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <!-- Preload the primary UI font so it streams in parallel with the CSS/JS
-         instead of being discovered only after the stylesheet parses. Geist is
-         the body + heading face (--font-sans) painted on every page's first
-         view; the file is small (~29 KB) and self-hosted, so this shrinks the
-         font-swap window without competing for bandwidth on the critical path.
-         Only Geist is preloaded — Inter is a fallback and far larger. -->
-    <link
-      rel="preload"
-      href="/fonts/Geist-Variable.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin="anonymous"
-    />
     <title>mosoo</title>
     <!-- Set html lang attribute early based on stored locale preference.
          Falls back to navigator.language. Runs before React mounts so the
