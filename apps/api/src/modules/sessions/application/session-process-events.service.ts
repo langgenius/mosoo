@@ -57,9 +57,7 @@ function normalizeProcessEventLimit(limit: number | null | undefined): number {
 function finalizeProcessEventDurations(
   projections: ProcessEventProjection[],
 ): SessionProcessEvent[] {
-  const sortedProjections = projections.toSorted(
-    (a, b) => a.startMs - b.startMs || a.order - b.order,
-  );
+  const sortedProjections = readChronologicalProcessEventProjections(projections);
 
   return sortedProjections.map((projection, index) => {
     const next = sortedProjections[index + 1] ?? null;
@@ -80,6 +78,32 @@ function finalizeProcessEventDurations(
       type: projection.event.type,
     };
   });
+}
+
+function compareProcessEventProjections(
+  left: ProcessEventProjection,
+  right: ProcessEventProjection,
+): number {
+  return left.startMs - right.startMs || left.order - right.order;
+}
+
+function readChronologicalProcessEventProjections(
+  projections: ProcessEventProjection[],
+): ProcessEventProjection[] {
+  for (let index = 1; index < projections.length; index += 1) {
+    const previous = projections[index - 1];
+    const current = projections[index];
+
+    if (
+      previous !== undefined &&
+      current !== undefined &&
+      compareProcessEventProjections(previous, current) > 0
+    ) {
+      return projections.toSorted(compareProcessEventProjections);
+    }
+  }
+
+  return projections;
 }
 
 function toProcessEventProjectionFromSessionEventRow(

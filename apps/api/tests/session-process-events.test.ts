@@ -10,9 +10,14 @@ import type {
   SessionRuntimeEventVisibility,
 } from "@mosoo/contracts/session";
 import { parsePlatformId } from "@mosoo/id";
+import type { RuntimeEventId, SessionRunId } from "@mosoo/id";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
-import { getThreadSessionProcessEvents } from "../src/modules/sessions/application/session-process-events.service";
+import {
+  createSessionProcessEventsFromSessionEventRows,
+  getThreadSessionProcessEvents,
+} from "../src/modules/sessions/application/session-process-events.service";
+import type { SessionEventProcessRow } from "../src/modules/sessions/application/session-process-events.service";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
 const ORGANIZATION_ID = "01J00000000000000000000006";
@@ -243,6 +248,29 @@ async function insertSessionProcessEvent(
     .run();
 }
 
+function sessionProcessRow(input: {
+  content: string;
+  eventType?: string;
+  id: string;
+  occurredAt: number;
+  processType: SessionProcessEventType;
+  runId?: string | null;
+  seq: number;
+}): SessionEventProcessRow {
+  return {
+    content_text: input.content,
+    ended_at: input.occurredAt,
+    event_type: input.eventType ?? input.processType,
+    id: input.id as RuntimeEventId,
+    occurred_at: input.occurredAt,
+    process_status: "available",
+    process_type: input.processType,
+    run_id: (input.runId ?? null) as SessionRunId | null,
+    seq: input.seq,
+    tokens: null,
+  };
+}
+
 describe("session process event projection", () => {
   test("rejects invalid process event limits", async () => {
     await expect(
@@ -282,6 +310,31 @@ describe("session process event projection", () => {
     );
 
     expect(events.map((event) => event.type)).toEqual(["run.started"]);
+  });
+
+  test("keeps defensive chronological projection for unsorted rows", () => {
+    const events = createSessionProcessEventsFromSessionEventRows(
+      [
+        sessionProcessRow({
+          content: "second",
+          id: "event-2",
+          occurredAt: 2000,
+          processType: "run.completed",
+          seq: 2,
+        }),
+        sessionProcessRow({
+          content: "first",
+          id: "event-1",
+          occurredAt: 1000,
+          processType: "run.started",
+          seq: 1,
+        }),
+      ],
+      { foldStreamedRows: false },
+    );
+
+    expect(events.map((event) => event.id)).toEqual(["event-1", "event-2"]);
+    expect(events.map((event) => event.durationMs)).toEqual([1000, 0]);
   });
 
   test("folds persisted assistant message fragments into one process event", async () => {
