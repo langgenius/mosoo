@@ -4,11 +4,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { captureProductEvent, PRODUCT_ANALYTICS_EVENTS } from "@/analytics/product-analytics";
 
-import { authClient } from "../../domains/auth/api/auth-client";
-import {
-  shouldUseMosooAiDevelopmentBackdoor,
-  signInWithMosooAiDevelopmentBackdoor,
-} from "../../domains/auth/mosoo-ai-development-backdoor";
 import { userKeys } from "../../domains/user/query/user-queries";
 import {
   decodeAuthError,
@@ -111,6 +106,7 @@ export function useLoginFlow(): LoginFlow {
     setError(null);
     captureProductEvent(PRODUCT_ANALYTICS_EVENTS.loginStarted, { method: "google" });
 
+    const { authClient } = await import("../../domains/auth/api/auth-client");
     const result = await authClient["signIn"].social({
       callbackURL: redirectPath,
       errorCallbackURL: loginErrorCallbackUrl,
@@ -135,12 +131,15 @@ export function useLoginFlow(): LoginFlow {
     captureProductEvent(PRODUCT_ANALYTICS_EVENTS.loginStarted, { method: "email_otp" });
 
     try {
+      const { shouldUseMosooAiDevelopmentBackdoor, signInWithMosooAiDevelopmentBackdoor } =
+        await import("../../domains/auth/mosoo-ai-development-backdoor");
       if (shouldUseMosooAiDevelopmentBackdoor(normalizedEmail)) {
         await signInWithMosooAiDevelopmentBackdoor(normalizedEmail);
         await finishSuccessfulLogin();
         return;
       }
 
+      const { authClient } = await import("../../domains/auth/api/auth-client");
       const result = await authClient["emailOtp"].sendVerificationOtp({
         email: normalizedEmail,
         type: "sign-in",
@@ -173,6 +172,7 @@ export function useLoginFlow(): LoginFlow {
 
     try {
       const normalizedEmail = email.trim();
+      const { authClient } = await import("../../domains/auth/api/auth-client");
       const result = await authClient["signIn"].emailOtp({
         email: normalizedEmail,
         name: deriveNameFromEmail(normalizedEmail),

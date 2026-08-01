@@ -18,7 +18,37 @@ function DeferredLoginDoodles(): ReactElement | null {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    let idleId: number | null = null;
+    let timeoutId: number | null = null;
+
+    const reveal = () => {
+      if (typeof window.requestIdleCallback === "function") {
+        idleId = window.requestIdleCallback(() => {
+          setMounted(true);
+        });
+        return;
+      }
+
+      timeoutId = window.setTimeout(() => {
+        setMounted(true);
+      }, 250);
+    };
+
+    if (document.readyState === "complete") {
+      timeoutId = window.setTimeout(reveal, 0);
+    } else {
+      window.addEventListener("load", reveal, { once: true });
+    }
+
+    return () => {
+      window.removeEventListener("load", reveal);
+      if (idleId !== null) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
   }, []);
 
   if (!mounted) {
