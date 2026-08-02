@@ -1,6 +1,6 @@
 import type { AppId, SessionId } from "@mosoo/contracts/id";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { createAgentSession, sendAgentSessionEvents } from "@/domains/session/api/agent-session";
 import {
@@ -36,6 +36,10 @@ export function useThreadActions({
 }) {
   const queryClient = useQueryClient();
   const [actionError, setActionError] = useState<string | null>(null);
+  const threadsById = useMemo(
+    () => new Map(allThreads.map((thread) => [thread.id, thread])),
+    [allThreads],
+  );
   const createMutation = useMutation({
     mutationFn: async (input: NewThreadSubmitInput) => {
       if (activeAppId === null) {
@@ -156,7 +160,7 @@ export function useThreadActions({
 
   const togglePinnedThread = useCallback(
     async (threadId: string): Promise<void> => {
-      const thread = allThreads.find((candidate) => candidate.id === threadId) ?? null;
+      const thread = threadsById.get(threadId) ?? null;
 
       if (thread === null) {
         return;
@@ -169,12 +173,12 @@ export function useThreadActions({
         setActionError(getMutationErrorMessage(error, "Failed to update pinned state."));
       }
     },
-    [allThreads, togglePinnedThreadLocal],
+    [threadsById, togglePinnedThreadLocal],
   );
 
   const archiveThread = useCallback(
     async (threadId: string): Promise<void> => {
-      const thread = allThreads.find((candidate) => candidate.id === threadId) ?? null;
+      const thread = threadsById.get(threadId) ?? null;
 
       try {
         if (thread === null) {
@@ -190,7 +194,7 @@ export function useThreadActions({
         setActionError(getMutationErrorMessage(error, "Failed to archive thread."));
       }
     },
-    [allThreads, archiveMutation],
+    [threadsById, archiveMutation],
   );
 
   const deleteThread = useCallback(
@@ -201,7 +205,7 @@ export function useThreadActions({
       }
 
       try {
-        const thread = allThreads.find((candidate) => candidate.id === threadId) ?? null;
+        const thread = threadsById.get(threadId) ?? null;
 
         if (thread === null) {
           throw new Error("Thread not found.");
@@ -220,7 +224,7 @@ export function useThreadActions({
         setActionError(getMutationErrorMessage(error, "Failed to delete thread."));
       }
     },
-    [activeThreadId, allThreads, deleteMutation, navigateToList],
+    [activeThreadId, threadsById, deleteMutation, navigateToList],
   );
 
   const sendFollowUp = useCallback(
