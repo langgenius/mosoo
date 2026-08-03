@@ -94,7 +94,7 @@ If setup fails, start with the focused recipe: submodule issues use `git submodu
 
 ## Example: Build a Codex Agent API
 
-[Codex Pet](./examples/use-cases/codex-pet.md) shows a published mosoo Agent integrated into an existing product backend through the Thread API. The same API can expose Agents backed by Claude Agent SDK or OpenCode.
+[Codex Pet](https://mosoo.ai/en/use-cases/codex-pet) shows a published mosoo Agent integrated into an existing product backend through the Thread API. The same API can expose Agents backed by Claude Agent SDK or OpenCode.
 
 https://github.com/user-attachments/assets/4a4bbaab-c192-4462-99e0-020eab966fff
 
