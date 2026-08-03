@@ -591,7 +591,7 @@ describe("app deployment service", () => {
     expect(deploymentAfterPointerDrift?.latestRun?.id).toBe(run.id);
   });
 
-  test("stores, rotates, and revokes App deployment secrets without exposing their values", async () => {
+  test("stores, rotates, and deletes App deployment secrets without exposing their values", async () => {
     const database = createDatabase();
     const { bindings } = createBindings(database);
 
@@ -791,13 +791,138 @@ describe("app deployment service", () => {
     expect(runRows.map((row) => row.planJson).join("\n")).not.toContain("rotated-worker-secret");
   });
 
+  test("submits the value rotated while the deployment build is running", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    const submittedSecrets: Record<string, string>[] = [];
+    const runner: AppDeploymentBuildRunner = {
+      async build() {
+        await setAppDeploymentSecret(bindings, VIEWER, {
+          appId: APP_ID,
+          name: "MOSOO_API_TOKEN",
+          value: "rotated-during-build",
+        });
+      },
+      async deploy({ secretVars }) {
+        submittedSecrets.push(secretVars);
+        return {
+          externalDeploymentId: "worker-deployment-1",
+          externalProjectId: null,
+          externalVersionId: "worker-version-1",
+          url: `https://app-${APP_ID.toLowerCase()}.apps.localhost`,
+        };
+      },
+      async prepare() {
+        return {
+          repoDir: "/repo",
+          snapshot: {
+            files: {
+              ".mosoo.toml": [
+                'type = "worker"',
+                "",
+                "[worker]",
+                'entry = "src/index.js"',
+                "",
+                "[secrets]",
+                'required = ["MOSOO_API_TOKEN"]',
+              ].join("\n"),
+            },
+          },
+        };
+      },
+    };
+    await setAppDeploymentSecret(bindings, VIEWER, {
+      appId: APP_ID,
+      name: "MOSOO_API_TOKEN",
+      value: "value-before-build",
+    });
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      { runner },
+    );
+
+    expect(submittedSecrets).toEqual([{ MOSOO_API_TOKEN: "rotated-during-build" }]);
+  });
+
+  test("does not submit a secret deleted while the deployment build is running", async () => {
+    const database = createDatabase();
+    const { bindings } = createBindings(database);
+    let deployCalled = false;
+    const runner: AppDeploymentBuildRunner = {
+      async build() {
+        await deleteAppDeploymentSecret(bindings, VIEWER, {
+          appId: APP_ID,
+          name: "MOSOO_API_TOKEN",
+        });
+      },
+      async deploy() {
+        deployCalled = true;
+        return {
+          externalDeploymentId: "worker-deployment-1",
+          externalProjectId: null,
+          externalVersionId: "worker-version-1",
+          url: `https://app-${APP_ID.toLowerCase()}.apps.localhost`,
+        };
+      },
+      async prepare() {
+        return {
+          repoDir: "/repo",
+          snapshot: {
+            files: {
+              ".mosoo.toml": [
+                'type = "worker"',
+                "",
+                "[worker]",
+                'entry = "src/index.js"',
+                "",
+                "[secrets]",
+                'required = ["MOSOO_API_TOKEN"]',
+              ].join("\n"),
+            },
+          },
+        };
+      },
+    };
+    await setAppDeploymentSecret(bindings, VIEWER, {
+      appId: APP_ID,
+      name: "MOSOO_API_TOKEN",
+      value: "value-before-build",
+    });
+    const run = await deployApp(
+      bindings,
+      VIEWER,
+      { appId: APP_ID, repoUrl: "https://github.com/samzong/awire" },
+      { fetch: githubFetch, nowMs: () => NOW_MS },
+    );
+
+    await dispatchAppDeploymentRun(
+      bindings as ApiBindings,
+      { appDeploymentRunId: run.id },
+      { runner },
+    );
+
+    await expect(getAppDeploymentStatus(bindings, VIEWER, APP_ID)).resolves.toMatchObject({
+      errorCode: "deployment_required_secret_missing",
+      status: "failed",
+    });
+    expect(deployCalled).toBe(false);
+  });
+
   test("removes App deployment secrets after managed Worker cleanup", async () => {
     const database = createDatabase();
     const { bindings } = createBindings(database);
     await setAppDeploymentSecret(bindings, VIEWER, {
       appId: APP_ID,
       name: "MOSOO_API_TOKEN",
-      value: "secret-to-revoke",
+      value: "secret-to-delete",
     });
     await deployApp(
       bindings,

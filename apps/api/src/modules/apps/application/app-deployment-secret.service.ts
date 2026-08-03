@@ -231,8 +231,40 @@ export async function deleteAppDeploymentSecretsForApp(
 }
 
 /**
+ * Checks that every manifest-declared name still has an App-owned secret
+ * without decrypting a value before the Worker submission boundary.
+ */
+export async function assertAppDeploymentSecretNamesAvailable(
+  bindings: Pick<ApiBindings, "DB">,
+  input: { appId: AppId; names: readonly string[] },
+): Promise<void> {
+  const names = [...new Set(input.names)];
+
+  if (names.length === 0) {
+    return;
+  }
+
+  const rows = await getAppDatabase(bindings.DB)
+    .select({ name: appDeploymentSecretsTable.name })
+    .from(appDeploymentSecretsTable)
+    .where(
+      and(
+        eq(appDeploymentSecretsTable.appId, input.appId),
+        inArray(appDeploymentSecretsTable.name, names),
+      ),
+    )
+    .all();
+  const configuredNames = new Set(rows.map((row) => row.name));
+  const missing = names.filter((name) => !configuredNames.has(name));
+
+  if (missing.length > 0) {
+    throw new AppDeploymentSecretResolutionError(missing);
+  }
+}
+
+/**
  * Resolve only names declared in the repository manifest. Values are returned
- * directly to the Cloudflare upload boundary and must never enter a plan,
+ * at the final Cloudflare upload boundary and must never enter a plan,
  * generated Wrangler config, build sandbox, log, or API response.
  */
 export async function resolveAppDeploymentSecretValues(
