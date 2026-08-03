@@ -4,7 +4,7 @@ import type { PlatformId } from "@mosoo/id";
 import { eq, inArray } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
-import { getAppDatabase } from "../../../platform/db/drizzle";
+import { getAppDatabase, getD1ChangeCount } from "../../../platform/db/drizzle";
 import { fromBase64, toArrayBuffer, toBase64 } from "../../../shared/bytes";
 import { isTruthy } from "../../../shared/truthiness";
 import { currentTimestampMs } from "../../../time";
@@ -104,7 +104,7 @@ async function decryptSecretPayload(
 
 export async function storeSecret(
   database: D1Database,
-  bindings: ApiBindings,
+  bindings: VaultSecretBindings,
   input: { kind: string; value: string },
 ): Promise<PlatformId> {
   const id = createPlatformId();
@@ -162,6 +162,34 @@ export async function readSecretOutcome(
   }
 
   return { status: "found", value: await decryptSecretPayload(requireVaultSecret(bindings), row) };
+}
+
+/**
+ * Re-encrypt an existing secret in place. Keeping the Vault record identity
+ * stable lets an owning resource rotate its value without a window where its
+ * metadata points at a deleted or orphaned secret.
+ */
+export async function replaceSecret(
+  database: D1Database,
+  bindings: VaultSecretBindings,
+  input: { secretId: string; value: string },
+): Promise<void> {
+  const encrypted = await encryptSecretPayload(requireVaultSecret(bindings), input.value);
+  const result = await getAppDatabase(database)
+    .update(vaultSecretsTable)
+    .set({
+      ciphertext: encrypted.ciphertext,
+      ciphertextIv: encrypted.ciphertextIv,
+      updatedAt: currentTimestampMs(),
+      wrappedDek: encrypted.wrappedDek,
+      wrappedDekIv: encrypted.wrappedDekIv,
+    })
+    .where(eq(vaultSecretsTable.id, readVaultSecretId(input.secretId)))
+    .run();
+
+  if (getD1ChangeCount(result) === 0) {
+    throw new Error("Vault secret could not be found for replacement.");
+  }
 }
 
 export async function deleteSecret(

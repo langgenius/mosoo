@@ -115,11 +115,14 @@ export const appGraphQLSpec = {
   mutationFields: [
     "createApp(input: CreateAppInput!): App!",
     "deleteAppDeployment(input: DeleteAppDeploymentInput!): OperationResult!",
+    "deleteAppDeploymentSecret(input: DeleteAppDeploymentSecretInput!): OperationResult!",
     "deployApp(input: DeployAppInput!): AppDeploymentRun!",
     "renameApp(input: RenameAppInput!): App!",
+    "setAppDeploymentSecret(input: SetAppDeploymentSecretInput!): AppDeploymentSecret!",
   ],
   queryFields: [
     "appDeploymentRunList(appId: ULID!, limit: Int): [AppDeploymentRun!]!",
+    "appDeploymentSecretList(appId: ULID!): [AppDeploymentSecret!]!",
     "appDeploymentStatus(appId: ULID!): AppDeploymentRun",
     "appList(organizationId: ULID!): [App!]!",
     "appOverview(appId: ULID!, agentLimit: Int, credentialLimit: Int): AppOverview!",

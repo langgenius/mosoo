@@ -36,6 +36,11 @@ import {
   detectAppDeploymentPlan,
 } from "./app-deployment-detector";
 import type { AppDeploymentPlan, AppDeploymentRepositorySnapshot } from "./app-deployment-detector";
+import {
+  AppDeploymentSecretResolutionError,
+  assertAppDeploymentSecretNamesAvailable,
+  resolveAppDeploymentSecretValues,
+} from "./app-deployment-secret.service";
 
 interface AppDeploymentDispatchContext {
   deployment: AppDeploymentRow;
@@ -66,6 +71,7 @@ export interface AppDeploymentBuildRunner {
     plan: AppDeploymentPlan;
     prepared: PreparedAppDeploymentRepository;
     run: AppDeploymentRunRow;
+    secretVars: Record<string, string>;
   }): Promise<AppDeploymentDeployResult>;
   prepare(input: {
     deployment: AppDeploymentRow;
@@ -650,6 +656,7 @@ class SandboxAppDeploymentBuildRunner implements AppDeploymentBuildRunner {
     plan: AppDeploymentPlan;
     prepared: PreparedAppDeploymentRepository;
     run: AppDeploymentRunRow;
+    secretVars: Record<string, string>;
   }): Promise<AppDeploymentDeployResult> {
     const buildSandbox = this.#requireBuildSandbox();
     const buildWorkDir = this.#requireBuildWorkDir();
@@ -756,6 +763,7 @@ class SandboxAppDeploymentBuildRunner implements AppDeploymentBuildRunner {
     const worker = await this.#cloudflareClient.deployWorkerModule({
       compatibilityDate: APP_DEPLOYMENT_COMPATIBILITY_DATE,
       mainModuleName,
+      secrets: input.secretVars,
       scriptContent,
       scriptName: targetName,
       vars: input.envVars,
@@ -911,11 +919,13 @@ export async function dispatchAppDeploymentRun(
       return;
     }
 
-    let envVars: Record<string, string>;
     try {
-      envVars = await resolveDeploymentEnvVars(bindings, context.deployment, context.run, plan);
+      await assertAppDeploymentSecretNamesAvailable(bindings, {
+        appId: context.deployment.appId,
+        names: plan.secretNames,
+      });
     } catch (error) {
-      if (error instanceof AppAgentBindingResolutionError) {
+      if (error instanceof AppDeploymentSecretResolutionError) {
         await failDeploymentRunIfActive({
           database: bindings.DB,
           errorCode: error.code,
@@ -955,8 +965,34 @@ export async function dispatchAppDeploymentRun(
       return;
     }
 
+    let envVars: Record<string, string>;
+    let secretVars: Record<string, string>;
+    try {
+      [envVars, secretVars] = await Promise.all([
+        resolveDeploymentEnvVars(bindings, context.deployment, context.run, plan),
+        resolveAppDeploymentSecretValues(bindings, {
+          appId: context.deployment.appId,
+          names: plan.secretNames,
+        }),
+      ]);
+    } catch (error) {
+      if (
+        error instanceof AppAgentBindingResolutionError ||
+        error instanceof AppDeploymentSecretResolutionError
+      ) {
+        await failDeploymentRunIfActive({
+          database: bindings.DB,
+          errorCode: error.code,
+          errorMessage: error.message,
+          runId: context.run.id,
+        });
+        return;
+      }
+      throw error;
+    }
+
     externallyAttemptedDeployment = context.deployment;
-    const result = await runner.deploy({ ...context, envVars, plan, prepared });
+    const result = await runner.deploy({ ...context, envVars, plan, prepared, secretVars });
 
     if (!(await updateRunStatus(bindings.DB, input.appDeploymentRunId, "submitted"))) {
       await failDeploymentRunIfActive({

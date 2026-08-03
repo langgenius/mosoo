@@ -4,6 +4,11 @@ import type { OrganizationId, AppId } from "@mosoo/id";
 import type { GraphQLModule } from "../../../adapters/graphql/graphql-module";
 import { appGraphQLSpec } from "../../../adapters/graphql/graphql-module-specs";
 import {
+  deleteAppDeploymentSecret,
+  listAppDeploymentSecrets,
+  setAppDeploymentSecret,
+} from "../application/app-deployment-secret.service";
+import {
   deleteAppDeployment,
   deployApp,
   getAppDeploymentStatus,
@@ -49,8 +54,16 @@ interface DeleteAppDeploymentArgs {
   input: Parameters<typeof deleteAppDeployment>[2];
 }
 
+interface DeleteAppDeploymentSecretArgs {
+  input: Parameters<typeof deleteAppDeploymentSecret>[2];
+}
+
 interface RenameAppArgs {
   input: Parameters<typeof renameApp>[2];
+}
+
+interface SetAppDeploymentSecretArgs {
+  input: Parameters<typeof setAppDeploymentSecret>[2];
 }
 
 function parseAppId(value: string): AppId {
@@ -64,14 +77,22 @@ export const appGraphQLModule = {
       createApp(context.bindings, context.viewer, args.input),
     deleteAppDeployment: async (_parent, args: DeleteAppDeploymentArgs, context) =>
       deleteAppDeployment(context.bindings, context.viewer, args.input),
+    deleteAppDeploymentSecret: async (_parent, args: DeleteAppDeploymentSecretArgs, context) => {
+      await deleteAppDeploymentSecret(context.bindings, context.viewer, args.input);
+      return { ok: true };
+    },
     deployApp: async (_parent, args: DeployAppArgs, context) =>
       deployApp(context.bindings, context.viewer, args.input),
     renameApp: async (_parent, args: RenameAppArgs, context) =>
       renameApp(context.bindings.DB, context.viewer, args.input),
+    setAppDeploymentSecret: async (_parent, args: SetAppDeploymentSecretArgs, context) =>
+      setAppDeploymentSecret(context.bindings, context.viewer, args.input),
   },
   authenticatedQueryResolvers: {
     appDeploymentRunList: async (_parent, args: AppDeploymentRunListArgs, context) =>
       listAppDeploymentRuns(context.bindings, context.viewer, parseAppId(args.appId), args.limit),
+    appDeploymentSecretList: async (_parent, args: { appId: string }, context) =>
+      listAppDeploymentSecrets(context.bindings, context.viewer, parseAppId(args.appId)),
     appDeploymentStatus: async (_parent, args: { appId: string }, context) =>
       getAppDeploymentStatus(context.bindings, context.viewer, parseAppId(args.appId)),
     appList: async (_parent, args: OrganizationIdArgs, context) =>

@@ -313,6 +313,11 @@ export type DeleteAppDeploymentInput = {
   appId: PlatformId;
 };
 
+export type DeleteAppDeploymentSecretInput = {
+  appId: PlatformId;
+  name: string;
+};
+
 export type DeleteEnvironmentInput = {
   appId: PlatformId;
   environmentId: PlatformId;
@@ -569,6 +574,12 @@ export type SessionType =
 export type SetAppDefaultEnvironmentInput = {
   appId: PlatformId;
   environmentId: PlatformId;
+};
+
+export type SetAppDeploymentSecretInput = {
+  appId: PlatformId;
+  name: string;
+  value: string;
 };
 
 export type SetDefaultVendorCredentialInput = {
@@ -902,6 +913,13 @@ export type AppDeploymentRunListQueryVariables = Exact<{
 
 export type AppDeploymentRunListQuery = { appDeploymentRunList: Array<{ appId: PlatformId, createdAt: string, deploymentId: PlatformId, errorCode: string | null, errorMessage: string | null, id: PlatformId, liveUrl: string | null, plannedUrl: string, sourceBranch: string, sourceCommitSha: string, status: AppDeploymentRunStatus, targetKind: AppDeploymentTargetKind | null, updatedAt: string }> };
 
+export type AppDeploymentSecretListQueryVariables = Exact<{
+  appId: PlatformId;
+}>;
+
+
+export type AppDeploymentSecretListQuery = { appDeploymentSecretList: Array<{ appId: PlatformId, createdAt: string, name: string, updatedAt: string }> };
+
 export type DeployAppMutationVariables = Exact<{
   input: DeployAppInput;
 }>;
@@ -915,6 +933,20 @@ export type DeleteAppDeploymentMutationVariables = Exact<{
 
 
 export type DeleteAppDeploymentMutation = { deleteAppDeployment: { ok: boolean } };
+
+export type SetAppDeploymentSecretMutationVariables = Exact<{
+  input: SetAppDeploymentSecretInput;
+}>;
+
+
+export type SetAppDeploymentSecretMutation = { setAppDeploymentSecret: { appId: PlatformId, createdAt: string, name: string, updatedAt: string } };
+
+export type DeleteAppDeploymentSecretMutationVariables = Exact<{
+  input: DeleteAppDeploymentSecretInput;
+}>;
+
+
+export type DeleteAppDeploymentSecretMutation = { deleteAppDeploymentSecret: { ok: boolean } };
 
 type CostTotalsFields_CostAgentRow_Fragment = { activeUsers: number, cacheCreationTokens: number, cacheReadTokens: number, inputTokens: number, outputTokens: number, requestCount: number, totalCostUsd: number, unpricedRequestCount: number };
 
@@ -2701,6 +2733,16 @@ export const AppDeploymentRunListDocument = /*#__PURE__*/ new TypedDocumentStrin
   }
 }
     `) as unknown as TypedDocumentString<AppDeploymentRunListQuery, AppDeploymentRunListQueryVariables>;
+export const AppDeploymentSecretListDocument = /*#__PURE__*/ new TypedDocumentString(`
+    query AppDeploymentSecretList($appId: ULID!) {
+  appDeploymentSecretList(appId: $appId) {
+    appId
+    createdAt
+    name
+    updatedAt
+  }
+}
+    `) as unknown as TypedDocumentString<AppDeploymentSecretListQuery, AppDeploymentSecretListQueryVariables>;
 export const DeployAppDocument = /*#__PURE__*/ new TypedDocumentString(`
     mutation DeployApp($input: DeployAppInput!) {
   deployApp(input: $input) {
@@ -2727,6 +2769,23 @@ export const DeleteAppDeploymentDocument = /*#__PURE__*/ new TypedDocumentString
   }
 }
     `) as unknown as TypedDocumentString<DeleteAppDeploymentMutation, DeleteAppDeploymentMutationVariables>;
+export const SetAppDeploymentSecretDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation SetAppDeploymentSecret($input: SetAppDeploymentSecretInput!) {
+  setAppDeploymentSecret(input: $input) {
+    appId
+    createdAt
+    name
+    updatedAt
+  }
+}
+    `) as unknown as TypedDocumentString<SetAppDeploymentSecretMutation, SetAppDeploymentSecretMutationVariables>;
+export const DeleteAppDeploymentSecretDocument = /*#__PURE__*/ new TypedDocumentString(`
+    mutation DeleteAppDeploymentSecret($input: DeleteAppDeploymentSecretInput!) {
+  deleteAppDeploymentSecret(input: $input) {
+    ok
+  }
+}
+    `) as unknown as TypedDocumentString<DeleteAppDeploymentSecretMutation, DeleteAppDeploymentSecretMutationVariables>;
 export const AppCostCardDocument = /*#__PURE__*/ new TypedDocumentString(`
     query AppCostCard($appId: ULID!, $range: CostRange!, $runPurposes: [CostRunPurpose!]) {
   appCostCard(appId: $appId, range: $range, runPurposes: $runPurposes) {
