@@ -1,7 +1,27 @@
 import type { AccountId, EnvironmentId, EnvironmentRevisionId, AppId } from "../id/id.contract";
 
 export type EnvironmentNetworkPolicy = "full" | "limited";
-export type EnvironmentPackageManager = "apt" | "cargo" | "gem" | "go" | "npm" | "pip";
+
+export const ENVIRONMENT_PACKAGE_MANAGERS = ["apt", "cargo", "gem", "go", "npm", "pip"] as const;
+export type EnvironmentPackageManager = (typeof ENVIRONMENT_PACKAGE_MANAGERS)[number];
+
+export const WRITABLE_ENVIRONMENT_PACKAGE_MANAGERS = [
+  "npm",
+  "pip",
+] as const satisfies readonly EnvironmentPackageManager[];
+export type WritableEnvironmentPackageManager =
+  (typeof WRITABLE_ENVIRONMENT_PACKAGE_MANAGERS)[number];
+
+const WRITABLE_ENVIRONMENT_PACKAGE_MANAGER_SET = new Set<string>(
+  WRITABLE_ENVIRONMENT_PACKAGE_MANAGERS,
+);
+
+export function isWritableEnvironmentPackageManager(
+  manager: EnvironmentPackageManager,
+): manager is WritableEnvironmentPackageManager {
+  return WRITABLE_ENVIRONMENT_PACKAGE_MANAGER_SET.has(manager);
+}
+
 export type EnvironmentRegistryRole = "owner";
 
 export interface EnvironmentOwnerSummary {

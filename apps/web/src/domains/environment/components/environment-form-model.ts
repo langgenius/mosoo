@@ -1,3 +1,7 @@
+import {
+  isWritableEnvironmentPackageManager,
+  WRITABLE_ENVIRONMENT_PACKAGE_MANAGERS,
+} from "@mosoo/contracts/environment";
 import type {
   CreateEnvironmentInput,
   EnvironmentDetail,
@@ -38,10 +42,8 @@ export interface EnvironmentDraft {
   setupScript: string;
 }
 
-export const PACKAGE_MANAGERS = [
-  "npm",
-  "pip",
-] as const satisfies readonly EnvironmentPackageManager[];
+export const PACKAGE_MANAGERS = WRITABLE_ENVIRONMENT_PACKAGE_MANAGERS;
+const WRITABLE_PACKAGE_MANAGER_NAMES = WRITABLE_ENVIRONMENT_PACKAGE_MANAGERS.join(" or ");
 
 export const PACKAGE_MANAGER_LABELS: Record<EnvironmentPackageManager, string> = {
   apt: "apt",
@@ -56,6 +58,10 @@ export const NETWORK_POLICY_LABELS: Record<EnvironmentNetworkPolicy, string> = {
   full: "Full",
   limited: "Limited",
 };
+
+function unsupportedPackageManagerMessage(manager: EnvironmentPackageManager): string {
+  return `${PACKAGE_MANAGER_LABELS[manager]} is not supported by the current Driver runtime. Change it to ${WRITABLE_PACKAGE_MANAGER_NAMES}, or remove this row before saving.`;
+}
 
 export function createDraftId(): string {
   if ("randomUUID" in crypto) {
@@ -139,6 +145,10 @@ function parsePackages(rows: EditablePackageRow[]) {
       return trimmed ? [trimmed] : [];
     });
 
+    if (packages.length > 0 && !isWritableEnvironmentPackageManager(row.manager)) {
+      throw new Error(unsupportedPackageManagerMessage(row.manager));
+    }
+
     return packages.length > 0
       ? [
           {
@@ -157,12 +167,25 @@ function toEnvVarInputs(envVars: EditableEnvVar[]) {
   });
 }
 
-export function hasPackageManagerError(rows: EditablePackageRow[]): boolean {
-  return rows.some(
+export function getPackageManagerError(rows: EditablePackageRow[]): string | null {
+  const invalidRow = rows.find((row) => row.packagesText.trim() && !row.manager);
+
+  if (invalidRow) {
+    return "Choose a package manager for every package row.";
+  }
+
+  const unsupportedRow = rows.find(
     (row) =>
       row.packagesText.trim() &&
-      (row.manager === null || !PACKAGE_MANAGERS.some((manager) => manager === row.manager)),
+      row.manager !== null &&
+      !isWritableEnvironmentPackageManager(row.manager),
   );
+
+  if (unsupportedRow?.manager) {
+    return unsupportedPackageManagerMessage(unsupportedRow.manager);
+  }
+
+  return null;
 }
 
 export function toCreateEnvironmentInput(

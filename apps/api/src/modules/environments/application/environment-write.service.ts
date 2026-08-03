@@ -6,6 +6,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { getAppDatabase, runAppDatabaseBatch } from "../../../platform/db/drizzle";
 import {
+  assertWritableEnvironmentPackageManagers,
   buildStoredEnvVars,
   decryptEnvironmentVariables,
   serializeConfig,
@@ -22,6 +23,8 @@ export async function createRevision(
     timestampMs: number;
   },
 ): Promise<EnvironmentRevisionId> {
+  assertWritableEnvironmentPackageManagers(input.config.packages);
+
   const revisionId = createPlatformId<EnvironmentRevisionId>();
   const serialized = serializeConfig(input.config);
 
@@ -62,6 +65,8 @@ export async function createEnvironmentFromConfig(
     timestampMs: number;
   },
 ): Promise<EnvironmentId> {
+  assertWritableEnvironmentPackageManagers(input.config.packages);
+
   const environmentId = input.environmentId ?? createPlatformId<EnvironmentId>();
   const revisionId = createPlatformId<EnvironmentRevisionId>();
   const serialized = serializeConfig(input.config);

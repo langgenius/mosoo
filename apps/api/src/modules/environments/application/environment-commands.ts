@@ -22,7 +22,11 @@ import {
   ensureEnvironmentEditor,
   getEnvironmentRecordRow,
 } from "./environment-access.service";
-import { buildStoredEnvVars, normalizeEnvironmentMetadata } from "./environment-config";
+import {
+  assertWritableEnvironmentPackageManagers,
+  buildStoredEnvVars,
+  normalizeEnvironmentMetadata,
+} from "./environment-config";
 import {
   normalizeConfigForCreate,
   toConfig,
@@ -153,6 +157,8 @@ export async function setEnvironmentVariableValue(
   if (!beforeConfig.envVars.some((envVar) => envVar.key === key)) {
     throw new Error(`Environment variable ${key} is not configured on this Environment.`);
   }
+
+  assertWritableEnvironmentPackageManagers(beforeConfig.packages);
 
   const timestampMs = currentTimestampMs();
   const envVars = await buildStoredEnvVars(bindings, {
